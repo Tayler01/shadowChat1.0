@@ -10,6 +10,18 @@ interface AuthGuardProps {
 export function AuthGuard({ children }: AuthGuardProps) {
   const { user, loading, error } = useAuth();
 
+  // Debug auth state
+  React.useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('🔐 AuthGuard: Auth state', {
+        user: !!user,
+        loading,
+        error: error || 'none',
+        timestamp: new Date().toISOString()
+      });
+    }
+  }, [user, loading, error]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
