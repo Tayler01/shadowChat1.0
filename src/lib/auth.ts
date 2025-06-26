@@ -109,6 +109,9 @@ export const signIn = async ({ email, password }: SignInData) => {
 
       if (insertError) {
         console.error('Error creating user profile on sign in:', insertError)
+        // Sign out the user since profile creation failed
+        await supabase.auth.signOut()
+        throw new Error('Failed to create user profile')
       }
     } else {
       // Update user status to online if profile exists
