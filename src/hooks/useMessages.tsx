@@ -567,6 +567,8 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
   // Dev-only: Add test function to window for console testing
   useEffect(() => {
     if (import.meta.env.DEV) {
+      console.log('🧪 Setting up dev functions...');
+      
       const sendTestMessage = (content = "Hello from console! 🚀") => {
         console.log('🧪 Dev Test: Sending test message:', content);
         return value.sendMessage(content);
@@ -583,6 +585,14 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
       (globalThis as any).sendTestMessage = sendTestMessage;
       (globalThis as any).sendTestReaction = sendTestReaction;
       
+      // Also set them directly on the global scope
+      try {
+        eval('globalThis.sendTestMessage = sendTestMessage');
+        eval('globalThis.sendTestReaction = sendTestReaction');
+      } catch (e) {
+        console.warn('Could not set global functions via eval:', e);
+      }
+      
       console.log('🧪 Dev functions available:');
       console.log('  - window.sendTestMessage(content?) - Send a test message');
       console.log('  - window.sendTestReaction(messageId, emoji?) - Add a reaction');
@@ -593,12 +603,25 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
       console.log('🔍 Function check:', {
         windowSendTestMessage: typeof (window as any).sendTestMessage,
         globalSendTestMessage: typeof (globalThis as any).sendTestMessage,
-        directAccess: typeof sendTestMessage
+        directAccess: typeof sendTestMessage,
+        windowObject: window,
+        globalThisObject: globalThis
       });
+      
+      // Test immediate access
+      setTimeout(() => {
+        console.log('🔍 Delayed function check:', {
+          windowSendTestMessage: typeof (window as any).sendTestMessage,
+          globalSendTestMessage: typeof (globalThis as any).sendTestMessage,
+          canCallWindow: typeof (window as any).sendTestMessage === 'function',
+          canCallGlobal: typeof (globalThis as any).sendTestMessage === 'function'
+        });
+      }, 100);
     }
     
     return () => {
       if (import.meta.env.DEV) {
+        console.log('🧪 Cleaning up dev functions...');
         delete (window as any).sendTestMessage;
         delete (window as any).sendTestReaction;
         delete (globalThis as any).sendTestMessage;
