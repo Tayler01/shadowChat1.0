@@ -64,7 +64,12 @@ export function useAuth() {
             console.log('👤 User in auth change, getting profile...');
             const profile = await getCurrentUser();
             console.log('📝 Profile in auth change:', profile ? 'Profile loaded' : 'No profile');
-            setUser(profile);
+            if (profile) {
+              setUser(profile);
+            } else {
+              console.log('❌ Failed to get profile, keeping user as null');
+              setUser(null);
+            }
           } else {
             console.log('❌ No user in auth change');
             setUser(null);
