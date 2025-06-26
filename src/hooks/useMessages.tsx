@@ -6,6 +6,7 @@ import React, {
   useCallback
 } from 'react';
 import { supabase, Message } from '../lib/supabase';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
 
 interface MessagesContextValue {
@@ -65,18 +66,21 @@ function useProvideMessages(): MessagesContextValue {
     }
 
     console.log('🔄 Setting up real-time subscription for messages...');
-    
+
     // Use a static channel name to prevent duplicate subscriptions
     const channelName = 'public:messages';
-    
-    let channel = supabase
-      .channel(channelName, {
-        config: {
-          broadcast: { self: true },
-          presence: { key: user.id }
-        }
-      })
-      .on(
+
+    let channel: RealtimeChannel | null = null;
+
+    const subscribeToChannel = (): RealtimeChannel => {
+      const newChannel = supabase
+        .channel(channelName, {
+          config: {
+            broadcast: { self: true },
+            presence: { key: user.id }
+          }
+        })
+        .on(
         'postgres_changes',
         {
           event: 'INSERT',
@@ -186,22 +190,21 @@ function useProvideMessages(): MessagesContextValue {
         }
         if (status === 'CLOSED' || status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
           console.warn(`⚠️ Channel ${status}, resubscribing...`);
+          supabase.removeChannel(newChannel);
           setTimeout(() => {
-            supabase.removeChannel(channel);
-            channel = supabase.channel(channelName, {
-              config: {
-                broadcast: { self: true },
-                presence: { key: user.id }
-              }
-            });
-            channel.subscribe();
+            channel = subscribeToChannel();
           }, 1000);
         }
       });
 
+      return newChannel;
+    };
+
+    channel = subscribeToChannel();
+
     return () => {
       console.log('🔌 Cleaning up real-time subscription');
-      supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel);
     };
   }, [user]);
 
