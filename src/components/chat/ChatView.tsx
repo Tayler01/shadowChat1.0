@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Hash, Users, Pin } from 'lucide-react'
 import { useMessages } from '../../hooks/useMessages'
