@@ -211,7 +211,7 @@ export const ProfileView: React.FC = () => {
                   {profile.status_message && (
                     <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-lg">
                       <p className="text-gray-700 dark:text-gray-300">
-                        {profile.status_message}
+                        "{profile.status_message}"
                       </p>
                     </div>
                   )}
