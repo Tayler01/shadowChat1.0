@@ -32,8 +32,19 @@ export function useAuth() {
         }
       } catch (error) {
         console.error('Error getting initial session:', error);
-        setError(error instanceof Error ? error.message : 'Unknown error');
-        setUser(null);
+        
+        // Check if this is the specific "user not found" error from invalid JWT
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        if (errorMessage.includes('User from sub claim in JWT does not exist')) {
+          console.log('🧹 Invalid JWT detected, clearing session...');
+          // Clear the invalid session
+          await authSignOut();
+          setUser(null);
+          // Don't set this as an error since it's expected behavior
+        } else {
+          setError(errorMessage);
+          setUser(null);
+        }
       } finally {
         console.log('✅ Initial session check complete, setting loading to false');
         setLoading(false);
