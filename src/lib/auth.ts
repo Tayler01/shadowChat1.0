@@ -121,15 +121,6 @@ export const getCurrentUser = async () => {
   console.log('🔍 getCurrentUser called');
 
   try {
-    console.log('🔐 Refreshing session...');
-    // Explicitly refresh the session so getUser() has a valid access token
-    const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
-    if (refreshError) {
-      console.error('❌ Failed to refresh session:', refreshError)
-    } else {
-      console.log('✅ Session refreshed:', !!refreshData.session)
-    }
-
     console.log('🔐 Checking auth user...');
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
