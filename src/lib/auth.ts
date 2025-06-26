@@ -146,75 +146,14 @@ export const getCurrentUser = async () => {
         .from('users')
         .select('*')
         .eq('id', user.id)
-        .maybeSingle()
+        .single()
 
       console.log('📝 Profile query result:', { profile: !!profile, error: error?.code });
 
-      if (error) {
+      if (error && error.code === 'PGRST116') {
+        // Profile doesn't exist, create it
         console.error('Error fetching user profile:', error)
-        
-        // If profile doesn't exist, create it from auth user metadata
-        if (error.code === 'PGRST116' || !profile) {
-          console.log('Creating missing user profile...')
-          
-          const userData = {
-            id: user.id,
-            email: user.email!,
-            username: user.user_metadata?.username || user.email?.split('@')[0] || `user_${user.id.slice(0, 8)}`,
-            display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || 'User',
-            status: 'online'
-          };
-          
-          console.log('📝 Creating profile with data:', userData);
-          
-          const { error: insertError } = await supabase
-            .from('users')
-            .insert(userData)
-          
-          if (insertError) {
-            console.error('Error creating user profile:', insertError)
-            // If username conflict, try with a unique suffix
-            if (insertError.code === '23505') {
-              console.log('Username conflict, trying with unique suffix...');
-              userData.username = `${userData.username}_${Date.now()}`;
-              const { error: retryError } = await supabase
-                .from('users')
-                .insert(userData);
-              
-              if (retryError) {
-                console.error('Error creating user profile with unique username:', retryError);
-                return null;
-              }
-            } else {
-              return null;
-            }
-          }
-          
-          console.log('✅ Profile created, fetching...');
-          
-          // Fetch the newly created profile
-          const { data: newProfile, error: fetchError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', user.id)
-            .single()
-          
-          if (fetchError) {
-            console.error('Error fetching newly created profile:', fetchError);
-            return null
-          }
-          
-          console.log('✅ New profile fetched successfully');
-          
-          return newProfile
-        }
-        
-        return null
-      }
-
-      // Check if profile is null even without error
-      if (!profile) {
-        console.log('Profile is null, creating missing user profile...')
+        console.log('Creating missing user profile...')
         
         const userData = {
           id: user.id,
@@ -232,18 +171,22 @@ export const getCurrentUser = async () => {
         
         if (insertError) {
           console.error('Error creating user profile:', insertError)
-          // If username conflict, try with a unique suffix
+          // If user already exists (race condition), just fetch it
           if (insertError.code === '23505') {
-            console.log('Username conflict, trying with unique suffix...');
-            userData.username = `${userData.username}_${Date.now()}`;
-            const { error: retryError } = await supabase
+            console.log('Profile already exists (race condition), fetching existing profile...');
+            const { data: existingProfile, error: fetchError } = await supabase
               .from('users')
-              .insert(userData);
+              .select('*')
+              .eq('id', user.id)
+              .single()
             
-            if (retryError) {
-              console.error('Error creating user profile with unique username:', retryError);
+            if (fetchError) {
+              console.error('Error fetching existing profile:', fetchError);
               return null;
             }
+            
+            console.log('✅ Existing profile fetched successfully');
+            return existingProfile;
           } else {
             return null;
           }
@@ -264,9 +207,12 @@ export const getCurrentUser = async () => {
         }
         
         console.log('✅ New profile fetched successfully');
-        
         return newProfile
+      } else if (error) {
+        console.error('Unexpected error fetching profile:', error);
+        return null;
       }
+
       console.log('✅ Profile found and returned');
       return profile
     } catch (error) {

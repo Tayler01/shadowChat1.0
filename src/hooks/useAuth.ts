@@ -8,6 +8,7 @@ export function useAuth() {
   const [error, setError] = useState<string | null>(null);
   const initialLoadRef = useRef(false);
   const processingRef = useRef(false);
+  const profileCreationRef = useRef(false);
 
   useEffect(() => {
     // Get initial session
@@ -75,7 +76,7 @@ export function useAuth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         // Skip if we're still doing initial load or already processing
-        if (!initialLoadRef.current || processingRef.current) {
+        if (!initialLoadRef.current || processingRef.current || profileCreationRef.current) {
           console.log('⏭️ Skipping auth change during initial load or processing');
           return;
         }
@@ -87,8 +88,10 @@ export function useAuth() {
           if (event === 'SIGNED_OUT') {
             console.log('👋 User signed out');
             setUser(null);
+            profileCreationRef.current = false;
           } else if (session?.user) {
             console.log('👤 User in auth change, getting profile...');
+            profileCreationRef.current = true;
             const profile = await getCurrentUser();
             console.log('📝 Profile in auth change:', profile ? 'Profile loaded' : 'No profile');
             if (profile) {
@@ -97,6 +100,7 @@ export function useAuth() {
               console.log('❌ Failed to get profile, keeping user as null');
               setUser(null);
             }
+            profileCreationRef.current = false;
           } else {
             console.log('❌ No user in auth change');
             setUser(null);
@@ -105,6 +109,7 @@ export function useAuth() {
           console.error('Error in auth state change:', error);
           setError(error instanceof Error ? error.message : 'Unknown error');
           setUser(null);
+          profileCreationRef.current = false;
         } finally {
           processingRef.current = false;
         }
