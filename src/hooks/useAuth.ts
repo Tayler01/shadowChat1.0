@@ -2,21 +2,26 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase, User, updateUserPresence } from '../lib/supabase';
 import { signIn as authSignIn, signUp as authSignUp, signOut as authSignOut, getCurrentUser, updateUserProfile } from '../lib/auth';
 
+// Global state to prevent multiple auth processes
+let globalAuthProcessing = false;
+let globalAuthPromise: Promise<any> | null = null;
+
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const initialLoadRef = useRef(false);
-  const processingRef = useRef(false);
-  const authChangeCountRef = useRef(0);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
+    
     // Get initial session
     const getInitialSession = async () => {
-      if (initialLoadRef.current || processingRef.current) return;
+      if (initialLoadRef.current || globalAuthProcessing) return;
       
       console.log('🔍 Getting initial session...');
-      processingRef.current = true;
+      globalAuthProcessing = true;
       
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -25,14 +30,16 @@ export function useAuth() {
         if (sessionError && sessionError.message?.includes('User from sub claim in JWT does not exist')) {
           console.log('🧹 Invalid JWT detected in getSession, clearing session...');
           await supabase.auth.signOut();
-          setUser(null);
+          if (mountedRef.current) setUser(null);
           return;
         }
         
         if (sessionError) {
           console.error('Session error:', sessionError);
-          setError(sessionError.message);
-          setUser(null);
+          if (mountedRef.current) {
+            setError(sessionError.message);
+            setUser(null);
+          }
           return;
         }
         
@@ -42,10 +49,12 @@ export function useAuth() {
           console.log('👤 User found in session, getting profile...');
           const profile = await getCurrentUser();
           console.log('📝 Profile result:', profile ? 'Profile loaded' : 'No profile');
-          setUser(profile);
+          if (mountedRef.current) {
+            setUser(profile);
+          }
         } else {
           console.log('❌ No user in session');
-          setUser(null);
+          if (mountedRef.current) setUser(null);
         }
       } catch (error) {
         console.error('Error getting initial session:', error);
@@ -56,17 +65,21 @@ export function useAuth() {
           console.log('🧹 Invalid JWT detected, clearing session...');
           // Clear the invalid session
           await authSignOut();
-          setUser(null);
+          if (mountedRef.current) setUser(null);
           // Don't set this as an error since it's expected behavior
         } else {
-          setError(errorMessage);
-          setUser(null);
+          if (mountedRef.current) {
+            setError(errorMessage);
+            setUser(null);
+          }
         }
       } finally {
         console.log('✅ Initial session check complete, setting loading to false');
-        setLoading(false);
+        if (mountedRef.current) {
+          setLoading(false);
+        }
         initialLoadRef.current = true;
-        processingRef.current = false;
+        globalAuthProcessing = false;
       }
     };
 
@@ -75,63 +88,65 @@ export function useAuth() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        // Skip if we're still doing initial load
-        if (!initialLoadRef.current) {
-          console.log('⏭️ Skipping auth change during initial load or processing');
+        // Skip if we're still doing initial load or component is unmounted
+        if (!initialLoadRef.current || !mountedRef.current) {
+          console.log('⏭️ Skipping auth change during initial load or unmounted');
           return;
         }
 
-        // Debounce rapid auth changes
-        authChangeCountRef.current += 1;
-        const currentCount = authChangeCountRef.current;
-        
-        // Wait a bit to see if more changes come in
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // If more changes came in, skip this one
-        if (currentCount !== authChangeCountRef.current) {
-          console.log('⏭️ Skipping auth change due to newer change');
+        // If already processing, wait for it to complete
+        if (globalAuthProcessing && globalAuthPromise) {
+          console.log('⏭️ Auth change already processing, waiting...');
+          await globalAuthPromise;
           return;
         }
         
-        // Skip if already processing
-        if (processingRef.current) {
-          console.log('⏭️ Skipping auth change - already processing');
+        // Skip if still processing after wait
+        if (globalAuthProcessing) {
+          console.log('⏭️ Skipping auth change - still processing');
           return;
         }
 
         console.log('🔄 Auth state change:', event);
-        processingRef.current = true;
+        globalAuthProcessing = true;
         
-        try {
+        globalAuthPromise = (async () => {
           if (event === 'SIGNED_OUT') {
             console.log('👋 User signed out');
-            setUser(null);
+            if (mountedRef.current) setUser(null);
           } else if (session?.user) {
             console.log('👤 User in auth change, getting profile...');
             const profile = await getCurrentUser();
             console.log('📝 Profile in auth change:', profile ? 'Profile loaded' : 'No profile');
             if (profile) {
-              setUser(profile);
+              if (mountedRef.current) setUser(profile);
             } else {
               console.log('❌ Failed to get profile, keeping user as null');
-              setUser(null);
+              if (mountedRef.current) setUser(null);
             }
           } else {
             console.log('❌ No user in auth change');
+            if (mountedRef.current) setUser(null);
+          }
+        })().catch(error => {
+          console.error('Error in auth state change:', error);
+          if (mountedRef.current) {
+            setError(error instanceof Error ? error.message : 'Unknown error');
             setUser(null);
           }
-        } catch (error) {
-          console.error('Error in auth state change:', error);
-          setError(error instanceof Error ? error.message : 'Unknown error');
-          setUser(null);
-        } finally {
-          processingRef.current = false;
-        }
+        }).finally(() => {
+          globalAuthProcessing = false;
+          globalAuthPromise = null;
+        });
+        
+        await globalAuthPromise;
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mountedRef.current = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   // Update presence periodically
