@@ -564,6 +564,21 @@ function useProvideMessages(): MessagesContextValue {
 export function MessagesProvider({ children }: { children: React.ReactNode }) {
   const value = useProvideMessages();
   
+  // Set a flag to indicate the provider is mounted
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      (window as any).__MESSAGES_PROVIDER_MOUNTED__ = true;
+      console.log('🏠 MessagesProvider mounted');
+    }
+    
+    return () => {
+      if (import.meta.env.DEV) {
+        (window as any).__MESSAGES_PROVIDER_MOUNTED__ = false;
+        console.log('🏠 MessagesProvider unmounted');
+      }
+    };
+  }, []);
+  
   // Dev-only: Add test function to window for console testing
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -579,19 +594,31 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
         return value.toggleReaction(messageId, emoji);
       };
       
-      // Assign to both window and globalThis for maximum compatibility
-      (window as any).sendTestMessage = sendTestMessage;
-      (window as any).sendTestReaction = sendTestReaction;
-      (globalThis as any).sendTestMessage = sendTestMessage;
-      (globalThis as any).sendTestReaction = sendTestReaction;
+      // Force assignment to window object
+      Object.defineProperty(window, 'sendTestMessage', {
+        value: sendTestMessage,
+        writable: true,
+        configurable: true
+      });
       
-      // Also set them directly on the global scope
-      try {
-        eval('globalThis.sendTestMessage = sendTestMessage');
-        eval('globalThis.sendTestReaction = sendTestReaction');
-      } catch (e) {
-        console.warn('Could not set global functions via eval:', e);
-      }
+      Object.defineProperty(window, 'sendTestReaction', {
+        value: sendTestReaction,
+        writable: true,
+        configurable: true
+      });
+      
+      // Also assign to globalThis
+      Object.defineProperty(globalThis, 'sendTestMessage', {
+        value: sendTestMessage,
+        writable: true,
+        configurable: true
+      });
+      
+      Object.defineProperty(globalThis, 'sendTestReaction', {
+        value: sendTestReaction,
+        writable: true,
+        configurable: true
+      });
       
       console.log('🧪 Dev functions available:');
       console.log('  - window.sendTestMessage(content?) - Send a test message');
@@ -603,9 +630,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
       console.log('🔍 Function check:', {
         windowSendTestMessage: typeof (window as any).sendTestMessage,
         globalSendTestMessage: typeof (globalThis as any).sendTestMessage,
-        directAccess: typeof sendTestMessage,
-        windowObject: window,
-        globalThisObject: globalThis
+        directAccess: typeof sendTestMessage
       });
       
       // Test immediate access
@@ -616,16 +641,32 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
           canCallWindow: typeof (window as any).sendTestMessage === 'function',
           canCallGlobal: typeof (globalThis as any).sendTestMessage === 'function'
         });
+        
+        // Try to call the function to verify it works
+        try {
+          console.log('🧪 Testing function call...');
+          if (typeof (window as any).sendTestMessage === 'function') {
+            console.log('✅ window.sendTestMessage is callable');
+          } else {
+            console.error('❌ window.sendTestMessage is not a function:', typeof (window as any).sendTestMessage);
+          }
+        } catch (e) {
+          console.error('❌ Error testing function:', e);
+        }
       }, 100);
     }
     
     return () => {
       if (import.meta.env.DEV) {
         console.log('🧪 Cleaning up dev functions...');
-        delete (window as any).sendTestMessage;
-        delete (window as any).sendTestReaction;
-        delete (globalThis as any).sendTestMessage;
-        delete (globalThis as any).sendTestReaction;
+        try {
+          delete (window as any).sendTestMessage;
+          delete (window as any).sendTestReaction;
+          delete (globalThis as any).sendTestMessage;
+          delete (globalThis as any).sendTestReaction;
+        } catch (e) {
+          console.warn('Error cleaning up dev functions:', e);
+        }
       }
     };
   }, [value.sendMessage, value.toggleReaction]);
