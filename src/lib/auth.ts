@@ -110,19 +110,53 @@ export const getCurrentUser = async () => {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  // Get the user profile from the users table
-  const { data: profile, error } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', user.id)
-    .maybeSingle()
+  try {
+    // Get the user profile from the users table
+    const { data: profile, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle()
 
-  if (error) {
-    console.error('Error fetching user profile:', error)
+    if (error) {
+      console.error('Error fetching user profile:', error)
+      
+      // If profile doesn't exist, create it from auth user metadata
+      if (error.code === 'PGRST116') {
+        console.log('Creating missing user profile...')
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert({
+            id: user.id,
+            email: user.email!,
+            username: user.user_metadata?.username || user.email?.split('@')[0] || 'user',
+            display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || 'User',
+            status: 'online'
+          })
+        
+        if (insertError) {
+          console.error('Error creating user profile:', insertError)
+          return null
+        }
+        
+        // Fetch the newly created profile
+        const { data: newProfile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', user.id)
+          .single()
+        
+        return newProfile
+      }
+      
+      return null
+    }
+
+    return profile
+  } catch (error) {
+    console.error('Unexpected error in getCurrentUser:', error)
     return null
   }
-
-  return profile
 }
 
 export const getUserProfile = async (userId: string) => {

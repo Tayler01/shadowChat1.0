@@ -9,11 +9,18 @@ export function useAuth() {
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        const profile = await getCurrentUser();
-        setUser(profile);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          const profile = await getCurrentUser();
+          setUser(profile);
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Error getting initial session:', error);
+        setUser(null);
       }
       
       setLoading(false);
@@ -24,10 +31,15 @@ export function useAuth() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (session?.user) {
-          const profile = await getCurrentUser();
-          setUser(profile);
-        } else {
+        try {
+          if (session?.user) {
+            const profile = await getCurrentUser();
+            setUser(profile);
+          } else {
+            setUser(null);
+          }
+        } catch (error) {
+          console.error('Error in auth state change:', error);
           setUser(null);
         }
         setLoading(false);
