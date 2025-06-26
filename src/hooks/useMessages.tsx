@@ -1,8 +1,27 @@
-import { useEffect, useState, useCallback } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback
+} from 'react';
 import { supabase, Message } from '../lib/supabase';
 import { useAuth } from './useAuth';
 
-export function useMessages() {
+interface MessagesContextValue {
+  messages: Message[];
+  loading: boolean;
+  sending: boolean;
+  sendMessage: (content: string, type?: 'text' | 'command') => Promise<void>;
+  editMessage: (id: string, content: string) => Promise<void>;
+  deleteMessage: (id: string) => Promise<void>;
+  toggleReaction: (id: string, emoji: string) => Promise<void>;
+  togglePin: (id: string) => Promise<void>;
+}
+
+const MessagesContext = createContext<MessagesContextValue | undefined>(undefined);
+
+function useProvideMessages(): MessagesContextValue {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -344,4 +363,19 @@ export function useMessages() {
     toggleReaction,
     togglePin,
   };
+}
+
+export function MessagesProvider({ children }: { children: React.ReactNode }) {
+  const value = useProvideMessages();
+  return (
+    <MessagesContext.Provider value={value}>{children}</MessagesContext.Provider>
+  );
+}
+
+export function useMessages() {
+  const context = useContext(MessagesContext);
+  if (!context) {
+    throw new Error('useMessages must be used within a MessagesProvider');
+  }
+  return context;
 }

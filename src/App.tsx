@@ -7,6 +7,7 @@ import { DirectMessagesView } from './components/dms/DirectMessagesView'
 import { ProfileView } from './components/profile/ProfileView'
 import { SettingsView } from './components/settings/SettingsView'
 import { useAuth } from './hooks/useAuth'
+import { MessagesProvider } from './hooks/useMessages'
 import { updateUserPresence } from './lib/supabase'
 
 type View = 'chat' | 'dms' | 'profile' | 'settings'
@@ -68,30 +69,32 @@ function App() {
 
   return (
     <AuthGuard>
-      <div className="h-screen flex bg-gray-100 dark:bg-gray-900">
-        <Sidebar
-          currentView={currentView}
-          onViewChange={setCurrentView}
-          isDarkMode={isDarkMode}
-          onToggleDarkMode={toggleDarkMode}
-        />
-        
-        <main className="flex-1 flex flex-col min-w-0">
-          {renderCurrentView()}
-        </main>
-        
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: isDarkMode ? '#374151' : '#ffffff',
-              color: isDarkMode ? '#f3f4f6' : '#111827',
-              border: isDarkMode ? '1px solid #4b5563' : '1px solid #e5e7eb',
-            },
-          }}
-        />
-      </div>
+      <MessagesProvider>
+        <div className="h-screen flex bg-gray-100 dark:bg-gray-900">
+          <Sidebar
+            currentView={currentView}
+            onViewChange={setCurrentView}
+            isDarkMode={isDarkMode}
+            onToggleDarkMode={toggleDarkMode}
+          />
+
+          <main className="flex-1 flex flex-col min-w-0">
+            {renderCurrentView()}
+          </main>
+
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: isDarkMode ? '#374151' : '#ffffff',
+                color: isDarkMode ? '#f3f4f6' : '#111827',
+                border: isDarkMode ? '1px solid #4b5563' : '1px solid #e5e7eb',
+              },
+            }}
+          />
+        </div>
+      </MessagesProvider>
     </AuthGuard>
   )
 }
