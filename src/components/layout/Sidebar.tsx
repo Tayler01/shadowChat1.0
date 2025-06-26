@@ -116,7 +116,9 @@ export function Sidebar({
                     src={conversation.other_user?.avatar_url}
                     alt={conversation.other_user?.full_name || 'User'}
                     size="sm"
+                    color={conversation.other_user?.color}
                     status={conversation.other_user?.status}
+                    showStatus
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
@@ -147,7 +149,9 @@ export function Sidebar({
             src={user?.avatar_url}
             alt={user?.full_name || 'You'}
             size="md"
+            color={user?.color}
             status={user?.status}
+            showStatus
           />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900 truncate">
