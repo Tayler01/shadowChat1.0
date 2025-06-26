@@ -18,7 +18,23 @@ export function useAuth() {
       processingRef.current = true;
       
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        // Handle the specific "user not found" error from invalid JWT
+        if (sessionError && sessionError.message?.includes('User from sub claim in JWT does not exist')) {
+          console.log('🧹 Invalid JWT detected in getSession, clearing session...');
+          await supabase.auth.signOut();
+          setUser(null);
+          return;
+        }
+        
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          setError(sessionError.message);
+          setUser(null);
+          return;
+        }
+        
         console.log('📋 Session data:', session ? 'Session exists' : 'No session');
         
         if (session?.user) {

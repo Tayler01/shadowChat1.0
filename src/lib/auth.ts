@@ -122,7 +122,20 @@ export const getCurrentUser = async () => {
   });
   
   const getUserPromise = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
+    // Handle the specific "user not found" error from invalid JWT
+    if (authError && authError.message?.includes('User from sub claim in JWT does not exist')) {
+      console.log('🧹 Invalid JWT detected in getCurrentUser, clearing session...');
+      await supabase.auth.signOut();
+      return null;
+    }
+    
+    if (authError) {
+      console.error('Auth error in getCurrentUser:', authError);
+      return null;
+    }
+    
     console.log('👤 Auth user:', user ? `User ID: ${user.id}` : 'No auth user');
     if (!user) return null
 
