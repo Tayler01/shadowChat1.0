@@ -78,7 +78,7 @@ export function useAuth() {
           if (session?.user) {
             // Add a small delay to ensure the profile exists after sign-up
             let retries = 0;
-            const maxRetries = 3;
+            const maxRetries = 5;
             
             while (retries < maxRetries) {
               try {
@@ -99,7 +99,7 @@ export function useAuth() {
                   break;
                 } else if (retries < maxRetries - 1) {
                   // Profile doesn't exist yet, wait and retry
-                  await new Promise(resolve => setTimeout(resolve, 500));
+                  await new Promise(resolve => setTimeout(resolve, 1000));
                   retries++;
                 } else {
                   // Profile still doesn't exist after retries
