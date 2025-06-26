@@ -15,9 +15,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 })
 
-// Database types
+// Database types matching the actual schema
 export interface User {
   id: string
+  email: string
   username: string
   display_name: string
   avatar_url?: string
@@ -81,8 +82,9 @@ export const updateUserPresence = async () => {
 
 export const toggleReaction = async (messageId: string, emoji: string, isDM = false) => {
   const { error } = await supabase.rpc('toggle_message_reaction', {
-    message_id_param: messageId,
-    emoji_param: emoji
+    message_id: messageId,
+    emoji: emoji,
+    is_dm: isDM
   })
   if (error) console.error('Error toggling reaction:', error)
 }

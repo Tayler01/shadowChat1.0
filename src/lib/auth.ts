@@ -53,7 +53,7 @@ export const signUp = async ({ email, password, username, displayName }: SignUpD
       .from('users')
       .insert({
         id: data.user.id,
-        email: data.user.email,
+        email: data.user.email!,
         username,
         display_name: displayName,
         status: 'online'
@@ -120,148 +120,102 @@ export const signOut = async () => {
 export const getCurrentUser = async () => {
   console.log('🔍 getCurrentUser called');
   
-  // Add timeout to prevent hanging - increased to 30 seconds for better diagnostics
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => {
-      const timeoutError = new Error('getCurrentUser timeout after 30s')
-      console.error('🚨 Authentication timeout detected. Please check:')
-      console.error('1. Network connectivity')
-      console.error('2. Supabase project status')
-      console.error('3. Environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)')
-      console.error('4. Database RLS policies on users table')
-      console.error('Current Supabase URL:', import.meta.env.VITE_SUPABASE_URL)
-      throw timeoutError
-    }, 30000);
-  });
-  
-  const getUserPromise = async () => {
-    try {
-      console.log('🔐 Checking auth user...');
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-      
-      // Handle the specific "user not found" error from invalid JWT
-      if (authError && authError.message?.includes('User from sub claim in JWT does not exist')) {
-        console.log('🧹 Invalid JWT detected in getCurrentUser, clearing session...');
-        await supabase.auth.signOut();
-        return null;
-      }
-      
-      if (authError) {
-        console.error('Auth error in getCurrentUser:', authError);
-        return null;
-      }
-      
-      console.log('👤 Auth user:', user ? `User ID: ${user.id}` : 'No auth user');
-      if (!user) return null
+  try {
+    console.log('🔐 Checking auth user...');
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
+    // Handle the specific "user not found" error from invalid JWT
+    if (authError && authError.message?.includes('User from sub claim in JWT does not exist')) {
+      console.log('🧹 Invalid JWT detected in getCurrentUser, clearing session...');
+      await supabase.auth.signOut();
+      return null;
+    }
+    
+    if (authError) {
+      console.error('Auth error in getCurrentUser:', authError);
+      return null;
+    }
+    
+    console.log('👤 Auth user:', user ? `User ID: ${user.id}` : 'No auth user');
+    if (!user) return null
 
-      console.log('📋 Fetching user profile from database...');
+    console.log('📋 Fetching user profile from database...');
+    
+    const { data: profile, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    console.log('📝 Profile query result:', { profile: !!profile, error: error?.code });
+
+    if (error && error.code === 'PGRST116') {
+      // Profile doesn't exist, create it
+      console.error('Error fetching user profile:', error)
+      console.log('Creating missing user profile...')
       
-      // Add a separate timeout for the database query
-      const profilePromise = supabase
+      const userData = {
+        id: user.id,
+        email: user.email!,
+        username: user.user_metadata?.username || user.email?.split('@')[0] || `user_${user.id.slice(0, 8)}`,
+        display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || 'User',
+        status: 'online'
+      };
+      
+      console.log('📝 Creating profile with data:', userData);
+      
+      const { error: insertError } = await supabase
+        .from('users')
+        .insert(userData)
+      
+      if (insertError) {
+        console.error('Error creating user profile:', insertError)
+        // If user already exists (race condition), just fetch it
+        if (insertError.code === '23505') {
+          console.log('Profile already exists (race condition), fetching existing profile...');
+          const { data: existingProfile, error: fetchError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .single()
+          
+          if (fetchError) {
+            console.error('Error fetching existing profile:', fetchError);
+            return null;
+          }
+          
+          console.log('✅ Existing profile fetched successfully');
+          return existingProfile;
+        } else {
+          return null;
+        }
+      }
+      
+      console.log('✅ Profile created, fetching...');
+      
+      // Fetch the newly created profile
+      const { data: newProfile, error: fetchError } = await supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
-        .single();
-        
-      const profileTimeout = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Profile query timeout')), 15000);
-      });
+        .single()
       
-      const { data: profile, error } = await Promise.race([profilePromise, profileTimeout]);
-
-      console.log('📝 Profile query result:', { profile: !!profile, error: error?.code });
-
-      if (error && error.code === 'PGRST116') {
-        // Profile doesn't exist, create it
-        console.error('Error fetching user profile:', error)
-        console.log('Creating missing user profile...')
-        
-        const userData = {
-          id: user.id,
-          email: user.email!,
-          username: user.user_metadata?.username || user.email?.split('@')[0] || `user_${user.id.slice(0, 8)}`,
-          display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || 'User',
-          status: 'online'
-        };
-        
-        console.log('📝 Creating profile with data:', userData);
-        
-        const { error: insertError } = await supabase
-          .from('users')
-          .insert(userData)
-        
-        if (insertError) {
-          console.error('Error creating user profile:', insertError)
-          // If user already exists (race condition), just fetch it
-          if (insertError.code === '23505') {
-            console.log('Profile already exists (race condition), fetching existing profile...');
-            const { data: existingProfile, error: fetchError } = await supabase
-              .from('users')
-              .select('*')
-              .eq('id', user.id)
-              .single()
-            
-            if (fetchError) {
-              console.error('Error fetching existing profile:', fetchError);
-              return null;
-            }
-            
-            console.log('✅ Existing profile fetched successfully');
-            return existingProfile;
-          } else {
-            return null;
-          }
-        }
-        
-        console.log('✅ Profile created, fetching...');
-        
-        // Fetch the newly created profile
-        const { data: newProfile, error: fetchError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', user.id)
-          .single()
-        
-        if (fetchError) {
-          console.error('Error fetching newly created profile:', fetchError);
-          return null
-        }
-        
-        console.log('✅ New profile fetched successfully');
-        return newProfile
-      } else if (error) {
-        console.error('Unexpected error fetching profile:', error);
-        return null;
-      }
-
-      console.log('✅ Profile found and returned');
-      return profile
-    } catch (error) {
-      console.error('Error in getUserPromise:', error);
-      
-      // If it's a timeout error, provide more specific information
-      if (error instanceof Error && error.message.includes('timeout')) {
-        console.error('Database query timed out - check network connectivity and Supabase status');
+      if (fetchError) {
+        console.error('Error fetching newly created profile:', fetchError);
+        return null
       }
       
+      console.log('✅ New profile fetched successfully');
+      return newProfile
+    } else if (error) {
+      console.error('Unexpected error fetching profile:', error);
       return null;
     }
-  }
-  
-  try {
-    return await Promise.race([getUserPromise(), timeoutPromise]);
+
+    console.log('✅ Profile found and returned');
+    return profile
   } catch (error) {
-    console.error('getCurrentUser failed or timed out:', error);
-    
-    // If it's a timeout, provide helpful debugging information
-    if (error instanceof Error && error.message.includes('timeout')) {
-      console.error('🚨 Authentication timeout detected. Please check:');
-      console.error('1. Network connectivity');
-      console.error('2. Supabase project status');
-      console.error('3. Environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)');
-      console.error('4. Database RLS policies on users table');
-    }
-    
+    console.error('Error in getCurrentUser:', error);
     return null;
   }
 }
@@ -291,7 +245,7 @@ export const updateUserProfile = async (updates: Partial<{
     .update(updates)
     .eq('id', user.id)
     .select()
-    .maybeSingle()
+    .single()
 
   if (error) throw error
   return data

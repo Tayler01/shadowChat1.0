@@ -2,10 +2,6 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase, User, updateUserPresence } from '../lib/supabase';
 import { signIn as authSignIn, signUp as authSignUp, signOut as authSignOut, getCurrentUser, updateUserProfile } from '../lib/auth';
 
-// Global state to prevent multiple auth processes
-let globalAuthProcessing = false;
-let globalAuthPromise: Promise<any> | null = null;
-
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -18,10 +14,9 @@ export function useAuth() {
     
     // Get initial session
     const getInitialSession = async () => {
-      if (initialLoadRef.current || globalAuthProcessing) return;
+      if (initialLoadRef.current) return;
       
       console.log('🔍 Getting initial session...');
-      globalAuthProcessing = true;
       
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -89,7 +84,6 @@ export function useAuth() {
           setLoading(false);
         }
         initialLoadRef.current = true;
-        globalAuthProcessing = false;
       }
     };
 
@@ -104,61 +98,34 @@ export function useAuth() {
           return;
         }
 
-        // If already processing, wait for it to complete
-        if (globalAuthProcessing && globalAuthPromise) {
-          console.log('⏭️ Auth change already processing, waiting...');
-          await globalAuthPromise;
-          return;
-        }
-        
-        // Skip if still processing after wait
-        if (globalAuthProcessing) {
-          console.log('⏭️ Skipping auth change - still processing');
-          return;
-        }
-
         console.log('🔄 Auth state change:', event);
-        globalAuthProcessing = true;
         
-        globalAuthPromise = (async () => {
-          if (event === 'SIGNED_OUT') {
-            console.log('👋 User signed out');
-            if (mountedRef.current) setUser(null);
-          } else if (session?.user) {
-            console.log('👤 User in auth change, getting profile...');
-            try {
-              const profile = await getCurrentUser();
-              console.log('📝 Profile in auth change:', profile ? 'Profile loaded' : 'No profile');
-              if (profile) {
-                if (mountedRef.current) setUser(profile);
-              } else {
-                console.log('❌ Failed to get profile, keeping user as null');
-                if (mountedRef.current) setUser(null);
-              }
-            } catch (error) {
-              console.error('Failed to get user profile during auth change:', error);
-              if (mountedRef.current) {
-                setError('Failed to load user profile. Please try signing in again.');
-                setUser(null);
-              }
+        if (event === 'SIGNED_OUT') {
+          console.log('👋 User signed out');
+          if (mountedRef.current) setUser(null);
+        } else if (session?.user) {
+          console.log('👤 User in auth change, getting profile...');
+          try {
+            const profile = await getCurrentUser();
+            console.log('📝 Profile in auth change:', profile ? 'Profile loaded' : 'No profile');
+            if (profile) {
+              if (mountedRef.current) setUser(profile);
+            } else {
+              console.log('❌ Failed to get profile, keeping user as null');
+              if (mountedRef.current) setUser(null);
             }
-          } else {
-            // No authenticated user in the session
-            console.log('❌ No user in auth change');
-            if (mountedRef.current) setUser(null);
+          } catch (error) {
+            console.error('Failed to get user profile during auth change:', error);
+            if (mountedRef.current) {
+              setError('Failed to load user profile. Please try signing in again.');
+              setUser(null);
+            }
           }
-        })().catch(error => {
-          console.error('Error in auth state change:', error);
-          if (mountedRef.current) {
-            setError(error instanceof Error ? error.message : 'Unknown error');
-            setUser(null);
-          }
-        }).finally(() => {
-          globalAuthProcessing = false;
-          globalAuthPromise = null;
-        });
-        
-        await globalAuthPromise;
+        } else {
+          // No authenticated user in the session
+          console.log('❌ No user in auth change');
+          if (mountedRef.current) setUser(null);
+        }
       }
     );
 
@@ -269,6 +236,7 @@ export function useAuth() {
 
   return {
     user,
+    profile: user, // Add profile alias for backward compatibility
     loading,
     error,
     signIn,
