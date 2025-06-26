@@ -31,6 +31,12 @@ function useProvideMessages(): MessagesContextValue {
   // Fetch initial messages
   useEffect(() => {
     const fetchMessages = async () => {
+      // Refresh the session to ensure the access token is valid
+      try {
+        await supabase.auth.refreshSession()
+      } catch (err) {
+        console.error('Error refreshing session before fetching messages:', err)
+      }
       console.log('📥 Fetching initial messages...');
       try {
         const { data, error } = await supabase
@@ -236,8 +242,15 @@ function useProvideMessages(): MessagesContextValue {
 
     console.log('📤 Sending message:', { userId: user.id, content, messageType });
     setSending(true);
-    
+
     try {
+      // Ensure we have a fresh session before attempting to send
+      try {
+        await supabase.auth.refreshSession()
+      } catch (err) {
+        console.error('Error refreshing session before sending message:', err)
+      }
+
       const messageData = {
         user_id: user.id,
         content: content.trim(),
