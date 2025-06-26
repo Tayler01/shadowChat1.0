@@ -36,7 +36,8 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
     console.log('📋 MessageList: messages updated', { 
       count: messages.length, 
       loading,
-      messageIds: messages.map(m => m.id).slice(-3) // Show last 3 message IDs
+      messageIds: messages.map(m => m.id).slice(-3), // Show last 3 message IDs
+      lastMessage: messages[messages.length - 1]?.content // Show last message content
     });
   }, [messages, loading]);
   

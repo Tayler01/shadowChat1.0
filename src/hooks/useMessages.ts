@@ -95,7 +95,7 @@ export function useMessages() {
                 
                 // Add new message to the end
                 const updated = [...prev, newMessage as Message];
-                console.log('📋 Updated messages count:', updated.length);
+                console.log('📋 Updated messages count:', updated.length, 'Last message:', updated[updated.length - 1]?.content);
                 return updated;
               });
             }
@@ -205,8 +205,8 @@ export function useMessages() {
 
       console.log('✅ Message sent successfully:', data);
 
-      // Don't add to state here - let real-time handle it
-      // This prevents duplicates and ensures consistent ordering
+      // Note: We rely on real-time subscription to add the message to state
+      // This ensures proper ordering and prevents duplicates
       
     } catch (error) {
       console.error('❌ Exception sending message:', error);
