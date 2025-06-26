@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Pin, 
@@ -27,20 +26,22 @@ interface MessageListProps {
   onReply?: (messageId: string, content: string) => void
 }
 
-const MessageListComponent: React.FC<MessageListProps> = ({ onReply }) => {
+export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
   const { profile } = useAuth()
   const { messages, loading, editMessage, deleteMessage, togglePin } = useMessages()
   const { typingUsers } = useTyping('general')
   
   // Debug logging
   useEffect(() => {
-    if (messages.length > 0) {
-      console.log('📋 MessageList: messages updated', { 
-        count: messages.length, 
-        loading,
-        lastMessage: messages[messages.length - 1]?.content
-      });
-    }
+    console.log('📋 MessageList: messages updated', { 
+      count: messages.length, 
+      loading,
+      messageIds: messages.map(m => m.id).slice(-3), // Show last 3 message IDs
+      lastMessage: messages[messages.length - 1]?.content // Show last message content
+    });
+    
+    // Force a re-render check
+    console.log('🔄 MessageList: Component will re-render with', messages.length, 'messages');
   }, [messages, loading]);
   
   const [editingMessage, setEditingMessage] = useState<string | null>(null)
@@ -216,13 +217,25 @@ const MessageListComponent: React.FC<MessageListProps> = ({ onReply }) => {
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
+        <div className="text-center">
         <div className="text-gray-500 dark:text-gray-400">Loading messages...</div>
+          <div className="text-xs text-gray-400 mt-2">
+            Debug: {messages.length} messages in state
+          </div>
+        </div>
       </div>
     )
   }
 
+  console.log('🎨 MessageList: Rendering with', messages.length, 'messages');
+
   return (
     <div ref={listRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+      {/* Debug info */}
+      <div className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 p-2 rounded">
+        Debug: Showing {messages.length} messages | Loading: {loading.toString()}
+      </div>
+      
       {/* Pinned Messages */}
       {messages.some(m => m.pinned) && (
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
@@ -371,6 +384,3 @@ const MessageListComponent: React.FC<MessageListProps> = ({ onReply }) => {
     </div>
   )
 }
-
-// Memoize the component to prevent unnecessary re-renders
-export const MessageList = memo(MessageListComponent)

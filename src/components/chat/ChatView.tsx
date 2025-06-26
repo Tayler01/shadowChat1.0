@@ -71,7 +71,7 @@ export const ChatView: React.FC = () => {
       </div>
 
       {/* Messages */}
-      <MessageList />
+      <MessageList key={`messages-${messages.length}`} />
 
       {/* Message Input */}
       <MessageInput
