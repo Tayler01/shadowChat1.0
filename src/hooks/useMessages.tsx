@@ -5,7 +5,7 @@ import React, {
   useState,
   useCallback
 } from 'react';
-import { supabase, Message } from '../lib/supabase';
+import { supabase, Message, ensureSession } from '../lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
 
@@ -244,8 +244,12 @@ function useProvideMessages(): MessagesContextValue {
 
     console.log('📤 Sending message:', { userId: user.id, content, messageType });
     setSending(true);
-    
+
     try {
+      const hasSession = await ensureSession();
+      if (!hasSession) {
+        throw new Error('No valid session');
+      }
       const messageData = {
         user_id: user.id,
         content: content.trim(),
@@ -253,8 +257,7 @@ function useProvideMessages(): MessagesContextValue {
       };
 
       console.log('📝 Inserting message data:', messageData);
-
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('messages')
         .insert(messageData)
         .select(`
@@ -265,7 +268,22 @@ function useProvideMessages(): MessagesContextValue {
 
       if (error) {
         console.error('❌ Error inserting message:', error);
-        throw error;
+        if (error.status === 401 || /jwt|token|expired/i.test(error.message)) {
+          const refreshed = await ensureSession();
+          if (refreshed) {
+            const retry = await supabase
+              .from('messages')
+              .insert(messageData)
+              .select(`
+                *,
+                user:users!user_id(*)
+              `)
+              .single();
+            data = retry.data;
+            error = retry.error;
+          }
+        }
+        if (error) throw error;
       }
 
       console.log('✅ Message sent successfully:', data);

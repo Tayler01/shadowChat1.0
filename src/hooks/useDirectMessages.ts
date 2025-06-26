@@ -6,6 +6,7 @@ import {
   DMMessage,
   getOrCreateDMConversation,
   markDMMessagesRead,
+  ensureSession,
 } from '../lib/supabase';
 import { useAuth } from './useAuth';
 
@@ -305,6 +306,10 @@ export function useConversationMessages(conversationId: string | null) {
 
     setSending(true);
     try {
+      const hasSession = await ensureSession();
+      if (!hasSession) {
+        throw new Error('No valid session');
+      }
       const { data, error } = await supabase
         .from('dm_messages')
         .insert({
@@ -318,11 +323,34 @@ export function useConversationMessages(conversationId: string | null) {
         `)
         .single();
 
-      if (error) throw error;
+      let finalData = data;
+      let finalError = error;
+      if (finalError) {
+        if (finalError.status === 401 || /jwt|token|expired/i.test(finalError.message)) {
+          const refreshed = await ensureSession();
+          if (refreshed) {
+            const retry = await supabase
+              .from('dm_messages')
+              .insert({
+                conversation_id: conversationId,
+                sender_id: user.id,
+                content: content.trim(),
+              })
+              .select(`
+                *,
+                sender:users!sender_id(*)
+              `)
+              .single();
+            finalData = retry.data;
+            finalError = retry.error;
+          }
+        }
+        if (finalError) throw finalError;
+      }
 
-      if (data) {
+      if (finalData) {
         // Optimistically add the sent message
-        setMessages(prev => [...prev, data as DMMessage]);
+        setMessages(prev => [...prev, finalData as DMMessage]);
       }
     } catch (error) {
       console.error('Error sending DM:', error);
