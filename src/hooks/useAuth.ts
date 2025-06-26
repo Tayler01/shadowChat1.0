@@ -73,15 +73,22 @@ export function useAuth() {
     }
   };
 
-  const signUp = async (email: string, password: string, userData: { full_name: string; username: string }) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    userData: { full_name: string; username: string }
+  ) => {
     setLoading(true);
     try {
-      await authSignUp({
+      const profile = await authSignUp({
         email,
         password,
         username: userData.username,
-        displayName: userData.full_name
+        displayName: userData.full_name,
       });
+      if (profile) {
+        setUser(profile);
+      }
     } finally {
       setLoading(false);
     }
