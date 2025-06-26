@@ -47,9 +47,16 @@ export function useMessages() {
 
     console.log('🔄 Setting up real-time subscription for messages...');
     
-    // Use a static channel name to prevent duplicate subscriptions
+    // Create a unique channel name
+    const channelName = `messages_${Date.now()}`;
+    
     const channel = supabase
-      .channel('public:messages')
+      .channel(channelName, {
+        config: {
+          broadcast: { self: true },
+          presence: { key: user.id }
+        }
+      })
       .on(
         'postgres_changes',
         {
