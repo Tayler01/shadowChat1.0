@@ -3,7 +3,8 @@ import React, {
   useContext,
   useEffect,
   useState,
-  useCallback
+  useCallback,
+  useRef
 } from 'react';
 import { supabase, Message, ensureSession } from '../lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
@@ -27,6 +28,7 @@ function useProvideMessages(): MessagesContextValue {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const { user } = useAuth();
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
   const fetchMessages = useCallback(async () => {
     console.log('📥 Fetching messages...');
@@ -136,6 +138,15 @@ function useProvideMessages(): MessagesContextValue {
           }
         }
       )
+      .on('broadcast', { event: 'new_message' }, (payload) => {
+        console.log('📡 Broadcast new_message received:', payload)
+        const newMessage = payload.payload as Message
+        setMessages(prev => {
+          const exists = prev.find(m => m.id === newMessage.id)
+          if (exists) return prev
+          return [...prev, newMessage]
+        })
+      })
       .on(
         'postgres_changes',
         {
@@ -213,6 +224,7 @@ function useProvideMessages(): MessagesContextValue {
     };
 
     channel = subscribeToChannel();
+    channelRef.current = channel;
 
     const handleVisibility = () => {
       if (!document.hidden) {
@@ -232,7 +244,8 @@ function useProvideMessages(): MessagesContextValue {
     return () => {
       console.log('🔌 Cleaning up real-time subscription');
       document.removeEventListener('visibilitychange', handleVisibility)
-      if (channel) supabase.removeChannel(channel);
+      if (channel) supabase.removeChannel(channel)
+      channelRef.current = null
     };
   }, [user, fetchMessages]);
 
@@ -288,8 +301,22 @@ function useProvideMessages(): MessagesContextValue {
 
       console.log('✅ Message sent successfully:', data);
 
-      // Note: We rely on real-time subscription to add the message to state
-      // This ensures proper ordering and prevents duplicates
+      // Immediately add the new message locally while waiting for the
+      // realtime subscription to broadcast the insert. This mirrors the
+      // typing indicator approach and guarantees the sender sees their
+      // message without delay. The realtime listener will skip duplicates.
+      if (data) {
+        setMessages(prev => {
+          const exists = prev.find(m => m.id === data.id)
+          if (exists) return prev
+          return [...prev, data as Message]
+        })
+        channelRef.current?.send({
+          type: 'broadcast',
+          event: 'new_message',
+          payload: data
+        })
+      }
       
     } catch (error) {
       console.error('❌ Exception sending message:', error);
