@@ -207,8 +207,23 @@ function useProvideMessages(): MessagesContextValue {
 
     channel = subscribeToChannel();
 
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        supabase.auth.refreshSession().catch(err => {
+          console.error('Error refreshing session on visibility change:', err)
+        })
+        if (channel && channel.state !== 'joined') {
+          supabase.removeChannel(channel)
+          channel = subscribeToChannel()
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+
     return () => {
       console.log('🔌 Cleaning up real-time subscription');
+      document.removeEventListener('visibilitychange', handleVisibility)
       if (channel) supabase.removeChannel(channel);
     };
   }, [user]);
