@@ -44,9 +44,16 @@ function useProvideMessages(): MessagesContextValue {
 
         if (error) {
           console.error('❌ Error fetching messages:', error);
-        } else {
-          console.log('✅ Fetched messages:', data?.length || 0);
-          setMessages(data || []);
+        } else if (data) {
+          console.log('✅ Fetched messages:', data.length);
+          setMessages(prev => {
+            if (prev.length === 0) {
+              return data as Message[];
+            }
+            const ids = new Set(prev.map(m => m.id));
+            const merged = [...prev, ...data.filter(m => !ids.has(m.id))];
+            return merged;
+          });
         }
       } catch (error) {
         console.error('❌ Exception fetching messages:', error);

@@ -33,6 +33,10 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
 
   // Auto-scroll to bottom
   useEffect(() => {
+    const list = listRef.current
+    if (list) {
+      list.scrollTop = list.scrollHeight
+    }
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
@@ -42,7 +46,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
     try {
       await editMessage(messageId, content)
       toast.success('Message updated')
-    } catch (error) {
+    } catch {
       toast.error('Failed to update message')
     }
   }
@@ -51,7 +55,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
     try {
       await deleteMessage(messageId)
       toast.success('Message deleted')
-    } catch (error) {
+    } catch {
       toast.error('Failed to delete message')
     }
   }
