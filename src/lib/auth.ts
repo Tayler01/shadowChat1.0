@@ -45,9 +45,6 @@ export const signUp = async ({ email, password, username, displayName }: SignUpD
 
   // Create profile in users table after a short delay to ensure auth context is ready
   if (data.user && data.session) {
-    // Wait a moment for the auth session to be fully established
-    await new Promise(resolve => setTimeout(resolve, 100))
-    
     try {
       const { error: profileError } = await supabase
         .from('users')
