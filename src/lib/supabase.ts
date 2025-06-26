@@ -121,21 +121,38 @@ export const markDMMessagesRead = async (conversationId: string) => {
 }
 
 export const ensureSession = async (): Promise<boolean> => {
-  const { data: { session }, error } = await supabase.auth.getSession()
-  if (error) {
-    console.error('Error getting session:', error)
-    return false
-  }
-  if (!session) {
-    console.warn('No active session')
-    return false
-  }
-  if (session.expires_at && session.expires_at < Math.floor(Date.now() / 1000)) {
-    const { error: refreshError } = await supabase.auth.refreshSession()
-    if (refreshError) {
-      console.error('Failed to refresh session:', refreshError)
+  try {
+    // Add timeout to prevent hanging
+    const sessionPromise = supabase.auth.getSession()
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Session check timeout')), 5000)
+    )
+    
+    const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]) as any
+    
+    if (error) {
+      console.error('Error getting session:', error)
       return false
     }
+    if (!session) {
+      console.warn('No active session')
+      return false
+    }
+    if (session.expires_at && session.expires_at < Math.floor(Date.now() / 1000)) {
+      const refreshPromise = supabase.auth.refreshSession()
+      const refreshTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Session refresh timeout')), 5000)
+      )
+      
+      const { error: refreshError } = await Promise.race([refreshPromise, refreshTimeoutPromise]) as any
+      if (refreshError) {
+        console.error('Failed to refresh session:', refreshError)
+        return false
+      }
+    }
+    return true
+  } catch (error) {
+    console.error('Session validation failed:', error)
+    return false
   }
-  return true
 }

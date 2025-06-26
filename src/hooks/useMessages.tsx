@@ -271,7 +271,15 @@ function useProvideMessages(): MessagesContextValue {
     try {
       // Step 1: Check session
       console.log(`${logPrefix}: 🔐 Step 1 - Checking session validity`);
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      
+      // Add timeout to prevent hanging on session check
+      const sessionPromise = supabase.auth.getSession();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Session check timeout after 5 seconds')), 5000)
+      );
+      
+      const { data: sessionData, error: sessionError } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+      
       console.log(`${logPrefix}: Session data:`, {
         hasSession: !!sessionData.session,
         userId: sessionData.session?.user?.id,
@@ -295,7 +303,14 @@ function useProvideMessages(): MessagesContextValue {
       // Step 2: Refresh session if needed
       if (sessionData.session.expires_at && sessionData.session.expires_at < Math.floor(Date.now() / 1000)) {
         console.log(`${logPrefix}: 🔄 Step 2 - Session expired, refreshing...`);
-        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        
+        const refreshPromise = supabase.auth.refreshSession();
+        const refreshTimeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session refresh timeout after 5 seconds')), 5000)
+        );
+        
+        const { data: refreshData, error: refreshError } = await Promise.race([refreshPromise, refreshTimeoutPromise]) as any;
+        
         console.log(`${logPrefix}: Refresh result:`, {
           success: !!refreshData.session,
           error: refreshError?.message,
@@ -312,7 +327,15 @@ function useProvideMessages(): MessagesContextValue {
       
       // Step 3: Prepare message data
       console.log(`${logPrefix}: 📝 Step 3 - Preparing message data`);
-      const hasSession = await ensureSession();
+      
+      // Add timeout to ensureSession call
+      const ensureSessionPromise = ensureSession();
+      const ensureTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('ensureSession timeout after 5 seconds')), 5000)
+      );
+      
+      const hasSession = await Promise.race([ensureSessionPromise, ensureTimeoutPromise]);
+      
       if (!hasSession) {
         console.error(`${logPrefix}: ❌ ensureSession returned false`);
         throw new Error('No valid session');
@@ -326,7 +349,13 @@ function useProvideMessages(): MessagesContextValue {
       console.log(`${logPrefix}: Message payload:`, messageData);
 
       // Step 4: Get current auth headers
-      const { data: currentSession } = await supabase.auth.getSession();
+      const currentSessionPromise = supabase.auth.getSession();
+      const currentSessionTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Current session check timeout after 5 seconds')), 5000)
+      );
+      
+      const { data: currentSession } = await Promise.race([currentSessionPromise, currentSessionTimeoutPromise]) as any;
+      
       const authHeaders = {
         'Authorization': `Bearer ${currentSession.session?.access_token}`,
         'apikey': supabase.supabaseKey,
@@ -342,7 +371,8 @@ function useProvideMessages(): MessagesContextValue {
       
       // Step 5: Attempt database insert
       console.log(`${logPrefix}: 💾 Step 5 - Inserting into database`);
-      let { data, error } = await supabase
+      
+      const insertPromise = supabase
         .from('messages')
         .insert(messageData)
         .select(`
@@ -350,6 +380,12 @@ function useProvideMessages(): MessagesContextValue {
           user:users!user_id(*)
         `)
         .single();
+        
+      const insertTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database insert timeout after 10 seconds')), 10000)
+      );
+      
+      let { data, error } = await Promise.race([insertPromise, insertTimeoutPromise]) as any;
 
       console.log(`${logPrefix}: Database insert result:`, {
         success: !!data,
