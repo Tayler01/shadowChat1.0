@@ -22,17 +22,6 @@ export interface SignInData {
 }
 
 export const signUp = async ({ email, password, username, displayName }: SignUpData) => {
-  // First check if username is taken
-  const { data: existingUser } = await supabase
-    .from('users')
-    .select('username')
-    .eq('username', username)
-    .single()
-
-  if (existingUser) {
-    throw new Error('Username is already taken')
-  }
-
   // Create auth user
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -40,29 +29,12 @@ export const signUp = async ({ email, password, username, displayName }: SignUpD
     options: {
       data: {
         username,
-        display_name: displayName,
+        display_name: displayName
       }
     }
   })
 
   if (error) throw error
-
-  // Create profile in users table
-  if (data.user) {
-    const { error: profileError } = await supabase
-      .from('users')
-      .insert({
-        id: data.user.id,
-        username,
-        display_name: displayName,
-        status: 'online'
-      })
-
-    if (profileError) {
-      console.error('Error creating user profile:', profileError)
-    }
-  }
-
   return data
 }
 
@@ -74,12 +46,34 @@ export const signIn = async ({ email, password }: SignInData) => {
 
   if (error) throw error
 
-  // Update user status to online
+  // Ensure user profile exists and update status
   if (data.user) {
-    await supabase
+    // First try to get existing profile
+    const { data: existingProfile } = await supabase
       .from('users')
-      .update({ status: 'online', last_active: new Date().toISOString() })
+      .select('id')
       .eq('id', data.user.id)
+      .single()
+
+    if (!existingProfile) {
+      // Create profile if it doesn't exist (handles email confirmation flow)
+      const userData = data.user.user_metadata
+      await supabase
+        .from('users')
+        .insert({
+          id: data.user.id,
+          email: data.user.email!,
+          username: userData.username,
+          display_name: userData.display_name,
+          status: 'online'
+        })
+    } else {
+      // Update existing profile status
+      await supabase
+        .from('users')
+        .update({ status: 'online', last_active: new Date().toISOString() })
+        .eq('id', data.user.id)
+    }
   }
 
   return data
@@ -102,7 +96,21 @@ export const signOut = async () => {
 
 export const getCurrentUser = async () => {
   const { data: { user } } = await supabase.auth.getUser()
-  return user
+  if (!user) return null
+
+  // Get the user profile from our users table
+  const { data: profile, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', user.id)
+    .single()
+
+  if (error) {
+    console.error('Error fetching user profile:', error)
+    return null
+  }
+
+  return profile
 }
 
 export const getUserProfile = async (userId: string) => {
