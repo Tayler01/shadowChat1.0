@@ -8,7 +8,7 @@ export function useAuth() {
   const [error, setError] = useState<string | null>(null);
   const initialLoadRef = useRef(false);
   const processingRef = useRef(false);
-  const profileCreationRef = useRef(false);
+  const authChangeCountRef = useRef(0);
 
   useEffect(() => {
     // Get initial session
@@ -75,9 +75,28 @@ export function useAuth() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        // Skip if we're still doing initial load or already processing
-        if (!initialLoadRef.current || processingRef.current || profileCreationRef.current) {
+        // Skip if we're still doing initial load
+        if (!initialLoadRef.current) {
           console.log('⏭️ Skipping auth change during initial load or processing');
+          return;
+        }
+
+        // Debounce rapid auth changes
+        authChangeCountRef.current += 1;
+        const currentCount = authChangeCountRef.current;
+        
+        // Wait a bit to see if more changes come in
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // If more changes came in, skip this one
+        if (currentCount !== authChangeCountRef.current) {
+          console.log('⏭️ Skipping auth change due to newer change');
+          return;
+        }
+        
+        // Skip if already processing
+        if (processingRef.current) {
+          console.log('⏭️ Skipping auth change - already processing');
           return;
         }
 
@@ -88,10 +107,8 @@ export function useAuth() {
           if (event === 'SIGNED_OUT') {
             console.log('👋 User signed out');
             setUser(null);
-            profileCreationRef.current = false;
           } else if (session?.user) {
             console.log('👤 User in auth change, getting profile...');
-            profileCreationRef.current = true;
             const profile = await getCurrentUser();
             console.log('📝 Profile in auth change:', profile ? 'Profile loaded' : 'No profile');
             if (profile) {
@@ -100,7 +117,6 @@ export function useAuth() {
               console.log('❌ Failed to get profile, keeping user as null');
               setUser(null);
             }
-            profileCreationRef.current = false;
           } else {
             console.log('❌ No user in auth change');
             setUser(null);
@@ -109,7 +125,6 @@ export function useAuth() {
           console.error('Error in auth state change:', error);
           setError(error instanceof Error ? error.message : 'Unknown error');
           setUser(null);
-          profileCreationRef.current = false;
         } finally {
           processingRef.current = false;
         }
