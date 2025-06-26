@@ -33,21 +33,21 @@ function useProvideAuth() {
     const getInitialSession = async () => {
       if (initialLoadRef.current) return;
       
-      console.log('🔍 [AUTH] Getting initial session...');
+      console.log('🔍 Getting initial session...');
       
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         // Handle the specific "user not found" error from invalid JWT
         if (sessionError && sessionError.message?.includes('User from sub claim in JWT does not exist')) {
-          console.log('🧹 [AUTH] Invalid JWT detected in getSession, clearing session...');
+          console.log('🧹 Invalid JWT detected in getSession, clearing session...');
           await supabase.auth.signOut();
           if (mountedRef.current) setUser(null);
           return;
         }
         
         if (sessionError) {
-          console.error('❌ [AUTH] Session error:', sessionError);
+          console.error('Session error:', sessionError);
           if (mountedRef.current) {
             setError(sessionError.message);
             setUser(null);
@@ -55,36 +55,36 @@ function useProvideAuth() {
           return;
         }
         
-        console.log('📋 [AUTH] Session data:', session ? `Session exists (expires: ${new Date(session.expires_at * 1000).toLocaleString()})` : 'No session');
+        console.log('📋 Session data:', session ? 'Session exists' : 'No session');
         
         if (session?.user) {
-          console.log('👤 [AUTH] User found in session, getting profile...');
+          console.log('👤 User found in session, getting profile...');
           try {
             const profile = await getCurrentUser();
-            console.log('📝 [AUTH] Profile result:', profile ? `Profile loaded (${profile.display_name})` : 'No profile');
+            console.log('📝 Profile result:', profile ? 'Profile loaded' : 'No profile');
             if (mountedRef.current) {
               setUser(profile);
             }
           } catch (error) {
-            console.error('❌ [AUTH] Failed to get user profile during initial session:', error);
+            console.error('Failed to get user profile during initial session:', error);
             if (mountedRef.current) {
               setError('Failed to load user profile. Please try refreshing the page.');
               setUser(null);
             }
           }
         } else {
-          console.log('❌ [AUTH] No user in session');
+          console.log('❌ No user in session');
           if (mountedRef.current) {
             setUser(null);
           }
         }
       } catch (error) {
-        console.error('❌ [AUTH] Error getting initial session:', error);
+        console.error('Error getting initial session:', error);
         
         // Check if this is the specific "user not found" error from invalid JWT
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         if (errorMessage.includes('User from sub claim in JWT does not exist')) {
-          console.log('🧹 [AUTH] Invalid JWT detected, clearing session...');
+          console.log('🧹 Invalid JWT detected, clearing session...');
           // Clear the invalid session
           await authSignOut();
           if (mountedRef.current) setUser(null);
@@ -96,7 +96,7 @@ function useProvideAuth() {
           }
         }
       } finally {
-        console.log('✅ [AUTH] Initial session check complete, setting loading to false');
+        console.log('✅ Initial session check complete, setting loading to false');
         if (mountedRef.current) {
           setLoading(false);
         }
@@ -111,28 +111,28 @@ function useProvideAuth() {
       async (event, session) => {
         // Skip if we're still doing initial load or component is unmounted
         if (!initialLoadRef.current || !mountedRef.current) {
-          console.log('⏭️ [AUTH] Skipping auth change during initial load or unmounted');
+          console.log('⏭️ Skipping auth change during initial load or unmounted');
           return;
         }
 
-        console.log('🔄 [AUTH] Auth state change:', event, session ? `(user: ${session.user?.email})` : '(no session)');
+        console.log('🔄 Auth state change:', event);
         
         if (event === 'SIGNED_OUT') {
-          console.log('👋 [AUTH] User signed out');
+          console.log('👋 User signed out');
           if (mountedRef.current) setUser(null);
         } else if (session?.user) {
-          console.log('👤 [AUTH] User in auth change, getting profile...');
+          console.log('👤 User in auth change, getting profile...');
           try {
             const profile = await getCurrentUser();
-            console.log('📝 [AUTH] Profile in auth change:', profile ? `Profile loaded (${profile.display_name})` : 'No profile');
+            console.log('📝 Profile in auth change:', profile ? 'Profile loaded' : 'No profile');
             if (profile) {
               if (mountedRef.current) setUser(profile);
             } else {
-              console.log('❌ [AUTH] Failed to get profile, keeping user as null');
+              console.log('❌ Failed to get profile, keeping user as null');
               if (mountedRef.current) setUser(null);
             }
           } catch (error) {
-            console.error('❌ [AUTH] Failed to get user profile during auth change:', error);
+            console.error('Failed to get user profile during auth change:', error);
             if (mountedRef.current) {
               setError('Failed to load user profile. Please try signing in again.');
               setUser(null);
@@ -140,7 +140,7 @@ function useProvideAuth() {
           }
         } else {
           // No authenticated user in the session
-          console.log('❌ [AUTH] No user in auth change');
+          console.log('❌ No user in auth change');
           if (mountedRef.current) setUser(null);
         }
       }
@@ -183,67 +183,6 @@ function useProvideAuth() {
     };
   }, [user]);
 
-  // Dev-only: Add auth debug functions
-  useEffect(() => {
-    if (import.meta.env.DEV) {
-      const checkAuthStatus = async () => {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        
-        console.log('🔍 [AUTH DEBUG] Current auth status:', {
-          hasSession: !!session,
-          sessionExpiry: session ? new Date(session.expires_at * 1000).toLocaleString() : 'N/A',
-          hasUser: !!user,
-          userEmail: user?.email,
-          sessionError: sessionError?.message,
-          userError: userError?.message,
-          profileLoaded: !!user,
-          profileData: user ? { id: user.id, email: user.email } : null
-        });
-        
-        return { session, user, sessionError, userError };
-      };
-      
-      const quickSignIn = async (email = 'test@example.com', password = 'password123') => {
-        console.log('🔐 [AUTH DEBUG] Attempting quick sign in...');
-        try {
-          await signIn(email, password);
-          console.log('✅ [AUTH DEBUG] Sign in successful');
-        } catch (error) {
-          console.error('❌ [AUTH DEBUG] Sign in failed:', error);
-        }
-      };
-      
-      const quickSignUp = async (email = 'test@example.com', password = 'password123') => {
-        console.log('📝 [AUTH DEBUG] Attempting quick sign up...');
-        try {
-          await signUp(email, password, {
-            full_name: 'Test User',
-            username: 'testuser'
-          });
-          console.log('✅ [AUTH DEBUG] Sign up successful');
-        } catch (error) {
-          console.error('❌ [AUTH DEBUG] Sign up failed:', error);
-        }
-      };
-      
-      // Add to window
-      (window as any).checkAuthStatus = checkAuthStatus;
-      (window as any).quickSignIn = quickSignIn;
-      (window as any).quickSignUp = quickSignUp;
-      
-      console.log('🧪 [AUTH DEBUG] Functions available:');
-      console.log('  - checkAuthStatus() - Check current auth state');
-      console.log('  - quickSignIn(email?, password?) - Quick sign in');
-      console.log('  - quickSignUp(email?, password?) - Quick sign up');
-      
-      return () => {
-        delete (window as any).checkAuthStatus;
-        delete (window as any).quickSignIn;
-        delete (window as any).quickSignUp;
-      };
-    }
-  }, [signIn, signUp, user]);
   const signIn = async (email: string, password: string) => {
     setLoading(true);
     setError(null);
