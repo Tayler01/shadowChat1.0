@@ -67,7 +67,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
 
   const handleReaction = async (messageId: string, emoji: string) => {
     try {
-      await toggleReaction(messageId, emoji, false)
+      await toggleReaction(messageId, emoji)
     } catch (error) {
       toast.error('Failed to add reaction')
     }
