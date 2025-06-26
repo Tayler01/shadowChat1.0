@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { 
-  MessageSquare, 
-  Search, 
-  Plus, 
+import {
+  MessageSquare,
+  Search,
+  Plus,
   ArrowLeft,
-  UserPlus
+  UserPlus,
+  Menu
 } from 'lucide-react'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
 import { useAuth } from '../../hooks/useAuth'
@@ -16,7 +17,11 @@ import { MessageInput } from '../chat/MessageInput'
 import { formatTime, shouldGroupMessage } from '../../lib/utils'
 import toast from 'react-hot-toast'
 
-export const DirectMessagesView: React.FC = () => {
+interface DirectMessagesViewProps {
+  onToggleSidebar: () => void
+}
+
+export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggleSidebar }) => {
   const { profile } = useAuth()
   const {
     conversations,
@@ -80,9 +85,14 @@ export const DirectMessagesView: React.FC = () => {
         {/* Header */}
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <div className="flex items-center">
+              <button onClick={onToggleSidebar} className="md:hidden p-2 -ml-2 mr-2">
+                <Menu className="w-5 h-5" />
+              </button>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               Direct Messages
-            </h2>
+              </h2>
+            </div>
             <Button
               size="sm"
               onClick={() => setShowNewConversation(true)}
@@ -213,6 +223,9 @@ export const DirectMessagesView: React.FC = () => {
             {/* Header */}
             <div className="flex-shrink-0 px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center space-x-3">
+                <button onClick={onToggleSidebar} className="md:hidden p-2 -ml-2">
+                  <Menu className="w-5 h-5" />
+                </button>
                 <Button
                   variant="ghost"
                   size="sm"

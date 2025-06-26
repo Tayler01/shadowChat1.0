@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageSquare, Users, User, Settings, Plus, Moon, Sun } from 'lucide-react';
+import { MessageSquare, Users, User, Settings, Plus, Moon, Sun, X } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
 import { useAuth } from '../../hooks/useAuth';
 import { useDirectMessages } from '../../hooks/useDirectMessages';
@@ -10,6 +10,8 @@ interface SidebarProps {
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
   onNewDM?: () => void;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
 export function Sidebar({
@@ -18,6 +20,8 @@ export function Sidebar({
   isDarkMode,
   onToggleDarkMode,
   onNewDM,
+  isOpen,
+  onClose,
 }: SidebarProps) {
   const { user } = useAuth();
   const { conversations } = useDirectMessages();
@@ -52,7 +56,17 @@ export function Sidebar({
   ];
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
+    <div
+      className={`w-64 bg-white border-r border-gray-200 flex flex-col h-full fixed inset-y-0 left-0 z-40 transform transition-transform md:relative md:translate-x-0 ${
+        isOpen ? '' : '-translate-x-full'
+      }`}
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-2 right-2 p-2 rounded-md text-gray-500 hover:text-gray-700 md:hidden"
+      >
+        <X className="w-4 h-4" />
+      </button>
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center space-x-3">

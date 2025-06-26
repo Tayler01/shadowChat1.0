@@ -1,13 +1,17 @@
 import React, { useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Hash, Users, Pin } from 'lucide-react'
+import { Hash, Users, Pin, Menu } from 'lucide-react'
 import { useMessages } from '../../hooks/useMessages'
 import { useAuth } from '../../hooks/useAuth'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import toast from 'react-hot-toast'
 
-export const ChatView: React.FC = () => {
+interface ChatViewProps {
+  onToggleSidebar: () => void
+}
+
+export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar }) => {
   const { sendMessage, messages, loading } = useMessages()
   const { user } = useAuth()
 
@@ -41,6 +45,12 @@ export const ChatView: React.FC = () => {
       <div className="flex-shrink-0 px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
+            <button
+              onClick={onToggleSidebar}
+              className="md:hidden p-2 -ml-2"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
             <div className="flex items-center space-x-2">
               <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
                 <Hash className="w-5 h-5 text-blue-600 dark:text-blue-400" />
