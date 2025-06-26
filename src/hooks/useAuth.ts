@@ -5,24 +5,32 @@ import { signIn as authSignIn, signUp as authSignUp, signOut as authSignOut, get
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
+      console.log('🔍 Getting initial session...');
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        console.log('📋 Session data:', session ? 'Session exists' : 'No session');
         
         if (session?.user) {
+          console.log('👤 User found in session, getting profile...');
           const profile = await getCurrentUser();
+          console.log('📝 Profile result:', profile ? 'Profile loaded' : 'No profile');
           setUser(profile);
         } else {
+          console.log('❌ No user in session');
           setUser(null);
         }
       } catch (error) {
         console.error('Error getting initial session:', error);
+        setError(error instanceof Error ? error.message : 'Unknown error');
         setUser(null);
       }
       
+      console.log('✅ Initial session check complete, setting loading to false');
       setLoading(false);
     };
 
@@ -31,15 +39,20 @@ export function useAuth() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('🔄 Auth state change:', event);
         try {
           if (session?.user) {
+            console.log('👤 User in auth change, getting profile...');
             const profile = await getCurrentUser();
+            console.log('📝 Profile in auth change:', profile ? 'Profile loaded' : 'No profile');
             setUser(profile);
           } else {
+            console.log('❌ No user in auth change');
             setUser(null);
           }
         } catch (error) {
           console.error('Error in auth state change:', error);
+          setError(error instanceof Error ? error.message : 'Unknown error');
           setUser(null);
         }
         setLoading(false);
@@ -126,6 +139,7 @@ export function useAuth() {
   return {
     user,
     loading,
+    error,
     signIn,
     signUp,
     signOut,

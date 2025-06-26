@@ -8,7 +8,7 @@ interface AuthGuardProps {
 }
 
 export function AuthGuard({ children }: AuthGuardProps) {
-  const { user, loading } = useAuth();
+  const { user, loading, error } = useAuth();
 
   if (loading) {
     return (
@@ -16,6 +16,9 @@ export function AuthGuard({ children }: AuthGuardProps) {
         <div className="text-center space-y-4">
           <LoadingSpinner size="lg" />
           <p className="text-gray-600">Loading...</p>
+          {error && (
+            <p className="text-red-600 text-sm">Error: {error}</p>
+          )}
         </div>
       </div>
     );
