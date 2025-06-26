@@ -134,7 +134,7 @@ export function useAuth() {
   const signIn = async (email: string, password: string) => {
     setLoading(true);
     try {
-      await AuthService.signIn(email, password);
+      await AuthService.signIn({ email, password });
     } finally {
       setLoading(false);
     }
