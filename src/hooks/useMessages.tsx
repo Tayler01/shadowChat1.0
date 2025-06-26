@@ -186,14 +186,16 @@ function useProvideMessages(): MessagesContextValue {
         }
         if (status === 'CLOSED' || status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
           console.warn(`⚠️ Channel ${status}, resubscribing...`);
-          supabase.removeChannel(channel);
-          channel = supabase.channel(channelName, {
-            config: {
-              broadcast: { self: true },
-              presence: { key: user.id }
-            }
-          });
-          channel.subscribe();
+          setTimeout(() => {
+            supabase.removeChannel(channel);
+            channel = supabase.channel(channelName, {
+              config: {
+                broadcast: { self: true },
+                presence: { key: user.id }
+              }
+            });
+            channel.subscribe();
+          }, 1000);
         }
       });
 
