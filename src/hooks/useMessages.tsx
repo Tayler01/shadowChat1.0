@@ -577,21 +577,32 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
         return value.toggleReaction(messageId, emoji);
       };
       
-      // Assign to window
+      // Assign to both window and globalThis for maximum compatibility
       (window as any).sendTestMessage = sendTestMessage;
       (window as any).sendTestReaction = sendTestReaction;
+      (globalThis as any).sendTestMessage = sendTestMessage;
+      (globalThis as any).sendTestReaction = sendTestReaction;
       
       console.log('🧪 Dev functions available:');
       console.log('  - window.sendTestMessage(content?) - Send a test message');
       console.log('  - window.sendTestReaction(messageId, emoji?) - Add a reaction');
       console.log('  - sendTestMessage() - Also works without window prefix');
       console.log('  - sendTestReaction(messageId, emoji) - Also works without window prefix');
+      
+      // Also log the functions to verify they're set
+      console.log('🔍 Function check:', {
+        windowSendTestMessage: typeof (window as any).sendTestMessage,
+        globalSendTestMessage: typeof (globalThis as any).sendTestMessage,
+        directAccess: typeof sendTestMessage
+      });
     }
     
     return () => {
       if (import.meta.env.DEV) {
         delete (window as any).sendTestMessage;
         delete (window as any).sendTestReaction;
+        delete (globalThis as any).sendTestMessage;
+        delete (globalThis as any).sendTestReaction;
       }
     };
   }, [value.sendMessage, value.toggleReaction]);
