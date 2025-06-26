@@ -256,13 +256,18 @@ function useProvideMessages(): MessagesContextValue {
     console.group(`${logPrefix}: Starting message send process`);
     console.log(`${logPrefix}: Content:`, content);
     console.log(`${logPrefix}: Message type:`, messageType);
-    console.log(`${logPrefix}: User exists:`, !!user);
-    console.log(`${logPrefix}: User ID:`, user?.id);
     console.log(`${logPrefix}: Network status:`, navigator.onLine ? 'online' : 'offline');
     console.log(`${logPrefix}: Document visibility:`, document.hidden ? 'hidden' : 'visible');
     
-    if (!user || !content.trim()) {
-      console.log(`${logPrefix}: ❌ Cannot send message - missing user or content`);
+    // 🔥 HOTFIX: Always pull fresh user from session instead of React state
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentUser = sessionData?.session?.user;
+    
+    console.log(`${logPrefix}: Fresh user from session:`, !!currentUser);
+    console.log(`${logPrefix}: User ID:`, currentUser?.id);
+    
+    if (!currentUser || !content.trim()) {
+      console.log(`${logPrefix}: ❌ Cannot send - no valid user from session`);
       console.groupEnd();
       return;
     }
@@ -284,7 +289,7 @@ function useProvideMessages(): MessagesContextValue {
       console.log(`${logPrefix}: 📝 Step 1 - Preparing message data`);
       
       const messageData = {
-        user_id: user.id,
+        user_id: currentUser.id,
         content: content.trim(),
         message_type: messageType,
       };
@@ -421,7 +426,7 @@ function useProvideMessages(): MessagesContextValue {
       console.error(`${logPrefix}: ❌ Exception in send process:`, {
         message: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined,
-        userAvailable: !!user,
+        userAvailable: !!currentUser,
         networkOnline: navigator.onLine,
         error
       });
@@ -431,10 +436,14 @@ function useProvideMessages(): MessagesContextValue {
       setSending(false);
       console.groupEnd();
     }
-  }, [user]);
+  }, []);
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
-    if (!user) return;
+    // 🔥 HOTFIX: Always pull fresh user from session
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentUser = sessionData?.session?.user;
+    
+    if (!currentUser) return;
 
     // console.log('📝 Editing message:', { messageId, content });
 
@@ -446,7 +455,7 @@ function useProvideMessages(): MessagesContextValue {
           edited_at: new Date().toISOString(),
         })
         .eq('id', messageId)
-        .eq('user_id', user.id);
+        .eq('user_id', currentUser.id);
 
       if (error) {
         // console.error('❌ Error editing message:', error);
@@ -458,10 +467,14 @@ function useProvideMessages(): MessagesContextValue {
       // console.error('❌ Exception editing message:', error);
       throw error;
     }
-  }, [user]);
+  }, []);
 
   const deleteMessage = useCallback(async (messageId: string) => {
-    if (!user) return;
+    // 🔥 HOTFIX: Always pull fresh user from session
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentUser = sessionData?.session?.user;
+    
+    if (!currentUser) return;
 
     // console.log('🗑️ Deleting message:', messageId);
 
@@ -470,7 +483,7 @@ function useProvideMessages(): MessagesContextValue {
         .from('messages')
         .delete()
         .eq('id', messageId)
-        .eq('user_id', user.id);
+        .eq('user_id', currentUser.id);
 
       if (error) {
         // console.error('❌ Error deleting message:', error);
@@ -482,10 +495,14 @@ function useProvideMessages(): MessagesContextValue {
       // console.error('❌ Exception deleting message:', error);
       throw error;
     }
-  }, [user]);
+  }, []);
 
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
-    if (!user) return;
+    // 🔥 HOTFIX: Always pull fresh user from session
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentUser = sessionData?.session?.user;
+    
+    if (!currentUser) return;
 
     // console.log('👍 Toggling reaction:', { messageId, emoji });
 
@@ -506,10 +523,14 @@ function useProvideMessages(): MessagesContextValue {
       // console.error('❌ Exception toggling reaction:', error);
       throw error;
     }
-  }, [user]);
+  }, []);
 
   const togglePin = useCallback(async (messageId: string) => {
-    if (!user) return;
+    // 🔥 HOTFIX: Always pull fresh user from session
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentUser = sessionData?.session?.user;
+    
+    if (!currentUser) return;
 
     // console.log('📌 Toggling pin:', messageId);
 
@@ -532,7 +553,7 @@ function useProvideMessages(): MessagesContextValue {
         .from('messages')
         .update({
           pinned: !isPinned,
-          pinned_by: !isPinned ? user.id : null,
+          pinned_by: !isPinned ? currentUser.id : null,
           pinned_at: !isPinned ? new Date().toISOString() : null,
         })
         .eq('id', messageId);
@@ -547,7 +568,7 @@ function useProvideMessages(): MessagesContextValue {
       // console.error('❌ Exception toggling pin:', error);
       throw error;
     }
-  }, [user]);
+  }, []);
 
   return {
     messages,
