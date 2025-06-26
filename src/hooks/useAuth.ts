@@ -61,12 +61,10 @@ export function useAuth() {
             }
           }
         } else {
-          console.log('📝 Profile result:', profile ? 'Profile loaded' : 'No profile');
-          if (mountedRef.current) {
-            setUser(profile);
-          }
           console.log('❌ No user in session');
-          if (mountedRef.current) setUser(null);
+          if (mountedRef.current) {
+            setUser(null);
+          }
         }
       } catch (error) {
         console.error('Error getting initial session:', error);
