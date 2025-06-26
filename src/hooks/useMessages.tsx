@@ -259,13 +259,23 @@ function useProvideMessages(): MessagesContextValue {
     console.log(`${logPrefix}: Network status:`, navigator.onLine ? 'online' : 'offline');
     console.log(`${logPrefix}: Document visibility:`, document.hidden ? 'hidden' : 'visible');
     
-    // 🔥 HOTFIX: Always pull fresh user from session instead of React state
+    // 🔐 Ensure the session is valid before pulling the user
+    console.log(`${logPrefix}: 🔐 Step 0 - Ensuring valid session`);
+    const sessionValid = await ensureSession();
+    if (!sessionValid) {
+      console.error(`${logPrefix}: ❌ Invalid or expired session, cannot send message`);
+      console.groupEnd();
+      throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
+    }
+    console.log(`${logPrefix}: ✅ Session validated successfully`);
+
+    // Always pull the fresh user from the now-valid session
     const { data: sessionData } = await supabase.auth.getSession();
     const currentUser = sessionData?.session?.user;
-    
+
     console.log(`${logPrefix}: Fresh user from session:`, !!currentUser);
     console.log(`${logPrefix}: User ID:`, currentUser?.id);
-    
+
     if (!currentUser || !content.trim()) {
       console.log(`${logPrefix}: ❌ Cannot send - no valid user from session`);
       console.groupEnd();
@@ -274,15 +284,6 @@ function useProvideMessages(): MessagesContextValue {
 
     console.log(`${logPrefix}: 📤 Proceeding with message send`);
     setSending(true);
-
-    // Ensure we have a valid session before attempting database operations
-    console.log(`${logPrefix}: 🔐 Step 0 - Ensuring valid session`);
-    const sessionValid = await ensureSession();
-    if (!sessionValid) {
-      console.error(`${logPrefix}: ❌ Invalid or expired session, cannot send message`);
-      throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
-    }
-    console.log(`${logPrefix}: ✅ Session validated successfully`);
 
     try {
       // Step 1: Prepare message data
@@ -439,10 +440,12 @@ function useProvideMessages(): MessagesContextValue {
   }, []);
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
-    // 🔥 HOTFIX: Always pull fresh user from session
+    // Ensure a valid session and pull the current user
+    const sessionOk = await ensureSession();
+    if (!sessionOk) return;
     const { data: sessionData } = await supabase.auth.getSession();
     const currentUser = sessionData?.session?.user;
-    
+
     if (!currentUser) return;
 
     // console.log('📝 Editing message:', { messageId, content });
@@ -470,10 +473,11 @@ function useProvideMessages(): MessagesContextValue {
   }, []);
 
   const deleteMessage = useCallback(async (messageId: string) => {
-    // 🔥 HOTFIX: Always pull fresh user from session
+    const sessionOk = await ensureSession();
+    if (!sessionOk) return;
     const { data: sessionData } = await supabase.auth.getSession();
     const currentUser = sessionData?.session?.user;
-    
+
     if (!currentUser) return;
 
     // console.log('🗑️ Deleting message:', messageId);
@@ -498,10 +502,11 @@ function useProvideMessages(): MessagesContextValue {
   }, []);
 
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
-    // 🔥 HOTFIX: Always pull fresh user from session
+    const sessionOk = await ensureSession();
+    if (!sessionOk) return;
     const { data: sessionData } = await supabase.auth.getSession();
     const currentUser = sessionData?.session?.user;
-    
+
     if (!currentUser) return;
 
     // console.log('👍 Toggling reaction:', { messageId, emoji });
@@ -526,10 +531,11 @@ function useProvideMessages(): MessagesContextValue {
   }, []);
 
   const togglePin = useCallback(async (messageId: string) => {
-    // 🔥 HOTFIX: Always pull fresh user from session
+    const sessionOk = await ensureSession();
+    if (!sessionOk) return;
     const { data: sessionData } = await supabase.auth.getSession();
     const currentUser = sessionData?.session?.user;
-    
+
     if (!currentUser) return;
 
     // console.log('📌 Toggling pin:', messageId);
