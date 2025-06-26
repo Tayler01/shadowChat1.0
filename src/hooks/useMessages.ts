@@ -95,10 +95,9 @@ export function useMessages() {
                 
                 // Add new message to the end
                 const updated = [...prev, newMessage as Message];
-                console.log('📋 Updated messages count:', updated.length, 'Last message:', updated[updated.length - 1]?.content);
+                console.log('📋 Updated messages count:', updated.length);
                 
-                // Force a new array reference to ensure React detects the change
-                return updated.slice();
+                return updated;
               });
             }
           } catch (error) {
