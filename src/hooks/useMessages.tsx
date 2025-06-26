@@ -328,19 +328,6 @@ function useProvideMessages(): MessagesContextValue {
       // Step 3: Prepare message data
       console.log(`${logPrefix}: 📝 Step 3 - Preparing message data`);
       
-      // Add timeout to ensureSession call
-      const ensureSessionPromise = ensureSession();
-      const ensureTimeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('ensureSession timeout after 5 seconds')), 5000)
-      );
-      
-      const hasSession = await Promise.race([ensureSessionPromise, ensureTimeoutPromise]);
-      
-      if (!hasSession) {
-        console.error(`${logPrefix}: ❌ ensureSession returned false`);
-        throw new Error('No valid session');
-      }
-      
       const messageData = {
         user_id: user.id,
         content: content.trim(),
@@ -403,15 +390,23 @@ function useProvideMessages(): MessagesContextValue {
         // Step 6: Handle auth errors with retry
         if (error.status === 401 || /jwt|token|expired/i.test(error.message)) {
           console.log(`${logPrefix}: 🔄 Step 6 - Auth error detected, attempting retry`);
-          const refreshed = await ensureSession();
-          console.log(`${logPrefix}: Retry session refresh result:`, refreshed);
           
-          if (refreshed) {
+          // Try refreshing the session
+          const refreshPromise = supabase.auth.refreshSession();
+          const refreshTimeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Session refresh timeout after 5 seconds')), 5000)
+          );
+          
+          const { data: refreshData, error: refreshError } = await Promise.race([refreshPromise, refreshTimeoutPromise]) as any;
+          console.log(`${logPrefix}: Retry session refresh result:`, {
+            success: !!refreshData.session,
+            error: refreshError?.message
+          });
+          
+          if (!refreshError && refreshData.session) {
             console.log(`${logPrefix}: 🔁 Retrying database insert with refreshed session`);
-            const { data: retrySession } = await supabase.auth.getSession();
-            console.log(`${logPrefix}: Retry auth token:`, retrySession.session?.access_token ? `${retrySession.session.access_token.substring(0, 30)}...` : 'none');
             
-            const retry = await supabase
+            const retryPromise = supabase
               .from('messages')
               .insert(messageData)
               .select(`
@@ -420,6 +415,12 @@ function useProvideMessages(): MessagesContextValue {
               `)
               .single();
               
+            const retryTimeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Retry database insert timeout after 10 seconds')), 10000)
+            );
+            
+            const retry = await Promise.race([retryPromise, retryTimeoutPromise]) as any;
+            
             console.log(`${logPrefix}: Retry result:`, {
               success: !!retry.data,
               error: retry.error?.message,
@@ -428,6 +429,8 @@ function useProvideMessages(): MessagesContextValue {
             
             data = retry.data;
             error = retry.error;
+          } else {
+            console.error(`${logPrefix}: ❌ Session refresh failed, cannot retry`);
           }
         }
         
