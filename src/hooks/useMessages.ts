@@ -198,13 +198,13 @@ export function useMessages() {
   }, [authUser]);
 
   const pinMessage = useCallback(async (messageId: string) => {
-    if (!user) return;
+    if (!authUser) return;
 
     const { error } = await supabase
       .from('messages')
       .update({
         pinned: true,
-        pinned_by: user.id,
+        pinned_by: authUser.id,
         pinned_at: new Date().toISOString(),
       })
       .eq('id', messageId);
@@ -213,7 +213,7 @@ export function useMessages() {
       console.error('Error pinning message:', error);
       throw error;
     }
-  }, [user]);
+  }, [authUser]);
 
   const togglePin = useCallback(async (messageId: string) => {
     if (!authUser) return;
