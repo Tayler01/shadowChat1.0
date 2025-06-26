@@ -78,7 +78,7 @@ export function useAuth() {
           if (session?.user) {
             // Add a small delay to ensure the profile exists after sign-up
             let retries = 0;
-            const maxRetries = 6;
+            const maxRetries = 3;
             
             while (retries < maxRetries) {
               try {
