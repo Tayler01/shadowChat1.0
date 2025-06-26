@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { supabase, updateUserPresence } from './supabase'
 import type { User } from '@supabase/supabase-js'
 
 export interface AuthUser extends User {
@@ -136,11 +136,17 @@ export const updateUserProfile = async (updates: Partial<{
   return data
 }
 
+export const updatePresence = async () => updateUserPresence()
+
+export const updateProfile = updateUserProfile
+
 export const AuthService = {
   signUp,
   signIn,
   signOut,
   getCurrentUser,
   getUserProfile,
-  updateUserProfile
+  updateUserProfile,
+  updatePresence,
+  updateProfile
 }
