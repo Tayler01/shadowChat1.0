@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { supabase, User } from '../lib/supabase';
-import { AuthService } from '../lib/auth';
+import { supabase, User, updateUserPresence } from '../lib/supabase';
+import { signIn as authSignIn, signUp as authSignUp, signOut as authSignOut, getCurrentUser, updateUserProfile } from '../lib/auth';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -12,7 +12,7 @@ export function useAuth() {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session?.user) {
-        const profile = await AuthService.getCurrentUser();
+        const profile = await getCurrentUser();
         setUser(profile);
       }
       
@@ -25,7 +25,7 @@ export function useAuth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (session?.user) {
-          const profile = await AuthService.getCurrentUser();
+          const profile = await getCurrentUser();
           setUser(profile);
         } else {
           setUser(null);
@@ -41,7 +41,7 @@ export function useAuth() {
   useEffect(() => {
     if (!user) return;
 
-    const updatePresence = () => AuthService.updatePresence();
+    const updatePresence = () => updateUserPresence();
     
     // Update immediately
     updatePresence();
@@ -67,7 +67,7 @@ export function useAuth() {
   const signIn = async (email: string, password: string) => {
     setLoading(true);
     try {
-      await AuthService.signIn(email, password);
+      await authSignIn(email, password);
     } finally {
       setLoading(false);
     }
@@ -76,7 +76,7 @@ export function useAuth() {
   const signUp = async (email: string, password: string, userData: { full_name: string; username: string }) => {
     setLoading(true);
     try {
-      await AuthService.signUp(email, password, userData);
+      await authSignUp(email, password, userData);
     } finally {
       setLoading(false);
     }
@@ -85,7 +85,7 @@ export function useAuth() {
   const signOut = async () => {
     setLoading(true);
     try {
-      await AuthService.signOut();
+      await authSignOut();
     } finally {
       setLoading(false);
     }
@@ -94,7 +94,7 @@ export function useAuth() {
   const updateProfile = async (updates: Partial<User>) => {
     if (!user) return;
     
-    const updatedUser = await AuthService.updateProfile(updates);
+    const updatedUser = await updateUserProfile(updates);
     setUser(updatedUser);
     return updatedUser;
   };
