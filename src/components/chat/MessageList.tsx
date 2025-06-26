@@ -27,7 +27,6 @@ interface MessageListProps {
   onReply?: (messageId: string, content: string) => void
 }
 
-export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
 const MessageListComponent: React.FC<MessageListProps> = ({ onReply }) => {
   const { profile } = useAuth()
   const { messages, loading, editMessage, deleteMessage, togglePin } = useMessages()
