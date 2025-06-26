@@ -116,14 +116,6 @@ export const getUserProfile = async (userId: string) => {
   return data
 }
 
-export const AuthService = {
-  signUp,
-  signIn,
-  signOut,
-  getCurrentUser,
-  getUserProfile,
-  updateUserProfile
-}
 export const updateUserProfile = async (updates: Partial<{
   display_name: string
   status_message: string
@@ -142,4 +134,13 @@ export const updateUserProfile = async (updates: Partial<{
 
   if (error) throw error
   return data
+}
+
+export const AuthService = {
+  signUp,
+  signIn,
+  signOut,
+  getCurrentUser,
+  getUserProfile,
+  updateUserProfile
 }
