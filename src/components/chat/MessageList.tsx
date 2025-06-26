@@ -28,6 +28,7 @@ interface MessageListProps {
 }
 
 export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
+const MessageListComponent: React.FC<MessageListProps> = ({ onReply }) => {
   const { profile } = useAuth()
   const { messages, loading, editMessage, deleteMessage, togglePin } = useMessages()
   const { typingUsers } = useTyping('general')
