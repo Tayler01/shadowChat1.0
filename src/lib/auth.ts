@@ -27,7 +27,7 @@ export const signUp = async ({ email, password, username, displayName }: SignUpD
     .from('users')
     .select('username')
     .eq('username', username)
-    .single()
+    .maybeSingle()
 
   if (existingUser) {
     throw new Error('Username is already taken')
