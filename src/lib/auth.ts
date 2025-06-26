@@ -61,7 +61,11 @@ export const signUp = async ({ email, password, username, displayName }: SignUpD
 
     if (profileError) {
       console.error('Error creating user profile:', profileError)
-      throw profileError
+      // Ignore duplicate key errors caused by race conditions with the
+      // auth state change handler which may also insert the profile.
+      if (profileError.code !== '23505') {
+        throw profileError
+      }
     }
 
     // If user is confirmed (auto-login), fetch and return the profile
