@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase, User } from '../lib/supabase';
-import { AuthService } from '../lib/auth';
+import { AuthService, SignUpData } from '../lib/auth';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -76,7 +76,13 @@ export function useAuth() {
   const signUp = async (email: string, password: string, userData: { full_name: string; username: string }) => {
     setLoading(true);
     try {
-      await AuthService.signUp(email, password, userData);
+      const data: SignUpData = {
+        email,
+        password,
+        username: userData.username,
+        displayName: userData.full_name,
+      };
+      await AuthService.signUp(data);
     } finally {
       setLoading(false);
     }
