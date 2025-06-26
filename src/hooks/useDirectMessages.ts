@@ -281,6 +281,13 @@ export function useConversationMessages(conversationId: string | null) {
 
     setSending(true);
     try {
+      // Refresh the session to avoid invalid token errors
+      try {
+        await supabase.auth.refreshSession()
+      } catch (err) {
+        console.error('Error refreshing session before sending DM:', err)
+      }
+
       const { data, error } = await supabase
         .from('dm_messages')
         .insert({
