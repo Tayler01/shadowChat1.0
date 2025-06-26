@@ -6,13 +6,12 @@ export function useMessages() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [subscribed, setSubscribed] = useState(false);
   const { user } = useAuth();
 
   // Fetch initial messages
   useEffect(() => {
     const fetchMessages = async () => {
-      console.log('📥 useMessages: Fetching initial messages...');
+      console.log('📥 Fetching initial messages...');
       try {
         const { data, error } = await supabase
           .from('messages')
@@ -24,13 +23,13 @@ export function useMessages() {
           .limit(100);
 
         if (error) {
-          console.error('❌ useMessages: Error fetching messages:', error);
+          console.error('❌ Error fetching messages:', error);
         } else {
-          console.log('✅ useMessages: Fetched messages:', data?.length || 0);
+          console.log('✅ Fetched messages:', data?.length || 0);
           setMessages(data || []);
         }
       } catch (error) {
-        console.error('❌ useMessages: Exception fetching messages:', error);
+        console.error('❌ Exception fetching messages:', error);
       } finally {
         setLoading(false);
       }
@@ -42,19 +41,14 @@ export function useMessages() {
   // Subscribe to real-time updates
   useEffect(() => {
     if (!user) {
-      console.log('⏭️ useMessages: Skipping real-time setup - no user');
+      console.log('⏭️ Skipping real-time setup - no user');
       return;
     }
 
-    if (subscribed) {
-      console.log('⏭️ useMessages: Already subscribed to real-time');
-      return;
-    }
-
-    console.log('🔄 useMessages: Setting up real-time subscription...');
+    console.log('🔄 Setting up real-time subscription for messages...');
     
     // Use a static channel name to prevent duplicate subscriptions
-    const channelName = `messages-${user.id}`;
+    const channelName = 'public:messages';
     
     const channel = supabase
       .channel(channelName, {
@@ -69,10 +63,9 @@ export function useMessages() {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          publication: 'supabase_realtime'
         },
         async (payload) => {
-          console.log('📨 useMessages: Real-time INSERT received for message:', payload.new.id);
+          console.log('📨 Real-time INSERT received:', payload);
           
           try {
             // Fetch the complete message with user data
@@ -86,29 +79,30 @@ export function useMessages() {
               .single();
 
             if (error) {
-              console.error('❌ useMessages: Error fetching new message details:', error);
+              console.error('❌ Error fetching new message details:', error);
               return;
             }
 
             if (newMessage) {
+              console.log('✅ Adding new message to state:', newMessage);
               setMessages(prev => {
                 // Check if message already exists to avoid duplicates
                 const exists = prev.find(msg => msg.id === newMessage.id);
                 if (exists) {
-                  console.log('⚠️ useMessages: Message already exists, skipping duplicate');
+                  console.log('⚠️ Message already exists, skipping duplicate');
                   return prev;
                 }
                 
-                console.log('✅ useMessages: Adding new message to state');
                 // Add new message to the end
                 const updated = [...prev, newMessage as Message];
+                console.log('📋 Updated messages count:', updated.length, 'Last message:', updated[updated.length - 1]?.content);
                 
                 // Force a new array reference to ensure React detects the change
                 return updated.slice();
               });
             }
           } catch (error) {
-            console.error('❌ useMessages: Exception handling new message:', error);
+            console.error('❌ Exception handling new message:', error);
           }
         }
       )
@@ -118,10 +112,9 @@ export function useMessages() {
           event: 'UPDATE',
           schema: 'public',
           table: 'messages',
-          publication: 'supabase_realtime'
         },
         async (payload) => {
-          console.log('📝 useMessages: Real-time UPDATE received for message:', payload.new.id);
+          console.log('📝 Real-time UPDATE received:', payload);
           
           try {
             // Fetch the updated message with user data
@@ -135,18 +128,18 @@ export function useMessages() {
               .single();
 
             if (error) {
-              console.error('❌ useMessages: Error fetching updated message:', error);
+              console.error('❌ Error fetching updated message:', error);
               return;
             }
 
             if (updatedMessage) {
-              console.log('✅ useMessages: Updating message in state');
+              console.log('✅ Updating message in state:', updatedMessage);
               setMessages(prev =>
                 prev.map(msg => msg.id === updatedMessage.id ? updatedMessage as Message : msg)
               );
             }
           } catch (error) {
-            console.error('❌ useMessages: Exception handling message update:', error);
+            console.error('❌ Exception handling message update:', error);
           }
         }
       )
@@ -156,32 +149,29 @@ export function useMessages() {
           event: 'DELETE',
           schema: 'public',
           table: 'messages',
-          publication: 'supabase_realtime'
         },
         (payload) => {
-          console.log('🗑️ useMessages: Real-time DELETE received for message:', payload.old.id);
+          console.log('🗑️ Real-time DELETE received:', payload);
           setMessages(prev =>
             prev.filter(msg => msg.id !== payload.old.id)
           );
         }
       )
       .subscribe((status, err) => {
-        console.log('📡 useMessages: Real-time subscription status:', status);
+        console.log('📡 Real-time subscription status:', status);
         if (err) {
-          console.error('❌ useMessages: Real-time subscription error:', err);
+          console.error('❌ Real-time subscription error:', err);
         }
         if (status === 'SUBSCRIBED') {
-          console.log('✅ useMessages: Successfully subscribed to real-time messages');
-          setSubscribed(true);
+          console.log('✅ Successfully subscribed to real-time messages');
         }
       });
 
     return () => {
-      console.log('🔌 useMessages: Cleaning up real-time subscription');
-      setSubscribed(false);
+      console.log('🔌 Cleaning up real-time subscription');
       supabase.removeChannel(channel);
     };
-  }, [user, subscribed]);
+  }, [user]);
 
   const sendMessage = useCallback(async (content: string, messageType: 'text' | 'command' = 'text') => {
     if (!user || !content.trim()) {

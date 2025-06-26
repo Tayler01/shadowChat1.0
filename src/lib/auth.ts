@@ -118,28 +118,28 @@ export const signOut = async () => {
 }
 
 export const getCurrentUser = async () => {
-  console.log('🔍 auth: getCurrentUser called');
+  console.log('🔍 getCurrentUser called');
   
   try {
-    console.log('🔐 auth: Checking auth user...');
+    console.log('🔐 Checking auth user...');
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     // Handle the specific "user not found" error from invalid JWT
     if (authError && authError.message?.includes('User from sub claim in JWT does not exist')) {
-      console.log('🧹 auth: Invalid JWT detected in getCurrentUser, clearing session...');
+      console.log('🧹 Invalid JWT detected in getCurrentUser, clearing session...');
       await supabase.auth.signOut();
       return null;
     }
     
     if (authError) {
-      console.error('auth: Auth error in getCurrentUser:', authError);
+      console.error('Auth error in getCurrentUser:', authError);
       return null;
     }
     
-    console.log('👤 auth: Auth user:', user ? `User ID: ${user.id}` : 'No auth user');
+    console.log('👤 Auth user:', user ? `User ID: ${user.id}` : 'No auth user');
     if (!user) return null
 
-    console.log('📋 auth: Fetching user profile from database...');
+    console.log('📋 Fetching user profile from database...');
     
     const { data: profile, error } = await supabase
       .from('users')
@@ -147,12 +147,12 @@ export const getCurrentUser = async () => {
       .eq('id', user.id)
       .single();
 
-    console.log('📝 auth: Profile query result:', { profile: !!profile, error: error?.code });
+    console.log('📝 Profile query result:', { profile: !!profile, error: error?.code });
 
     if (error && error.code === 'PGRST116') {
       // Profile doesn't exist, create it
-      console.error('auth: Error fetching user profile:', error)
-      console.log('auth: Creating missing user profile...')
+      console.error('Error fetching user profile:', error)
+      console.log('Creating missing user profile...')
       
       const userData = {
         id: user.id,
@@ -162,17 +162,17 @@ export const getCurrentUser = async () => {
         status: 'online'
       };
       
-      console.log('📝 auth: Creating profile with data:', userData);
+      console.log('📝 Creating profile with data:', userData);
       
       const { error: insertError } = await supabase
         .from('users')
         .insert(userData)
       
       if (insertError) {
-        console.error('auth: Error creating user profile:', insertError)
+        console.error('Error creating user profile:', insertError)
         // If user already exists (race condition), just fetch it
         if (insertError.code === '23505') {
-          console.log('auth: Profile already exists (race condition), fetching existing profile...');
+          console.log('Profile already exists (race condition), fetching existing profile...');
           const { data: existingProfile, error: fetchError } = await supabase
             .from('users')
             .select('*')
@@ -180,18 +180,18 @@ export const getCurrentUser = async () => {
             .single()
           
           if (fetchError) {
-            console.error('auth: Error fetching existing profile:', fetchError);
+            console.error('Error fetching existing profile:', fetchError);
             return null;
           }
           
-          console.log('✅ auth: Existing profile fetched successfully');
+          console.log('✅ Existing profile fetched successfully');
           return existingProfile;
         } else {
           return null;
         }
       }
       
-      console.log('✅ auth: Profile created, fetching...');
+      console.log('✅ Profile created, fetching...');
       
       // Fetch the newly created profile
       const { data: newProfile, error: fetchError } = await supabase
@@ -201,21 +201,21 @@ export const getCurrentUser = async () => {
         .single()
       
       if (fetchError) {
-        console.error('auth: Error fetching newly created profile:', fetchError);
+        console.error('Error fetching newly created profile:', fetchError);
         return null
       }
       
-      console.log('✅ auth: New profile fetched successfully');
+      console.log('✅ New profile fetched successfully');
       return newProfile
     } else if (error) {
-      console.error('auth: Unexpected error fetching profile:', error);
+      console.error('Unexpected error fetching profile:', error);
       return null;
     }
 
-    console.log('✅ auth: Profile found and returned');
+    console.log('✅ Profile found and returned');
     return profile
   } catch (error) {
-    console.error('auth: Error in getCurrentUser:', error);
+    console.error('Error in getCurrentUser:', error);
     return null;
   }
 }
