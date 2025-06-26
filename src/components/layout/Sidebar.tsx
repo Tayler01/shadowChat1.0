@@ -1,16 +1,24 @@
 import React from 'react';
-import { MessageSquare, Users, User, Settings, Plus } from 'lucide-react';
+import { MessageSquare, Users, User, Settings, Plus, Moon, Sun } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
 import { useAuth } from '../../hooks/useAuth';
 import { useDirectMessages } from '../../hooks/useDirectMessages';
 
 interface SidebarProps {
-  activeSection: 'chat' | 'dms' | 'profile' | 'settings';
-  onSectionChange: (section: 'chat' | 'dms' | 'profile' | 'settings') => void;
+  currentView: 'chat' | 'dms' | 'profile' | 'settings';
+  onViewChange: (view: 'chat' | 'dms' | 'profile' | 'settings') => void;
+  isDarkMode: boolean;
+  onToggleDarkMode: () => void;
   onNewDM?: () => void;
 }
 
-export function Sidebar({ activeSection, onSectionChange, onNewDM }: SidebarProps) {
+export function Sidebar({
+  currentView,
+  onViewChange,
+  isDarkMode,
+  onToggleDarkMode,
+  onNewDM,
+}: SidebarProps) {
   const { user } = useAuth();
   const { conversations } = useDirectMessages();
 
@@ -63,11 +71,11 @@ export function Sidebar({ activeSection, onSectionChange, onNewDM }: SidebarProp
         {navItems.map((item) => (
           <button
             key={item.id}
-            onClick={() => onSectionChange(item.id)}
+            onClick={() => onViewChange(item.id)}
             className={`
               w-full flex items-center space-x-3 px-3 py-2 rounded-lg
               transition-all duration-200
-              ${activeSection === item.id
+              ${currentView === item.id
                 ? 'bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 border-l-4 border-blue-500'
                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               }
@@ -84,7 +92,7 @@ export function Sidebar({ activeSection, onSectionChange, onNewDM }: SidebarProp
         ))}
 
         {/* DM List */}
-        {activeSection === 'dms' && (
+        {currentView === 'dms' && (
           <div className="mt-6 space-y-2">
             <div className="flex items-center justify-between px-3">
               <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">
@@ -149,6 +157,16 @@ export function Sidebar({ activeSection, onSectionChange, onNewDM }: SidebarProp
               @{user?.username}
             </p>
           </div>
+          <button
+            onClick={onToggleDarkMode}
+            className="p-2 text-gray-500 hover:text-gray-700"
+          >
+            {isDarkMode ? (
+              <Sun className="w-4 h-4" />
+            ) : (
+              <Moon className="w-4 h-4" />
+            )}
+          </button>
         </div>
       </div>
     </div>
