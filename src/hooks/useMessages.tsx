@@ -258,6 +258,8 @@ function useProvideMessages(): MessagesContextValue {
     console.log(`${logPrefix}: Message type:`, messageType);
     console.log(`${logPrefix}: User exists:`, !!user);
     console.log(`${logPrefix}: User ID:`, user?.id);
+    console.log(`${logPrefix}: Network status:`, navigator.onLine ? 'online' : 'offline');
+    console.log(`${logPrefix}: Document visibility:`, document.hidden ? 'hidden' : 'visible');
     
     if (!user || !content.trim()) {
       console.log(`${logPrefix}: ❌ Cannot send message - missing user or content`);
@@ -268,9 +270,12 @@ function useProvideMessages(): MessagesContextValue {
     console.log(`${logPrefix}: 📤 Proceeding with message send`);
     setSending(true);
 
+    let sessionData: any = null;
+
     try {
       // Step 1: Check session
       console.log(`${logPrefix}: 🔐 Step 1 - Checking session validity`);
+      const sessionStartTime = performance.now();
       
       // Add timeout to prevent hanging on session check
       const sessionPromise = supabase.auth.getSession();
@@ -278,16 +283,24 @@ function useProvideMessages(): MessagesContextValue {
         setTimeout(() => reject(new Error('Session check timeout after 5 seconds')), 5000)
       );
       
-      const { data: sessionData, error: sessionError } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+      const sessionResult = await Promise.race([sessionPromise, timeoutPromise]) as any;
+      const sessionEndTime = performance.now();
+      const sessionDuration = sessionEndTime - sessionStartTime;
+      
+      console.log(`${logPrefix}: Session check completed in ${sessionDuration.toFixed(2)}ms`);
+      
+      const { data: sessionDataResult, error: sessionError } = sessionResult;
+      sessionData = sessionDataResult;
       
       console.log(`${logPrefix}: Session data:`, {
-        hasSession: !!sessionData.session,
-        userId: sessionData.session?.user?.id,
-        expiresAt: sessionData.session?.expires_at,
+        hasSession: !!sessionData?.session,
+        userId: sessionData?.session?.user?.id,
+        expiresAt: sessionData?.session?.expires_at,
         currentTime: Math.floor(Date.now() / 1000),
-        isExpired: sessionData.session?.expires_at ? sessionData.session.expires_at < Math.floor(Date.now() / 1000) : 'unknown',
-        accessToken: sessionData.session?.access_token ? `${sessionData.session.access_token.substring(0, 20)}...` : 'none',
-        refreshToken: sessionData.session?.refresh_token ? `${sessionData.session.refresh_token.substring(0, 20)}...` : 'none'
+        isExpired: sessionData?.session?.expires_at ? sessionData.session.expires_at < Math.floor(Date.now() / 1000) : 'unknown',
+        accessToken: sessionData?.session?.access_token ? `${sessionData.session.access_token.substring(0, 20)}...` : 'none',
+        refreshToken: sessionData?.session?.refresh_token ? `${sessionData.session.refresh_token.substring(0, 20)}...` : 'none',
+        sessionCheckDuration: `${sessionDuration.toFixed(2)}ms`
       });
       
       if (sessionError) {
@@ -295,7 +308,7 @@ function useProvideMessages(): MessagesContextValue {
         throw new Error(`Session error: ${sessionError.message}`);
       }
       
-      if (!sessionData.session) {
+      if (!sessionData?.session) {
         console.error(`${logPrefix}: ❌ No active session found`);
         throw new Error('No active session');
       }
@@ -303,6 +316,7 @@ function useProvideMessages(): MessagesContextValue {
       // Step 2: Refresh session if needed
       if (sessionData.session.expires_at && sessionData.session.expires_at < Math.floor(Date.now() / 1000)) {
         console.log(`${logPrefix}: 🔄 Step 2 - Session expired, refreshing...`);
+        const refreshStartTime = performance.now();
         
         const refreshPromise = supabase.auth.refreshSession();
         const refreshTimeoutPromise = new Promise((_, reject) => 
@@ -310,16 +324,24 @@ function useProvideMessages(): MessagesContextValue {
         );
         
         const { data: refreshData, error: refreshError } = await Promise.race([refreshPromise, refreshTimeoutPromise]) as any;
+        const refreshEndTime = performance.now();
+        const refreshDuration = refreshEndTime - refreshStartTime;
         
         console.log(`${logPrefix}: Refresh result:`, {
           success: !!refreshData.session,
           error: refreshError?.message,
-          newAccessToken: refreshData.session?.access_token ? `${refreshData.session.access_token.substring(0, 20)}...` : 'none'
+          newAccessToken: refreshData.session?.access_token ? `${refreshData.session.access_token.substring(0, 20)}...` : 'none',
+          refreshDuration: `${refreshDuration.toFixed(2)}ms`
         });
         
         if (refreshError) {
           console.error(`${logPrefix}: ❌ Failed to refresh session:`, refreshError);
           throw new Error(`Session refresh failed: ${refreshError.message}`);
+        }
+        
+        // Update sessionData with refreshed session
+        if (refreshData.session) {
+          sessionData = { session: refreshData.session };
         }
       } else {
         console.log(`${logPrefix}: ✅ Session is valid, no refresh needed`);
@@ -335,16 +357,11 @@ function useProvideMessages(): MessagesContextValue {
       };
       console.log(`${logPrefix}: Message payload:`, messageData);
 
-      // Step 4: Get current auth headers
-      const currentSessionPromise = supabase.auth.getSession();
-      const currentSessionTimeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Current session check timeout after 5 seconds')), 5000)
-      );
-      
-      const { data: currentSession } = await Promise.race([currentSessionPromise, currentSessionTimeoutPromise]) as any;
+      // Step 4: Prepare auth headers using existing session data
+      console.log(`${logPrefix}: 🔑 Step 4 - Preparing auth headers`);
       
       const authHeaders = {
-        'Authorization': `Bearer ${currentSession.session?.access_token}`,
+        'Authorization': `Bearer ${sessionData.session?.access_token}`,
         'apikey': supabase.supabaseKey,
         'Content-Type': 'application/json',
         'Prefer': 'return=representation'
@@ -358,6 +375,7 @@ function useProvideMessages(): MessagesContextValue {
       
       // Step 5: Attempt database insert
       console.log(`${logPrefix}: 💾 Step 5 - Inserting into database`);
+      const insertStartTime = performance.now();
       
       const insertPromise = supabase
         .from('messages')
@@ -373,6 +391,8 @@ function useProvideMessages(): MessagesContextValue {
       );
       
       let { data, error } = await Promise.race([insertPromise, insertTimeoutPromise]) as any;
+      const insertEndTime = performance.now();
+      const insertDuration = insertEndTime - insertStartTime;
 
       console.log(`${logPrefix}: Database insert result:`, {
         success: !!data,
@@ -381,7 +401,8 @@ function useProvideMessages(): MessagesContextValue {
         errorDetails: error?.details,
         errorHint: error?.hint,
         insertedId: data?.id,
-        insertedContent: data?.content
+        insertedContent: data?.content,
+        insertDuration: `${insertDuration.toFixed(2)}ms`
       });
 
       if (error) {
@@ -390,6 +411,7 @@ function useProvideMessages(): MessagesContextValue {
         // Step 6: Handle auth errors with retry
         if (error.status === 401 || /jwt|token|expired/i.test(error.message)) {
           console.log(`${logPrefix}: 🔄 Step 6 - Auth error detected, attempting retry`);
+          const retryRefreshStartTime = performance.now();
           
           // Try refreshing the session
           const refreshPromise = supabase.auth.refreshSession();
@@ -398,13 +420,18 @@ function useProvideMessages(): MessagesContextValue {
           );
           
           const { data: refreshData, error: refreshError } = await Promise.race([refreshPromise, refreshTimeoutPromise]) as any;
+          const retryRefreshEndTime = performance.now();
+          const retryRefreshDuration = retryRefreshEndTime - retryRefreshStartTime;
+          
           console.log(`${logPrefix}: Retry session refresh result:`, {
             success: !!refreshData.session,
-            error: refreshError?.message
+            error: refreshError?.message,
+            retryRefreshDuration: `${retryRefreshDuration.toFixed(2)}ms`
           });
           
           if (!refreshError && refreshData.session) {
             console.log(`${logPrefix}: 🔁 Retrying database insert with refreshed session`);
+            const retryInsertStartTime = performance.now();
             
             const retryPromise = supabase
               .from('messages')
@@ -420,11 +447,14 @@ function useProvideMessages(): MessagesContextValue {
             );
             
             const retry = await Promise.race([retryPromise, retryTimeoutPromise]) as any;
+            const retryInsertEndTime = performance.now();
+            const retryInsertDuration = retryInsertEndTime - retryInsertStartTime;
             
             console.log(`${logPrefix}: Retry result:`, {
               success: !!retry.data,
               error: retry.error?.message,
-              insertedId: retry.data?.id
+              insertedId: retry.data?.id,
+              retryInsertDuration: `${retryInsertDuration.toFixed(2)}ms`
             });
             
             data = retry.data;
@@ -474,6 +504,9 @@ function useProvideMessages(): MessagesContextValue {
       console.error(`${logPrefix}: ❌ Exception in send process:`, {
         message: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined,
+        sessionDataAvailable: !!sessionData,
+        userAvailable: !!user,
+        networkOnline: navigator.onLine,
         error
       });
       throw error;
