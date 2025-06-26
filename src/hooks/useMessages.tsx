@@ -270,85 +270,10 @@ function useProvideMessages(): MessagesContextValue {
     console.log(`${logPrefix}: 📤 Proceeding with message send`);
     setSending(true);
 
-    let sessionData: any = null;
 
     try {
-      // Step 1: Check session
-      console.log(`${logPrefix}: 🔐 Step 1 - Checking session validity`);
-      const sessionStartTime = performance.now();
-      
-      // Add timeout to prevent hanging on session check
-      const sessionPromise = supabase.auth.getSession();
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Session check timeout after 5 seconds')), 5000)
-      );
-      
-      const sessionResult = await Promise.race([sessionPromise, timeoutPromise]) as any;
-      const sessionEndTime = performance.now();
-      const sessionDuration = sessionEndTime - sessionStartTime;
-      
-      console.log(`${logPrefix}: Session check completed in ${sessionDuration.toFixed(2)}ms`);
-      
-      const { data: sessionDataResult, error: sessionError } = sessionResult;
-      sessionData = sessionDataResult;
-      
-      console.log(`${logPrefix}: Session data:`, {
-        hasSession: !!sessionData?.session,
-        userId: sessionData?.session?.user?.id,
-        expiresAt: sessionData?.session?.expires_at,
-        currentTime: Math.floor(Date.now() / 1000),
-        isExpired: sessionData?.session?.expires_at ? sessionData.session.expires_at < Math.floor(Date.now() / 1000) : 'unknown',
-        accessToken: sessionData?.session?.access_token ? `${sessionData.session.access_token.substring(0, 20)}...` : 'none',
-        refreshToken: sessionData?.session?.refresh_token ? `${sessionData.session.refresh_token.substring(0, 20)}...` : 'none',
-        sessionCheckDuration: `${sessionDuration.toFixed(2)}ms`
-      });
-      
-      if (sessionError) {
-        console.error(`${logPrefix}: ❌ Session error:`, sessionError);
-        throw new Error(`Session error: ${sessionError.message}`);
-      }
-      
-      if (!sessionData?.session) {
-        console.error(`${logPrefix}: ❌ No active session found`);
-        throw new Error('No active session');
-      }
-      
-      // Step 2: Refresh session if needed
-      if (sessionData.session.expires_at && sessionData.session.expires_at < Math.floor(Date.now() / 1000)) {
-        console.log(`${logPrefix}: 🔄 Step 2 - Session expired, refreshing...`);
-        const refreshStartTime = performance.now();
-        
-        const refreshPromise = supabase.auth.refreshSession();
-        const refreshTimeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Session refresh timeout after 5 seconds')), 5000)
-        );
-        
-        const { data: refreshData, error: refreshError } = await Promise.race([refreshPromise, refreshTimeoutPromise]) as any;
-        const refreshEndTime = performance.now();
-        const refreshDuration = refreshEndTime - refreshStartTime;
-        
-        console.log(`${logPrefix}: Refresh result:`, {
-          success: !!refreshData.session,
-          error: refreshError?.message,
-          newAccessToken: refreshData.session?.access_token ? `${refreshData.session.access_token.substring(0, 20)}...` : 'none',
-          refreshDuration: `${refreshDuration.toFixed(2)}ms`
-        });
-        
-        if (refreshError) {
-          console.error(`${logPrefix}: ❌ Failed to refresh session:`, refreshError);
-          throw new Error(`Session refresh failed: ${refreshError.message}`);
-        }
-        
-        // Update sessionData with refreshed session
-        if (refreshData.session) {
-          sessionData = { session: refreshData.session };
-        }
-      } else {
-        console.log(`${logPrefix}: ✅ Session is valid, no refresh needed`);
-      }
-      
-      // Step 3: Prepare message data
-      console.log(`${logPrefix}: 📝 Step 3 - Preparing message data`);
+      // Step 1: Prepare message data
+      console.log(`${logPrefix}: 📝 Step 1 - Preparing message data`);
       
       const messageData = {
         user_id: user.id,
@@ -357,24 +282,8 @@ function useProvideMessages(): MessagesContextValue {
       };
       console.log(`${logPrefix}: Message payload:`, messageData);
 
-      // Step 4: Prepare auth headers using existing session data
-      console.log(`${logPrefix}: 🔑 Step 4 - Preparing auth headers`);
-      
-      const authHeaders = {
-        'Authorization': `Bearer ${sessionData.session?.access_token}`,
-        'apikey': supabase.supabaseKey,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation'
-      };
-      console.log(`${logPrefix}: Auth headers:`, {
-        hasAuth: !!authHeaders.Authorization,
-        authTokenPrefix: authHeaders.Authorization ? authHeaders.Authorization.substring(0, 30) + '...' : 'none',
-        hasApiKey: !!authHeaders.apikey,
-        apiKeyPrefix: authHeaders.apikey ? authHeaders.apikey.substring(0, 20) + '...' : 'none'
-      });
-      
-      // Step 5: Attempt database insert
-      console.log(`${logPrefix}: 💾 Step 5 - Inserting into database`);
+      // Step 2: Attempt database insert (let Supabase handle auth internally)
+      console.log(`${logPrefix}: 💾 Step 2 - Inserting into database`);
       const insertStartTime = performance.now();
       
       const insertPromise = supabase
@@ -408,9 +317,9 @@ function useProvideMessages(): MessagesContextValue {
       if (error) {
         console.error(`${logPrefix}: ❌ Database insert failed:`, error);
         
-        // Step 6: Handle auth errors with retry
+        // Step 3: Handle auth errors with retry
         if (error.status === 401 || /jwt|token|expired/i.test(error.message)) {
-          console.log(`${logPrefix}: 🔄 Step 6 - Auth error detected, attempting retry`);
+          console.log(`${logPrefix}: 🔄 Step 3 - Auth error detected, attempting session refresh and retry`);
           const retryRefreshStartTime = performance.now();
           
           // Try refreshing the session
@@ -477,8 +386,8 @@ function useProvideMessages(): MessagesContextValue {
         createdAt: data?.created_at
       });
 
-      // Step 7: Update local state and broadcast
-      console.log(`${logPrefix}: 📡 Step 7 - Updating local state and broadcasting`);
+      // Step 4: Update local state and broadcast
+      console.log(`${logPrefix}: 📡 Step 4 - Updating local state and broadcasting`);
       if (data) {
         setMessages(prev => {
           const exists = prev.find(m => m.id === data.id)
@@ -504,7 +413,6 @@ function useProvideMessages(): MessagesContextValue {
       console.error(`${logPrefix}: ❌ Exception in send process:`, {
         message: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined,
-        sessionDataAvailable: !!sessionData,
         userAvailable: !!user,
         networkOnline: navigator.onLine,
         error
