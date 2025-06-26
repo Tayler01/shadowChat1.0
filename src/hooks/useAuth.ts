@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase, User, updateUserPresence } from '../lib/supabase';
 import { signIn as authSignIn, signUp as authSignUp, signOut as authSignOut, getCurrentUser, updateUserProfile } from '../lib/auth';
 
@@ -6,11 +6,17 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const initialLoadRef = useRef(false);
+  const processingRef = useRef(false);
 
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
+      if (initialLoadRef.current || processingRef.current) return;
+      
       console.log('🔍 Getting initial session...');
+      processingRef.current = true;
+      
       try {
         const { data: { session } } = await supabase.auth.getSession();
         console.log('📋 Session data:', session ? 'Session exists' : 'No session');
@@ -28,10 +34,12 @@ export function useAuth() {
         console.error('Error getting initial session:', error);
         setError(error instanceof Error ? error.message : 'Unknown error');
         setUser(null);
+      } finally {
+        console.log('✅ Initial session check complete, setting loading to false');
+        setLoading(false);
+        initialLoadRef.current = true;
+        processingRef.current = false;
       }
-      
-      console.log('✅ Initial session check complete, setting loading to false');
-      setLoading(false);
     };
 
     getInitialSession();
@@ -39,9 +47,20 @@ export function useAuth() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        // Skip if we're still doing initial load or already processing
+        if (!initialLoadRef.current || processingRef.current) {
+          console.log('⏭️ Skipping auth change during initial load or processing');
+          return;
+        }
+
         console.log('🔄 Auth state change:', event);
+        processingRef.current = true;
+        
         try {
-          if (session?.user) {
+          if (event === 'SIGNED_OUT') {
+            console.log('👋 User signed out');
+            setUser(null);
+          } else if (session?.user) {
             console.log('👤 User in auth change, getting profile...');
             const profile = await getCurrentUser();
             console.log('📝 Profile in auth change:', profile ? 'Profile loaded' : 'No profile');
@@ -54,8 +73,9 @@ export function useAuth() {
           console.error('Error in auth state change:', error);
           setError(error instanceof Error ? error.message : 'Unknown error');
           setUser(null);
+        } finally {
+          processingRef.current = false;
         }
-        setLoading(false);
       }
     );
 
@@ -91,8 +111,12 @@ export function useAuth() {
 
   const signIn = async (email: string, password: string) => {
     setLoading(true);
+    setError(null);
     try {
       await authSignIn({ email, password });
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Sign in failed');
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -104,6 +128,7 @@ export function useAuth() {
     userData: { full_name: string; username: string }
   ) => {
     setLoading(true);
+    setError(null);
     try {
       const profile = await authSignUp({
         email,
@@ -114,6 +139,9 @@ export function useAuth() {
       if (profile) {
         setUser(profile);
       }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Sign up failed');
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -121,8 +149,12 @@ export function useAuth() {
 
   const signOut = async () => {
     setLoading(true);
+    setError(null);
     try {
       await authSignOut();
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Sign out failed');
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -131,9 +163,14 @@ export function useAuth() {
   const updateProfile = async (updates: Partial<User>) => {
     if (!user) return;
     
-    const updatedUser = await updateUserProfile(updates);
-    setUser(updatedUser);
-    return updatedUser;
+    try {
+      const updatedUser = await updateUserProfile(updates);
+      setUser(updatedUser);
+      return updatedUser;
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Profile update failed');
+      throw error;
+    }
   };
 
   return {

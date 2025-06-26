@@ -108,6 +108,13 @@ export const signOut = async () => {
 
 export const getCurrentUser = async () => {
   console.log('🔍 getCurrentUser called');
+  
+  // Add timeout to prevent hanging
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error('getCurrentUser timeout')), 10000);
+  });
+  
+  const getUserPromise = async () => {
   const { data: { user } } = await supabase.auth.getUser()
   console.log('👤 Auth user:', user ? `User ID: ${user.id}` : 'No auth user');
   if (!user) return null
@@ -184,6 +191,14 @@ export const getCurrentUser = async () => {
       
       return null
     }
+  };
+  
+  try {
+    return await Promise.race([getUserPromise(), timeoutPromise]);
+  } catch (error) {
+    console.error('getCurrentUser failed or timed out:', error);
+    return null;
+  }
 
     console.log('✅ Profile found and returned');
     return profile
