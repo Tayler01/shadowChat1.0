@@ -30,7 +30,10 @@ export function useAuth() {
         if (sessionError && sessionError.message?.includes('User from sub claim in JWT does not exist')) {
           console.log('🧹 Invalid JWT detected in getSession, clearing session...');
           await supabase.auth.signOut();
-          if (mountedRef.current) setUser(null);
+          if (mountedRef.current) {
+            setUser(null);
+            setError(null);
+          }
           return;
         }
         
@@ -51,7 +54,8 @@ export function useAuth() {
             const profile = await getCurrentUser();
             console.log('📝 Profile result:', profile ? 'Profile loaded' : 'No profile');
             if (mountedRef.current) {
-              setUser(profile);
+              setUser(profile || null);
+              setError(null);
             }
           } catch (error) {
             console.error('Failed to get user profile during initial session:', error);
@@ -62,7 +66,10 @@ export function useAuth() {
           }
         } else {
           console.log('❌ No user in session');
-          if (mountedRef.current) setUser(null);
+          if (mountedRef.current) {
+            setUser(null);
+            setError(null);
+          }
         }
       } catch (error) {
         console.error('Error getting initial session:', error);
@@ -73,7 +80,10 @@ export function useAuth() {
           console.log('🧹 Invalid JWT detected, clearing session...');
           // Clear the invalid session
           await authSignOut();
-          if (mountedRef.current) setUser(null);
+          if (mountedRef.current) {
+            setUser(null);
+            setError(null);
+          }
           // Don't set this as an error since it's expected behavior
         } else {
           if (mountedRef.current) {
@@ -121,17 +131,18 @@ export function useAuth() {
         globalAuthPromise = (async () => {
           if (event === 'SIGNED_OUT') {
             console.log('👋 User signed out');
-            if (mountedRef.current) setUser(null);
+            if (mountedRef.current) {
+              setUser(null);
+              setError(null);
+            }
           } else if (session?.user) {
             console.log('👤 User in auth change, getting profile...');
             try {
               const profile = await getCurrentUser();
               console.log('📝 Profile in auth change:', profile ? 'Profile loaded' : 'No profile');
-              if (profile) {
-                if (mountedRef.current) setUser(profile);
-              } else {
-                console.log('❌ Failed to get profile, keeping user as null');
-                if (mountedRef.current) setUser(null);
+              if (mountedRef.current) {
+                setUser(profile || null);
+                setError(null);
               }
             } catch (error) {
               console.error('Failed to get user profile during auth change:', error);
@@ -142,7 +153,10 @@ export function useAuth() {
             }
           } else {
             console.log('❌ No user in auth change');
-            if (mountedRef.current) setUser(null);
+            if (mountedRef.current) {
+              setUser(null);
+              setError(null);
+            }
           }
         })().catch(error => {
           console.error('Error in auth state change:', error);
@@ -227,6 +241,7 @@ export function useAuth() {
       } else if (result.user && !result.session) {
         console.log('📧 Email confirmation required');
         // Don't set user yet, they need to confirm email
+        setUser(null);
       }
       
       return result;
@@ -243,6 +258,7 @@ export function useAuth() {
     setError(null);
     try {
       await authSignOut();
+      setUser(null);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Sign out failed');
       throw error;
@@ -256,7 +272,7 @@ export function useAuth() {
     
     try {
       const updatedUser = await updateUserProfile(updates);
-      setUser(updatedUser);
+      setUser(updatedUser || null);
       return updatedUser;
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Profile update failed');
@@ -264,6 +280,15 @@ export function useAuth() {
     }
   };
 
+  // Add debugging to track user state changes
+  useEffect(() => {
+    console.log('🔍 useAuth - user state changed:', { 
+      user: user, 
+      hasUser: !!user,
+      userId: user?.id,
+      userType: typeof user
+    });
+  }, [user]);
   return {
     user,
     loading,
