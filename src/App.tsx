@@ -15,6 +15,7 @@ type View = 'chat' | 'dms' | 'profile' | 'settings'
 function App() {
   const { user } = useAuth()
   const [currentView, setCurrentView] = useState<View>('chat')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('darkMode') === 'true' ||
@@ -52,31 +53,46 @@ function App() {
     setIsDarkMode(!isDarkMode)
   }
 
+  const toggleSidebar = () => {
+    setSidebarOpen((prev) => !prev)
+  }
+
+  const closeSidebar = () => setSidebarOpen(false)
+
   const renderCurrentView = () => {
     switch (currentView) {
       case 'chat':
-        return <ChatView />
+        return <ChatView onToggleSidebar={toggleSidebar} />
       case 'dms':
-        return <DirectMessagesView />
+        return <DirectMessagesView onToggleSidebar={toggleSidebar} />
       case 'profile':
-        return <ProfileView />
+        return <ProfileView onToggleSidebar={toggleSidebar} />
       case 'settings':
-        return <SettingsView />
+        return <SettingsView onToggleSidebar={toggleSidebar} />
       default:
-        return <ChatView />
+        return <ChatView onToggleSidebar={toggleSidebar} />
     }
   }
 
   return (
     <AuthGuard>
       <MessagesProvider>
-        <div className="h-screen flex bg-gray-100 dark:bg-gray-900">
+        <div className="h-screen flex flex-col md:flex-row bg-gray-100 dark:bg-gray-900">
           <Sidebar
             currentView={currentView}
             onViewChange={setCurrentView}
             isDarkMode={isDarkMode}
             onToggleDarkMode={toggleDarkMode}
+            isOpen={sidebarOpen}
+            onClose={closeSidebar}
           />
+
+          {sidebarOpen && (
+            <div
+              className="fixed inset-0 bg-black/40 md:hidden"
+              onClick={closeSidebar}
+            />
+          )}
 
           <main className="flex-1 flex flex-col min-w-0">
             {renderCurrentView()}
