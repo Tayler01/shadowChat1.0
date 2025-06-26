@@ -115,96 +115,96 @@ export const getCurrentUser = async () => {
   });
   
   const getUserPromise = async () => {
-  const { data: { user } } = await supabase.auth.getUser()
-  console.log('👤 Auth user:', user ? `User ID: ${user.id}` : 'No auth user');
-  if (!user) return null
+    const { data: { user } } = await supabase.auth.getUser()
+    console.log('👤 Auth user:', user ? `User ID: ${user.id}` : 'No auth user');
+    if (!user) return null
 
-  try {
-    console.log('📋 Fetching user profile from database...');
-    // Get the user profile from the users table
-    const { data: profile, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', user.id)
-      .maybeSingle()
+    try {
+      console.log('📋 Fetching user profile from database...');
+      // Get the user profile from the users table
+      const { data: profile, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle()
 
-    console.log('📝 Profile query result:', { profile: !!profile, error: error?.code });
+      console.log('📝 Profile query result:', { profile: !!profile, error: error?.code });
 
-    if (error) {
-      console.error('Error fetching user profile:', error)
-      
-      // If profile doesn't exist, create it from auth user metadata
-      if (error.code === 'PGRST116') {
-        console.log('Creating missing user profile...')
+      if (error) {
+        console.error('Error fetching user profile:', error)
         
-        const userData = {
-          id: user.id,
-          email: user.email!,
-          username: user.user_metadata?.username || user.email?.split('@')[0] || `user_${user.id.slice(0, 8)}`,
-          display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || 'User',
-          status: 'online'
-        };
-        
-        console.log('📝 Creating profile with data:', userData);
-        
-        const { error: insertError } = await supabase
-          .from('users')
-          .insert(userData)
-        
-        if (insertError) {
-          console.error('Error creating user profile:', insertError)
-          // If username conflict, try with a unique suffix
-          if (insertError.code === '23505') {
-            console.log('Username conflict, trying with unique suffix...');
-            userData.username = `${userData.username}_${Date.now()}`;
-            const { error: retryError } = await supabase
-              .from('users')
-              .insert(userData);
-            
-            if (retryError) {
-              console.error('Error creating user profile with unique username:', retryError);
+        // If profile doesn't exist, create it from auth user metadata
+        if (error.code === 'PGRST116') {
+          console.log('Creating missing user profile...')
+          
+          const userData = {
+            id: user.id,
+            email: user.email!,
+            username: user.user_metadata?.username || user.email?.split('@')[0] || `user_${user.id.slice(0, 8)}`,
+            display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || 'User',
+            status: 'online'
+          };
+          
+          console.log('📝 Creating profile with data:', userData);
+          
+          const { error: insertError } = await supabase
+            .from('users')
+            .insert(userData)
+          
+          if (insertError) {
+            console.error('Error creating user profile:', insertError)
+            // If username conflict, try with a unique suffix
+            if (insertError.code === '23505') {
+              console.log('Username conflict, trying with unique suffix...');
+              userData.username = `${userData.username}_${Date.now()}`;
+              const { error: retryError } = await supabase
+                .from('users')
+                .insert(userData);
+              
+              if (retryError) {
+                console.error('Error creating user profile with unique username:', retryError);
+                return null;
+              }
+            } else {
               return null;
             }
-          } else {
-            return null;
           }
+          
+          console.log('✅ Profile created, fetching...');
+          
+          // Fetch the newly created profile
+          const { data: newProfile, error: fetchError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .single()
+          
+          if (fetchError) {
+            console.error('Error fetching newly created profile:', fetchError);
+            return null
+          }
+          
+          console.log('✅ New profile fetched successfully');
+          
+          return newProfile
         }
         
-        console.log('✅ Profile created, fetching...');
-        
-        // Fetch the newly created profile
-        const { data: newProfile, error: fetchError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', user.id)
-          .single()
-        
-        if (fetchError) {
-          console.error('Error fetching newly created profile:', fetchError);
-          return null
-        }
-        
-        console.log('✅ New profile fetched successfully');
-        
-        return newProfile
+        return null
       }
-      
+
+      console.log('✅ Profile found and returned');
+      return profile
+    } catch (error) {
+      console.error('Unexpected error in getCurrentUser:', error)
       return null
     }
-  };
+  }
   
   try {
     return await Promise.race([getUserPromise(), timeoutPromise]);
   } catch (error) {
     console.error('getCurrentUser failed or timed out:', error);
     return null;
-  }
-
-    console.log('✅ Profile found and returned');
-    return profile
-  } catch (error) {
-    console.error('Unexpected error in getCurrentUser:', error)
-    return null
   }
 }
 
