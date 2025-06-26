@@ -10,12 +10,21 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   realtime: {
     params: {
-      eventsPerSecond: 20,
+      eventsPerSecond: 50,
     },
   },
   auth: {
     autoRefreshToken: true,
     persistSession: true,
+    detectSessionInUrl: true,
+  },
+  global: {
+    headers: {
+      'x-my-custom-header': 'realtime-chat',
+    },
+    params: {
+      eventsPerSecond: 20,
+    },
   },
 })
 

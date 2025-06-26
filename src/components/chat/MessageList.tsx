@@ -33,7 +33,11 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
   
   // Debug logging
   useEffect(() => {
-    console.log('📋 MessageList: messages updated', { count: messages.length, loading });
+    console.log('📋 MessageList: messages updated', { 
+      count: messages.length, 
+      loading,
+      messageIds: messages.map(m => m.id).slice(-3) // Show last 3 message IDs
+    });
   }, [messages, loading]);
   
   const [editingMessage, setEditingMessage] = useState<string | null>(null)

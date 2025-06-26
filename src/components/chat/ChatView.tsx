@@ -12,10 +12,10 @@ export const ChatView: React.FC = () => {
   const { user } = useAuth()
 
   const handleSendMessage = async (content: string) => {
-    console.log('🚀 ChatView: Sending message:', content);
+    console.log('🚀 ChatView: Sending message:', { content, userExists: !!user });
     try {
       await sendMessage(content)
-      console.log('✅ ChatView: Message sent successfully');
+      console.log('✅ ChatView: Message sent successfully, waiting for real-time update');
     } catch (error) {
       console.error('❌ ChatView: Failed to send message:', error);
       toast.error('Failed to send message')
