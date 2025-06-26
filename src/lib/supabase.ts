@@ -119,3 +119,23 @@ export const markDMMessagesRead = async (conversationId: string) => {
   })
   if (error) console.error('Error marking messages as read:', error)
 }
+
+export const ensureSession = async (): Promise<boolean> => {
+  const { data: { session }, error } = await supabase.auth.getSession()
+  if (error) {
+    console.error('Error getting session:', error)
+    return false
+  }
+  if (!session) {
+    console.warn('No active session')
+    return false
+  }
+  if (session.expires_at && session.expires_at < Math.floor(Date.now() / 1000)) {
+    const { error: refreshError } = await supabase.auth.refreshSession()
+    if (refreshError) {
+      console.error('Failed to refresh session:', refreshError)
+      return false
+    }
+  }
+  return true
+}
