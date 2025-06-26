@@ -61,10 +61,6 @@ export function useAuth() {
             }
           }
         } else {
-          console.log('📝 Profile result:', profile ? 'Profile loaded' : 'No profile');
-          if (mountedRef.current) {
-            setUser(profile);
-          }
           console.log('❌ No user in session');
           if (mountedRef.current) setUser(null);
         }
@@ -145,13 +141,6 @@ export function useAuth() {
               }
             }
           } else {
-            console.log('📝 Profile in auth change:', profile ? 'Profile loaded' : 'No profile');
-            if (profile) {
-              if (mountedRef.current) setUser(profile);
-            } else {
-              console.log('❌ Failed to get profile, keeping user as null');
-              if (mountedRef.current) setUser(null);
-            }
             console.log('❌ No user in auth change');
             if (mountedRef.current) setUser(null);
           }

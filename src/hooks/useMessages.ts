@@ -185,9 +185,8 @@ export function useMessages() {
 
     try {
       const { error } = await supabase.rpc('toggle_message_reaction', {
-        message_id: messageId,
-        emoji: emoji,
-        is_dm: false
+        message_id_param: messageId,
+        emoji_param: emoji
       });
 
       if (error) throw error;
