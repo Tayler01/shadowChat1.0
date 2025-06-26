@@ -1,6 +1,21 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { AuthService, SignUpData, AuthUser } from '../lib/auth';
+import { AuthService, SignUpData } from '../lib/auth';
+
+interface AuthUser {
+  id: string;
+  email: string;
+  username?: string;
+  display_name?: string;
+  avatar_url?: string;
+  banner_url?: string;
+  status?: string;
+  status_message?: string;
+  color?: string;
+  last_active?: string;
+  created_at?: string;
+  updated_at?: string;
+}
 
 export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -9,11 +24,46 @@ export function useAuth() {
   useEffect(() => {
     // Get initial session
     const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        const profile = await AuthService.getCurrentUser();
-        setUser(profile);
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Session error:', error);
+          await supabase.auth.signOut();
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+        
+        if (session?.user) {
+          try {
+            // Get user profile from database
+            const { data: profile, error: profileError } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+
+            if (profileError || !profile) {
+              console.error('Profile error:', profileError);
+              // User exists in auth but not in users table, sign them out
+              await supabase.auth.signOut();
+              setUser(null);
+            } else {
+              setUser(profile);
+            }
+          } catch (error) {
+            console.error('Error fetching profile:', error);
+            await supabase.auth.signOut();
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        await supabase.auth.signOut();
+        setUser(null);
       }
       
       setLoading(false);
@@ -24,10 +74,27 @@ export function useAuth() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (session?.user) {
-          const profile = await AuthService.getCurrentUser();
-          setUser(profile);
-        } else {
+        try {
+          if (session?.user) {
+            // Get user profile from database
+            const { data: profile, error: profileError } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+
+            if (profileError || !profile) {
+              console.error('Profile error on auth change:', profileError);
+              await supabase.auth.signOut();
+              setUser(null);
+            } else {
+              setUser(profile);
+            }
+          } else {
+            setUser(null);
+          }
+        } catch (error) {
+          console.error('Auth state change error:', error);
           setUser(null);
         }
         setLoading(false);
@@ -100,9 +167,22 @@ export function useAuth() {
   const updateProfile = async (updates: Partial<AuthUser>) => {
     if (!user) return;
     
-    const updatedUser = await AuthService.updateProfile(updates);
-    setUser(updatedUser);
-    return updatedUser;
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .update(updates)
+        .eq('id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setUser(data);
+      return data;
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
+    }
   };
 
   return {
@@ -112,5 +192,6 @@ export function useAuth() {
     signUp,
     signOut,
     updateProfile,
+    profile: user,
   };
 }

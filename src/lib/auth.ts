@@ -1,13 +1,5 @@
-import { supabase, updateUserPresence } from './supabase'
+import { supabase } from './supabase'
 import type { User } from '@supabase/supabase-js'
-
-export interface AuthUser extends User {
-  user_metadata: {
-    username?: string
-    display_name?: string
-    avatar_url?: string
-  }
-}
 
 export interface SignUpData {
   email: string
@@ -23,11 +15,15 @@ export interface SignInData {
 
 export const signUp = async ({ email, password, username, displayName }: SignUpData) => {
   // First check if username is taken
-  const { data: existingUser } = await supabase
+  const { data: existingUser, error: checkError } = await supabase
     .from('users')
     .select('username')
     .eq('username', username)
     .maybeSingle()
+
+  if (checkError && checkError.code !== 'PGRST116') {
+    throw new Error('Error checking username availability')
+  }
 
   if (existingUser) {
     throw new Error('Username is already taken')
@@ -51,16 +47,17 @@ export const signUp = async ({ email, password, username, displayName }: SignUpD
   if (data.user) {
     const { error: profileError } = await supabase
       .from('users')
-      .insert({
+      .upsert({
         id: data.user.id,
         email,
         username,
         display_name: displayName,
         status: 'online'
-      })
+      }, { onConflict: 'id' })
 
     if (profileError) {
       console.error('Error creating user profile:', profileError)
+      throw new Error('Failed to create user profile')
     }
   }
 
@@ -76,25 +73,33 @@ export const signIn = async ({ email, password }: SignInData) => {
   if (error) throw error
 
   // Update user status to online
-  if (data.user) {
-    await supabase
+  if (data.user && data.session) {
+    const { error: updateError } = await supabase
       .from('users')
       .update({ status: 'online', last_active: new Date().toISOString() })
       .eq('id', data.user.id)
+    
+    if (updateError) {
+      console.warn('Could not update user status:', updateError)
+    }
   }
 
   return data
 }
 
 export const signOut = async () => {
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error: getUserError } = await supabase.auth.getUser()
   
-  if (user) {
+  if (user && !getUserError) {
     // Update status to offline before signing out
-    await supabase
+    const { error: updateError } = await supabase
       .from('users')
       .update({ status: 'offline' })
       .eq('id', user.id)
+    
+    if (updateError) {
+      console.warn('Could not update user status to offline:', updateError)
+    }
   }
 
   const { error } = await supabase.auth.signOut()
@@ -102,8 +107,20 @@ export const signOut = async () => {
 }
 
 export const getCurrentUser = async () => {
-  const { data: { user } } = await supabase.auth.getUser()
-  return user
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error) throw error
+  
+  if (!user) return null
+  
+  // Get profile from users table
+  const { data: profile, error: profileError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', user.id)
+    .single()
+  
+  if (profileError) throw profileError
+  return profile
 }
 
 export const getUserProfile = async (userId: string) => {
@@ -117,12 +134,7 @@ export const getUserProfile = async (userId: string) => {
   return data
 }
 
-export const updateUserProfile = async (updates: Partial<{
-  display_name: string
-  status_message: string
-  color: string
-  status: 'online' | 'away' | 'busy' | 'offline'
-}>) => {
+export const updateUserProfile = async (updates: any) => {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
@@ -137,9 +149,10 @@ export const updateUserProfile = async (updates: Partial<{
   return data
 }
 
-export const updatePresence = async () => updateUserPresence()
-
-export const updateProfile = updateUserProfile
+export const updatePresence = async () => {
+  const { error } = await supabase.rpc('update_user_last_active')
+  if (error) console.error('Error updating presence:', error)
+}
 
 export const AuthService = {
   signUp,
@@ -147,7 +160,6 @@ export const AuthService = {
   signOut,
   getCurrentUser,
   getUserProfile,
-  updateUserProfile,
+  updateProfile: updateUserProfile,
   updatePresence,
-  updateProfile
 }
