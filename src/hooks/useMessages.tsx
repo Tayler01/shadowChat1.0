@@ -69,7 +69,7 @@ function useProvideMessages(): MessagesContextValue {
     // Use a static channel name to prevent duplicate subscriptions
     const channelName = 'public:messages';
     
-    const channel = supabase
+    let channel = supabase
       .channel(channelName, {
         config: {
           broadcast: { self: true },
@@ -176,13 +176,24 @@ function useProvideMessages(): MessagesContextValue {
           );
         }
       )
-      .subscribe((status, err) => {
+      .subscribe(async (status, err) => {
         console.log('📡 Real-time subscription status:', status);
         if (err) {
           console.error('❌ Real-time subscription error:', err);
         }
         if (status === 'SUBSCRIBED') {
           console.log('✅ Successfully subscribed to real-time messages');
+        }
+        if (status === 'CLOSED' || status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+          console.warn(`⚠️ Channel ${status}, resubscribing...`);
+          supabase.removeChannel(channel);
+          channel = supabase.channel(channelName, {
+            config: {
+              broadcast: { self: true },
+              presence: { key: user.id }
+            }
+          });
+          channel.subscribe();
         }
       });
 
