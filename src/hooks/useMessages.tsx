@@ -563,6 +563,33 @@ function useProvideMessages(): MessagesContextValue {
 
 export function MessagesProvider({ children }: { children: React.ReactNode }) {
   const value = useProvideMessages();
+  
+  // Dev-only: Add test function to window for console testing
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      (window as any).sendTestMessage = (content = "Hello from console! 🚀") => {
+        console.log('🧪 Dev Test: Sending test message:', content);
+        return value.sendMessage(content);
+      };
+      
+      (window as any).sendTestReaction = (messageId: string, emoji = "👍") => {
+        console.log('🧪 Dev Test: Adding test reaction:', { messageId, emoji });
+        return value.toggleReaction(messageId, emoji);
+      };
+      
+      console.log('🧪 Dev functions available:');
+      console.log('  - window.sendTestMessage(content?) - Send a test message');
+      console.log('  - window.sendTestReaction(messageId, emoji?) - Add a reaction');
+    }
+    
+    return () => {
+      if (import.meta.env.DEV) {
+        delete (window as any).sendTestMessage;
+        delete (window as any).sendTestReaction;
+      }
+    };
+  }, [value.sendMessage, value.toggleReaction]);
+  
   return (
     <MessagesContext.Provider value={value}>{children}</MessagesContext.Provider>
   );
