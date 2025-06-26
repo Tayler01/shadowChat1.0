@@ -27,7 +27,7 @@ export const signUp = async ({ email, password, username, displayName }: SignUpD
     .from('users')
     .select('username')
     .eq('username', username)
-    .single()
+    .maybeSingle()
 
   if (existingUser) {
     throw new Error('Username is already taken')
@@ -63,9 +63,13 @@ export const signUp = async ({ email, password, username, displayName }: SignUpD
       console.error('Error creating user profile:', profileError)
       throw profileError
     }
+
+    // Fetch the profile after creation
+    const profile = await getUserProfile(data.user.id)
+    return profile
   }
 
-  return data
+  return null
 }
 
 export const signIn = async ({ email, password }: SignInData) => {
@@ -111,7 +115,7 @@ export const getCurrentUser = async () => {
     .from('users')
     .select('*')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
   if (error) {
     console.error('Error fetching user profile:', error)
@@ -126,7 +130,7 @@ export const getUserProfile = async (userId: string) => {
     .from('users')
     .select('*')
     .eq('id', userId)
-    .single()
+    .maybeSingle()
 
   if (error) throw error
   return data
@@ -146,7 +150,7 @@ export const updateUserProfile = async (updates: Partial<{
     .update(updates)
     .eq('id', user.id)
     .select()
-    .single()
+    .maybeSingle()
 
   if (error) throw error
   return data
