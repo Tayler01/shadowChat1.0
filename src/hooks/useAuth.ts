@@ -24,31 +24,7 @@ export function useAuth() {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-          // Ensure user profile exists when signing in
-          const { data: existingProfile } = await supabase
-            .from('users')
-            .select('id')
-            .eq('id', session.user.id)
-            .single()
-
-          if (!existingProfile) {
-            // Create profile if it doesn't exist (handles email confirmation flow)
-            const userData = session.user.user_metadata
-            await supabase
-              .from('users')
-              .insert({
-                id: session.user.id,
-                email: session.user.email!,
-                username: userData.username,
-                display_name: userData.display_name,
-                status: 'online'
-              })
-          }
-          
-          const profile = await AuthService.getCurrentUser();
-          setUser(profile);
-        } else if (session?.user) {
+        if (session?.user) {
           const profile = await AuthService.getCurrentUser();
           setUser(profile);
         } else {

@@ -1,18 +1,3 @@
--- Reset database schema
-DROP TRIGGER IF EXISTS update_dm_conversation_timestamp ON dm_messages;
-DROP TABLE IF EXISTS user_presence CASCADE;
-DROP TABLE IF EXISTS message_reactions CASCADE;
-DROP TABLE IF EXISTS dm_messages CASCADE;
-DROP TABLE IF EXISTS dm_conversations CASCADE;
-DROP TABLE IF EXISTS messages CASCADE;
-DROP TABLE IF EXISTS users CASCADE;
-
-DROP FUNCTION IF EXISTS update_conversation_timestamp() CASCADE;
-DROP FUNCTION IF EXISTS update_user_last_active() CASCADE;
-DROP FUNCTION IF EXISTS toggle_message_reaction(uuid, text) CASCADE;
-DROP FUNCTION IF EXISTS create_dm_conversation(uuid) CASCADE;
-DROP FUNCTION IF EXISTS get_or_create_dm_conversation(uuid) CASCADE;
-DROP FUNCTION IF EXISTS mark_dm_messages_read(uuid) CASCADE;
 /*
   # Realtime Chat Platform Database Schema
 
@@ -43,13 +28,13 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS users (
   id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email text UNIQUE NOT NULL,
-  display_name text,
+  full_name text,
   username text UNIQUE,
   avatar_url text,
   banner_url text,
   status text DEFAULT 'online',
   status_message text,
-  color text DEFAULT '#3B82F6',
+  chat_color text DEFAULT '#3B82F6',
   last_active timestamptz DEFAULT now(),
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
@@ -352,99 +337,4 @@ CREATE TRIGGER update_dm_conversation_timestamp
 -- Grant permissions
 GRANT EXECUTE ON FUNCTION update_user_last_active() TO authenticated;
 GRANT EXECUTE ON FUNCTION toggle_message_reaction(uuid, text) TO authenticated;
-GRANT EXECUTE ON FUNCTION create_dm_conversation(uuid) TO authenticated;-- Enable replication settings for realtime
-
-ALTER TABLE messages REPLICA IDENTITY FULL;
-ALTER TABLE dm_messages REPLICA IDENTITY FULL;
-ALTER TABLE dm_conversations REPLICA IDENTITY FULL;
-ALTER TABLE message_reactions REPLICA IDENTITY FULL;
-ALTER TABLE user_presence REPLICA IDENTITY FULL;
-
-ALTER PUBLICATION supabase_realtime
-  ADD TABLE messages, dm_messages, dm_conversations, message_reactions, user_presence;
-CREATE POLICY "Users can delete own DM messages"
-  ON dm_messages FOR DELETE
-  TO authenticated
-  USING (auth.uid() = sender_id);
--- Add DM helper functions
-
--- Function to get or create a DM conversation
-CREATE OR REPLACE FUNCTION get_or_create_dm_conversation(other_user_id uuid)
-RETURNS uuid AS $$
-DECLARE
-  conversation_id uuid;
-  participants_array uuid[];
-BEGIN
-  -- Create sorted participants array
-  participants_array := ARRAY[LEAST(auth.uid(), other_user_id), GREATEST(auth.uid(), other_user_id)];
-
-  -- Try to find existing conversation
-  SELECT id INTO conversation_id
-  FROM dm_conversations
-  WHERE participants = participants_array;
-
-  -- Create if it doesn't exist
-  IF conversation_id IS NULL THEN
-    INSERT INTO dm_conversations (participants)
-    VALUES (participants_array)
-    RETURNING id INTO conversation_id;
-  END IF;
-
-  RETURN conversation_id;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Function to mark DM messages as read
-CREATE OR REPLACE FUNCTION mark_dm_messages_read(conversation_id uuid)
-RETURNS void AS $$
-BEGIN
-  UPDATE dm_messages
-  SET read_at = now()
-  WHERE dm_messages.conversation_id = mark_dm_messages_read.conversation_id
-    AND sender_id != auth.uid()
-    AND read_at IS NULL;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Permissions
-GRANT EXECUTE ON FUNCTION get_or_create_dm_conversation(uuid) TO authenticated;
-GRANT EXECUTE ON FUNCTION mark_dm_messages_read(uuid) TO authenticated;
--- Add display_name column to users if not exists
-ALTER TABLE users
-  ADD COLUMN IF NOT EXISTS display_name text;
-/*
-  # Fix RLS policies for users table
-
-  1. Security
-    - Drop existing policies that might be causing issues
-    - Create new, more explicit policies for user operations
-    - Ensure proper authentication checks
-*/
-
--- Drop existing policies
-DROP POLICY IF EXISTS "Users can insert own profile" ON users;
-DROP POLICY IF EXISTS "Users can read all profiles" ON users;
-DROP POLICY IF EXISTS "Users can update own profile" ON users;
-
--- Create new policies with explicit checks
-CREATE POLICY "Enable insert for authenticated users on own profile"
-  ON users
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (auth.uid() = id);
-
-CREATE POLICY "Enable read access for authenticated users"
-  ON users
-  FOR SELECT
-  TO authenticated
-  USING (true);
-
-CREATE POLICY "Enable update for users based on user_id"
-  ON users
-  FOR UPDATE
-  TO authenticated
-  USING (auth.uid() = id)
-  WITH CHECK (auth.uid() = id);
-
--- Ensure RLS is enabled
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+GRANT EXECUTE ON FUNCTION create_dm_conversation(uuid) TO authenticated;

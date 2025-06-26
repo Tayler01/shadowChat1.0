@@ -151,3 +151,5 @@ export const useTyping = (channelName: string = 'general') => {
     stopTyping
   }
 }
+
+export { useTyping }
