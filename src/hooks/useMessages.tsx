@@ -567,19 +567,25 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
   // Dev-only: Add test function to window for console testing
   useEffect(() => {
     if (import.meta.env.DEV) {
-      (window as any).sendTestMessage = (content = "Hello from console! 🚀") => {
+      const sendTestMessage = (content = "Hello from console! 🚀") => {
         console.log('🧪 Dev Test: Sending test message:', content);
         return value.sendMessage(content);
       };
       
-      (window as any).sendTestReaction = (messageId: string, emoji = "👍") => {
+      const sendTestReaction = (messageId: string, emoji = "👍") => {
         console.log('🧪 Dev Test: Adding test reaction:', { messageId, emoji });
         return value.toggleReaction(messageId, emoji);
       };
       
+      // Assign to window
+      (window as any).sendTestMessage = sendTestMessage;
+      (window as any).sendTestReaction = sendTestReaction;
+      
       console.log('🧪 Dev functions available:');
       console.log('  - window.sendTestMessage(content?) - Send a test message');
       console.log('  - window.sendTestReaction(messageId, emoji?) - Add a reaction');
+      console.log('  - sendTestMessage() - Also works without window prefix');
+      console.log('  - sendTestReaction(messageId, emoji) - Also works without window prefix');
     }
     
     return () => {
