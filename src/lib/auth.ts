@@ -43,21 +43,32 @@ export const signUp = async ({ email, password, username, displayName }: SignUpD
 
   if (error) throw error
 
-  // Create profile in users table
-  if (data.user) {
-    const { error: profileError } = await supabase
-      .from('users')
-      .upsert({
-        id: data.user.id,
-        email,
-        username,
-        display_name: displayName,
-        status: 'online'
-      }, { onConflict: 'id' })
+  // Create profile in users table after a short delay to ensure auth context is ready
+  if (data.user && data.session) {
+    // Wait a moment for the auth session to be fully established
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
+    try {
+      const { error: profileError } = await supabase
+        .from('users')
+        .insert({
+          id: data.user.id,
+          email,
+          username,
+          display_name: displayName,
+          status: 'online'
+        })
 
-    if (profileError) {
-      console.error('Error creating user profile:', profileError)
-      throw new Error('Failed to create user profile')
+      if (profileError) {
+        console.error('Error creating user profile:', profileError)
+        // If profile creation fails, clean up the auth user
+        await supabase.auth.signOut()
+        throw new Error('Failed to create user profile')
+      }
+    } catch (error) {
+      console.error('Error in profile creation:', error)
+      await supabase.auth.signOut()
+      throw error
     }
   }
 

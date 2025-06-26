@@ -76,19 +76,45 @@ export function useAuth() {
       async (event, session) => {
         try {
           if (session?.user) {
-            // Get user profile from database
-            const { data: profile, error: profileError } = await supabase
-              .from('users')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
+            // Add a small delay to ensure the profile exists after sign-up
+            let retries = 0;
+            const maxRetries = 3;
+            
+            while (retries < maxRetries) {
+              try {
+                // Get user profile from database
+                const { data: profile, error: profileError } = await supabase
+                  .from('users')
+                  .select('*')
+                  .eq('id', session.user.id)
+                  .maybeSingle();
 
-            if (profileError || !profile) {
-              console.error('Profile error on auth change:', profileError);
-              await supabase.auth.signOut();
-              setUser(null);
-            } else {
-              setUser(profile);
+                if (profileError && profileError.code !== 'PGRST116') {
+                  console.error('Profile error on auth change:', profileError);
+                  throw profileError;
+                }
+
+                if (profile) {
+                  setUser(profile);
+                  break;
+                } else if (retries < maxRetries - 1) {
+                  // Profile doesn't exist yet, wait and retry
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  retries++;
+                } else {
+                  // Profile still doesn't exist after retries
+                  console.error('Profile not found after retries');
+                  await supabase.auth.signOut();
+                  setUser(null);
+                }
+              } catch (error) {
+                console.error('Error fetching profile on retry:', error);
+                if (retries === maxRetries - 1) {
+                  await supabase.auth.signOut();
+                  setUser(null);
+                }
+                break;
+              }
             }
           } else {
             setUser(null);
