@@ -27,7 +27,7 @@ interface MessageListProps {
 }
 
 export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
-  const { user } = useAuth()
+  const { profile } = useAuth()
   const { messages, loading, editMessage, deleteMessage, togglePin } = useMessages()
   const { typingUsers } = useTyping('general')
   const [editingMessage, setEditingMessage] = useState<string | null>(null)
@@ -84,7 +84,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
   }
 
   const MessageActions: React.FC<{ message: any }> = ({ message }) => {
-    const isOwner = user?.id === message.user_id
+    const isOwner = profile?.id === message.user_id
     const [showActions, setShowActions] = useState(false)
 
     return (
@@ -175,7 +175,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
     return (
       <div className="flex flex-wrap gap-1 mt-2">
         {Object.entries(reactions).map(([emoji, data]: [string, any]) => {
-          const isReacted = data.users?.includes(user?.id)
+          const isReacted = data.users?.includes(profile?.id)
           
           return (
             <motion.button

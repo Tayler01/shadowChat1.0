@@ -9,7 +9,7 @@ import toast from 'react-hot-toast'
 
 export const ChatView: React.FC = () => {
   const { sendMessage } = useMessages()
-  const { user } = useAuth()
+  const { profile } = useAuth()
 
   const handleSendMessage = async (content: string) => {
     try {
@@ -18,9 +18,6 @@ export const ChatView: React.FC = () => {
       toast.error('Failed to send message')
     }
   }
-
-  // Add debugging
-  console.log('🔍 ChatView - user state:', { user: !!user, userId: user?.id });
 
   return (
     <motion.div
