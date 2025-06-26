@@ -229,15 +229,25 @@ export function useConversationMessages(conversationId: string | null) {
 
     setSending(true);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('dm_messages')
         .insert({
           conversation_id: conversationId,
           sender_id: user.id,
           content: content.trim(),
-        });
+        })
+        .select(`
+          *,
+          sender:users!sender_id(*)
+        `)
+        .single();
 
       if (error) throw error;
+
+      if (data) {
+        // Optimistically add the sent message
+        setMessages(prev => [...prev, data as DMMessage]);
+      }
     } catch (error) {
       console.error('Error sending DM:', error);
       throw error;

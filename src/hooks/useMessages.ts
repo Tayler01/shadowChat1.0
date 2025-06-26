@@ -141,15 +141,23 @@ export function useMessages() {
           content: content.trim(),
           message_type: messageType,
         })
-        .select()
+        .select(`
+          *,
+          user:users!user_id(*)
+        `)
         .single();
 
       if (error) {
         console.error('❌ Error inserting message:', error);
         throw error;
       }
-      
+
       console.log('✅ Message sent successfully:', data);
+
+      if (data) {
+        // Optimistically add the sent message so it appears instantly
+        setMessages(prev => [...prev, data as Message]);
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       throw error;
