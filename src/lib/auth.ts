@@ -120,37 +120,45 @@ export const signOut = async () => {
 export const getCurrentUser = async () => {
   console.log('🔍 getCurrentUser called');
   
-  // Add timeout to prevent hanging
+  // Add timeout to prevent hanging - increased to 30 seconds for better diagnostics
   const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('getCurrentUser timeout')), 10000);
+    setTimeout(() => reject(new Error('getCurrentUser timeout after 30s')), 30000);
   });
   
   const getUserPromise = async () => {
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    // Handle the specific "user not found" error from invalid JWT
-    if (authError && authError.message?.includes('User from sub claim in JWT does not exist')) {
-      console.log('🧹 Invalid JWT detected in getCurrentUser, clearing session...');
-      await supabase.auth.signOut();
-      return null;
-    }
-    
-    if (authError) {
-      console.error('Auth error in getCurrentUser:', authError);
-      return null;
-    }
-    
-    console.log('👤 Auth user:', user ? `User ID: ${user.id}` : 'No auth user');
-    if (!user) return null
-
     try {
+      console.log('🔐 Checking auth user...');
+      const { data: { user }, error: authError } = await supabase.auth.getUser()
+      
+      // Handle the specific "user not found" error from invalid JWT
+      if (authError && authError.message?.includes('User from sub claim in JWT does not exist')) {
+        console.log('🧹 Invalid JWT detected in getCurrentUser, clearing session...');
+        await supabase.auth.signOut();
+        return null;
+      }
+      
+      if (authError) {
+        console.error('Auth error in getCurrentUser:', authError);
+        return null;
+      }
+      
+      console.log('👤 Auth user:', user ? `User ID: ${user.id}` : 'No auth user');
+      if (!user) return null
+
       console.log('📋 Fetching user profile from database...');
-      // Get the user profile from the users table
-      const { data: profile, error } = await supabase
+      
+      // Add a separate timeout for the database query
+      const profilePromise = supabase
         .from('users')
         .select('*')
         .eq('id', user.id)
-        .single()
+        .single();
+        
+      const profileTimeout = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Profile query timeout')), 15000);
+      });
+      
+      const { data: profile, error } = await Promise.race([profilePromise, profileTimeout]);
 
       console.log('📝 Profile query result:', { profile: !!profile, error: error?.code });
 
@@ -220,8 +228,14 @@ export const getCurrentUser = async () => {
       console.log('✅ Profile found and returned');
       return profile
     } catch (error) {
-      console.error('Unexpected error in getCurrentUser:', error)
-      return null
+      console.error('Error in getUserPromise:', error);
+      
+      // If it's a timeout error, provide more specific information
+      if (error instanceof Error && error.message.includes('timeout')) {
+        console.error('Database query timed out - check network connectivity and Supabase status');
+      }
+      
+      return null;
     }
   }
   
@@ -229,6 +243,16 @@ export const getCurrentUser = async () => {
     return await Promise.race([getUserPromise(), timeoutPromise]);
   } catch (error) {
     console.error('getCurrentUser failed or timed out:', error);
+    
+    // If it's a timeout, provide helpful debugging information
+    if (error instanceof Error && error.message.includes('timeout')) {
+      console.error('🚨 Authentication timeout detected. Please check:');
+      console.error('1. Network connectivity');
+      console.error('2. Supabase project status');
+      console.error('3. Environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)');
+      console.error('4. Database RLS policies on users table');
+    }
+    
     return null;
   }
 }

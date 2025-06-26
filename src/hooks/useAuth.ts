@@ -47,12 +47,24 @@ export function useAuth() {
         
         if (session?.user) {
           console.log('👤 User found in session, getting profile...');
-          const profile = await getCurrentUser();
+          try {
+            const profile = await getCurrentUser();
+            console.log('📝 Profile result:', profile ? 'Profile loaded' : 'No profile');
+            if (mountedRef.current) {
+              setUser(profile);
+            }
+          } catch (error) {
+            console.error('Failed to get user profile during initial session:', error);
+            if (mountedRef.current) {
+              setError('Failed to load user profile. Please try refreshing the page.');
+              setUser(null);
+            }
+          }
+        } else {
           console.log('📝 Profile result:', profile ? 'Profile loaded' : 'No profile');
           if (mountedRef.current) {
             setUser(profile);
           }
-        } else {
           console.log('❌ No user in session');
           if (mountedRef.current) setUser(null);
         }
@@ -116,7 +128,23 @@ export function useAuth() {
             if (mountedRef.current) setUser(null);
           } else if (session?.user) {
             console.log('👤 User in auth change, getting profile...');
-            const profile = await getCurrentUser();
+            try {
+              const profile = await getCurrentUser();
+              console.log('📝 Profile in auth change:', profile ? 'Profile loaded' : 'No profile');
+              if (profile) {
+                if (mountedRef.current) setUser(profile);
+              } else {
+                console.log('❌ Failed to get profile, keeping user as null');
+                if (mountedRef.current) setUser(null);
+              }
+            } catch (error) {
+              console.error('Failed to get user profile during auth change:', error);
+              if (mountedRef.current) {
+                setError('Failed to load user profile. Please try signing in again.');
+                setUser(null);
+              }
+            }
+          } else {
             console.log('📝 Profile in auth change:', profile ? 'Profile loaded' : 'No profile');
             if (profile) {
               if (mountedRef.current) setUser(profile);
@@ -124,7 +152,6 @@ export function useAuth() {
               console.log('❌ Failed to get profile, keeping user as null');
               if (mountedRef.current) setUser(null);
             }
-          } else {
             console.log('❌ No user in auth change');
             if (mountedRef.current) setUser(null);
           }
