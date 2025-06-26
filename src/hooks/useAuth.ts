@@ -6,7 +6,7 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const initialLoadRef = useRef(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -14,23 +14,23 @@ export function useAuth() {
     
     // Get initial session
     const getInitialSession = async () => {
-      if (initialLoadRef.current) return;
+      if (initialLoadComplete) return;
       
-      console.log('🔍 Getting initial session...');
+      console.log('🔍 useAuth: Getting initial session...');
       
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         // Handle the specific "user not found" error from invalid JWT
         if (sessionError && sessionError.message?.includes('User from sub claim in JWT does not exist')) {
-          console.log('🧹 Invalid JWT detected in getSession, clearing session...');
+          console.log('🧹 useAuth: Invalid JWT detected, clearing session...');
           await supabase.auth.signOut();
           if (mountedRef.current) setUser(null);
           return;
         }
         
         if (sessionError) {
-          console.error('Session error:', sessionError);
+          console.error('useAuth: Session error:', sessionError);
           if (mountedRef.current) {
             setError(sessionError.message);
             setUser(null);
@@ -38,36 +38,36 @@ export function useAuth() {
           return;
         }
         
-        console.log('📋 Session data:', session ? 'Session exists' : 'No session');
+        console.log('📋 useAuth: Session data:', session ? 'Session exists' : 'No session');
         
         if (session?.user) {
-          console.log('👤 User found in session, getting profile...');
+          console.log('👤 useAuth: User found in session, getting profile...');
           try {
             const profile = await getCurrentUser();
-            console.log('📝 Profile result:', profile ? 'Profile loaded' : 'No profile');
+            console.log('📝 useAuth: Profile result:', profile ? 'Profile loaded' : 'No profile');
             if (mountedRef.current) {
               setUser(profile);
             }
           } catch (error) {
-            console.error('Failed to get user profile during initial session:', error);
+            console.error('useAuth: Failed to get user profile during initial session:', error);
             if (mountedRef.current) {
               setError('Failed to load user profile. Please try refreshing the page.');
               setUser(null);
             }
           }
         } else {
-          console.log('❌ No user in session');
+          console.log('❌ useAuth: No user in session');
           if (mountedRef.current) {
             setUser(null);
           }
         }
       } catch (error) {
-        console.error('Error getting initial session:', error);
+        console.error('useAuth: Error getting initial session:', error);
         
         // Check if this is the specific "user not found" error from invalid JWT
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         if (errorMessage.includes('User from sub claim in JWT does not exist')) {
-          console.log('🧹 Invalid JWT detected, clearing session...');
+          console.log('🧹 useAuth: Invalid JWT detected, clearing session...');
           // Clear the invalid session
           await authSignOut();
           if (mountedRef.current) setUser(null);
@@ -79,11 +79,11 @@ export function useAuth() {
           }
         }
       } finally {
-        console.log('✅ Initial session check complete, setting loading to false');
+        console.log('✅ useAuth: Initial session check complete');
         if (mountedRef.current) {
           setLoading(false);
+          setInitialLoadComplete(true);
         }
-        initialLoadRef.current = true;
       }
     };
 
@@ -93,29 +93,28 @@ export function useAuth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         // Skip if we're still doing initial load or component is unmounted
-        if (!initialLoadRef.current || !mountedRef.current) {
-          console.log('⏭️ Skipping auth change during initial load or unmounted');
+        if (!initialLoadComplete || !mountedRef.current) {
           return;
         }
 
-        console.log('🔄 Auth state change:', event);
+        console.log('🔄 useAuth: Auth state change:', event);
         
         if (event === 'SIGNED_OUT') {
-          console.log('👋 User signed out');
+          console.log('👋 useAuth: User signed out');
           if (mountedRef.current) setUser(null);
         } else if (session?.user) {
-          console.log('👤 User in auth change, getting profile...');
+          console.log('👤 useAuth: User in auth change, getting profile...');
           try {
             const profile = await getCurrentUser();
-            console.log('📝 Profile in auth change:', profile ? 'Profile loaded' : 'No profile');
+            console.log('📝 useAuth: Profile in auth change:', profile ? 'Profile loaded' : 'No profile');
             if (profile) {
               if (mountedRef.current) setUser(profile);
             } else {
-              console.log('❌ Failed to get profile, keeping user as null');
+              console.log('❌ useAuth: Failed to get profile, keeping user as null');
               if (mountedRef.current) setUser(null);
             }
           } catch (error) {
-            console.error('Failed to get user profile during auth change:', error);
+            console.error('useAuth: Failed to get user profile during auth change:', error);
             if (mountedRef.current) {
               setError('Failed to load user profile. Please try signing in again.');
               setUser(null);
@@ -123,7 +122,7 @@ export function useAuth() {
           }
         } else {
           // No authenticated user in the session
-          console.log('❌ No user in auth change');
+          console.log('❌ useAuth: No user in auth change');
           if (mountedRef.current) setUser(null);
         }
       }
@@ -133,7 +132,7 @@ export function useAuth() {
       mountedRef.current = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [initialLoadComplete]);
 
   // Update presence periodically
   useEffect(() => {
