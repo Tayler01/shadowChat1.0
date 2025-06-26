@@ -6,7 +6,16 @@ export function useMessages() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const { user } = useAuth();
+  const { user: authUser } = useAuth();
+
+  // Add debugging for user state
+  useEffect(() => {
+    console.log('🔍 useMessages - user state changed:', { 
+      user: authUser, 
+      hasUser: !!authUser,
+      userId: authUser?.id 
+    });
+  }, [authUser]);
 
   // Fetch initial messages
   useEffect(() => {
@@ -104,18 +113,22 @@ export function useMessages() {
   }, []);
 
   const sendMessage = useCallback(async (content: string, messageType: 'text' | 'command' = 'text') => {
-    if (!user || !content.trim()) {
-      console.log('❌ Cannot send message: missing user or content', { user: !!user, content: content.trim() });
+    if (!authUser || !content.trim()) {
+      console.log('❌ Cannot send message: missing user or content', { 
+        user: !!authUser, 
+        userId: authUser?.id,
+        content: content.trim() 
+      });
       return;
     }
 
-    console.log('📤 Sending message:', { userId: user.id, content, messageType });
+    console.log('📤 Sending message:', { userId: authUser.id, content, messageType });
     setSending(true);
     try {
       const { error } = await supabase
         .from('messages')
         .insert({
-          user_id: user.id,
+          user_id: authUser.id,
           content: content.trim(),
           message_type: messageType,
         });
@@ -132,10 +145,10 @@ export function useMessages() {
     } finally {
       setSending(false);
     }
-  }, [user]);
+  }, [authUser]);
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
-    if (!user) return;
+    if (!authUser) return;
 
     const { error } = await supabase
       .from('messages')
@@ -144,31 +157,31 @@ export function useMessages() {
         edited_at: new Date().toISOString(),
       })
       .eq('id', messageId)
-      .eq('user_id', user.id);
+      .eq('user_id', authUser.id);
 
     if (error) {
       console.error('Error editing message:', error);
       throw error;
     }
-  }, [user]);
+  }, [authUser]);
 
   const deleteMessage = useCallback(async (messageId: string) => {
-    if (!user) return;
+    if (!authUser) return;
 
     const { error } = await supabase
       .from('messages')
       .delete()
       .eq('id', messageId)
-      .eq('user_id', user.id);
+      .eq('user_id', authUser.id);
 
     if (error) {
       console.error('Error deleting message:', error);
       throw error;
     }
-  }, [user]);
+  }, [authUser]);
 
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
-    if (!user) return;
+    if (!authUser) return;
 
     try {
       const { error } = await supabase.rpc('toggle_message_reaction', {
@@ -182,7 +195,7 @@ export function useMessages() {
       console.error('Error toggling reaction:', error);
       throw error;
     }
-  }, [user]);
+  }, [authUser]);
 
   const pinMessage = useCallback(async (messageId: string) => {
     if (!user) return;
@@ -203,7 +216,7 @@ export function useMessages() {
   }, [user]);
 
   const togglePin = useCallback(async (messageId: string) => {
-    if (!user) return;
+    if (!authUser) return;
 
     // First get the current pinned status
     const { data: message } = await supabase
@@ -219,7 +232,7 @@ export function useMessages() {
       .from('messages')
       .update({
         pinned: !isPinned,
-        pinned_by: !isPinned ? user.id : null,
+        pinned_by: !isPinned ? authUser.id : null,
         pinned_at: !isPinned ? new Date().toISOString() : null,
       })
       .eq('id', messageId);
@@ -228,7 +241,7 @@ export function useMessages() {
       console.error('Error toggling pin:', error);
       throw error;
     }
-  }, [user]);
+  }, [authUser]);
 
   return {
     messages,
