@@ -53,6 +53,7 @@ export const signUp = async ({ email, password, username, displayName }: SignUpD
       .from('users')
       .insert({
         id: data.user.id,
+        email: data.user.email,
         username,
         display_name: displayName,
         status: 'online'
@@ -60,6 +61,7 @@ export const signUp = async ({ email, password, username, displayName }: SignUpD
 
     if (profileError) {
       console.error('Error creating user profile:', profileError)
+      throw profileError
     }
   }
 
@@ -102,7 +104,21 @@ export const signOut = async () => {
 
 export const getCurrentUser = async () => {
   const { data: { user } } = await supabase.auth.getUser()
-  return user
+  if (!user) return null
+
+  // Get the user profile from the users table
+  const { data: profile, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', user.id)
+    .single()
+
+  if (error) {
+    console.error('Error fetching user profile:', error)
+    return null
+  }
+
+  return profile
 }
 
 export const getUserProfile = async (userId: string) => {

@@ -67,7 +67,7 @@ export function useAuth() {
   const signIn = async (email: string, password: string) => {
     setLoading(true);
     try {
-      await authSignIn(email, password);
+      await authSignIn({ email, password });
     } finally {
       setLoading(false);
     }
@@ -76,7 +76,9 @@ export function useAuth() {
   const signUp = async (email: string, password: string, userData: { full_name: string; username: string }) => {
     setLoading(true);
     try {
-      await authSignUp(email, password, {
+      await authSignUp({
+        email,
+        password,
         username: userData.username,
         displayName: userData.full_name
       });
