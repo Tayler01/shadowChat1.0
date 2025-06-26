@@ -8,8 +8,17 @@ import { MessageInput } from './MessageInput'
 import toast from 'react-hot-toast'
 
 export const ChatView: React.FC = () => {
-  const { sendMessage } = useMessages()
+  const { sendMessage, messages, loading } = useMessages()
   const { user } = useAuth()
+
+  // Debug the messages state in ChatView
+  useEffect(() => {
+    console.log('🏠 ChatView: Messages state updated', { 
+      count: messages.length, 
+      loading,
+      lastMessage: messages[messages.length - 1]?.content 
+    });
+  }, [messages, loading]);
 
   const handleSendMessage = async (content: string) => {
     console.log('🚀 ChatView: Sending message:', { content, userExists: !!user });
@@ -62,7 +71,7 @@ export const ChatView: React.FC = () => {
       </div>
 
       {/* Messages */}
-      <MessageList />
+      <MessageList key={`messages-${messages.length}`} />
 
       {/* Message Input */}
       <MessageInput
