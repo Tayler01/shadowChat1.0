@@ -28,13 +28,13 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE IF NOT EXISTS users (
   id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email text UNIQUE NOT NULL,
-  full_name text,
+  display_name text,
   username text UNIQUE,
   avatar_url text,
   banner_url text,
   status text DEFAULT 'online',
   status_message text,
-  chat_color text DEFAULT '#3B82F6',
+  color text DEFAULT '#3B82F6',
   last_active timestamptz DEFAULT now(),
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
