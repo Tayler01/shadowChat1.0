@@ -9,12 +9,15 @@ import toast from 'react-hot-toast'
 
 export const ChatView: React.FC = () => {
   const { sendMessage } = useMessages()
-  const { profile } = useAuth()
+  const { user } = useAuth()
 
   const handleSendMessage = async (content: string) => {
+    console.log('🚀 ChatView: Sending message:', content);
     try {
       await sendMessage(content)
+      console.log('✅ ChatView: Message sent successfully');
     } catch (error) {
+      console.error('❌ ChatView: Failed to send message:', error);
       toast.error('Failed to send message')
     }
   }

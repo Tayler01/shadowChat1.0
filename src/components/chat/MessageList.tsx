@@ -30,6 +30,12 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
   const { profile } = useAuth()
   const { messages, loading, editMessage, deleteMessage, togglePin } = useMessages()
   const { typingUsers } = useTyping('general')
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('📋 MessageList: messages updated', { count: messages.length, loading });
+  }, [messages, loading]);
+  
   const [editingMessage, setEditingMessage] = useState<string | null>(null)
   const [editContent, setEditContent] = useState('')
   const [selectedMessage, setSelectedMessage] = useState<string | null>(null)

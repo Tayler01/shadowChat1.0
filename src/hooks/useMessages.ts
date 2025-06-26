@@ -11,6 +11,7 @@ export function useMessages() {
   // Fetch initial messages
   useEffect(() => {
     const fetchMessages = async () => {
+      console.log('📥 Fetching initial messages...');
       const { data, error } = await supabase
         .from('messages')
         .select(`
@@ -23,6 +24,7 @@ export function useMessages() {
       if (error) {
         console.error('Error fetching messages:', error);
       } else {
+        console.log('✅ Fetched messages:', data?.length || 0);
         setMessages(data || []);
       }
       setLoading(false);
@@ -33,8 +35,10 @@ export function useMessages() {
 
   // Subscribe to real-time updates
   useEffect(() => {
+    console.log('🔄 Setting up real-time subscription for messages...');
+    
     const channel = supabase
-      .channel('messages')
+      .channel('public:messages')
       .on(
         'postgres_changes',
         {
@@ -43,6 +47,8 @@ export function useMessages() {
           table: 'messages',
         },
         async (payload) => {
+          console.log('📨 New message received:', payload.new);
+          
           // Fetch the complete message with user data
           const { data } = await supabase
             .from('messages')
@@ -54,7 +60,16 @@ export function useMessages() {
             .single();
 
           if (data) {
-            setMessages(prev => [...prev, data]);
+            console.log('✅ Adding new message to state:', data);
+            setMessages(prev => {
+              // Check if message already exists to avoid duplicates
+              const exists = prev.find(msg => msg.id === data.id);
+              if (exists) {
+                console.log('⚠️ Message already exists, skipping');
+                return prev;
+              }
+              return [...prev, data];
+            });
           }
         }
       )
@@ -66,6 +81,8 @@ export function useMessages() {
           table: 'messages',
         },
         async (payload) => {
+          console.log('📝 Message updated:', payload.new);
+          
           // Fetch the updated message with user data
           const { data } = await supabase
             .from('messages')
@@ -77,6 +94,7 @@ export function useMessages() {
             .single();
 
           if (data) {
+            console.log('✅ Updating message in state:', data);
             setMessages(prev =>
               prev.map(msg => msg.id === data.id ? data : msg)
             );
@@ -91,14 +109,18 @@ export function useMessages() {
           table: 'messages',
         },
         (payload) => {
+          console.log('🗑️ Message deleted:', payload.old);
           setMessages(prev =>
             prev.filter(msg => msg.id !== payload.old.id)
           );
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Real-time subscription status:', status);
+      });
 
     return () => {
+      console.log('🔌 Cleaning up real-time subscription');
       supabase.removeChannel(channel);
     };
   }, []);
@@ -112,20 +134,22 @@ export function useMessages() {
     console.log('📤 Sending message:', { userId: user.id, content, messageType });
     setSending(true);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('messages')
         .insert({
           user_id: user.id,
           content: content.trim(),
           message_type: messageType,
-        });
+        })
+        .select()
+        .single();
 
       if (error) {
         console.error('❌ Error inserting message:', error);
         throw error;
       }
       
-      console.log('✅ Message sent successfully');
+      console.log('✅ Message sent successfully:', data);
     } catch (error) {
       console.error('Error sending message:', error);
       throw error;
