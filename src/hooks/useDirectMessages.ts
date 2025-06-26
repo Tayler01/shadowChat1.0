@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import {
   supabase,
   DMConversation,
@@ -235,44 +236,67 @@ export function useConversationMessages(conversationId: string | null) {
   useEffect(() => {
     if (!conversationId) return;
 
-    const channel = supabase
-      .channel(`dm_messages:${conversationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'dm_messages',
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        async (payload) => {
-          // Fetch the complete message with sender data
-          const { data } = await supabase
-            .from('dm_messages')
-            .select(`
-              *,
-              sender:users!sender_id(*)
-            `)
-            .eq('id', payload.new.id)
-            .single();
+    let channel: RealtimeChannel | null = null;
 
-          if (data) {
-            setMessages(prev => [...prev, data]);
-            
-            // Mark as read if not sent by current user
-            if (user && data.sender_id !== user.id) {
-              await supabase
-                .from('dm_messages')
-                .update({ read_at: new Date().toISOString() })
-                .eq('id', data.id);
+    const subscribeToChannel = (): RealtimeChannel => {
+      const newChannel = supabase
+        .channel(`dm_messages:${conversationId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'dm_messages',
+            filter: `conversation_id=eq.${conversationId}`,
+          },
+          async (payload) => {
+            // Fetch the complete message with sender data
+            const { data } = await supabase
+              .from('dm_messages')
+              .select(`
+                *,
+                sender:users!sender_id(*)
+              `)
+              .eq('id', payload.new.id)
+              .single();
+
+            if (data) {
+              setMessages(prev => [...prev, data]);
+
+              // Mark as read if not sent by current user
+              if (user && data.sender_id !== user.id) {
+                await supabase
+                  .from('dm_messages')
+                  .update({ read_at: new Date().toISOString() })
+                  .eq('id', data.id);
+              }
             }
           }
+        )
+        .subscribe();
+
+      return newChannel;
+    };
+
+    channel = subscribeToChannel();
+
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        supabase.auth.refreshSession().catch(err => {
+          console.error('Error refreshing session on visibility change:', err);
+        });
+        if (channel && channel.state !== 'joined') {
+          supabase.removeChannel(channel);
+          channel = subscribeToChannel();
         }
-      )
-      .subscribe();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
-      supabase.removeChannel(channel);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (channel) supabase.removeChannel(channel);
     };
   }, [conversationId, user]);
 
@@ -281,13 +305,6 @@ export function useConversationMessages(conversationId: string | null) {
 
     setSending(true);
     try {
-      // Refresh the session to avoid invalid token errors
-      try {
-        await supabase.auth.refreshSession()
-      } catch (err) {
-        console.error('Error refreshing session before sending DM:', err)
-      }
-
       const { data, error } = await supabase
         .from('dm_messages')
         .insert({
