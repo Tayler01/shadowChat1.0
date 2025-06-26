@@ -69,6 +69,7 @@ export function useMessages() {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
+          publication: 'supabase_realtime'
         },
         async (payload) => {
           console.log('📨 useMessages: Real-time INSERT received for message:', payload.new.id);
@@ -117,6 +118,7 @@ export function useMessages() {
           event: 'UPDATE',
           schema: 'public',
           table: 'messages',
+          publication: 'supabase_realtime'
         },
         async (payload) => {
           console.log('📝 useMessages: Real-time UPDATE received for message:', payload.new.id);
@@ -154,6 +156,7 @@ export function useMessages() {
           event: 'DELETE',
           schema: 'public',
           table: 'messages',
+          publication: 'supabase_realtime'
         },
         (payload) => {
           console.log('🗑️ useMessages: Real-time DELETE received for message:', payload.old.id);
