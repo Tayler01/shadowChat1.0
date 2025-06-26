@@ -1,8 +1,25 @@
-import { useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { supabase, User, updateUserPresence } from '../lib/supabase';
 import { signIn as authSignIn, signUp as authSignUp, signOut as authSignOut, getCurrentUser, updateUserProfile } from '../lib/auth';
 
-export function useAuth() {
+interface AuthContextValue {
+  user: User | null;
+  profile: User | null;
+  loading: boolean;
+  error: string | null;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (
+    email: string,
+    password: string,
+    userData: { full_name: string; username: string }
+  ) => Promise<any>;
+  signOut: () => Promise<void>;
+  updateProfile: (updates: Partial<User>) => Promise<User | void>;
+}
+
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+function useProvideAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -245,3 +262,17 @@ export function useAuth() {
     updateProfile,
   };
 }
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const value = useProvideAuth();
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
+
