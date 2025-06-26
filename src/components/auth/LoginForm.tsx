@@ -44,7 +44,13 @@ export function LoginForm() {
         toast.success('Account created! Welcome to the chat!');
       }
     } catch (error: any) {
-      toast.error(error.message || 'An error occurred');
+      // Handle specific error cases
+      if (error.message === 'User already registered') {
+        toast.error('This email is already registered. Please sign in instead.');
+        setIsLogin(true); // Switch to login form
+      } else {
+        toast.error(error.message || 'An error occurred');
+      }
     }
   };
 
