@@ -79,11 +79,10 @@ export const updateUserPresence = async () => {
   if (error) console.error('Error updating presence:', error)
 }
 
-export const toggleReaction = async (messageId: string, emoji: string, isDM = false) => {
+export const toggleReaction = async (messageId: string, emoji: string) => {
   const { error } = await supabase.rpc('toggle_message_reaction', {
-    message_id: messageId,
-    emoji,
-    is_dm: isDM
+    message_id_param: messageId,
+    emoji_param: emoji,
   })
   if (error) console.error('Error toggling reaction:', error)
 }
