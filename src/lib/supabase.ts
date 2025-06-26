@@ -105,7 +105,3 @@ export const markDMMessagesRead = async (conversationId: string) => {
   })
   if (error) console.error('Error marking messages as read:', error)
 }
-
-export { updateUserPresence }
-
-export { toggleReaction }

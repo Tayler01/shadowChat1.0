@@ -135,5 +135,3 @@ export const updateUserProfile = async (updates: Partial<{
   if (error) throw error
   return data
 }
-
-export { signOut }
