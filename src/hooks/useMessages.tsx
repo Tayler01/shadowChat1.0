@@ -28,42 +28,42 @@ function useProvideMessages(): MessagesContextValue {
   const [sending, setSending] = useState(false);
   const { user } = useAuth();
 
+  const fetchMessages = useCallback(async () => {
+    console.log('📥 Fetching messages...');
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          user:users!user_id(*)
+        `)
+        .order('created_at', { ascending: true })
+        .limit(100);
+
+      if (error) {
+        console.error('❌ Error fetching messages:', error);
+      } else if (data) {
+        console.log('✅ Fetched messages:', data.length);
+        setMessages(prev => {
+          if (prev.length === 0) {
+            return data as Message[];
+          }
+          const ids = new Set(prev.map(m => m.id));
+          const merged = [...prev, ...data.filter(m => !ids.has(m.id))];
+          return merged;
+        });
+      }
+    } catch (error) {
+      console.error('❌ Exception fetching messages:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Fetch initial messages
   useEffect(() => {
-    const fetchMessages = async () => {
-      console.log('📥 Fetching initial messages...');
-      try {
-        const { data, error } = await supabase
-          .from('messages')
-          .select(`
-            *,
-            user:users!user_id(*)
-          `)
-          .order('created_at', { ascending: true })
-          .limit(100);
-
-        if (error) {
-          console.error('❌ Error fetching messages:', error);
-        } else if (data) {
-          console.log('✅ Fetched messages:', data.length);
-          setMessages(prev => {
-            if (prev.length === 0) {
-              return data as Message[];
-            }
-            const ids = new Set(prev.map(m => m.id));
-            const merged = [...prev, ...data.filter(m => !ids.has(m.id))];
-            return merged;
-          });
-        }
-      } catch (error) {
-        console.error('❌ Exception fetching messages:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchMessages();
-  }, []);
+  }, [fetchMessages]);
 
   // Subscribe to real-time updates
   useEffect(() => {
@@ -223,6 +223,7 @@ function useProvideMessages(): MessagesContextValue {
           supabase.removeChannel(channel)
           channel = subscribeToChannel()
         }
+        fetchMessages()
       }
     }
 
@@ -233,7 +234,7 @@ function useProvideMessages(): MessagesContextValue {
       document.removeEventListener('visibilitychange', handleVisibility)
       if (channel) supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, fetchMessages]);
 
   const sendMessage = useCallback(async (content: string, messageType: 'text' | 'command' = 'text') => {
     if (!user || !content.trim()) {
