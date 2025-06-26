@@ -119,8 +119,12 @@ export const signOut = async () => {
 
 export const getCurrentUser = async () => {
   console.log('🔍 getCurrentUser called');
-  
+
   try {
+    console.log('🔐 Refreshing session...');
+    // Ensure we refresh the session so getUser() has a valid access token
+    await supabase.auth.getSession()
+
     console.log('🔐 Checking auth user...');
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
