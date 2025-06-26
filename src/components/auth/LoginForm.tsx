@@ -37,11 +37,16 @@ export function LoginForm() {
           return;
         }
 
-        await signUp(formData.email, formData.password, {
+        const result = await signUp(formData.email, formData.password, {
           full_name: formData.full_name,
           username: formData.username,
         });
-        toast.success('Account created! Welcome to the chat!');
+        
+        if (result.session) {
+          toast.success('Account created! Welcome to the chat!');
+        } else {
+          toast.success('Account created! Please check your email to confirm your account.');
+        }
       }
     } catch (error: any) {
       toast.error(error.message || 'An error occurred');

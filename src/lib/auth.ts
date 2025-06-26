@@ -64,12 +64,19 @@ export const signUp = async ({ email, password, username, displayName }: SignUpD
       throw profileError
     }
 
-    // Fetch the profile after creation
-    const profile = await getUserProfile(data.user.id)
-    return profile
+    // If user is confirmed (auto-login), fetch and return the profile
+    if (data.session) {
+      console.log('✅ User auto-confirmed, fetching profile...')
+      const profile = await getUserProfile(data.user.id)
+      return { user: data.user, profile, session: data.session }
+    }
+    
+    // If email confirmation is required, return user data without profile
+    console.log('📧 Email confirmation required')
+    return { user: data.user, profile: null, session: null }
   }
 
-  return null
+  return { user: null, profile: null, session: null }
 }
 
 export const signIn = async ({ email, password }: SignInData) => {

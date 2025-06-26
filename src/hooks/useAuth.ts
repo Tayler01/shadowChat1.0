@@ -130,15 +130,23 @@ export function useAuth() {
     setLoading(true);
     setError(null);
     try {
-      const profile = await authSignUp({
+      const result = await authSignUp({
         email,
         password,
         username: userData.username,
         displayName: userData.full_name,
       });
-      if (profile) {
-        setUser(profile);
+      
+      // If user is auto-confirmed (has session), set user immediately
+      if (result.session && result.profile) {
+        console.log('✅ Auto-login after signup successful');
+        setUser(result.profile);
+      } else if (result.user && !result.session) {
+        console.log('📧 Email confirmation required');
+        // Don't set user yet, they need to confirm email
       }
+      
+      return result;
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Sign up failed');
       throw error;
