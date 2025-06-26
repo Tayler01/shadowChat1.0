@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { supabase, User } from '../lib/supabase';
-import { AuthService, SignUpData } from '../lib/auth';
+import { supabase } from '../lib/supabase';
+import { AuthService, SignUpData, AuthUser } from '../lib/auth';
 
 export function useAuth() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -97,7 +97,7 @@ export function useAuth() {
     }
   };
 
-  const updateProfile = async (updates: Partial<User>) => {
+  const updateProfile = async (updates: Partial<AuthUser>) => {
     if (!user) return;
     
     const updatedUser = await AuthService.updateProfile(updates);
