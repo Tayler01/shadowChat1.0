@@ -15,7 +15,7 @@ export function useMessages() {
         .from('messages')
         .select(`
           *,
-          user:users(*)
+          user:user_id(*)
         `)
         .order('created_at', { ascending: true })
         .limit(100);
@@ -48,7 +48,7 @@ export function useMessages() {
             .from('messages')
             .select(`
               *,
-              user:users(*)
+              user:user_id(*)
             `)
             .eq('id', payload.new.id)
             .single();
@@ -71,7 +71,7 @@ export function useMessages() {
             .from('messages')
             .select(`
               *,
-              user:users(*)
+              user:user_id(*)
             `)
             .eq('id', payload.new.id)
             .single();

@@ -21,7 +21,7 @@ export function useDirectMessages() {
             content,
             sender_id,
             created_at,
-            sender:users(*)
+            sender:sender_id(*)
           )
         `)
         .contains('participants', [user.id])
@@ -152,7 +152,7 @@ export function useConversationMessages(conversationId: string | null) {
         .from('dm_messages')
         .select(`
           *,
-          sender:users(*)
+          sender:sender_id(*)
         `)
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true })
@@ -199,7 +199,7 @@ export function useConversationMessages(conversationId: string | null) {
             .from('dm_messages')
             .select(`
               *,
-              sender:users(*)
+              sender:sender_id(*)
             `)
             .eq('id', payload.new.id)
             .single();
