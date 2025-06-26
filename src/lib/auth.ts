@@ -83,15 +83,43 @@ export const signIn = async ({ email, password }: SignInData) => {
 
   if (error) throw error
 
-  // Update user status to online
   if (data.user && data.session) {
-    const { error: updateError } = await supabase
+    // Check if a profile row already exists
+    const { data: profile, error: profileError } = await supabase
       .from('users')
-      .update({ status: 'online', last_active: new Date().toISOString() })
+      .select('id')
       .eq('id', data.user.id)
-    
-    if (updateError) {
-      console.warn('Could not update user status:', updateError)
+      .maybeSingle()
+
+    if (profileError && profileError.code !== 'PGRST116') {
+      console.warn('Could not fetch user profile:', profileError)
+    }
+
+    if (!profile) {
+      // Create the profile using metadata from the auth user
+      const { error: insertError } = await supabase
+        .from('users')
+        .insert({
+          id: data.user.id,
+          email: data.user.email,
+          username: data.user.user_metadata?.username,
+          display_name: data.user.user_metadata?.display_name,
+          status: 'online'
+        })
+
+      if (insertError) {
+        console.error('Error creating user profile on sign in:', insertError)
+      }
+    } else {
+      // Update user status to online if profile exists
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ status: 'online', last_active: new Date().toISOString() })
+        .eq('id', data.user.id)
+
+      if (updateError) {
+        console.warn('Could not update user status:', updateError)
+      }
     }
   }
 
