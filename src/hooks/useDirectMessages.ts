@@ -1,10 +1,17 @@
 import { useEffect, useState, useCallback } from 'react';
-import { supabase, DMConversation, DMMessage } from '../lib/supabase';
+import {
+  supabase,
+  DMConversation,
+  DMMessage,
+  getOrCreateDMConversation,
+  markDMMessagesRead,
+} from '../lib/supabase';
 import { useAuth } from './useAuth';
 
 export function useDirectMessages() {
   const [conversations, setConversations] = useState<DMConversation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentConversation, setCurrentConversation] = useState<string | null>(null);
   const { user } = useAuth();
 
   // Fetch conversations
@@ -125,10 +132,55 @@ export function useDirectMessages() {
       throw error;
     }
   }, [user]);
+  const {
+    messages,
+    sendMessage,
+  } = useConversationMessages(currentConversation);
+
+  const startConversation = useCallback(async (username: string) => {
+    if (!user) return null;
+
+    const { data: otherUser, error } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error finding user:', error);
+      throw error;
+    }
+
+    if (!otherUser) {
+      throw new Error('User not found');
+    }
+
+    const conversation = await getOrCreateDMConversation(otherUser.id);
+    if (conversation) {
+      setCurrentConversation(conversation.id);
+      return conversation.id as string;
+    }
+    return null;
+  }, [user]);
+
+  const markAsRead = useCallback(async (conversationId: string) => {
+    await markDMMessagesRead(conversationId);
+    setConversations(prev =>
+      prev.map(c =>
+        c.id === conversationId ? { ...c, unread_count: 0 } : c
+      )
+    );
+  }, []);
 
   return {
     conversations,
     loading,
+    currentConversation,
+    setCurrentConversation,
+    messages,
+    startConversation,
+    sendMessage,
+    markAsRead,
     createConversation,
   };
 }
