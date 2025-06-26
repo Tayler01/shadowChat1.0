@@ -12,54 +12,33 @@ export function useMessages() {
   useEffect(() => {
     const fetchMessages = async () => {
       console.log('📥 Fetching initial messages...');
-      
-      try {
-        const { data, error } = await supabase
-          .from('messages')
-          .select(`
-            *,
-            user:users!user_id(*)
-          `)
-          .order('created_at', { ascending: true })
-          .limit(100);
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          user:users!user_id(*)
+        `)
+        .order('created_at', { ascending: true })
+        .limit(100);
 
-        if (error) {
-          console.error('❌ Error fetching messages:', error);
-        } else {
-          console.log('✅ Fetched messages:', data?.length || 0);
-          setMessages(data || []);
-        }
-      } catch (error) {
-        console.error('❌ Exception fetching messages:', error);
-      } finally {
-        setLoading(false);
+      if (error) {
+        console.error('Error fetching messages:', error);
+      } else {
+        console.log('✅ Fetched messages:', data?.length || 0);
+        setMessages(data || []);
       }
+      setLoading(false);
     };
 
-    // Only fetch if we have a user
-    if (user) {
-      fetchMessages();
-    } else {
-      setLoading(false);
-    }
-  }, [user]);
+    fetchMessages();
+  }, []);
 
   // Subscribe to real-time updates
   useEffect(() => {
-    if (!user) {
-      console.log('⏭️ Skipping real-time setup - no user');
-      return;
-    }
-
     console.log('🔄 Setting up real-time subscription for messages...');
     
     const channel = supabase
-      .channel('public:messages', {
-        config: {
-          broadcast: { self: true },
-          presence: { key: user.id }
-        }
-      })
+      .channel('public:messages')
       .on(
         'postgres_changes',
         {
@@ -68,38 +47,29 @@ export function useMessages() {
           table: 'messages',
         },
         async (payload) => {
-          console.log('📨 New message received via real-time:', payload.new);
+          console.log('📨 New message received:', payload.new);
           
-          try {
-            // Fetch the complete message with user data
-            const { data, error } = await supabase
-              .from('messages')
-              .select(`
-                *,
-                user:users!user_id(*)
-              `)
-              .eq('id', payload.new.id)
-              .single();
+          // Fetch the complete message with user data
+          const { data } = await supabase
+            .from('messages')
+            .select(`
+              *,
+              user:users!user_id(*)
+            `)
+            .eq('id', payload.new.id)
+            .single();
 
-            if (error) {
-              console.error('❌ Error fetching new message details:', error);
-              return;
-            }
-
-            if (data) {
-              console.log('✅ Adding new message to state:', data);
-              setMessages(prev => {
-                // Check if message already exists to avoid duplicates
-                const exists = prev.find(msg => msg.id === data.id);
-                if (exists) {
-                  console.log('⚠️ Message already exists, skipping');
-                  return prev;
-                }
-                return [...prev, data];
-              });
-            }
-          } catch (error) {
-            console.error('❌ Exception handling new message:', error);
+          if (data) {
+            console.log('✅ Adding new message to state:', data);
+            setMessages(prev => {
+              // Check if message already exists to avoid duplicates
+              const exists = prev.find(msg => msg.id === data.id);
+              if (exists) {
+                console.log('⚠️ Message already exists, skipping');
+                return prev;
+              }
+              return [...prev, data];
+            });
           }
         }
       )
@@ -111,32 +81,23 @@ export function useMessages() {
           table: 'messages',
         },
         async (payload) => {
-          console.log('📝 Message updated via real-time:', payload.new);
+          console.log('📝 Message updated:', payload.new);
           
-          try {
-            // Fetch the updated message with user data
-            const { data, error } = await supabase
-              .from('messages')
-              .select(`
-                *,
-                user:users!user_id(*)
-              `)
-              .eq('id', payload.new.id)
-              .single();
+          // Fetch the updated message with user data
+          const { data } = await supabase
+            .from('messages')
+            .select(`
+              *,
+              user:users!user_id(*)
+            `)
+            .eq('id', payload.new.id)
+            .single();
 
-            if (error) {
-              console.error('❌ Error fetching updated message details:', error);
-              return;
-            }
-
-            if (data) {
-              console.log('✅ Updating message in state:', data);
-              setMessages(prev =>
-                prev.map(msg => msg.id === data.id ? data : msg)
-              );
-            }
-          } catch (error) {
-            console.error('❌ Exception handling message update:', error);
+          if (data) {
+            console.log('✅ Updating message in state:', data);
+            setMessages(prev =>
+              prev.map(msg => msg.id === data.id ? data : msg)
+            );
           }
         }
       )
@@ -148,7 +109,7 @@ export function useMessages() {
           table: 'messages',
         },
         (payload) => {
-          console.log('🗑️ Message deleted via real-time:', payload.old);
+          console.log('🗑️ Message deleted:', payload.old);
           setMessages(prev =>
             prev.filter(msg => msg.id !== payload.old.id)
           );
@@ -156,18 +117,13 @@ export function useMessages() {
       )
       .subscribe((status) => {
         console.log('📡 Real-time subscription status:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ Successfully subscribed to real-time messages');
-        } else if (status === 'CHANNEL_ERROR') {
-          console.error('❌ Real-time subscription error');
-        }
       });
 
     return () => {
       console.log('🔌 Cleaning up real-time subscription');
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, []);
 
   const sendMessage = useCallback(async (content: string, messageType: 'text' | 'command' = 'text') => {
     if (!user || !content.trim()) {
@@ -177,7 +133,6 @@ export function useMessages() {
 
     console.log('📤 Sending message:', { userId: user.id, content, messageType });
     setSending(true);
-    
     try {
       const { data, error } = await supabase
         .from('messages')
@@ -186,10 +141,7 @@ export function useMessages() {
           content: content.trim(),
           message_type: messageType,
         })
-        .select(`
-          *,
-          user:users!user_id(*)
-        `)
+        .select()
         .single();
 
       if (error) {
@@ -198,17 +150,8 @@ export function useMessages() {
       }
       
       console.log('✅ Message sent successfully:', data);
-      
-      // Optimistically add the message to avoid waiting for real-time
-      if (data) {
-        setMessages(prev => {
-          const exists = prev.find(msg => msg.id === data.id);
-          if (exists) return prev;
-          return [...prev, data];
-        });
-      }
     } catch (error) {
-      console.error('❌ Exception sending message:', error);
+      console.error('Error sending message:', error);
       throw error;
     } finally {
       setSending(false);
@@ -218,22 +161,17 @@ export function useMessages() {
   const editMessage = useCallback(async (messageId: string, content: string) => {
     if (!user) return;
 
-    try {
-      const { error } = await supabase
-        .from('messages')
-        .update({
-          content,
-          edited_at: new Date().toISOString(),
-        })
-        .eq('id', messageId)
-        .eq('user_id', user.id);
+    const { error } = await supabase
+      .from('messages')
+      .update({
+        content,
+        edited_at: new Date().toISOString(),
+      })
+      .eq('id', messageId)
+      .eq('user_id', user.id);
 
-      if (error) {
-        console.error('Error editing message:', error);
-        throw error;
-      }
-    } catch (error) {
-      console.error('Exception editing message:', error);
+    if (error) {
+      console.error('Error editing message:', error);
       throw error;
     }
   }, [user]);
@@ -241,19 +179,14 @@ export function useMessages() {
   const deleteMessage = useCallback(async (messageId: string) => {
     if (!user) return;
 
-    try {
-      const { error } = await supabase
-        .from('messages')
-        .delete()
-        .eq('id', messageId)
-        .eq('user_id', user.id);
+    const { error } = await supabase
+      .from('messages')
+      .delete()
+      .eq('id', messageId)
+      .eq('user_id', user.id);
 
-      if (error) {
-        console.error('Error deleting message:', error);
-        throw error;
-      }
-    } catch (error) {
-      console.error('Exception deleting message:', error);
+    if (error) {
+      console.error('Error deleting message:', error);
       throw error;
     }
   }, [user]);
@@ -268,12 +201,27 @@ export function useMessages() {
         is_dm: false
       });
 
-      if (error) {
-        console.error('Error toggling reaction:', error);
-        throw error;
-      }
+      if (error) throw error;
     } catch (error) {
-      console.error('Exception toggling reaction:', error);
+      console.error('Error toggling reaction:', error);
+      throw error;
+    }
+  }, [user]);
+
+  const pinMessage = useCallback(async (messageId: string) => {
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('messages')
+      .update({
+        pinned: true,
+        pinned_by: user.id,
+        pinned_at: new Date().toISOString(),
+      })
+      .eq('id', messageId);
+
+    if (error) {
+      console.error('Error pinning message:', error);
       throw error;
     }
   }, [user]);
@@ -281,33 +229,27 @@ export function useMessages() {
   const togglePin = useCallback(async (messageId: string) => {
     if (!user) return;
 
-    try {
-      // First get the current pinned status
-      const { data: message } = await supabase
-        .from('messages')
-        .select('pinned')
-        .eq('id', messageId)
-        .single();
+    // First get the current pinned status
+    const { data: message } = await supabase
+      .from('messages')
+      .select('pinned')
+      .eq('id', messageId);
 
-      if (!message) return;
+    if (!message || message.length === 0) return;
 
-      const isPinned = message.pinned;
-      
-      const { error } = await supabase
-        .from('messages')
-        .update({
-          pinned: !isPinned,
-          pinned_by: !isPinned ? user.id : null,
-          pinned_at: !isPinned ? new Date().toISOString() : null,
-        })
-        .eq('id', messageId);
+    const isPinned = message[0].pinned;
+    
+    const { error } = await supabase
+      .from('messages')
+      .update({
+        pinned: !isPinned,
+        pinned_by: !isPinned ? user.id : null,
+        pinned_at: !isPinned ? new Date().toISOString() : null,
+      })
+      .eq('id', messageId);
 
-      if (error) {
-        console.error('Error toggling pin:', error);
-        throw error;
-      }
-    } catch (error) {
-      console.error('Exception toggling pin:', error);
+    if (error) {
+      console.error('Error toggling pin:', error);
       throw error;
     }
   }, [user]);

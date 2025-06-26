@@ -13,13 +13,6 @@ export const ChatView: React.FC = () => {
 
   const handleSendMessage = async (content: string) => {
     console.log('🚀 ChatView: Sending message:', content);
-    
-    if (!user) {
-      console.error('❌ ChatView: No user available');
-      toast.error('Please sign in to send messages');
-      return;
-    }
-    
     try {
       await sendMessage(content)
       console.log('✅ ChatView: Message sent successfully');

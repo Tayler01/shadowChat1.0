@@ -27,18 +27,13 @@ interface MessageListProps {
 }
 
 export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
-  const { user } = useAuth()
+  const { profile } = useAuth()
   const { messages, loading, editMessage, deleteMessage, togglePin } = useMessages()
   const { typingUsers } = useTyping('general')
   
   // Debug logging
   useEffect(() => {
-    console.log('📋 MessageList: messages updated', { 
-      count: messages.length, 
-      loading, 
-      hasUser: !!user,
-      messageIds: messages.map(m => m.id).slice(-3) // Last 3 message IDs
-    });
+    console.log('📋 MessageList: messages updated', { count: messages.length, loading });
   }, [messages, loading]);
   
   const [editingMessage, setEditingMessage] = useState<string | null>(null)
@@ -95,7 +90,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
   }
 
   const MessageActions: React.FC<{ message: any }> = ({ message }) => {
-    const isOwner = user?.id === message.user_id
+    const isOwner = profile?.id === message.user_id
     const [showActions, setShowActions] = useState(false)
 
     return (
@@ -186,7 +181,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
     return (
       <div className="flex flex-wrap gap-1 mt-2">
         {Object.entries(reactions).map(([emoji, data]: [string, any]) => {
-          const isReacted = data.users?.includes(user?.id)
+          const isReacted = data.users?.includes(profile?.id)
           
           return (
             <motion.button
@@ -213,30 +208,8 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <div className="text-gray-500 dark:text-gray-400">Loading messages...</div>
-        </div>
-      </div>
-    )
-  }
-  
-  if (!user) {
-    return (
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="text-gray-500 dark:text-gray-400">Please sign in to view messages</div>
-      </div>
-    )
-  }
-  
-  if (messages.length === 0 && !loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="text-center">
-          <div className="text-gray-500 dark:text-gray-400 mb-2">No messages yet</div>
-          <div className="text-sm text-gray-400 dark:text-gray-500">Be the first to start the conversation!</div>
-        </div>
+      <div className="flex-1 flex items-center justify-center">
+        <div className="text-gray-500 dark:text-gray-400">Loading messages...</div>
       </div>
     )
   }
