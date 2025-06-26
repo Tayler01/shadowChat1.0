@@ -104,8 +104,12 @@ export function useMessages() {
   }, []);
 
   const sendMessage = useCallback(async (content: string, messageType: 'text' | 'command' = 'text') => {
-    if (!user || !content.trim()) return;
+    if (!user || !content.trim()) {
+      console.log('❌ Cannot send message: missing user or content', { user: !!user, content: content.trim() });
+      return;
+    }
 
+    console.log('📤 Sending message:', { userId: user.id, content, messageType });
     setSending(true);
     try {
       const { error } = await supabase
@@ -116,7 +120,12 @@ export function useMessages() {
           message_type: messageType,
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error inserting message:', error);
+        throw error;
+      }
+      
+      console.log('✅ Message sent successfully');
     } catch (error) {
       console.error('Error sending message:', error);
       throw error;
@@ -163,8 +172,9 @@ export function useMessages() {
 
     try {
       const { error } = await supabase.rpc('toggle_message_reaction', {
-        message_id_param: messageId,
-        emoji_param: emoji,
+        message_id: messageId,
+        emoji: emoji,
+        is_dm: false
       });
 
       if (error) throw error;
@@ -192,20 +202,30 @@ export function useMessages() {
     }
   }, [user]);
 
-  const unpinMessage = useCallback(async (messageId: string) => {
+  const togglePin = useCallback(async (messageId: string) => {
     if (!user) return;
 
+    // First get the current pinned status
+    const { data: message } = await supabase
+      .from('messages')
+      .select('pinned')
+      .eq('id', messageId);
+
+    if (!message || message.length === 0) return;
+
+    const isPinned = message[0].pinned;
+    
     const { error } = await supabase
       .from('messages')
       .update({
-        pinned: false,
-        pinned_by: null,
-        pinned_at: null,
+        pinned: !isPinned,
+        pinned_by: !isPinned ? user.id : null,
+        pinned_at: !isPinned ? new Date().toISOString() : null,
       })
       .eq('id', messageId);
 
     if (error) {
-      console.error('Error unpinning message:', error);
+      console.error('Error toggling pin:', error);
       throw error;
     }
   }, [user]);
@@ -218,7 +238,6 @@ export function useMessages() {
     editMessage,
     deleteMessage,
     toggleReaction,
-    pinMessage,
-    unpinMessage,
+    togglePin,
   };
 }
