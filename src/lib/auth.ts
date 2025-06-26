@@ -53,6 +53,7 @@ export const signUp = async ({ email, password, username, displayName }: SignUpD
       .from('users')
       .insert({
         id: data.user.id,
+        email,
         username,
         display_name: displayName,
         status: 'online'
