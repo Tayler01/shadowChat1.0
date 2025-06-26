@@ -188,9 +188,14 @@ function useProvideMessages(): MessagesContextValue {
         if (status === 'SUBSCRIBED') {
           console.log('✅ Successfully subscribed to real-time messages');
         }
-        if (status === 'CLOSED' || status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
-          console.warn(`⚠️ Channel ${status}, resubscribing...`);
-          supabase.removeChannel(newChannel);
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn(`⚠️ Channel ${status}, removing and resubscribing...`);
+          await supabase.removeChannel(newChannel);
+          setTimeout(() => {
+            channel = subscribeToChannel();
+          }, 1000);
+        } else if (status === 'CLOSED') {
+          console.warn('⚠️ Channel closed, resubscribing...');
           setTimeout(() => {
             channel = subscribeToChannel();
           }, 1000);
