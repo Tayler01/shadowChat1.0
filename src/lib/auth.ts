@@ -154,40 +154,6 @@ export const updatePresence = async () => {
   if (error) console.error('Error updating presence:', error)
 }
 
-export const clearAllSessions = async () => {
-  try {
-    // Sign out from Supabase (this clears the session)
-    await supabase.auth.signOut()
-    
-    // Clear any remaining localStorage items related to Supabase
-    const keysToRemove = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key && key.startsWith('supabase.auth.token')) {
-        keysToRemove.push(key)
-      }
-    }
-    keysToRemove.forEach(key => localStorage.removeItem(key))
-    
-    // Clear session storage as well
-    const sessionKeysToRemove = []
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const key = sessionStorage.key(i)
-      if (key && key.startsWith('supabase.auth.token')) {
-        sessionKeysToRemove.push(key)
-      }
-    }
-    sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key))
-    
-    // Force reload to ensure clean state
-    window.location.reload()
-  } catch (error) {
-    console.error('Error clearing sessions:', error)
-    // Force reload even if there's an error
-    window.location.reload()
-  }
-}
-
 export const AuthService = {
   signUp,
   signIn,
@@ -196,5 +162,4 @@ export const AuthService = {
   getUserProfile,
   updateProfile: updateUserProfile,
   updatePresence,
-  clearAllSessions,
 }

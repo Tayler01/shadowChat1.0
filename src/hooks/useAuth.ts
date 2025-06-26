@@ -29,7 +29,7 @@ export function useAuth() {
         
         if (error) {
           console.error('Session error:', error);
-          await AuthService.clearAllSessions();
+          await supabase.auth.signOut();
           setUser(null);
           setLoading(false);
           return;
@@ -47,14 +47,14 @@ export function useAuth() {
             if (profileError || !profile) {
               console.error('Profile error:', profileError);
               // User exists in auth but not in users table, sign them out
-              await AuthService.clearAllSessions();
+              await supabase.auth.signOut();
               setUser(null);
             } else {
               setUser(profile);
             }
           } catch (error) {
             console.error('Error fetching profile:', error);
-            await AuthService.clearAllSessions();
+            await supabase.auth.signOut();
             setUser(null);
           }
         } else {
@@ -62,7 +62,7 @@ export function useAuth() {
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
-        await AuthService.clearAllSessions();
+        await supabase.auth.signOut();
         setUser(null);
       }
       
@@ -85,7 +85,7 @@ export function useAuth() {
 
             if (profileError || !profile) {
               console.error('Profile error on auth change:', profileError);
-              await AuthService.clearAllSessions();
+              await supabase.auth.signOut();
               setUser(null);
             } else {
               setUser(profile);
