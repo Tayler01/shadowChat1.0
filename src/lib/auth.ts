@@ -122,7 +122,16 @@ export const getCurrentUser = async () => {
   
   // Add timeout to prevent hanging - increased to 30 seconds for better diagnostics
   const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new Error('getCurrentUser timeout after 30s')), 30000);
+    setTimeout(() => {
+      const timeoutError = new Error('getCurrentUser timeout after 30s')
+      console.error('🚨 Authentication timeout detected. Please check:')
+      console.error('1. Network connectivity')
+      console.error('2. Supabase project status')
+      console.error('3. Environment variables (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY)')
+      console.error('4. Database RLS policies on users table')
+      console.error('Current Supabase URL:', import.meta.env.VITE_SUPABASE_URL)
+      throw timeoutError
+    }, 30000);
   });
   
   const getUserPromise = async () => {
