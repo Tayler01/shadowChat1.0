@@ -18,14 +18,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: true,
   },
-  global: {
-    headers: {
-      'x-my-custom-header': 'realtime-chat',
-    },
-    params: {
-      eventsPerSecond: 20,
-    },
-  },
 })
 
 // Database types matching the actual schema
@@ -118,4 +110,48 @@ export const markDMMessagesRead = async (conversationId: string) => {
     conversation_id: conversationId
   })
   if (error) console.error('Error marking messages as read:', error)
+}
+
+// Helper function to ensure valid session before database operations
+export const ensureSession = async () => {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession()
+    
+    if (error) {
+      console.error('Error getting session:', error)
+      return false
+    }
+    
+    if (!session) {
+      console.warn('No active session found')
+      return false
+    }
+    
+    // Check if session is expired or about to expire (within 5 minutes)
+    const expiresAt = session.expires_at
+    const now = Math.floor(Date.now() / 1000)
+    const fiveMinutes = 5 * 60
+    
+    if (expiresAt && (expiresAt - now) < fiveMinutes) {
+      console.log('Session expiring soon, refreshing...')
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+      
+      if (refreshError) {
+        console.error('Error refreshing session:', refreshError)
+        return false
+      }
+      
+      if (!refreshData.session) {
+        console.warn('Failed to refresh session')
+        return false
+      }
+      
+      console.log('Session refreshed successfully')
+    }
+    
+    return true
+  } catch (error) {
+    console.error('Exception in ensureSession:', error)
+    return false
+  }
 }

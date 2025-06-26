@@ -270,6 +270,14 @@ function useProvideMessages(): MessagesContextValue {
     console.log(`${logPrefix}: 📤 Proceeding with message send`);
     setSending(true);
 
+    // Ensure we have a valid session before attempting database operations
+    console.log(`${logPrefix}: 🔐 Step 0 - Ensuring valid session`);
+    const sessionValid = await ensureSession();
+    if (!sessionValid) {
+      console.error(`${logPrefix}: ❌ Invalid or expired session, cannot send message`);
+      throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
+    }
+    console.log(`${logPrefix}: ✅ Session validated successfully`);
 
     try {
       // Step 1: Prepare message data
