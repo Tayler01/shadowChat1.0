@@ -445,7 +445,7 @@ function useProvideMessages(): MessagesContextValue {
       
       console.log(`${logPrefix}: 💾 Calling supabase.from('messages').insert() NOW`);
       
-      const { data, error } = await supabase
+      const insertResult = await supabase
         .from('messages')
         .insert(messageData)
         .select(`
@@ -453,6 +453,8 @@ function useProvideMessages(): MessagesContextValue {
           user:users!user_id(*)
         `)
         .single();
+      
+      const { data, error } = insertResult;
         
       console.log(`${logPrefix}: 🧪 Insert response received from Supabase`, {
         data,
@@ -461,10 +463,37 @@ function useProvideMessages(): MessagesContextValue {
         hasError: !!error,
         errorMessage: error?.message,
         errorCode: error?.code,
+        errorDetails: error?.details,
+        errorHint: error?.hint,
         dataId: data?.id,
         dataContent: data?.content,
         timestamp: new Date().toISOString()
       });
+      
+      // Explicit error/success logging
+      if (error) {
+        console.error(`${logPrefix}: ❌ INSERT FAILED`, {
+          error,
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+          status: error.status || 'unknown'
+        });
+      } else if (data) {
+        console.log(`${logPrefix}: ✅ INSERT SUCCEEDED`, {
+          messageId: data.id,
+          content: data.content,
+          userId: data.user_id,
+          timestamp: data.created_at
+        });
+      } else {
+        console.warn(`${logPrefix}: ⚠️ INSERT RETURNED NO DATA AND NO ERROR`, {
+          insertResult,
+          data,
+          error
+        });
+      }
         
       const insertEndTime = performance.now();
       const insertDuration = insertEndTime - insertStartTime;
