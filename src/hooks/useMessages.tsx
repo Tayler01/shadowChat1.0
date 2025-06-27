@@ -58,6 +58,8 @@ async function manualInsertMessage(messageData: {
     body: JSON.stringify(messageData)
   });
   
+  console.log(`${logPrefix}: Insert response status`, res.status);
+  
   console.log(`${logPrefix}: Fetch response`, {
     status: res.status,
     statusText: res.statusText,
@@ -67,6 +69,7 @@ async function manualInsertMessage(messageData: {
   
   if (!res.ok) {
     const errorText = await res.text();
+    console.error(`${logPrefix}: Insert failed:`, res.status, errorText);
     console.error(`${logPrefix}: ❌ Manual insert failed`, {
       status: res.status,
       statusText: res.statusText,
@@ -76,6 +79,7 @@ async function manualInsertMessage(messageData: {
   }
   
   const data = await res.json();
+  console.log(`${logPrefix}: Insert success:`, data);
   console.log(`${logPrefix}: ✅ Manual insert succeeded`, {
     data,
     messageId: data?.id || data?.[0]?.id
