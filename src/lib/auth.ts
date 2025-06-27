@@ -140,12 +140,22 @@ export const signOut = async () => {
 }
 
 export const getCurrentUser = async () => {
+  console.log('🔍 [getCurrentUser] Function started');
 
   try {
+    console.log('🔍 [getCurrentUser] Getting user from auth');
     const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
+    console.log('🔍 [getCurrentUser] Auth user result:', {
+      hasUser: !!user,
+      userId: user?.id,
+      hasAuthError: !!authError,
+      authErrorMessage: authError?.message
+    });
     
     // Handle the specific "user not found" error from invalid JWT
     if (authError && authError.message?.includes('User from sub claim in JWT does not exist')) {
+      console.log('🔍 [getCurrentUser] Invalid JWT detected, signing out');
       await supabase.auth.signOut();
       return null;
     }
@@ -155,9 +165,65 @@ export const getCurrentUser = async () => {
       return null;
     }
     
-    if (!user) return null
+    if (!user) {
+      console.log('🔍 [getCurrentUser] No user found in auth');
+      return null;
+    }
 
+    console.log('🔍 [getCurrentUser] Fetching user profile from database');
     
+    // Add timeout and retry logic for the database query
+    let profile = null;
+    let error = null;
+    
+    try {
+      const profileQuery = supabase
+        .from('users')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      // Add a timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database query timeout')), 10000)
+      );
+      
+      const result = await Promise.race([profileQuery, timeoutPromise]) as any;
+      profile = result.data;
+      error = result.error;
+      
+      console.log('🔍 [getCurrentUser] Profile query result:', {
+        hasProfile: !!profile,
+        hasError: !!error,
+        errorCode: error?.code,
+        errorMessage: error?.message
+      });
+    } catch (fetchError) {
+      console.error('🔍 [getCurrentUser] Database fetch error:', fetchError);
+      
+      // If it's a network error, return a minimal user object to prevent app crash
+      if (fetchError instanceof Error && (
+        fetchError.message.includes('Failed to fetch') ||
+        fetchError.message.includes('Network') ||
+        fetchError.message.includes('timeout')
+      )) {
+        console.warn('🔍 [getCurrentUser] Network error detected, returning minimal user object');
+        return {
+          id: user.id,
+          email: user.email!,
+          username: user.user_metadata?.username || user.email?.split('@')[0] || `user_${user.id.slice(0, 8)}`,
+          display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || 'User',
+          status: 'online',
+          color: '#3B82F6',
+          status_message: '',
+          last_active: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+      }
+      
+      throw fetchError;
+    }
     const { data: profile, error } = await supabase
       .from('users')
       .select('*')
@@ -167,7 +233,7 @@ export const getCurrentUser = async () => {
 
     if (error && error.code === 'PGRST116') {
       // Profile doesn't exist, create it
-      console.error('Error fetching user profile:', error)
+      console.log('🔍 [getCurrentUser] Profile not found, creating new profile');
       
       const userData = {
         id: user.id,
@@ -177,10 +243,76 @@ export const getCurrentUser = async () => {
         status: 'online'
       };
       
+      console.log('🔍 [getCurrentUser] Inserting new user profile:', userData);
       
-      const { error: insertError } = await supabase
-        .from('users')
-        .insert(userData)
+      try {
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert(userData)
+        
+        if (insertError) {
+          console.error('🔍 [getCurrentUser] Error creating user profile:', insertError)
+          // If user already exists (race condition), just fetch it
+          if (insertError.code === '23505') {
+            console.log('🔍 [getCurrentUser] Profile already exists, fetching existing profile');
+            const { data: existingProfile, error: fetchError } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', user.id)
+              .single()
+            
+            if (fetchError) {
+              console.error('🔍 [getCurrentUser] Error fetching existing profile:', fetchError);
+              return null;
+            }
+            
+            return existingProfile;
+          } else {
+            return null;
+          }
+        }
+        
+        console.log('🔍 [getCurrentUser] Profile created successfully, fetching new profile');
+        
+        // Fetch the newly created profile
+        const { data: newProfile, error: fetchError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', user.id)
+          .single()
+        
+        if (fetchError) {
+          console.error('🔍 [getCurrentUser] Error fetching newly created profile:', fetchError);
+          return null
+        }
+        
+        return newProfile
+      } catch (insertError) {
+        console.error('🔍 [getCurrentUser] Exception during profile creation:', insertError);
+        
+        // If there's a network error during profile creation, return minimal user object
+        if (insertError instanceof Error && (
+          insertError.message.includes('Failed to fetch') ||
+          insertError.message.includes('Network') ||
+          insertError.message.includes('timeout')
+        )) {
+          console.warn('🔍 [getCurrentUser] Network error during profile creation, returning minimal user object');
+          return {
+            id: user.id,
+            email: user.email!,
+            username: user.user_metadata?.username || user.email?.split('@')[0] || `user_${user.id.slice(0, 8)}`,
+            display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || 'User',
+            status: 'online',
+            color: '#3B82F6',
+            status_message: '',
+            last_active: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+        }
+        
+        return null;
+      }
       
       if (insertError) {
         console.error('Error creating user profile:', insertError)
@@ -218,13 +350,72 @@ export const getCurrentUser = async () => {
       
       return newProfile
     } else if (error) {
-      console.error('Unexpected error fetching profile:', error);
+      console.error('🔍 [getCurrentUser] Unexpected error fetching profile:', error);
+      
+      // If it's a network error, return minimal user object
+      if (error.message && (
+        error.message.includes('Failed to fetch') ||
+        error.message.includes('Network') ||
+        error.message.includes('timeout')
+      )) {
+        console.warn('🔍 [getCurrentUser] Network error in profile fetch, returning minimal user object');
+        return {
+          id: user.id,
+          email: user.email!,
+          username: user.user_metadata?.username || user.email?.split('@')[0] || `user_${user.id.slice(0, 8)}`,
+          display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || 'User',
+          status: 'online',
+          color: '#3B82F6',
+          status_message: '',
+          last_active: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+      }
+      
       return null;
     }
 
+    console.log('🔍 [getCurrentUser] Successfully fetched profile:', {
+      userId: profile?.id,
+      username: profile?.username,
+      displayName: profile?.display_name
+    });
+    
     return profile
   } catch (error) {
-    console.error('Error in getCurrentUser:', error);
+    console.error('🔍 [getCurrentUser] Exception caught:', error);
+    
+    // If it's a network error, try to return a minimal user object if we have auth user
+    if (error instanceof Error && (
+      error.message.includes('Failed to fetch') ||
+      error.message.includes('Network') ||
+      error.message.includes('timeout')
+    )) {
+      console.warn('🔍 [getCurrentUser] Network error in main try/catch, attempting to get auth user');
+      
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          console.warn('🔍 [getCurrentUser] Returning minimal user object due to network error');
+          return {
+            id: user.id,
+            email: user.email!,
+            username: user.user_metadata?.username || user.email?.split('@')[0] || `user_${user.id.slice(0, 8)}`,
+            display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || 'User',
+            status: 'online',
+            color: '#3B82F6',
+            status_message: '',
+            last_active: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+        }
+      } catch (authError) {
+        console.error('🔍 [getCurrentUser] Failed to get auth user for fallback:', authError);
+      }
+    }
+    
     return null;
   }
 }
