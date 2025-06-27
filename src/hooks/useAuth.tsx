@@ -26,6 +26,53 @@ function useProvideAuth() {
   const initialLoadRef = useRef(false);
   const mountedRef = useRef(true);
 
+  const refreshSessionOnFocus = async () => {
+    console.log('🔄 Refreshing session and profile on focus...');
+    try {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (
+        sessionError &&
+        sessionError.message?.includes('User from sub claim in JWT does not exist')
+      ) {
+        console.log('🧹 Invalid JWT detected during focus refresh, clearing session...');
+        await supabase.auth.signOut();
+        if (mountedRef.current) setUser(null);
+        return;
+      }
+
+      if (sessionError) {
+        console.error('Session error during focus refresh:', sessionError);
+        if (mountedRef.current) {
+          setError(sessionError.message);
+          setUser(null);
+        }
+        return;
+      }
+
+      if (session?.user) {
+        try {
+          const profile = await getCurrentUser();
+          if (mountedRef.current) setUser(profile);
+        } catch (err) {
+          console.error('Failed to load profile during focus refresh:', err);
+          if (mountedRef.current) {
+            setError('Failed to load user profile.');
+            setUser(null);
+          }
+        }
+      } else if (mountedRef.current) {
+        setUser(null);
+      }
+    } catch (err) {
+      console.error('Unexpected error during focus refresh:', err);
+      if (mountedRef.current) setUser(null);
+    }
+  };
+
   useEffect(() => {
     mountedRef.current = true;
     
@@ -167,8 +214,7 @@ function useProvideAuth() {
     // Update on page visibility change
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        // Refresh the auth session when the page comes back into focus
-        supabase.auth.refreshSession().catch((err) => {
+        refreshSessionOnFocus().catch((err) => {
           console.error('Error refreshing session on visibility change:', err)
         })
         updatePresence();
