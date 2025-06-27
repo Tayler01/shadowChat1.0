@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from './useAuth'
 
 interface TypingUser {
   id: string
@@ -9,7 +8,6 @@ interface TypingUser {
 }
 
 export const useTyping = (channelName: string = 'general') => {
-  const { user } = useAuth()
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([])
   const [isTyping, setIsTyping] = useState(false)
   const typingTimeoutRef = useRef<NodeJS.Timeout>()
@@ -51,50 +49,33 @@ export const useTyping = (channelName: string = 'general') => {
     }
   }, [channelName])
 
-  const stopTyping = useCallback(async () => {
-    if (!isTyping || !user) return
-
-    try {
-      setIsTyping(false)
-
-      // Broadcast typing stop using current user info
-      await channelRef.current?.send({
-        type: 'broadcast',
-        event: 'typing',
-        payload: {
-          user: {
-            id: user.id,
-            username: user.username,
-            display_name: user.display_name
-          },
-          typing: false
-        }
-      })
-
-      // Clear timeout
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current)
-      }
-    } catch (err) {
-      console.error('Error stopping typing:', err)
-    }
-  }, [isTyping, user])
-
   const startTyping = useCallback(async () => {
-    if (isTyping || !user) return
+    if (isTyping) return
 
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // Get user profile for typing indicator
+      const { data: profile } = await supabase
+        .from('users')
+        .select('username, display_name')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile) return
+
       setIsTyping(true)
 
-      // Broadcast typing start using current user info
+      // Broadcast typing start
       await channelRef.current?.send({
         type: 'broadcast',
         event: 'typing',
         payload: {
           user: {
             id: user.id,
-            username: user.username,
-            display_name: user.display_name
+            username: profile.username,
+            display_name: profile.display_name
           },
           typing: true
         }
@@ -112,7 +93,47 @@ export const useTyping = (channelName: string = 'general') => {
     } catch (err) {
       console.error('Error starting typing:', err)
     }
-  }, [isTyping, user, stopTyping])
+  }, [isTyping])
+
+  const stopTyping = useCallback(async () => {
+    if (!isTyping) return
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile } = await supabase
+        .from('users')
+        .select('username, display_name')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile) return
+
+      setIsTyping(false)
+
+      // Broadcast typing stop
+      await channelRef.current?.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: {
+          user: {
+            id: user.id,
+            username: profile.username,
+            display_name: profile.display_name
+          },
+          typing: false
+        }
+      })
+
+      // Clear timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+      }
+    } catch (err) {
+      console.error('Error stopping typing:', err)
+    }
+  }, [isTyping])
 
   // Clean up timeout on unmount
   useEffect(() => {

@@ -6,88 +6,9 @@ import React, {
   useCallback,
   useRef
 } from 'react';
-import { supabase, Message, ensureSession, getValidAccessToken } from '../lib/supabase';
+import { supabase, Message, ensureSession } from '../lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
-
-// Manual Supabase message insert via fetch to bypass client issues
-async function manualInsertMessage(messageData: {
-  user_id: string
-  content: string
-  message_type: string
-}) {
-  const timestamp = new Date().toISOString();
-  const logPrefix = `🔧 [${timestamp}] MANUAL_INSERT`;
-  
-  console.log(`${logPrefix}: Starting manual insert`, { messageData });
-  
-  // Get session and access token
-  const { data: session } = await supabase.auth.getSession();
-  const accessToken = session?.access_token;
-  
-  console.log(`${logPrefix}: Session details`, {
-    hasSession: !!session,
-    hasAccessToken: !!accessToken,
-    tokenLength: accessToken?.length || 0,
-    userId: session?.user?.id
-  });
-  
-  if (!accessToken) {
-    throw new Error('No access token available for manual insert');
-  }
-  
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  const url = `${supabaseUrl}/rest/v1/messages`;
-  
-  console.log(`${logPrefix}: Making fetch request`, {
-    url,
-    method: 'POST',
-    hasAnonKey: !!supabaseAnonKey,
-    hasAccessToken: !!accessToken
-  });
-  
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'apikey': supabaseAnonKey,
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=representation'
-    },
-    body: JSON.stringify(messageData)
-  });
-  
-  console.log(`${logPrefix}: Insert response status`, res.status);
-  
-  console.log(`${logPrefix}: Fetch response`, {
-    status: res.status,
-    statusText: res.statusText,
-    ok: res.ok,
-    headers: Object.fromEntries(res.headers.entries())
-  });
-  
-  if (!res.ok) {
-    const errorText = await res.text();
-    console.error(`${logPrefix}: Insert failed:`, res.status, errorText);
-    console.error(`${logPrefix}: ❌ Manual insert failed`, {
-      status: res.status,
-      statusText: res.statusText,
-      errorText
-    });
-    throw new Error(`Manual insert failed: ${res.status} - ${errorText}`);
-  }
-  
-  const data = await res.json();
-  console.log(`${logPrefix}: Insert success:`, data);
-  console.log(`${logPrefix}: ✅ Manual insert succeeded`, {
-    data,
-    messageId: data?.id || data?.[0]?.id
-  });
-  
-  // Return the first item if it's an array, otherwise return the data
-  return Array.isArray(data) ? data[0] : data;
-}
 
 interface MessagesContextValue {
   messages: Message[];
@@ -110,91 +31,50 @@ function useProvideMessages(): MessagesContextValue {
   const channelRef = useRef<RealtimeChannel | null>(null);
 
   const fetchMessages = useCallback(async () => {
-    const timestamp = new Date().toISOString();
-    const logPrefix = `📥 [${timestamp}] FETCH_MESSAGES`;
-    
-    console.log(`${logPrefix}: Starting message fetch`, {
-      hasUser: !!user,
-      userId: user?.id,
-      currentMessageCount: messages.length
-    });
-
+    // console.log('📥 Fetching messages...');
     try {
-      // Get valid access token
-      const accessToken = await getValidAccessToken()
-      if (!accessToken) {
-        throw new Error('No valid access token available')
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          user:users!user_id(*)
+        `)
+        .order('created_at', { ascending: true })
+        .limit(100);
+
+      if (error) {
+        // console.error('❌ Error fetching messages:', error);
+      } else if (data) {
+        // console.log('✅ Fetched messages:', data.length);
+        setMessages(prev => {
+          if (prev.length === 0) {
+            return data as Message[];
+          }
+          const ids = new Set(prev.map(m => m.id));
+          const merged = [...prev, ...data.filter(m => !ids.has(m.id))];
+          return merged;
+        });
       }
-
-      console.log(`${logPrefix}: Access token validated, fetching messages...`)
-      
-      // Use direct fetch to avoid Supabase client issues
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-      
-      const url = `${supabaseUrl}/rest/v1/messages?select=*,user:users!messages_user_id_fkey(id,username,display_name,avatar_url,color,status)&order=created_at.asc&limit=100`
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'apikey': supabaseAnonKey,
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`${logPrefix}: ❌ Error fetching messages:`, response.status, errorText)
-        throw new Error(`Failed to fetch messages: ${response.status} - ${errorText}`)
-      }
-
-      const messagesData = await response.json()
-      
-      console.log(`${logPrefix}: ✅ Messages fetched successfully:`, {
-        count: messagesData?.length || 0,
-        sample: messagesData?.slice(0, 3).map((m: any) => ({ id: m.id, content: m.content?.substring(0, 50) }))
-      })
-
-        // TEMPORARY: Replace messages entirely to see if fetch data contains missing messages
-        console.log(`${logPrefix}: 🔄 TEMPORARILY replacing entire message state (for debugging)`);
-        setMessages(messagesData || []);
-        
-        // Original logic (commented out for debugging):
-        // setMessages(prev => {
-        //   if (prev.length === 0) {
-        //     return data as Message[];
-        //   }
-        //   const ids = new Set(prev.map(m => m.id));
-        //   const merged = [...prev, ...data.filter(m => !ids.has(m.id))];
-        //   return merged;
-        // });
     } catch (error) {
-      console.error(`${logPrefix}: ❌ Exception fetching messages:`, {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-        error
-      });
+      // console.error('❌ Exception fetching messages:', error);
     } finally {
-      console.log(`${logPrefix}: Setting loading to false`);
       setLoading(false);
     }
-  }, [user, messages.length]);
+  }, []);
 
   // Fetch initial messages
   useEffect(() => {
-    console.log('📥 [MESSAGES] Initial fetch effect triggered');
     fetchMessages();
   }, [fetchMessages]);
 
   // Subscribe to real-time updates
   useEffect(() => {
     if (!user) {
-      console.log('📡 [REALTIME] No user, skipping real-time subscription');
+      // console.log('⏭️ Skipping real-time setup - no user');
       return;
     }
 
-    console.log('📡 [REALTIME] Setting up real-time subscription for user:', user.id);
+    // console.log('🔄 Setting up real-time subscription for messages...');
 
     // Use a static channel name to prevent duplicate subscriptions
     const channelName = 'public:messages';
@@ -202,8 +82,6 @@ function useProvideMessages(): MessagesContextValue {
     let channel: RealtimeChannel | null = null;
 
     const subscribeToChannel = (): RealtimeChannel => {
-      console.log('📡 [REALTIME] Creating new channel subscription');
-      
       const newChannel = supabase
         .channel(channelName, {
           config: {
@@ -219,21 +97,10 @@ function useProvideMessages(): MessagesContextValue {
           table: 'messages',
         },
         async (payload) => {
-          const timestamp = new Date().toISOString();
-          const logPrefix = `📨 [${timestamp}] POSTGRES_INSERT`;
-          
-          console.log(`${logPrefix}: Received postgres_changes INSERT event`, {
-            payloadNew: payload.new,
-            messageId: payload.new?.id,
-            content: payload.new?.content,
-            userId: payload.new?.user_id,
-            isFromCurrentUser: payload.new?.user_id === user.id
-          });
+          // console.log('📨 Real-time INSERT received:', payload);
           
           try {
             // Fetch the complete message with user data
-            console.log(`${logPrefix}: Fetching complete message data for ID: ${payload.new.id}`);
-            
             const { data: newMessage, error } = await supabase
               .from('messages')
               .select(`
@@ -244,73 +111,39 @@ function useProvideMessages(): MessagesContextValue {
               .single();
 
             if (error) {
-              console.error(`${logPrefix}: ❌ Error fetching new message details:`, error);
+              // console.error('❌ Error fetching new message details:', error);
               return;
             }
 
             if (newMessage) {
-              // Log received message with clear indication if it's from another user
-              const isFromCurrentUser = newMessage.user_id === user.id;
-              const userLogPrefix = isFromCurrentUser ? '📨 [REALTIME-SELF]' : '📨 [REALTIME-OTHER]';
-              console.log(`${userLogPrefix} Message received:`, {
-                id: newMessage.id,
-                content: newMessage.content,
-                from: newMessage.user?.display_name || 'Unknown',
-                userId: newMessage.user_id,
-                isFromMe: isFromCurrentUser,
-                timestamp: newMessage.created_at
-              });
-
+              // console.log('✅ Adding new message to state:', newMessage);
               setMessages(prev => {
                 // Check if message already exists to avoid duplicates
                 const exists = prev.find(msg => msg.id === newMessage.id);
                 if (exists) {
-                  console.log(`${logPrefix}: Message already exists in state, skipping`);
+                  // console.log('⚠️ Message already exists, skipping duplicate');
                   return prev;
                 }
                 
                 // Add new message to the end
                 const updated = [...prev, newMessage as Message];
-                
-                console.log(`${logPrefix}: Adding message to state`, {
-                  previousCount: prev.length,
-                  newCount: updated.length,
-                  addedMessageId: newMessage.id
-                });
+                // console.log('📋 Updated messages count:', updated.length, 'Last message:', updated[updated.length - 1]?.content);
                 
                 // Force a new array reference to ensure React detects the change
                 return updated.slice();
               });
             }
           } catch (error) {
-            console.error(`${logPrefix}: ❌ Exception handling new message:`, error);
+            // console.error('❌ Exception handling new message:', error);
           }
         }
       )
       .on('broadcast', { event: 'new_message' }, (payload) => {
+        // console.log('📡 Broadcast new_message received:', payload)
         const newMessage = payload.payload as Message
-        const timestamp = new Date().toISOString();
-        const logPrefix = `📡 [${timestamp}] BROADCAST_MESSAGE`;
-        
-        // Log broadcast message with clear indication if it's from another user
-        const isFromCurrentUser = newMessage.user_id === user.id;
-        const userLogPrefix = isFromCurrentUser ? '📡 [BROADCAST-SELF]' : '📡 [BROADCAST-OTHER]';
-        console.log(`${userLogPrefix} Broadcast message received:`, {
-          id: newMessage.id,
-          content: newMessage.content,
-          from: newMessage.user?.display_name || 'Unknown',
-          userId: newMessage.user_id,
-          isFromMe: isFromCurrentUser,
-          timestamp: newMessage.created_at
-        });
-        
         setMessages(prev => {
           const exists = prev.find(m => m.id === newMessage.id)
-          if (exists) {
-            console.log(`${logPrefix}: Message already exists in state, skipping`);
-            return prev
-          }
-          console.log(`${logPrefix}: Adding broadcast message to state`);
+          if (exists) return prev
           return [...prev, newMessage]
         })
       })
@@ -322,13 +155,7 @@ function useProvideMessages(): MessagesContextValue {
           table: 'messages',
         },
         async (payload) => {
-          const timestamp = new Date().toISOString();
-          const logPrefix = `📝 [${timestamp}] POSTGRES_UPDATE`;
-          
-          console.log(`${logPrefix}: Received postgres_changes UPDATE event`, {
-            payloadNew: payload.new,
-            messageId: payload.new?.id
-          });
+          // console.log('📝 Real-time UPDATE received:', payload);
           
           try {
             // Fetch the updated message with user data
@@ -342,22 +169,18 @@ function useProvideMessages(): MessagesContextValue {
               .single();
 
             if (error) {
-              console.error(`${logPrefix}: ❌ Error fetching updated message:`, error);
+              // console.error('❌ Error fetching updated message:', error);
               return;
             }
 
             if (updatedMessage) {
-              console.log(`${logPrefix}: Updating message in state`, {
-                messageId: updatedMessage.id,
-                content: updatedMessage.content
-              });
-              
+              // console.log('✅ Updating message in state:', updatedMessage);
               setMessages(prev =>
                 prev.map(msg => msg.id === updatedMessage.id ? updatedMessage as Message : msg)
               );
             }
           } catch (error) {
-            console.error(`${logPrefix}: ❌ Exception handling message update:`, error);
+            // console.error('❌ Exception handling message update:', error);
           }
         }
       )
@@ -369,40 +192,28 @@ function useProvideMessages(): MessagesContextValue {
           table: 'messages',
         },
         (payload) => {
-          const timestamp = new Date().toISOString();
-          const logPrefix = `🗑️ [${timestamp}] POSTGRES_DELETE`;
-          
-          console.log(`${logPrefix}: Received postgres_changes DELETE event`, {
-            payloadOld: payload.old,
-            messageId: payload.old?.id
-          });
-          
+          // console.log('🗑️ Real-time DELETE received:', payload);
           setMessages(prev =>
             prev.filter(msg => msg.id !== payload.old.id)
           );
         }
       )
       .subscribe(async (status, err) => {
-        const timestamp = new Date().toISOString();
-        const logPrefix = `📡 [${timestamp}] CHANNEL_STATUS`;
-        
-        console.log(`${logPrefix}: Channel status changed`, {
-          status,
-          error: err?.message,
-          channelName
-        });
-        
+        // console.log('📡 Real-time subscription status:', status);
         if (err) {
-          console.error(`${logPrefix}: ❌ Real-time subscription error:`, err);
+          // console.error('❌ Real-time subscription error:', err);
+        }
+        if (status === 'SUBSCRIBED') {
+          // console.log('✅ Successfully subscribed to real-time messages');
         }
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          console.warn(`${logPrefix}: ⚠️ Channel ${status}, removing and resubscribing...`);
+          // console.warn(`⚠️ Channel ${status}, removing and resubscribing...`);
           await supabase.removeChannel(newChannel);
           setTimeout(() => {
             channel = subscribeToChannel();
           }, 1000);
         } else if (status === 'CLOSED') {
-          console.warn(`${logPrefix}: ⚠️ Channel closed, resubscribing...`);
+          // console.warn('⚠️ Channel closed, resubscribing...');
           setTimeout(() => {
             channel = subscribeToChannel();
           }, 1000);
@@ -416,28 +227,14 @@ function useProvideMessages(): MessagesContextValue {
     channelRef.current = channel;
 
     const handleVisibility = () => {
-      const timestamp = new Date().toISOString();
-      const logPrefix = `👁️ [${timestamp}] VISIBILITY_CHANGE`;
-      
-      const state = channel?.state
-      console.log(`${logPrefix}: Page visibility changed`, { 
-        hidden: document.hidden, 
-        channelState: state,
-        hasChannel: !!channel,
-        hasUser: !!user
-      })
-      
       if (!document.hidden) {
-        console.log(`${logPrefix}: Page became visible, checking channel and fetching messages`);
-        
+        // supabase.auth.refreshSession().catch(err => {
+        //   console.error('Error refreshing session on visibility change:', err)
+        // })
         if (channel && channel.state !== 'joined') {
-          console.log(`${logPrefix}: 🌀 Resubscribing channel due to state: ${channel.state}`)
           supabase.removeChannel(channel)
           channel = subscribeToChannel()
-          channelRef.current = channel
         }
-        
-        console.log(`${logPrefix}: Calling fetchMessages() due to visibility change`);
         fetchMessages()
       }
     }
@@ -445,7 +242,7 @@ function useProvideMessages(): MessagesContextValue {
     document.addEventListener('visibilitychange', handleVisibility)
 
     return () => {
-      console.log('📡 [REALTIME] Cleaning up real-time subscription');
+      // console.log('🔌 Cleaning up real-time subscription');
       document.removeEventListener('visibilitychange', handleVisibility)
       if (channel) supabase.removeChannel(channel)
       channelRef.current = null
@@ -455,121 +252,97 @@ function useProvideMessages(): MessagesContextValue {
   const sendMessage = useCallback(async (content: string, messageType: 'text' | 'command' = 'text') => {
     const timestamp = new Date().toISOString();
     const logPrefix = `🚀 [${timestamp}] MESSAGE_SEND`;
-
-    console.log(`${logPrefix}: Called`, {
-      hasUser: !!user,
-      userId: user?.id,
-      content
-    });
-
+    
+    console.group(`${logPrefix}: Starting message send process`);
+    console.log(`${logPrefix}: Content:`, content);
+    console.log(`${logPrefix}: Message type:`, messageType);
+    console.log(`${logPrefix}: User exists:`, !!user);
+    console.log(`${logPrefix}: User ID:`, user?.id);
+    
     if (!user || !content.trim()) {
-      console.warn(`${logPrefix}: Skipped send — missing user or empty content`, { hasUser: !!user, content, userId: user?.id });
+      console.log(`${logPrefix}: ❌ Cannot send message - missing user or content`);
+      console.groupEnd();
       return;
     }
 
+    console.log(`${logPrefix}: 📤 Proceeding with message send`);
     setSending(true);
-    console.log(`${logPrefix}: Channel state before send`, {
-      hasChannel: !!channelRef.current,
-      state: channelRef.current?.state,
-    })
-
-    // Get valid access token (this handles refresh automatically)
-    const accessToken = await getValidAccessToken();
-    console.log(`${logPrefix}: After getValidAccessToken`, {
-      hasToken: !!accessToken,
-      hasUser: !!user,
-      userId: user?.id,
-    });
-    
-    console.log(`${logPrefix}: 🔍 Checking conditions before proceeding to insert`);
-    
-    if (!accessToken) {
-      console.error(`${logPrefix}: ❌ EARLY EXIT: accessToken is null`);
-      console.error(`${logPrefix}: ❌ No valid access token, cannot send message`);
-      throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
-    }
-    
-    console.log(`${logPrefix}: ✅ accessToken check passed`);
-    
-    if (!user) {
-      console.error(`${logPrefix}: ❌ EARLY EXIT: user is null/undefined after getValidAccessToken`);
-      return;
-    }
-    
-    console.log(`${logPrefix}: ✅ user check passed`);
-    
-    if (!content || !content.trim()) {
-      console.error(`${logPrefix}: ❌ EARLY EXIT: content is empty after trim`);
-      return;
-    }
-    
-    console.log(`${logPrefix}: ✅ content check passed`);
-
-    // 🔥 BYPASS: Skip the hanging getSession() call after getValidAccessToken() has already validated
-    // Since getValidAccessToken() returned a token, we trust that the session is usable
-    console.log(`${logPrefix}: ✅ Skipping getSession() check - trusting getValidAccessToken() validation`);
-    
-    console.log(`${logPrefix}: 🔍 All pre-insert checks completed, proceeding to insert`);
 
     try {
-      // Step 1: Prepare message data
-
+      // Step 1: Check session
+      console.log(`${logPrefix}: 🔐 Step 1 - Checking session validity`);
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      console.log(`${logPrefix}: Session data:`, {
+        hasSession: !!sessionData.session,
+        userId: sessionData.session?.user?.id,
+        expiresAt: sessionData.session?.expires_at,
+        currentTime: Math.floor(Date.now() / 1000),
+        isExpired: sessionData.session?.expires_at ? sessionData.session.expires_at < Math.floor(Date.now() / 1000) : 'unknown',
+        accessToken: sessionData.session?.access_token ? `${sessionData.session.access_token.substring(0, 20)}...` : 'none',
+        refreshToken: sessionData.session?.refresh_token ? `${sessionData.session.refresh_token.substring(0, 20)}...` : 'none'
+      });
+      
+      if (sessionError) {
+        console.error(`${logPrefix}: ❌ Session error:`, sessionError);
+        throw new Error(`Session error: ${sessionError.message}`);
+      }
+      
+      if (!sessionData.session) {
+        console.error(`${logPrefix}: ❌ No active session found`);
+        throw new Error('No active session');
+      }
+      
+      // Step 2: Refresh session if needed
+      if (sessionData.session.expires_at && sessionData.session.expires_at < Math.floor(Date.now() / 1000)) {
+        console.log(`${logPrefix}: 🔄 Step 2 - Session expired, refreshing...`);
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        console.log(`${logPrefix}: Refresh result:`, {
+          success: !!refreshData.session,
+          error: refreshError?.message,
+          newAccessToken: refreshData.session?.access_token ? `${refreshData.session.access_token.substring(0, 20)}...` : 'none'
+        });
+        
+        if (refreshError) {
+          console.error(`${logPrefix}: ❌ Failed to refresh session:`, refreshError);
+          throw new Error(`Session refresh failed: ${refreshError.message}`);
+        }
+      } else {
+        console.log(`${logPrefix}: ✅ Session is valid, no refresh needed`);
+      }
+      
+      // Step 3: Prepare message data
+      console.log(`${logPrefix}: 📝 Step 3 - Preparing message data`);
+      const hasSession = await ensureSession();
+      if (!hasSession) {
+        console.error(`${logPrefix}: ❌ ensureSession returned false`);
+        throw new Error('No valid session');
+      }
+      
       const messageData = {
         user_id: user.id,
         content: content.trim(),
         message_type: messageType,
       };
-      console.log(`${logPrefix}: Prepared message data`, messageData)
+      console.log(`${logPrefix}: Message payload:`, messageData);
 
-      // Step 2: Use fetch-based insert to bypass Supabase client issues
-      console.log(`${logPrefix}: 🔧 Using fetch-based insert to bypass client issues`);
+      // Step 4: Get current auth headers
+      const { data: currentSession } = await supabase.auth.getSession();
+      const authHeaders = {
+        'Authorization': `Bearer ${currentSession.session?.access_token}`,
+        'apikey': supabase.supabaseKey,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      };
+      console.log(`${logPrefix}: Auth headers:`, {
+        hasAuth: !!authHeaders.Authorization,
+        authTokenPrefix: authHeaders.Authorization ? authHeaders.Authorization.substring(0, 30) + '...' : 'none',
+        hasApiKey: !!authHeaders.apikey,
+        apiKeyPrefix: authHeaders.apikey ? authHeaders.apikey.substring(0, 20) + '...' : 'none'
+      });
       
-      let data = null;
-      let error = null;
-      
-      try {
-        const fetchResult = await fetchInsert('messages', messageData, { select: '*' });
-        console.log(`${logPrefix}: ✅ Fetch insert succeeded`, {
-          fetchResult,
-          messageId: fetchResult?.id,
-          hasResult: !!fetchResult
-        });
-        
-        // Fetch the complete message with user data using Supabase client
-        if (fetchResult?.id) {
-          console.log(`${logPrefix}: Fetching complete message data with user info`);
-          const { data: completeMessage, error: fetchError } = await supabase
-            .from('messages')
-            .select(`
-              *,
-              user:users!user_id(*)
-            `)
-            .eq('id', fetchResult.id)
-            .single();
-            
-          if (fetchError) {
-            console.warn(`${logPrefix}: ⚠️ Failed to fetch complete message, using fetch result`, fetchError);
-            data = fetchResult;
-          } else {
-            console.log(`${logPrefix}: ✅ Complete message data fetched successfully`);
-            data = completeMessage;
-          }
-        } else {
-          data = fetchResult;
-        }
-        
-      } catch (fetchError) {
-        console.warn(`${logPrefix}: ⚠️ Fetch insert failed, falling back to Supabase client`, {
-          fetchError,
-          message: fetchError instanceof Error ? fetchError.message : 'Unknown error'
-        });
-        
-        // Fallback to original Supabase client method
-        console.log(`${logPrefix}: 💾 Falling back to Supabase client insert`);
-        
-      const insertStartTime = performance.now();
-      
-      const insertResult = await supabase
+      // Step 5: Attempt database insert
+      console.log(`${logPrefix}: 💾 Step 5 - Inserting into database`);
+      let { data, error } = await supabase
         .from('messages')
         .insert(messageData)
         .select(`
@@ -577,32 +350,30 @@ function useProvideMessages(): MessagesContextValue {
           user:users!user_id(*)
         `)
         .single();
-      
-        const insertData = insertResult.data;
-        const insertError = insertResult.error;
+
+      console.log(`${logPrefix}: Database insert result:`, {
+        success: !!data,
+        error: error?.message,
+        errorCode: error?.code,
+        errorDetails: error?.details,
+        errorHint: error?.hint,
+        insertedId: data?.id,
+        insertedContent: data?.content
+      });
+
+      if (error) {
+        console.error(`${logPrefix}: ❌ Database insert failed:`, error);
         
-        console.log(`${logPrefix}: 🧪 Supabase client insert response`, {
-          data: insertData,
-          error: insertError,
-          hasData: !!insertData,
-          hasError: !!insertError
-        });
-      
-        const insertEndTime = performance.now();
-        const insertDuration = insertEndTime - insertStartTime;
-        console.log(`${logPrefix}: 📊 Supabase client insert timing`, { duration: insertDuration });
-        
-        data = insertData;
-        error = insertError;
-        
-        // Handle auth errors with retry for Supabase client
-        if (error && (error.status === 401 || /jwt|token|expired/i.test(error.message))) {
-          console.log(`${logPrefix}: 🔄 Auth error detected, attempting session refresh and retry`);
+        // Step 6: Handle auth errors with retry
+        if (error.status === 401 || /jwt|token|expired/i.test(error.message)) {
+          console.log(`${logPrefix}: 🔄 Step 6 - Auth error detected, attempting retry`);
+          const refreshed = await ensureSession();
+          console.log(`${logPrefix}: Retry session refresh result:`, refreshed);
           
-          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-          
-          if (!refreshError && refreshData.session) {
-            console.log(`${logPrefix}: ✅ Session refreshed, retrying insert`);
+          if (refreshed) {
+            console.log(`${logPrefix}: 🔁 Retrying database insert with refreshed session`);
+            const { data: retrySession } = await supabase.auth.getSession();
+            console.log(`${logPrefix}: Retry auth token:`, retrySession.session?.access_token ? `${retrySession.session.access_token.substring(0, 30)}...` : 'none');
             
             const retry = await supabase
               .from('messages')
@@ -613,57 +384,41 @@ function useProvideMessages(): MessagesContextValue {
               `)
               .single();
               
+            console.log(`${logPrefix}: Retry result:`, {
+              success: !!retry.data,
+              error: retry.error?.message,
+              insertedId: retry.data?.id
+            });
+            
             data = retry.data;
             error = retry.error;
-            
-            console.log(`${logPrefix}: 🔄 Retry result`, {
-              hasData: !!data,
-              hasError: !!error
-            });
-          } else {
-            console.error(`${logPrefix}: ❌ Session refresh failed, cannot retry`);
           }
+        }
+        
+        if (error) {
+          console.error(`${logPrefix}: ❌ Final error after retry:`, error);
+          throw error;
         }
       }
 
-      // Final error check
-      if (error) {
-        console.error(`${logPrefix}: ❌ Final insert error`, {
-          error,
-          message: error.message,
-          code: error.code,
-          details: error.details
-        });
-        throw error;
-      }
-      
-      if (data) {
-        console.log(`${logPrefix}: ✅ INSERT SUCCEEDED`, {
-          messageId: data.id,
-          content: data.content,
-          userId: data.user_id,
-          timestamp: data.created_at
-        });
-      } else {
-        console.warn(`${logPrefix}: ⚠️ No data returned from insert`);
-        throw new Error('No data returned from message insert');
-      }
+      console.log(`${logPrefix}: ✅ Message sent successfully:`, {
+        id: data?.id,
+        content: data?.content,
+        userId: data?.user_id,
+        createdAt: data?.created_at
+      });
 
-      // Step 3: Update local state and broadcast
-      console.log(`${logPrefix}: 📤 Updating local state and broadcasting message`);
-      
+      // Step 7: Update local state and broadcast
+      console.log(`${logPrefix}: 📡 Step 7 - Updating local state and broadcasting`);
+      if (data) {
         setMessages(prev => {
           const exists = prev.find(m => m.id === data.id)
           if (exists) {
-            console.log(`${logPrefix}: Message already exists in state, skipping update`);
+            console.log(`${logPrefix}: Message already exists in local state`);
             return prev;
           }
-          const updated = [...prev, data as Message]
-          console.log(`${logPrefix}: Message state updated`, {
-            totalMessages: updated.length,
-            addedMessageId: data.id
-          })
-          return updated
+          console.log(`${logPrefix}: Adding message to local state`);
+          return [...prev, data as Message];
         })
         
         const broadcastResult = channelRef.current?.send({
@@ -671,10 +426,8 @@ function useProvideMessages(): MessagesContextValue {
           event: 'new_message',
           payload: data
         });
-        console.log(`${logPrefix}: Broadcast result`, {
-          result: broadcastResult,
-          channelState: channelRef.current?.state,
-        });
+        console.log(`${logPrefix}: Broadcast sent:`, !!broadcastResult);
+      }
       
       console.log(`${logPrefix}: ✅ Message send process completed successfully`);
       
@@ -682,37 +435,39 @@ function useProvideMessages(): MessagesContextValue {
       console.error(`${logPrefix}: ❌ Exception in send process:`, {
         message: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined,
-        userAvailable: !!user,
-        networkOnline: navigator.onLine,
         error
       });
       throw error;
     } finally {
+      console.log(`${logPrefix}: 🏁 Cleaning up - setting sending to false`);
       setSending(false);
+      console.groupEnd();
     }
   }, [user]);
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
     if (!user) return;
 
-    console.log('📝 [EDIT] Editing message:', { messageId, content });
+    // console.log('📝 Editing message:', { messageId, content });
 
     try {
-      await fetchUpdate(
-        'messages',
-        {
+      const { error } = await supabase
+        .from('messages')
+        .update({
           content,
           edited_at: new Date().toISOString(),
-        },
-        {
-          id: messageId,
-          user_id: user.id
-        }
-      );
+        })
+        .eq('id', messageId)
+        .eq('user_id', user.id);
 
-      console.log('✅ Message edited successfully');
+      if (error) {
+        // console.error('❌ Error editing message:', error);
+        throw error;
+      }
+
+      // console.log('✅ Message edited successfully');
     } catch (error) {
-      console.error('❌ Exception editing message:', error);
+      // console.error('❌ Exception editing message:', error);
       throw error;
     }
   }, [user]);
@@ -720,17 +475,23 @@ function useProvideMessages(): MessagesContextValue {
   const deleteMessage = useCallback(async (messageId: string) => {
     if (!user) return;
 
-    console.log('🗑️ [DELETE] Deleting message:', { messageId });
+    // console.log('🗑️ Deleting message:', messageId);
 
     try {
-      await fetchDelete('messages', {
-        id: messageId,
-        user_id: user.id
-      });
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('id', messageId)
+        .eq('user_id', user.id);
 
-      console.log('✅ Message deleted successfully');
+      if (error) {
+        // console.error('❌ Error deleting message:', error);
+        throw error;
+      }
+
+      // console.log('✅ Message deleted successfully');
     } catch (error) {
-      console.error('❌ Exception deleting message:', error);
+      // console.error('❌ Exception deleting message:', error);
       throw error;
     }
   }, [user]);
@@ -738,18 +499,23 @@ function useProvideMessages(): MessagesContextValue {
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!user) return;
 
-    console.log('👍 [REACTION] Toggling reaction:', { messageId, emoji });
+    // console.log('👍 Toggling reaction:', { messageId, emoji });
 
     try {
-      await fetchRPC('toggle_message_reaction', {
+      const { error } = await supabase.rpc('toggle_message_reaction', {
         message_id: messageId,
         emoji: emoji,
         is_dm: false
       });
 
-      console.log('✅ Reaction toggled successfully');
+      if (error) {
+        // console.error('❌ Error toggling reaction:', error);
+        throw error;
+      }
+
+      // console.log('✅ Reaction toggled successfully');
     } catch (error) {
-      console.error('❌ Exception toggling reaction:', error);
+      // console.error('❌ Exception toggling reaction:', error);
       throw error;
     }
   }, [user]);
@@ -757,7 +523,7 @@ function useProvideMessages(): MessagesContextValue {
   const togglePin = useCallback(async (messageId: string) => {
     if (!user) return;
 
-    console.log('📌 [PIN] Toggling pin:', { messageId });
+    // console.log('📌 Toggling pin:', messageId);
 
     try {
       // First get the current pinned status
@@ -768,25 +534,29 @@ function useProvideMessages(): MessagesContextValue {
         .single();
 
       if (!message) {
-        console.error('❌ Message not found for pin toggle');
+        // console.error('❌ Message not found for pin toggle');
         return;
       }
 
       const isPinned = message.pinned;
       
-      await fetchUpdate(
-        'messages',
-        {
+      const { error } = await supabase
+        .from('messages')
+        .update({
           pinned: !isPinned,
           pinned_by: !isPinned ? user.id : null,
           pinned_at: !isPinned ? new Date().toISOString() : null,
-        },
-        { id: messageId }
-      );
+        })
+        .eq('id', messageId);
 
-      console.log('✅ Pin toggled successfully');
+      if (error) {
+        // console.error('❌ Error toggling pin:', error);
+        throw error;
+      }
+
+      // console.log('✅ Pin toggled successfully');
     } catch (error) {
-      console.error('❌ Exception toggling pin:', error);
+      // console.error('❌ Exception toggling pin:', error);
       throw error;
     }
   }, [user]);

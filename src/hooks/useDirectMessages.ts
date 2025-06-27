@@ -6,6 +6,7 @@ import {
   DMMessage,
   getOrCreateDMConversation,
   markDMMessagesRead,
+  ensureSession,
 } from '../lib/supabase';
 import { useAuth } from './useAuth';
 
@@ -305,6 +306,10 @@ export function useConversationMessages(conversationId: string | null) {
 
     setSending(true);
     try {
+      const hasSession = await ensureSession();
+      if (!hasSession) {
+        throw new Error('No valid session');
+      }
       const { data, error } = await supabase
         .from('dm_messages')
         .insert({
@@ -322,8 +327,8 @@ export function useConversationMessages(conversationId: string | null) {
       let finalError = error;
       if (finalError) {
         if (finalError.status === 401 || /jwt|token|expired/i.test(finalError.message)) {
-          const { error: refreshError } = await supabase.auth.refreshSession();
-          if (!refreshError) {
+          const refreshed = await ensureSession();
+          if (refreshed) {
             const retry = await supabase
               .from('dm_messages')
               .insert({

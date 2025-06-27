@@ -53,9 +53,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
   }, [message])
 
-  const handleSubmit = (
-    e: React.FormEvent<HTMLFormElement> | React.KeyboardEvent<HTMLTextAreaElement>
-  ) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!message.trim() || disabled) return
@@ -75,9 +73,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
   }
 
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-
+  const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSubmit(e)
@@ -165,7 +161,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             ref={textareaRef}
             value={message}
             onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
+            onKeyPress={handleKeyPress}
             placeholder={placeholder}
             disabled={disabled}
             rows={1}
