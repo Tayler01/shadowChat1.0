@@ -178,6 +178,13 @@ export const forceSessionRefresh = async (): Promise<boolean> => {
 
     if (error || !data?.session) {
       console.error('🔥 [NUCLEAR_REFRESH] ❌ setSession failed:', error?.message);
+      
+      // If the session is missing on the server, clear local storage and sign out
+      if (error?.message === 'Auth session missing!') {
+        console.log('🔥 [NUCLEAR_REFRESH] Session missing on server, clearing local auth state...');
+        await supabase.auth.signOut();
+      }
+      
       return false;
     }
 
