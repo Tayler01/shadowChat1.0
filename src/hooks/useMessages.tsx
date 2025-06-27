@@ -206,18 +206,6 @@ function useProvideMessages(): MessagesContextValue {
     const handleVisibility = () => {
       if (!document.hidden) {
         console.log('🔄 Messages: Page became visible, refreshing session...');
-        // Force refresh session when page becomes visible
-        supabase.auth.refreshSession().then(({ data, error }) => {
-          if (error) {
-            console.error('❌ Messages: Error refreshing session on visibility change:', error);
-          } else if (data.session) {
-            console.log('✅ Messages: Session refreshed successfully on visibility change');
-          } else {
-            console.warn('⚠️ Messages: No session returned from refresh on visibility change');
-          }
-        }).catch(err => {
-          console.error('❌ Messages: Exception refreshing session on visibility change:', err);
-        });
         
         if (channel && channel.state !== 'joined') {
           console.log('🔄 Messages: Reconnecting channel...');
@@ -225,10 +213,7 @@ function useProvideMessages(): MessagesContextValue {
           channel = subscribeToChannel();
         }
         
-        // Fetch messages after a short delay to ensure session is refreshed
-        setTimeout(() => {
-          fetchMessages();
-        }, 100);
+        fetchMessages();
       }
     };
 
@@ -247,47 +232,16 @@ function useProvideMessages(): MessagesContextValue {
     
     console.log(`${logPrefix}: Starting message send process`);
     
-    try {
-      // 🔐 Ensure the session is valid before pulling the user
-      const sessionValid = await ensureSession();
-      if (!sessionValid) {
-        console.error(`${logPrefix}: ❌ Invalid or expired session, cannot send message`);
-        throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
-      }
-
-      // Always pull the fresh user from the now-valid session
-      const { data: sessionData } = await supabase.auth.getSession();
-      const currentUser = sessionData?.session?.user;
-
-      console.log(`${logPrefix}: Current user:`, currentUser?.id);
-
-      if (!currentUser || !content.trim()) {
-        console.error(`${logPrefix}: ❌ No user or empty content`);
-        return;
-      }
-
-      // Check if user profile exists
-      const { data: userProfile, error: profileError } = await supabase
-        .from('users')
-        .select('id, username, display_name')
-        .eq('id', currentUser.id)
-        .single();
-
-      if (profileError || !userProfile) {
-        console.error(`${logPrefix}: ❌ User profile not found:`, profileError);
-        throw new Error('User profile not found. Please refresh the page and try again.');
-      }
-
-      console.log(`${logPrefix}: User profile found:`, userProfile.username);
-    } catch (error) {
-      console.error(`${logPrefix}: ❌ Pre-flight checks failed:`, error);
-      setSending(false);
-      throw error;
-    }
-
-    // Get current user again after validation
+    // Get current user from session
     const { data: sessionData } = await supabase.auth.getSession();
     const currentUser = sessionData?.session?.user;
+
+    console.log(`${logPrefix}: Current user:`, currentUser?.id);
+
+    if (!currentUser || !content.trim()) {
+      console.error(`${logPrefix}: ❌ No user or empty content`);
+      return;
+    }
 
     setSending(true);
 
@@ -328,23 +282,12 @@ function useProvideMessages(): MessagesContextValue {
         // Step 3: Handle auth errors with retry
         if (error.status === 401 || /jwt|token|expired/i.test(error.message)) {
           console.log(`${logPrefix}: Attempting session refresh due to auth error`);
-          const retryRefreshStartTime = performance.now();
           
           // Try refreshing the session
-          const refreshPromise = supabase.auth.refreshSession();
-          const refreshTimeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Session refresh timeout after 5 seconds')), 5000)
-          );
-          
-          const { data: refreshData, error: refreshError } = await Promise.race([refreshPromise, refreshTimeoutPromise]) as any;
-          const retryRefreshEndTime = performance.now();
-          const retryRefreshDuration = retryRefreshEndTime - retryRefreshStartTime;
-          
-          console.log(`${logPrefix}: Session refresh completed in ${retryRefreshDuration}ms`, { success: !!refreshData.session, error: !!refreshError });
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
           
           if (!refreshError && refreshData.session) {
             console.log(`${logPrefix}: Retrying insert with refreshed session`);
-            const retryInsertStartTime = performance.now();
             
             const retryPromise = supabase
               .from('messages')
@@ -355,15 +298,7 @@ function useProvideMessages(): MessagesContextValue {
               `)
               .single();
               
-            const retryTimeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Retry database insert timeout after 10 seconds')), 10000)
-            );
-            
-            const retry = await Promise.race([retryPromise, retryTimeoutPromise]) as any;
-            const retryInsertEndTime = performance.now();
-            const retryInsertDuration = retryInsertEndTime - retryInsertStartTime;
-            
-            console.log(`${logPrefix}: Retry insert completed in ${retryInsertDuration}ms`, { data: !!retry.data, error: !!retry.error });
+            const retry = await retryPromise;
             
             data = retry.data;
             error = retry.error;
