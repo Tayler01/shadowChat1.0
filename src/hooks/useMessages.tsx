@@ -69,6 +69,7 @@ function useProvideMessages(): MessagesContextValue {
       return;
     }
 
+
     // Use a static channel name to prevent duplicate subscriptions
     const channelName = 'public:messages';
 
@@ -83,108 +84,118 @@ function useProvideMessages(): MessagesContextValue {
           }
         })
         .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'messages',
-          },
-          async (payload) => {
-            try {
-              // Fetch the complete message with user data
-              const { data: newMessage, error } = await supabase
-                .from('messages')
-                .select(`
-                  *,
-                  user:users!user_id(*)
-                `)
-                .eq('id', payload.new.id)
-                .single();
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+        },
+        async (payload) => {
+          
+          try {
+            // Fetch the complete message with user data
+            const { data: newMessage, error } = await supabase
+              .from('messages')
+              .select(`
+                *,
+                user:users!user_id(*)
+              `)
+              .eq('id', payload.new.id)
+              .single();
 
-              if (error) {
-                return;
-              }
-
-              if (newMessage) {
-                setMessages(prev => {
-                  // Check if message already exists to avoid duplicates
-                  const exists = prev.find(msg => msg.id === newMessage.id);
-                  if (exists) {
-                    return prev;
-                  }
-                  
-                  // Add new message to the end
-                  const updated = [...prev, newMessage as Message];
-                  
-                  // Force a new array reference to ensure React detects the change
-                  return updated.slice();
-                });
-              }
-            } catch (error) {
+            if (error) {
+              return;
             }
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'messages',
-          },
-          async (payload) => {
-            try {
-              // Fetch the updated message with user data
-              const { data: updatedMessage, error } = await supabase
-                .from('messages')
-                .select(`
-                  *,
-                  user:users!user_id(*)
-                `)
-                .eq('id', payload.new.id)
-                .single();
 
-              if (error) {
-                return;
-              }
-
-              if (updatedMessage) {
-                setMessages(prev =>
-                  prev.map(msg => msg.id === updatedMessage.id ? updatedMessage as Message : msg)
-                );
-              }
-            } catch (error) {
+            if (newMessage) {
+              setMessages(prev => {
+                // Check if message already exists to avoid duplicates
+                const exists = prev.find(msg => msg.id === newMessage.id);
+                if (exists) {
+                  return prev;
+                }
+                
+                // Add new message to the end
+                const updated = [...prev, newMessage as Message];
+                
+                // Force a new array reference to ensure React detects the change
+                return updated.slice();
+              });
             }
+          } catch (error) {
           }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'DELETE',
-            schema: 'public',
-            table: 'messages',
-          },
-          (payload) => {
-            setMessages(prev =>
-              prev.filter(msg => msg.id !== payload.old.id)
-            );
+        }
+      )
+      .on('broadcast', { event: 'new_message' }, (payload) => {
+        const newMessage = payload.payload as Message
+        setMessages(prev => {
+          const exists = prev.find(m => m.id === newMessage.id)
+          if (exists) return prev
+          return [...prev, newMessage]
+        })
+      })
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+        },
+        async (payload) => {
+          
+          try {
+            // Fetch the updated message with user data
+            const { data: updatedMessage, error } = await supabase
+              .from('messages')
+              .select(`
+                *,
+                user:users!user_id(*)
+              `)
+              .eq('id', payload.new.id)
+              .single();
+
+            if (error) {
+              return;
+            }
+
+            if (updatedMessage) {
+              setMessages(prev =>
+                prev.map(msg => msg.id === updatedMessage.id ? updatedMessage as Message : msg)
+              );
+            }
+          } catch (error) {
           }
-        )
-        .subscribe(async (status, err) => {
-          if (err) {
-          }
-          if (status === 'SUBSCRIBED') {
-          }
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            await supabase.removeChannel(newChannel);
-            setTimeout(() => {
-              channel = subscribeToChannel();
-            }, 1000);
-          } else if (status === 'CLOSED') {
-            setTimeout(() => {
-              channel = subscribeToChannel();
-            }, 1000);
-          }
-        });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'messages',
+        },
+        (payload) => {
+          setMessages(prev =>
+            prev.filter(msg => msg.id !== payload.old.id)
+          );
+        }
+      )
+      .subscribe(async (status, err) => {
+        if (err) {
+        }
+        if (status === 'SUBSCRIBED') {
+        }
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          await supabase.removeChannel(newChannel);
+          setTimeout(() => {
+            channel = subscribeToChannel();
+          }, 1000);
+        } else if (status === 'CLOSED') {
+          setTimeout(() => {
+            channel = subscribeToChannel();
+          }, 1000);
+        }
+      });
 
       return newChannel;
     };
@@ -194,24 +205,20 @@ function useProvideMessages(): MessagesContextValue {
 
     const handleVisibility = () => {
       if (!document.hidden) {
-        console.log('🔄 Messages: Page became visible, refreshing session...');
-        
         if (channel && channel.state !== 'joined') {
-          console.log('🔄 Messages: Reconnecting channel...');
-          supabase.removeChannel(channel);
-          channel = subscribeToChannel();
+          supabase.removeChannel(channel)
+          channel = subscribeToChannel()
         }
-        
-        fetchMessages();
+        fetchMessages()
       }
-    };
+    }
 
-    document.addEventListener('visibilitychange', handleVisibility);
+    document.addEventListener('visibilitychange', handleVisibility)
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
-      if (channel) supabase.removeChannel(channel);
-      channelRef.current = null;
+      document.removeEventListener('visibilitychange', handleVisibility)
+      if (channel) supabase.removeChannel(channel)
+      channelRef.current = null
     };
   }, [user, fetchMessages]);
 
@@ -219,16 +226,20 @@ function useProvideMessages(): MessagesContextValue {
     const timestamp = new Date().toISOString();
     const logPrefix = `🚀 [${timestamp}] MESSAGE_SEND`;
     
-    console.log(`${logPrefix}: Starting message send process`);
     
-    // Get current user from session
+    // 🔐 Ensure the session is valid before pulling the user
+    const sessionValid = await ensureSession();
+    if (!sessionValid) {
+      console.error(`${logPrefix}: ❌ Invalid or expired session, cannot send message`);
+      throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
+    }
+
+    // Always pull the fresh user from the now-valid session
     const { data: sessionData } = await supabase.auth.getSession();
     const currentUser = sessionData?.session?.user;
 
-    console.log(`${logPrefix}: Current user:`, currentUser?.id);
 
     if (!currentUser || !content.trim()) {
-      console.error(`${logPrefix}: ❌ No user or empty content`);
       return;
     }
 
@@ -236,7 +247,7 @@ function useProvideMessages(): MessagesContextValue {
 
     try {
       // Step 1: Prepare message data
-      console.log(`${logPrefix}: Preparing message data`);
+      
       const messageData = {
         user_id: currentUser.id,
         content: content.trim(),
@@ -245,7 +256,7 @@ function useProvideMessages(): MessagesContextValue {
 
       // Step 2: Attempt database insert (let Supabase handle auth internally)
       const insertStartTime = performance.now();
-      console.log(`${logPrefix}: Attempting database insert`);
+      
       const insertPromise = supabase
         .from('messages')
         .insert(messageData)
@@ -262,21 +273,43 @@ function useProvideMessages(): MessagesContextValue {
       let { data, error } = await Promise.race([insertPromise, insertTimeoutPromise]) as any;
       const insertEndTime = performance.now();
       const insertDuration = insertEndTime - insertStartTime;
-      
-      console.log(`${logPrefix}: Insert completed in ${insertDuration}ms`, { data: !!data, error: !!error });
+
+      console.log(`${logPrefix}: Database insert result`, {
+        success: !!data,
+        error: error?.message,
+        errorCode: error?.code,
+        errorDetails: error?.details,
+        errorHint: error?.hint,
+        insertedId: data?.id,
+        insertedContent: data?.content,
+        insertDuration: `${insertDuration.toFixed(2)}ms`
+      });
 
       if (error) {
         console.error(`${logPrefix}: ❌ Database insert failed:`, error);
         
         // Step 3: Handle auth errors with retry
         if (error.status === 401 || /jwt|token|expired/i.test(error.message)) {
-          console.log(`${logPrefix}: Attempting session refresh due to auth error`);
+          const retryRefreshStartTime = performance.now();
           
           // Try refreshing the session
-          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          const refreshPromise = supabase.auth.refreshSession();
+          const refreshTimeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Session refresh timeout after 5 seconds')), 5000)
+          );
+          
+          const { data: refreshData, error: refreshError } = await Promise.race([refreshPromise, refreshTimeoutPromise]) as any;
+          const retryRefreshEndTime = performance.now();
+          const retryRefreshDuration = retryRefreshEndTime - retryRefreshStartTime;
+          
+          console.log(`${logPrefix}: Session refresh result`, {
+            success: !!refreshData.session,
+            error: refreshError?.message,
+            retryRefreshDuration: `${retryRefreshDuration.toFixed(2)}ms`
+          });
           
           if (!refreshError && refreshData.session) {
-            console.log(`${logPrefix}: Retrying insert with refreshed session`);
+            const retryInsertStartTime = performance.now();
             
             const retryPromise = supabase
               .from('messages')
@@ -287,7 +320,20 @@ function useProvideMessages(): MessagesContextValue {
               `)
               .single();
               
-            const retry = await retryPromise;
+            const retryTimeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Retry database insert timeout after 10 seconds')), 10000)
+            );
+            
+            const retry = await Promise.race([retryPromise, retryTimeoutPromise]) as any;
+            const retryInsertEndTime = performance.now();
+            const retryInsertDuration = retryInsertEndTime - retryInsertStartTime;
+            
+            console.log(`${logPrefix}: Retry insert result`, {
+              success: !!retry.data,
+              error: retry.error?.message,
+              insertedId: retry.data?.id,
+              retryInsertDuration: `${retryInsertDuration.toFixed(2)}ms`
+            });
             
             data = retry.data;
             error = retry.error;
@@ -302,38 +348,36 @@ function useProvideMessages(): MessagesContextValue {
         }
       }
 
+      console.log(`${logPrefix}: Message sent successfully`, {
+        id: data?.id,
+        content: data?.content,
+        userId: data?.user_id,
+        createdAt: data?.created_at
+      });
+
       // Step 4: Update local state and broadcast
       if (data) {
-        console.log(`${logPrefix}: ✅ Message sent successfully, updating local state`);
         setMessages(prev => {
-          const exists = prev.find(m => m.id === data.id);
+          const exists = prev.find(m => m.id === data.id)
           if (exists) {
-            console.log(`${logPrefix}: Message already exists in local state`);
             return prev;
           }
-          console.log(`${logPrefix}: Adding message to local state`);
           return [...prev, data as Message];
-        });
+        })
         
-        // Don't await the broadcast - make it non-blocking
-        channelRef.current?.send({
+        const broadcastResult = channelRef.current?.send({
           type: 'broadcast',
           event: 'new_message',
           payload: data
-        }).then(result => {
-          console.log(`${logPrefix}: Broadcast completed:`, result);
-        }).catch(err => {
-          console.warn(`${logPrefix}: Broadcast failed (non-critical):`, err);
         });
-        
-        console.log(`${logPrefix}: Message processing complete`);
       }
+      
       
     } catch (error) {
       console.error(`${logPrefix}: ❌ Exception in send process:`, {
         message: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined,
-        userAvailable: !!user,
+        userAvailable: !!currentUser,
         networkOnline: navigator.onLine,
         error
       });
@@ -341,10 +385,17 @@ function useProvideMessages(): MessagesContextValue {
     } finally {
       setSending(false);
     }
-  }, [user]);
+  }, []);
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
-    if (!user) return;
+    // Ensure a valid session and pull the current user
+    const sessionOk = await ensureSession();
+    if (!sessionOk) return;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentUser = sessionData?.session?.user;
+
+    if (!currentUser) return;
+
 
     try {
       const { error } = await supabase
@@ -354,7 +405,7 @@ function useProvideMessages(): MessagesContextValue {
           edited_at: new Date().toISOString(),
         })
         .eq('id', messageId)
-        .eq('user_id', user.id);
+        .eq('user_id', currentUser.id);
 
       if (error) {
         throw error;
@@ -363,17 +414,23 @@ function useProvideMessages(): MessagesContextValue {
     } catch (error) {
       throw error;
     }
-  }, [user]);
+  }, []);
 
   const deleteMessage = useCallback(async (messageId: string) => {
-    if (!user) return;
+    const sessionOk = await ensureSession();
+    if (!sessionOk) return;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentUser = sessionData?.session?.user;
+
+    if (!currentUser) return;
+
 
     try {
       const { error } = await supabase
         .from('messages')
         .delete()
         .eq('id', messageId)
-        .eq('user_id', user.id);
+        .eq('user_id', currentUser.id);
 
       if (error) {
         throw error;
@@ -382,10 +439,16 @@ function useProvideMessages(): MessagesContextValue {
     } catch (error) {
       throw error;
     }
-  }, [user]);
+  }, []);
 
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
-    if (!user) return;
+    const sessionOk = await ensureSession();
+    if (!sessionOk) return;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentUser = sessionData?.session?.user;
+
+    if (!currentUser) return;
+
 
     try {
       const { error } = await supabase.rpc('toggle_message_reaction', {
@@ -401,10 +464,16 @@ function useProvideMessages(): MessagesContextValue {
     } catch (error) {
       throw error;
     }
-  }, [user]);
+  }, []);
 
   const togglePin = useCallback(async (messageId: string) => {
-    if (!user) return;
+    const sessionOk = await ensureSession();
+    if (!sessionOk) return;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentUser = sessionData?.session?.user;
+
+    if (!currentUser) return;
+
 
     try {
       // First get the current pinned status
@@ -424,7 +493,7 @@ function useProvideMessages(): MessagesContextValue {
         .from('messages')
         .update({
           pinned: !isPinned,
-          pinned_by: !isPinned ? user.id : null,
+          pinned_by: !isPinned ? currentUser.id : null,
           pinned_at: !isPinned ? new Date().toISOString() : null,
         })
         .eq('id', messageId);
@@ -436,7 +505,7 @@ function useProvideMessages(): MessagesContextValue {
     } catch (error) {
       throw error;
     }
-  }, [user]);
+  }, []);
 
   return {
     messages,

@@ -282,9 +282,10 @@ export function useConversationMessages(conversationId: string | null) {
 
     const handleVisibility = () => {
       if (!document.hidden) {
-        console.log('🔄 DMs: Page became visible, refreshing session...');
+        supabase.auth.refreshSession().catch(err => {
+          console.error('Error refreshing session on visibility change:', err);
+        });
         if (channel && channel.state !== 'joined') {
-          console.log('🔄 DMs: Reconnecting channel...');
           supabase.removeChannel(channel);
           channel = subscribeToChannel();
         }

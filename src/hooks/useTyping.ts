@@ -53,7 +53,6 @@ export const useTyping = (channelName: string = 'general') => {
     if (isTyping) return
 
     try {
-      console.log('🔤 Starting typing indicator');
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
@@ -64,17 +63,12 @@ export const useTyping = (channelName: string = 'general') => {
         .eq('id', user.id)
         .single()
 
-      if (!profile) {
-        console.error('🔤 ❌ User profile not found for typing indicator');
-        return;
-      }
-
-      console.log('🔤 User profile found:', profile.username);
+      if (!profile) return
 
       setIsTyping(true)
 
       // Broadcast typing start
-      const broadcastResult = await channelRef.current?.send({
+      await channelRef.current?.send({
         type: 'broadcast',
         event: 'typing',
         payload: {
@@ -86,8 +80,6 @@ export const useTyping = (channelName: string = 'general') => {
           typing: true
         }
       })
-      
-      console.log('🔤 Typing start broadcast result:', broadcastResult);
 
       // Clear any existing timeout
       if (typingTimeoutRef.current) {
@@ -107,7 +99,6 @@ export const useTyping = (channelName: string = 'general') => {
     if (!isTyping) return
 
     try {
-      console.log('🔤 Stopping typing indicator');
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
@@ -122,7 +113,7 @@ export const useTyping = (channelName: string = 'general') => {
       setIsTyping(false)
 
       // Broadcast typing stop
-      const broadcastResult = await channelRef.current?.send({
+      await channelRef.current?.send({
         type: 'broadcast',
         event: 'typing',
         payload: {
@@ -134,8 +125,6 @@ export const useTyping = (channelName: string = 'general') => {
           typing: false
         }
       })
-      
-      console.log('🔤 Typing stop broadcast result:', broadcastResult);
 
       // Clear timeout
       if (typingTimeoutRef.current) {
