@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { supabase, User, updateUserPresence } from '../lib/supabase';
+import { supabase, User, updateUserPresence, forceSessionRefresh } from '../lib/supabase';
 import { signIn as authSignIn, signUp as authSignUp, signOut as authSignOut, getCurrentUser, updateUserProfile } from '../lib/auth';
 
 interface AuthContextValue {
@@ -205,9 +205,10 @@ function useProvideAuth() {
     // Update on page visibility change
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        // Refresh the auth session when the page comes back into focus
-        supabase.auth.refreshSession().catch((err) => {
-          console.error('Error refreshing session on visibility change:', err)
+        console.log('🔄 [AUTH] Page became visible, attempting forceSessionRefresh...');
+        // Use forceSessionRefresh instead of the problematic supabase.auth.refreshSession
+        forceSessionRefresh().catch((err) => {
+          console.error('🔄 [AUTH] Error with forceSessionRefresh on visibility change:', err)
         })
         updatePresence();
       }

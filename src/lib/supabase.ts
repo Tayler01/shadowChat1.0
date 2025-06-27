@@ -150,6 +150,77 @@ export const markDMMessagesRead = async (conversationId: string) => {
   if (error) console.error('Error marking messages as read:', error)
 }
 
+// Community-validated workaround for broken session refresh cycle
+export const forceSessionRefresh = async (): Promise<boolean> => {
+  console.log('🔄 [FORCE_REFRESH] Starting forced session refresh...');
+  
+  try {
+    // Get refresh token from localStorage
+    const authData = localStorage.getItem('sb-' + supabaseUrl.split('//')[1].split('.')[0] + '-auth-token');
+    let refresh_token = null;
+    
+    if (authData) {
+      try {
+        const parsed = JSON.parse(authData);
+        refresh_token = parsed?.refresh_token;
+        console.log('🔄 [FORCE_REFRESH] Found refresh token in localStorage:', {
+          hasToken: !!refresh_token,
+          tokenLength: refresh_token?.length || 0
+        });
+      } catch (parseError) {
+        console.error('🔄 [FORCE_REFRESH] Failed to parse auth data from localStorage:', parseError);
+      }
+    }
+    
+    // Fallback: try the old format
+    if (!refresh_token) {
+      const oldAuthData = localStorage.getItem('supabase.auth.token');
+      if (oldAuthData) {
+        try {
+          const parsed = JSON.parse(oldAuthData);
+          refresh_token = parsed?.refresh_token;
+          console.log('🔄 [FORCE_REFRESH] Found refresh token in old localStorage format:', {
+            hasToken: !!refresh_token,
+            tokenLength: refresh_token?.length || 0
+          });
+        } catch (parseError) {
+          console.error('🔄 [FORCE_REFRESH] Failed to parse old auth data from localStorage:', parseError);
+        }
+      }
+    }
+
+    if (!refresh_token) {
+      console.warn('🔄 [FORCE_REFRESH] ❌ No refresh token found in localStorage');
+      return false;
+    }
+
+    console.log('🔄 [FORCE_REFRESH] Calling supabase.auth.refreshSession with stored token...');
+    const { data, error } = await supabase.auth.refreshSession({ refresh_token });
+
+    if (error) {
+      console.error('🔄 [FORCE_REFRESH] ❌ refreshSession failed:', error.message);
+      return false;
+    }
+
+    if (!data.session) {
+      console.warn('🔄 [FORCE_REFRESH] ❌ No session returned from refresh');
+      return false;
+    }
+
+    console.log('🔄 [FORCE_REFRESH] ✅ Session manually refreshed successfully:', {
+      userId: data.session.user?.id,
+      expiresAt: data.session.expires_at,
+      hasAccessToken: !!data.session.access_token,
+      hasRefreshToken: !!data.session.refresh_token
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('🔄 [FORCE_REFRESH] ❌ Exception during forced refresh:', error);
+    return false;
+  }
+};
+
 // Helper function to ensure valid session before database operations
 export const ensureSession = async () => {
   console.log('ensureSession: Starting...');
@@ -186,21 +257,49 @@ export const ensureSession = async () => {
     
     const timeoutPromise = new Promise((_, reject) => 
       setTimeout(() => {
-        console.log('ensureSession: Timeout triggered - getSession took longer than 30 seconds');
-        reject(new Error('getSession timeout after 30 seconds'));
-      }, 30000)
+        console.log('ensureSession: Timeout triggered - getSession took longer than 10 seconds, trying forceSessionRefresh');
+        reject(new Error('getSession timeout after 10 seconds'));
+      }, 10000)
     );
     
-    console.log('ensureSession: Starting Promise.race between getSession and 30-second timeout...');
-    const { data: { session }, error } = await Promise.race([getSessionPromise, timeoutPromise]) as any;
-    console.log('ensureSession: Promise.race completed - getSession returned successfully', {
-      hasSession: !!session,
-      hasError: !!error,
-      sessionUserId: session?.user?.id,
-      sessionExpiresAt: session?.expires_at,
-      errorMessage: error?.message,
-      timestamp: new Date().toISOString()
-    });
+    console.log('ensureSession: Starting Promise.race between getSession and 10-second timeout...');
+    
+    let session, error;
+    try {
+      const result = await Promise.race([getSessionPromise, timeoutPromise]) as any;
+      session = result.data?.session;
+      error = result.error;
+      
+      console.log('ensureSession: Promise.race completed - getSession returned successfully', {
+        hasSession: !!session,
+        hasError: !!error,
+        sessionUserId: session?.user?.id,
+        sessionExpiresAt: session?.expires_at,
+        errorMessage: error?.message,
+        timestamp: new Date().toISOString()
+      });
+    } catch (timeoutError) {
+      console.log('ensureSession: getSession timed out, attempting forceSessionRefresh...');
+      
+      const refreshSuccess = await forceSessionRefresh();
+      if (!refreshSuccess) {
+        console.error('ensureSession: forceSessionRefresh failed');
+        return false;
+      }
+      
+      // Try getSession again after forced refresh
+      console.log('ensureSession: Retrying getSession after forced refresh...');
+      const retryResult = await supabase.auth.getSession();
+      session = retryResult.data?.session;
+      error = retryResult.error;
+      
+      console.log('ensureSession: Retry getSession result:', {
+        hasSession: !!session,
+        hasError: !!error,
+        sessionUserId: session?.user?.id,
+        sessionExpiresAt: session?.expires_at
+      });
+    }
 
     if (error) {
       console.error('ensureSession: Error getting session:', error)
@@ -233,49 +332,13 @@ export const ensureSession = async () => {
     if (expiresAt && (expiresAt - now) < fiveMinutes) {
       console.log('ensureSession: Session is about to expire, refreshing...');
       
-      // Also add timeout to refreshSession call (increased to 30 seconds)
-      const refreshSessionPromise = supabase.auth.refreshSession();
-      
-      // Log refresh promise details
-      console.log('ensureSession: refreshSessionPromise created', {
-        promiseType: typeof refreshSessionPromise,
-        isPromise: refreshSessionPromise instanceof Promise,
-        timestamp: new Date().toISOString()
-      });
-      
-      const refreshTimeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => {
-          console.log('ensureSession: Refresh timeout triggered - refreshSession took longer than 30 seconds');
-          reject(new Error('refreshSession timeout after 30 seconds'));
-        }, 30000)
-      );
-      
-      console.log('ensureSession: Starting Promise.race between refreshSession and 30-second timeout...');
-      const { data: refreshData, error: refreshError } = await Promise.race([refreshSessionPromise, refreshTimeoutPromise]) as any;
-      console.log('ensureSession: Promise.race completed - refreshSession returned successfully', {
-        hasRefreshData: !!refreshData,
-        hasRefreshSession: !!refreshData?.session,
-        hasRefreshError: !!refreshError,
-        refreshSessionUserId: refreshData?.session?.user?.id,
-        refreshSessionExpiresAt: refreshData?.session?.expires_at,
-        refreshErrorMessage: refreshError?.message,
-        timestamp: new Date().toISOString()
-      });
-
-      if (refreshError) {
-        console.error('ensureSession: Error refreshing session:', refreshError)
+      const refreshSuccess = await forceSessionRefresh();
+      if (!refreshSuccess) {
+        console.error('ensureSession: forceSessionRefresh failed during expiry refresh')
         return false
       }
-
-      if (!refreshData.session) {
-        console.warn('ensureSession: Failed to refresh session')
-        return false
-      }
-
-      console.log('ensureSession: session refreshed successfully', {
-        userId: refreshData.session.user?.id,
-        expiresAt: refreshData.session.expires_at,
-      })
+      
+      console.log('ensureSession: Session refreshed successfully using forceSessionRefresh');
     } else {
       console.log('ensureSession: Session is still valid, no refresh needed');
     }
