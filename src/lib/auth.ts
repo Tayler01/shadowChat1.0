@@ -70,13 +70,11 @@ export const signUp = async ({ email, password, username, displayName }: SignUpD
 
     // If user is confirmed (auto-login), fetch and return the profile
     if (data.session) {
-      console.log('✅ User auto-confirmed, fetching profile...')
       const profile = await getUserProfile(data.user.id)
       return { user: data.user, profile, session: data.session }
     }
-    
+
     // If email confirmation is required, return user data without profile
-    console.log('📧 Email confirmation required')
     return { user: data.user, profile: null, session: null }
   }
 
@@ -118,15 +116,12 @@ export const signOut = async () => {
 }
 
 export const getCurrentUser = async () => {
-  console.log('🔍 getCurrentUser called');
 
   try {
-    console.log('🔐 Checking auth user...');
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     // Handle the specific "user not found" error from invalid JWT
     if (authError && authError.message?.includes('User from sub claim in JWT does not exist')) {
-      console.log('🧹 Invalid JWT detected in getCurrentUser, clearing session...');
       await supabase.auth.signOut();
       return null;
     }
@@ -136,10 +131,8 @@ export const getCurrentUser = async () => {
       return null;
     }
     
-    console.log('👤 Auth user:', user ? `User ID: ${user.id}` : 'No auth user');
     if (!user) return null
 
-    console.log('📋 Fetching user profile from database...');
     
     const { data: profile, error } = await supabase
       .from('users')
@@ -147,12 +140,10 @@ export const getCurrentUser = async () => {
       .eq('id', user.id)
       .single();
 
-    console.log('📝 Profile query result:', { profile: !!profile, error: error?.code });
 
     if (error && error.code === 'PGRST116') {
       // Profile doesn't exist, create it
       console.error('Error fetching user profile:', error)
-      console.log('Creating missing user profile...')
       
       const userData = {
         id: user.id,
@@ -162,7 +153,6 @@ export const getCurrentUser = async () => {
         status: 'online'
       };
       
-      console.log('📝 Creating profile with data:', userData);
       
       const { error: insertError } = await supabase
         .from('users')
@@ -172,7 +162,6 @@ export const getCurrentUser = async () => {
         console.error('Error creating user profile:', insertError)
         // If user already exists (race condition), just fetch it
         if (insertError.code === '23505') {
-          console.log('Profile already exists (race condition), fetching existing profile...');
           const { data: existingProfile, error: fetchError } = await supabase
             .from('users')
             .select('*')
@@ -184,14 +173,12 @@ export const getCurrentUser = async () => {
             return null;
           }
           
-          console.log('✅ Existing profile fetched successfully');
           return existingProfile;
         } else {
           return null;
         }
       }
       
-      console.log('✅ Profile created, fetching...');
       
       // Fetch the newly created profile
       const { data: newProfile, error: fetchError } = await supabase
@@ -205,14 +192,12 @@ export const getCurrentUser = async () => {
         return null
       }
       
-      console.log('✅ New profile fetched successfully');
       return newProfile
     } else if (error) {
       console.error('Unexpected error fetching profile:', error);
       return null;
     }
 
-    console.log('✅ Profile found and returned');
     return profile
   } catch (error) {
     console.error('Error in getCurrentUser:', error);

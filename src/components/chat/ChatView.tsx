@@ -15,20 +15,14 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar }) => {
   const { sendMessage, messages, loading } = useMessages()
   const { user } = useAuth()
 
-  // Debug the messages state in ChatView
+  // Sync with messages state changes
   useEffect(() => {
-    console.log('🏠 ChatView: Messages state updated', { 
-      count: messages.length, 
-      loading,
-      lastMessage: messages[messages.length - 1]?.content 
-    });
+    // Intentionally left blank to react to updates
   }, [messages, loading]);
 
   const handleSendMessage = async (content: string) => {
-    // console.log('🚀 ChatView: Sending message:', { content, userExists: !!user });
     try {
       await sendMessage(content)
-      // console.log('✅ ChatView: Message sent successfully, waiting for real-time update');
     } catch (error) {
       console.error('❌ ChatView: Failed to send message:', error);
       toast.error('Failed to send message')
