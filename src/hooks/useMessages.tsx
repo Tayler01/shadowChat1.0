@@ -310,6 +310,7 @@ function useProvideMessages(): MessagesContextValue {
           const { data: refreshData, error: refreshError } = await Promise.race([refreshPromise, refreshTimeoutPromise]) as any;
           const retryRefreshEndTime = performance.now();
           const retryRefreshDuration = retryRefreshEndTime - retryRefreshStartTime;
+          console.log(`${logPrefix}: Session refresh duration`, retryRefreshDuration);
           
           
           if (!refreshError && refreshData.session) {
@@ -331,6 +332,7 @@ function useProvideMessages(): MessagesContextValue {
             const retry = await Promise.race([retryPromise, retryTimeoutPromise]) as any;
             const retryInsertEndTime = performance.now();
             const retryInsertDuration = retryInsertEndTime - retryInsertStartTime;
+            console.log(`${logPrefix}: Retry insert duration`, retryInsertDuration);
             
             
             data = retry.data;
