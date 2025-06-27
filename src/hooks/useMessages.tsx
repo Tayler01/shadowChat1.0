@@ -435,15 +435,52 @@ function useProvideMessages(): MessagesContextValue {
       };
       console.log(`${logPrefix}: Prepared message data`, messageData)
 
-      // Step 2: Attempt database insert (let Supabase handle auth internally)
+      // Step 2: Try manual fetch first to bypass Supabase client issues
+      console.log(`${logPrefix}: 🔧 Attempting manual fetch insert to bypass client issues`);
+      
+      let data = null;
+      let error = null;
+      
+      try {
+        const manualResult = await manualInsertMessage(messageData);
+        console.log(`${logPrefix}: ✅ Manual insert succeeded`, {
+          manualResult,
+          messageId: manualResult?.id
+        });
+        
+        // Fetch the complete message with user data using Supabase client
+        if (manualResult?.id) {
+          console.log(`${logPrefix}: Fetching complete message data with user info`);
+          const { data: completeMessage, error: fetchError } = await supabase
+            .from('messages')
+            .select(`
+              *,
+              user:users!user_id(*)
+            `)
+            .eq('id', manualResult.id)
+            .single();
+            
+          if (fetchError) {
+            console.warn(`${logPrefix}: ⚠️ Failed to fetch complete message, using manual result`, fetchError);
+            data = manualResult;
+          } else {
+            console.log(`${logPrefix}: ✅ Complete message data fetched successfully`);
+            data = completeMessage;
+          }
+        } else {
+          data = manualResult;
+        }
+        
+      } catch (manualError) {
+        console.warn(`${logPrefix}: ⚠️ Manual insert failed, falling back to Supabase client`, {
+          manualError,
+          message: manualError instanceof Error ? manualError.message : 'Unknown error'
+        });
+        
+        // Fallback to original Supabase client method
+        console.log(`${logPrefix}: 💾 Falling back to Supabase client insert`);
+        
       const insertStartTime = performance.now();
-      
-      console.log(`${logPrefix}: 💾 About to insert message into database`, {
-        messageData,
-        timestamp: new Date().toISOString()
-      });
-      
-      console.log(`${logPrefix}: 💾 Calling supabase.from('messages').insert() NOW`);
       
       const insertResult = await supabase
         .from('messages')
@@ -454,74 +491,31 @@ function useProvideMessages(): MessagesContextValue {
         `)
         .single();
       
-      const { data, error } = insertResult;
+        const insertData = insertResult.data;
+        const insertError = insertResult.error;
         
-      console.log(`${logPrefix}: 🧪 Insert response received from Supabase`, {
-        data,
-        error,
-        hasData: !!data,
-        hasError: !!error,
-        errorMessage: error?.message,
-        errorCode: error?.code,
-        errorDetails: error?.details,
-        errorHint: error?.hint,
-        dataId: data?.id,
-        dataContent: data?.content,
-        timestamp: new Date().toISOString()
-      });
+        console.log(`${logPrefix}: 🧪 Supabase client insert response`, {
+          data: insertData,
+          error: insertError,
+          hasData: !!insertData,
+          hasError: !!insertError
+        });
       
-      // Explicit error/success logging
-      if (error) {
-        console.error(`${logPrefix}: ❌ INSERT FAILED`, {
-          error,
-          message: error.message,
-          code: error.code,
-          details: error.details,
-          hint: error.hint,
-          status: error.status || 'unknown'
-        });
-      } else if (data) {
-        console.log(`${logPrefix}: ✅ INSERT SUCCEEDED`, {
-          messageId: data.id,
-          content: data.content,
-          userId: data.user_id,
-          timestamp: data.created_at
-        });
-      } else {
-        console.warn(`${logPrefix}: ⚠️ INSERT RETURNED NO DATA AND NO ERROR`, {
-          insertResult,
-          data,
-          error
-        });
-      }
+        const insertEndTime = performance.now();
+        const insertDuration = insertEndTime - insertStartTime;
+        console.log(`${logPrefix}: 📊 Supabase client insert timing`, { duration: insertDuration });
         
-      const insertEndTime = performance.now();
-      const insertDuration = insertEndTime - insertStartTime;
-
-      console.log(`${logPrefix}: 📊 Insert timing and summary`, { 
-        duration: insertDuration, 
-        success: !error && !!data,
-        messageId: data?.id 
-      });
-
-      // Insert result logged for debugging
-
-      if (error) {
-        console.error(`${logPrefix}: ❌ Database insert failed:`, error);
+        data = insertData;
+        error = insertError;
         
-        // Step 3: Handle auth errors with retry
-        if (error.status === 401 || /jwt|token|expired/i.test(error.message)) {
-          const retryRefreshStartTime = performance.now();
+        // Handle auth errors with retry for Supabase client
+        if (error && (error.status === 401 || /jwt|token|expired/i.test(error.message))) {
+          console.log(`${logPrefix}: 🔄 Auth error detected, attempting session refresh and retry`);
           
-          // Try refreshing the session
           const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-          const retryRefreshEndTime = performance.now();
-          const retryRefreshDuration = retryRefreshEndTime - retryRefreshStartTime;
-          console.log(`${logPrefix}: Session refresh duration`, retryRefreshDuration);
-          
           
           if (!refreshError && refreshData.session) {
-            const retryInsertStartTime = performance.now();
+            console.log(`${logPrefix}: ✅ Session refreshed, retrying insert`);
             
             const retry = await supabase
               .from('messages')
@@ -532,36 +526,55 @@ function useProvideMessages(): MessagesContextValue {
               `)
               .single();
               
-            const retryInsertEndTime = performance.now();
-            const retryInsertDuration = retryInsertEndTime - retryInsertStartTime;
-            console.log(`${logPrefix}: Retry insert duration`, retryInsertDuration);
-            
-            
             data = retry.data;
             error = retry.error;
+            
+            console.log(`${logPrefix}: 🔄 Retry result`, {
+              hasData: !!data,
+              hasError: !!error
+            });
           } else {
             console.error(`${logPrefix}: ❌ Session refresh failed, cannot retry`);
           }
         }
-        
-        if (error) {
-          console.error(`${logPrefix}: ❌ Final error after retry:`, error);
-          throw error;
-        }
       }
 
-      // Message successfully inserted
-
-      // Step 4: Update local state and broadcast
+      // Final error check
+      if (error) {
+        console.error(`${logPrefix}: ❌ Final insert error`, {
+          error,
+          message: error.message,
+          code: error.code,
+          details: error.details
+        });
+        throw error;
+      }
+      
       if (data) {
+        console.log(`${logPrefix}: ✅ INSERT SUCCEEDED`, {
+          messageId: data.id,
+          content: data.content,
+          userId: data.user_id,
+          timestamp: data.created_at
+        });
+      } else {
+        console.warn(`${logPrefix}: ⚠️ No data returned from insert`);
+        throw new Error('No data returned from message insert');
+      }
+
+      // Step 3: Update local state and broadcast
+      console.log(`${logPrefix}: 📤 Updating local state and broadcasting message`);
+      
         setMessages(prev => {
           const exists = prev.find(m => m.id === data.id)
           if (exists) {
+            console.log(`${logPrefix}: Message already exists in state, skipping update`);
             return prev;
           }
           const updated = [...prev, data as Message]
           console.log(`${logPrefix}: Message state updated`, {
             totalMessages: updated.length,
+            addedMessageId: data.id
           })
           return updated
         })
@@ -575,8 +588,8 @@ function useProvideMessages(): MessagesContextValue {
           result: broadcastResult,
           channelState: channelRef.current?.state,
         });
-      }
       
+      console.log(`${logPrefix}: ✅ Message send process completed successfully`);
       
     } catch (error) {
       console.error(`${logPrefix}: ❌ Exception in send process:`, {
