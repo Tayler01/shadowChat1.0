@@ -281,136 +281,72 @@ export const legacyForceSessionRefresh = async (): Promise<boolean> => {
   }
 };
 
+// Helper function to check if session is usable without calling getSession()
+async function isSessionUsable(): Promise<boolean> {
+  try {
+    const stored = localStorage.getItem('sb-' + supabaseUrl.split('//')[1].split('.')[0] + '-auth-token');
+    if (!stored) return false;
+
+    const parsed = JSON.parse(stored);
+    const access_token = parsed?.access_token;
+    const refresh_token = parsed?.refresh_token;
+    const expires_at = parsed?.expires_at;
+
+    const now = Math.floor(Date.now() / 1000);
+
+    if (!access_token || !expires_at) return false;
+
+    if (now > expires_at - 30) {
+      console.warn('⚠️ Token expired or near expiry');
+      return false;
+    }
+
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 // Helper function to ensure valid session before database operations
 export const ensureSession = async () => {
-  console.log('ensureSession: Starting...');
+  console.log('🔒 [ENSURE_SESSION] Starting session validation...');
+  
   try {
-    console.log('ensureSession: Calling supabase.auth.getSession()...');
+    // Step 1: Check if session is usable without calling getSession()
+    console.log('🔒 [ENSURE_SESSION] Checking session usability from localStorage...');
+    const usable = await isSessionUsable();
     
-    // Add timeout to getSession call to detect if it's hanging (increased to 30 seconds)
-    const getSessionPromise = supabase.auth.getSession();
-    
-    // Log the promise state and properties
-    console.log('ensureSession: getSessionPromise created', {
-      promiseType: typeof getSessionPromise,
-      isPromise: getSessionPromise instanceof Promise,
-      promiseState: getSessionPromise.constructor.name,
-      timestamp: new Date().toISOString()
-    });
-    
-    // Add a promise inspector to see if it resolves/rejects
-    getSessionPromise
-      .then((result) => {
-        console.log('ensureSession: getSessionPromise resolved successfully', {
-          hasData: !!result?.data,
-          hasSession: !!result?.data?.session,
-          hasError: !!result?.error,
-          timestamp: new Date().toISOString()
-        });
-      })
-      .catch((error) => {
-        console.log('ensureSession: getSessionPromise rejected', {
-          error: error?.message || 'Unknown error',
-          timestamp: new Date().toISOString()
-        });
-      });
-    
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => {
-        console.log('ensureSession: Timeout triggered - getSession took longer than 10 seconds, trying forceSessionRefresh');
-        reject(new Error('getSession timeout after 10 seconds'));
-      }, 10000)
-    );
-    
-    console.log('ensureSession: Starting Promise.race between getSession and 10-second timeout...');
-    
-    let session, error;
-    try {
-      const result = await Promise.race([getSessionPromise, timeoutPromise]) as any;
-      session = result.data?.session;
-      error = result.error;
-      
-      console.log('ensureSession: Promise.race completed - getSession returned successfully', {
-        hasSession: !!session,
-        hasError: !!error,
-        sessionUserId: session?.user?.id,
-        sessionExpiresAt: session?.expires_at,
-        errorMessage: error?.message,
-        timestamp: new Date().toISOString()
-      });
-    } catch (timeoutError) {
-      console.log('ensureSession: getSession timed out, attempting forceSessionRefresh...');
-      
+    if (!usable) {
+      console.warn('🔒 [ENSURE_SESSION] ⚠️ Session not usable, triggering nuclear refresh');
       const refreshSuccess = await forceSessionRefresh();
+      
       if (!refreshSuccess) {
-        console.error('ensureSession: forceSessionRefresh failed');
+        console.error('🔒 [ENSURE_SESSION] ❌ Nuclear refresh failed');
         return false;
       }
       
-      // Try getSession again after forced refresh
-      console.log('ensureSession: Retrying getSession after forced refresh...');
-      const retryResult = await supabase.auth.getSession();
-      session = retryResult.data?.session;
-      error = retryResult.error;
+      console.log('🔒 [ENSURE_SESSION] ✅ Nuclear refresh completed successfully');
       
-      console.log('ensureSession: Retry getSession result:', {
-        hasSession: !!session,
-        hasError: !!error,
-        sessionUserId: session?.user?.id,
-        sessionExpiresAt: session?.expires_at
-      });
-    }
-
-    if (error) {
-      console.error('ensureSession: Error getting session:', error)
-      return false
-    }
-
-    if (!session) {
-      console.warn('ensureSession: No active session found')
-      return false
-    }
-
-    console.log('ensureSession: current session details', {
-      userId: session.user?.id,
-      expiresAt: session.expires_at,
-      currentTime: Math.floor(Date.now() / 1000),
-    })
-    
-    // Check if session is expired or about to expire (within 5 minutes)
-    const expiresAt = session.expires_at
-    const now = Math.floor(Date.now() / 1000)
-    const fiveMinutes = 5 * 60
-    
-    console.log('ensureSession: Session expiry check', {
-      expiresAt,
-      now,
-      timeUntilExpiry: expiresAt ? (expiresAt - now) : 'unknown',
-      needsRefresh: expiresAt && (expiresAt - now) < fiveMinutes
-    });
-    
-    if (expiresAt && (expiresAt - now) < fiveMinutes) {
-      console.log('ensureSession: Session is about to expire, refreshing...');
-      
-      const refreshSuccess = await forceSessionRefresh();
-      if (!refreshSuccess) {
-        console.error('ensureSession: forceSessionRefresh failed during expiry refresh')
-        return false
+      // Verify the refresh worked by checking localStorage again
+      const usableAfterRefresh = await isSessionUsable();
+      if (!usableAfterRefresh) {
+        console.error('🔒 [ENSURE_SESSION] ❌ Session still not usable after refresh');
+        return false;
       }
       
-      console.log('ensureSession: Session refreshed successfully using forceSessionRefresh');
+      console.log('🔒 [ENSURE_SESSION] ✅ Session confirmed usable after refresh');
     } else {
-      console.log('ensureSession: Session is still valid, no refresh needed');
+      console.log('🔒 [ENSURE_SESSION] ✅ Session is already usable, no refresh needed');
     }
-    
-    console.log('ensureSession: Session validation complete - returning true');
-    return true
+
+    console.log('🔒 [ENSURE_SESSION] ✅ Session validation complete - returning true');
+    return true;
   } catch (error) {
-    console.error('ensureSession: Exception caught:', {
+    console.error('🔒 [ENSURE_SESSION] ❌ Exception caught:', {
       message: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
       error
     });
-    return false
+    return false;
   }
-}
+};
