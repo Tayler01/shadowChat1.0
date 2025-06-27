@@ -20,6 +20,11 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 })
 
+// Expose Supabase to window for debugging
+if (typeof window !== 'undefined') {
+  (window as any).supabase = supabase;
+}
+
 // Database types matching the actual schema
 export interface User {
   id: string
