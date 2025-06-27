@@ -126,14 +126,6 @@ function useProvideMessages(): MessagesContextValue {
           }
         }
       )
-      .on('broadcast', { event: 'new_message' }, (payload) => {
-        const newMessage = payload.payload as Message;
-        setMessages(prev => {
-          const exists = prev.find(m => m.id === newMessage.id);
-          if (exists) return prev;
-          return [...prev, newMessage];
-        });
-      })
       .on(
         'postgres_changes',
         {
@@ -165,7 +157,8 @@ function useProvideMessages(): MessagesContextValue {
             }
           } catch (error) {
           }
-        }
+        // Don't await the broadcast - make it non-blocking
+        channelRef.current?.send({
       )
       .on(
         'postgres_changes',
@@ -326,19 +319,30 @@ function useProvideMessages(): MessagesContextValue {
           return [...prev, data as Message];
         });
         
-        const broadcastResult = channelRef.current?.send({
+        // Don't await the broadcast - make it non-blocking
+        channelRef.current?.send({
           type: 'broadcast',
           event: 'new_message',
           payload: data
+        }).then(result => {
+          console.log(`${logPrefix}: Broadcast completed:`, result);
+        }).catch(err => {
+          console.warn(`${logPrefix}: Broadcast failed (non-critical):`, err);
         });
-        console.log(`${logPrefix}: Broadcast result:`, broadcastResult);
+        
+        console.log(`${logPrefix}: Message processing complete`);
+        }).catch(err => {
+          console.warn(`${logPrefix}: Broadcast failed (non-critical):`, err);
+        });
+        
+        console.log(`${logPrefix}: Message processing complete`);
       }
       
     } catch (error) {
       console.error(`${logPrefix}: ❌ Exception in send process:`, {
         message: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined,
-        userAvailable: !!currentUser,
+        userAvailable: !!user,
         networkOnline: navigator.onLine,
         error
       });
@@ -346,16 +350,10 @@ function useProvideMessages(): MessagesContextValue {
     } finally {
       setSending(false);
     }
-  }, []);
+  }, [user]);
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
-    // Ensure a valid session and pull the current user
-    const sessionOk = await ensureSession();
-    if (!sessionOk) return;
-    const { data: sessionData } = await supabase.auth.getSession();
-    const currentUser = sessionData?.session?.user;
-
-    if (!currentUser) return;
+    if (!user) return;
 
 
     try {
@@ -366,7 +364,7 @@ function useProvideMessages(): MessagesContextValue {
           edited_at: new Date().toISOString(),
         })
         .eq('id', messageId)
-        .eq('user_id', currentUser.id);
+        .eq('user_id', user.id);
 
       if (error) {
         throw error;
@@ -375,15 +373,10 @@ function useProvideMessages(): MessagesContextValue {
     } catch (error) {
       throw error;
     }
-  }, []);
+  }, [user]);
 
   const deleteMessage = useCallback(async (messageId: string) => {
-    const sessionOk = await ensureSession();
-    if (!sessionOk) return;
-    const { data: sessionData } = await supabase.auth.getSession();
-    const currentUser = sessionData?.session?.user;
-
-    if (!currentUser) return;
+    if (!user) return;
 
 
     try {
@@ -391,7 +384,7 @@ function useProvideMessages(): MessagesContextValue {
         .from('messages')
         .delete()
         .eq('id', messageId)
-        .eq('user_id', currentUser.id);
+        .eq('user_id', user.id);
 
       if (error) {
         throw error;
@@ -400,15 +393,10 @@ function useProvideMessages(): MessagesContextValue {
     } catch (error) {
       throw error;
     }
-  }, []);
+  }, [user]);
 
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
-    const sessionOk = await ensureSession();
-    if (!sessionOk) return;
-    const { data: sessionData } = await supabase.auth.getSession();
-    const currentUser = sessionData?.session?.user;
-
-    if (!currentUser) return;
+    if (!user) return;
 
 
     try {
@@ -425,15 +413,10 @@ function useProvideMessages(): MessagesContextValue {
     } catch (error) {
       throw error;
     }
-  }, []);
+  }, [user]);
 
   const togglePin = useCallback(async (messageId: string) => {
-    const sessionOk = await ensureSession();
-    if (!sessionOk) return;
-    const { data: sessionData } = await supabase.auth.getSession();
-    const currentUser = sessionData?.session?.user;
-
-    if (!currentUser) return;
+    if (!user) return;
 
 
     try {
@@ -454,7 +437,7 @@ function useProvideMessages(): MessagesContextValue {
         .from('messages')
         .update({
           pinned: !isPinned,
-          pinned_by: !isPinned ? currentUser.id : null,
+          pinned_by: !isPinned ? user.id : null,
           pinned_at: !isPinned ? new Date().toISOString() : null,
         })
         .eq('id', messageId);
@@ -466,7 +449,7 @@ function useProvideMessages(): MessagesContextValue {
     } catch (error) {
       throw error;
     }
-  }, []);
+  }, [user]);
 
   return {
     messages,

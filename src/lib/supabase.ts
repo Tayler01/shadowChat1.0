@@ -1,186 +1,477 @@
-import { createClient } from '@supabase/supabase-js'
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  useRef
+} from 'react';
+import { supabase, Message, ensureSession } from '../lib/supabase';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+import { useAuth } from './useAuth';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables')
+interface MessagesContextValue {
+  messages: Message[];
+  loading: boolean;
+  sending: boolean;
+  sendMessage: (content: string, type?: 'text' | 'command') => Promise<void>;
+  editMessage: (id: string, content: string) => Promise<void>;
+  deleteMessage: (id: string) => Promise<void>;
+  toggleReaction: (id: string, emoji: string) => Promise<void>;
+  togglePin: (id: string) => Promise<void>;
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  realtime: {
-    params: {
-      eventsPerSecond: 50,
-    },
-  },
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-  },
-})
+const MessagesContext = createContext<MessagesContextValue | undefined>(undefined);
 
-// Expose Supabase to window for debugging
-if (typeof window !== 'undefined') {
-  (window as any).supabase = supabase;
-  console.log('🔧 Supabase client exposed to window.supabase');
-}
+function useProvideMessages(): MessagesContextValue {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const { user } = useAuth();
+  const channelRef = useRef<RealtimeChannel | null>(null);
 
-// Database types matching the actual schema
-export interface User {
-  id: string
-  email: string
-  username: string
-  display_name: string
-  avatar_url?: string
-  banner_url?: string
-  status: 'online' | 'away' | 'busy' | 'offline'
-  status_message: string
-  color: string
-  last_active: string
-  created_at: string
-  updated_at: string
-}
+  const fetchMessages = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          user:users!user_id(*)
+        `)
+        .order('created_at', { ascending: true })
+        .limit(100);
 
-export interface Message {
-  id: string
-  user_id: string
-  content: string
-  reactions: Record<string, { count: number; users: string[] }>
-  pinned: boolean
-  edited_at?: string
-  reply_to?: string
-  created_at: string
-  updated_at: string
-  user?: User
-}
+      if (error) {
+      } else if (data) {
+        setMessages(prev => {
+          if (prev.length === 0) {
+            return data as Message[];
+          }
+          const ids = new Set(prev.map(m => m.id));
+          const merged = [...prev, ...data.filter(m => !ids.has(m.id))];
+          return merged;
+        });
+      }
+    } catch (error) {
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-export interface DMConversation {
-  id: string
-  participants: string[]
-  last_message_at: string
-  created_at: string
-  other_user?: User
-  unread_count?: number
-  last_message?: DMMessage
-}
+  // Fetch initial messages
+  useEffect(() => {
+    fetchMessages();
+  }, [fetchMessages]);
 
-export interface DMMessage {
-  id: string
-  conversation_id: string
-  sender_id: string
-  content: string
-  read_at?: string
-  reactions: Record<string, { count: number; users: string[] }>
-  edited_at?: string
-  created_at: string
-  sender?: User
-}
+  // Subscribe to real-time updates
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
 
-export interface UserSession {
-  id: string
-  user_id: string
-  session_token: string
-  last_ping: string
-  created_at: string
-}
 
-// Helper functions
-export const updateUserPresence = async () => {
-  const { error } = await supabase.rpc('update_user_last_active')
-  if (error) console.error('Error updating presence:', error)
-}
+    // Use a static channel name to prevent duplicate subscriptions
+    const channelName = 'public:messages';
 
-export const toggleReaction = async (messageId: string, emoji: string, isDM = false) => {
-  const { error } = await supabase.rpc('toggle_message_reaction', {
-    message_id: messageId,
-    emoji: emoji,
-    is_dm: isDM
-  })
-  if (error) console.error('Error toggling reaction:', error)
-}
+    let channel: RealtimeChannel | null = null;
 
-export const getOrCreateDMConversation = async (otherUserId: string) => {
-  const { data, error } = await supabase.rpc('get_or_create_dm_conversation', {
-    other_user_id: otherUserId
-  })
-  if (error) {
-    console.error('Error getting/creating DM conversation:', error)
-    return null
-  }
-  return data
-}
+    const subscribeToChannel = (): RealtimeChannel => {
+      const newChannel = supabase
+        .channel(channelName, {
+          config: {
+            broadcast: { self: true },
+            presence: { key: user.id }
+          }
+        })
+        .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+        },
+        async (payload) => {
+          
+          try {
+            // Fetch the complete message with user data
+            const { data: newMessage, error } = await supabase
+              .from('messages')
+              .select(`
+                *,
+                user:users!user_id(*)
+              `)
+              .eq('id', payload.new.id)
+              .single();
 
-export const markDMMessagesRead = async (conversationId: string) => {
-  const { error } = await supabase.rpc('mark_dm_messages_read', {
-    conversation_id: conversationId
-  })
-  if (error) console.error('Error marking messages as read:', error)
-}
+            if (error) {
+              return;
+            }
 
-// Helper function to ensure valid session before database operations
-export const ensureSession = async () => {
-  try {
-    console.log('🔐 Checking session validity');
+            if (newMessage) {
+              setMessages(prev => {
+                // Check if message already exists to avoid duplicates
+                const exists = prev.find(msg => msg.id === newMessage.id);
+                if (exists) {
+                  return prev;
+                }
+                
+                // Add new message to the end
+                const updated = [...prev, newMessage as Message];
+                
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+        },
+        async (payload) => {
+          
+          try {
+            // Fetch the updated message with user data
+            const { data: updatedMessage, error } = await supabase
+              .from('messages')
+              .select(`
+                *,
+                user:users!user_id(*)
+              `)
+              .eq('id', payload.new.id)
+              .single();
+
+            if (error) {
+              return;
+            }
+
+            if (updatedMessage) {
+              setMessages(prev =>
+                prev.map(msg => msg.id === updatedMessage.id ? updatedMessage as Message : msg)
+              );
+            }
+          } catch (error) {
+          }
+        // Don't await the broadcast - make it non-blocking
+        channelRef.current?.send({
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'messages',
+        },
+        (payload) => {
+          setMessages(prev =>
+            prev.filter(msg => msg.id !== payload.old.id)
+          );
+        }
+      )
+      .subscribe(async (status, err) => {
+        if (err) {
+        }
+        if (status === 'SUBSCRIBED') {
+        }
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          await supabase.removeChannel(newChannel);
+          setTimeout(() => {
+            channel = subscribeToChannel();
+          }, 1000);
+        } else if (status === 'CLOSED') {
+          setTimeout(() => {
+            channel = subscribeToChannel();
+          }, 1000);
+        }
+      });
+
+      return newChannel;
+    };
+
+    channel = subscribeToChannel();
+    channelRef.current = channel;
+
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        console.log('🔄 Messages: Page became visible, refreshing session...');
+        
+        if (channel && channel.state !== 'joined') {
+          console.log('🔄 Messages: Reconnecting channel...');
+          supabase.removeChannel(channel);
+          channel = subscribeToChannel();
+        }
+        
+        fetchMessages();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (channel) supabase.removeChannel(channel);
+      channelRef.current = null;
+    };
+  }, [user, fetchMessages]);
+
+  const sendMessage = useCallback(async (content: string, messageType: 'text' | 'command' = 'text') => {
+    const timestamp = new Date().toISOString();
+    const logPrefix = `🚀 [${timestamp}] MESSAGE_SEND`;
     
-    // Add timeout to prevent hanging
-    const sessionPromise = supabase.auth.getSession();
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Session check timeout')), 5000)
-    );
+    console.log(`${logPrefix}: Starting message send process`);
     
-    let { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]) as any;
-    
-    if (error || !session) {
-      console.log('🔐 No valid session found, attempting refresh');
-      
-      const refreshPromise = supabase.auth.refreshSession();
-      const refreshTimeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Session refresh timeout')), 5000)
+    // Get current user from session
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentUser = sessionData?.session?.user;
+
+    console.log(`${logPrefix}: Current user:`, currentUser?.id);
+
+    if (!currentUser || !content.trim()) {
+      console.error(`${logPrefix}: ❌ No user or empty content`);
+      return;
+    }
+
+    setSending(true);
+
+    try {
+      // Step 1: Prepare message data
+      console.log(`${logPrefix}: Preparing message data`);
+      const messageData = {
+        user_id: currentUser.id,
+        content: content.trim(),
+        message_type: messageType,
+      };
+
+      // Step 2: Attempt database insert (let Supabase handle auth internally)
+      const insertStartTime = performance.now();
+      console.log(`${logPrefix}: Attempting database insert`);
+      const insertPromise = supabase
+        .from('messages')
+        .insert(messageData)
+        .select(`
+          *,
+          user:users!user_id(*)
+        `)
+        .single();
+        
+      const insertTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database insert timeout after 10 seconds')), 10000)
       );
       
-      const { data: refreshData, error: refreshError } = await Promise.race([refreshPromise, refreshTimeoutPromise]) as any;
+      let { data, error } = await Promise.race([insertPromise, insertTimeoutPromise]) as any;
+      const insertEndTime = performance.now();
+      const insertDuration = insertEndTime - insertStartTime;
       
-      if (refreshError || !refreshData.session) {
-        console.error('🔐 ❌ Failed to refresh session:', refreshError);
-        return false;
+      console.log(`${logPrefix}: Insert completed in ${insertDuration}ms`, { data: !!data, error: !!error });
+
+      if (error) {
+        console.error(`${logPrefix}: ❌ Database insert failed:`, error);
+        
+        // Step 3: Handle auth errors with retry
+        if (error.status === 401 || /jwt|token|expired/i.test(error.message)) {
+          console.log(`${logPrefix}: Attempting session refresh due to auth error`);
+          
+          // Try refreshing the session
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          
+          if (!refreshError && refreshData.session) {
+            console.log(`${logPrefix}: Retrying insert with refreshed session`);
+            
+            const retryPromise = supabase
+              .from('messages')
+              .insert(messageData)
+              .select(`
+                *,
+                user:users!user_id(*)
+              `)
+              .single();
+              
+            const retry = await retryPromise;
+            
+            data = retry.data;
+            error = retry.error;
+          } else {
+            console.error(`${logPrefix}: ❌ Session refresh failed, cannot retry`);
+          }
+        }
+        
+        if (error) {
+          console.error(`${logPrefix}: ❌ Final error after retry:`, error);
+          throw error;
+        }
+      }
+
+      // Step 4: Update local state and broadcast
+      if (data) {
+        console.log(`${logPrefix}: ✅ Message sent successfully, updating local state`);
+        setMessages(prev => {
+          const exists = prev.find(m => m.id === data.id);
+          if (exists) {
+            console.log(`${logPrefix}: Message already exists in local state`);
+            return prev;
+          }
+          console.log(`${logPrefix}: Adding message to local state`);
+          return [...prev, data as Message];
+        });
+        
+        // Don't await the broadcast - make it non-blocking
+        channelRef.current?.send({
+        channelRef.current?.send({
+          type: 'broadcast',
+          event: 'new_message',
+          payload: data
+        }).then(result => {
+          console.log(`${logPrefix}: Broadcast completed:`, result);
+        }).catch(err => {
+          console.warn(`${logPrefix}: Broadcast failed (non-critical):`, err);
+        });
+        
+        console.log(`${logPrefix}: Message processing complete`);
+        }).catch(err => {
+          console.warn(`${logPrefix}: Broadcast failed (non-critical):`, err);
+        });
+        
+        console.log(`${logPrefix}: Message processing complete`);
+        }).catch(err => {
+          console.warn(`${logPrefix}: Broadcast failed (non-critical):`, err);
+        });
+        
+        console.log(`${logPrefix}: Message processing complete`);
       }
       
-      session = refreshData.session;
-      console.log('🔐 ✅ Session refreshed successfully');
-      return true;
+    } catch (error) {
+      console.error(`${logPrefix}: ❌ Exception in send process:`, {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        userAvailable: !!user,
+        networkOnline: navigator.onLine,
+        error
+      });
+      throw error;
+    } finally {
+      setSending(false);
     }
-    
-    console.log('🔐 Session found, checking expiration');
-    
-    // Check if session is expired or about to expire (within 5 minutes)
-    const expiresAt = session.expires_at
-    const now = Math.floor(Date.now() / 1000)
-    const fiveMinutes = 5 * 60
-    
-    if (expiresAt && (expiresAt - now) < fiveMinutes) {
-      console.log('🔐 Session expiring soon, refreshing');
-      
-      const refreshPromise = supabase.auth.refreshSession();
-      const refreshTimeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Session refresh timeout')), 5000)
-      );
-      
-      const { data: refreshData, error: refreshError } = await Promise.race([refreshPromise, refreshTimeoutPromise]) as any;
-      
-      if (refreshError || !refreshData.session) {
-        console.error('🔐 ❌ Error refreshing session:', refreshError)
-        return false
+  }, [user]);
+
+  const editMessage = useCallback(async (messageId: string, content: string) => {
+    if (!user) return;
+
+
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .update({
+          content,
+          edited_at: new Date().toISOString(),
+        })
+        .eq('id', messageId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        throw error;
       }
-      
-      console.log('🔐 ✅ Session refreshed successfully');
-    } else {
-      console.log('🔐 ✅ Session is valid');
+
+    } catch (error) {
+      throw error;
     }
-    
-    return true
-  } catch (error) {
-    console.error('🔐 ❌ Exception in ensureSession:', error)
-    return false
+  }, [user]);
+
+  const deleteMessage = useCallback(async (messageId: string) => {
+    if (!user) return;
+
+
+    try {
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('id', messageId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        throw error;
+      }
+
+    } catch (error) {
+      throw error;
+    }
+  }, [user]);
+
+  const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
+    if (!user) return;
+
+
+    try {
+      const { error } = await supabase.rpc('toggle_message_reaction', {
+        message_id: messageId,
+        emoji: emoji,
+        is_dm: false
+      });
+
+      if (error) {
+        throw error;
+      }
+
+    } catch (error) {
+      throw error;
+    }
+  }, [user]);
+
+  const togglePin = useCallback(async (messageId: string) => {
+    if (!user) return;
+
+
+    try {
+      // First get the current pinned status
+      const { data: message } = await supabase
+        .from('messages')
+        .select('pinned')
+        .eq('id', messageId)
+        .single();
+
+      if (!message) {
+        return;
+      }
+
+      const isPinned = message.pinned;
+      
+      const { error } = await supabase
+        .from('messages')
+        .update({
+          pinned: !isPinned,
+          pinned_by: !isPinned ? user.id : null,
+          pinned_at: !isPinned ? new Date().toISOString() : null,
+        })
+        .eq('id', messageId);
+
+      if (error) {
+        throw error;
+      }
+
+    } catch (error) {
+      throw error;
+    }
+  }, [user]);
+
+  return {
+    messages,
+    loading,
+    sending,
+    sendMessage,
+    editMessage,
+    deleteMessage,
+    toggleReaction,
+    togglePin,
+  };
+}
+
+export function MessagesProvider({ children }: { children: React.ReactNode }) {
+  const value = useProvideMessages();
+  return (
+    <MessagesContext.Provider value={value}>{children}</MessagesContext.Provider>
+  );
+}
+
+export function useMessages() {
+  const context = useContext(MessagesContext);
+  if (!context) {
+    throw new Error('useMessages must be used within a MessagesProvider');
   }
+  return context;
 }
