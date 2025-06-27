@@ -7,6 +7,7 @@ import { DirectMessagesView } from './components/dms/DirectMessagesView'
 import { ProfileView } from './components/profile/ProfileView'
 import { SettingsView } from './components/settings/SettingsView'
 import { useAuth } from './hooks/useAuth'
+import { MessagesProvider } from './hooks/useMessages'
 import { updateUserPresence } from './lib/supabase'
 
 type View = 'chat' | 'dms' | 'profile' | 'settings'
@@ -14,6 +15,7 @@ type View = 'chat' | 'dms' | 'profile' | 'settings'
 function App() {
   const { user } = useAuth()
   const [currentView, setCurrentView] = useState<View>('chat')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('darkMode') === 'true' ||
@@ -51,47 +53,64 @@ function App() {
     setIsDarkMode(!isDarkMode)
   }
 
+  const toggleSidebar = () => {
+    setSidebarOpen((prev) => !prev)
+  }
+
+  const closeSidebar = () => setSidebarOpen(false)
+
   const renderCurrentView = () => {
     switch (currentView) {
       case 'chat':
-        return <ChatView />
+        return <ChatView onToggleSidebar={toggleSidebar} />
       case 'dms':
-        return <DirectMessagesView />
+        return <DirectMessagesView onToggleSidebar={toggleSidebar} />
       case 'profile':
-        return <ProfileView />
+        return <ProfileView onToggleSidebar={toggleSidebar} />
       case 'settings':
-        return <SettingsView />
+        return <SettingsView onToggleSidebar={toggleSidebar} />
       default:
-        return <ChatView />
+        return <ChatView onToggleSidebar={toggleSidebar} />
     }
   }
 
   return (
     <AuthGuard>
-      <div className="h-screen flex bg-gray-100 dark:bg-gray-900">
-        <Sidebar
-          currentView={currentView}
-          onViewChange={setCurrentView}
-          isDarkMode={isDarkMode}
-          onToggleDarkMode={toggleDarkMode}
-        />
-        
-        <main className="flex-1 flex flex-col min-w-0">
-          {renderCurrentView()}
-        </main>
-        
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: isDarkMode ? '#374151' : '#ffffff',
-              color: isDarkMode ? '#f3f4f6' : '#111827',
-              border: isDarkMode ? '1px solid #4b5563' : '1px solid #e5e7eb',
-            },
-          }}
-        />
-      </div>
+      <MessagesProvider>
+        <div className="h-screen flex flex-col md:flex-row bg-gray-100 dark:bg-gray-900">
+          <Sidebar
+            currentView={currentView}
+            onViewChange={setCurrentView}
+            isDarkMode={isDarkMode}
+            onToggleDarkMode={toggleDarkMode}
+            isOpen={sidebarOpen}
+            onClose={closeSidebar}
+          />
+
+          {sidebarOpen && (
+            <div
+              className="fixed inset-0 bg-black/40 md:hidden"
+              onClick={closeSidebar}
+            />
+          )}
+
+          <main className="flex-1 flex flex-col min-w-0">
+            {renderCurrentView()}
+          </main>
+
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                background: isDarkMode ? '#374151' : '#ffffff',
+                color: isDarkMode ? '#f3f4f6' : '#111827',
+                border: isDarkMode ? '1px solid #4b5563' : '1px solid #e5e7eb',
+              },
+            }}
+          />
+        </div>
+      </MessagesProvider>
     </AuthGuard>
   )
 }

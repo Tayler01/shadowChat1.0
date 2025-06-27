@@ -1,5 +1,40 @@
 import { createClient } from '@supabase/supabase-js'
 
+// Custom fetch that logs all request and response details for debugging
+const loggingFetch: typeof fetch = async (input, init) => {
+  const url = typeof input === 'string' ? input : input.url
+  const method = init?.method ?? 'GET'
+  let headers: Record<string, string> = {}
+  if (init?.headers instanceof Headers) {
+    headers = Object.fromEntries(init.headers.entries())
+  } else if (init?.headers) {
+    headers = init.headers as Record<string, string>
+  }
+  const body = init?.body
+
+  console.log('📡 [Supabase] Request:', { url, method, headers, body })
+
+  try {
+    const response = await fetch(input, init)
+    const clone = response.clone()
+    let responseBody: string | undefined
+    try {
+      responseBody = await clone.text()
+    } catch {
+      responseBody = '<unreadable>'
+    }
+    console.log('📡 [Supabase] Response:', {
+      url,
+      status: response.status,
+      body: responseBody,
+    })
+    return response
+  } catch (err) {
+    console.error('📡 [Supabase] Fetch error:', err)
+    throw err
+  }
+}
+
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
@@ -19,12 +54,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
   },
   global: {
-    headers: {
-      'x-my-custom-header': 'realtime-chat',
-    },
-    params: {
-      eventsPerSecond: 20,
-    },
+    fetch: loggingFetch,
   },
 })
 
@@ -118,4 +148,55 @@ export const markDMMessagesRead = async (conversationId: string) => {
     conversation_id: conversationId
   })
   if (error) console.error('Error marking messages as read:', error)
+}
+
+// Helper function to ensure valid session before database operations
+export const ensureSession = async () => {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession()
+
+    if (error) {
+      console.error('Error getting session:', error)
+      return false
+    }
+
+    if (!session) {
+      console.warn('No active session found')
+      return false
+    }
+
+    console.log('ensureSession: current session', {
+      userId: session.user?.id,
+      expiresAt: session.expires_at,
+    })
+    
+    // Check if session is expired or about to expire (within 5 minutes)
+    const expiresAt = session.expires_at
+    const now = Math.floor(Date.now() / 1000)
+    const fiveMinutes = 5 * 60
+    
+    if (expiresAt && (expiresAt - now) < fiveMinutes) {
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+
+      if (refreshError) {
+        console.error('Error refreshing session:', refreshError)
+        return false
+      }
+
+      if (!refreshData.session) {
+        console.warn('Failed to refresh session')
+        return false
+      }
+
+      console.log('ensureSession: session refreshed', {
+        userId: refreshData.session.user?.id,
+        expiresAt: refreshData.session.expires_at,
+      })
+    }
+    
+    return true
+  } catch (error) {
+    console.error('Exception in ensureSession:', error)
+    return false
+  }
 }

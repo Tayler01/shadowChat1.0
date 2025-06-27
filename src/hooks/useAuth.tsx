@@ -1,8 +1,25 @@
-import { useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { supabase, User, updateUserPresence } from '../lib/supabase';
 import { signIn as authSignIn, signUp as authSignUp, signOut as authSignOut, getCurrentUser, updateUserProfile } from '../lib/auth';
 
-export function useAuth() {
+interface AuthContextValue {
+  user: User | null;
+  profile: User | null;
+  loading: boolean;
+  error: string | null;
+  signIn: (email: string, password: string) => Promise<void>;
+  signUp: (
+    email: string,
+    password: string,
+    userData: { full_name: string; username: string }
+  ) => Promise<any>;
+  signOut: () => Promise<void>;
+  updateProfile: (updates: Partial<User>) => Promise<User | void>;
+}
+
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+function useProvideAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -16,14 +33,12 @@ export function useAuth() {
     const getInitialSession = async () => {
       if (initialLoadRef.current) return;
       
-      console.log('🔍 Getting initial session...');
       
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         // Handle the specific "user not found" error from invalid JWT
         if (sessionError && sessionError.message?.includes('User from sub claim in JWT does not exist')) {
-          console.log('🧹 Invalid JWT detected in getSession, clearing session...');
           await supabase.auth.signOut();
           if (mountedRef.current) setUser(null);
           return;
@@ -38,13 +53,10 @@ export function useAuth() {
           return;
         }
         
-        console.log('📋 Session data:', session ? 'Session exists' : 'No session');
         
         if (session?.user) {
-          console.log('👤 User found in session, getting profile...');
           try {
             const profile = await getCurrentUser();
-            console.log('📝 Profile result:', profile ? 'Profile loaded' : 'No profile');
             if (mountedRef.current) {
               setUser(profile);
             }
@@ -56,7 +68,6 @@ export function useAuth() {
             }
           }
         } else {
-          console.log('❌ No user in session');
           if (mountedRef.current) {
             setUser(null);
           }
@@ -67,7 +78,6 @@ export function useAuth() {
         // Check if this is the specific "user not found" error from invalid JWT
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         if (errorMessage.includes('User from sub claim in JWT does not exist')) {
-          console.log('🧹 Invalid JWT detected, clearing session...');
           // Clear the invalid session
           await authSignOut();
           if (mountedRef.current) setUser(null);
@@ -79,7 +89,6 @@ export function useAuth() {
           }
         }
       } finally {
-        console.log('✅ Initial session check complete, setting loading to false');
         if (mountedRef.current) {
           setLoading(false);
         }
@@ -93,27 +102,22 @@ export function useAuth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         // Skip if we're still doing initial load or component is unmounted
-        if (!initialLoadRef.current || !mountedRef.current) {
-          console.log('⏭️ Skipping auth change during initial load or unmounted');
-          return;
-        }
 
-        console.log('🔄 Auth state change:', event);
+          if (!initialLoadRef.current || !mountedRef.current) {
+            return;
+          }
+
         
-        if (event === 'SIGNED_OUT') {
-          console.log('👋 User signed out');
-          if (mountedRef.current) setUser(null);
-        } else if (session?.user) {
-          console.log('👤 User in auth change, getting profile...');
-          try {
-            const profile = await getCurrentUser();
-            console.log('📝 Profile in auth change:', profile ? 'Profile loaded' : 'No profile');
-            if (profile) {
-              if (mountedRef.current) setUser(profile);
-            } else {
-              console.log('❌ Failed to get profile, keeping user as null');
-              if (mountedRef.current) setUser(null);
-            }
+          if (event === 'SIGNED_OUT') {
+            if (mountedRef.current) setUser(null);
+          } else if (session?.user) {
+            try {
+              const profile = await getCurrentUser();
+              if (profile) {
+                if (mountedRef.current) setUser(profile);
+              } else {
+                if (mountedRef.current) setUser(null);
+              }
           } catch (error) {
             console.error('Failed to get user profile during auth change:', error);
             if (mountedRef.current) {
@@ -121,10 +125,9 @@ export function useAuth() {
               setUser(null);
             }
           }
-        } else {
-          // No authenticated user in the session
-          console.log('❌ No user in auth change');
-          if (mountedRef.current) setUser(null);
+          } else {
+            // No authenticated user in the session
+            if (mountedRef.current) setUser(null);
         }
       }
     );
@@ -150,6 +153,10 @@ export function useAuth() {
     // Update on page visibility change
     const handleVisibilityChange = () => {
       if (!document.hidden) {
+        // Refresh the auth session when the page comes back into focus
+        supabase.auth.refreshSession().catch((err) => {
+          console.error('Error refreshing session on visibility change:', err)
+        })
         updatePresence();
       }
     };
@@ -192,10 +199,8 @@ export function useAuth() {
       
       // If user is auto-confirmed (has session), set user immediately
       if (result.session && result.profile) {
-        console.log('✅ Auto-login after signup successful');
         setUser(result.profile);
       } else if (result.user && !result.session) {
-        console.log('📧 Email confirmation required');
         // Don't set user yet, they need to confirm email
       }
       
@@ -245,3 +250,17 @@ export function useAuth() {
     updateProfile,
   };
 }
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const value = useProvideAuth();
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
+
