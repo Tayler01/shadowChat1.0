@@ -39,8 +39,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar }) => {
               <Menu className="w-5 h-5" />
             </button>
             <div className="flex items-center space-x-2">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
-                <Hash className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <div className="p-2 bg-[var(--color-accent-light)] rounded-lg">
+                <Hash className="w-5 h-5 text-[var(--color-accent)]" />
               </div>
               <div>
                 <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">

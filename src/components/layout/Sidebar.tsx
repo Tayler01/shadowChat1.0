@@ -70,7 +70,7 @@ export function Sidebar({
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center space-x-3">
-          <div className="p-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg">
+          <div className="p-2 bg-gradient-to-r from-[var(--color-primary-start)] to-[var(--color-primary-end)] rounded-lg">
             <MessageSquare className="w-6 h-6 text-white" />
           </div>
           <div>
@@ -90,7 +90,7 @@ export function Sidebar({
               w-full flex items-center space-x-3 px-3 py-2 rounded-lg
               transition-all duration-200
               ${currentView === item.id
-                ? 'bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 border-l-4 border-blue-500'
+                ? 'bg-[var(--color-accent-light)] text-[var(--color-accent)] border-l-4 border-[var(--color-accent)]'
                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               }
             `}

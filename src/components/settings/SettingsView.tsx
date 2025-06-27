@@ -2,11 +2,12 @@ import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { 
   Bell, 
-  Moon, 
-  Sun, 
-  Volume2, 
-  VolumeX, 
-  Shield, 
+  Moon,
+  Sun,
+  Volume2,
+  VolumeX,
+  Palette,
+  Shield,
   Database,
   Download,
   Trash2,
@@ -16,6 +17,7 @@ import {
 import { Button } from '../ui/Button'
 import { signOut } from '../../lib/auth'
 import toast from 'react-hot-toast'
+import { useTheme, colorSchemes, ColorScheme } from '../../hooks/useTheme'
 
 interface SettingsViewProps {
   onToggleSidebar: () => void
@@ -25,6 +27,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
   const [notifications, setNotifications] = useState(true)
   const [sounds, setSounds] = useState(true)
   const [showDangerZone, setShowDangerZone] = useState(false)
+  const { scheme, setScheme } = useTheme()
 
   const handleExportData = () => {
     toast.success('Data export started - you will receive an email when ready')
@@ -120,7 +123,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
                       onClick={() => setting.onChange(!setting.enabled)}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                         setting.enabled
-                          ? 'bg-blue-600'
+                          ? 'bg-[var(--color-accent)]'
                           : 'bg-gray-200 dark:bg-gray-700'
                       }`}
                     >
@@ -135,6 +138,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
               </div>
             </div>
           ))}
+
+          {/* Appearance */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center space-x-3 mb-4">
+              <Palette className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Color Scheme
+              </h2>
+            </div>
+            <div className="flex space-x-4">
+              {(Object.keys(colorSchemes) as ColorScheme[]).map((key) => (
+                <button
+                  key={key}
+                  onClick={() => setScheme(key)}
+                  className={`w-8 h-8 rounded-full border-2 ${scheme === key ? 'border-[var(--color-accent)]' : 'border-transparent'}`}
+                  style={{ background: `linear-gradient(to right, ${colorSchemes[key].start}, ${colorSchemes[key].end})` }}
+                />
+              ))}
+            </div>
+          </div>
 
           {/* Data & Privacy */}
           <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">

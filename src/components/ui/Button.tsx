@@ -9,7 +9,7 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants = {
-  primary: 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl',
+  primary: 'bg-gradient-to-r from-[var(--color-primary-start)] to-[var(--color-primary-end)] text-white shadow-lg hover:shadow-xl',
   secondary: 'bg-gray-100 hover:bg-gray-200 text-gray-900 border border-gray-300',
   ghost: 'hover:bg-gray-100 text-gray-700 hover:text-gray-900',
   danger: 'bg-red-600 hover:bg-red-700 text-white shadow-lg hover:shadow-xl',
@@ -37,7 +37,7 @@ export function Button({
         font-medium rounded-lg
         transition-all duration-200
         disabled:opacity-50 disabled:cursor-not-allowed
-        focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2
+        focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:ring-offset-2
         ${variants[variant]}
         ${sizes[size]}
         ${className}

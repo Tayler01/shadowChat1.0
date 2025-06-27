@@ -5,9 +5,34 @@
 @layer base {
   :root {
     color-scheme: light;
+    --color-primary-start: #6366f1;
+    --color-primary-end: #8b5cf6;
+    --color-accent: #6366f1;
+    --color-accent-light: #eef2ff;
   }
 
   .dark {
     color-scheme: dark;
   }
+}
+
+:root[data-scheme='indigo'] {
+  --color-primary-start: #6366f1;
+  --color-primary-end: #8b5cf6;
+  --color-accent: #6366f1;
+  --color-accent-light: #eef2ff;
+}
+
+:root[data-scheme='teal'] {
+  --color-primary-start: #14b8a6;
+  --color-primary-end: #10b981;
+  --color-accent: #14b8a6;
+  --color-accent-light: #ccfbf1;
+}
+
+:root[data-scheme='rose'] {
+  --color-primary-start: #f43f5e;
+  --color-primary-end: #d946ef;
+  --color-accent: #e11d48;
+  --color-accent-light: #fdf2f8;
 }

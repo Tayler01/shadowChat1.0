@@ -62,13 +62,13 @@ export function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--color-accent-light)] via-white to-white">
       <div className="max-w-md w-full mx-4">
         <div className="bg-white rounded-2xl shadow-2xl p-8 space-y-6">
           {/* Header */}
           <div className="text-center">
             <div className="flex justify-center mb-4">
-              <div className="p-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl">
+            <div className="p-3 bg-gradient-to-r from-[var(--color-primary-start)] to-[var(--color-primary-end)] rounded-2xl">
                 <MessageSquare className="w-8 h-8 text-white" />
               </div>
             </div>
@@ -155,7 +155,7 @@ export function LoginForm() {
             <button
               type="button"
               onClick={() => setIsLogin(!isLogin)}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              className="text-sm text-[var(--color-accent)] hover:underline font-medium"
             >
               {isLogin 
                 ? "Don't have an account? Sign up" 
