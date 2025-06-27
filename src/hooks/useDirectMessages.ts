@@ -283,10 +283,7 @@ export function useConversationMessages(conversationId: string | null) {
 
     const handleVisibility = () => {
       if (!document.hidden) {
-        supabase.auth.refreshSession().catch(err => {
-          console.error('Error refreshing session on visibility change:', err);
-        });
-        if (channel && channel.state !== 'joined') {
+        if (channel) {
           supabase.removeChannel(channel);
           channel = subscribeToChannel();
         }
