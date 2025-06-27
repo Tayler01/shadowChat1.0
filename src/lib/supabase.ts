@@ -155,7 +155,14 @@ export const ensureSession = async () => {
   console.log('ensureSession: Starting...');
   try {
     console.log('ensureSession: Calling supabase.auth.getSession()...');
-    const { data: { session }, error } = await supabase.auth.getSession()
+    
+    // Add timeout to getSession call to detect if it's hanging
+    const getSessionPromise = supabase.auth.getSession();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('getSession timeout after 10 seconds')), 10000)
+    );
+    
+    const { data: { session }, error } = await Promise.race([getSessionPromise, timeoutPromise]) as any;
     console.log('ensureSession: supabase.auth.getSession() returned.');
 
     if (error) {
@@ -188,7 +195,14 @@ export const ensureSession = async () => {
     
     if (expiresAt && (expiresAt - now) < fiveMinutes) {
       console.log('ensureSession: Session is about to expire, refreshing...');
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+      
+      // Also add timeout to refreshSession call
+      const refreshSessionPromise = supabase.auth.refreshSession();
+      const refreshTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('refreshSession timeout after 10 seconds')), 10000)
+      );
+      
+      const { data: refreshData, error: refreshError } = await Promise.race([refreshSessionPromise, refreshTimeoutPromise]) as any;
       console.log('ensureSession: supabase.auth.refreshSession() returned.');
 
       if (refreshError) {
