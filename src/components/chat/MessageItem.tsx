@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Pin,
@@ -17,6 +17,8 @@ import { formatTime, shouldGroupMessage } from '../../lib/utils'
 import { toggleReaction, type Message } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 
+const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '🙏']
+
 interface MessageItemProps {
   message: Message
   previousMessage?: Message
@@ -32,6 +34,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const [isEditing, setIsEditing] = useState(false)
     const [editContent, setEditContent] = useState(message.content)
     const [showActions, setShowActions] = useState(false)
+    const actionsRef = useRef<HTMLDivElement>(null)
 
     const isGrouped = shouldGroupMessage(message, previousMessage)
     const isOwner = profile?.id === message.user_id
@@ -49,6 +52,16 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const handleCopyMessage = () => {
       navigator.clipboard.writeText(message.content)
     }
+
+    useEffect(() => {
+      const handleClick = (e: MouseEvent) => {
+        if (actionsRef.current && !actionsRef.current.contains(e.target as Node)) {
+          setShowActions(false)
+        }
+      }
+      document.addEventListener('mousedown', handleClick)
+      return () => document.removeEventListener('mousedown', handleClick)
+    }, [])
 
     return (
       <motion.div
@@ -112,8 +125,21 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
             </div>
           ) : (
             <>
-              <div className="text-gray-900 dark:text-gray-100 break-words">
-                {message.content}
+              <div className="relative group/message inline-block max-w-full">
+                <div className="bg-gray-100 dark:bg-gray-700 rounded-xl px-3 py-2 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors break-words">
+                  {message.content}
+                </div>
+                <div className="hidden group-hover/message:flex absolute -top-8 left-1/2 -translate-x-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow px-2 py-1 space-x-1 z-10">
+                  {QUICK_REACTIONS.map(e => (
+                    <button
+                      key={e}
+                      onClick={() => handleReaction(e)}
+                      className="text-base hover:scale-110 transition-transform"
+                    >
+                      {e}
+                    </button>
+                  ))}
+                </div>
               </div>
               <MessageReactions message={message} onReact={handleReaction} />
             </>
@@ -121,12 +147,16 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         </div>
 
         {/* Actions */}
-        <div className="relative">
+        <div
+          className="relative"
+          ref={actionsRef}
+          onMouseLeave={() => setShowActions(false)}
+        >
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setShowActions(!showActions)}
-            className="opacity-0 group-hover:opacity-100 transition-opacity"
+            className="opacity-70 group-hover:opacity-100 transition-opacity"
           >
             <MoreHorizontal className="w-4 h-4" />
           </Button>
