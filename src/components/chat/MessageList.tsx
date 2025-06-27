@@ -15,18 +15,8 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
   const { messages, loading, editMessage, deleteMessage, togglePin } = useMessages()
   const { typingUsers } = useTyping('general')
   
-  // Debug logging
-  useEffect(() => {
-    // console.log('📋 MessageList: messages updated', { 
-    //   count: messages.length, 
-    //   loading,
-    //   messageIds: messages.map(m => m.id).slice(-3), // Show last 3 message IDs
-    //   lastMessage: messages[messages.length - 1]?.content // Show last message content
-    // });
-    
-    // Force a re-render check
-    // console.log('🔄 MessageList: Component will re-render with', messages.length, 'messages');
-  }, [messages, loading]);
+  // Trigger re-render on message changes
+  useEffect(() => {}, [messages, loading]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -73,15 +63,9 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
     )
   }
 
-  // console.log('🎨 MessageList: Rendering with', messages.length, 'messages');
 
   return (
     <div ref={listRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-      {/* Debug info - commented out */}
-      {/* <div className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-800 p-2 rounded">
-        Debug: Showing {messages.length} messages | Loading: {loading.toString()}
-      </div> */}
-      
       {/* Pinned Messages */}
       {messages.some(m => m.pinned) && (
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
