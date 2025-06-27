@@ -236,11 +236,14 @@ function useProvideMessages(): MessagesContextValue {
     channelRef.current = channel;
 
     const handleVisibility = () => {
+      const state = channel?.state
+      console.log('🌀 visibilitychange', { hidden: document.hidden, channelState: state })
       if (!document.hidden) {
         // supabase.auth.refreshSession().catch(err => {
         //   console.error('Error refreshing session on visibility change:', err)
         // })
         if (channel && channel.state !== 'joined') {
+          console.log('🌀 Resubscribing channel due to state', channel.state)
           supabase.removeChannel(channel)
           channel = subscribeToChannel()
           channelRef.current = channel
@@ -274,6 +277,10 @@ function useProvideMessages(): MessagesContextValue {
     }
 
     setSending(true);
+    console.log(`${logPrefix}: Channel state before send`, {
+      hasChannel: !!channelRef.current,
+      state: channelRef.current?.state,
+    })
 
     // Ensure we have a valid session before attempting database operations
     const sessionValid = await ensureSession();
@@ -396,7 +403,11 @@ function useProvideMessages(): MessagesContextValue {
           if (exists) {
             return prev;
           }
-          return [...prev, data as Message];
+          const updated = [...prev, data as Message]
+          console.log(`${logPrefix}: Message state updated`, {
+            totalMessages: updated.length,
+          })
+          return updated
         })
         
         const broadcastResult = channelRef.current?.send({
@@ -404,7 +415,10 @@ function useProvideMessages(): MessagesContextValue {
           event: 'new_message',
           payload: data
         });
-        console.log(`${logPrefix}: Broadcast result`, broadcastResult);
+        console.log(`${logPrefix}: Broadcast result`, {
+          result: broadcastResult,
+          channelState: channelRef.current?.state,
+        });
       }
       
       
