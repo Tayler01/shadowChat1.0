@@ -29,6 +29,11 @@ export function formatDate(date: string | Date) {
   }
 }
 
+export function isToday(date: string | Date) {
+  const d = new Date(date)
+  const today = new Date()
+  return d.toDateString() === today.toDateString()
+}
 
 export function groupMessagesByDate(messages: any[]) {
   const groups: { date: string; messages: any[] }[] = []

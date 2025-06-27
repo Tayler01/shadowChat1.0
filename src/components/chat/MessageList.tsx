@@ -15,6 +15,18 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
   const { messages, loading, editMessage, deleteMessage, togglePin } = useMessages()
   const { typingUsers } = useTyping('general')
   
+  // Debug logging
+  useEffect(() => {
+    // console.log('📋 MessageList: messages updated', { 
+    //   count: messages.length, 
+    //   loading,
+    //   messageIds: messages.map(m => m.id).slice(-3), // Show last 3 message IDs
+    //   lastMessage: messages[messages.length - 1]?.content // Show last message content
+    // });
+    
+    // Force a re-render check
+    // console.log('🔄 MessageList: Component will re-render with', messages.length, 'messages');
+  }, [messages, loading]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -61,6 +73,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
     )
   }
 
+  // console.log('🎨 MessageList: Rendering with', messages.length, 'messages');
 
   return (
     <div ref={listRef} className="flex-1 overflow-y-auto p-4 space-y-4">
