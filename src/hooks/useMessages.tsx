@@ -419,52 +419,9 @@ function useProvideMessages(): MessagesContextValue {
     
     console.log(`${logPrefix}: ✅ content check passed`);
 
-    // Log current session tokens and user details for debugging
-    console.log(`${logPrefix}: 🔍 About to check session details`);
-    
-    console.log('🧪 MESSAGE_SEND: Before getSession() call');
-
-    let sessionData, sessionError;
-    try {
-      const getSessionWithTimeout = async (ms = 5000) => {
-        return Promise.race([
-          supabase.auth.getSession(),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('getSession timeout')), ms)
-          ),
-        ]);
-      };
-      
-      const result = await getSessionWithTimeout();
-      sessionData = result.data;
-      sessionError = result.error;
-      console.log('🧪 MESSAGE_SEND: getSession resolved', { sessionData, sessionError });
-    } catch (err) {
-      console.error('🔥 MESSAGE_SEND: getSession threw exception', err);
-      return;
-    }
-
-    if (sessionError) {
-      console.error(`${logPrefix}: ❌ MESSAGE_SEND: getSession() error:`, sessionError.message);
-    }
-
-    if (!sessionData?.session) {
-      console.warn(`${logPrefix}: ❌ MESSAGE_SEND: No session returned from getSession():`, sessionData);
-      return;
-    }
-
-    if (!sessionData.session.user) {
-      console.warn(`${logPrefix}: ❌ MESSAGE_SEND: Session has no user:`, sessionData.session);
-      return;
-    }
-
-    console.log(`${logPrefix}: ✅ MESSAGE_SEND: Session details valid - proceeding to insert`);
-    console.log(`${logPrefix}: Session details`, {
-      access_token: sessionData.session?.access_token,
-      refresh_token: sessionData.session?.refresh_token,
-      userId: sessionData.session?.user?.id,
-    });
-      
+    // 🔥 BYPASS: Skip the hanging getSession() call after ensureSession() has already validated
+    // Since ensureSession() returned true, we trust that the session is usable
+    console.log(`${logPrefix}: ✅ Skipping getSession() check - trusting ensureSession() validation`);
     
     console.log(`${logPrefix}: 🔍 All pre-insert checks completed, proceeding to insert`);
 
