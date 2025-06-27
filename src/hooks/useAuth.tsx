@@ -207,9 +207,23 @@ function useProvideAuth() {
       if (!document.hidden) {
         console.log('🔄 [AUTH] Page became visible, attempting forceSessionRefresh...');
         // Use forceSessionRefresh instead of the problematic supabase.auth.refreshSession
-        forceSessionRefresh().catch((err) => {
-          console.error('🔄 [AUTH] Error with forceSessionRefresh on visibility change:', err)
-        })
+        forceSessionRefresh()
+          .then((success) => {
+            if (!success) {
+              console.warn('🔄 [AUTH] forceSessionRefresh failed, signing out user');
+              // If session refresh fails, sign out the user to clear invalid state
+              signOut().catch((signOutErr) => {
+                console.error('🔄 [AUTH] Error during signOut after failed refresh:', signOutErr);
+              });
+            }
+          })
+          .catch((err) => {
+            console.error('🔄 [AUTH] Error with forceSessionRefresh on visibility change:', err);
+            // If there's an exception, also sign out to clear invalid state
+            signOut().catch((signOutErr) => {
+              console.error('🔄 [AUTH] Error during signOut after refresh exception:', signOutErr);
+            });
+          });
         updatePresence();
       }
     };

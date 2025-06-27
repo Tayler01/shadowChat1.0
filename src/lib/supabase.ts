@@ -180,9 +180,17 @@ export const forceSessionRefresh = async (): Promise<boolean> => {
       console.error('🔥 [NUCLEAR_REFRESH] ❌ setSession failed:', error?.message);
       
       // If the session is missing on the server, clear local storage and sign out
-      if (error?.message === 'Auth session missing!') {
+      if (error?.message === 'Auth session missing!' || error?.message?.includes('Auth session missing')) {
         console.log('🔥 [NUCLEAR_REFRESH] Session missing on server, clearing local auth state...');
-        await supabase.auth.signOut();
+        try {
+          await supabase.auth.signOut();
+        } catch (signOutError) {
+          console.error('🔥 [NUCLEAR_REFRESH] Error during signOut:', signOutError);
+          // Clear localStorage manually if signOut fails
+          const authKey = 'sb-' + supabaseUrl.split('//')[1].split('.')[0] + '-auth-token';
+          localStorage.removeItem(authKey);
+          localStorage.removeItem('supabase.auth.token'); // Legacy key
+        }
       }
       
       return false;
@@ -196,6 +204,21 @@ export const forceSessionRefresh = async (): Promise<boolean> => {
     return true;
   } catch (e) {
     console.error('🔥 [NUCLEAR_REFRESH] ❌ Exception during forced session re-auth', e);
+    
+    // If we get an auth session missing error in the exception, handle it
+    if (e instanceof Error && (e.message === 'Auth session missing!' || e.message?.includes('Auth session missing'))) {
+      console.log('🔥 [NUCLEAR_REFRESH] Auth session missing in exception, clearing local auth state...');
+      try {
+        await supabase.auth.signOut();
+      } catch (signOutError) {
+        console.error('🔥 [NUCLEAR_REFRESH] Error during signOut in exception handler:', signOutError);
+        // Clear localStorage manually if signOut fails
+        const authKey = 'sb-' + supabaseUrl.split('//')[1].split('.')[0] + '-auth-token';
+        localStorage.removeItem(authKey);
+        localStorage.removeItem('supabase.auth.token'); // Legacy key
+      }
+    }
+    
     return false;
   }
 };
