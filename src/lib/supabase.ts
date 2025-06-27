@@ -158,12 +158,42 @@ export const ensureSession = async () => {
     
     // Add timeout to getSession call to detect if it's hanging
     const getSessionPromise = supabase.auth.getSession();
+    
+    // Log the promise state and properties
+    console.log('ensureSession: getSessionPromise created', {
+      promiseType: typeof getSessionPromise,
+      isPromise: getSessionPromise instanceof Promise,
+      promiseState: getSessionPromise.constructor.name,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Add a promise inspector to see if it resolves/rejects
+    getSessionPromise
+      .then((result) => {
+        console.log('ensureSession: getSessionPromise resolved successfully', {
+          hasData: !!result?.data,
+          hasSession: !!result?.data?.session,
+          hasError: !!result?.error,
+          timestamp: new Date().toISOString()
+        });
+      })
+      .catch((error) => {
+        console.log('ensureSession: getSessionPromise rejected', {
+          error: error?.message || 'Unknown error',
+          timestamp: new Date().toISOString()
+        });
+      });
+    
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('getSession timeout after 10 seconds')), 10000)
+      setTimeout(() => {
+        console.log('ensureSession: Timeout triggered - getSession took longer than 10 seconds');
+        reject(new Error('getSession timeout after 10 seconds'));
+      }, 10000)
     );
     
+    console.log('ensureSession: Starting Promise.race between getSession and timeout...');
     const { data: { session }, error } = await Promise.race([getSessionPromise, timeoutPromise]) as any;
-    console.log('ensureSession: supabase.auth.getSession() returned.');
+    console.log('ensureSession: Promise.race completed - getSession returned successfully');
 
     if (error) {
       console.error('ensureSession: Error getting session:', error)
@@ -198,12 +228,24 @@ export const ensureSession = async () => {
       
       // Also add timeout to refreshSession call
       const refreshSessionPromise = supabase.auth.refreshSession();
+      
+      // Log refresh promise details
+      console.log('ensureSession: refreshSessionPromise created', {
+        promiseType: typeof refreshSessionPromise,
+        isPromise: refreshSessionPromise instanceof Promise,
+        timestamp: new Date().toISOString()
+      });
+      
       const refreshTimeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('refreshSession timeout after 10 seconds')), 10000)
+        setTimeout(() => {
+          console.log('ensureSession: Refresh timeout triggered - refreshSession took longer than 10 seconds');
+          reject(new Error('refreshSession timeout after 10 seconds'));
+        }, 10000)
       );
       
+      console.log('ensureSession: Starting Promise.race between refreshSession and timeout...');
       const { data: refreshData, error: refreshError } = await Promise.race([refreshSessionPromise, refreshTimeoutPromise]) as any;
-      console.log('ensureSession: supabase.auth.refreshSession() returned.');
+      console.log('ensureSession: Promise.race completed - refreshSession returned successfully');
 
       if (refreshError) {
         console.error('ensureSession: Error refreshing session:', refreshError)
