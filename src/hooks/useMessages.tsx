@@ -111,6 +111,18 @@ function useProvideMessages(): MessagesContextValue {
             }
 
             if (newMessage) {
+              // Log received message with clear indication if it's from another user
+              const isFromCurrentUser = newMessage.user_id === user.id;
+              const logPrefix = isFromCurrentUser ? '📨 [REALTIME-SELF]' : '📨 [REALTIME-OTHER]';
+              console.log(`${logPrefix} Message received:`, {
+                id: newMessage.id,
+                content: newMessage.content,
+                from: newMessage.user?.display_name || 'Unknown',
+                userId: newMessage.user_id,
+                isFromMe: isFromCurrentUser,
+                timestamp: newMessage.created_at
+              });
+
               setMessages(prev => {
                 // Check if message already exists to avoid duplicates
                 const exists = prev.find(msg => msg.id === newMessage.id);
@@ -132,6 +144,19 @@ function useProvideMessages(): MessagesContextValue {
       )
       .on('broadcast', { event: 'new_message' }, (payload) => {
         const newMessage = payload.payload as Message
+        
+        // Log broadcast message with clear indication if it's from another user
+        const isFromCurrentUser = newMessage.user_id === user.id;
+        const logPrefix = isFromCurrentUser ? '📡 [BROADCAST-SELF]' : '📡 [BROADCAST-OTHER]';
+        console.log(`${logPrefix} Broadcast message received:`, {
+          id: newMessage.id,
+          content: newMessage.content,
+          from: newMessage.user?.display_name || 'Unknown',
+          userId: newMessage.user_id,
+          isFromMe: isFromCurrentUser,
+          timestamp: newMessage.created_at
+        });
+        
         setMessages(prev => {
           const exists = prev.find(m => m.id === newMessage.id)
           if (exists) return prev
