@@ -23,7 +23,7 @@ export function MobileNav({ currentView, onViewChange }: MobileNavProps) {
               onClick={() => onViewChange(item.id)}
               className={`flex flex-col items-center py-2 text-xs focus:outline-none w-full ${
                 currentView === item.id
-                  ? 'text-blue-600 dark:text-blue-400'
+                  ? 'text-[var(--color-accent)]'
                   : 'text-gray-500 dark:text-gray-400'
               }`}
             >

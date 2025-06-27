@@ -133,7 +133,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                   onClick={() => insertSlashCommand(cmd.command)}
                   className="w-full text-left px-2 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
-                  <div className="font-mono text-sm text-blue-600 dark:text-blue-400">
+                  <div className="font-mono text-sm text-[var(--color-accent)]">
                     {cmd.command}
                   </div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -169,7 +169,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             placeholder={placeholder}
             disabled={disabled}
             rows={1}
-            className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none max-h-32"
+            className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-[var(--color-accent)] resize-none max-h-32"
           />
           
           {/* Input Actions */}
