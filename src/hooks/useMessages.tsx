@@ -394,12 +394,33 @@ function useProvideMessages(): MessagesContextValue {
       hasUser: !!user,
       userId: user?.id,
     });
+    
+    console.log(`${logPrefix}: 🔍 Checking conditions before proceeding to insert`);
+    
     if (!sessionValid) {
+      console.error(`${logPrefix}: ❌ EARLY EXIT: sessionValid is false`);
       console.error(`${logPrefix}: ❌ Invalid or expired session, cannot send message`);
       throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
     }
+    
+    console.log(`${logPrefix}: ✅ sessionValid check passed`);
+    
+    if (!user) {
+      console.error(`${logPrefix}: ❌ EARLY EXIT: user is null/undefined after ensureSession`);
+      return;
+    }
+    
+    console.log(`${logPrefix}: ✅ user check passed`);
+    
+    if (!content || !content.trim()) {
+      console.error(`${logPrefix}: ❌ EARLY EXIT: content is empty after trim`);
+      return;
+    }
+    
+    console.log(`${logPrefix}: ✅ content check passed`);
 
     // Log current session tokens and user details for debugging
+    console.log(`${logPrefix}: 🔍 About to check session details`);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       console.log(`${logPrefix}: Session details`, {
@@ -410,6 +431,8 @@ function useProvideMessages(): MessagesContextValue {
     } catch (tokenErr) {
       console.error(`${logPrefix}: Failed to get session tokens`, tokenErr);
     }
+    
+    console.log(`${logPrefix}: 🔍 All pre-insert checks completed, proceeding to insert`);
 
     try {
       // Step 1: Prepare message data
