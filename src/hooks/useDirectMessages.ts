@@ -283,8 +283,13 @@ export function useConversationMessages(conversationId: string | null) {
 
     const handleVisibility = () => {
       if (!document.hidden) {
+        console.log('🔄 Page focus detected - resetting DM channel');
         if (channel) {
+          console.log('🔌 Removing existing DM channel before re-subscribing');
           supabase.removeChannel(channel);
+          channel = subscribeToChannel();
+        } else {
+          console.log('🔌 No existing DM channel, subscribing anew');
           channel = subscribeToChannel();
         }
       }

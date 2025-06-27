@@ -40,6 +40,7 @@ function useProvideAuth() {
       ) {
         console.log('🧹 Invalid JWT detected during focus refresh, clearing session...');
         await supabase.auth.signOut();
+        console.log('🧹 Session cleared after invalid JWT');
         if (mountedRef.current) setUser(null);
         return;
       }
@@ -57,6 +58,7 @@ function useProvideAuth() {
         try {
           const profile = await getCurrentUser();
           if (mountedRef.current) setUser(profile);
+          console.log('✅ Focus refresh loaded profile for user', profile?.id);
         } catch (err) {
           console.error('Failed to load profile during focus refresh:', err);
           if (mountedRef.current) {
@@ -66,10 +68,13 @@ function useProvideAuth() {
         }
       } else if (mountedRef.current) {
         setUser(null);
+        console.log('ℹ️ No active session during focus refresh');
       }
     } catch (err) {
       console.error('Unexpected error during focus refresh:', err);
       if (mountedRef.current) setUser(null);
+    } finally {
+      console.log('🔄 Focus refresh complete. Current user:', mountedRef.current ? user?.id : 'unmounted');
     }
   };
 
