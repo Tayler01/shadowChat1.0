@@ -152,22 +152,26 @@ export const markDMMessagesRead = async (conversationId: string) => {
 
 // Helper function to ensure valid session before database operations
 export const ensureSession = async () => {
+  console.log('ensureSession: Starting...');
   try {
+    console.log('ensureSession: Calling supabase.auth.getSession()...');
     const { data: { session }, error } = await supabase.auth.getSession()
+    console.log('ensureSession: supabase.auth.getSession() returned.');
 
     if (error) {
-      console.error('Error getting session:', error)
+      console.error('ensureSession: Error getting session:', error)
       return false
     }
 
     if (!session) {
-      console.warn('No active session found')
+      console.warn('ensureSession: No active session found')
       return false
     }
 
-    console.log('ensureSession: current session', {
+    console.log('ensureSession: current session details', {
       userId: session.user?.id,
       expiresAt: session.expires_at,
+      currentTime: Math.floor(Date.now() / 1000),
     })
     
     // Check if session is expired or about to expire (within 5 minutes)
@@ -175,28 +179,44 @@ export const ensureSession = async () => {
     const now = Math.floor(Date.now() / 1000)
     const fiveMinutes = 5 * 60
     
+    console.log('ensureSession: Session expiry check', {
+      expiresAt,
+      now,
+      timeUntilExpiry: expiresAt ? (expiresAt - now) : 'unknown',
+      needsRefresh: expiresAt && (expiresAt - now) < fiveMinutes
+    });
+    
     if (expiresAt && (expiresAt - now) < fiveMinutes) {
+      console.log('ensureSession: Session is about to expire, refreshing...');
       const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+      console.log('ensureSession: supabase.auth.refreshSession() returned.');
 
       if (refreshError) {
-        console.error('Error refreshing session:', refreshError)
+        console.error('ensureSession: Error refreshing session:', refreshError)
         return false
       }
 
       if (!refreshData.session) {
-        console.warn('Failed to refresh session')
+        console.warn('ensureSession: Failed to refresh session')
         return false
       }
 
-      console.log('ensureSession: session refreshed', {
+      console.log('ensureSession: session refreshed successfully', {
         userId: refreshData.session.user?.id,
         expiresAt: refreshData.session.expires_at,
       })
+    } else {
+      console.log('ensureSession: Session is still valid, no refresh needed');
     }
     
+    console.log('ensureSession: Session validation complete - returning true');
     return true
   } catch (error) {
-    console.error('Exception in ensureSession:', error)
+    console.error('ensureSession: Exception caught:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      error
+    });
     return false
   }
 }
