@@ -1,45 +1,20 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Custom fetch that logs all request and response details for debugging
-const loggingFetch: typeof fetch = async (input, init) => {
-  const url = typeof input === 'string' ? input : input.url
-  const method = init?.method ?? 'GET'
-  let headers: Record<string, string> = {}
-  if (init?.headers instanceof Headers) {
-    headers = Object.fromEntries(init.headers.entries())
-  } else if (init?.headers) {
-    headers = init.headers as Record<string, string>
-  }
-  const body = init?.body
-
-  console.log('📡 [Supabase] Request:', { url, method, headers, body })
-
-  try {
-    const response = await fetch(input, init)
-    const clone = response.clone()
-    let responseBody: string | undefined
-    try {
-      responseBody = await clone.text()
-    } catch {
-      responseBody = '<unreadable>'
-    }
-    console.log('📡 [Supabase] Response:', {
-      url,
-      status: response.status,
-      body: responseBody,
-    })
-    return response
-  } catch (err) {
-    console.error('📡 [Supabase] Fetch error:', err)
-    throw err
-  }
-}
-
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
+console.log('🔧 [Supabase Config]', {
+  url: supabaseUrl,
+  hasAnonKey: !!supabaseAnonKey,
+  anonKeyLength: supabaseAnonKey?.length || 0
+})
+
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables')
+  console.error('❌ Missing Supabase environment variables:', {
+    VITE_SUPABASE_URL: supabaseUrl,
+    VITE_SUPABASE_ANON_KEY: supabaseAnonKey ? '[REDACTED]' : 'undefined'
+  })
+  throw new Error(`Missing Supabase environment variables. URL: ${supabaseUrl}, Key: ${supabaseAnonKey ? 'present' : 'missing'}`)
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -52,9 +27,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
-  },
-  global: {
-    fetch: loggingFetch,
   },
 })
 
