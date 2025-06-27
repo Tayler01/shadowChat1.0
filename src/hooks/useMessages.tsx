@@ -231,6 +231,7 @@ function useProvideMessages(): MessagesContextValue {
     const timestamp = new Date().toISOString();
     const logPrefix = `🚀 [${timestamp}] MESSAGE_SEND`;
     
+    console.log(`${logPrefix}: Starting message send process`);
     
     // 🔐 Ensure the session is valid before pulling the user
     const sessionValid = await ensureSession();
@@ -243,16 +244,32 @@ function useProvideMessages(): MessagesContextValue {
     const { data: sessionData } = await supabase.auth.getSession();
     const currentUser = sessionData?.session?.user;
 
+    console.log(`${logPrefix}: Current user:`, currentUser?.id);
 
     if (!currentUser || !content.trim()) {
+      console.error(`${logPrefix}: ❌ No user or empty content`);
       return;
     }
+
+    // Check if user profile exists
+    const { data: userProfile, error: profileError } = await supabase
+      .from('users')
+      .select('id, username, display_name')
+      .eq('id', currentUser.id)
+      .single();
+
+    if (profileError || !userProfile) {
+      console.error(`${logPrefix}: ❌ User profile not found:`, profileError);
+      throw new Error('User profile not found. Please refresh the page and try again.');
+    }
+
+    console.log(`${logPrefix}: User profile found:`, userProfile.username);
 
     setSending(true);
 
     try {
       // Step 1: Prepare message data
-      
+      console.log(`${logPrefix}: Preparing message data`);
       const messageData = {
         user_id: currentUser.id,
         content: content.trim(),
@@ -261,7 +278,7 @@ function useProvideMessages(): MessagesContextValue {
 
       // Step 2: Attempt database insert (let Supabase handle auth internally)
       const insertStartTime = performance.now();
-      
+      console.log(`${logPrefix}: Attempting database insert`);
       const insertPromise = supabase
         .from('messages')
         .insert(messageData)
@@ -278,12 +295,15 @@ function useProvideMessages(): MessagesContextValue {
       let { data, error } = await Promise.race([insertPromise, insertTimeoutPromise]) as any;
       const insertEndTime = performance.now();
       const insertDuration = insertEndTime - insertStartTime;
+      
+      console.log(`${logPrefix}: Insert completed in ${insertDuration}ms`, { data: !!data, error: !!error });
 
       if (error) {
         console.error(`${logPrefix}: ❌ Database insert failed:`, error);
         
         // Step 3: Handle auth errors with retry
         if (error.status === 401 || /jwt|token|expired/i.test(error.message)) {
+          console.log(`${logPrefix}: Attempting session refresh due to auth error`);
           const retryRefreshStartTime = performance.now();
           
           // Try refreshing the session
@@ -296,7 +316,10 @@ function useProvideMessages(): MessagesContextValue {
           const retryRefreshEndTime = performance.now();
           const retryRefreshDuration = retryRefreshEndTime - retryRefreshStartTime;
           
+          console.log(`${logPrefix}: Session refresh completed in ${retryRefreshDuration}ms`, { success: !!refreshData.session, error: !!refreshError });
+          
           if (!refreshError && refreshData.session) {
+            console.log(`${logPrefix}: Retrying insert with refreshed session`);
             const retryInsertStartTime = performance.now();
             
             const retryPromise = supabase
@@ -316,6 +339,8 @@ function useProvideMessages(): MessagesContextValue {
             const retryInsertEndTime = performance.now();
             const retryInsertDuration = retryInsertEndTime - retryInsertStartTime;
             
+            console.log(`${logPrefix}: Retry insert completed in ${retryInsertDuration}ms`, { data: !!retry.data, error: !!retry.error });
+            
             data = retry.data;
             error = retry.error;
           } else {
@@ -331,11 +356,14 @@ function useProvideMessages(): MessagesContextValue {
 
       // Step 4: Update local state and broadcast
       if (data) {
+        console.log(`${logPrefix}: ✅ Message sent successfully, updating local state`);
         setMessages(prev => {
           const exists = prev.find(m => m.id === data.id);
           if (exists) {
+            console.log(`${logPrefix}: Message already exists in local state`);
             return prev;
           }
+          console.log(`${logPrefix}: Adding message to local state`);
           return [...prev, data as Message];
         });
         
@@ -344,6 +372,7 @@ function useProvideMessages(): MessagesContextValue {
           event: 'new_message',
           payload: data
         });
+        console.log(`${logPrefix}: Broadcast result:`, broadcastResult);
       }
       
     } catch (error) {

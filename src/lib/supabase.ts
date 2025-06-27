@@ -121,6 +121,7 @@ export const markDMMessagesRead = async (conversationId: string) => {
 // Helper function to ensure valid session before database operations
 export const ensureSession = async () => {
   try {
+    console.log('🔐 Checking session validity');
     const { data: { session }, error } = await supabase.auth.getSession()
     
     if (error) {
@@ -133,12 +134,14 @@ export const ensureSession = async () => {
       return false
     }
     
+    console.log('🔐 Session found, checking expiration');
     // Check if session is expired or about to expire (within 5 minutes)
     const expiresAt = session.expires_at
     const now = Math.floor(Date.now() / 1000)
     const fiveMinutes = 5 * 60
     
     if (expiresAt && (expiresAt - now) < fiveMinutes) {
+      console.log('🔐 Session expiring soon, refreshing');
       const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
       
       if (refreshError) {
@@ -151,6 +154,9 @@ export const ensureSession = async () => {
         return false
       }
       
+      console.log('🔐 ✅ Session refreshed successfully');
+    } else {
+      console.log('🔐 ✅ Session is valid');
     }
     
     return true
