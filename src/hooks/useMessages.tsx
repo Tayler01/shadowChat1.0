@@ -10,6 +10,81 @@ import { supabase, Message, ensureSession } from '../lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
 
+// Manual Supabase message insert via fetch to bypass client issues
+async function manualInsertMessage(messageData: {
+  user_id: string
+  content: string
+  message_type: string
+}) {
+  const timestamp = new Date().toISOString();
+  const logPrefix = `🔧 [${timestamp}] MANUAL_INSERT`;
+  
+  console.log(`${logPrefix}: Starting manual insert`, { messageData });
+  
+  // Get session and access token
+  const { data: session } = await supabase.auth.getSession();
+  const accessToken = session?.access_token;
+  
+  console.log(`${logPrefix}: Session details`, {
+    hasSession: !!session,
+    hasAccessToken: !!accessToken,
+    tokenLength: accessToken?.length || 0,
+    userId: session?.user?.id
+  });
+  
+  if (!accessToken) {
+    throw new Error('No access token available for manual insert');
+  }
+  
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const url = `${supabaseUrl}/rest/v1/messages`;
+  
+  console.log(`${logPrefix}: Making fetch request`, {
+    url,
+    method: 'POST',
+    hasAnonKey: !!supabaseAnonKey,
+    hasAccessToken: !!accessToken
+  });
+  
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'apikey': supabaseAnonKey,
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    },
+    body: JSON.stringify(messageData)
+  });
+  
+  console.log(`${logPrefix}: Fetch response`, {
+    status: res.status,
+    statusText: res.statusText,
+    ok: res.ok,
+    headers: Object.fromEntries(res.headers.entries())
+  });
+  
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error(`${logPrefix}: ❌ Manual insert failed`, {
+      status: res.status,
+      statusText: res.statusText,
+      errorText
+    });
+    throw new Error(`Manual insert failed: ${res.status} - ${errorText}`);
+  }
+  
+  const data = await res.json();
+  console.log(`${logPrefix}: ✅ Manual insert succeeded`, {
+    data,
+    messageId: data?.id || data?.[0]?.id
+  });
+  
+  // Return the first item if it's an array, otherwise return the data
+  return Array.isArray(data) ? data[0] : data;
+}
+
 interface MessagesContextValue {
   messages: Message[];
   loading: boolean;
@@ -445,7 +520,8 @@ function useProvideMessages(): MessagesContextValue {
         const manualResult = await manualInsertMessage(messageData);
         console.log(`${logPrefix}: ✅ Manual insert succeeded`, {
           manualResult,
-          messageId: manualResult?.id
+          messageId: manualResult?.id,
+          hasResult: !!manualResult
         });
         
         // Fetch the complete message with user data using Supabase client
