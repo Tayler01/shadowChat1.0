@@ -235,7 +235,7 @@ function useProvideMessages(): MessagesContextValue {
   const sendMessage = useCallback(async (content: string, messageType: 'text' | 'command' = 'text') => {
     const timestamp = new Date().toISOString();
     const logPrefix = `🚀 [${timestamp}] MESSAGE_SEND`;
-    
+
     if (!user || !content.trim()) {
       return;
     }
@@ -249,6 +249,17 @@ function useProvideMessages(): MessagesContextValue {
       throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
     }
 
+    // Log current session tokens for debugging
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log(`${logPrefix}: Session details`, {
+        access_token: session?.access_token,
+        refresh_token: session?.refresh_token,
+      });
+    } catch (tokenErr) {
+      console.error(`${logPrefix}: Failed to get session tokens`, tokenErr);
+    }
+
     try {
       // Step 1: Prepare message data
 
@@ -257,6 +268,7 @@ function useProvideMessages(): MessagesContextValue {
         content: content.trim(),
         message_type: messageType,
       };
+      console.log(`${logPrefix}: Prepared message data`, messageData)
 
       // Step 2: Attempt database insert (let Supabase handle auth internally)
       const insertStartTime = performance.now();
@@ -277,6 +289,8 @@ function useProvideMessages(): MessagesContextValue {
       let { data, error } = await Promise.race([insertPromise, insertTimeoutPromise]) as any;
       const insertEndTime = performance.now();
       const insertDuration = insertEndTime - insertStartTime;
+
+      console.log(`${logPrefix}: Insert response`, { duration: insertDuration, data, error });
 
       // Insert result logged for debugging
 
@@ -349,7 +363,7 @@ function useProvideMessages(): MessagesContextValue {
           event: 'new_message',
           payload: data
         });
-        // Broadcast result not logged
+        console.log(`${logPrefix}: Broadcast result`, broadcastResult);
       }
       
       
