@@ -152,8 +152,51 @@ export const markDMMessagesRead = async (conversationId: string) => {
 
 // Community-validated workaround for broken session refresh cycle
 export const forceSessionRefresh = async (): Promise<boolean> => {
-  console.log('🔄 [FORCE_REFRESH] Starting forced session refresh...');
+  console.log('🔥 [NUCLEAR_REFRESH] Starting nuclear session refresh...');
   
+  try {
+    const stored = localStorage.getItem('sb-' + supabaseUrl.split('//')[1].split('.')[0] + '-auth-token');
+    if (!stored) {
+      console.warn('🔥 [NUCLEAR_REFRESH] ❌ No refresh token found in storage');
+      return false;
+    }
+
+    const parsed = JSON.parse(stored);
+    const refresh_token = parsed?.refresh_token;
+    if (!refresh_token) {
+      console.warn('🔥 [NUCLEAR_REFRESH] ❌ Could not parse refresh token');
+      return false;
+    }
+
+    console.log('🔥 [NUCLEAR_REFRESH] Using refresh token to re-auth via setSession');
+
+    // 🔥 NUCLEAR FIX: Use setSession with empty access_token to force re-auth
+    const { data, error } = await supabase.auth.setSession({
+      refresh_token,
+      access_token: '', // forces Supabase to issue a new session
+    });
+
+    if (error || !data?.session) {
+      console.error('🔥 [NUCLEAR_REFRESH] ❌ setSession failed:', error?.message);
+      return false;
+    }
+
+    console.log('🔥 [NUCLEAR_REFRESH] ✅ Session forcibly refreshed via setSession()', {
+      userId: data.session.user.id,
+      expires: data.session.expires_at,
+    });
+
+    return true;
+  } catch (e) {
+    console.error('🔥 [NUCLEAR_REFRESH] ❌ Exception during forced session re-auth', e);
+    return false;
+  }
+};
+
+// Legacy function kept for compatibility - now uses nuclear refresh
+export const legacyForceSessionRefresh = async (): Promise<boolean> => {
+  console.log('🔄 [LEGACY_REFRESH] Starting legacy session refresh...');
+    
   try {
     // Get refresh token from localStorage
     const authData = localStorage.getItem('sb-' + supabaseUrl.split('//')[1].split('.')[0] + '-auth-token');
@@ -163,12 +206,12 @@ export const forceSessionRefresh = async (): Promise<boolean> => {
       try {
         const parsed = JSON.parse(authData);
         refresh_token = parsed?.refresh_token;
-        console.log('🔄 [FORCE_REFRESH] Found refresh token in localStorage:', {
+        console.log('🔄 [LEGACY_REFRESH] Found refresh token in localStorage:', {
           hasToken: !!refresh_token,
           tokenLength: refresh_token?.length || 0
         });
       } catch (parseError) {
-        console.error('🔄 [FORCE_REFRESH] Failed to parse auth data from localStorage:', parseError);
+        console.error('🔄 [LEGACY_REFRESH] Failed to parse auth data from localStorage:', parseError);
       }
     }
     
@@ -179,49 +222,49 @@ export const forceSessionRefresh = async (): Promise<boolean> => {
         try {
           const parsed = JSON.parse(oldAuthData);
           refresh_token = parsed?.refresh_token;
-          console.log('🔄 [FORCE_REFRESH] Found refresh token in old localStorage format:', {
+          console.log('🔄 [LEGACY_REFRESH] Found refresh token in old localStorage format:', {
             hasToken: !!refresh_token,
             tokenLength: refresh_token?.length || 0
           });
         } catch (parseError) {
-          console.error('🔄 [FORCE_REFRESH] Failed to parse old auth data from localStorage:', parseError);
+          console.error('🔄 [LEGACY_REFRESH] Failed to parse old auth data from localStorage:', parseError);
         }
       }
     }
 
     if (!refresh_token) {
-      console.warn('🔄 [FORCE_REFRESH] ❌ No refresh token found in localStorage');
+      console.warn('🔄 [LEGACY_REFRESH] ❌ No refresh token found in localStorage');
       return false;
     }
 
-    console.log('🔄 [FORCE_REFRESH] Calling supabase.auth.refreshSession with stored token...');
+    console.log('🔄 [LEGACY_REFRESH] Calling supabase.auth.refreshSession with stored token...');
     const { data, error } = await supabase.auth.refreshSession({ refresh_token });
 
     if (error) {
-      console.error('🔄 [FORCE_REFRESH] ❌ refreshSession failed:', error.message);
+      console.error('🔄 [LEGACY_REFRESH] ❌ refreshSession failed:', error.message);
       return false;
     }
 
     if (!data.session) {
-      console.warn('🔄 [FORCE_REFRESH] ❌ No session returned from refresh');
+      console.warn('🔄 [LEGACY_REFRESH] ❌ No session returned from refresh');
       return false;
     }
 
     // 🔥 CRITICAL: Force Supabase to use the new tokens by calling setSession
-    console.log('🔄 [FORCE_REFRESH] Injecting new session tokens via setSession...');
+    console.log('🔄 [LEGACY_REFRESH] Injecting new session tokens via setSession...');
     const { error: setSessionError } = await supabase.auth.setSession({
       access_token: data.session.access_token,
       refresh_token: data.session.refresh_token,
     });
 
     if (setSessionError) {
-      console.error('🔄 [FORCE_REFRESH] ❌ setSession failed:', setSessionError.message);
+      console.error('🔄 [LEGACY_REFRESH] ❌ setSession failed:', setSessionError.message);
       return false;
     }
 
-    console.log('🔄 [FORCE_REFRESH] ✅ Session manually injected via setSession');
+    console.log('🔄 [LEGACY_REFRESH] ✅ Session manually injected via setSession');
 
-    console.log('🔄 [FORCE_REFRESH] ✅ Session manually refreshed successfully:', {
+    console.log('🔄 [LEGACY_REFRESH] ✅ Session manually refreshed successfully:', {
       userId: data.session.user?.id,
       expiresAt: data.session.expires_at,
       hasAccessToken: !!data.session.access_token,
@@ -231,7 +274,7 @@ export const forceSessionRefresh = async (): Promise<boolean> => {
     
     return true;
   } catch (error) {
-    console.error('🔄 [FORCE_REFRESH] ❌ Exception during forced refresh:', error);
+    console.error('🔄 [LEGACY_REFRESH] ❌ Exception during forced refresh:', error);
     return false;
   }
 };
