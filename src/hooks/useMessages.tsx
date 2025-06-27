@@ -274,7 +274,6 @@ function useProvideMessages(): MessagesContextValue {
       const insertEndTime = performance.now();
       const insertDuration = insertEndTime - insertStartTime;
 
-      console.log(`${logPrefix}: Database insert result`, {
         success: !!data,
         error: error?.message,
         errorCode: error?.code,
@@ -302,7 +301,6 @@ function useProvideMessages(): MessagesContextValue {
           const retryRefreshEndTime = performance.now();
           const retryRefreshDuration = retryRefreshEndTime - retryRefreshStartTime;
           
-          console.log(`${logPrefix}: Session refresh result`, {
             success: !!refreshData.session,
             error: refreshError?.message,
             retryRefreshDuration: `${retryRefreshDuration.toFixed(2)}ms`
@@ -328,7 +326,6 @@ function useProvideMessages(): MessagesContextValue {
             const retryInsertEndTime = performance.now();
             const retryInsertDuration = retryInsertEndTime - retryInsertStartTime;
             
-            console.log(`${logPrefix}: Retry insert result`, {
               success: !!retry.data,
               error: retry.error?.message,
               insertedId: retry.data?.id,
@@ -348,7 +345,6 @@ function useProvideMessages(): MessagesContextValue {
         }
       }
 
-      console.log(`${logPrefix}: Message sent successfully`, {
         id: data?.id,
         content: data?.content,
         userId: data?.user_id,

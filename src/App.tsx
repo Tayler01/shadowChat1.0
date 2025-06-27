@@ -9,16 +9,11 @@ import { SettingsView } from './components/settings/SettingsView'
 import { useAuth } from './hooks/useAuth'
 import { MessagesProvider } from './hooks/useMessages'
 import { updateUserPresence } from './lib/supabase'
-import { useSessionSyncOnVisibility } from './hooks/useSessionSyncOnVisibility'
 
 type View = 'chat' | 'dms' | 'profile' | 'settings'
 
 function App() {
   const { user } = useAuth()
-  
-  // Enable production-safe session resync on tab visibility
-  useSessionSyncOnVisibility()
-  
   const [currentView, setCurrentView] = useState<View>('chat')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(() => {

@@ -7,7 +7,6 @@ interface AuthContextValue {
   profile: User | null;
   loading: boolean;
   error: string | null;
-  setUser: (user: User | null) => void;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (
     email: string,
@@ -248,7 +247,6 @@ function useProvideAuth() {
     signUp,
     signOut,
     updateProfile,
-    setUser,
   };
 }
 
