@@ -423,6 +423,22 @@ function useProvideMessages(): MessagesContextValue {
     console.log(`${logPrefix}: 🔍 About to check session details`);
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      
+      if (error) {
+        console.error(`${logPrefix}: ❌ MESSAGE_SEND: getSession() error:`, error.message);
+      }
+
+      if (!session) {
+        console.warn(`${logPrefix}: ❌ MESSAGE_SEND: No session returned from getSession():`, session);
+        return;
+      }
+
+      if (!session.user) {
+        console.warn(`${logPrefix}: ❌ MESSAGE_SEND: Session has no user:`, session);
+        return;
+      }
+
+      console.log(`${logPrefix}: ✅ MESSAGE_SEND: Session details valid - proceeding to insert`);
       console.log(`${logPrefix}: Session details`, {
         access_token: session?.access_token,
         refresh_token: session?.refresh_token,
@@ -430,6 +446,15 @@ function useProvideMessages(): MessagesContextValue {
       });
     } catch (tokenErr) {
       console.error(`${logPrefix}: Failed to get session tokens`, tokenErr);
+      console.warn(`${logPrefix}: ⚠️ MESSAGE_SEND: Forcing hard reauth due to getSession() exception`);
+      // Optional failsafe - force refresh if getSession() throws
+      try {
+        await forceSessionRefresh();
+        console.log(`${logPrefix}: ✅ Hard reauth completed, retrying insert`);
+      } catch (refreshErr) {
+        console.error(`${logPrefix}: ❌ Hard reauth failed:`, refreshErr);
+        throw new Error('Session validation failed and refresh attempt failed');
+      }
     }
     
     console.log(`${logPrefix}: 🔍 All pre-insert checks completed, proceeding to insert`);
