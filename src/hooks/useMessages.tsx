@@ -205,6 +205,11 @@ function useProvideMessages(): MessagesContextValue {
 
     const handleVisibility = () => {
       if (!document.hidden) {
+        // Refresh session when page becomes visible
+        supabase.auth.refreshSession().catch(err => {
+          console.error('Error refreshing session on visibility change:', err);
+        });
+        
         if (channel && channel.state !== 'joined') {
           supabase.removeChannel(channel);
           channel = subscribeToChannel();

@@ -153,9 +153,15 @@ function useProvideAuth() {
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         // Refresh the auth session when the page comes back into focus
-        supabase.auth.refreshSession().catch((err) => {
-          console.error('Error refreshing session on visibility change:', err)
-        })
+        supabase.auth.refreshSession().then(({ data, error }) => {
+          if (error) {
+            console.error('Error refreshing session on visibility change:', error);
+          } else if (data.session) {
+            console.log('✅ Session refreshed successfully on visibility change');
+          }
+        }).catch((err) => {
+          console.error('Exception refreshing session on visibility change:', err);
+        });
         updatePresence();
       }
     };
