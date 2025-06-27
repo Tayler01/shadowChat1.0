@@ -424,10 +424,12 @@ function useProvideMessages(): MessagesContextValue {
       // Step 2: Attempt database insert (let Supabase handle auth internally)
       const insertStartTime = performance.now();
       
-      console.log(`${logPrefix}: About to call supabase.from('messages').insert()`, {
+      console.log(`${logPrefix}: 💾 About to insert message into database`, {
         messageData,
         timestamp: new Date().toISOString()
       });
+      
+      console.log(`${logPrefix}: 💾 Calling supabase.from('messages').insert() NOW`);
       
       const { data, error } = await supabase
         .from('messages')
@@ -438,16 +440,26 @@ function useProvideMessages(): MessagesContextValue {
         `)
         .single();
         
-      console.log(`${logPrefix}: Supabase insert completed`, {
+      console.log(`${logPrefix}: 🧪 Insert response received from Supabase`, {
         data,
         error,
+        hasData: !!data,
+        hasError: !!error,
+        errorMessage: error?.message,
+        errorCode: error?.code,
+        dataId: data?.id,
+        dataContent: data?.content,
         timestamp: new Date().toISOString()
       });
         
       const insertEndTime = performance.now();
       const insertDuration = insertEndTime - insertStartTime;
 
-      console.log(`${logPrefix}: Insert response`, { duration: insertDuration, data, error });
+      console.log(`${logPrefix}: 📊 Insert timing and summary`, { 
+        duration: insertDuration, 
+        success: !error && !!data,
+        messageId: data?.id 
+      });
 
       // Insert result logged for debugging
 
