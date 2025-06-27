@@ -9,6 +9,7 @@ import { SettingsView } from './components/settings/SettingsView'
 import { useAuth } from './hooks/useAuth'
 import { MessagesProvider } from './hooks/useMessages'
 import { updateUserPresence } from './lib/supabase'
+import { MobileNav } from './components/layout/MobileNav'
 
 type View = 'chat' | 'dms' | 'profile' | 'settings'
 
@@ -94,9 +95,12 @@ function App() {
             />
           )}
 
-          <main className="flex-1 flex flex-col min-w-0">
+          <main className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0">
             {renderCurrentView()}
           </main>
+
+          {/* Mobile bottom navigation */}
+          <MobileNav currentView={currentView} onViewChange={setCurrentView} />
 
           <Toaster
             position="top-right"
