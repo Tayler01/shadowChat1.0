@@ -283,12 +283,12 @@ export function useConversationMessages(conversationId: string | null) {
 
     const handleVisibility = () => {
       if (!document.hidden) {
-        supabase.auth.refreshSession().catch(err => {
-          console.error('Error refreshing session on visibility change:', err);
-        });
-        if (channel && channel.state !== 'joined') {
+        console.log('👀 DM view visible, resetting realtime channel');
+        if (channel) {
           supabase.removeChannel(channel);
+          console.log('🔌 Old DM channel removed');
           channel = subscribeToChannel();
+          console.log('🔗 New DM channel subscribed');
         }
       }
     };

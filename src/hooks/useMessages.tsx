@@ -228,12 +228,12 @@ function useProvideMessages(): MessagesContextValue {
 
     const handleVisibility = () => {
       if (!document.hidden) {
-        // supabase.auth.refreshSession().catch(err => {
-        //   console.error('Error refreshing session on visibility change:', err)
-        // })
-        if (channel && channel.state !== 'joined') {
+        console.log('👀 Messages view visible, resetting realtime channel');
+        if (channel) {
           supabase.removeChannel(channel)
+          console.log('🔌 Old channel removed');
           channel = subscribeToChannel()
+          console.log('🔗 New channel subscribed');
         }
         fetchMessages()
       }
