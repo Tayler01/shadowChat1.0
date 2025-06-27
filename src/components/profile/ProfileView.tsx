@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Camera, Edit3, Save, X, Upload } from 'lucide-react'
+import { Camera, Edit3, Save, X, Upload, Menu } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
@@ -20,7 +20,11 @@ const colorOptions = [
   '#06B6D4', '#84CC16', '#F97316', '#EC4899', '#6366F1'
 ]
 
-export const ProfileView: React.FC = () => {
+interface ProfileViewProps {
+  onToggleSidebar: () => void
+}
+
+export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => {
   const { profile, updateProfile } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -71,6 +75,9 @@ export const ProfileView: React.FC = () => {
       className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900"
     >
       <div className="max-w-2xl mx-auto p-6">
+        <button onClick={onToggleSidebar} className="md:hidden p-2 -ml-2 mb-2">
+          <Menu className="w-5 h-5" />
+        </button>
         {/* Header */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
           {/* Banner */}

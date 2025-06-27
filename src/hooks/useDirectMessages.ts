@@ -1,10 +1,18 @@
 import { useEffect, useState, useCallback } from 'react';
-import { supabase, DMConversation, DMMessage } from '../lib/supabase';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+import {
+  supabase,
+  DMConversation,
+  DMMessage,
+  getOrCreateDMConversation,
+  markDMMessagesRead,
+} from '../lib/supabase';
 import { useAuth } from './useAuth';
 
 export function useDirectMessages() {
   const [conversations, setConversations] = useState<DMConversation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentConversation, setCurrentConversation] = useState<string | null>(null);
   const { user } = useAuth();
 
   // Fetch conversations
@@ -125,10 +133,55 @@ export function useDirectMessages() {
       throw error;
     }
   }, [user]);
+  const {
+    messages,
+    sendMessage,
+  } = useConversationMessages(currentConversation);
+
+  const startConversation = useCallback(async (username: string) => {
+    if (!user) return null;
+
+    const { data: otherUser, error } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error finding user:', error);
+      throw error;
+    }
+
+    if (!otherUser) {
+      throw new Error('User not found');
+    }
+
+    const conversation = await getOrCreateDMConversation(otherUser.id);
+    if (conversation) {
+      setCurrentConversation(conversation.id);
+      return conversation.id as string;
+    }
+    return null;
+  }, [user]);
+
+  const markAsRead = useCallback(async (conversationId: string) => {
+    await markDMMessagesRead(conversationId);
+    setConversations(prev =>
+      prev.map(c =>
+        c.id === conversationId ? { ...c, unread_count: 0 } : c
+      )
+    );
+  }, []);
 
   return {
     conversations,
     loading,
+    currentConversation,
+    setCurrentConversation,
+    messages,
+    startConversation,
+    sendMessage,
+    markAsRead,
     createConversation,
   };
 }
@@ -183,44 +236,67 @@ export function useConversationMessages(conversationId: string | null) {
   useEffect(() => {
     if (!conversationId) return;
 
-    const channel = supabase
-      .channel(`dm_messages:${conversationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'dm_messages',
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        async (payload) => {
-          // Fetch the complete message with sender data
-          const { data } = await supabase
-            .from('dm_messages')
-            .select(`
-              *,
-              sender:users!sender_id(*)
-            `)
-            .eq('id', payload.new.id)
-            .single();
+    let channel: RealtimeChannel | null = null;
 
-          if (data) {
-            setMessages(prev => [...prev, data]);
-            
-            // Mark as read if not sent by current user
-            if (user && data.sender_id !== user.id) {
-              await supabase
-                .from('dm_messages')
-                .update({ read_at: new Date().toISOString() })
-                .eq('id', data.id);
+    const subscribeToChannel = (): RealtimeChannel => {
+      const newChannel = supabase
+        .channel(`dm_messages:${conversationId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'dm_messages',
+            filter: `conversation_id=eq.${conversationId}`,
+          },
+          async (payload) => {
+            // Fetch the complete message with sender data
+            const { data } = await supabase
+              .from('dm_messages')
+              .select(`
+                *,
+                sender:users!sender_id(*)
+              `)
+              .eq('id', payload.new.id)
+              .single();
+
+            if (data) {
+              setMessages(prev => [...prev, data]);
+
+              // Mark as read if not sent by current user
+              if (user && data.sender_id !== user.id) {
+                await supabase
+                  .from('dm_messages')
+                  .update({ read_at: new Date().toISOString() })
+                  .eq('id', data.id);
+              }
             }
           }
+        )
+        .subscribe();
+
+      return newChannel;
+    };
+
+    channel = subscribeToChannel();
+
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        supabase.auth.refreshSession().catch(err => {
+          console.error('Error refreshing session on visibility change:', err);
+        });
+        if (channel && channel.state !== 'joined') {
+          supabase.removeChannel(channel);
+          channel = subscribeToChannel();
         }
-      )
-      .subscribe();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
-      supabase.removeChannel(channel);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (channel) supabase.removeChannel(channel);
     };
   }, [conversationId, user]);
 
@@ -242,11 +318,34 @@ export function useConversationMessages(conversationId: string | null) {
         `)
         .single();
 
-      if (error) throw error;
+      let finalData = data;
+      let finalError = error;
+      if (finalError) {
+        if (finalError.status === 401 || /jwt|token|expired/i.test(finalError.message)) {
+          const { error: refreshError } = await supabase.auth.refreshSession();
+          if (!refreshError) {
+            const retry = await supabase
+              .from('dm_messages')
+              .insert({
+                conversation_id: conversationId,
+                sender_id: user.id,
+                content: content.trim(),
+              })
+              .select(`
+                *,
+                sender:users!sender_id(*)
+              `)
+              .single();
+            finalData = retry.data;
+            finalError = retry.error;
+          }
+        }
+        if (finalError) throw finalError;
+      }
 
-      if (data) {
+      if (finalData) {
         // Optimistically add the sent message
-        setMessages(prev => [...prev, data as DMMessage]);
+        setMessages(prev => [...prev, finalData as DMMessage]);
       }
     } catch (error) {
       console.error('Error sending DM:', error);
