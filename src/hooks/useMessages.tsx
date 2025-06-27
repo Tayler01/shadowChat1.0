@@ -228,13 +228,11 @@ function useProvideMessages(): MessagesContextValue {
 
     const handleVisibility = () => {
       if (!document.hidden) {
-        console.log('🔄 Page focus detected - resetting message channel')
-        if (channel) {
-          console.log('🔌 Removing existing message channel before re-subscribing')
+        // supabase.auth.refreshSession().catch(err => {
+        //   console.error('Error refreshing session on visibility change:', err)
+        // })
+        if (channel && channel.state !== 'joined') {
           supabase.removeChannel(channel)
-          channel = subscribeToChannel()
-        } else {
-          console.log('🔌 No existing message channel, subscribing anew')
           channel = subscribeToChannel()
         }
         fetchMessages()
@@ -242,12 +240,10 @@ function useProvideMessages(): MessagesContextValue {
     }
 
     document.addEventListener('visibilitychange', handleVisibility)
-    window.addEventListener('focus', handleVisibility)
 
     return () => {
       // console.log('🔌 Cleaning up real-time subscription');
       document.removeEventListener('visibilitychange', handleVisibility)
-      window.removeEventListener('focus', handleVisibility)
       if (channel) supabase.removeChannel(channel)
       channelRef.current = null
     };

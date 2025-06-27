@@ -26,58 +26,6 @@ function useProvideAuth() {
   const initialLoadRef = useRef(false);
   const mountedRef = useRef(true);
 
-  const refreshSessionOnFocus = async () => {
-    console.log('🔄 Refreshing session and profile on focus...');
-    try {
-      const {
-        data: { session },
-        error: sessionError,
-      } = await supabase.auth.getSession();
-
-      if (
-        sessionError &&
-        sessionError.message?.includes('User from sub claim in JWT does not exist')
-      ) {
-        console.log('🧹 Invalid JWT detected during focus refresh, clearing session...');
-        await supabase.auth.signOut();
-        console.log('🧹 Session cleared after invalid JWT');
-        if (mountedRef.current) setUser(null);
-        return;
-      }
-
-      if (sessionError) {
-        console.error('Session error during focus refresh:', sessionError);
-        if (mountedRef.current) {
-          setError(sessionError.message);
-          setUser(null);
-        }
-        return;
-      }
-
-      if (session?.user) {
-        try {
-          const profile = await getCurrentUser();
-          if (mountedRef.current) setUser(profile);
-          console.log('✅ Focus refresh loaded profile for user', profile?.id);
-        } catch (err) {
-          console.error('Failed to load profile during focus refresh:', err);
-          if (mountedRef.current) {
-            setError('Failed to load user profile.');
-            setUser(null);
-          }
-        }
-      } else if (mountedRef.current) {
-        setUser(null);
-        console.log('ℹ️ No active session during focus refresh');
-      }
-    } catch (err) {
-      console.error('Unexpected error during focus refresh:', err);
-      if (mountedRef.current) setUser(null);
-    } finally {
-      console.log('🔄 Focus refresh complete. Current user:', mountedRef.current ? user?.id : 'unmounted');
-    }
-  };
-
   useEffect(() => {
     mountedRef.current = true;
     
@@ -219,20 +167,19 @@ function useProvideAuth() {
     // Update on page visibility change
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        refreshSessionOnFocus().catch((err) => {
+        // Refresh the auth session when the page comes back into focus
+        supabase.auth.refreshSession().catch((err) => {
           console.error('Error refreshing session on visibility change:', err)
         })
         updatePresence();
       }
     };
-
+    
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleVisibilityChange);
     
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleVisibilityChange);
     };
   }, [user]);
 

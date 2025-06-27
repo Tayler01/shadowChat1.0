@@ -283,24 +283,20 @@ export function useConversationMessages(conversationId: string | null) {
 
     const handleVisibility = () => {
       if (!document.hidden) {
-        console.log('🔄 Page focus detected - resetting DM channel');
-        if (channel) {
-          console.log('🔌 Removing existing DM channel before re-subscribing');
+        supabase.auth.refreshSession().catch(err => {
+          console.error('Error refreshing session on visibility change:', err);
+        });
+        if (channel && channel.state !== 'joined') {
           supabase.removeChannel(channel);
-          channel = subscribeToChannel();
-        } else {
-          console.log('🔌 No existing DM channel, subscribing anew');
           channel = subscribeToChannel();
         }
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibility);
-    window.addEventListener('focus', handleVisibility);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
-      window.removeEventListener('focus', handleVisibility);
       if (channel) supabase.removeChannel(channel);
     };
   }, [conversationId, user]);
