@@ -294,9 +294,11 @@ export function useConversationMessages(conversationId: string | null) {
     };
 
     document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleVisibility);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleVisibility);
       if (channel) supabase.removeChannel(channel);
     };
   }, [conversationId, user]);

@@ -240,10 +240,12 @@ function useProvideMessages(): MessagesContextValue {
     }
 
     document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
 
     return () => {
       // console.log('🔌 Cleaning up real-time subscription');
       document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
       if (channel) supabase.removeChannel(channel)
       channelRef.current = null
     };
