@@ -15,8 +15,6 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
   const { messages, loading, editMessage, deleteMessage, togglePin } = useMessages()
   const { typingUsers } = useTyping('general')
   
-  // Trigger re-render on message changes
-  useEffect(() => {}, [messages, loading]);
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
