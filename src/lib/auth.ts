@@ -241,7 +241,31 @@ export const getCurrentUser = async () => {
       console.log('🔍 [getCurrentUser] Inserting new user profile:', userData);
       
       try {
-        await fetchInsert('users', userData);
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert(userData)
+        
+        if (insertError) {
+          console.error('🔍 [getCurrentUser] Error creating user profile:', insertError)
+          // If user already exists (race condition), just fetch it
+          if (insertError.code === '23505') {
+            console.log('🔍 [getCurrentUser] Profile already exists, fetching existing profile');
+            const { data: existingProfile, error: fetchError } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', user.id)
+              .single()
+            
+            if (fetchError) {
+              console.error('🔍 [getCurrentUser] Error fetching existing profile:', fetchError);
+              return null;
+            }
+            
+            return existingProfile;
+          } else {
+            return null;
+          }
+        }
         
         console.log('🔍 [getCurrentUser] Profile created successfully, fetching new profile');
         
@@ -259,23 +283,6 @@ export const getCurrentUser = async () => {
         
         return newProfile
       } catch (insertError) {
-        // If user already exists (409 status), just fetch it
-        if (insertError instanceof Error && insertError.message?.includes('409')) {
-          console.log('🔍 [getCurrentUser] Profile already exists, fetching existing profile');
-          const { data: existingProfile, error: fetchError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', user.id)
-            .single()
-          
-          if (fetchError) {
-            console.error('🔍 [getCurrentUser] Error fetching existing profile:', fetchError);
-            return null;
-          }
-          
-          return existingProfile;
-        }
-        
         console.error('🔍 [getCurrentUser] Exception during profile creation:', insertError);
         
         // If there's a network error during profile creation, return minimal user object
@@ -428,13 +435,12 @@ export const updateUserProfile = async (updates: Partial<{
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  const { data, error } = await supabase
-    .from('users')
-    .update(updates)
-    .eq('id', user.id)
-    .select()
-    .single()
+  const data = await fetchUpdate(
+    'users',
+    updates,
+    { id: user.id },
+    { select: '*' }
+  );
 
-  if (error) throw error
   return data
 }
