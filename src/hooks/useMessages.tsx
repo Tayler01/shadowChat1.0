@@ -205,16 +205,30 @@ function useProvideMessages(): MessagesContextValue {
 
     const handleVisibility = () => {
       if (!document.hidden) {
-        // Refresh session when page becomes visible
-        supabase.auth.refreshSession().catch(err => {
-          console.error('Error refreshing session on visibility change:', err);
+        console.log('🔄 Messages: Page became visible, refreshing session...');
+        // Force refresh session when page becomes visible
+        supabase.auth.refreshSession().then(({ data, error }) => {
+          if (error) {
+            console.error('❌ Messages: Error refreshing session on visibility change:', error);
+          } else if (data.session) {
+            console.log('✅ Messages: Session refreshed successfully on visibility change');
+          } else {
+            console.warn('⚠️ Messages: No session returned from refresh on visibility change');
+          }
+        }).catch(err => {
+          console.error('❌ Messages: Exception refreshing session on visibility change:', err);
         });
         
         if (channel && channel.state !== 'joined') {
+          console.log('🔄 Messages: Reconnecting channel...');
           supabase.removeChannel(channel);
           channel = subscribeToChannel();
         }
-        fetchMessages();
+        
+        // Fetch messages after a short delay to ensure session is refreshed
+        setTimeout(() => {
+          fetchMessages();
+        }, 100);
       }
     };
 

@@ -122,15 +122,69 @@ export const markDMMessagesRead = async (conversationId: string) => {
 export const ensureSession = async () => {
   try {
     console.log('🔐 Checking session validity');
-    const { data: { session }, error } = await supabase.auth.getSession()
+    
+    // First try to get the current session
+    let { data: { session }, error } = await supabase.auth.getSession()
     
     if (error) {
       console.error('Error getting session:', error)
-      return false
+      // Try to refresh if there's an error getting session
+      console.log('🔐 Attempting to refresh session due to error');
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+      if (refreshError) {
+        console.error('🔐 ❌ Failed to refresh session:', refreshError);
+        return false
+      }
+      session = refreshData.session
+      error = null
     }
     
     if (!session) {
-      console.warn('No active session found')
+      console.warn('🔐 ❌ No active session found, attempting refresh');
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+      if (refreshError) {
+        console.error('🔐 ❌ Failed to refresh session:', refreshError);
+        return false
+      }
+      session = refreshData.session
+      if (!session) {
+        console.warn('🔐 ❌ Still no session after refresh')
+        return false
+      }
+    }
+    
+    console.log('🔐 Session found, checking expiration');
+    
+    // Check if session is expired or about to expire (within 5 minutes)
+    const expiresAt = session.expires_at
+    const now = Math.floor(Date.now() / 1000)
+    const fiveMinutes = 5 * 60
+    
+    if (expiresAt && (expiresAt - now) < fiveMinutes) {
+      console.log('🔐 Session expiring soon, refreshing');
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+      
+      if (refreshError) {
+        console.error('🔐 ❌ Error refreshing session:', refreshError)
+      return false
+    }
+    
+      if (!refreshData.session) {
+        console.warn('🔐 ❌ Failed to refresh session')
+        return false
+      }
+      
+      console.log('🔐 ✅ Session refreshed successfully');
+    } else {
+      console.log('🔐 ✅ Session is valid');
+    }
+    
+    return true
+  } catch (error) {
+    console.error('🔐 ❌ Exception in ensureSession:', error)
+    return false
+  }
+}
       return false
     }
     

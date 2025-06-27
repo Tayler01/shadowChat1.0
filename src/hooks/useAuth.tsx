@@ -152,15 +152,27 @@ function useProvideAuth() {
     // Update on page visibility change
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        // Refresh the auth session when the page comes back into focus
-        supabase.auth.refreshSession().then(({ data, error }) => {
+        console.log('🔄 Page became visible, refreshing session...');
+        // Force refresh the auth session when the page comes back into focus
+        supabase.auth.refreshSession().then(async ({ data, error }) => {
           if (error) {
-            console.error('Error refreshing session on visibility change:', error);
+            console.error('❌ Error refreshing session on visibility change:', error);
+            // If refresh fails, try to get current user to trigger auth flow
+            try {
+              const { data: userData, error: userError } = await supabase.auth.getUser();
+              if (userError) {
+                console.error('❌ Error getting user after failed refresh:', userError);
+              }
+            } catch (e) {
+              console.error('❌ Exception getting user after failed refresh:', e);
+            }
           } else if (data.session) {
             console.log('✅ Session refreshed successfully on visibility change');
+          } else {
+            console.warn('⚠️ No session returned from refresh on visibility change');
           }
         }).catch((err) => {
-          console.error('Exception refreshing session on visibility change:', err);
+          console.error('❌ Exception refreshing session on visibility change:', err);
         });
         updatePresence();
       }
