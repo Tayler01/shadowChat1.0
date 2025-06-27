@@ -261,8 +261,14 @@ function useProvideMessages(): MessagesContextValue {
     const timestamp = new Date().toISOString();
     const logPrefix = `🚀 [${timestamp}] MESSAGE_SEND`;
 
+    console.log(`${logPrefix}: Called`, {
+      hasUser: !!user,
+      userId: user?.id,
+      content
+    });
+
     if (!user || !content.trim()) {
-      console.warn(`${logPrefix}: Skipped send — missing user or empty content`, { hasUser: !!user, content });
+      console.warn(`${logPrefix}: Skipped send — missing user or empty content`, { hasUser: !!user, content, userId: user?.id });
       return;
     }
 
@@ -270,17 +276,23 @@ function useProvideMessages(): MessagesContextValue {
 
     // Ensure we have a valid session before attempting database operations
     const sessionValid = await ensureSession();
+    console.log(`${logPrefix}: After ensureSession`, {
+      sessionValid,
+      hasUser: !!user,
+      userId: user?.id,
+    });
     if (!sessionValid) {
       console.error(`${logPrefix}: ❌ Invalid or expired session, cannot send message`);
       throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
     }
 
-    // Log current session tokens for debugging
+    // Log current session tokens and user details for debugging
     try {
       const { data: { session } } = await supabase.auth.getSession();
       console.log(`${logPrefix}: Session details`, {
         access_token: session?.access_token,
         refresh_token: session?.refresh_token,
+        userId: session?.user?.id,
       });
     } catch (tokenErr) {
       console.error(`${logPrefix}: Failed to get session tokens`, tokenErr);
