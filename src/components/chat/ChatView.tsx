@@ -1,8 +1,7 @@
-import React, { useEffect } from 'react'
+import React from 'react'
 import { motion } from 'framer-motion'
 import { Hash, Users, Pin, Menu } from 'lucide-react'
 import { useMessages } from '../../hooks/useMessages'
-import { useAuth } from '../../hooks/useAuth'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import toast from 'react-hot-toast'
@@ -13,12 +12,6 @@ interface ChatViewProps {
 
 export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar }) => {
   const { sendMessage, messages, loading } = useMessages()
-  const { user } = useAuth()
-
-  // Sync with messages state changes
-  useEffect(() => {
-    // Intentionally left blank to react to updates
-  }, [messages, loading]);
 
   const handleSendMessage = async (content: string) => {
     try {
