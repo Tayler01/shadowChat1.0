@@ -33,14 +33,12 @@ function useProvideAuth() {
     const getInitialSession = async () => {
       if (initialLoadRef.current) return;
       
-      console.log('🔍 Getting initial session...');
       
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         // Handle the specific "user not found" error from invalid JWT
         if (sessionError && sessionError.message?.includes('User from sub claim in JWT does not exist')) {
-          console.log('🧹 Invalid JWT detected in getSession, clearing session...');
           await supabase.auth.signOut();
           if (mountedRef.current) setUser(null);
           return;
@@ -55,13 +53,10 @@ function useProvideAuth() {
           return;
         }
         
-        console.log('📋 Session data:', session ? 'Session exists' : 'No session');
         
         if (session?.user) {
-          console.log('👤 User found in session, getting profile...');
           try {
             const profile = await getCurrentUser();
-            console.log('📝 Profile result:', profile ? 'Profile loaded' : 'No profile');
             if (mountedRef.current) {
               setUser(profile);
             }
@@ -73,7 +68,6 @@ function useProvideAuth() {
             }
           }
         } else {
-          console.log('❌ No user in session');
           if (mountedRef.current) {
             setUser(null);
           }
@@ -84,7 +78,6 @@ function useProvideAuth() {
         // Check if this is the specific "user not found" error from invalid JWT
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         if (errorMessage.includes('User from sub claim in JWT does not exist')) {
-          console.log('🧹 Invalid JWT detected, clearing session...');
           // Clear the invalid session
           await authSignOut();
           if (mountedRef.current) setUser(null);
@@ -96,7 +89,6 @@ function useProvideAuth() {
           }
         }
       } finally {
-        console.log('✅ Initial session check complete, setting loading to false');
         if (mountedRef.current) {
           setLoading(false);
         }
@@ -111,24 +103,18 @@ function useProvideAuth() {
       async (event, session) => {
         // Skip if we're still doing initial load or component is unmounted
         if (!initialLoadRef.current || !mountedRef.current) {
-          console.log('⏭️ Skipping auth change during initial load or unmounted');
           return;
         }
 
-        console.log('🔄 Auth state change:', event);
         
         if (event === 'SIGNED_OUT') {
-          console.log('👋 User signed out');
           if (mountedRef.current) setUser(null);
         } else if (session?.user) {
-          console.log('👤 User in auth change, getting profile...');
           try {
             const profile = await getCurrentUser();
-            console.log('📝 Profile in auth change:', profile ? 'Profile loaded' : 'No profile');
             if (profile) {
               if (mountedRef.current) setUser(profile);
             } else {
-              console.log('❌ Failed to get profile, keeping user as null');
               if (mountedRef.current) setUser(null);
             }
           } catch (error) {
@@ -140,7 +126,6 @@ function useProvideAuth() {
           }
         } else {
           // No authenticated user in the session
-          console.log('❌ No user in auth change');
           if (mountedRef.current) setUser(null);
         }
       }
@@ -213,10 +198,8 @@ function useProvideAuth() {
       
       // If user is auto-confirmed (has session), set user immediately
       if (result.session && result.profile) {
-        console.log('✅ Auto-login after signup successful');
         setUser(result.profile);
       } else if (result.user && !result.session) {
-        console.log('📧 Email confirmation required');
         // Don't set user yet, they need to confirm email
       }
       

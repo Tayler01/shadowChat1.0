@@ -133,7 +133,6 @@ export const ensureSession = async () => {
     const fiveMinutes = 5 * 60
     
     if (expiresAt && (expiresAt - now) < fiveMinutes) {
-      console.log('Session expiring soon, refreshing...')
       const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
       
       if (refreshError) {
@@ -146,7 +145,6 @@ export const ensureSession = async () => {
         return false
       }
       
-      console.log('Session refreshed successfully')
     }
     
     return true
