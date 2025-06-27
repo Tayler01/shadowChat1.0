@@ -69,7 +69,6 @@ function useProvideMessages(): MessagesContextValue {
       return;
     }
 
-
     // Use a static channel name to prevent duplicate subscriptions
     const channelName = 'public:messages';
 
@@ -84,103 +83,106 @@ function useProvideMessages(): MessagesContextValue {
           }
         })
         .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-        },
-        async (payload) => {
-          
-          try {
-            // Fetch the complete message with user data
-            const { data: newMessage, error } = await supabase
-              .from('messages')
-              .select(`
-                *,
-                user:users!user_id(*)
-              `)
-              .eq('id', payload.new.id)
-              .single();
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+          },
+          async (payload) => {
+            try {
+              // Fetch the complete message with user data
+              const { data: newMessage, error } = await supabase
+                .from('messages')
+                .select(`
+                  *,
+                  user:users!user_id(*)
+                `)
+                .eq('id', payload.new.id)
+                .single();
 
-            if (error) {
-              return;
+              if (error) {
+                return;
+              }
+
+              if (newMessage) {
+                setMessages(prev => {
+                  // Check if message already exists to avoid duplicates
+                  const exists = prev.find(msg => msg.id === newMessage.id);
+                  if (exists) {
+                    return prev;
+                  }
+                  
+                  // Add new message to the end
+                  const updated = [...prev, newMessage as Message];
+                  return updated;
+                });
+              }
+            } catch (error) {
             }
-
-            if (newMessage) {
-              setMessages(prev => {
-                // Check if message already exists to avoid duplicates
-                const exists = prev.find(msg => msg.id === newMessage.id);
-                if (exists) {
-                  return prev;
-                }
-                
-                // Add new message to the end
-                const updated = [...prev, newMessage as Message];
-                
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages',
-        },
-        async (payload) => {
-          
-          try {
-            // Fetch the updated message with user data
-            const { data: updatedMessage, error } = await supabase
-              .from('messages')
-              .select(`
-                *,
-                user:users!user_id(*)
-              `)
-              .eq('id', payload.new.id)
-              .single();
-
-            if (error) {
-              return;
-            }
-
-            if (updatedMessage) {
-              setMessages(prev =>
-                prev.map(msg => msg.id === updatedMessage.id ? updatedMessage as Message : msg)
-              );
-            }
-          } catch (error) {
           }
-        // Don't await the broadcast - make it non-blocking
-        channelRef.current?.send({
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'messages',
-        },
-        (payload) => {
-          setMessages(prev =>
-            prev.filter(msg => msg.id !== payload.old.id)
-          );
-        }
-      )
-      .subscribe(async (status, err) => {
-        if (err) {
-        }
-        if (status === 'SUBSCRIBED') {
-        }
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          await supabase.removeChannel(newChannel);
-          setTimeout(() => {
-            channel = subscribeToChannel();
-          }, 1000);
-        } else if (status === 'CLOSED') {
-          setTimeout(() => {
-            channel = subscribeToChannel();
-          }, 1000);
-        }
-      });
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages',
+          },
+          async (payload) => {
+            try {
+              // Fetch the updated message with user data
+              const { data: updatedMessage, error } = await supabase
+                .from('messages')
+                .select(`
+                  *,
+                  user:users!user_id(*)
+                `)
+                .eq('id', payload.new.id)
+                .single();
+
+              if (error) {
+                return;
+              }
+
+              if (updatedMessage) {
+                setMessages(prev =>
+                  prev.map(msg => msg.id === updatedMessage.id ? updatedMessage as Message : msg)
+                );
+              }
+            } catch (error) {
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'messages',
+          },
+          (payload) => {
+            setMessages(prev =>
+              prev.filter(msg => msg.id !== payload.old.id)
+            );
+          }
+        )
+        .subscribe(async (status, err) => {
+          if (err) {
+          }
+          if (status === 'SUBSCRIBED') {
+          }
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            await supabase.removeChannel(newChannel);
+            setTimeout(() => {
+              channel = subscribeToChannel();
+            }, 1000);
+          } else if (status === 'CLOSED') {
+            setTimeout(() => {
+              channel = subscribeToChannel();
+            }, 1000);
+          }
+        });
 
       return newChannel;
     };
@@ -313,22 +315,11 @@ function useProvideMessages(): MessagesContextValue {
         
         // Don't await the broadcast - make it non-blocking
         channelRef.current?.send({
-        channelRef.current?.send({
           type: 'broadcast',
           event: 'new_message',
           payload: data
         }).then(result => {
           console.log(`${logPrefix}: Broadcast completed:`, result);
-        }).catch(err => {
-          console.warn(`${logPrefix}: Broadcast failed (non-critical):`, err);
-        });
-        
-        console.log(`${logPrefix}: Message processing complete`);
-        }).catch(err => {
-          console.warn(`${logPrefix}: Broadcast failed (non-critical):`, err);
-        });
-        
-        console.log(`${logPrefix}: Message processing complete`);
         }).catch(err => {
           console.warn(`${logPrefix}: Broadcast failed (non-critical):`, err);
         });
@@ -353,7 +344,6 @@ function useProvideMessages(): MessagesContextValue {
   const editMessage = useCallback(async (messageId: string, content: string) => {
     if (!user) return;
 
-
     try {
       const { error } = await supabase
         .from('messages')
@@ -376,7 +366,6 @@ function useProvideMessages(): MessagesContextValue {
   const deleteMessage = useCallback(async (messageId: string) => {
     if (!user) return;
 
-
     try {
       const { error } = await supabase
         .from('messages')
@@ -396,7 +385,6 @@ function useProvideMessages(): MessagesContextValue {
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!user) return;
 
-
     try {
       const { error } = await supabase.rpc('toggle_message_reaction', {
         message_id: messageId,
@@ -415,7 +403,6 @@ function useProvideMessages(): MessagesContextValue {
 
   const togglePin = useCallback(async (messageId: string) => {
     if (!user) return;
-
 
     try {
       // First get the current pinned status
