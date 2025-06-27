@@ -315,6 +315,48 @@ async function isSessionUsable(): Promise<boolean> {
   }
 }
 
+// Helper function to get valid access token
+export const getValidAccessToken = async (): Promise<string | null> => {
+  try {
+    const stored = localStorage.getItem('sb-' + supabaseUrl.split('//')[1].split('.')[0] + '-auth-token');
+    if (!stored) {
+      console.warn('🔑 No auth token found in localStorage');
+      return null;
+    }
+
+    const parsed = JSON.parse(stored);
+    const access_token = parsed?.access_token;
+    const expires_at = parsed?.expires_at;
+
+    if (!access_token) {
+      console.warn('🔑 No access token in stored auth data');
+      return null;
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    if (now > expires_at - 30) {
+      console.warn('🔑 Access token expired or near expiry, attempting refresh...');
+      const refreshSuccess = await forceSessionRefresh();
+      if (!refreshSuccess) {
+        console.error('🔑 Failed to refresh session');
+        return null;
+      }
+      
+      // Get the new token after refresh
+      const newStored = localStorage.getItem('sb-' + supabaseUrl.split('//')[1].split('.')[0] + '-auth-token');
+      if (!newStored) return null;
+      
+      const newParsed = JSON.parse(newStored);
+      return newParsed?.access_token || null;
+    }
+
+    return access_token;
+  } catch (e) {
+    console.error('🔑 Error getting valid access token:', e);
+    return null;
+  }
+};
+
 // Helper function to ensure valid session before database operations
 export const ensureSession = async () => {
   console.log('🔒 [ENSURE_SESSION] Starting session validation...');
