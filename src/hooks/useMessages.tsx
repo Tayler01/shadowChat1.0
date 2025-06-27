@@ -228,8 +228,13 @@ function useProvideMessages(): MessagesContextValue {
 
     const handleVisibility = () => {
       if (!document.hidden) {
+        console.log('🔄 Page focus detected - resetting message channel')
         if (channel) {
+          console.log('🔌 Removing existing message channel before re-subscribing')
           supabase.removeChannel(channel)
+          channel = subscribeToChannel()
+        } else {
+          console.log('🔌 No existing message channel, subscribing anew')
           channel = subscribeToChannel()
         }
         fetchMessages()
