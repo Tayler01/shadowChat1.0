@@ -6,7 +6,7 @@ import React, {
   useCallback,
   useRef
 } from 'react';
-import { supabase, Message, ensureSession } from '../lib/supabase';
+import { supabase, Message, ensureSession, getValidAccessToken } from '../lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
 
@@ -120,37 +120,45 @@ function useProvideMessages(): MessagesContextValue {
     });
 
     try {
-      console.log(`${logPrefix}: Calling supabase.from('messages').select()`);
+      // Get valid access token
+      const accessToken = await getValidAccessToken()
+      if (!accessToken) {
+        throw new Error('No valid access token available')
+      }
+
+      console.log(`${logPrefix}: Access token validated, fetching messages...`)
       
-      const { data, error } = await supabase
-        .from('messages')
-        .select(`
-          *,
-          user:users!user_id(*)
-        `)
-        .order('created_at', { ascending: true })
-        .limit(100);
+      // Use direct fetch to avoid Supabase client issues
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+      
+      const url = `${supabaseUrl}/rest/v1/messages?select=*,user:users!messages_user_id_fkey(id,username,display_name,avatar_url,color,status)&order=created_at.asc&limit=100`
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      })
 
-      console.log(`${logPrefix}: Supabase query completed`, {
-        hasData: !!data,
-        dataLength: data?.length || 0,
-        hasError: !!error,
-        errorMessage: error?.message,
-        errorCode: error?.code
-      });
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`${logPrefix}: ❌ Error fetching messages:`, response.status, errorText)
+        throw new Error(`Failed to fetch messages: ${response.status} - ${errorText}`)
+      }
 
-      if (error) {
-        console.error(`${logPrefix}: ❌ Error fetching messages:`, error);
-      } else if (data) {
-        console.log(`${logPrefix}: ✅ Messages fetched successfully`, {
-          fetchedCount: data.length,
-          messageIds: data.map(m => m.id),
-          messageContents: data.map(m => ({ id: m.id, content: m.content.substring(0, 50) + '...' }))
-        });
+      const messagesData = await response.json()
+      
+      console.log(`${logPrefix}: ✅ Messages fetched successfully:`, {
+        count: messagesData?.length || 0,
+        sample: messagesData?.slice(0, 3).map((m: any) => ({ id: m.id, content: m.content?.substring(0, 50) }))
+      })
 
         // TEMPORARY: Replace messages entirely to see if fetch data contains missing messages
         console.log(`${logPrefix}: 🔄 TEMPORARILY replacing entire message state (for debugging)`);
-        setMessages(data as Message[]);
+        setMessages(messagesData || []);
         
         // Original logic (commented out for debugging):
         // setMessages(prev => {
@@ -161,7 +169,6 @@ function useProvideMessages(): MessagesContextValue {
         //   const merged = [...prev, ...data.filter(m => !ids.has(m.id))];
         //   return merged;
         // });
-      }
     } catch (error) {
       console.error(`${logPrefix}: ❌ Exception fetching messages:`, {
         message: error instanceof Error ? error.message : 'Unknown error',
