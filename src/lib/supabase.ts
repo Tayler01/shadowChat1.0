@@ -207,11 +207,26 @@ export const forceSessionRefresh = async (): Promise<boolean> => {
       return false;
     }
 
+    // 🔥 CRITICAL: Force Supabase to use the new tokens by calling setSession
+    console.log('🔄 [FORCE_REFRESH] Injecting new session tokens via setSession...');
+    const { error: setSessionError } = await supabase.auth.setSession({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+    });
+
+    if (setSessionError) {
+      console.error('🔄 [FORCE_REFRESH] ❌ setSession failed:', setSessionError.message);
+      return false;
+    }
+
+    console.log('🔄 [FORCE_REFRESH] ✅ Session manually injected via setSession');
+
     console.log('🔄 [FORCE_REFRESH] ✅ Session manually refreshed successfully:', {
       userId: data.session.user?.id,
       expiresAt: data.session.expires_at,
       hasAccessToken: !!data.session.access_token,
-      hasRefreshToken: !!data.session.refresh_token
+      hasRefreshToken: !!data.session.refresh_token,
+      sessionInjected: !setSessionError
     });
     
     return true;
