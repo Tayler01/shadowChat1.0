@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import type { ChatMessage } from './supabase'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -35,10 +36,10 @@ export function isToday(date: string | Date) {
   return d.toDateString() === today.toDateString()
 }
 
-export function groupMessagesByDate(messages: any[]) {
-  const groups: { date: string; messages: any[] }[] = []
+export function groupMessagesByDate(messages: ChatMessage[]) {
+  const groups: { date: string; messages: ChatMessage[] }[] = []
   let currentDate = ''
-  let currentGroup: any[] = []
+  let currentGroup: ChatMessage[] = []
 
   messages.forEach(message => {
     const messageDate = formatDate(message.created_at)
@@ -61,7 +62,7 @@ export function groupMessagesByDate(messages: any[]) {
   return groups
 }
 
-export function shouldGroupMessage(current: any, previous: any) {
+export function shouldGroupMessage(current: ChatMessage, previous?: ChatMessage) {
   if (!previous) return false
   
   // Don't group if different users

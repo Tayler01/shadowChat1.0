@@ -14,12 +14,12 @@ import {
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { formatTime, shouldGroupMessage } from '../../lib/utils'
-import { toggleReaction } from '../../lib/supabase'
+import { toggleReaction, type Message } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 
 interface MessageItemProps {
-  message: any
-  previousMessage?: any
+  message: Message
+  previousMessage?: Message
   onReply?: (messageId: string, content: string) => void
   onEdit: (messageId: string, content: string) => Promise<void>
   onDelete: (messageId: string) => Promise<void>
@@ -210,17 +210,17 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
 
 MessageItem.displayName = 'MessageItem'
 
-const MessageReactions: React.FC<{ message: any; onReact: (emoji: string) => void }> = ({ message, onReact }) => {
+const MessageReactions: React.FC<{ message: Message; onReact: (emoji: string) => void }> = ({ message, onReact }) => {
   const { profile } = useAuth()
-  const reactions = message.reactions || {}
+  const reactions: Record<string, { count: number; users: string[] }> = message.reactions || {}
   const hasReactions = Object.keys(reactions).length > 0
 
   if (!hasReactions) return null
 
   return (
     <div className="flex flex-wrap gap-1 mt-2">
-      {Object.entries(reactions).map(([emoji, data]: [string, any]) => {
-        const isReacted = data.users?.includes(profile?.id)
+      {Object.entries(reactions).map(([emoji, data]: [string, { count: number; users: string[] }]) => {
+        const isReacted = data.users?.includes(profile?.id ?? '')
         return (
           <motion.button
             key={emoji}

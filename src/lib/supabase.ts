@@ -116,6 +116,8 @@ export interface DMMessage {
   sender?: User
 }
 
+export type ChatMessage = Message | DMMessage
+
 export interface UserSession {
   id: string
   user_id: string
