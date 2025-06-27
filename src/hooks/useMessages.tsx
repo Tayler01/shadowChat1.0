@@ -6,7 +6,7 @@ import React, {
   useCallback,
   useRef
 } from 'react';
-import { supabase, Message, ensureSession } from '../lib/supabase';
+import { supabase, Message, ensureSession, DEBUG } from '../lib/supabase';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
 
@@ -114,14 +114,16 @@ function useProvideMessages(): MessagesContextValue {
               // Log received message with clear indication if it's from another user
               const isFromCurrentUser = newMessage.user_id === user.id;
               const logPrefix = isFromCurrentUser ? '📨 [REALTIME-SELF]' : '📨 [REALTIME-OTHER]';
-              console.log(`${logPrefix} Message received:`, {
-                id: newMessage.id,
-                content: newMessage.content,
-                from: newMessage.user?.display_name || 'Unknown',
-                userId: newMessage.user_id,
-                isFromMe: isFromCurrentUser,
-                timestamp: newMessage.created_at
-              });
+              if (DEBUG) {
+                console.log(`${logPrefix} Message received:`, {
+                  id: newMessage.id,
+                  content: newMessage.content,
+                  from: newMessage.user?.display_name || 'Unknown',
+                  userId: newMessage.user_id,
+                  isFromMe: isFromCurrentUser,
+                  timestamp: newMessage.created_at
+                });
+              }
 
               setMessages(prev => {
                 // Check if message already exists to avoid duplicates
@@ -148,14 +150,16 @@ function useProvideMessages(): MessagesContextValue {
         // Log broadcast message with clear indication if it's from another user
         const isFromCurrentUser = newMessage.user_id === user.id;
         const logPrefix = isFromCurrentUser ? '📡 [BROADCAST-SELF]' : '📡 [BROADCAST-OTHER]';
-        console.log(`${logPrefix} Broadcast message received:`, {
-          id: newMessage.id,
-          content: newMessage.content,
-          from: newMessage.user?.display_name || 'Unknown',
-          userId: newMessage.user_id,
-          isFromMe: isFromCurrentUser,
-          timestamp: newMessage.created_at
-        });
+        if (DEBUG) {
+          console.log(`${logPrefix} Broadcast message received:`, {
+            id: newMessage.id,
+            content: newMessage.content,
+            from: newMessage.user?.display_name || 'Unknown',
+            userId: newMessage.user_id,
+            isFromMe: isFromCurrentUser,
+            timestamp: newMessage.created_at
+          });
+        }
         
         setMessages(prev => {
           const exists = prev.find(m => m.id === newMessage.id)
@@ -237,13 +241,17 @@ function useProvideMessages(): MessagesContextValue {
 
     const handleVisibility = () => {
       const state = channel?.state
-      console.log('🌀 visibilitychange', { hidden: document.hidden, channelState: state })
+      if (DEBUG) {
+        console.log('🌀 visibilitychange', { hidden: document.hidden, channelState: state })
+      }
       if (!document.hidden) {
         // supabase.auth.refreshSession().catch(err => {
         //   console.error('Error refreshing session on visibility change:', err)
         // })
         if (channel && channel.state !== 'joined') {
-          console.log('🌀 Resubscribing channel due to state', channel.state)
+          if (DEBUG) {
+            console.log('🌀 Resubscribing channel due to state', channel.state)
+          }
           supabase.removeChannel(channel)
           channel = subscribeToChannel()
           channelRef.current = channel
@@ -265,11 +273,13 @@ function useProvideMessages(): MessagesContextValue {
     const timestamp = new Date().toISOString();
     const logPrefix = `🚀 [${timestamp}] MESSAGE_SEND`;
 
-    console.log(`${logPrefix}: Called`, {
-      hasUser: !!user,
-      userId: user?.id,
-      content
-    });
+    if (DEBUG) {
+      console.log(`${logPrefix}: Called`, {
+        hasUser: !!user,
+        userId: user?.id,
+        content
+      });
+    }
 
     if (!user || !content.trim()) {
       console.warn(`${logPrefix}: Skipped send — missing user or empty content`, { hasUser: !!user, content, userId: user?.id });
@@ -277,18 +287,22 @@ function useProvideMessages(): MessagesContextValue {
     }
 
     setSending(true);
-    console.log(`${logPrefix}: Channel state before send`, {
-      hasChannel: !!channelRef.current,
-      state: channelRef.current?.state,
-    })
+    if (DEBUG) {
+      console.log(`${logPrefix}: Channel state before send`, {
+        hasChannel: !!channelRef.current,
+        state: channelRef.current?.state,
+      })
+    }
 
     // Ensure we have a valid session before attempting database operations
     const sessionValid = await ensureSession();
-    console.log(`${logPrefix}: After ensureSession`, {
-      sessionValid,
-      hasUser: !!user,
-      userId: user?.id,
-    });
+    if (DEBUG) {
+      console.log(`${logPrefix}: After ensureSession`, {
+        sessionValid,
+        hasUser: !!user,
+        userId: user?.id,
+      });
+    }
     if (!sessionValid) {
       console.error(`${logPrefix}: ❌ Invalid or expired session, cannot send message`);
       throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
@@ -297,11 +311,13 @@ function useProvideMessages(): MessagesContextValue {
     // Log current session tokens and user details for debugging
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      console.log(`${logPrefix}: Session details`, {
-        access_token: session?.access_token,
-        refresh_token: session?.refresh_token,
-        userId: session?.user?.id,
-      });
+      if (DEBUG) {
+        console.log(`${logPrefix}: Session details`, {
+          access_token: session?.access_token,
+          refresh_token: session?.refresh_token,
+          userId: session?.user?.id,
+        });
+      }
     } catch (tokenErr) {
       console.error(`${logPrefix}: Failed to get session tokens`, tokenErr);
     }
@@ -314,7 +330,9 @@ function useProvideMessages(): MessagesContextValue {
         content: content.trim(),
         message_type: messageType,
       };
-      console.log(`${logPrefix}: Prepared message data`, messageData)
+      if (DEBUG) {
+        console.log(`${logPrefix}: Prepared message data`, messageData)
+      }
 
       // Step 2: Attempt database insert (let Supabase handle auth internally)
       const insertStartTime = performance.now();
@@ -336,7 +354,9 @@ function useProvideMessages(): MessagesContextValue {
       const insertEndTime = performance.now();
       const insertDuration = insertEndTime - insertStartTime;
 
-      console.log(`${logPrefix}: Insert response`, { duration: insertDuration, data, error });
+      if (DEBUG) {
+        console.log(`${logPrefix}: Insert response`, { duration: insertDuration, data, error });
+      }
 
       // Insert result logged for debugging
 
@@ -356,7 +376,9 @@ function useProvideMessages(): MessagesContextValue {
           const { data: refreshData, error: refreshError } = await Promise.race([refreshPromise, refreshTimeoutPromise]) as any;
           const retryRefreshEndTime = performance.now();
           const retryRefreshDuration = retryRefreshEndTime - retryRefreshStartTime;
-          console.log(`${logPrefix}: Session refresh duration`, retryRefreshDuration);
+          if (DEBUG) {
+            console.log(`${logPrefix}: Session refresh duration`, retryRefreshDuration);
+          }
           
           
           if (!refreshError && refreshData.session) {
@@ -378,7 +400,9 @@ function useProvideMessages(): MessagesContextValue {
             const retry = await Promise.race([retryPromise, retryTimeoutPromise]) as any;
             const retryInsertEndTime = performance.now();
             const retryInsertDuration = retryInsertEndTime - retryInsertStartTime;
-            console.log(`${logPrefix}: Retry insert duration`, retryInsertDuration);
+            if (DEBUG) {
+              console.log(`${logPrefix}: Retry insert duration`, retryInsertDuration);
+            }
             
             
             data = retry.data;
@@ -404,9 +428,11 @@ function useProvideMessages(): MessagesContextValue {
             return prev;
           }
           const updated = [...prev, data as Message]
-          console.log(`${logPrefix}: Message state updated`, {
-            totalMessages: updated.length,
-          })
+          if (DEBUG) {
+            console.log(`${logPrefix}: Message state updated`, {
+              totalMessages: updated.length,
+            })
+          }
           return updated
         })
         
@@ -415,10 +441,12 @@ function useProvideMessages(): MessagesContextValue {
           event: 'new_message',
           payload: data
         });
-        console.log(`${logPrefix}: Broadcast result`, {
-          result: broadcastResult,
-          channelState: channelRef.current?.state,
-        });
+        if (DEBUG) {
+          console.log(`${logPrefix}: Broadcast result`, {
+            result: broadcastResult,
+            channelState: channelRef.current?.state,
+          });
+        }
       }
       
       
