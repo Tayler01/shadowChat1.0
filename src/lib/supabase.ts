@@ -123,34 +123,32 @@ export const ensureSession = async () => {
   try {
     console.log('🔐 Checking session validity');
     
-    // First try to get the current session
-    let { data: { session }, error } = await supabase.auth.getSession()
+    // Add timeout to prevent hanging
+    const sessionPromise = supabase.auth.getSession();
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Session check timeout')), 5000)
+    );
     
-    if (error) {
-      console.error('Error getting session:', error)
-      // Try to refresh if there's an error getting session
-      console.log('🔐 Attempting to refresh session due to error');
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
-      if (refreshError) {
-        console.error('🔐 ❌ Failed to refresh session:', refreshError);
-        return false
-      }
-      session = refreshData.session
-      error = null
-    }
+    let { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]) as any;
     
-    if (!session) {
-      console.warn('🔐 ❌ No active session found, attempting refresh');
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
-      if (refreshError) {
+    if (error || !session) {
+      console.log('🔐 No valid session found, attempting refresh');
+      
+      const refreshPromise = supabase.auth.refreshSession();
+      const refreshTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Session refresh timeout')), 5000)
+      );
+      
+      const { data: refreshData, error: refreshError } = await Promise.race([refreshPromise, refreshTimeoutPromise]) as any;
+      
+      if (refreshError || !refreshData.session) {
         console.error('🔐 ❌ Failed to refresh session:', refreshError);
-        return false
+        return false;
       }
-      session = refreshData.session
-      if (!session) {
-        console.warn('🔐 ❌ Still no session after refresh')
-        return false
-      }
+      
+      session = refreshData.session;
+      console.log('🔐 ✅ Session refreshed successfully');
+      return true;
     }
     
     console.log('🔐 Session found, checking expiration');
@@ -162,15 +160,16 @@ export const ensureSession = async () => {
     
     if (expiresAt && (expiresAt - now) < fiveMinutes) {
       console.log('🔐 Session expiring soon, refreshing');
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
       
-      if (refreshError) {
+      const refreshPromise = supabase.auth.refreshSession();
+      const refreshTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Session refresh timeout')), 5000)
+      );
+      
+      const { data: refreshData, error: refreshError } = await Promise.race([refreshPromise, refreshTimeoutPromise]) as any;
+      
+      if (refreshError || !refreshData.session) {
         console.error('🔐 ❌ Error refreshing session:', refreshError)
-        return false
-      }
-    
-      if (!refreshData.session) {
-        console.warn('🔐 ❌ Failed to refresh session')
         return false
       }
       

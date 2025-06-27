@@ -247,37 +247,47 @@ function useProvideMessages(): MessagesContextValue {
     
     console.log(`${logPrefix}: Starting message send process`);
     
-    // 🔐 Ensure the session is valid before pulling the user
-    const sessionValid = await ensureSession();
-    if (!sessionValid) {
-      console.error(`${logPrefix}: ❌ Invalid or expired session, cannot send message`);
-      throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
+    try {
+      // 🔐 Ensure the session is valid before pulling the user
+      const sessionValid = await ensureSession();
+      if (!sessionValid) {
+        console.error(`${logPrefix}: ❌ Invalid or expired session, cannot send message`);
+        throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
+      }
+
+      // Always pull the fresh user from the now-valid session
+      const { data: sessionData } = await supabase.auth.getSession();
+      const currentUser = sessionData?.session?.user;
+
+      console.log(`${logPrefix}: Current user:`, currentUser?.id);
+
+      if (!currentUser || !content.trim()) {
+        console.error(`${logPrefix}: ❌ No user or empty content`);
+        return;
+      }
+
+      // Check if user profile exists
+      const { data: userProfile, error: profileError } = await supabase
+        .from('users')
+        .select('id, username, display_name')
+        .eq('id', currentUser.id)
+        .single();
+
+      if (profileError || !userProfile) {
+        console.error(`${logPrefix}: ❌ User profile not found:`, profileError);
+        throw new Error('User profile not found. Please refresh the page and try again.');
+      }
+
+      console.log(`${logPrefix}: User profile found:`, userProfile.username);
+    } catch (error) {
+      console.error(`${logPrefix}: ❌ Pre-flight checks failed:`, error);
+      setSending(false);
+      throw error;
     }
 
-    // Always pull the fresh user from the now-valid session
+    // Get current user again after validation
     const { data: sessionData } = await supabase.auth.getSession();
     const currentUser = sessionData?.session?.user;
-
-    console.log(`${logPrefix}: Current user:`, currentUser?.id);
-
-    if (!currentUser || !content.trim()) {
-      console.error(`${logPrefix}: ❌ No user or empty content`);
-      return;
-    }
-
-    // Check if user profile exists
-    const { data: userProfile, error: profileError } = await supabase
-      .from('users')
-      .select('id, username, display_name')
-      .eq('id', currentUser.id)
-      .single();
-
-    if (profileError || !userProfile) {
-      console.error(`${logPrefix}: ❌ User profile not found:`, profileError);
-      throw new Error('User profile not found. Please refresh the page and try again.');
-    }
-
-    console.log(`${logPrefix}: User profile found:`, userProfile.username);
 
     setSending(true);
 
