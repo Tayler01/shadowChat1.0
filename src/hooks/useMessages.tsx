@@ -31,7 +31,18 @@ function useProvideMessages(): MessagesContextValue {
   const channelRef = useRef<RealtimeChannel | null>(null);
 
   const fetchMessages = useCallback(async () => {
+    const timestamp = new Date().toISOString();
+    const logPrefix = `📥 [${timestamp}] FETCH_MESSAGES`;
+    
+    console.log(`${logPrefix}: Starting message fetch`, {
+      hasUser: !!user,
+      userId: user?.id,
+      currentMessageCount: messages.length
+    });
+
     try {
+      console.log(`${logPrefix}: Calling supabase.from('messages').select()`);
+      
       const { data, error } = await supabase
         .from('messages')
         .select(`
@@ -41,36 +52,63 @@ function useProvideMessages(): MessagesContextValue {
         .order('created_at', { ascending: true })
         .limit(100);
 
+      console.log(`${logPrefix}: Supabase query completed`, {
+        hasData: !!data,
+        dataLength: data?.length || 0,
+        hasError: !!error,
+        errorMessage: error?.message,
+        errorCode: error?.code
+      });
+
       if (error) {
-        // console.error('❌ Error fetching messages:', error);
+        console.error(`${logPrefix}: ❌ Error fetching messages:`, error);
       } else if (data) {
-        setMessages(prev => {
-          if (prev.length === 0) {
-            return data as Message[];
-          }
-          const ids = new Set(prev.map(m => m.id));
-          const merged = [...prev, ...data.filter(m => !ids.has(m.id))];
-          return merged;
+        console.log(`${logPrefix}: ✅ Messages fetched successfully`, {
+          fetchedCount: data.length,
+          messageIds: data.map(m => m.id),
+          messageContents: data.map(m => ({ id: m.id, content: m.content.substring(0, 50) + '...' }))
         });
+
+        // TEMPORARY: Replace messages entirely to see if fetch data contains missing messages
+        console.log(`${logPrefix}: 🔄 TEMPORARILY replacing entire message state (for debugging)`);
+        setMessages(data as Message[]);
+        
+        // Original logic (commented out for debugging):
+        // setMessages(prev => {
+        //   if (prev.length === 0) {
+        //     return data as Message[];
+        //   }
+        //   const ids = new Set(prev.map(m => m.id));
+        //   const merged = [...prev, ...data.filter(m => !ids.has(m.id))];
+        //   return merged;
+        // });
       }
     } catch (error) {
-      // console.error('❌ Exception fetching messages:', error);
+      console.error(`${logPrefix}: ❌ Exception fetching messages:`, {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        error
+      });
     } finally {
+      console.log(`${logPrefix}: Setting loading to false`);
       setLoading(false);
     }
-  }, []);
+  }, [user, messages.length]);
 
   // Fetch initial messages
   useEffect(() => {
+    console.log('📥 [MESSAGES] Initial fetch effect triggered');
     fetchMessages();
   }, [fetchMessages]);
 
   // Subscribe to real-time updates
   useEffect(() => {
     if (!user) {
+      console.log('📡 [REALTIME] No user, skipping real-time subscription');
       return;
     }
 
+    console.log('📡 [REALTIME] Setting up real-time subscription for user:', user.id);
 
     // Use a static channel name to prevent duplicate subscriptions
     const channelName = 'public:messages';
@@ -78,6 +116,8 @@ function useProvideMessages(): MessagesContextValue {
     let channel: RealtimeChannel | null = null;
 
     const subscribeToChannel = (): RealtimeChannel => {
+      console.log('📡 [REALTIME] Creating new channel subscription');
+      
       const newChannel = supabase
         .channel(channelName, {
           config: {
@@ -93,9 +133,21 @@ function useProvideMessages(): MessagesContextValue {
           table: 'messages',
         },
         async (payload) => {
+          const timestamp = new Date().toISOString();
+          const logPrefix = `📨 [${timestamp}] POSTGRES_INSERT`;
+          
+          console.log(`${logPrefix}: Received postgres_changes INSERT event`, {
+            payloadNew: payload.new,
+            messageId: payload.new?.id,
+            content: payload.new?.content,
+            userId: payload.new?.user_id,
+            isFromCurrentUser: payload.new?.user_id === user.id
+          });
           
           try {
             // Fetch the complete message with user data
+            console.log(`${logPrefix}: Fetching complete message data for ID: ${payload.new.id}`);
+            
             const { data: newMessage, error } = await supabase
               .from('messages')
               .select(`
@@ -106,15 +158,15 @@ function useProvideMessages(): MessagesContextValue {
               .single();
 
             if (error) {
-              // console.error('❌ Error fetching new message details:', error);
+              console.error(`${logPrefix}: ❌ Error fetching new message details:`, error);
               return;
             }
 
             if (newMessage) {
               // Log received message with clear indication if it's from another user
               const isFromCurrentUser = newMessage.user_id === user.id;
-              const logPrefix = isFromCurrentUser ? '📨 [REALTIME-SELF]' : '📨 [REALTIME-OTHER]';
-              console.log(`${logPrefix} Message received:`, {
+              const userLogPrefix = isFromCurrentUser ? '📨 [REALTIME-SELF]' : '📨 [REALTIME-OTHER]';
+              console.log(`${userLogPrefix} Message received:`, {
                 id: newMessage.id,
                 content: newMessage.content,
                 from: newMessage.user?.display_name || 'Unknown',
@@ -127,28 +179,37 @@ function useProvideMessages(): MessagesContextValue {
                 // Check if message already exists to avoid duplicates
                 const exists = prev.find(msg => msg.id === newMessage.id);
                 if (exists) {
+                  console.log(`${logPrefix}: Message already exists in state, skipping`);
                   return prev;
                 }
                 
                 // Add new message to the end
                 const updated = [...prev, newMessage as Message];
                 
+                console.log(`${logPrefix}: Adding message to state`, {
+                  previousCount: prev.length,
+                  newCount: updated.length,
+                  addedMessageId: newMessage.id
+                });
+                
                 // Force a new array reference to ensure React detects the change
                 return updated.slice();
               });
             }
           } catch (error) {
-            // console.error('❌ Exception handling new message:', error);
+            console.error(`${logPrefix}: ❌ Exception handling new message:`, error);
           }
         }
       )
       .on('broadcast', { event: 'new_message' }, (payload) => {
         const newMessage = payload.payload as Message
+        const timestamp = new Date().toISOString();
+        const logPrefix = `📡 [${timestamp}] BROADCAST_MESSAGE`;
         
         // Log broadcast message with clear indication if it's from another user
         const isFromCurrentUser = newMessage.user_id === user.id;
-        const logPrefix = isFromCurrentUser ? '📡 [BROADCAST-SELF]' : '📡 [BROADCAST-OTHER]';
-        console.log(`${logPrefix} Broadcast message received:`, {
+        const userLogPrefix = isFromCurrentUser ? '📡 [BROADCAST-SELF]' : '📡 [BROADCAST-OTHER]';
+        console.log(`${userLogPrefix} Broadcast message received:`, {
           id: newMessage.id,
           content: newMessage.content,
           from: newMessage.user?.display_name || 'Unknown',
@@ -159,7 +220,11 @@ function useProvideMessages(): MessagesContextValue {
         
         setMessages(prev => {
           const exists = prev.find(m => m.id === newMessage.id)
-          if (exists) return prev
+          if (exists) {
+            console.log(`${logPrefix}: Message already exists in state, skipping`);
+            return prev
+          }
+          console.log(`${logPrefix}: Adding broadcast message to state`);
           return [...prev, newMessage]
         })
       })
@@ -171,6 +236,13 @@ function useProvideMessages(): MessagesContextValue {
           table: 'messages',
         },
         async (payload) => {
+          const timestamp = new Date().toISOString();
+          const logPrefix = `📝 [${timestamp}] POSTGRES_UPDATE`;
+          
+          console.log(`${logPrefix}: Received postgres_changes UPDATE event`, {
+            payloadNew: payload.new,
+            messageId: payload.new?.id
+          });
           
           try {
             // Fetch the updated message with user data
@@ -184,17 +256,22 @@ function useProvideMessages(): MessagesContextValue {
               .single();
 
             if (error) {
-              // console.error('❌ Error fetching updated message:', error);
+              console.error(`${logPrefix}: ❌ Error fetching updated message:`, error);
               return;
             }
 
             if (updatedMessage) {
+              console.log(`${logPrefix}: Updating message in state`, {
+                messageId: updatedMessage.id,
+                content: updatedMessage.content
+              });
+              
               setMessages(prev =>
                 prev.map(msg => msg.id === updatedMessage.id ? updatedMessage as Message : msg)
               );
             }
           } catch (error) {
-            // console.error('❌ Exception handling message update:', error);
+            console.error(`${logPrefix}: ❌ Exception handling message update:`, error);
           }
         }
       )
@@ -206,23 +283,40 @@ function useProvideMessages(): MessagesContextValue {
           table: 'messages',
         },
         (payload) => {
+          const timestamp = new Date().toISOString();
+          const logPrefix = `🗑️ [${timestamp}] POSTGRES_DELETE`;
+          
+          console.log(`${logPrefix}: Received postgres_changes DELETE event`, {
+            payloadOld: payload.old,
+            messageId: payload.old?.id
+          });
+          
           setMessages(prev =>
             prev.filter(msg => msg.id !== payload.old.id)
           );
         }
       )
       .subscribe(async (status, err) => {
+        const timestamp = new Date().toISOString();
+        const logPrefix = `📡 [${timestamp}] CHANNEL_STATUS`;
+        
+        console.log(`${logPrefix}: Channel status changed`, {
+          status,
+          error: err?.message,
+          channelName
+        });
+        
         if (err) {
-          // console.error('❌ Real-time subscription error:', err);
+          console.error(`${logPrefix}: ❌ Real-time subscription error:`, err);
         }
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          // console.warn(`⚠️ Channel ${status}, removing and resubscribing...`);
+          console.warn(`${logPrefix}: ⚠️ Channel ${status}, removing and resubscribing...`);
           await supabase.removeChannel(newChannel);
           setTimeout(() => {
             channel = subscribeToChannel();
           }, 1000);
         } else if (status === 'CLOSED') {
-          // console.warn('⚠️ Channel closed, resubscribing...');
+          console.warn(`${logPrefix}: ⚠️ Channel closed, resubscribing...`);
           setTimeout(() => {
             channel = subscribeToChannel();
           }, 1000);
@@ -236,18 +330,28 @@ function useProvideMessages(): MessagesContextValue {
     channelRef.current = channel;
 
     const handleVisibility = () => {
+      const timestamp = new Date().toISOString();
+      const logPrefix = `👁️ [${timestamp}] VISIBILITY_CHANGE`;
+      
       const state = channel?.state
-      console.log('🌀 visibilitychange', { hidden: document.hidden, channelState: state })
+      console.log(`${logPrefix}: Page visibility changed`, { 
+        hidden: document.hidden, 
+        channelState: state,
+        hasChannel: !!channel,
+        hasUser: !!user
+      })
+      
       if (!document.hidden) {
-        // supabase.auth.refreshSession().catch(err => {
-        //   console.error('Error refreshing session on visibility change:', err)
-        // })
+        console.log(`${logPrefix}: Page became visible, checking channel and fetching messages`);
+        
         if (channel && channel.state !== 'joined') {
-          console.log('🌀 Resubscribing channel due to state', channel.state)
+          console.log(`${logPrefix}: 🌀 Resubscribing channel due to state: ${channel.state}`)
           supabase.removeChannel(channel)
           channel = subscribeToChannel()
           channelRef.current = channel
         }
+        
+        console.log(`${logPrefix}: Calling fetchMessages() due to visibility change`);
         fetchMessages()
       }
     }
@@ -255,6 +359,7 @@ function useProvideMessages(): MessagesContextValue {
     document.addEventListener('visibilitychange', handleVisibility)
 
     return () => {
+      console.log('📡 [REALTIME] Cleaning up real-time subscription');
       document.removeEventListener('visibilitychange', handleVisibility)
       if (channel) supabase.removeChannel(channel)
       channelRef.current = null
@@ -435,6 +540,7 @@ function useProvideMessages(): MessagesContextValue {
   const editMessage = useCallback(async (messageId: string, content: string) => {
     if (!user) return;
 
+    console.log('📝 [EDIT] Editing message:', { messageId, content });
 
     try {
       const { error } = await supabase
@@ -447,12 +553,13 @@ function useProvideMessages(): MessagesContextValue {
         .eq('user_id', user.id);
 
       if (error) {
-        // console.error('❌ Error editing message:', error);
+        console.error('❌ Error editing message:', error);
         throw error;
       }
 
+      console.log('✅ Message edited successfully');
     } catch (error) {
-      // console.error('❌ Exception editing message:', error);
+      console.error('❌ Exception editing message:', error);
       throw error;
     }
   }, [user]);
@@ -460,6 +567,7 @@ function useProvideMessages(): MessagesContextValue {
   const deleteMessage = useCallback(async (messageId: string) => {
     if (!user) return;
 
+    console.log('🗑️ [DELETE] Deleting message:', { messageId });
 
     try {
       const { error } = await supabase
@@ -469,12 +577,13 @@ function useProvideMessages(): MessagesContextValue {
         .eq('user_id', user.id);
 
       if (error) {
-        // console.error('❌ Error deleting message:', error);
+        console.error('❌ Error deleting message:', error);
         throw error;
       }
 
+      console.log('✅ Message deleted successfully');
     } catch (error) {
-      // console.error('❌ Exception deleting message:', error);
+      console.error('❌ Exception deleting message:', error);
       throw error;
     }
   }, [user]);
@@ -482,6 +591,7 @@ function useProvideMessages(): MessagesContextValue {
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!user) return;
 
+    console.log('👍 [REACTION] Toggling reaction:', { messageId, emoji });
 
     try {
       const { error } = await supabase.rpc('toggle_message_reaction', {
@@ -491,12 +601,13 @@ function useProvideMessages(): MessagesContextValue {
       });
 
       if (error) {
-        // console.error('❌ Error toggling reaction:', error);
+        console.error('❌ Error toggling reaction:', error);
         throw error;
       }
 
+      console.log('✅ Reaction toggled successfully');
     } catch (error) {
-      // console.error('❌ Exception toggling reaction:', error);
+      console.error('❌ Exception toggling reaction:', error);
       throw error;
     }
   }, [user]);
@@ -504,6 +615,7 @@ function useProvideMessages(): MessagesContextValue {
   const togglePin = useCallback(async (messageId: string) => {
     if (!user) return;
 
+    console.log('📌 [PIN] Toggling pin:', { messageId });
 
     try {
       // First get the current pinned status
@@ -514,7 +626,7 @@ function useProvideMessages(): MessagesContextValue {
         .single();
 
       if (!message) {
-        // console.error('❌ Message not found for pin toggle');
+        console.error('❌ Message not found for pin toggle');
         return;
       }
 
@@ -530,12 +642,13 @@ function useProvideMessages(): MessagesContextValue {
         .eq('id', messageId);
 
       if (error) {
-        // console.error('❌ Error toggling pin:', error);
+        console.error('❌ Error toggling pin:', error);
         throw error;
       }
 
+      console.log('✅ Pin toggled successfully');
     } catch (error) {
-      // console.error('❌ Exception toggling pin:', error);
+      console.error('❌ Exception toggling pin:', error);
       throw error;
     }
   }, [user]);
