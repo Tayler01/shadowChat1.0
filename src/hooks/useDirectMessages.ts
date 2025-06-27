@@ -6,6 +6,7 @@ import {
   DMMessage,
   getOrCreateDMConversation,
   markDMMessagesRead,
+  fetchDMConversations,
 } from '../lib/supabase';
 import { useAuth } from './useAuth';
 
@@ -19,61 +20,13 @@ export function useDirectMessages() {
   useEffect(() => {
     if (!user) return;
 
-    const fetchConversations = async () => {
-      const { data, error } = await supabase
-        .from('dm_conversations')
-        .select(`
-          *,
-          dm_messages(
-            id,
-            content,
-            sender_id,
-            created_at,
-            sender:users!sender_id(*)
-          )
-        `)
-        .contains('participants', [user.id])
-        .order('last_message_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching conversations:', error);
-      } else {
-        // Process conversations to get other user and last message
-        const processedConversations = await Promise.all(
-          (data || []).map(async (conv) => {
-            const otherUserId = conv.participants.find((id: string) => id !== user.id);
-            
-            const { data: otherUser } = await supabase
-              .from('users')
-              .select('*')
-              .eq('id', otherUserId)
-              .single();
-
-            const lastMessage = conv.dm_messages?.[conv.dm_messages.length - 1];
-            
-            // Count unread messages
-            const { count: unreadCount } = await supabase
-              .from('dm_messages')
-              .select('*', { count: 'exact', head: true })
-              .eq('conversation_id', conv.id)
-              .neq('sender_id', user.id)
-              .is('read_at', null);
-
-            return {
-              ...conv,
-              other_user: otherUser,
-              last_message: lastMessage,
-              unread_count: unreadCount || 0,
-            };
-          })
-        );
-
-        setConversations(processedConversations);
-      }
+    const fetchData = async () => {
+      const convs = await fetchDMConversations();
+      setConversations(convs);
       setLoading(false);
     };
 
-    fetchConversations();
+    fetchData();
   }, [user]);
 
   // Subscribe to real-time updates
@@ -98,8 +51,18 @@ export function useDirectMessages() {
               updated[convIndex] = {
                 ...updated[convIndex],
                 last_message_at: payload.new.created_at,
-                unread_count: payload.new.sender_id !== user.id 
-                  ? (updated[convIndex].unread_count || 0) + 1 
+                last_message: {
+                  id: payload.new.id,
+                  conversation_id: payload.new.conversation_id,
+                  sender_id: payload.new.sender_id,
+                  content: payload.new.content,
+                  read_at: payload.new.read_at,
+                  reactions: payload.new.reactions,
+                  edited_at: payload.new.edited_at,
+                  created_at: payload.new.created_at,
+                },
+                unread_count: payload.new.sender_id !== user.id
+                  ? (updated[convIndex].unread_count || 0) + 1
                   : updated[convIndex].unread_count,
               };
               // Move to top
