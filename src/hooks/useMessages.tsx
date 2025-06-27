@@ -319,6 +319,11 @@ function useProvideMessages(): MessagesContextValue {
       // Step 2: Attempt database insert (let Supabase handle auth internally)
       const insertStartTime = performance.now();
       
+      console.log(`${logPrefix}: About to call supabase.from('messages').insert()`, {
+        messageData,
+        timestamp: new Date().toISOString()
+      });
+      
       const { data, error } = await supabase
         .from('messages')
         .insert(messageData)
@@ -327,6 +332,12 @@ function useProvideMessages(): MessagesContextValue {
           user:users!user_id(*)
         `)
         .single();
+        
+      console.log(`${logPrefix}: Supabase insert completed`, {
+        data,
+        error,
+        timestamp: new Date().toISOString()
+      });
         
       const insertEndTime = performance.now();
       const insertDuration = insertEndTime - insertStartTime;
