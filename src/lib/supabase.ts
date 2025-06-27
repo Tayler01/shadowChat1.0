@@ -139,6 +139,15 @@ export const toggleReaction = async (messageId: string, emoji: string, isDM = fa
   if (error) console.error('Error toggling reaction:', error)
 }
 
+export const fetchDMConversations = async () => {
+  const { data, error } = await supabase.rpc('get_dm_conversations')
+  if (error) {
+    console.error('Error fetching DM conversations:', error)
+    return [] as DMConversation[]
+  }
+  return (data ?? []) as DMConversation[]
+}
+
 export const getOrCreateDMConversation = async (otherUserId: string) => {
   const { data, error } = await supabase.rpc('get_or_create_dm_conversation', {
     other_user_id: otherUserId
