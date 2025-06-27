@@ -224,11 +224,6 @@ export const getCurrentUser = async () => {
       
       throw fetchError;
     }
-    const { data: profile, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', user.id)
-      .single();
 
 
     if (error && error.code === 'PGRST116') {
