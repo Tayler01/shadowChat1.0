@@ -327,14 +327,14 @@ export const ensureSession = async () => {
     if (!usable) {
       console.warn('🔒 [ENSURE_SESSION] ⚠️ Session not usable, triggering nuclear refresh');
       // 🧼 Use the cleaner refreshSession() approach instead of manual setSession
-      const refreshSuccess = await cleanSessionRefresh();
+      const refreshSuccess = await forceSessionRefresh();
       
       if (!refreshSuccess) {
         console.error('🔒 [ENSURE_SESSION] ❌ Clean refresh failed (page should reload)');
         return false;
       }
       
-      console.log('🔒 [ENSURE_SESSION] ✅ Clean refresh completed successfully');
+      console.log('🔒 [ENSURE_SESSION] ✅ Nuclear refresh completed successfully');
       
       // Verify the refresh worked by checking localStorage again
       const usableAfterRefresh = await isSessionUsable();
@@ -358,4 +358,3 @@ export const ensureSession = async () => {
     });
     return false;
   }
-};
