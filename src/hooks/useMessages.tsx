@@ -319,7 +319,7 @@ function useProvideMessages(): MessagesContextValue {
       // Step 2: Attempt database insert (let Supabase handle auth internally)
       const insertStartTime = performance.now();
       
-      const insertPromise = supabase
+      const { data, error } = await supabase
         .from('messages')
         .insert(messageData)
         .select(`
@@ -328,11 +328,6 @@ function useProvideMessages(): MessagesContextValue {
         `)
         .single();
         
-      const insertTimeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Database insert timeout after 10 seconds')), 10000)
-      );
-      
-      let { data, error } = await Promise.race([insertPromise, insertTimeoutPromise]) as any;
       const insertEndTime = performance.now();
       const insertDuration = insertEndTime - insertStartTime;
 
@@ -348,12 +343,7 @@ function useProvideMessages(): MessagesContextValue {
           const retryRefreshStartTime = performance.now();
           
           // Try refreshing the session
-          const refreshPromise = supabase.auth.refreshSession();
-          const refreshTimeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Session refresh timeout after 5 seconds')), 5000)
-          );
-          
-          const { data: refreshData, error: refreshError } = await Promise.race([refreshPromise, refreshTimeoutPromise]) as any;
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
           const retryRefreshEndTime = performance.now();
           const retryRefreshDuration = retryRefreshEndTime - retryRefreshStartTime;
           console.log(`${logPrefix}: Session refresh duration`, retryRefreshDuration);
@@ -362,7 +352,7 @@ function useProvideMessages(): MessagesContextValue {
           if (!refreshError && refreshData.session) {
             const retryInsertStartTime = performance.now();
             
-            const retryPromise = supabase
+            const retry = await supabase
               .from('messages')
               .insert(messageData)
               .select(`
@@ -371,11 +361,6 @@ function useProvideMessages(): MessagesContextValue {
               `)
               .single();
               
-            const retryTimeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Retry database insert timeout after 10 seconds')), 10000)
-            );
-            
-            const retry = await Promise.race([retryPromise, retryTimeoutPromise]) as any;
             const retryInsertEndTime = performance.now();
             const retryInsertDuration = retryInsertEndTime - retryInsertStartTime;
             console.log(`${logPrefix}: Retry insert duration`, retryInsertDuration);
