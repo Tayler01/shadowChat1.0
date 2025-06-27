@@ -243,6 +243,7 @@ function useProvideMessages(): MessagesContextValue {
         if (channel && channel.state !== 'joined') {
           supabase.removeChannel(channel)
           channel = subscribeToChannel()
+          channelRef.current = channel
         }
         fetchMessages()
       }
