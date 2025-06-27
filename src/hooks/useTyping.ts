@@ -51,6 +51,35 @@ export const useTyping = (channelName: string = 'general') => {
     }
   }, [channelName])
 
+  const stopTyping = useCallback(async () => {
+    if (!isTyping || !user) return
+
+    try {
+      setIsTyping(false)
+
+      // Broadcast typing stop using current user info
+      await channelRef.current?.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: {
+          user: {
+            id: user.id,
+            username: user.username,
+            display_name: user.display_name
+          },
+          typing: false
+        }
+      })
+
+      // Clear timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+      }
+    } catch (err) {
+      console.error('Error stopping typing:', err)
+    }
+  }, [isTyping, user])
+
   const startTyping = useCallback(async () => {
     if (isTyping || !user) return
 
@@ -84,35 +113,6 @@ export const useTyping = (channelName: string = 'general') => {
       console.error('Error starting typing:', err)
     }
   }, [isTyping, user, stopTyping])
-
-  const stopTyping = useCallback(async () => {
-    if (!isTyping || !user) return
-
-    try {
-      setIsTyping(false)
-
-      // Broadcast typing stop using current user info
-      await channelRef.current?.send({
-        type: 'broadcast',
-        event: 'typing',
-        payload: {
-          user: {
-            id: user.id,
-            username: user.username,
-            display_name: user.display_name
-          },
-          typing: false
-        }
-      })
-
-      // Clear timeout
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current)
-      }
-    } catch (err) {
-      console.error('Error stopping typing:', err)
-    }
-  }, [isTyping, user])
 
   // Clean up timeout on unmount
   useEffect(() => {
