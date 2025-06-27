@@ -63,19 +63,19 @@ export function Sidebar({
     >
       <button
         onClick={onClose}
-        className="absolute top-2 right-2 p-2 rounded-md text-gray-500 hover:text-gray-700 md:hidden"
+        className="absolute top-2 right-2 p-2 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 md:hidden"
       >
         <X className="w-4 h-4" />
       </button>
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center space-x-3">
           <div className="p-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg">
             <MessageSquare className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="font-bold text-xl text-gray-900">ChatFlow</h1>
-            <p className="text-xs text-gray-500">Realtime Messaging</p>
+            <h1 className="font-bold text-xl text-gray-900 dark:text-gray-100">ChatFlow</h1>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Realtime Messaging</p>
           </div>
         </div>
       </div>
@@ -90,8 +90,8 @@ export function Sidebar({
               w-full flex items-center space-x-3 px-3 py-2 rounded-lg
               transition-all duration-200
               ${currentView === item.id
-                ? 'bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 border-l-4 border-blue-500'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                ? 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 text-blue-700 dark:text-blue-400 border-l-4 border-blue-500 dark:border-blue-400'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
               }
             `}
           >
@@ -109,12 +109,12 @@ export function Sidebar({
         {currentView === 'dms' && (
           <div className="mt-6 space-y-2">
             <div className="flex items-center justify-between px-3">
-              <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">
+              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                 Conversations
               </h3>
               <button
                 onClick={onNewDM}
-                className="p-1 text-gray-400 hover:text-gray-600 rounded"
+                className="p-1 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 rounded"
               >
                 <Plus className="w-4 h-4" />
               </button>
@@ -124,7 +124,7 @@ export function Sidebar({
               {conversations.map((conversation) => (
                 <button
                   key={conversation.id}
-                  className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-50 text-left"
+                  className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-left"
                 >
                   <Avatar
                     src={conversation.other_user?.avatar_url}
@@ -135,11 +135,11 @@ export function Sidebar({
                     showStatus
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                       {conversation.other_user?.full_name || conversation.other_user?.username}
                     </p>
                     {conversation.last_message && (
-                      <p className="text-xs text-gray-500 truncate">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                         {conversation.last_message.content}
                       </p>
                     )}
@@ -157,7 +157,7 @@ export function Sidebar({
       </nav>
 
       {/* User Profile */}
-      <div className="p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
         <div className="flex items-center space-x-3">
           <Avatar
             src={user?.avatar_url}
@@ -168,16 +168,16 @@ export function Sidebar({
             showStatus
           />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
               {user?.full_name}
             </p>
-            <p className="text-xs text-gray-500 truncate">
+            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
               @{user?.username}
             </p>
           </div>
           <button
             onClick={onToggleDarkMode}
-            className="p-2 text-gray-500 hover:text-gray-700"
+            className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
           >
             {isDarkMode ? (
               <Sun className="w-4 h-4" />
