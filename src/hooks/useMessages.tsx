@@ -127,12 +127,12 @@ function useProvideMessages(): MessagesContextValue {
         }
       )
       .on('broadcast', { event: 'new_message' }, (payload) => {
-        const newMessage = payload.payload as Message
+        const newMessage = payload.payload as Message;
         setMessages(prev => {
-          const exists = prev.find(m => m.id === newMessage.id)
-          if (exists) return prev
-          return [...prev, newMessage]
-        })
+          const exists = prev.find(m => m.id === newMessage.id);
+          if (exists) return prev;
+          return [...prev, newMessage];
+        });
       })
       .on(
         'postgres_changes',
@@ -206,19 +206,19 @@ function useProvideMessages(): MessagesContextValue {
     const handleVisibility = () => {
       if (!document.hidden) {
         if (channel && channel.state !== 'joined') {
-          supabase.removeChannel(channel)
-          channel = subscribeToChannel()
+          supabase.removeChannel(channel);
+          channel = subscribeToChannel();
         }
-        fetchMessages()
+        fetchMessages();
       }
-    }
+    };
 
-    document.addEventListener('visibilitychange', handleVisibility)
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibility)
-      if (channel) supabase.removeChannel(channel)
-      channelRef.current = null
+      document.removeEventListener('visibilitychange', handleVisibility);
+      if (channel) supabase.removeChannel(channel);
+      channelRef.current = null;
     };
   }, [user, fetchMessages]);
 
@@ -274,16 +274,6 @@ function useProvideMessages(): MessagesContextValue {
       const insertEndTime = performance.now();
       const insertDuration = insertEndTime - insertStartTime;
 
-        success: !!data,
-        error: error?.message,
-        errorCode: error?.code,
-        errorDetails: error?.details,
-        errorHint: error?.hint,
-        insertedId: data?.id,
-        insertedContent: data?.content,
-        insertDuration: `${insertDuration.toFixed(2)}ms`
-      });
-
       if (error) {
         console.error(`${logPrefix}: ❌ Database insert failed:`, error);
         
@@ -300,11 +290,6 @@ function useProvideMessages(): MessagesContextValue {
           const { data: refreshData, error: refreshError } = await Promise.race([refreshPromise, refreshTimeoutPromise]) as any;
           const retryRefreshEndTime = performance.now();
           const retryRefreshDuration = retryRefreshEndTime - retryRefreshStartTime;
-          
-            success: !!refreshData.session,
-            error: refreshError?.message,
-            retryRefreshDuration: `${retryRefreshDuration.toFixed(2)}ms`
-          });
           
           if (!refreshError && refreshData.session) {
             const retryInsertStartTime = performance.now();
@@ -326,12 +311,6 @@ function useProvideMessages(): MessagesContextValue {
             const retryInsertEndTime = performance.now();
             const retryInsertDuration = retryInsertEndTime - retryInsertStartTime;
             
-              success: !!retry.data,
-              error: retry.error?.message,
-              insertedId: retry.data?.id,
-              retryInsertDuration: `${retryInsertDuration.toFixed(2)}ms`
-            });
-            
             data = retry.data;
             error = retry.error;
           } else {
@@ -345,21 +324,15 @@ function useProvideMessages(): MessagesContextValue {
         }
       }
 
-        id: data?.id,
-        content: data?.content,
-        userId: data?.user_id,
-        createdAt: data?.created_at
-      });
-
       // Step 4: Update local state and broadcast
       if (data) {
         setMessages(prev => {
-          const exists = prev.find(m => m.id === data.id)
+          const exists = prev.find(m => m.id === data.id);
           if (exists) {
             return prev;
           }
           return [...prev, data as Message];
-        })
+        });
         
         const broadcastResult = channelRef.current?.send({
           type: 'broadcast',
@@ -367,7 +340,6 @@ function useProvideMessages(): MessagesContextValue {
           payload: data
         });
       }
-      
       
     } catch (error) {
       console.error(`${logPrefix}: ❌ Exception in send process:`, {
