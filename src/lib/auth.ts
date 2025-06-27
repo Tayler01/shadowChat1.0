@@ -119,7 +119,7 @@ export const signOut = async () => {
 
 export const getCurrentUser = async () => {
   console.log('🔍 getCurrentUser called');
-
+  
   try {
     console.log('🔐 Checking auth user...');
     const { data: { user }, error: authError } = await supabase.auth.getUser()

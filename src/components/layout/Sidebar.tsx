@@ -1,28 +1,16 @@
 import React from 'react';
-import { MessageSquare, Users, User, Settings, Plus, Moon, Sun, X } from 'lucide-react';
+import { MessageSquare, Users, User, Settings, Plus } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
 import { useAuth } from '../../hooks/useAuth';
 import { useDirectMessages } from '../../hooks/useDirectMessages';
 
 interface SidebarProps {
-  currentView: 'chat' | 'dms' | 'profile' | 'settings';
-  onViewChange: (view: 'chat' | 'dms' | 'profile' | 'settings') => void;
-  isDarkMode: boolean;
-  onToggleDarkMode: () => void;
+  activeSection: 'chat' | 'dms' | 'profile' | 'settings';
+  onSectionChange: (section: 'chat' | 'dms' | 'profile' | 'settings') => void;
   onNewDM?: () => void;
-  isOpen: boolean;
-  onClose: () => void;
 }
 
-export function Sidebar({
-  currentView,
-  onViewChange,
-  isDarkMode,
-  onToggleDarkMode,
-  onNewDM,
-  isOpen,
-  onClose,
-}: SidebarProps) {
+export function Sidebar({ activeSection, onSectionChange, onNewDM }: SidebarProps) {
   const { user } = useAuth();
   const { conversations } = useDirectMessages();
 
@@ -56,17 +44,7 @@ export function Sidebar({
   ];
 
   return (
-    <div
-      className={`w-64 bg-white border-r border-gray-200 flex flex-col h-full fixed inset-y-0 left-0 z-40 transform transition-transform md:relative md:translate-x-0 ${
-        isOpen ? '' : '-translate-x-full'
-      }`}
-    >
-      <button
-        onClick={onClose}
-        className="absolute top-2 right-2 p-2 rounded-md text-gray-500 hover:text-gray-700 md:hidden"
-      >
-        <X className="w-4 h-4" />
-      </button>
+    <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center space-x-3">
@@ -85,11 +63,11 @@ export function Sidebar({
         {navItems.map((item) => (
           <button
             key={item.id}
-            onClick={() => onViewChange(item.id)}
+            onClick={() => onSectionChange(item.id)}
             className={`
               w-full flex items-center space-x-3 px-3 py-2 rounded-lg
               transition-all duration-200
-              ${currentView === item.id
+              ${activeSection === item.id
                 ? 'bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 border-l-4 border-blue-500'
                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
               }
@@ -106,7 +84,7 @@ export function Sidebar({
         ))}
 
         {/* DM List */}
-        {currentView === 'dms' && (
+        {activeSection === 'dms' && (
           <div className="mt-6 space-y-2">
             <div className="flex items-center justify-between px-3">
               <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide">
@@ -130,9 +108,7 @@ export function Sidebar({
                     src={conversation.other_user?.avatar_url}
                     alt={conversation.other_user?.full_name || 'User'}
                     size="sm"
-                    color={conversation.other_user?.color}
                     status={conversation.other_user?.status}
-                    showStatus
                   />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
@@ -163,9 +139,7 @@ export function Sidebar({
             src={user?.avatar_url}
             alt={user?.full_name || 'You'}
             size="md"
-            color={user?.color}
             status={user?.status}
-            showStatus
           />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-900 truncate">
@@ -175,16 +149,6 @@ export function Sidebar({
               @{user?.username}
             </p>
           </div>
-          <button
-            onClick={onToggleDarkMode}
-            className="p-2 text-gray-500 hover:text-gray-700"
-          >
-            {isDarkMode ? (
-              <Sun className="w-4 h-4" />
-            ) : (
-              <Moon className="w-4 h-4" />
-            )}
-          </button>
         </div>
       </div>
     </div>

@@ -7,8 +7,6 @@ interface AvatarProps {
   fallback?: string;
   className?: string;
   status?: 'online' | 'away' | 'busy' | 'offline';
-  color?: string;
-  showStatus?: boolean;
 }
 
 const sizeClasses = {
@@ -25,33 +23,21 @@ const statusColors = {
   offline: 'bg-gray-400',
 };
 
-export function Avatar({
-  src,
-  alt,
-  size = 'md',
-  fallback,
-  className = '',
-  status,
-  color,
-  showStatus,
-}: AvatarProps) {
+export function Avatar({ src, alt, size = 'md', fallback, className = '', status }: AvatarProps) {
   const initials = fallback || alt.split(' ').map(n => n[0]).join('').toUpperCase();
   
   return (
     <div className={`relative inline-block ${className}`}>
-      <div
-        className={`
-        ${sizeClasses[size]}
-        rounded-full
-        overflow-hidden
-        ${color ? '' : 'bg-gradient-to-br from-blue-500 to-purple-600'}
+      <div className={`
+        ${sizeClasses[size]} 
+        rounded-full 
+        overflow-hidden 
+        bg-gradient-to-br from-blue-500 to-purple-600
         flex items-center justify-center
         text-white font-medium
         ring-2 ring-white
         transition-all duration-200 hover:scale-105
-      `}
-        style={color ? { backgroundColor: color } : undefined}
-      >
+      `}>
         {src ? (
           <img
             src={src}
@@ -66,7 +52,7 @@ export function Avatar({
         )}
       </div>
       
-      {showStatus && status && (
+      {status && (
         <div className={`
           absolute -bottom-0.5 -right-0.5
           w-3 h-3 rounded-full border-2 border-white

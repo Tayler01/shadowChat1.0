@@ -68,7 +68,6 @@ A trigger on dm_messages updates the last_message_at timestamp on the correspond
 --- ## Advanced UI / UX Features ### Navigation
 Persistent sidebar navigation with icons for Chat, DMs, Profile, and Settings
 Collapsible on mobile and tablet
-Menu buttons in each view header toggle the sidebar on small screens
 Sidebar shows unread message badges and typing indicators
 ### Dark Mode
 Theme toggle available in settings
