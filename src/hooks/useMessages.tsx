@@ -237,6 +237,7 @@ function useProvideMessages(): MessagesContextValue {
     const logPrefix = `🚀 [${timestamp}] MESSAGE_SEND`;
 
     if (!user || !content.trim()) {
+      console.warn(`${logPrefix}: Skipped send — missing user or empty content`, { hasUser: !!user, content });
       return;
     }
 
