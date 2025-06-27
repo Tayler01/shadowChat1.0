@@ -166,8 +166,8 @@ export const ensureSession = async () => {
       
       if (refreshError) {
         console.error('🔐 ❌ Error refreshing session:', refreshError)
-      return false
-    }
+        return false
+      }
     
       if (!refreshData.session) {
         console.warn('🔐 ❌ Failed to refresh session')
@@ -182,40 +182,6 @@ export const ensureSession = async () => {
     return true
   } catch (error) {
     console.error('🔐 ❌ Exception in ensureSession:', error)
-    return false
-  }
-}
-      return false
-    }
-    
-    console.log('🔐 Session found, checking expiration');
-    // Check if session is expired or about to expire (within 5 minutes)
-    const expiresAt = session.expires_at
-    const now = Math.floor(Date.now() / 1000)
-    const fiveMinutes = 5 * 60
-    
-    if (expiresAt && (expiresAt - now) < fiveMinutes) {
-      console.log('🔐 Session expiring soon, refreshing');
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
-      
-      if (refreshError) {
-        console.error('Error refreshing session:', refreshError)
-        return false
-      }
-      
-      if (!refreshData.session) {
-        console.warn('Failed to refresh session')
-        return false
-      }
-      
-      console.log('🔐 ✅ Session refreshed successfully');
-    } else {
-      console.log('🔐 ✅ Session is valid');
-    }
-    
-    return true
-  } catch (error) {
-    console.error('Exception in ensureSession:', error)
     return false
   }
 }
