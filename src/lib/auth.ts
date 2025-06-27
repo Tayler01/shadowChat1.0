@@ -101,18 +101,42 @@ export const signIn = async ({ email, password }: SignInData) => {
 }
 
 export const signOut = async () => {
+  console.log('🚪 [AUTH] signOut: Function started');
+  
   const { data: { user } } = await supabase.auth.getUser()
+  console.log('🚪 [AUTH] signOut: Current user retrieved:', {
+    hasUser: !!user,
+    userId: user?.id,
+    email: user?.email
+  });
   
   if (user) {
+    console.log('🚪 [AUTH] signOut: Updating user status to offline');
     // Update status to offline before signing out
-    await supabase
+    const { error: updateError } = await supabase
       .from('users')
       .update({ status: 'offline' })
       .eq('id', user.id)
+    
+    if (updateError) {
+      console.error('🚪 [AUTH] signOut: Error updating user status:', updateError);
+    } else {
+      console.log('🚪 [AUTH] signOut: User status updated to offline successfully');
+    }
+  } else {
+    console.log('🚪 [AUTH] signOut: No user found, skipping status update');
   }
 
+  console.log('🚪 [AUTH] signOut: Calling supabase.auth.signOut()');
   const { error } = await supabase.auth.signOut()
-  if (error) throw error
+  
+  if (error) {
+    console.error('🚪 [AUTH] signOut: Supabase signOut error:', error);
+    throw error
+  }
+  
+  console.log('🚪 [AUTH] signOut: Supabase signOut completed successfully');
+  console.log('🚪 [AUTH] signOut: Function completed');
 }
 
 export const getCurrentUser = async () => {

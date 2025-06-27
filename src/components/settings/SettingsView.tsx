@@ -35,11 +35,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
   }
 
   const handleSignOut = async () => {
+    console.log('🚪 [SIGNOUT] handleSignOut: Function called - button click registered');
     try {
+      console.log('🚪 [SIGNOUT] handleSignOut: About to call signOut()');
       await signOut()
+      console.log('🚪 [SIGNOUT] handleSignOut: signOut() completed successfully');
       toast.success('Signed out successfully')
+      console.log('🚪 [SIGNOUT] handleSignOut: Success toast displayed');
     } catch (error) {
+      console.error('🚪 [SIGNOUT] handleSignOut: Error caught:', error);
       toast.error('Failed to sign out')
+      console.log('🚪 [SIGNOUT] handleSignOut: Error toast displayed');
     }
   }
 
