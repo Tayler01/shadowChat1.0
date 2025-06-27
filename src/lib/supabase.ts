@@ -1,5 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
 
+// Global debug flag used to gate verbose logging
+export const DEBUG = import.meta.env.DEV
+
 // Custom fetch that logs all request and response details for debugging
 const loggingFetch: typeof fetch = async (input, init) => {
   const url = typeof input === 'string' ? input : input.url
@@ -12,7 +15,9 @@ const loggingFetch: typeof fetch = async (input, init) => {
   }
   const body = init?.body
 
-  console.log('📡 [Supabase] Request:', { url, method, headers, body })
+  if (DEBUG) {
+    console.log('📡 [Supabase] Request:', { url, method, headers, body })
+  }
 
   try {
     const response = await fetch(input, init)
@@ -23,11 +28,13 @@ const loggingFetch: typeof fetch = async (input, init) => {
     } catch {
       responseBody = '<unreadable>'
     }
-    console.log('📡 [Supabase] Response:', {
-      url,
-      status: response.status,
-      body: responseBody,
-    })
+    if (DEBUG) {
+      console.log('📡 [Supabase] Response:', {
+        url,
+        status: response.status,
+        body: responseBody,
+      })
+    }
     return response
   } catch (err) {
     console.error('📡 [Supabase] Fetch error:', err)
@@ -165,10 +172,12 @@ export const ensureSession = async () => {
       return false
     }
 
-    console.log('ensureSession: current session', {
-      userId: session.user?.id,
-      expiresAt: session.expires_at,
-    })
+    if (DEBUG) {
+      console.log('ensureSession: current session', {
+        userId: session.user?.id,
+        expiresAt: session.expires_at,
+      })
+    }
     
     // Check if session is expired or about to expire (within 5 minutes)
     const expiresAt = session.expires_at
@@ -188,10 +197,12 @@ export const ensureSession = async () => {
         return false
       }
 
-      console.log('ensureSession: session refreshed', {
-        userId: refreshData.session.user?.id,
-        expiresAt: refreshData.session.expires_at,
-      })
+      if (DEBUG) {
+        console.log('ensureSession: session refreshed', {
+          userId: refreshData.session.user?.id,
+          expiresAt: refreshData.session.expires_at,
+        })
+      }
     }
     
     return true
