@@ -149,7 +149,11 @@ export const forceSessionRefresh = async (): Promise<boolean> => {
     });
 
     if (error || !data?.session) {
-      console.error('🔥 [NUCLEAR_REFRESH] ❌ setSession failed:', error?.message);
+      if (error?.message === 'Auth session missing!' || error?.message?.includes('Auth session missing')) {
+        console.warn('🔥 [NUCLEAR_REFRESH] ⚠️ setSession failed - Auth session missing (expected, will sign out):', error?.message);
+      } else {
+        console.error('🔥 [NUCLEAR_REFRESH] ❌ setSession failed:', error?.message);
+      }
       
       // If the session is missing on the server, clear local storage and sign out
       if (error?.message === 'Auth session missing!' || error?.message?.includes('Auth session missing')) {
@@ -175,7 +179,11 @@ export const forceSessionRefresh = async (): Promise<boolean> => {
 
     return true;
   } catch (e) {
-    console.error('🔥 [NUCLEAR_REFRESH] ❌ Exception during forced session re-auth', e);
+    if (e instanceof Error && (e.message === 'Auth session missing!' || e.message?.includes('Auth session missing'))) {
+      console.warn('🔥 [NUCLEAR_REFRESH] ⚠️ Exception during forced session re-auth - Auth session missing (expected, will sign out)', e);
+    } else {
+      console.error('🔥 [NUCLEAR_REFRESH] ❌ Exception during forced session re-auth', e);
+    }
     
     // If we get an auth session missing error in the exception, handle it
     if (e instanceof Error && (e.message === 'Auth session missing!' || e.message?.includes('Auth session missing'))) {
