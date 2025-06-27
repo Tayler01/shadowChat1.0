@@ -359,3 +359,196 @@ export const ensureSession = async () => {
     return false;
   }
 }
+
+// Fetch-based database operations to bypass Supabase client issues
+export const fetchInsert = async (
+  table: string, 
+  data: Record<string, any>, 
+  options: { select?: string } = {}
+): Promise<any> => {
+  const timestamp = new Date().toISOString();
+  const logPrefix = `🔧 [${timestamp}] FETCH_INSERT`;
+  
+  console.log(`${logPrefix}: Starting fetch insert`, { table, data, options });
+  
+  const accessToken = await getValidAccessToken();
+  if (!accessToken) {
+    throw new Error('No valid access token available for fetch insert');
+  }
+  
+  const url = `${supabaseUrl}/rest/v1/${table}`;
+  const headers = {
+    'apikey': supabaseAnonKey,
+    'Authorization': `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+    'Prefer': options.select ? 'return=representation' : 'return=minimal'
+  };
+  
+  console.log(`${logPrefix}: Making fetch request`, { url, headers: { ...headers, Authorization: '[REDACTED]' } });
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(data)
+  });
+  
+  console.log(`${logPrefix}: Response status`, response.status);
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`${logPrefix}: ❌ Insert failed:`, response.status, errorText);
+    throw new Error(`Fetch insert failed: ${response.status} - ${errorText}`);
+  }
+  
+  if (options.select) {
+    const result = await response.json();
+    console.log(`${logPrefix}: ✅ Insert success with data:`, result);
+    return Array.isArray(result) ? result[0] : result;
+  } else {
+    console.log(`${logPrefix}: ✅ Insert success (no data returned)`);
+    return null;
+  }
+};
+
+export const fetchUpdate = async (
+  table: string,
+  data: Record<string, any>,
+  filters: Record<string, any>,
+  options: { select?: string } = {}
+): Promise<any> => {
+  const timestamp = new Date().toISOString();
+  const logPrefix = `🔧 [${timestamp}] FETCH_UPDATE`;
+  
+  console.log(`${logPrefix}: Starting fetch update`, { table, data, filters, options });
+  
+  const accessToken = await getValidAccessToken();
+  if (!accessToken) {
+    throw new Error('No valid access token available for fetch update');
+  }
+  
+  // Build query string for filters
+  const queryParams = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    queryParams.append(key, `eq.${value}`);
+  });
+  
+  const url = `${supabaseUrl}/rest/v1/${table}?${queryParams.toString()}`;
+  const headers = {
+    'apikey': supabaseAnonKey,
+    'Authorization': `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
+    'Prefer': options.select ? 'return=representation' : 'return=minimal'
+  };
+  
+  console.log(`${logPrefix}: Making fetch request`, { url, headers: { ...headers, Authorization: '[REDACTED]' } });
+  
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify(data)
+  });
+  
+  console.log(`${logPrefix}: Response status`, response.status);
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`${logPrefix}: ❌ Update failed:`, response.status, errorText);
+    throw new Error(`Fetch update failed: ${response.status} - ${errorText}`);
+  }
+  
+  if (options.select) {
+    const result = await response.json();
+    console.log(`${logPrefix}: ✅ Update success with data:`, result);
+    return Array.isArray(result) ? result[0] : result;
+  } else {
+    console.log(`${logPrefix}: ✅ Update success (no data returned)`);
+    return null;
+  }
+};
+
+export const fetchDelete = async (
+  table: string,
+  filters: Record<string, any>
+): Promise<void> => {
+  const timestamp = new Date().toISOString();
+  const logPrefix = `🔧 [${timestamp}] FETCH_DELETE`;
+  
+  console.log(`${logPrefix}: Starting fetch delete`, { table, filters });
+  
+  const accessToken = await getValidAccessToken();
+  if (!accessToken) {
+    throw new Error('No valid access token available for fetch delete');
+  }
+  
+  // Build query string for filters
+  const queryParams = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    queryParams.append(key, `eq.${value}`);
+  });
+  
+  const url = `${supabaseUrl}/rest/v1/${table}?${queryParams.toString()}`;
+  const headers = {
+    'apikey': supabaseAnonKey,
+    'Authorization': `Bearer ${accessToken}`,
+    'Content-Type': 'application/json'
+  };
+  
+  console.log(`${logPrefix}: Making fetch request`, { url, headers: { ...headers, Authorization: '[REDACTED]' } });
+  
+  const response = await fetch(url, {
+    method: 'DELETE',
+    headers
+  });
+  
+  console.log(`${logPrefix}: Response status`, response.status);
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`${logPrefix}: ❌ Delete failed:`, response.status, errorText);
+    throw new Error(`Fetch delete failed: ${response.status} - ${errorText}`);
+  }
+  
+  console.log(`${logPrefix}: ✅ Delete success`);
+};
+
+export const fetchRPC = async (
+  functionName: string,
+  params: Record<string, any> = {}
+): Promise<any> => {
+  const timestamp = new Date().toISOString();
+  const logPrefix = `🔧 [${timestamp}] FETCH_RPC`;
+  
+  console.log(`${logPrefix}: Starting fetch RPC`, { functionName, params });
+  
+  const accessToken = await getValidAccessToken();
+  if (!accessToken) {
+    throw new Error('No valid access token available for fetch RPC');
+  }
+  
+  const url = `${supabaseUrl}/rest/v1/rpc/${functionName}`;
+  const headers = {
+    'apikey': supabaseAnonKey,
+    'Authorization': `Bearer ${accessToken}`,
+    'Content-Type': 'application/json'
+  };
+  
+  console.log(`${logPrefix}: Making fetch request`, { url, headers: { ...headers, Authorization: '[REDACTED]' } });
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(params)
+  });
+  
+  console.log(`${logPrefix}: Response status`, response.status);
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`${logPrefix}: ❌ RPC failed:`, response.status, errorText);
+    throw new Error(`Fetch RPC failed: ${response.status} - ${errorText}`);
+  }
+  
+  const result = await response.json();
+  console.log(`${logPrefix}: ✅ RPC success:`, result);
+  return result;
+};

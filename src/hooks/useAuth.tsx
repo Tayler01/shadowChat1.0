@@ -205,25 +205,27 @@ function useProvideAuth() {
     // Update on page visibility change
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        console.log('🔄 [AUTH] Page became visible, attempting forceSessionRefresh...');
-        // Use forceSessionRefresh instead of the problematic supabase.auth.refreshSession
-        forceSessionRefresh()
-          .then((success) => {
-            if (!success) {
-              console.warn('🔄 [AUTH] forceSessionRefresh failed, signing out user');
-              // If session refresh fails, sign out the user to clear invalid state
-              signOut().catch((signOutErr) => {
-                console.error('🔄 [AUTH] Error during signOut after failed refresh:', signOutErr);
-              });
-            }
-          })
-          .catch((err) => {
-            console.error('🔄 [AUTH] Error with forceSessionRefresh on visibility change:', err);
-            // If there's an exception, also sign out to clear invalid state
-            signOut().catch((signOutErr) => {
-              console.error('🔄 [AUTH] Error during signOut after refresh exception:', signOutErr);
-            });
-          });
+        console.log('🔄 [AUTH] Page became visible, triggering NUCLEAR REFRESH...');
+        
+        // NUCLEAR OPTION: Force page reload on visibility change to avoid all auth issues
+        const lastReload = localStorage.getItem('lastNuclearReload');
+        const now = Date.now();
+        const fiveMinutesAgo = now - (5 * 60 * 1000);
+        
+        // Only reload if we haven't reloaded in the last 5 minutes
+        if (!lastReload || parseInt(lastReload) < fiveMinutesAgo) {
+          console.log('🔄 [AUTH] 💥 NUCLEAR RELOAD: Reloading page to clear auth state');
+          localStorage.setItem('lastNuclearReload', now.toString());
+          window.location.reload();
+          return;
+        }
+        
+        console.log('🔄 [AUTH] Skipping nuclear reload (too recent), attempting force refresh...');
+        forceSessionRefresh().catch((err) => {
+          console.error('🔄 [AUTH] Force refresh failed, signing out:', err);
+          signOut().catch(console.error);
+        });
+        
         updatePresence();
       }
     };

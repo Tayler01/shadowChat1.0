@@ -466,26 +466,26 @@ function useProvideMessages(): MessagesContextValue {
       state: channelRef.current?.state,
     })
 
-    // Ensure we have a valid session before attempting database operations
-    const sessionValid = await ensureSession();
-    console.log(`${logPrefix}: After ensureSession`, {
-      sessionValid,
+    // Get valid access token (this handles refresh automatically)
+    const accessToken = await getValidAccessToken();
+    console.log(`${logPrefix}: After getValidAccessToken`, {
+      hasToken: !!accessToken,
       hasUser: !!user,
       userId: user?.id,
     });
     
     console.log(`${logPrefix}: 🔍 Checking conditions before proceeding to insert`);
     
-    if (!sessionValid) {
-      console.error(`${logPrefix}: ❌ EARLY EXIT: sessionValid is false`);
-      console.error(`${logPrefix}: ❌ Invalid or expired session, cannot send message`);
+    if (!accessToken) {
+      console.error(`${logPrefix}: ❌ EARLY EXIT: accessToken is null`);
+      console.error(`${logPrefix}: ❌ No valid access token, cannot send message`);
       throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
     }
     
-    console.log(`${logPrefix}: ✅ sessionValid check passed`);
+    console.log(`${logPrefix}: ✅ accessToken check passed`);
     
     if (!user) {
-      console.error(`${logPrefix}: ❌ EARLY EXIT: user is null/undefined after ensureSession`);
+      console.error(`${logPrefix}: ❌ EARLY EXIT: user is null/undefined after getValidAccessToken`);
       return;
     }
     
@@ -498,9 +498,9 @@ function useProvideMessages(): MessagesContextValue {
     
     console.log(`${logPrefix}: ✅ content check passed`);
 
-    // 🔥 BYPASS: Skip the hanging getSession() call after ensureSession() has already validated
-    // Since ensureSession() returned true, we trust that the session is usable
-    console.log(`${logPrefix}: ✅ Skipping getSession() check - trusting ensureSession() validation`);
+    // 🔥 BYPASS: Skip the hanging getSession() call after getValidAccessToken() has already validated
+    // Since getValidAccessToken() returned a token, we trust that the session is usable
+    console.log(`${logPrefix}: ✅ Skipping getSession() check - trusting getValidAccessToken() validation`);
     
     console.log(`${logPrefix}: 🔍 All pre-insert checks completed, proceeding to insert`);
 
@@ -514,22 +514,22 @@ function useProvideMessages(): MessagesContextValue {
       };
       console.log(`${logPrefix}: Prepared message data`, messageData)
 
-      // Step 2: Try manual fetch first to bypass Supabase client issues
-      console.log(`${logPrefix}: 🔧 Attempting manual fetch insert to bypass client issues`);
+      // Step 2: Use fetch-based insert to bypass Supabase client issues
+      console.log(`${logPrefix}: 🔧 Using fetch-based insert to bypass client issues`);
       
       let data = null;
       let error = null;
       
       try {
-        const manualResult = await manualInsertMessage(messageData);
-        console.log(`${logPrefix}: ✅ Manual insert succeeded`, {
-          manualResult,
-          messageId: manualResult?.id,
-          hasResult: !!manualResult
+        const fetchResult = await fetchInsert('messages', messageData, { select: '*' });
+        console.log(`${logPrefix}: ✅ Fetch insert succeeded`, {
+          fetchResult,
+          messageId: fetchResult?.id,
+          hasResult: !!fetchResult
         });
         
         // Fetch the complete message with user data using Supabase client
-        if (manualResult?.id) {
+        if (fetchResult?.id) {
           console.log(`${logPrefix}: Fetching complete message data with user info`);
           const { data: completeMessage, error: fetchError } = await supabase
             .from('messages')
@@ -537,24 +537,24 @@ function useProvideMessages(): MessagesContextValue {
               *,
               user:users!user_id(*)
             `)
-            .eq('id', manualResult.id)
+            .eq('id', fetchResult.id)
             .single();
             
           if (fetchError) {
-            console.warn(`${logPrefix}: ⚠️ Failed to fetch complete message, using manual result`, fetchError);
-            data = manualResult;
+            console.warn(`${logPrefix}: ⚠️ Failed to fetch complete message, using fetch result`, fetchError);
+            data = fetchResult;
           } else {
             console.log(`${logPrefix}: ✅ Complete message data fetched successfully`);
             data = completeMessage;
           }
         } else {
-          data = manualResult;
+          data = fetchResult;
         }
         
-      } catch (manualError) {
-        console.warn(`${logPrefix}: ⚠️ Manual insert failed, falling back to Supabase client`, {
-          manualError,
-          message: manualError instanceof Error ? manualError.message : 'Unknown error'
+      } catch (fetchError) {
+        console.warn(`${logPrefix}: ⚠️ Fetch insert failed, falling back to Supabase client`, {
+          fetchError,
+          message: fetchError instanceof Error ? fetchError.message : 'Unknown error'
         });
         
         // Fallback to original Supabase client method
@@ -691,19 +691,17 @@ function useProvideMessages(): MessagesContextValue {
     console.log('📝 [EDIT] Editing message:', { messageId, content });
 
     try {
-      const { error } = await supabase
-        .from('messages')
-        .update({
+      await fetchUpdate(
+        'messages',
+        {
           content,
           edited_at: new Date().toISOString(),
-        })
-        .eq('id', messageId)
-        .eq('user_id', user.id);
-
-      if (error) {
-        console.error('❌ Error editing message:', error);
-        throw error;
-      }
+        },
+        {
+          id: messageId,
+          user_id: user.id
+        }
+      );
 
       console.log('✅ Message edited successfully');
     } catch (error) {
@@ -718,16 +716,10 @@ function useProvideMessages(): MessagesContextValue {
     console.log('🗑️ [DELETE] Deleting message:', { messageId });
 
     try {
-      const { error } = await supabase
-        .from('messages')
-        .delete()
-        .eq('id', messageId)
-        .eq('user_id', user.id);
-
-      if (error) {
-        console.error('❌ Error deleting message:', error);
-        throw error;
-      }
+      await fetchDelete('messages', {
+        id: messageId,
+        user_id: user.id
+      });
 
       console.log('✅ Message deleted successfully');
     } catch (error) {
@@ -742,16 +734,11 @@ function useProvideMessages(): MessagesContextValue {
     console.log('👍 [REACTION] Toggling reaction:', { messageId, emoji });
 
     try {
-      const { error } = await supabase.rpc('toggle_message_reaction', {
+      await fetchRPC('toggle_message_reaction', {
         message_id: messageId,
         emoji: emoji,
         is_dm: false
       });
-
-      if (error) {
-        console.error('❌ Error toggling reaction:', error);
-        throw error;
-      }
 
       console.log('✅ Reaction toggled successfully');
     } catch (error) {
@@ -780,19 +767,15 @@ function useProvideMessages(): MessagesContextValue {
 
       const isPinned = message.pinned;
       
-      const { error } = await supabase
-        .from('messages')
-        .update({
+      await fetchUpdate(
+        'messages',
+        {
           pinned: !isPinned,
           pinned_by: !isPinned ? user.id : null,
           pinned_at: !isPinned ? new Date().toISOString() : null,
-        })
-        .eq('id', messageId);
-
-      if (error) {
-        console.error('❌ Error toggling pin:', error);
-        throw error;
-      }
+        },
+        { id: messageId }
+      );
 
       console.log('✅ Pin toggled successfully');
     } catch (error) {
