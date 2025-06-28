@@ -1,10 +1,19 @@
-import React, { useEffect, useRef, useMemo } from 'react'
+import React, {
+  useEffect,
+  useRef,
+  useMemo,
+  useState,
+  useCallback,
+  useLayoutEffect,
+} from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Pin } from 'lucide-react'
+import { VariableSizeList as List } from 'react-window'
 import { useMessages } from '../../hooks/useMessages'
 import { useTyping } from '../../hooks/useTyping'
 import { groupMessagesByDate } from '../../lib/utils'
 import { MessageItem } from './MessageItem'
+import type { Message as ChatMessage } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
 interface MessageListProps {
@@ -17,18 +26,51 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
   
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const listRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<List>(null)
+  const [listHeight, setListHeight] = useState(0)
+
+  useLayoutEffect(() => {
+    const handleResize = () => {
+      if (containerRef.current) {
+        setListHeight(containerRef.current.clientHeight)
+      }
+    }
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  const groupedMessages = useMemo(() => groupMessagesByDate(messages), [messages])
+
+  const items = useMemo(() => {
+    const arr: { type: 'header' | 'message'; date?: string; message?: ChatMessage; prev?: ChatMessage }[] = []
+    groupedMessages.forEach(group => {
+      arr.push({ type: 'header', date: group.date })
+      group.messages.forEach((m, idx) => {
+        arr.push({ type: 'message', message: m, prev: group.messages[idx - 1] })
+      })
+    })
+    return arr
+  }, [groupedMessages])
 
   // Auto-scroll to bottom
   useEffect(() => {
-    const list = listRef.current
-    if (list) {
-      list.scrollTop = list.scrollHeight
+    if (listRef.current) {
+      listRef.current.scrollToItem(items.length - 1)
     }
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [items.length])
 
-  const groupedMessages = useMemo(() => groupMessagesByDate(messages), [messages])
+  const sizeMap = useRef<Record<number, number>>({})
+
+  const getSize = useCallback((index: number) => sizeMap.current[index] ?? 80, [])
+
+  const setSize = useCallback((index: number, size: number) => {
+    if (sizeMap.current[index] !== size) {
+      sizeMap.current[index] = size
+      listRef.current?.resetAfterIndex(index)
+    }
+  }, [])
 
   const handleEdit = async (messageId: string, content: string) => {
     try {
@@ -62,11 +104,43 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
   }
 
 
+  const Row = ({ index, style }: { index: number; style: React.CSSProperties }) => {
+    const item = items[index]
+    const refCallback = (el: HTMLDivElement | null) => {
+      if (el) {
+        const height = el.getBoundingClientRect().height
+        setSize(index, height)
+      }
+    }
+
+    if (item.type === 'header') {
+      return (
+        <div ref={refCallback} style={style} className="sticky top-0 z-10 flex justify-center">
+          <div className="bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full text-xs font-medium text-gray-500 dark:text-gray-400">
+            {item.date}
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div ref={refCallback} style={style} className="py-1">
+        <MessageItem
+          message={item.message as ChatMessage}
+          previousMessage={item.prev}
+          onReply={onReply}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onTogglePin={togglePin}
+        />
+      </div>
+    )
+  }
+
   return (
-    <div ref={listRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-      {/* Pinned Messages */}
+    <div ref={containerRef} className="flex-1 overflow-hidden p-4">
       {messages.some(m => m.pinned) && (
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
           <div className="flex items-center space-x-2 mb-2">
             <Pin className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
             <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
@@ -83,41 +157,26 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
         </div>
       )}
 
-      {/* Message Groups */}
-      {groupedMessages.map(group => (
-        <div key={group.date} className="space-y-4">
-          {/* Date Header */}
-          <div className="sticky top-0 z-10 flex justify-center">
-            <div className="bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full text-xs font-medium text-gray-500 dark:text-gray-400">
-              {group.date}
-            </div>
-          </div>
+      {listHeight > 0 && (
+        <List
+          ref={listRef}
+          height={listHeight}
+          width="100%"
+          itemCount={items.length}
+          itemSize={getSize}
+          overscanCount={10}
+        >
+          {Row}
+        </List>
+      )}
 
-          {/* Messages */}
-          <div className="space-y-3">
-            {group.messages.map((message, index) => (
-              <MessageItem
-                key={message.id}
-                message={message}
-                previousMessage={group.messages[index - 1]}
-                onReply={onReply}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onTogglePin={togglePin}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-
-      {/* Typing Indicators */}
       <AnimatePresence>
         {typingUsers.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400"
+            className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400 mt-2"
           >
             <div className="flex space-x-1">
               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
@@ -125,13 +184,12 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
             </div>
             <span>
-              {typingUsers.map(u => u.display_name).join(', ')} 
+              {typingUsers.map(u => u.display_name).join(', ')}
               {typingUsers.length === 1 ? ' is' : ' are'} typing...
             </span>
           </motion.div>
         )}
       </AnimatePresence>
-
       <div ref={messagesEndRef} />
     </div>
   )
