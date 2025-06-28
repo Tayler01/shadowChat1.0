@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import {
   supabase,
@@ -10,6 +10,7 @@ import {
 } from '../lib/supabase';
 import { MESSAGE_FETCH_LIMIT } from '../config';
 import { useAuth } from './useAuth';
+import { useVisibilityRefresh } from './useVisibilityRefresh';
 
 export function useDirectMessages() {
   const [conversations, setConversations] = useState<DMConversation[]>([]);
@@ -167,6 +168,21 @@ export function useConversationMessages(conversationId: string | null) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const { user } = useAuth();
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const subscribeRef = useRef<() => RealtimeChannel>();
+
+  const handleVisible = useCallback(() => {
+    const channel = channelRef.current;
+    if (channel && channel.state !== 'joined') {
+      supabase.removeChannel(channel);
+      const newChannel = subscribeRef.current?.();
+      if (newChannel) {
+        channelRef.current = newChannel;
+      }
+    }
+  }, []);
+
+  useVisibilityRefresh(handleVisible);
 
   // Fetch messages for conversation
   useEffect(() => {
@@ -280,23 +296,9 @@ export function useConversationMessages(conversationId: string | null) {
     };
 
     channel = subscribeToChannel();
-
-    const handleVisibility = () => {
-      if (!document.hidden) {
-        supabase.auth.refreshSession().catch(err => {
-          console.error('Error refreshing session on visibility change:', err);
-        });
-        if (channel && channel.state !== 'joined') {
-          supabase.removeChannel(channel);
-          channel = subscribeToChannel();
-        }
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibility);
-
+    subscribeRef.current = subscribeToChannel;
+    channelRef.current = channel;
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibility);
       if (channel) supabase.removeChannel(channel);
     };
   }, [conversationId, user]);

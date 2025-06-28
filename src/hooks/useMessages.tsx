@@ -10,6 +10,7 @@ import { supabase, Message, ensureSession, DEBUG } from '../lib/supabase';
 import { MESSAGE_FETCH_LIMIT } from '../config';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
+import { useVisibilityRefresh } from './useVisibilityRefresh';
 
 interface MessagesContextValue {
   messages: Message[];
@@ -30,6 +31,24 @@ function useProvideMessages(): MessagesContextValue {
   const [sending, setSending] = useState(false);
   const { user } = useAuth();
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const subscribeRef = useRef<() => RealtimeChannel>();
+
+  const handleVisible = useCallback(() => {
+    const channel = channelRef.current;
+    if (channel && channel.state !== 'joined') {
+      if (DEBUG) {
+        console.log('🌀 Resubscribing channel due to state', channel.state)
+      }
+      supabase.removeChannel(channel)
+      const newChannel = subscribeRef.current?.()
+      if (newChannel) {
+        channelRef.current = newChannel
+      }
+    }
+    fetchMessages()
+  }, [fetchMessages])
+
+  useVisibilityRefresh(handleVisible)
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -238,33 +257,10 @@ function useProvideMessages(): MessagesContextValue {
     };
 
     channel = subscribeToChannel();
+    subscribeRef.current = subscribeToChannel;
     channelRef.current = channel;
 
-    const handleVisibility = () => {
-      const state = channel?.state
-      if (DEBUG) {
-        console.log('🌀 visibilitychange', { hidden: document.hidden, channelState: state })
-      }
-      if (!document.hidden) {
-        // supabase.auth.refreshSession().catch(err => {
-        //   console.error('Error refreshing session on visibility change:', err)
-        // })
-        if (channel && channel.state !== 'joined') {
-          if (DEBUG) {
-            console.log('🌀 Resubscribing channel due to state', channel.state)
-          }
-          supabase.removeChannel(channel)
-          channel = subscribeToChannel()
-          channelRef.current = channel
-        }
-        fetchMessages()
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibility)
-
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibility)
       if (channel) supabase.removeChannel(channel)
       channelRef.current = null
     };
