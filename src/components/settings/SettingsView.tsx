@@ -77,7 +77,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900"
+      className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 pb-16"
     >
       <div className="max-w-2xl mx-auto p-6">
         <button
