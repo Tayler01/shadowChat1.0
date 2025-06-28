@@ -49,7 +49,7 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
   return (
     <div
       className={cn(
-        'relative p-2 rounded-md bg-yellow-100/60 dark:bg-yellow-800/40 flex items-start',
+        'relative p-2 rounded-md bg-yellow-100/60 dark:bg-yellow-800/40 flex items-start ml-2',
         hasReactions && 'pt-6'
       )}
     >
