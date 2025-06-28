@@ -60,8 +60,14 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
       setShowReactionPicker(false)
     }
 
-    const handleCopyMessage = () => {
-      navigator.clipboard.writeText(message.content)
+    const handleCopyMessage = async () => {
+      try {
+        await navigator.clipboard.writeText(message.content)
+        toast.success('Message copied')
+      } catch (error) {
+        console.error('❌ MessageItem: Failed to copy message:', error)
+        toast.error('Failed to copy message')
+      }
     }
 
     useEffect(() => {
