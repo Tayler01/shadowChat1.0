@@ -25,6 +25,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     document.documentElement.dataset.scheme = scheme
+    document.documentElement.classList.remove('indigo', 'teal', 'rose')
+    document.documentElement.classList.add(scheme)
     localStorage.setItem('colorScheme', scheme)
   }, [scheme])
 
