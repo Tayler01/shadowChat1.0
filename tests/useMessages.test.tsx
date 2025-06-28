@@ -10,6 +10,7 @@ jest.mock('../src/lib/supabase', () => {
       from: jest.fn(),
       channel: jest.fn(),
       removeChannel: jest.fn(),
+      rpc: jest.fn(),
       auth: { getSession: jest.fn(), refreshSession: jest.fn() },
     },
     ensureSession: jest.fn(),
@@ -126,5 +127,145 @@ describe('sendMessage', () => {
     expect(insertFail).toHaveBeenCalled();
     expect(supabase.auth.refreshSession).toHaveBeenCalled();
     expect(insertSuccess).toHaveBeenCalled();
+  });
+});
+
+describe('message actions', () => {
+  const user = { id: 'user1' } as any;
+  beforeEach(() => {
+    jest.resetAllMocks();
+    (useAuth as jest.Mock).mockReturnValue({ user });
+
+    const sb = supabase as SupabaseMock;
+
+    sb.from.mockImplementation(() => {
+      return {
+        insert: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        single: jest.fn().mockResolvedValue({ data: [], error: null }),
+        order: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        update: jest.fn().mockReturnThis(),
+        delete: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        rpc: jest.fn().mockReturnThis(),
+      } as any;
+    });
+    sb.channel.mockReturnValue({
+      on: jest.fn().mockReturnThis(),
+      subscribe: jest.fn(),
+      send: jest.fn(),
+    } as any);
+    sb.removeChannel.mockResolvedValue();
+    sb.auth = {
+      getSession: jest.fn(),
+      refreshSession: jest.fn(),
+    } as any;
+    (ensureSession as jest.Mock).mockResolvedValue(true);
+  });
+
+  it('edits message', async () => {
+    const updateFn = jest.fn().mockReturnThis();
+    const eqFn = jest.fn().mockReturnThis();
+    (supabase.from as jest.Mock).mockReturnValueOnce({
+      insert: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: [], error: null }),
+      order: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      update: updateFn,
+      delete: jest.fn().mockReturnThis(),
+      eq: eqFn,
+      rpc: jest.fn().mockReturnThis(),
+    } as any);
+
+    const { result } = renderHook(() => useMessages(), { wrapper: MessagesProvider });
+
+    await act(async () => {
+      await result.current.editMessage('m1', 'hi');
+    });
+
+    expect(updateFn).toHaveBeenCalledWith(expect.objectContaining({ content: 'hi', edited_at: expect.any(String) }));
+    expect(eqFn).toHaveBeenNthCalledWith(1, 'id', 'm1');
+    expect(eqFn).toHaveBeenNthCalledWith(2, 'user_id', user.id);
+  });
+
+  it('deletes message', async () => {
+    const deleteFn = jest.fn().mockReturnThis();
+    const eqFn = jest.fn().mockReturnThis();
+    (supabase.from as jest.Mock).mockReturnValueOnce({
+      insert: jest.fn().mockReturnThis(),
+      select: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: [], error: null }),
+      order: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      delete: deleteFn,
+      eq: eqFn,
+      rpc: jest.fn().mockReturnThis(),
+    } as any);
+
+    const { result } = renderHook(() => useMessages(), { wrapper: MessagesProvider });
+
+    await act(async () => {
+      await result.current.deleteMessage('m1');
+    });
+
+    expect(deleteFn).toHaveBeenCalled();
+    expect(eqFn).toHaveBeenNthCalledWith(1, 'id', 'm1');
+    expect(eqFn).toHaveBeenNthCalledWith(2, 'user_id', user.id);
+  });
+
+  it('toggles reaction', async () => {
+    const rpcFn = jest.fn().mockResolvedValue({ data: null, error: null });
+    (supabase.rpc as jest.Mock).mockImplementationOnce(rpcFn);
+
+    const { result } = renderHook(() => useMessages(), { wrapper: MessagesProvider });
+
+    await act(async () => {
+      await result.current.toggleReaction('m1', '😀');
+    });
+
+    expect(rpcFn).toHaveBeenCalledWith('toggle_message_reaction', { message_id: 'm1', emoji: '😀', is_dm: false });
+  });
+
+  it('toggles pin state', async () => {
+    const selectEq = jest.fn().mockReturnThis();
+    const updateEq = jest.fn().mockReturnThis();
+    const updateFn = jest.fn().mockReturnThis();
+
+    (supabase.from as jest.Mock)
+      .mockReturnValueOnce({
+        insert: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        single: jest.fn().mockResolvedValue({ data: { pinned: false }, error: null }),
+        order: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        update: jest.fn().mockReturnThis(),
+        delete: jest.fn().mockReturnThis(),
+        eq: selectEq,
+        rpc: jest.fn().mockReturnThis(),
+      } as any)
+      .mockReturnValueOnce({
+        insert: jest.fn().mockReturnThis(),
+        select: jest.fn().mockReturnThis(),
+        single: jest.fn().mockResolvedValue({ data: [], error: null }),
+        order: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        update: updateFn,
+        delete: jest.fn().mockReturnThis(),
+        eq: updateEq,
+        rpc: jest.fn().mockReturnThis(),
+      } as any);
+
+    const { result } = renderHook(() => useMessages(), { wrapper: MessagesProvider });
+
+    await act(async () => {
+      await result.current.togglePin('m1');
+    });
+
+    expect(updateFn).toHaveBeenCalledWith(expect.objectContaining({ pinned: true, pinned_by: user.id, pinned_at: expect.any(String) }));
+    expect(selectEq).toHaveBeenCalledWith('id', 'm1');
+    expect(updateEq).toHaveBeenCalledWith('id', 'm1');
   });
 });
