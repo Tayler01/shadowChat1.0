@@ -116,8 +116,8 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
     return arr
   }, [groupedMessages])
 
-  // Auto-scroll to bottom whenever items change or list resizes
-  useEffect(() => {
+  // Auto-scroll to the most recent message
+  useLayoutEffect(() => {
     if (listRef.current) {
       listRef.current.scrollToItem(items.length - 1, 'end')
     }
@@ -178,7 +178,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
   return (
     <div
       ref={containerRef}
-      className="relative flex-1 overflow-y-hidden overflow-x-visible p-4 pb-16"
+      className="relative flex-1 overflow-y-hidden overflow-x-visible p-4 pb-24"
     >
       {messages.some(m => m.pinned) && (
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
