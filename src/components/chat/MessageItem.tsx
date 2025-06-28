@@ -17,6 +17,7 @@ import { Button } from '../ui/Button'
 import { formatTime, shouldGroupMessage } from '../../lib/utils'
 import { toggleReaction, type Message } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
+import toast from 'react-hot-toast'
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '🙏']
 
@@ -74,10 +75,17 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     }, [])
 
     useEffect(() => {
-      if (showReactionPicker && !EmojiPicker) {
-        import('emoji-picker-react').then(mod => {
+      const loadPicker = async () => {
+        try {
+          const mod = await import('emoji-picker-react')
           setEmojiPicker(() => mod.default)
-        })
+        } catch (error) {
+          console.error('❌ MessageItem: Failed to load emoji picker:', error)
+          toast.error('Failed to load emoji picker')
+        }
+      }
+      if (showReactionPicker && !EmojiPicker) {
+        loadPicker()
       }
     }, [showReactionPicker, EmojiPicker])
 

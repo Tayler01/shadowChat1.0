@@ -4,6 +4,7 @@ import { Send, Smile, Paperclip, Command } from 'lucide-react'
 import { useTyping } from '../../hooks/useTyping'
 import { Button } from '../ui/Button'
 import { processSlashCommand, slashCommands } from '../../lib/utils'
+import toast from 'react-hot-toast'
 
 interface MessageInputProps {
   onSendMessage: (content: string) => void
@@ -46,10 +47,17 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }, [])
 
   useEffect(() => {
-    if (showEmojiPicker && !EmojiPicker) {
-      import('emoji-picker-react').then(mod => {
+    const loadPicker = async () => {
+      try {
+        const mod = await import('emoji-picker-react')
         setEmojiPicker(() => mod.default)
-      })
+      } catch (error) {
+        console.error('❌ MessageInput: Failed to load emoji picker:', error)
+        toast.error('Failed to load emoji picker')
+      }
+    }
+    if (showEmojiPicker && !EmojiPicker) {
+      loadPicker()
     }
   }, [showEmojiPicker, EmojiPicker])
 
