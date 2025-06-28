@@ -1,10 +1,4 @@
-import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
 import type { ChatMessage } from './supabase'
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
-}
 
 export function formatTime(date: string | Date) {
   const d = new Date(date)
@@ -114,16 +108,3 @@ export function processSlashCommand(input: string): string | null {
   return slashCommand.handler(args)
 }
 
-export function generateColor(seed: string): string {
-  const colors = [
-    '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
-    '#06B6D4', '#84CC16', '#F97316', '#EC4899', '#6366F1'
-  ]
-  
-  let hash = 0
-  for (let i = 0; i < seed.length; i++) {
-    hash = seed.charCodeAt(i) + ((hash << 5) - hash)
-  }
-  
-  return colors[Math.abs(hash) % colors.length]
-}
