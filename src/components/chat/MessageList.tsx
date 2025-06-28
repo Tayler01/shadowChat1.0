@@ -105,12 +105,14 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
 
   const Row = ({ index, style }: { index: number; style: React.CSSProperties }) => {
     const item = items[index]
-    const refCallback = (el: HTMLDivElement | null) => {
-      if (el) {
-        const height = el.getBoundingClientRect().height
+    const rowRef = useRef<HTMLDivElement | null>(null)
+
+    useLayoutEffect(() => {
+      if (rowRef.current) {
+        const height = rowRef.current.getBoundingClientRect().height
         setSize(index, height)
       }
-    }
+    }, [item, index])
 
     const hasReactions =
       item.type === 'message' &&
@@ -120,7 +122,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
     if (item.type === 'header') {
       return (
         <div
-          ref={refCallback}
+          ref={rowRef}
           style={style}
           className="sticky top-0 z-10 flex items-center my-2"
         >
@@ -134,7 +136,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
     }
 
     return (
-      <div ref={refCallback} style={style} className={cn('py-1', hasReactions && 'pb-6')}>
+      <div ref={rowRef} style={style} className={cn('py-1', hasReactions && 'pb-6')}>
         <MessageItem
           message={item.message as ChatMessage}
           previousMessage={item.prev}
