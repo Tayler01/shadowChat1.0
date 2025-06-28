@@ -1,16 +1,16 @@
 import { renderHook } from '@testing-library/react'
 import { useVisibilityRefresh } from '../src/hooks/useVisibilityRefresh'
-import { supabase } from '../src/lib/supabase'
 
-jest.mock('../src/lib/supabase', () => ({
-  supabase: { auth: { refreshSession: jest.fn() } }
-}))
+Object.defineProperty(window, 'location', {
+  value: { reload: jest.fn() },
+  writable: true,
+})
 
-test('refreshes session and runs callback on visibility change', () => {
+test('reloads page and runs callback on visibility change', () => {
   const cb = jest.fn()
   renderHook(() => useVisibilityRefresh(cb))
   Object.defineProperty(document, 'hidden', { value: false, configurable: true })
   document.dispatchEvent(new Event('visibilitychange'))
-  expect(supabase.auth.refreshSession).toHaveBeenCalled()
+  expect(window.location.reload).toHaveBeenCalled()
   expect(cb).toHaveBeenCalled()
 })
