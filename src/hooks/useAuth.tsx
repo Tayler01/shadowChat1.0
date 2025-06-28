@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { supabase, User, updateUserPresence } from '../lib/supabase';
+import { PRESENCE_INTERVAL_MS } from '../config';
 import { signIn as authSignIn, signUp as authSignUp, signOut as authSignOut, getCurrentUser, updateUserProfile } from '../lib/auth';
 
 interface AuthContextValue {
@@ -147,8 +148,8 @@ function useProvideAuth() {
     // Update immediately
     updatePresence();
     
-    // Update every 30 seconds
-    const interval = setInterval(updatePresence, 30000);
+    // Update at configured interval
+    const interval = setInterval(updatePresence, PRESENCE_INTERVAL_MS);
     
     // Update on page visibility change
     const handleVisibilityChange = () => {
