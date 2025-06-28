@@ -267,46 +267,8 @@ describe('message actions', () => {
   });
 
   it('toggles pin state', async () => {
-    const selectEq = jest.fn().mockReturnThis();
-    const unpinEq = jest.fn().mockReturnThis();
-    const unpinUpdateFn = jest.fn().mockReturnThis();
-    const updateEq = jest.fn().mockReturnThis();
-    const updateFn = jest.fn().mockReturnThis();
-
-    (supabase.from as jest.Mock)
-      .mockReturnValueOnce({
-        insert: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValue({ data: { pinned: false }, error: null }),
-        order: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockReturnThis(),
-        update: jest.fn().mockReturnThis(),
-        delete: jest.fn().mockReturnThis(),
-        eq: selectEq,
-        rpc: jest.fn().mockReturnThis(),
-      } as any)
-      .mockReturnValueOnce({
-        insert: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValue({ data: [], error: null }),
-        order: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockReturnThis(),
-        update: unpinUpdateFn,
-        delete: jest.fn().mockReturnThis(),
-        eq: unpinEq,
-        rpc: jest.fn().mockReturnThis(),
-      } as any)
-      .mockReturnValueOnce({
-        insert: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValue({ data: [], error: null }),
-        order: jest.fn().mockReturnThis(),
-        limit: jest.fn().mockReturnThis(),
-        update: updateFn,
-        delete: jest.fn().mockReturnThis(),
-        eq: updateEq,
-        rpc: jest.fn().mockReturnThis(),
-      } as any);
+    const rpcFn = jest.fn().mockResolvedValue({ data: null, error: null });
+    (supabase.rpc as jest.Mock).mockImplementationOnce(rpcFn);
 
     const { result } = renderHook(() => useMessages(), { wrapper: MessagesProvider });
 
@@ -314,10 +276,6 @@ describe('message actions', () => {
       await result.current.togglePin('m1');
     });
 
-    expect(unpinUpdateFn).toHaveBeenCalledWith({ pinned: false, pinned_by: null, pinned_at: null });
-    expect(unpinEq).toHaveBeenCalledWith('pinned', true);
-    expect(updateFn).toHaveBeenCalledWith(expect.objectContaining({ pinned: true, pinned_by: user.id, pinned_at: expect.any(String) }));
-    expect(selectEq).toHaveBeenCalledWith('id', 'm1');
-    expect(updateEq).toHaveBeenCalledWith('id', 'm1');
+    expect(rpcFn).toHaveBeenCalledWith('toggle_message_pin', { message_id: 'm1' });
   });
 });

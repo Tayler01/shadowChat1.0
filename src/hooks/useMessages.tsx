@@ -646,45 +646,19 @@ function useProvideMessages(): MessagesContextValue {
   const togglePin = useCallback(async (messageId: string) => {
     if (!user) return;
 
+    const current = messages.find(m => m.id === messageId);
+    const isPinned = current?.pinned;
 
     try {
-      // First get the current pinned status
-      const { data: message } = await supabase
-        .from('messages')
-        .select('pinned')
-        .eq('id', messageId)
-        .single();
-
-      if (!message) {
-        // console.error('❌ Message not found for pin toggle');
-        return;
-      }
-
-      const isPinned = message.pinned;
-
-      if (!isPinned) {
-        // Unpin any currently pinned message so only one remains
-        await supabase
-          .from('messages')
-          .update({ pinned: false, pinned_by: null, pinned_at: null })
-          .eq('pinned', true);
-      }
-
-      const { error } = await supabase
-        .from('messages')
-        .update({
-          pinned: !isPinned,
-          pinned_by: !isPinned ? user.id : null,
-          pinned_at: !isPinned ? new Date().toISOString() : null,
-        })
-        .eq('id', messageId);
+      const { error } = await supabase.rpc('toggle_message_pin', {
+        message_id: messageId,
+      });
 
       if (error) {
         // console.error('❌ Error toggling pin:', error);
         throw error;
       }
 
-      // Optimistically update local state
       setMessages(prev =>
         prev.map(m => {
           if (m.id === messageId) {
@@ -695,18 +669,16 @@ function useProvideMessages(): MessagesContextValue {
               pinned_at: !isPinned ? new Date().toISOString() : null,
             };
           }
-          // If we just pinned a message, unpin all others
           return !isPinned
             ? { ...m, pinned: false, pinned_by: null, pinned_at: null }
             : m;
         })
       );
-
     } catch (error) {
       // console.error('❌ Exception toggling pin:', error);
       throw error;
     }
-  }, [user]);
+  }, [user, messages]);
 
   return {
     messages,
