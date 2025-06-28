@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Send, Smile, Paperclip, Command } from 'lucide-react'
-import EmojiPicker from 'emoji-picker-react'
 import { useTyping } from '../../hooks/useTyping'
 import { Button } from '../ui/Button'
 import { processSlashCommand, slashCommands } from '../../lib/utils'
@@ -19,6 +18,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 }) => {
   const [message, setMessage] = useState('')
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [EmojiPicker, setEmojiPicker] = useState<React.ComponentType<any> | null>(null)
   const [showSlashCommands, setShowSlashCommands] = useState(false)
   const { startTyping, stopTyping } = useTyping('general')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -44,6 +44,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  useEffect(() => {
+    if (showEmojiPicker && !EmojiPicker) {
+      import('emoji-picker-react').then(mod => {
+        setEmojiPicker(() => mod.default)
+      })
+    }
+  }, [showEmojiPicker, EmojiPicker])
 
   // Auto-resize textarea
   useEffect(() => {
@@ -147,7 +155,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       )}
 
       {/* Emoji Picker */}
-      {showEmojiPicker && (
+      {showEmojiPicker && EmojiPicker && (
         <div ref={emojiPickerRef} className="absolute bottom-full right-4 mb-2">
           <EmojiPicker
             onEmojiClick={insertEmoji}
