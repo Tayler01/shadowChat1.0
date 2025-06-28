@@ -111,8 +111,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         animate={{ opacity: 1, y: 0 }}
         className={cn(
           'group flex space-x-3',
-          isGrouped ? 'mt-1' : 'mt-4',
-          hasReactions && 'mb-6'
+          isGrouped ? 'mt-1' : 'mt-4'
         )}
       >
         {/* Avatar */}
