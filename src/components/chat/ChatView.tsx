@@ -1,6 +1,6 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { Hash, Users, Pin, Menu } from 'lucide-react'
+import { Hash, Users, Pin } from 'lucide-react'
 import { useMessages } from '../../hooks/useMessages'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
@@ -32,22 +32,17 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar }) => {
       <div className="flex-shrink-0 px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <button
-              onClick={onToggleSidebar}
-              className="md:hidden p-2 -ml-2"
-              aria-label="Toggle sidebar"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
+            {/* Menu button removed on mobile */}
+            {/* Header title */}
             <div className="flex items-center space-x-2">
-              <div className="p-2 bg-[var(--color-accent-light)] rounded-lg">
+              <div className="hidden md:block p-2 bg-[var(--color-accent-light)] rounded-lg">
                 <Hash className="w-5 h-5 text-[var(--color-accent)]" />
               </div>
               <div>
                 <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                   General Chat
                 </h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="hidden md:block text-sm text-gray-500 dark:text-gray-400">
                   Welcome to the general discussion
                 </p>
               </div>
@@ -59,8 +54,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar }) => {
               <Users className="w-4 h-4" />
               <span>Online</span>
             </div>
-            
-            <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+            <div className="hidden md:flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
               <Pin className="w-4 h-4" />
               <span>Pinned</span>
             </div>
