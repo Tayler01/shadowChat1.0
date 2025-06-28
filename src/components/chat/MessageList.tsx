@@ -13,6 +13,7 @@ import { useMessages } from '../../hooks/useMessages'
 import { useTyping } from '../../hooks/useTyping'
 import { groupMessagesByDate, cn } from '../../lib/utils'
 import { MessageItem } from './MessageItem'
+import { PinnedMessageItem } from './PinnedMessageItem'
 import type { Message as ChatMessage } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
@@ -168,11 +169,16 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
             </span>
           </div>
           <div className="space-y-2">
-            {messages.filter(m => m.pinned).map(message => (
-              <div key={message.id} className="text-sm text-yellow-700 dark:text-yellow-300">
-                <strong>{message.user?.display_name}:</strong> {message.content}
-              </div>
-            ))}
+            {messages
+              .filter(m => m.pinned)
+              .map(message => (
+                <PinnedMessageItem
+                  key={message.id}
+                  message={message}
+                  onUnpin={togglePin}
+                  onToggleReaction={toggleReaction}
+                />
+              ))}
           </div>
         </div>
       )}
