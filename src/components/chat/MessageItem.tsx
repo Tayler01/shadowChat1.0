@@ -172,7 +172,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   <MessageReactions
                     message={message}
                     onReact={handleReaction}
-                    className="absolute top-1 left-2 text-[0.65rem]"
+                    className="absolute top-1 right-2 text-[0.65rem]"
                   />
                   {message.content}
                 </div>
@@ -332,14 +332,14 @@ export const MessageReactions: React.FC<{
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             onClick={() => onReact(emoji)}
-            className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs transition-colors ${
+            className={`inline-flex items-center space-x-1 text-xs transition-colors cursor-pointer ${
               isReacted
-                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                ? 'text-blue-600'
+                : 'text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-gray-100'
             }`}
           >
             <span>{emoji}</span>
-            <span>{data.count}</span>
+            <span className="text-[0.5em]">{data.count}</span>
           </motion.button>
         )
       })}

@@ -56,7 +56,7 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
       <MessageReactions
         message={message}
         onReact={handleReaction}
-        className="absolute top-1 left-2 text-[0.65rem]"
+        className="absolute top-1 right-2 text-[0.65rem]"
       />
       <div className="flex-1 min-w-0">
         <div className="text-sm text-yellow-800 dark:text-yellow-200 break-words">
