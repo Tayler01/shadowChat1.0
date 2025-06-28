@@ -437,17 +437,23 @@ function useProvideMessages(): MessagesContextValue {
           return updated
         })
         
-        const broadcastResult = channelRef.current?.send({
-          type: 'broadcast',
-          event: 'new_message',
-          payload: data
-        });
+        let broadcastResult: unknown = null
+        if (channelRef.current?.state === 'joined') {
+          broadcastResult = channelRef.current.send({
+            type: 'broadcast',
+            event: 'new_message',
+            payload: data,
+          })
+        }
         if (DEBUG) {
           console.log(`${logPrefix}: Broadcast result`, {
             result: broadcastResult,
             channelState: channelRef.current?.state,
-          });
+          })
         }
+
+        // Ensure we didn't miss any messages due to timing issues
+        fetchMessages()
       }
       
       
