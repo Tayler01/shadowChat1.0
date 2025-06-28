@@ -12,7 +12,7 @@ export const useTyping = (channelName: string = 'general') => {
   const { user } = useAuth()
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([])
   const [isTyping, setIsTyping] = useState(false)
-  const typingTimeoutRef = useRef<NodeJS.Timeout>()
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
   const channelRef = useRef<any>()
 
   useEffect(() => {
