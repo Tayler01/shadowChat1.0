@@ -103,7 +103,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
   }
 
 
-  const Row = ({ index, style }: { index: number; style: React.CSSProperties }) => {
+  const Row = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
     const item = items[index]
     const rowRef = useRef<HTMLDivElement | null>(null)
 
@@ -147,7 +147,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
         />
       </div>
     )
-  }
+  }, [items, onReply, handleEdit, handleDelete, togglePin])
 
   return (
     <div
@@ -179,6 +179,11 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
           width="100%"
           itemCount={items.length}
           itemSize={getSize}
+          itemKey={(index) =>
+            items[index].type === 'header'
+              ? `header-${items[index].date}`
+              : (items[index].message as ChatMessage).id
+          }
           overscanCount={10}
         >
           {Row}
