@@ -4,13 +4,16 @@ import { Hash, Users, Pin } from 'lucide-react'
 import { useMessages } from '../../hooks/useMessages'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
+import { MobileChatFooter } from '../layout/MobileChatFooter'
 import toast from 'react-hot-toast'
 
 interface ChatViewProps {
   onToggleSidebar: () => void
+  currentView: 'chat' | 'dms' | 'profile' | 'settings'
+  onViewChange: (view: 'chat' | 'dms' | 'profile' | 'settings') => void
 }
 
-export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar }) => {
+export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView, onViewChange }) => {
   const { sendMessage, messages, loading } = useMessages()
 
   const handleSendMessage = async (content: string) => {
@@ -65,11 +68,25 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar }) => {
       {/* Messages */}
       <MessageList />
 
-      {/* Message Input */}
-      <MessageInput
-        onSendMessage={handleSendMessage}
-        placeholder="Type a message in #general..."
-      />
+      {/* Desktop Message Input */}
+      <div className="hidden md:block">
+        <MessageInput
+          onSendMessage={handleSendMessage}
+          placeholder="Type a message in #general..."
+        />
+      </div>
+
+      {/* Mobile Message Input with Navigation */}
+      <MobileChatFooter
+        currentView={currentView}
+        onViewChange={onViewChange}
+      >
+        <MessageInput
+          onSendMessage={handleSendMessage}
+          placeholder="Type a message in #general..."
+          className="border-t"
+        />
+      </MobileChatFooter>
     </motion.div>
   )
 }

@@ -11,12 +11,14 @@ interface MessageInputProps {
   onSendMessage: (content: string) => void
   placeholder?: string
   disabled?: boolean
+  className?: string
 }
 
 export const MessageInput: React.FC<MessageInputProps> = ({
   onSendMessage,
   placeholder = 'Type a message...',
-  disabled = false
+  disabled = false,
+  className = ''
 }) => {
   const [message, setMessage] = useState('')
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
@@ -115,7 +117,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }
 
   return (
-    <div className="relative p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+    <div
+      className={`relative p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${className}`}
+    >
       {/* Slash Commands Dropdown */}
       {showSlashCommands && (
         <motion.div
