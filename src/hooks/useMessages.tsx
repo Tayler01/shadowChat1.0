@@ -528,6 +528,23 @@ function useProvideMessages(): MessagesContextValue {
         throw error;
       }
 
+      // Optimistically update local state
+      setMessages(prev =>
+        prev.map(msg => {
+          if (msg.id !== messageId) return msg;
+          const reactions = { ...(msg.reactions || {}) } as Record<string, { count: number; users: string[] }>;
+          const data = reactions[emoji] || { count: 0, users: [] };
+          const reacted = data.users.includes(user.id);
+          const users = reacted ? data.users.filter(u => u !== user.id) : [...data.users, user.id];
+          if (users.length === 0) {
+            delete reactions[emoji];
+          } else {
+            reactions[emoji] = { count: users.length, users };
+          }
+          return { ...msg, reactions } as Message;
+        })
+      );
+
     } catch (error) {
       // console.error('❌ Exception toggling reaction:', error);
       throw error;

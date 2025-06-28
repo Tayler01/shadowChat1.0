@@ -15,7 +15,7 @@ import {
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { formatTime, shouldGroupMessage } from '../../lib/utils'
-import { toggleReaction, type Message } from '../../lib/supabase'
+import type { Message } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '🙏']
@@ -27,10 +27,11 @@ interface MessageItemProps {
   onEdit: (messageId: string, content: string) => Promise<void>
   onDelete: (messageId: string) => Promise<void>
   onTogglePin: (messageId: string) => Promise<void>
+  onToggleReaction: (messageId: string, emoji: string) => Promise<void>
 }
 
 export const MessageItem: React.FC<MessageItemProps> = React.memo(
-  ({ message, previousMessage, onReply, onEdit, onDelete, onTogglePin }) => {
+  ({ message, previousMessage, onReply, onEdit, onDelete, onTogglePin, onToggleReaction }) => {
     const { profile } = useAuth()
     const [isEditing, setIsEditing] = useState(false)
     const [editContent, setEditContent] = useState(message.content)
@@ -50,7 +51,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     }
 
     const handleReaction = async (emoji: string) => {
-      await toggleReaction(message.id, emoji, false)
+      await onToggleReaction(message.id, emoji)
     }
 
     const handleReactionSelect = (emojiData: any) => {
