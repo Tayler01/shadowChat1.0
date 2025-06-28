@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from './useAuth'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 
 interface TypingUser {
   id: string
@@ -13,7 +14,7 @@ export const useTyping = (channelName: string = 'general') => {
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([])
   const [isTyping, setIsTyping] = useState(false)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
-  const channelRef = useRef<any>()
+  const channelRef = useRef<RealtimeChannel | null>(null)
 
   useEffect(() => {
     const channel = supabase.channel(`typing:${channelName}`)

@@ -18,6 +18,7 @@ import { formatTime, shouldGroupMessage, cn } from '../../lib/utils'
 import { toggleReaction, type Message } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
+import type { EmojiPickerProps, EmojiClickData } from '../../types'
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '🙏']
 
@@ -37,7 +38,9 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const [editContent, setEditContent] = useState(message.content)
     const [showActions, setShowActions] = useState(false)
     const [showReactionPicker, setShowReactionPicker] = useState(false)
-    const [EmojiPicker, setEmojiPicker] = useState<React.ComponentType<any> | null>(null)
+    const [EmojiPicker, setEmojiPicker] = useState<
+      React.ComponentType<EmojiPickerProps> | null
+    >(null)
     const reactionPickerRef = useRef<HTMLDivElement>(null)
     const actionsRef = useRef<HTMLDivElement>(null)
 
@@ -54,7 +57,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
       await toggleReaction(message.id, emoji, false)
     }
 
-    const handleReactionSelect = (emojiData: any) => {
+    const handleReactionSelect = (emojiData: EmojiClickData) => {
       const emoji = emojiData.emoji
       handleReaction(emoji)
       setShowReactionPicker(false)

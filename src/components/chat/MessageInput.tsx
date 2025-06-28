@@ -5,6 +5,7 @@ import { useTyping } from '../../hooks/useTyping'
 import { Button } from '../ui/Button'
 import { processSlashCommand, slashCommands } from '../../lib/utils'
 import toast from 'react-hot-toast'
+import type { EmojiPickerProps, EmojiClickData } from '../../types'
 
 interface MessageInputProps {
   onSendMessage: (content: string) => void
@@ -19,7 +20,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 }) => {
   const [message, setMessage] = useState('')
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
-  const [EmojiPicker, setEmojiPicker] = useState<React.ComponentType<any> | null>(null)
+  const [EmojiPicker, setEmojiPicker] = useState<
+    React.ComponentType<EmojiPickerProps> | null
+  >(null)
   const [showSlashCommands, setShowSlashCommands] = useState(false)
   const { startTyping, stopTyping } = useTyping('general')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -112,7 +115,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
   }
 
-  const insertEmoji = (emojiData: any) => {
+  const insertEmoji = (emojiData: EmojiClickData) => {
     const emoji = emojiData.emoji
     setMessage(prev => prev + emoji)
     setShowEmojiPicker(false)
