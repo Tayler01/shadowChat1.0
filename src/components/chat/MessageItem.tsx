@@ -109,10 +109,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className={cn(
-          'group flex space-x-3',
-          isGrouped ? 'mt-1' : 'mt-4'
-        )}
+        className="group flex space-x-3 mt-2"
       >
         {/* Avatar */}
         <div className="flex-shrink-0 w-10">
