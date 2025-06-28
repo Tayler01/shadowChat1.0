@@ -8,6 +8,7 @@ import {
   Reply,
   MoreHorizontal,
   ThumbsUp,
+  Plus,
   Copy,
   Check,
 } from 'lucide-react'
@@ -34,6 +35,9 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const [isEditing, setIsEditing] = useState(false)
     const [editContent, setEditContent] = useState(message.content)
     const [showActions, setShowActions] = useState(false)
+    const [showReactionPicker, setShowReactionPicker] = useState(false)
+    const [EmojiPicker, setEmojiPicker] = useState<React.ComponentType<any> | null>(null)
+    const reactionPickerRef = useRef<HTMLDivElement>(null)
     const actionsRef = useRef<HTMLDivElement>(null)
 
     const isGrouped = shouldGroupMessage(message, previousMessage)
@@ -49,6 +53,12 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
       await toggleReaction(message.id, emoji, false)
     }
 
+    const handleReactionSelect = (emojiData: any) => {
+      const emoji = emojiData.emoji
+      handleReaction(emoji)
+      setShowReactionPicker(false)
+    }
+
     const handleCopyMessage = () => {
       navigator.clipboard.writeText(message.content)
     }
@@ -62,6 +72,28 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
       document.addEventListener('mousedown', handleClick)
       return () => document.removeEventListener('mousedown', handleClick)
     }, [])
+
+    useEffect(() => {
+      if (showReactionPicker && !EmojiPicker) {
+        import('emoji-picker-react').then(mod => {
+          setEmojiPicker(() => mod.default)
+        })
+      }
+    }, [showReactionPicker, EmojiPicker])
+
+    useEffect(() => {
+      if (!showReactionPicker) return
+      const handleClick = (e: MouseEvent) => {
+        if (
+          reactionPickerRef.current &&
+          !reactionPickerRef.current.contains(e.target as Node)
+        ) {
+          setShowReactionPicker(false)
+        }
+      }
+      document.addEventListener('mousedown', handleClick)
+      return () => document.removeEventListener('mousedown', handleClick)
+    }, [showReactionPicker])
 
     return (
       <motion.div
@@ -139,7 +171,26 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                       {e}
                     </button>
                   ))}
+                  <button
+                    onClick={() => setShowReactionPicker(!showReactionPicker)}
+                    className="text-base hover:scale-110 transition-transform"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
                 </div>
+                {showReactionPicker && EmojiPicker && (
+                  <div
+                    ref={reactionPickerRef}
+                    className="absolute -top-48 left-1/2 -translate-x-1/2 z-20"
+                  >
+                    <EmojiPicker
+                      onEmojiClick={handleReactionSelect}
+                      width={320}
+                      height={400}
+                      theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
+                    />
+                  </div>
+                )}
               </div>
               <MessageReactions message={message} onReact={handleReaction} />
             </>
