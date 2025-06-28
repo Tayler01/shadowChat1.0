@@ -21,6 +21,72 @@ interface MessageListProps {
   onReply?: (messageId: string, content: string) => void
 }
 
+interface MessageListRowProps {
+  index: number
+  style: React.CSSProperties
+  data: {
+    items: { type: 'header' | 'message'; date?: string; message?: ChatMessage; prev?: ChatMessage }[]
+    setSize: (index: number, size: number) => void
+    onReply?: (messageId: string, content: string) => void
+    handleEdit: (messageId: string, content: string) => Promise<void>
+    handleDelete: (messageId: string) => Promise<void>
+    togglePin: (messageId: string) => Promise<void>
+    toggleReaction: (messageId: string, emoji: string) => Promise<void>
+  }
+}
+
+const MessageListRow: React.FC<MessageListRowProps> = ({ index, style, data }) => {
+  const { items, setSize, onReply, handleEdit, handleDelete, togglePin, toggleReaction } = data
+  const item = items[index]
+  const rowRef = useRef<HTMLDivElement | null>(null)
+
+  useLayoutEffect(() => {
+    if (rowRef.current) {
+      const height = rowRef.current.getBoundingClientRect().height
+      setSize(index, height)
+    }
+  }, [item, index, setSize])
+
+  const hasReactions =
+    item.type === 'message' &&
+    item.message?.reactions &&
+    Object.keys(item.message.reactions).length > 0
+
+  if (item.type === 'header') {
+    return (
+      <div
+        ref={rowRef}
+        style={style}
+        className="sticky top-0 z-10 flex items-center my-2"
+      >
+        <hr className="flex-grow border-t border-gray-300 dark:border-gray-700" />
+        <span className="mx-2 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+          {item.date}
+        </span>
+        <hr className="flex-grow border-t border-gray-300 dark:border-gray-700" />
+      </div>
+    )
+  }
+
+  return (
+    <div
+      ref={rowRef}
+      style={style}
+      className={cn('py-1', hasReactions && 'pb-6')}
+    >
+      <MessageItem
+        message={item.message as ChatMessage}
+        previousMessage={item.prev}
+        onReply={onReply}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        onTogglePin={togglePin}
+        onToggleReaction={toggleReaction}
+      />
+    </div>
+  )
+}
+
 export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
   const { messages, loading, editMessage, deleteMessage, togglePin, toggleReaction } = useMessages()
   const { typingUsers } = useTyping('general')
@@ -90,6 +156,16 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
     }
   }
 
+  const itemData = useMemo(() => ({
+    items,
+    setSize,
+    onReply,
+    handleEdit,
+    handleDelete,
+    togglePin,
+    toggleReaction
+  }), [items, setSize, onReply, handleEdit, handleDelete, togglePin, toggleReaction])
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -102,58 +178,6 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
       </div>
     )
   }
-
-
-  const Row = useCallback(({ index, style }: { index: number; style: React.CSSProperties }) => {
-    const item = items[index]
-    const rowRef = useRef<HTMLDivElement | null>(null)
-
-    useLayoutEffect(() => {
-      if (rowRef.current) {
-        const height = rowRef.current.getBoundingClientRect().height
-        setSize(index, height)
-      }
-    }, [item, index])
-
-    const hasReactions =
-      item.type === 'message' &&
-      item.message?.reactions &&
-      Object.keys(item.message.reactions).length > 0
-
-    if (item.type === 'header') {
-      return (
-        <div
-          ref={rowRef}
-          style={style}
-          className="sticky top-0 z-10 flex items-center my-2"
-        >
-          <hr className="flex-grow border-t border-gray-300 dark:border-gray-700" />
-          <span className="mx-2 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-            {item.date}
-          </span>
-          <hr className="flex-grow border-t border-gray-300 dark:border-gray-700" />
-        </div>
-      )
-    }
-
-    return (
-      <div
-        ref={rowRef}
-        style={style}
-        className={cn('py-1', hasReactions && 'pb-6')}
-      >
-        <MessageItem
-          message={item.message as ChatMessage}
-          previousMessage={item.prev}
-          onReply={onReply}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onTogglePin={togglePin}
-          onToggleReaction={toggleReaction}
-        />
-      </div>
-    )
-  }, [items, onReply, handleEdit, handleDelete, togglePin, toggleReaction])
 
   return (
     <div
@@ -190,6 +214,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
           width="100%"
           itemCount={items.length}
           itemSize={getSize}
+          itemData={itemData}
           itemKey={(index) =>
             items[index].type === 'header'
               ? `header-${items[index].date}`
@@ -197,7 +222,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
           }
           overscanCount={10}
         >
-          {Row}
+          {MessageListRow}
         </List>
       )}
 
