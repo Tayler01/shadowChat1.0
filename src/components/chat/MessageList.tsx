@@ -42,12 +42,25 @@ const MessageListRow: React.FC<MessageListRowProps> = ({ index, style, data }) =
   const rowRef = useRef<HTMLDivElement | null>(null)
 
   useLayoutEffect(() => {
-    if (rowRef.current) {
-      const height = rowRef.current.getBoundingClientRect().height
-      setSize(index, height)
-      if (index === items.length - 1) {
-        scrollToBottom()
+    if (!rowRef.current) return
+
+    const updateSize = () => {
+      if (rowRef.current) {
+        const height = rowRef.current.getBoundingClientRect().height
+        setSize(index, height)
+        if (index === items.length - 1) {
+          scrollToBottom()
+        }
       }
+    }
+
+    updateSize()
+
+    const observer = new ResizeObserver(updateSize)
+    observer.observe(rowRef.current)
+
+    return () => {
+      observer.disconnect()
     }
   }, [item, index, setSize, scrollToBottom])
 
