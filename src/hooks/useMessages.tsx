@@ -111,23 +111,6 @@ function useProvideMessages(): MessagesContextValue {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const subscribeRef = useRef<() => RealtimeChannel>();
 
-  const handleVisible = useCallback(() => {
-    const channel = channelRef.current;
-    if (channel && channel.state !== 'joined') {
-      if (DEBUG) {
-        console.log('🌀 Resubscribing channel due to state', channel.state)
-      }
-      supabase.removeChannel(channel)
-      const newChannel = subscribeRef.current?.()
-      if (newChannel) {
-        channelRef.current = newChannel
-      }
-    }
-    fetchMessages()
-  }, [fetchMessages])
-
-  useVisibilityRefresh(handleVisible)
-
   const fetchMessages = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -157,6 +140,23 @@ function useProvideMessages(): MessagesContextValue {
       setLoading(false);
     }
   }, []);
+
+  const handleVisible = useCallback(() => {
+    const channel = channelRef.current;
+    if (channel && channel.state !== 'joined') {
+      if (DEBUG) {
+        console.log('🌀 Resubscribing channel due to state', channel.state)
+      }
+      supabase.removeChannel(channel)
+      const newChannel = subscribeRef.current?.()
+      if (newChannel) {
+        channelRef.current = newChannel
+      }
+    }
+    fetchMessages()
+  }, [fetchMessages])
+
+  useVisibilityRefresh(handleVisible)
 
   // Fetch initial messages
   useEffect(() => {
