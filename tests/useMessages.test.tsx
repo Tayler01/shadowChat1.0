@@ -1,5 +1,12 @@
 import { renderHook, act } from '@testing-library/react';
-import { MessagesProvider, useMessages } from '../src/hooks/useMessages';
+import {
+  MessagesProvider,
+  useMessages,
+  prepareMessageData,
+  insertMessage,
+  refreshSessionAndRetry,
+} from '../src/hooks/useMessages';
+import * as messagesModule from '../src/hooks/useMessages';
 import { useAuth } from '../src/hooks/useAuth';
 import { supabase, ensureSession } from '../src/lib/supabase';
 
@@ -18,6 +25,36 @@ jest.mock('../src/lib/supabase', () => {
 });
 
 type SupabaseMock = jest.Mocked<typeof supabase>;
+
+describe('helper functions', () => {
+  it('prepareMessageData trims content', () => {
+    const result = prepareMessageData('u1', ' hi ', 'text');
+    expect(result).toEqual({ user_id: 'u1', content: 'hi', message_type: 'text' });
+  });
+
+  it('insertMessage inserts through supabase', async () => {
+    const insertMock = jest.fn(() => ({ select: () => ({ single: () => Promise.resolve({ data: { id: '1' }, error: null }) }) }));
+    (supabase.from as jest.Mock).mockReturnValueOnce({ insert: insertMock } as any);
+
+    const { data, error } = await insertMessage({ user_id: 'u1', content: 'hi', message_type: 'text' });
+    expect(insertMock).toHaveBeenCalledWith({ user_id: 'u1', content: 'hi', message_type: 'text' });
+    expect(data).toEqual({ id: '1' });
+    expect(error).toBeNull();
+  });
+
+  it('refreshSessionAndRetry refreshes and retries insert', async () => {
+    const insertSpy = jest.spyOn(messagesModule, 'insertMessage').mockResolvedValueOnce({ data: { id: '1' }, error: null });
+    (supabase.auth.refreshSession as jest.Mock).mockResolvedValue({ data: { session: {} }, error: null });
+
+    const { data, error } = await refreshSessionAndRetry({ user_id: 'u1', content: 'hi', message_type: 'text' });
+
+    expect(supabase.auth.refreshSession).toHaveBeenCalled();
+    expect(insertSpy).toHaveBeenCalled();
+    expect(data).toEqual({ id: '1' });
+    expect(error).toBeNull();
+    insertSpy.mockRestore();
+  });
+});
 
 describe('sendMessage', () => {
   const user = { id: 'user1' } as any;
