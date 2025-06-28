@@ -29,14 +29,14 @@ BEGIN
     c.created_at,
     c.updated_at,
     (
-      SELECT row_to_json(u)
+      SELECT to_jsonb(u)
       FROM users u
       WHERE u.id <> auth.uid()
         AND u.id = ANY (c.participants)
       LIMIT 1
     ) AS other_user,
     (
-      SELECT row_to_json(m)
+      SELECT to_jsonb(m)
       FROM dm_messages m
       WHERE m.conversation_id = c.id
       ORDER BY m.created_at DESC
