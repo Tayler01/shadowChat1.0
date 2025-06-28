@@ -64,9 +64,13 @@ export function groupMessagesByDate(messages: ChatMessage[]) {
 
 export function shouldGroupMessage(current: ChatMessage, previous?: ChatMessage) {
   if (!previous) return false
-  
+
+  // Determine ids for chat or DM messages
+  const currentId = (current as any).user_id ?? (current as any).sender_id
+  const previousId = (previous as any).user_id ?? (previous as any).sender_id
+
   // Don't group if different users
-  if (current.user_id !== previous.user_id && current.sender_id !== previous.sender_id) return false
+  if (currentId !== previousId) return false
   
   // Don't group if more than 5 minutes apart
   const currentTime = new Date(current.created_at).getTime()
