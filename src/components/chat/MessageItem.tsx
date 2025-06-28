@@ -220,7 +220,6 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
           <AnimatePresence>
             {showActions && (
               <div
-                onMouseLeave={() => setShowActions(false)}
                 className="absolute right-0 top-full mt-1 p-2 -m-2"
               >
                 <motion.div
