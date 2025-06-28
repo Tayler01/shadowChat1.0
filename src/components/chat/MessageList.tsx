@@ -11,7 +11,7 @@ import { Pin } from 'lucide-react'
 import { VariableSizeList as List } from 'react-window'
 import { useMessages } from '../../hooks/useMessages'
 import { useTyping } from '../../hooks/useTyping'
-import { groupMessagesByDate } from '../../lib/utils'
+import { groupMessagesByDate, cn } from '../../lib/utils'
 import { MessageItem } from './MessageItem'
 import type { Message as ChatMessage } from '../../lib/supabase'
 import toast from 'react-hot-toast'
@@ -112,6 +112,11 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
       }
     }
 
+    const hasReactions =
+      item.type === 'message' &&
+      item.message?.reactions &&
+      Object.keys(item.message.reactions).length > 0
+
     if (item.type === 'header') {
       return (
         <div
@@ -129,7 +134,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
     }
 
     return (
-      <div ref={refCallback} style={style} className="py-1">
+      <div ref={refCallback} style={style} className={cn('py-1', hasReactions && 'pb-6')}>
         <MessageItem
           message={item.message as ChatMessage}
           previousMessage={item.prev}
