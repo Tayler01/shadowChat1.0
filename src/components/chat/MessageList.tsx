@@ -136,7 +136,11 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
     }
 
     return (
-      <div ref={rowRef} style={style} className={cn('py-1', hasReactions && 'pb-6')}>
+      <div
+        ref={rowRef}
+        style={style}
+        className={cn(hasReactions ? 'py-2 pb-6' : 'py-0.5')}
+      >
         <MessageItem
           message={item.message as ChatMessage}
           previousMessage={item.prev}
