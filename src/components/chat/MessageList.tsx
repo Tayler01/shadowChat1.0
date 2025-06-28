@@ -47,10 +47,6 @@ const MessageListRow: React.FC<MessageListRowProps> = ({ index, style, data }) =
     }
   }, [item, index, setSize])
 
-  const hasReactions =
-    item.type === 'message' &&
-    item.message?.reactions &&
-    Object.keys(item.message.reactions).length > 0
 
   if (item.type === 'header') {
     return (
@@ -72,7 +68,7 @@ const MessageListRow: React.FC<MessageListRowProps> = ({ index, style, data }) =
     <div
       ref={rowRef}
       style={style}
-      className={cn('py-1', hasReactions && 'pb-6')}
+      className="py-1"
     >
       <MessageItem
         message={item.message as ChatMessage}

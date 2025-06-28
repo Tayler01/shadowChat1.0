@@ -44,21 +44,14 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
     setShowPicker(false)
   }
 
-  const hasReactions = !!message.reactions && Object.keys(message.reactions).length > 0
-
   return (
-    <div
-      className={cn(
-        'relative p-2 rounded-md bg-yellow-100/60 dark:bg-yellow-800/40 flex items-start',
-        hasReactions && 'pt-6'
-      )}
-    >
-      <MessageReactions
-        message={message}
-        onReact={handleReaction}
-        className="absolute top-1 left-2 text-[0.65rem]"
-      />
-      <div className="flex-1 min-w-0">
+    <div className="relative p-2 rounded-md bg-yellow-100/60 dark:bg-yellow-800/40 flex items-start">
+      <div className="flex-1 min-w-0 space-y-1">
+        <MessageReactions
+          message={message}
+          onReact={handleReaction}
+          className="text-[0.65rem]"
+        />
         <div className="text-sm text-yellow-800 dark:text-yellow-200 break-words">
           <strong>{message.user?.display_name}:</strong> {message.content}
         </div>
