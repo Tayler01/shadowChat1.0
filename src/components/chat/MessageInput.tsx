@@ -71,6 +71,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     setMessage('')
     stopTyping()
     setShowSlashCommands(false)
+    // Keep focus on the textarea so the mobile keyboard stays open
+    textareaRef.current?.focus()
 
     // Reset textarea height
     if (textareaRef.current) {
@@ -205,6 +207,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           disabled={!message.trim() || disabled}
           className="h-12 w-12 p-0 rounded-xl"
           aria-label="Send message"
+          onMouseDown={e => e.preventDefault()}
         >
           <Send className="w-5 h-5" />
         </Button>
