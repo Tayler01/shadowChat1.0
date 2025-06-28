@@ -163,7 +163,17 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
           ) : (
             <>
               <div className="relative group/message inline-block max-w-full">
-                <div className="bg-gray-100 dark:bg-gray-700 rounded-xl px-3 py-2 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors break-words">
+                <div
+                  className={cn(
+                    'relative bg-gray-100 dark:bg-gray-700 rounded-xl px-3 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors break-words',
+                    hasReactions ? 'pt-5 pb-2' : 'py-2'
+                  )}
+                >
+                  <MessageReactions
+                    message={message}
+                    onReact={handleReaction}
+                    className="absolute top-1 left-2 text-[0.65rem]"
+                  />
                   {message.content}
                 </div>
                 <div className="hidden group-hover/message:flex absolute -top-8 left-1/2 -translate-x-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow px-2 py-1 space-x-1 z-10">
@@ -197,7 +207,6 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   </div>
                 )}
               </div>
-              <MessageReactions message={message} onReact={handleReaction} />
             </>
           )}
         </div>
@@ -300,7 +309,11 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
 
 MessageItem.displayName = 'MessageItem'
 
-export const MessageReactions: React.FC<{ message: Message; onReact: (emoji: string) => void }> = ({ message, onReact }) => {
+export const MessageReactions: React.FC<{
+  message: Message
+  onReact: (emoji: string) => void
+  className?: string
+}> = ({ message, onReact, className = '' }) => {
   const { profile } = useAuth()
   const reactions: Record<string, { count: number; users: string[] }> = message.reactions || {}
   const hasReactions = Object.keys(reactions).length > 0
@@ -308,7 +321,7 @@ export const MessageReactions: React.FC<{ message: Message; onReact: (emoji: str
   if (!hasReactions) return null
 
   return (
-    <div className="flex flex-wrap gap-1 mt-2">
+    <div className={cn('flex flex-wrap gap-1', className)}>
       {Object.entries(reactions).map(([emoji, data]: [string, { count: number; users: string[] }]) => {
         const isReacted = data.users?.includes(profile?.id ?? '')
         return (
