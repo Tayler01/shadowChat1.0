@@ -27,6 +27,7 @@ interface MessageListRowProps {
   data: {
     items: { type: 'header' | 'message'; date?: string; message?: ChatMessage; prev?: ChatMessage }[]
     setSize: (index: number, size: number) => void
+    scrollToBottom: () => void
     onReply?: (messageId: string, content: string) => void
     handleEdit: (messageId: string, content: string) => Promise<void>
     handleDelete: (messageId: string) => Promise<void>
@@ -36,7 +37,7 @@ interface MessageListRowProps {
 }
 
 const MessageListRow: React.FC<MessageListRowProps> = ({ index, style, data }) => {
-  const { items, setSize, onReply, handleEdit, handleDelete, togglePin, toggleReaction } = data
+  const { items, setSize, scrollToBottom, onReply, handleEdit, handleDelete, togglePin, toggleReaction } = data
   const item = items[index]
   const rowRef = useRef<HTMLDivElement | null>(null)
 
@@ -44,8 +45,11 @@ const MessageListRow: React.FC<MessageListRowProps> = ({ index, style, data }) =
     if (rowRef.current) {
       const height = rowRef.current.getBoundingClientRect().height
       setSize(index, height)
+      if (index === items.length - 1) {
+        scrollToBottom()
+      }
     }
-  }, [item, index, setSize])
+  }, [item, index, setSize, scrollToBottom])
 
 
   if (item.type === 'header') {
@@ -134,6 +138,12 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
     }
   }, [])
 
+  const scrollToBottom = useCallback(() => {
+    if (listRef.current) {
+      listRef.current.scrollToItem(items.length - 1, 'end')
+    }
+  }, [items.length])
+
   const handleEdit = async (messageId: string, content: string) => {
     try {
       await editMessage(messageId, content)
@@ -152,15 +162,19 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
     }
   }
 
-  const itemData = useMemo(() => ({
-    items,
-    setSize,
-    onReply,
-    handleEdit,
-    handleDelete,
-    togglePin,
-    toggleReaction
-  }), [items, setSize, onReply, handleEdit, handleDelete, togglePin, toggleReaction])
+  const itemData = useMemo(
+    () => ({
+      items,
+      setSize,
+      scrollToBottom,
+      onReply,
+      handleEdit,
+      handleDelete,
+      togglePin,
+      toggleReaction,
+    }),
+    [items, setSize, scrollToBottom, onReply, handleEdit, handleDelete, togglePin, toggleReaction]
+  )
 
   if (loading) {
     return (
