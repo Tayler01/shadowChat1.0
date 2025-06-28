@@ -139,7 +139,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
       <div
         ref={rowRef}
         style={style}
-        className={cn(hasReactions ? 'py-2 pb-6' : 'py-0.5')}
+        className={cn(hasReactions ? 'py-3 pb-8' : 'py-1')}
       >
         <MessageItem
           message={item.message as ChatMessage}
