@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
-import { formatTime, shouldGroupMessage } from '../../lib/utils'
+import { formatTime, shouldGroupMessage, cn } from '../../lib/utils'
 import { toggleReaction, type Message } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -95,11 +95,17 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
       return () => document.removeEventListener('mousedown', handleClick)
     }, [showReactionPicker])
 
+    const hasReactions = !!message.reactions && Object.keys(message.reactions).length > 0
+
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className={`group flex space-x-3 ${isGrouped ? 'mt-1' : 'mt-4'}`}
+        className={cn(
+          'group flex space-x-3',
+          isGrouped ? 'mt-1' : 'mt-4',
+          hasReactions && 'mb-6'
+        )}
       >
         {/* Avatar */}
         <div className="flex-shrink-0 w-10">

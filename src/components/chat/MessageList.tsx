@@ -54,12 +54,12 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
     return arr
   }, [groupedMessages])
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom whenever items change or list resizes
   useEffect(() => {
     if (listRef.current) {
-      listRef.current.scrollToItem(items.length - 1)
+      listRef.current.scrollToItem(items.length - 1, 'end')
     }
-  }, [items.length])
+  }, [items.length, listHeight])
 
   const sizeMap = useRef<Record<number, number>>({})
 
@@ -115,10 +115,16 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
 
     if (item.type === 'header') {
       return (
-        <div ref={refCallback} style={style} className="sticky top-0 z-10 flex justify-center">
-          <div className="bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full text-xs font-medium text-gray-500 dark:text-gray-400">
+        <div
+          ref={refCallback}
+          style={style}
+          className="sticky top-0 z-10 flex items-center my-2"
+        >
+          <hr className="flex-grow border-t border-gray-300 dark:border-gray-700" />
+          <span className="mx-2 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
             {item.date}
-          </div>
+          </span>
+          <hr className="flex-grow border-t border-gray-300 dark:border-gray-700" />
         </div>
       )
     }
