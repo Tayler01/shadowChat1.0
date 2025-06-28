@@ -21,7 +21,7 @@ interface MessageListProps {
 }
 
 export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
-  const { messages, loading, editMessage, deleteMessage, togglePin } = useMessages()
+  const { messages, loading, editMessage, deleteMessage, togglePin, toggleReaction } = useMessages()
   const { typingUsers } = useTyping('general')
   
   
@@ -148,10 +148,11 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
           onEdit={handleEdit}
           onDelete={handleDelete}
           onTogglePin={togglePin}
+          onToggleReaction={toggleReaction}
         />
       </div>
     )
-  }, [items, onReply, handleEdit, handleDelete, togglePin])
+  }, [items, onReply, handleEdit, handleDelete, togglePin, toggleReaction])
 
   return (
     <div
