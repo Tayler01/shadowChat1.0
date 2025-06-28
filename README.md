@@ -122,11 +122,17 @@ VITE_PRESENCE_INTERVAL_MS=30000 # optional
 --- ## Getting Started
 
 # Clone the repo
-git clone https://github.com/your-org/realtime-chat-app.git
-cd realtime-chat-app
+git clone https://github.com/Tayler01/shadowChat1.0.git
+cd shadowChat1.0
 
 # Install dependencies
 npm install
+
+# Lint the code
+npm run lint
+
+# Run tests
+npm test
 
 # Apply Supabase migrations
 npx supabase db push
