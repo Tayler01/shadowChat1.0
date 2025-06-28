@@ -7,8 +7,9 @@ import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import toast from 'react-hot-toast'
+import type { UserStatus } from '../../types'
 
-const statusOptions = [
+const statusOptions: { value: UserStatus; label: string; color: string }[] = [
   { value: 'online', label: 'Online', color: 'bg-green-500' },
   { value: 'away', label: 'Away', color: 'bg-yellow-500' },
   { value: 'busy', label: 'Busy', color: 'bg-red-500' },
@@ -24,11 +25,18 @@ interface ProfileViewProps {
   onToggleSidebar: () => void
 }
 
+interface ProfileFormData {
+  display_name: string
+  status_message: string
+  status: UserStatus
+  color: string
+}
+
 export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => {
   const { profile, updateProfile } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ProfileFormData>({
     display_name: profile?.display_name || '',
     status_message: profile?.status_message || '',
     status: profile?.status || 'online',
@@ -148,7 +156,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
                       {statusOptions.map((option) => (
                         <button
                           key={option.value}
-                          onClick={() => setFormData(prev => ({ ...prev, status: option.value as any }))}
+                          onClick={() => setFormData(prev => ({ ...prev, status: option.value }))}
                           className={`p-3 rounded-lg border-2 transition-colors ${
                             formData.status === option.value
                               ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'

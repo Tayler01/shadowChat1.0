@@ -66,6 +66,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 })
 
 // Database types matching the actual schema
+import type { UserStatus } from '../types'
+
 export interface User {
   id: string
   email: string
@@ -73,7 +75,7 @@ export interface User {
   display_name: string
   avatar_url?: string
   banner_url?: string
-  status: 'online' | 'away' | 'busy' | 'offline'
+  status: UserStatus
   status_message: string
   color: string
   last_active: string
