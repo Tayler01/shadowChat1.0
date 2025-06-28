@@ -67,10 +67,16 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
       try {
         await navigator.clipboard.writeText(message.content)
         toast.success('Message copied')
+        setShowActions(false)
       } catch (error) {
         console.error('❌ MessageItem: Failed to copy message:', error)
         toast.error('Failed to copy message')
       }
+    }
+
+    const handlePinToggle = async () => {
+      await onTogglePin(message.id)
+      setShowActions(false)
     }
 
     useEffect(() => {
@@ -146,7 +152,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 rows={2}
               />
               <div className="flex space-x-2">
-                <Button size="sm" onClick={handleEditSave}>
+                <Button size="sm" onClick={handleEditSave} type="button">
                   <Check className="w-4 h-4 mr-1" />
                   Save
                 </Button>
@@ -154,6 +160,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   size="sm"
                   variant="ghost"
                   onClick={() => setIsEditing(false)}
+                  type="button"
                 >
                   Cancel
                 </Button>
@@ -180,6 +187,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                       key={e}
                       onClick={() => handleReaction(e)}
                       className="text-base hover:scale-110 transition-transform"
+                      type="button"
                     >
                       {e}
                     </button>
@@ -187,6 +195,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   <button
                     onClick={() => setShowReactionPicker(!showReactionPicker)}
                     className="text-base hover:scale-110 transition-transform"
+                    type="button"
                   >
                     <Plus className="w-4 h-4" />
                   </button>
@@ -220,6 +229,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
             onClick={() => setShowActions(!showActions)}
             className="opacity-70 group-hover:opacity-100 transition-opacity"
             aria-label="Message actions"
+            type="button"
           >
             <MoreHorizontal className="w-4 h-4" />
           </Button>
@@ -238,6 +248,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   <button
                     onClick={() => handleReaction('👍')}
                     className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                    type="button"
                   >
                     <ThumbsUp className="w-4 h-4" />
                     <span>React</span>
@@ -246,6 +257,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 <button
                   onClick={handleCopyMessage}
                   className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                  type="button"
                 >
                   <Copy className="w-4 h-4" />
                   <span>Copy</span>
@@ -255,6 +267,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   <button
                     onClick={() => onReply(message.id, message.content)}
                     className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                    type="button"
                   >
                     <Reply className="w-4 h-4" />
                     <span>Reply</span>
@@ -269,6 +282,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                         setEditContent(message.content)
                       }}
                       className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                      type="button"
                     >
                       <Edit3 className="w-4 h-4" />
                       <span>Edit</span>
@@ -277,6 +291,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     <button
                       onClick={() => onDelete(message.id)}
                       className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-red-600 dark:text-red-400 flex items-center space-x-2"
+                      type="button"
                     >
                       <Trash2 className="w-4 h-4" />
                       <span>Delete</span>
@@ -285,8 +300,9 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 )}
 
                 <button
-                  onClick={() => onTogglePin(message.id)}
+                  onClick={handlePinToggle}
                   className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                  type="button"
                 >
                   {message.pinned ? (
                     <PinOff className="w-4 h-4" />
