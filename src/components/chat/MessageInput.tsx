@@ -4,8 +4,8 @@ import { Send, Smile, Paperclip, Command } from 'lucide-react'
 import { useTyping } from '../../hooks/useTyping'
 import { Button } from '../ui/Button'
 import { processSlashCommand, slashCommands } from '../../lib/utils'
-import toast from 'react-hot-toast'
 import type { EmojiPickerProps, EmojiClickData } from '../../types'
+import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 
 interface MessageInputProps {
   onSendMessage: (content: string) => void
@@ -20,9 +20,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 }) => {
   const [message, setMessage] = useState('')
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
-  const [EmojiPicker, setEmojiPicker] = useState<
-    React.ComponentType<EmojiPickerProps> | null
-  >(null)
+  const EmojiPicker = useEmojiPicker(showEmojiPicker)
   const [showSlashCommands, setShowSlashCommands] = useState(false)
   const { startTyping, stopTyping } = useTyping('general')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -49,20 +47,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  useEffect(() => {
-    const loadPicker = async () => {
-      try {
-        const mod = await import('emoji-picker-react')
-        setEmojiPicker(() => mod.default)
-      } catch (error) {
-        console.error('❌ MessageInput: Failed to load emoji picker:', error)
-        toast.error('Failed to load emoji picker')
-      }
-    }
-    if (showEmojiPicker && !EmojiPicker) {
-      loadPicker()
-    }
-  }, [showEmojiPicker, EmojiPicker])
 
   // Auto-resize textarea
   useEffect(() => {

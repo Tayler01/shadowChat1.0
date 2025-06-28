@@ -18,7 +18,8 @@ import { formatTime, shouldGroupMessage, cn } from '../../lib/utils'
 import { toggleReaction, type Message } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
-import type { EmojiPickerProps, EmojiClickData } from '../../types'
+import type { EmojiClickData } from '../../types'
+import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '🙏']
 
@@ -38,9 +39,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const [editContent, setEditContent] = useState(message.content)
     const [showActions, setShowActions] = useState(false)
     const [showReactionPicker, setShowReactionPicker] = useState(false)
-    const [EmojiPicker, setEmojiPicker] = useState<
-      React.ComponentType<EmojiPickerProps> | null
-    >(null)
+    const EmojiPicker = useEmojiPicker(showReactionPicker)
     const reactionPickerRef = useRef<HTMLDivElement>(null)
     const actionsRef = useRef<HTMLDivElement>(null)
 
@@ -83,20 +82,6 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
       return () => document.removeEventListener('mousedown', handleClick)
     }, [])
 
-    useEffect(() => {
-      const loadPicker = async () => {
-        try {
-          const mod = await import('emoji-picker-react')
-          setEmojiPicker(() => mod.default)
-        } catch (error) {
-          console.error('❌ MessageItem: Failed to load emoji picker:', error)
-          toast.error('Failed to load emoji picker')
-        }
-      }
-      if (showReactionPicker && !EmojiPicker) {
-        loadPicker()
-      }
-    }, [showReactionPicker, EmojiPicker])
 
     useEffect(() => {
       if (!showReactionPicker) return
