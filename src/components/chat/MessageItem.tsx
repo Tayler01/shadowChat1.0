@@ -40,9 +40,11 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const [editContent, setEditContent] = useState(message.content)
     const [showActions, setShowActions] = useState(false)
     const [showReactionPicker, setShowReactionPicker] = useState(false)
+    const [openAbove, setOpenAbove] = useState(false)
     const EmojiPicker = useEmojiPicker(showReactionPicker)
     const reactionPickerRef = useRef<HTMLDivElement>(null)
     const actionsRef = useRef<HTMLDivElement>(null)
+    const menuRef = useRef<HTMLDivElement>(null)
 
     const isGrouped = shouldGroupMessage(message, previousMessage)
     const isOwner = profile?.id === message.user_id
@@ -88,6 +90,22 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
       document.addEventListener('mousedown', handleClick)
       return () => document.removeEventListener('mousedown', handleClick)
     }, [])
+
+    useEffect(() => {
+      if (!showActions) return
+      const btnRect = actionsRef.current?.getBoundingClientRect()
+      const menuEl = menuRef.current
+      if (btnRect && menuEl) {
+        const spaceBelow = window.innerHeight - btnRect.bottom
+        const spaceAbove = btnRect.top
+        const menuHeight = menuEl.offsetHeight
+        if (spaceBelow < menuHeight && spaceAbove > menuHeight) {
+          setOpenAbove(true)
+        } else {
+          setOpenAbove(false)
+        }
+      }
+    }, [showActions])
 
 
     useEffect(() => {
@@ -237,7 +255,11 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
           <AnimatePresence>
             {showActions && (
               <div
-                className="absolute right-0 top-full mt-1 p-2 -m-2 z-50"
+                className={cn(
+                  'absolute right-0 p-2 -m-2 z-50',
+                  openAbove ? 'bottom-full mb-1' : 'top-full mt-1'
+                )}
+                ref={menuRef}
               >
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
