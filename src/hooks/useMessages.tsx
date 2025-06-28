@@ -127,18 +127,35 @@ function useProvideMessages(): MessagesContextValue {
 
   const fetchMessages = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select(`
+      const [pinnedRes, messagesRes] = await Promise.all([
+        supabase
+          .from('messages')
+          .select(
+            `
           *,
           user:users!user_id(*)
-        `)
-        .order('created_at', { ascending: true })
-        .limit(MESSAGE_FETCH_LIMIT);
+        `,
+          )
+          .eq('pinned', true)
+          .order('pinned_at', { ascending: true }),
+        supabase
+          .from('messages')
+          .select(
+            `
+          *,
+          user:users!user_id(*)
+        `,
+          )
+          .order('created_at', { ascending: true })
+          .limit(MESSAGE_FETCH_LIMIT),
+      ]);
+
+      const data = [...(pinnedRes.data || []), ...(messagesRes.data || [])];
+      const error = pinnedRes.error || messagesRes.error;
 
       if (error) {
         // console.error('❌ Error fetching messages:', error);
-      } else if (data) {
+      } else if (data.length > 0) {
         setMessages(prev => {
           if (prev.length === 0) {
             if (typeof localStorage !== 'undefined') {
