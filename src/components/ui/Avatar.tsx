@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 interface AvatarProps {
   src?: string;
@@ -35,6 +35,7 @@ export function Avatar({
   color,
   showStatus,
 }: AvatarProps) {
+  const [imageError, setImageError] = useState(false);
   const initials = fallback || alt.split(' ').map(n => n[0]).join('').toUpperCase();
   
   return (
@@ -52,14 +53,12 @@ export function Avatar({
       `}
         style={color ? { backgroundColor: color } : undefined}
       >
-        {src ? (
+        {src && !imageError ? (
           <img
             src={src}
             alt={alt}
             className="w-full h-full object-cover"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
+            onError={() => setImageError(true)}
           />
         ) : (
           <span className="select-none">{initials}</span>
