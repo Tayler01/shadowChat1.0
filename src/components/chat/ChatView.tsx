@@ -63,7 +63,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar }) => {
       </div>
 
       {/* Messages */}
-      <MessageList key={`messages-${messages.length}`} />
+      <MessageList />
 
       {/* Message Input */}
       <MessageInput
