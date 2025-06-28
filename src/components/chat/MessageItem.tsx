@@ -150,7 +150,6 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         <div
           className="relative"
           ref={actionsRef}
-          onMouseLeave={() => setShowActions(false)}
         >
           <Button
             variant="ghost"
@@ -167,6 +166,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
+                onMouseLeave={() => setShowActions(false)}
                 className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10 min-w-[160px]"
               >
                 <button
