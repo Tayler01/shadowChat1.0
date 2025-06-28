@@ -155,7 +155,7 @@ Deploy to Netlify or Vercel on merge to main
 Optional: Slack/Discord webhook alerts
 --- ## Future Features
 Push notifications (web + mobile)
-Offline drafts and local caching
+Offline drafts and local caching (message history cached on load)
 Threaded replies and collapsible chains
 Video or voice rooms using WebRTC
 Third-party plugin support
