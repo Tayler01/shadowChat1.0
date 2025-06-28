@@ -98,7 +98,6 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
       return () => document.removeEventListener('mousedown', handleClick)
     }, [showReactionPicker])
 
-    const hasReactions = !!message.reactions && Object.keys(message.reactions).length > 0
 
     return (
       <motion.div
@@ -165,14 +164,13 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
               <div className="relative group/message inline-block max-w-full">
                 <div
                   className={cn(
-                    'relative bg-gray-100 dark:bg-gray-700 rounded-xl px-3 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors break-words',
-                    hasReactions ? 'pt-5 pb-2' : 'py-2'
+                    'relative bg-gray-100 dark:bg-gray-700 rounded-xl px-3 py-2 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors break-words space-y-1'
                   )}
                 >
                   <MessageReactions
                     message={message}
                     onReact={handleReaction}
-                    className="absolute top-1 left-2 text-[0.65rem]"
+                    className="text-[0.65rem]"
                   />
                   {message.content}
                 </div>
