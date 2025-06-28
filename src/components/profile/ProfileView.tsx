@@ -75,14 +75,21 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
       className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900"
     >
       <div className="max-w-2xl mx-auto p-6">
-        <button onClick={onToggleSidebar} className="md:hidden p-2 -ml-2 mb-2">
+        <button
+          onClick={onToggleSidebar}
+          className="md:hidden p-2 -ml-2 mb-2"
+          aria-label="Toggle sidebar"
+        >
           <Menu className="w-5 h-5" />
         </button>
         {/* Header */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
           {/* Banner */}
           <div className="h-32 bg-gradient-to-r from-blue-500 to-purple-600 relative">
-            <button className="absolute top-4 right-4 p-2 bg-black bg-opacity-20 rounded-lg text-white hover:bg-opacity-30 transition-colors">
+            <button
+              className="absolute top-4 right-4 p-2 bg-black bg-opacity-20 rounded-lg text-white hover:bg-opacity-30 transition-colors"
+              aria-label="Change banner image"
+            >
               <Camera className="w-4 h-4" />
             </button>
           </div>
@@ -98,7 +105,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
                   color={profile.color}
                   className="border-4 border-white dark:border-gray-800"
                 />
-                <button className="absolute bottom-0 right-0 p-1.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors">
+                <button
+                  className="absolute bottom-0 right-0 p-1.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
+                  aria-label="Change avatar"
+                >
                   <Camera className="w-3 h-3" />
                 </button>
               </div>

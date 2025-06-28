@@ -35,6 +35,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar }) => {
             <button
               onClick={onToggleSidebar}
               className="md:hidden p-2 -ml-2"
+              aria-label="Toggle sidebar"
             >
               <Menu className="w-5 h-5" />
             </button>
