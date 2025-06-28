@@ -45,7 +45,7 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
   }
 
   return (
-    <div className="relative p-2 rounded-md bg-yellow-100/60 dark:bg-yellow-800/40 flex items-start">
+    <div className="relative p-2 rounded-md bg-yellow-100/60 dark:bg-yellow-800/40 flex items-start group">
       <div className="flex-1 min-w-0 space-y-1">
         <MessageReactions
           message={message}
@@ -55,7 +55,7 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
         <div className="text-sm text-yellow-800 dark:text-yellow-200 break-words">
           <strong>{message.user?.display_name}:</strong> {message.content}
         </div>
-        <div className="flex items-center space-x-2 mt-1">
+        <div className={cn('hidden group-hover:flex items-center space-x-2 mt-1', showPicker && 'flex')}>
           {QUICK_REACTIONS.map(e => (
             <button
               key={e}
@@ -72,17 +72,17 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
           >
             <Plus className="w-4 h-4" />
           </button>
-          {showPicker && Picker && (
-            <div ref={pickerRef} className="absolute z-50 top-full mt-2">
-              <Picker
-                onEmojiClick={handleSelect}
-                width={320}
-                height={400}
-                theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
-              />
-            </div>
-          )}
         </div>
+        {showPicker && Picker && (
+          <div ref={pickerRef} className="absolute z-50 top-full mt-2">
+            <Picker
+              onEmojiClick={handleSelect}
+              width={320}
+              height={400}
+              theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
+            />
+          </div>
+        )}
       </div>
       <Button
         variant="ghost"
