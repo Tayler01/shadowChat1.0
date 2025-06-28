@@ -97,7 +97,7 @@ function App() {
   return (
     <AuthGuard>
       <MessagesProvider>
-        <div className="h-screen flex flex-col md:flex-row bg-gray-100 dark:bg-gray-900">
+        <div className="h-screen overflow-hidden flex flex-col md:flex-row bg-gray-100 dark:bg-gray-900">
           <Sidebar
             currentView={currentView}
             onViewChange={setCurrentView}
@@ -114,11 +114,7 @@ function App() {
             />
           )}
 
-          <main
-            className={`flex-1 flex flex-col min-w-0 ${
-              currentView === 'chat' || currentView === 'dms' ? 'pb-32' : 'pb-16'
-            } md:pb-0`}
-          >
+          <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
             {renderCurrentView()}
           </main>
 
