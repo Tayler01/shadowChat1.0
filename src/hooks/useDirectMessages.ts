@@ -110,21 +110,6 @@ export function useDirectMessages() {
     };
   }, [user]);
 
-  const createConversation = useCallback(async (otherUserId: string) => {
-    if (!user) return null;
-
-    try {
-      const { data, error } = await supabase.rpc('create_dm_conversation', {
-        other_user_id: otherUserId,
-      });
-
-      if (error) throw error;
-      return data;
-    } catch (error) {
-      console.error('Error creating conversation:', error);
-      throw error;
-    }
-  }, [user]);
   const {
     messages,
     sendMessage,
@@ -174,7 +159,6 @@ export function useDirectMessages() {
     startConversation,
     sendMessage,
     markAsRead,
-    createConversation,
   };
 }
 
