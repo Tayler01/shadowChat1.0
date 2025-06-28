@@ -12,7 +12,11 @@ export function MobileChatFooter({ currentView, onViewChange, children }: Mobile
     <div className="md:hidden fixed bottom-0 inset-x-0 bg-white dark:bg-gray-800 z-50 flex flex-col">
       {children}
       <div className="border-t border-gray-200 dark:border-gray-700" />
-      <MobileNav currentView={currentView} onViewChange={onViewChange} className="" />
+      <MobileNav
+        currentView={currentView}
+        onViewChange={onViewChange}
+        className="static"
+      />
     </div>
   )
 }
