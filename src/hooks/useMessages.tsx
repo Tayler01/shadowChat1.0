@@ -528,6 +528,13 @@ function useProvideMessages(): MessagesContextValue {
         throw error;
       }
 
+      // Optimistically update local state
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === messageId ? { ...m, content, edited_at: new Date().toISOString() } as Message : m
+        )
+      );
+
     } catch (error) {
       // console.error('❌ Exception editing message:', error);
       throw error;
@@ -549,6 +556,9 @@ function useProvideMessages(): MessagesContextValue {
         // console.error('❌ Error deleting message:', error);
         throw error;
       }
+
+      // Optimistically remove from local state
+      setMessages(prev => prev.filter(m => m.id !== messageId));
 
     } catch (error) {
       // console.error('❌ Exception deleting message:', error);
@@ -642,6 +652,20 @@ function useProvideMessages(): MessagesContextValue {
         // console.error('❌ Error toggling pin:', error);
         throw error;
       }
+
+      // Optimistically update local state
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === messageId
+            ? {
+                ...m,
+                pinned: !isPinned,
+                pinned_by: !isPinned ? user.id : null,
+                pinned_at: !isPinned ? new Date().toISOString() : null,
+              }
+            : m
+        )
+      );
 
     } catch (error) {
       // console.error('❌ Exception toggling pin:', error);
