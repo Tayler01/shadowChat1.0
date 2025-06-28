@@ -75,6 +75,34 @@ export function useDirectMessages() {
           });
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'dm_messages',
+        },
+        (payload) => {
+          setConversations(prev => {
+            const convIndex = prev.findIndex(c => c.id === payload.new.conversation_id);
+            if (convIndex >= 0 && prev[convIndex].last_message?.id === payload.new.id) {
+              const updated = [...prev];
+              updated[convIndex] = {
+                ...updated[convIndex],
+                last_message: {
+                  ...updated[convIndex].last_message!,
+                  reactions: payload.new.reactions,
+                  content: payload.new.content,
+                  read_at: payload.new.read_at,
+                  edited_at: payload.new.edited_at,
+                },
+              };
+              return updated;
+            }
+            return prev;
+          });
+        }
+      )
       .subscribe();
 
     return () => {
@@ -234,6 +262,31 @@ export function useConversationMessages(conversationId: string | null) {
                   .update({ read_at: new Date().toISOString() })
                   .eq('id', data.id);
               }
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'dm_messages',
+            filter: `conversation_id=eq.${conversationId}`,
+          },
+          async (payload) => {
+            const { data } = await supabase
+              .from('dm_messages')
+              .select(`
+                *,
+                sender:users!sender_id(*)
+              `)
+              .eq('id', payload.new.id)
+              .single();
+
+            if (data) {
+              setMessages(prev =>
+                prev.map(m => (m.id === data.id ? data : m))
+              );
             }
           }
         )
