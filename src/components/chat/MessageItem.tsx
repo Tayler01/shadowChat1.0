@@ -301,7 +301,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
 
 MessageItem.displayName = 'MessageItem'
 
-const MessageReactions: React.FC<{ message: Message; onReact: (emoji: string) => void }> = ({ message, onReact }) => {
+export const MessageReactions: React.FC<{ message: Message; onReact: (emoji: string) => void }> = ({ message, onReact }) => {
   const { profile } = useAuth()
   const reactions: Record<string, { count: number; users: string[] }> = message.reactions || {}
   const hasReactions = Object.keys(reactions).length > 0
