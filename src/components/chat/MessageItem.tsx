@@ -237,22 +237,14 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
           <AnimatePresence>
             {showActions && (
               <div
-                className="absolute right-0 top-full mt-1 p-2 -m-2"
+                className="absolute right-0 top-full mt-1 p-2 -m-2 z-50"
               >
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10 min-w-[160px]"
+                  className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50 min-w-[160px]"
                 >
-                  <button
-                    onClick={() => handleReaction('👍')}
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
-                    type="button"
-                  >
-                    <ThumbsUp className="w-4 h-4" />
-                    <span>React</span>
-                  </button>
 
                 <button
                   onClick={handleCopyMessage}
@@ -265,7 +257,10 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
 
                 {onReply && (
                   <button
-                    onClick={() => onReply(message.id, message.content)}
+                    onClick={() => {
+                      onReply(message.id, message.content)
+                      setShowActions(false)
+                    }}
                     className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
                     type="button"
                   >
@@ -280,6 +275,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                       onClick={() => {
                         setIsEditing(true)
                         setEditContent(message.content)
+                        setShowActions(false)
                       }}
                       className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
                       type="button"
@@ -289,7 +285,10 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     </button>
 
                     <button
-                      onClick={() => onDelete(message.id)}
+                      onClick={() => {
+                        onDelete(message.id)
+                        setShowActions(false)
+                      }}
                       className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-red-600 dark:text-red-400 flex items-center space-x-2"
                       type="button"
                     >
