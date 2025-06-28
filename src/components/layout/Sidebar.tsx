@@ -64,6 +64,7 @@ export function Sidebar({
       <button
         onClick={onClose}
         className="absolute top-2 right-2 p-2 rounded-md text-gray-500 hover:text-gray-700 md:hidden"
+        aria-label="Close sidebar"
       >
         <X className="w-4 h-4" />
       </button>
@@ -115,6 +116,7 @@ export function Sidebar({
               <button
                 onClick={onNewDM}
                 className="p-1 text-gray-400 hover:text-gray-600 rounded"
+                aria-label="Start new conversation"
               >
                 <Plus className="w-4 h-4" />
               </button>
@@ -178,6 +180,7 @@ export function Sidebar({
           <button
             onClick={onToggleDarkMode}
             className="p-2 text-gray-500 hover:text-gray-700"
+            aria-label="Toggle dark mode"
           >
             {isDarkMode ? (
               <Sun className="w-4 h-4" />

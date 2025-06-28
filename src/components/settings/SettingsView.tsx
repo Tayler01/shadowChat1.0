@@ -80,7 +80,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
       className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900"
     >
       <div className="max-w-2xl mx-auto p-6">
-        <button onClick={onToggleSidebar} className="md:hidden p-2 -ml-2 mb-2">
+        <button
+          onClick={onToggleSidebar}
+          className="md:hidden p-2 -ml-2 mb-2"
+          aria-label="Toggle sidebar"
+        >
           <Menu className="w-5 h-5" />
         </button>
         {/* Header */}
@@ -126,6 +130,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
                           ? 'bg-[var(--color-accent)]'
                           : 'bg-gray-200 dark:bg-gray-700'
                       }`}
+                      aria-label={`Toggle ${setting.label}`}
                     >
                       <span
                         className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -154,6 +159,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
                   onClick={() => setScheme(key)}
                   className={`w-8 h-8 rounded-full border-2 ${scheme === key ? 'border-[var(--color-accent)]' : 'border-transparent'}`}
                   style={{ background: `linear-gradient(to right, ${colorSchemes[key].start}, ${colorSchemes[key].end})` }}
+                  aria-label={`Select ${key} color scheme`}
                 />
               ))}
             </div>

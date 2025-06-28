@@ -188,6 +188,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               size="sm"
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
               className="h-8 w-8 p-0"
+              aria-label="Insert emoji"
             >
               <Smile className="w-4 h-4" />
             </Button>
@@ -197,6 +198,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               variant="ghost"
               size="sm"
               className="h-8 w-8 p-0"
+              aria-label="Attach file"
             >
               <Paperclip className="w-4 h-4" />
             </Button>
@@ -207,6 +209,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           type="submit"
           disabled={!message.trim() || disabled}
           className="h-12 w-12 p-0 rounded-xl"
+          aria-label="Send message"
         >
           <Send className="w-5 h-5" />
         </Button>

@@ -208,6 +208,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
             size="sm"
             onClick={() => setShowActions(!showActions)}
             className="opacity-70 group-hover:opacity-100 transition-opacity"
+            aria-label="Message actions"
           >
             <MoreHorizontal className="w-4 h-4" />
           </Button>
