@@ -319,7 +319,7 @@ export const MessageReactions: React.FC<{
   if (!hasReactions) return null
 
   return (
-    <div className={cn('flex flex-wrap gap-1', className)}>
+    <div className={cn('flex flex-wrap gap-1 w-full justify-end', className)}>
       {Object.entries(reactions).map(([emoji, data]: [string, { count: number; users: string[] }]) => {
         const isReacted = data.users?.includes(profile?.id ?? '')
         return (
@@ -330,14 +330,14 @@ export const MessageReactions: React.FC<{
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             onClick={() => onReact(emoji)}
-            className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs transition-colors ${
+            className={`inline-flex items-center space-x-1 text-xs rounded-full transition-colors ${
               isReacted
-                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                ? 'text-blue-800 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
             }`}
           >
             <span>{emoji}</span>
-            <span>{data.count}</span>
+            <span className="text-[0.5em]">{data.count}</span>
           </motion.button>
         )
       })}
