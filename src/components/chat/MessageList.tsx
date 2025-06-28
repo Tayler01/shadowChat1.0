@@ -25,7 +25,6 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
   const { typingUsers } = useTyping('general')
   
   
-  const messagesEndRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<List>(null)
   const [listHeight, setListHeight] = useState(0)
@@ -190,7 +189,6 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
           </motion.div>
         )}
       </AnimatePresence>
-      <div ref={messagesEndRef} />
     </div>
   )
 }
