@@ -343,9 +343,15 @@ function useProvideMessages(): MessagesContextValue {
             }
 
             if (updatedMessage) {
-              setMessages(prev =>
-                prev.map(msg => msg.id === updatedMessage.id ? updatedMessage as Message : msg)
-              );
+              setMessages(prev => {
+                const index = prev.findIndex(msg => msg.id === updatedMessage.id)
+                if (index !== -1) {
+                  return prev.map(msg =>
+                    msg.id === updatedMessage.id ? (updatedMessage as Message) : msg
+                  )
+                }
+                return [...prev, updatedMessage as Message]
+              })
             }
           } catch (error) {
             // console.error('❌ Exception handling message update:', error);
