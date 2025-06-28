@@ -269,7 +269,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 overflow-y-auto p-4 pl-6 space-y-3">
               {messages.map((message, index) => {
                 const previousMessage = messages[index - 1]
                 const isGrouped = shouldGroupMessage(message, previousMessage)
