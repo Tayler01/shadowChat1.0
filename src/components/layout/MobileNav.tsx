@@ -4,9 +4,10 @@ import { MessageSquare, Users, User, Settings } from 'lucide-react'
 interface MobileNavProps {
   currentView: 'chat' | 'dms' | 'profile' | 'settings'
   onViewChange: (view: 'chat' | 'dms' | 'profile' | 'settings') => void
+  className?: string
 }
 
-export function MobileNav({ currentView, onViewChange }: MobileNavProps) {
+export function MobileNav({ currentView, onViewChange, className }: MobileNavProps) {
   const navItems = [
     { id: 'chat' as const, icon: MessageSquare, label: 'Chat' },
     { id: 'dms' as const, icon: Users, label: 'DMs' },
@@ -15,7 +16,11 @@ export function MobileNav({ currentView, onViewChange }: MobileNavProps) {
   ]
 
   return (
-    <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 h-16 z-50">
+    <nav
+      className={`md:hidden bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 h-16 ${
+        className || 'fixed bottom-0 inset-x-0 z-50'
+      }`}
+    >
       <ul className="flex justify-around">
         {navItems.map(item => (
           <li key={item.id}>

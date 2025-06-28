@@ -14,14 +14,17 @@ import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { MessageInput } from '../chat/MessageInput'
+import { MobileChatFooter } from '../layout/MobileChatFooter'
 import { formatTime, shouldGroupMessage } from '../../lib/utils'
 import toast from 'react-hot-toast'
 
 interface DirectMessagesViewProps {
   onToggleSidebar: () => void
+  currentView: 'chat' | 'dms' | 'profile' | 'settings'
+  onViewChange: (view: 'chat' | 'dms' | 'profile' | 'settings') => void
 }
 
-export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggleSidebar }) => {
+export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggleSidebar, currentView, onViewChange }) => {
   const { profile } = useAuth()
   const {
     conversations,
@@ -312,11 +315,25 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
               })}
             </div>
 
-            {/* Message Input */}
-            <MessageInput
-              onSendMessage={handleSendMessage}
-              placeholder={`Message @${currentConv.other_user?.username}...`}
-            />
+            {/* Desktop Message Input */}
+            <div className="hidden md:block">
+              <MessageInput
+                onSendMessage={handleSendMessage}
+                placeholder={`Message @${currentConv.other_user?.username}...`}
+              />
+            </div>
+
+            {/* Mobile Message Input with Navigation */}
+            <MobileChatFooter
+              currentView={currentView}
+              onViewChange={onViewChange}
+            >
+              <MessageInput
+                onSendMessage={handleSendMessage}
+                placeholder={`Message @${currentConv.other_user?.username}...`}
+                className="border-t"
+              />
+            </MobileChatFooter>
           </>
         ) : (
           <div className="flex-1 flex items-center justify-center">

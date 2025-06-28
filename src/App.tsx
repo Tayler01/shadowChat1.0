@@ -64,15 +64,33 @@ function App() {
   const renderCurrentView = () => {
     switch (currentView) {
       case 'chat':
-        return <ChatView onToggleSidebar={toggleSidebar} />
+        return (
+          <ChatView
+            onToggleSidebar={toggleSidebar}
+            currentView={currentView}
+            onViewChange={setCurrentView}
+          />
+        )
       case 'dms':
-        return <DirectMessagesView onToggleSidebar={toggleSidebar} />
+        return (
+          <DirectMessagesView
+            onToggleSidebar={toggleSidebar}
+            currentView={currentView}
+            onViewChange={setCurrentView}
+          />
+        )
       case 'profile':
         return <ProfileView onToggleSidebar={toggleSidebar} />
       case 'settings':
         return <SettingsView onToggleSidebar={toggleSidebar} />
       default:
-        return <ChatView onToggleSidebar={toggleSidebar} />
+        return (
+          <ChatView
+            onToggleSidebar={toggleSidebar}
+            currentView={currentView}
+            onViewChange={setCurrentView}
+          />
+        )
     }
   }
 
@@ -96,12 +114,18 @@ function App() {
             />
           )}
 
-          <main className="flex-1 flex flex-col min-w-0 pb-16 md:pb-0">
+          <main
+            className={`flex-1 flex flex-col min-w-0 ${
+              currentView === 'chat' || currentView === 'dms' ? 'pb-32' : 'pb-16'
+            } md:pb-0`}
+          >
             {renderCurrentView()}
           </main>
 
           {/* Mobile bottom navigation */}
-          <MobileNav currentView={currentView} onViewChange={setCurrentView} />
+          {currentView !== 'chat' && currentView !== 'dms' && (
+            <MobileNav currentView={currentView} onViewChange={setCurrentView} />
+          )}
 
           <Toaster
             position="top-right"
