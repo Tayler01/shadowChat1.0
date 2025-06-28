@@ -181,7 +181,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 {showReactionPicker && EmojiPicker && (
                   <div
                     ref={reactionPickerRef}
-                    className="absolute -top-48 left-1/2 -translate-x-1/2 z-20"
+                    className="absolute -top-48 left-1/2 -translate-x-1/2 z-50"
                   >
                     <EmojiPicker
                       onEmojiClick={handleReactionSelect}
