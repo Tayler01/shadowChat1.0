@@ -9,6 +9,7 @@ import { SettingsView } from './components/settings/SettingsView'
 import { useAuth } from './hooks/useAuth'
 import { MessagesProvider } from './hooks/useMessages'
 import { updateUserPresence } from './lib/supabase'
+import { PRESENCE_INTERVAL_MS } from './config'
 import { MobileNav } from './components/layout/MobileNav'
 
 type View = 'chat' | 'dms' | 'profile' | 'settings'
@@ -45,7 +46,7 @@ function App() {
     // Set up periodic presence updates
     const interval = setInterval(() => {
       updateUserPresence()
-    }, parseInt(import.meta.env.VITE_PRESENCE_INTERVAL_MS || '30000'))
+    }, PRESENCE_INTERVAL_MS)
 
     return () => clearInterval(interval)
   }, [user])

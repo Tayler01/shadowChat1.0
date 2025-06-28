@@ -7,6 +7,7 @@ import React, {
   useRef
 } from 'react';
 import { supabase, Message, ensureSession, DEBUG } from '../lib/supabase';
+import { MESSAGE_FETCH_LIMIT } from '../config';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
 
@@ -39,7 +40,7 @@ function useProvideMessages(): MessagesContextValue {
           user:users!user_id(*)
         `)
         .order('created_at', { ascending: true })
-        .limit(100);
+        .limit(MESSAGE_FETCH_LIMIT);
 
       if (error) {
         // console.error('❌ Error fetching messages:', error);

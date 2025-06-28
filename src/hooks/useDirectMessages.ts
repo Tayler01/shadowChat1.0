@@ -8,6 +8,7 @@ import {
   markDMMessagesRead,
   fetchDMConversations,
 } from '../lib/supabase';
+import { MESSAGE_FETCH_LIMIT } from '../config';
 import { useAuth } from './useAuth';
 
 export function useDirectMessages() {
@@ -172,7 +173,7 @@ export function useConversationMessages(conversationId: string | null) {
         `)
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true })
-        .limit(100);
+        .limit(MESSAGE_FETCH_LIMIT);
 
       if (error) {
         console.error('Error fetching DM messages:', error);
