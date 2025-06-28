@@ -152,7 +152,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-y-hidden overflow-x-visible p-4"
+      className="relative flex-1 overflow-y-hidden overflow-x-visible p-4 pb-8"
     >
       {messages.some(m => m.pinned) && (
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
@@ -191,7 +191,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400 mt-2"
+            className="absolute left-4 bottom-2 flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400"
           >
             <div className="flex space-x-1">
               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
