@@ -214,20 +214,23 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
 
           <AnimatePresence>
             {showActions && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
+              <div
                 onMouseLeave={() => setShowActions(false)}
-                className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10 min-w-[160px]"
+                className="absolute right-0 top-full mt-1 p-2 -m-2"
               >
-                <button
-                  onClick={() => handleReaction('👍')}
-                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10 min-w-[160px]"
                 >
-                  <ThumbsUp className="w-4 h-4" />
-                  <span>React</span>
-                </button>
+                  <button
+                    onClick={() => handleReaction('👍')}
+                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                  >
+                    <ThumbsUp className="w-4 h-4" />
+                    <span>React</span>
+                  </button>
 
                 <button
                   onClick={handleCopyMessage}
@@ -282,6 +285,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   <span>{message.pinned ? 'Unpin' : 'Pin'}</span>
                 </button>
               </motion.div>
+            </div>
             )}
           </AnimatePresence>
         </div>
