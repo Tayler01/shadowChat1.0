@@ -655,7 +655,15 @@ function useProvideMessages(): MessagesContextValue {
       }
 
       const isPinned = message.pinned;
-      
+
+      if (!isPinned) {
+        // Unpin any currently pinned message so only one remains
+        await supabase
+          .from('messages')
+          .update({ pinned: false, pinned_by: null, pinned_at: null })
+          .eq('pinned', true);
+      }
+
       const { error } = await supabase
         .from('messages')
         .update({
@@ -672,16 +680,20 @@ function useProvideMessages(): MessagesContextValue {
 
       // Optimistically update local state
       setMessages(prev =>
-        prev.map(m =>
-          m.id === messageId
-            ? {
-                ...m,
-                pinned: !isPinned,
-                pinned_by: !isPinned ? user.id : null,
-                pinned_at: !isPinned ? new Date().toISOString() : null,
-              }
-            : m
-        )
+        prev.map(m => {
+          if (m.id === messageId) {
+            return {
+              ...m,
+              pinned: !isPinned,
+              pinned_by: !isPinned ? user.id : null,
+              pinned_at: !isPinned ? new Date().toISOString() : null,
+            };
+          }
+          // If we just pinned a message, unpin all others
+          return !isPinned
+            ? { ...m, pinned: false, pinned_by: null, pinned_at: null }
+            : m;
+        })
       );
 
     } catch (error) {
