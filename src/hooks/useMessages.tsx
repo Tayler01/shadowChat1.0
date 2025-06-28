@@ -11,6 +11,84 @@ import { MESSAGE_FETCH_LIMIT } from '../config';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
 
+// --- Helper functions extracted from sendMessage workflow ---
+export const prepareMessageData = (
+  userId: string,
+  content: string,
+  messageType: 'text' | 'command'
+) => ({
+  user_id: userId,
+  content: content.trim(),
+  message_type: messageType,
+});
+
+export const insertMessage = async (messageData: {
+  user_id: string;
+  content: string;
+  message_type: 'text' | 'command';
+}) => {
+  const start = performance.now();
+  const insertPromise = supabase
+    .from('messages')
+    .insert(messageData)
+    .select(`
+      *,
+      user:users!user_id(*)
+    `)
+    .single();
+
+  const timeout = new Promise((_, reject) =>
+    setTimeout(
+      () => reject(new Error('Database insert timeout after 10 seconds')),
+      10000
+    )
+  );
+
+  const result = (await Promise.race([insertPromise, timeout])) as any;
+
+  if (DEBUG) {
+    const duration = performance.now() - start;
+    console.log('[insertMessage] result', { duration, ...result });
+  }
+
+  return result as { data: Message | null; error: any };
+};
+
+export const refreshSessionAndRetry = async (messageData: {
+  user_id: string;
+  content: string;
+  message_type: 'text' | 'command';
+}) => {
+  const refreshPromise = supabase.auth.refreshSession();
+  const refreshTimeout = new Promise((_, reject) =>
+    setTimeout(
+      () => reject(new Error('Session refresh timeout after 5 seconds')),
+      5000
+    )
+  );
+
+  const { data: refreshData, error: refreshError } = (await Promise.race([
+    refreshPromise,
+    refreshTimeout,
+  ])) as any;
+
+  if (DEBUG) {
+    console.log('[refreshSessionAndRetry] refresh result', {
+      refreshData,
+      refreshError,
+    });
+  }
+
+  if (!refreshError && refreshData.session) {
+    return insertMessage(messageData);
+  }
+
+  return { data: null, error: refreshError } as {
+    data: Message | null;
+    error: any;
+  };
+};
+
 interface MessagesContextValue {
   messages: Message[];
   loading: boolean;
@@ -325,98 +403,27 @@ function useProvideMessages(): MessagesContextValue {
 
     try {
       // Step 1: Prepare message data
-
-      const messageData = {
-        user_id: user.id,
-        content: content.trim(),
-        message_type: messageType,
-      };
+      const messageData = prepareMessageData(user.id, content, messageType);
       if (DEBUG) {
-        console.log(`${logPrefix}: Prepared message data`, messageData)
+        console.log(`${logPrefix}: Prepared message data`, messageData);
       }
 
       // Step 2: Attempt database insert (let Supabase handle auth internally)
-      const insertStartTime = performance.now();
-      
-      const insertPromise = supabase
-        .from('messages')
-        .insert(messageData)
-        .select(`
-          *,
-          user:users!user_id(*)
-        `)
-        .single();
-        
-      const insertTimeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Database insert timeout after 10 seconds')), 10000)
-      );
-      
-      let { data, error } = await Promise.race([insertPromise, insertTimeoutPromise]) as any;
-      const insertEndTime = performance.now();
-      const insertDuration = insertEndTime - insertStartTime;
+      let { data, error } = await insertMessage(messageData);
 
-      if (DEBUG) {
-        console.log(`${logPrefix}: Insert response`, { duration: insertDuration, data, error });
+      // Step 3: Handle auth errors with retry
+      if (error && (error.status === 401 || /jwt|token|expired/i.test(error.message))) {
+        const retry = await refreshSessionAndRetry(messageData);
+        if (DEBUG) {
+          console.log(`${logPrefix}: Retry result`, retry);
+        }
+        data = retry.data;
+        error = retry.error;
       }
 
-      // Insert result logged for debugging
-
       if (error) {
-        console.error(`${logPrefix}: ❌ Database insert failed:`, error);
-        
-        // Step 3: Handle auth errors with retry
-        if (error.status === 401 || /jwt|token|expired/i.test(error.message)) {
-          const retryRefreshStartTime = performance.now();
-          
-          // Try refreshing the session
-          const refreshPromise = supabase.auth.refreshSession();
-          const refreshTimeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Session refresh timeout after 5 seconds')), 5000)
-          );
-          
-          const { data: refreshData, error: refreshError } = await Promise.race([refreshPromise, refreshTimeoutPromise]) as any;
-          const retryRefreshEndTime = performance.now();
-          const retryRefreshDuration = retryRefreshEndTime - retryRefreshStartTime;
-          if (DEBUG) {
-            console.log(`${logPrefix}: Session refresh duration`, retryRefreshDuration);
-          }
-          
-          
-          if (!refreshError && refreshData.session) {
-            const retryInsertStartTime = performance.now();
-            
-            const retryPromise = supabase
-              .from('messages')
-              .insert(messageData)
-              .select(`
-                *,
-                user:users!user_id(*)
-              `)
-              .single();
-              
-            const retryTimeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Retry database insert timeout after 10 seconds')), 10000)
-            );
-            
-            const retry = await Promise.race([retryPromise, retryTimeoutPromise]) as any;
-            const retryInsertEndTime = performance.now();
-            const retryInsertDuration = retryInsertEndTime - retryInsertStartTime;
-            if (DEBUG) {
-              console.log(`${logPrefix}: Retry insert duration`, retryInsertDuration);
-            }
-            
-            
-            data = retry.data;
-            error = retry.error;
-          } else {
-            console.error(`${logPrefix}: ❌ Session refresh failed, cannot retry`);
-          }
-        }
-        
-        if (error) {
-          console.error(`${logPrefix}: ❌ Final error after retry:`, error);
-          throw error;
-        }
+        console.error(`${logPrefix}: ❌ Final error after retry:`, error);
+        throw error;
       }
 
       // Message successfully inserted
