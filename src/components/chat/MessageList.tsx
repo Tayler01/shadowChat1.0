@@ -113,6 +113,8 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
     const handleResize = () => {
       if (containerRef.current) {
         setListHeight(containerRef.current.clientHeight)
+        sizeMap.current = {}
+        listRef.current?.resetAfterIndex(0, true)
       }
     }
     handleResize()
