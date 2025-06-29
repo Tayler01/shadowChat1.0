@@ -33,3 +33,20 @@ test('searches users by term', async () => {
   expect(result.current.results).toEqual([{ id: 'u1' }])
   expect(result.current.error).toBeNull()
 })
+
+test('returns error when no users found', async () => {
+  const orMock = jest.fn().mockResolvedValue({ data: [], error: null })
+  const sb = supabase as SupabaseMock
+  ;(sb.from as jest.Mock).mockReturnValue({
+    select: jest.fn().mockReturnThis(),
+    or: orMock,
+  } as any)
+
+  const { result } = renderHook(() => useUserSearch('missing'))
+  await act(async () => {
+    await Promise.resolve()
+  })
+
+  expect(result.current.results).toEqual([])
+  expect(result.current.error).toBe('User not found')
+})
