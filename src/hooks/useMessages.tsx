@@ -16,17 +16,20 @@ import { useVisibilityRefresh } from './useVisibilityRefresh';
 export const prepareMessageData = (
   userId: string,
   content: string,
-  messageType: 'text' | 'command' | 'audio'
+  messageType: 'text' | 'command' | 'audio' | 'image',
+  fileUrl?: string
 ) => ({
   user_id: userId,
   content: content.trim(),
   message_type: messageType,
+  file_url: fileUrl,
 });
 
 export const insertMessage = async (messageData: {
   user_id: string;
   content: string;
-  message_type: 'text' | 'command' | 'audio';
+  message_type: 'text' | 'command' | 'audio' | 'image';
+  file_url?: string;
 }) => {
   const start = performance.now();
   const insertPromise = supabase
@@ -58,7 +61,8 @@ export const insertMessage = async (messageData: {
 export const refreshSessionAndRetry = async (messageData: {
   user_id: string;
   content: string;
-  message_type: 'text' | 'command' | 'audio';
+  message_type: 'text' | 'command' | 'audio' | 'image';
+  file_url?: string;
 }) => {
   const refreshPromise = supabase.auth.refreshSession();
   const refreshTimeout = new Promise((_, reject) =>
@@ -94,7 +98,11 @@ interface MessagesContextValue {
   messages: Message[];
   loading: boolean;
   sending: boolean;
-  sendMessage: (content: string, type?: 'text' | 'command' | 'audio') => Promise<void>;
+  sendMessage: (
+    content: string,
+    type?: 'text' | 'command' | 'audio' | 'image',
+    fileUrl?: string
+  ) => Promise<void>;
   editMessage: (id: string, content: string) => Promise<void>;
   deleteMessage: (id: string) => Promise<void>;
   toggleReaction: (id: string, emoji: string) => Promise<void>;
@@ -402,7 +410,11 @@ function useProvideMessages(): MessagesContextValue {
     };
   }, [user, fetchMessages]);
 
-  const sendMessage = useCallback(async (content: string, messageType: 'text' | 'command' | 'audio' = 'text') => {
+  const sendMessage = useCallback(async (
+    content: string,
+    messageType: 'text' | 'command' | 'audio' | 'image' = 'text',
+    fileUrl?: string
+  ) => {
     const timestamp = new Date().toISOString();
     const logPrefix = `🚀 [${timestamp}] MESSAGE_SEND`;
 
@@ -457,7 +469,7 @@ function useProvideMessages(): MessagesContextValue {
 
     try {
       // Step 1: Prepare message data
-      const messageData = prepareMessageData(user.id, content, messageType);
+      const messageData = prepareMessageData(user.id, content, messageType, fileUrl);
       if (DEBUG) {
         console.log(`${logPrefix}: Prepared message data`, messageData);
       }

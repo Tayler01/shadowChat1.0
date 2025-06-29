@@ -4,12 +4,16 @@ import { Send, Smile, Command, Plus, Mic } from 'lucide-react'
 import { useTyping } from '../../hooks/useTyping'
 import { Button } from '../ui/Button'
 import { processSlashCommand, slashCommands } from '../../lib/utils'
-import { uploadVoiceMessage } from '../../lib/supabase'
+import { uploadVoiceMessage, uploadChatFile } from '../../lib/supabase'
 import type { EmojiPickerProps, EmojiClickData } from '../../types'
 import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 
 interface MessageInputProps {
-  onSendMessage: (content: string, type?: 'text' | 'command' | 'audio') => void
+  onSendMessage: (
+    content: string,
+    type?: 'text' | 'command' | 'audio' | 'image',
+    fileUrl?: string
+  ) => void
   placeholder?: string
   disabled?: boolean
   className?: string
@@ -136,7 +140,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      console.log('Selected image:', file)
+      uploadChatFile(file)
+        .then(url => {
+          onSendMessage('', 'image', url)
+        })
+        .catch(err => console.error('Failed to upload image', err))
     }
   }
 

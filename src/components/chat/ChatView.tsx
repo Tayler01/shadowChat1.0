@@ -18,10 +18,11 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
 
   const handleSendMessage = async (
     content: string,
-    type?: 'text' | 'command' | 'audio'
+    type?: 'text' | 'command' | 'audio' | 'image',
+    fileUrl?: string
   ) => {
     try {
-      await sendMessage(content, type)
+      await sendMessage(content, type, fileUrl)
     } catch (error) {
       console.error('❌ ChatView: Failed to send message:', error)
       toast.error('Failed to send message')
