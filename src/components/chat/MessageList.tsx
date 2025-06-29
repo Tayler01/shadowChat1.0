@@ -87,7 +87,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
 
       {groupedMessages.map(group => (
         <React.Fragment key={group.date}>
-          <div className="sticky top-0 z-10 flex items-center my-2">
+          <div className="flex items-center my-2">
             <hr className="flex-grow border-t border-gray-300 dark:border-gray-700" />
             <span className="mx-2 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{group.date}</span>
             <hr className="flex-grow border-t border-gray-300 dark:border-gray-700" />
