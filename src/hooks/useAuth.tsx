@@ -1,7 +1,15 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { supabase, User, updateUserPresence } from '../lib/supabase';
 import { PRESENCE_INTERVAL_MS } from '../config';
-import { signIn as authSignIn, signUp as authSignUp, signOut as authSignOut, getCurrentUser, updateUserProfile } from '../lib/auth';
+import {
+  signIn as authSignIn,
+  signUp as authSignUp,
+  signOut as authSignOut,
+  getCurrentUser,
+  updateUserProfile,
+  uploadUserAvatar,
+  uploadUserBanner,
+} from '../lib/auth';
 
 interface AuthContextValue {
   user: User | null;
@@ -16,6 +24,8 @@ interface AuthContextValue {
   ) => Promise<any>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<User>) => Promise<User | void>;
+  uploadAvatar: (file: File) => Promise<string | void>;
+  uploadBanner: (file: File) => Promise<string | void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -229,13 +239,37 @@ function useProvideAuth() {
 
   const updateProfile = async (updates: Partial<User>) => {
     if (!user) return;
-    
+
     try {
       const updatedUser = await updateUserProfile(updates);
       setUser(updatedUser);
       return updatedUser;
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Profile update failed');
+      throw error;
+    }
+  };
+
+  const uploadAvatar = async (file: File) => {
+    if (!user) return;
+    try {
+      const url = await uploadUserAvatar(file);
+      setUser(prev => (prev ? { ...prev, avatar_url: url } : prev));
+      return url;
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Avatar upload failed');
+      throw error;
+    }
+  };
+
+  const uploadBanner = async (file: File) => {
+    if (!user) return;
+    try {
+      const url = await uploadUserBanner(file);
+      setUser(prev => (prev ? { ...prev, banner_url: url } : prev));
+      return url;
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Banner upload failed');
       throw error;
     }
   };
@@ -249,6 +283,8 @@ function useProvideAuth() {
     signUp,
     signOut,
     updateProfile,
+    uploadAvatar,
+    uploadBanner,
   };
 }
 

@@ -33,15 +33,49 @@ interface ProfileFormData {
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => {
-  const { profile, updateProfile } = useAuth()
+  const { profile, updateProfile, uploadAvatar, uploadBanner } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [uploadingBanner, setUploadingBanner] = useState(false)
+  const avatarInputRef = React.useRef<HTMLInputElement>(null)
+  const bannerInputRef = React.useRef<HTMLInputElement>(null)
   const [formData, setFormData] = useState<ProfileFormData>({
     display_name: profile?.display_name || '',
     status_message: profile?.status_message || '',
     status: profile?.status || 'online',
     color: profile?.color || '#3B82F6'
   })
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingAvatar(true)
+    try {
+      await uploadAvatar(file)
+      toast.success('Avatar updated!')
+    } catch {
+      toast.error('Failed to upload avatar')
+    } finally {
+      setUploadingAvatar(false)
+      e.target.value = ''
+    }
+  }
+
+  const handleBannerChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingBanner(true)
+    try {
+      await uploadBanner(file)
+      toast.success('Banner updated!')
+    } catch {
+      toast.error('Failed to upload banner')
+    } finally {
+      setUploadingBanner(false)
+      e.target.value = ''
+    }
+  }
 
   const handleSave = async () => {
     if (!profile) return
@@ -93,13 +127,26 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
         {/* Header */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
           {/* Banner */}
-          <div className="h-32 bg-gradient-to-r from-blue-500 to-purple-600 relative">
+          <div className="h-32 relative">
+            {profile.banner_url ? (
+              <img src={profile.banner_url} alt="Banner" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-r from-blue-500 to-purple-600" />
+            )}
             <button
               className="absolute top-4 right-4 p-2 bg-black bg-opacity-20 rounded-lg text-white hover:bg-opacity-30 transition-colors"
               aria-label="Change banner image"
+              onClick={() => bannerInputRef.current?.click()}
             >
-              <Camera className="w-4 h-4" />
+              {uploadingBanner ? <LoadingSpinner size="sm" /> : <Camera className="w-4 h-4" />}
             </button>
+            <input
+              type="file"
+              accept="image/*"
+              ref={bannerInputRef}
+              onChange={handleBannerChange}
+              className="hidden"
+            />
           </div>
 
           {/* Profile Info */}
@@ -116,9 +163,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
                 <button
                   className="absolute bottom-0 right-0 p-1.5 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
                   aria-label="Change avatar"
+                  onClick={() => avatarInputRef.current?.click()}
                 >
-                  <Camera className="w-3 h-3" />
+                  {uploadingAvatar ? <LoadingSpinner size="sm" /> : <Camera className="w-3 h-3" />}
                 </button>
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={avatarInputRef}
+                  onChange={handleAvatarChange}
+                  className="hidden"
+                />
               </div>
 
               <Button
