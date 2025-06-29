@@ -37,6 +37,8 @@ function useProvideAuth() {
       
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        // Ensure realtime uses the latest access token
+        supabase.realtime.setAuth(session?.access_token || '');
         
         // Handle the specific "user not found" error from invalid JWT
         if (sessionError && sessionError.message?.includes('User from sub claim in JWT does not exist')) {
@@ -103,10 +105,12 @@ function useProvideAuth() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         // Skip if we're still doing initial load or component is unmounted
+        if (!initialLoadRef.current || !mountedRef.current) {
+          return;
+        }
 
-          if (!initialLoadRef.current || !mountedRef.current) {
-            return;
-          }
+        // Update realtime auth token whenever session changes
+        supabase.realtime.setAuth(session?.access_token || '');
 
         
           if (event === 'SIGNED_OUT') {
