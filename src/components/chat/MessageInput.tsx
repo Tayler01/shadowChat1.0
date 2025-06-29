@@ -229,7 +229,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             variant="ghost"
             size="sm"
             onClick={() => setShowAttachmentMenu(prev => !prev)}
-            className="h-8 w-8 p-0"
+            className="h-12 w-12 p-0 rounded-xl"
             aria-label="Add attachment"
           >
             <Plus className="w-4 h-4" />
@@ -285,7 +285,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           variant="ghost"
           size="sm"
           onClick={handleRecordClick}
-          className="h-8 w-8 p-0"
+          className="h-12 w-12 p-0 rounded-xl"
           aria-label="Record audio"
         >
           <Mic className="w-4 h-4" />
@@ -296,7 +296,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           variant="ghost"
           size="sm"
           onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-          className="h-8 w-8 p-0 text-[var(--color-accent)]"
+          className="h-12 w-12 p-0 rounded-xl text-[var(--color-accent)]"
           aria-label="Insert emoji"
         >
           <Smile className="w-4 h-4" />
