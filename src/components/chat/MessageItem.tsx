@@ -134,7 +134,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
           {!isGrouped && (
             <Avatar
               src={message.user?.avatar_url}
-              alt={message.user?.display_name}
+              alt={message.user?.display_name || 'Unknown User'}
               size="md"
               color={message.user?.color}
               status={message.user?.status}

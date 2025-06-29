@@ -163,7 +163,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                     <div className="relative">
                       <Avatar
                         src={conversation.other_user?.avatar_url}
-                        alt={conversation.other_user?.display_name}
+                        alt={conversation.other_user?.display_name || 'Unknown User'}
                         size="md"
                         color={conversation.other_user?.color}
                         status={conversation.other_user?.status}
@@ -234,7 +234,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                 
                 <Avatar
                   src={currentConv.other_user?.avatar_url}
-                  alt={currentConv.other_user?.display_name}
+                  alt={currentConv.other_user?.display_name || 'Unknown User'}
                   size="md"
                   color={currentConv.other_user?.color}
                   status={currentConv.other_user?.status}
@@ -274,7 +274,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                       {!isGrouped && !isOwn && (
                         <Avatar
                           src={message.sender?.avatar_url}
-                          alt={message.sender?.display_name}
+                          alt={message.sender?.display_name || 'Unknown User'}
                           size="sm"
                           color={message.sender?.color}
                         />
