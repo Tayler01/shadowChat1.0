@@ -119,6 +119,25 @@ describe('sendMessage', () => {
     expect(insertFn).toHaveBeenCalled();
   });
 
+  it('inserts audio message with correct type', async () => {
+    const insertFn = jest.fn(() => ({
+      select: () => ({ single: () => Promise.resolve({ data: { id: '1' }, error: null }) })
+    }));
+    (supabase.from as jest.Mock).mockReturnValueOnce({ insert: insertFn } as any);
+
+    const { result } = renderHook(() => useMessages(), { wrapper: MessagesProvider });
+
+    await act(async () => {
+      await result.current.sendMessage('https://example.com/audio.webm', 'audio');
+    });
+
+    expect(insertFn).toHaveBeenCalledWith({
+      user_id: user.id,
+      content: 'https://example.com/audio.webm',
+      message_type: 'audio',
+    });
+  });
+
   it('refreshes session and retries on 401 insert error', async () => {
     const insertFail = jest.fn(() => ({
       select: () => ({

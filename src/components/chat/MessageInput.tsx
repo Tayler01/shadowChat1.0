@@ -4,11 +4,12 @@ import { Send, Smile, Command, Plus, Mic } from 'lucide-react'
 import { useTyping } from '../../hooks/useTyping'
 import { Button } from '../ui/Button'
 import { processSlashCommand, slashCommands } from '../../lib/utils'
+import { uploadVoiceMessage } from '../../lib/supabase'
 import type { EmojiPickerProps, EmojiClickData } from '../../types'
 import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 
 interface MessageInputProps {
-  onSendMessage: (content: string) => void
+  onSendMessage: (content: string, type?: 'text' | 'command' | 'audio') => void
   placeholder?: string
   disabled?: boolean
   className?: string
@@ -156,9 +157,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         const recorder = new MediaRecorder(stream)
         audioChunksRef.current = []
         recorder.ondataavailable = e => audioChunksRef.current.push(e.data)
-        recorder.onstop = () => {
+        recorder.onstop = async () => {
           const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-          console.log('Recorded audio:', blob)
+          try {
+            const url = await uploadVoiceMessage(blob)
+            onSendMessage(url, 'audio')
+          } catch (err) {
+            console.error('Failed to upload audio', err)
+          }
         }
         recorder.start()
         mediaRecorderRef.current = recorder
@@ -288,7 +294,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           className="h-8 w-8 p-0"
           aria-label="Record audio"
         >
-          <Mic className="w-4 h-4" />
+          <Mic className={`w-4 h-4 ${recording ? 'text-red-600' : ''}`} />
         </Button>
 
         <Button

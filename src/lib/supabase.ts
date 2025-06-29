@@ -65,6 +65,18 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 })
 
+export const VOICE_BUCKET = 'message-media'
+
+export const uploadVoiceMessage = async (blob: Blob) => {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  const filePath = `${user.id}/${Date.now()}.webm`
+  const { error } = await supabase.storage.from(VOICE_BUCKET).upload(filePath, blob)
+  if (error) throw error
+  const { data } = supabase.storage.from(VOICE_BUCKET).getPublicUrl(filePath)
+  return data.publicUrl
+}
+
 // Database types matching the actual schema
 import type { UserStatus } from '../types'
 
@@ -87,6 +99,8 @@ export interface Message {
   id: string
   user_id: string
   content: string
+  audio_url?: string
+  audio_duration?: number
   reactions: Record<string, { count: number; users: string[] }>
   pinned: boolean
   edited_at?: string
@@ -111,6 +125,8 @@ export interface DMMessage {
   conversation_id: string
   sender_id: string
   content: string
+  audio_url?: string
+  audio_duration?: number
   read_at?: string
   reactions: Record<string, { count: number; users: string[] }>
   edited_at?: string
