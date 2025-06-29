@@ -36,3 +36,11 @@
   --color-accent: #e11d48;
   --color-accent-light: #fdf2f8;
 }
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
