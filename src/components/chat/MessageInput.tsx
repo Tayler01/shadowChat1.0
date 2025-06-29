@@ -17,7 +17,7 @@ interface MessageInputProps {
 
 export const MessageInput: React.FC<MessageInputProps> = ({
   onSendMessage,
-  placeholder = 'Type a message...',
+  placeholder = 'Type a message',
   disabled = false,
   className = ''
 }) => {
@@ -256,6 +256,26 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               >
                 File
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleRecordClick()
+                  setShowAttachmentMenu(false)
+                }}
+                className="md:hidden block w-full px-3 py-1.5 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                Voice
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEmojiPicker(true)
+                  setShowAttachmentMenu(false)
+                }}
+                className="md:hidden block w-full px-3 py-1.5 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                Emoji
+              </button>
             </div>
           )}
           <input
@@ -291,7 +311,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           variant="ghost"
           size="sm"
           onClick={handleRecordClick}
-          className="h-12 w-12 p-0 rounded-xl"
+          className="hidden md:inline-flex h-12 w-12 p-0 rounded-xl"
           aria-label="Record audio"
         >
           <Mic className={`w-4 h-4 ${recording ? 'text-red-600' : ''}`} />
@@ -302,7 +322,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           variant="ghost"
           size="sm"
           onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-          className="h-12 w-12 p-0 rounded-xl text-[var(--color-accent)]"
+          className="hidden md:inline-flex h-12 w-12 p-0 rounded-xl text-[var(--color-accent)]"
           aria-label="Insert emoji"
         >
           <Smile className="w-4 h-4" />
