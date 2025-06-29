@@ -1,165 +1,30 @@
-import React, {
-  useEffect,
-  useRef,
-  useMemo,
-  useState,
-  useCallback,
-  useLayoutEffect,
-} from 'react'
+import React, { useEffect, useMemo, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Pin } from 'lucide-react'
-import { VariableSizeList as List } from 'react-window'
 import { useMessages } from '../../hooks/useMessages'
 import { useTyping } from '../../hooks/useTyping'
 import { groupMessagesByDate, cn, shouldGroupMessage } from '../../lib/utils'
 import { MessageItem } from './MessageItem'
 import { PinnedMessageItem } from './PinnedMessageItem'
-import type { Message as ChatMessage } from '../../lib/supabase'
 import toast from 'react-hot-toast'
 
 interface MessageListProps {
   onReply?: (messageId: string, content: string) => void
 }
 
-interface MessageListRowProps {
-  index: number
-  style: React.CSSProperties
-  data: {
-    items: { type: 'header' | 'message'; date?: string; message?: ChatMessage; prev?: ChatMessage }[]
-    setSize: (index: number, size: number) => void
-    scrollToBottom: () => void
-    onReply?: (messageId: string, content: string) => void
-    handleEdit: (messageId: string, content: string) => Promise<void>
-    handleDelete: (messageId: string) => Promise<void>
-    togglePin: (messageId: string) => Promise<void>
-    toggleReaction: (messageId: string, emoji: string) => Promise<void>
-  }
-}
-
-const MessageListRow: React.FC<MessageListRowProps> = ({ index, style, data }) => {
-  const { items, setSize, scrollToBottom, onReply, handleEdit, handleDelete, togglePin, toggleReaction } = data
-  const item = items[index]
-  const rowRef = useRef<HTMLDivElement | null>(null)
-  const isGrouped =
-    item.type === 'message' && shouldGroupMessage(item.message as ChatMessage, item.prev)
-
-  useLayoutEffect(() => {
-    if (!rowRef.current) return
-
-    const updateSize = () => {
-      if (rowRef.current) {
-        const height = rowRef.current.getBoundingClientRect().height
-        setSize(index, height)
-        if (index === items.length - 1) {
-          scrollToBottom()
-        }
-      }
-    }
-
-    updateSize()
-
-    const observer = new ResizeObserver(updateSize)
-    observer.observe(rowRef.current)
-
-    return () => {
-      observer.disconnect()
-    }
-  }, [item, index, setSize, scrollToBottom])
-
-
-  if (item.type === 'header') {
-    return (
-      <div
-        ref={rowRef}
-        style={style}
-        className="sticky top-0 z-10 flex items-center my-2"
-      >
-        <hr className="flex-grow border-t border-gray-300 dark:border-gray-700" />
-        <span className="mx-2 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
-          {item.date}
-        </span>
-        <hr className="flex-grow border-t border-gray-300 dark:border-gray-700" />
-      </div>
-    )
-  }
-
-  return (
-    <div
-      ref={rowRef}
-      style={style}
-      className={cn(isGrouped ? 'pt-1 pb-1' : 'pt-4 pb-1')}
-    >
-      <MessageItem
-        message={item.message as ChatMessage}
-        previousMessage={item.prev}
-        onReply={onReply}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onTogglePin={togglePin}
-        onToggleReaction={toggleReaction}
-      />
-    </div>
-  )
-}
-
 export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
   const { messages, loading, editMessage, deleteMessage, togglePin, toggleReaction } = useMessages()
   const { typingUsers } = useTyping('general')
-  
-  
   const containerRef = useRef<HTMLDivElement>(null)
-  const listRef = useRef<List>(null)
-  const [listHeight, setListHeight] = useState(0)
-
-  useLayoutEffect(() => {
-    const handleResize = () => {
-      if (containerRef.current) {
-        setListHeight(containerRef.current.clientHeight)
-        sizeMap.current = {}
-        listRef.current?.resetAfterIndex(0, true)
-      }
-    }
-    handleResize()
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
 
   const groupedMessages = useMemo(() => groupMessagesByDate(messages), [messages])
 
-  const items = useMemo(() => {
-    const arr: { type: 'header' | 'message'; date?: string; message?: ChatMessage; prev?: ChatMessage }[] = []
-    groupedMessages.forEach(group => {
-      arr.push({ type: 'header', date: group.date })
-      group.messages.forEach((m, idx) => {
-        arr.push({ type: 'message', message: m, prev: group.messages[idx - 1] })
-      })
-    })
-    return arr
-  }, [groupedMessages])
-
-  // Auto-scroll to the most recent message
-  useLayoutEffect(() => {
-    if (listRef.current) {
-      listRef.current.scrollToItem(items.length - 1, 'end')
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight
     }
-  }, [items.length, listHeight])
-
-  const sizeMap = useRef<Record<number, number>>({})
-
-  const getSize = useCallback((index: number) => sizeMap.current[index] ?? 80, [])
-
-  const setSize = useCallback((index: number, size: number) => {
-    if (sizeMap.current[index] !== size) {
-      sizeMap.current[index] = size
-      listRef.current?.resetAfterIndex(index)
-    }
-  }, [])
-
-  const scrollToBottom = useCallback(() => {
-    if (listRef.current) {
-      listRef.current.scrollToItem(items.length - 1, 'end')
-    }
-  }, [items.length])
+  }, [messages])
 
   const handleEdit = async (messageId: string, content: string) => {
     try {
@@ -179,45 +44,24 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
     }
   }
 
-  const itemData = useMemo(
-    () => ({
-      items,
-      setSize,
-      scrollToBottom,
-      onReply,
-      handleEdit,
-      handleDelete,
-      togglePin,
-      toggleReaction,
-    }),
-    [items, setSize, scrollToBottom, onReply, handleEdit, handleDelete, togglePin, toggleReaction]
-  )
-
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-        <div className="text-gray-500 dark:text-gray-400">Loading messages...</div>
-          <div className="text-xs text-gray-400 mt-2">
-            Debug: {messages.length} messages in state
-          </div>
+          <div className="text-gray-500 dark:text-gray-400">Loading messages...</div>
+          <div className="text-xs text-gray-400 mt-2">Debug: {messages.length} messages in state</div>
         </div>
       </div>
     )
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="relative flex-1 overflow-y-hidden overflow-x-visible p-4 pb-32"
-    >
+    <div ref={containerRef} className="relative flex-1 overflow-y-auto overflow-x-visible p-4 pb-32">
       {messages.some(m => m.pinned) && (
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
           <div className="flex items-center space-x-2 mb-2">
             <Pin className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-            <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-              Pinned Messages
-            </span>
+            <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Pinned Messages</span>
           </div>
           <div className="space-y-2">
             {messages
@@ -234,24 +78,32 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
         </div>
       )}
 
-      {listHeight > 0 && (
-        <List
-          ref={listRef}
-          height={listHeight}
-          width="100%"
-          itemCount={items.length}
-          itemSize={getSize}
-          itemData={itemData}
-          itemKey={(index) =>
-            items[index].type === 'header'
-              ? `header-${items[index].date}`
-              : (items[index].message as ChatMessage).id
-          }
-          overscanCount={10}
-        >
-          {MessageListRow}
-        </List>
-      )}
+      {groupedMessages.map(group => (
+        <React.Fragment key={group.date}>
+          <div className="sticky top-0 z-10 flex items-center my-2">
+            <hr className="flex-grow border-t border-gray-300 dark:border-gray-700" />
+            <span className="mx-2 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{group.date}</span>
+            <hr className="flex-grow border-t border-gray-300 dark:border-gray-700" />
+          </div>
+          {group.messages.map((message, idx) => {
+            const prev = group.messages[idx - 1]
+            const isGrouped = shouldGroupMessage(message, prev)
+            return (
+              <div key={message.id} className={cn(isGrouped ? 'pt-1 pb-1' : 'pt-4 pb-1')}>
+                <MessageItem
+                  message={message}
+                  previousMessage={prev}
+                  onReply={onReply}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onTogglePin={togglePin}
+                  onToggleReaction={toggleReaction}
+                />
+              </div>
+            )
+          })}
+        </React.Fragment>
+      ))}
 
       <AnimatePresence>
         {typingUsers.length > 0 && (
@@ -267,8 +119,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
             </div>
             <span>
-              {typingUsers.map(u => u.display_name).join(', ')}
-              {typingUsers.length === 1 ? ' is' : ' are'} typing...
+              {typingUsers.map(u => u.display_name).join(', ')}{typingUsers.length === 1 ? ' is' : ' are'} typing...
             </span>
           </motion.div>
         )}
