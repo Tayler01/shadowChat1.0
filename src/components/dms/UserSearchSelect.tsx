@@ -1,7 +1,8 @@
 import React from 'react'
 import { Avatar } from '../ui/Avatar'
 import { Input } from '../ui/Input'
-import { useUserSearch, BasicUser } from '../../hooks/useUserSearch'
+import { useUserSearch } from '../../hooks/useUserSearch'
+import type { BasicUser } from '../../lib/supabase'
 
 interface UserSearchSelectProps {
   value: string
