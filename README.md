@@ -137,6 +137,9 @@ npm test
 # Apply Supabase migrations
 npx supabase db push
 
+# This will also create the `avatars` and `banners` storage buckets
+# along with the row-level security policies needed for uploads.
+
 # Start the dev server
 npm run dev
 --- ## Testing & CI/CD ### Testing Stack
