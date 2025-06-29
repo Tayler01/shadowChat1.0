@@ -1,6 +1,9 @@
 import { supabase } from './supabase'
 import type { User } from '@supabase/supabase-js'
 
+const AVATAR_BUCKET = 'avatars'
+const BANNER_BUCKET = 'banners'
+
 export interface AuthUser extends User {
   user_metadata: {
     username?: string
@@ -217,10 +220,12 @@ export const getUserProfile = async (userId: string) => {
 }
 
 export const updateUserProfile = async (updates: Partial<{
-  display_name: string
-  status_message: string
-  color: string
-  status: 'online' | 'away' | 'busy' | 'offline'
+  display_name: string;
+  status_message: string;
+  color: string;
+  status: 'online' | 'away' | 'busy' | 'offline';
+  avatar_url: string;
+  banner_url: string;
 }>) => {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
@@ -234,4 +239,26 @@ export const updateUserProfile = async (updates: Partial<{
 
   if (error) throw error
   return data
+}
+
+export const uploadUserAvatar = async (file: File) => {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  const filePath = `${user.id}/${Date.now()}_${file.name}`
+  const { error } = await supabase.storage.from(AVATAR_BUCKET).upload(filePath, file, { upsert: true })
+  if (error) throw error
+  const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(filePath)
+  await updateUserProfile({ avatar_url: data.publicUrl })
+  return data.publicUrl
+}
+
+export const uploadUserBanner = async (file: File) => {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  const filePath = `${user.id}/${Date.now()}_${file.name}`
+  const { error } = await supabase.storage.from(BANNER_BUCKET).upload(filePath, file, { upsert: true })
+  if (error) throw error
+  const { data } = supabase.storage.from(BANNER_BUCKET).getPublicUrl(filePath)
+  await updateUserProfile({ banner_url: data.publicUrl })
+  return data.publicUrl
 }

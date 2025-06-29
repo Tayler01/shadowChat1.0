@@ -92,3 +92,27 @@ test('signOut calls auth.signOut', async () => {
 
   expect(authModule.signOut).toHaveBeenCalled();
 });
+
+test('uploadAvatar calls auth.uploadUserAvatar', async () => {
+  authModule.uploadUserAvatar.mockResolvedValue('url');
+
+  const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+
+  await act(async () => {
+    await result.current.uploadAvatar(new File(['x'], 'a.png', { type: 'image/png' }));
+  });
+
+  expect(authModule.uploadUserAvatar).toHaveBeenCalled();
+});
+
+test('uploadBanner calls auth.uploadUserBanner', async () => {
+  authModule.uploadUserBanner.mockResolvedValue('url');
+
+  const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+
+  await act(async () => {
+    await result.current.uploadBanner(new File(['x'], 'b.png', { type: 'image/png' }));
+  });
+
+  expect(authModule.uploadUserBanner).toHaveBeenCalled();
+});
