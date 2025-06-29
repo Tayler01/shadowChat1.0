@@ -69,7 +69,7 @@ export function Sidebar({
         <X className="w-4 h-4" />
       </button>
       {/* Header */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center space-x-3">
           <div className="p-2 bg-gradient-to-r from-[var(--color-primary-start)] to-[var(--color-primary-end)] rounded-lg">
             <MessageSquare className="w-6 h-6 text-white" />
@@ -82,7 +82,7 @@ export function Sidebar({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-2">
+      <nav className="flex-1 px-6 py-4 space-y-2">
         {navItems.map((item) => (
           <button
             key={item.id}
@@ -159,7 +159,7 @@ export function Sidebar({
       </nav>
 
       {/* User Profile */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+      <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700">
         <div className="flex items-center space-x-3">
           <Avatar
             src={user?.avatar_url}
