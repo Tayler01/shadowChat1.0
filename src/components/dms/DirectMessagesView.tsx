@@ -51,9 +51,12 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
     }
   }
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (
+    content: string,
+    type?: 'text' | 'command' | 'audio'
+  ) => {
     try {
-      await sendMessage(content)
+      await sendMessage(content, type)
     } catch (error) {
       toast.error('Failed to send message')
     }
@@ -281,7 +284,11 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                           ? 'bg-blue-600 text-white'
                           : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600'
                       }`}>
-                        <p className="text-sm break-words">{message.content}</p>
+                        {message.message_type === 'audio' ? (
+                          <audio controls src={message.content} className="mt-1 max-w-full" />
+                        ) : (
+                          <p className="text-sm break-words">{message.content}</p>
+                        )}
                         <p className={`text-xs mt-1 ${
                           isOwn ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'
                         }`}>

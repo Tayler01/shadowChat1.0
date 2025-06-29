@@ -16,7 +16,7 @@ import { useVisibilityRefresh } from './useVisibilityRefresh';
 export const prepareMessageData = (
   userId: string,
   content: string,
-  messageType: 'text' | 'command'
+  messageType: 'text' | 'command' | 'audio'
 ) => ({
   user_id: userId,
   content: content.trim(),
@@ -26,7 +26,7 @@ export const prepareMessageData = (
 export const insertMessage = async (messageData: {
   user_id: string;
   content: string;
-  message_type: 'text' | 'command';
+  message_type: 'text' | 'command' | 'audio';
 }) => {
   const start = performance.now();
   const insertPromise = supabase
@@ -58,7 +58,7 @@ export const insertMessage = async (messageData: {
 export const refreshSessionAndRetry = async (messageData: {
   user_id: string;
   content: string;
-  message_type: 'text' | 'command';
+  message_type: 'text' | 'command' | 'audio';
 }) => {
   const refreshPromise = supabase.auth.refreshSession();
   const refreshTimeout = new Promise((_, reject) =>
@@ -94,7 +94,7 @@ interface MessagesContextValue {
   messages: Message[];
   loading: boolean;
   sending: boolean;
-  sendMessage: (content: string, type?: 'text' | 'command') => Promise<void>;
+  sendMessage: (content: string, type?: 'text' | 'command' | 'audio') => Promise<void>;
   editMessage: (id: string, content: string) => Promise<void>;
   deleteMessage: (id: string) => Promise<void>;
   toggleReaction: (id: string, emoji: string) => Promise<void>;
@@ -402,7 +402,7 @@ function useProvideMessages(): MessagesContextValue {
     };
   }, [user, fetchMessages]);
 
-  const sendMessage = useCallback(async (content: string, messageType: 'text' | 'command' = 'text') => {
+  const sendMessage = useCallback(async (content: string, messageType: 'text' | 'command' | 'audio' = 'text') => {
     const timestamp = new Date().toISOString();
     const logPrefix = `🚀 [${timestamp}] MESSAGE_SEND`;
 

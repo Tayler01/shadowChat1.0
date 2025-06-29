@@ -116,6 +116,31 @@ test('sendMessage retries on 401 error', async () => {
   expect(insertSuccess).toHaveBeenCalled();
 });
 
+test('sends audio message with proper type', async () => {
+  const insertFn = jest.fn(() => ({
+    select: () => ({ single: () => Promise.resolve({ data: { id: '1' }, error: null }) })
+  }));
+  const sb = supabase as SupabaseMock;
+  sb.from.mockReturnValueOnce({ insert: insertFn } as any);
+
+  const { result } = renderHook(() => useDirectMessages());
+
+  await act(async () => {
+    result.current.setCurrentConversation('conv1');
+  });
+
+  await act(async () => {
+    await result.current.sendMessage('https://example.com/a.webm', 'audio');
+  });
+
+  expect(insertFn).toHaveBeenCalledWith({
+    conversation_id: 'conv1',
+    sender_id: 'u1',
+    content: 'https://example.com/a.webm',
+    message_type: 'audio',
+  });
+});
+
 test('startConversation sets currentConversation', async () => {
   const sb = supabase as SupabaseMock;
   const maybeSingle = jest.fn().mockResolvedValue({ data: { id: 'u2' }, error: null });

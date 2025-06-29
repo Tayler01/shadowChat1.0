@@ -303,7 +303,7 @@ export function useConversationMessages(conversationId: string | null) {
     };
   }, [conversationId, user]);
 
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, messageType: 'text' | 'command' | 'audio' = 'text') => {
     if (!user || !conversationId || !content.trim()) return;
 
     setSending(true);
@@ -314,6 +314,7 @@ export function useConversationMessages(conversationId: string | null) {
           conversation_id: conversationId,
           sender_id: user.id,
           content: content.trim(),
+          message_type: messageType,
         })
         .select(`
           *,
@@ -333,6 +334,7 @@ export function useConversationMessages(conversationId: string | null) {
                 conversation_id: conversationId,
                 sender_id: user.id,
                 content: content.trim(),
+                message_type: messageType,
               })
               .select(`
                 *,
