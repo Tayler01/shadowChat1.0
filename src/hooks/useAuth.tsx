@@ -154,8 +154,6 @@ function useProvideAuth() {
     // Update on page visibility change
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        // Reload the page when it comes back into focus
-        window.location.reload();
         updatePresence();
       }
     };

@@ -4,7 +4,6 @@ export function useVisibilityRefresh(onVisible?: () => void) {
   useEffect(() => {
     const handler = () => {
       if (!document.hidden) {
-        window.location.reload()
         onVisible?.()
       }
     }

@@ -676,6 +676,8 @@ function useProvideMessages(): MessagesContextValue {
       );
     } catch (error) {
       // console.error('❌ Exception toggling pin:', error);
+      // Re-sync with database to revert optimistic updates
+      fetchMessages();
       throw error;
     }
   }, [user, messages]);
