@@ -7,6 +7,7 @@ import { processSlashCommand, slashCommands } from '../../lib/utils'
 import { uploadVoiceMessage, uploadChatFile } from '../../lib/supabase'
 import type { EmojiPickerProps, EmojiClickData } from '../../types'
 import { useEmojiPicker } from '../../hooks/useEmojiPicker'
+import { RecordingIndicator } from '../ui/RecordingIndicator'
 
 interface MessageInputProps {
   onSendMessage: (
@@ -31,6 +32,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [showSlashCommands, setShowSlashCommands] = useState(false)
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
   const [recording, setRecording] = useState(false)
+  const [recordingDuration, setRecordingDuration] = useState(0)
+  const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const { startTyping, stopTyping } = useTyping('general')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const emojiPickerRef = useRef<HTMLDivElement>(null)
@@ -59,6 +62,25 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  // Track recording duration
+  useEffect(() => {
+    if (recording) {
+      recordingIntervalRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1)
+      }, 1000)
+    } else {
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current)
+      }
+      setRecordingDuration(0)
+    }
+    return () => {
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current)
+      }
+    }
+  }, [recording])
 
 
   // Auto-resize textarea
@@ -187,6 +209,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     <div
       className={`relative p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${className}`}
     >
+      {recording && (
+        <RecordingIndicator seconds={recordingDuration} />
+      )}
       {/* Slash Commands Dropdown */}
       {showSlashCommands && (
         <motion.div
