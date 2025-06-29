@@ -1,7 +1,7 @@
 import { renderHook, act } from '@testing-library/react';
 import { useDirectMessages } from '../src/hooks/useDirectMessages';
 import { useAuth } from '../src/hooks/useAuth';
-import { supabase } from '../src/lib/supabase';
+import { supabase, getOrCreateDMConversation } from '../src/lib/supabase';
 
 jest.mock('../src/hooks/useAuth');
 jest.mock('../src/lib/supabase', () => {
@@ -12,6 +12,9 @@ jest.mock('../src/lib/supabase', () => {
       removeChannel: jest.fn(),
       auth: { getSession: jest.fn(), refreshSession: jest.fn() },
     },
+    fetchDMConversations: jest.fn().mockResolvedValue([]),
+    getOrCreateDMConversation: jest.fn(),
+    markDMMessagesRead: jest.fn(),
   };
 });
 
@@ -108,4 +111,56 @@ test('sendMessage retries on 401 error', async () => {
   expect(insertFail).toHaveBeenCalled();
   expect(sb.auth.refreshSession).toHaveBeenCalled();
   expect(insertSuccess).toHaveBeenCalled();
+});
+
+test('startConversation sets currentConversation', async () => {
+  const sb = supabase as SupabaseMock;
+  const maybeSingle = jest.fn().mockResolvedValue({ data: { id: 'u2' }, error: null });
+  sb.from.mockImplementationOnce(() => ({
+    insert: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    single: jest.fn().mockResolvedValue({ data: [], error: null }),
+    order: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    update: jest.fn().mockReturnThis(),
+    delete: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    contains: jest.fn().mockReturnThis(),
+    maybeSingle,
+    rpc: jest.fn().mockReturnThis(),
+  } as any));
+
+  const conversation = { id: 'c1' } as any;
+  (getOrCreateDMConversation as jest.Mock).mockResolvedValue(conversation);
+
+  const { result } = renderHook(() => useDirectMessages());
+
+  await act(async () => {
+    const id = await result.current.startConversation('bob');
+    expect(id).toBe('c1');
+  });
+
+  expect(result.current.currentConversation).toBe('c1');
+  expect(maybeSingle).toHaveBeenCalled();
+});
+
+test('startConversation throws when user not found', async () => {
+  const sb = supabase as SupabaseMock;
+  sb.from.mockImplementationOnce(() => ({
+    insert: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    single: jest.fn().mockResolvedValue({ data: [], error: null }),
+    order: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    update: jest.fn().mockReturnThis(),
+    delete: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    contains: jest.fn().mockReturnThis(),
+    maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+    rpc: jest.fn().mockReturnThis(),
+  } as any));
+
+  const { result } = renderHook(() => useDirectMessages());
+
+  await expect(result.current.startConversation('missing')).rejects.toThrow('User not found');
 });

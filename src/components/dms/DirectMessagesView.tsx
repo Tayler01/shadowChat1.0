@@ -2,17 +2,15 @@ import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   MessageSquare,
-  Search,
   Plus,
   ArrowLeft,
-  UserPlus,
   Menu
 } from 'lucide-react'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
 import { useAuth } from '../../hooks/useAuth'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
-import { Input } from '../ui/Input'
+import { UserSearchSelect } from './UserSearchSelect'
 import { MessageInput } from '../chat/MessageInput'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import { formatTime, shouldGroupMessage } from '../../lib/utils'
@@ -38,15 +36,10 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
   
   const [showNewConversation, setShowNewConversation] = useState(false)
   const [searchUsername, setSearchUsername] = useState('')
-  const [searchLoading, setSearchLoading] = useState(false)
 
-  const handleStartConversation = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!searchUsername.trim()) return
-
-    setSearchLoading(true)
+  const handleUserSelect = async (user: { username: string }) => {
     try {
-      const conversationId = await startConversation(searchUsername.trim())
+      const conversationId = await startConversation(user.username)
       if (conversationId) {
         setCurrentConversation(conversationId)
         setShowNewConversation(false)
@@ -55,8 +48,6 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to start conversation')
-    } finally {
-      setSearchLoading(false)
     }
   }
 
@@ -113,29 +104,18 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
           {/* New Conversation Form */}
           <AnimatePresence>
             {showNewConversation && (
-              <motion.form
+              <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                onSubmit={handleStartConversation}
                 className="space-y-3"
               >
-                <Input
-                  placeholder="Enter username..."
+                <UserSearchSelect
                   value={searchUsername}
-                  onChange={(e) => setSearchUsername(e.target.value)}
-                  className="text-sm"
+                  onChange={setSearchUsername}
+                  onSelect={handleUserSelect}
                 />
-                <div className="flex space-x-2">
-                  <Button
-                    type="submit"
-                    size="sm"
-                    loading={searchLoading}
-                    className="flex-1"
-                  >
-                    <UserPlus className="w-4 h-4 mr-1" />
-                    Start Chat
-                  </Button>
+                <div className="flex justify-end">
                   <Button
                     type="button"
                     variant="ghost"
@@ -148,7 +128,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                     Cancel
                   </Button>
                 </div>
-              </motion.form>
+              </motion.div>
             )}
           </AnimatePresence>
         </div>
