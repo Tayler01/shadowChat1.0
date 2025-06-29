@@ -53,10 +53,11 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
 
   const handleSendMessage = async (
     content: string,
-    type?: 'text' | 'command' | 'audio'
+    type?: 'text' | 'command' | 'audio' | 'image',
+    fileUrl?: string
   ) => {
     try {
-      await sendMessage(content, type)
+      await sendMessage(content, type, fileUrl)
     } catch (error) {
       toast.error('Failed to send message')
     }

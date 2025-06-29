@@ -303,7 +303,12 @@ export function useConversationMessages(conversationId: string | null) {
     };
   }, [conversationId, user]);
 
-  const sendMessage = useCallback(async (content: string, messageType: 'text' | 'command' | 'audio' = 'text') => {
+  const sendMessage = useCallback(
+    async (
+      content: string,
+      messageType: 'text' | 'command' | 'audio' | 'image' = 'text',
+      fileUrl?: string
+    ) => {
     if (!user || !conversationId || !content.trim()) return;
 
     setSending(true);
@@ -315,6 +320,7 @@ export function useConversationMessages(conversationId: string | null) {
           sender_id: user.id,
           content: content.trim(),
           message_type: messageType,
+          file_url: fileUrl,
         })
         .select(`
           *,
@@ -335,6 +341,7 @@ export function useConversationMessages(conversationId: string | null) {
                 sender_id: user.id,
                 content: content.trim(),
                 message_type: messageType,
+                file_url: fileUrl,
               })
               .select(`
                 *,

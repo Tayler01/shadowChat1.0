@@ -137,8 +137,9 @@ npm test
 # Apply Supabase migrations
 npx supabase db push
 
-# This will also create the `avatars`, `banners`, and `message-media` storage buckets
+# This will also create the `avatars`, `banners`, `message-media`, and `chat-uploads` storage buckets
 # along with the row-level security policies needed for uploads.
+# Run the same command in production to ensure the bucket exists
 
 # Start the dev server
 npm run dev

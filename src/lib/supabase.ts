@@ -66,6 +66,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 })
 
 export const VOICE_BUCKET = 'message-media'
+export const UPLOADS_BUCKET = 'chat-uploads'
 
 export const uploadVoiceMessage = async (blob: Blob) => {
   const { data: { user } } = await supabase.auth.getUser()
@@ -74,6 +75,16 @@ export const uploadVoiceMessage = async (blob: Blob) => {
   const { error } = await supabase.storage.from(VOICE_BUCKET).upload(filePath, blob)
   if (error) throw error
   const { data } = supabase.storage.from(VOICE_BUCKET).getPublicUrl(filePath)
+  return data.publicUrl
+}
+
+export const uploadChatFile = async (file: File) => {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  const filePath = `${user.id}/${Date.now()}_${file.name}`
+  const { error } = await supabase.storage.from(UPLOADS_BUCKET).upload(filePath, file)
+  if (error) throw error
+  const { data } = supabase.storage.from(UPLOADS_BUCKET).getPublicUrl(filePath)
   return data.publicUrl
 }
 
@@ -101,6 +112,7 @@ export interface Message {
   content: string
   audio_url?: string
   audio_duration?: number
+  file_url?: string
   reactions: Record<string, { count: number; users: string[] }>
   pinned: boolean
   edited_at?: string
@@ -127,6 +139,7 @@ export interface DMMessage {
   content: string
   audio_url?: string
   audio_duration?: number
+  file_url?: string
   read_at?: string
   reactions: Record<string, { count: number; users: string[] }>
   edited_at?: string
