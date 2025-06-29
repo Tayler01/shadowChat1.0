@@ -104,22 +104,8 @@ interface MessagesContextValue {
 const MessagesContext = createContext<MessagesContextValue | undefined>(undefined);
 
 function useProvideMessages(): MessagesContextValue {
-  const initialMessages = (() => {
-    if (typeof localStorage !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('chatHistory');
-        if (stored) {
-          return JSON.parse(stored) as Message[];
-        }
-      } catch {
-        // ignore parse errors
-      }
-    }
-    return [] as Message[];
-  })();
-
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
-  const [loading, setLoading] = useState(initialMessages.length === 0);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const { user } = useAuth();
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -157,21 +143,8 @@ function useProvideMessages(): MessagesContextValue {
         // console.error('❌ Error fetching messages:', error);
       } else if (data.length > 0) {
         setMessages(prev => {
-          if (prev.length === 0) {
-            if (typeof localStorage !== 'undefined') {
-              try {
-                localStorage.setItem('chatHistory', JSON.stringify(data));
-              } catch {}
-            }
-            return data as Message[];
-          }
           const ids = new Set(prev.map(m => m.id));
           const merged = [...prev, ...data.filter(m => !ids.has(m.id))];
-          if (typeof localStorage !== 'undefined') {
-            try {
-              localStorage.setItem('chatHistory', JSON.stringify(merged));
-            } catch {}
-          }
           return merged;
         });
       }
@@ -203,17 +176,6 @@ function useProvideMessages(): MessagesContextValue {
   useEffect(() => {
     fetchMessages();
   }, [fetchMessages]);
-
-  // Persist messages to localStorage whenever they change
-  useEffect(() => {
-    if (typeof localStorage !== 'undefined') {
-      try {
-        localStorage.setItem('chatHistory', JSON.stringify(messages));
-      } catch {
-        // ignore storage errors
-      }
-    }
-  }, [messages]);
 
   // Subscribe to real-time updates
   useEffect(() => {
