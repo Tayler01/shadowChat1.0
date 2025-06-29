@@ -16,11 +16,14 @@ interface ChatViewProps {
 export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView, onViewChange }) => {
   const { sendMessage, messages, loading } = useMessages()
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (
+    content: string,
+    type: 'text' | 'command' | 'audio' = 'text'
+  ) => {
     try {
-      await sendMessage(content)
+      await sendMessage(content, type)
     } catch (error) {
-      console.error('❌ ChatView: Failed to send message:', error);
+      console.error('❌ ChatView: Failed to send message:', error)
       toast.error('Failed to send message')
     }
   }

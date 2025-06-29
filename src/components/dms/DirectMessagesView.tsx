@@ -51,9 +51,12 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
     }
   }
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (
+    content: string,
+    type: 'text' | 'command' | 'audio' = 'text'
+  ) => {
     try {
-      await sendMessage(content)
+      await sendMessage(content, type)
     } catch (error) {
       toast.error('Failed to send message')
     }
@@ -191,9 +194,20 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                       </div>
                       
                       {conversation.last_message && (
-                        <p className="text-sm text-gray-600 dark:text-gray-300 truncate mt-1">
-                          {conversation.last_message.content}
-                        </p>
+                        conversation.last_message.message_type === 'audio' ? (
+                          <audio
+                            controls
+                            src={
+                              conversation.last_message.audio_url ||
+                              conversation.last_message.content
+                            }
+                            className="max-w-full mt-1"
+                          />
+                        ) : (
+                          <p className="text-sm text-gray-600 dark:text-gray-300 truncate mt-1">
+                            {conversation.last_message.content}
+                          </p>
+                        )
                       )}
                     </div>
                   </div>
@@ -281,7 +295,15 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                           ? 'bg-blue-600 text-white'
                           : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600'
                       }`}>
-                        <p className="text-sm break-words">{message.content}</p>
+                        {message.message_type === 'audio' ? (
+                          <audio
+                            controls
+                            src={message.audio_url || message.content}
+                            className="max-w-full"
+                          />
+                        ) : (
+                          <p className="text-sm break-words">{message.content}</p>
+                        )}
                         <p className={`text-xs mt-1 ${
                           isOwn ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'
                         }`}>

@@ -303,18 +303,19 @@ export function useConversationMessages(conversationId: string | null) {
     };
   }, [conversationId, user]);
 
-  const sendMessage = useCallback(async (content: string) => {
-    if (!user || !conversationId || !content.trim()) return;
-
-    setSending(true);
-    try {
-      const { data, error } = await supabase
-        .from('dm_messages')
-        .insert({
-          conversation_id: conversationId,
-          sender_id: user.id,
-          content: content.trim(),
-        })
+  const sendMessage = useCallback(
+    async (content: string, messageType: 'text' | 'command' | 'audio' = 'text') => {
+      if (!user || !conversationId || !content.trim()) return;
+      setSending(true);
+      try {
+        const { data, error } = await supabase
+          .from('dm_messages')
+          .insert({
+            conversation_id: conversationId,
+            sender_id: user.id,
+            content: content.trim(),
+            message_type: messageType,
+          })
         .select(`
           *,
           sender:users!sender_id(*)
@@ -333,6 +334,7 @@ export function useConversationMessages(conversationId: string | null) {
                 conversation_id: conversationId,
                 sender_id: user.id,
                 content: content.trim(),
+                message_type: messageType,
               })
               .select(`
                 *,

@@ -87,6 +87,9 @@ export interface Message {
   id: string
   user_id: string
   content: string
+  message_type?: string
+  audio_url?: string
+  audio_duration?: number
   reactions: Record<string, { count: number; users: string[] }>
   pinned: boolean
   edited_at?: string
@@ -111,6 +114,9 @@ export interface DMMessage {
   conversation_id: string
   sender_id: string
   content: string
+  message_type?: string
+  audio_url?: string
+  audio_duration?: number
   read_at?: string
   reactions: Record<string, { count: number; users: string[] }>
   edited_at?: string
@@ -168,6 +174,24 @@ export const markDMMessagesRead = async (conversationId: string) => {
     conversation_id: conversationId
   })
   if (error) console.error('Error marking messages as read:', error)
+}
+
+const MESSAGE_MEDIA_BUCKET = 'message-media'
+
+export const uploadVoiceMessage = async (blob: Blob) => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  const filePath = `${user.id}/${Date.now()}.webm`
+  const { error } = await supabase.storage
+    .from(MESSAGE_MEDIA_BUCKET)
+    .upload(filePath, blob, { upsert: true })
+  if (error) throw error
+  const { data } = supabase.storage
+    .from(MESSAGE_MEDIA_BUCKET)
+    .getPublicUrl(filePath)
+  return data.publicUrl
 }
 
 // Helper function to ensure valid session before database operations
