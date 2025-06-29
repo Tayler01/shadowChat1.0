@@ -11,7 +11,7 @@ import { Pin } from 'lucide-react'
 import { VariableSizeList as List } from 'react-window'
 import { useMessages } from '../../hooks/useMessages'
 import { useTyping } from '../../hooks/useTyping'
-import { groupMessagesByDate, cn } from '../../lib/utils'
+import { groupMessagesByDate, cn, shouldGroupMessage } from '../../lib/utils'
 import { MessageItem } from './MessageItem'
 import { PinnedMessageItem } from './PinnedMessageItem'
 import type { Message as ChatMessage } from '../../lib/supabase'
@@ -40,6 +40,8 @@ const MessageListRow: React.FC<MessageListRowProps> = ({ index, style, data }) =
   const { items, setSize, scrollToBottom, onReply, handleEdit, handleDelete, togglePin, toggleReaction } = data
   const item = items[index]
   const rowRef = useRef<HTMLDivElement | null>(null)
+  const isGrouped =
+    item.type === 'message' && shouldGroupMessage(item.message as ChatMessage, item.prev)
 
   useLayoutEffect(() => {
     if (!rowRef.current) return
@@ -85,7 +87,7 @@ const MessageListRow: React.FC<MessageListRowProps> = ({ index, style, data }) =
     <div
       ref={rowRef}
       style={style}
-      className="py-1"
+      className={cn(isGrouped ? 'pt-1 pb-1' : 'pt-4 pb-1')}
     >
       <MessageItem
         message={item.message as ChatMessage}
