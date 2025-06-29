@@ -13,10 +13,10 @@ SECURITY DEFINER
 AS $$
 BEGIN
   RETURN QUERY
-  SELECT id, username, display_name, avatar_url, color, status
-  FROM users
-  WHERE username ILIKE '%' || term || '%'
-     OR display_name ILIKE '%' || term || '%';
+  SELECT u.id, u.username, u.display_name, u.avatar_url, u.color, u.status
+  FROM users u
+  WHERE u.username ILIKE '%' || term || '%'
+     OR u.display_name ILIKE '%' || term || '%';
 END;
 $$;
 
