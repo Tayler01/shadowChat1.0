@@ -1,46 +1,40 @@
 import { renderHook, act } from '@testing-library/react'
 import { useUserSearch } from '../src/hooks/useUserSearch'
-import { supabase } from '../src/lib/supabase'
+import { searchUsers } from '../src/lib/supabase'
 
 jest.mock('../src/lib/supabase', () => {
   return {
-    supabase: {
-      from: jest.fn(),
-    },
+    searchUsers: jest.fn(),
   }
 })
 
-type SupabaseMock = jest.Mocked<typeof supabase>
+type SearchUsersMock = jest.MockedFunction<typeof searchUsers>
 
 beforeEach(() => {
   jest.resetAllMocks()
 })
 
 test('searches users by term', async () => {
-  const orMock = jest.fn().mockResolvedValue({ data: [{ id: 'u1' }], error: null })
-  const sb = supabase as SupabaseMock
-  ;(sb.from as jest.Mock).mockReturnValue({
-    select: jest.fn().mockReturnThis(),
-    or: orMock,
-  } as any)
+  const searchMock = searchUsers as SearchUsersMock
+  searchMock.mockResolvedValue([
+    { id: 'u1', username: 'bob', display_name: 'Bob', avatar_url: null, color: '#fff', status: 'online' } as any,
+  ])
 
   const { result } = renderHook(() => useUserSearch('bob'))
   await act(async () => {
     await Promise.resolve()
   })
 
-  expect(orMock).toHaveBeenCalled()
-  expect(result.current.results).toEqual([{ id: 'u1' }])
+  expect(searchMock).toHaveBeenCalledWith('bob')
+  expect(result.current.results).toEqual([
+    { id: 'u1', username: 'bob', display_name: 'Bob', avatar_url: null, color: '#fff', status: 'online' },
+  ])
   expect(result.current.error).toBeNull()
 })
 
 test('returns error when no users found', async () => {
-  const orMock = jest.fn().mockResolvedValue({ data: [], error: null })
-  const sb = supabase as SupabaseMock
-  ;(sb.from as jest.Mock).mockReturnValue({
-    select: jest.fn().mockReturnThis(),
-    or: orMock,
-  } as any)
+  const searchMock = searchUsers as SearchUsersMock
+  searchMock.mockResolvedValue([])
 
   const { result } = renderHook(() => useUserSearch('missing'))
   await act(async () => {

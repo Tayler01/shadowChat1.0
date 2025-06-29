@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase, User } from '../lib/supabase'
-
-export interface BasicUser extends Pick<User, 'id' | 'username' | 'display_name' | 'avatar_url' | 'color' | 'status'> {}
+import { searchUsers, BasicUser } from '../lib/supabase'
 
 export function useUserSearch(term: string) {
   const [results, setResults] = useState<BasicUser[]>([])
@@ -17,19 +15,10 @@ export function useUserSearch(term: string) {
         return
       }
       setLoading(true)
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, username, display_name, avatar_url, color, status')
-        .or(`username.ilike.%${term}%,display_name.ilike.%${term}%`)
+      const users = await searchUsers(term)
       if (!active) return
-      if (error) {
-        console.error('Error searching users:', error)
-        setError('Failed to search users')
-        setResults([])
-      } else {
-        setResults((data ?? []) as BasicUser[])
-        setError(data && data.length > 0 ? null : 'User not found')
-      }
+      setResults(users)
+      setError(users.length > 0 ? null : 'User not found')
       setLoading(false)
     }
     search()

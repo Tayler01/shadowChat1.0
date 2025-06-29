@@ -118,6 +118,12 @@ export interface DMMessage {
   sender?: User
 }
 
+export interface BasicUser
+  extends Pick<
+    User,
+    'id' | 'username' | 'display_name' | 'avatar_url' | 'color' | 'status'
+  > {}
+
 export type ChatMessage = Message | DMMessage
 
 export interface UserSession {
@@ -168,6 +174,15 @@ export const markDMMessagesRead = async (conversationId: string) => {
     conversation_id: conversationId
   })
   if (error) console.error('Error marking messages as read:', error)
+}
+
+export const searchUsers = async (term: string) => {
+  const { data, error } = await supabase.rpc('search_users', { term })
+  if (error) {
+    console.error('Error searching users:', error)
+    return [] as BasicUser[]
+  }
+  return (data ?? []) as BasicUser[]
 }
 
 // Helper function to ensure valid session before database operations
