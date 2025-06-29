@@ -1,7 +1,10 @@
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { useDirectMessages } from '../src/hooks/useDirectMessages';
 import { useAuth } from '../src/hooks/useAuth';
+import * as dmModule from '../src/hooks/useDirectMessages';
+import * as searchModule from '../src/hooks/useUserSearch';
 import { supabase, getOrCreateDMConversation } from '../src/lib/supabase';
+import { DirectMessagesView } from '../src/components/dms/DirectMessagesView';
 
 jest.mock('../src/hooks/useAuth');
 jest.mock('../src/lib/supabase', () => {
@@ -163,4 +166,86 @@ test('startConversation throws when user not found', async () => {
   const { result } = renderHook(() => useDirectMessages());
 
   await expect(result.current.startConversation('missing')).rejects.toThrow('User not found');
+});
+
+describe('DirectMessagesView user search', () => {
+  let dmSpy: jest.SpyInstance;
+  let searchSpy: jest.SpyInstance;
+  let startConversationMock: jest.Mock;
+  let setCurrentConversationMock: jest.Mock;
+
+  const user = {
+    id: 'u2',
+    username: 'bob',
+    display_name: 'Bob',
+    avatar_url: '',
+    color: 'red',
+    status: 'online',
+  };
+
+  beforeEach(() => {
+    startConversationMock = jest.fn().mockResolvedValue('c1');
+    setCurrentConversationMock = jest.fn();
+
+    dmSpy = jest.spyOn(dmModule, 'useDirectMessages');
+    dmSpy.mockReturnValue({
+      conversations: [],
+      currentConversation: null,
+      messages: [],
+      loading: false,
+      setCurrentConversation: setCurrentConversationMock,
+      startConversation: startConversationMock,
+      sendMessage: jest.fn(),
+      markAsRead: jest.fn(),
+    } as any);
+
+    searchSpy = jest.spyOn(searchModule, 'useUserSearch');
+    searchSpy.mockReturnValue({ results: [user], loading: false, error: null });
+
+    (useAuth as jest.Mock).mockReturnValue({ profile: { id: 'u1' } });
+  });
+
+  afterEach(() => {
+    dmSpy.mockRestore();
+    searchSpy.mockRestore();
+  });
+
+  test('selecting a user starts conversation and sets id', async () => {
+    render(
+      <DirectMessagesView
+        onToggleSidebar={() => {}}
+        currentView="dms"
+        onViewChange={() => {}}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /start new conversation/i }));
+    fireEvent.change(screen.getByPlaceholderText(/enter username/i), { target: { value: 'bob' } });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /bob/i }));
+    });
+
+    expect(startConversationMock).toHaveBeenCalledWith('bob');
+    await waitFor(() => expect(setCurrentConversationMock).toHaveBeenCalledWith('c1'));
+  });
+
+  test('shows user not found error', async () => {
+    searchSpy.mockReturnValueOnce({ results: [], loading: false, error: 'User not found' });
+
+    render(
+      <DirectMessagesView
+        onToggleSidebar={() => {}}
+        currentView="dms"
+        onViewChange={() => {}}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /start new conversation/i }));
+    fireEvent.change(screen.getByPlaceholderText(/enter username/i), { target: { value: 'alice' } });
+
+    expect(await screen.findByText(/user not found/i)).toBeInTheDocument();
+    expect(startConversationMock).not.toHaveBeenCalled();
+    expect(setCurrentConversationMock).not.toHaveBeenCalled();
+  });
 });
