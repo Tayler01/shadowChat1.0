@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Send, Smile, Paperclip, Command } from 'lucide-react'
+import { Send, Smile, Command, Plus, Mic } from 'lucide-react'
 import { useTyping } from '../../hooks/useTyping'
 import { Button } from '../ui/Button'
 import { processSlashCommand, slashCommands } from '../../lib/utils'
@@ -24,9 +24,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const EmojiPicker = useEmojiPicker(showEmojiPicker)
   const [showSlashCommands, setShowSlashCommands] = useState(false)
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
+  const [recording, setRecording] = useState(false)
   const { startTyping, stopTyping } = useTyping('general')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const emojiPickerRef = useRef<HTMLDivElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
 
   // Handle typing indicators
   useEffect(() => {
@@ -116,6 +122,53 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     textareaRef.current?.focus()
   }
 
+  const openImageUpload = () => {
+    imageInputRef.current?.click()
+    setShowAttachmentMenu(false)
+  }
+
+  const openFileUpload = () => {
+    fileInputRef.current?.click()
+    setShowAttachmentMenu(false)
+  }
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      console.log('Selected image:', file)
+    }
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      console.log('Selected file:', file)
+    }
+  }
+
+  const handleRecordClick = async () => {
+    if (recording) {
+      mediaRecorderRef.current?.stop()
+      setRecording(false)
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        const recorder = new MediaRecorder(stream)
+        audioChunksRef.current = []
+        recorder.ondataavailable = e => audioChunksRef.current.push(e.data)
+        recorder.onstop = () => {
+          const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+          console.log('Recorded audio:', blob)
+        }
+        recorder.start()
+        mediaRecorderRef.current = recorder
+        setRecording(true)
+      } catch (err) {
+        console.error('Failed to start recording', err)
+      }
+    }
+  }
+
   return (
     <div
       className={`relative p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${className}`}
@@ -157,7 +210,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
       {/* Emoji Picker */}
       {showEmojiPicker && EmojiPicker && (
-        <div ref={emojiPickerRef} className="absolute bottom-full right-4 mb-2">
+        <div ref={emojiPickerRef} className="absolute bottom-full right-0 mb-2">
           <EmojiPicker
             onEmojiClick={insertEmoji}
             width={320}
@@ -169,7 +222,52 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
       {/* Input Form */}
       <form onSubmit={handleSubmit} className="flex items-end space-x-3">
-        <div className="flex-1 relative">
+        {/* Attachment Button */}
+        <div className="relative">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowAttachmentMenu(prev => !prev)}
+            className="h-8 w-8 p-0"
+            aria-label="Add attachment"
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
+          {showAttachmentMenu && (
+            <div className="absolute bottom-full left-0 mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg">
+              <button
+                type="button"
+                onClick={openImageUpload}
+                className="block w-full px-3 py-1.5 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                Image
+              </button>
+              <button
+                type="button"
+                onClick={openFileUpload}
+                className="block w-full px-3 py-1.5 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                File
+              </button>
+            </div>
+          )}
+          <input
+            type="file"
+            accept="image/*"
+            ref={imageInputRef}
+            onChange={handleImageChange}
+            className="hidden"
+          />
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </div>
+
+        <div className="flex-1">
           <textarea
             ref={textareaRef}
             value={message}
@@ -178,33 +276,31 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             placeholder={placeholder}
             disabled={disabled}
             rows={1}
-            className="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-[var(--color-accent)] resize-none max-h-32"
+            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-[var(--color-accent)] resize-none max-h-32 no-scrollbar"
           />
-          
-          {/* Input Actions */}
-          <div className="absolute right-2 bottom-2 flex items-center space-x-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="h-8 w-8 p-0"
-              aria-label="Insert emoji"
-            >
-              <Smile className="w-4 h-4" />
-            </Button>
-            
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0"
-              aria-label="Attach file"
-            >
-              <Paperclip className="w-4 h-4" />
-            </Button>
-          </div>
         </div>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={handleRecordClick}
+          className="h-8 w-8 p-0"
+          aria-label="Record audio"
+        >
+          <Mic className="w-4 h-4" />
+        </Button>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+          className="h-8 w-8 p-0 text-[var(--color-accent)]"
+          aria-label="Insert emoji"
+        >
+          <Smile className="w-4 h-4" />
+        </Button>
 
         <Button
           type="submit"
