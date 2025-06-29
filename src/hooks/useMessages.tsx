@@ -431,6 +431,12 @@ function useProvideMessages(): MessagesContextValue {
       return;
     }
 
+    // For image/audio messages, content can be empty if fileUrl is provided
+    if (!user || (!content.trim() && !fileUrl)) {
+      console.warn(`${logPrefix}: Skipped send — missing user or empty content`, { hasUser: !!user, content, userId: user?.id, hasFileUrl: !!fileUrl });
+      return;
+    }
+
     setSending(true);
     if (DEBUG) {
       console.log(`${logPrefix}: Channel state before send`, {
