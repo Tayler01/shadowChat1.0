@@ -1,14 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Send, Smile, Paperclip, Command } from 'lucide-react'
+import { Send, Smile, Paperclip, Command, Mic, Square } from 'lucide-react'
 import { useTyping } from '../../hooks/useTyping'
 import { Button } from '../ui/Button'
 import { processSlashCommand, slashCommands } from '../../lib/utils'
+import { uploadVoiceMessage } from '../../lib/supabase'
 import type { EmojiPickerProps, EmojiClickData } from '../../types'
 import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 
 interface MessageInputProps {
-  onSendMessage: (content: string) => void
+  onSendMessage: (content: string, type?: 'text' | 'audio') => void
   placeholder?: string
   disabled?: boolean
   className?: string
@@ -24,6 +25,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const EmojiPicker = useEmojiPicker(showEmojiPicker)
   const [showSlashCommands, setShowSlashCommands] = useState(false)
+  const [recording, setRecording] = useState(false)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
   const { startTyping, stopTyping } = useTyping('general')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const emojiPickerRef = useRef<HTMLDivElement>(null)
@@ -69,7 +73,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     const processedMessage = processSlashCommand(message.trim())
     const finalMessage = processedMessage || message.trim()
 
-    onSendMessage(finalMessage)
+    onSendMessage(finalMessage, 'text')
     setMessage('')
     stopTyping()
     setShowSlashCommands(false)
@@ -114,6 +118,33 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     setMessage(command + ' ')
     setShowSlashCommands(false)
     textareaRef.current?.focus()
+  }
+
+  const toggleRecording = async () => {
+    if (recording) {
+      mediaRecorderRef.current?.stop()
+      setRecording(false)
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        const recorder = new MediaRecorder(stream)
+        recorder.ondataavailable = e => {
+          if (e.data.size > 0) chunksRef.current.push(e.data)
+        }
+        recorder.onstop = async () => {
+          const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+          chunksRef.current = []
+          const url = await uploadVoiceMessage(blob)
+          onSendMessage(url, 'audio')
+        }
+        chunksRef.current = []
+        recorder.start()
+        mediaRecorderRef.current = recorder
+        setRecording(true)
+      } catch {
+        // Ignore errors (e.g., permission denied)
+      }
+    }
   }
 
   return (
@@ -183,15 +214,26 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           
           {/* Input Actions */}
           <div className="absolute right-2 bottom-2 flex items-center space-x-1">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className="h-8 w-8 p-0"
-              aria-label="Insert emoji"
-            >
-              <Smile className="w-4 h-4" />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={toggleRecording}
+            className="h-8 w-8 p-0"
+            aria-label="Record voice"
+          >
+            {recording ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+            className="h-8 w-8 p-0"
+            aria-label="Insert emoji"
+          >
+            <Smile className="w-4 h-4" />
             </Button>
             
             <Button

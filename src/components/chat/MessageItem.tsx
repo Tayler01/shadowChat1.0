@@ -197,7 +197,11 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     onReact={handleReaction}
                     className="text-[0.65rem]"
                   />
-                  {message.content}
+                  {message.message_type === 'audio' ? (
+                    <audio controls src={message.content} className="max-w-full" />
+                  ) : (
+                    message.content
+                  )}
                 </div>
                 <div className="hidden group-hover/message:flex absolute -top-8 left-1/2 -translate-x-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow px-2 py-1 space-x-1 z-10">
                   {QUICK_REACTIONS.map(e => (

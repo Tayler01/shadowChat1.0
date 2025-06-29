@@ -53,7 +53,12 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
           className="text-[0.65rem]"
         />
         <div className="text-sm text-yellow-800 dark:text-yellow-200 break-words">
-          <strong>{message.user?.display_name}:</strong> {message.content}
+          <strong>{message.user?.display_name}:</strong>{' '}
+          {message.message_type === 'audio' ? (
+            <audio controls src={message.content} className="inline-block" />
+          ) : (
+            message.content
+          )}
         </div>
         <div className={cn('hidden group-hover:flex items-center space-x-2 mt-1', showPicker && 'flex')}>
           {QUICK_REACTIONS.map(e => (

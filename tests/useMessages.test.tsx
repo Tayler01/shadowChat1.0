@@ -119,6 +119,31 @@ describe('sendMessage', () => {
     expect(insertFn).toHaveBeenCalled();
   });
 
+  it('sends audio message', async () => {
+    const insertFn = jest.fn(() => ({
+      select: () => ({ single: () => Promise.resolve({ data: { id: '1' }, error: null }) })
+    }))
+    ;(supabase.from as jest.Mock).mockReturnValueOnce({
+      insert: insertFn,
+      select: jest.fn().mockReturnThis(),
+      single: jest.fn().mockResolvedValue({ data: [], error: null }),
+      order: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      update: jest.fn().mockReturnThis(),
+      delete: jest.fn().mockReturnThis(),
+      eq: jest.fn().mockReturnThis(),
+      rpc: jest.fn().mockReturnThis(),
+    } as any)
+
+    const { result } = renderHook(() => useMessages(), { wrapper: MessagesProvider })
+
+    await act(async () => {
+      await result.current.sendMessage('https://file', 'audio')
+    })
+
+    expect(insertFn).toHaveBeenCalledWith({ user_id: 'user1', content: 'https://file', message_type: 'audio' })
+  })
+
   it('refreshes session and retries on 401 insert error', async () => {
     const insertFail = jest.fn(() => ({
       select: () => ({

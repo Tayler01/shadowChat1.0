@@ -116,6 +116,58 @@ test('sendMessage retries on 401 error', async () => {
   expect(insertSuccess).toHaveBeenCalled();
 });
 
+test('sendMessage sends audio type', async () => {
+  const insertMock = jest.fn(() => ({
+    select: () => ({ single: () => Promise.resolve({ data: { id: '1' }, error: null }) })
+  }))
+
+  const sb = supabase as SupabaseMock
+  sb.from.mockImplementationOnce(() => ({
+    insert: jest.fn().mockReturnThis(),
+    select: jest.fn().mockReturnThis(),
+    single: jest.fn().mockResolvedValue({ data: [], error: null }),
+    order: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    update: jest.fn().mockReturnThis(),
+    delete: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    contains: jest.fn().mockReturnThis(),
+    maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+    rpc: jest.fn().mockReturnThis(),
+  } as any))
+
+  const { result } = renderHook(() => useDirectMessages())
+  await act(async () => {
+    result.current.setCurrentConversation('c1')
+  })
+
+  sb.from.mockClear()
+  sb.from.mockImplementationOnce(() => ({
+    insert: insertMock,
+    select: jest.fn().mockReturnThis(),
+    single: jest.fn().mockResolvedValue({ data: [], error: null }),
+    order: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    update: jest.fn().mockReturnThis(),
+    delete: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    contains: jest.fn().mockReturnThis(),
+    maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+    rpc: jest.fn().mockReturnThis(),
+  } as any))
+
+  await act(async () => {
+    await result.current.sendMessage('file', 'audio')
+  })
+
+  expect(insertMock).toHaveBeenCalledWith({
+    conversation_id: 'c1',
+    sender_id: 'u1',
+    content: 'file',
+    message_type: 'audio'
+  })
+})
+
 test('startConversation sets currentConversation', async () => {
   const sb = supabase as SupabaseMock;
   const maybeSingle = jest.fn().mockResolvedValue({ data: { id: 'u2' }, error: null });
