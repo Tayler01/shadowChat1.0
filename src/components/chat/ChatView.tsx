@@ -75,7 +75,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       <div className="hidden md:block">
         <MessageInput
           onSendMessage={handleSendMessage}
-          placeholder="Type a message in #general..."
+          placeholder="Type a message"
         />
       </div>
 
@@ -86,7 +86,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       >
         <MessageInput
           onSendMessage={handleSendMessage}
-          placeholder="Type a message in #general..."
+          placeholder="Type a message"
           className="border-t"
         />
       </MobileChatFooter>
