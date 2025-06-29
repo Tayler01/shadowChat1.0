@@ -426,12 +426,7 @@ function useProvideMessages(): MessagesContextValue {
       });
     }
 
-    if (!user || !content.trim()) {
-      console.warn(`${logPrefix}: Skipped send — missing user or empty content`, { hasUser: !!user, content, userId: user?.id });
-      return;
-    }
-
-    // For image/audio messages, content can be empty if fileUrl is provided
+    // Text messages require content, but image/audio messages may provide just a file URL
     if (!user || (!content.trim() && !fileUrl)) {
       console.warn(`${logPrefix}: Skipped send — missing user or empty content`, { hasUser: !!user, content, userId: user?.id, hasFileUrl: !!fileUrl });
       return;
