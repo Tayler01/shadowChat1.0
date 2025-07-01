@@ -162,7 +162,9 @@ function useProvideMessages(): MessagesContextValue {
       const error = pinnedRes.error || messagesRes.error;
 
       if (error) {
-        // console.error('❌ Error fetching messages:', error);
+        if (DEBUG) {
+          console.error('❌ Error fetching messages:', error)
+        }
       } else if (data.length > 0) {
         setMessages(prev => {
           if (prev.length === 0) {
@@ -184,7 +186,9 @@ function useProvideMessages(): MessagesContextValue {
         });
       }
     } catch (error) {
-      // console.error('❌ Exception fetching messages:', error);
+      if (DEBUG) {
+        console.error('❌ Exception fetching messages:', error)
+      }
     } finally {
       setLoading(false);
     }
@@ -264,7 +268,9 @@ function useProvideMessages(): MessagesContextValue {
               .single();
 
             if (error) {
-              // console.error('❌ Error fetching new message details:', error);
+              if (DEBUG) {
+                console.error('❌ Error fetching new message details:', error)
+              }
               return;
             }
 
@@ -298,7 +304,9 @@ function useProvideMessages(): MessagesContextValue {
               });
             }
           } catch (error) {
-            // console.error('❌ Exception handling new message:', error);
+            if (DEBUG) {
+              console.error('❌ Exception handling new message:', error)
+            }
           }
         }
       )
@@ -346,7 +354,9 @@ function useProvideMessages(): MessagesContextValue {
               .single();
 
             if (error) {
-              // console.error('❌ Error fetching updated message:', error);
+              if (DEBUG) {
+                console.error('❌ Error fetching updated message:', error)
+              }
               return;
             }
 
@@ -362,7 +372,9 @@ function useProvideMessages(): MessagesContextValue {
               })
             }
           } catch (error) {
-            // console.error('❌ Exception handling message update:', error);
+            if (DEBUG) {
+              console.error('❌ Exception handling message update:', error)
+            }
           }
         }
       )
@@ -381,16 +393,22 @@ function useProvideMessages(): MessagesContextValue {
       )
       .subscribe(async (status, err) => {
         if (err) {
-          // console.error('❌ Real-time subscription error:', err);
+          if (DEBUG) {
+            console.error('❌ Real-time subscription error:', err)
+          }
         }
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          // console.warn(`⚠️ Channel ${status}, removing and resubscribing...`);
+          if (DEBUG) {
+            console.warn(`⚠️ Channel ${status}, removing and resubscribing...`)
+          }
           await supabase.removeChannel(newChannel);
           setTimeout(() => {
             channel = subscribeToChannel();
           }, 1000);
         } else if (status === 'CLOSED') {
-          // console.warn('⚠️ Channel closed, resubscribing...');
+          if (DEBUG) {
+            console.warn('⚠️ Channel closed, resubscribing...')
+          }
           setTimeout(() => {
             channel = subscribeToChannel();
           }, 1000);
@@ -560,7 +578,9 @@ function useProvideMessages(): MessagesContextValue {
         .eq('user_id', user.id);
 
       if (error) {
-        // console.error('❌ Error editing message:', error);
+        if (DEBUG) {
+          console.error('❌ Error editing message:', error)
+        }
         throw error;
       }
 
@@ -572,7 +592,9 @@ function useProvideMessages(): MessagesContextValue {
       );
 
     } catch (error) {
-      // console.error('❌ Exception editing message:', error);
+      if (DEBUG) {
+        console.error('❌ Exception editing message:', error)
+      }
       throw error;
     }
   }, [user]);
@@ -589,7 +611,9 @@ function useProvideMessages(): MessagesContextValue {
         .eq('user_id', user.id);
 
       if (error) {
-        // console.error('❌ Error deleting message:', error);
+        if (DEBUG) {
+          console.error('❌ Error deleting message:', error)
+        }
         throw error;
       }
 
@@ -597,7 +621,9 @@ function useProvideMessages(): MessagesContextValue {
       setMessages(prev => prev.filter(m => m.id !== messageId));
 
     } catch (error) {
-      // console.error('❌ Exception deleting message:', error);
+      if (DEBUG) {
+        console.error('❌ Exception deleting message:', error)
+      }
       throw error;
     }
   }, [user]);
@@ -647,11 +673,15 @@ function useProvideMessages(): MessagesContextValue {
       });
 
       if (error) {
-        // console.error('❌ Error toggling reaction:', error);
+        if (DEBUG) {
+          console.error('❌ Error toggling reaction:', error)
+        }
         throw error;
       }
     } catch (error) {
-      // console.error('❌ Exception toggling reaction:', error);
+      if (DEBUG) {
+        console.error('❌ Exception toggling reaction:', error)
+      }
       throw error;
     }
   }, [user]);
@@ -668,7 +698,9 @@ function useProvideMessages(): MessagesContextValue {
       });
 
       if (error) {
-        // console.error('❌ Error toggling pin:', error);
+        if (DEBUG) {
+          console.error('❌ Error toggling pin:', error)
+        }
         throw error;
       }
 
@@ -688,7 +720,9 @@ function useProvideMessages(): MessagesContextValue {
         })
       );
     } catch (error) {
-      // console.error('❌ Exception toggling pin:', error);
+      if (DEBUG) {
+        console.error('❌ Exception toggling pin:', error)
+      }
       // Re-sync with database to revert optimistic updates
       fetchMessages();
       throw error;
