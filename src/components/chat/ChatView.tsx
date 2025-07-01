@@ -36,6 +36,37 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     setConsoleOpen(true)
     setLogs([])
 
+    appendLog('Testing Supabase connectivity...')
+    try {
+      const { error: pingError } = await supabase.from('users').select('id').limit(1)
+      if (pingError) {
+        appendLog(`Connectivity check failed: ${pingError.message}`)
+      } else {
+        appendLog('Connectivity check succeeded ✅')
+      }
+    } catch (err) {
+      appendLog(`Connectivity check threw: ${(err as Error).message}`)
+    }
+
+    appendLog('Running basic feature tests...')
+    try {
+      const { error: msgError } = await supabase.from('messages').select('id').limit(1)
+      if (msgError) {
+        appendLog(`Messages query failed: ${msgError.message}`)
+      } else {
+        appendLog('Messages query succeeded ✅')
+      }
+
+      const { error: presenceError } = await supabase.rpc('update_user_last_active')
+      if (presenceError) {
+        appendLog(`Presence RPC failed: ${presenceError.message}`)
+      } else {
+        appendLog('Presence RPC succeeded ✅')
+      }
+    } catch (err) {
+      appendLog(`Basic tests threw: ${(err as Error).message}`)
+    }
+
     appendLog('Checking session...')
     const { data: before } = await supabase.auth.getSession()
     appendLog(
