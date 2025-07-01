@@ -75,7 +75,7 @@ export function Sidebar({
             <MessageSquare className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="font-bold text-xl text-gray-900 dark:text-gray-100">ChatFlow</h1>
+            <h1 className="font-bold text-xl text-gray-900 dark:text-gray-100">ShadowChat</h1>
             <p className="text-xs text-gray-500 dark:text-gray-400">Realtime Messaging</p>
           </div>
         </div>
