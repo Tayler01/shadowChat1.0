@@ -65,6 +65,23 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 })
 
+// --- Refresh session locking -------------------------------------------------
+// Prevent multiple concurrent refreshSession calls from triggering duplicate
+// network requests. Any callers will await the same promise while a refresh is
+// in flight.
+let refreshSessionPromise: Promise<{ data: any; error: any }> | null = null
+
+export const refreshSessionLocked = async () => {
+  if (!refreshSessionPromise) {
+    refreshSessionPromise = supabase.auth
+      .refreshSession()
+      .finally(() => {
+        refreshSessionPromise = null
+      })
+  }
+  return refreshSessionPromise
+}
+
 export const VOICE_BUCKET = 'message-media'
 export const UPLOADS_BUCKET = 'chat-uploads'
 
@@ -298,7 +315,7 @@ export const ensureSession = async () => {
     const fiveMinutes = 5 * 60
     
     if (expiresAt && (expiresAt - now) < fiveMinutes) {
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+      const { data: refreshData, error: refreshError } = await refreshSessionLocked()
 
       if (refreshError) {
         console.error('Error refreshing session:', refreshError)
