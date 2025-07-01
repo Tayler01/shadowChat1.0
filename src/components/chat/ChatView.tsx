@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Hash, Users, Pin } from 'lucide-react'
 import { useMessages } from '../../hooks/useMessages'
@@ -6,6 +6,9 @@ import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import toast from 'react-hot-toast'
+import { Button } from '../ui/Button'
+import { ConsoleModal } from '../ui/ConsoleModal'
+import { supabase, ensureSession } from '../../lib/supabase'
 
 interface ChatViewProps {
   onToggleSidebar: () => void
@@ -15,6 +18,31 @@ interface ChatViewProps {
 
 export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView, onViewChange }) => {
   const { sendMessage, messages, loading } = useMessages()
+
+  const [consoleOpen, setConsoleOpen] = useState(false)
+  const [logs, setLogs] = useState<string[]>([])
+
+  const appendLog = (msg: string) => setLogs((l) => [...l, msg])
+
+  const handleCheckAuth = async () => {
+    setConsoleOpen(true)
+    setLogs([])
+
+    appendLog('Checking session...')
+    const valid = await ensureSession()
+    appendLog(valid ? 'Session valid ✅' : 'Session invalid ❌')
+
+    appendLog('Testing database query...')
+    const { error } = await supabase.from('users').select('id').limit(1)
+    if (error) {
+      appendLog(`Database query failed: ${error.message}`)
+    } else {
+      appendLog('Database query succeeded ✅')
+    }
+
+    const { data } = await supabase.auth.getSession()
+    appendLog(`Token expires at: ${data.session?.expires_at}`)
+  }
 
   const handleSendMessage = async (
     content: string,
@@ -65,6 +93,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
               <Pin className="w-4 h-4" />
               <span>Pinned</span>
             </div>
+            <Button size="sm" variant="secondary" onClick={handleCheckAuth}">
+              Test Auth
+            </Button>
           </div>
         </div>
       </div>
@@ -91,6 +122,11 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
           className="border-t"
         />
       </MobileChatFooter>
+      <ConsoleModal
+        open={consoleOpen}
+        logs={logs}
+        onClose={() => setConsoleOpen(false)}
+      />
     </motion.div>
   )
 }
