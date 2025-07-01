@@ -254,8 +254,15 @@ export const markDMMessagesRead = async (conversationId: string) => {
   if (error) console.error('Error marking messages as read:', error)
 }
 
-export const searchUsers = async (term: string) => {
-  const { data, error } = await supabase.rpc('search_users', { term })
+export const searchUsers = async (
+  term: string,
+  options?: { signal?: AbortSignal }
+) => {
+  const { data, error } = await supabase.rpc(
+    'search_users',
+    { term },
+    options
+  )
   if (error) {
     console.error('Error searching users:', error)
     return [] as BasicUser[]

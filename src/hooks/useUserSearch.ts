@@ -7,23 +7,36 @@ export function useUserSearch(term: string) {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    let active = true
+    const controller = new AbortController()
+
     const search = async () => {
       if (!term.trim()) {
         setResults([])
         setError(null)
         return
       }
+
       setLoading(true)
-      const users = await searchUsers(term)
-      if (!active) return
-      setResults(users)
-      setError(users.length > 0 ? null : 'User not found')
-      setLoading(false)
+
+      try {
+        const users = await searchUsers(term, { signal: controller.signal })
+        if (controller.signal.aborted) return
+        setResults(users)
+        setError(users.length > 0 ? null : 'User not found')
+      } catch (err) {
+        if ((err as any).name !== 'AbortError') {
+          console.error('Error searching users:', err)
+          setError('Error searching users')
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false)
+      }
     }
+
     search()
+
     return () => {
-      active = false
+      controller.abort()
     }
   }, [term])
 
