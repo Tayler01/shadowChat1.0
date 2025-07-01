@@ -317,3 +317,33 @@ export const ensureSession = async () => {
     return false
   }
 }
+
+export interface UserStats {
+  messages: number
+  reactions: number
+  friends: number
+}
+
+export const fetchUserStats = async (userId: string): Promise<UserStats> => {
+  const [messagesRes, reactionsRes, friendsRes] = await Promise.all([
+    supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId),
+    supabase
+      .from('message_reactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId),
+    supabase
+      .from('dm_conversations')
+      .select('id', { count: 'exact', head: true })
+      .contains('participants', [userId]),
+  ])
+
+  return {
+    messages: messagesRes.count || 0,
+    reactions: reactionsRes.count || 0,
+    friends: friendsRes.count || 0,
+  }
+}
+

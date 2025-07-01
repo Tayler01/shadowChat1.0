@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Camera, Edit3, Save, X, Upload, Menu } from 'lucide-react'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useAuth } from '../../hooks/useAuth'
+import { fetchUserStats } from '../../lib/supabase'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
@@ -40,6 +41,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
   const [loading, setLoading] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingBanner, setUploadingBanner] = useState(false)
+  const [stats, setStats] = useState({ messages: 0, reactions: 0, friends: 0 })
   const avatarInputRef = React.useRef<HTMLInputElement>(null)
   const bannerInputRef = React.useRef<HTMLInputElement>(null)
   const [formData, setFormData] = useState<ProfileFormData>({
@@ -48,6 +50,21 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
     status: profile?.status || 'online',
     color: profile?.color || '#3B82F6'
   })
+
+  useEffect(() => {
+    let active = true
+    const load = async () => {
+      if (!profile) return
+      try {
+        const counts = await fetchUserStats(profile.id)
+        if (active) setStats(counts)
+      } catch {
+        // ignore
+      }
+    }
+    load()
+    return () => { active = false }
+  }, [profile])
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -333,15 +350,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4 mt-6">
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 text-center border border-gray-200 dark:border-gray-700">
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">0</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.messages}</div>
             <div className="text-sm text-gray-500 dark:text-gray-400">Messages</div>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 text-center border border-gray-200 dark:border-gray-700">
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">0</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.reactions}</div>
             <div className="text-sm text-gray-500 dark:text-gray-400">Reactions</div>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-xl p-4 text-center border border-gray-200 dark:border-gray-700">
-            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">0</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.friends}</div>
             <div className="text-sm text-gray-500 dark:text-gray-400">Friends</div>
           </div>
         </div>
