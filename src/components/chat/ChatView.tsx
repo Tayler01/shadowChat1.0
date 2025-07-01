@@ -62,22 +62,36 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   }
 
   const handleRefreshSession = async () => {
-    appendLog('Starting forced session refresh...')
-    appendLog('Calling supabase.auth.refreshSession()')
+    appendLog('Starting session validation and refresh...')
+    appendLog('Calling ensureSession() function')
 
-    const { data, error } = await supabase.auth.refreshSession()
-    const { session, user } = data
-
-    if (error) {
-      console.error('Forced session restore failed:', error.message)
-      appendLog(`Refresh failed: ${error.message}`)
-      return
+    try {
+      const sessionValid = await ensureSession()
+      
+      if (sessionValid) {
+        appendLog('Session validation successful ✅')
+        
+        // Get the current session details after validation
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          appendLog(`Error getting session details: ${error.message}`)
+        } else if (session) {
+          appendLog(`Session expires at: ${session.expires_at}`)
+          appendLog(`User id: ${session.user?.id}`)
+          appendLog(`Access token length: ${session.access_token?.length || 0} chars`)
+        } else {
+          appendLog('No active session found after validation')
+        }
+      } else {
+        appendLog('Session validation failed ❌')
+        appendLog('Session is invalid or expired')
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      appendLog(`Session validation error: ${errorMessage}`)
+      console.error('Session validation failed:', error)
     }
-
-    appendLog('Session refresh successful ✅')
-    appendLog(`New session expires at: ${session?.expires_at}`)
-    appendLog(`User id: ${user?.id}`)
-    appendLog(`Full response: ${JSON.stringify(data, null, 2)}`)
   }
 
   const handleSendMessage = async (
