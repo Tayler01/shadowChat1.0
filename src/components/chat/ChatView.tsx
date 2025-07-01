@@ -62,7 +62,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   }
 
   const handleRefreshSession = async () => {
-    appendLog('Refreshing session...')
+    appendLog('Starting forced session refresh...')
+    appendLog('Calling supabase.auth.refreshSession()')
 
     const { data, error } = await supabase.auth.refreshSession()
 
@@ -72,7 +73,10 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       return
     }
 
+    appendLog('Session refresh successful ✅')
     appendLog(`New session expires at: ${data.session?.expires_at}`)
+    appendLog('Reloading page to establish new session...')
+    window.location.reload()
   }
 
   const handleSendMessage = async (
