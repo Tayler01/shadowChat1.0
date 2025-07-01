@@ -41,3 +41,18 @@ test('renders image message', () => {
   const img = screen.getByAltText(/uploaded image/i)
   expect(img).toHaveAttribute('src', baseMessage.file_url)
 })
+
+test('add reaction button has aria-label', () => {
+  render(
+    <MessageItem
+      message={baseMessage}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+    />
+  )
+
+  const btn = screen.getByLabelText('Add reaction', { hidden: true })
+  expect(btn).toBeInTheDocument()
+})

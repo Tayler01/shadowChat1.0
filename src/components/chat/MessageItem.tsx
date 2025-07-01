@@ -224,6 +224,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     onClick={() => setShowReactionPicker(!showReactionPicker)}
                     className="text-base hover:scale-110 transition-transform"
                     type="button"
+                    aria-label="Add reaction"
                   >
                     <Plus className="w-4 h-4" />
                   </button>
