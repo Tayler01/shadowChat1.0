@@ -62,31 +62,22 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   }
 
   const handleRefreshSession = async () => {
-    appendLog('🔄 Force refreshing session...')
-    appendLog('Calling supabase.auth.refreshSession() directly')
+    appendLog('Starting forced session refresh...')
+    appendLog('Calling supabase.auth.refreshSession()')
 
-    try {
-      const { data, error } = await supabase.auth.refreshSession()
-      
-      if (error) {
-        appendLog(`❌ Refresh failed: ${error.message}`)
-        console.error('Force session refresh failed:', error)
-      } else {
-        appendLog('✅ Session refreshed successfully')
-        
-        if (data.session) {
-          appendLog(`📅 New session expires at: ${data.session.expires_at}`)
-          appendLog(`👤 User id: ${data.session.user?.id}`)
-          appendLog(`🔑 Access token length: ${data.session.access_token?.length || 0} chars`)
-        } else {
-          appendLog('⚠️ No session returned after refresh')
-        }
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      appendLog(`💥 refreshSession() threw an error: ${errorMessage}`)
-      console.error('Session refresh failed:', error)
+    const { data, error } = await supabase.auth.refreshSession()
+    const { session, user } = data
+
+    if (error) {
+      console.error('Forced session restore failed:', error.message)
+      appendLog(`Refresh failed: ${error.message}`)
+      return
     }
+
+    appendLog('Session refresh successful ✅')
+    appendLog(`New session expires at: ${session?.expires_at}`)
+    appendLog(`User id: ${user?.id}`)
+    appendLog(`Full response: ${JSON.stringify(data, null, 2)}`)
   }
 
   const handleSendMessage = async (
