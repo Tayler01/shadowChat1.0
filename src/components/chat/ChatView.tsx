@@ -135,6 +135,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     } else {
       appendLog(after.session ? 'Session valid ✅' : 'Session invalid ❌')
     }
+
+    // Force a session refresh to ensure tokens are valid
+    await ensureSession(true)
   }
 
   const handleFocusRefresh = async () => {
@@ -204,6 +207,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     } else {
       appendLog(after.session ? 'Session valid ✅' : 'Session invalid ❌')
     }
+
+    // Force a session refresh to ensure tokens are valid
+    await ensureSession(true)
   }
 
   useVisibilityRefresh(handleFocusRefresh)

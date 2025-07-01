@@ -110,6 +110,9 @@ export const refreshSessionLocked = async () => {
       })
     }
 
+    if (DEBUG) {
+      console.log('[refreshSessionLocked] calling supabase.auth.refreshSession')
+    }
     const refresh = supabase.auth
       .refreshSession()
       .then((res) => {
@@ -117,6 +120,10 @@ export const refreshSessionLocked = async () => {
           console.log('[refreshSessionLocked] refresh result', res)
         }
         return res
+      })
+      .catch((err) => {
+        console.error('[refreshSessionLocked] refresh error', err)
+        throw err
       })
     const timeout = new Promise<never>((_, reject) =>
       setTimeout(
@@ -127,11 +134,25 @@ export const refreshSessionLocked = async () => {
     refreshSessionPromise = (Promise.race([refresh, timeout]) as Promise<{
       data: any
       error: any
-    }>).finally(() => {
-      refreshSessionPromise = null
-    })
+    }>)
+      .then((res) => {
+        if (DEBUG) {
+          console.log('[refreshSessionLocked] final result', res)
+        }
+        return res
+      })
+      .finally(() => {
+        refreshSessionPromise = null
+      })
   }
   return refreshSessionPromise
+}
+
+export const forceRefreshSession = async () => {
+  if (DEBUG) {
+    console.log('[forceRefreshSession] invoked')
+  }
+  return refreshSessionLocked()
 }
 
 export const VOICE_BUCKET = 'message-media'
@@ -340,7 +361,7 @@ export const searchUsers = async (
 }
 
 // Helper function to ensure valid session before database operations
-export const ensureSession = async () => {
+export const ensureSession = async (force = false) => {
   try {
     const { data: { session }, error } = await supabase.auth.getSession()
 
@@ -365,8 +386,11 @@ export const ensureSession = async () => {
     const expiresAt = session.expires_at
     const now = Math.floor(Date.now() / 1000)
     const fiveMinutes = 5 * 60
-    
-    if (expiresAt && (expiresAt - now) < fiveMinutes) {
+
+    if (force || (expiresAt && (expiresAt - now) < fiveMinutes)) {
+      if (DEBUG && force) {
+        console.log('ensureSession: forcing refresh regardless of expiry')
+      }
       const { data: refreshData, error: refreshError } = await refreshSessionLocked()
 
       if (refreshError) {
