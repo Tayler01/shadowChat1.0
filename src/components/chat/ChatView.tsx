@@ -29,8 +29,25 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     setLogs([])
 
     appendLog('Checking session...')
-    const valid = await ensureSession()
-    appendLog(valid ? 'Session valid ✅' : 'Session invalid ❌')
+
+    try {
+      const valid = await Promise.race([
+        ensureSession(),
+        new Promise<boolean>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 10000)
+        ),
+      ])
+
+      appendLog(valid ? 'Session valid ✅' : 'Session invalid ❌')
+    } catch (err) {
+      if ((err as Error).message === 'timeout') {
+        appendLog('Connection verification timed out ❌')
+      } else {
+        appendLog('Failed to verify connection ❌')
+      }
+      console.error('Session verification failed:', err)
+      return
+    }
 
     appendLog('Testing database query...')
     const { error } = await supabase.from('users').select('id').limit(1)
@@ -42,6 +59,18 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
 
     const { data } = await supabase.auth.getSession()
     appendLog(`Token expires at: ${data.session?.expires_at}`)
+  }
+
+  const handleRefreshSession = async () => {
+    appendLog('Refreshing session...')
+    const { data, error } = await supabase.auth.refreshSession()
+    if (error) {
+      console.error('Refresh failed:', error.message)
+      appendLog(`Refresh failed: ${error.message}`)
+    } else {
+      console.log('Session refreshed:', data.session)
+      appendLog(`Session refreshed: ${JSON.stringify(data.session)}`)
+    }
   }
 
   const handleSendMessage = async (
@@ -126,6 +155,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
         open={consoleOpen}
         logs={logs}
         onClose={() => setConsoleOpen(false)}
+        onRefresh={handleRefreshSession}
       />
     </motion.div>
   )
