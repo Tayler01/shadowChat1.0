@@ -62,35 +62,30 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   }
 
   const handleRefreshSession = async () => {
-    appendLog('🔄 Using ensureSession() for smart session management')
-    appendLog('This will validate current session and refresh only if needed')
+    appendLog('🔄 Force refreshing session...')
+    appendLog('Calling supabase.auth.refreshSession() directly')
 
     try {
-      const sessionValid = await ensureSession()
+      const { data, error } = await supabase.auth.refreshSession()
       
-      if (sessionValid) {
-        appendLog('✅ ensureSession() completed successfully')
-        
-        // Get the current session details after validation
-        const { data: { session }, error } = await supabase.auth.getSession()
-        
-        if (error) {
-          appendLog(`❌ Error getting session details: ${error.message}`)
-        } else if (session) {
-          appendLog(`📅 Session expires at: ${session.expires_at}`)
-          appendLog(`👤 User id: ${session.user?.id}`)
-          appendLog(`🔑 Access token length: ${session.access_token?.length || 0} chars`)
-        } else {
-          appendLog('⚠️ No active session found after validation')
-        }
+      if (error) {
+        appendLog(`❌ Refresh failed: ${error.message}`)
+        console.error('Force session refresh failed:', error)
       } else {
-        appendLog('❌ ensureSession() returned false')
-        appendLog('Session is invalid, expired, or could not be refreshed')
+        appendLog('✅ Session refreshed successfully')
+        
+        if (data.session) {
+          appendLog(`📅 New session expires at: ${data.session.expires_at}`)
+          appendLog(`👤 User id: ${data.session.user?.id}`)
+          appendLog(`🔑 Access token length: ${data.session.access_token?.length || 0} chars`)
+        } else {
+          appendLog('⚠️ No session returned after refresh')
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      appendLog(`💥 ensureSession() threw an error: ${errorMessage}`)
-      console.error('Session validation failed:', error)
+      appendLog(`💥 refreshSession() threw an error: ${errorMessage}`)
+      console.error('Session refresh failed:', error)
     }
   }
 
