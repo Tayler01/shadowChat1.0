@@ -8,7 +8,8 @@ import { MobileChatFooter } from '../layout/MobileChatFooter'
 import toast from 'react-hot-toast'
 import { Button } from '../ui/Button'
 import { ConsoleModal } from '../ui/ConsoleModal'
-import { supabase, ensureSession } from '../../lib/supabase'
+import { supabase, ensureSession, refreshSessionLocked } from '../../lib/supabase'
+import { useVisibilityRefresh } from '../../hooks/useVisibilityRefresh'
 
 interface ChatViewProps {
   onToggleSidebar: () => void
@@ -65,7 +66,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     appendLog('Starting forced session refresh...')
     appendLog('Calling supabase.auth.refreshSession()')
 
-    const { data, error } = await supabase.auth.refreshSession()
+    const { data, error } = await refreshSessionLocked()
     const { session, user } = data
 
     if (error) {
@@ -79,6 +80,34 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     appendLog(`User id: ${user?.id}`)
     appendLog(`Full response: ${JSON.stringify(data, null, 2)}`)
   }
+
+  const handleFocusRefresh = async () => {
+    setConsoleOpen(true)
+    setLogs([])
+    appendLog('Page became visible - refreshing session')
+    appendLog('Calling supabase.auth.refreshSession()')
+
+    const { data, error } = await refreshSessionLocked()
+    const { session, user } = data
+
+    if (error) {
+      appendLog(`Refresh failed: ${error.message}`)
+    } else {
+      appendLog('Session refresh successful ✅')
+      appendLog(`New session expires at: ${session?.expires_at}`)
+      appendLog(`User id: ${user?.id}`)
+      appendLog(`Full response: ${JSON.stringify(data, null, 2)}`)
+    }
+
+    const { data: checkData, error: checkError } = await supabase.auth.getSession()
+    if (checkError) {
+      appendLog(`Session check failed: ${checkError.message}`)
+    } else {
+      appendLog(checkData.session ? 'Session valid ✅' : 'Session invalid ❌')
+    }
+  }
+
+  useVisibilityRefresh(handleFocusRefresh)
 
   const handleSendMessage = async (
     content: string,
