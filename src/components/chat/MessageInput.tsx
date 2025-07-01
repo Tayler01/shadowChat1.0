@@ -37,6 +37,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const { startTyping, stopTyping } = useTyping('general')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const emojiPickerRef = useRef<HTMLDivElement>(null)
+  const attachmentMenuRef = useRef<HTMLDivElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -56,6 +57,18 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     const handleClickOutside = (event: MouseEvent) => {
       if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
         setShowEmojiPicker(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Handle clicks outside attachment menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (attachmentMenuRef.current && !attachmentMenuRef.current.contains(event.target as Node)) {
+        setShowAttachmentMenu(false)
       }
     }
 
@@ -262,7 +275,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       {/* Input Form */}
       <form onSubmit={handleSubmit} className="flex items-end space-x-3">
         {/* Attachment Button */}
-        <div className="relative">
+        <div ref={attachmentMenuRef} className="relative">
           <Button
             type="button"
             variant="ghost"
