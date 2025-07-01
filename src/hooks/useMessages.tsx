@@ -12,6 +12,8 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
 import { useVisibilityRefresh } from './useVisibilityRefresh';
 
+const STORED_MESSAGE_LIMIT = 200;
+
 // --- Helper functions extracted from sendMessage workflow ---
 export const prepareMessageData = (
   userId: string,
@@ -120,7 +122,7 @@ function useProvideMessages(): MessagesContextValue {
       try {
         const stored = localStorage.getItem('chatHistory');
         if (stored) {
-          return JSON.parse(stored) as Message[];
+          return (JSON.parse(stored) as Message[]).slice(-STORED_MESSAGE_LIMIT);
         }
       } catch {
         // ignore parse errors
@@ -173,7 +175,10 @@ function useProvideMessages(): MessagesContextValue {
           if (prev.length === 0) {
             if (typeof localStorage !== 'undefined') {
               try {
-                localStorage.setItem('chatHistory', JSON.stringify(data));
+              localStorage.setItem(
+                'chatHistory',
+                JSON.stringify(data.slice(-STORED_MESSAGE_LIMIT))
+              );
               } catch {}
             }
             return data as Message[];
@@ -182,7 +187,10 @@ function useProvideMessages(): MessagesContextValue {
           const merged = [...prev, ...data.filter(m => !ids.has(m.id))];
           if (typeof localStorage !== 'undefined') {
             try {
-              localStorage.setItem('chatHistory', JSON.stringify(merged));
+              localStorage.setItem(
+                'chatHistory',
+                JSON.stringify(merged.slice(-STORED_MESSAGE_LIMIT))
+              );
             } catch {}
           }
           return merged;
@@ -223,7 +231,10 @@ function useProvideMessages(): MessagesContextValue {
   useEffect(() => {
     if (typeof localStorage !== 'undefined') {
       try {
-        localStorage.setItem('chatHistory', JSON.stringify(messages));
+        localStorage.setItem(
+          'chatHistory',
+          JSON.stringify(messages.slice(-STORED_MESSAGE_LIMIT))
+        );
       } catch {
         // ignore storage errors
       }
