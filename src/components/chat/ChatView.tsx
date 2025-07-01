@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Hash, Users, Pin } from 'lucide-react'
 import { useMessages } from '../../hooks/useMessages'
@@ -14,6 +14,8 @@ import {
   refreshSessionLocked,
   getStoredRefreshToken,
   localStorageKey,
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
 } from '../../lib/supabase'
 import { useVisibilityRefresh } from '../../hooks/useVisibilityRefresh'
 
@@ -32,9 +34,21 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   const appendLog = (msg: string) =>
     setLogs((l) => [...l, `${new Date().toLocaleTimeString()} ${msg}`])
 
+  const appendSupabaseInfo = () => {
+    appendLog(`Supabase URL: ${SUPABASE_URL}`)
+    appendLog(`Supabase Key: ${SUPABASE_ANON_KEY}`)
+  }
+
+  useEffect(() => {
+    setConsoleOpen(true)
+    setLogs([])
+    appendSupabaseInfo()
+  }, [])
+
   const handleCheckAuth = async () => {
     setConsoleOpen(true)
     setLogs([])
+    appendSupabaseInfo()
 
     appendLog('Testing Supabase connectivity...')
     try {
@@ -108,6 +122,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   }
 
   const handleRefreshSession = async () => {
+    appendSupabaseInfo()
     appendLog('Starting forced session refresh...')
     const { data: before } = await supabase.auth.getSession()
     appendLog(
@@ -174,6 +189,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   const handleFocusRefresh = async () => {
     setConsoleOpen(true)
     setLogs([])
+    appendSupabaseInfo()
     appendLog('Page became visible - refreshing session')
     const { data: before } = await supabase.auth.getSession()
     appendLog(
