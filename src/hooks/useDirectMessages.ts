@@ -253,7 +253,9 @@ export function useConversationMessages(conversationId: string | null) {
               .single();
 
             if (data) {
-              setMessages(prev => [...prev, data]);
+              setMessages(prev => {
+                return prev.some(m => m.id === data.id) ? prev : [...prev, data];
+              });
 
               // Mark as read if not sent by current user
               if (user && data.sender_id !== user.id) {
