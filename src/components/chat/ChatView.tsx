@@ -8,7 +8,13 @@ import { MobileChatFooter } from '../layout/MobileChatFooter'
 import toast from 'react-hot-toast'
 import { Button } from '../ui/Button'
 import { ConsoleModal } from '../ui/ConsoleModal'
-import { supabase, ensureSession, refreshSessionLocked } from '../../lib/supabase'
+import {
+  supabase,
+  ensureSession,
+  refreshSessionLocked,
+  getStoredRefreshToken,
+  localStorageKey,
+} from '../../lib/supabase'
 import { useVisibilityRefresh } from '../../hooks/useVisibilityRefresh'
 
 interface ChatViewProps {
@@ -78,6 +84,13 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
         ? `Current session expires at: ${before.session.expires_at}`
         : 'No active session before refresh'
     )
+    appendLog(
+      `Memory refresh token: ${before.session?.refresh_token ?? 'null'}`
+    )
+    const storedToken = getStoredRefreshToken()
+    appendLog(
+      `Stored refresh token (${localStorageKey}): ${storedToken ?? 'null'}`
+    )
     appendLog('Calling supabase.auth.refreshSession()')
 
     let result
@@ -103,6 +116,16 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     appendLog(`User id: ${user?.id}`)
     appendLog(`Full response: ${JSON.stringify(data, null, 2)}`)
 
+    const storedAfter = getStoredRefreshToken()
+    appendLog(
+      `Stored refresh token (${localStorageKey}) after refresh: ${
+        storedAfter ?? 'null'
+      }`
+    )
+    appendLog(
+      `Memory refresh token after refresh: ${session?.refresh_token ?? 'null'}`
+    )
+
     const { data: after, error: checkError } = await supabase.auth.getSession()
     if (after.session) {
       appendLog(`Post-refresh expires at: ${after.session.expires_at}`)
@@ -123,6 +146,13 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       before.session
         ? `Current session expires at: ${before.session.expires_at}`
         : 'No active session before refresh'
+    )
+    appendLog(
+      `Memory refresh token: ${before.session?.refresh_token ?? 'null'}`
+    )
+    const storedToken = getStoredRefreshToken()
+    appendLog(
+      `Stored refresh token (${localStorageKey}): ${storedToken ?? 'null'}`
     )
     appendLog('Calling supabase.auth.refreshSession()')
 
@@ -154,6 +184,15 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       appendLog(`New session expires at: ${session?.expires_at}`)
       appendLog(`User id: ${user?.id}`)
       appendLog(`Full response: ${JSON.stringify(data, null, 2)}`)
+      const storedAfter = getStoredRefreshToken()
+      appendLog(
+        `Stored refresh token (${localStorageKey}) after refresh: ${
+          storedAfter ?? 'null'
+        }`
+      )
+      appendLog(
+        `Memory refresh token after refresh: ${session?.refresh_token ?? 'null'}`
+      )
     }
 
     const { data: after, error: checkError } = await supabase.auth.getSession()
