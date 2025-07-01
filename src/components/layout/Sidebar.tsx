@@ -109,7 +109,7 @@ export function Sidebar({
       </nav>
 
       {/* User Profile */}
-      <div className="px-6 py-5 border-t border-gray-200 dark:border-gray-700">
+      <div className="px-6 py-6 border-t border-gray-200 dark:border-gray-700">
         <div className="flex items-center space-x-3">
           <Avatar
             src={user?.avatar_url}
