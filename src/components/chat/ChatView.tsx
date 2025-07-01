@@ -62,34 +62,34 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   }
 
   const handleRefreshSession = async () => {
-    appendLog('Starting session validation and refresh...')
-    appendLog('Calling ensureSession() function')
+    appendLog('🔄 Using ensureSession() for smart session management')
+    appendLog('This will validate current session and refresh only if needed')
 
     try {
       const sessionValid = await ensureSession()
       
       if (sessionValid) {
-        appendLog('Session validation successful ✅')
+        appendLog('✅ ensureSession() completed successfully')
         
         // Get the current session details after validation
         const { data: { session }, error } = await supabase.auth.getSession()
         
         if (error) {
-          appendLog(`Error getting session details: ${error.message}`)
+          appendLog(`❌ Error getting session details: ${error.message}`)
         } else if (session) {
-          appendLog(`Session expires at: ${session.expires_at}`)
-          appendLog(`User id: ${session.user?.id}`)
-          appendLog(`Access token length: ${session.access_token?.length || 0} chars`)
+          appendLog(`📅 Session expires at: ${session.expires_at}`)
+          appendLog(`👤 User id: ${session.user?.id}`)
+          appendLog(`🔑 Access token length: ${session.access_token?.length || 0} chars`)
         } else {
-          appendLog('No active session found after validation')
+          appendLog('⚠️ No active session found after validation')
         }
       } else {
-        appendLog('Session validation failed ❌')
-        appendLog('Session is invalid or expired')
+        appendLog('❌ ensureSession() returned false')
+        appendLog('Session is invalid, expired, or could not be refreshed')
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-      appendLog(`Session validation error: ${errorMessage}`)
+      appendLog(`💥 ensureSession() threw an error: ${errorMessage}`)
       console.error('Session validation failed:', error)
     }
   }
