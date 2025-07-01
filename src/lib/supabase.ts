@@ -122,6 +122,15 @@ export const refreshSessionLocked = async () => {
         if (DEBUG) {
           console.log('[refreshSessionLocked] refresh result', res)
         }
+        if (res.data?.session) {
+          supabase.realtime.setAuth(res.data.session?.access_token || '')
+          // Reconnect websocket in case it was closed on token expiry
+          try {
+            supabase.realtime.connect()
+          } catch (err) {
+            if (DEBUG) console.error('realtime.connect error', err)
+          }
+        }
         return res
       })
       .catch((err) => {
