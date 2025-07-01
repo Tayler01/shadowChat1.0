@@ -101,16 +101,10 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
             {/* Menu button removed on mobile */}
             {/* Header title */}
             <div className="flex items-center space-x-2">
-              <div className="hidden md:block p-2 bg-[var(--color-accent-light)] rounded-lg">
-                <Hash className="w-5 h-5 text-[var(--color-accent)]" />
-              </div>
               <div>
                 <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                   General Chat
                 </h1>
-                <p className="hidden md:block text-sm text-gray-500 dark:text-gray-400">
-                  Welcome to the general discussion
-                </p>
               </div>
             </div>
           </div>
