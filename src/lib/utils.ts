@@ -69,8 +69,15 @@ export function shouldGroupMessage(current: ChatMessage, previous?: ChatMessage)
   const currentId = (current as any).user_id ?? (current as any).sender_id
   const previousId = (previous as any).user_id ?? (previous as any).sender_id
 
-  // Group messages whenever they are from the same sender
-  return currentId === previousId
+  // Only group messages if they are from the same sender and sent within a
+  // short time window (default: 5 minutes)
+  if (currentId !== previousId) return false
+
+  const currentTime = new Date(current.created_at).getTime()
+  const previousTime = new Date(previous.created_at).getTime()
+  const FIVE_MINUTES = 5 * 60 * 1000
+
+  return Math.abs(currentTime - previousTime) < FIVE_MINUTES
 }
 
 // Slash command processor
