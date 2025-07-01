@@ -73,11 +73,19 @@ let refreshSessionPromise: Promise<{ data: any; error: any }> | null = null
 
 export const refreshSessionLocked = async () => {
   if (!refreshSessionPromise) {
-    refreshSessionPromise = supabase.auth
-      .refreshSession()
-      .finally(() => {
-        refreshSessionPromise = null
-      })
+    const refresh = supabase.auth.refreshSession()
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error('Session refresh timeout after 10 seconds')),
+        10000
+      )
+    )
+    refreshSessionPromise = (Promise.race([refresh, timeout]) as Promise<{
+      data: any
+      error: any
+    }>).finally(() => {
+      refreshSessionPromise = null
+    })
   }
   return refreshSessionPromise
 }
