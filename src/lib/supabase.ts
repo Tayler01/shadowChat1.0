@@ -73,6 +73,10 @@ let refreshSessionPromise: Promise<{ data: any; error: any }> | null = null
 
 export const refreshSessionLocked = async () => {
   if (!refreshSessionPromise) {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return Promise.reject(new Error('Offline: cannot refresh session'))
+    }
+
     const refresh = supabase.auth.refreshSession()
     const timeout = new Promise<never>((_, reject) =>
       setTimeout(
