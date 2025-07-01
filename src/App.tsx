@@ -6,17 +6,13 @@ import { ChatView } from './components/chat/ChatView'
 import { DirectMessagesView } from './components/dms/DirectMessagesView'
 import { ProfileView } from './components/profile/ProfileView'
 import { SettingsView } from './components/settings/SettingsView'
-import { useAuth } from './hooks/useAuth'
 import { MessagesProvider } from './hooks/useMessages'
-import { updateUserPresence } from './lib/supabase'
-import { PRESENCE_INTERVAL_MS } from './config'
 import { MobileNav } from './components/layout/MobileNav'
 import { useIsDesktop } from './hooks/useIsDesktop'
 
 type View = 'chat' | 'dms' | 'profile' | 'settings'
 
 function App() {
-  const { user } = useAuth()
   const [currentView, setCurrentView] = useState<View>('chat')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const isDesktop = useIsDesktop()
@@ -38,20 +34,6 @@ function App() {
     localStorage.setItem('darkMode', isDarkMode.toString())
   }, [isDarkMode])
 
-  // Update user presence periodically
-  useEffect(() => {
-    if (!user) return
-
-    // Update presence immediately
-    updateUserPresence()
-
-    // Set up periodic presence updates
-    const interval = setInterval(() => {
-      updateUserPresence()
-    }, PRESENCE_INTERVAL_MS)
-
-    return () => clearInterval(interval)
-  }, [user])
 
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode)
