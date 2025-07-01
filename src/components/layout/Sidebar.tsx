@@ -106,56 +106,7 @@ export function Sidebar({
           </button>
         ))}
 
-        {/* DM List */}
-        {currentView === 'dms' && (
-          <div className="mt-6 space-y-2">
-            <div className="flex items-center justify-between px-3">
-              <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                Conversations
-              </h3>
-              <button
-                onClick={onNewDM}
-                className="p-1 text-gray-400 hover:text-gray-600 dark:text-gray-400 dark:hover:text-gray-200 rounded"
-                aria-label="Start new conversation"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-            
-            <div className="space-y-1 max-h-64 overflow-y-auto">
-              {conversations.map((conversation) => (
-                <button
-                  key={conversation.id}
-                  className="w-full flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-left"
-                >
-                  <Avatar
-                    src={conversation.other_user?.avatar_url}
-                    alt={conversation.other_user?.full_name || 'User'}
-                    size="sm"
-                    color={conversation.other_user?.color}
-                    status={conversation.other_user?.status}
-                    showStatus
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                      {conversation.other_user?.full_name || conversation.other_user?.username}
-                    </p>
-                    {conversation.last_message && (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                        {conversation.last_message.content}
-                      </p>
-                    )}
-                  </div>
-                  {conversation.unread_count > 0 && (
-                    <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-                      {conversation.unread_count}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* DM List intentionally omitted as the Direct Messages view includes its own sidebar */}
       </nav>
 
       {/* User Profile */}
