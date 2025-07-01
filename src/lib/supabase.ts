@@ -167,6 +167,23 @@ export const forceRefreshSession = async () => {
   return refreshSessionLocked()
 }
 
+export const resetRealtimeConnection = async () => {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  supabase.realtime.setAuth(session?.access_token || '')
+  try {
+    supabase.realtime.disconnect()
+  } catch (err) {
+    if (DEBUG) console.error('realtime.disconnect error', err)
+  }
+  try {
+    supabase.realtime.connect()
+  } catch (err) {
+    if (DEBUG) console.error('realtime.connect error', err)
+  }
+}
+
 export const VOICE_BUCKET = 'message-media'
 export const UPLOADS_BUCKET = 'chat-uploads'
 

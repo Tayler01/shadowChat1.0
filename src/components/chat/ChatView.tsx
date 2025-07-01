@@ -12,6 +12,7 @@ import {
   supabase,
   ensureSession,
   refreshSessionLocked,
+  resetRealtimeConnection,
   getStoredRefreshToken,
   localStorageKey,
   SUPABASE_URL,
@@ -183,7 +184,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     }
 
     // Force a session refresh to ensure tokens are valid
-    await ensureSession(true)
+    const valid = await ensureSession(true)
+    if (valid) await resetRealtimeConnection()
   }
 
   const handleFocusRefresh = async () => {
@@ -256,7 +258,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     }
 
     // Force a session refresh to ensure tokens are valid
-    await ensureSession(true)
+    const valid = await ensureSession(true)
+    if (valid) await resetRealtimeConnection()
   }
 
   useVisibilityRefresh(handleFocusRefresh)

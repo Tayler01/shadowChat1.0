@@ -157,6 +157,20 @@ GitHub Actions pipeline:
 Run lint, type-check, and test on pull request
 Deploy to Netlify or Vercel on merge to main
 Optional: Slack/Discord webhook alerts
+
+--- ## Troubleshooting Realtime Connections
+
+If realtime channels stop updating after a manual session refresh, call the `resetRealtimeConnection` helper to re-authenticate the websocket:
+
+```ts
+import { resetRealtimeConnection } from './src/lib/supabase'
+
+await resetRealtimeConnection()
+```
+
+This disconnects the realtime client, reconnects it and sets the auth token
+from the current session.
+
 --- ## Future Features
 Push notifications (web + mobile)
 Offline drafts and local caching (message history cached on load)
