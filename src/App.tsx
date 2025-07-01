@@ -11,6 +11,7 @@ import { MessagesProvider } from './hooks/useMessages'
 import { updateUserPresence } from './lib/supabase'
 import { PRESENCE_INTERVAL_MS } from './config'
 import { MobileNav } from './components/layout/MobileNav'
+import { useIsDesktop } from './hooks/useIsDesktop'
 
 type View = 'chat' | 'dms' | 'profile' | 'settings'
 
@@ -18,6 +19,7 @@ function App() {
   const { user } = useAuth()
   const [currentView, setCurrentView] = useState<View>('chat')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const isDesktop = useIsDesktop()
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('darkMode') === 'true' ||
@@ -98,16 +100,18 @@ function App() {
     <AuthGuard>
       <MessagesProvider>
         <div className="h-screen overflow-hidden flex flex-col md:flex-row bg-gray-100 dark:bg-gray-900">
-          <Sidebar
-            currentView={currentView}
-            onViewChange={setCurrentView}
-            isDarkMode={isDarkMode}
-            onToggleDarkMode={toggleDarkMode}
-            isOpen={sidebarOpen}
-            onClose={closeSidebar}
-          />
+          {isDesktop && (
+            <Sidebar
+              currentView={currentView}
+              onViewChange={setCurrentView}
+              isDarkMode={isDarkMode}
+              onToggleDarkMode={toggleDarkMode}
+              isOpen={sidebarOpen}
+              onClose={closeSidebar}
+            />
+          )}
 
-          {sidebarOpen && (
+          {isDesktop && sidebarOpen && (
             <div
               className="fixed inset-0 bg-black/40 md:hidden"
               onClick={closeSidebar}

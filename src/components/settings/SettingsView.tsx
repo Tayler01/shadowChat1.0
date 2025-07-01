@@ -18,6 +18,7 @@ import { Button } from '../ui/Button'
 import { signOut } from '../../lib/auth'
 import toast from 'react-hot-toast'
 import { useTheme, colorSchemes, ColorScheme } from '../../hooks/useTheme'
+import { useIsDesktop } from '../../hooks/useIsDesktop'
 
 interface SettingsViewProps {
   onToggleSidebar: () => void
@@ -28,6 +29,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
   const [sounds, setSounds] = useState(true)
   const [showDangerZone, setShowDangerZone] = useState(false)
   const { scheme, setScheme } = useTheme()
+  const isDesktop = useIsDesktop()
 
   const handleExportData = () => {
     toast.success('Data export started - you will receive an email when ready')
@@ -80,13 +82,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
       className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 pb-16"
     >
       <div className="max-w-2xl mx-auto p-6">
-        <button
-          onClick={onToggleSidebar}
-          className="md:hidden p-2 -ml-2 mb-2"
-          aria-label="Toggle sidebar"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
+        {isDesktop && (
+          <button
+            onClick={onToggleSidebar}
+            className="p-2 -ml-2 mb-2"
+            aria-label="Toggle sidebar"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">

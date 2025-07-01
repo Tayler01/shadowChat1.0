@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Camera, Edit3, Save, X, Upload, Menu } from 'lucide-react'
+import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useAuth } from '../../hooks/useAuth'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
@@ -34,6 +35,7 @@ interface ProfileFormData {
 
 export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => {
   const { profile, updateProfile, uploadAvatar, uploadBanner } = useAuth()
+  const isDesktop = useIsDesktop()
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
@@ -117,13 +119,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
       className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900 pb-16"
     >
       <div className="max-w-2xl mx-auto p-6">
-        <button
-          onClick={onToggleSidebar}
-          className="md:hidden p-2 -ml-2 mb-2"
-          aria-label="Toggle sidebar"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
+        {isDesktop && (
+          <button
+            onClick={onToggleSidebar}
+            className="p-2 -ml-2 mb-2"
+            aria-label="Toggle sidebar"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
         {/* Header */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
           {/* Banner */}
