@@ -95,7 +95,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       className="flex flex-col h-full bg-gray-50 dark:bg-gray-900"
     >
       {/* Header */}
-      <div className="flex-shrink-0 px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex-shrink-0 px-6 py-5 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
             {/* Menu button removed on mobile */}
