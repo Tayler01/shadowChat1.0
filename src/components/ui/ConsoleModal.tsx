@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
 import { Button } from './Button'
 
@@ -11,6 +11,12 @@ interface ConsoleModalProps {
 
 export const ConsoleModal: React.FC<ConsoleModalProps> = ({ open, logs, onClose, onRefresh }) => {
   if (!open) return null
+
+  const logRef = useRef<HTMLPreElement>(null)
+
+  useEffect(() => {
+    logRef.current?.scrollTo(0, logRef.current.scrollHeight)
+  }, [logs])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -31,7 +37,10 @@ export const ConsoleModal: React.FC<ConsoleModalProps> = ({ open, logs, onClose,
             </button>
           </div>
         </div>
-        <pre className="flex-1 overflow-y-auto p-4 text-sm whitespace-pre-wrap text-gray-800 dark:text-gray-200">
+        <pre
+          ref={logRef}
+          className="flex-1 overflow-y-auto p-4 text-sm whitespace-pre-wrap text-gray-800 dark:text-gray-200"
+        >
 {logs.join('\n')}
         </pre>
       </div>
