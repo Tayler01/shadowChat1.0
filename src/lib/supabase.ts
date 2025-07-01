@@ -65,6 +65,29 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 })
 
+// Key used by Supabase to persist the auth session in localStorage
+const projectRefMatch = supabaseUrl.match(/https?:\/\/(.*?)\./)
+const projectRef = projectRefMatch ? projectRefMatch[1] : ''
+export const localStorageKey = `sb-${projectRef}-auth-token`
+
+export const getStoredRefreshToken = (): string | null => {
+  if (typeof localStorage === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(localStorageKey)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return (
+      parsed?.currentSession?.refresh_token ||
+      parsed?.refresh_token ||
+      parsed?.refreshToken ||
+      null
+    )
+  } catch (err) {
+    console.error('[Supabase] Failed to read stored refresh token', err)
+    return null
+  }
+}
+
 // --- Refresh session locking -------------------------------------------------
 // Prevent multiple concurrent refreshSession calls from triggering duplicate
 // network requests. Any callers will await the same promise while a refresh is
@@ -77,7 +100,24 @@ export const refreshSessionLocked = async () => {
       return Promise.reject(new Error('Offline: cannot refresh session'))
     }
 
-    const refresh = supabase.auth.refreshSession()
+    const { data: { session }, error } = await supabase.auth.getSession()
+    const storedToken = getStoredRefreshToken()
+    if (DEBUG) {
+      console.log('[refreshSessionLocked] starting refresh', {
+        memoryRefreshToken: session?.refresh_token,
+        storedRefreshToken: storedToken,
+        expiresAt: session?.expires_at,
+      })
+    }
+
+    const refresh = supabase.auth
+      .refreshSession()
+      .then((res) => {
+        if (DEBUG) {
+          console.log('[refreshSessionLocked] refresh result', res)
+        }
+        return res
+      })
     const timeout = new Promise<never>((_, reject) =>
       setTimeout(
         () => reject(new Error('Session refresh timeout after 10 seconds')),
