@@ -41,3 +41,24 @@ test('renders image message', () => {
   const img = screen.getByAltText(/uploaded image/i)
   expect(img).toHaveAttribute('src', baseMessage.file_url)
 })
+
+test('renders audio message', () => {
+  const audioMessage = {
+    ...baseMessage,
+    message_type: 'audio',
+    audio_url: 'https://example.com/test.webm',
+  } as Message
+
+  const { container } = render(
+    <MessageItem
+      message={audioMessage}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+    />
+  )
+
+  const audio = container.querySelector('audio')
+  expect(audio).toHaveAttribute('src', audioMessage.audio_url)
+})

@@ -133,8 +133,9 @@ describe('sendMessage', () => {
 
     expect(insertFn).toHaveBeenCalledWith({
       user_id: user.id,
-      content: 'https://example.com/audio.webm',
+      content: '',
       message_type: 'audio',
+      audio_url: 'https://example.com/audio.webm',
     });
   });
 

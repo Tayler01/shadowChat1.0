@@ -55,7 +55,7 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
         <div className="text-sm text-yellow-800 dark:text-yellow-200 break-words">
           <strong>{message.user?.display_name}:</strong>{' '}
           {message.message_type === 'audio' ? (
-            <audio controls src={message.content} className="mt-1 max-w-full" />
+            <audio controls src={message.audio_url} className="mt-1 max-w-full" />
           ) : (
             message.content
           )}

@@ -20,9 +20,10 @@ export const prepareMessageData = (
   fileUrl?: string
 ) => ({
   user_id: userId,
-  content: content.trim(),
+  content: messageType === 'audio' ? '' : content.trim(),
   message_type: messageType,
   file_url: fileUrl,
+  ...(messageType === 'audio' ? { audio_url: content.trim() } : {}),
 });
 
 export const insertMessage = async (messageData: {
@@ -30,6 +31,7 @@ export const insertMessage = async (messageData: {
   content: string;
   message_type: 'text' | 'command' | 'audio' | 'image';
   file_url?: string;
+  audio_url?: string;
 }) => {
   const start = performance.now();
   const insertPromise = supabase
@@ -63,6 +65,7 @@ export const refreshSessionAndRetry = async (messageData: {
   content: string;
   message_type: 'text' | 'command' | 'audio' | 'image';
   file_url?: string;
+  audio_url?: string;
 }) => {
   const refreshPromise = supabase.auth.refreshSession();
   const refreshTimeout = new Promise((_, reject) =>

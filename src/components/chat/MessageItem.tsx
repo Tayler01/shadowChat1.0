@@ -198,7 +198,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     className="text-[0.65rem]"
                   />
                   {message.message_type === 'audio' ? (
-                    <audio controls src={message.content} className="mt-1 max-w-full" />
+                    <audio controls src={message.audio_url} className="mt-1 max-w-full" />
                   ) : message.message_type === 'image' && message.file_url ? (
                     <img
                       src={message.file_url}
