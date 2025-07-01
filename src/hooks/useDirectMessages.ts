@@ -7,6 +7,7 @@ import {
   getOrCreateDMConversation,
   markDMMessagesRead,
   fetchDMConversations,
+  refreshAuthSession,
 } from '../lib/supabase';
 import { MESSAGE_FETCH_LIMIT } from '../config';
 import { useAuth } from './useAuth';
@@ -334,7 +335,7 @@ export function useConversationMessages(conversationId: string | null) {
       let finalError = error;
       if (finalError) {
         if (finalError.status === 401 || /jwt|token|expired/i.test(finalError.message)) {
-          const { error: refreshError } = await supabase.auth.refreshSession();
+          const { error: refreshError } = await refreshAuthSession();
           if (!refreshError) {
             const retry = await supabase
               .from('dm_messages')

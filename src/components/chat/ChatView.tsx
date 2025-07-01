@@ -8,7 +8,7 @@ import { MobileChatFooter } from '../layout/MobileChatFooter'
 import toast from 'react-hot-toast'
 import { Button } from '../ui/Button'
 import { ConsoleModal } from '../ui/ConsoleModal'
-import { supabase, ensureSession } from '../../lib/supabase'
+import { supabase, ensureSession, refreshAuthSession } from '../../lib/supabase'
 
 interface ChatViewProps {
   onToggleSidebar: () => void
@@ -64,7 +64,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   const handleRefreshSession = async () => {
     appendLog('Refreshing session...')
 
-    const { data, error } = await supabase.auth.refreshSession()
+    const { data, error } = await refreshAuthSession()
 
     if (error) {
       console.error('Forced session restore failed:', error.message)

@@ -18,6 +18,7 @@ jest.mock('../src/lib/supabase', () => {
     fetchDMConversations: jest.fn().mockResolvedValue([]),
     getOrCreateDMConversation: jest.fn(),
     markDMMessagesRead: jest.fn(),
+    refreshAuthSession: jest.fn(),
   };
 });
 

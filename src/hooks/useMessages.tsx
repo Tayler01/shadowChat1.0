@@ -6,7 +6,7 @@ import React, {
   useCallback,
   useRef
 } from 'react';
-import { supabase, Message, ensureSession, DEBUG } from '../lib/supabase';
+import { supabase, Message, ensureSession, DEBUG, refreshAuthSession } from '../lib/supabase';
 import { MESSAGE_FETCH_LIMIT } from '../config';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
@@ -69,7 +69,7 @@ export const refreshSessionAndRetry = async (messageData: {
   file_url?: string;
   audio_url?: string;
 }) => {
-  const refreshPromise = supabase.auth.refreshSession();
+  const refreshPromise = refreshAuthSession();
   const refreshTimeout = new Promise((_, reject) =>
     setTimeout(
       () => reject(new Error('Session refresh timeout after 5 seconds')),

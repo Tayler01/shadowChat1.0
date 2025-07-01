@@ -20,6 +20,7 @@ jest.mock('../src/lib/supabase', () => {
       rpc: jest.fn(),
       auth: { getSession: jest.fn(), refreshSession: jest.fn() },
     },
+    refreshAuthSession: jest.fn(),
     ensureSession: jest.fn(),
   };
 });

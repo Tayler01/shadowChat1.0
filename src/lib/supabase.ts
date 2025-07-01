@@ -68,6 +68,15 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 export const VOICE_BUCKET = 'message-media'
 export const UPLOADS_BUCKET = 'chat-uploads'
 
+// Force refresh auth session and update realtime connection token
+export const refreshAuthSession = async () => {
+  const result = await supabase.auth.refreshSession()
+  if (result.data?.session?.access_token) {
+    supabase.realtime.setAuth(result.data.session.access_token)
+  }
+  return result
+}
+
 export const uploadVoiceMessage = async (blob: Blob) => {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
@@ -298,7 +307,7 @@ export const ensureSession = async () => {
     const fiveMinutes = 5 * 60
     
     if (expiresAt && (expiresAt - now) < fiveMinutes) {
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+      const { data: refreshData, error: refreshError } = await refreshAuthSession()
 
       if (refreshError) {
         console.error('Error refreshing session:', refreshError)
