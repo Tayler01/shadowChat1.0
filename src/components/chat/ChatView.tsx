@@ -93,7 +93,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
               <Pin className="w-4 h-4" />
               <span>Pinned</span>
             </div>
-            <Button size="sm" variant="secondary" onClick={handleCheckAuth}">
+            <Button size="sm" variant="secondary" onClick={handleCheckAuth}>
               Test Auth
             </Button>
           </div>
