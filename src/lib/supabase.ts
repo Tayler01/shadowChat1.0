@@ -332,6 +332,12 @@ export interface UserStats {
 }
 
 export const fetchUserStats = async (userId: string): Promise<UserStats> => {
+  const sessionValid = await ensureSession()
+
+  if (!sessionValid) {
+    return { messages: 0, reactions: 0, friends: 0 }
+  }
+
   const [messagesRes, reactionsRes, friendsRes] = await Promise.all([
     supabase
       .from('messages')
