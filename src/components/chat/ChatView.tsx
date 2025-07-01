@@ -66,7 +66,16 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     appendLog('Starting forced session refresh...')
     appendLog('Calling supabase.auth.refreshSession()')
 
-    const { data, error } = await refreshSessionLocked()
+    let result
+    try {
+      result = await refreshSessionLocked()
+    } catch (err) {
+      console.error('Forced session restore threw:', err)
+      appendLog(`Refresh threw: ${(err as Error).message}`)
+      return
+    }
+
+    const { data, error } = result
     const { session, user } = data
 
     if (error) {
@@ -87,7 +96,25 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     appendLog('Page became visible - refreshing session')
     appendLog('Calling supabase.auth.refreshSession()')
 
-    const { data, error } = await refreshSessionLocked()
+    let result
+    try {
+      result = await refreshSessionLocked()
+    } catch (err) {
+      console.error('Visibility session refresh threw:', err)
+      appendLog(`Refresh threw: ${(err as Error).message}`)
+      const { data: checkData, error: checkError } =
+        await supabase.auth.getSession()
+      if (checkError) {
+        appendLog(`Session check failed: ${checkError.message}`)
+      } else {
+        appendLog(
+          checkData.session ? 'Session valid ✅' : 'Session invalid ❌'
+        )
+      }
+      return
+    }
+
+    const { data, error } = result
     const { session, user } = data
 
     if (error) {
