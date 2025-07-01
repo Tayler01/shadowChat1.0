@@ -64,27 +64,15 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   const handleRefreshSession = async () => {
     appendLog('Refreshing session...')
 
-    const {
-      data: { session },
-      error: getSessionError,
-    } = await supabase.auth.getSession()
+    const { data, error } = await supabase.auth.refreshSession()
 
-    if (!session?.refresh_token) {
-      appendLog('No refresh token found ❌')
-      return
-    }
-
-    const { data, error } = await supabase.auth.setSession({
-      access_token: '', // force fallback
-      refresh_token: session.refresh_token,
-    })
     if (error) {
       console.error('Forced session restore failed:', error.message)
       appendLog(`Refresh failed: ${error.message}`)
-    } else {
-      console.log('Session re-established:', data.session)
-      appendLog(`Session refreshed: ${JSON.stringify(data.session)}`)
+      return
     }
+
+    appendLog(`New session expires at: ${data.session?.expires_at}`)
   }
 
   const handleSendMessage = async (
