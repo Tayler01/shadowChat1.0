@@ -23,13 +23,20 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   const [consoleOpen, setConsoleOpen] = useState(false)
   const [logs, setLogs] = useState<string[]>([])
 
-  const appendLog = (msg: string) => setLogs((l) => [...l, msg])
+  const appendLog = (msg: string) =>
+    setLogs((l) => [...l, `${new Date().toLocaleTimeString()} ${msg}`])
 
   const handleCheckAuth = async () => {
     setConsoleOpen(true)
     setLogs([])
 
     appendLog('Checking session...')
+    const { data: before } = await supabase.auth.getSession()
+    appendLog(
+      before.session
+        ? `Current session expires at: ${before.session.expires_at}`
+        : 'No active session'
+    )
 
     try {
       const valid = await Promise.race([
@@ -60,10 +67,17 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
 
     const { data } = await supabase.auth.getSession()
     appendLog(`Token expires at: ${data.session?.expires_at}`)
+    appendLog(data.session ? 'Session still valid ✅' : 'Session missing ❌')
   }
 
   const handleRefreshSession = async () => {
     appendLog('Starting forced session refresh...')
+    const { data: before } = await supabase.auth.getSession()
+    appendLog(
+      before.session
+        ? `Current session expires at: ${before.session.expires_at}`
+        : 'No active session before refresh'
+    )
     appendLog('Calling supabase.auth.refreshSession()')
 
     let result
@@ -88,12 +102,28 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     appendLog(`New session expires at: ${session?.expires_at}`)
     appendLog(`User id: ${user?.id}`)
     appendLog(`Full response: ${JSON.stringify(data, null, 2)}`)
+
+    const { data: after, error: checkError } = await supabase.auth.getSession()
+    if (after.session) {
+      appendLog(`Post-refresh expires at: ${after.session.expires_at}`)
+    }
+    if (checkError) {
+      appendLog(`Session check failed: ${checkError.message}`)
+    } else {
+      appendLog(after.session ? 'Session valid ✅' : 'Session invalid ❌')
+    }
   }
 
   const handleFocusRefresh = async () => {
     setConsoleOpen(true)
     setLogs([])
     appendLog('Page became visible - refreshing session')
+    const { data: before } = await supabase.auth.getSession()
+    appendLog(
+      before.session
+        ? `Current session expires at: ${before.session.expires_at}`
+        : 'No active session before refresh'
+    )
     appendLog('Calling supabase.auth.refreshSession()')
 
     let result
@@ -126,11 +156,14 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       appendLog(`Full response: ${JSON.stringify(data, null, 2)}`)
     }
 
-    const { data: checkData, error: checkError } = await supabase.auth.getSession()
+    const { data: after, error: checkError } = await supabase.auth.getSession()
+    if (after.session) {
+      appendLog(`Post-refresh expires at: ${after.session.expires_at}`)
+    }
     if (checkError) {
       appendLog(`Session check failed: ${checkError.message}`)
     } else {
-      appendLog(checkData.session ? 'Session valid ✅' : 'Session invalid ❌')
+      appendLog(after.session ? 'Session valid ✅' : 'Session invalid ❌')
     }
   }
 
