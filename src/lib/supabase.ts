@@ -184,7 +184,56 @@ export const fetchDMConversations = async () => {
     console.error('Error fetching DM conversations:', error)
     return [] as DMConversation[]
   }
-  return (data ?? []) as DMConversation[]
+
+  const rows = (data ?? []) as any[]
+
+  const missingIds = rows
+    .filter(r => !r.other_user && r.other_user_id)
+    .map(r => r.other_user_id as string)
+
+  let usersMap: Record<string, User> = {}
+  if (missingIds.length) {
+    const { data: usersData, error: userErr } = await supabase
+      .from('users')
+      .select('id, username, display_name, avatar_url, color, status')
+      .in('id', missingIds)
+    if (userErr) {
+      console.error('Error fetching conversation users:', userErr)
+    } else {
+      usersMap = Object.fromEntries(
+        (usersData ?? []).map(u => [u.id, u as User])
+      )
+    }
+  }
+
+  return rows.map((row) => {
+    const lastMsg = row.last_message ||
+      (row.last_message_id && {
+        id: row.last_message_id,
+        conversation_id: row.id,
+        sender_id: row.last_message_sender_id,
+        content: row.last_message_content,
+        created_at: row.last_message_created_at,
+      })
+
+    const otherUser = row.other_user ||
+      usersMap[row.other_user_id] ||
+      (row.other_user_id && {
+        id: row.other_user_id,
+        username: row.other_user_username,
+        display_name: row.other_user_display_name,
+      })
+
+    return {
+      id: row.id,
+      participants: row.participants,
+      last_message_at: row.last_message_at,
+      created_at: row.created_at,
+      other_user: otherUser,
+      unread_count: row.unread_count,
+      last_message: lastMsg,
+    } as DMConversation
+  })
 }
 
 export const getOrCreateDMConversation = async (otherUserId: string) => {
