@@ -25,7 +25,7 @@ test('searches users by term', async () => {
     await Promise.resolve()
   })
 
-  expect(searchMock).toHaveBeenCalledWith('bob')
+  expect(searchMock).toHaveBeenCalledWith('bob', { signal: expect.anything() })
   expect(result.current.results).toEqual([
     { id: 'u1', username: 'bob', display_name: 'Bob', avatar_url: null, color: '#fff', status: 'online' },
   ])
