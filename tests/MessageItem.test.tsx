@@ -62,3 +62,18 @@ test('renders audio message', () => {
   const audio = container.querySelector('audio')
   expect(audio).toHaveAttribute('src', audioMessage.audio_url)
 })
+
+test('icon buttons have aria-labels', () => {
+  render(
+    <MessageItem
+      message={baseMessage}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+    />
+  )
+
+  const addReaction = screen.getByRole('button', { name: /add reaction/i })
+  expect(addReaction).toBeInTheDocument()
+})
