@@ -231,7 +231,7 @@ export function useConversationMessages(conversationId: string | null) {
         // Clean up old channel
         if (channelRef.current) {
           if (DEBUG) console.log('🗑️ [DM_CONV] Removing old realtime channel...')
-          supabase.removeChannel(channelRef.current)
+          // Channel cleanup will be handled by the useEffect cleanup
           channelRef.current = null
           if (DEBUG) console.log('✅ [DM_CONV] Old channel removed')
         }
@@ -293,11 +293,9 @@ export function useConversationMessages(conversationId: string | null) {
     if (!conversationId) return;
 
     let channel: RealtimeChannel | null = null;
-    let currentClient: any = null;
 
-    const subscribeToChannel = async (): Promise<RealtimeChannel> => {
-      currentClient = await getWorkingClient();
-      const newChannel = currentClient
+    const subscribeToChannel = (): RealtimeChannel => {
+      const newChannel = supabase
         .channel(`dm_messages:${conversationId}`)
         .on(
           'postgres_changes',
@@ -365,15 +363,11 @@ export function useConversationMessages(conversationId: string | null) {
       return newChannel;
     };
 
-    subscribeToChannel().then(newChannel => {
-      channel = newChannel;
-      channelRef.current = newChannel;
-    });
+    channel = subscribeToChannel();
     subscribeRef.current = subscribeToChannel;
+    channelRef.current = channel;
     return () => {
-      if (channel && currentClient) {
-        currentClient.removeChannel(channel);
-      }
+      if (channel) supabase.removeChannel(channel);
     };
   }, [conversationId, user]);
 
