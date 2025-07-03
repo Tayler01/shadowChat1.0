@@ -160,15 +160,15 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       )
       const { error } = await Promise.race([finalTest, finalTimeout]) as any
       
-    if (error) {
-      appendLog(`Database query failed: ${error.message}`)
-    } else {
-      appendLog('Database query succeeded ✅')
-    }
+      if (error) {
+        appendLog(`Database query failed: ${error.message}`)
+      } else {
+        appendLog('Database query succeeded ✅')
+      }
 
-    const { data } = await supabase.auth.getSession()
-    appendLog(`Token expires at: ${data.session?.expires_at}`)
-    appendLog(data.session ? 'Session still valid ✅' : 'Session missing ❌')
+      const { data } = await supabase.auth.getSession()
+      appendLog(`Token expires at: ${data.session?.expires_at}`)
+      appendLog(data.session ? 'Session still valid ✅' : 'Session missing ❌')
     } catch (err) {
       appendLog(`Database test threw: ${(err as Error).message}`)
     }
@@ -277,9 +277,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
           checkData.session ? 'Session valid ✅' : 'Session invalid ❌'
         )
       }
-    } catch (err) {
-      appendLog(`Final database test threw: ${(err as Error).message}`)
-    }
       return
     }
 
@@ -394,7 +391,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
         />
       </MobileChatFooter>
       <ConsoleModal
-       key={consoleOpen ? 'console-open' : 'console-closed'}
+        key={consoleOpen ? 'console-open' : 'console-closed'}
         open={consoleOpen}
         logs={logs}
         onClose={() => setConsoleOpen(false)}
