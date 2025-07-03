@@ -47,6 +47,34 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     setLogs([])
     appendSupabaseInfo()
 
+    // First, test if the Supabase client is responsive
+    appendLog('Testing Supabase client responsiveness...')
+    try {
+      const testPromise = supabase.auth.getSession()
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Client responsiveness test timeout')), 2000)
+      )
+      
+      const { data: { session }, error } = await Promise.race([testPromise, timeoutPromise]) as any
+      
+      if (error) {
+        appendLog(`Client responsiveness test failed: ${error.message}`)
+        appendLog('Attempting to reset Supabase client...')
+        const resetSuccess = await resetSupabaseClient()
+        appendLog(`Client reset ${resetSuccess ? 'succeeded' : 'failed'}`)
+      } else {
+        appendLog('Client responsiveness test passed ✅')
+      }
+    } catch (error) {
+      if ((error as Error).message.includes('timeout')) {
+        appendLog('Client appears stuck/unresponsive - resetting...')
+        const resetSuccess = await resetSupabaseClient()
+        appendLog(`Client reset ${resetSuccess ? 'succeeded' : 'failed'}`)
+      } else {
+        appendLog(`Client test error: ${(error as Error).message}`)
+      }
+    }
+
     // Test Supabase URL accessibility
     appendLog('Testing Supabase URL accessibility...')
     try {
@@ -407,45 +435,60 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   }
 
   const handleFocusRefresh = async () => {
-    // First, test if the Supabase client is working
+    setConsoleOpen(true)
+    setLogs([])
+    appendSupabaseInfo()
+    appendLog('Page became visible - checking client health...')
+    
     try {
-      // Quick test to see if the client is responsive
+      // Quick test to see if the client is responsive (2 second timeout)
       const testPromise = supabase.auth.getSession()
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Client test timeout')), 2000)
       )
       
+      appendLog('Testing client responsiveness...')
       const { data: { session }, error } = await Promise.race([testPromise, timeoutPromise]) as any
       
       if (error) {
-        console.warn('Session check failed on visibility change, resetting client:', error)
-        await resetSupabaseClient()
+        appendLog(`Session check failed: ${error.message}`)
+        appendLog('Resetting Supabase client...')
+        const resetSuccess = await resetSupabaseClient()
+        appendLog(`Client reset ${resetSuccess ? 'succeeded ✅' : 'failed ❌'}`)
       } else if (!session) {
-        console.warn('No session found on visibility change')
+        appendLog('No session found - client responsive but not authenticated')
       } else {
+        appendLog('Client responsive ✅')
         // Client is responsive, check if session needs refresh
         const now = Math.floor(Date.now() / 1000)
         const expiresAt = session.expires_at
         const fiveMinutes = 5 * 60
         
         if (expiresAt && (expiresAt - now) < fiveMinutes) {
-          console.log('Session close to expiring, refreshing...')
+          appendLog('Session close to expiring, refreshing...')
           clearRefreshSessionPromise()
           const valid = await ensureSession(true)
           if (valid) {
+            appendLog('Session refreshed and realtime reconnected ✅')
             await resetRealtimeConnection()
+          } else {
+            appendLog('Session refresh failed ❌')
           }
         } else {
+          appendLog('Session still valid, resetting realtime connection...')
           // Session is still valid, just reset realtime connection
           await resetRealtimeConnection()
+          appendLog('Realtime connection reset ✅')
         }
       }
     } catch (error) {
       if ((error as Error).message.includes('timeout')) {
-        console.warn('Supabase client appears stuck, resetting...')
-        await resetSupabaseClient()
+        appendLog('Supabase client appears stuck/unresponsive!')
+        appendLog('Attempting aggressive client reset...')
+        const resetSuccess = await resetSupabaseClient()
+        appendLog(`Aggressive reset ${resetSuccess ? 'succeeded ✅' : 'failed ❌'}`)
       } else {
-        console.error('Error in handleFocusRefresh:', error)
+        appendLog(`Unexpected error: ${(error as Error).message}`)
       }
     }
   }
