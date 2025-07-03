@@ -128,6 +128,44 @@ const timeout = (ms: number) => new Promise((_, reject) =>
   setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms)
 )
 
+// Promote fallback client to main client
+export const promoteFallbackToMain = async (): Promise<void> => {
+  if (DEBUG) console.log('🔄 [SUPABASE] promoteFallbackToMain: Starting...')
+  
+  if (!fallbackClient) {
+    if (DEBUG) console.log('⚠️ [SUPABASE] promoteFallbackToMain: No fallback client to promote')
+    return
+  }
+  
+  try {
+    // Test that fallback client is actually working
+    if (DEBUG) console.log('🧪 [SUPABASE] Testing fallback client before promotion...')
+    const isResponsive = await testClientResponsiveness(fallbackClient, 2000)
+    
+    if (!isResponsive) {
+      if (DEBUG) console.log('❌ [SUPABASE] Fallback client is not responsive, cannot promote')
+      return
+    }
+    
+    if (DEBUG) console.log('✅ [SUPABASE] Fallback client is responsive, promoting to main...')
+    
+    // Destroy old main client
+    if (DEBUG) console.log('🗑️ [SUPABASE] Destroying old main client...')
+    await destroyClient(currentSupabaseClient)
+    
+    // Promote fallback to main
+    currentSupabaseClient = fallbackClient
+    fallbackClient = null
+    
+    // Reset health check timer to force immediate use of new main client
+    lastHealthCheck = 0
+    
+    if (DEBUG) console.log('✅ [SUPABASE] promoteFallbackToMain: Complete - fallback is now main client')
+  } catch (error) {
+    if (DEBUG) console.error('❌ [SUPABASE] promoteFallbackToMain: Failed:', error)
+  }
+}
+
 // Test client responsiveness
 const testClientResponsiveness = async (client: ReturnType<typeof createClient>, timeoutMs = 2000): Promise<boolean> => {
   try {

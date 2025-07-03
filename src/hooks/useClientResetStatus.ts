@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { DEBUG, recreateSupabaseClient, forceSessionRestore, getWorkingClient } from '../lib/supabase'
+import { DEBUG, recreateSupabaseClient, forceSessionRestore, getWorkingClient, promoteFallbackToMain } from '../lib/supabase'
 
 export type ClientResetStatus = 'idle' | 'resetting' | 'success' | 'error'
 
@@ -47,6 +47,11 @@ export function useClientResetStatus() {
           
           await Promise.race([testPromise, timeoutPromise])
           if (DEBUG) console.log('✅ [CLIENT_RESET] Step 4 complete: Database connectivity verified')
+          
+          // Step 5: Promote the working fallback client to be the main client
+          if (DEBUG) console.log('🔄 [CLIENT_RESET] Step 5: Promoting fallback client to main...')
+          await promoteFallbackToMain()
+          if (DEBUG) console.log('✅ [CLIENT_RESET] Step 5 complete: Client promotion successful')
           
           if (DEBUG) console.log('🎉 [CLIENT_RESET] BOOM! Comprehensive reset complete!')
           return true
