@@ -6,7 +6,7 @@ import React, {
   useCallback,
   useRef
 } from 'react';
-import { supabase, Message, ensureSession, DEBUG, refreshSessionLocked, getWorkingClient } from '../lib/supabase';
+import { supabase, Message, ensureSession, DEBUG, refreshSessionLocked } from '../lib/supabase';
 import { MESSAGE_FETCH_LIMIT } from '../config';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
@@ -140,10 +140,8 @@ function useProvideMessages(): MessagesContextValue {
 
   const fetchMessages = useCallback(async () => {
     try {
-      // Use working client for fetching messages
-      const client = await getWorkingClient()
       const [pinnedRes, messagesRes] = await Promise.all([
-        client
+        supabase
           .from('messages')
           .select(
             `
@@ -153,7 +151,7 @@ function useProvideMessages(): MessagesContextValue {
           )
           .eq('pinned', true)
           .order('pinned_at', { ascending: true }),
-        client
+        supabase
           .from('messages')
           .select(
             `
@@ -208,7 +206,17 @@ function useProvideMessages(): MessagesContextValue {
   }, []);
 
   const handleVisible = useCallback(() => {
-    // On visibility change, just fetch messages - client recovery is handled by useVisibilityRefresh
+    const channel = channelRef.current;
+    if (channel && channel.state !== 'joined') {
+      if (DEBUG) {
+        console.log('🌀 Resubscribing channel due to state', channel.state)
+      }
+      supabase.removeChannel(channel)
+      const newChannel = subscribeRef.current?.()
+      if (newChannel) {
+        channelRef.current = newChannel
+      }
+    }
     fetchMessages()
   }, [fetchMessages])
 
@@ -478,8 +486,19 @@ function useProvideMessages(): MessagesContextValue {
       throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
     }
 
-    // Get working client for database operations
-    const client = await getWorkingClient()
+    // Log current session tokens and user details for debugging
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (DEBUG) {
+        console.log(`${logPrefix}: Session details`, {
+          access_token: session?.access_token,
+          refresh_token: session?.refresh_token,
+          userId: session?.user?.id,
+        });
+      }
+    } catch (tokenErr) {
+      console.error(`${logPrefix}: Failed to get session tokens`, tokenErr);
+    }
 
     try {
       // Step 1: Prepare message data
@@ -489,11 +508,11 @@ function useProvideMessages(): MessagesContextValue {
       }
 
       // Step 2: Attempt database insert (let Supabase handle auth internally)
-      let { data, error } = await insertMessageWithClient(client, messageData);
+      let { data, error } = await insertMessage(messageData);
 
       // Step 3: Handle auth errors with retry
       if (error && (error.status === 401 || /jwt|token|expired/i.test(error.message))) {
-        const retry = await refreshSessionAndRetryWithClient(client, messageData);
+        const retry = await refreshSessionAndRetry(messageData);
         if (DEBUG) {
           console.log(`${logPrefix}: Retry result`, retry);
         }
@@ -561,10 +580,9 @@ function useProvideMessages(): MessagesContextValue {
   const editMessage = useCallback(async (messageId: string, content: string) => {
     if (!user) return;
 
-    const client = await getWorkingClient()
 
     try {
-      const { error } = await client
+      const { error } = await supabase
         .from('messages')
         .update({
           content,
@@ -598,10 +616,9 @@ function useProvideMessages(): MessagesContextValue {
   const deleteMessage = useCallback(async (messageId: string) => {
     if (!user) return;
 
-    const client = await getWorkingClient()
 
     try {
-      const { error } = await client
+      const { error } = await supabase
         .from('messages')
         .delete()
         .eq('id', messageId)
@@ -662,9 +679,8 @@ function useProvideMessages(): MessagesContextValue {
       return newMessages;
     });
 
-    const client = await getWorkingClient()
     try {
-      const { error } = await client.rpc('toggle_message_reaction', {
+      const { error } = await supabase.rpc('toggle_message_reaction', {
         message_id: messageId,
         emoji: emoji,
         is_dm: false,
@@ -690,9 +706,8 @@ function useProvideMessages(): MessagesContextValue {
     const current = messages.find(m => m.id === messageId);
     const isPinned = current?.pinned;
 
-    const client = await getWorkingClient()
     try {
-      const { error } = await client.rpc('toggle_message_pin', {
+      const { error } = await supabase.rpc('toggle_message_pin', {
         message_id: messageId,
       });
 
@@ -739,78 +754,6 @@ function useProvideMessages(): MessagesContextValue {
     togglePin,
   };
 }
-
-// Helper function to insert message with specific client
-export const insertMessageWithClient = async (client: ReturnType<typeof getWorkingClient> extends Promise<infer T> ? T : never, messageData: {
-  user_id: string;
-  content: string;
-  message_type: 'text' | 'command' | 'audio' | 'image';
-  file_url?: string;
-  audio_url?: string;
-}) => {
-  const start = performance.now();
-  const insertPromise = client
-    .from('messages')
-    .insert(messageData)
-    .select(`
-      *,
-      user:users!user_id(*)
-    `)
-    .single();
-
-  const timeout = new Promise((_, reject) =>
-    setTimeout(
-      () => reject(new Error('Database insert timeout after 10 seconds')),
-      10000
-    )
-  );
-
-  const result = (await Promise.race([insertPromise, timeout])) as any;
-
-  if (DEBUG) {
-    const duration = performance.now() - start;
-    console.log('[insertMessageWithClient] result', { duration, ...result });
-  }
-
-  return result as { data: Message | null; error: any };
-};
-
-export const refreshSessionAndRetryWithClient = async (client: ReturnType<typeof getWorkingClient> extends Promise<infer T> ? T : never, messageData: {
-  user_id: string;
-  content: string;
-  message_type: 'text' | 'command' | 'audio' | 'image';
-  file_url?: string;
-  audio_url?: string;
-}) => {
-  const refreshPromise = refreshSessionLocked();
-  const refreshTimeout = new Promise((_, reject) =>
-    setTimeout(
-      () => reject(new Error('Session refresh timeout after 5 seconds')),
-      5000
-    )
-  );
-
-  const { data: refreshData, error: refreshError } = (await Promise.race([
-    refreshPromise,
-    refreshTimeout,
-  ])) as any;
-
-  if (DEBUG) {
-    console.log('[refreshSessionAndRetryWithClient] refresh result', {
-      refreshData,
-      refreshError,
-    });
-  }
-
-  if (!refreshError && refreshData.session) {
-    return insertMessageWithClient(client, messageData);
-  }
-
-  return { data: null, error: refreshError } as {
-    data: Message | null;
-    error: any;
-  };
-};
 
 export function MessagesProvider({ children }: { children: React.ReactNode }) {
   const value = useProvideMessages();

@@ -3,37 +3,15 @@ import { createClient } from '@supabase/supabase-js'
 // Global debug flag used to gate verbose logging
 export const DEBUG = import.meta.env.VITE_DEBUG_LOGS === 'true'
 
-// Client recreation system - simulates page reload when client gets stuck
-let currentSupabaseClient: ReturnType<typeof createClient> | null = null
-let clientCreationTime = Date.now()
-let isClientStuck = false
-let lastStuckTime = 0
+// Single client instance management
+let isClientHealthy = true
+let lastHealthCheck = 0
+const HEALTH_CHECK_INTERVAL = 10000 // 10 seconds
 
-// Create a fresh Supabase client with the same configuration as the original
-const createFreshSupabaseClient = () => {
-  if (DEBUG) console.log('🔄 Creating fresh Supabase client...')
-  
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    realtime: {
-      params: {
-        eventsPerSecond: 50,
-      },
-    },
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true,
-    },
-    global: {
-      fetch: loggingFetch,
-    },
-  })
-}
-
-// Test if a client is responsive
-export const testClientResponsiveness = async (client: ReturnType<typeof createClient>, timeoutMs = 3000): Promise<boolean> => {
+// Test if the main client is responsive
+export const testClientResponsiveness = async (timeoutMs = 3000): Promise<boolean> => {
   try {
-    const testPromise = client.auth.getSession()
+    const testPromise = supabase.auth.getSession()
     const timeoutPromise = new Promise((_, reject) => 
       setTimeout(() => reject(new Error('Client responsiveness timeout')), timeoutMs)
     )
@@ -48,113 +26,92 @@ export const testClientResponsiveness = async (client: ReturnType<typeof createC
   }
 }
 
-// Get the current working client, recreating if necessary
+// Reset the client's internal state without creating new instances
+export const resetClientState = async (): Promise<boolean> => {
+  try {
+    if (DEBUG) console.log('🔄 Resetting client state...')
+    
+    // Clear any stuck promises
+    clearRefreshSessionPromise()
+    
+    // Reset realtime connection
+    try {
+      supabase.realtime.disconnect()
+      await new Promise(resolve => setTimeout(resolve, 100)) // Brief pause
+      supabase.realtime.connect()
+    } catch (err) {
+      if (DEBUG) console.warn('Realtime reset warning:', err)
+    }
+    
+    // Force refresh session to ensure it's valid
+    try {
+      await refreshSessionLocked()
+    } catch (err) {
+      if (DEBUG) console.warn('Session refresh warning:', err)
+    }
+    
+    if (DEBUG) console.log('✅ Client state reset complete')
+    return true
+  } catch (error) {
+    if (DEBUG) console.error('❌ Client state reset failed:', error)
+    return false
+  }
+}
+
+// Get the working client (always returns the main client, but ensures it's healthy)
 export const getWorkingClient = async (): Promise<ReturnType<typeof createClient>> => {
   const now = Date.now()
   
-  // If we recently detected a stuck client, don't test again immediately
-  if (isClientStuck && (now - lastStuckTime) < 5000) {
-    if (DEBUG) console.log('⚠️ Client recently stuck, using current client')
-    return currentSupabaseClient || supabase
-  }
-  
-  // Test current client (either original or recreated)
-  const clientToTest = currentSupabaseClient || supabase
-  const isResponsive = await testClientResponsiveness(clientToTest, 2000)
-  
-  if (isResponsive) {
-    if (DEBUG && isClientStuck) console.log('✅ Client has recovered')
-    isClientStuck = false
-    return clientToTest
-  }
-  
-  // Client is stuck - recreate it completely
-  if (DEBUG) console.log('❌ Client unresponsive, recreating...')
-  isClientStuck = true
-  lastStuckTime = now
-  
-  // Destroy old client
-  if (currentSupabaseClient) {
-    try {
-      currentSupabaseClient.realtime.disconnect()
-    } catch (err) {
-      // Ignore disconnect errors
-    }
-  }
-  
-  // Create completely new client
-  currentSupabaseClient = createFreshSupabaseClient()
-  clientCreationTime = now
-  
-  // Copy session from localStorage to new client
-  try {
-    const storedSession = localStorage.getItem(localStorageKey)
-    if (storedSession) {
-      const sessionData = JSON.parse(storedSession)
-      if (sessionData?.currentSession || sessionData?.session) {
-        const session = sessionData.currentSession || sessionData.session
-        if (DEBUG) console.log('🔄 Restoring session to new client')
-        
-        // Set the session on the new client
-        await currentSupabaseClient.auth.setSession({
-          access_token: session.access_token,
-          refresh_token: session.refresh_token
-        })
+  // Only check health periodically to avoid excessive testing
+  if (now - lastHealthCheck > HEALTH_CHECK_INTERVAL) {
+    lastHealthCheck = now
+    
+    const isResponsive = await testClientResponsiveness(2000)
+    
+    if (!isResponsive && isClientHealthy) {
+      if (DEBUG) console.log('❌ Client became unresponsive, attempting reset...')
+      isClientHealthy = false
+      
+      // Try to reset the client state
+      const resetSuccess = await resetClientState()
+      if (resetSuccess) {
+        // Test again after reset
+        const isResponsiveAfterReset = await testClientResponsiveness(2000)
+        if (isResponsiveAfterReset) {
+          if (DEBUG) console.log('✅ Client recovered after reset')
+          isClientHealthy = true
+        } else {
+          if (DEBUG) console.log('❌ Client still unresponsive after reset')
+        }
       }
+    } else if (isResponsive && !isClientHealthy) {
+      if (DEBUG) console.log('✅ Client has recovered')
+      isClientHealthy = true
     }
-  } catch (error) {
-    if (DEBUG) console.warn('Failed to restore session to new client:', error)
   }
   
-  if (DEBUG) console.log('✅ Fresh client created and session restored')
-  return currentSupabaseClient
+  return supabase
 }
 
-// Force recreation of the client (simulates page reload)
+// Force a client reset (simulates what happens on page reload)
 export const recreateSupabaseClient = async (): Promise<ReturnType<typeof createClient>> => {
-  if (DEBUG) console.log('🔄 Force recreating Supabase client...')
+  if (DEBUG) console.log('🔄 Force resetting Supabase client state...')
   
-  // Clear any stuck promises
-  clearRefreshSessionPromise()
+  isClientHealthy = false
+  lastHealthCheck = 0
   
-  // Destroy current client
-  if (currentSupabaseClient) {
-    try {
-      currentSupabaseClient.realtime.disconnect()
-    } catch (err) {
-      // Ignore disconnect errors
+  const resetSuccess = await resetClientState()
+  if (resetSuccess) {
+    // Test the client after reset
+    const isResponsive = await testClientResponsiveness(3000)
+    isClientHealthy = isResponsive
+    
+    if (DEBUG) {
+      console.log(isResponsive ? '✅ Client reset successful' : '❌ Client still unresponsive after reset')
     }
   }
   
-  // Reset state
-  isClientStuck = false
-  lastStuckTime = 0
-  
-  // Create new client
-  currentSupabaseClient = createFreshSupabaseClient()
-  clientCreationTime = Date.now()
-  
-  // Restore session
-  try {
-    const storedSession = localStorage.getItem(localStorageKey)
-    if (storedSession) {
-      const sessionData = JSON.parse(storedSession)
-      if (sessionData?.currentSession || sessionData?.session) {
-        const session = sessionData.currentSession || sessionData.session
-        if (DEBUG) console.log('🔄 Restoring session to recreated client')
-        
-        await currentSupabaseClient.auth.setSession({
-          access_token: session.access_token,
-          refresh_token: session.refresh_token
-        })
-      }
-    }
-  } catch (error) {
-    if (DEBUG) console.warn('Failed to restore session to recreated client:', error)
-  }
-  
-  if (DEBUG) console.log('✅ Client recreated successfully')
-  return currentSupabaseClient
+  return supabase
 }
 
 // Custom fetch that logs all request and response details for debugging
@@ -253,41 +210,6 @@ let refreshSessionPromise: Promise<{ data: any; error: any }> | null = null
 
 export const clearRefreshSessionPromise = () => {
   refreshSessionPromise = null
-}
-
-// Function to completely reset the Supabase client
-export const resetSupabaseClient = async () => {
-  try {
-    if (DEBUG) console.log('Starting Supabase client reset...')
-    
-    // Clear backup client to prevent multiple instances
-    if (backupClient) {
-      try {
-        backupClient.realtime.disconnect()
-      } catch (err) {
-        // Ignore disconnect errors
-      }
-    }
-    backupClient = null
-    
-    // Clear refresh promise to prevent conflicts
-    clearRefreshSessionPromise()
-    
-    // Simple realtime reset
-    try {
-      await resetRealtimeConnection()
-      if (DEBUG) console.log('Realtime connection reset')
-    } catch (err) {
-      if (DEBUG) console.log('Realtime reset error:', (err as Error).message)
-    }
-    
-    if (DEBUG) console.log('Client reset process completed')
-    
-    return true
-  } catch (error) {
-    if (DEBUG) console.error('Error in resetSupabaseClient:', error)
-    return false
-  }
 }
 
 export const refreshSessionLocked = async () => {
@@ -585,7 +507,6 @@ export const searchUsers = async (
 // Helper function to ensure valid session before database operations
 export const ensureSession = async (force = false) => {
   try {
-    // Always use main client for session management to avoid conflicts
     const { data: { session }, error } = await supabase.auth.getSession()
 
     if (error) {

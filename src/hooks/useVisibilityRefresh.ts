@@ -1,17 +1,18 @@
 import { useEffect } from 'react'
-import { recreateSupabaseClient, DEBUG } from '../lib/supabase'
+import { recreateSupabaseClient, DEBUG, resetRealtimeConnection } from '../lib/supabase'
 
 export function useVisibilityRefresh(onVisible?: () => void) {
   useEffect(() => {
     const handler = async () => {
       if (!document.hidden) {
-        if (DEBUG) console.log('📱 Page became visible - recreating client to ensure freshness')
+        if (DEBUG) console.log('📱 Page became visible - resetting client state to ensure freshness')
         
-        // Recreate the client when page becomes visible (simulates page reload)
+        // Reset the client state when page becomes visible (simulates page reload)
         try {
           await recreateSupabaseClient()
+          await resetRealtimeConnection()
         } catch (error) {
-          console.warn('Client recreation failed on visibility change:', error)
+          console.warn('Client reset failed on visibility change:', error)
         }
         
         onVisible?.()

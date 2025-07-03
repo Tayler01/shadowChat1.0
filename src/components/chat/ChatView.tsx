@@ -17,9 +17,7 @@ import {
   localStorageKey,
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
-  clearRefreshSessionPromise,
   testClientResponsiveness,
-  getWorkingClient,
   recreateSupabaseClient,
 } from '../../lib/supabase'
 import { useVisibilityRefresh } from '../../hooks/useVisibilityRefresh'
@@ -55,7 +53,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     // Test client responsiveness with detailed diagnostics
     appendLog('🔍 Testing Supabase client responsiveness...')
     try {
-      const isResponsive = await testClientResponsiveness(supabase, 3000)
+      const isResponsive = await testClientResponsiveness(3000)
       if (isResponsive) {
         appendLog('✅ Main client is responsive')
         
@@ -78,48 +76,26 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       } else {
         appendLog('❌ Main client is unresponsive')
         
-        // Try backup client
-        appendLog('🔄 Testing backup client...')
+        // Try resetting the client
+        appendLog('🔄 Testing client reset...')
         try {
-          const workingClient = await getWorkingClient()
-          const isWorkingClientResponsive = await testClientResponsiveness(workingClient, 5000)
-          if (isWorkingClientResponsive) {
-            appendLog('✅ Working client is responsive!')
+          await recreateSupabaseClient()
+          const isResponsiveAfterReset = await testClientResponsiveness(5000)
+          if (isResponsiveAfterReset) {
+            appendLog('✅ Client responsive after reset!')
             
-            // Test a query with the working client
-            const { data, error } = await workingClient.from('users').select('id').limit(1)
+            // Test a query after reset
+            const { data, error } = await supabase.from('users').select('id').limit(1)
             if (error) {
-              appendLog(`❌ Working client query failed: ${error.message}`)
+              appendLog(`❌ Reset client query failed: ${error.message}`)
             } else {
-              appendLog('✅ Working client query succeeded')
+              appendLog('✅ Reset client query succeeded')
             }
           } else {
-            appendLog('❌ Working client is also unresponsive')
+            appendLog('❌ Client still unresponsive after reset')
           }
-        } catch (workingError) {
-          appendLog(`❌ Working client error: ${(workingError as Error).message}`)
-        }
-        
-        // Try recreating the client
-        appendLog('🔄 Testing client recreation...')
-        try {
-          const recreatedClient = await recreateSupabaseClient()
-          const isRecreatedResponsive = await testClientResponsiveness(recreatedClient, 5000)
-          if (isRecreatedResponsive) {
-            appendLog('✅ Recreated client is responsive!')
-            
-            // Test a query with the recreated client
-            const { data, error } = await recreatedClient.from('users').select('id').limit(1)
-            if (error) {
-              appendLog(`❌ Recreated client query failed: ${error.message}`)
-            } else {
-              appendLog('✅ Recreated client query succeeded - client recreation works!')
-            }
-          } else {
-            appendLog('❌ Recreated client is also unresponsive')
-          }
-        } catch (recreateError) {
-          appendLog(`❌ Client recreation error: ${(recreateError as Error).message}`)
+        } catch (resetError) {
+          appendLog(`❌ Client reset error: ${(resetError as Error).message}`)
         }
       }
     } catch (error) {
@@ -230,12 +206,11 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     // Final comprehensive test
     appendLog('🧪 Final comprehensive test...')
     try {
-      const workingClient = await getWorkingClient()
-      appendLog(`Using ${workingClient === supabase ? 'main' : 'recreated'} client for final test`)
+      appendLog('Using main client for final test')
       
       // Test session with timeout
       try {
-        const sessionPromise = workingClient.auth.getSession()
+        const sessionPromise = supabase.auth.getSession()
         const sessionTimeout = new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Session timeout')), 5000)
         )
@@ -251,7 +226,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       
       // Test database with timeout
       try {
-        const dbPromise = workingClient.from('users').select('id').limit(1)
+        const dbPromise = supabase.from('users').select('id').limit(1)
         const dbTimeout = new Promise((_, reject) => 
           setTimeout(() => reject(new Error('Database timeout')), 5000)
         )
@@ -338,7 +313,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   }
 
   const handleFocusRefresh = async () => {
-    // Let the visibility refresh hook handle client recreation
+    // Let the visibility refresh hook handle client reset
     try {
       await ensureSession()
     } catch (error) {
