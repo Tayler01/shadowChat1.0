@@ -252,29 +252,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     }
 
     appendLog('🏁 Diagnostics complete!')
-    
-    // Final step: Ensure we have a valid session for posting messages
-    appendLog('🔐 Ensuring valid session for message posting...')
-    try {
-      const sessionValid = await ensureSession(true) // Force refresh
-      if (sessionValid) {
-        appendLog('✅ Session is valid for message posting')
-        
-        // Test if we can actually post a message (dry run)
-        const workingClient = await getWorkingClient()
-        const { data: { user } } = await workingClient.auth.getUser()
-        if (user) {
-          appendLog(`✅ Authenticated as user: ${user.id}`)
-          appendLog('✅ Ready to post messages!')
-        } else {
-          appendLog('❌ No authenticated user found')
-        }
-      } else {
-        appendLog('❌ Session refresh failed - cannot post messages')
-      }
-    } catch (sessionErr) {
-      appendLog(`❌ Session validation failed: ${(sessionErr as Error).message}`)
-    }
   }
 
   const handleRefreshSession = async () => {
