@@ -18,10 +18,9 @@ import {
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
   clearRefreshSessionPromise,
-  resetSupabaseClient,
   testClientResponsiveness,
   getWorkingClient,
-  attemptClientRecovery,
+  recreateSupabaseClient,
 } from '../../lib/supabase'
 import { useVisibilityRefresh } from '../../hooks/useVisibilityRefresh'
 
@@ -56,7 +55,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     // Test client responsiveness with detailed diagnostics
     appendLog('🔍 Testing Supabase client responsiveness...')
     try {
-      const isResponsive = await testClientResponsiveness(3000)
+      const isResponsive = await testClientResponsiveness(supabase, 3000)
       if (isResponsive) {
         appendLog('✅ Main client is responsive')
         
@@ -83,18 +82,44 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
         appendLog('🔄 Testing backup client...')
         try {
           const workingClient = await getWorkingClient()
-          const backupQueryPromise = workingClient.from('users').select('id').limit(1)
-          const backupTimeout = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Backup query timeout')), 5000)
-          )
-          const { data, error } = await Promise.race([backupQueryPromise, backupTimeout]) as any
-          if (error) {
-            appendLog(`❌ Backup client query failed: ${error.message}`)
+          const isWorkingClientResponsive = await testClientResponsiveness(workingClient, 5000)
+          if (isWorkingClientResponsive) {
+            appendLog('✅ Working client is responsive!')
+            
+            // Test a query with the working client
+            const { data, error } = await workingClient.from('users').select('id').limit(1)
+            if (error) {
+              appendLog(`❌ Working client query failed: ${error.message}`)
+            } else {
+              appendLog('✅ Working client query succeeded')
+            }
           } else {
-            appendLog('✅ Backup client works! Main client issue confirmed')
+            appendLog('❌ Working client is also unresponsive')
           }
-        } catch (backupError) {
-          appendLog(`❌ Backup client error: ${(backupError as Error).message}`)
+        } catch (workingError) {
+          appendLog(`❌ Working client error: ${(workingError as Error).message}`)
+        }
+        
+        // Try recreating the client
+        appendLog('🔄 Testing client recreation...')
+        try {
+          const recreatedClient = await recreateSupabaseClient()
+          const isRecreatedResponsive = await testClientResponsiveness(recreatedClient, 5000)
+          if (isRecreatedResponsive) {
+            appendLog('✅ Recreated client is responsive!')
+            
+            // Test a query with the recreated client
+            const { data, error } = await recreatedClient.from('users').select('id').limit(1)
+            if (error) {
+              appendLog(`❌ Recreated client query failed: ${error.message}`)
+            } else {
+              appendLog('✅ Recreated client query succeeded - client recreation works!')
+            }
+          } else {
+            appendLog('❌ Recreated client is also unresponsive')
+          }
+        } catch (recreateError) {
+          appendLog(`❌ Client recreation error: ${(recreateError as Error).message}`)
         }
       }
     } catch (error) {
@@ -206,7 +231,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     appendLog('🧪 Final comprehensive test...')
     try {
       const workingClient = await getWorkingClient()
-      appendLog(`Using ${workingClient === supabase ? 'main' : 'backup'} client for final test`)
+      appendLog(`Using ${workingClient === supabase ? 'main' : 'recreated'} client for final test`)
       
       // Test session with timeout
       try {
@@ -313,7 +338,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   }
 
   const handleFocusRefresh = async () => {
-    // Let the visibility refresh hook handle client recovery
+    // Let the visibility refresh hook handle client recreation
     try {
       await ensureSession()
     } catch (error) {
