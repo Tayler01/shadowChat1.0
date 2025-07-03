@@ -46,28 +46,23 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     setLogs([])
     appendSupabaseInfo()
 
-    // Test basic network connectivity first
-    appendLog('Testing basic network connectivity...')
-    try {
-      const networkTest = fetch('https://httpbin.org/get', { 
-        method: 'GET',
-        signal: AbortSignal.timeout(5000)
-      })
-      const networkResult = await networkTest
-      appendLog(`Network test: ${networkResult.ok ? 'SUCCESS' : 'FAILED'} (${networkResult.status})`)
-    } catch (err) {
-      appendLog(`Network test failed: ${(err as Error).message}`)
-    }
-
     // Test Supabase URL accessibility
     appendLog('Testing Supabase URL accessibility...')
     try {
-      const supabaseUrlTest = fetch(SUPABASE_URL, { 
+      const supabaseUrlTest = fetch(`${SUPABASE_URL}/rest/v1/`, { 
         method: 'GET',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
         signal: AbortSignal.timeout(5000)
       })
       const supabaseResult = await supabaseUrlTest
       appendLog(`Supabase URL test: ${supabaseResult.ok ? 'SUCCESS' : 'FAILED'} (${supabaseResult.status})`)
+      if (!supabaseResult.ok) {
+        const errorText = await supabaseResult.text()
+        appendLog(`Supabase URL error: ${errorText}`)
+      }
     } catch (err) {
       appendLog(`Supabase URL test failed: ${(err as Error).message}`)
     }
@@ -91,27 +86,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       }
     } catch (err) {
       appendLog(`Auth endpoint test failed: ${(err as Error).message}`)
-    }
-
-    // Test REST API endpoint
-    appendLog('Testing Supabase REST API endpoint...')
-    try {
-      const restTest = fetch(`${SUPABASE_URL}/rest/v1/`, {
-        method: 'GET',
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-        },
-        signal: AbortSignal.timeout(5000)
-      })
-      const restResult = await restTest
-      appendLog(`REST API test: ${restResult.ok ? 'SUCCESS' : 'FAILED'} (${restResult.status})`)
-      if (!restResult.ok) {
-        const errorText = await restResult.text()
-        appendLog(`REST API error: ${errorText}`)
-      }
-    } catch (err) {
-      appendLog(`REST API test failed: ${(err as Error).message}`)
     }
 
     // Check current auth state before testing
