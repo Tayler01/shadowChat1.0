@@ -9,10 +9,8 @@ import toast from 'react-hot-toast'
 import { Button } from '../ui/Button'
 import { ConsoleModal } from '../ui/ConsoleModal'
 import {
-  supabase,
   getWorkingClient,
   ensureSession,
-  refreshSessionLocked,
   resetRealtimeConnection,
   getStoredRefreshToken,
   localStorageKey,
@@ -254,71 +252,43 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     appendLog('🏁 Diagnostics complete!')
   }
 
-  const handleRefreshSession = async () => {
+  const handleConsoleAuthCheck = async () => {
     appendSupabaseInfo()
-    appendLog('Starting forced session refresh...')
+    appendLog('Running authentication checks...')
     const workingClient = await getWorkingClient()
-    const { data: before } = await workingClient.auth.getSession()
-    appendLog(
-      before.session
-        ? `Current session expires at: ${before.session.expires_at}`
-        : 'No active session before refresh'
-    )
-    appendLog(
-      `Memory refresh token: ${before.session?.refresh_token ?? 'null'}`
-    )
+    const { data: before, error } = await workingClient.auth.getSession()
+
+    if (error) {
+      appendLog(`Failed to get session: ${error.message}`)
+      return
+    }
+
+    if (!before.session) {
+      appendLog('No active session found')
+    } else {
+      const session = before.session
+      appendLog(`Current session expires at: ${session.expires_at}`)
+      const now = Math.floor(Date.now() / 1000)
+      appendLog(
+        now < (session.expires_at ?? 0)
+          ? 'Access token valid ✅'
+          : 'Access token expired ❌'
+      )
+      appendLog(`Memory refresh token: ${session.refresh_token ?? 'null'}`)
+    }
+
     const storedToken = getStoredRefreshToken()
     appendLog(
       `Stored refresh token (${localStorageKey}): ${storedToken ?? 'null'}`
     )
-    appendLog('Calling workingClient.auth.refreshSession()')
 
-    let result
-    try {
-      result = await refreshSessionLocked()
-    } catch (err) {
-      console.error('Forced session restore threw:', err)
-      appendLog(`Refresh threw: ${(err as Error).message}`)
-      return
+    if (before.session?.refresh_token) {
+      appendLog(
+        storedToken === before.session.refresh_token
+          ? 'Stored and memory refresh tokens match ✅'
+          : 'Stored and memory refresh tokens differ ❌'
+      )
     }
-
-    const { data, error } = result
-    const { session, user } = data
-
-    if (error) {
-      console.error('Forced session restore failed:', error.message)
-      appendLog(`Refresh failed: ${error.message}`)
-      return
-    }
-
-    appendLog('Session refresh successful ✅')
-    appendLog(`New session expires at: ${session?.expires_at}`)
-    appendLog(`User id: ${user?.id}`)
-    appendLog(`Full response: ${JSON.stringify(data, null, 2)}`)
-
-    const storedAfter = getStoredRefreshToken()
-    appendLog(
-      `Stored refresh token (${localStorageKey}) after refresh: ${
-        storedAfter ?? 'null'
-      }`
-    )
-    appendLog(
-      `Memory refresh token after refresh: ${session?.refresh_token ?? 'null'}`
-    )
-
-    const { data: after, error: checkError } = await workingClient.auth.getSession()
-    if (after.session) {
-      appendLog(`Post-refresh expires at: ${after.session.expires_at}`)
-    }
-    if (checkError) {
-      appendLog(`Session check failed: ${checkError.message}`)
-    } else {
-      appendLog(after.session ? 'Session valid ✅' : 'Session invalid ❌')
-    }
-
-    // Force a session refresh to ensure tokens are valid
-    const valid = await ensureSession(true)
-    if (valid) await resetRealtimeConnection()
   }
 
   const handleFocusRefresh = async () => {
@@ -409,7 +379,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
         open={consoleOpen}
         logs={logs}
         onClose={() => setConsoleOpen(false)}
-        onRefresh={handleRefreshSession}
+        onAuthCheck={handleConsoleAuthCheck}
       />
     </motion.div>
   )
