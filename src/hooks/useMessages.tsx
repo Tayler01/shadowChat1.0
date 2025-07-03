@@ -555,7 +555,8 @@ function useProvideMessages(): MessagesContextValue {
 
     // Log current session tokens and user details for debugging
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const workingClient = await getWorkingClient();
+      const { data: { session } } = await workingClient.auth.getSession();
       if (DEBUG) {
         console.log(`${logPrefix}: Session details`, {
           access_token: session?.access_token,
