@@ -169,6 +169,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     const { data } = await supabase.auth.getSession()
     appendLog(`Token expires at: ${data.session?.expires_at}`)
     appendLog(data.session ? 'Session still valid ✅' : 'Session missing ❌')
+    } catch (err) {
+      appendLog(`Database test threw: ${(err as Error).message}`)
+    }
   }
 
   const handleRefreshSession = async () => {
