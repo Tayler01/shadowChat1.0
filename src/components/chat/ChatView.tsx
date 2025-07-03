@@ -325,8 +325,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     // Test message posting capability
     appendLog('📝 Testing message posting capability...')
     try {
+      const currentSession = before.session || after?.session
       const testMessage = {
-        user_id: before.session?.user?.id || after?.session?.user?.id,
+        user_id: currentSession?.user?.id,
         content: `Test message from auth diagnostics - ${new Date().toISOString()}`,
         message_type: 'text'
       }
@@ -334,6 +335,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       if (!testMessage.user_id) {
         appendLog('❌ Cannot test message posting: No authenticated user ID')
       } else {
+        // Test message insertion
         const postPromise = workingClient
           .from('messages')
           .insert(testMessage)
@@ -359,17 +361,27 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
           appendLog(`   Message ID: ${messageData.id}`)
           appendLog(`   Created at: ${messageData.created_at}`)
           
-          // Clean up the test message
+          // Clean up the test message immediately
           appendLog('🧹 Cleaning up test message...')
-          const { error: deleteError } = await workingClient
-            .from('messages')
-            .delete()
-            .eq('id', messageData.id)
-          
-          if (deleteError) {
-            appendLog(`⚠️ Failed to clean up test message: ${deleteError.message}`)
-          } else {
-            appendLog('✅ Test message cleaned up successfully')
+          try {
+            const deletePromise = workingClient
+              .from('messages')
+              .delete()
+              .eq('id', messageData.id)
+            
+            const deleteTimeout = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Delete timeout')), 3000)
+            )
+            
+            const { error: deleteError } = await Promise.race([deletePromise, deleteTimeout]) as any
+            
+            if (deleteError) {
+              appendLog(`⚠️ Failed to clean up test message: ${deleteError.message}`)
+            } else {
+              appendLog('✅ Test message cleaned up successfully')
+            }
+          } catch (deleteErr) {
+            appendLog(`⚠️ Delete operation failed: ${(deleteErr as Error).message}`)
           }
         } else {
           appendLog('❌ Message post returned no data')
