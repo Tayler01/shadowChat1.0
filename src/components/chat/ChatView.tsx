@@ -8,6 +8,8 @@ import { MobileChatFooter } from '../layout/MobileChatFooter'
 import toast from 'react-hot-toast'
 import { Button } from '../ui/Button'
 import { ConsoleModal } from '../ui/ConsoleModal'
+import { ClientResetIndicator } from '../ui/ClientResetIndicator'
+import { useClientResetStatus } from '../../hooks/useClientResetStatus'
 import {
   getWorkingClient,
   ensureSession,
@@ -29,6 +31,7 @@ interface ChatViewProps {
 
 export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView, onViewChange }) => {
   const { sendMessage, messages, loading } = useMessages()
+  const { status: resetStatus, lastResetTime, manualReset } = useClientResetStatus()
 
   const [consoleOpen, setConsoleOpen] = useState(false)
   const [logs, setLogs] = useState<string[]>([])
@@ -444,12 +447,13 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
             <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
               <Users className="w-4 h-4" />
               <span>Online</span>
+              <ClientResetIndicator status={resetStatus} lastResetTime={lastResetTime} />
             </div>
             <div className="hidden md:flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
               <Pin className="w-4 h-4" />
               <span>Pinned</span>
             </div>
-            <Button size="sm" variant="secondary" onClick={handleCheckAuth}>
+            <Button size="sm" variant="secondary" onClick={() => { handleCheckAuth(); manualReset(); }}>
               Test Auth
             </Button>
           </div>
