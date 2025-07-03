@@ -146,15 +146,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     } catch (err) {
       appendLog(`Environment test failed: ${(err as Error).message}`)
     }
-        appendLog('Client responsive after reset ✅')
-        
-      } catch (err) {
-        appendLog(`Reset failed: ${(err as Error).message}`)
-        if ((err as Error).message.includes('timeout')) {
-          appendLog('Reset process timed out - client may be completely stuck')
-        }
-      }
-    }
 
     // Test Supabase URL accessibility
     appendLog('Testing Supabase URL accessibility...')
