@@ -41,12 +41,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     appendLog(`Supabase Key: ${SUPABASE_ANON_KEY}`)
   }
 
-  useEffect(() => {
-    setConsoleOpen(true)
-    setLogs([])
-    appendSupabaseInfo()
-  }, [])
-
   const handleCheckAuth = async () => {
     setConsoleOpen(true)
     setLogs([])
@@ -241,77 +235,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   }
 
   const handleFocusRefresh = async () => {
-    setConsoleOpen(true)
-    setLogs([])
-    appendSupabaseInfo()
-    appendLog('Clearing any stuck refresh session promise')
+    // Clear any stuck refresh promises and refresh session silently
     clearRefreshSessionPromise()
-    appendLog('Page became visible - refreshing session')
-    const { data: before } = await supabase.auth.getSession()
-    appendLog(
-      before.session
-        ? `Current session expires at: ${before.session.expires_at}`
-        : 'No active session before refresh'
-    )
-    appendLog(
-      `Memory refresh token: ${before.session?.refresh_token ?? 'null'}`
-    )
-    const storedToken = getStoredRefreshToken()
-    appendLog(
-      `Stored refresh token (${localStorageKey}): ${storedToken ?? 'null'}`
-    )
-    appendLog('Calling supabase.auth.refreshSession()')
-
-    let result
-    try {
-      result = await refreshSessionLocked()
-    } catch (err) {
-      console.error('Visibility session refresh threw:', err)
-      appendLog(`Refresh threw: ${(err as Error).message}`)
-      const { data: checkData, error: checkError } =
-        await supabase.auth.getSession()
-      if (checkError) {
-        appendLog(`Session check failed: ${checkError.message}`)
-      } else {
-        appendLog(
-          checkData.session ? 'Session valid ✅' : 'Session invalid ❌'
-        )
-      }
-      return
-    }
-
-    const { data, error } = result
-    const { session, user } = data
-
-    if (error) {
-      appendLog(`Refresh failed: ${error.message}`)
-    } else {
-      appendLog('Session refresh successful ✅')
-      appendLog(`New session expires at: ${session?.expires_at}`)
-      appendLog(`User id: ${user?.id}`)
-      appendLog(`Full response: ${JSON.stringify(data, null, 2)}`)
-      const storedAfter = getStoredRefreshToken()
-      appendLog(
-        `Stored refresh token (${localStorageKey}) after refresh: ${
-          storedAfter ?? 'null'
-        }`
-      )
-      appendLog(
-        `Memory refresh token after refresh: ${session?.refresh_token ?? 'null'}`
-      )
-    }
-
-    const { data: after, error: checkError } = await supabase.auth.getSession()
-    if (after.session) {
-      appendLog(`Post-refresh expires at: ${after.session.expires_at}`)
-    }
-    if (checkError) {
-      appendLog(`Session check failed: ${checkError.message}`)
-    } else {
-      appendLog(after.session ? 'Session valid ✅' : 'Session invalid ❌')
-    }
-
-    // Force a session refresh to ensure tokens are valid
     const valid = await ensureSession(true)
     if (valid) await resetRealtimeConnection()
   }
