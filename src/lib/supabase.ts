@@ -106,62 +106,99 @@ export const resetSupabaseClient = async () => {
   try {
     if (DEBUG) console.log('Starting Supabase client reset...')
     
-    // Get current session before reset
-    if (DEBUG) console.log('Getting current session...')
+    // Try to get session from localStorage directly since client may be stuck
+    if (DEBUG) console.log('Getting session from localStorage...')
     let session = null
     try {
-      const sessionPromise = supabase.auth.getSession()
-      const sessionTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('getSession timeout')), 3000)
-      )
-      const { data: { session: currentSession } } = await Promise.race([sessionPromise, sessionTimeout]) as any
-      session = currentSession
-      if (DEBUG) console.log('Session retrieved successfully')
+      const storedSession = localStorage.getItem(localStorageKey)
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession)
+        session = parsed?.currentSession || parsed
+        if (DEBUG) console.log('Session retrieved from localStorage')
+      }
     } catch (err) {
-      if (DEBUG) console.log('Failed to get session, continuing without it:', (err as Error).message)
+      if (DEBUG) console.log('Failed to get session from localStorage:', (err as Error).message)
     }
     
-    // Disconnect realtime
-    if (DEBUG) console.log('Disconnecting realtime...')
+    // Force disconnect everything
+    if (DEBUG) console.log('Force disconnecting all connections...')
     try {
-      supabase.realtime.disconnect()
-      if (DEBUG) console.log('Realtime disconnected')
+      // Try to disconnect realtime, but don't wait if it hangs
+      const disconnectPromise = Promise.resolve(supabase.realtime.disconnect())
+      const disconnectTimeout = new Promise(resolve => setTimeout(resolve, 1000))
+      await Promise.race([disconnectPromise, disconnectTimeout])
+      if (DEBUG) console.log('Realtime disconnected (or timed out)')
     } catch (err) {
-      if (DEBUG) console.error('Error disconnecting realtime:', err)
+      if (DEBUG) console.log('Realtime disconnect error (continuing):', (err as Error).message)
     }
     
-    // Clear any pending promises
-    if (DEBUG) console.log('Clearing refresh promises...')
+    // Clear all pending promises and state
+    if (DEBUG) console.log('Clearing all pending state...')
     clearRefreshSessionPromise()
     
-    // Wait a moment for cleanup
-    await new Promise(resolve => setTimeout(resolve, 100))
+    // Wait for cleanup
+    await new Promise(resolve => setTimeout(resolve, 500))
     
-    // Reconnect realtime with fresh auth
-    if (DEBUG) console.log('Setting realtime auth...')
-    if (session?.access_token) {
-      supabase.realtime.setAuth(session.access_token)
-      if (DEBUG) console.log('Realtime auth set with token')
-    } else {
-      supabase.realtime.setAuth('')
-      if (DEBUG) console.log('Realtime auth cleared (no session)')
+    // Create a completely new client instance to test if the issue is with the current instance
+    if (DEBUG) console.log('Creating test client instance...')
+    const { createClient } = await import('@supabase/supabase-js')
+    const testClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false,
+      },
+      global: {
+        fetch: fetch, // Use native fetch for test client
+      },
+    })
+    
+    // Test the new client
+    if (DEBUG) console.log('Testing new client instance...')
+    try {
+      const testPromise = testClient.from('users').select('id').limit(1)
+      const testTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Test client timeout')), 3000)
+      )
+      await Promise.race([testPromise, testTimeout])
+      if (DEBUG) console.log('New client instance works ✅')
+    } catch (err) {
+      if (DEBUG) console.log('New client instance also failed:', (err as Error).message)
+      return false
     }
     
+    // If new client works, the issue is with our main client
+    // Reset the main client's auth and realtime
+    if (DEBUG) console.log('Resetting main client auth...')
+    try {
+      // Set auth token from session
+      if (session?.access_token) {
+        supabase.realtime.setAuth(session.access_token)
+        if (DEBUG) console.log('Auth token restored from session')
+      } else {
+        supabase.realtime.setAuth('')
+        if (DEBUG) console.log('Auth token cleared (no session)')
+      }
+    } catch (err) {
+      if (DEBUG) console.log('Auth reset error:', (err as Error).message)
+    }
+    
+    // Reconnect realtime
     if (DEBUG) console.log('Reconnecting realtime...')
     try {
-      supabase.realtime.connect()
-      if (DEBUG) console.log('Realtime reconnected')
+      const connectPromise = Promise.resolve(supabase.realtime.connect())
+      const connectTimeout = new Promise(resolve => setTimeout(resolve, 2000))
+      await Promise.race([connectPromise, connectTimeout])
+      if (DEBUG) console.log('Realtime reconnected (or timed out)')
     } catch (err) {
-      if (DEBUG) console.error('Error reconnecting realtime:', err)
+      if (DEBUG) console.log('Realtime reconnect error:', (err as Error).message)
     }
     
-    if (DEBUG) {
-      console.log('Supabase client reset completed')
-    }
+    if (DEBUG) console.log('Client reset process completed')
     
     return true
   } catch (error) {
-    console.error('Error resetting Supabase client:', error)
+    if (DEBUG) console.error('Error in resetSupabaseClient:', error)
     return false
   }
 }

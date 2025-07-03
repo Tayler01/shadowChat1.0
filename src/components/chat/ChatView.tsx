@@ -79,20 +79,73 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
         appendLog('Starting client reset process...')
         const resetPromise = resetSupabaseClient()
         const resetTimeout = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Reset timeout after 5 seconds')), 5000)
+          setTimeout(() => reject(new Error('Reset timeout after 10 seconds')), 10000)
         )
         
         const resetSuccess = await Promise.race([resetPromise, resetTimeout])
         appendLog(`Client reset ${resetSuccess ? 'succeeded ✅' : 'failed ❌'}`)
         
-        // Test if reset worked
+        // Test if reset worked with a simple query
         appendLog('Testing client after reset...')
-        const testAfterReset = supabase.auth.getSession()
+        const testAfterReset = supabase.from('users').select('id').limit(1)
         const testTimeout = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Post-reset test timeout')), 2000)
+          setTimeout(() => reject(new Error('Post-reset test timeout')), 3000)
         )
         
-        await Promise.race([testAfterReset, testTimeout])
+        const { error: testError } = await Promise.race([testAfterReset, testTimeout]) as any
+        if (testError) {
+          appendLog(`Post-reset test failed: ${testError.message}`)
+        } else {
+          appendLog('Client responsive after reset ✅')
+        }
+        
+        // Also test auth after reset
+        appendLog('Testing auth after reset...')
+        const authTestPromise = supabase.auth.getSession()
+        const authTestTimeout = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Auth test timeout')), 3000)
+        )
+        
+        const { data: authData, error: authError } = await Promise.race([authTestPromise, authTestTimeout]) as any
+        if (authError) {
+          appendLog(`Auth test failed: ${authError.message}`)
+        } else {
+          appendLog(`Auth test passed: ${authData.session ? 'Session found' : 'No session'}`)
+        }
+        
+      } catch (err) {
+        appendLog(`Reset failed: ${(err as Error).message}`)
+        if ((err as Error).message.includes('timeout')) {
+          appendLog('Reset process timed out - client may be completely stuck')
+          appendLog('This suggests a deeper connectivity issue')
+        }
+      }
+    }
+
+    // Additional network connectivity test
+    appendLog('Testing basic network connectivity...')
+    try {
+      const networkTest = fetch('https://www.google.com/favicon.ico', { 
+        method: 'HEAD',
+        signal: AbortSignal.timeout(3000)
+      })
+      const networkResult = await networkTest
+      appendLog(`Network test: ${networkResult.ok ? 'SUCCESS' : 'FAILED'} (${networkResult.status})`)
+    } catch (err) {
+      appendLog(`Network test failed: ${(err as Error).message}`)
+      appendLog('This suggests a broader network connectivity issue')
+    }
+
+    // Test if the issue is WebContainer-specific
+    appendLog('Testing WebContainer environment...')
+    try {
+      appendLog(`User agent: ${navigator.userAgent}`)
+      appendLog(`Online status: ${navigator.onLine}`)
+      appendLog(`Connection type: ${(navigator as any).connection?.effectiveType || 'unknown'}`)
+      appendLog(`Current URL: ${window.location.href}`)
+    } catch (err) {
+      appendLog(`Environment test failed: ${(err as Error).message}`)
+    }
         appendLog('Client responsive after reset ✅')
         
       } catch (err) {
