@@ -88,11 +88,17 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center">
-              {!isDesktop && lastConversation && (
+              {!isDesktop && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setCurrentConversation(lastConversation)}
+                  onClick={() => {
+                    if (lastConversation) {
+                      setCurrentConversation(lastConversation)
+                    } else {
+                      onViewChange('chat')
+                    }
+                  }}
                   className="mr-2"
                   aria-label="Back"
                 >
