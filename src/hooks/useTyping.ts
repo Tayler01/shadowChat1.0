@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { supabase } from '../lib/supabase'
+import { getWorkingClient } from '../lib/supabase'
 import { useAuth } from './useAuth'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
@@ -17,11 +17,16 @@ export const useTyping = (channelName: string = 'general') => {
   const channelRef = useRef<RealtimeChannel | null>(null)
 
   useEffect(() => {
-    const channel = supabase.channel(`typing:${channelName}`)
-    channelRef.current = channel
+    let channel: RealtimeChannel | null = null;
+    let currentClient: any = null;
 
-    // Listen for typing events
-    channel
+    const setupChannel = async () => {
+      currentClient = await getWorkingClient();
+      channel = currentClient.channel(`typing:${channelName}`);
+      channelRef.current = channel;
+
+      // Listen for typing events
+      channel
       .on('broadcast', { event: 'typing' }, (payload) => {
         const { user, typing } = payload.payload
         
@@ -46,9 +51,14 @@ export const useTyping = (channelName: string = 'general') => {
         }
       })
       .subscribe()
+    };
+
+    setupChannel();
 
     return () => {
-      supabase.removeChannel(channel)
+      if (channel && currentClient) {
+        currentClient.removeChannel(channel);
+      }
     }
   }, [channelName])
 
