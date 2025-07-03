@@ -218,7 +218,12 @@ function useProvideMessages(): MessagesContextValue {
       // Clean up old channel
       if (channelRef.current) {
         if (DEBUG) console.log('🗑️ [MESSAGES] Removing old realtime channel...')
-        supabase.removeChannel(channelRef.current)
+        try {
+          const workingClient = await getWorkingClient()
+          await workingClient.removeChannel(channelRef.current)
+        } catch (error) {
+          if (DEBUG) console.warn('⚠️ [MESSAGES] Failed to remove old channel:', error)
+        }
         channelRef.current = null
         if (DEBUG) console.log('✅ [MESSAGES] Old channel removed')
       }
@@ -319,6 +324,7 @@ function useProvideMessages(): MessagesContextValue {
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
+          filter: 'id=neq.null'
         },
         async (payload) => {
           
@@ -406,6 +412,7 @@ function useProvideMessages(): MessagesContextValue {
           event: 'UPDATE',
           schema: 'public',
           table: 'messages',
+          filter: 'id=neq.null'
         },
         async (payload) => {
           
@@ -452,6 +459,7 @@ function useProvideMessages(): MessagesContextValue {
           event: 'DELETE',
           schema: 'public',
           table: 'messages',
+          filter: 'id=neq.null'
         },
         (payload) => {
           setMessages(prev =>
@@ -469,7 +477,7 @@ function useProvideMessages(): MessagesContextValue {
           if (DEBUG) {
             console.warn(`⚠️ Channel ${status}, removing and resubscribing...`)
           }
-          if (currentClient) {
+          if (currentClient && typeof currentClient.removeChannel === 'function') {
             await currentClient.removeChannel(newChannel);
           }
           setTimeout(() => {
@@ -501,7 +509,7 @@ function useProvideMessages(): MessagesContextValue {
     subscribeRef.current = subscribeToChannel;
 
     return () => {
-      if (channel && currentClient) {
+      if (channel && currentClient && typeof currentClient.removeChannel === 'function') {
         currentClient.removeChannel(channel);
       }
       channelRef.current = null
