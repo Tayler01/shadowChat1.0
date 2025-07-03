@@ -406,10 +406,41 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   }
 
   const handleFocusRefresh = async () => {
-    // Clear any stuck refresh promises and refresh session silently
-    clearRefreshSessionPromise()
-    const valid = await ensureSession(true)
-    if (valid) await resetRealtimeConnection()
+    // Only refresh if we detect the session might be stale
+    try {
+      // First check if we can get the current session without forcing a refresh
+      const { data: { session }, error } = await supabase.auth.getSession()
+      
+      if (error) {
+        console.warn('Session check failed on visibility change:', error)
+        return
+      }
+      
+      if (!session) {
+        console.warn('No session found on visibility change')
+        return
+      }
+      
+      // Only refresh if session is close to expiring (within 5 minutes)
+      const now = Math.floor(Date.now() / 1000)
+      const expiresAt = session.expires_at
+      const fiveMinutes = 5 * 60
+      
+      if (expiresAt && (expiresAt - now) < fiveMinutes) {
+        console.log('Session close to expiring, refreshing...')
+        clearRefreshSessionPromise()
+        const valid = await ensureSession(true)
+        if (valid) {
+          await resetRealtimeConnection()
+        }
+      } else {
+        // Session is still valid, just reset realtime connection
+        await resetRealtimeConnection()
+      }
+    } catch (error) {
+      console.error('Error in handleFocusRefresh:', error)
+      // Don't propagate the error, just log it
+    }
   }
 
   useVisibilityRefresh(handleFocusRefresh)
