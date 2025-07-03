@@ -109,6 +109,46 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       appendLog(`Session check error stack: ${(err as Error).stack}`)
     }
     appendLog('Testing Supabase connectivity...')
+    
+    // First, let's check if the supabase client is properly initialized
+    appendLog('Checking Supabase client configuration...')
+    try {
+      appendLog(`Supabase client URL: ${supabase.supabaseUrl}`)
+      appendLog(`Supabase client key: ${supabase.supabaseKey}`)
+      appendLog(`Supabase client auth: ${typeof supabase.auth}`)
+      appendLog(`Supabase client from: ${typeof supabase.from}`)
+      appendLog(`Supabase client realtime: ${typeof supabase.realtime}`)
+    } catch (err) {
+      appendLog(`Client config check failed: ${(err as Error).message}`)
+    }
+    
+    // Try a direct REST API call to bypass the client
+    appendLog('Testing direct REST API call...')
+    try {
+      const directApiCall = fetch(`${SUPABASE_URL}/rest/v1/users?select=id&limit=1`, {
+        method: 'GET',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        signal: AbortSignal.timeout(5000)
+      })
+      const directResult = await directApiCall
+      appendLog(`Direct API call: ${directResult.ok ? 'SUCCESS' : 'FAILED'} (${directResult.status})`)
+      if (!directResult.ok) {
+        const errorText = await directResult.text()
+        appendLog(`Direct API error: ${errorText}`)
+      } else {
+        const responseText = await directResult.text()
+        appendLog(`Direct API response: ${responseText}`)
+      }
+    } catch (err) {
+      appendLog(`Direct API call failed: ${(err as Error).message}`)
+    }
+    
+    // Now try the Supabase client
     try {
       appendLog('Creating users query...')
       // Add timeout to prevent hanging
@@ -159,6 +199,43 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       }
     }
 
+    // Test if the issue is specific to the 'users' table
+    appendLog('Testing alternative table access...')
+    try {
+      const altTest = supabase.from('messages').select('id').limit(1)
+      const altTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Alternative table test timeout after 5 seconds')), 5000)
+      )
+      const { error: altError } = await Promise.race([altTest, altTimeout]) as any
+      
+      if (altError) {
+        appendLog(`Alternative table test failed: ${altError.message}`)
+      } else {
+        appendLog('Alternative table test succeeded ✅')
+      }
+    } catch (err) {
+      appendLog(`Alternative table test threw: ${(err as Error).message}`)
+    }
+    
+    // Test auth methods specifically
+    appendLog('Testing auth methods...')
+    try {
+      appendLog('Testing auth.getUser()...')
+      const getUserTest = supabase.auth.getUser()
+      const getUserTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('getUser timeout after 5 seconds')), 5000)
+      )
+      const { data: userData, error: userError } = await Promise.race([getUserTest, getUserTimeout]) as any
+      
+      if (userError) {
+        appendLog(`getUser failed: ${userError.message}`)
+      } else {
+        appendLog(`getUser succeeded: ${userData.user ? 'User found' : 'No user'}`)
+      }
+    } catch (err) {
+      appendLog(`getUser threw: ${(err as Error).message}`)
+    }
+    
     appendLog('Running basic feature tests...')
     try {
       appendLog('Testing messages table access...')
