@@ -395,14 +395,14 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     }
   }
 
-  const handleFocusRefresh = async () => {
+  const handleFocusRefresh = useCallback(async () => {
     // Let the visibility refresh hook handle client reset
     try {
       await ensureSession()
     } catch (error) {
       console.warn('Visibility refresh failed:', error)
     }
-  }
+  }, [])
 
   useVisibilityRefresh(handleFocusRefresh)
 

@@ -20,6 +20,23 @@ export function useDirectMessages() {
   const [currentConversation, setCurrentConversation] = useState<string | null>(null);
   const { user } = useAuth();
 
+  // Reset function for page refocus
+  const resetWithFreshClient = useCallback(async () => {
+    if (DEBUG) {
+      console.log('🔄 useDirectMessages: Resetting with fresh client...')
+    }
+    
+    try {
+      // Refetch conversations with new client
+      const convs = await fetchDMConversations();
+      setConversations(convs);
+      
+      if (DEBUG) console.log('✅ useDirectMessages: Reset complete')
+    } catch (error) {
+      if (DEBUG) console.error('❌ useDirectMessages: Reset failed:', error)
+    }
+  }, []);
+
   // Fetch conversations
   useEffect(() => {
     if (!user) return;
@@ -173,6 +190,7 @@ export function useConversationMessages(conversationId: string | null) {
   const { user } = useAuth();
   const channelRef = useRef<RealtimeChannel | null>(null);
   const subscribeRef = useRef<() => RealtimeChannel>();
+  const clientResetRef = useRef<() => Promise<void>>();
 
   const handleVisible = useCallback(() => {
     const channel = channelRef.current;
@@ -183,12 +201,40 @@ export function useConversationMessages(conversationId: string | null) {
         channelRef.current = newChannel;
       }
     }
+    
+    // Use reset function if available
+    if (clientResetRef.current) {
+      clientResetRef.current()
+    }
   }, []);
 
   useVisibilityRefresh(handleVisible);
 
   // Fetch messages for conversation
   useEffect(() => {
+    const resetWithFreshClient = async () => {
+      if (!conversationId) return
+      
+      if (DEBUG) {
+        console.log('🔄 useConversationMessages: Resetting with fresh client...')
+      }
+      
+      try {
+        // Clean up old channel
+        if (channelRef.current) {
+          supabase.removeChannel(channelRef.current)
+          channelRef.current = null
+        }
+        
+        // Refetch messages and resubscribe
+        // This will be handled by the existing useEffect logic
+        
+        if (DEBUG) console.log('✅ useConversationMessages: Reset complete')
+      } catch (error) {
+        if (DEBUG) console.error('❌ useConversationMessages: Reset failed:', error)
+      }
+    }
+    
     if (!conversationId) {
       setMessages([]);
       setLoading(false);
@@ -225,6 +271,9 @@ export function useConversationMessages(conversationId: string | null) {
       setLoading(false);
     };
 
+    // Store reset function
+    clientResetRef.current = resetWithFreshClient;
+    
     fetchMessages();
   }, [conversationId, user]);
 

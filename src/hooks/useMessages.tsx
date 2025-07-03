@@ -138,6 +138,7 @@ function useProvideMessages(): MessagesContextValue {
   const { user } = useAuth();
   const channelRef = useRef<RealtimeChannel | null>(null);
   const subscribeRef = useRef<() => RealtimeChannel>();
+  const clientResetRef = useRef<() => Promise<void>>();
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -207,6 +208,34 @@ function useProvideMessages(): MessagesContextValue {
     }
   }, []);
 
+  // Reset function to reinitialize everything with fresh client
+  const resetWithFreshClient = useCallback(async () => {
+    if (DEBUG) {
+      console.log('🔄 useMessages: Resetting with fresh client...')
+    }
+    
+    try {
+      // Clean up old channel
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
+      
+      // Refetch messages with new client
+      await fetchMessages()
+      
+      // Resubscribe to realtime with new client
+      if (subscribeRef.current) {
+        const newChannel = subscribeRef.current()
+        channelRef.current = newChannel
+      }
+      
+      if (DEBUG) console.log('✅ useMessages: Reset complete')
+    } catch (error) {
+      if (DEBUG) console.error('❌ useMessages: Reset failed:', error)
+    }
+  }, []);
+
   const handleVisible = useCallback(() => {
     const channel = channelRef.current;
     if (channel && channel.state !== 'joined') {
@@ -219,7 +248,13 @@ function useProvideMessages(): MessagesContextValue {
         channelRef.current = newChannel
       }
     }
-    fetchMessages()
+    
+    // Use the reset function instead of just fetchMessages
+    if (clientResetRef.current) {
+      clientResetRef.current()
+    } else {
+      fetchMessages()
+    }
   }, [fetchMessages])
 
   useVisibilityRefresh(handleVisible)
@@ -227,6 +262,10 @@ function useProvideMessages(): MessagesContextValue {
   // Fetch initial messages
   useEffect(() => {
     fetchMessages();
+    
+    // Store the reset function for visibility refresh
+    clientResetRef.current = resetWithFreshClient;
+    
   }, [fetchMessages]);
 
   // Persist messages to localStorage whenever they change
