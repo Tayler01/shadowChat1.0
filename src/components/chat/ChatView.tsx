@@ -54,26 +54,65 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
 
     appendLog('Testing Supabase connectivity...')
     try {
-      const { error: pingError } = await supabase.from('users').select('id').limit(1)
+      // Add timeout to prevent hanging
+      const connectivityTest = supabase.from('users').select('id').limit(1)
+      const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Connectivity test timeout after 10 seconds')), 10000)
+      )
+      
+      const { error: pingError } = await Promise.race([connectivityTest, timeout]) as any
       if (pingError) {
         appendLog(`Connectivity check failed: ${pingError.message}`)
       } else {
         appendLog('Connectivity check succeeded ✅')
       }
     } catch (err) {
-      appendLog(`Connectivity check threw: ${(err as Error).message}`)
+      const errorMsg = (err as Error).message
+      appendLog(`Connectivity check threw: ${errorMsg}`)
+      
+      // If it's a timeout, try to clear any stuck promises and retry
+      if (errorMsg.includes('timeout')) {
+        appendLog('Clearing stuck promises and retrying...')
+        clearRefreshSessionPromise()
+        
+        try {
+          const retryTest = supabase.from('users').select('id').limit(1)
+          const retryTimeout = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Retry timeout after 5 seconds')), 5000)
+          )
+          const { error: retryError } = await Promise.race([retryTest, retryTimeout]) as any
+          
+          if (retryError) {
+            appendLog(`Retry failed: ${retryError.message}`)
+          } else {
+            appendLog('Retry succeeded ✅')
+          }
+        } catch (retryErr) {
+          appendLog(`Retry threw: ${(retryErr as Error).message}`)
+        }
+      }
     }
 
     appendLog('Running basic feature tests...')
     try {
-      const { error: msgError } = await supabase.from('messages').select('id').limit(1)
+      const messagesTest = supabase.from('messages').select('id').limit(1)
+      const msgTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Messages test timeout after 10 seconds')), 10000)
+      )
+      const { error: msgError } = await Promise.race([messagesTest, msgTimeout]) as any
+      
       if (msgError) {
         appendLog(`Messages query failed: ${msgError.message}`)
       } else {
         appendLog('Messages query succeeded ✅')
       }
 
-      const { error: presenceError } = await supabase.rpc('update_user_last_active')
+      const presenceTest = supabase.rpc('update_user_last_active')
+      const presenceTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Presence test timeout after 10 seconds')), 10000)
+      )
+      const { error: presenceError } = await Promise.race([presenceTest, presenceTimeout]) as any
+      
       if (presenceError) {
         appendLog(`Presence RPC failed: ${presenceError.message}`)
       } else {
@@ -92,6 +131,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     )
 
     try {
+      appendLog('Clearing any stuck refresh promises before session check...')
+      clearRefreshSessionPromise()
+      
       const valid = await Promise.race([
         ensureSession(),
         new Promise<boolean>((_, reject) =>
@@ -111,7 +153,13 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     }
 
     appendLog('Testing database query...')
-    const { error } = await supabase.from('users').select('id').limit(1)
+    try {
+      const finalTest = supabase.from('users').select('id').limit(1)
+      const finalTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Final test timeout after 10 seconds')), 10000)
+      )
+      const { error } = await Promise.race([finalTest, finalTimeout]) as any
+      
     if (error) {
       appendLog(`Database query failed: ${error.message}`)
     } else {
@@ -226,6 +274,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
           checkData.session ? 'Session valid ✅' : 'Session invalid ❌'
         )
       }
+    } catch (err) {
+      appendLog(`Final database test threw: ${(err as Error).message}`)
+    }
       return
     }
 
