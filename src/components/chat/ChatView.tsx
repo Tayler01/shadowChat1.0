@@ -321,6 +321,63 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
         )
       }
     }
+    
+    // Test message posting capability
+    appendLog('📝 Testing message posting capability...')
+    try {
+      const testMessage = {
+        user_id: before.session?.user?.id || after?.session?.user?.id,
+        content: `Test message from auth diagnostics - ${new Date().toISOString()}`,
+        message_type: 'text'
+      }
+      
+      if (!testMessage.user_id) {
+        appendLog('❌ Cannot test message posting: No authenticated user ID')
+      } else {
+        const postPromise = workingClient
+          .from('messages')
+          .insert(testMessage)
+          .select('id, created_at')
+          .single()
+        
+        const postTimeout = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Message post timeout')), 5000)
+        )
+        
+        const { data: messageData, error: messageError } = await Promise.race([postPromise, postTimeout]) as any
+        
+        if (messageError) {
+          appendLog(`❌ Message post failed: ${messageError.message}`)
+          if (messageError.code) {
+            appendLog(`   Error code: ${messageError.code}`)
+          }
+          if (messageError.details) {
+            appendLog(`   Details: ${messageError.details}`)
+          }
+        } else if (messageData) {
+          appendLog(`✅ Message posted successfully!`)
+          appendLog(`   Message ID: ${messageData.id}`)
+          appendLog(`   Created at: ${messageData.created_at}`)
+          
+          // Clean up the test message
+          appendLog('🧹 Cleaning up test message...')
+          const { error: deleteError } = await workingClient
+            .from('messages')
+            .delete()
+            .eq('id', messageData.id)
+          
+          if (deleteError) {
+            appendLog(`⚠️ Failed to clean up test message: ${deleteError.message}`)
+          } else {
+            appendLog('✅ Test message cleaned up successfully')
+          }
+        } else {
+          appendLog('❌ Message post returned no data')
+        }
+      }
+    } catch (postErr) {
+      appendLog(`❌ Message post test failed: ${(postErr as Error).message}`)
+    }
   }
 
   const handleFocusRefresh = async () => {
