@@ -168,25 +168,11 @@ const recreateClientWithStoredToken = async (): Promise<ReturnType<typeof create
     fallbackClient = null
   }
   
-  // Get session from localStorage manually (don't use stuck client)
-  const raw = localStorage.getItem(localStorageKey)
-  const session = raw ? JSON.parse(raw) : null
-  
   // Create new client with unique storage key
   const newClient = createFreshSupabaseClient()
   
-  // Restore session if available
-  if (session?.currentSession?.access_token && session?.currentSession?.refresh_token) {
-    try {
-      await newClient.auth.setSession({
-        access_token: session.currentSession.access_token,
-        refresh_token: session.currentSession.refresh_token,
-      })
-      if (DEBUG) console.log('✅ Session restored to fresh client')
-    } catch (err) {
-      if (DEBUG) console.warn('⚠️ Failed to restore session to fresh client:', err)
-    }
-  }
+  // Attempt to restore session from localStorage
+  await restoreSessionIfNeeded(newClient)
   
   return newClient
 }
@@ -266,6 +252,73 @@ export const recreateSupabaseClient = async (): Promise<ReturnType<typeof create
   return fallbackClient
 }
 
+// Restore session from localStorage to a fresh client
+export const restoreSessionIfNeeded = async (client: ReturnType<typeof createClient>): Promise<boolean> => {
+  try {
+    const raw = localStorage.getItem(localStorageKey)
+    const stored = raw ? JSON.parse(raw) : null
+    
+    if (!stored?.currentSession?.refresh_token && !stored?.refresh_token) {
+      if (DEBUG) console.log('🔍 No stored refresh token found')
+      return false
+    }
+
+    const refreshToken = stored.currentSession?.refresh_token || stored.refresh_token
+    const accessToken = stored.currentSession?.access_token || stored.access_token || ''
+
+    if (DEBUG) console.log('🔄 Attempting to restore session from localStorage...')
+    
+    const { data, error } = await client.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    })
+
+    if (error) {
+      if (DEBUG) console.warn('❌ Failed to restore session from stored token:', error.message)
+      return false
+    } else {
+      if (DEBUG) console.log('✅ Session restored from localStorage')
+      // Update realtime auth token
+      client.realtime.setAuth(data.session?.access_token || '')
+      return true
+    }
+  } catch (error) {
+    if (DEBUG) console.error('❌ Exception during session restoration:', error)
+    return false
+  }
+}
+
+// Force session restoration for diagnostics
+export const forceSessionRestore = async (): Promise<boolean> => {
+  try {
+    const workingClient = await getWorkingClient()
+    
+    // First check if we already have a session
+    const { data: { session }, error } = await workingClient.auth.getSession()
+    if (!error && session) {
+      if (DEBUG) console.log('✅ Active session already exists')
+      return true
+    }
+    
+    if (DEBUG) console.log('🔍 No active session found, attempting restoration...')
+    
+    // Try to restore from localStorage
+    const restored = await restoreSessionIfNeeded(workingClient)
+    if (restored) {
+      return true
+    }
+    
+    // If restoration failed, try with a fresh client
+    if (DEBUG) console.log('🔄 Trying session restoration with fresh client...')
+    const freshClient = await recreateSupabaseClient()
+    const restoredWithFresh = await restoreSessionIfNeeded(freshClient)
+    
+    return restoredWithFresh
+  } catch (error) {
+    if (DEBUG) console.error('❌ Force session restore failed:', error)
+    return false
+  }
+}
 // --- Refresh session locking -------------------------------------------------
 // Prevent multiple concurrent refreshSession calls from triggering duplicate
 // network requests. Any callers will await the same promise while a refresh is

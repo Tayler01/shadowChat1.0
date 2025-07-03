@@ -17,6 +17,7 @@ import {
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
   recreateSupabaseClient,
+  forceSessionRestore,
 } from '../../lib/supabase'
 import { useVisibilityRefresh } from '../../hooks/useVisibilityRefresh'
 
@@ -265,6 +266,37 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
 
     if (!before.session) {
       appendLog('No active session found')
+      
+      // Trigger session restoration when no active session is found
+      appendLog('🔄 Attempting to restore session from localStorage...')
+      const restored = await forceSessionRestore()
+      
+      if (restored) {
+        appendLog('✅ Session successfully restored!')
+        
+        // Re-check session after restoration
+        const { data: after, error: afterError } = await workingClient.auth.getSession()
+        if (!afterError && after.session) {
+          const session = after.session
+          appendLog(`✅ Restored session expires at: ${session.expires_at}`)
+          const now = Math.floor(Date.now() / 1000)
+          appendLog(
+            now < (session.expires_at ?? 0)
+              ? 'Restored access token is valid ✅'
+              : 'Restored access token is expired ❌'
+          )
+          appendLog(`Restored refresh token: ${session.refresh_token ? 'present' : 'null'}`)
+        } else {
+          appendLog('❌ Session restoration appeared to succeed but no session found')
+        }
+      } else {
+        appendLog('❌ Session restoration failed')
+        appendLog('💡 This could mean:')
+        appendLog('  - No valid refresh token in localStorage')
+        appendLog('  - Refresh token has expired')
+        appendLog('  - Network connectivity issues')
+        appendLog('  - User needs to sign in again')
+      }
     } else {
       const session = before.session
       appendLog(`Current session expires at: ${session.expires_at}`)
@@ -275,19 +307,19 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
           : 'Access token expired ❌'
       )
       appendLog(`Memory refresh token: ${session.refresh_token ?? 'null'}`)
-    }
-
-    const storedToken = getStoredRefreshToken()
-    appendLog(
-      `Stored refresh token (${localStorageKey}): ${storedToken ?? 'null'}`
-    )
-
-    if (before.session?.refresh_token) {
+      
+      const storedToken = getStoredRefreshToken()
       appendLog(
-        storedToken === before.session.refresh_token
-          ? 'Stored and memory refresh tokens match ✅'
-          : 'Stored and memory refresh tokens differ ❌'
+        `Stored refresh token (${localStorageKey}): ${storedToken ?? 'null'}`
       )
+
+      if (session.refresh_token) {
+        appendLog(
+          storedToken === session.refresh_token
+            ? 'Stored and memory refresh tokens match ✅'
+            : 'Stored and memory refresh tokens differ ❌'
+        )
+      }
     }
   }
 
