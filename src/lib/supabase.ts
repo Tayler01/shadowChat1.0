@@ -319,8 +319,8 @@ export const refreshSessionLocked = async () => {
       })
     const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(
-        () => reject(new Error('Session refresh timeout after 10 seconds')),
-        10000
+        () => reject(new Error('Session refresh timeout after 30 seconds')),
+        30000
       )
     )
     refreshSessionPromise = (Promise.race([refresh, timeoutPromise]) as Promise<{
