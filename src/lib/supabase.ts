@@ -590,7 +590,25 @@ export const ensureSession = async (force = false) => {
     }
 
     if (!session) {
-      console.warn('No active session found')
+      if (DEBUG) {
+        console.warn('No active session found - user is not authenticated')
+      }
+      return false
+    }
+
+    // Verify we have a valid user in the session
+    if (!session.user) {
+      if (DEBUG) {
+        console.warn('Session exists but no user found')
+      }
+      return false
+    }
+
+    // Check if we have required tokens for refresh
+    if (!session.access_token || !session.refresh_token) {
+      if (DEBUG) {
+        console.warn('Session missing required tokens')
+      }
       return false
     }
 
@@ -598,6 +616,8 @@ export const ensureSession = async (force = false) => {
       console.log('ensureSession: current session', {
         userId: session.user?.id,
         expiresAt: session.expires_at,
+        hasAccessToken: !!session.access_token,
+        hasRefreshToken: !!session.refresh_token,
       })
     }
     
@@ -609,7 +629,14 @@ export const ensureSession = async (force = false) => {
     if (force || (expiresAt && (expiresAt - now) < fiveMinutes)) {
       if (DEBUG && force) {
         console.log('ensureSession: forcing refresh regardless of expiry')
+      } else if (DEBUG) {
+        console.log('ensureSession: session expires soon, refreshing', {
+          expiresAt,
+          now,
+          timeUntilExpiry: expiresAt ? (expiresAt - now) : 'unknown'
+        })
       }
+      
       const { data: refreshData, error: refreshError } = await refreshSessionLocked()
 
       if (refreshError) {
@@ -628,6 +655,8 @@ export const ensureSession = async (force = false) => {
           expiresAt: refreshData.session.expires_at,
         })
       }
+    } else if (DEBUG) {
+      console.log('ensureSession: session is still valid, no refresh needed')
     }
     
     return true
