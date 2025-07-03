@@ -25,12 +25,17 @@ const createBackupSupabaseClient = () => {
     }
   }
   
-  const { createClient } = require('@supabase/supabase-js')
+  // Create a backup client with minimal configuration
   return createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
       detectSessionInUrl: false,
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 10, // Lower than main client
+      },
     },
     global: {
       fetch: backupFetch,

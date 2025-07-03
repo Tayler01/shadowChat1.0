@@ -58,11 +58,19 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
         
         // Test a simple query
         appendLog('🔍 Testing simple database query...')
-        const { data, error } = await supabase.from('users').select('id').limit(1)
-        if (error) {
-          appendLog(`❌ Database query failed: ${error.message}`)
-        } else {
-          appendLog('✅ Database query succeeded')
+        try {
+          const queryPromise = supabase.from('users').select('id').limit(1)
+          const queryTimeout = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Query timeout')), 5000)
+          )
+          const { data, error } = await Promise.race([queryPromise, queryTimeout]) as any
+          if (error) {
+            appendLog(`❌ Database query failed: ${error.message}`)
+          } else {
+            appendLog('✅ Database query succeeded')
+          }
+        } catch (queryError) {
+          appendLog(`❌ Database query timeout: ${(queryError as Error).message}`)
         }
       } else {
         appendLog('❌ Main client is unresponsive')
@@ -71,9 +79,13 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
         appendLog('🔄 Testing backup client...')
         try {
           const workingClient = await getWorkingClient()
-          const { data, error } = await workingClient.from('users').select('id').limit(1)
+          const backupQueryPromise = workingClient.from('users').select('id').limit(1)
+          const backupTimeout = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Backup query timeout')), 5000)
+          )
+          const { data, error } = await Promise.race([backupQueryPromise, backupTimeout]) as any
           if (error) {
-            appendLog(`❌ Backup client also failed: ${error.message}`)
+            appendLog(`❌ Backup client query failed: ${error.message}`)
           } else {
             appendLog('✅ Backup client works! Main client issue confirmed')
           }
@@ -88,7 +100,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     // Network diagnostics
     appendLog('🌐 Testing network connectivity...')
     try {
-      const networkTest = fetch('https://www.google.com/favicon.ico', { 
+      const networkTest = fetch('https://httpbin.org/status/200', { 
         method: 'HEAD',
         signal: AbortSignal.timeout(3000)
       })
@@ -96,6 +108,19 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       appendLog(`✅ Network test: SUCCESS (${networkResult.status})`)
     } catch (err) {
       appendLog(`❌ Network test failed: ${(err as Error).message}`)
+      
+      // Try alternative network test
+      appendLog('🔄 Trying alternative network test...')
+      try {
+        const altTest = fetch('https://jsonplaceholder.typicode.com/posts/1', { 
+          method: 'HEAD',
+          signal: AbortSignal.timeout(3000)
+        })
+        const altResult = await altTest
+        appendLog(`✅ Alternative network test: SUCCESS (${altResult.status})`)
+      } catch (altErr) {
+        appendLog(`❌ Alternative network test also failed: ${(altErr as Error).message}`)
+      }
     }
 
     // Environment diagnostics
@@ -179,18 +204,36 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       const workingClient = await getWorkingClient()
       appendLog(`Using ${workingClient === supabase ? 'main' : 'backup'} client for final test`)
       
-      const { data: sessionData, error: sessionError } = await workingClient.auth.getSession()
-      if (sessionError) {
-        appendLog(`❌ Session check failed: ${sessionError.message}`)
-      } else {
-        appendLog(`✅ Session check: ${sessionData.session ? 'Authenticated' : 'Not authenticated'}`)
+      // Test session with timeout
+      try {
+        const sessionPromise = workingClient.auth.getSession()
+        const sessionTimeout = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session timeout')), 5000)
+        )
+        const { data: sessionData, error: sessionError } = await Promise.race([sessionPromise, sessionTimeout]) as any
+        if (sessionError) {
+          appendLog(`❌ Session check failed: ${sessionError.message}`)
+        } else {
+          appendLog(`✅ Session check: ${sessionData.session ? 'Authenticated' : 'Not authenticated'}`)
+        }
+      } catch (sessionErr) {
+        appendLog(`❌ Session check timeout: ${(sessionErr as Error).message}`)
       }
       
-      const { data: dbData, error: dbError } = await workingClient.from('users').select('id').limit(1)
-      if (dbError) {
-        appendLog(`❌ Database query failed: ${dbError.message}`)
-      } else {
-        appendLog(`✅ Database query succeeded`)
+      // Test database with timeout
+      try {
+        const dbPromise = workingClient.from('users').select('id').limit(1)
+        const dbTimeout = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Database timeout')), 5000)
+        )
+        const { data: dbData, error: dbError } = await Promise.race([dbPromise, dbTimeout]) as any
+        if (dbError) {
+          appendLog(`❌ Database query failed: ${dbError.message}`)
+        } else {
+          appendLog(`✅ Database query succeeded`)
+        }
+      } catch (dbErr) {
+        appendLog(`❌ Database query timeout: ${(dbErr as Error).message}`)
       }
     } catch (err) {
       appendLog(`❌ Final test failed: ${(err as Error).message}`)
