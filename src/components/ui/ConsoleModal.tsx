@@ -6,10 +6,10 @@ interface ConsoleModalProps {
   open: boolean
   logs: string[]
   onClose: () => void
-  onRefresh?: () => void
+  onAuthCheck?: () => void
 }
 
-export const ConsoleModal: React.FC<ConsoleModalProps> = ({ open, logs, onClose, onRefresh }) => {
+export const ConsoleModal: React.FC<ConsoleModalProps> = ({ open, logs, onClose, onAuthCheck }) => {
   if (!open) return null
 
   const logRef = useRef<HTMLPreElement>(null)
@@ -24,9 +24,9 @@ export const ConsoleModal: React.FC<ConsoleModalProps> = ({ open, logs, onClose,
         <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Connection Test</h2>
           <div className="flex items-center space-x-2">
-            {onRefresh && (
-              <Button size="sm" variant="secondary" onClick={onRefresh}>
-                Refresh
+            {onAuthCheck && (
+              <Button size="sm" variant="secondary" onClick={onAuthCheck}>
+                Check Auth
               </Button>
             )}
             <button
