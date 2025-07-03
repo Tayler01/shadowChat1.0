@@ -328,7 +328,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       const currentSession = before.session || after?.session
       const testMessage = {
         user_id: currentSession?.user?.id,
-        content: `Test message from auth diagnostics - ${new Date().toISOString()}`,
+        content: `🔧 AUTH TEST MESSAGE - This is a test message from the authentication diagnostics. It will be automatically deleted in 3 seconds. Time: ${new Date().toLocaleTimeString()}`,
         message_type: 'text'
       }
       
@@ -360,29 +360,32 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
           appendLog(`✅ Message posted successfully!`)
           appendLog(`   Message ID: ${messageData.id}`)
           appendLog(`   Created at: ${messageData.created_at}`)
+          appendLog(`⏱️ Message will be visible for 3 seconds...`)
           
-          // Clean up the test message immediately
-          appendLog('🧹 Cleaning up test message...')
-          try {
-            const deletePromise = workingClient
-              .from('messages')
-              .delete()
-              .eq('id', messageData.id)
-            
-            const deleteTimeout = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Delete timeout')), 3000)
-            )
-            
-            const { error: deleteError } = await Promise.race([deletePromise, deleteTimeout]) as any
-            
-            if (deleteError) {
-              appendLog(`⚠️ Failed to clean up test message: ${deleteError.message}`)
-            } else {
-              appendLog('✅ Test message cleaned up successfully')
+          // Wait 3 seconds before cleaning up the test message
+          setTimeout(async () => {
+            appendLog('🧹 Cleaning up test message...')
+            try {
+              const deletePromise = workingClient
+                .from('messages')
+                .delete()
+                .eq('id', messageData.id)
+              
+              const deleteTimeout = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Delete timeout')), 3000)
+              )
+              
+              const { error: deleteError } = await Promise.race([deletePromise, deleteTimeout]) as any
+              
+              if (deleteError) {
+                appendLog(`⚠️ Failed to clean up test message: ${deleteError.message}`)
+              } else {
+                appendLog('✅ Test message cleaned up successfully')
+              }
+            } catch (deleteErr) {
+              appendLog(`⚠️ Delete operation failed: ${(deleteErr as Error).message}`)
             }
-          } catch (deleteErr) {
-            appendLog(`⚠️ Delete operation failed: ${(deleteErr as Error).message}`)
-          }
+          }, 3000)
         } else {
           appendLog('❌ Message post returned no data')
         }
