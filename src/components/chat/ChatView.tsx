@@ -91,7 +91,12 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     // Check current auth state before testing
     appendLog('Checking current auth state...')
     try {
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      const sessionCheck = supabase.auth.getSession()
+      const sessionTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Session check timeout after 10 seconds')), 10000)
+      )
+      const { data: sessionData, error: sessionError } = await Promise.race([sessionCheck, sessionTimeout]) as any
+      
       if (sessionError) {
         appendLog(`Session error: ${sessionError.message}`)
       } else if (sessionData.session) {
@@ -101,6 +106,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       }
     } catch (err) {
       appendLog(`Session check failed: ${(err as Error).message}`)
+      appendLog(`Session check error stack: ${(err as Error).stack}`)
     }
     appendLog('Testing Supabase connectivity...')
     try {
@@ -188,17 +194,26 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     }
 
     appendLog('Checking session...')
-    const { data: before } = await supabase.auth.getSession()
-    appendLog(
-      before.session
-        ? `Current session expires at: ${before.session.expires_at}`
-        : 'No active session'
-    )
+    try {
+      const beforeSessionCheck = supabase.auth.getSession()
+      const beforeTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Before session check timeout after 10 seconds')), 10000)
+      )
+      const { data: before } = await Promise.race([beforeSessionCheck, beforeTimeout]) as any
+      appendLog(
+        before.session
+          ? `Current session expires at: ${before.session.expires_at}`
+          : 'No active session'
+      )
+    } catch (err) {
+      appendLog(`Before session check failed: ${(err as Error).message}`)
+    }
 
     try {
       appendLog('Clearing any stuck refresh promises before session check...')
       clearRefreshSessionPromise()
       
+      appendLog('Starting ensureSession call...')
       const valid = await Promise.race([
         ensureSession(),
         new Promise<boolean>((_, reject) =>
@@ -212,6 +227,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
         appendLog('Connection verification timed out ❌')
       } else {
         appendLog('Failed to verify connection ❌')
+        appendLog(`ensureSession error: ${(err as Error).message}`)
+        appendLog(`ensureSession error stack: ${(err as Error).stack}`)
       }
       console.error('Session verification failed:', err)
       return
@@ -231,11 +248,17 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
         appendLog('Database query succeeded ✅')
       }
 
-      const { data } = await supabase.auth.getSession()
+      appendLog('Final session check...')
+      const finalSessionCheck = supabase.auth.getSession()
+      const finalSessionTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Final session check timeout after 10 seconds')), 10000)
+      )
+      const { data } = await Promise.race([finalSessionCheck, finalSessionTimeout]) as any
       appendLog(`Token expires at: ${data.session?.expires_at}`)
       appendLog(data.session ? 'Session still valid ✅' : 'Session missing ❌')
     } catch (err) {
       appendLog(`Database test threw: ${(err as Error).message}`)
+      appendLog(`Database test error stack: ${(err as Error).stack}`)
     }
   }
 
