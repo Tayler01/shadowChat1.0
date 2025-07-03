@@ -46,23 +46,111 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     setLogs([])
     appendSupabaseInfo()
 
+    // Test basic network connectivity first
+    appendLog('Testing basic network connectivity...')
+    try {
+      const networkTest = fetch('https://httpbin.org/get', { 
+        method: 'GET',
+        signal: AbortSignal.timeout(5000)
+      })
+      const networkResult = await networkTest
+      appendLog(`Network test: ${networkResult.ok ? 'SUCCESS' : 'FAILED'} (${networkResult.status})`)
+    } catch (err) {
+      appendLog(`Network test failed: ${(err as Error).message}`)
+    }
+
+    // Test Supabase URL accessibility
+    appendLog('Testing Supabase URL accessibility...')
+    try {
+      const supabaseUrlTest = fetch(SUPABASE_URL, { 
+        method: 'GET',
+        signal: AbortSignal.timeout(5000)
+      })
+      const supabaseResult = await supabaseUrlTest
+      appendLog(`Supabase URL test: ${supabaseResult.ok ? 'SUCCESS' : 'FAILED'} (${supabaseResult.status})`)
+    } catch (err) {
+      appendLog(`Supabase URL test failed: ${(err as Error).message}`)
+    }
+
+    // Test auth endpoint specifically
+    appendLog('Testing Supabase auth endpoint...')
+    try {
+      const authTest = fetch(`${SUPABASE_URL}/auth/v1/settings`, {
+        method: 'GET',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        signal: AbortSignal.timeout(5000)
+      })
+      const authResult = await authTest
+      appendLog(`Auth endpoint test: ${authResult.ok ? 'SUCCESS' : 'FAILED'} (${authResult.status})`)
+      if (!authResult.ok) {
+        const errorText = await authResult.text()
+        appendLog(`Auth endpoint error: ${errorText}`)
+      }
+    } catch (err) {
+      appendLog(`Auth endpoint test failed: ${(err as Error).message}`)
+    }
+
+    // Test REST API endpoint
+    appendLog('Testing Supabase REST API endpoint...')
+    try {
+      const restTest = fetch(`${SUPABASE_URL}/rest/v1/`, {
+        method: 'GET',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+        },
+        signal: AbortSignal.timeout(5000)
+      })
+      const restResult = await restTest
+      appendLog(`REST API test: ${restResult.ok ? 'SUCCESS' : 'FAILED'} (${restResult.status})`)
+      if (!restResult.ok) {
+        const errorText = await restResult.text()
+        appendLog(`REST API error: ${errorText}`)
+      }
+    } catch (err) {
+      appendLog(`REST API test failed: ${(err as Error).message}`)
+    }
+
+    // Check current auth state before testing
+    appendLog('Checking current auth state...')
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) {
+        appendLog(`Session error: ${sessionError.message}`)
+      } else if (sessionData.session) {
+        appendLog(`Current session: User ${sessionData.session.user?.id}, expires ${sessionData.session.expires_at}`)
+      } else {
+        appendLog('No current session found')
+      }
+    } catch (err) {
+      appendLog(`Session check failed: ${(err as Error).message}`)
+    }
     appendLog('Testing Supabase connectivity...')
     try {
+      appendLog('Creating users query...')
       // Add timeout to prevent hanging
       const connectivityTest = supabase.from('users').select('id').limit(1)
+      appendLog('Query created, executing with timeout...')
       const timeout = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Connectivity test timeout after 10 seconds')), 10000)
       )
       
+      appendLog('Awaiting query result...')
       const { error: pingError } = await Promise.race([connectivityTest, timeout]) as any
+      appendLog('Query completed')
       if (pingError) {
         appendLog(`Connectivity check failed: ${pingError.message}`)
+        appendLog(`Error details: ${JSON.stringify(pingError, null, 2)}`)
       } else {
         appendLog('Connectivity check succeeded ✅')
       }
     } catch (err) {
       const errorMsg = (err as Error).message
       appendLog(`Connectivity check threw: ${errorMsg}`)
+      appendLog(`Error stack: ${(err as Error).stack}`)
       
       // If it's a timeout, try to clear any stuck promises and retry
       if (errorMsg.includes('timeout')) {
@@ -70,25 +158,30 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
         clearRefreshSessionPromise()
         
         try {
+          appendLog('Creating retry query...')
           const retryTest = supabase.from('users').select('id').limit(1)
           const retryTimeout = new Promise((_, reject) => 
             setTimeout(() => reject(new Error('Retry timeout after 5 seconds')), 5000)
           )
+          appendLog('Executing retry query...')
           const { error: retryError } = await Promise.race([retryTest, retryTimeout]) as any
           
           if (retryError) {
             appendLog(`Retry failed: ${retryError.message}`)
+            appendLog(`Retry error details: ${JSON.stringify(retryError, null, 2)}`)
           } else {
             appendLog('Retry succeeded ✅')
           }
         } catch (retryErr) {
           appendLog(`Retry threw: ${(retryErr as Error).message}`)
+          appendLog(`Retry error stack: ${(retryErr as Error).stack}`)
         }
       }
     }
 
     appendLog('Running basic feature tests...')
     try {
+      appendLog('Testing messages table access...')
       const messagesTest = supabase.from('messages').select('id').limit(1)
       const msgTimeout = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Messages test timeout after 10 seconds')), 10000)
@@ -97,10 +190,12 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       
       if (msgError) {
         appendLog(`Messages query failed: ${msgError.message}`)
+        appendLog(`Messages error details: ${JSON.stringify(msgError, null, 2)}`)
       } else {
         appendLog('Messages query succeeded ✅')
       }
 
+      appendLog('Testing RPC function call...')
       const presenceTest = supabase.rpc('update_user_last_active')
       const presenceTimeout = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Presence test timeout after 10 seconds')), 10000)
@@ -109,11 +204,13 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       
       if (presenceError) {
         appendLog(`Presence RPC failed: ${presenceError.message}`)
+        appendLog(`Presence error details: ${JSON.stringify(presenceError, null, 2)}`)
       } else {
         appendLog('Presence RPC succeeded ✅')
       }
     } catch (err) {
       appendLog(`Basic tests threw: ${(err as Error).message}`)
+      appendLog(`Basic tests error stack: ${(err as Error).stack}`)
     }
 
     appendLog('Checking session...')
