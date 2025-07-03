@@ -211,28 +211,34 @@ function useProvideMessages(): MessagesContextValue {
   // Reset function to reinitialize everything with fresh client
   const resetWithFreshClient = useCallback(async () => {
     if (DEBUG) {
-      console.log('🔄 useMessages: Resetting with fresh client...')
+      console.log('🔄 [MESSAGES] resetWithFreshClient: Starting...')
     }
     
     try {
       // Clean up old channel
       if (channelRef.current) {
+        if (DEBUG) console.log('🗑️ [MESSAGES] Removing old realtime channel...')
         supabase.removeChannel(channelRef.current)
         channelRef.current = null
+        if (DEBUG) console.log('✅ [MESSAGES] Old channel removed')
       }
       
       // Refetch messages with new client
+      if (DEBUG) console.log('📥 [MESSAGES] Refetching messages with new client...')
       await fetchMessages()
+      if (DEBUG) console.log('✅ [MESSAGES] Messages refetched')
       
       // Resubscribe to realtime with new client
       if (subscribeRef.current) {
+        if (DEBUG) console.log('📡 [MESSAGES] Resubscribing to realtime...')
         const newChannel = subscribeRef.current()
         channelRef.current = newChannel
+        if (DEBUG) console.log('✅ [MESSAGES] Realtime resubscribed')
       }
       
-      if (DEBUG) console.log('✅ useMessages: Reset complete')
+      if (DEBUG) console.log('✅ [MESSAGES] resetWithFreshClient: Complete')
     } catch (error) {
-      if (DEBUG) console.error('❌ useMessages: Reset failed:', error)
+      if (DEBUG) console.error('❌ [MESSAGES] resetWithFreshClient: Failed:', error)
     }
   }, []);
 
@@ -240,19 +246,22 @@ function useProvideMessages(): MessagesContextValue {
     const channel = channelRef.current;
     if (channel && channel.state !== 'joined') {
       if (DEBUG) {
-        console.log('🌀 Resubscribing channel due to state', channel.state)
+        console.log('🌀 [MESSAGES] handleVisible: Resubscribing channel due to state:', channel.state)
       }
       supabase.removeChannel(channel)
       const newChannel = subscribeRef.current?.()
       if (newChannel) {
         channelRef.current = newChannel
+        if (DEBUG) console.log('✅ [MESSAGES] handleVisible: Channel resubscribed')
       }
     }
     
     // Use the reset function instead of just fetchMessages
     if (clientResetRef.current) {
+      if (DEBUG) console.log('🔄 [MESSAGES] handleVisible: Triggering client reset...')
       clientResetRef.current()
     } else {
+      if (DEBUG) console.log('📥 [MESSAGES] handleVisible: Fallback to fetchMessages...')
       fetchMessages()
     }
   }, [fetchMessages])
@@ -491,7 +500,7 @@ function useProvideMessages(): MessagesContextValue {
     fileUrl?: string
   ) => {
     const timestamp = new Date().toISOString();
-    const logPrefix = `🚀 [${timestamp}] MESSAGE_SEND`;
+    const logPrefix = `🚀 [MESSAGES] [${timestamp}] sendMessage`;
 
     if (DEBUG) {
       console.log(`${logPrefix}: Called`, {
@@ -516,6 +525,7 @@ function useProvideMessages(): MessagesContextValue {
     }
 
     // Ensure we have a valid session before attempting database operations
+    if (DEBUG) console.log(`${logPrefix}: Calling ensureSession...`)
     const sessionValid = await ensureSession();
     if (DEBUG) {
       console.log(`${logPrefix}: After ensureSession`, {
@@ -551,10 +561,12 @@ function useProvideMessages(): MessagesContextValue {
       }
 
       // Step 2: Attempt database insert (let Supabase handle auth internally)
+      if (DEBUG) console.log(`${logPrefix}: Attempting database insert...`)
       let { data, error } = await insertMessage(messageData);
 
       // Step 3: Handle auth errors with retry
       if (error && (error.status === 401 || /jwt|token|expired/i.test(error.message))) {
+        if (DEBUG) console.log(`${logPrefix}: Auth error detected, attempting retry...`)
         const retry = await refreshSessionAndRetry(messageData);
         if (DEBUG) {
           console.log(`${logPrefix}: Retry result`, retry);
@@ -588,11 +600,13 @@ function useProvideMessages(): MessagesContextValue {
         
         let broadcastResult: unknown = null
         if (channelRef.current?.state === 'joined') {
+          if (DEBUG) console.log(`${logPrefix}: Broadcasting message...`)
           broadcastResult = channelRef.current.send({
             type: 'broadcast',
             event: 'new_message',
             payload: data,
           })
+          if (DEBUG) console.log(`${logPrefix}: Broadcast sent`)
         }
         if (DEBUG) {
           console.log(`${logPrefix}: Broadcast result`, {
@@ -602,6 +616,7 @@ function useProvideMessages(): MessagesContextValue {
         }
 
         // Ensure we didn't miss any messages due to timing issues
+        if (DEBUG) console.log(`${logPrefix}: Triggering fetchMessages to ensure sync...`)
         fetchMessages()
       }
       
@@ -623,9 +638,12 @@ function useProvideMessages(): MessagesContextValue {
   const editMessage = useCallback(async (messageId: string, content: string) => {
     if (!user) return;
 
+    if (DEBUG) console.log('✏️ [MESSAGES] editMessage: Starting...', { messageId, content })
 
     try {
       const workingClient = await getWorkingClient();
+      if (DEBUG) console.log('✏️ [MESSAGES] editMessage: Got working client')
+      
       const { error } = await workingClient
         .from('messages')
         .update({
@@ -637,10 +655,12 @@ function useProvideMessages(): MessagesContextValue {
 
       if (error) {
         if (DEBUG) {
-          console.error('❌ Error editing message:', error)
+          console.error('❌ [MESSAGES] editMessage: Database error:', error)
         }
         throw error;
       }
+
+      if (DEBUG) console.log('✅ [MESSAGES] editMessage: Database update successful')
 
       // Optimistically update local state
       setMessages(prev =>
@@ -648,10 +668,12 @@ function useProvideMessages(): MessagesContextValue {
           m.id === messageId ? { ...m, content, edited_at: new Date().toISOString() } as Message : m
         )
       );
+      
+      if (DEBUG) console.log('✅ [MESSAGES] editMessage: Local state updated')
 
     } catch (error) {
       if (DEBUG) {
-        console.error('❌ Exception editing message:', error)
+        console.error('❌ [MESSAGES] editMessage: Exception:', error)
       }
       throw error;
     }
@@ -660,9 +682,12 @@ function useProvideMessages(): MessagesContextValue {
   const deleteMessage = useCallback(async (messageId: string) => {
     if (!user) return;
 
+    if (DEBUG) console.log('🗑️ [MESSAGES] deleteMessage: Starting...', { messageId })
 
     try {
       const workingClient = await getWorkingClient();
+      if (DEBUG) console.log('🗑️ [MESSAGES] deleteMessage: Got working client')
+      
       const { error } = await workingClient
         .from('messages')
         .delete()
@@ -671,17 +696,21 @@ function useProvideMessages(): MessagesContextValue {
 
       if (error) {
         if (DEBUG) {
-          console.error('❌ Error deleting message:', error)
+          console.error('❌ [MESSAGES] deleteMessage: Database error:', error)
         }
         throw error;
       }
 
+      if (DEBUG) console.log('✅ [MESSAGES] deleteMessage: Database delete successful')
+
       // Optimistically remove from local state
       setMessages(prev => prev.filter(m => m.id !== messageId));
+      
+      if (DEBUG) console.log('✅ [MESSAGES] deleteMessage: Local state updated')
 
     } catch (error) {
       if (DEBUG) {
-        console.error('❌ Exception deleting message:', error)
+        console.error('❌ [MESSAGES] deleteMessage: Exception:', error)
       }
       throw error;
     }
@@ -689,6 +718,8 @@ function useProvideMessages(): MessagesContextValue {
 
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!user) return;
+
+    if (DEBUG) console.log('😀 [MESSAGES] toggleReaction: Starting...', { messageId, emoji })
 
     // Optimistically update local state so the reaction appears immediately
     setMessages(prev => {
@@ -721,11 +752,14 @@ function useProvideMessages(): MessagesContextValue {
       const updated = { ...message, reactions };
       const newMessages = [...prev];
       newMessages[idx] = updated as Message;
+      if (DEBUG) console.log('😀 [MESSAGES] toggleReaction: Local state updated optimistically')
       return newMessages;
     });
 
     try {
       const workingClient = await getWorkingClient();
+      if (DEBUG) console.log('😀 [MESSAGES] toggleReaction: Got working client')
+      
       const { error } = await workingClient.rpc('toggle_message_reaction', {
         message_id: messageId,
         emoji: emoji,
@@ -734,13 +768,15 @@ function useProvideMessages(): MessagesContextValue {
 
       if (error) {
         if (DEBUG) {
-          console.error('❌ Error toggling reaction:', error)
+          console.error('❌ [MESSAGES] toggleReaction: RPC error:', error)
         }
         throw error;
       }
+      
+      if (DEBUG) console.log('✅ [MESSAGES] toggleReaction: RPC successful')
     } catch (error) {
       if (DEBUG) {
-        console.error('❌ Exception toggling reaction:', error)
+        console.error('❌ [MESSAGES] toggleReaction: Exception:', error)
       }
       throw error;
     }
@@ -749,21 +785,27 @@ function useProvideMessages(): MessagesContextValue {
   const togglePin = useCallback(async (messageId: string) => {
     if (!user) return;
 
+    if (DEBUG) console.log('📌 [MESSAGES] togglePin: Starting...', { messageId })
+
     const current = messages.find(m => m.id === messageId);
     const isPinned = current?.pinned;
 
     try {
       const workingClient = await getWorkingClient();
+      if (DEBUG) console.log('📌 [MESSAGES] togglePin: Got working client')
+      
       const { error } = await workingClient.rpc('toggle_message_pin', {
         message_id: messageId,
       });
 
       if (error) {
         if (DEBUG) {
-          console.error('❌ Error toggling pin:', error)
+          console.error('❌ [MESSAGES] togglePin: RPC error:', error)
         }
         throw error;
       }
+
+      if (DEBUG) console.log('✅ [MESSAGES] togglePin: RPC successful')
 
       setMessages(prev =>
         prev.map(m => {
@@ -780,11 +822,14 @@ function useProvideMessages(): MessagesContextValue {
             : m;
         })
       );
+      
+      if (DEBUG) console.log('✅ [MESSAGES] togglePin: Local state updated')
     } catch (error) {
       if (DEBUG) {
-        console.error('❌ Exception toggling pin:', error)
+        console.error('❌ [MESSAGES] togglePin: Exception:', error)
       }
       // Re-sync with database to revert optimistic updates
+      if (DEBUG) console.log('🔄 [MESSAGES] togglePin: Re-syncing with database...')
       fetchMessages();
       throw error;
     }

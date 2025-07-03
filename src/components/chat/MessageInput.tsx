@@ -4,7 +4,7 @@ import { Send, Smile, Command, Plus, Mic } from 'lucide-react'
 import { useTyping } from '../../hooks/useTyping'
 import { Button } from '../ui/Button'
 import { processSlashCommand, slashCommands } from '../../lib/utils'
-import { uploadVoiceMessage, uploadChatFile } from '../../lib/supabase'
+import { uploadVoiceMessage, uploadChatFile, DEBUG } from '../../lib/supabase'
 import type { EmojiPickerProps, EmojiClickData } from '../../types'
 import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import { RecordingIndicator } from '../ui/RecordingIndicator'
@@ -107,15 +107,29 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const handleSubmit = (
     e: React.FormEvent<HTMLFormElement> | React.KeyboardEvent<HTMLTextAreaElement>
   ) => {
+    if (DEBUG) console.log('📝 [MESSAGE_INPUT] handleSubmit: Starting...', {
+      hasMessage: !!message.trim(),
+      messageLength: message.length,
+      disabled
+    })
+    
     e.preventDefault()
     
-    if (!message.trim() || disabled) return
+    if (!message.trim() || disabled) {
+      if (DEBUG) console.log('❌ [MESSAGE_INPUT] handleSubmit: Aborted - no message or disabled')
+      return
+    }
 
     // Process slash commands
+    if (DEBUG) console.log('🔧 [MESSAGE_INPUT] handleSubmit: Processing slash commands...')
     const processedMessage = processSlashCommand(message.trim())
     const finalMessage = processedMessage || message.trim()
+    if (DEBUG) console.log('🔧 [MESSAGE_INPUT] handleSubmit: Final message:', finalMessage)
 
+    if (DEBUG) console.log('📤 [MESSAGE_INPUT] handleSubmit: Calling onSendMessage...')
     onSendMessage(finalMessage)
+    if (DEBUG) console.log('✅ [MESSAGE_INPUT] handleSubmit: onSendMessage called')
+    
     setMessage('')
     stopTyping()
     setShowSlashCommands(false)
@@ -126,6 +140,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
     }
+    
+    if (DEBUG) console.log('✅ [MESSAGE_INPUT] handleSubmit: Complete')
   }
 
 
@@ -173,47 +189,69 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (DEBUG) console.log('🖼️ [MESSAGE_INPUT] handleImageChange: Starting...')
     const file = e.target.files?.[0]
     if (file) {
+      if (DEBUG) console.log('🖼️ [MESSAGE_INPUT] handleImageChange: Uploading file...', {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type
+      })
       uploadChatFile(file)
         .then(url => {
+          if (DEBUG) console.log('✅ [MESSAGE_INPUT] handleImageChange: Upload successful, sending message...', url)
           onSendMessage('', 'image', url)
         })
-        .catch(err => console.error('Failed to upload image', err))
+        .catch(err => {
+          if (DEBUG) console.error('❌ [MESSAGE_INPUT] handleImageChange: Upload failed:', err)
+        })
     }
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (DEBUG) console.log('📁 [MESSAGE_INPUT] handleFileChange: Starting...')
     const file = e.target.files?.[0]
     if (file) {
-      console.log('Selected file:', file)
+      if (DEBUG) console.log('📁 [MESSAGE_INPUT] handleFileChange: File selected:', {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type
+      })
     }
   }
 
   const handleRecordClick = async () => {
+    if (DEBUG) console.log('🎤 [MESSAGE_INPUT] handleRecordClick: Starting...', { recording })
+    
     if (recording) {
+      if (DEBUG) console.log('🛑 [MESSAGE_INPUT] handleRecordClick: Stopping recording...')
       mediaRecorderRef.current?.stop()
       setRecording(false)
     } else {
       try {
+        if (DEBUG) console.log('🎤 [MESSAGE_INPUT] handleRecordClick: Starting recording...')
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
         const recorder = new MediaRecorder(stream)
         audioChunksRef.current = []
         recorder.ondataavailable = e => audioChunksRef.current.push(e.data)
         recorder.onstop = async () => {
+          if (DEBUG) console.log('🎤 [MESSAGE_INPUT] Recording stopped, processing audio...')
           const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
           try {
+            if (DEBUG) console.log('📤 [MESSAGE_INPUT] Uploading voice message...')
             const url = await uploadVoiceMessage(blob)
+            if (DEBUG) console.log('✅ [MESSAGE_INPUT] Voice upload successful, sending message...', url)
             onSendMessage(url, 'audio')
           } catch (err) {
-            console.error('Failed to upload audio', err)
+            if (DEBUG) console.error('❌ [MESSAGE_INPUT] Voice upload failed:', err)
           }
         }
         recorder.start()
         mediaRecorderRef.current = recorder
         setRecording(true)
+        if (DEBUG) console.log('✅ [MESSAGE_INPUT] Recording started')
       } catch (err) {
-        console.error('Failed to start recording', err)
+        if (DEBUG) console.error('❌ [MESSAGE_INPUT] Failed to start recording:', err)
       }
     }
   }

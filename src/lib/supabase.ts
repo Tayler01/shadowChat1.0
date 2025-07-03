@@ -160,19 +160,25 @@ const destroyClient = async (client: ReturnType<typeof createClient>) => {
 
 // Recreate client using stored token (mimics page reload)
 const recreateClientWithStoredToken = async (): Promise<ReturnType<typeof createClient>> => {
-  if (DEBUG) console.log('🔄 Recreating client with stored token...')
+  if (DEBUG) console.log('🔄 [SUPABASE] recreateClientWithStoredToken: Starting...')
   
   // Destroy old fallback client if it exists
   if (fallbackClient) {
+    if (DEBUG) console.log('🗑️ [SUPABASE] Destroying old fallback client...')
     await destroyClient(fallbackClient)
     fallbackClient = null
+    if (DEBUG) console.log('✅ [SUPABASE] Old fallback client destroyed')
   }
   
   // Create new client with unique storage key
+  if (DEBUG) console.log('🆕 [SUPABASE] Creating fresh client...')
   const newClient = createFreshSupabaseClient()
+  if (DEBUG) console.log('✅ [SUPABASE] Fresh client created')
   
   // Attempt to restore session from localStorage
+  if (DEBUG) console.log('🔐 [SUPABASE] Attempting session restoration...')
   await restoreSessionIfNeeded(newClient)
+  if (DEBUG) console.log('✅ [SUPABASE] recreateClientWithStoredToken: Complete')
   
   return newClient
 }
@@ -230,43 +236,58 @@ export const getWorkingClient = async (): Promise<ReturnType<typeof createClient
 
 // Force client recreation (simulates page reload)
 export const recreateSupabaseClient = async (): Promise<ReturnType<typeof createClient>> => {
-  if (DEBUG) console.log('🔄 Force recreating Supabase client...')
+  if (DEBUG) console.log('🔄 [SUPABASE] recreateSupabaseClient: Starting force recreation...')
   
   lastHealthCheck = 0 // Force health check on next call
+  if (DEBUG) console.log('🔄 [SUPABASE] Health check timer reset')
   
   // Destroy old fallback client
   if (fallbackClient) {
+    if (DEBUG) console.log('🗑️ [SUPABASE] Destroying existing fallback client...')
     await destroyClient(fallbackClient)
+    if (DEBUG) console.log('✅ [SUPABASE] Existing fallback client destroyed')
   }
   
   // Create new fallback client
+  if (DEBUG) console.log('🆕 [SUPABASE] Creating new fallback client...')
   fallbackClient = await recreateClientWithStoredToken()
+  if (DEBUG) console.log('✅ [SUPABASE] New fallback client created')
   
   // Test the new client
+  if (DEBUG) console.log('🧪 [SUPABASE] Testing new client responsiveness...')
   const isResponsive = await testClientResponsiveness(fallbackClient, 3000)
   
   if (DEBUG) {
-    console.log(isResponsive ? '✅ Fresh client is responsive' : '❌ Fresh client is also unresponsive')
+    console.log(isResponsive ? '✅ [SUPABASE] Fresh client is responsive' : '❌ [SUPABASE] Fresh client is also unresponsive')
   }
   
+  if (DEBUG) console.log('✅ [SUPABASE] recreateSupabaseClient: Complete')
   return fallbackClient
 }
 
 // Restore session from localStorage to a fresh client
 export const restoreSessionIfNeeded = async (client: ReturnType<typeof createClient>): Promise<boolean> => {
+  if (DEBUG) console.log('🔐 [SUPABASE] restoreSessionIfNeeded: Starting...')
+  
   try {
+    if (DEBUG) console.log('📖 [SUPABASE] Reading localStorage for session data...')
     const raw = localStorage.getItem(localStorageKey)
     const stored = raw ? JSON.parse(raw) : null
     
     if (!stored?.currentSession?.refresh_token && !stored?.refresh_token) {
-      if (DEBUG) console.log('🔍 No stored refresh token found')
+      if (DEBUG) console.log('❌ [SUPABASE] No stored refresh token found in localStorage')
       return false
     }
 
     const refreshToken = stored.currentSession?.refresh_token || stored.refresh_token
     const accessToken = stored.currentSession?.access_token || stored.access_token || ''
 
-    if (DEBUG) console.log('🔄 Attempting to restore session from localStorage...')
+    if (DEBUG) console.log('🔄 [SUPABASE] Found tokens, calling setSession...', {
+      hasRefreshToken: !!refreshToken,
+      hasAccessToken: !!accessToken,
+      refreshTokenLength: refreshToken?.length || 0,
+      accessTokenLength: accessToken?.length || 0
+    })
     
     const { data, error } = await client.auth.setSession({
       access_token: accessToken,
@@ -274,48 +295,72 @@ export const restoreSessionIfNeeded = async (client: ReturnType<typeof createCli
     })
 
     if (error) {
-      if (DEBUG) console.warn('❌ Failed to restore session from stored token:', error.message)
+      if (DEBUG) console.warn('❌ [SUPABASE] setSession failed:', {
+        message: error.message,
+        code: error.status,
+        details: error
+      })
       return false
     } else {
-      if (DEBUG) console.log('✅ Session restored from localStorage')
+      if (DEBUG) console.log('✅ [SUPABASE] setSession successful:', {
+        hasSession: !!data.session,
+        userId: data.session?.user?.id,
+        expiresAt: data.session?.expires_at
+      })
       // Update realtime auth token
       client.realtime.setAuth(data.session?.access_token || '')
+      if (DEBUG) console.log('✅ [SUPABASE] Realtime auth token updated')
       return true
     }
   } catch (error) {
-    if (DEBUG) console.error('❌ Exception during session restoration:', error)
+    if (DEBUG) console.error('❌ [SUPABASE] Exception during session restoration:', error)
     return false
   }
 }
 
 // Force session restoration for diagnostics
 export const forceSessionRestore = async (): Promise<boolean> => {
+  if (DEBUG) console.log('🔐 [SUPABASE] forceSessionRestore: Starting...')
+  
   try {
+    if (DEBUG) console.log('🔍 [SUPABASE] Getting working client...')
     const workingClient = await getWorkingClient()
+    if (DEBUG) console.log('✅ [SUPABASE] Working client obtained')
     
     // First check if we already have a session
+    if (DEBUG) console.log('🔍 [SUPABASE] Checking for existing session...')
     const { data: { session }, error } = await workingClient.auth.getSession()
     if (!error && session) {
-      if (DEBUG) console.log('✅ Active session already exists')
+      if (DEBUG) console.log('✅ [SUPABASE] Active session already exists:', {
+        userId: session.user?.id,
+        expiresAt: session.expires_at
+      })
       return true
     }
     
-    if (DEBUG) console.log('🔍 No active session found, attempting restoration...')
+    if (DEBUG) console.log('🔍 [SUPABASE] No active session found, attempting restoration...')
     
     // Try to restore from localStorage
+    if (DEBUG) console.log('🔄 [SUPABASE] Trying restoration with current working client...')
     const restored = await restoreSessionIfNeeded(workingClient)
     if (restored) {
+      if (DEBUG) console.log('✅ [SUPABASE] Session restored with working client')
       return true
     }
     
     // If restoration failed, try with a fresh client
-    if (DEBUG) console.log('🔄 Trying session restoration with fresh client...')
+    if (DEBUG) console.log('🔄 [SUPABASE] Working client restoration failed, trying with fresh client...')
     const freshClient = await recreateSupabaseClient()
     const restoredWithFresh = await restoreSessionIfNeeded(freshClient)
     
+    if (DEBUG) console.log(restoredWithFresh ? 
+      '✅ [SUPABASE] Session restored with fresh client' : 
+      '❌ [SUPABASE] Session restoration failed with fresh client'
+    )
+    
     return restoredWithFresh
   } catch (error) {
-    if (DEBUG) console.error('❌ Force session restore failed:', error)
+    if (DEBUG) console.error('❌ [SUPABASE] forceSessionRestore failed:', error)
     return false
   }
 }
