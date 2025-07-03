@@ -6,7 +6,7 @@ import React, {
   useCallback,
   useRef
 } from 'react';
-import { supabase, Message, ensureSession, DEBUG, refreshSessionLocked, getWorkingClient, recreateSupabaseClient } from '../lib/supabase';
+import { Message, ensureSession, DEBUG, refreshSessionLocked, getWorkingClient, recreateSupabaseClient } from '../lib/supabase';
 import { MESSAGE_FETCH_LIMIT } from '../config';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
@@ -248,7 +248,7 @@ function useProvideMessages(): MessagesContextValue {
       if (DEBUG) {
         console.log('🌀 [MESSAGES] handleVisible: Resubscribing channel due to state:', channel.state)
       }
-      supabase.removeChannel(channel)
+      // Channel cleanup will be handled by the useEffect cleanup
       const newChannel = subscribeRef.current?.()
       if (newChannel) {
         channelRef.current = newChannel
@@ -302,9 +302,11 @@ function useProvideMessages(): MessagesContextValue {
     const channelName = 'public:messages';
 
     let channel: RealtimeChannel | null = null;
+    let currentClient: any = null;
 
-    const subscribeToChannel = (): RealtimeChannel => {
-      const newChannel = supabase
+    const subscribeToChannel = async (): Promise<RealtimeChannel> => {
+      currentClient = await getWorkingClient();
+      const newChannel = currentClient
         .channel(channelName, {
           config: {
             broadcast: { self: true },
@@ -467,16 +469,24 @@ function useProvideMessages(): MessagesContextValue {
           if (DEBUG) {
             console.warn(`⚠️ Channel ${status}, removing and resubscribing...`)
           }
-          await supabase.removeChannel(newChannel);
+          if (currentClient) {
+            await currentClient.removeChannel(newChannel);
+          }
           setTimeout(() => {
-            channel = subscribeToChannel();
+            subscribeToChannel().then(newCh => {
+              channel = newCh;
+              channelRef.current = newCh;
+            });
           }, 1000);
         } else if (status === 'CLOSED') {
           if (DEBUG) {
             console.warn('⚠️ Channel closed, resubscribing...')
           }
           setTimeout(() => {
-            channel = subscribeToChannel();
+            subscribeToChannel().then(newCh => {
+              channel = newCh;
+              channelRef.current = newCh;
+            });
           }, 1000);
         }
       });
@@ -484,12 +494,16 @@ function useProvideMessages(): MessagesContextValue {
       return newChannel;
     };
 
-    channel = subscribeToChannel();
+    subscribeToChannel().then(newChannel => {
+      channel = newChannel;
+      channelRef.current = newChannel;
+    });
     subscribeRef.current = subscribeToChannel;
-    channelRef.current = channel;
 
     return () => {
-      if (channel) supabase.removeChannel(channel)
+      if (channel && currentClient) {
+        currentClient.removeChannel(channel);
+      }
       channelRef.current = null
     };
   }, [user, fetchMessages]);
