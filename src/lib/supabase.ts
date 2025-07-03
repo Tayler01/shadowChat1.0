@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 // Global debug flag used to gate verbose logging
-export const DEBUG = import.meta.env.VITE_DEBUG_LOGS === 'true'
+export const DEBUG = import.meta.env.VITE_DEBUG_LOGS === 'true' || import.meta.env.DEV === true
 
 // Custom fetch that logs all request and response details for debugging
 const loggingFetch: typeof fetch = async (input, init) => {
