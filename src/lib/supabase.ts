@@ -101,6 +101,44 @@ export const clearRefreshSessionPromise = () => {
   refreshSessionPromise = null
 }
 
+// Function to completely reset the Supabase client
+export const resetSupabaseClient = async () => {
+  try {
+    // Get current session before reset
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    // Disconnect realtime
+    try {
+      supabase.realtime.disconnect()
+    } catch (err) {
+      if (DEBUG) console.error('Error disconnecting realtime:', err)
+    }
+    
+    // Clear any pending promises
+    clearRefreshSessionPromise()
+    
+    // Reconnect realtime with fresh auth
+    if (session?.access_token) {
+      supabase.realtime.setAuth(session.access_token)
+    }
+    
+    try {
+      supabase.realtime.connect()
+    } catch (err) {
+      if (DEBUG) console.error('Error reconnecting realtime:', err)
+    }
+    
+    if (DEBUG) {
+      console.log('Supabase client reset completed')
+    }
+    
+    return true
+  } catch (error) {
+    console.error('Error resetting Supabase client:', error)
+    return false
+  }
+}
+
 export const refreshSessionLocked = async () => {
   if (!refreshSessionPromise) {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {

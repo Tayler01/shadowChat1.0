@@ -18,6 +18,7 @@ import {
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
   clearRefreshSessionPromise,
+  resetSupabaseClient,
 } from '../../lib/supabase'
 import { useVisibilityRefresh } from '../../hooks/useVisibilityRefresh'
 
@@ -406,40 +407,46 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   }
 
   const handleFocusRefresh = async () => {
-    // Only refresh if we detect the session might be stale
+    // First, test if the Supabase client is working
     try {
-      // First check if we can get the current session without forcing a refresh
-      const { data: { session }, error } = await supabase.auth.getSession()
+      // Quick test to see if the client is responsive
+      const testPromise = supabase.auth.getSession()
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Client test timeout')), 2000)
+      )
+      
+      const { data: { session }, error } = await Promise.race([testPromise, timeoutPromise]) as any
       
       if (error) {
-        console.warn('Session check failed on visibility change:', error)
-        return
-      }
-      
-      if (!session) {
+        console.warn('Session check failed on visibility change, resetting client:', error)
+        await resetSupabaseClient()
+      } else if (!session) {
         console.warn('No session found on visibility change')
-        return
-      }
-      
-      // Only refresh if session is close to expiring (within 5 minutes)
-      const now = Math.floor(Date.now() / 1000)
-      const expiresAt = session.expires_at
-      const fiveMinutes = 5 * 60
-      
-      if (expiresAt && (expiresAt - now) < fiveMinutes) {
-        console.log('Session close to expiring, refreshing...')
-        clearRefreshSessionPromise()
-        const valid = await ensureSession(true)
-        if (valid) {
+      } else {
+        // Client is responsive, check if session needs refresh
+        const now = Math.floor(Date.now() / 1000)
+        const expiresAt = session.expires_at
+        const fiveMinutes = 5 * 60
+        
+        if (expiresAt && (expiresAt - now) < fiveMinutes) {
+          console.log('Session close to expiring, refreshing...')
+          clearRefreshSessionPromise()
+          const valid = await ensureSession(true)
+          if (valid) {
+            await resetRealtimeConnection()
+          }
+        } else {
+          // Session is still valid, just reset realtime connection
           await resetRealtimeConnection()
         }
-      } else {
-        // Session is still valid, just reset realtime connection
-        await resetRealtimeConnection()
       }
     } catch (error) {
-      console.error('Error in handleFocusRefresh:', error)
-      // Don't propagate the error, just log it
+      if ((error as Error).message.includes('timeout')) {
+        console.warn('Supabase client appears stuck, resetting...')
+        await resetSupabaseClient()
+      } else {
+        console.error('Error in handleFocusRefresh:', error)
+      }
     }
   }
 
