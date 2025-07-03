@@ -456,6 +456,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
             <Button size="sm" variant="secondary" onClick={() => { handleCheckAuth(); manualReset(); }}>
               Test Auth
             </Button>
+            <Button size="sm" variant="secondary" onClick={manualReset}>
+              Reset Client
+            </Button>
           </div>
         </div>
       </div>
