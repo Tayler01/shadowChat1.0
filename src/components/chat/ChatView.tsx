@@ -38,12 +38,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
 
   const appendLog = (msg: string) =>
     setLogs((l) => [...l, `${new Date().toLocaleTimeString()} ${msg}`])
-
-  const appendSupabaseInfo = () => {
-    appendLog(`Supabase URL: ${SUPABASE_URL}`)
-    appendLog(`Supabase Key: ${SUPABASE_ANON_KEY}`)
-  }
-
   const handleCheckAuth = async () => {
     setConsoleOpen(true)
     setLogs([])
