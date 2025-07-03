@@ -21,6 +21,7 @@ import {
   resetSupabaseClient,
   testClientResponsiveness,
   getWorkingClient,
+  attemptClientRecovery,
 } from '../../lib/supabase'
 import { useVisibilityRefresh } from '../../hooks/useVisibilityRefresh'
 
@@ -312,7 +313,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   }
 
   const handleFocusRefresh = async () => {
-    // Simple, non-intrusive refresh - just ensure session is valid
+    // Let the visibility refresh hook handle client recovery
     try {
       await ensureSession()
     } catch (error) {
@@ -320,8 +321,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     }
   }
 
-  // Temporarily disable visibility refresh to prevent client conflicts
-  // useVisibilityRefresh(handleFocusRefresh)
+  useVisibilityRefresh(handleFocusRefresh)
 
   const handleSendMessage = async (
     content: string,

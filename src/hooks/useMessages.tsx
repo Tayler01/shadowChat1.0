@@ -206,12 +206,11 @@ function useProvideMessages(): MessagesContextValue {
   }, []);
 
   const handleVisible = useCallback(() => {
-    // Simple visibility refresh - just fetch messages
+    // On visibility change, just fetch messages - client recovery is handled by useVisibilityRefresh
     fetchMessages()
   }, [fetchMessages])
 
-  // Temporarily disable visibility refresh to prevent client conflicts
-  // useVisibilityRefresh(handleVisible)
+  useVisibilityRefresh(handleVisible)
 
   // Fetch initial messages
   useEffect(() => {

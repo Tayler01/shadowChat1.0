@@ -64,15 +64,29 @@ export const testClientResponsiveness = async (timeoutMs = 2000): Promise<boolea
 // Backup client for when main client is stuck
 let backupClient: ReturnType<typeof createClient> | null = null
 
+// Track if we're in a stuck state to prevent infinite loops
+let isClientStuck = false
+
 export const getWorkingClient = async () => {
-  const isResponsive = await testClientResponsiveness()
+  // If we know the client is stuck, don't test again immediately
+  if (isClientStuck) {
+    if (DEBUG) console.log('⚠️ Client known to be stuck, using backup')
+    if (!backupClient) {
+      backupClient = createBackupSupabaseClient()
+    }
+    return backupClient
+  }
+  
+  const isResponsive = await testClientResponsiveness(1000) // Shorter timeout
   
   if (isResponsive) {
     if (DEBUG) console.log('✅ Main client is responsive')
+    isClientStuck = false
     return supabase
   }
   
   if (DEBUG) console.log('⚠️ Main client unresponsive, using backup')
+  isClientStuck = true
   
   if (!backupClient) {
     console.warn('Creating backup Supabase client due to main client being unresponsive')
@@ -80,6 +94,42 @@ export const getWorkingClient = async () => {
   }
   
   return backupClient
+}
+
+// Function to attempt client recovery
+export const attemptClientRecovery = async (): Promise<boolean> => {
+  if (DEBUG) console.log('🔄 Attempting client recovery...')
+  
+  try {
+    // Clear any stuck promises
+    clearRefreshSessionPromise()
+    
+    // Test if main client has recovered
+    const isResponsive = await testClientResponsiveness(2000)
+    
+    if (isResponsive) {
+      if (DEBUG) console.log('✅ Main client has recovered')
+      isClientStuck = false
+      
+      // Clean up backup client
+      if (backupClient) {
+        try {
+          backupClient.realtime.disconnect()
+        } catch (err) {
+          // Ignore disconnect errors
+        }
+        backupClient = null
+      }
+      
+      return true
+    }
+    
+    if (DEBUG) console.log('❌ Main client still unresponsive')
+    return false
+  } catch (error) {
+    if (DEBUG) console.error('Client recovery failed:', error)
+    return false
+  }
 }
 
 // Custom fetch that logs all request and response details for debugging

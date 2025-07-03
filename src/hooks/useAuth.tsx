@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { supabase, User, updateUserPresence } from '../lib/supabase';
+import { supabase, User, updateUserPresence, getWorkingClient } from '../lib/supabase';
 import { PRESENCE_INTERVAL_MS } from '../config';
 import {
   signIn as authSignIn,
@@ -157,7 +157,16 @@ function useProvideAuth() {
   useEffect(() => {
     if (!user) return;
 
-    const updatePresence = () => updateUserPresence();
+    const updatePresence = async () => {
+      try {
+        // Use working client for presence updates to avoid stuck client issues
+        const client = await getWorkingClient()
+        const { error } = await client.rpc('update_user_last_active')
+        if (error) console.error('Error updating presence:', error)
+      } catch (error) {
+        console.error('Failed to update presence:', error)
+      }
+    };
     
     // Update immediately
     updatePresence();

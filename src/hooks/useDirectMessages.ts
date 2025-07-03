@@ -173,12 +173,10 @@ export function useConversationMessages(conversationId: string | null) {
   const subscribeRef = useRef<() => RealtimeChannel>();
 
   const handleVisible = useCallback(() => {
-    // Simple visibility refresh - no channel manipulation
-    // Just let the existing subscriptions handle reconnection
+    // Simple visibility refresh - let client recovery handle the heavy lifting
   }, []);
 
-  // Temporarily disable visibility refresh to prevent client conflicts
-  // useVisibilityRefresh(handleVisible);
+  useVisibilityRefresh(handleVisible);
 
   // Fetch messages for conversation
   useEffect(() => {
