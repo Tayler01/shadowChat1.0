@@ -276,57 +276,95 @@ export const clearRefreshSessionPromise = () => {
   refreshSessionPromise = null
 }
 
+// Helper function to implement retry logic with exponential backoff
+const retryWithBackoff = async <T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> => {
+  let lastError: Error
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation()
+    } catch (error) {
+      lastError = error as Error
+      
+      if (attempt === maxRetries) {
+        throw lastError
+      }
+      
+      // Exponential backoff: 1s, 2s, 4s
+      const delay = baseDelay * Math.pow(2, attempt)
+      if (DEBUG) {
+        console.log(`[retryWithBackoff] Attempt ${attempt + 1} failed, retrying in ${delay}ms:`, lastError.message)
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
+  
+  throw lastError!
+}
+
 export const refreshSessionLocked = async () => {
   if (!refreshSessionPromise) {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       return Promise.reject(new Error('Offline: cannot refresh session'))
     }
 
-    const workingClient = await getWorkingClient()
-    const { data: { session }, error } = await workingClient.auth.getSession()
-    const storedToken = getStoredRefreshToken()
-    if (DEBUG) {
-      console.log('[refreshSessionLocked] starting refresh', {
-        memoryRefreshToken: session?.refresh_token,
-        storedRefreshToken: storedToken,
-        expiresAt: session?.expires_at,
-      })
-    }
+    // Wrap the entire refresh operation in retry logic
+    refreshSessionPromise = retryWithBackoff(async () => {
+      const workingClient = await getWorkingClient()
+      const { data: { session }, error } = await workingClient.auth.getSession()
+      const storedToken = getStoredRefreshToken()
+      if (DEBUG) {
+        console.log('[refreshSessionLocked] starting refresh', {
+          memoryRefreshToken: session?.refresh_token,
+          storedRefreshToken: storedToken,
+          expiresAt: session?.expires_at,
+        })
+      }
 
-    if (DEBUG) {
-      console.log('[refreshSessionLocked] calling workingClient.auth.refreshSession')
-    }
-    const refresh = workingClient.auth
-      .refreshSession()
-      .then((res) => {
-        if (DEBUG) {
-          console.log('[refreshSessionLocked] refresh result', res)
-        }
-        if (res.data?.session) {
-          workingClient.realtime.setAuth(res.data.session?.access_token || '')
-          // Reconnect websocket in case it was closed on token expiry
-          try {
-            workingClient.realtime.connect()
-          } catch (err) {
-            if (DEBUG) console.error('realtime.connect error', err)
+      if (DEBUG) {
+        console.log('[refreshSessionLocked] calling workingClient.auth.refreshSession')
+      }
+      
+      // Create refresh operation with timeout
+      const refresh = workingClient.auth
+        .refreshSession()
+        .then((res) => {
+          if (DEBUG) {
+            console.log('[refreshSessionLocked] refresh result', res)
           }
-        }
-        return res
-      })
-      .catch((err) => {
-        console.error('[refreshSessionLocked] refresh error', err)
-        throw err
-      })
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject(new Error('Session refresh timeout after 30 seconds')),
-        30000
+          if (res.data?.session) {
+            workingClient.realtime.setAuth(res.data.session?.access_token || '')
+            // Reconnect websocket in case it was closed on token expiry
+            try {
+              workingClient.realtime.connect()
+            } catch (err) {
+              if (DEBUG) console.error('realtime.connect error', err)
+            }
+          }
+          return res
+        })
+        .catch((err) => {
+          console.error('[refreshSessionLocked] refresh error', err)
+          throw err
+        })
+      
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error('Session refresh timeout after 30 seconds')),
+          30000
+        )
       )
-    )
-    refreshSessionPromise = (Promise.race([refresh, timeoutPromise]) as Promise<{
-      data: any
-      error: any
-    }>)
+      
+      return Promise.race([refresh, timeoutPromise]) as Promise<{
+        data: any
+        error: any
+      }>
+    }, 3, 1000) // Retry up to 3 times with 1s, 2s, 4s delays
       .then((res) => {
         if (DEBUG) {
           console.log('[refreshSessionLocked] final result', res)
