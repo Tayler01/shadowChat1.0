@@ -17,6 +17,7 @@ import {
   localStorageKey,
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
+  clearRefreshSessionPromise,
 } from '../../lib/supabase'
 import { useVisibilityRefresh } from '../../hooks/useVisibilityRefresh'
 
@@ -192,6 +193,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     setConsoleOpen(true)
     setLogs([])
     appendSupabaseInfo()
+    appendLog('Clearing any stuck refresh session promise')
+    clearRefreshSessionPromise()
     appendLog('Page became visible - refreshing session')
     const { data: before } = await supabase.auth.getSession()
     appendLog(

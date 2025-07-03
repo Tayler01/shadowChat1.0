@@ -97,6 +97,10 @@ export const getStoredRefreshToken = (): string | null => {
 // in flight.
 let refreshSessionPromise: Promise<{ data: any; error: any }> | null = null
 
+export const clearRefreshSessionPromise = () => {
+  refreshSessionPromise = null
+}
+
 export const refreshSessionLocked = async () => {
   if (!refreshSessionPromise) {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
