@@ -104,26 +104,53 @@ export const clearRefreshSessionPromise = () => {
 // Function to completely reset the Supabase client
 export const resetSupabaseClient = async () => {
   try {
+    if (DEBUG) console.log('Starting Supabase client reset...')
+    
     // Get current session before reset
-    const { data: { session } } = await supabase.auth.getSession()
+    if (DEBUG) console.log('Getting current session...')
+    let session = null
+    try {
+      const sessionPromise = supabase.auth.getSession()
+      const sessionTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('getSession timeout')), 3000)
+      )
+      const { data: { session: currentSession } } = await Promise.race([sessionPromise, sessionTimeout]) as any
+      session = currentSession
+      if (DEBUG) console.log('Session retrieved successfully')
+    } catch (err) {
+      if (DEBUG) console.log('Failed to get session, continuing without it:', (err as Error).message)
+    }
     
     // Disconnect realtime
+    if (DEBUG) console.log('Disconnecting realtime...')
     try {
       supabase.realtime.disconnect()
+      if (DEBUG) console.log('Realtime disconnected')
     } catch (err) {
       if (DEBUG) console.error('Error disconnecting realtime:', err)
     }
     
     // Clear any pending promises
+    if (DEBUG) console.log('Clearing refresh promises...')
     clearRefreshSessionPromise()
     
+    // Wait a moment for cleanup
+    await new Promise(resolve => setTimeout(resolve, 100))
+    
     // Reconnect realtime with fresh auth
+    if (DEBUG) console.log('Setting realtime auth...')
     if (session?.access_token) {
       supabase.realtime.setAuth(session.access_token)
+      if (DEBUG) console.log('Realtime auth set with token')
+    } else {
+      supabase.realtime.setAuth('')
+      if (DEBUG) console.log('Realtime auth cleared (no session)')
     }
     
+    if (DEBUG) console.log('Reconnecting realtime...')
     try {
       supabase.realtime.connect()
+      if (DEBUG) console.log('Realtime reconnected')
     } catch (err) {
       if (DEBUG) console.error('Error reconnecting realtime:', err)
     }

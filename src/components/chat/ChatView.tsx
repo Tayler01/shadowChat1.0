@@ -59,19 +59,47 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       
       if (error) {
         appendLog(`Client responsiveness test failed: ${error.message}`)
-        appendLog('Attempting to reset Supabase client...')
-        const resetSuccess = await resetSupabaseClient()
-        appendLog(`Client reset ${resetSuccess ? 'succeeded' : 'failed'}`)
+        appendLog('Client has error, attempting reset...')
+        await attemptClientReset()
       } else {
         appendLog('Client responsiveness test passed ✅')
       }
     } catch (error) {
       if ((error as Error).message.includes('timeout')) {
         appendLog('Client appears stuck/unresponsive - resetting...')
-        const resetSuccess = await resetSupabaseClient()
-        appendLog(`Client reset ${resetSuccess ? 'succeeded' : 'failed'}`)
+        await attemptClientReset()
       } else {
         appendLog(`Client test error: ${(error as Error).message}`)
+      }
+    }
+    
+    // Helper function to attempt client reset with timeout
+    async function attemptClientReset() {
+      try {
+        appendLog('Starting client reset process...')
+        const resetPromise = resetSupabaseClient()
+        const resetTimeout = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Reset timeout after 5 seconds')), 5000)
+        )
+        
+        const resetSuccess = await Promise.race([resetPromise, resetTimeout])
+        appendLog(`Client reset ${resetSuccess ? 'succeeded ✅' : 'failed ❌'}`)
+        
+        // Test if reset worked
+        appendLog('Testing client after reset...')
+        const testAfterReset = supabase.auth.getSession()
+        const testTimeout = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Post-reset test timeout')), 2000)
+        )
+        
+        await Promise.race([testAfterReset, testTimeout])
+        appendLog('Client responsive after reset ✅')
+        
+      } catch (err) {
+        appendLog(`Reset failed: ${(err as Error).message}`)
+        if ((err as Error).message.includes('timeout')) {
+          appendLog('Reset process timed out - client may be completely stuck')
+        }
       }
     }
 
