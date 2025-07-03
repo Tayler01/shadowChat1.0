@@ -159,7 +159,7 @@ function useProvideAuth() {
 
     const updatePresence = async () => {
       try {
-        // Use working client for presence updates to avoid stuck client issues
+        // Use working client for presence updates
         const client = await getWorkingClient()
         const { error } = await client.rpc('update_user_last_active')
         if (error) console.error('Error updating presence:', error)
