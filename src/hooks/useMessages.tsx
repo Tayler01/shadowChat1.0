@@ -206,21 +206,12 @@ function useProvideMessages(): MessagesContextValue {
   }, []);
 
   const handleVisible = useCallback(() => {
-    const channel = channelRef.current;
-    if (channel && channel.state !== 'joined') {
-      if (DEBUG) {
-        console.log('🌀 Resubscribing channel due to state', channel.state)
-      }
-      supabase.removeChannel(channel)
-      const newChannel = subscribeRef.current?.()
-      if (newChannel) {
-        channelRef.current = newChannel
-      }
-    }
+    // Simple visibility refresh - just fetch messages
     fetchMessages()
   }, [fetchMessages])
 
-  useVisibilityRefresh(handleVisible)
+  // Temporarily disable visibility refresh to prevent client conflicts
+  // useVisibilityRefresh(handleVisible)
 
   // Fetch initial messages
   useEffect(() => {

@@ -309,65 +309,16 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   }
 
   const handleFocusRefresh = async () => {
-    setConsoleOpen(true)
-    setLogs([])
-    appendSupabaseInfo()
-    appendLog('Page became visible - checking client health...')
-    
+    // Simple, non-intrusive refresh - just ensure session is valid
     try {
-      // Quick test to see if the client is responsive (2 second timeout)
-      const testPromise = supabase.auth.getSession()
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Client test timeout')), 2000)
-      )
-      
-      appendLog('Testing client responsiveness...')
-      const { data: { session }, error } = await Promise.race([testPromise, timeoutPromise]) as any
-      
-      if (error) {
-        appendLog(`Session check failed: ${error.message}`)
-        appendLog('Resetting Supabase client...')
-        const resetSuccess = await resetSupabaseClient()
-        appendLog(`Client reset ${resetSuccess ? 'succeeded ✅' : 'failed ❌'}`)
-      } else if (!session) {
-        appendLog('No session found - client responsive but not authenticated')
-      } else {
-        appendLog('Client responsive ✅')
-        // Client is responsive, check if session needs refresh
-        const now = Math.floor(Date.now() / 1000)
-        const expiresAt = session.expires_at
-        const fiveMinutes = 5 * 60
-        
-        if (expiresAt && (expiresAt - now) < fiveMinutes) {
-          appendLog('Session close to expiring, refreshing...')
-          clearRefreshSessionPromise()
-          const valid = await ensureSession(true)
-          if (valid) {
-            appendLog('Session refreshed and realtime reconnected ✅')
-            await resetRealtimeConnection()
-          } else {
-            appendLog('Session refresh failed ❌')
-          }
-        } else {
-          appendLog('Session still valid, resetting realtime connection...')
-          // Session is still valid, just reset realtime connection
-          await resetRealtimeConnection()
-          appendLog('Realtime connection reset ✅')
-        }
-      }
+      await ensureSession()
     } catch (error) {
-      if ((error as Error).message.includes('timeout')) {
-        appendLog('Supabase client appears stuck/unresponsive!')
-        appendLog('Attempting aggressive client reset...')
-        const resetSuccess = await resetSupabaseClient()
-        appendLog(`Aggressive reset ${resetSuccess ? 'succeeded ✅' : 'failed ❌'}`)
-      } else {
-        appendLog(`Unexpected error: ${(error as Error).message}`)
-      }
+      console.warn('Visibility refresh failed:', error)
     }
   }
 
-  useVisibilityRefresh(handleFocusRefresh)
+  // Temporarily disable visibility refresh to prevent client conflicts
+  // useVisibilityRefresh(handleFocusRefresh)
 
   const handleSendMessage = async (
     content: string,

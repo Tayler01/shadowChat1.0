@@ -62,7 +62,7 @@ export const testClientResponsiveness = async (timeoutMs = 2000): Promise<boolea
 }
 
 // Backup client for when main client is stuck
-let backupClient: any = null
+let backupClient: ReturnType<typeof createClient> | null = null
 
 export const getWorkingClient = async () => {
   const isResponsive = await testClientResponsiveness()
@@ -75,6 +75,7 @@ export const getWorkingClient = async () => {
   if (DEBUG) console.log('⚠️ Main client unresponsive, using backup')
   
   if (!backupClient) {
+    console.warn('Creating backup Supabase client due to main client being unresponsive')
     backupClient = createBackupSupabaseClient()
   }
   
@@ -184,85 +185,25 @@ export const resetSupabaseClient = async () => {
   try {
     if (DEBUG) console.log('Starting Supabase client reset...')
     
-    // Clear backup client if it exists
+    // Clear backup client to prevent multiple instances
+    if (backupClient) {
+      try {
+        backupClient.realtime.disconnect()
+      } catch (err) {
+        // Ignore disconnect errors
+      }
+    }
     backupClient = null
     
-    // Try to get session from localStorage directly since client may be stuck
-    if (DEBUG) console.log('Getting session from localStorage...')
-    let session = null
-    try {
-      const storedSession = localStorage.getItem(localStorageKey)
-      if (storedSession) {
-        const parsed = JSON.parse(storedSession)
-        session = parsed?.currentSession || parsed
-        if (DEBUG) console.log('Session retrieved from localStorage')
-      }
-    } catch (err) {
-      if (DEBUG) console.log('Failed to get session from localStorage:', (err as Error).message)
-    }
-    
-    // Force disconnect everything
-    if (DEBUG) console.log('Force disconnecting all connections...')
-    try {
-      // Try to disconnect realtime, but don't wait if it hangs
-      const disconnectPromise = Promise.resolve(supabase.realtime.disconnect())
-      const disconnectTimeout = new Promise(resolve => setTimeout(resolve, 1000))
-      await Promise.race([disconnectPromise, disconnectTimeout])
-      if (DEBUG) console.log('Realtime disconnected (or timed out)')
-    } catch (err) {
-      if (DEBUG) console.log('Realtime disconnect error (continuing):', (err as Error).message)
-    }
-    
-    // Clear all pending promises and state
-    if (DEBUG) console.log('Clearing all pending state...')
+    // Clear refresh promise to prevent conflicts
     clearRefreshSessionPromise()
     
-    // Wait for cleanup
-    await new Promise(resolve => setTimeout(resolve, 500))
-    
-    // Create a completely new client instance to test if the issue is with the current instance
-    if (DEBUG) console.log('Creating test client instance...')
-    const testClient = createBackupSupabaseClient()
-    
-    // Test the new client
-    if (DEBUG) console.log('Testing new client instance...')
+    // Simple realtime reset
     try {
-      const testPromise = testClient.from('users').select('id').limit(1)
-      const testTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Test client timeout')), 3000)
-      )
-      await Promise.race([testPromise, testTimeout])
-      if (DEBUG) console.log('New client instance works ✅')
+      await resetRealtimeConnection()
+      if (DEBUG) console.log('Realtime connection reset')
     } catch (err) {
-      if (DEBUG) console.log('New client instance also failed:', (err as Error).message)
-      return false
-    }
-    
-    // If new client works, the issue is with our main client
-    // Reset the main client's auth and realtime
-    if (DEBUG) console.log('Resetting main client auth...')
-    try {
-      // Set auth token from session
-      if (session?.access_token) {
-        supabase.realtime.setAuth(session.access_token)
-        if (DEBUG) console.log('Auth token restored from session')
-      } else {
-        supabase.realtime.setAuth('')
-        if (DEBUG) console.log('Auth token cleared (no session)')
-      }
-    } catch (err) {
-      if (DEBUG) console.log('Auth reset error:', (err as Error).message)
-    }
-    
-    // Reconnect realtime
-    if (DEBUG) console.log('Reconnecting realtime...')
-    try {
-      const connectPromise = Promise.resolve(supabase.realtime.connect())
-      const connectTimeout = new Promise(resolve => setTimeout(resolve, 2000))
-      await Promise.race([connectPromise, connectTimeout])
-      if (DEBUG) console.log('Realtime reconnected (or timed out)')
-    } catch (err) {
-      if (DEBUG) console.log('Realtime reconnect error:', (err as Error).message)
+      if (DEBUG) console.log('Realtime reset error:', (err as Error).message)
     }
     
     if (DEBUG) console.log('Client reset process completed')
@@ -569,8 +510,8 @@ export const searchUsers = async (
 // Helper function to ensure valid session before database operations
 export const ensureSession = async (force = false) => {
   try {
-    const client = await getWorkingClient()
-    const { data: { session }, error } = await client.auth.getSession()
+    // Always use main client for session management to avoid conflicts
+    const { data: { session }, error } = await supabase.auth.getSession()
 
     if (error) {
       console.error('Error getting session:', error)
@@ -598,10 +539,7 @@ export const ensureSession = async (force = false) => {
       if (DEBUG && force) {
         console.log('ensureSession: forcing refresh regardless of expiry')
       }
-      
-      // Use working client for refresh
-      const workingClient = await getWorkingClient()
-      const { data: refreshData, error: refreshError } = await workingClient.auth.refreshSession()
+      const { data: refreshData, error: refreshError } = await refreshSessionLocked()
 
       if (refreshError) {
         console.error('Error refreshing session:', refreshError)
@@ -635,7 +573,6 @@ export interface UserStats {
 }
 
 export const fetchUserStats = async (userId: string): Promise<UserStats> => {
-  const client = await getWorkingClient()
   const sessionValid = await ensureSession()
 
   if (!sessionValid) {
@@ -643,15 +580,15 @@ export const fetchUserStats = async (userId: string): Promise<UserStats> => {
   }
 
   const [messagesRes, reactionsRes, friendsRes] = await Promise.all([
-    client
+    supabase
       .from('messages')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId),
-    client
+    supabase
       .from('message_reactions')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId),
-    client
+    supabase
       .from('dm_conversations')
       .select('id', { count: 'exact', head: true })
       .contains('participants', [userId]),

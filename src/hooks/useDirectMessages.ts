@@ -173,17 +173,12 @@ export function useConversationMessages(conversationId: string | null) {
   const subscribeRef = useRef<() => RealtimeChannel>();
 
   const handleVisible = useCallback(() => {
-    const channel = channelRef.current;
-    if (channel && channel.state !== 'joined') {
-      supabase.removeChannel(channel);
-      const newChannel = subscribeRef.current?.();
-      if (newChannel) {
-        channelRef.current = newChannel;
-      }
-    }
+    // Simple visibility refresh - no channel manipulation
+    // Just let the existing subscriptions handle reconnection
   }, []);
 
-  useVisibilityRefresh(handleVisible);
+  // Temporarily disable visibility refresh to prevent client conflicts
+  // useVisibilityRefresh(handleVisible);
 
   // Fetch messages for conversation
   useEffect(() => {
