@@ -6,7 +6,7 @@ import React, {
   useCallback,
   useRef
 } from 'react';
-import { Message, ensureSession, DEBUG, refreshSessionLocked, getWorkingClient, recreateSupabaseClient } from '../lib/supabase';
+import { Message, ensureSession, DEBUG, refreshSessionLocked, getWorkingClient, recreateSupabaseClient, supabase } from '../lib/supabase';
 import { MESSAGE_FETCH_LIMIT } from '../config';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
