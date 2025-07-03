@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { supabase, User, updateUserPresence } from '../lib/supabase';
+import { supabase, User, updateUserPresence, getWorkingClient } from '../lib/supabase';
 import { PRESENCE_INTERVAL_MS } from '../config';
 import {
   signIn as authSignIn,
@@ -46,13 +46,14 @@ function useProvideAuth() {
       
       
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        const workingClient = await getWorkingClient();
+        const { data: { session }, error: sessionError } = await workingClient.auth.getSession();
         // Ensure realtime uses the latest access token
-        supabase.realtime.setAuth(session?.access_token || '');
+        workingClient.realtime.setAuth(session?.access_token || '');
         
         // Handle the specific "user not found" error from invalid JWT
         if (sessionError && sessionError.message?.includes('User from sub claim in JWT does not exist')) {
-          await supabase.auth.signOut();
+          await workingClient.auth.signOut();
           if (mountedRef.current) setUser(null);
           return;
         }
@@ -120,7 +121,12 @@ function useProvideAuth() {
         }
 
         // Update realtime auth token whenever session changes
-        supabase.realtime.setAuth(session?.access_token || '');
+        try {
+          const workingClient = await getWorkingClient();
+          workingClient.realtime.setAuth(session?.access_token || '');
+        } catch (err) {
+          console.warn('Failed to update realtime auth:', err);
+        }
 
         
           if (event === 'SIGNED_OUT') {

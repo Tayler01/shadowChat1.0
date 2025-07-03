@@ -6,7 +6,7 @@ import React, {
   useCallback,
   useRef
 } from 'react';
-import { supabase, Message, ensureSession, DEBUG, refreshSessionLocked } from '../lib/supabase';
+import { supabase, Message, ensureSession, DEBUG, refreshSessionLocked, getWorkingClient } from '../lib/supabase';
 import { MESSAGE_FETCH_LIMIT } from '../config';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
@@ -36,7 +36,8 @@ export const insertMessage = async (messageData: {
   audio_url?: string;
 }) => {
   const start = performance.now();
-  const insertPromise = supabase
+  const workingClient = await getWorkingClient();
+  const insertPromise = workingClient
     .from('messages')
     .insert(messageData)
     .select(`
@@ -140,8 +141,9 @@ function useProvideMessages(): MessagesContextValue {
 
   const fetchMessages = useCallback(async () => {
     try {
+      const workingClient = await getWorkingClient();
       const [pinnedRes, messagesRes] = await Promise.all([
-        supabase
+        workingClient
           .from('messages')
           .select(
             `
@@ -151,7 +153,7 @@ function useProvideMessages(): MessagesContextValue {
           )
           .eq('pinned', true)
           .order('pinned_at', { ascending: true }),
-        supabase
+        workingClient
           .from('messages')
           .select(
             `
@@ -272,7 +274,8 @@ function useProvideMessages(): MessagesContextValue {
           
           try {
             // Fetch the complete message with user data
-            const { data: newMessage, error } = await supabase
+            const workingClient = await getWorkingClient();
+            const { data: newMessage, error } = await workingClient
               .from('messages')
               .select(`
                 *,
@@ -358,7 +361,8 @@ function useProvideMessages(): MessagesContextValue {
           
           try {
             // Fetch the updated message with user data
-            const { data: updatedMessage, error } = await supabase
+            const workingClient = await getWorkingClient();
+            const { data: updatedMessage, error } = await workingClient
               .from('messages')
               .select(`
                 *,
@@ -582,7 +586,8 @@ function useProvideMessages(): MessagesContextValue {
 
 
     try {
-      const { error } = await supabase
+      const workingClient = await getWorkingClient();
+      const { error } = await workingClient
         .from('messages')
         .update({
           content,
@@ -618,7 +623,8 @@ function useProvideMessages(): MessagesContextValue {
 
 
     try {
-      const { error } = await supabase
+      const workingClient = await getWorkingClient();
+      const { error } = await workingClient
         .from('messages')
         .delete()
         .eq('id', messageId)
@@ -680,7 +686,8 @@ function useProvideMessages(): MessagesContextValue {
     });
 
     try {
-      const { error } = await supabase.rpc('toggle_message_reaction', {
+      const workingClient = await getWorkingClient();
+      const { error } = await workingClient.rpc('toggle_message_reaction', {
         message_id: messageId,
         emoji: emoji,
         is_dm: false,
@@ -707,7 +714,8 @@ function useProvideMessages(): MessagesContextValue {
     const isPinned = current?.pinned;
 
     try {
-      const { error } = await supabase.rpc('toggle_message_pin', {
+      const workingClient = await getWorkingClient();
+      const { error } = await workingClient.rpc('toggle_message_pin', {
         message_id: messageId,
       });
 

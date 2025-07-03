@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { recreateSupabaseClient, DEBUG, resetRealtimeConnection } from '../lib/supabase'
+import { recreateSupabaseClient, DEBUG } from '../lib/supabase'
 
 export function useVisibilityRefresh(onVisible?: () => void) {
   useEffect(() => {
@@ -7,10 +7,9 @@ export function useVisibilityRefresh(onVisible?: () => void) {
       if (!document.hidden) {
         if (DEBUG) console.log('📱 Page became visible - resetting client state to ensure freshness')
         
-        // Reset the client state when page becomes visible (simulates page reload)
+        // Recreate client when page becomes visible (simulates page reload)
         try {
           await recreateSupabaseClient()
-          await resetRealtimeConnection()
         } catch (error) {
           console.warn('Client reset failed on visibility change:', error)
         }

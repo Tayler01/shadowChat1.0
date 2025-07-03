@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import {
   supabase,
+  getWorkingClient,
   DMConversation,
   DMMessage,
   getOrCreateDMConversation,
@@ -120,7 +121,8 @@ export function useDirectMessages() {
   const startConversation = useCallback(async (username: string) => {
     if (!user) return null;
 
-    const { data: otherUser, error } = await supabase
+    const workingClient = await getWorkingClient();
+    const { data: otherUser, error } = await workingClient
       .from('users')
       .select('id')
       .eq('username', username)
@@ -194,7 +196,8 @@ export function useConversationMessages(conversationId: string | null) {
     }
 
     const fetchMessages = async () => {
-      const { data, error } = await supabase
+      const workingClient = await getWorkingClient();
+      const { data, error } = await workingClient
         .from('dm_messages')
         .select(`
           *,
@@ -211,7 +214,7 @@ export function useConversationMessages(conversationId: string | null) {
         
         // Mark messages as read
         if (user) {
-          await supabase
+          await workingClient
             .from('dm_messages')
             .update({ read_at: new Date().toISOString() })
             .eq('conversation_id', conversationId)
@@ -244,7 +247,8 @@ export function useConversationMessages(conversationId: string | null) {
           },
           async (payload) => {
             // Fetch the complete message with sender data
-            const { data } = await supabase
+            const workingClient = await getWorkingClient();
+            const { data } = await workingClient
               .from('dm_messages')
               .select(`
                 *,
@@ -260,7 +264,7 @@ export function useConversationMessages(conversationId: string | null) {
 
               // Mark as read if not sent by current user
               if (user && data.sender_id !== user.id) {
-                await supabase
+                await workingClient
                   .from('dm_messages')
                   .update({ read_at: new Date().toISOString() })
                   .eq('id', data.id);
@@ -277,7 +281,8 @@ export function useConversationMessages(conversationId: string | null) {
             filter: `conversation_id=eq.${conversationId}`,
           },
           async (payload) => {
-            const { data } = await supabase
+            const workingClient = await getWorkingClient();
+            const { data } = await workingClient
               .from('dm_messages')
               .select(`
                 *,
@@ -316,7 +321,8 @@ export function useConversationMessages(conversationId: string | null) {
 
     setSending(true);
     try {
-      const { data, error } = await supabase
+      const workingClient = await getWorkingClient();
+      const { data, error } = await workingClient
         .from('dm_messages')
         .insert({
           conversation_id: conversationId,
@@ -337,7 +343,8 @@ export function useConversationMessages(conversationId: string | null) {
         if (finalError.status === 401 || /jwt|token|expired/i.test(finalError.message)) {
           const { error: refreshError } = await refreshSessionLocked();
           if (!refreshError) {
-            const retry = await supabase
+            const retryClient = await getWorkingClient();
+            const retry = await retryClient
               .from('dm_messages')
               .insert({
                 conversation_id: conversationId,

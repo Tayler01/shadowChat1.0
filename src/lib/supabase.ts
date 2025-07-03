@@ -3,117 +3,6 @@ import { createClient } from '@supabase/supabase-js'
 // Global debug flag used to gate verbose logging
 export const DEBUG = import.meta.env.VITE_DEBUG_LOGS === 'true'
 
-// Single client instance management
-let isClientHealthy = true
-let lastHealthCheck = 0
-const HEALTH_CHECK_INTERVAL = 10000 // 10 seconds
-
-// Test if the main client is responsive
-export const testClientResponsiveness = async (timeoutMs = 3000): Promise<boolean> => {
-  try {
-    const testPromise = supabase.auth.getSession()
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Client responsiveness timeout')), timeoutMs)
-    )
-    
-    await Promise.race([testPromise, timeoutPromise])
-    return true
-  } catch (error) {
-    if (DEBUG) {
-      console.log('🔍 Client responsiveness test failed:', (error as Error).message)
-    }
-    return false
-  }
-}
-
-// Reset the client's internal state without creating new instances
-export const resetClientState = async (): Promise<boolean> => {
-  try {
-    if (DEBUG) console.log('🔄 Resetting client state...')
-    
-    // Clear any stuck promises
-    clearRefreshSessionPromise()
-    
-    // Reset realtime connection
-    try {
-      supabase.realtime.disconnect()
-      await new Promise(resolve => setTimeout(resolve, 100)) // Brief pause
-      supabase.realtime.connect()
-    } catch (err) {
-      if (DEBUG) console.warn('Realtime reset warning:', err)
-    }
-    
-    // Force refresh session to ensure it's valid
-    try {
-      await refreshSessionLocked()
-    } catch (err) {
-      if (DEBUG) console.warn('Session refresh warning:', err)
-    }
-    
-    if (DEBUG) console.log('✅ Client state reset complete')
-    return true
-  } catch (error) {
-    if (DEBUG) console.error('❌ Client state reset failed:', error)
-    return false
-  }
-}
-
-// Get the working client (always returns the main client, but ensures it's healthy)
-export const getWorkingClient = async (): Promise<ReturnType<typeof createClient>> => {
-  const now = Date.now()
-  
-  // Only check health periodically to avoid excessive testing
-  if (now - lastHealthCheck > HEALTH_CHECK_INTERVAL) {
-    lastHealthCheck = now
-    
-    const isResponsive = await testClientResponsiveness(2000)
-    
-    if (!isResponsive && isClientHealthy) {
-      if (DEBUG) console.log('❌ Client became unresponsive, attempting reset...')
-      isClientHealthy = false
-      
-      // Try to reset the client state
-      const resetSuccess = await resetClientState()
-      if (resetSuccess) {
-        // Test again after reset
-        const isResponsiveAfterReset = await testClientResponsiveness(2000)
-        if (isResponsiveAfterReset) {
-          if (DEBUG) console.log('✅ Client recovered after reset')
-          isClientHealthy = true
-        } else {
-          if (DEBUG) console.log('❌ Client still unresponsive after reset')
-        }
-      }
-    } else if (isResponsive && !isClientHealthy) {
-      if (DEBUG) console.log('✅ Client has recovered')
-      isClientHealthy = true
-    }
-  }
-  
-  return supabase
-}
-
-// Force a client reset (simulates what happens on page reload)
-export const recreateSupabaseClient = async (): Promise<ReturnType<typeof createClient>> => {
-  if (DEBUG) console.log('🔄 Force resetting Supabase client state...')
-  
-  isClientHealthy = false
-  lastHealthCheck = 0
-  
-  const resetSuccess = await resetClientState()
-  if (resetSuccess) {
-    // Test the client after reset
-    const isResponsive = await testClientResponsiveness(3000)
-    isClientHealthy = isResponsive
-    
-    if (DEBUG) {
-      console.log(isResponsive ? '✅ Client reset successful' : '❌ Client still unresponsive after reset')
-    }
-  }
-  
-  return supabase
-}
-
 // Custom fetch that logs all request and response details for debugging
 const loggingFetch: typeof fetch = async (input, init) => {
   const url = typeof input === 'string' ? input : input.url
@@ -163,6 +52,37 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables')
 }
 
+// Extract project ref for storage key
+const projectRefMatch = supabaseUrl.match(/https?:\/\/(.*?)\./)
+const projectRef = projectRefMatch ? projectRefMatch[1] : ''
+export const localStorageKey = `sb-${projectRef}-auth-token`
+
+// Create fresh client with unique storage key to avoid conflicts
+export function createFreshSupabaseClient() {
+  const uniqueStorageKey = `sb-${projectRef}-auth-token-fresh-${Date.now()}`
+  
+  if (DEBUG) {
+    console.log('🆕 Creating fresh Supabase client with storage key:', uniqueStorageKey)
+  }
+  
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      storageKey: uniqueStorageKey, // unique per instance
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 50,
+      },
+    },
+    global: {
+      fetch: loggingFetch,
+    },
+  })
+}
+
+// Main client with default storage key
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   realtime: {
     params: {
@@ -178,11 +98,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     fetch: loggingFetch,
   },
 })
-
-// Key used by Supabase to persist the auth session in localStorage
-const projectRefMatch = supabaseUrl.match(/https?:\/\/(.*?)\./)
-const projectRef = projectRefMatch ? projectRefMatch[1] : ''
-export const localStorageKey = `sb-${projectRef}-auth-token`
 
 export const getStoredRefreshToken = (): string | null => {
   if (typeof localStorage === 'undefined') return null
@@ -202,6 +117,155 @@ export const getStoredRefreshToken = (): string | null => {
   }
 }
 
+// Client management
+let currentSupabaseClient = supabase
+let fallbackClient: ReturnType<typeof createClient> | null = null
+let lastHealthCheck = 0
+const HEALTH_CHECK_INTERVAL = 10000 // 10 seconds
+
+// Timeout helper
+const timeout = (ms: number) => new Promise((_, reject) => 
+  setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms)
+)
+
+// Test client responsiveness
+const testClientResponsiveness = async (client: ReturnType<typeof createClient>, timeoutMs = 2000): Promise<boolean> => {
+  try {
+    await Promise.race([
+      client.from('users').select('id').limit(1),
+      timeout(timeoutMs),
+    ])
+    return true
+  } catch (error) {
+    if (DEBUG) {
+      console.log('🔍 Client responsiveness test failed:', (error as Error).message)
+    }
+    return false
+  }
+}
+
+// Destroy stale client before creating new ones
+const destroyClient = async (client: ReturnType<typeof createClient>) => {
+  if (!client) return
+  
+  try {
+    await client.realtime.disconnect()
+    // @ts-expect-error - forcibly clear internal state
+    delete client.auth
+    delete client.realtime
+  } catch (e) {
+    console.warn('Failed to clean up previous Supabase client:', e)
+  }
+}
+
+// Recreate client using stored token (mimics page reload)
+const recreateClientWithStoredToken = async (): Promise<ReturnType<typeof createClient>> => {
+  if (DEBUG) console.log('🔄 Recreating client with stored token...')
+  
+  // Destroy old fallback client if it exists
+  if (fallbackClient) {
+    await destroyClient(fallbackClient)
+    fallbackClient = null
+  }
+  
+  // Get session from localStorage manually (don't use stuck client)
+  const raw = localStorage.getItem(localStorageKey)
+  const session = raw ? JSON.parse(raw) : null
+  
+  // Create new client with unique storage key
+  const newClient = createFreshSupabaseClient()
+  
+  // Restore session if available
+  if (session?.currentSession?.access_token && session?.currentSession?.refresh_token) {
+    try {
+      await newClient.auth.setSession({
+        access_token: session.currentSession.access_token,
+        refresh_token: session.currentSession.refresh_token,
+      })
+      if (DEBUG) console.log('✅ Session restored to fresh client')
+    } catch (err) {
+      if (DEBUG) console.warn('⚠️ Failed to restore session to fresh client:', err)
+    }
+  }
+  
+  return newClient
+}
+
+// Centralized getWorkingClient that tracks and rotates clients
+export const getWorkingClient = async (): Promise<ReturnType<typeof createClient>> => {
+  const now = Date.now()
+  
+  // Only check health periodically to avoid excessive testing
+  if (now - lastHealthCheck > HEALTH_CHECK_INTERVAL) {
+    lastHealthCheck = now
+    
+    try {
+      // Test main client first
+      const mainClientWorks = await testClientResponsiveness(currentSupabaseClient, 2000)
+      
+      if (mainClientWorks) {
+        if (DEBUG && fallbackClient) {
+          console.log('✅ Main client recovered, cleaning up fallback')
+          await destroyClient(fallbackClient)
+          fallbackClient = null
+        }
+        return currentSupabaseClient
+      }
+      
+      if (DEBUG) console.log('❌ Main client unresponsive, switching to fallback')
+      
+      // Main client is stuck, create/use fallback
+      if (!fallbackClient) {
+        fallbackClient = await recreateClientWithStoredToken()
+      }
+      
+      // Test fallback client
+      const fallbackWorks = await testClientResponsiveness(fallbackClient, 2000)
+      
+      if (fallbackWorks) {
+        if (DEBUG) console.log('✅ Using working fallback client')
+        return fallbackClient
+      } else {
+        if (DEBUG) console.log('❌ Fallback client also unresponsive, recreating...')
+        await destroyClient(fallbackClient)
+        fallbackClient = await recreateClientWithStoredToken()
+        return fallbackClient
+      }
+      
+    } catch (error) {
+      if (DEBUG) console.error('❌ Error in getWorkingClient:', error)
+      return currentSupabaseClient // fallback to main client
+    }
+  }
+  
+  // Return current working client (main or fallback)
+  return fallbackClient || currentSupabaseClient
+}
+
+// Force client recreation (simulates page reload)
+export const recreateSupabaseClient = async (): Promise<ReturnType<typeof createClient>> => {
+  if (DEBUG) console.log('🔄 Force recreating Supabase client...')
+  
+  lastHealthCheck = 0 // Force health check on next call
+  
+  // Destroy old fallback client
+  if (fallbackClient) {
+    await destroyClient(fallbackClient)
+  }
+  
+  // Create new fallback client
+  fallbackClient = await recreateClientWithStoredToken()
+  
+  // Test the new client
+  const isResponsive = await testClientResponsiveness(fallbackClient, 3000)
+  
+  if (DEBUG) {
+    console.log(isResponsive ? '✅ Fresh client is responsive' : '❌ Fresh client is also unresponsive')
+  }
+  
+  return fallbackClient
+}
+
 // --- Refresh session locking -------------------------------------------------
 // Prevent multiple concurrent refreshSession calls from triggering duplicate
 // network requests. Any callers will await the same promise while a refresh is
@@ -218,7 +282,8 @@ export const refreshSessionLocked = async () => {
       return Promise.reject(new Error('Offline: cannot refresh session'))
     }
 
-    const { data: { session }, error } = await supabase.auth.getSession()
+    const workingClient = await getWorkingClient()
+    const { data: { session }, error } = await workingClient.auth.getSession()
     const storedToken = getStoredRefreshToken()
     if (DEBUG) {
       console.log('[refreshSessionLocked] starting refresh', {
@@ -229,19 +294,19 @@ export const refreshSessionLocked = async () => {
     }
 
     if (DEBUG) {
-      console.log('[refreshSessionLocked] calling supabase.auth.refreshSession')
+      console.log('[refreshSessionLocked] calling workingClient.auth.refreshSession')
     }
-    const refresh = supabase.auth
+    const refresh = workingClient.auth
       .refreshSession()
       .then((res) => {
         if (DEBUG) {
           console.log('[refreshSessionLocked] refresh result', res)
         }
         if (res.data?.session) {
-          supabase.realtime.setAuth(res.data.session?.access_token || '')
+          workingClient.realtime.setAuth(res.data.session?.access_token || '')
           // Reconnect websocket in case it was closed on token expiry
           try {
-            supabase.realtime.connect()
+            workingClient.realtime.connect()
           } catch (err) {
             if (DEBUG) console.error('realtime.connect error', err)
           }
@@ -252,13 +317,13 @@ export const refreshSessionLocked = async () => {
         console.error('[refreshSessionLocked] refresh error', err)
         throw err
       })
-    const timeout = new Promise<never>((_, reject) =>
+    const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(
         () => reject(new Error('Session refresh timeout after 10 seconds')),
         10000
       )
     )
-    refreshSessionPromise = (Promise.race([refresh, timeout]) as Promise<{
+    refreshSessionPromise = (Promise.race([refresh, timeoutPromise]) as Promise<{
       data: any
       error: any
     }>)
@@ -283,17 +348,18 @@ export const forceRefreshSession = async () => {
 }
 
 export const resetRealtimeConnection = async () => {
+  const workingClient = await getWorkingClient()
   const {
     data: { session },
-  } = await supabase.auth.getSession()
-  supabase.realtime.setAuth(session?.access_token || '')
+  } = await workingClient.auth.getSession()
+  workingClient.realtime.setAuth(session?.access_token || '')
   try {
-    supabase.realtime.disconnect()
+    workingClient.realtime.disconnect()
   } catch (err) {
     if (DEBUG) console.error('realtime.disconnect error', err)
   }
   try {
-    supabase.realtime.connect()
+    workingClient.realtime.connect()
   } catch (err) {
     if (DEBUG) console.error('realtime.connect error', err)
   }
@@ -303,22 +369,24 @@ export const VOICE_BUCKET = 'message-media'
 export const UPLOADS_BUCKET = 'chat-uploads'
 
 export const uploadVoiceMessage = async (blob: Blob) => {
-  const { data: { user } } = await supabase.auth.getUser()
+  const workingClient = await getWorkingClient()
+  const { data: { user } } = await workingClient.auth.getUser()
   if (!user) throw new Error('Not authenticated')
   const filePath = `${user.id}/${Date.now()}.webm`
-  const { error } = await supabase.storage.from(VOICE_BUCKET).upload(filePath, blob)
+  const { error } = await workingClient.storage.from(VOICE_BUCKET).upload(filePath, blob)
   if (error) throw error
-  const { data } = supabase.storage.from(VOICE_BUCKET).getPublicUrl(filePath)
+  const { data } = workingClient.storage.from(VOICE_BUCKET).getPublicUrl(filePath)
   return data.publicUrl
 }
 
 export const uploadChatFile = async (file: File) => {
-  const { data: { user } } = await supabase.auth.getUser()
+  const workingClient = await getWorkingClient()
+  const { data: { user } } = await workingClient.auth.getUser()
   if (!user) throw new Error('Not authenticated')
   const filePath = `${user.id}/${Date.now()}_${file.name}`
-  const { error } = await supabase.storage.from(UPLOADS_BUCKET).upload(filePath, file)
+  const { error } = await workingClient.storage.from(UPLOADS_BUCKET).upload(filePath, file)
   if (error) throw error
-  const { data } = supabase.storage.from(UPLOADS_BUCKET).getPublicUrl(filePath)
+  const { data } = workingClient.storage.from(UPLOADS_BUCKET).getPublicUrl(filePath)
   return data.publicUrl
 }
 
@@ -399,12 +467,14 @@ export interface UserSession {
 
 // Helper functions
 export const updateUserPresence = async () => {
-  const { error } = await supabase.rpc('update_user_last_active')
+  const workingClient = await getWorkingClient()
+  const { error } = await workingClient.rpc('update_user_last_active')
   if (error) console.error('Error updating presence:', error)
 }
 
 export const toggleReaction = async (messageId: string, emoji: string, isDM = false) => {
-  const { error } = await supabase.rpc('toggle_message_reaction', {
+  const workingClient = await getWorkingClient()
+  const { error } = await workingClient.rpc('toggle_message_reaction', {
     message_id: messageId,
     emoji: emoji,
     is_dm: isDM
@@ -413,7 +483,8 @@ export const toggleReaction = async (messageId: string, emoji: string, isDM = fa
 }
 
 export const fetchDMConversations = async () => {
-  const { data, error } = await supabase.rpc('get_dm_conversations')
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_dm_conversations')
   if (error) {
     console.error('Error fetching DM conversations:', error)
     return [] as DMConversation[]
@@ -427,7 +498,7 @@ export const fetchDMConversations = async () => {
 
   let usersMap: Record<string, User> = {}
   if (missingIds.length) {
-    const { data: usersData, error: userErr } = await supabase
+    const { data: usersData, error: userErr } = await workingClient
       .from('users')
       .select('id, username, display_name, avatar_url, color, status')
       .in('id', missingIds)
@@ -471,7 +542,8 @@ export const fetchDMConversations = async () => {
 }
 
 export const getOrCreateDMConversation = async (otherUserId: string) => {
-  const { data, error } = await supabase.rpc('get_or_create_dm_conversation', {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_or_create_dm_conversation', {
     other_user_id: otherUserId
   })
   if (error) {
@@ -482,7 +554,8 @@ export const getOrCreateDMConversation = async (otherUserId: string) => {
 }
 
 export const markDMMessagesRead = async (conversationId: string) => {
-  const { error } = await supabase.rpc('mark_dm_messages_read', {
+  const workingClient = await getWorkingClient()
+  const { error } = await workingClient.rpc('mark_dm_messages_read', {
     conversation_id: conversationId
   })
   if (error) console.error('Error marking messages as read:', error)
@@ -492,7 +565,8 @@ export const searchUsers = async (
   term: string,
   options?: { signal?: AbortSignal }
 ) => {
-  const { data, error } = await supabase.rpc(
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc(
     'search_users',
     { term },
     options
@@ -507,7 +581,8 @@ export const searchUsers = async (
 // Helper function to ensure valid session before database operations
 export const ensureSession = async (force = false) => {
   try {
-    const { data: { session }, error } = await supabase.auth.getSession()
+    const workingClient = await getWorkingClient()
+    const { data: { session }, error } = await workingClient.auth.getSession()
 
     if (error) {
       console.error('Error getting session:', error)
@@ -575,16 +650,18 @@ export const fetchUserStats = async (userId: string): Promise<UserStats> => {
     return { messages: 0, reactions: 0, friends: 0 }
   }
 
+  const workingClient = await getWorkingClient()
+
   const [messagesRes, reactionsRes, friendsRes] = await Promise.all([
-    supabase
+    workingClient
       .from('messages')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId),
-    supabase
+    workingClient
       .from('message_reactions')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId),
-    supabase
+    workingClient
       .from('dm_conversations')
       .select('id', { count: 'exact', head: true })
       .contains('participants', [userId]),
@@ -596,4 +673,3 @@ export const fetchUserStats = async (userId: string): Promise<UserStats> => {
     friends: friendsRes.count || 0,
   }
 }
-
