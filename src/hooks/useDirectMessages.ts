@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import {
   supabase,
+  DEBUG,
   getWorkingClient,
   DMConversation,
   DMMessage,
