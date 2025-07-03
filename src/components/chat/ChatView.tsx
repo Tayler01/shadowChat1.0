@@ -337,6 +337,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
         />
       </MobileChatFooter>
       <ConsoleModal
+       key={consoleOpen ? 'console-open' : 'console-closed'}
         open={consoleOpen}
         logs={logs}
         onClose={() => setConsoleOpen(false)}
