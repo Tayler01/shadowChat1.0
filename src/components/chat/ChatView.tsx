@@ -103,8 +103,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
             } else {
               appendLog('✅ Reset client query succeeded')
             }
-        } catch (resetTestError) {
-            appendLog('❌ Client still unresponsive after reset')
         } catch (resetError) {
           appendLog(`❌ Client reset error: ${(resetError as Error).message}`)
         }
