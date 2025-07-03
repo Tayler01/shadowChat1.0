@@ -3,6 +3,79 @@ import { createClient } from '@supabase/supabase-js'
 // Global debug flag used to gate verbose logging
 export const DEBUG = import.meta.env.VITE_DEBUG_LOGS === 'true'
 
+// Backup fetch function that bypasses the Supabase client when it's stuck
+const createBackupSupabaseClient = () => {
+  const backupFetch: typeof fetch = async (input, init) => {
+    const url = typeof input === 'string' ? input : input.url
+    const method = init?.method ?? 'GET'
+    
+    if (DEBUG) {
+      console.log('🔄 [Backup] Request:', { url, method })
+    }
+    
+    try {
+      const response = await fetch(input, init)
+      if (DEBUG) {
+        console.log('🔄 [Backup] Response:', { url, status: response.status })
+      }
+      return response
+    } catch (err) {
+      console.error('🔄 [Backup] Fetch error:', err)
+      throw err
+    }
+  }
+  
+  const { createClient } = require('@supabase/supabase-js')
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+    global: {
+      fetch: backupFetch,
+    },
+  })
+}
+
+// Test if the main client is responsive
+export const testClientResponsiveness = async (timeoutMs = 2000): Promise<boolean> => {
+  try {
+    const testPromise = supabase.auth.getSession()
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Client responsiveness timeout')), timeoutMs)
+    )
+    
+    await Promise.race([testPromise, timeoutPromise])
+    return true
+  } catch (error) {
+    if (DEBUG) {
+      console.log('🔍 Client responsiveness test failed:', (error as Error).message)
+    }
+    return false
+  }
+}
+
+// Backup client for when main client is stuck
+let backupClient: any = null
+
+export const getWorkingClient = async () => {
+  const isResponsive = await testClientResponsiveness()
+  
+  if (isResponsive) {
+    if (DEBUG) console.log('✅ Main client is responsive')
+    return supabase
+  }
+  
+  if (DEBUG) console.log('⚠️ Main client unresponsive, using backup')
+  
+  if (!backupClient) {
+    backupClient = createBackupSupabaseClient()
+  }
+  
+  return backupClient
+}
+
 // Custom fetch that logs all request and response details for debugging
 const loggingFetch: typeof fetch = async (input, init) => {
   const url = typeof input === 'string' ? input : input.url
@@ -106,6 +179,9 @@ export const resetSupabaseClient = async () => {
   try {
     if (DEBUG) console.log('Starting Supabase client reset...')
     
+    // Clear backup client if it exists
+    backupClient = null
+    
     // Try to get session from localStorage directly since client may be stuck
     if (DEBUG) console.log('Getting session from localStorage...')
     let session = null
@@ -141,17 +217,7 @@ export const resetSupabaseClient = async () => {
     
     // Create a completely new client instance to test if the issue is with the current instance
     if (DEBUG) console.log('Creating test client instance...')
-    const { createClient } = await import('@supabase/supabase-js')
-    const testClient = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-        detectSessionInUrl: false,
-      },
-      global: {
-        fetch: fetch, // Use native fetch for test client
-      },
-    })
+    const testClient = createBackupSupabaseClient()
     
     // Test the new client
     if (DEBUG) console.log('Testing new client instance...')
@@ -498,7 +564,8 @@ export const searchUsers = async (
 // Helper function to ensure valid session before database operations
 export const ensureSession = async (force = false) => {
   try {
-    const { data: { session }, error } = await supabase.auth.getSession()
+    const client = await getWorkingClient()
+    const { data: { session }, error } = await client.auth.getSession()
 
     if (error) {
       console.error('Error getting session:', error)
@@ -526,7 +593,10 @@ export const ensureSession = async (force = false) => {
       if (DEBUG && force) {
         console.log('ensureSession: forcing refresh regardless of expiry')
       }
-      const { data: refreshData, error: refreshError } = await refreshSessionLocked()
+      
+      // Use working client for refresh
+      const workingClient = await getWorkingClient()
+      const { data: refreshData, error: refreshError } = await workingClient.auth.refreshSession()
 
       if (refreshError) {
         console.error('Error refreshing session:', refreshError)
@@ -560,6 +630,7 @@ export interface UserStats {
 }
 
 export const fetchUserStats = async (userId: string): Promise<UserStats> => {
+  const client = await getWorkingClient()
   const sessionValid = await ensureSession()
 
   if (!sessionValid) {
@@ -567,15 +638,15 @@ export const fetchUserStats = async (userId: string): Promise<UserStats> => {
   }
 
   const [messagesRes, reactionsRes, friendsRes] = await Promise.all([
-    supabase
+    client
       .from('messages')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId),
-    supabase
+    client
       .from('message_reactions')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId),
-    supabase
+    client
       .from('dm_conversations')
       .select('id', { count: 'exact', head: true })
       .contains('participants', [userId]),

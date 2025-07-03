@@ -19,6 +19,8 @@ import {
   SUPABASE_ANON_KEY,
   clearRefreshSessionPromise,
   resetSupabaseClient,
+  testClientResponsiveness,
+  getWorkingClient,
 } from '../../lib/supabase'
 import { useVisibilityRefresh } from '../../hooks/useVisibilityRefresh'
 
@@ -47,108 +49,68 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     setLogs([])
     appendSupabaseInfo()
 
-    // First, test if the Supabase client is responsive
-    appendLog('Testing Supabase client responsiveness...')
+    // Test client responsiveness with detailed diagnostics
+    appendLog('🔍 Testing Supabase client responsiveness...')
     try {
-      const testPromise = supabase.auth.getSession()
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Client responsiveness test timeout')), 2000)
-      )
-      
-      const { data: { session }, error } = await Promise.race([testPromise, timeoutPromise]) as any
-      
-      if (error) {
-        appendLog(`Client responsiveness test failed: ${error.message}`)
-        appendLog('Client has error, attempting reset...')
-        await attemptClientReset()
+      const isResponsive = await testClientResponsiveness(3000)
+      if (isResponsive) {
+        appendLog('✅ Main client is responsive')
+        
+        // Test a simple query
+        appendLog('🔍 Testing simple database query...')
+        const { data, error } = await supabase.from('users').select('id').limit(1)
+        if (error) {
+          appendLog(`❌ Database query failed: ${error.message}`)
+        } else {
+          appendLog('✅ Database query succeeded')
+        }
       } else {
-        appendLog('Client responsiveness test passed ✅')
+        appendLog('❌ Main client is unresponsive')
+        
+        // Try backup client
+        appendLog('🔄 Testing backup client...')
+        try {
+          const workingClient = await getWorkingClient()
+          const { data, error } = await workingClient.from('users').select('id').limit(1)
+          if (error) {
+            appendLog(`❌ Backup client also failed: ${error.message}`)
+          } else {
+            appendLog('✅ Backup client works! Main client issue confirmed')
+          }
+        } catch (backupError) {
+          appendLog(`❌ Backup client error: ${(backupError as Error).message}`)
+        }
       }
     } catch (error) {
-      if ((error as Error).message.includes('timeout')) {
-        appendLog('Client appears stuck/unresponsive - resetting...')
-        await attemptClientReset()
-      } else {
-        appendLog(`Client test error: ${(error as Error).message}`)
-      }
+      appendLog(`❌ Client test error: ${(error as Error).message}`)
     }
     
-    // Helper function to attempt client reset with timeout
-    async function attemptClientReset() {
-      try {
-        appendLog('Starting client reset process...')
-        const resetPromise = resetSupabaseClient()
-        const resetTimeout = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Reset timeout after 10 seconds')), 10000)
-        )
-        
-        const resetSuccess = await Promise.race([resetPromise, resetTimeout])
-        appendLog(`Client reset ${resetSuccess ? 'succeeded ✅' : 'failed ❌'}`)
-        
-        // Test if reset worked with a simple query
-        appendLog('Testing client after reset...')
-        const testAfterReset = supabase.from('users').select('id').limit(1)
-        const testTimeout = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Post-reset test timeout')), 3000)
-        )
-        
-        const { error: testError } = await Promise.race([testAfterReset, testTimeout]) as any
-        if (testError) {
-          appendLog(`Post-reset test failed: ${testError.message}`)
-        } else {
-          appendLog('Client responsive after reset ✅')
-        }
-        
-        // Also test auth after reset
-        appendLog('Testing auth after reset...')
-        const authTestPromise = supabase.auth.getSession()
-        const authTestTimeout = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Auth test timeout')), 3000)
-        )
-        
-        const { data: authData, error: authError } = await Promise.race([authTestPromise, authTestTimeout]) as any
-        if (authError) {
-          appendLog(`Auth test failed: ${authError.message}`)
-        } else {
-          appendLog(`Auth test passed: ${authData.session ? 'Session found' : 'No session'}`)
-        }
-        
-      } catch (err) {
-        appendLog(`Reset failed: ${(err as Error).message}`)
-        if ((err as Error).message.includes('timeout')) {
-          appendLog('Reset process timed out - client may be completely stuck')
-          appendLog('This suggests a deeper connectivity issue')
-        }
-      }
-    }
-
-    // Additional network connectivity test
-    appendLog('Testing basic network connectivity...')
+    // Network diagnostics
+    appendLog('🌐 Testing network connectivity...')
     try {
       const networkTest = fetch('https://www.google.com/favicon.ico', { 
         method: 'HEAD',
         signal: AbortSignal.timeout(3000)
       })
       const networkResult = await networkTest
-      appendLog(`Network test: ${networkResult.ok ? 'SUCCESS' : 'FAILED'} (${networkResult.status})`)
+      appendLog(`✅ Network test: SUCCESS (${networkResult.status})`)
     } catch (err) {
-      appendLog(`Network test failed: ${(err as Error).message}`)
-      appendLog('This suggests a broader network connectivity issue')
+      appendLog(`❌ Network test failed: ${(err as Error).message}`)
     }
 
-    // Test if the issue is WebContainer-specific
-    appendLog('Testing WebContainer environment...')
+    // Environment diagnostics
+    appendLog('🔧 Environment diagnostics...')
     try {
       appendLog(`User agent: ${navigator.userAgent}`)
       appendLog(`Online status: ${navigator.onLine}`)
       appendLog(`Connection type: ${(navigator as any).connection?.effectiveType || 'unknown'}`)
-      appendLog(`Current URL: ${window.location.href}`)
+      appendLog(`WebContainer URL: ${window.location.href}`)
     } catch (err) {
       appendLog(`Environment test failed: ${(err as Error).message}`)
     }
 
-    // Test Supabase URL accessibility
-    appendLog('Testing Supabase URL accessibility...')
+    // Direct API tests
+    appendLog('🔗 Testing direct Supabase API access...')
     try {
       const supabaseUrlTest = fetch(`${SUPABASE_URL}/rest/v1/`, { 
         method: 'GET',
@@ -159,7 +121,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
         signal: AbortSignal.timeout(5000)
       })
       const supabaseResult = await supabaseUrlTest
-      appendLog(`Supabase URL test: ${supabaseResult.ok ? 'SUCCESS' : 'FAILED'} (${supabaseResult.status})`)
+      appendLog(`✅ Supabase REST API: SUCCESS (${supabaseResult.status})`)
       if (!supabaseResult.ok) {
         const errorText = await supabaseResult.text()
         appendLog(`Supabase URL error: ${errorText}`)
@@ -168,8 +130,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       appendLog(`Supabase URL test failed: ${(err as Error).message}`)
     }
 
-    // Test auth endpoint specifically
-    appendLog('Testing Supabase auth endpoint...')
+    appendLog('🔐 Testing Supabase auth endpoint...')
     try {
       const authTest = fetch(`${SUPABASE_URL}/auth/v1/settings`, {
         method: 'GET',
@@ -180,7 +141,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
         signal: AbortSignal.timeout(5000)
       })
       const authResult = await authTest
-      appendLog(`Auth endpoint test: ${authResult.ok ? 'SUCCESS' : 'FAILED'} (${authResult.status})`)
+      appendLog(`✅ Auth endpoint: SUCCESS (${authResult.status})`)
       if (!authResult.ok) {
         const errorText = await authResult.text()
         appendLog(`Auth endpoint error: ${errorText}`)
@@ -189,255 +150,53 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       appendLog(`Auth endpoint test failed: ${(err as Error).message}`)
     }
 
-    // Check current auth state before testing
-    appendLog('Checking current auth state...')
+    // Direct database test
+    appendLog('📊 Testing direct database access...')
     try {
-      const sessionCheck = supabase.auth.getSession()
-      const sessionTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Session check timeout after 10 seconds')), 10000)
-      )
-      const { data: sessionData, error: sessionError } = await Promise.race([sessionCheck, sessionTimeout]) as any
-      
-      if (sessionError) {
-        appendLog(`Session error: ${sessionError.message}`)
-      } else if (sessionData.session) {
-        appendLog(`Current session: User ${sessionData.session.user?.id}, expires ${sessionData.session.expires_at}`)
-      } else {
-        appendLog('No current session found')
-      }
-    } catch (err) {
-      appendLog(`Session check failed: ${(err as Error).message}`)
-      appendLog(`Session check error stack: ${(err as Error).stack}`)
-    }
-    appendLog('Testing Supabase connectivity...')
-    
-    // First, let's check if the supabase client is properly initialized
-    appendLog('Checking Supabase client configuration...')
-    try {
-      appendLog(`Supabase client URL: ${supabase.supabaseUrl}`)
-      appendLog(`Supabase client key: ${supabase.supabaseKey}`)
-      appendLog(`Supabase client auth: ${typeof supabase.auth}`)
-      appendLog(`Supabase client from: ${typeof supabase.from}`)
-      appendLog(`Supabase client realtime: ${typeof supabase.realtime}`)
-    } catch (err) {
-      appendLog(`Client config check failed: ${(err as Error).message}`)
-    }
-    
-    // Try a direct REST API call to bypass the client
-    appendLog('Testing direct REST API call...')
-    try {
-      const directApiCall = fetch(`${SUPABASE_URL}/rest/v1/users?select=id&limit=1`, {
+      const directDbTest = fetch(`${SUPABASE_URL}/rest/v1/users?select=id&limit=1`, {
         method: 'GET',
         headers: {
           'apikey': SUPABASE_ANON_KEY,
           'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
+          'Content-Type': 'application/json'
         },
         signal: AbortSignal.timeout(5000)
       })
-      const directResult = await directApiCall
-      appendLog(`Direct API call: ${directResult.ok ? 'SUCCESS' : 'FAILED'} (${directResult.status})`)
-      if (!directResult.ok) {
-        const errorText = await directResult.text()
-        appendLog(`Direct API error: ${errorText}`)
+      const dbResult = await directDbTest
+      if (dbResult.ok) {
+        const data = await dbResult.text()
+        appendLog(`✅ Direct DB access: SUCCESS - ${data}`)
       } else {
-        const responseText = await directResult.text()
-        appendLog(`Direct API response: ${responseText}`)
+        appendLog(`❌ Direct DB access failed: ${dbResult.status}`)
       }
     } catch (err) {
-      appendLog(`Direct API call failed: ${(err as Error).message}`)
-    }
-    
-    // Now try the Supabase client
-    try {
-      appendLog('Creating users query...')
-      // Add timeout to prevent hanging
-      const connectivityTest = supabase.from('users').select('id').limit(1)
-      appendLog('Query created, executing with timeout...')
-      const timeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Connectivity test timeout after 10 seconds')), 10000)
-      )
-      
-      appendLog('Awaiting query result...')
-      const { error: pingError } = await Promise.race([connectivityTest, timeout]) as any
-      appendLog('Query completed')
-      if (pingError) {
-        appendLog(`Connectivity check failed: ${pingError.message}`)
-        appendLog(`Error details: ${JSON.stringify(pingError, null, 2)}`)
-      } else {
-        appendLog('Connectivity check succeeded ✅')
-      }
-    } catch (err) {
-      const errorMsg = (err as Error).message
-      appendLog(`Connectivity check threw: ${errorMsg}`)
-      appendLog(`Error stack: ${(err as Error).stack}`)
-      
-      // If it's a timeout, try to clear any stuck promises and retry
-      if (errorMsg.includes('timeout')) {
-        appendLog('Clearing stuck promises and retrying...')
-        clearRefreshSessionPromise()
-        
-        try {
-          appendLog('Creating retry query...')
-          const retryTest = supabase.from('users').select('id').limit(1)
-          const retryTimeout = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Retry timeout after 5 seconds')), 5000)
-          )
-          appendLog('Executing retry query...')
-          const { error: retryError } = await Promise.race([retryTest, retryTimeout]) as any
-          
-          if (retryError) {
-            appendLog(`Retry failed: ${retryError.message}`)
-            appendLog(`Retry error details: ${JSON.stringify(retryError, null, 2)}`)
-          } else {
-            appendLog('Retry succeeded ✅')
-          }
-        } catch (retryErr) {
-          appendLog(`Retry threw: ${(retryErr as Error).message}`)
-          appendLog(`Retry error stack: ${(retryErr as Error).stack}`)
-        }
-      }
+      appendLog(`❌ Direct DB test failed: ${(err as Error).message}`)
     }
 
-    // Test if the issue is specific to the 'users' table
-    appendLog('Testing alternative table access...')
+    // Final comprehensive test
+    appendLog('🧪 Final comprehensive test...')
     try {
-      const altTest = supabase.from('messages').select('id').limit(1)
-      const altTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Alternative table test timeout after 5 seconds')), 5000)
-      )
-      const { error: altError } = await Promise.race([altTest, altTimeout]) as any
+      const workingClient = await getWorkingClient()
+      appendLog(`Using ${workingClient === supabase ? 'main' : 'backup'} client for final test`)
       
-      if (altError) {
-        appendLog(`Alternative table test failed: ${altError.message}`)
+      const { data: sessionData, error: sessionError } = await workingClient.auth.getSession()
+      if (sessionError) {
+        appendLog(`❌ Session check failed: ${sessionError.message}`)
       } else {
-        appendLog('Alternative table test succeeded ✅')
+        appendLog(`✅ Session check: ${sessionData.session ? 'Authenticated' : 'Not authenticated'}`)
+      }
+      
+      const { data: dbData, error: dbError } = await workingClient.from('users').select('id').limit(1)
+      if (dbError) {
+        appendLog(`❌ Database query failed: ${dbError.message}`)
+      } else {
+        appendLog(`✅ Database query succeeded`)
       }
     } catch (err) {
-      appendLog(`Alternative table test threw: ${(err as Error).message}`)
-    }
-    
-    // Test auth methods specifically
-    appendLog('Testing auth methods...')
-    try {
-      appendLog('Testing auth.getUser()...')
-      const getUserTest = supabase.auth.getUser()
-      const getUserTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('getUser timeout after 5 seconds')), 5000)
-      )
-      const { data: userData, error: userError } = await Promise.race([getUserTest, getUserTimeout]) as any
-      
-      if (userError) {
-        appendLog(`getUser failed: ${userError.message}`)
-      } else {
-        appendLog(`getUser succeeded: ${userData.user ? 'User found' : 'No user'}`)
-      }
-    } catch (err) {
-      appendLog(`getUser threw: ${(err as Error).message}`)
-    }
-    
-    appendLog('Running basic feature tests...')
-    try {
-      appendLog('Testing messages table access...')
-      const messagesTest = supabase.from('messages').select('id').limit(1)
-      const msgTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Messages test timeout after 10 seconds')), 10000)
-      )
-      const { error: msgError } = await Promise.race([messagesTest, msgTimeout]) as any
-      
-      if (msgError) {
-        appendLog(`Messages query failed: ${msgError.message}`)
-        appendLog(`Messages error details: ${JSON.stringify(msgError, null, 2)}`)
-      } else {
-        appendLog('Messages query succeeded ✅')
-      }
-
-      appendLog('Testing RPC function call...')
-      const presenceTest = supabase.rpc('update_user_last_active')
-      const presenceTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Presence test timeout after 10 seconds')), 10000)
-      )
-      const { error: presenceError } = await Promise.race([presenceTest, presenceTimeout]) as any
-      
-      if (presenceError) {
-        appendLog(`Presence RPC failed: ${presenceError.message}`)
-        appendLog(`Presence error details: ${JSON.stringify(presenceError, null, 2)}`)
-      } else {
-        appendLog('Presence RPC succeeded ✅')
-      }
-    } catch (err) {
-      appendLog(`Basic tests threw: ${(err as Error).message}`)
-      appendLog(`Basic tests error stack: ${(err as Error).stack}`)
+      appendLog(`❌ Final test failed: ${(err as Error).message}`)
     }
 
-    appendLog('Checking session...')
-    try {
-      const beforeSessionCheck = supabase.auth.getSession()
-      const beforeTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Before session check timeout after 10 seconds')), 10000)
-      )
-      const { data: before } = await Promise.race([beforeSessionCheck, beforeTimeout]) as any
-      appendLog(
-        before.session
-          ? `Current session expires at: ${before.session.expires_at}`
-          : 'No active session'
-      )
-    } catch (err) {
-      appendLog(`Before session check failed: ${(err as Error).message}`)
-    }
-
-    try {
-      appendLog('Clearing any stuck refresh promises before session check...')
-      clearRefreshSessionPromise()
-      
-      appendLog('Starting ensureSession call...')
-      const valid = await Promise.race([
-        ensureSession(),
-        new Promise<boolean>((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 10000)
-        ),
-      ])
-
-      appendLog(valid ? 'Session valid ✅' : 'Session invalid ❌')
-    } catch (err) {
-      if ((err as Error).message === 'timeout') {
-        appendLog('Connection verification timed out ❌')
-      } else {
-        appendLog('Failed to verify connection ❌')
-        appendLog(`ensureSession error: ${(err as Error).message}`)
-        appendLog(`ensureSession error stack: ${(err as Error).stack}`)
-      }
-      console.error('Session verification failed:', err)
-      return
-    }
-
-    appendLog('Testing database query...')
-    try {
-      const finalTest = supabase.from('users').select('id').limit(1)
-      const finalTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Final test timeout after 10 seconds')), 10000)
-      )
-      const { error } = await Promise.race([finalTest, finalTimeout]) as any
-      
-      if (error) {
-        appendLog(`Database query failed: ${error.message}`)
-      } else {
-        appendLog('Database query succeeded ✅')
-      }
-
-      appendLog('Final session check...')
-      const finalSessionCheck = supabase.auth.getSession()
-      const finalSessionTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Final session check timeout after 10 seconds')), 10000)
-      )
-      const { data } = await Promise.race([finalSessionCheck, finalSessionTimeout]) as any
-      appendLog(`Token expires at: ${data.session?.expires_at}`)
-      appendLog(data.session ? 'Session still valid ✅' : 'Session missing ❌')
-    } catch (err) {
-      appendLog(`Database test threw: ${(err as Error).message}`)
-      appendLog(`Database test error stack: ${(err as Error).stack}`)
-    }
+    appendLog('🏁 Diagnostics complete!')
   }
 
   const handleRefreshSession = async () => {
