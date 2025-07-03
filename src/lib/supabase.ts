@@ -276,95 +276,57 @@ export const clearRefreshSessionPromise = () => {
   refreshSessionPromise = null
 }
 
-// Helper function to implement retry logic with exponential backoff
-const retryWithBackoff = async <T>(
-  operation: () => Promise<T>,
-  maxRetries: number = 3,
-  baseDelay: number = 1000
-): Promise<T> => {
-  let lastError: Error
-  
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await operation()
-    } catch (error) {
-      lastError = error as Error
-      
-      if (attempt === maxRetries) {
-        throw lastError
-      }
-      
-      // Exponential backoff: 1s, 2s, 4s
-      const delay = baseDelay * Math.pow(2, attempt)
-      if (DEBUG) {
-        console.log(`[retryWithBackoff] Attempt ${attempt + 1} failed, retrying in ${delay}ms:`, lastError.message)
-      }
-      
-      await new Promise(resolve => setTimeout(resolve, delay))
-    }
-  }
-  
-  throw lastError!
-}
-
 export const refreshSessionLocked = async () => {
   if (!refreshSessionPromise) {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       return Promise.reject(new Error('Offline: cannot refresh session'))
     }
 
-    // Wrap the entire refresh operation in retry logic
-    refreshSessionPromise = retryWithBackoff(async () => {
-      const workingClient = await getWorkingClient()
-      const { data: { session }, error } = await workingClient.auth.getSession()
-      const storedToken = getStoredRefreshToken()
-      if (DEBUG) {
-        console.log('[refreshSessionLocked] starting refresh', {
-          memoryRefreshToken: session?.refresh_token,
-          storedRefreshToken: storedToken,
-          expiresAt: session?.expires_at,
-        })
-      }
+    const workingClient = await getWorkingClient()
+    const { data: { session }, error } = await workingClient.auth.getSession()
+    const storedToken = getStoredRefreshToken()
+    if (DEBUG) {
+      console.log('[refreshSessionLocked] starting refresh', {
+        memoryRefreshToken: session?.refresh_token,
+        storedRefreshToken: storedToken,
+        expiresAt: session?.expires_at,
+      })
+    }
 
-      if (DEBUG) {
-        console.log('[refreshSessionLocked] calling workingClient.auth.refreshSession')
-      }
-      
-      // Create refresh operation with timeout
-      const refresh = workingClient.auth
-        .refreshSession()
-        .then((res) => {
-          if (DEBUG) {
-            console.log('[refreshSessionLocked] refresh result', res)
+    if (DEBUG) {
+      console.log('[refreshSessionLocked] calling workingClient.auth.refreshSession')
+    }
+    const refresh = workingClient.auth
+      .refreshSession()
+      .then((res) => {
+        if (DEBUG) {
+          console.log('[refreshSessionLocked] refresh result', res)
+        }
+        if (res.data?.session) {
+          workingClient.realtime.setAuth(res.data.session?.access_token || '')
+          // Reconnect websocket in case it was closed on token expiry
+          try {
+            workingClient.realtime.connect()
+          } catch (err) {
+            if (DEBUG) console.error('realtime.connect error', err)
           }
-          if (res.data?.session) {
-            workingClient.realtime.setAuth(res.data.session?.access_token || '')
-            // Reconnect websocket in case it was closed on token expiry
-            try {
-              workingClient.realtime.connect()
-            } catch (err) {
-              if (DEBUG) console.error('realtime.connect error', err)
-            }
-          }
-          return res
-        })
-        .catch((err) => {
-          console.error('[refreshSessionLocked] refresh error', err)
-          throw err
-        })
-      
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error('Session refresh timeout after 30 seconds')),
-          30000
-        )
+        }
+        return res
+      })
+      .catch((err) => {
+        console.error('[refreshSessionLocked] refresh error', err)
+        throw err
+      })
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error('Session refresh timeout after 10 seconds')),
+        10000
       )
-      
-      return Promise.race([refresh, timeoutPromise]) as Promise<{
-        data: any
-        error: any
-      }>
-    }, 3, 1000) // Retry up to 3 times with 1s, 2s, 4s delays
+    )
+    refreshSessionPromise = (Promise.race([refresh, timeoutPromise]) as Promise<{
+      data: any
+      error: any
+    }>)
       .then((res) => {
         if (DEBUG) {
           console.log('[refreshSessionLocked] final result', res)
@@ -628,25 +590,7 @@ export const ensureSession = async (force = false) => {
     }
 
     if (!session) {
-      if (DEBUG) {
-        console.warn('No active session found - user is not authenticated')
-      }
-      return false
-    }
-
-    // Verify we have a valid user in the session
-    if (!session.user) {
-      if (DEBUG) {
-        console.warn('Session exists but no user found')
-      }
-      return false
-    }
-
-    // Check if we have required tokens for refresh
-    if (!session.access_token || !session.refresh_token) {
-      if (DEBUG) {
-        console.warn('Session missing required tokens')
-      }
+      console.warn('No active session found')
       return false
     }
 
@@ -654,8 +598,6 @@ export const ensureSession = async (force = false) => {
       console.log('ensureSession: current session', {
         userId: session.user?.id,
         expiresAt: session.expires_at,
-        hasAccessToken: !!session.access_token,
-        hasRefreshToken: !!session.refresh_token,
       })
     }
     
@@ -667,14 +609,7 @@ export const ensureSession = async (force = false) => {
     if (force || (expiresAt && (expiresAt - now) < fiveMinutes)) {
       if (DEBUG && force) {
         console.log('ensureSession: forcing refresh regardless of expiry')
-      } else if (DEBUG) {
-        console.log('ensureSession: session expires soon, refreshing', {
-          expiresAt,
-          now,
-          timeUntilExpiry: expiresAt ? (expiresAt - now) : 'unknown'
-        })
       }
-      
       const { data: refreshData, error: refreshError } = await refreshSessionLocked()
 
       if (refreshError) {
@@ -693,8 +628,6 @@ export const ensureSession = async (force = false) => {
           expiresAt: refreshData.session.expires_at,
         })
       }
-    } else if (DEBUG) {
-      console.log('ensureSession: session is still valid, no refresh needed')
     }
     
     return true
