@@ -13,6 +13,7 @@ import {
   Check,
 } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
+import { ImageModal } from '../ui/ImageModal'
 import { Button } from '../ui/Button'
 import { formatTime, shouldGroupMessage, cn } from '../../lib/utils'
 import type { Message } from '../../lib/supabase'
@@ -42,6 +43,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const [showActions, setShowActions] = useState(false)
     const [showReactionPicker, setShowReactionPicker] = useState(false)
     const [openAbove, setOpenAbove] = useState(false)
+    const [showImageModal, setShowImageModal] = useState(false)
     const EmojiPicker = useEmojiPicker(showReactionPicker)
     const reactionPickerRef = useRef<HTMLDivElement>(null)
     const actionsRef = useRef<HTMLDivElement>(null)
@@ -207,7 +209,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     <img
                       src={message.file_url}
                       alt="uploaded image"
-                      className="mt-1 max-w-full rounded"
+                      className="mt-1 max-w-xs rounded cursor-pointer"
+                      onClick={() => setShowImageModal(true)}
                     />
                   ) : (
                     message.content
@@ -346,6 +349,12 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
           </AnimatePresence>
         </div>
       </motion.div>
+      <ImageModal
+        open={showImageModal}
+        src={message.file_url || ''}
+        alt="uploaded image"
+        onClose={() => setShowImageModal(false)}
+      />
     )
   }
 )
