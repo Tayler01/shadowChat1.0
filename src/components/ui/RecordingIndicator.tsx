@@ -1,11 +1,13 @@
 import React from 'react'
 import { Loader2 } from 'lucide-react'
+import { Button } from './Button'
 
 interface RecordingIndicatorProps {
   seconds: number
+  onStop: () => void
 }
 
-export const RecordingIndicator: React.FC<RecordingIndicatorProps> = ({ seconds }) => {
+export const RecordingIndicator: React.FC<RecordingIndicatorProps> = ({ seconds, onStop }) => {
   const formatTime = (s: number) => {
     const mins = Math.floor(s / 60)
     const secs = s % 60
@@ -17,6 +19,9 @@ export const RecordingIndicator: React.FC<RecordingIndicatorProps> = ({ seconds 
       <Loader2 className="w-5 h-5 text-red-600 animate-spin" />
       <span className="font-mono text-gray-900 dark:text-gray-100">{formatTime(seconds)}</span>
       <span className="text-sm text-gray-700 dark:text-gray-300">Recording…</span>
+      <Button type="button" variant="ghost" size="sm" onClick={onStop} className="text-red-600">
+        Stop
+      </Button>
     </div>
   )
 }

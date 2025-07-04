@@ -8,7 +8,6 @@ import { uploadVoiceMessage, uploadChatFile, DEBUG } from '../../lib/supabase'
 import type { EmojiPickerProps, EmojiClickData } from '../../types'
 import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import { RecordingIndicator } from '../ui/RecordingIndicator'
-import { RecordingPopup } from '../ui/RecordingPopup'
 import { useDraft } from '../../hooks/useDraft'
 import toast from 'react-hot-toast'
 
@@ -39,7 +38,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const EmojiPicker = useEmojiPicker(showEmojiPicker)
   const [showSlashCommands, setShowSlashCommands] = useState(false)
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
-  const [showRecordPopup, setShowRecordPopup] = useState(false)
   const [recording, setRecording] = useState(false)
   const [recordingDuration, setRecordingDuration] = useState(0)
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -268,7 +266,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           if (DEBUG) console.error('❌ [MESSAGE_INPUT] Voice upload failed:', err)
         } finally {
           onUploadStatusChange(false)
-          setShowRecordPopup(false)
           mediaStreamRef.current = null
           mediaRecorderRef.current = null
         }
@@ -281,7 +278,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       if (DEBUG) console.error('❌ [MESSAGE_INPUT] Failed to start recording:', err)
       toast.error('Microphone access was denied')
       setRecording(false)
-      setShowRecordPopup(false)
     }
   }
 
@@ -305,20 +301,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     <div
       className={`relative p-4 md:p-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${className}`}
     >
-      {recording && !showRecordPopup && (
-        <RecordingIndicator seconds={recordingDuration} />
+      {recording && (
+        <RecordingIndicator seconds={recordingDuration} onStop={stopRecording} />
       )}
-      <RecordingPopup
-        open={showRecordPopup}
-        recording={recording}
-        seconds={recordingDuration}
-        onClose={() => {
-          setShowRecordPopup(false)
-          if (recording) stopRecording()
-        }}
-        onStart={startRecording}
-        onStop={stopRecording}
-      />
       {/* Slash Commands Dropdown */}
       {showSlashCommands && (
         <motion.div
@@ -398,8 +383,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setShowRecordPopup(true)
+                onClick={async () => {
+                  await startRecording()
                   setShowAttachmentMenu(false)
                 }}
                 className="md:hidden block w-full px-3 py-1.5 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700"
