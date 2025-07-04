@@ -44,6 +44,21 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
   const [lastConversation, setLastConversation] = useState<string | null>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
+  const footerRef = useRef<HTMLDivElement>(null)
+  const [footerHeight, setFooterHeight] = useState(0)
+
+  useEffect(() => {
+    const updateHeight = () => setFooterHeight(footerRef.current?.offsetHeight ?? 0)
+    updateHeight()
+    if (!footerRef.current) return
+    const ro = new ResizeObserver(updateHeight)
+    ro.observe(footerRef.current)
+    window.addEventListener('resize', updateHeight)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', updateHeight)
+    }
+  }, [])
 
   const handleUserSelect = async (user: { username: string }) => {
     try {
@@ -305,6 +320,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
               ref={messagesRef}
               onScroll={handleScroll}
               className="flex-1 overflow-y-auto p-4 space-y-3 pb-48 md:pb-40"
+              style={{ paddingBottom: Math.max(isDesktop ? 160 : 192, footerHeight + 16) }}
             >
               {messages.map((message, index) => {
                 const previousMessage = messages[index - 1]
@@ -373,6 +389,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
 
             {/* Mobile Message Input with Navigation */}
             <MobileChatFooter
+              ref={footerRef}
               currentView={currentView}
               onViewChange={onViewChange}
             >

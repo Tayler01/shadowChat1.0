@@ -9,14 +9,16 @@ import { PinnedMessageItem } from './PinnedMessageItem'
 import type { FailedMessage } from '../../hooks/useFailedMessages'
 import { FailedMessageItem } from './FailedMessageItem'
 import toast from 'react-hot-toast'
+import { useIsDesktop } from '../../hooks/useIsDesktop'
 
 interface MessageListProps {
   onReply?: (messageId: string, content: string) => void
   failedMessages?: FailedMessage[]
   onResend?: (msg: FailedMessage) => void
+  footerHeight?: number
 }
 
-export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessages = [], onResend }) => {
+export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessages = [], onResend, footerHeight = 0 }) => {
   const {
     messages,
     loading,
@@ -26,6 +28,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     toggleReaction
   } = useMessages()
   const { typingUsers } = useTyping('general')
+  const isDesktop = useIsDesktop()
   const containerRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
 
@@ -79,6 +82,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
       ref={containerRef}
       onScroll={handleScroll}
       className="relative flex-1 overflow-y-auto overflow-x-visible p-4 pb-48 md:pb-40"
+      style={{ paddingBottom: Math.max(isDesktop ? 160 : 192, footerHeight + 16) }}
     >
       {messages.some(m => m.pinned) && (
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">

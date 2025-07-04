@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Hash, Users, Pin } from 'lucide-react'
 import { useMessages } from '../../hooks/useMessages'
@@ -37,6 +37,22 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
 
   const [consoleOpen, setConsoleOpen] = useState(false)
   const [logs, setLogs] = useState<string[]>([])
+
+  const footerRef = useRef<HTMLDivElement>(null)
+  const [footerHeight, setFooterHeight] = useState(0)
+
+  useEffect(() => {
+    const updateHeight = () => setFooterHeight(footerRef.current?.offsetHeight ?? 0)
+    updateHeight()
+    if (!footerRef.current) return
+    const ro = new ResizeObserver(updateHeight)
+    ro.observe(footerRef.current)
+    window.addEventListener('resize', updateHeight)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', updateHeight)
+    }
+  }, [])
 
   const appendLog = (msg: string) =>
     setLogs((l) => [...l, `${new Date().toLocaleTimeString()} ${msg}`])
@@ -467,10 +483,14 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       </div>
 
       {/* Messages */}
-      <MessageList failedMessages={failedMessages} onResend={msg => {
-        removeFailedMessage(msg.id)
-        handleSendMessage(msg.content, msg.type, msg.dataUrl)
-      }} />
+      <MessageList
+        footerHeight={footerHeight}
+        failedMessages={failedMessages}
+        onResend={msg => {
+          removeFailedMessage(msg.id)
+          handleSendMessage(msg.content, msg.type, msg.dataUrl)
+        }}
+      />
 
       {/* Desktop Message Input */}
       <div className="hidden md:block">
@@ -483,6 +503,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
 
       {/* Mobile Message Input with Navigation */}
       <MobileChatFooter
+        ref={footerRef}
         currentView={currentView}
         onViewChange={onViewChange}
       >
