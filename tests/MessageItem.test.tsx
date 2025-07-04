@@ -35,6 +35,7 @@ test('renders image message', () => {
       onDelete={async () => {}}
       onTogglePin={async () => {}}
       onToggleReaction={async () => {}}
+      containerRef={React.createRef()}
     />
   )
 
@@ -56,6 +57,7 @@ test('renders audio message', () => {
       onDelete={async () => {}}
       onTogglePin={async () => {}}
       onToggleReaction={async () => {}}
+      containerRef={React.createRef()}
     />
   )
 
@@ -71,6 +73,7 @@ test('icon buttons have aria-labels', () => {
       onDelete={async () => {}}
       onTogglePin={async () => {}}
       onToggleReaction={async () => {}}
+      containerRef={React.createRef()}
     />
   )
 

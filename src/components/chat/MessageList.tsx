@@ -124,6 +124,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
                   onDelete={handleDelete}
                   onTogglePin={togglePin}
                   onToggleReaction={toggleReaction}
+                  containerRef={containerRef}
                 />
               </div>
             )
