@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getWorkingClient } from '../lib/supabase'
 import { useAuth } from './useAuth'
-import type { RealtimeChannel } from '@supabase/supabase-js'
+import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
 
 interface TypingUser {
   id: string
@@ -15,14 +15,15 @@ export const useTyping = (channelName: string = 'general') => {
   const [isTyping, setIsTyping] = useState(false)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
   const channelRef = useRef<RealtimeChannel | null>(null)
+  const clientRef = useRef<SupabaseClient | null>(null)
 
   useEffect(() => {
     let channel: RealtimeChannel | null = null;
-    let currentClient: any = null;
 
     const setupChannel = async () => {
-      currentClient = await getWorkingClient();
-      channel = currentClient.channel(`typing:${channelName}`);
+      const client = await getWorkingClient();
+      clientRef.current = client;
+      channel = client.channel(`typing:${channelName}`);
       channelRef.current = channel;
 
       // Listen for typing events
@@ -56,8 +57,8 @@ export const useTyping = (channelName: string = 'general') => {
     setupChannel();
 
     return () => {
-      if (channel && currentClient) {
-        currentClient.removeChannel(channel);
+      if (channel && clientRef.current) {
+        clientRef.current.removeChannel(channel);
       }
     }
   }, [channelName])
