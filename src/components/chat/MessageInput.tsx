@@ -10,6 +10,7 @@ import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import { RecordingIndicator } from '../ui/RecordingIndicator'
 import { RecordingPopup } from '../ui/RecordingPopup'
 import { useDraft } from '../../hooks/useDraft'
+import toast from 'react-hot-toast'
 
 interface MessageInputProps {
   onSendMessage: (
@@ -278,6 +279,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       if (DEBUG) console.log('✅ [MESSAGE_INPUT] Recording started')
     } catch (err) {
       if (DEBUG) console.error('❌ [MESSAGE_INPUT] Failed to start recording:', err)
+      toast.error('Microphone access was denied')
+      setRecording(false)
+      setShowRecordPopup(false)
     }
   }
 
