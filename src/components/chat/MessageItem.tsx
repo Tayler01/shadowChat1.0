@@ -43,6 +43,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const [showActions, setShowActions] = useState(false)
     const [showReactionPicker, setShowReactionPicker] = useState(false)
     const [openAbove, setOpenAbove] = useState(false)
+    const [openRight, setOpenRight] = useState(false)
     const [showImageModal, setShowImageModal] = useState(false)
     const EmojiPicker = useEmojiPicker(showReactionPicker)
     const reactionPickerRef = useRef<HTMLDivElement>(null)
@@ -101,7 +102,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
       if (btnRect && containerRect) {
         const center = containerRect.top + containerRect.height / 2
         setOpenAbove(btnRect.top > center)
-      } else if (btnRect && menuRef.current) {
+      }
+      if (btnRect && menuRef.current) {
         const spaceBelow = window.innerHeight - btnRect.bottom
         const spaceAbove = btnRect.top
         const menuHeight = menuRef.current.offsetHeight
@@ -109,6 +111,14 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
           setOpenAbove(true)
         } else {
           setOpenAbove(false)
+        }
+
+        const menuWidth = menuRef.current.offsetWidth
+        const SIDEBAR_WIDTH = 256 // width of left sidebar on desktop
+        if (btnRect.left - menuWidth < SIDEBAR_WIDTH) {
+          setOpenRight(true)
+        } else {
+          setOpenRight(false)
         }
       }
     }, [showActions, containerRef])
@@ -234,8 +244,9 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     {showActions && (
                       <div
                         className={cn(
-                          'absolute right-0 p-2 -m-2 z-50',
-                          openAbove ? 'bottom-full mb-1' : 'top-full mt-1'
+                          'absolute p-2 -m-2 z-50',
+                          openAbove ? 'bottom-full mb-1' : 'top-full mt-1',
+                          openRight ? 'left-full ml-2' : 'right-0'
                         )}
                         ref={menuRef}
                       >
