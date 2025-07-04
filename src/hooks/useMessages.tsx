@@ -469,6 +469,34 @@ function useProvideMessages(): MessagesContextValue {
           if (DEBUG) {
             console.error('❌ Real-time subscription error:', err)
           }
+          
+          // Handle specific binding mismatch error
+          if (err.message && err.message.includes('mismatch between server and client bindings for postgres changes')) {
+            if (DEBUG) {
+              console.warn('⚠️ Detected binding mismatch, performing comprehensive reset...')
+            }
+            try {
+              // Use resetRealtimeConnection to clear server-side bindings
+              await resetRealtimeConnection();
+              if (DEBUG) console.log('✅ Realtime connection reset completed');
+              
+              // Use the comprehensive reset function
+              if (clientResetRef.current) {
+                await clientResetRef.current();
+                if (DEBUG) console.log('✅ Client reset completed');
+              }
+            } catch (resetError) {
+              if (DEBUG) console.error('❌ Error during binding mismatch reset:', resetError);
+              // Fallback to simple resubscription after delay
+              setTimeout(() => {
+                subscribeToChannel().then(newCh => {
+                  channel = newCh;
+                  channelRef.current = newCh;
+                });
+              }, 2000);
+            }
+            return;
+          }
         }
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           if (DEBUG) {
