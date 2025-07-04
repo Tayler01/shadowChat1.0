@@ -193,10 +193,10 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
             </div>
           ) : (
             <>
-              <div className="relative group/message inline-block max-w-full">
+              <div className="relative inline-block max-w-full">
                 <div
                   className={cn(
-                    'relative bg-gray-100 dark:bg-gray-700 rounded-xl px-3 py-2 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors break-words space-y-1'
+                    'relative peer group/message bg-gray-100 dark:bg-gray-700 rounded-xl px-3 py-2 break-words space-y-1'
                   )}
                 >
                   <MessageReactions
@@ -217,47 +217,13 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     message.content
                   )}
                 </div>
-                <div className="hidden group-hover/message:flex absolute -top-8 left-1/2 -translate-x-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow px-2 py-1 space-x-1 z-10">
-                  {QUICK_REACTIONS.map(e => (
-                    <button
-                      key={e}
-                      onClick={() => handleReaction(e)}
-                      className="text-base hover:scale-110 transition-transform"
-                      type="button"
-                    >
-                      {e}
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => setShowReactionPicker(!showReactionPicker)}
-                    className="text-base hover:scale-110 transition-transform"
-                    type="button"
-                    aria-label="Add reaction"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-                {showReactionPicker && EmojiPicker && (
-                  <div
-                    ref={reactionPickerRef}
-                    className="absolute -top-48 left-1/2 -translate-x-1/2 z-50"
-                  >
-                    <EmojiPicker
-                      onEmojiClick={handleReactionSelect}
-                      width={320}
-                      height={400}
-                      theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
-                    />
-                  </div>
-                )}
-
                 {/* Actions */}
-                <div className="absolute -right-6 top-1" ref={actionsRef}>
+                <div className="absolute -right-8 -top-2" ref={actionsRef}>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowActions(!showActions)}
-                    className="opacity-70 group-hover:opacity-100 transition-opacity"
+                    className="opacity-70 peer-hover:opacity-100 transition-opacity hover:text-[var(--color-accent)]"
                     aria-label="Message actions"
                     type="button"
                   >
@@ -349,6 +315,40 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     )}
                   </AnimatePresence>
                 </div>
+
+                <div className="hidden peer-hover:flex absolute -top-8 left-1/2 -translate-x-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow px-2 py-1 space-x-1 z-10">
+                  {QUICK_REACTIONS.map(e => (
+                    <button
+                      key={e}
+                      onClick={() => handleReaction(e)}
+                      className="text-base hover:scale-110 transition-transform"
+                      type="button"
+                    >
+                      {e}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setShowReactionPicker(!showReactionPicker)}
+                    className="text-base hover:scale-110 transition-transform"
+                    type="button"
+                    aria-label="Add reaction"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+                {showReactionPicker && EmojiPicker && (
+                  <div
+                    ref={reactionPickerRef}
+                    className="absolute -top-48 left-1/2 -translate-x-1/2 z-50"
+                  >
+                    <EmojiPicker
+                      onEmojiClick={handleReactionSelect}
+                      width={320}
+                      height={400}
+                      theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
+                    />
+                  </div>
+                )}
               </div>
             </>
           )}
