@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react'
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Pin } from 'lucide-react'
 import { useMessages } from '../../hooks/useMessages'
@@ -27,15 +27,23 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
   } = useMessages()
   const { typingUsers } = useTyping('general')
   const containerRef = useRef<HTMLDivElement>(null)
+  const [autoScroll, setAutoScroll] = useState(true)
+
+  const handleScroll = useCallback(() => {
+    const el = containerRef.current
+    if (!el) return
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 20
+    setAutoScroll(atBottom)
+  }, [])
 
   const groupedMessages = useMemo(() => groupMessagesByDate(messages), [messages])
 
   // Scroll to bottom when messages or typing users change
   useEffect(() => {
-    if (containerRef.current) {
+    if (autoScroll && containerRef.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight
     }
-  }, [messages, typingUsers])
+  }, [messages, typingUsers, autoScroll])
 
   const handleEdit = async (messageId: string, content: string) => {
     try {
@@ -67,7 +75,11 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
   }
 
   return (
-    <div ref={containerRef} className="relative flex-1 overflow-y-auto overflow-x-visible p-4 pb-40 md:pb-32">
+    <div
+      ref={containerRef}
+      onScroll={handleScroll}
+      className="relative flex-1 overflow-y-auto overflow-x-visible p-4 pb-48 md:pb-40"
+    >
       {messages.some(m => m.pinned) && (
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
           <div className="flex items-center space-x-2 mb-2">

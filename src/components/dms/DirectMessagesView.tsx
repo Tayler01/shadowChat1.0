@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   MessageSquare,
@@ -42,6 +42,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
   const [showNewConversation, setShowNewConversation] = useState(false)
   const [searchUsername, setSearchUsername] = useState('')
   const [lastConversation, setLastConversation] = useState<string | null>(null)
+  const messagesRef = useRef<HTMLDivElement>(null)
+  const [autoScroll, setAutoScroll] = useState(true)
 
   const handleUserSelect = async (user: { username: string }) => {
     try {
@@ -75,6 +77,23 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
     setCurrentConversation(conversationId)
     markAsRead(conversationId)
   }
+
+  const handleScroll = useCallback(() => {
+    const el = messagesRef.current
+    if (!el) return
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 20
+    setAutoScroll(atBottom)
+  }, [])
+
+  useEffect(() => {
+    if (autoScroll && messagesRef.current) {
+      messagesRef.current.scrollTop = messagesRef.current.scrollHeight
+    }
+  }, [messages, currentConversation, autoScroll])
+
+  useEffect(() => {
+    setAutoScroll(true)
+  }, [currentConversation])
 
   const currentConv = conversations.find(c => c.id === currentConversation)
 
@@ -282,7 +301,11 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-40 md:pb-32">
+            <div
+              ref={messagesRef}
+              onScroll={handleScroll}
+              className="flex-1 overflow-y-auto p-4 space-y-3 pb-48 md:pb-40"
+            >
               {messages.map((message, index) => {
                 const previousMessage = messages[index - 1]
                 const isGrouped = shouldGroupMessage(message, previousMessage)
