@@ -97,33 +97,46 @@ export function createFreshSupabaseClient() {
 // Main client with default storage key
 export let supabase: ReturnType<typeof createClient>
 
-try {
-  supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    realtime: {
-      params: {
-        eventsPerSecond: 50,
-      },
-    },
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true,
-    },
-    global: {
-      fetch: loggingFetch,
-    },
-  })
-} catch (error) {
-  console.error('❌ Failed to create main Supabase client:', error)
-  // Create a minimal fallback client
-  supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true,
-    },
-  })
+declare global {
+  // eslint-disable-next-line no-var
+  var __supabaseClient: ReturnType<typeof createClient> | undefined
 }
+
+const globalRef = globalThis as typeof globalThis & {
+  __supabaseClient?: ReturnType<typeof createClient>
+}
+
+if (!globalRef.__supabaseClient) {
+  try {
+    globalRef.__supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      realtime: {
+        params: {
+          eventsPerSecond: 50,
+        },
+      },
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
+      global: {
+        fetch: loggingFetch,
+      },
+    })
+  } catch (error) {
+    console.error('❌ Failed to create main Supabase client:', error)
+    // Create a minimal fallback client
+    globalRef.__supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
+    })
+  }
+}
+
+supabase = globalRef.__supabaseClient!
 
 export const getStoredRefreshToken = (): string | null => {
   if (typeof localStorage === 'undefined') return null
