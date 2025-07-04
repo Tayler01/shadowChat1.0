@@ -130,11 +130,12 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
 
 
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className={cn('group flex space-x-3 ml-2')}
-      >
+      <>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={cn('group flex space-x-3 ml-2')}
+        >
         {/* Avatar */}
         <div className="flex-shrink-0 w-10">
           {!isGrouped && (
@@ -355,6 +356,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         alt="uploaded image"
         onClose={() => setShowImageModal(false)}
       />
+      </>
     )
   }
 )
