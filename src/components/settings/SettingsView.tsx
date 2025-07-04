@@ -15,7 +15,7 @@ import {
   Menu
 } from 'lucide-react'
 import { Button } from '../ui/Button'
-import { signOut } from '../../lib/auth'
+import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
 import { useTheme, colorSchemes, ColorScheme } from '../../hooks/useTheme'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
@@ -30,6 +30,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
   const [showDangerZone, setShowDangerZone] = useState(false)
   const { scheme, setScheme } = useTheme()
   const isDesktop = useIsDesktop()
+  const { signOut } = useAuth()
 
   const handleExportData = () => {
     toast.success('Data export started - you will receive an email when ready')
