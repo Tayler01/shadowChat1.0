@@ -13,6 +13,8 @@ import { Button } from '../ui/Button'
 import { UserSearchSelect } from './UserSearchSelect'
 import { MessageInput } from '../chat/MessageInput'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
+import { FailedMessageItem } from '../chat/FailedMessageItem'
+import { useFailedMessages } from '../../hooks/useFailedMessages'
 import { formatTime, shouldGroupMessage } from '../../lib/utils'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import toast from 'react-hot-toast'
@@ -35,6 +37,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
     sendMessage,
     markAsRead
   } = useDirectMessages()
+  const { failedMessages, addFailedMessage, removeFailedMessage } = useFailedMessages(currentConversation || 'none')
   
   const [showNewConversation, setShowNewConversation] = useState(false)
   const [searchUsername, setSearchUsername] = useState('')
@@ -63,6 +66,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
       await sendMessage(content, type, fileUrl)
     } catch (error) {
       toast.error('Failed to send message')
+      addFailedMessage({ id: Date.now().toString(), type: type || 'text', content, dataUrl: fileUrl })
     }
   }
 
@@ -326,6 +330,13 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                   </motion.div>
                 )
               })}
+
+              {failedMessages.map(msg => (
+                <FailedMessageItem key={msg.id} message={msg} onResend={m => {
+                  removeFailedMessage(m.id)
+                  handleSendMessage(m.content, m.type, m.dataUrl)
+                }} />
+              ))}
             </div>
 
             {/* Desktop Message Input */}
@@ -333,6 +344,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
               <MessageInput
                 onSendMessage={handleSendMessage}
                 placeholder={`Message @${currentConv.other_user?.username}...`}
+                cacheKey={`dm-${currentConversation}`}
               />
             </div>
 
@@ -345,6 +357,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                 onSendMessage={handleSendMessage}
                 placeholder={`Message @${currentConv.other_user?.username}...`}
                 className="border-t"
+                cacheKey={`dm-${currentConversation}`}
               />
             </MobileChatFooter>
           </>

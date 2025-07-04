@@ -8,25 +8,29 @@ import { uploadVoiceMessage, uploadChatFile, DEBUG } from '../../lib/supabase'
 import type { EmojiPickerProps, EmojiClickData } from '../../types'
 import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import { RecordingIndicator } from '../ui/RecordingIndicator'
+import { useDraft } from '../../hooks/useDraft'
 
 interface MessageInputProps {
   onSendMessage: (
     content: string,
     type?: 'text' | 'command' | 'audio' | 'image',
     fileUrl?: string
-  ) => void
+  ) => Promise<void> | void
   placeholder?: string
   disabled?: boolean
   className?: string
+  cacheKey?: string
 }
 
 export const MessageInput: React.FC<MessageInputProps> = ({
   onSendMessage,
   placeholder = 'Type a message',
   disabled = false,
-  className = ''
+  className = '',
+  cacheKey = 'general'
 }) => {
-  const [message, setMessage] = useState('')
+  const { draft, setDraft, clear } = useDraft(cacheKey)
+  const [message, setMessage] = useState(draft)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const EmojiPicker = useEmojiPicker(showEmojiPicker)
   const [showSlashCommands, setShowSlashCommands] = useState(false)
@@ -127,12 +131,16 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     if (DEBUG) console.log('🔧 [MESSAGE_INPUT] handleSubmit: Final message:', finalMessage)
 
     if (DEBUG) console.log('📤 [MESSAGE_INPUT] handleSubmit: Calling onSendMessage...')
-    onSendMessage(finalMessage)
-    if (DEBUG) console.log('✅ [MESSAGE_INPUT] handleSubmit: onSendMessage called')
-    
-    setMessage('')
-    stopTyping()
-    setShowSlashCommands(false)
+    try {
+      await onSendMessage(finalMessage)
+      if (DEBUG) console.log('✅ [MESSAGE_INPUT] handleSubmit: onSendMessage resolved')
+      clear()
+      setMessage('')
+      stopTyping()
+      setShowSlashCommands(false)
+    } catch (err) {
+      if (DEBUG) console.error('❌ [MESSAGE_INPUT] handleSubmit: send failed', err)
+    }
     // Keep focus on the textarea so the mobile keyboard stays open
     textareaRef.current?.focus()
 
@@ -156,6 +164,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value
     setMessage(value)
+    setDraft(value)
 
     // Show slash commands if message starts with /
     if (value.startsWith('/') && value.length > 1) {

@@ -4,6 +4,7 @@ import { Hash, Users, Pin } from 'lucide-react'
 import { useMessages } from '../../hooks/useMessages'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
+import { useFailedMessages } from '../../hooks/useFailedMessages'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import toast from 'react-hot-toast'
 import { Button } from '../ui/Button'
@@ -32,6 +33,7 @@ interface ChatViewProps {
 export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView, onViewChange }) => {
   const { sendMessage, messages, loading } = useMessages()
   const { status: resetStatus, lastResetTime, manualReset } = useClientResetStatus()
+  const { failedMessages, addFailedMessage, removeFailedMessage } = useFailedMessages('general')
 
   const [consoleOpen, setConsoleOpen] = useState(false)
   const [logs, setLogs] = useState<string[]>([])
@@ -419,6 +421,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     } catch (error) {
       console.error('❌ ChatView: Failed to send message:', error)
       toast.error('Failed to send message')
+      addFailedMessage({ id: Date.now().toString(), type: type || 'text', content: content, dataUrl: fileUrl })
     }
   }
 
@@ -464,13 +467,17 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       </div>
 
       {/* Messages */}
-      <MessageList />
+      <MessageList failedMessages={failedMessages} onResend={msg => {
+        removeFailedMessage(msg.id)
+        handleSendMessage(msg.content, msg.type, msg.dataUrl)
+      }} />
 
       {/* Desktop Message Input */}
       <div className="hidden md:block">
         <MessageInput
           onSendMessage={handleSendMessage}
           placeholder="Type a message"
+          cacheKey="general"
         />
       </div>
 
@@ -483,6 +490,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
           onSendMessage={handleSendMessage}
           placeholder="Type a message"
           className="border-t"
+          cacheKey="general"
         />
       </MobileChatFooter>
       <ConsoleModal
