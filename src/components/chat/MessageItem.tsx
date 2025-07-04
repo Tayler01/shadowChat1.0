@@ -280,78 +280,78 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                           className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50 min-w-[160px]"
                         >
 
-                <button
-                  onClick={handleCopyMessage}
-                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
-                  type="button"
-                >
-                  <Copy className="w-4 h-4" />
-                  <span>Copy</span>
-                </button>
+                          <button
+                            onClick={handleCopyMessage}
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                            type="button"
+                          >
+                            <Copy className="w-4 h-4" />
+                            <span>Copy</span>
+                          </button>
 
-                {onReply && (
-                  <button
-                    onClick={() => {
-                      onReply(message.id, message.content)
-                      setShowActions(false)
-                    }}
-                    className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
-                    type="button"
-                  >
-                    <Reply className="w-4 h-4" />
-                    <span>Reply</span>
-                  </button>
-                )}
+                          {onReply && (
+                            <button
+                              onClick={() => {
+                                onReply(message.id, message.content)
+                                setShowActions(false)
+                              }}
+                              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                              type="button"
+                            >
+                              <Reply className="w-4 h-4" />
+                              <span>Reply</span>
+                            </button>
+                          )}
 
-                {isOwner && (
-                  <>
-                    <button
-                      onClick={() => {
-                        setIsEditing(true)
-                        setEditContent(message.content)
-                        setShowActions(false)
-                      }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
-                      type="button"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                      <span>Edit</span>
-                    </button>
+                          {isOwner && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setIsEditing(true)
+                                  setEditContent(message.content)
+                                  setShowActions(false)
+                                }}
+                                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                                type="button"
+                              >
+                                <Edit3 className="w-4 h-4" />
+                                <span>Edit</span>
+                              </button>
 
-                    <button
-                      onClick={() => {
-                        onDelete(message.id)
-                        setShowActions(false)
-                      }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-red-600 dark:text-red-400 flex items-center space-x-2"
-                      type="button"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      <span>Delete</span>
-                    </button>
-                  </>
-                )}
+                              <button
+                                onClick={() => {
+                                  onDelete(message.id)
+                                  setShowActions(false)
+                                }}
+                                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-red-600 dark:text-red-400 flex items-center space-x-2"
+                                type="button"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                <span>Delete</span>
+                              </button>
+                            </>
+                          )}
 
-                <button
-                  onClick={handlePinToggle}
-                  className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
-                  type="button"
-                >
-                  {message.pinned ? (
-                    <PinOff className="w-4 h-4" />
-                  ) : (
-                    <Pin className="w-4 h-4" />
-                  )}
-                  <span>{message.pinned ? 'Unpin' : 'Pin'}</span>
-                </button>
-              </motion.div>
-            </div>
-            )}
-          </AnimatePresence>
-        </div>
-              </>
-            )}
-          </div>
+                          <button
+                            onClick={handlePinToggle}
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                            type="button"
+                          >
+                            {message.pinned ? (
+                              <PinOff className="w-4 h-4" />
+                            ) : (
+                              <Pin className="w-4 h-4" />
+                            )}
+                            <span>{message.pinned ? 'Unpin' : 'Pin'}</span>
+                          </button>
+                        </motion.div>
+                      </div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </div>
+            </>
+          )}
         </div>
         </motion.div>
         <ImageModal
@@ -363,9 +363,9 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
       </>
     )
   }
-);
+)
 
-MessageItem.displayName = 'MessageItem';
+MessageItem.displayName = 'MessageItem'
 
 export const MessageReactions: React.FC<{
   message: Message
@@ -403,6 +403,6 @@ export const MessageReactions: React.FC<{
       })}
     </div>
   )
-};
+}
 
 
