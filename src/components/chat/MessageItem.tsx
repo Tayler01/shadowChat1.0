@@ -252,7 +252,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 )}
 
                 {/* Actions */}
-                <div className="absolute top-1 right-1" ref={actionsRef}>
+                <div className="absolute -right-6 top-1" ref={actionsRef}>
                   <Button
                     variant="ghost"
                     size="sm"
