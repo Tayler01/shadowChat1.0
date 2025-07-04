@@ -488,17 +488,25 @@ export const forceRefreshSession = async () => {
 }
 
 export const resetRealtimeConnection = async () => {
-  const workingClient = await getWorkingClient()
-  const {
-    data: { session },
-  } = await workingClient.auth.getSession()
-  workingClient.realtime.setAuth(session?.access_token || '')
+  if (DEBUG) console.log('🔄 [SUPABASE] resetRealtimeConnection: Starting comprehensive reset...')
+  
+  // Get current session before recreating client
+  const currentClient = await getWorkingClient()
+  const { data: { session } } = await currentClient.auth.getSession()
+  
+  if (DEBUG) console.log('🔄 [SUPABASE] Current session:', {
+    hasSession: !!session,
+    userId: session?.user?.id,
+    expiresAt: session?.expires_at
+  })
+  
+  // Clean up existing channels on current client
   try {
-    // remove any existing channels to avoid binding mismatches
-    const channels = workingClient.getChannels()
+    const channels = currentClient.getChannels()
+    if (DEBUG) console.log('🗑️ [SUPABASE] Removing existing channels:', channels.length)
     channels.forEach(ch => {
       try {
-        workingClient.removeChannel(ch)
+        currentClient.removeChannel(ch)
       } catch (removeErr) {
         if (DEBUG) console.warn('removeChannel error', removeErr)
       }
@@ -506,13 +514,42 @@ export const resetRealtimeConnection = async () => {
   } catch (err) {
     if (DEBUG) console.warn('failed to clean channels', err)
   }
+  
+  // Disconnect current realtime connection
   try {
-    workingClient.realtime.disconnect()
+    if (DEBUG) console.log('🔌 [SUPABASE] Disconnecting current realtime...')
+    currentClient.realtime.disconnect()
   } catch (err) {
     if (DEBUG) console.error('realtime.disconnect error', err)
   }
+  
+  // Force recreation of client to get fresh bindings
+  if (DEBUG) console.log('🆕 [SUPABASE] Creating fresh client to resolve binding mismatch...')
+  const freshClient = await recreateSupabaseClient()
+  
+  // Promote the fresh client to main if it's working
+  if (DEBUG) console.log('🔄 [SUPABASE] Testing fresh client and promoting if working...')
+  const isResponsive = await testClientResponsiveness(freshClient, 3000)
+  
+  if (isResponsive) {
+    if (DEBUG) console.log('✅ [SUPABASE] Fresh client is responsive, promoting to main...')
+    await promoteFallbackToMain()
+  } else {
+    if (DEBUG) console.log('⚠️ [SUPABASE] Fresh client not responsive, keeping current setup')
+  }
+  
+  // Get the working client (either the promoted fresh one or current)
+  const workingClient = await getWorkingClient()
+  
+  // Set auth token on realtime
+  if (DEBUG) console.log('🔐 [SUPABASE] Setting realtime auth token...')
+  workingClient.realtime.setAuth(session?.access_token || '')
+  
+  // Connect realtime with fresh bindings
   try {
+    if (DEBUG) console.log('🔌 [SUPABASE] Connecting realtime with fresh bindings...')
     workingClient.realtime.connect()
+    if (DEBUG) console.log('✅ [SUPABASE] resetRealtimeConnection: Complete')
   } catch (err) {
     if (DEBUG) console.error('realtime.connect error', err)
   }
