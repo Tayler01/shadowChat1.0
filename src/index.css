@@ -44,3 +44,14 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+html, body, #root {
+  height: 100vh;
+  overflow: hidden;
+}
+
+@supports (height: 100dvh) {
+  html, body, #root {
+    height: 100dvh;
+  }
+}
