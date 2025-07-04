@@ -11,6 +11,16 @@ export function useDraft(key: string) {
     }
   })
 
+  // Load new draft when the key changes
+  useEffect(() => {
+    if (typeof localStorage === 'undefined') return
+    try {
+      setDraft(localStorage.getItem(storageKey) || '')
+    } catch {
+      setDraft('')
+    }
+  }, [storageKey])
+
   useEffect(() => {
     try {
       if (draft) {
