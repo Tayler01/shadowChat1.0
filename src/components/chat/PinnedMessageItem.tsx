@@ -79,12 +79,7 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
           </button>
         </div>
         {showPicker && Picker && (
-          <div 
-            ref={pickerRef} 
-            className="absolute z-50 top-full mt-2"
-            onMouseEnter={() => setShowPicker(true)}
-            onMouseLeave={() => setShowPicker(false)}
-          >
+          <div ref={pickerRef} className="absolute z-50 top-full mt-2">
             <Picker
               onEmojiClick={handleSelect}
               width={320}
