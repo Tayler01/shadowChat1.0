@@ -73,6 +73,7 @@ Sidebar shows unread message badges and typing indicators
 ### Dark Mode
 Theme toggle available in settings
 Stored in localStorage to persist across sessions
+Signing out clears cached chat history and failed message queues
 ### Typing Indicators
 When a user types, a typing event is broadcast to the channel
 Other users in that room see "User is typing..."

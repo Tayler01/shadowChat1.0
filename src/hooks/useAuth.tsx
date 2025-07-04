@@ -239,6 +239,20 @@ function useProvideAuth() {
       setError(error instanceof Error ? error.message : 'Sign out failed');
       throw error;
     } finally {
+      // Clear cached chat history and failed message queues on sign out
+      if (typeof localStorage !== 'undefined') {
+        try {
+          localStorage.removeItem('chatHistory');
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('failed-')) {
+              localStorage.removeItem(key);
+            }
+          });
+        } catch {
+          // ignore storage errors
+        }
+      }
+
       setLoading(false);
     }
   };
