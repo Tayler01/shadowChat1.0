@@ -350,7 +350,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
           </AnimatePresence>
         </div>
       </div>
-    </div>
+    </>
       </motion.div>
       <ImageModal
         open={showImageModal}
