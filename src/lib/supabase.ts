@@ -83,7 +83,7 @@ export function createFreshSupabaseClient() {
 }
 
 // Main client with default storage key
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export let supabase = createClient(supabaseUrl, supabaseAnonKey, {
   realtime: {
     params: {
       eventsPerSecond: 50,
@@ -119,6 +119,9 @@ export const getStoredRefreshToken = (): string | null => {
 
 // Client management
 let currentSupabaseClient = supabase
+export const setSupabaseClient = (client: ReturnType<typeof createClient>) => {
+  supabase = client
+}
 let fallbackClient: ReturnType<typeof createClient> | null = null
 let lastHealthCheck = 0
 const HEALTH_CHECK_INTERVAL = 10000 // 10 seconds
@@ -156,6 +159,7 @@ export const promoteFallbackToMain = async (): Promise<void> => {
     // Promote fallback to main
     currentSupabaseClient = fallbackClient
     fallbackClient = null
+    setSupabaseClient(currentSupabaseClient)
     
     // Reset health check timer to force immediate use of new main client
     lastHealthCheck = 0
