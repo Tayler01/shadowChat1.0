@@ -192,9 +192,6 @@ const destroyClient = async (client: ReturnType<typeof createClient>) => {
   
   try {
     await client.realtime.disconnect()
-    // @ts-expect-error - forcibly clear internal state
-    delete client.auth
-    delete client.realtime
   } catch (e) {
     console.warn('Failed to clean up previous Supabase client:', e)
   }
