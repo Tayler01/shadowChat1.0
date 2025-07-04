@@ -359,7 +359,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
       </>
     )
   }
-)
+);
 
 MessageItem.displayName = 'MessageItem'
 
@@ -399,6 +399,6 @@ export const MessageReactions: React.FC<{
       })}
     </div>
   )
-}
+};
 
 
