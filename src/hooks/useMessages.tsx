@@ -323,8 +323,7 @@ function useProvideMessages(): MessagesContextValue {
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'messages',
-          filter: 'id=neq.null'
+          table: 'messages'
         },
         async (payload) => {
           
@@ -411,8 +410,7 @@ function useProvideMessages(): MessagesContextValue {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'messages',
-          filter: 'id=neq.null'
+          table: 'messages'
         },
         async (payload) => {
           
@@ -458,8 +456,7 @@ function useProvideMessages(): MessagesContextValue {
         {
           event: 'DELETE',
           schema: 'public',
-          table: 'messages',
-          filter: 'id=neq.null'
+          table: 'messages'
         },
         (payload) => {
           setMessages(prev =>
