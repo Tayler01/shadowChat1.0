@@ -120,6 +120,13 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         } else {
           setOpenRight(false)
         }
+
+        // Ensure menu stays in view on mobile by scrolling it into view
+        if (window.innerWidth <= 768) {
+          setTimeout(() => {
+            menuRef.current?.scrollIntoView({ block: 'nearest' })
+          }, 0)
+        }
       }
     }, [showActions, containerRef])
 
