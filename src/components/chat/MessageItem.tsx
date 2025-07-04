@@ -349,15 +349,14 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
             )}
           </AnimatePresence>
         </div>
-      </div>
-    </>
-      </motion.div>
-      <ImageModal
-        open={showImageModal}
-        src={message.file_url || ''}
-        alt="uploaded image"
-        onClose={() => setShowImageModal(false)}
-      />
+        </div>
+        </motion.div>
+        <ImageModal
+          open={showImageModal}
+          src={message.file_url || ''}
+          alt="uploaded image"
+          onClose={() => setShowImageModal(false)}
+        />
       </>
     )
   }
