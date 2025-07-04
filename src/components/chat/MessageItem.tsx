@@ -210,10 +210,10 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
             </div>
           ) : (
             <>
-              <div className="relative inline-block max-w-full">
+              <div className="relative inline-block max-w-full group/message">
                 <div
                   className={cn(
-                    'relative peer group/message bg-gray-100 dark:bg-gray-700 rounded-xl px-3 py-2 break-words space-y-1'
+                    'relative peer bg-gray-100 dark:bg-gray-700 rounded-xl px-3 py-2 break-words space-y-1'
                   )}
                 >
                   <MessageReactions
@@ -334,7 +334,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   </AnimatePresence>
                 </div>
 
-                <div className="hidden peer-hover:flex absolute -top-8 left-1/2 -translate-x-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow px-2 py-1 space-x-1 z-10">
+                <div className="hidden group-hover/message:flex absolute -top-8 left-1/2 -translate-x-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow px-2 py-1 space-x-1 z-10">
                   {QUICK_REACTIONS.map(e => (
                     <button
                       key={e}
