@@ -9,14 +9,17 @@ import { PinnedMessageItem } from './PinnedMessageItem'
 import type { FailedMessage } from '../../hooks/useFailedMessages'
 import { FailedMessageItem } from './FailedMessageItem'
 import toast from 'react-hot-toast'
+import { LoadingSpinner } from '../ui/LoadingSpinner'
 
 interface MessageListProps {
   onReply?: (messageId: string, content: string) => void
   failedMessages?: FailedMessage[]
   onResend?: (msg: FailedMessage) => void
+  sending?: boolean
+  uploading?: boolean
 }
 
-export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessages = [], onResend }) => {
+export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessages = [], onResend, sending = false, uploading = false }) => {
   const {
     messages,
     loading,
@@ -131,6 +134,13 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
       {failedMessages.map(msg => (
         <FailedMessageItem key={msg.id} message={msg} onResend={onResend!} />
       ))}
+
+      {(uploading || sending) && (
+        <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+          <LoadingSpinner size="sm" />
+          <span>{uploading ? 'Uploading...' : 'Sending...'}</span>
+        </div>
+      )}
 
       <AnimatePresence>
         {typingUsers.length > 0 && (

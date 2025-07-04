@@ -20,6 +20,7 @@ interface MessageInputProps {
   disabled?: boolean
   className?: string
   cacheKey?: string
+  onUploadStatusChange?: (uploading: boolean) => void
 }
 
 export const MessageInput: React.FC<MessageInputProps> = ({
@@ -27,7 +28,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   placeholder = 'Type a message',
   disabled = false,
   className = '',
-  cacheKey = 'general'
+  cacheKey = 'general',
+  onUploadStatusChange = () => {}
 }) => {
   const { draft, setDraft, clear } = useDraft(cacheKey)
   const [message, setMessage] = useState(draft)
@@ -206,6 +208,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         fileSize: file.size,
         fileType: file.type
       })
+      onUploadStatusChange(true)
       uploadChatFile(file)
         .then(url => {
           if (DEBUG) console.log('✅ [MESSAGE_INPUT] handleImageChange: Upload successful, sending message...', url)
@@ -214,6 +217,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         .catch(err => {
           if (DEBUG) console.error('❌ [MESSAGE_INPUT] handleImageChange: Upload failed:', err)
         })
+        .finally(() => onUploadStatusChange(false))
     }
   }
 
@@ -226,6 +230,16 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         fileSize: file.size,
         fileType: file.type
       })
+      onUploadStatusChange(true)
+      uploadChatFile(file)
+        .then(url => {
+          if (DEBUG) console.log('✅ [MESSAGE_INPUT] handleFileChange: Upload successful, sending message...', url)
+          onSendMessage('', 'image', url)
+        })
+        .catch(err => {
+          if (DEBUG) console.error('❌ [MESSAGE_INPUT] handleFileChange: Upload failed:', err)
+        })
+        .finally(() => onUploadStatusChange(false))
     }
   }
 
@@ -248,11 +262,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
           try {
             if (DEBUG) console.log('📤 [MESSAGE_INPUT] Uploading voice message...')
+            onUploadStatusChange(true)
             const url = await uploadVoiceMessage(blob)
             if (DEBUG) console.log('✅ [MESSAGE_INPUT] Voice upload successful, sending message...', url)
             onSendMessage(url, 'audio')
           } catch (err) {
             if (DEBUG) console.error('❌ [MESSAGE_INPUT] Voice upload failed:', err)
+          } finally {
+            onUploadStatusChange(false)
           }
         }
         recorder.start()

@@ -31,12 +31,13 @@ interface ChatViewProps {
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView, onViewChange }) => {
-  const { sendMessage, messages, loading } = useMessages()
+  const { sendMessage, messages, loading, sending } = useMessages()
   const { status: resetStatus, lastResetTime, manualReset } = useClientResetStatus()
   const { failedMessages, addFailedMessage, removeFailedMessage } = useFailedMessages('general')
 
   const [consoleOpen, setConsoleOpen] = useState(false)
   const [logs, setLogs] = useState<string[]>([])
+  const [uploading, setUploading] = useState(false)
 
   const appendLog = (msg: string) =>
     setLogs((l) => [...l, `${new Date().toLocaleTimeString()} ${msg}`])
@@ -467,10 +468,15 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       </div>
 
       {/* Messages */}
-      <MessageList failedMessages={failedMessages} onResend={msg => {
-        removeFailedMessage(msg.id)
-        handleSendMessage(msg.content, msg.type, msg.dataUrl)
-      }} />
+      <MessageList
+        failedMessages={failedMessages}
+        onResend={msg => {
+          removeFailedMessage(msg.id)
+          handleSendMessage(msg.content, msg.type, msg.dataUrl)
+        }}
+        sending={sending}
+        uploading={uploading}
+      />
 
       {/* Desktop Message Input */}
       <div className="hidden md:block">
@@ -478,6 +484,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
           onSendMessage={handleSendMessage}
           placeholder="Type a message"
           cacheKey="general"
+          onUploadStatusChange={setUploading}
         />
       </div>
 
@@ -491,6 +498,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
           placeholder="Type a message"
           className="border-t"
           cacheKey="general"
+          onUploadStatusChange={setUploading}
         />
       </MobileChatFooter>
       <ConsoleModal

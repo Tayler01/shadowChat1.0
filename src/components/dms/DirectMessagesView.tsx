@@ -17,6 +17,7 @@ import { FailedMessageItem } from '../chat/FailedMessageItem'
 import { useFailedMessages } from '../../hooks/useFailedMessages'
 import { formatTime, shouldGroupMessage } from '../../lib/utils'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
+import { LoadingSpinner } from '../ui/LoadingSpinner'
 import toast from 'react-hot-toast'
 
 interface DirectMessagesViewProps {
@@ -35,7 +36,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
     setCurrentConversation,
     startConversation,
     sendMessage,
-    markAsRead
+    markAsRead,
+    sending
   } = useDirectMessages()
   const { failedMessages, addFailedMessage, removeFailedMessage } = useFailedMessages(currentConversation || 'none')
   
@@ -44,6 +46,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
   const [lastConversation, setLastConversation] = useState<string | null>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
+  const [uploading, setUploading] = useState(false)
 
   const handleUserSelect = async (user: { username: string }) => {
     try {
@@ -360,6 +363,13 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                   handleSendMessage(m.content, m.type, m.dataUrl)
                 }} />
               ))}
+
+              {(uploading || sending) && (
+                <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+                  <LoadingSpinner size="sm" />
+                  <span>{uploading ? 'Uploading...' : 'Sending...'}</span>
+                </div>
+              )}
             </div>
 
             {/* Desktop Message Input */}
@@ -368,6 +378,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                 onSendMessage={handleSendMessage}
                 placeholder={`Message @${currentConv.other_user?.username}...`}
                 cacheKey={`dm-${currentConversation}`}
+                onUploadStatusChange={setUploading}
               />
             </div>
 
@@ -381,6 +392,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                 placeholder={`Message @${currentConv.other_user?.username}...`}
                 className="border-t"
                 cacheKey={`dm-${currentConversation}`}
+                onUploadStatusChange={setUploading}
               />
             </MobileChatFooter>
           </>
