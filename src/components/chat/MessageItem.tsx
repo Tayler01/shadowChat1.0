@@ -213,7 +213,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
               <div className="relative inline-block max-w-full group/message">
                 <div
                   className={cn(
-                    'relative peer bg-gray-100 dark:bg-gray-700 rounded-xl px-3 py-2 break-words space-y-1 group/content'
+                    'relative peer bg-gray-100 dark:bg-gray-700 rounded-xl px-3 py-2 break-words space-y-1 group/content hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200'
                   )}
                 >
                   <MessageReactions
@@ -334,12 +334,12 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   </AnimatePresence>
                 </div>
 
-                <div className="hidden group-hover/content:flex absolute -top-8 left-1/2 -translate-x-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow px-2 py-1 space-x-1 z-10">
+                <div className="hidden group-hover/content:flex absolute -top-10 left-1/2 -translate-x-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow-lg px-3 py-2 space-x-2 z-20 animate-in fade-in-0 slide-in-from-bottom-2 duration-200">
                   {QUICK_REACTIONS.map(e => (
                     <button
                       key={e}
                       onClick={() => handleReaction(e)}
-                      className="text-base hover:scale-125 transition-transform duration-150"
+                      className="text-lg hover:scale-125 transition-transform duration-150 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full w-8 h-8 flex items-center justify-center"
                       type="button"
                     >
                       {e}
@@ -347,7 +347,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   ))}
                   <button
                     onClick={() => setShowReactionPicker(!showReactionPicker)}
-                    className="text-base hover:scale-125 transition-transform duration-150"
+                    className="text-lg hover:scale-125 transition-transform duration-150 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full w-8 h-8 flex items-center justify-center"
                     type="button"
                     aria-label="Add reaction"
                   >
@@ -357,7 +357,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 {showReactionPicker && EmojiPicker && (
                   <div
                     ref={reactionPickerRef}
-                    className="absolute -top-48 left-1/2 -translate-x-1/2 z-50"
+                    className="absolute -top-48 left-1/2 -translate-x-1/2 z-50 animate-in fade-in-0 zoom-in-95 duration-200"
                   >
                     <EmojiPicker
                       onEmojiClick={handleReactionSelect}
