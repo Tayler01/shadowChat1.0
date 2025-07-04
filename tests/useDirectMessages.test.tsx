@@ -1,5 +1,5 @@
 import { renderHook, act, render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { useDirectMessages } from '../src/hooks/useDirectMessages';
+import { useDirectMessages, DirectMessagesProvider } from '../src/hooks/useDirectMessages';
 import { useAuth } from '../src/hooks/useAuth';
 import * as dmModule from '../src/hooks/useDirectMessages';
 import * as searchModule from '../src/hooks/useUserSearch';
@@ -72,7 +72,7 @@ test('sendMessage retries on 401 error', async () => {
     rpc: jest.fn().mockReturnThis(),
   } as any));
 
-  const { result } = renderHook(() => useDirectMessages());
+  const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider });
 
   await act(async () => {
     result.current.setCurrentConversation('conv1');
@@ -123,7 +123,7 @@ test('sends audio message with proper type', async () => {
   const sb = supabase as SupabaseMock;
   sb.from.mockReturnValueOnce({ insert: insertFn } as any);
 
-  const { result } = renderHook(() => useDirectMessages());
+  const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider });
 
   await act(async () => {
     result.current.setCurrentConversation('conv1');
@@ -161,7 +161,7 @@ test('startConversation sets currentConversation', async () => {
   const conversation = { id: 'c1' } as any;
   (getOrCreateDMConversation as jest.Mock).mockResolvedValue(conversation);
 
-  const { result } = renderHook(() => useDirectMessages());
+  const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider });
 
   await act(async () => {
     const id = await result.current.startConversation('bob');
@@ -188,7 +188,7 @@ test('startConversation throws when user not found', async () => {
     rpc: jest.fn().mockReturnThis(),
   } as any));
 
-  const { result } = renderHook(() => useDirectMessages());
+  const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider });
 
   await expect(result.current.startConversation('missing')).rejects.toThrow('User not found');
 });

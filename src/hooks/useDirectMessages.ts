@@ -1,4 +1,11 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  createContext,
+  useContext,
+} from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import {
   supabase,
@@ -15,7 +22,24 @@ import { MESSAGE_FETCH_LIMIT } from '../config';
 import { useAuth } from './useAuth';
 import { useVisibilityRefresh } from './useVisibilityRefresh';
 
-export function useDirectMessages() {
+interface DirectMessagesContextValue {
+  conversations: DMConversation[];
+  loading: boolean;
+  currentConversation: string | null;
+  setCurrentConversation: React.Dispatch<React.SetStateAction<string | null>>;
+  messages: DMMessage[];
+  startConversation: (username: string) => Promise<string | null>;
+  sendMessage: (
+    content: string,
+    messageType?: 'text' | 'command' | 'audio' | 'image',
+    fileUrl?: string
+  ) => Promise<void>;
+  markAsRead: (conversationId: string) => Promise<void>;
+}
+
+const DirectMessagesContext = createContext<DirectMessagesContextValue | undefined>(undefined);
+
+function useProvideDirectMessages(): DirectMessagesContextValue {
   const [conversations, setConversations] = useState<DMConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentConversation, setCurrentConversation] = useState<string | null>(null);
@@ -458,4 +482,21 @@ export function useConversationMessages(conversationId: string | null) {
     sending,
     sendMessage,
   };
+}
+
+export function DirectMessagesProvider({ children }: { children: React.ReactNode }) {
+  const value = useProvideDirectMessages();
+  return (
+    <DirectMessagesContext.Provider value={value}>
+      {children}
+    </DirectMessagesContext.Provider>
+  );
+}
+
+export function useDirectMessages() {
+  const context = useContext(DirectMessagesContext);
+  if (!context) {
+    throw new Error('useDirectMessages must be used within a DirectMessagesProvider');
+  }
+  return context;
 }
