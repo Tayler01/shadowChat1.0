@@ -7,6 +7,7 @@ import { DirectMessagesView } from './components/dms/DirectMessagesView'
 import { ProfileView } from './components/profile/ProfileView'
 import { SettingsView } from './components/settings/SettingsView'
 import { MessagesProvider } from './hooks/useMessages'
+import { DirectMessagesProvider } from './hooks/useDirectMessages'
 import { MobileNav } from './components/layout/MobileNav'
 import { useIsDesktop } from './hooks/useIsDesktop'
 
@@ -81,7 +82,8 @@ function App() {
   return (
     <AuthGuard>
       <MessagesProvider>
-        <div className="h-screen overflow-hidden flex flex-col md:flex-row bg-gray-100 dark:bg-gray-900">
+        <DirectMessagesProvider>
+          <div className="h-screen overflow-hidden flex flex-col md:flex-row bg-gray-100 dark:bg-gray-900">
           {isDesktop && (
             <Sidebar
               currentView={currentView}
@@ -121,6 +123,7 @@ function App() {
             }}
           />
         </div>
+        </DirectMessagesProvider>
       </MessagesProvider>
     </AuthGuard>
   )
