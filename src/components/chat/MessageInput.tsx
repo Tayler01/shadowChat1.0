@@ -284,7 +284,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   return (
     <div
-      className={`relative p-4 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${className}`}
+      className={`relative p-4 md:p-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${className}`}
     >
       {recording && (
         <RecordingIndicator seconds={recordingDuration} />
@@ -412,7 +412,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             placeholder={placeholder}
             disabled={disabled}
             rows={1}
-            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-[var(--color-accent)] resize-none max-h-32 no-scrollbar"
+            className="w-full px-4 py-3 md:px-3 md:py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-[var(--color-accent)] resize-none max-h-32 no-scrollbar"
           />
         </div>
 
