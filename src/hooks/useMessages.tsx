@@ -6,7 +6,7 @@ import React, {
   useCallback,
   useRef
 } from 'react';
-import { Message, ensureSession, DEBUG, refreshSessionLocked, getWorkingClient, recreateSupabaseClient, supabase } from '../lib/supabase';
+import { Message, ensureSession, DEBUG, refreshSessionLocked, getWorkingClient, recreateSupabaseClient, supabase, resetRealtimeConnection } from '../lib/supabase';
 import { MESSAGE_FETCH_LIMIT } from '../config';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
@@ -472,17 +472,28 @@ function useProvideMessages(): MessagesContextValue {
         }
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           if (DEBUG) {
-            console.warn(`⚠️ Channel ${status}, removing and resubscribing...`)
+            console.warn(`⚠️ Channel ${status}, performing comprehensive reset...`)
           }
-          if (currentClient && typeof currentClient.removeChannel === 'function') {
-            await currentClient.removeChannel(newChannel);
+          try {
+            // Use resetRealtimeConnection to clear server-side bindings
+            await resetRealtimeConnection();
+            if (DEBUG) console.log('✅ Realtime connection reset completed');
+            
+            // Use the comprehensive reset function
+            if (clientResetRef.current) {
+              await clientResetRef.current();
+              if (DEBUG) console.log('✅ Client reset completed');
+            }
+          } catch (resetError) {
+            if (DEBUG) console.error('❌ Error during reset:', resetError);
+            // Fallback to simple resubscription after delay
+            setTimeout(() => {
+              subscribeToChannel().then(newCh => {
+                channel = newCh;
+                channelRef.current = newCh;
+              });
+            }, 2000);
           }
-          setTimeout(() => {
-            subscribeToChannel().then(newCh => {
-              channel = newCh;
-              channelRef.current = newCh;
-            });
-          }, 1000);
         } else if (status === 'CLOSED') {
           if (DEBUG) {
             console.warn('⚠️ Channel closed, resubscribing...')
