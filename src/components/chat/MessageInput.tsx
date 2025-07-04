@@ -49,6 +49,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const imageInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
 
   // Handle typing indicators
@@ -249,6 +250,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     try {
       if (DEBUG) console.log('🎤 [MESSAGE_INPUT] startRecording: Starting...')
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      mediaStreamRef.current = stream
       const recorder = new MediaRecorder(stream)
       audioChunksRef.current = []
       recorder.ondataavailable = e => audioChunksRef.current.push(e.data)
@@ -266,6 +268,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         } finally {
           onUploadStatusChange(false)
           setShowRecordPopup(false)
+          mediaStreamRef.current = null
+          mediaRecorderRef.current = null
         }
       }
       recorder.start()
@@ -280,6 +284,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const stopRecording = () => {
     if (DEBUG) console.log('🛑 [MESSAGE_INPUT] stopRecording')
     mediaRecorderRef.current?.stop()
+    mediaStreamRef.current?.getTracks().forEach(track => track.stop())
+    mediaStreamRef.current = null
     setRecording(false)
   }
 
