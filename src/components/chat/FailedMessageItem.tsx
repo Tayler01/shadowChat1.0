@@ -1,6 +1,7 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { FailedMessage } from '../../hooks/useFailedMessages'
 import { Button } from '../ui/Button'
+import { ImageModal } from '../ui/ImageModal'
 
 interface Props {
   message: FailedMessage
@@ -8,12 +9,18 @@ interface Props {
 }
 
 export const FailedMessageItem: React.FC<Props> = ({ message, onResend }) => {
+  const [showImageModal, setShowImageModal] = useState(false)
   return (
     <div className="flex space-x-2 items-start ml-12 my-2">
       <div className="bg-red-100 dark:bg-red-900/40 rounded-xl px-3 py-2">
         {message.type === 'text' && <div>{message.content}</div>}
         {message.type === 'image' && message.dataUrl && (
-          <img src={message.dataUrl} alt={message.fileName} className="max-w-xs rounded" />
+          <img
+            src={message.dataUrl}
+            alt={message.fileName}
+            className="max-w-xs rounded cursor-pointer"
+            onClick={() => setShowImageModal(true)}
+          />
         )}
         {message.type === 'audio' && message.dataUrl && (
           <audio controls src={message.dataUrl} className="max-w-xs" />
@@ -23,6 +30,12 @@ export const FailedMessageItem: React.FC<Props> = ({ message, onResend }) => {
           Resend
         </Button>
       </div>
+      <ImageModal
+        open={showImageModal}
+        src={message.dataUrl || ''}
+        alt={message.fileName}
+        onClose={() => setShowImageModal(false)}
+      />
     </div>
   )
 }
