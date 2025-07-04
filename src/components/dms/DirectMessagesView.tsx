@@ -24,9 +24,10 @@ interface DirectMessagesViewProps {
   onToggleSidebar: () => void
   currentView: 'chat' | 'dms' | 'profile' | 'settings'
   onViewChange: (view: 'chat' | 'dms' | 'profile' | 'settings') => void
+  initialConversation?: string
 }
 
-export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggleSidebar, currentView, onViewChange }) => {
+export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggleSidebar, currentView, onViewChange, initialConversation }) => {
   const { profile } = useAuth()
   const isDesktop = useIsDesktop()
   const {
@@ -47,6 +48,13 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
   const messagesRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
   const [uploading, setUploading] = useState(false)
+
+  useEffect(() => {
+    if (initialConversation && currentConversation !== initialConversation) {
+      setCurrentConversation(initialConversation)
+      markAsRead(initialConversation)
+    }
+  }, [initialConversation, currentConversation, markAsRead])
 
   const handleUserSelect = async (user: { username: string }) => {
     try {

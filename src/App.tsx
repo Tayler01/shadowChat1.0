@@ -9,6 +9,7 @@ import { SettingsView } from './components/settings/SettingsView'
 import { MessagesProvider } from './hooks/useMessages'
 import { MobileNav } from './components/layout/MobileNav'
 import { useIsDesktop } from './hooks/useIsDesktop'
+import { useMessageNotifications } from './hooks/useMessageNotifications'
 
 type View = 'chat' | 'dms' | 'profile' | 'settings'
 
@@ -16,6 +17,7 @@ function App() {
   const [currentView, setCurrentView] = useState<View>('chat')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const isDesktop = useIsDesktop()
+  const [dmTarget, setDmTarget] = useState<string | null>(null)
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('darkMode') === 'true' ||
@@ -43,7 +45,18 @@ function App() {
     setSidebarOpen((prev) => !prev)
   }
 
+  useMessageNotifications((conversationId) => {
+    setDmTarget(conversationId)
+    setCurrentView('dms')
+  })
+
   const closeSidebar = () => setSidebarOpen(false)
+
+  useEffect(() => {
+    if (currentView === 'dms' && dmTarget) {
+      setDmTarget(null)
+    }
+  }, [currentView, dmTarget])
 
   const renderCurrentView = () => {
     switch (currentView) {
@@ -61,6 +74,7 @@ function App() {
             onToggleSidebar={toggleSidebar}
             currentView={currentView}
             onViewChange={setCurrentView}
+            initialConversation={dmTarget || undefined}
           />
         )
       case 'profile':
