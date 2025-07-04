@@ -31,10 +31,11 @@ interface MessageItemProps {
   onDelete: (messageId: string) => Promise<void>
   onTogglePin: (messageId: string) => Promise<void>
   onToggleReaction: (messageId: string, emoji: string) => Promise<void>
+  containerRef?: React.RefObject<HTMLDivElement>
 }
 
 export const MessageItem: React.FC<MessageItemProps> = React.memo(
-  ({ message, previousMessage, onReply, onEdit, onDelete, onTogglePin, onToggleReaction }) => {
+  ({ message, previousMessage, onReply, onEdit, onDelete, onTogglePin, onToggleReaction, containerRef }) => {
     const { profile } = useAuth()
     const [isEditing, setIsEditing] = useState(false)
     const [editContent, setEditContent] = useState(message.content)
@@ -94,18 +95,21 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     useEffect(() => {
       if (!showActions) return
       const btnRect = actionsRef.current?.getBoundingClientRect()
-      const menuEl = menuRef.current
-      if (btnRect && menuEl) {
+      const containerRect = containerRef?.current?.getBoundingClientRect()
+      if (btnRect && containerRect) {
+        const center = containerRect.top + containerRect.height / 2
+        setOpenAbove(btnRect.top > center)
+      } else if (btnRect && menuRef.current) {
         const spaceBelow = window.innerHeight - btnRect.bottom
         const spaceAbove = btnRect.top
-        const menuHeight = menuEl.offsetHeight
+        const menuHeight = menuRef.current.offsetHeight
         if (spaceBelow < menuHeight && spaceAbove > menuHeight) {
           setOpenAbove(true)
         } else {
           setOpenAbove(false)
         }
       }
-    }, [showActions])
+    }, [showActions, containerRef])
 
 
     useEffect(() => {
