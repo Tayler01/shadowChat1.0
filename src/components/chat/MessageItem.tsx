@@ -235,12 +235,12 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   )}
                 </div>
                 {/* Actions */}
-                <div className="absolute -right-8 -top-2" ref={actionsRef}>
+                <div className="absolute -right-6 -top-2" ref={actionsRef}>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowActions(!showActions)}
-                    className="opacity-70 peer-hover:opacity-100 transition-opacity hover:text-[var(--color-accent)]"
+                    className="opacity-0 group-hover/message:opacity-70 hover:opacity-100 transition-opacity hover:text-[var(--color-accent)]"
                     aria-label="Message actions"
                     type="button"
                   >
@@ -334,32 +334,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   </AnimatePresence>
                 </div>
 
-                {/* Hover area that includes both message and picker */}
-                <div className="absolute inset-0 -top-12 group/hover">
-                  <div className="hidden group-hover/hover:flex absolute -top-8 left-1/2 -translate-x-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow px-2 py-1 space-x-1 z-10">
-                    {QUICK_REACTIONS.map(e => (
-                      <button
-                        key={e}
-                        onClick={() => handleReaction(e)}
-                        className="text-base hover:scale-110 transition-transform"
-                        type="button"
-                      >
-                        {e}
-                      </button>
-                    ))}
-                    <button
-                      onClick={() => setShowReactionPicker(!showReactionPicker)}
-                      className="text-base hover:scale-110 transition-transform"
-                      type="button"
-                      aria-label="Add reaction"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Alternative hover trigger that works better */}
-                <div className="hidden peer-hover:flex hover:flex absolute -top-8 left-1/2 -translate-x-1/2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow px-2 py-1 space-x-1 z-10">
+                {/* Emoji picker positioned just above message bubble */}
+                <div className="hidden group-hover/message:flex hover:flex absolute -top-12 left-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow px-2 py-1 space-x-1 z-10">
                   {QUICK_REACTIONS.map(e => (
                     <button
                       key={e}
