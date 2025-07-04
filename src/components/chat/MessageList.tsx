@@ -6,13 +6,17 @@ import { useTyping } from '../../hooks/useTyping'
 import { groupMessagesByDate, cn, shouldGroupMessage } from '../../lib/utils'
 import { MessageItem } from './MessageItem'
 import { PinnedMessageItem } from './PinnedMessageItem'
+import type { FailedMessage } from '../../hooks/useFailedMessages'
+import { FailedMessageItem } from './FailedMessageItem'
 import toast from 'react-hot-toast'
 
 interface MessageListProps {
   onReply?: (messageId: string, content: string) => void
+  failedMessages?: FailedMessage[]
+  onResend?: (msg: FailedMessage) => void
 }
 
-export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
+export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessages = [], onResend }) => {
   const {
     messages,
     loading,
@@ -110,6 +114,10 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply }) => {
             )
           })}
         </React.Fragment>
+      ))}
+
+      {failedMessages.map(msg => (
+        <FailedMessageItem key={msg.id} message={msg} onResend={onResend!} />
       ))}
 
       <AnimatePresence>
