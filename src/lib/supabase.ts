@@ -65,39 +65,65 @@ export function createFreshSupabaseClient() {
     console.log('🆕 Creating fresh Supabase client with storage key:', uniqueStorageKey)
   }
   
-  return createClient(supabaseUrl, supabaseAnonKey, {
-    auth: {
-      storageKey: uniqueStorageKey, // unique per instance
-      autoRefreshToken: false,
-      persistSession: false,
-    },
+  try {
+    return createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        storageKey: uniqueStorageKey, // unique per instance
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 50,
+        },
+      },
+      global: {
+        fetch: loggingFetch,
+      },
+    })
+  } catch (error) {
+    console.error('❌ Failed to create fresh Supabase client:', error)
+    // Return a minimal client object to prevent null reference errors
+    return createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        storageKey: uniqueStorageKey,
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+  }
+}
+
+// Main client with default storage key
+export let supabase: ReturnType<typeof createClient>
+
+try {
+  supabase = createClient(supabaseUrl, supabaseAnonKey, {
     realtime: {
       params: {
         eventsPerSecond: 50,
       },
     },
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
+    },
     global: {
       fetch: loggingFetch,
     },
   })
-}
-
-// Main client with default storage key
-export let supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  realtime: {
-    params: {
-      eventsPerSecond: 50,
+} catch (error) {
+  console.error('❌ Failed to create main Supabase client:', error)
+  // Create a minimal fallback client
+  supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: true,
     },
-  },
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-  },
-  global: {
-    fetch: loggingFetch,
-  },
-})
+  })
+}
 
 export const getStoredRefreshToken = (): string | null => {
   if (typeof localStorage === 'undefined') return null
@@ -172,6 +198,11 @@ export const promoteFallbackToMain = async (): Promise<void> => {
 
 // Test client responsiveness
 const testClientResponsiveness = async (client: ReturnType<typeof createClient>, timeoutMs = 2000): Promise<boolean> => {
+  if (!client) {
+    if (DEBUG) console.log('🔍 Client responsiveness test failed: client is null/undefined')
+    return false
+  }
+  
   try {
     await Promise.race([
       client.from('users').select('id').limit(1),
@@ -191,7 +222,9 @@ const destroyClient = async (client: ReturnType<typeof createClient>) => {
   if (!client) return
   
   try {
-    await client.realtime.disconnect()
+    if (client.realtime && typeof client.realtime.disconnect === 'function') {
+      await client.realtime.disconnect()
+    }
   } catch (e) {
     console.warn('Failed to clean up previous Supabase client:', e)
   }
@@ -489,6 +522,11 @@ export const resetRealtimeConnection = async () => {
   
   // Get current session before recreating client
   const currentClient = await getWorkingClient()
+  if (!currentClient) {
+    if (DEBUG) console.error('❌ [SUPABASE] resetRealtimeConnection: No working client available')
+    return
+  }
+  
   const { data: { session } } = await currentClient.auth.getSession()
   
   if (DEBUG) console.log('🔄 [SUPABASE] Current session:', {
@@ -499,11 +537,13 @@ export const resetRealtimeConnection = async () => {
   
   // Clean up existing channels on current client
   try {
-    const channels = currentClient.getChannels()
+    const channels = currentClient.getChannels?.() || []
     if (DEBUG) console.log('🗑️ [SUPABASE] Removing existing channels:', channels.length)
     channels.forEach(ch => {
       try {
-        currentClient.removeChannel(ch)
+        if (currentClient.removeChannel && typeof currentClient.removeChannel === 'function') {
+          currentClient.removeChannel(ch)
+        }
       } catch (removeErr) {
         if (DEBUG) console.warn('removeChannel error', removeErr)
       }
@@ -515,7 +555,9 @@ export const resetRealtimeConnection = async () => {
   // Disconnect current realtime connection
   try {
     if (DEBUG) console.log('🔌 [SUPABASE] Disconnecting current realtime...')
-    currentClient.realtime.disconnect()
+    if (currentClient.realtime && typeof currentClient.realtime.disconnect === 'function') {
+      currentClient.realtime.disconnect()
+    }
   } catch (err) {
     if (DEBUG) console.error('realtime.disconnect error', err)
   }
@@ -523,6 +565,11 @@ export const resetRealtimeConnection = async () => {
   // Force recreation of client to get fresh bindings
   if (DEBUG) console.log('🆕 [SUPABASE] Creating fresh client to resolve binding mismatch...')
   const freshClient = await recreateSupabaseClient()
+  
+  if (!freshClient) {
+    if (DEBUG) console.error('❌ [SUPABASE] Failed to create fresh client')
+    return
+  }
   
   // Promote the fresh client to main if it's working
   if (DEBUG) console.log('🔄 [SUPABASE] Testing fresh client and promoting if working...')
@@ -538,14 +585,23 @@ export const resetRealtimeConnection = async () => {
   // Get the working client (either the promoted fresh one or current)
   const workingClient = await getWorkingClient()
   
+  if (!workingClient) {
+    if (DEBUG) console.error('❌ [SUPABASE] No working client available after reset')
+    return
+  }
+  
   // Set auth token on realtime
   if (DEBUG) console.log('🔐 [SUPABASE] Setting realtime auth token...')
-  workingClient.realtime.setAuth(session?.access_token || '')
+  if (workingClient.realtime && typeof workingClient.realtime.setAuth === 'function') {
+    workingClient.realtime.setAuth(session?.access_token || '')
+  }
   
   // Connect realtime with fresh bindings
   try {
     if (DEBUG) console.log('🔌 [SUPABASE] Connecting realtime with fresh bindings...')
-    workingClient.realtime.connect()
+    if (workingClient.realtime && typeof workingClient.realtime.connect === 'function') {
+      workingClient.realtime.connect()
+    }
     if (DEBUG) console.log('✅ [SUPABASE] resetRealtimeConnection: Complete')
   } catch (err) {
     if (DEBUG) console.error('realtime.connect error', err)
@@ -654,9 +710,18 @@ export interface UserSession {
 
 // Helper functions
 export const updateUserPresence = async () => {
-  const workingClient = await getWorkingClient()
-  const { error } = await workingClient.rpc('update_user_last_active')
-  if (error) console.error('Error updating presence:', error)
+  try {
+    const workingClient = await getWorkingClient()
+    if (!workingClient) {
+      console.warn('No working client available for presence update')
+      return
+    }
+    
+    const { error } = await workingClient.rpc('update_user_last_active')
+    if (error) console.error('Error updating presence:', error)
+  } catch (error) {
+    console.error('Exception updating presence:', error)
+  }
 }
 
 export const toggleReaction = async (messageId: string, emoji: string, isDM = false) => {

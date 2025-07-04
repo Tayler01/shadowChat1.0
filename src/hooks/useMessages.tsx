@@ -220,7 +220,9 @@ function useProvideMessages(): MessagesContextValue {
         if (DEBUG) console.log('🗑️ [MESSAGES] Removing old realtime channel...')
         try {
           const workingClient = await getWorkingClient()
-          await workingClient.removeChannel(channelRef.current)
+          if (workingClient && workingClient.removeChannel && typeof workingClient.removeChannel === 'function') {
+            await workingClient.removeChannel(channelRef.current)
+          }
         } catch (error) {
           if (DEBUG) console.warn('⚠️ [MESSAGES] Failed to remove old channel:', error)
         }
@@ -236,9 +238,13 @@ function useProvideMessages(): MessagesContextValue {
       // Resubscribe to realtime with new client
       if (subscribeRef.current) {
         if (DEBUG) console.log('📡 [MESSAGES] Resubscribing to realtime...')
-        const newChannel = subscribeRef.current()
-        channelRef.current = newChannel
-        if (DEBUG) console.log('✅ [MESSAGES] Realtime resubscribed')
+        try {
+          const newChannel = await subscribeRef.current()
+          channelRef.current = newChannel
+          if (DEBUG) console.log('✅ [MESSAGES] Realtime resubscribed')
+        } catch (subscribeError) {
+          if (DEBUG) console.warn('⚠️ [MESSAGES] Failed to resubscribe to realtime:', subscribeError)
+        }
       }
       
       if (DEBUG) console.log('✅ [MESSAGES] resetWithFreshClient: Complete')
@@ -254,10 +260,15 @@ function useProvideMessages(): MessagesContextValue {
         console.log('🌀 [MESSAGES] handleVisible: Resubscribing channel due to state:', channel.state)
       }
       // Channel cleanup will be handled by the useEffect cleanup
-      const newChannel = subscribeRef.current?.()
-      if (newChannel) {
-        channelRef.current = newChannel
-        if (DEBUG) console.log('✅ [MESSAGES] handleVisible: Channel resubscribed')
+      if (subscribeRef.current) {
+        subscribeRef.current().then(newChannel => {
+          if (newChannel) {
+            channelRef.current = newChannel
+            if (DEBUG) console.log('✅ [MESSAGES] handleVisible: Channel resubscribed')
+          }
+        }).catch(error => {
+          if (DEBUG) console.warn('⚠️ [MESSAGES] handleVisible: Failed to resubscribe channel:', error)
+        })
       }
     }
     
@@ -311,6 +322,15 @@ function useProvideMessages(): MessagesContextValue {
 
     const subscribeToChannel = async (): Promise<RealtimeChannel> => {
       currentClient = await getWorkingClient();
+      
+      if (!currentClient) {
+        throw new Error('No working Supabase client available')
+      }
+      
+      if (!currentClient.channel || typeof currentClient.channel !== 'function') {
+        throw new Error('Supabase client does not support realtime channels')
+      }
+      
       const newChannel = currentClient
         .channel(channelName, {
           config: {
@@ -545,7 +565,7 @@ function useProvideMessages(): MessagesContextValue {
     subscribeRef.current = subscribeToChannel;
 
     return () => {
-      if (channel && currentClient && typeof currentClient.removeChannel === 'function') {
+      if (channel && currentClient && currentClient.removeChannel && typeof currentClient.removeChannel === 'function') {
         currentClient.removeChannel(channel);
       }
       channelRef.current = null
