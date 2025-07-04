@@ -2,6 +2,7 @@ import React from 'react'
 import { Avatar } from '../ui/Avatar'
 import { Input } from '../ui/Input'
 import { useUserSearch } from '../../hooks/useUserSearch'
+import { useAllUsers } from '../../hooks/useAllUsers'
 import type { BasicUser } from '../../lib/supabase'
 
 interface UserSearchSelectProps {
@@ -12,6 +13,9 @@ interface UserSearchSelectProps {
 
 export const UserSearchSelect: React.FC<UserSearchSelectProps> = ({ value, onChange, onSelect }) => {
   const { results, loading, error } = useUserSearch(value)
+  const { users: allUsers, loading: allLoading } = useAllUsers()
+  const list = value ? results : allUsers
+  const isLoading = value ? loading : allLoading
   return (
     <div className="relative">
       <Input
@@ -20,15 +24,15 @@ export const UserSearchSelect: React.FC<UserSearchSelectProps> = ({ value, onCha
         onChange={e => onChange(e.target.value)}
         className="text-sm"
       />
-      {value && (
+      {(value || list.length > 0) && (
         <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow max-h-60 overflow-y-auto">
-          {loading && (
-            <div className="p-2 text-sm text-gray-500">Searching...</div>
+          {isLoading && (
+            <div className="p-2 text-sm text-gray-500">Loading...</div>
           )}
-          {error && !loading && (
+          {error && value && !isLoading && (
             <div className="p-2 text-sm text-red-500">{error}</div>
           )}
-          {!loading && results.map(u => (
+          {!isLoading && list.map(u => (
             <button
               key={u.id}
               onClick={() => onSelect(u)}

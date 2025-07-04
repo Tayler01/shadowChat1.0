@@ -718,6 +718,21 @@ export const searchUsers = async (
   return (data ?? []) as BasicUser[]
 }
 
+export const fetchAllUsers = async (options?: { signal?: AbortSignal }) => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient
+    .from('users')
+    .select(
+      'id, username, display_name, avatar_url, color, status',
+      options
+    )
+  if (error) {
+    console.error('Error fetching users:', error)
+    return [] as BasicUser[]
+  }
+  return (data ?? []) as BasicUser[]
+}
+
 // Helper function to ensure valid session before database operations
 export const ensureSession = async (force = false) => {
   try {

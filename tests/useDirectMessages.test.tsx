@@ -3,6 +3,7 @@ import { useDirectMessages, DirectMessagesProvider } from '../src/hooks/useDirec
 import { useAuth } from '../src/hooks/useAuth';
 import * as dmModule from '../src/hooks/useDirectMessages';
 import * as searchModule from '../src/hooks/useUserSearch';
+import * as allUsersModule from '../src/hooks/useAllUsers';
 import { supabase, getOrCreateDMConversation } from '../src/lib/supabase';
 import { DirectMessagesView } from '../src/components/dms/DirectMessagesView';
 
@@ -196,6 +197,7 @@ test('startConversation throws when user not found', async () => {
 describe('DirectMessagesView user search', () => {
   let dmSpy: jest.SpyInstance;
   let searchSpy: jest.SpyInstance;
+  let allSpy: jest.SpyInstance;
   let startConversationMock: jest.Mock;
   let setCurrentConversationMock: jest.Mock;
 
@@ -227,12 +229,16 @@ describe('DirectMessagesView user search', () => {
     searchSpy = jest.spyOn(searchModule, 'useUserSearch');
     searchSpy.mockReturnValue({ results: [user], loading: false, error: null });
 
+    allSpy = jest.spyOn(allUsersModule, 'useAllUsers');
+    allSpy.mockReturnValue({ users: [user], loading: false, error: null });
+
     (useAuth as jest.Mock).mockReturnValue({ profile: { id: 'u1' } });
   });
 
   afterEach(() => {
     dmSpy.mockRestore();
     searchSpy.mockRestore();
+    allSpy.mockRestore();
   });
 
   test('selecting a user starts conversation and sets id', async () => {
@@ -272,5 +278,27 @@ describe('DirectMessagesView user search', () => {
     expect(await screen.findByText(/user not found/i)).toBeInTheDocument();
     expect(startConversationMock).not.toHaveBeenCalled();
     expect(setCurrentConversationMock).not.toHaveBeenCalled();
+  });
+
+  test('displays all users when search empty', () => {
+    allSpy.mockReturnValueOnce({
+      users: [user, { ...user, id: 'u3', username: 'alice', display_name: 'Alice' }],
+      loading: false,
+      error: null,
+    });
+    searchSpy.mockReturnValueOnce({ results: [], loading: false, error: null });
+
+    render(
+      <DirectMessagesView
+        onToggleSidebar={() => {}}
+        currentView="dms"
+        onViewChange={() => {}}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /start new conversation/i }));
+
+    expect(screen.getByRole('button', { name: /bob/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /alice/i })).toBeInTheDocument();
   });
 });
