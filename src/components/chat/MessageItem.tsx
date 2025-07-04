@@ -354,10 +354,14 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     <Plus className="w-4 h-4" />
                   </button>
                 </div>
+                
+                {/* Emoji Picker */}
                 {showReactionPicker && EmojiPicker && (
                   <div
                     ref={reactionPickerRef}
                     className="absolute -top-48 left-1/2 -translate-x-1/2 z-50"
+                    onMouseEnter={() => setShowReactionPicker(true)}
+                    onMouseLeave={() => setShowReactionPicker(false)}
                   >
                     <EmojiPicker
                       onEmojiClick={handleReactionSelect}
@@ -378,7 +382,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
           alt="uploaded image"
           onClose={() => setShowImageModal(false)}
         />
-      </>
+    onToggleReaction(message.id, emoji)
     )
   }
 )
