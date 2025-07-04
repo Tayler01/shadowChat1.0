@@ -81,7 +81,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className="relative flex-1 overflow-y-auto overflow-x-visible p-4 pb-60 md:pb-52"
+      className="relative flex-1 overflow-y-auto overflow-x-visible p-4 pb-[calc(env(safe-area-inset-bottom)_+_15rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_13rem)]"
     >
       {messages.some(m => m.pinned) && (
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
