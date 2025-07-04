@@ -8,6 +8,7 @@ import { uploadVoiceMessage, uploadChatFile, DEBUG } from '../../lib/supabase'
 import type { EmojiPickerProps, EmojiClickData } from '../../types'
 import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import { RecordingIndicator } from '../ui/RecordingIndicator'
+import { RecordingPopup } from '../ui/RecordingPopup'
 import { useDraft } from '../../hooks/useDraft'
 
 interface MessageInputProps {
@@ -37,6 +38,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const EmojiPicker = useEmojiPicker(showEmojiPicker)
   const [showSlashCommands, setShowSlashCommands] = useState(false)
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
+  const [showRecordPopup, setShowRecordPopup] = useState(false)
   const [recording, setRecording] = useState(false)
   const [recordingDuration, setRecordingDuration] = useState(0)
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -243,42 +245,49 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
   }
 
-  const handleRecordClick = async () => {
-    if (DEBUG) console.log('🎤 [MESSAGE_INPUT] handleRecordClick: Starting...', { recording })
-    
-    if (recording) {
-      if (DEBUG) console.log('🛑 [MESSAGE_INPUT] handleRecordClick: Stopping recording...')
-      mediaRecorderRef.current?.stop()
-      setRecording(false)
-    } else {
-      try {
-        if (DEBUG) console.log('🎤 [MESSAGE_INPUT] handleRecordClick: Starting recording...')
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-        const recorder = new MediaRecorder(stream)
-        audioChunksRef.current = []
-        recorder.ondataavailable = e => audioChunksRef.current.push(e.data)
-        recorder.onstop = async () => {
-          if (DEBUG) console.log('🎤 [MESSAGE_INPUT] Recording stopped, processing audio...')
-          const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-          try {
-            if (DEBUG) console.log('📤 [MESSAGE_INPUT] Uploading voice message...')
-            onUploadStatusChange(true)
-            const url = await uploadVoiceMessage(blob)
-            if (DEBUG) console.log('✅ [MESSAGE_INPUT] Voice upload successful, sending message...', url)
-            onSendMessage(url, 'audio')
-          } catch (err) {
-            if (DEBUG) console.error('❌ [MESSAGE_INPUT] Voice upload failed:', err)
-          } finally {
-            onUploadStatusChange(false)
-          }
+  const startRecording = async () => {
+    try {
+      if (DEBUG) console.log('🎤 [MESSAGE_INPUT] startRecording: Starting...')
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      audioChunksRef.current = []
+      recorder.ondataavailable = e => audioChunksRef.current.push(e.data)
+      recorder.onstop = async () => {
+        if (DEBUG) console.log('🎤 [MESSAGE_INPUT] Recording stopped, processing audio...')
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        try {
+          if (DEBUG) console.log('📤 [MESSAGE_INPUT] Uploading voice message...')
+          onUploadStatusChange(true)
+          const url = await uploadVoiceMessage(blob)
+          if (DEBUG) console.log('✅ [MESSAGE_INPUT] Voice upload successful, sending message...', url)
+          onSendMessage(url, 'audio')
+        } catch (err) {
+          if (DEBUG) console.error('❌ [MESSAGE_INPUT] Voice upload failed:', err)
+        } finally {
+          onUploadStatusChange(false)
+          setShowRecordPopup(false)
         }
-        recorder.start()
-        mediaRecorderRef.current = recorder
-        setRecording(true)
-        if (DEBUG) console.log('✅ [MESSAGE_INPUT] Recording started')
-      } catch (err) {
-        if (DEBUG) console.error('❌ [MESSAGE_INPUT] Failed to start recording:', err)
       }
+      recorder.start()
+      mediaRecorderRef.current = recorder
+      setRecording(true)
+      if (DEBUG) console.log('✅ [MESSAGE_INPUT] Recording started')
+    } catch (err) {
+      if (DEBUG) console.error('❌ [MESSAGE_INPUT] Failed to start recording:', err)
+    }
+  }
+
+  const stopRecording = () => {
+    if (DEBUG) console.log('🛑 [MESSAGE_INPUT] stopRecording')
+    mediaRecorderRef.current?.stop()
+    setRecording(false)
+  }
+
+  const handleRecordClick = async () => {
+    if (recording) {
+      stopRecording()
+    } else {
+      await startRecording()
     }
   }
 
@@ -286,9 +295,20 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     <div
       className={`relative p-4 md:p-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${className}`}
     >
-      {recording && (
+      {recording && !showRecordPopup && (
         <RecordingIndicator seconds={recordingDuration} />
       )}
+      <RecordingPopup
+        open={showRecordPopup}
+        recording={recording}
+        seconds={recordingDuration}
+        onClose={() => {
+          setShowRecordPopup(false)
+          if (recording) stopRecording()
+        }}
+        onStart={startRecording}
+        onStop={stopRecording}
+      />
       {/* Slash Commands Dropdown */}
       {showSlashCommands && (
         <motion.div
@@ -369,7 +389,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  handleRecordClick()
+                  setShowRecordPopup(true)
                   setShowAttachmentMenu(false)
                 }}
                 className="md:hidden block w-full px-3 py-1.5 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700"
