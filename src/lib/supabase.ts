@@ -494,6 +494,19 @@ export const resetRealtimeConnection = async () => {
   } = await workingClient.auth.getSession()
   workingClient.realtime.setAuth(session?.access_token || '')
   try {
+    // remove any existing channels to avoid binding mismatches
+    const channels = workingClient.getChannels()
+    channels.forEach(ch => {
+      try {
+        workingClient.removeChannel(ch)
+      } catch (removeErr) {
+        if (DEBUG) console.warn('removeChannel error', removeErr)
+      }
+    })
+  } catch (err) {
+    if (DEBUG) console.warn('failed to clean channels', err)
+  }
+  try {
     workingClient.realtime.disconnect()
   } catch (err) {
     if (DEBUG) console.error('realtime.disconnect error', err)
