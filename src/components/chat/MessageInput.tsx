@@ -108,7 +108,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
   }, [message])
 
-  const handleSubmit = (
+  const handleSubmit = async (
     e: React.FormEvent<HTMLFormElement> | React.KeyboardEvent<HTMLTextAreaElement>
   ) => {
     if (DEBUG) console.log('📝 [MESSAGE_INPUT] handleSubmit: Starting...', {
