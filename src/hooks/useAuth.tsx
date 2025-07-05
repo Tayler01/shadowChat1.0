@@ -59,7 +59,6 @@ function useProvideAuth() {
         }
         
         if (sessionError) {
-          console.error('Session error:', sessionError);
           if (mountedRef.current) {
             setError(sessionError.message);
             setUser(null);
@@ -74,8 +73,7 @@ function useProvideAuth() {
             if (mountedRef.current) {
               setUser(profile);
             }
-          } catch (error) {
-            console.error('Failed to get user profile during initial session:', error);
+          } catch {
             if (mountedRef.current) {
               setError('Failed to load user profile. Please try refreshing the page.');
               setUser(null);
@@ -86,8 +84,7 @@ function useProvideAuth() {
             setUser(null);
           }
         }
-      } catch (error) {
-        console.error('Error getting initial session:', error);
+      } catch {
         
         // Check if this is the specific "user not found" error from invalid JWT
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -125,7 +122,6 @@ function useProvideAuth() {
           const workingClient = await getWorkingClient();
           workingClient.realtime.setAuth(session?.access_token || '');
         } catch (err) {
-          console.warn('Failed to update realtime auth:', err);
         }
 
         
@@ -139,8 +135,7 @@ function useProvideAuth() {
               } else {
                 if (mountedRef.current) setUser(null);
               }
-          } catch (error) {
-            console.error('Failed to get user profile during auth change:', error);
+          } catch {
             if (mountedRef.current) {
               setError('Failed to load user profile. Please try signing in again.');
               setUser(null);
@@ -191,7 +186,7 @@ function useProvideAuth() {
     setError(null);
     try {
       await authSignIn({ email, password });
-    } catch (error) {
+    } catch {
       setError(error instanceof Error ? error.message : 'Sign in failed');
       throw error;
     } finally {
@@ -222,7 +217,7 @@ function useProvideAuth() {
       }
       
       return result;
-    } catch (error) {
+    } catch {
       setError(error instanceof Error ? error.message : 'Sign up failed');
       throw error;
     } finally {
@@ -235,7 +230,7 @@ function useProvideAuth() {
     setError(null);
     try {
       await authSignOut();
-    } catch (error) {
+    } catch {
       setError(error instanceof Error ? error.message : 'Sign out failed');
       throw error;
     } finally {
@@ -264,7 +259,7 @@ function useProvideAuth() {
       const updatedUser = await updateUserProfile(updates);
       setUser(updatedUser);
       return updatedUser;
-    } catch (error) {
+    } catch {
       setError(error instanceof Error ? error.message : 'Profile update failed');
       throw error;
     }
@@ -276,7 +271,7 @@ function useProvideAuth() {
       const url = await uploadUserAvatar(file);
       setUser(prev => (prev ? { ...prev, avatar_url: url } : prev));
       return url;
-    } catch (error) {
+    } catch {
       setError(error instanceof Error ? error.message : 'Avatar upload failed');
       throw error;
     }
@@ -288,7 +283,7 @@ function useProvideAuth() {
       const url = await uploadUserBanner(file);
       setUser(prev => (prev ? { ...prev, banner_url: url } : prev));
       return url;
-    } catch (error) {
+    } catch {
       setError(error instanceof Error ? error.message : 'Banner upload failed');
       throw error;
     }

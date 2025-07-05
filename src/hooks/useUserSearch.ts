@@ -25,7 +25,6 @@ export function useUserSearch(term: string) {
         setError(users.length > 0 ? null : 'User not found')
       } catch (err) {
         if ((err as any).name !== 'AbortError') {
-          console.error('Error searching users:', err)
           setError('Error searching users')
         }
       } finally {

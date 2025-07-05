@@ -31,8 +31,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     // Let the visibility refresh hook handle client reset
     try {
       await ensureSession()
-    } catch (error) {
-      console.warn('Visibility refresh failed:', error)
+    } catch {
     }
   }, [])
 
@@ -45,8 +44,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   ) => {
     try {
       await sendMessage(content, type, fileUrl)
-    } catch (error) {
-      console.error('❌ ChatView: Failed to send message:', error)
+    } catch {
       toast.error('Failed to send message')
       addFailedMessage({ id: Date.now().toString(), type: type || 'text', content: content, dataUrl: fileUrl })
     }

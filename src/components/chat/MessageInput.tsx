@@ -4,7 +4,7 @@ import { Send, Smile, Command, Plus, Mic } from 'lucide-react'
 import { useTyping } from '../../hooks/useTyping'
 import { Button } from '../ui/Button'
 import { processSlashCommand, slashCommands } from '../../lib/utils'
-import { uploadVoiceMessage, uploadChatFile, DEBUG } from '../../lib/supabase'
+import { uploadVoiceMessage, uploadChatFile } from '../../lib/supabase'
 import type { EmojiPickerProps, EmojiClickData } from '../../types'
 import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import { RecordingIndicator } from '../ui/RecordingIndicator'
@@ -117,35 +117,24 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const handleSubmit = async (
     e: React.FormEvent<HTMLFormElement> | React.KeyboardEvent<HTMLTextAreaElement>
   ) => {
-    if (DEBUG) console.log('📝 [MESSAGE_INPUT] handleSubmit: Starting...', {
-      hasMessage: !!message.trim(),
-      messageLength: message.length,
-      disabled
-    })
     
     e.preventDefault()
     
     if (!message.trim() || disabled) {
-      if (DEBUG) console.log('❌ [MESSAGE_INPUT] handleSubmit: Aborted - no message or disabled')
       return
     }
 
     // Process slash commands
-    if (DEBUG) console.log('🔧 [MESSAGE_INPUT] handleSubmit: Processing slash commands...')
     const processedMessage = processSlashCommand(message.trim())
     const finalMessage = processedMessage || message.trim()
-    if (DEBUG) console.log('🔧 [MESSAGE_INPUT] handleSubmit: Final message:', finalMessage)
 
-    if (DEBUG) console.log('📤 [MESSAGE_INPUT] handleSubmit: Calling onSendMessage...')
     try {
       await onSendMessage(finalMessage)
-      if (DEBUG) console.log('✅ [MESSAGE_INPUT] handleSubmit: onSendMessage resolved')
       clear()
       setMessage('')
       stopTyping()
       setShowSlashCommands(false)
     } catch (err) {
-      if (DEBUG) console.error('❌ [MESSAGE_INPUT] handleSubmit: send failed', err)
     }
     // Keep focus on the textarea so the mobile keyboard stays open
     textareaRef.current?.focus()
@@ -155,7 +144,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       textareaRef.current.style.height = 'auto'
     }
     
-    if (DEBUG) console.log('✅ [MESSAGE_INPUT] handleSubmit: Complete')
   }
 
 
@@ -204,44 +192,28 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (DEBUG) console.log('🖼️ [MESSAGE_INPUT] handleImageChange: Starting...')
     const file = e.target.files?.[0]
     if (file) {
-      if (DEBUG) console.log('🖼️ [MESSAGE_INPUT] handleImageChange: Uploading file...', {
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type
-      })
       onUploadStatusChange(true)
       uploadChatFile(file)
         .then(url => {
-          if (DEBUG) console.log('✅ [MESSAGE_INPUT] handleImageChange: Upload successful, sending message...', url)
           onSendMessage('', 'image', url)
         })
         .catch(err => {
-          if (DEBUG) console.error('❌ [MESSAGE_INPUT] handleImageChange: Upload failed:', err)
         })
         .finally(() => onUploadStatusChange(false))
     }
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (DEBUG) console.log('📁 [MESSAGE_INPUT] handleFileChange: Starting...')
     const file = e.target.files?.[0]
     if (file) {
-      if (DEBUG) console.log('📁 [MESSAGE_INPUT] handleFileChange: File selected:', {
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type
-      })
       onUploadStatusChange(true)
       uploadChatFile(file)
         .then(url => {
-          if (DEBUG) console.log('✅ [MESSAGE_INPUT] handleFileChange: Upload successful, sending message...', url)
           onSendMessage('', 'image', url)
         })
         .catch(err => {
-          if (DEBUG) console.error('❌ [MESSAGE_INPUT] handleFileChange: Upload failed:', err)
         })
         .finally(() => onUploadStatusChange(false))
     }
@@ -249,23 +221,18 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   const startRecording = async () => {
     try {
-      if (DEBUG) console.log('🎤 [MESSAGE_INPUT] startRecording: Starting...')
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       mediaStreamRef.current = stream
       const recorder = new MediaRecorder(stream)
       audioChunksRef.current = []
       recorder.ondataavailable = e => audioChunksRef.current.push(e.data)
       recorder.onstop = async () => {
-        if (DEBUG) console.log('🎤 [MESSAGE_INPUT] Recording stopped, processing audio...')
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
         try {
-          if (DEBUG) console.log('📤 [MESSAGE_INPUT] Uploading voice message...')
           onUploadStatusChange(true)
           const url = await uploadVoiceMessage(blob)
-          if (DEBUG) console.log('✅ [MESSAGE_INPUT] Voice upload successful, sending message...', url)
           onSendMessage(url, 'audio')
         } catch (err) {
-          if (DEBUG) console.error('❌ [MESSAGE_INPUT] Voice upload failed:', err)
         } finally {
           onUploadStatusChange(false)
           setShowRecordPopup(false)
@@ -276,9 +243,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       recorder.start()
       mediaRecorderRef.current = recorder
       setRecording(true)
-      if (DEBUG) console.log('✅ [MESSAGE_INPUT] Recording started')
     } catch (err) {
-      if (DEBUG) console.error('❌ [MESSAGE_INPUT] Failed to start recording:', err)
       toast.error('Microphone access was denied')
       setRecording(false)
       setShowRecordPopup(false)
@@ -286,7 +251,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }
 
   const stopRecording = () => {
-    if (DEBUG) console.log('🛑 [MESSAGE_INPUT] stopRecording')
     mediaRecorderRef.current?.stop()
     mediaStreamRef.current?.getTracks().forEach(track => track.stop())
     mediaStreamRef.current = null

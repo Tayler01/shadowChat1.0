@@ -63,7 +63,6 @@ export const signUp = async ({ email, password, username, displayName }: SignUpD
       })
 
     if (profileError) {
-      console.error('Error creating user profile:', profileError)
       // Ignore duplicate key errors caused by race conditions with the
       // auth state change handler which may also insert the profile.
       if (profileError.code !== '23505') {
@@ -130,7 +129,6 @@ export const getCurrentUser = async () => {
     }
     
     if (authError) {
-      console.error('Auth error in getCurrentUser:', authError);
       return null;
     }
     
@@ -146,7 +144,6 @@ export const getCurrentUser = async () => {
 
     if (error && error.code === 'PGRST116') {
       // Profile doesn't exist, create it
-      console.error('Error fetching user profile:', error)
       
       const userData = {
         id: user.id,
@@ -162,7 +159,6 @@ export const getCurrentUser = async () => {
         .insert(userData)
       
       if (insertError) {
-        console.error('Error creating user profile:', insertError)
         // If user already exists (race condition), just fetch it
         if (insertError.code === '23505') {
           const { data: existingProfile, error: fetchError } = await supabase
@@ -172,7 +168,6 @@ export const getCurrentUser = async () => {
             .single()
           
           if (fetchError) {
-            console.error('Error fetching existing profile:', fetchError);
             return null;
           }
           
@@ -191,19 +186,16 @@ export const getCurrentUser = async () => {
         .single()
       
       if (fetchError) {
-        console.error('Error fetching newly created profile:', fetchError);
         return null
       }
       
       return newProfile
     } else if (error) {
-      console.error('Unexpected error fetching profile:', error);
       return null;
     }
 
     return profile
-  } catch (error) {
-    console.error('Error in getCurrentUser:', error);
+  } catch {
     return null;
   }
 }

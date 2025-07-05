@@ -18,7 +18,6 @@ export function useAllUsers() {
         }
       } catch (err) {
         if ((err as any).name !== 'AbortError') {
-          console.error('Error fetching users:', err)
           setError('Failed to load users')
         }
       } finally {

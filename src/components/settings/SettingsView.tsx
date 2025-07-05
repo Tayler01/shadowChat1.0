@@ -44,7 +44,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
     try {
       await signOut()
       toast.success('Signed out successfully')
-    } catch (error) {
+    } catch {
       toast.error('Failed to sign out')
     }
   }

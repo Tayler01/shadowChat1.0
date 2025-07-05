@@ -6,7 +6,7 @@ import React, {
   useCallback,
   useRef
 } from 'react';
-import { Message, ensureSession, DEBUG, refreshSessionLocked, getWorkingClient, recreateSupabaseClient, supabase, resetRealtimeConnection } from '../lib/supabase';
+import { Message, ensureSession, refreshSessionLocked, getWorkingClient, recreateSupabaseClient, supabase, resetRealtimeConnection } from '../lib/supabase';
 import { MESSAGE_FETCH_LIMIT } from '../config';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
@@ -55,9 +55,7 @@ export const insertMessage = async (messageData: {
 
   const result = (await Promise.race([insertPromise, timeout])) as any;
 
-  if (DEBUG) {
     const duration = performance.now() - start;
-    console.log('[insertMessage] result', { duration, ...result });
   }
 
   return result as { data: Message | null; error: any };
@@ -83,11 +81,6 @@ export const refreshSessionAndRetry = async (messageData: {
     refreshTimeout,
   ])) as any;
 
-  if (DEBUG) {
-    console.log('[refreshSessionAndRetry] refresh result', {
-      refreshData,
-      refreshError,
-    });
   }
 
   if (!refreshError && refreshData.session) {
@@ -170,8 +163,6 @@ function useProvideMessages(): MessagesContextValue {
       const error = pinnedRes.error || messagesRes.error;
 
       if (error) {
-        if (DEBUG) {
-          console.error('❌ Error fetching messages:', error)
         }
       } else if (data.length > 0) {
         setMessages(prev => {
@@ -199,9 +190,7 @@ function useProvideMessages(): MessagesContextValue {
           return merged;
         });
       }
-    } catch (error) {
-      if (DEBUG) {
-        console.error('❌ Exception fetching messages:', error)
+    } catch {
       }
     } finally {
       setLoading(false);
@@ -210,74 +199,56 @@ function useProvideMessages(): MessagesContextValue {
 
   // Reset function to reinitialize everything with fresh client
   const resetWithFreshClient = useCallback(async () => {
-    if (DEBUG) {
-      console.log('🔄 [MESSAGES] resetWithFreshClient: Starting...')
     }
     
     try {
       // Clean up old channel
       if (channelRef.current) {
-        if (DEBUG) console.log('🗑️ [MESSAGES] Removing old realtime channel...')
         try {
           const workingClient = await getWorkingClient()
           if (workingClient && workingClient.removeChannel && typeof workingClient.removeChannel === 'function') {
             await workingClient.removeChannel(channelRef.current)
           }
-        } catch (error) {
-          if (DEBUG) console.warn('⚠️ [MESSAGES] Failed to remove old channel:', error)
+        } catch {
         }
         channelRef.current = null
-        if (DEBUG) console.log('✅ [MESSAGES] Old channel removed')
       }
       
       // Refetch messages with new client
-      if (DEBUG) console.log('📥 [MESSAGES] Refetching messages with new client...')
       await fetchMessages()
-      if (DEBUG) console.log('✅ [MESSAGES] Messages refetched')
       
       // Resubscribe to realtime with new client
       if (subscribeRef.current) {
-        if (DEBUG) console.log('📡 [MESSAGES] Resubscribing to realtime...')
         try {
           const newChannel = await subscribeRef.current()
           channelRef.current = newChannel
-          if (DEBUG) console.log('✅ [MESSAGES] Realtime resubscribed')
         } catch (subscribeError) {
-          if (DEBUG) console.warn('⚠️ [MESSAGES] Failed to resubscribe to realtime:', subscribeError)
         }
       }
       
-      if (DEBUG) console.log('✅ [MESSAGES] resetWithFreshClient: Complete')
-    } catch (error) {
-      if (DEBUG) console.error('❌ [MESSAGES] resetWithFreshClient: Failed:', error)
+    } catch {
     }
   }, []);
 
   const handleVisible = useCallback(() => {
     const channel = channelRef.current;
     if (channel && channel.state !== 'joined') {
-      if (DEBUG) {
-        console.log('🌀 [MESSAGES] handleVisible: Resubscribing channel due to state:', channel.state)
       }
       // Channel cleanup will be handled by the useEffect cleanup
       if (subscribeRef.current) {
         subscribeRef.current().then(newChannel => {
           if (newChannel) {
             channelRef.current = newChannel
-            if (DEBUG) console.log('✅ [MESSAGES] handleVisible: Channel resubscribed')
           }
         }).catch(error => {
-          if (DEBUG) console.warn('⚠️ [MESSAGES] handleVisible: Failed to resubscribe channel:', error)
         })
       }
     }
     
     // Use the reset function instead of just fetchMessages
     if (clientResetRef.current) {
-      if (DEBUG) console.log('🔄 [MESSAGES] handleVisible: Triggering client reset...')
       clientResetRef.current()
     } else {
-      if (DEBUG) console.log('📥 [MESSAGES] handleVisible: Fallback to fetchMessages...')
       fetchMessages()
     }
   }, [fetchMessages])
@@ -360,8 +331,6 @@ function useProvideMessages(): MessagesContextValue {
               .single();
 
             if (error) {
-              if (DEBUG) {
-                console.error('❌ Error fetching new message details:', error)
               }
               return;
             }
@@ -370,15 +339,6 @@ function useProvideMessages(): MessagesContextValue {
               // Log received message with clear indication if it's from another user
               const isFromCurrentUser = newMessage.user_id === user.id;
               const logPrefix = isFromCurrentUser ? '📨 [REALTIME-SELF]' : '📨 [REALTIME-OTHER]';
-              if (DEBUG) {
-                console.log(`${logPrefix} Message received:`, {
-                  id: newMessage.id,
-                  content: newMessage.content,
-                  from: newMessage.user?.display_name || 'Unknown',
-                  userId: newMessage.user_id,
-                  isFromMe: isFromCurrentUser,
-                  timestamp: newMessage.created_at
-                });
               }
 
               setMessages(prev => {
@@ -395,9 +355,7 @@ function useProvideMessages(): MessagesContextValue {
                 return updated.slice();
               });
             }
-          } catch (error) {
-            if (DEBUG) {
-              console.error('❌ Exception handling new message:', error)
+          } catch {
             }
           }
         }
@@ -408,15 +366,6 @@ function useProvideMessages(): MessagesContextValue {
         // Log broadcast message with clear indication if it's from another user
         const isFromCurrentUser = newMessage.user_id === user.id;
         const logPrefix = isFromCurrentUser ? '📡 [BROADCAST-SELF]' : '📡 [BROADCAST-OTHER]';
-        if (DEBUG) {
-          console.log(`${logPrefix} Broadcast message received:`, {
-            id: newMessage.id,
-            content: newMessage.content,
-            from: newMessage.user?.display_name || 'Unknown',
-            userId: newMessage.user_id,
-            isFromMe: isFromCurrentUser,
-            timestamp: newMessage.created_at
-          });
         }
         
         setMessages(prev => {
@@ -447,8 +396,6 @@ function useProvideMessages(): MessagesContextValue {
               .single();
 
             if (error) {
-              if (DEBUG) {
-                console.error('❌ Error fetching updated message:', error)
               }
               return;
             }
@@ -464,9 +411,7 @@ function useProvideMessages(): MessagesContextValue {
                 return [...prev, updatedMessage as Message]
               })
             }
-          } catch (error) {
-            if (DEBUG) {
-              console.error('❌ Exception handling message update:', error)
+          } catch {
             }
           }
         }
@@ -486,27 +431,20 @@ function useProvideMessages(): MessagesContextValue {
       )
       .subscribe(async (status, err) => {
         if (err) {
-          if (DEBUG) {
-            console.error('❌ Real-time subscription error:', err)
           }
           
           // Handle specific binding mismatch error
           if (err.message && err.message.includes('mismatch between server and client bindings for postgres changes')) {
-            if (DEBUG) {
-              console.warn('⚠️ Detected binding mismatch, performing comprehensive reset...')
             }
             try {
               // Use resetRealtimeConnection to clear server-side bindings
               await resetRealtimeConnection();
-              if (DEBUG) console.log('✅ Realtime connection reset completed');
               
               // Use the comprehensive reset function
               if (clientResetRef.current) {
                 await clientResetRef.current();
-                if (DEBUG) console.log('✅ Client reset completed');
               }
             } catch (resetError) {
-              if (DEBUG) console.error('❌ Error during binding mismatch reset:', resetError);
               // Fallback to simple resubscription after delay
               setTimeout(() => {
                 subscribeToChannel().then(newCh => {
@@ -519,21 +457,16 @@ function useProvideMessages(): MessagesContextValue {
           }
         }
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          if (DEBUG) {
-            console.warn(`⚠️ Channel ${status}, performing comprehensive reset...`)
           }
           try {
             // Use resetRealtimeConnection to clear server-side bindings
             await resetRealtimeConnection();
-            if (DEBUG) console.log('✅ Realtime connection reset completed');
             
             // Use the comprehensive reset function
             if (clientResetRef.current) {
               await clientResetRef.current();
-              if (DEBUG) console.log('✅ Client reset completed');
             }
           } catch (resetError) {
-            if (DEBUG) console.error('❌ Error during reset:', resetError);
             // Fallback to simple resubscription after delay
             setTimeout(() => {
               subscribeToChannel().then(newCh => {
@@ -543,8 +476,6 @@ function useProvideMessages(): MessagesContextValue {
             }, 2000);
           }
         } else if (status === 'CLOSED') {
-          if (DEBUG) {
-            console.warn('⚠️ Channel closed, resubscribing...')
           }
           setTimeout(() => {
             subscribeToChannel().then(newCh => {
@@ -580,40 +511,20 @@ function useProvideMessages(): MessagesContextValue {
     const timestamp = new Date().toISOString();
     const logPrefix = `🚀 [MESSAGES] [${timestamp}] sendMessage`;
 
-    if (DEBUG) {
-      console.log(`${logPrefix}: Called`, {
-        hasUser: !!user,
-        userId: user?.id,
-        content
-      });
     }
 
     // Text messages require content, but image/audio messages may provide just a file URL
     if (!user || (!content.trim() && !fileUrl)) {
-      console.warn(`${logPrefix}: Skipped send — missing user or empty content`, { hasUser: !!user, content, userId: user?.id, hasFileUrl: !!fileUrl });
       return;
     }
 
     setSending(true);
-    if (DEBUG) {
-      console.log(`${logPrefix}: Channel state before send`, {
-        hasChannel: !!channelRef.current,
-        state: channelRef.current?.state,
-      })
     }
 
     // Ensure we have a valid session before attempting database operations
-    if (DEBUG) console.log(`${logPrefix}: Calling ensureSession...`)
     const sessionValid = await ensureSession();
-    if (DEBUG) {
-      console.log(`${logPrefix}: After ensureSession`, {
-        sessionValid,
-        hasUser: !!user,
-        userId: user?.id,
-      });
     }
     if (!sessionValid) {
-      console.error(`${logPrefix}: ❌ Invalid or expired session, cannot send message`);
       throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
     }
 
@@ -621,41 +532,27 @@ function useProvideMessages(): MessagesContextValue {
     try {
       const workingClient = await getWorkingClient();
       const { data: { session } } = await workingClient.auth.getSession();
-      if (DEBUG) {
-        console.log(`${logPrefix}: Session details`, {
-          access_token: session?.access_token,
-          refresh_token: session?.refresh_token,
-          userId: session?.user?.id,
-        });
       }
     } catch (tokenErr) {
-      console.error(`${logPrefix}: Failed to get session tokens`, tokenErr);
     }
 
     try {
       // Step 1: Prepare message data
       const messageData = prepareMessageData(user.id, content, messageType, fileUrl);
-      if (DEBUG) {
-        console.log(`${logPrefix}: Prepared message data`, messageData);
       }
 
       // Step 2: Attempt database insert (let Supabase handle auth internally)
-      if (DEBUG) console.log(`${logPrefix}: Attempting database insert...`)
       let { data, error } = await insertMessage(messageData);
 
       // Step 3: Handle auth errors with retry
       if (error && (error.status === 401 || /jwt|token|expired/i.test(error.message))) {
-        if (DEBUG) console.log(`${logPrefix}: Auth error detected, attempting retry...`)
         const retry = await refreshSessionAndRetry(messageData);
-        if (DEBUG) {
-          console.log(`${logPrefix}: Retry result`, retry);
         }
         data = retry.data;
         error = retry.error;
       }
 
       if (error) {
-        console.error(`${logPrefix}: ❌ Final error after retry:`, error);
         throw error;
       }
 
@@ -669,45 +566,26 @@ function useProvideMessages(): MessagesContextValue {
             return prev;
           }
           const updated = [...prev, data as Message]
-          if (DEBUG) {
-            console.log(`${logPrefix}: Message state updated`, {
-              totalMessages: updated.length,
-            })
           }
           return updated
         })
         
         let broadcastResult: unknown = null
         if (channelRef.current?.state === 'joined') {
-          if (DEBUG) console.log(`${logPrefix}: Broadcasting message...`)
           broadcastResult = channelRef.current.send({
             type: 'broadcast',
             event: 'new_message',
             payload: data,
           })
-          if (DEBUG) console.log(`${logPrefix}: Broadcast sent`)
         }
-        if (DEBUG) {
-          console.log(`${logPrefix}: Broadcast result`, {
-            result: broadcastResult,
-            channelState: channelRef.current?.state,
-          })
         }
 
         // Ensure we didn't miss any messages due to timing issues
-        if (DEBUG) console.log(`${logPrefix}: Triggering fetchMessages to ensure sync...`)
         fetchMessages()
       }
       
       
-    } catch (error) {
-      console.error(`${logPrefix}: ❌ Exception in send process:`, {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined,
-        userAvailable: !!user,
-        networkOnline: navigator.onLine,
-        error
-      });
+    } catch {
       throw error;
     } finally {
       setSending(false);
@@ -717,11 +595,9 @@ function useProvideMessages(): MessagesContextValue {
   const editMessage = useCallback(async (messageId: string, content: string) => {
     if (!user) return;
 
-    if (DEBUG) console.log('✏️ [MESSAGES] editMessage: Starting...', { messageId, content })
 
     try {
       const workingClient = await getWorkingClient();
-      if (DEBUG) console.log('✏️ [MESSAGES] editMessage: Got working client')
       
       const { error } = await workingClient
         .from('messages')
@@ -733,13 +609,10 @@ function useProvideMessages(): MessagesContextValue {
         .eq('user_id', user.id);
 
       if (error) {
-        if (DEBUG) {
-          console.error('❌ [MESSAGES] editMessage: Database error:', error)
         }
         throw error;
       }
 
-      if (DEBUG) console.log('✅ [MESSAGES] editMessage: Database update successful')
 
       // Optimistically update local state
       setMessages(prev =>
@@ -748,11 +621,8 @@ function useProvideMessages(): MessagesContextValue {
         )
       );
       
-      if (DEBUG) console.log('✅ [MESSAGES] editMessage: Local state updated')
 
-    } catch (error) {
-      if (DEBUG) {
-        console.error('❌ [MESSAGES] editMessage: Exception:', error)
+    } catch {
       }
       throw error;
     }
@@ -761,11 +631,9 @@ function useProvideMessages(): MessagesContextValue {
   const deleteMessage = useCallback(async (messageId: string) => {
     if (!user) return;
 
-    if (DEBUG) console.log('🗑️ [MESSAGES] deleteMessage: Starting...', { messageId })
 
     try {
       const workingClient = await getWorkingClient();
-      if (DEBUG) console.log('🗑️ [MESSAGES] deleteMessage: Got working client')
       
       const { error } = await workingClient
         .from('messages')
@@ -774,22 +642,16 @@ function useProvideMessages(): MessagesContextValue {
         .eq('user_id', user.id);
 
       if (error) {
-        if (DEBUG) {
-          console.error('❌ [MESSAGES] deleteMessage: Database error:', error)
         }
         throw error;
       }
 
-      if (DEBUG) console.log('✅ [MESSAGES] deleteMessage: Database delete successful')
 
       // Optimistically remove from local state
       setMessages(prev => prev.filter(m => m.id !== messageId));
       
-      if (DEBUG) console.log('✅ [MESSAGES] deleteMessage: Local state updated')
 
-    } catch (error) {
-      if (DEBUG) {
-        console.error('❌ [MESSAGES] deleteMessage: Exception:', error)
+    } catch {
       }
       throw error;
     }
@@ -798,7 +660,6 @@ function useProvideMessages(): MessagesContextValue {
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!user) return;
 
-    if (DEBUG) console.log('😀 [MESSAGES] toggleReaction: Starting...', { messageId, emoji })
 
     // Optimistically update local state so the reaction appears immediately
     setMessages(prev => {
@@ -831,13 +692,11 @@ function useProvideMessages(): MessagesContextValue {
       const updated = { ...message, reactions };
       const newMessages = [...prev];
       newMessages[idx] = updated as Message;
-      if (DEBUG) console.log('😀 [MESSAGES] toggleReaction: Local state updated optimistically')
       return newMessages;
     });
 
     try {
       const workingClient = await getWorkingClient();
-      if (DEBUG) console.log('😀 [MESSAGES] toggleReaction: Got working client')
       
       const { error } = await workingClient.rpc('toggle_message_reaction', {
         message_id: messageId,
@@ -846,16 +705,11 @@ function useProvideMessages(): MessagesContextValue {
       });
 
       if (error) {
-        if (DEBUG) {
-          console.error('❌ [MESSAGES] toggleReaction: RPC error:', error)
         }
         throw error;
       }
       
-      if (DEBUG) console.log('✅ [MESSAGES] toggleReaction: RPC successful')
-    } catch (error) {
-      if (DEBUG) {
-        console.error('❌ [MESSAGES] toggleReaction: Exception:', error)
+    } catch {
       }
       throw error;
     }
@@ -864,27 +718,22 @@ function useProvideMessages(): MessagesContextValue {
   const togglePin = useCallback(async (messageId: string) => {
     if (!user) return;
 
-    if (DEBUG) console.log('📌 [MESSAGES] togglePin: Starting...', { messageId })
 
     const current = messages.find(m => m.id === messageId);
     const isPinned = current?.pinned;
 
     try {
       const workingClient = await getWorkingClient();
-      if (DEBUG) console.log('📌 [MESSAGES] togglePin: Got working client')
       
       const { error } = await workingClient.rpc('toggle_message_pin', {
         message_id: messageId,
       });
 
       if (error) {
-        if (DEBUG) {
-          console.error('❌ [MESSAGES] togglePin: RPC error:', error)
         }
         throw error;
       }
 
-      if (DEBUG) console.log('✅ [MESSAGES] togglePin: RPC successful')
 
       setMessages(prev =>
         prev.map(m => {
@@ -902,13 +751,9 @@ function useProvideMessages(): MessagesContextValue {
         })
       );
       
-      if (DEBUG) console.log('✅ [MESSAGES] togglePin: Local state updated')
-    } catch (error) {
-      if (DEBUG) {
-        console.error('❌ [MESSAGES] togglePin: Exception:', error)
+    } catch {
       }
       // Re-sync with database to revert optimistic updates
-      if (DEBUG) console.log('🔄 [MESSAGES] togglePin: Re-syncing with database...')
       fetchMessages();
       throw error;
     }

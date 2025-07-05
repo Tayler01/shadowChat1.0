@@ -19,8 +19,7 @@ export const useEmojiPicker = (
       try {
         const mod = await import('emoji-picker-react')
         setPicker(() => mod.default)
-      } catch (error) {
-        console.error('❌ useEmojiPicker: Failed to load emoji picker:', error)
+      } catch {
         toast.error('Failed to load emoji picker')
       }
     }

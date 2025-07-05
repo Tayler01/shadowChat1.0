@@ -9,7 +9,6 @@ import React, {
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import {
   supabase,
-  DEBUG,
   getWorkingClient,
   DMConversation,
   DMMessage,
@@ -47,20 +46,14 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
 
   // Reset function for page refocus
   const resetWithFreshClient = useCallback(async () => {
-    if (DEBUG) {
-      console.log('🔄 [DM] resetWithFreshClient: Starting...')
     }
     
     try {
       // Refetch conversations with new client
-      if (DEBUG) console.log('📥 [DM] Refetching conversations...')
       const convs = await fetchDMConversations();
       setConversations(convs);
-      if (DEBUG) console.log('✅ [DM] Conversations refetched:', convs.length)
       
-      if (DEBUG) console.log('✅ [DM] resetWithFreshClient: Complete')
-    } catch (error) {
-      if (DEBUG) console.error('❌ [DM] resetWithFreshClient: Failed:', error)
+    } catch {
     }
   }, []);
 
@@ -173,7 +166,6 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
       .maybeSingle();
 
     if (error) {
-      console.error('Error finding user:', error);
       throw error;
     }
 
@@ -222,21 +214,17 @@ export function useConversationMessages(conversationId: string | null) {
   const handleVisible = useCallback(() => {
     const channel = channelRef.current;
     if (channel && channel.state !== 'joined') {
-      if (DEBUG) console.log('🌀 [DM] handleVisible: Resubscribing channel due to state:', channel.state)
       supabase.removeChannel(channel);
       const newChannel = subscribeRef.current?.();
       if (newChannel) {
         channelRef.current = newChannel;
-        if (DEBUG) console.log('✅ [DM] handleVisible: Channel resubscribed')
       }
     }
     
     // Use reset function if available
     if (clientResetRef.current) {
-      if (DEBUG) console.log('🔄 [DM] handleVisible: Triggering client reset...')
       clientResetRef.current()
     } else {
-      if (DEBUG) console.log('⚠️ [DM] handleVisible: No reset function available')
     }
   }, []);
 
@@ -247,26 +235,19 @@ export function useConversationMessages(conversationId: string | null) {
     const resetWithFreshClient = async () => {
       if (!conversationId) return
       
-      if (DEBUG) {
-        console.log('🔄 [DM_CONV] resetWithFreshClient: Starting...', { conversationId })
       }
       
       try {
         // Clean up old channel
         if (channelRef.current) {
-          if (DEBUG) console.log('🗑️ [DM_CONV] Removing old realtime channel...')
           // Channel cleanup will be handled by the useEffect cleanup
           channelRef.current = null
-          if (DEBUG) console.log('✅ [DM_CONV] Old channel removed')
         }
         
         // Refetch messages and resubscribe
         // This will be handled by the existing useEffect logic
-        if (DEBUG) console.log('📥 [DM_CONV] Messages will be refetched by useEffect...')
         
-        if (DEBUG) console.log('✅ [DM_CONV] resetWithFreshClient: Complete')
-      } catch (error) {
-        if (DEBUG) console.error('❌ [DM_CONV] resetWithFreshClient: Failed:', error)
+      } catch {
       }
     }
     
@@ -289,7 +270,6 @@ export function useConversationMessages(conversationId: string | null) {
         .limit(MESSAGE_FETCH_LIMIT);
 
       if (error) {
-        console.error('Error fetching DM messages:', error);
       } else {
         setMessages(data || []);
         
@@ -401,20 +381,12 @@ export function useConversationMessages(conversationId: string | null) {
       messageType: 'text' | 'command' | 'audio' | 'image' = 'text',
       fileUrl?: string
     ) => {
-    if (DEBUG) console.log('🚀 [DM_CONV] sendMessage: Starting...', {
-      conversationId,
-      messageType,
-      hasContent: !!content,
-      hasFileUrl: !!fileUrl
-    })
     
     if (!user || !conversationId || !content.trim()) return;
 
     setSending(true);
     try {
-      if (DEBUG) console.log('📤 [DM_CONV] sendMessage: Getting working client...')
       const workingClient = await getWorkingClient();
-      if (DEBUG) console.log('📤 [DM_CONV] sendMessage: Inserting message...')
       
       const { data, error } = await workingClient
         .from('dm_messages')
@@ -435,10 +407,8 @@ export function useConversationMessages(conversationId: string | null) {
       let finalError = error;
       if (finalError) {
         if (finalError.status === 401 || /jwt|token|expired/i.test(finalError.message)) {
-          if (DEBUG) console.log('🔄 [DM_CONV] sendMessage: Auth error, refreshing session...')
           const { error: refreshError } = await refreshSessionLocked();
           if (!refreshError) {
-            if (DEBUG) console.log('🔄 [DM_CONV] sendMessage: Session refreshed, retrying...')
             const retryClient = await getWorkingClient();
             const retry = await retryClient
               .from('dm_messages')
@@ -456,20 +426,16 @@ export function useConversationMessages(conversationId: string | null) {
               .single();
             finalData = retry.data;
             finalError = retry.error;
-            if (DEBUG) console.log('🔄 [DM_CONV] sendMessage: Retry result:', { hasData: !!finalData, hasError: !!finalError })
           }
         }
         if (finalError) throw finalError;
       }
 
       if (finalData) {
-        if (DEBUG) console.log('✅ [DM_CONV] sendMessage: Message inserted successfully')
         // Optimistically add the sent message
         setMessages(prev => [...prev, finalData as DMMessage]);
-        if (DEBUG) console.log('✅ [DM_CONV] sendMessage: Local state updated')
       }
-    } catch (error) {
-      if (DEBUG) console.error('❌ [DM_CONV] sendMessage: Error:', error);
+    } catch {
       throw error;
     } finally {
       setSending(false);
