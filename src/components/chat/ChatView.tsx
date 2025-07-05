@@ -8,7 +8,7 @@ import { useFailedMessages } from '../../hooks/useFailedMessages'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import toast from 'react-hot-toast'
 import { ClientResetIndicator } from '../ui/ClientResetIndicator'
-import { useClientResetStatus } from '../../hooks/useClientResetStatus'
+import { useClientReset } from '../../hooks/ClientResetContext'
 import {
   ensureSession,
 } from '../../lib/supabase'
@@ -22,7 +22,7 @@ interface ChatViewProps {
 
 export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView, onViewChange }) => {
   const { sendMessage, sending } = useMessages()
-  const { status: resetStatus, lastResetTime } = useClientResetStatus()
+  const { status: resetStatus, lastResetTime } = useClientReset()
   const { failedMessages, addFailedMessage, removeFailedMessage } = useFailedMessages('general')
 
   const [uploading, setUploading] = useState(false)
