@@ -46,8 +46,6 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
 
   // Reset function for page refocus
   const resetWithFreshClient = useCallback(async () => {
-    }
-    
     try {
       // Refetch conversations with new client
       const convs = await fetchDMConversations();

@@ -15,7 +15,6 @@ const loggingFetch: typeof fetch = async (input, init) => {
   }
   const body = init?.body
 
-  }
 
   try {
     const response = await fetch(input, init)
@@ -25,7 +24,6 @@ const loggingFetch: typeof fetch = async (input, init) => {
       responseBody = await clone.text()
     } catch {
       responseBody = '<unreadable>'
-    }
     }
     return response
   } catch (err) {

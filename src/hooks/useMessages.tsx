@@ -55,8 +55,7 @@ export const insertMessage = async (messageData: {
 
   const result = (await Promise.race([insertPromise, timeout])) as any;
 
-    const duration = performance.now() - start;
-  }
+  const duration = performance.now() - start;
 
   return result as { data: Message | null; error: any };
 };
