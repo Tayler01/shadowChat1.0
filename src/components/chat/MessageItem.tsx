@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, useLayoutEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Pin,
@@ -94,22 +94,30 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
       return () => document.removeEventListener('mousedown', handleClick)
     }, [])
 
-    useEffect(() => {
+    useLayoutEffect(() => {
       if (!showActions) return
+
       const btnRect = actionsRef.current?.getBoundingClientRect()
       const containerRect = containerRef?.current?.getBoundingClientRect()
-      if (btnRect && containerRect) {
+
+      if (!btnRect) return
+
+      let openUp = false
+
+      if (containerRect) {
         const center = containerRect.top + containerRect.height / 2
-        setOpenAbove(btnRect.top > center)
+        openUp = btnRect.top > center
       }
-      if (btnRect && menuRef.current) {
+
+      if (menuRef.current) {
+        const menuHeight = menuRef.current.offsetHeight
         const spaceBelow = window.innerHeight - btnRect.bottom
         const spaceAbove = btnRect.top
-        const menuHeight = menuRef.current.offsetHeight
+
         if (spaceBelow < menuHeight && spaceAbove > menuHeight) {
-          setOpenAbove(true)
-        } else {
-          setOpenAbove(false)
+          openUp = true
+        } else if (spaceBelow > menuHeight) {
+          openUp = false
         }
 
         const menuWidth = menuRef.current.offsetWidth
@@ -120,13 +128,14 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
           setOpenRight(false)
         }
 
-        // Ensure menu stays in view on mobile by scrolling it into view
         if (window.innerWidth <= 768) {
-          setTimeout(() => {
+          requestAnimationFrame(() => {
             menuRef.current?.scrollIntoView({ block: 'nearest' })
-          }, 0)
+          })
         }
       }
+
+      setOpenAbove(openUp)
     }, [showActions, containerRef])
 
 
