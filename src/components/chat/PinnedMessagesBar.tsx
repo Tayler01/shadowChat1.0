@@ -1,4 +1,5 @@
 import React from 'react'
+import { useState } from 'react'
 import { PinnedMessageItem } from './PinnedMessageItem'
 import type { Message } from '../../lib/supabase'
 
@@ -11,14 +12,34 @@ interface PinnedMessagesBarProps {
 }
 
 export function PinnedMessagesBar({ messages, onUnpin, onToggleReaction, className, compact = false }: PinnedMessagesBarProps) {
+  const [showTooltip, setShowTooltip] = useState(false)
+  
   if (messages.length === 0) return null
   
   if (compact) {
     return (
-      <div className={`flex items-center space-x-2 ${className || ''}`}>
-        <span className="text-xs text-gray-500 dark:text-gray-400">📌</span>
-        <div className="text-sm text-gray-700 dark:text-gray-300 truncate max-w-xs">
+      <div className={`relative flex items-center space-x-2 ${className || ''}`}>
+        <button
+          onClick={() => onUnpin(messages[0].id)}
+          className="text-xs text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors cursor-pointer"
+          title="Unpin message"
+        >
+          📌
+        </button>
+        <div 
+          className="text-sm text-gray-700 dark:text-gray-300 truncate max-w-xs cursor-help relative"
+          onMouseEnter={() => setShowTooltip(true)}
+          onMouseLeave={() => setShowTooltip(false)}
+        >
           <strong>{messages[0].user?.display_name}:</strong> {messages[0].content}
+          
+          {/* Tooltip */}
+          {showTooltip && (
+            <div className="absolute bottom-full left-0 mb-2 z-50 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded px-2 py-1 whitespace-nowrap shadow-lg">
+              <strong>{messages[0].user?.display_name}:</strong> {messages[0].content}
+              <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+            </div>
+          )}
         </div>
         {messages.length > 1 && (
           <span className="text-xs text-gray-500 dark:text-gray-400">
