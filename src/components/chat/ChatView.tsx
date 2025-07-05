@@ -64,12 +64,20 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
           <div className="flex items-center space-x-3">
             {/* Menu button removed on mobile */}
             {/* Header title */}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-4">
               <div>
                 <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
                   General Chat
                 </h1>
               </div>
+              {pinnedMessages.length > 0 && (
+                <PinnedMessagesBar
+                  messages={pinnedMessages}
+                  onUnpin={togglePin}
+                  onToggleReaction={toggleReaction}
+                  compact={true}
+                />
+              )}
             </div>
           </div>
 
@@ -81,15 +89,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
             </div>
           </div>
         </div>
-        {pinnedMessages.length > 0 && (
-          <div className="mt-4">
-            <PinnedMessagesBar
-              messages={pinnedMessages}
-              onUnpin={togglePin}
-              onToggleReaction={toggleReaction}
-            />
-          </div>
-        )}
       </div>
 
       {/* Pinned messages on mobile */}
