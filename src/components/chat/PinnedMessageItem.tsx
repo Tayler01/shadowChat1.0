@@ -45,14 +45,14 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
   }
 
   return (
-    <div className="relative p-2 rounded-md bg-yellow-100/60 dark:bg-yellow-800/40 flex items-start group">
+    <div className="relative p-2 rounded-md bg-white dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 flex items-start group">
       <div className="flex-1 min-w-0 space-y-1">
         <MessageReactions
           message={message}
           onReact={handleReaction}
           className="text-[0.65rem]"
         />
-        <div className="text-sm text-yellow-800 dark:text-yellow-200 break-words">
+        <div className="text-sm text-gray-900 dark:text-gray-100 break-words">
           <strong>{message.user?.display_name}:</strong>{' '}
           {message.message_type === 'audio' ? (
             <audio controls src={message.audio_url} className="mt-1 max-w-full" />
@@ -94,7 +94,7 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
         size="sm"
         onClick={() => onUnpin(message.id)}
         aria-label="Unpin message"
-        className="ml-2 text-yellow-700 dark:text-yellow-300"
+        className="ml-2 text-gray-500 dark:text-gray-400 hover:text-[var(--color-accent)]"
       >
         <PinOff className="w-4 h-4" />
       </Button>
