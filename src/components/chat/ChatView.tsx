@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Users, Pin } from 'lucide-react'
+import { Users } from 'lucide-react'
 import { useMessages } from '../../hooks/useMessages'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
@@ -78,10 +78,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
               <Users className="w-4 h-4" />
               <span>Online</span>
               <ClientResetIndicator status={resetStatus} lastResetTime={lastResetTime} />
-            </div>
-            <div className="hidden md:flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-              <Pin className="w-4 h-4" />
-              <span>Pinned</span>
             </div>
           </div>
         </div>
