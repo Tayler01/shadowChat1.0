@@ -269,7 +269,14 @@ export const getWorkingClient = async (): Promise<ReturnType<typeof createClient
   }
   
   // Return current working client (main or fallback)
-  return fallbackClient || currentSupabaseClient
+  const client = fallbackClient || currentSupabaseClient
+  
+  // Final safeguard: ensure we always return a valid client
+  if (!client) {
+    return supabase
+  }
+  
+  return client
 }
 
 // Force client recreation (simulates page reload)
