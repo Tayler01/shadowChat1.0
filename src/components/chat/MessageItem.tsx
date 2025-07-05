@@ -49,9 +49,32 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const reactionPickerRef = useRef<HTMLDivElement>(null)
     const actionsRef = useRef<HTMLDivElement>(null)
     const menuRef = useRef<HTMLDivElement>(null)
+    const [showQuickReactions, setShowQuickReactions] = useState(false)
+    const reactionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
     const isGrouped = shouldGroupMessage(message, previousMessage)
     const isOwner = profile?.id === message.user_id
+
+    const handleMouseEnterReactions = () => {
+      if (reactionTimeoutRef.current) {
+        clearTimeout(reactionTimeoutRef.current)
+      }
+      setShowQuickReactions(true)
+    }
+
+    const handleMouseLeaveReactions = () => {
+      reactionTimeoutRef.current = setTimeout(() => {
+        setShowQuickReactions(false)
+      }, 300) // 300ms delay
+    }
+
+    useEffect(() => {
+      return () => {
+        if (reactionTimeoutRef.current) {
+          clearTimeout(reactionTimeoutRef.current)
+        }
+      }
+    }, [])
 
     const handleEditSave = async () => {
       if (!editContent.trim()) return
@@ -343,7 +366,13 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 </div>
 
                 {/* Emoji picker positioned just above message bubble */}
-                <div className="hidden group-hover/message:flex absolute -top-10 left-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow px-2 py-1 space-x-1 z-10 hover:flex">
+                <div 
+                  className={`absolute -top-10 left-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow px-2 py-1 space-x-1 z-10 transition-opacity duration-200 ${
+                    showQuickReactions ? 'flex opacity-100' : 'hidden opacity-0'
+                  }`}
+                  onMouseEnter={handleMouseEnterReactions}
+                  onMouseLeave={handleMouseLeaveReactions}
+                >
                   {QUICK_REACTIONS.map(e => (
                     <button
                       key={e}
@@ -363,6 +392,14 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     <Plus className="w-4 h-4" />
                   </button>
                 </div>
+                
+                {/* Invisible hover area to trigger reactions */}
+                <div 
+                  className="absolute -top-12 -left-2 -right-2 h-16 group-hover/message:block hidden"
+                  onMouseEnter={handleMouseEnterReactions}
+                  onMouseLeave={handleMouseLeaveReactions}
+                />
+                
                 {showReactionPicker && EmojiPicker && (
                   <div
                     ref={reactionPickerRef}
@@ -431,5 +468,3 @@ export const MessageReactions: React.FC<{
     </div>
   )
 }
-
-
