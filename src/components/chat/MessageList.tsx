@@ -79,7 +79,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className="relative flex-1 overflow-y-auto overflow-x-visible p-4 md:p-2 pb-[calc(env(safe-area-inset-bottom)_+_20rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
+      className="relative flex-1 w-full overflow-y-auto overflow-x-hidden p-4 md:p-2 pb-[calc(env(safe-area-inset-bottom)_+_24rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
     >
 
 
