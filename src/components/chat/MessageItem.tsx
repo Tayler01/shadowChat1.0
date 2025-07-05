@@ -243,7 +243,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   )}
                 </div>
                 {/* Actions */}
-                <div className="absolute -right-6 -top-2" ref={actionsRef}>
+                <div className="absolute -right-12 -top-2" ref={actionsRef}>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -343,7 +343,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 </div>
 
                 {/* Emoji picker positioned just above message bubble */}
-                <div className="hidden group-hover/message:flex hover:flex absolute -top-12 left-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow px-2 py-1 space-x-1 z-10">
+                <div className="hidden group-hover/message:flex hover:flex absolute -top-10 left-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow px-2 py-1 space-x-1 z-10">
                   {QUICK_REACTIONS.map(e => (
                     <button
                       key={e}
@@ -366,7 +366,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 {showReactionPicker && EmojiPicker && (
                   <div
                     ref={reactionPickerRef}
-                    className="absolute -top-48 left-1/2 -translate-x-1/2 z-50"
+                    className="absolute -top-46 left-1/2 -translate-x-1/2 z-50"
                   >
                     <EmojiPicker
                       onEmojiClick={handleReactionSelect}
