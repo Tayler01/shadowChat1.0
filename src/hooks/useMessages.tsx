@@ -80,8 +80,6 @@ export const refreshSessionAndRetry = async (messageData: {
     refreshTimeout,
   ])) as any;
 
-  }
-
   if (!refreshError && refreshData.session) {
     return insertMessage(messageData);
   }
@@ -162,7 +160,7 @@ function useProvideMessages(): MessagesContextValue {
       const error = pinnedRes.error || messagesRes.error;
 
       if (error) {
-        }
+        throw error;
       } else if (data.length > 0) {
         setMessages(prev => {
           if (prev.length === 0) {
@@ -189,8 +187,8 @@ function useProvideMessages(): MessagesContextValue {
           return merged;
         });
       }
-    } catch {
-      }
+    } catch (error) {
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -198,61 +196,62 @@ function useProvideMessages(): MessagesContextValue {
 
   // Reset function to reinitialize everything with fresh client
   const resetWithFreshClient = useCallback(async () => {
-    }
-    
     try {
       // Clean up old channel
       if (channelRef.current) {
         try {
-          const workingClient = await getWorkingClient()
+          const workingClient = await getWorkingClient();
           if (workingClient && workingClient.removeChannel && typeof workingClient.removeChannel === 'function') {
-            await workingClient.removeChannel(channelRef.current)
+            await workingClient.removeChannel(channelRef.current);
           }
-        } catch {
+        } catch (error) {
+          throw error;
         }
-        channelRef.current = null
+        channelRef.current = null;
       }
       
       // Refetch messages with new client
-      await fetchMessages()
+      await fetchMessages();
       
       // Resubscribe to realtime with new client
       if (subscribeRef.current) {
         try {
-          const newChannel = await subscribeRef.current()
-          channelRef.current = newChannel
+          const newChannel = await subscribeRef.current();
+          channelRef.current = newChannel;
         } catch (subscribeError) {
+          throw subscribeError;
         }
       }
       
-    } catch {
+    } catch (error) {
+      throw error;
     }
-  }, []);
+  }, [fetchMessages]);
 
   const handleVisible = useCallback(() => {
     const channel = channelRef.current;
     if (channel && channel.state !== 'joined') {
-      }
       // Channel cleanup will be handled by the useEffect cleanup
       if (subscribeRef.current) {
         subscribeRef.current().then(newChannel => {
           if (newChannel) {
-            channelRef.current = newChannel
+            channelRef.current = newChannel;
           }
         }).catch(error => {
-        })
+          throw error;
+        });
       }
     }
     
     // Use the reset function instead of just fetchMessages
     if (clientResetRef.current) {
-      clientResetRef.current()
+      clientResetRef.current();
     } else {
-      fetchMessages()
+      fetchMessages();
     }
-  }, [fetchMessages])
+  }, [fetchMessages]);
 
-  useVisibilityRefresh(handleVisible)
+  useVisibilityRefresh(handleVisible);
 
   // Fetch initial messages
   useEffect(() => {
@@ -283,7 +282,6 @@ function useProvideMessages(): MessagesContextValue {
       return;
     }
 
-
     // Use a static channel name to prevent duplicate subscriptions
     const channelName = 'public:messages';
 
@@ -294,11 +292,11 @@ function useProvideMessages(): MessagesContextValue {
       currentClient = await getWorkingClient();
       
       if (!currentClient) {
-        throw new Error('No working Supabase client available')
+        throw new Error('No working Supabase client available');
       }
       
       if (!currentClient.channel || typeof currentClient.channel !== 'function') {
-        throw new Error('Supabase client does not support realtime channels')
+        throw new Error('Supabase client does not support realtime channels');
       }
       
       const newChannel = currentClient
@@ -316,7 +314,6 @@ function useProvideMessages(): MessagesContextValue {
           table: 'messages'
         },
         async (payload) => {
-          
           try {
             // Fetch the complete message with user data
             const workingClient = await getWorkingClient();
@@ -330,15 +327,13 @@ function useProvideMessages(): MessagesContextValue {
               .single();
 
             if (error) {
-              }
-              return;
+              throw error;
             }
 
             if (newMessage) {
               // Log received message with clear indication if it's from another user
               const isFromCurrentUser = newMessage.user_id === user.id;
               const logPrefix = isFromCurrentUser ? '📨 [REALTIME-SELF]' : '📨 [REALTIME-OTHER]';
-              }
 
               setMessages(prev => {
                 // Check if message already exists to avoid duplicates
@@ -354,87 +349,101 @@ function useProvideMessages(): MessagesContextValue {
                 return updated.slice();
               });
             }
-          } catch {
+          } catch (error) {
+            throw error;
+          }
+        })
+        .on('broadcast', { event: 'new_message' }, (payload) => {
+          const newMessage = payload.payload as Message;
+          
+          // Log broadcast message with clear indication if it's from another user
+          const isFromCurrentUser = newMessage.user_id === user.id;
+          const logPrefix = isFromCurrentUser ? '📡 [BROADCAST-SELF]' : '📡 [BROADCAST-OTHER]';
+          
+          setMessages(prev => {
+            const exists = prev.find(m => m.id === newMessage.id);
+            if (exists) return prev;
+            return [...prev, newMessage];
+          });
+        })
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages'
+          },
+          async (payload) => {
+            try {
+              // Fetch the updated message with user data
+              const workingClient = await getWorkingClient();
+              const { data: updatedMessage, error } = await workingClient
+                .from('messages')
+                .select(`
+                  *,
+                  user:users!user_id(*)
+                `)
+                .eq('id', payload.new.id)
+                .single();
+
+              if (error) {
+                throw error;
+              }
+
+              if (updatedMessage) {
+                setMessages(prev => {
+                  const index = prev.findIndex(msg => msg.id === updatedMessage.id);
+                  if (index !== -1) {
+                    return prev.map(msg =>
+                      msg.id === updatedMessage.id ? (updatedMessage as Message) : msg
+                    );
+                  }
+                  return [...prev, updatedMessage as Message];
+                });
+              }
+            } catch (error) {
+              throw error;
             }
           }
-        }
-      )
-      .on('broadcast', { event: 'new_message' }, (payload) => {
-        const newMessage = payload.payload as Message
-        
-        // Log broadcast message with clear indication if it's from another user
-        const isFromCurrentUser = newMessage.user_id === user.id;
-        const logPrefix = isFromCurrentUser ? '📡 [BROADCAST-SELF]' : '📡 [BROADCAST-OTHER]';
-        }
-        
-        setMessages(prev => {
-          const exists = prev.find(m => m.id === newMessage.id)
-          if (exists) return prev
-          return [...prev, newMessage]
-        })
-      })
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages'
-        },
-        async (payload) => {
-          
-          try {
-            // Fetch the updated message with user data
-            const workingClient = await getWorkingClient();
-            const { data: updatedMessage, error } = await workingClient
-              .from('messages')
-              .select(`
-                *,
-                user:users!user_id(*)
-              `)
-              .eq('id', payload.new.id)
-              .single();
-
-            if (error) {
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'messages'
+          },
+          (payload) => {
+            setMessages(prev =>
+              prev.filter(msg => msg.id !== payload.old.id)
+            );
+          }
+        )
+        .subscribe(async (status, err) => {
+          if (err) {
+            // Handle specific binding mismatch error
+            if (err.message && err.message.includes('mismatch between server and client bindings for postgres changes')) {
+              try {
+                // Use resetRealtimeConnection to clear server-side bindings
+                await resetRealtimeConnection();
+                
+                // Use the comprehensive reset function
+                if (clientResetRef.current) {
+                  await clientResetRef.current();
+                }
+              } catch (resetError) {
+                // Fallback to simple resubscription after delay
+                setTimeout(() => {
+                  subscribeToChannel().then(newCh => {
+                    channel = newCh;
+                    channelRef.current = newCh;
+                  });
+                }, 2000);
               }
               return;
             }
-
-            if (updatedMessage) {
-              setMessages(prev => {
-                const index = prev.findIndex(msg => msg.id === updatedMessage.id)
-                if (index !== -1) {
-                  return prev.map(msg =>
-                    msg.id === updatedMessage.id ? (updatedMessage as Message) : msg
-                  )
-                }
-                return [...prev, updatedMessage as Message]
-              })
-            }
-          } catch {
-            }
           }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'messages'
-        },
-        (payload) => {
-          setMessages(prev =>
-            prev.filter(msg => msg.id !== payload.old.id)
-          );
-        }
-      )
-      .subscribe(async (status, err) => {
-        if (err) {
-          }
-          
-          // Handle specific binding mismatch error
-          if (err.message && err.message.includes('mismatch between server and client bindings for postgres changes')) {
-            }
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             try {
               // Use resetRealtimeConnection to clear server-side bindings
               await resetRealtimeConnection();
@@ -452,38 +461,15 @@ function useProvideMessages(): MessagesContextValue {
                 });
               }, 2000);
             }
-            return;
-          }
-        }
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          }
-          try {
-            // Use resetRealtimeConnection to clear server-side bindings
-            await resetRealtimeConnection();
-            
-            // Use the comprehensive reset function
-            if (clientResetRef.current) {
-              await clientResetRef.current();
-            }
-          } catch (resetError) {
-            // Fallback to simple resubscription after delay
+          } else if (status === 'CLOSED') {
             setTimeout(() => {
               subscribeToChannel().then(newCh => {
                 channel = newCh;
                 channelRef.current = newCh;
               });
-            }, 2000);
+            }, 1000);
           }
-        } else if (status === 'CLOSED') {
-          }
-          setTimeout(() => {
-            subscribeToChannel().then(newCh => {
-              channel = newCh;
-              channelRef.current = newCh;
-            });
-          }, 1000);
-        }
-      });
+        });
 
       return newChannel;
     };
@@ -498,7 +484,7 @@ function useProvideMessages(): MessagesContextValue {
       if (channel && currentClient && currentClient.removeChannel && typeof currentClient.removeChannel === 'function') {
         currentClient.removeChannel(channel);
       }
-      channelRef.current = null
+      channelRef.current = null;
     };
   }, [user, fetchMessages]);
 
@@ -510,19 +496,15 @@ function useProvideMessages(): MessagesContextValue {
     const timestamp = new Date().toISOString();
     const logPrefix = `🚀 [MESSAGES] [${timestamp}] sendMessage`;
 
-    }
-
     // Text messages require content, but image/audio messages may provide just a file URL
     if (!user || (!content.trim() && !fileUrl)) {
       return;
     }
 
     setSending(true);
-    }
 
     // Ensure we have a valid session before attempting database operations
     const sessionValid = await ensureSession();
-    }
     if (!sessionValid) {
       throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
     }
@@ -531,14 +513,13 @@ function useProvideMessages(): MessagesContextValue {
     try {
       const workingClient = await getWorkingClient();
       const { data: { session } } = await workingClient.auth.getSession();
-      }
     } catch (tokenErr) {
+      throw tokenErr;
     }
 
     try {
       // Step 1: Prepare message data
       const messageData = prepareMessageData(user.id, content, messageType, fileUrl);
-      }
 
       // Step 2: Attempt database insert (let Supabase handle auth internally)
       let { data, error } = await insertMessage(messageData);
@@ -546,7 +527,6 @@ function useProvideMessages(): MessagesContextValue {
       // Step 3: Handle auth errors with retry
       if (error && (error.status === 401 || /jwt|token|expired/i.test(error.message))) {
         const retry = await refreshSessionAndRetry(messageData);
-        }
         data = retry.data;
         error = retry.error;
       }
@@ -560,31 +540,28 @@ function useProvideMessages(): MessagesContextValue {
       // Step 4: Update local state and broadcast
       if (data) {
         setMessages(prev => {
-          const exists = prev.find(m => m.id === data.id)
+          const exists = prev.find(m => m.id === data.id);
           if (exists) {
             return prev;
           }
-          const updated = [...prev, data as Message]
-          }
-          return updated
-        })
+          const updated = [...prev, data as Message];
+          return updated;
+        });
         
-        let broadcastResult: unknown = null
+        let broadcastResult: unknown = null;
         if (channelRef.current?.state === 'joined') {
           broadcastResult = channelRef.current.send({
             type: 'broadcast',
             event: 'new_message',
             payload: data,
-          })
-        }
+          });
         }
 
         // Ensure we didn't miss any messages due to timing issues
-        fetchMessages()
+        fetchMessages();
       }
       
-      
-    } catch {
+    } catch (error) {
       throw error;
     } finally {
       setSending(false);
@@ -593,7 +570,6 @@ function useProvideMessages(): MessagesContextValue {
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
     if (!user) return;
-
 
     try {
       const workingClient = await getWorkingClient();
@@ -608,10 +584,8 @@ function useProvideMessages(): MessagesContextValue {
         .eq('user_id', user.id);
 
       if (error) {
-        }
         throw error;
       }
-
 
       // Optimistically update local state
       setMessages(prev =>
@@ -619,17 +593,14 @@ function useProvideMessages(): MessagesContextValue {
           m.id === messageId ? { ...m, content, edited_at: new Date().toISOString() } as Message : m
         )
       );
-      
 
-    } catch {
-      }
+    } catch (error) {
       throw error;
     }
   }, [user]);
 
   const deleteMessage = useCallback(async (messageId: string) => {
     if (!user) return;
-
 
     try {
       const workingClient = await getWorkingClient();
@@ -641,24 +612,19 @@ function useProvideMessages(): MessagesContextValue {
         .eq('user_id', user.id);
 
       if (error) {
-        }
         throw error;
       }
 
-
       // Optimistically remove from local state
       setMessages(prev => prev.filter(m => m.id !== messageId));
-      
 
-    } catch {
-      }
+    } catch (error) {
       throw error;
     }
   }, [user]);
 
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!user) return;
-
 
     // Optimistically update local state so the reaction appears immediately
     setMessages(prev => {
@@ -704,19 +670,16 @@ function useProvideMessages(): MessagesContextValue {
       });
 
       if (error) {
-        }
         throw error;
       }
       
-    } catch {
-      }
+    } catch (error) {
       throw error;
     }
   }, [user]);
 
   const togglePin = useCallback(async (messageId: string) => {
     if (!user) return;
-
 
     const current = messages.find(m => m.id === messageId);
     const isPinned = current?.pinned;
@@ -729,10 +692,8 @@ function useProvideMessages(): MessagesContextValue {
       });
 
       if (error) {
-        }
         throw error;
       }
-
 
       setMessages(prev =>
         prev.map(m => {
@@ -750,8 +711,7 @@ function useProvideMessages(): MessagesContextValue {
         })
       );
       
-    } catch {
-      }
+    } catch (error) {
       // Re-sync with database to revert optimistic updates
       fetchMessages();
       throw error;
