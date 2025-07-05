@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { recreateSupabaseClient, forceSessionRestore, getWorkingClient, promoteFallbackToMain } from '../lib/supabase'
 
 export type ClientResetStatus = 'idle' | 'resetting' | 'success' | 'error'
@@ -6,10 +6,16 @@ export type ClientResetStatus = 'idle' | 'resetting' | 'success' | 'error'
 export function useClientResetStatus() {
   const [status, setStatus] = useState<ClientResetStatus>('idle')
   const [lastResetTime, setLastResetTime] = useState<Date | null>(null)
+  const isResettingRef = useRef(false)
 
   // Comprehensive reset function that matches the Test Auth button logic
   const performComprehensiveReset = useCallback(async (): Promise<boolean> => {
-    
+    if (isResettingRef.current) {
+      return false
+    }
+
+    isResettingRef.current = true
+
     try {
       // Step 1: Recreate the client (delete old, create new)
       await recreateSupabaseClient()
@@ -47,15 +53,17 @@ export function useClientResetStatus() {
       }
     } catch {
       return false
+    } finally {
+      isResettingRef.current = false
     }
   }, [])
 
   useEffect(() => {
     const handleVisibilityChange = async () => {
-      if (!document.hidden) {
+      if (!document.hidden && !isResettingRef.current) {
         setStatus('resetting')
         setLastResetTime(new Date())
-        
+
         // Perform the actual comprehensive reset
         const resetSuccess = await performComprehensiveReset()
         
