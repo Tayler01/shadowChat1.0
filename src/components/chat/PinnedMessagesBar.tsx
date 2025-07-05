@@ -1,5 +1,4 @@
 import React from 'react'
-import { Pin } from 'lucide-react'
 import { PinnedMessageItem } from './PinnedMessageItem'
 import type { Message } from '../../lib/supabase'
 
@@ -16,10 +15,6 @@ export function PinnedMessagesBar({ messages, onUnpin, onToggleReaction, classNa
     <div
       className={`bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded-lg p-4 ${className || ''}`}
     >
-      <div className="flex items-center space-x-2 mb-2">
-        <Pin className="w-4 h-4 text-[var(--color-accent)]" />
-        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Pinned Messages</span>
-      </div>
       <div className="space-y-2">
         {messages.map(message => (
           <PinnedMessageItem
