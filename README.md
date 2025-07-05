@@ -172,6 +172,11 @@ await resetRealtimeConnection()
 This disconnects the realtime client, reconnects it and sets the auth token
 from the current session.
 
+Fresh clients store auth tokens under keys prefixed with
+`sb-${projectRef}-auth-token-fresh-`. The library automatically purges old
+keys whenever a new fresh client is created or promoted so stale entries do not
+linger in `localStorage`.
+
 --- ## Future Features
 Push notifications (web + mobile)
 Offline drafts and local caching (message history cached on load)

@@ -46,12 +46,33 @@ const projectRefMatch = supabaseUrl.match(/https?:\/\/(.*?)\./)
 const projectRef = projectRefMatch ? projectRefMatch[1] : ''
 export const localStorageKey = `sb-${projectRef}-auth-token`
 
+// Remove stale auth keys left over from previous fresh clients
+export const purgeOldAuthKeys = (activeKey?: string) => {
+  if (typeof localStorage === 'undefined') return
+  const prefix = `sb-${projectRef}-auth-token-fresh-`
+  const toRemove: string[] = []
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i)
+    if (key && key.startsWith(prefix) && key !== activeKey) {
+      toRemove.push(key)
+    }
+  }
+  toRemove.forEach(k => {
+    try {
+      localStorage.removeItem(k)
+    } catch {
+      // ignore
+    }
+  })
+}
+
 // Create fresh client with unique storage key to avoid conflicts
 export function createFreshSupabaseClient() {
   const uniqueStorageKey = `sb-${projectRef}-auth-token-fresh-${Date.now()}`
+  purgeOldAuthKeys(uniqueStorageKey)
   
   try {
-    return createClient(supabaseUrl, supabaseAnonKey, {
+    const client = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         storageKey: uniqueStorageKey, // unique per instance
         autoRefreshToken: false,
@@ -66,15 +87,19 @@ export function createFreshSupabaseClient() {
         fetch: loggingFetch,
       },
     })
+    ;(client as any).__storageKey = uniqueStorageKey
+    return client
   } catch {
     // Return a minimal client object to prevent null reference errors
-    return createClient(supabaseUrl, supabaseAnonKey, {
+    const client = createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         storageKey: uniqueStorageKey,
         autoRefreshToken: false,
         persistSession: false,
       },
     })
+    ;(client as any).__storageKey = uniqueStorageKey
+    return client
   }
 }
 
@@ -174,6 +199,7 @@ export const promoteFallbackToMain = async (): Promise<void> => {
     currentSupabaseClient = fallbackClient
     fallbackClient = null
     setSupabaseClient(currentSupabaseClient)
+    purgeOldAuthKeys((currentSupabaseClient as any).__storageKey)
     
     // Reset health check timer to force immediate use of new main client
     lastHealthCheck = 0
