@@ -20,16 +20,20 @@ export const FileAttachment: React.FC<FileAttachmentProps> = ({ url, meta }) => 
     // ignore
   }
 
-  const preview = type === 'application/pdf' || type.startsWith('text/')
+  const previewDocument = type === 'application/pdf' || type.startsWith('text/')
+  const previewAudio = type.startsWith('audio/')
 
   return (
     <div className="mt-1 max-w-xs">
-      {preview && (
+      {previewDocument && (
         <iframe
           src={url}
           title={name}
           className="w-full h-48 rounded border mb-2"
         />
+      )}
+      {previewAudio && (
+        <audio controls src={url} className="w-full mt-1 mb-2" />
       )}
       <div className="flex items-center space-x-2">
         <FileText className="w-4 h-4 flex-shrink-0" />
@@ -39,7 +43,7 @@ export const FileAttachment: React.FC<FileAttachmentProps> = ({ url, meta }) => 
         {size > 0 && (
           <span className="text-xs text-gray-500">({formatBytes(size)})</span>
         )}
-        {!preview && type && (
+        {!previewDocument && !previewAudio && type && (
           <span className="text-xs text-gray-500">{type}</span>
         )}
       </div>
