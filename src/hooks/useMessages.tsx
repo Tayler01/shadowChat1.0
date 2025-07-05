@@ -18,7 +18,7 @@ const STORED_MESSAGE_LIMIT = 200;
 export const prepareMessageData = (
   userId: string,
   content: string,
-  messageType: 'text' | 'command' | 'audio' | 'image',
+  messageType: 'text' | 'command' | 'audio' | 'image' | 'file',
   fileUrl?: string
 ) => ({
   user_id: userId,
@@ -31,7 +31,7 @@ export const prepareMessageData = (
 export const insertMessage = async (messageData: {
   user_id: string;
   content: string;
-  message_type: 'text' | 'command' | 'audio' | 'image';
+  message_type: 'text' | 'command' | 'audio' | 'image' | 'file';
   file_url?: string;
   audio_url?: string;
 }) => {
@@ -63,7 +63,7 @@ export const insertMessage = async (messageData: {
 export const refreshSessionAndRetry = async (messageData: {
   user_id: string;
   content: string;
-  message_type: 'text' | 'command' | 'audio' | 'image';
+  message_type: 'text' | 'command' | 'audio' | 'image' | 'file';
   file_url?: string;
   audio_url?: string;
 }) => {
@@ -96,7 +96,7 @@ interface MessagesContextValue {
   sending: boolean;
   sendMessage: (
     content: string,
-    type?: 'text' | 'command' | 'audio' | 'image',
+    type?: 'text' | 'command' | 'audio' | 'image' | 'file',
     fileUrl?: string
   ) => Promise<void>;
   editMessage: (id: string, content: string) => Promise<void>;
@@ -490,7 +490,7 @@ function useProvideMessages(): MessagesContextValue {
 
   const sendMessage = useCallback(async (
     content: string,
-    messageType: 'text' | 'command' | 'audio' | 'image' = 'text',
+    messageType: 'text' | 'command' | 'audio' | 'image' | 'file' = 'text',
     fileUrl?: string
   ) => {
     const timestamp = new Date().toISOString();

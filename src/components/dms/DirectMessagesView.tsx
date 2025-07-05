@@ -14,6 +14,7 @@ import { UserSearchSelect } from './UserSearchSelect'
 import { MessageInput } from '../chat/MessageInput'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import { FailedMessageItem } from '../chat/FailedMessageItem'
+import { FileAttachment } from '../chat/FileAttachment'
 import { useFailedMessages } from '../../hooks/useFailedMessages'
 import { formatTime, shouldGroupMessage } from '../../lib/utils'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
@@ -72,7 +73,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
 
   const handleSendMessage = async (
     content: string,
-    type?: 'text' | 'command' | 'audio' | 'image',
+    type?: 'text' | 'command' | 'audio' | 'image' | 'file',
     fileUrl?: string
   ) => {
     try {
@@ -350,6 +351,10 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                       }`}>
                         {message.message_type === 'audio' ? (
                           <audio controls src={message.content} className="mt-1 max-w-full" />
+                        ) : message.message_type === 'image' && message.file_url ? (
+                          <img src={message.file_url} alt="uploaded" className="mt-1 max-w-xs rounded" />
+                        ) : message.message_type === 'file' && message.file_url ? (
+                          <FileAttachment url={message.file_url} meta={message.content} />
                         ) : (
                           <p className="text-sm break-words">{message.content}</p>
                         )}

@@ -41,7 +41,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
 
   const handleSendMessage = async (
     content: string,
-    type?: 'text' | 'command' | 'audio' | 'image',
+    type?: 'text' | 'command' | 'audio' | 'image' | 'file',
     fileUrl?: string
   ) => {
     try {

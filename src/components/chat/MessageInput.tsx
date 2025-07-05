@@ -14,7 +14,7 @@ import toast from 'react-hot-toast'
 interface MessageInputProps {
   onSendMessage: (
     content: string,
-    type?: 'text' | 'command' | 'audio' | 'image',
+    type?: 'text' | 'command' | 'audio' | 'image' | 'file',
     fileUrl?: string
   ) => Promise<void> | void
   placeholder?: string
@@ -201,6 +201,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         })
         .finally(() => onUploadStatusChange(false))
     }
+    e.target.value = ''
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -209,12 +210,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       onUploadStatusChange(true)
       uploadChatFile(file)
         .then(url => {
-          onSendMessage('', 'image', url)
+          const messageType = file.type.startsWith('image/') ? 'image' : 'file'
+          const meta = JSON.stringify({ name: file.name, size: file.size, type: file.type })
+          onSendMessage(messageType === 'image' ? '' : meta, messageType as any, url)
         })
         .catch(err => {
         })
         .finally(() => onUploadStatusChange(false))
     }
+    e.target.value = ''
   }
 
   const startRecording = async () => {
