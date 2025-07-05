@@ -494,11 +494,12 @@ export const resetRealtimeConnection = async () => {
 export const VOICE_BUCKET = 'message-media'
 export const UPLOADS_BUCKET = 'chat-uploads'
 
-export const uploadVoiceMessage = async (blob: Blob) => {
+export const uploadVoiceMessage = async (blob: Blob, mimeType = 'audio/webm') => {
   const workingClient = await getWorkingClient()
   const { data: { user } } = await workingClient.auth.getUser()
   if (!user) throw new Error('Not authenticated')
-  const filePath = `${user.id}/${Date.now()}.webm`
+  const ext = mimeType.split('/')[1]?.split(';')[0] || 'webm'
+  const filePath = `${user.id}/${Date.now()}.${ext}`
   const { error } = await workingClient.storage.from(VOICE_BUCKET).upload(filePath, blob)
   if (error) throw error
   const { data } = workingClient.storage.from(VOICE_BUCKET).getPublicUrl(filePath)
