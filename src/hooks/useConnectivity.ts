@@ -14,7 +14,13 @@ export function useConnectivity() {
     try {
       const controller = new AbortController()
       const timeoutId = window.setTimeout(() => controller.abort(), 3000)
-      await fetch('/favicon.ico', { method: 'HEAD', cache: 'no-store', signal: controller.signal })
+      // Use a more reliable endpoint for connectivity check
+      await fetch('https://www.google.com/favicon.ico', { 
+        method: 'HEAD', 
+        cache: 'no-store', 
+        signal: controller.signal,
+        mode: 'no-cors' // Avoid CORS issues
+      })
       clearTimeout(timeoutId)
       if (offline) {
         setOffline(false)
