@@ -89,6 +89,30 @@ test('renders file message', () => {
   expect(link).toHaveAttribute('href', fileMessage.file_url)
 })
 
+test('renders audio file preview', () => {
+  const fileMeta = JSON.stringify({ name: 'sound.mp3', size: 123, type: 'audio/mpeg' })
+  const audioFile = {
+    ...baseMessage,
+    message_type: 'file',
+    content: fileMeta,
+    file_url: 'https://example.com/sound.mp3'
+  } as Message
+
+  const { container } = render(
+    <MessageItem
+      message={audioFile}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+      containerRef={React.createRef()}
+    />
+  )
+
+  const audio = container.querySelector('audio')
+  expect(audio).toHaveAttribute('src', audioFile.file_url)
+})
+
 test('icon buttons have aria-labels', () => {
   render(
     <MessageItem
