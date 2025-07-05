@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { recreateSupabaseClient, forceSessionRestore, getWorkingClient, promoteFallbackToMain } from '../lib/supabase'
 
+// Promise used to queue reset requests across hook instances
+let resetPromise: Promise<boolean> | null = null
+
 export type ClientResetStatus = 'idle' | 'resetting' | 'success' | 'error'
 
 export function useClientResetStatus() {
@@ -10,57 +13,62 @@ export function useClientResetStatus() {
 
   // Comprehensive reset function that matches the Test Auth button logic
   const performComprehensiveReset = useCallback(async (): Promise<boolean> => {
-    if (isResettingRef.current) {
-      return false
+    if (resetPromise) {
+      return resetPromise
     }
 
     isResettingRef.current = true
 
-    try {
-      // Step 1: Recreate the client (delete old, create new)
-      await recreateSupabaseClient()
-      
-      // Step 2: Run auth restoration logic (like Check Auth button)
-      const authRestored = await forceSessionRestore()
-      if (authRestored) {
-      } else {
-      }
-      
-      // Step 3: Verify the working client is ready
-      const workingClient = await getWorkingClient()
-      const { data: { session }, error } = await workingClient.auth.getSession()
-      
-      if (!error && session) {
-        
-        // Step 4: Test basic database connectivity
-        try {
-          const testPromise = workingClient.from('users').select('id').limit(1)
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Database test timeout')), 3000)
-          )
-          
-          await Promise.race([testPromise, timeoutPromise])
-          
-          // Step 5: Promote the working fallback client to be the main client
-          await promoteFallbackToMain()
-          
-          return true
-        } catch (dbError) {
+    resetPromise = (async () => {
+      try {
+        // Step 1: Recreate the client (delete old, create new)
+        await recreateSupabaseClient()
+
+        // Step 2: Run auth restoration logic (like Check Auth button)
+        const authRestored = await forceSessionRestore()
+        if (authRestored) {
+        } else {
+        }
+
+        // Step 3: Verify the working client is ready
+        const workingClient = await getWorkingClient()
+        const { data: { session }, error } = await workingClient.auth.getSession()
+
+        if (!error && session) {
+
+          // Step 4: Test basic database connectivity
+          try {
+            const testPromise = workingClient.from('users').select('id').limit(1)
+            const timeoutPromise = new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Database test timeout')), 3000)
+            )
+
+            await Promise.race([testPromise, timeoutPromise])
+
+            // Step 5: Promote the working fallback client to be the main client
+            await promoteFallbackToMain()
+
+            return true
+          } catch (dbError) {
+            return false
+          }
+        } else {
           return false
         }
-      } else {
+      } catch {
         return false
+      } finally {
+        isResettingRef.current = false
+        resetPromise = null
       }
-    } catch {
-      return false
-    } finally {
-      isResettingRef.current = false
-    }
+    })()
+
+    return resetPromise
   }, [])
 
   useEffect(() => {
     const handleVisibilityChange = async () => {
-      if (!document.hidden && !isResettingRef.current) {
+      if (!document.hidden) {
         setStatus('resetting')
         setLastResetTime(new Date())
 
