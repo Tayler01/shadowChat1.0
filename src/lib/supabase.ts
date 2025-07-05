@@ -776,8 +776,8 @@ export const fetchUserStats = async (userId: string): Promise<UserStats> => {
       .from('messages')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId),
-    workingClient.rpc('count_reactions_to_user_messages', { user_id: userId }),
-    workingClient.rpc('count_reactions_to_user_dm_messages', { user_id: userId }),
+    workingClient.rpc('count_reactions_to_user_messages', { target_user_id: userId }),
+    workingClient.rpc('count_reactions_to_user_dm_messages', { target_user_id: userId }),
     workingClient
       .from('dm_conversations')
       .select('id', { count: 'exact', head: true })
