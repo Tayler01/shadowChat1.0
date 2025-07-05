@@ -343,7 +343,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 </div>
 
                 {/* Emoji picker positioned just above message bubble */}
-                <div className="hidden group-hover/message:flex hover:flex absolute -top-10 left-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow px-2 py-1 space-x-1 z-10">
+                <div className="hidden group-hover/message:flex absolute -top-10 left-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow px-2 py-1 space-x-1 z-10 hover:flex">
                   {QUICK_REACTIONS.map(e => (
                     <button
                       key={e}
