@@ -16,7 +16,7 @@ import { MobileChatFooter } from '../layout/MobileChatFooter'
 import { FailedMessageItem } from '../chat/FailedMessageItem'
 import { FileAttachment } from '../chat/FileAttachment'
 import { useFailedMessages } from '../../hooks/useFailedMessages'
-import { formatTime, shouldGroupMessage } from '../../lib/utils'
+import { formatTime, shouldGroupMessage, getReadableTextColor } from '../../lib/utils'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import toast from 'react-hot-toast'
@@ -322,6 +322,10 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                 const previousMessage = messages[index - 1]
                 const isGrouped = shouldGroupMessage(message, previousMessage)
                 const isOwn = message.sender_id === profile?.id
+                const bubbleColor = isOwn ? profile?.color : message.sender?.color
+                const bubbleStyle = bubbleColor
+                  ? { backgroundColor: bubbleColor, color: getReadableTextColor(bubbleColor) }
+                  : undefined
 
                 return (
                   <motion.div
@@ -344,11 +348,14 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                         />
                       )}
                       
-                      <div className={`rounded-2xl px-4 py-2 ${
-                        isOwn
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600'
-                      }`}>
+                      <div
+                        className={`rounded-2xl px-4 py-2 ${
+                          bubbleStyle ? '' : isOwn
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-gray-200 dark:border-gray-600'
+                        }`}
+                        style={bubbleStyle}
+                      >
                         {message.message_type === 'audio' ? (
                           <audio controls src={message.content} className="mt-1 max-w-full" />
                         ) : message.message_type === 'image' && message.file_url ? (

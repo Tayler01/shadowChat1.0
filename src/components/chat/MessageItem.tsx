@@ -16,7 +16,7 @@ import { Avatar } from '../ui/Avatar'
 import { ImageModal } from '../ui/ImageModal'
 import { Button } from '../ui/Button'
 import { FileAttachment } from './FileAttachment'
-import { formatTime, shouldGroupMessage, cn } from '../../lib/utils'
+import { formatTime, shouldGroupMessage, cn, getReadableTextColor } from '../../lib/utils'
 import type { Message } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
@@ -55,6 +55,11 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
 
     const isGrouped = shouldGroupMessage(message, previousMessage)
     const isOwner = profile?.id === message.user_id
+
+    const bubbleColor = message.user?.color
+    const bubbleStyle = bubbleColor
+      ? { backgroundColor: bubbleColor, color: getReadableTextColor(bubbleColor) }
+      : undefined
 
     const handleMouseEnterReactions = () => {
       if (reactionTimeoutRef.current) {
@@ -245,8 +250,10 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
               <div className="relative inline-block max-w-full group/message">
                 <div
                   className={cn(
-                    'relative peer bg-gray-100 dark:bg-gray-700 rounded-xl px-3 py-2 break-words space-y-1'
+                    'relative peer rounded-xl px-3 py-2 break-words space-y-1',
+                    bubbleStyle ? '' : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
                   )}
+                  style={bubbleStyle}
                 >
                   <MessageReactions
                     message={message}

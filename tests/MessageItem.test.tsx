@@ -128,3 +128,25 @@ test('icon buttons have aria-labels', () => {
   const addReaction = screen.getByRole('button', { name: /add reaction/i })
   expect(addReaction).toBeInTheDocument()
 })
+
+test('applies user color to message bubble', () => {
+  const colored = {
+    ...baseMessage,
+    content: 'hello',
+    user: { ...baseMessage.user, color: '#ff0000' }
+  } as Message
+
+  render(
+    <MessageItem
+      message={colored}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+      containerRef={React.createRef()}
+    />
+  )
+
+  const msg = screen.getByText('hello')
+  expect(msg.parentElement).toHaveStyle('background-color: #ff0000')
+})
