@@ -50,8 +50,6 @@ export const localStorageKey = `sb-${projectRef}-auth-token`
 export function createFreshSupabaseClient() {
   const uniqueStorageKey = `sb-${projectRef}-auth-token-fresh-${Date.now()}`
   
-  }
-  
   try {
     return createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
@@ -169,7 +167,6 @@ export const promoteFallbackToMain = async (): Promise<void> => {
       return
     }
     
-    
     // Destroy old main client
     await destroyClient(currentSupabaseClient)
     
@@ -198,7 +195,6 @@ const testClientResponsiveness = async (client: ReturnType<typeof createClient>,
     ])
     return true
   } catch {
-    }
     return false
   }
 }
@@ -246,12 +242,10 @@ export const getWorkingClient = async (): Promise<ReturnType<typeof createClient
       const mainClientWorks = await testClientResponsiveness(currentSupabaseClient, 2000)
       
       if (mainClientWorks) {
-          await destroyClient(fallbackClient)
-          fallbackClient = null
-        }
+        await destroyClient(fallbackClient)
+        fallbackClient = null
         return currentSupabaseClient
       }
-      
       
       // Main client is stuck, create/use fallback
       if (!fallbackClient) {
@@ -294,6 +288,8 @@ export const recreateSupabaseClient = async (): Promise<ReturnType<typeof create
   // Test the new client
   const isResponsive = await testClientResponsiveness(fallbackClient, 3000)
   
+  if (!isResponsive) {
+    throw new Error('New client is not responsive')
   }
   
   return fallbackClient
@@ -343,7 +339,6 @@ export const forceSessionRestore = async (): Promise<boolean> => {
       return true
     }
     
-    
     // Try to restore from localStorage
     const restored = await restoreSessionIfNeeded(workingClient)
     if (restored) {
@@ -353,7 +348,6 @@ export const forceSessionRestore = async (): Promise<boolean> => {
     // If restoration failed, try with a fresh client
     const freshClient = await recreateSupabaseClient()
     const restoredWithFresh = await restoreSessionIfNeeded(freshClient)
-    
     
     return restoredWithFresh
   } catch {
@@ -379,12 +373,16 @@ export const refreshSessionLocked = async () => {
     const workingClient = await getWorkingClient()
     const { data: { session }, error } = await workingClient.auth.getSession()
     const storedToken = getStoredRefreshToken()
+    
+    if (!session && !storedToken) {
+      return Promise.reject(new Error('No session to refresh'))
     }
 
-    }
     const refresh = workingClient.auth
       .refreshSession()
       .then((res) => {
+        if (!res.data?.session) {
+          throw new Error('Failed to refresh session')
         }
         if (res.data?.session) {
           workingClient.realtime.setAuth(res.data.session?.access_token || '')
@@ -410,7 +408,7 @@ export const refreshSessionLocked = async () => {
       error: any
     }>)
       .then((res) => {
-        }
+        clearRefreshSessionPromise()
         return res
       })
       .finally(() => {
@@ -421,7 +419,7 @@ export const refreshSessionLocked = async () => {
 }
 
 export const forceRefreshSession = async () => {
-  }
+  clearRefreshSessionPromise()
   return refreshSessionLocked()
 }
 
@@ -434,7 +432,6 @@ export const resetRealtimeConnection = async () => {
   }
   
   const { data: { session } } = await currentClient.auth.getSession()
-  
   
   // Clean up existing channels on current client
   try {
@@ -734,8 +731,6 @@ export const ensureSession = async (force = false) => {
     if (!session) {
       return false
     }
-
-    }
     
     // Check if session is expired or about to expire (within 5 minutes)
     const expiresAt = session.expires_at
@@ -743,7 +738,6 @@ export const ensureSession = async (force = false) => {
     const fiveMinutes = 5 * 60
 
     if (force || (expiresAt && (expiresAt - now) < fiveMinutes)) {
-      }
       const { data: refreshData, error: refreshError } = await refreshSessionLocked()
 
       if (refreshError) {
@@ -752,8 +746,6 @@ export const ensureSession = async (force = false) => {
 
       if (!refreshData.session) {
         return false
-      }
-
       }
     }
     
