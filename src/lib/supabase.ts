@@ -68,7 +68,9 @@ export const purgeOldAuthKeys = (activeKey?: string) => {
 
 // Create fresh client with unique storage key to avoid conflicts
 export function createFreshSupabaseClient() {
-  const uniqueStorageKey = `sb-${projectRef}-auth-token-fresh-${Date.now()}`
+  const uniqueStorageKey = `sb-${projectRef}-auth-token-fresh-${
+    typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)
+  }`
   purgeOldAuthKeys(uniqueStorageKey)
   
   try {
