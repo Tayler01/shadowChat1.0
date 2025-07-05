@@ -771,15 +771,13 @@ export const fetchUserStats = async (userId: string): Promise<UserStats> => {
 
   const workingClient = await getWorkingClient()
 
-  const [messagesRes, reactionsRes, friendsRes] = await Promise.all([
+  const [messagesRes, channelReactionsRes, dmReactionsRes, friendsRes] = await Promise.all([
     workingClient
       .from('messages')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId),
-    workingClient
-      .from('message_reactions')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId),
+    workingClient.rpc('count_reactions_to_user_messages', { user_id: userId }),
+    workingClient.rpc('count_reactions_to_user_dm_messages', { user_id: userId }),
     workingClient
       .from('dm_conversations')
       .select('id', { count: 'exact', head: true })
@@ -788,7 +786,9 @@ export const fetchUserStats = async (userId: string): Promise<UserStats> => {
 
   return {
     messages: messagesRes.count || 0,
-    reactions: reactionsRes.count || 0,
+    reactions:
+      (channelReactionsRes.data as number || 0) +
+      (dmReactionsRes.data as number || 0),
     friends: friendsRes.count || 0,
   }
 }
