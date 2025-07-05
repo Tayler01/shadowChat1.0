@@ -225,10 +225,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       audioChunksRef.current = []
       recorder.ondataavailable = e => audioChunksRef.current.push(e.data)
       recorder.onstop = async () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        const mimeType = recorder.mimeType || 'audio/webm'
+        const blob = new Blob(audioChunksRef.current, { type: mimeType })
         try {
           onUploadStatusChange(true)
-          const url = await uploadVoiceMessage(blob)
+          const url = await uploadVoiceMessage(blob, mimeType)
           onSendMessage(url, 'audio')
         } catch (err) {
         } finally {
