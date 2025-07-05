@@ -65,7 +65,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
         setSearchUsername('')
         toast.success('Conversation started!')
       }
-    } catch (error) {
+    } catch {
       toast.error(error instanceof Error ? error.message : 'Failed to start conversation')
     }
   }
@@ -77,7 +77,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
   ) => {
     try {
       await sendMessage(content, type, fileUrl)
-    } catch (error) {
+    } catch {
       toast.error('Failed to send message')
       addFailedMessage({ id: Date.now().toString(), type: type || 'text', content, dataUrl: fileUrl })
     }

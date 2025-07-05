@@ -104,7 +104,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
       await updateProfile(formData)
       setIsEditing(false)
       toast.success('Profile updated successfully!')
-    } catch (error) {
+    } catch {
       toast.error('Failed to update profile')
     } finally {
       setLoading(false)

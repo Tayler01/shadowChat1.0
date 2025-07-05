@@ -88,7 +88,6 @@ export const useTyping = (channelName: string = 'general') => {
         clearTimeout(typingTimeoutRef.current)
       }
     } catch (err) {
-      console.error('Error stopping typing:', err)
     }
   }, [isTyping, user])
 
@@ -122,7 +121,6 @@ export const useTyping = (channelName: string = 'general') => {
         stopTyping()
       }, 2000)
     } catch (err) {
-      console.error('Error starting typing:', err)
     }
   }, [isTyping, user, stopTyping])
 

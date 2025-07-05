@@ -1,10 +1,9 @@
 import { useEffect } from 'react'
-import { recreateSupabaseClient, DEBUG, forceSessionRestore, getWorkingClient } from '../lib/supabase'
+import { recreateSupabaseClient, forceSessionRestore, getWorkingClient } from '../lib/supabase'
 export function useVisibilityRefresh(onVisible?: () => void, delayMs = 200) {
   useEffect(() => {
     const handler = async () => {
       if (!document.hidden) {
-        if (DEBUG) console.log('📱 [VISIBILITY] Page became visible - triggering component callbacks...')
 
         try {
           // Give the client reset process a moment to complete
@@ -14,16 +13,11 @@ export function useVisibilityRefresh(onVisible?: () => void, delayMs = 200) {
 
           // The comprehensive reset is now handled by useClientResetStatus
           // This just triggers the component callbacks for message refetch, etc.
-          if (DEBUG) console.log('🎯 [VISIBILITY] Triggering component callbacks...')
           onVisible?.()
-          if (DEBUG) console.log('✅ [VISIBILITY] Component callbacks complete')
           
-          if (DEBUG) console.log('🎉 [VISIBILITY] Visibility refresh complete!')
           
-        } catch (error) {
-          console.error('❌ [VISIBILITY] Component callback failed:', error)
+        } catch {
           // Still try to call the callback even if something failed
-          if (DEBUG) console.log('🔄 [VISIBILITY] Attempting fallback callback...')
           onVisible?.()
         }
       }
