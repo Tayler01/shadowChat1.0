@@ -221,7 +221,7 @@ export function useConversationMessages(conversationId: string | null) {
     
     // Use reset function if available
     if (clientResetRef.current) {
-      clientResetRef.current()
+      clientResetRef.current();
     } else {
     }
   }, []);
@@ -231,15 +231,13 @@ export function useConversationMessages(conversationId: string | null) {
   // Fetch messages for conversation
   useEffect(() => {
     const resetWithFreshClient = async () => {
-      if (!conversationId) return
-      
-      }
+      if (!conversationId) return;
       
       try {
         // Clean up old channel
         if (channelRef.current) {
           // Channel cleanup will be handled by the useEffect cleanup
-          channelRef.current = null
+          channelRef.current = null;
         }
         
         // Refetch messages and resubscribe
@@ -247,7 +245,7 @@ export function useConversationMessages(conversationId: string | null) {
         
       } catch {
       }
-    }
+    };
     
     if (!conversationId) {
       setMessages([]);
@@ -380,65 +378,65 @@ export function useConversationMessages(conversationId: string | null) {
       fileUrl?: string
     ) => {
     
-    if (!user || !conversationId || !content.trim()) return;
+      if (!user || !conversationId || !content.trim()) return;
 
-    setSending(true);
-    try {
-      const workingClient = await getWorkingClient();
-      
-      const { data, error } = await workingClient
-        .from('dm_messages')
-        .insert({
-          conversation_id: conversationId,
-          sender_id: user.id,
-          content: content.trim(),
-          message_type: messageType,
-          file_url: fileUrl,
-        })
-        .select(`
-          *,
-          sender:users!sender_id(*)
-        `)
-        .single();
+      setSending(true);
+      try {
+        const workingClient = await getWorkingClient();
+        
+        const { data, error } = await workingClient
+          .from('dm_messages')
+          .insert({
+            conversation_id: conversationId,
+            sender_id: user.id,
+            content: content.trim(),
+            message_type: messageType,
+            file_url: fileUrl,
+          })
+          .select(`
+            *,
+            sender:users!sender_id(*)
+          `)
+          .single();
 
-      let finalData = data;
-      let finalError = error;
-      if (finalError) {
-        if (finalError.status === 401 || /jwt|token|expired/i.test(finalError.message)) {
-          const { error: refreshError } = await refreshSessionLocked();
-          if (!refreshError) {
-            const retryClient = await getWorkingClient();
-            const retry = await retryClient
-              .from('dm_messages')
-              .insert({
-                conversation_id: conversationId,
-                sender_id: user.id,
-                content: content.trim(),
-                message_type: messageType,
-                file_url: fileUrl,
-              })
-              .select(`
-                *,
-                sender:users!sender_id(*)
-              `)
-              .single();
-            finalData = retry.data;
-            finalError = retry.error;
+        let finalData = data;
+        let finalError = error;
+        if (finalError) {
+          if (finalError.status === 401 || /jwt|token|expired/i.test(finalError.message)) {
+            const { error: refreshError } = await refreshSessionLocked();
+            if (!refreshError) {
+              const retryClient = await getWorkingClient();
+              const retry = await retryClient
+                .from('dm_messages')
+                .insert({
+                  conversation_id: conversationId,
+                  sender_id: user.id,
+                  content: content.trim(),
+                  message_type: messageType,
+                  file_url: fileUrl,
+                })
+                .select(`
+                  *,
+                  sender:users!sender_id(*)
+                `)
+                .single();
+              finalData = retry.data;
+              finalError = retry.error;
+            }
           }
+          if (finalError) throw finalError;
         }
-        if (finalError) throw finalError;
-      }
 
-      if (finalData) {
-        // Optimistically add the sent message
-        setMessages(prev => [...prev, finalData as DMMessage]);
+        if (finalData) {
+          // Optimistically add the sent message
+          setMessages(prev => [...prev, finalData as DMMessage]);
+        }
+      } catch (error) {
+        throw error;
+      } finally {
+        setSending(false);
       }
-    } catch {
-      throw error;
-    } finally {
-      setSending(false);
-    }
-  }, [user, conversationId]);
+    }, [user, conversationId]);
 
   return {
     messages,
