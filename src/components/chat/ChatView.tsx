@@ -77,7 +77,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
             <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
               <Users className="w-4 h-4" />
               <span>Online</span>
-              <ClientResetIndicator status={resetStatus} lastResetTime={lastResetTime} />
+              <ClientResetIndicator status={resetStatus} />
             </div>
           </div>
         </div>
