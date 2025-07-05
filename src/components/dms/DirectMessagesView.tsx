@@ -316,7 +316,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
             <div
               ref={messagesRef}
               onScroll={handleScroll}
-              className="flex-1 overflow-y-auto p-4 space-y-3 pb-[calc(env(safe-area-inset-bottom)_+_20rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
+              className="flex-1 w-full overflow-y-auto overflow-x-hidden p-4 space-y-3 pb-[calc(env(safe-area-inset-bottom)_+_24rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
             >
               {messages.map((message, index) => {
                 const previousMessage = messages[index - 1]
