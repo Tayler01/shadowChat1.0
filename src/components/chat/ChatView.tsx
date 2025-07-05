@@ -4,6 +4,7 @@ import { Users, Pin } from 'lucide-react'
 import { useMessages } from '../../hooks/useMessages'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
+import { PinnedMessagesBar } from './PinnedMessagesBar'
 import { useFailedMessages } from '../../hooks/useFailedMessages'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import toast from 'react-hot-toast'
@@ -21,7 +22,8 @@ interface ChatViewProps {
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView, onViewChange }) => {
-  const { sendMessage, sending } = useMessages()
+  const { messages, sendMessage, sending, togglePin, toggleReaction } = useMessages()
+  const pinnedMessages = messages.filter(m => m.pinned)
   const { status: resetStatus, lastResetTime } = useClientReset()
   const { failedMessages, addFailedMessage, removeFailedMessage } = useFailedMessages('general')
 
@@ -83,7 +85,27 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
             </div>
           </div>
         </div>
+        {pinnedMessages.length > 0 && (
+          <div className="mt-4">
+            <PinnedMessagesBar
+              messages={pinnedMessages}
+              onUnpin={togglePin}
+              onToggleReaction={toggleReaction}
+            />
+          </div>
+        )}
       </div>
+
+      {/* Pinned messages on mobile */}
+      {pinnedMessages.length > 0 && (
+        <div className="md:hidden px-4 pt-4">
+          <PinnedMessagesBar
+            messages={pinnedMessages}
+            onUnpin={togglePin}
+            onToggleReaction={toggleReaction}
+          />
+        </div>
+      )}
 
       {/* Messages */}
       <MessageList
