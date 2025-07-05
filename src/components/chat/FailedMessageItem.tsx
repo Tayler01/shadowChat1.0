@@ -22,6 +22,13 @@ export const FailedMessageItem: React.FC<Props> = ({ message, onResend }) => {
             onClick={() => setShowImageModal(true)}
           />
         )}
+        {message.type === 'file' && (
+          <div className="max-w-xs">
+            <a href={message.dataUrl} download className="text-blue-600 underline break-all">
+              {message.fileName || 'Download file'}
+            </a>
+          </div>
+        )}
         {message.type === 'audio' && message.dataUrl && (
           <audio controls src={message.dataUrl} className="max-w-xs" />
         )}

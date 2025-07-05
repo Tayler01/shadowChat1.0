@@ -65,6 +65,30 @@ test('renders audio message', () => {
   expect(audio).toHaveAttribute('src', audioMessage.audio_url)
 })
 
+test('renders file message', () => {
+  const fileMeta = JSON.stringify({ name: 'doc.txt', size: 10, type: 'text/plain' })
+  const fileMessage = {
+    ...baseMessage,
+    message_type: 'file',
+    content: fileMeta,
+    file_url: 'https://example.com/doc.txt',
+  } as Message
+
+  render(
+    <MessageItem
+      message={fileMessage}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+      containerRef={React.createRef()}
+    />
+  )
+
+  const link = screen.getByRole('link', { name: /doc.txt/i })
+  expect(link).toHaveAttribute('href', fileMessage.file_url)
+})
+
 test('icon buttons have aria-labels', () => {
   render(
     <MessageItem

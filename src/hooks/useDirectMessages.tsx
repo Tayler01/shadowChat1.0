@@ -30,7 +30,7 @@ interface DirectMessagesContextValue {
   startConversation: (username: string) => Promise<string | null>;
   sendMessage: (
     content: string,
-    messageType?: 'text' | 'command' | 'audio' | 'image',
+    messageType?: 'text' | 'command' | 'audio' | 'image' | 'file',
     fileUrl?: string
   ) => Promise<void>;
   markAsRead: (conversationId: string) => Promise<void>;
@@ -374,7 +374,7 @@ export function useConversationMessages(conversationId: string | null) {
   const sendMessage = useCallback(
     async (
       content: string,
-      messageType: 'text' | 'command' | 'audio' | 'image' = 'text',
+      messageType: 'text' | 'command' | 'audio' | 'image' | 'file' = 'text',
       fileUrl?: string
     ) => {
     
