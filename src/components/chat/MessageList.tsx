@@ -25,7 +25,10 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     editMessage,
     deleteMessage,
     togglePin,
-    toggleReaction
+    toggleReaction,
+    loadOlderMessages,
+    loadingMore,
+    hasMore
   } = useMessages()
   const { typingUsers } = useTyping('general')
   const containerRef = useRef<HTMLDivElement>(null)
@@ -36,7 +39,11 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     if (!el) return
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 20
     setAutoScroll(atBottom)
-  }, [])
+
+    if (el.scrollTop < 100 && hasMore && !loadingMore) {
+      loadOlderMessages()
+    }
+  }, [hasMore, loadingMore, loadOlderMessages])
 
   const scrollToBottom = useCallback(() => {
     if (containerRef.current) {
@@ -89,6 +96,12 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
       onScroll={handleScroll}
       className="relative flex-1 w-full overflow-y-auto overflow-x-hidden p-4 md:p-2 pb-[calc(env(safe-area-inset-bottom)_+_24rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
     >
+
+      {loadingMore && (
+        <div className="flex justify-center py-2 text-gray-500 text-sm">
+          <LoadingSpinner size="sm" /> Loading more...
+        </div>
+      )}
 
 
       {groupedMessages.map(group => (

@@ -40,7 +40,10 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
     startConversation,
     sendMessage,
     markAsRead,
-    sending
+    sending,
+    loadOlderMessages,
+    loadingMore,
+    hasMore
   } = useDirectMessages()
   const { failedMessages, addFailedMessage, removeFailedMessage } = useFailedMessages(currentConversation || 'none')
   
@@ -96,7 +99,10 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
     if (!el) return
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 20
     setAutoScroll(atBottom)
-  }, [])
+    if (el.scrollTop < 100 && hasMore && !loadingMore) {
+      loadOlderMessages()
+    }
+  }, [hasMore, loadingMore, loadOlderMessages])
 
   const scrollToBottom = useCallback(() => {
     if (messagesRef.current) {
@@ -326,6 +332,11 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
               onScroll={handleScroll}
               className="relative flex-1 w-full overflow-y-auto overflow-x-hidden p-4 space-y-3 pb-[calc(env(safe-area-inset-bottom)_+_24rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
             >
+              {loadingMore && (
+                <div className="flex justify-center py-2 text-gray-500 text-sm">
+                  <LoadingSpinner size="sm" /> Loading more...
+                </div>
+              )}
               {messages.map((message, index) => {
                 const previousMessage = messages[index - 1]
                 const isGrouped = shouldGroupMessage(message, previousMessage)
