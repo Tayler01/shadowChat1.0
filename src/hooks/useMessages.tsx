@@ -162,20 +162,46 @@ function useProvideMessages(): MessagesContextValue {
       if (error) {
         throw error;
       } else if (data.length > 0) {
+        const pinnedIds = new Set((pinnedRes.data || []).map(m => m.id));
+
         setMessages(prev => {
           if (prev.length === 0) {
             if (typeof localStorage !== 'undefined') {
               try {
-              localStorage.setItem(
-                'chatHistory',
-                JSON.stringify(data.slice(-STORED_MESSAGE_LIMIT))
-              );
+                localStorage.setItem(
+                  'chatHistory',
+                  JSON.stringify(data.slice(-STORED_MESSAGE_LIMIT))
+                );
               } catch {}
             }
             return data as Message[];
           }
-          const ids = new Set(prev.map(m => m.id));
-          const merged = [...prev, ...data.filter(m => !ids.has(m.id))];
+
+          const mergedMap = new Map<string, Message>();
+
+          // Replace or update existing messages
+          prev.forEach(m => {
+            const fetched = data.find(d => d.id === m.id);
+            let updated = m;
+
+            if (fetched) {
+              updated = fetched as Message;
+            } else if (m.pinned && !pinnedIds.has(m.id)) {
+              updated = { ...m, pinned: false, pinned_by: null, pinned_at: null } as Message;
+            }
+
+            mergedMap.set(updated.id, updated);
+          });
+
+          // Add new messages
+          data.forEach(d => {
+            if (!mergedMap.has(d.id)) {
+              mergedMap.set(d.id, d as Message);
+            }
+          });
+
+          const merged = Array.from(mergedMap.values());
+
           if (typeof localStorage !== 'undefined') {
             try {
               localStorage.setItem(
@@ -184,6 +210,7 @@ function useProvideMessages(): MessagesContextValue {
               );
             } catch {}
           }
+
           return merged;
         });
       }
