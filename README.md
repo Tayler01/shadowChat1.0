@@ -12,6 +12,7 @@ Emoji reactions, toggled with live updates
 Slash command system (/shrug, /me, /giphy) with a pluggable command registry
 Typing indicators displayed in real-time using broadcast channels
 Sticky date headers that remain visible while scrolling
+"Jump to Latest" button appears when new messages arrive and you're not at the bottom
 ### Direct Messaging (DMs)
 1-on-1 private chats using dedicated DM tables and RLS policies
 Unread tracking with live badge updates and local fallback

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { ArrowDown } from 'lucide-react'
 import { useMessages } from '../../hooks/useMessages'
 import { useTyping } from '../../hooks/useTyping'
 import { groupMessagesByDate, cn, shouldGroupMessage } from '../../lib/utils'
@@ -35,6 +36,13 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     if (!el) return
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 20
     setAutoScroll(atBottom)
+  }, [])
+
+  const scrollToBottom = useCallback(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight
+      setAutoScroll(true)
+    }
   }, [])
 
   const groupedMessages = useMemo(() => groupMessagesByDate(messages), [messages])
@@ -148,6 +156,17 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
           </motion.div>
         )}
       </AnimatePresence>
+
+      {!autoScroll && (
+        <button
+          type="button"
+          onClick={scrollToBottom}
+          aria-label="Jump to latest"
+          className="absolute bottom-20 right-4 bg-[var(--color-accent)] text-white p-2 rounded-full shadow-lg hover:bg-opacity-90"
+        >
+          <ArrowDown className="w-5 h-5" />
+        </button>
+      )}
     </div>
   )
 }
