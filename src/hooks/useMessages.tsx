@@ -580,22 +580,24 @@ function useProvideMessages(): MessagesContextValue {
       }
     };
 
-    let lastError: any = null;
-    for (let i = 0; i < 3; i++) {
-      try {
-        await attemptSend();
-        lastError = null;
-        break;
-      } catch (err) {
-        lastError = err;
-        if (i < 2) {
-          await new Promise(res => setTimeout(res, 300));
+    try {
+      let lastError: any = null;
+      for (let i = 0; i < 3; i++) {
+        try {
+          await attemptSend();
+          lastError = null;
+          break;
+        } catch (err) {
+          lastError = err;
+          if (i < 2) {
+            await new Promise(res => setTimeout(res, 300));
+          }
         }
       }
-    }
 
-    if (lastError) {
-      throw lastError;
+      if (lastError) {
+        throw lastError;
+      }
     } finally {
       setSending(false);
     }
