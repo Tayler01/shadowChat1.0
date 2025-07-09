@@ -162,7 +162,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
           type="button"
           onClick={scrollToBottom}
           aria-label="Jump to latest"
-          className="absolute bottom-20 right-4 bg-[var(--color-accent)] text-white p-2 rounded-full shadow-lg hover:bg-opacity-90"
+          className="absolute bottom-32 right-4 bg-[var(--color-accent)] text-white p-2 rounded-full shadow-lg hover:bg-opacity-90"
         >
           <ArrowDown className="w-5 h-5" />
         </button>
