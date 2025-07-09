@@ -27,6 +27,8 @@ interface DirectMessagesContextValue {
   currentConversation: string | null;
   setCurrentConversation: React.Dispatch<React.SetStateAction<string | null>>;
   messages: DMMessage[];
+  loadingMore: boolean;
+  hasMore: boolean;
   startConversation: (username: string) => Promise<string | null>;
   sendMessage: (
     content: string,
@@ -34,6 +36,7 @@ interface DirectMessagesContextValue {
     fileUrl?: string
   ) => Promise<void>;
   markAsRead: (conversationId: string) => Promise<void>;
+  loadOlderMessages: () => Promise<void>;
 }
 
 const DirectMessagesContext = createContext<DirectMessagesContextValue | undefined>(undefined);
@@ -151,6 +154,9 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
   const {
     messages,
     sendMessage,
+    loadingMore,
+    hasMore,
+    loadOlderMessages,
   } = useConversationMessages(currentConversation);
 
   const startConversation = useCallback(async (username: string) => {
@@ -194,9 +200,12 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     currentConversation,
     setCurrentConversation,
     messages,
+    loadingMore,
+    hasMore,
     startConversation,
     sendMessage,
     markAsRead,
+    loadOlderMessages,
   };
 }
 
@@ -204,6 +213,8 @@ export function useConversationMessages(conversationId: string | null) {
   const [messages, setMessages] = useState<DMMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const { user } = useAuth();
   const channelRef = useRef<RealtimeChannel | null>(null);
   const subscribeRef = useRef<() => RealtimeChannel>();
@@ -257,17 +268,19 @@ export function useConversationMessages(conversationId: string | null) {
       const workingClient = await getWorkingClient();
       const { data, error } = await workingClient
         .from('dm_messages')
-        .select(`
+        .select(
+          `
           *,
           sender:users!sender_id(*)
         `)
         .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false })
         .limit(MESSAGE_FETCH_LIMIT);
 
       if (error) {
       } else {
-        setMessages(data || []);
+        setHasMore((data?.length || 0) === MESSAGE_FETCH_LIMIT);
+        setMessages((data || []).reverse());
         
         // Mark messages as read
         if (user) {
@@ -287,6 +300,39 @@ export function useConversationMessages(conversationId: string | null) {
     
     fetchMessages();
   }, [conversationId, user]);
+
+  const loadOlderMessages = useCallback(async () => {
+    if (loadingMore || !hasMore || !conversationId) return;
+    const oldest = messages[0]?.created_at;
+    if (!oldest) return;
+    setLoadingMore(true);
+    try {
+      const workingClient = await getWorkingClient();
+      const { data, error } = await workingClient
+        .from('dm_messages')
+        .select(
+          `
+          *,
+          sender:users!sender_id(*)
+        `)
+        .eq('conversation_id', conversationId)
+        .lt('created_at', oldest)
+        .order('created_at', { ascending: false })
+        .limit(MESSAGE_FETCH_LIMIT);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const newMessages = data.reverse();
+        setMessages(prev => [...newMessages, ...prev]);
+        setHasMore(data.length === MESSAGE_FETCH_LIMIT);
+      } else {
+        setHasMore(false);
+      }
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, conversationId, messages]);
 
   // Subscribe to real-time updates
   useEffect(() => {
@@ -442,7 +488,10 @@ export function useConversationMessages(conversationId: string | null) {
     messages,
     loading,
     sending,
+    loadingMore,
+    hasMore,
     sendMessage,
+    loadOlderMessages,
   };
 }
 

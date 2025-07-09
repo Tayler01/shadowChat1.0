@@ -94,6 +94,8 @@ interface MessagesContextValue {
   messages: Message[];
   loading: boolean;
   sending: boolean;
+  loadingMore: boolean;
+  hasMore: boolean;
   sendMessage: (
     content: string,
     type?: 'text' | 'command' | 'audio' | 'image' | 'file',
@@ -103,6 +105,7 @@ interface MessagesContextValue {
   deleteMessage: (id: string) => Promise<void>;
   toggleReaction: (id: string, emoji: string) => Promise<void>;
   togglePin: (id: string) => Promise<void>;
+  loadOlderMessages: () => Promise<void>;
 }
 
 const MessagesContext = createContext<MessagesContextValue | undefined>(undefined);
@@ -125,6 +128,8 @@ function useProvideMessages(): MessagesContextValue {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [loading, setLoading] = useState(initialMessages.length === 0);
   const [sending, setSending] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const { user } = useAuth();
   const channelRef = useRef<RealtimeChannel | null>(null);
   const subscribeRef = useRef<() => RealtimeChannel>();
@@ -152,11 +157,13 @@ function useProvideMessages(): MessagesContextValue {
           user:users!user_id(*)
         `,
           )
-          .order('created_at', { ascending: true })
+          .order('created_at', { ascending: false })
           .limit(MESSAGE_FETCH_LIMIT),
       ]);
 
-      const data = [...(pinnedRes.data || []), ...(messagesRes.data || [])];
+      const fetchedMessages = (messagesRes.data || []).reverse();
+      setHasMore((messagesRes.data?.length || 0) === MESSAGE_FETCH_LIMIT);
+      const data = [...(pinnedRes.data || []), ...fetchedMessages];
       const error = pinnedRes.error || messagesRes.error;
 
       if (error) {
@@ -220,6 +227,43 @@ function useProvideMessages(): MessagesContextValue {
       setLoading(false);
     }
   }, []);
+
+  const loadOlderMessages = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    const oldest = messages.find(m => !m.pinned)?.created_at;
+    if (!oldest) return;
+    setLoadingMore(true);
+    try {
+      const workingClient = await getWorkingClient();
+      const { data, error } = await workingClient
+        .from('messages')
+        .select(
+          `
+        *,
+        user:users!user_id(*)
+      `,
+        )
+        .lt('created_at', oldest)
+        .order('created_at', { ascending: false })
+        .limit(MESSAGE_FETCH_LIMIT);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const newMessages = data.reverse();
+        setMessages(prev => {
+          const pinned = prev.filter(m => m.pinned);
+          const rest = prev.filter(m => !m.pinned);
+          return [...pinned, ...newMessages, ...rest];
+        });
+        setHasMore(data.length === MESSAGE_FETCH_LIMIT);
+      } else {
+        setHasMore(false);
+      }
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [messages, loadingMore, hasMore]);
 
   // Reset function to reinitialize everything with fresh client
   const resetWithFreshClient = useCallback(async () => {
@@ -757,11 +801,14 @@ function useProvideMessages(): MessagesContextValue {
     messages,
     loading,
     sending,
+    loadingMore,
+    hasMore,
     sendMessage,
     editMessage,
     deleteMessage,
     toggleReaction,
     togglePin,
+    loadOlderMessages,
   };
 }
 
