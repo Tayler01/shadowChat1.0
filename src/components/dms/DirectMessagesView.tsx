@@ -4,7 +4,8 @@ import {
   MessageSquare,
   Plus,
   ArrowLeft,
-  Menu
+  Menu,
+  ArrowDown
 } from 'lucide-react'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
 import { useAuth } from '../../hooks/useAuth'
@@ -95,6 +96,13 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
     if (!el) return
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 20
     setAutoScroll(atBottom)
+  }, [])
+
+  const scrollToBottom = useCallback(() => {
+    if (messagesRef.current) {
+      messagesRef.current.scrollTop = messagesRef.current.scrollHeight
+      setAutoScroll(true)
+    }
   }, [])
 
   useEffect(() => {
@@ -316,7 +324,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
             <div
               ref={messagesRef}
               onScroll={handleScroll}
-              className="flex-1 w-full overflow-y-auto overflow-x-hidden p-4 space-y-3 pb-[calc(env(safe-area-inset-bottom)_+_24rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
+              className="relative flex-1 w-full overflow-y-auto overflow-x-hidden p-4 space-y-3 pb-[calc(env(safe-area-inset-bottom)_+_24rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
             >
               {messages.map((message, index) => {
                 const previousMessage = messages[index - 1]
@@ -389,6 +397,17 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                   <LoadingSpinner size="sm" />
                   <span>{uploading ? 'Uploading...' : 'Sending...'}</span>
                 </div>
+              )}
+
+              {!autoScroll && (
+                <button
+                  type="button"
+                  onClick={scrollToBottom}
+                  aria-label="Jump to latest"
+                  className="absolute bottom-32 right-4 bg-[var(--color-accent)] text-white p-2 rounded-full shadow-lg hover:bg-opacity-90"
+                >
+                  <ArrowDown className="w-5 h-5" />
+                </button>
               )}
             </div>
 
