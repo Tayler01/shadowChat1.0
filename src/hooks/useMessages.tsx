@@ -544,14 +544,11 @@ function useProvideMessages(): MessagesContextValue {
       throw tokenErr;
     }
 
-    try {
-      // Step 1: Prepare message data
-      const messageData = prepareMessageData(user.id, content, messageType, fileUrl);
+    const messageData = prepareMessageData(user.id, content, messageType, fileUrl);
 
-      // Step 2: Attempt database insert (let Supabase handle auth internally)
+    const attemptSend = async () => {
       let { data, error } = await insertMessage(messageData);
 
-      // Step 3: Handle auth errors with retry
       if (error && (error.status === 401 || /jwt|token|expired/i.test(error.message))) {
         const retry = await refreshSessionAndRetry(messageData);
         data = retry.data;
@@ -562,34 +559,43 @@ function useProvideMessages(): MessagesContextValue {
         throw error;
       }
 
-      // Message successfully inserted
-
-      // Step 4: Update local state and broadcast
       if (data) {
         setMessages(prev => {
           const exists = prev.find(m => m.id === data.id);
           if (exists) {
             return prev;
           }
-          const updated = [...prev, data as Message];
-          return updated;
+          return [...prev, data as Message];
         });
-        
-        let broadcastResult: unknown = null;
+
         if (channelRef.current?.state === 'joined') {
-          broadcastResult = channelRef.current.send({
+          channelRef.current.send({
             type: 'broadcast',
             event: 'new_message',
             payload: data,
           });
         }
 
-        // Ensure we didn't miss any messages due to timing issues
         fetchMessages();
       }
-      
-    } catch (error) {
-      throw error;
+    };
+
+    let lastError: any = null;
+    for (let i = 0; i < 3; i++) {
+      try {
+        await attemptSend();
+        lastError = null;
+        break;
+      } catch (err) {
+        lastError = err;
+        if (i < 2) {
+          await new Promise(res => setTimeout(res, 300));
+        }
+      }
+    }
+
+    if (lastError) {
+      throw lastError;
     } finally {
       setSending(false);
     }
