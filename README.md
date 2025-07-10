@@ -102,10 +102,10 @@ By user
 By date range
 By conversation
 Message results are highlighted and jump-to enabled
---- ## AI-Ready Features (Planned)
-Thread summarization using OpenAI GPT
+--- ## AI-Powered Features
+Conversation summarization using lightweight heuristics
 Tone analysis to detect emotional content
-AI replies and auto-suggested responses
+Auto-suggested replies for quick responses
 Moderation engine to flag offensive or inappropriate content
 Smart mentions or entity linking to user profiles, topics, or commands
 --- ## Security & Moderation
