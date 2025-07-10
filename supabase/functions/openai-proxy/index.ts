@@ -7,6 +7,17 @@ if (!OPENAI_KEY) {
 }
 
 serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+      }
+    })
+  }
+
   const body = await req.json();
 
   const res = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -21,6 +32,9 @@ serve(async (req: Request) => {
   const text = await res.text();
   return new Response(text, {
     status: res.status,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*"
+    },
   });
 });
