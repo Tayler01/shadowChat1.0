@@ -14,7 +14,8 @@ serve(async (req) => {
   try {
     const { messages, model = 'gpt-3.5-turbo' } = await req.json()
 
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
+    const openaiApiKey =
+      Deno.env.get('OPENAI_KEY') || Deno.env.get('OPENAI_API_KEY')
     if (!openaiApiKey) {
       throw new Error('OpenAI API key not configured')
     }
