@@ -150,3 +150,25 @@ test('applies user color to message bubble', () => {
   const msg = screen.getByText('hello')
   expect(msg.parentElement).toHaveStyle('background-color: #ff0000')
 })
+
+test('shows tone indicator emoji', () => {
+  const textMessage = {
+    ...baseMessage,
+    message_type: 'text',
+    content: 'I love this!',
+  } as Message
+
+  render(
+    <MessageItem
+      message={textMessage}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+      containerRef={React.createRef()}
+    />
+  )
+
+  const indicator = screen.getByTestId('tone-indicator')
+  expect(indicator).toHaveTextContent('😊')
+})

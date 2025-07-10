@@ -22,6 +22,7 @@ import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
 import type { EmojiClickData } from '../../types'
 import { useEmojiPicker } from '../../hooks/useEmojiPicker'
+import { useToneAnalysis } from '../../hooks/useToneAnalysis'
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '🙏']
 
@@ -52,6 +53,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const menuRef = useRef<HTMLDivElement>(null)
     const [showQuickReactions, setShowQuickReactions] = useState(false)
     const reactionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+    const analyzeTone = useToneAnalysis()
 
     const isGrouped = shouldGroupMessage(message, previousMessage)
     const isOwner = profile?.id === message.user_id
@@ -60,6 +62,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const bubbleStyle = bubbleColor
       ? { backgroundColor: bubbleColor, color: getReadableTextColor(bubbleColor) }
       : undefined
+    const { tone } = analyzeTone(message.content)
+    const toneEmoji = tone === 'positive' ? '😊' : tone === 'negative' ? '☹️' : '😐'
 
     const handleMouseEnterReactions = () => {
       if (reactionTimeoutRef.current) {
@@ -272,7 +276,12 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   ) : message.message_type === 'file' && message.file_url ? (
                     <FileAttachment url={message.file_url} meta={message.content} />
                   ) : (
-                    message.content
+                    <span>
+                      {message.content}
+                      <span data-testid="tone-indicator" className="ml-1">
+                        {toneEmoji}
+                      </span>
+                    </span>
                   )}
                 </div>
                 {/* Actions */}
