@@ -29,7 +29,6 @@ interface MessageInputProps {
   messages?: ChatMessage[]
   replyingTo?: { id: string; content: string }
   onCancelReply?: () => void
-  typingChannel?: string | null
 }
 
 export const MessageInput: React.FC<MessageInputProps> = ({
@@ -41,8 +40,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   onUploadStatusChange = () => {},
   messages = [],
   replyingTo,
-  onCancelReply,
-  typingChannel = 'general'
+  onCancelReply
 }) => {
   const { draft, setDraft, clear } = useDraft(cacheKey)
   const [message, setMessage] = useState(draft)
@@ -53,7 +51,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [recording, setRecording] = useState(false)
   const [recordingDuration, setRecordingDuration] = useState(0)
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  const { startTyping, stopTyping } = useTyping(typingChannel)
+  const { startTyping, stopTyping } = useTyping('general')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const emojiPickerRef = useRef<HTMLDivElement>(null)
   const attachmentMenuRef = useRef<HTMLDivElement>(null)
