@@ -119,6 +119,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
         }}
         sending={sending}
         uploading={uploading}
+        typingChannel="general"
       />
 
       {/* Desktop Message Input */}
@@ -127,6 +128,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
           onSendMessage={handleSendMessage}
           placeholder="Type a message"
           cacheKey="general"
+          typingChannel="general"
           onUploadStatusChange={setUploading}
           messages={messages}
           replyingTo={replyTo || undefined}
@@ -144,6 +146,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
           placeholder="Type a message"
           className="border-t"
           cacheKey="general"
+          typingChannel="general"
           onUploadStatusChange={setUploading}
           messages={messages}
           replyingTo={replyTo || undefined}

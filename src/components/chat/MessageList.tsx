@@ -17,9 +17,10 @@ interface MessageListProps {
   onResend?: (msg: FailedMessage) => void
   sending?: boolean
   uploading?: boolean
+  typingChannel?: string | null
 }
 
-export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessages = [], onResend, sending = false, uploading = false }) => {
+export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessages = [], onResend, sending = false, uploading = false, typingChannel = 'general' }) => {
   const {
     messages,
     loading,
@@ -31,7 +32,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     loadingMore,
     hasMore
   } = useMessages()
-  const { typingUsers } = useTyping('general')
+  const { typingUsers } = useTyping(typingChannel)
   const containerRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
   const [collapsed, setCollapsed] = useState<Set<string>>(() => {
