@@ -1,0 +1,26 @@
+import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
+
+const OPENAI_KEY = Deno.env.get("OPENAI_KEY");
+
+if (!OPENAI_KEY) {
+  console.error("OPENAI_KEY not set");
+}
+
+serve(async (req: Request) => {
+  const body = await req.json();
+
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${OPENAI_KEY}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const text = await res.text();
+  return new Response(text, {
+    status: res.status,
+    headers: { "Content-Type": "application/json" },
+  });
+});
