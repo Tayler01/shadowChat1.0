@@ -6,9 +6,9 @@ export function useSuggestionsEnabled() {
   const [enabled, setEnabled] = useState(() => {
     if (typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem('suggestionsEnabled')
-      return stored !== 'false'
+      return stored === 'true' // Default to false, only enable if explicitly set to true
     }
-    return true
+    return false // Default to disabled
   })
 
   useEffect(() => {

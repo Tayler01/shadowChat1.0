@@ -34,7 +34,18 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
   const { typingUsers } = useTyping('general')
   const containerRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    // Start with all messages that have replies collapsed by default
+    const initialCollapsed = new Set<string>()
+    messages.forEach(m => {
+      if (m.reply_to) return // Skip reply messages
+      const hasReplies = messages.some(other => other.reply_to === m.id)
+      if (hasReplies) {
+        initialCollapsed.add(m.id)
+      }
+    })
+    return initialCollapsed
+  })
 
   const messageMap = useMemo(() => {
     const map = new Map<string, Message>()
@@ -54,6 +65,21 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
   }, [messages])
 
   const rootMessages = useMemo(() => messages.filter(m => !m.reply_to), [messages])
+
+  // Update collapsed state when messages change to include new threads
+  useEffect(() => {
+    setCollapsed(prev => {
+      const newCollapsed = new Set(prev)
+      messages.forEach(m => {
+        if (m.reply_to) return // Skip reply messages
+        const hasReplies = messages.some(other => other.reply_to === m.id)
+        if (hasReplies && !prev.has(m.id)) {
+          newCollapsed.add(m.id) // Collapse new threads by default
+        }
+      })
+      return newCollapsed
+    })
+  }, [messages])
 
   const toggleThread = (id: string) => {
     setCollapsed(prev => {
