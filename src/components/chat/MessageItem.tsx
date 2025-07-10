@@ -60,8 +60,9 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
 
     const isGrouped = shouldGroupMessage(message, previousMessage)
     const isOwner = profile?.id === message.user_id
+    const isAIMessage = message.message_type === 'command'
 
-    const bubbleColor = message.user?.color
+    const bubbleColor = isAIMessage ? undefined : message.user?.color
     const bubbleStyle = bubbleColor
       ? { backgroundColor: bubbleColor, color: getReadableTextColor(bubbleColor) }
       : undefined
@@ -263,7 +264,11 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 <div
                   className={cn(
                     'relative peer rounded-xl px-3 py-2 break-words space-y-1',
-                    bubbleStyle ? '' : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                    isAIMessage
+                      ? 'bg-[var(--color-accent-light)] border-l-4 border-[var(--color-accent)] text-gray-900 dark:text-gray-100'
+                      : bubbleStyle
+                      ? ''
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
                   )}
                   style={bubbleStyle}
                 >
