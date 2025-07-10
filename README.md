@@ -103,10 +103,12 @@ By user
 By date range
 By conversation
 Message results are highlighted and jump-to enabled
---- ## AI-Ready Features (Planned)
+--- ## AI-Ready Features
 Thread summarization using OpenAI GPT
+
 Tone analysis to detect emotional content
 AI replies and auto-suggested responses (implemented)
+
 Moderation engine to flag offensive or inappropriate content
 Smart mentions or entity linking to user profiles, topics, or commands
 --- ## Security & Moderation
@@ -122,7 +124,8 @@ View moderation logs
 VITE_SUPABASE_URL=<your Supabase project URL>
 VITE_SUPABASE_ANON_KEY=<your Supabase anon key>
 VITE_PRESENCE_INTERVAL_MS=30000 # optional
-VITE_OPENAI_KEY=<your OpenAI API key> # for /summary and suggestions
+VITE_OPENAI_KEY=<your OpenAI API key> # for /summary and suggestions and tone analysis
+
 --- ## Getting Started
 
 # Clone the repo
@@ -131,6 +134,7 @@ cd shadowChat1.0
 
 # Install dependencies
 npm install
+# This pulls in the `sentiment` package used for tone analysis
 
 # Lint the code
 npm run lint
