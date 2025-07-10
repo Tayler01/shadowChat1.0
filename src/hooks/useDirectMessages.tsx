@@ -179,6 +179,8 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
 
     const conversation = await getOrCreateDMConversation(otherUser.id);
     if (conversation) {
+      const convs = await fetchDMConversations();
+      setConversations(convs);
       setCurrentConversation(conversation.id);
       return conversation.id as string;
     }
