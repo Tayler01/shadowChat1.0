@@ -19,6 +19,7 @@ import { Button } from '../ui/Button'
 import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
 import { useTheme, colorSchemes, ColorScheme } from '../../hooks/useTheme'
+import { usePushNotifications } from '../../hooks/usePushNotifications'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useSuggestionsEnabled } from '../../hooks/useSuggestedReplies'
 import { useToneAnalysisEnabled } from '../../hooks/useToneAnalysisEnabled'
@@ -28,7 +29,8 @@ interface SettingsViewProps {
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) => {
-  const [notifications, setNotifications] = useState(true)
+  const { enabled: notifications, setEnabled: setNotifications } =
+    usePushNotifications()
   const [sounds, setSounds] = useState(true)
   const [showDangerZone, setShowDangerZone] = useState(false)
   const { scheme, setScheme } = useTheme()
