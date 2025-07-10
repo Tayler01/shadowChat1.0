@@ -29,25 +29,28 @@ export const useTyping = (channelName: string = 'general') => {
       // Listen for typing events
       channel
       .on('broadcast', { event: 'typing' }, (payload) => {
-        const { user, typing } = payload.payload
-        
+        const { user: typingUser, typing } = payload.payload
+
+        // Ignore events from the current user
+        if (typingUser.id === user?.id) return
+
         setTypingUsers(prev => {
           if (typing) {
             // Add user to typing list if not already there
-            if (!prev.find(u => u.id === user.id)) {
-              return [...prev, user]
+            if (!prev.find(u => u.id === typingUser.id)) {
+              return [...prev, typingUser]
             }
             return prev
           } else {
             // Remove user from typing list
-            return prev.filter(u => u.id !== user.id)
+            return prev.filter(u => u.id !== typingUser.id)
           }
         })
 
         // Auto-remove typing users after 3 seconds of inactivity
         if (typing) {
           setTimeout(() => {
-            setTypingUsers(prev => prev.filter(u => u.id !== user.id))
+            setTypingUsers(prev => prev.filter(u => u.id !== typingUser.id))
           }, 3000)
         }
       })
