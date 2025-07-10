@@ -156,15 +156,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                   <ArrowLeft className="w-4 h-4" />
                 </Button>
               )}
-              {isDesktop && (
-                <button
-                  onClick={onToggleSidebar}
-                  className="p-2 -ml-2 mr-2"
-                  aria-label="Toggle sidebar"
-                >
-                  <Menu className="w-5 h-5" />
-                </button>
-              )}
+              {/* Sidebar toggle removed */}
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               Direct Messages
               </h2>
@@ -289,15 +281,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
             {/* Header */}
             <div className="flex-shrink-0 px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center space-x-3">
-                {isDesktop && (
-                  <button
-                    onClick={onToggleSidebar}
-                    className="p-2 -ml-2"
-                    aria-label="Toggle sidebar"
-                  >
-                    <Menu className="w-5 h-5" />
-                  </button>
-                )}
+                {/* Sidebar toggle removed */}
                 <Button
                   variant="ghost"
                   size="sm"
