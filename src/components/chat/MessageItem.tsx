@@ -289,7 +289,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   ) : message.message_type === 'file' && message.file_url ? (
                     <FileAttachment url={message.file_url} meta={message.content} />
                   ) : (
-                    <span>
+                    <span className={isAIMessage ? 'font-bold text-black' : ''}>
                       {message.content}
                       {toneEnabled && (
                         <span data-testid="tone-indicator" className="ml-1">
