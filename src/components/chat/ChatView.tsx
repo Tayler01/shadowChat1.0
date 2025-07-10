@@ -7,6 +7,8 @@ import { MessageInput } from './MessageInput'
 import { PinnedMessagesBar } from './PinnedMessagesBar'
 import { useFailedMessages } from '../../hooks/useFailedMessages'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
+import { useSoundEffects } from '../../hooks/useSoundEffects'
+import { useMessageArrivalSound } from '../../hooks/useMessageArrivalSound'
 import toast from 'react-hot-toast'
 import { ClientResetIndicator } from '../ui/ClientResetIndicator'
 import { useClientReset } from '../../hooks/ClientResetContext'
@@ -24,6 +26,8 @@ interface ChatViewProps {
 export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView, onViewChange }) => {
   const { messages, sendMessage, sending, togglePin, toggleReaction } = useMessages()
   const pinnedMessages = messages.filter(m => m.pinned)
+  const { enabled: soundsEnabled, sound } = useSoundEffects()
+  useMessageArrivalSound(messages, soundsEnabled, sound)
   const { status: resetStatus, lastResetTime } = useClientReset()
   const { failedMessages, addFailedMessage, removeFailedMessage } = useFailedMessages('general')
 

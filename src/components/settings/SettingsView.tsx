@@ -5,7 +5,6 @@ import {
   Moon,
   Sun,
   Volume2,
-  VolumeX,
   Palette,
   Shield,
   Database,
@@ -22,6 +21,7 @@ import { useTheme, colorSchemes, ColorScheme } from '../../hooks/useTheme'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useSuggestionsEnabled } from '../../hooks/useSuggestedReplies'
 import { useToneAnalysisEnabled } from '../../hooks/useToneAnalysisEnabled'
+import { useSoundEffects, MessageSound } from '../../hooks/useSoundEffects'
 
 interface SettingsViewProps {
   onToggleSidebar: () => void
@@ -29,7 +29,7 @@ interface SettingsViewProps {
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) => {
   const [notifications, setNotifications] = useState(true)
-  const [sounds, setSounds] = useState(true)
+  const { enabled: sounds, setEnabled: setSounds, sound, setSound } = useSoundEffects()
   const [showDangerZone, setShowDangerZone] = useState(false)
   const { scheme, setScheme } = useTheme()
   const isDesktop = useIsDesktop()
@@ -168,6 +168,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
                     </button>
                   </div>
                 ))}
+                {section.title === 'Audio' && (
+                  <div className="flex items-center justify-between pt-2">
+                    <div>
+                      <h3 className="font-medium text-gray-900 dark:text-gray-100">Message Sound</h3>
+                    </div>
+                    <select
+                      value={sound}
+                      onChange={e => setSound(e.target.value as MessageSound)}
+                      className="border rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    >
+                      <option value="chime">Chime</option>
+                      <option value="pop">Pop</option>
+                    </select>
+                  </div>
+                )}
               </div>
             </div>
           ))}

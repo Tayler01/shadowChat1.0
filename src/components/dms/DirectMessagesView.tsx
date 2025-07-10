@@ -22,6 +22,8 @@ import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { useTyping } from '../../hooks/useTyping'
 import toast from 'react-hot-toast'
+import { useSoundEffects } from '../../hooks/useSoundEffects'
+import { useMessageArrivalSound } from '../../hooks/useMessageArrivalSound'
 
 interface DirectMessagesViewProps {
   onToggleSidebar: () => void
@@ -55,6 +57,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
   const [autoScroll, setAutoScroll] = useState(true)
   const [uploading, setUploading] = useState(false)
   const { typingUsers } = useTyping(currentConversation ? `dm-${currentConversation}` : 'none')
+  const { enabled: soundsEnabled, sound } = useSoundEffects()
+  useMessageArrivalSound(messages, soundsEnabled, sound)
 
   useEffect(() => {
     if (initialConversation && currentConversation !== initialConversation) {
