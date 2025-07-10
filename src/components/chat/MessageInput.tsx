@@ -156,7 +156,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         try {
           const answer = await askQuestion(aiMatch)
           if (answer) {
-            await onSendMessage(answer, 'command')
+            await onSendMessage(answer, 'command', undefined, finalMessage)
           }
         } catch {
         }
