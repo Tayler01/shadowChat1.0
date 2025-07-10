@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getMessaging, getToken, onMessage, deleteToken } from 'firebase/messaging'
+import { supabase } from './supabase'
 
 const firebaseConfig = {
   apiKey: 'AIzaSyDwEGv1PRl9GLZwE-QdCnXCEiFn-fRPZt0',
@@ -34,7 +35,25 @@ export const requestPushPermission = async () => {
 
     if (token) {
       console.log('Push token:', token)
-      // TODO: Save token to Supabase `user_devices` table
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { error } = await supabase
+        .from('user_devices')
+        .upsert(
+          {
+            user_id: user.id,
+            token,
+            platform: 'web',
+            last_seen: new Date().toISOString(),
+          },
+          { onConflict: 'user_id,platform' }
+        )
+
+      if (error) {
+        console.error('Error saving push token to Supabase', error)
+      }
     } else {
       console.log('No registration token available. Request permission to generate one.')
     }
