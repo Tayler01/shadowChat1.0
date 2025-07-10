@@ -41,7 +41,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   onUploadStatusChange = () => {},
   messages = [],
   replyingTo,
-  onCancelReply
+  onCancelReply,
   typingChannel = 'general',
 }) => {
   const { draft, setDraft, clear } = useDraft(cacheKey)
