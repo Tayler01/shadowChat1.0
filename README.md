@@ -154,6 +154,7 @@ npm run dev
 
 # AI suggested replies
 OpenAI-powered reply suggestions appear above the message box. Toggle this feature in **Settings → AI → Suggested Replies**.
+Tone indicators next to messages can be disabled under **Settings → AI → Tone Indicators**.
 --- ## Testing & CI/CD ### Testing Stack
 Jest for unit tests
 React Testing Library for DOM interaction

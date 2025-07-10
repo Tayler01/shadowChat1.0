@@ -23,6 +23,7 @@ import toast from 'react-hot-toast'
 import type { EmojiClickData } from '../../types'
 import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import { useToneAnalysis } from '../../hooks/useToneAnalysis'
+import { useToneAnalysisEnabled } from '../../hooks/useToneAnalysisEnabled'
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '🙏']
 
@@ -55,6 +56,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const [showQuickReactions, setShowQuickReactions] = useState(false)
     const reactionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const analyzeTone = useToneAnalysis()
+    const { enabled: toneEnabled } = useToneAnalysisEnabled()
 
     const isGrouped = shouldGroupMessage(message, previousMessage)
     const isOwner = profile?.id === message.user_id
@@ -63,7 +65,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const bubbleStyle = bubbleColor
       ? { backgroundColor: bubbleColor, color: getReadableTextColor(bubbleColor) }
       : undefined
-    const { tone } = analyzeTone(message.content)
+    const { tone } = toneEnabled ? analyzeTone(message.content) : { tone: 'neutral' }
     const toneEmoji = tone === 'positive' ? '😊' : tone === 'negative' ? '☹️' : '😐'
 
     const handleMouseEnterReactions = () => {
@@ -284,9 +286,11 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   ) : (
                     <span>
                       {message.content}
-                      <span data-testid="tone-indicator" className="ml-1">
-                        {toneEmoji}
-                      </span>
+                      {toneEnabled && (
+                        <span data-testid="tone-indicator" className="ml-1">
+                          {toneEmoji}
+                        </span>
+                      )}
                     </span>
                   )}
                 </div>
