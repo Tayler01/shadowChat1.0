@@ -143,7 +143,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       : null
 
     try {
-      await onSendMessage(finalMessage, 'text', undefined, replyingTo?.id)
+      const sent = await onSendMessage(
+        finalMessage,
+        'text',
+        undefined,
+        replyingTo?.id
+      )
       clear()
       setMessage('')
       stopTyping()
@@ -154,7 +159,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         try {
           const answer = await askQuestion(aiMatch)
           if (answer) {
-            await onSendMessage(answer, 'command')
+            await onSendMessage(answer, 'command', undefined, sent?.id)
           }
         } catch {
         }

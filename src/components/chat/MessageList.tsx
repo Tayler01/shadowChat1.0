@@ -35,13 +35,15 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
   const containerRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
   const [collapsed, setCollapsed] = useState<Set<string>>(() => {
-    // Start with all messages that have replies collapsed by default
     const initialCollapsed = new Set<string>()
     messages.forEach(m => {
-      if (m.reply_to) return // Skip reply messages
-      const hasReplies = messages.some(other => other.reply_to === m.id)
-      if (hasReplies) {
-        initialCollapsed.add(m.id)
+      if (m.reply_to) return
+      const replies = messages.filter(r => r.reply_to === m.id)
+      if (replies.length > 0) {
+        const allAI = replies.every(r => r.message_type === 'command')
+        if (!allAI) {
+          initialCollapsed.add(m.id)
+        }
       }
     })
     return initialCollapsed
@@ -71,10 +73,13 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     setCollapsed(prev => {
       const newCollapsed = new Set(prev)
       messages.forEach(m => {
-        if (m.reply_to) return // Skip reply messages
-        const hasReplies = messages.some(other => other.reply_to === m.id)
-        if (hasReplies && !prev.has(m.id)) {
-          newCollapsed.add(m.id) // Collapse new threads by default
+        if (m.reply_to) return
+        const replies = messages.filter(r => r.reply_to === m.id)
+        if (replies.length > 0 && !prev.has(m.id)) {
+          const allAI = replies.every(r => r.message_type === 'command')
+          if (!allAI) {
+            newCollapsed.add(m.id)
+          }
         }
       })
       return newCollapsed

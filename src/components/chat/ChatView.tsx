@@ -51,11 +51,13 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     replyToId?: string
   ) => {
     try {
-      await sendMessage(content, type, fileUrl, replyToId)
+      const msg = await sendMessage(content, type, fileUrl, replyToId)
       setReplyTo(null)
+      return msg
     } catch {
       toast.error('Failed to send message')
       addFailedMessage({ id: Date.now().toString(), type: type || 'text', content: content, dataUrl: fileUrl })
+      return null
     }
   }
 

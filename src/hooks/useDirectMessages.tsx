@@ -34,7 +34,7 @@ interface DirectMessagesContextValue {
     content: string,
     messageType?: 'text' | 'command' | 'audio' | 'image' | 'file',
     fileUrl?: string
-  ) => Promise<void>;
+  ) => Promise<DMMessage | null>;
   markAsRead: (conversationId: string) => Promise<void>;
   loadOlderMessages: () => Promise<void>;
 }
@@ -422,9 +422,9 @@ export function useConversationMessages(conversationId: string | null) {
       content: string,
       messageType: 'text' | 'command' | 'audio' | 'image' | 'file' = 'text',
       fileUrl?: string
-    ) => {
+    ): Promise<DMMessage | null> => {
     
-      if (!user || !conversationId || !content.trim()) return;
+      if (!user || !conversationId || !content.trim()) return null;
 
       setSending(true);
       try {
@@ -476,7 +476,9 @@ export function useConversationMessages(conversationId: string | null) {
         if (finalData) {
           // Optimistically add the sent message
           setMessages(prev => [...prev, finalData as DMMessage]);
+          return finalData as DMMessage;
         }
+        return null;
       } catch (error) {
         throw error;
       } finally {
