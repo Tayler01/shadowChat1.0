@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Send, Smile, Command, Plus, Mic } from 'lucide-react'
+import { Send, Smile, Command, Plus, Mic, X } from 'lucide-react'
 import { useTyping } from '../../hooks/useTyping'
 import { Button } from '../ui/Button'
 import { processSlashCommand, slashCommands } from '../../lib/utils'
@@ -17,7 +17,8 @@ interface MessageInputProps {
   onSendMessage: (
     content: string,
     type?: 'text' | 'command' | 'audio' | 'image' | 'file',
-    fileUrl?: string
+    fileUrl?: string,
+    replyTo?: string
   ) => Promise<void> | void
   placeholder?: string
   disabled?: boolean
@@ -25,6 +26,8 @@ interface MessageInputProps {
   cacheKey?: string
   onUploadStatusChange?: (uploading: boolean) => void
   messages?: ChatMessage[]
+  replyingTo?: { id: string; content: string }
+  onCancelReply?: () => void
 }
 
 export const MessageInput: React.FC<MessageInputProps> = ({
@@ -34,7 +37,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   className = '',
   cacheKey = 'general',
   onUploadStatusChange = () => {},
-  messages = []
+  messages = [],
+  replyingTo,
+  onCancelReply
 }) => {
   const { draft, setDraft, clear } = useDraft(cacheKey)
   const [message, setMessage] = useState(draft)
@@ -133,11 +138,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     const finalMessage = processedMessage || message.trim()
 
     try {
-      await onSendMessage(finalMessage)
+      await onSendMessage(finalMessage, 'text', undefined, replyingTo?.id)
       clear()
       setMessage('')
       stopTyping()
       setShowSlashCommands(false)
+      onCancelReply?.()
     } catch (err) {
     }
     // Keep focus on the textarea so the mobile keyboard stays open
@@ -201,7 +207,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       onUploadStatusChange(true)
       uploadChatFile(file)
         .then(url => {
-          onSendMessage('', 'image', url)
+          onSendMessage('', 'image', url, replyingTo?.id)
+          onCancelReply?.()
         })
         .catch(err => {
         })
@@ -218,7 +225,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         .then(url => {
           const messageType = file.type.startsWith('image/') ? 'image' : 'file'
           const meta = JSON.stringify({ name: file.name, size: file.size, type: file.type })
-          onSendMessage(messageType === 'image' ? '' : meta, messageType as any, url)
+          onSendMessage(
+            messageType === 'image' ? '' : meta,
+            messageType as any,
+            url,
+            replyingTo?.id
+          )
+          onCancelReply?.()
         })
         .catch(err => {
         })
@@ -240,7 +253,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         try {
           onUploadStatusChange(true)
           const url = await uploadVoiceMessage(blob, mimeType)
-          onSendMessage(url, 'audio')
+          onSendMessage(url, 'audio', undefined, replyingTo?.id)
+          onCancelReply?.()
         } catch (err) {
         } finally {
           onUploadStatusChange(false)
@@ -276,6 +290,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     <div
       className={`relative p-4 md:p-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${className}`}
     >
+      {replyingTo && (
+        <div className="mb-2 flex items-center justify-between text-xs bg-gray-100 dark:bg-gray-700 rounded px-2 py-1">
+          <span className="truncate">Replying to: {replyingTo.content.slice(0, 30)}</span>
+          <button type="button" onClick={onCancelReply} aria-label="Cancel reply">
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
       {recording && (
         <RecordingIndicator seconds={recordingDuration} onStop={stopRecording} />
       )}

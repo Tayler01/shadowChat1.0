@@ -29,6 +29,7 @@ const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '🙏']
 interface MessageItemProps {
   message: Message
   previousMessage?: Message
+  parentMessage?: Message
   onReply?: (messageId: string, content: string) => void
   onEdit: (messageId: string, content: string) => Promise<void>
   onDelete: (messageId: string) => Promise<void>
@@ -38,7 +39,7 @@ interface MessageItemProps {
 }
 
 export const MessageItem: React.FC<MessageItemProps> = React.memo(
-  ({ message, previousMessage, onReply, onEdit, onDelete, onTogglePin, onToggleReaction, containerRef }) => {
+  ({ message, previousMessage, parentMessage, onReply, onEdit, onDelete, onTogglePin, onToggleReaction, containerRef }) => {
     const { profile } = useAuth()
     const [isEditing, setIsEditing] = useState(false)
     const [editContent, setEditContent] = useState(message.content)
@@ -252,6 +253,11 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
           ) : (
             <>
               <div className="relative inline-block max-w-full group/message">
+                {parentMessage && (
+                  <div className="text-xs text-gray-500 mb-1">
+                    Replying to {parentMessage.user?.display_name || 'Unknown'}: {parentMessage.content.slice(0, 30)}
+                  </div>
+                )}
                 <div
                   className={cn(
                     'relative peer rounded-xl px-3 py-2 break-words space-y-1',

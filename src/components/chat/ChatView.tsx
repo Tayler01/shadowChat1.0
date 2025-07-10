@@ -28,6 +28,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   const { failedMessages, addFailedMessage, removeFailedMessage } = useFailedMessages('general')
 
   const [uploading, setUploading] = useState(false)
+  const [replyTo, setReplyTo] = useState<{ id: string; content: string } | null>(null)
 
   const handleFocusRefresh = useCallback(async () => {
     // Let the visibility refresh hook handle client reset
@@ -39,13 +40,19 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
 
   useVisibilityRefresh(handleFocusRefresh)
 
+  const handleReply = useCallback((id: string, content: string) => {
+    setReplyTo({ id, content })
+  }, [])
+
   const handleSendMessage = async (
     content: string,
     type?: 'text' | 'command' | 'audio' | 'image' | 'file',
-    fileUrl?: string
+    fileUrl?: string,
+    replyToId?: string
   ) => {
     try {
-      await sendMessage(content, type, fileUrl)
+      await sendMessage(content, type, fileUrl, replyToId)
+      setReplyTo(null)
     } catch {
       toast.error('Failed to send message')
       addFailedMessage({ id: Date.now().toString(), type: type || 'text', content: content, dataUrl: fileUrl })
@@ -104,6 +111,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
 
       {/* Messages */}
       <MessageList
+        onReply={handleReply}
         failedMessages={failedMessages}
         onResend={msg => {
           removeFailedMessage(msg.id)
@@ -121,6 +129,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
           cacheKey="general"
           onUploadStatusChange={setUploading}
           messages={messages}
+          replyingTo={replyTo || undefined}
+          onCancelReply={() => setReplyTo(null)}
         />
       </div>
 
@@ -136,6 +146,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
           cacheKey="general"
           onUploadStatusChange={setUploading}
           messages={messages}
+          replyingTo={replyTo || undefined}
+          onCancelReply={() => setReplyTo(null)}
         />
       </MobileChatFooter>
     </motion.div>
