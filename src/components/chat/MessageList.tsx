@@ -33,6 +33,8 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
   } = useMessages()
   const { typingUsers } = useTyping('general')
   const containerRef = useRef<HTMLDivElement>(null)
+  const prevHeightRef = useRef(0)
+  const prevScrollTopRef = useRef(0)
   const [autoScroll, setAutoScroll] = useState(true)
   const [collapsed, setCollapsed] = useState<Set<string>>(() => {
     const initialCollapsed = new Set<string>()
@@ -105,6 +107,8 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     setAutoScroll(atBottom)
 
     if (el.scrollTop < 100 && hasMore && !loadingMore) {
+      prevHeightRef.current = el.scrollHeight
+      prevScrollTopRef.current = el.scrollTop
       loadOlderMessages()
     }
   }, [hasMore, loadingMore, loadOlderMessages])
@@ -120,6 +124,18 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     () => groupMessagesByDate(rootMessages),
     [rootMessages]
   )
+
+  // Maintain scroll position when older messages are prepended
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    if (!loadingMore && prevHeightRef.current) {
+      const diff = el.scrollHeight - prevHeightRef.current
+      el.scrollTop = prevScrollTopRef.current + diff
+      prevHeightRef.current = 0
+      prevScrollTopRef.current = 0
+    }
+  }, [loadingMore, messages])
 
   // Scroll to bottom when messages or typing users change
   useEffect(() => {
