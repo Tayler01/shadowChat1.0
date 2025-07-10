@@ -10,6 +10,7 @@ import type { EmojiPickerProps, EmojiClickData } from '../../types'
 import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import { RecordingIndicator } from '../ui/RecordingIndicator'
 import { useDraft } from '../../hooks/useDraft'
+import { useSuggestedReplies, useSuggestionsEnabled } from '../../hooks/useSuggestedReplies'
 import toast from 'react-hot-toast'
 
 interface MessageInputProps {
@@ -53,6 +54,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
+  const { enabled: suggestionsEnabled, setEnabled: _set } = useSuggestionsEnabled()
+  const { suggestions } = useSuggestedReplies(messages, suggestionsEnabled)
 
   // Handle typing indicators
   useEffect(() => {
@@ -320,6 +323,24 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             height={400}
             theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
           />
+        </div>
+      )}
+
+      {suggestionsEnabled && suggestions.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-2">
+          {suggestions.map(s => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => {
+                setMessage(s)
+                textareaRef.current?.focus()
+              }}
+              className="px-3 py-1 rounded-full text-sm bg-gray-200 dark:bg-gray-700"
+            >
+              {s}
+            </button>
+          ))}
         </div>
       )}
 

@@ -106,7 +106,7 @@ Message results are highlighted and jump-to enabled
 --- ## AI-Ready Features (Planned)
 Thread summarization using OpenAI GPT
 Tone analysis to detect emotional content
-AI replies and auto-suggested responses
+AI replies and auto-suggested responses (implemented)
 Moderation engine to flag offensive or inappropriate content
 Smart mentions or entity linking to user profiles, topics, or commands
 --- ## Security & Moderation
@@ -122,7 +122,7 @@ View moderation logs
 VITE_SUPABASE_URL=<your Supabase project URL>
 VITE_SUPABASE_ANON_KEY=<your Supabase anon key>
 VITE_PRESENCE_INTERVAL_MS=30000 # optional
-VITE_OPENAI_KEY=<your OpenAI API key> # for /summary
+VITE_OPENAI_KEY=<your OpenAI API key> # for /summary and suggestions
 --- ## Getting Started
 
 # Clone the repo
@@ -147,6 +147,9 @@ npx supabase db push
 
 # Start the dev server
 npm run dev
+
+# AI suggested replies
+OpenAI-powered reply suggestions appear above the message box. Toggle this feature in **Settings → AI → Suggested Replies**.
 --- ## Testing & CI/CD ### Testing Stack
 Jest for unit tests
 React Testing Library for DOM interaction

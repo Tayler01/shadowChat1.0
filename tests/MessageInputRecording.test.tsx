@@ -15,6 +15,11 @@ jest.mock('../src/hooks/useTyping', () => ({
   useTyping: () => ({ startTyping: jest.fn(), stopTyping: jest.fn() })
 }))
 
+jest.mock('../src/hooks/useSuggestedReplies', () => ({
+  useSuggestedReplies: () => ({ suggestions: [], loading: false }),
+  useSuggestionsEnabled: () => ({ enabled: false, setEnabled: jest.fn() })
+}))
+
 jest.mock('../src/hooks/useEmojiPicker', () => ({
   useEmojiPicker: () => null
 }))
