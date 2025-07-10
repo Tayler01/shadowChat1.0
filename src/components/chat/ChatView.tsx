@@ -126,7 +126,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       <div className="hidden md:block">
         <MessageInput
           onSendMessage={handleSendMessage}
-          placeholder="Type a message"
+          placeholder='Try "@ai" to ask AI anything'
           cacheKey="general"
           typingChannel="general"
           onUploadStatusChange={setUploading}
@@ -143,7 +143,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       >
         <MessageInput
           onSendMessage={handleSendMessage}
-          placeholder="Type a message"
+          placeholder='Try "@ai" to ask AI anything'
           className="border-t"
           cacheKey="general"
           typingChannel="general"
