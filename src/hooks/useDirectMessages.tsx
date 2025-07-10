@@ -86,10 +86,11 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
         },
         (payload) => {
           // Update conversations when new message arrives
+          let missing = false
           setConversations(prev => {
-            const convIndex = prev.findIndex(c => c.id === payload.new.conversation_id);
+            const convIndex = prev.findIndex(c => c.id === payload.new.conversation_id)
             if (convIndex >= 0) {
-              const updated = [...prev];
+              const updated = [...prev]
               updated[convIndex] = {
                 ...updated[convIndex],
                 last_message_at: payload.new.created_at,
@@ -103,17 +104,22 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
                   edited_at: payload.new.edited_at,
                   created_at: payload.new.created_at,
                 },
-                unread_count: payload.new.sender_id !== user.id
-                  ? (updated[convIndex].unread_count || 0) + 1
-                  : updated[convIndex].unread_count,
-              };
+                unread_count:
+                  payload.new.sender_id !== user.id
+                    ? (updated[convIndex].unread_count || 0) + 1
+                    : updated[convIndex].unread_count,
+              }
               // Move to top
-              const [moved] = updated.splice(convIndex, 1);
-              updated.unshift(moved);
-              return updated;
+              const [moved] = updated.splice(convIndex, 1)
+              updated.unshift(moved)
+              return updated
             }
-            return prev;
-          });
+            missing = true
+            return prev
+          })
+          if (missing) {
+            fetchDMConversations().then(setConversations)
+          }
         }
       )
       .on(
