@@ -9,8 +9,8 @@ interface TypingUser {
   display_name: string
 }
 
-export const useTyping = (channelName: string = 'general') => {
-  const { user } = useAuth()
+export const useTyping = (channelName?: string | null) => {
+  const { user: currentUser } = useAuth()
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([])
   const [isTyping, setIsTyping] = useState(false)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
@@ -18,6 +18,7 @@ export const useTyping = (channelName: string = 'general') => {
   const clientRef = useRef<SupabaseClient | null>(null)
 
   useEffect(() => {
+    if (!channelName) return;
     let channel: RealtimeChannel | null = null;
 
     const setupChannel = async () => {
@@ -29,25 +30,27 @@ export const useTyping = (channelName: string = 'general') => {
       // Listen for typing events
       channel
       .on('broadcast', { event: 'typing' }, (payload) => {
-        const { user, typing } = payload.payload
-        
+        const { user: payloadUser, typing } = payload.payload
+
+        if (payloadUser.id === currentUser?.id) return
+
         setTypingUsers(prev => {
           if (typing) {
             // Add user to typing list if not already there
-            if (!prev.find(u => u.id === user.id)) {
-              return [...prev, user]
+            if (!prev.find(u => u.id === payloadUser.id)) {
+              return [...prev, payloadUser]
             }
             return prev
           } else {
             // Remove user from typing list
-            return prev.filter(u => u.id !== user.id)
+            return prev.filter(u => u.id !== payloadUser.id)
           }
         })
 
         // Auto-remove typing users after 3 seconds of inactivity
         if (typing) {
           setTimeout(() => {
-            setTypingUsers(prev => prev.filter(u => u.id !== user.id))
+            setTypingUsers(prev => prev.filter(u => u.id !== payloadUser.id))
           }, 3000)
         }
       })
@@ -64,7 +67,7 @@ export const useTyping = (channelName: string = 'general') => {
   }, [channelName])
 
   const stopTyping = useCallback(async () => {
-    if (!isTyping || !user) return
+    if (!channelName || !isTyping || !currentUser) return
 
     try {
       setIsTyping(false)
@@ -75,9 +78,9 @@ export const useTyping = (channelName: string = 'general') => {
         event: 'typing',
         payload: {
           user: {
-            id: user.id,
-            username: user.username,
-            display_name: user.display_name
+            id: currentUser.id,
+            username: currentUser.username,
+            display_name: currentUser.display_name
           },
           typing: false
         }
@@ -89,10 +92,10 @@ export const useTyping = (channelName: string = 'general') => {
       }
     } catch (err) {
     }
-  }, [isTyping, user])
+  }, [channelName, isTyping, currentUser])
 
   const startTyping = useCallback(async () => {
-    if (isTyping || !user) return
+    if (!channelName || isTyping || !currentUser) return
 
     try {
       setIsTyping(true)
@@ -103,9 +106,9 @@ export const useTyping = (channelName: string = 'general') => {
         event: 'typing',
         payload: {
           user: {
-            id: user.id,
-            username: user.username,
-            display_name: user.display_name
+            id: currentUser.id,
+            username: currentUser.username,
+            display_name: currentUser.display_name
           },
           typing: true
         }
@@ -122,7 +125,7 @@ export const useTyping = (channelName: string = 'general') => {
       }, 2000)
     } catch (err) {
     }
-  }, [isTyping, user, stopTyping])
+  }, [channelName, isTyping, currentUser, stopTyping])
 
   // Clean up timeout on unmount
   useEffect(() => {
