@@ -1,11 +1,10 @@
 import React, { useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Users, Sparkles } from 'lucide-react'
+import { Users } from 'lucide-react'
 import { useMessages } from '../../hooks/useMessages'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import { PinnedMessagesBar } from './PinnedMessagesBar'
-import { AIAssistModal } from './AIAssistModal'
 import { useFailedMessages } from '../../hooks/useFailedMessages'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import toast from 'react-hot-toast'
@@ -29,7 +28,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   const { failedMessages, addFailedMessage, removeFailedMessage } = useFailedMessages('general')
 
   const [uploading, setUploading] = useState(false)
-  const [showAI, setShowAI] = useState(false)
 
   const handleFocusRefresh = useCallback(async () => {
     // Let the visibility refresh hook handle client reset
@@ -89,14 +87,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
               <span>Online</span>
               <ClientResetIndicator status={resetStatus} />
             </div>
-            <button
-              type="button"
-              onClick={() => setShowAI(true)}
-              className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-              aria-label="Open AI assistant"
-            >
-              <Sparkles className="w-4 h-4" />
-            </button>
           </div>
         </div>
       </div>
@@ -146,13 +136,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
           onUploadStatusChange={setUploading}
         />
       </MobileChatFooter>
-
-      <AIAssistModal
-        open={showAI}
-        messages={messages.slice(-20)}
-        onClose={() => setShowAI(false)}
-        onSendMessage={text => handleSendMessage(text, 'text')}
-      />
     </motion.div>
   )
 }
