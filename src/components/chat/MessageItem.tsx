@@ -46,7 +46,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const [editContent, setEditContent] = useState(message.content)
     const [showActions, setShowActions] = useState(false)
     const [showReactionPicker, setShowReactionPicker] = useState(false)
-    const [isCollapsed, setIsCollapsed] = useState(false)
+    const [isCollapsed, setIsCollapsed] = useState(false) // AI responses start expanded
     const [openAbove, setOpenAbove] = useState(false)
     const [openRight, setOpenRight] = useState(false)
     const [showImageModal, setShowImageModal] = useState(false)
@@ -265,11 +265,9 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 <div
                 
                   className={cn(
-                    'relative peer rounded-xl px-3 py-2 break-words space-y-1 transition-all duration-200',
+                    'relative peer rounded-xl px-3 py-2 break-words space-y-1',
                     isAIMessage
-                      ? `bg-[var(--color-accent-light)] border-l-4 border-[var(--color-accent)] text-gray-900 dark:text-gray-100 ${
-                          isCollapsed ? 'max-h-0 overflow-hidden opacity-0 py-0' : 'max-h-none opacity-100'
-                        }`
+                      ? 'bg-[var(--color-accent-light)] border-l-4 border-[var(--color-accent)] text-gray-900 dark:text-gray-100'
                       : bubbleStyle
                       ? ''
                       : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
@@ -278,24 +276,24 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 >
                   {/* AI Response with collapsible functionality */}
                   {isAIMessage && (
-                  <div className="mb-2">
-                    <button
-                      onClick={() => setIsCollapsed(!isCollapsed)}
-                      className="flex items-center space-x-2 text-xs text-[var(--color-accent)] hover:underline"
-                      type="button"
-                    >
-                      <span className={`transform transition-transform ${isCollapsed ? 'rotate-0' : 'rotate-90'}`}>
-                        ▶
-                      </span>
-                      <span>AI Response</span>
-                      {parentMessage && (
-                        <span className="text-gray-500">
-                          to: "{parentMessage.content.slice(0, 40)}{parentMessage.content.length > 40 ? '...' : ''}"
+                    <div className="mb-2">
+                      <button
+                        onClick={() => setIsCollapsed(!isCollapsed)}
+                        className="flex items-center space-x-2 text-xs text-[var(--color-accent)] hover:underline"
+                        type="button"
+                      >
+                        <span className={`transform transition-transform ${isCollapsed ? 'rotate-0' : 'rotate-90'}`}>
+                          ▶
                         </span>
-                      )}
-                    </button>
-                  </div>
-                )}
+                        <span>AI Response</span>
+                        {parentMessage && (
+                          <span className="text-gray-500">
+                            to: "{parentMessage.content.slice(0, 40)}{parentMessage.content.length > 40 ? '...' : ''}"
+                          </span>
+                        )}
+                      </button>
+                    </div>
+                  )}
 
                   <MessageReactions
                     message={message}
@@ -314,18 +312,25 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   ) : message.message_type === 'file' && message.file_url ? (
                     <FileAttachment url={message.file_url} meta={message.content} />
                   ) : (
-                    <span className={isAIMessage ? 'font-bold text-black' : ''}>
-                      {message.content}
-                      {toneEnabled && (
-                        <span data-testid="tone-indicator" className="ml-1">
-                          {toneEmoji}
+                    <div className={isCollapsed ? 'hidden' : 'block'}>
+                      <span className={isAIMessage ? 'font-bold text-black dark:text-white' : ''}>
+                        {message.content}
+                        {toneEnabled && !isAIMessage && (
+                          <span data-testid="tone-indicator" className="ml-1">
+                            {toneEmoji}
+                          </span>
+                        )}
+                      </span>
+                      {isCollapsed && isAIMessage && (
+                        <span className="text-gray-500 text-sm">
+                          {message.content.slice(0, 100)}{message.content.length > 100 ? '...' : ''}
                         </span>
                       )}
-                    </span>
+                    </div>
                   )}
                 </div>
                 {/* Actions */}
-                <div className={cn("absolute -right-12 -top-2", isAIMessage && isCollapsed && "hidden")} ref={actionsRef}>
+                <div className="absolute -right-12 -top-2" ref={actionsRef}>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -423,11 +428,11 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     )}
                   </AnimatePresence>
                 </div>
-                  <span className={isAIMessage ? 'font-bold text-black dark:text-white' : ''}>
+
                 {/* Emoji picker positioned just above message bubble */}
                 <div
                   className={`absolute -top-10 left-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow px-2 py-1 space-x-1 z-10 transition-opacity duration-200 ${
-                    showQuickReactions && !(isAIMessage && isCollapsed) ? 'flex opacity-100' : 'hidden opacity-0'
+                    showQuickReactions ? 'flex opacity-100' : 'hidden opacity-0'
                   }`}
                   onMouseEnter={handleMouseEnterReactions}
                   onMouseLeave={handleMouseLeaveReactions}
@@ -472,7 +477,6 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     />
                   </div>
                 )}
-              </span>
               </div>
             </>
           )}
