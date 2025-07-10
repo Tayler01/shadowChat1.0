@@ -20,7 +20,6 @@ import { useFailedMessages } from '../../hooks/useFailedMessages'
 import { formatTime, shouldGroupMessage, getReadableTextColor } from '../../lib/utils'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
-import { useTyping } from '../../hooks/useTyping'
 import toast from 'react-hot-toast'
 
 interface DirectMessagesViewProps {
@@ -54,7 +53,6 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
   const messagesRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
   const [uploading, setUploading] = useState(false)
-  const { typingUsers } = useTyping(currentConversation ? `dm-${currentConversation}` : null)
 
   useEffect(() => {
     if (initialConversation && currentConversation !== initialConversation) {
@@ -412,27 +410,6 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                 </div>
               )}
 
-              <AnimatePresence>
-                {typingUsers.length > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="mt-2 flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400"
-                  >
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                    </div>
-                    <span>
-                      {typingUsers.map(u => u.display_name).join(', ')}
-                      {typingUsers.length === 1 ? ' is' : ' are'} typing...
-                    </span>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
               {!autoScroll && (
                 <button
                   type="button"
@@ -451,7 +428,6 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                 onSendMessage={handleSendMessage}
                 placeholder={`Message @${currentConv.other_user?.username}...`}
                 cacheKey={`dm-${currentConversation}`}
-                typingChannel={`dm-${currentConversation}`}
                 onUploadStatusChange={setUploading}
                 messages={messages}
               />
@@ -467,7 +443,6 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                 placeholder={`Message @${currentConv.other_user?.username}...`}
                 className="border-t"
                 cacheKey={`dm-${currentConversation}`}
-                typingChannel={`dm-${currentConversation}`}
                 onUploadStatusChange={setUploading}
                 messages={messages}
               />
