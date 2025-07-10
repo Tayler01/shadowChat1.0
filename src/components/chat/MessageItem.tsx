@@ -397,7 +397,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                       </div>
                     )}
                   </AnimatePresence>
-                  <span className={isAIMessage ? 'font-bold text-black dark:text-white' : ''}>
+                </div>
+                <span className={isAIMessage ? 'font-bold text-black dark:text-white' : ''}>
                 {/* Emoji picker positioned just above message bubble */}
                 <div 
                   className={`absolute -top-10 left-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow px-2 py-1 space-x-1 z-10 transition-opacity duration-200 ${
@@ -446,6 +447,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     />
                   </div>
                 )}
+                </span>
               </div>
             </>
           )}
