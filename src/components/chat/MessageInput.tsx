@@ -12,6 +12,7 @@ import { RecordingIndicator } from '../ui/RecordingIndicator'
 import { useDraft } from '../../hooks/useDraft'
 import { useSuggestedReplies, useSuggestionsEnabled } from '../../hooks/useSuggestedReplies'
 import toast from 'react-hot-toast'
+import { askQuestion } from '../../lib/ai'
 
 interface MessageInputProps {
   onSendMessage: (
@@ -137,6 +138,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     const processedMessage = await processSlashCommand(message.trim(), messages)
     const finalMessage = processedMessage || message.trim()
 
+    const aiMatch = !processedMessage && message.trim().toLowerCase().startsWith('@ai')
+      ? message.trim().slice(3).trim()
+      : null
+
     try {
       await onSendMessage(finalMessage, 'text', undefined, replyingTo?.id)
       clear()
@@ -144,6 +149,16 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       stopTyping()
       setShowSlashCommands(false)
       onCancelReply?.()
+
+      if (aiMatch) {
+        try {
+          const answer = await askQuestion(aiMatch)
+          if (answer) {
+            await onSendMessage(answer, 'command')
+          }
+        } catch {
+        }
+      }
     } catch (err) {
     }
     // Keep focus on the textarea so the mobile keyboard stays open

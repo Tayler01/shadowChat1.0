@@ -69,3 +69,32 @@ export async function getSuggestedReplies(messages: ChatMessage[]): Promise<stri
 
   return content.split('\n').map((s: string) => s.trim()).filter(Boolean)
 }
+
+export async function askQuestion(question: string): Promise<string> {
+  if (!functionsUrl) {
+    throw new Error('Missing Supabase configuration')
+  }
+
+  const payload = {
+    model: 'gpt-3.5-turbo',
+    messages: [
+      {
+        role: 'system',
+        content:
+          'You are a helpful assistant participating in a group chat. Provide a concise answer to the user question.'
+      },
+      { role: 'user', content: question }
+    ]
+  }
+
+  const res = await fetch(`${functionsUrl}/openai-chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  })
+
+  const data = await res.json()
+  return data.choices?.[0]?.message?.content?.trim() || ''
+}
