@@ -264,8 +264,20 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 )}
                 <div
                 
-                {/* AI Response with collapsible functionality */}
-                {isAIMessage && (
+                  className={cn(
+                    'relative peer rounded-xl px-3 py-2 break-words space-y-1 transition-all duration-200',
+                    isAIMessage
+                      ? `bg-[var(--color-accent-light)] border-l-4 border-[var(--color-accent)] text-gray-900 dark:text-gray-100 ${
+                          isCollapsed ? 'max-h-0 overflow-hidden opacity-0 py-0' : 'max-h-none opacity-100'
+                        }`
+                      : bubbleStyle
+                      ? ''
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                  )}
+                  style={bubbleStyle}
+                >
+                  {/* AI Response with collapsible functionality */}
+                  {isAIMessage && (
                   <div className="mb-2">
                     <button
                       onClick={() => setIsCollapsed(!isCollapsed)}
@@ -285,18 +297,6 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   </div>
                 )}
 
-                  className={cn(
-                    'relative peer rounded-xl px-3 py-2 break-words space-y-1 transition-all duration-200',
-                    isAIMessage
-                      ? `bg-[var(--color-accent-light)] border-l-4 border-[var(--color-accent)] text-gray-900 dark:text-gray-100 ${
-                          isCollapsed ? 'max-h-0 overflow-hidden opacity-0 py-0' : 'max-h-none opacity-100'
-                        }`
-                      : bubbleStyle
-                      ? ''
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
-                  )}
-                  style={bubbleStyle}
-                >
                   <MessageReactions
                     message={message}
                     onReact={handleReaction}
