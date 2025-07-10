@@ -8,6 +8,7 @@ import { MessageItem } from './MessageItem'
 import type { FailedMessage } from '../../hooks/useFailedMessages'
 import { FailedMessageItem } from './FailedMessageItem'
 import toast from 'react-hot-toast'
+import type { Message } from '../../lib/supabase'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 
 interface MessageListProps {
@@ -33,6 +34,38 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
   const { typingUsers } = useTyping('general')
   const containerRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+
+  const messageMap = useMemo(() => {
+    const map = new Map<string, Message>()
+    messages.forEach(m => map.set(m.id, m))
+    return map
+  }, [messages])
+
+  const childrenMap = useMemo(() => {
+    const map = new Map<string, Message[]>()
+    messages.forEach(m => {
+      if (m.reply_to) {
+        if (!map.has(m.reply_to)) map.set(m.reply_to, [])
+        map.get(m.reply_to)!.push(m)
+      }
+    })
+    return map
+  }, [messages])
+
+  const rootMessages = useMemo(() => messages.filter(m => !m.reply_to), [messages])
+
+  const toggleThread = (id: string) => {
+    setCollapsed(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(id)) {
+        newSet.delete(id)
+      } else {
+        newSet.add(id)
+      }
+      return newSet
+    })
+  }
 
   const handleScroll = useCallback(() => {
     const el = containerRef.current
@@ -52,7 +85,10 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     }
   }, [])
 
-  const groupedMessages = useMemo(() => groupMessagesByDate(messages), [messages])
+  const groupedMessages = useMemo(
+    () => groupMessagesByDate(rootMessages),
+    [rootMessages]
+  )
 
   // Scroll to bottom when messages or typing users change
   useEffect(() => {
@@ -77,6 +113,53 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     } catch {
       toast.error('Failed to delete message')
     }
+  }
+
+  const renderThread = (
+    message: Message,
+    depth = 0,
+    prev?: Message
+  ): React.ReactNode => {
+    const replies = (childrenMap.get(message.id) || []).sort((a, b) =>
+      a.created_at.localeCompare(b.created_at)
+    )
+    const isCollapsed = collapsed.has(message.id)
+
+    return (
+      <div key={message.id} className={cn(depth > 0 ? 'ml-6 border-l pl-3' : '')}>
+        <MessageItem
+          message={message}
+          previousMessage={prev}
+          parentMessage={messageMap.get(message.reply_to ?? '')}
+          onReply={onReply}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onTogglePin={togglePin}
+          onToggleReaction={toggleReaction}
+          containerRef={containerRef}
+        />
+        {replies.length > 0 && (
+          <div className="mt-1">
+            <button
+              type="button"
+              onClick={() => toggleThread(message.id)}
+              className="text-xs text-gray-500"
+            >
+              {isCollapsed
+                ? `Show ${replies.length} repl${replies.length > 1 ? 'ies' : 'y'}`
+                : 'Hide replies'}
+            </button>
+            {!isCollapsed && (
+              <div className="mt-1 space-y-1">
+                {replies.map((m, idx) =>
+                  renderThread(m, depth + 1, replies[idx - 1])
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )
   }
 
   if (loading) {
@@ -116,16 +199,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
             const isGrouped = shouldGroupMessage(message, prev)
             return (
               <div key={message.id} className={cn(isGrouped ? 'pt-1 pb-1' : 'pt-4 pb-1')}>
-                <MessageItem
-                  message={message}
-                  previousMessage={prev}
-                  onReply={onReply}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onTogglePin={togglePin}
-                  onToggleReaction={toggleReaction}
-                  containerRef={containerRef}
-                />
+                {renderThread(message, 0, prev)}
               </div>
             )
           })}

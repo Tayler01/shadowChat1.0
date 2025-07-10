@@ -32,6 +32,16 @@ describe('helper functions', () => {
     expect(result).toEqual({ user_id: 'u1', content: 'hi', message_type: 'text' });
   });
 
+  it('prepareMessageData includes reply_to when provided', () => {
+    const result = prepareMessageData('u1', 'hi', 'text', undefined, 'p1');
+    expect(result).toEqual({
+      user_id: 'u1',
+      content: 'hi',
+      message_type: 'text',
+      reply_to: 'p1'
+    });
+  });
+
   it('insertMessage inserts through supabase', async () => {
     const insertMock = jest.fn(() => ({ select: () => ({ single: () => Promise.resolve({ data: { id: '1' }, error: null }) }) }));
     (supabase.from as jest.Mock).mockReturnValueOnce({ insert: insertMock } as any);
@@ -117,6 +127,26 @@ describe('sendMessage', () => {
 
     expect(ensureSession).toHaveBeenCalled();
     expect(insertFn).toHaveBeenCalled();
+  });
+
+  it('inserts message with reply_to', async () => {
+    const insertFn = jest.fn(() => ({
+      select: () => ({ single: () => Promise.resolve({ data: { id: '1' }, error: null }) })
+    }));
+    (supabase.from as jest.Mock).mockReturnValueOnce({ insert: insertFn } as any);
+
+    const { result } = renderHook(() => useMessages(), { wrapper: MessagesProvider });
+
+    await act(async () => {
+      await result.current.sendMessage('hello', 'text', undefined, 'parent');
+    });
+
+    expect(insertFn).toHaveBeenCalledWith({
+      user_id: user.id,
+      content: 'hello',
+      message_type: 'text',
+      reply_to: 'parent'
+    });
   });
 
   it('inserts audio message with correct type', async () => {
