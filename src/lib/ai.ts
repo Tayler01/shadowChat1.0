@@ -1,10 +1,14 @@
 import type { ChatMessage } from './supabase'
 
+// Build the Supabase functions URL from the main project URL
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+const functionsUrl = supabaseUrl
+  ? supabaseUrl.replace('.supabase.co', '.functions.supabase.co')
+  : ''
 
 export async function summarizeConversation(messages: ChatMessage[]): Promise<string> {
-  const apiKey = import.meta.env.VITE_OPENAI_KEY
-  if (!apiKey) {
-    throw new Error('Missing OpenAI API key')
+  if (!functionsUrl) {
+    throw new Error('Missing Supabase configuration')
   }
 
   const payload = {
@@ -14,11 +18,10 @@ export async function summarizeConversation(messages: ChatMessage[]): Promise<st
       ...messages.map(m => ({ role: 'user', content: m.content }))
     ]
   }
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await fetch(`${functionsUrl}/openai-chat`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify(payload)
   })
@@ -28,9 +31,8 @@ export async function summarizeConversation(messages: ChatMessage[]): Promise<st
 }
 
 export async function getSuggestedReplies(messages: ChatMessage[]): Promise<string[]> {
-  const apiKey = import.meta.env.VITE_OPENAI_KEY
-  if (!apiKey) {
-    throw new Error('Missing OpenAI API key')
+  if (!functionsUrl) {
+    throw new Error('Missing Supabase configuration')
   }
 
   const payload = {
@@ -45,11 +47,10 @@ export async function getSuggestedReplies(messages: ChatMessage[]): Promise<stri
     ]
   }
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await fetch(`${functionsUrl}/openai-chat`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`
+      'Content-Type': 'application/json'
     },
     body: JSON.stringify(payload)
   })
