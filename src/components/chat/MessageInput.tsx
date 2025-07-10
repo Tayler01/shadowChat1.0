@@ -355,12 +355,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               key={s}
               type="button"
               onClick={() => {
-                setMessage(s)
+                // Clean the suggestion text by removing quotes and numbering
+                const cleanText = s.replace(/^[\d\.\)\-\s]*["']?|["']?$/g, '').trim()
+                setMessage(cleanText)
                 textareaRef.current?.focus()
               }}
               className="px-3 py-1 rounded-full text-sm bg-gray-200 dark:bg-gray-700"
             >
-              {s}
+              {/* Display the original suggestion but insert cleaned version */}
+              {s.replace(/^[\d\.\)\-\s]*["']?|["']?$/g, '').trim()}
             </button>
           ))}
         </div>
