@@ -69,7 +69,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     };
 
     fetchData();
-  }, [user]);
+  }, [user, currentConversation]);
 
   // Subscribe to real-time updates
   useEffect(() => {
@@ -91,6 +91,13 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
             const convIndex = prev.findIndex(c => c.id === payload.new.conversation_id)
             if (convIndex >= 0) {
               const updated = [...prev]
+              const isCurrent =
+                payload.new.conversation_id === currentConversation
+              let unread = updated[convIndex].unread_count
+              if (payload.new.sender_id !== user.id) {
+                unread = isCurrent ? 0 : (unread || 0) + 1
+              }
+
               updated[convIndex] = {
                 ...updated[convIndex],
                 last_message_at: payload.new.created_at,
@@ -104,10 +111,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
                   edited_at: payload.new.edited_at,
                   created_at: payload.new.created_at,
                 },
-                unread_count:
-                  payload.new.sender_id !== user.id
-                    ? (updated[convIndex].unread_count || 0) + 1
-                    : updated[convIndex].unread_count,
+                unread_count: unread,
               }
               // Move to top
               const [moved] = updated.splice(convIndex, 1)
