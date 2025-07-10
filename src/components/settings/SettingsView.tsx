@@ -21,6 +21,7 @@ import toast from 'react-hot-toast'
 import { useTheme, colorSchemes, ColorScheme } from '../../hooks/useTheme'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useSuggestionsEnabled } from '../../hooks/useSuggestedReplies'
+import { useToneAnalysisEnabled } from '../../hooks/useToneAnalysisEnabled'
 
 interface SettingsViewProps {
   onToggleSidebar: () => void
@@ -34,6 +35,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
   const isDesktop = useIsDesktop()
   const { signOut } = useAuth()
   const { enabled: suggestionsEnabled, setEnabled: setSuggestionsEnabled } = useSuggestionsEnabled()
+  const { enabled: toneEnabled, setEnabled: setToneEnabled } = useToneAnalysisEnabled()
 
   const handleExportData = () => {
     toast.success('Data export started - you will receive an email when ready')
@@ -86,6 +88,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
           description: 'Show AI generated reply suggestions',
           enabled: suggestionsEnabled,
           onChange: setSuggestionsEnabled
+        },
+        {
+          label: 'Tone Indicators',
+          description: 'Show emoji tone of each message',
+          enabled: toneEnabled,
+          onChange: setToneEnabled
         }
       ]
     }

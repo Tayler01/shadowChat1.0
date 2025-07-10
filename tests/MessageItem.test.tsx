@@ -2,6 +2,11 @@ import { render, screen } from '@testing-library/react'
 import React from 'react'
 import { MessageItem } from '../src/components/chat/MessageItem'
 import type { Message } from '../src/lib/supabase'
+import { useToneAnalysisEnabled } from '../src/hooks/useToneAnalysisEnabled'
+
+jest.mock('../src/hooks/useToneAnalysisEnabled')
+
+const mockedToneEnabled = useToneAnalysisEnabled as jest.MockedFunction<typeof useToneAnalysisEnabled>
 
 const baseMessage = {
   id: 'm1',
@@ -26,6 +31,10 @@ const baseMessage = {
     updated_at: ''
   }
 } as unknown as Message
+
+beforeEach(() => {
+  mockedToneEnabled.mockReturnValue({ enabled: true, setEnabled: jest.fn() })
+})
 
 test('renders image message', () => {
   render(
@@ -171,4 +180,26 @@ test('shows tone indicator emoji', () => {
 
   const indicator = screen.getByTestId('tone-indicator')
   expect(indicator).toHaveTextContent('😊')
+})
+
+test('hides tone indicator when disabled', () => {
+  mockedToneEnabled.mockReturnValue({ enabled: false, setEnabled: jest.fn() })
+  const textMessage = {
+    ...baseMessage,
+    message_type: 'text',
+    content: 'hello there',
+  } as Message
+
+  render(
+    <MessageItem
+      message={textMessage}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+      containerRef={React.createRef()}
+    />
+  )
+
+  expect(screen.queryByTestId('tone-indicator')).toBeNull()
 })
