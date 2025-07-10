@@ -103,8 +103,9 @@ interface MessagesContextValue {
   sendMessage: (
     content: string,
     type?: 'text' | 'command' | 'audio' | 'image' | 'file',
-    fileUrl?: string
-  ) => Promise<void>;
+    fileUrl?: string,
+    replyTo?: string
+  ) => Promise<Message | null>;
   editMessage: (id: string, content: string) => Promise<void>;
   deleteMessage: (id: string) => Promise<void>;
   toggleReaction: (id: string, emoji: string) => Promise<void>;
@@ -568,7 +569,7 @@ function useProvideMessages(): MessagesContextValue {
     messageType: 'text' | 'command' | 'audio' | 'image' | 'file' = 'text',
     fileUrl?: string,
     replyTo?: string
-  ) => {
+  ): Promise<Message | null> => {
     const timestamp = new Date().toISOString();
     const logPrefix = `🚀 [MESSAGES] [${timestamp}] sendMessage`;
 
@@ -601,6 +602,8 @@ function useProvideMessages(): MessagesContextValue {
       replyTo
     );
 
+    let inserted: Message | null = null;
+
     const attemptSend = async () => {
       let { data, error } = await insertMessage(messageData);
 
@@ -615,6 +618,8 @@ function useProvideMessages(): MessagesContextValue {
       }
 
       if (data) {
+        inserted = data as Message;
+
         setMessages(prev => {
           const exists = prev.find(m => m.id === data.id);
           if (exists) {
@@ -656,6 +661,7 @@ function useProvideMessages(): MessagesContextValue {
     } finally {
       setSending(false);
     }
+    return inserted;
   }, [user]);
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
