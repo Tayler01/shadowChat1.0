@@ -18,6 +18,7 @@ Sticky date headers that remain visible while scrolling
 Unread tracking with live badge updates and local fallback
 Toast preview notifications for new incoming messages (if not viewing that thread)
 Search and initiate new conversations via username
+Double-tap a user in search to start a new conversation if one doesn't already exist
 Live presence updates in DMs (online/away indicators)
 Message read status stored with read_at timestamps per message
 ### User Presence System

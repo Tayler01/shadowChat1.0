@@ -35,7 +35,7 @@ export const UserSearchSelect: React.FC<UserSearchSelectProps> = ({ value, onCha
           {!isLoading && list.map(u => (
             <button
               key={u.id}
-              onClick={() => onSelect(u)}
+              onDoubleClick={() => onSelect(u)}
               className="w-full flex items-center px-2 py-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 text-left"
             >
               <Avatar src={u.avatar_url} alt={u.display_name} size="sm" color={u.color} status={u.status} showStatus />
