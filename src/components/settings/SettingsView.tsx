@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { motion } from 'framer-motion'
-import { 
-  Bell, 
+import {
+  Bell,
   Moon,
   Sun,
   Volume2,
@@ -12,13 +12,15 @@ import {
   Download,
   Trash2,
   AlertTriangle,
-  Menu
+  Menu,
+  Brain
 } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
 import { useTheme, colorSchemes, ColorScheme } from '../../hooks/useTheme'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
+import { useSuggestionsEnabled } from '../../hooks/useSuggestedReplies'
 
 interface SettingsViewProps {
   onToggleSidebar: () => void
@@ -31,6 +33,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
   const { scheme, setScheme } = useTheme()
   const isDesktop = useIsDesktop()
   const { signOut } = useAuth()
+  const { enabled: suggestionsEnabled, setEnabled: setSuggestionsEnabled } = useSuggestionsEnabled()
 
   const handleExportData = () => {
     toast.success('Data export started - you will receive an email when ready')
@@ -71,6 +74,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
           description: 'Play sounds for message notifications',
           enabled: sounds,
           onChange: setSounds
+        }
+      ]
+    },
+    {
+      title: 'AI',
+      icon: Brain,
+      settings: [
+        {
+          label: 'Suggested Replies',
+          description: 'Show AI generated reply suggestions',
+          enabled: suggestionsEnabled,
+          onChange: setSuggestionsEnabled
         }
       ]
     }
