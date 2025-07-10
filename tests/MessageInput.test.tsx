@@ -47,3 +47,10 @@ test('stops media stream tracks when recording stops', async () => {
   await user.click(btn)
   expect(trackStop).toHaveBeenCalled()
 })
+
+test('shows slash commands menu when only slash is typed', async () => {
+  render(<MessageInput onSendMessage={() => {}} />)
+  const textarea = screen.getByRole('textbox')
+  await userEvent.type(textarea, '/')
+  expect(screen.getByText(/Slash Commands/i)).toBeInTheDocument()
+})
