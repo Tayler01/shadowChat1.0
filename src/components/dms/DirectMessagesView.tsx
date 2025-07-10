@@ -429,6 +429,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                 placeholder={`Message @${currentConv.other_user?.username}...`}
                 cacheKey={`dm-${currentConversation}`}
                 onUploadStatusChange={setUploading}
+                messages={messages}
               />
             </div>
 
@@ -443,6 +444,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
                 className="border-t"
                 cacheKey={`dm-${currentConversation}`}
                 onUploadStatusChange={setUploading}
+                messages={messages}
               />
             </MobileChatFooter>
           </>
