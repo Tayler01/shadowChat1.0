@@ -19,12 +19,14 @@ export const prepareMessageData = (
   userId: string,
   content: string,
   messageType: 'text' | 'command' | 'audio' | 'image' | 'file',
-  fileUrl?: string
+  fileUrl?: string,
+  replyTo?: string
 ) => ({
   user_id: userId,
   content: messageType === 'audio' ? '' : content.trim(),
   message_type: messageType,
   file_url: fileUrl,
+  reply_to: replyTo,
   ...(messageType === 'audio' ? { audio_url: content.trim() } : {}),
 });
 
@@ -34,6 +36,7 @@ export const insertMessage = async (messageData: {
   message_type: 'text' | 'command' | 'audio' | 'image' | 'file';
   file_url?: string;
   audio_url?: string;
+  reply_to?: string;
 }) => {
   const start = performance.now();
   const workingClient = await getWorkingClient();
@@ -66,6 +69,7 @@ export const refreshSessionAndRetry = async (messageData: {
   message_type: 'text' | 'command' | 'audio' | 'image' | 'file';
   file_url?: string;
   audio_url?: string;
+  reply_to?: string;
 }) => {
   const refreshPromise = refreshSessionLocked();
   const refreshTimeout = new Promise((_, reject) =>
@@ -99,7 +103,8 @@ interface MessagesContextValue {
   sendMessage: (
     content: string,
     type?: 'text' | 'command' | 'audio' | 'image' | 'file',
-    fileUrl?: string
+    fileUrl?: string,
+    replyTo?: string
   ) => Promise<void>;
   editMessage: (id: string, content: string) => Promise<void>;
   deleteMessage: (id: string) => Promise<void>;
@@ -562,7 +567,8 @@ function useProvideMessages(): MessagesContextValue {
   const sendMessage = useCallback(async (
     content: string,
     messageType: 'text' | 'command' | 'audio' | 'image' | 'file' = 'text',
-    fileUrl?: string
+    fileUrl?: string,
+    replyTo?: string
   ) => {
     const timestamp = new Date().toISOString();
     const logPrefix = `🚀 [MESSAGES] [${timestamp}] sendMessage`;
@@ -588,7 +594,13 @@ function useProvideMessages(): MessagesContextValue {
       throw tokenErr;
     }
 
-    const messageData = prepareMessageData(user.id, content, messageType, fileUrl);
+    const messageData = prepareMessageData(
+      user.id,
+      content,
+      messageType,
+      fileUrl,
+      replyTo
+    );
 
     const attemptSend = async () => {
       let { data, error } = await insertMessage(messageData);

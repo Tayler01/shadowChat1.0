@@ -14,6 +14,7 @@ import { useClientReset } from '../../hooks/ClientResetContext'
 import {
   ensureSession,
 } from '../../lib/supabase'
+import type { Message } from '../../lib/supabase'
 import { useVisibilityRefresh } from '../../hooks/useVisibilityRefresh'
 
 interface ChatViewProps {
@@ -29,6 +30,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   const { failedMessages, addFailedMessage, removeFailedMessage } = useFailedMessages('general')
 
   const [uploading, setUploading] = useState(false)
+  const [replyTo, setReplyTo] = useState<Message | null>(null)
   const [showAI, setShowAI] = useState(false)
 
   const handleFocusRefresh = useCallback(async () => {
@@ -41,13 +43,19 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
 
   useVisibilityRefresh(handleFocusRefresh)
 
+  const handleReply = (id: string) => {
+    const msg = messages.find(m => m.id === id) || null
+    setReplyTo(msg)
+  }
+
   const handleSendMessage = async (
     content: string,
     type?: 'text' | 'command' | 'audio' | 'image' | 'file',
     fileUrl?: string
   ) => {
     try {
-      await sendMessage(content, type, fileUrl)
+      await sendMessage(content, type, fileUrl, replyTo?.id)
+      setReplyTo(null)
     } catch {
       toast.error('Failed to send message')
       addFailedMessage({ id: Date.now().toString(), type: type || 'text', content: content, dataUrl: fileUrl })
@@ -115,6 +123,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       {/* Messages */}
       <MessageList
         failedMessages={failedMessages}
+        onReply={handleReply}
         onResend={msg => {
           removeFailedMessage(msg.id)
           handleSendMessage(msg.content, msg.type, msg.dataUrl)
@@ -127,6 +136,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       <div className="hidden md:block">
         <MessageInput
           onSendMessage={handleSendMessage}
+          replyingTo={replyTo || undefined}
+          onCancelReply={() => setReplyTo(null)}
           placeholder="Type a message"
           cacheKey="general"
           onUploadStatusChange={setUploading}
@@ -140,6 +151,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
       >
         <MessageInput
           onSendMessage={handleSendMessage}
+          replyingTo={replyTo || undefined}
+          onCancelReply={() => setReplyTo(null)}
           placeholder="Type a message"
           className="border-t"
           cacheKey="general"

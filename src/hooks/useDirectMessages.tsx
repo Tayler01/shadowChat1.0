@@ -33,7 +33,8 @@ interface DirectMessagesContextValue {
   sendMessage: (
     content: string,
     messageType?: 'text' | 'command' | 'audio' | 'image' | 'file',
-    fileUrl?: string
+    fileUrl?: string,
+    replyTo?: string
   ) => Promise<void>;
   markAsRead: (conversationId: string) => Promise<void>;
   loadOlderMessages: () => Promise<void>;
@@ -421,7 +422,8 @@ export function useConversationMessages(conversationId: string | null) {
     async (
       content: string,
       messageType: 'text' | 'command' | 'audio' | 'image' | 'file' = 'text',
-      fileUrl?: string
+      fileUrl?: string,
+      _replyTo?: string
     ) => {
     
       if (!user || !conversationId || !content.trim()) return;

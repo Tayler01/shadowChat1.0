@@ -136,3 +136,30 @@ export function processSlashCommand(input: string): string | null {
   return slashCommand.handler(args)
 }
 
+
+export interface MessageTree extends import('./supabase').Message {
+  replies: MessageTree[]
+}
+
+export function buildMessageTree(messages: import('./supabase').Message[]): MessageTree[] {
+  const map = new Map<string, MessageTree>()
+  messages.forEach(m => {
+    map.set(m.id, { ...(m as any), replies: [] })
+  })
+  const roots: MessageTree[] = []
+  map.forEach(node => {
+    if (node.reply_to && map.has(node.reply_to)) {
+      map.get(node.reply_to)!.replies.push(node)
+    } else if (!node.reply_to) {
+      roots.push(node)
+    } else {
+      roots.push(node)
+    }
+  })
+  const sortNodes = (nodes: MessageTree[]) => {
+    nodes.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    nodes.forEach(n => sortNodes(n.replies))
+  }
+  sortNodes(roots)
+  return roots
+}
