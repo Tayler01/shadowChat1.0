@@ -447,6 +447,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     />
                   </div>
                 )}
+              </span>
               </div>
             </>
           )}
