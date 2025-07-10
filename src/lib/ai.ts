@@ -1,7 +1,12 @@
 import type { ChatMessage } from './supabase'
-import { supabase } from './supabase'
+
 
 export async function summarizeConversation(messages: ChatMessage[]): Promise<string> {
+  const apiKey = import.meta.env.VITE_OPENAI_KEY
+  if (!apiKey) {
+    throw new Error('Missing OpenAI API key')
+  }
+
   const payload = {
     model: 'gpt-3.5-turbo',
     messages: [
@@ -9,17 +14,25 @@ export async function summarizeConversation(messages: ChatMessage[]): Promise<st
       ...messages.map(m => ({ role: 'user', content: m.content }))
     ]
   }
-  const { data, error } = await supabase.functions.invoke('openai-proxy', {
-    body: payload
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(payload)
   })
-  if (error) {
-    throw error
-  }
-  // data is typed as any because the proxy just forwards the OpenAI response
-  return (data as any).choices?.[0]?.message?.content?.trim() || ''
+
+  const data = await res.json()
+  return data.choices?.[0]?.message?.content?.trim() || ''
 }
 
 export async function getSuggestedReplies(messages: ChatMessage[]): Promise<string[]> {
+  const apiKey = import.meta.env.VITE_OPENAI_KEY
+  if (!apiKey) {
+    throw new Error('Missing OpenAI API key')
+  }
+
   const payload = {
     model: 'gpt-3.5-turbo',
     messages: [
@@ -32,13 +45,17 @@ export async function getSuggestedReplies(messages: ChatMessage[]): Promise<stri
     ]
   }
 
-  const { data, error } = await supabase.functions.invoke('openai-proxy', {
-    body: payload
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(payload)
   })
-  if (error) {
-    throw error
-  }
-  const content = (data as any).choices?.[0]?.message?.content?.trim() || '[]'
+
+  const data = await res.json()
+  const content = data.choices?.[0]?.message?.content?.trim() || '[]'
 
   try {
     const parsed = JSON.parse(content)

@@ -124,9 +124,7 @@ View moderation logs
 VITE_SUPABASE_URL=<your Supabase project URL>
 VITE_SUPABASE_ANON_KEY=<your Supabase anon key>
 VITE_PRESENCE_INTERVAL_MS=30000 # optional
-# Set your OpenAI API key as a server-side environment variable used by the
-# `openai-proxy` edge function
-OPENAI_KEY=<your OpenAI API key>
+VITE_OPENAI_KEY=<your OpenAI API key> # for /summary and suggestions and tone analysis
 
 --- ## Getting Started
 
