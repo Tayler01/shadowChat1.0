@@ -192,8 +192,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     setMessage(value)
     setDraft(value)
 
-    // Show slash commands if message starts with /
-    if (value.startsWith('/') && value.length > 1) {
+    // Show slash commands as soon as the user types '/'
+    if (value.startsWith('/')) {
       setShowSlashCommands(true)
     } else {
       setShowSlashCommands(false)
