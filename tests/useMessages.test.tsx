@@ -28,8 +28,8 @@ type SupabaseMock = jest.Mocked<typeof supabase>;
 
 describe('helper functions', () => {
   it('prepareMessageData trims content', () => {
-    const result = prepareMessageData('u1', ' hi ', 'text');
-    expect(result).toEqual({ user_id: 'u1', content: 'hi', message_type: 'text' });
+    const result = prepareMessageData('u1', ' hi ', 'text', undefined, 'p1');
+    expect(result).toEqual({ user_id: 'u1', content: 'hi', message_type: 'text', reply_to: 'p1' });
   });
 
   it('insertMessage inserts through supabase', async () => {
@@ -138,6 +138,26 @@ describe('sendMessage', () => {
       audio_url: 'https://example.com/audio.webm',
     });
   });
+
+  it('sends message with reply_to id', async () => {
+    const insertFn = jest.fn(() => ({
+      select: () => ({ single: () => Promise.resolve({ data: { id: '1' }, error: null }) })
+    }))
+    ;(supabase.from as jest.Mock).mockReturnValueOnce({ insert: insertFn } as any)
+
+    const { result } = renderHook(() => useMessages(), { wrapper: MessagesProvider })
+
+    await act(async () => {
+      await result.current.sendMessage('reply', 'text', undefined, 'abc')
+    })
+
+    expect(insertFn).toHaveBeenCalledWith({
+      user_id: user.id,
+      content: 'reply',
+      message_type: 'text',
+      reply_to: 'abc'
+    })
+  })
 
   it('refreshes session and retries on 401 insert error', async () => {
     const insertFail = jest.fn(() => ({

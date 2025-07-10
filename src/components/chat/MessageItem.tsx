@@ -28,16 +28,17 @@ const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '🙏']
 interface MessageItemProps {
   message: Message
   previousMessage?: Message
-  onReply?: (messageId: string, content: string) => void
+  onReply?: (messageId: string) => void
   onEdit: (messageId: string, content: string) => Promise<void>
   onDelete: (messageId: string) => Promise<void>
   onTogglePin: (messageId: string) => Promise<void>
   onToggleReaction: (messageId: string, emoji: string) => Promise<void>
   containerRef?: React.RefObject<HTMLDivElement>
+  repliedMessage?: Message
 }
 
 export const MessageItem: React.FC<MessageItemProps> = React.memo(
-  ({ message, previousMessage, onReply, onEdit, onDelete, onTogglePin, onToggleReaction, containerRef }) => {
+  ({ message, previousMessage, onReply, onEdit, onDelete, onTogglePin, onToggleReaction, containerRef, repliedMessage }) => {
     const { profile } = useAuth()
     const [isEditing, setIsEditing] = useState(false)
     const [editContent, setEditContent] = useState(message.content)
@@ -255,6 +256,12 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   )}
                   style={bubbleStyle}
                 >
+                  {repliedMessage && (
+                    <div className="text-xs text-gray-500 dark:text-gray-400 border-l-2 border-gray-300 dark:border-gray-600 pl-2 mb-1 line-clamp-1">
+                      <span className="font-semibold mr-1">{repliedMessage.user?.display_name}:</span>
+                      {repliedMessage.content}
+                    </div>
+                  )}
                   <MessageReactions
                     message={message}
                     onReact={handleReaction}
@@ -317,7 +324,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                           {onReply && (
                             <button
                               onClick={() => {
-                                onReply(message.id, message.content)
+                                onReply(message.id)
                                 setShowActions(false)
                               }}
                               className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"

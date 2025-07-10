@@ -42,3 +42,20 @@ test('stops media stream tracks when recording stops', async () => {
   await user.click(btn)
   expect(trackStop).toHaveBeenCalled()
 })
+
+test('shows reply preview and sends reply id', async () => {
+  const onSend = jest.fn()
+  const user = userEvent.setup()
+  render(
+    <MessageInput
+      onSendMessage={onSend}
+      replyTo={{ id: 'm1', content: 'hello', user: { display_name: 'Alice' } }}
+      onCancelReply={() => {}}
+    />
+  )
+  expect(screen.getByText(/Replying to Alice/i)).toBeInTheDocument()
+  const input = screen.getByPlaceholderText(/type a message/i)
+  await user.type(input, 'hi')
+  await user.click(screen.getByRole('button', { name: /send message/i }))
+  expect(onSend).toHaveBeenCalledWith('hi', undefined, undefined, 'm1')
+})

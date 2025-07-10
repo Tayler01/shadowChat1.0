@@ -13,6 +13,7 @@ Slash command system (/shrug, /me, /giphy) with a pluggable command registry
 Typing indicators displayed in real-time using broadcast channels
 Sticky date headers that remain visible while scrolling
 "Jump to Latest" button appears when new messages arrive and you're not at the bottom
+Threaded replies with collapsible chains
 ### Direct Messaging (DMs)
 1-on-1 private chats using dedicated DM tables and RLS policies
 Unread tracking with live badge updates and local fallback
@@ -182,7 +183,6 @@ entries do not linger in `localStorage`.
 --- ## Future Features
 Push notifications (web + mobile)
 Offline drafts and local caching (message history cached on load)
-Threaded replies and collapsible chains
 Video or voice rooms using WebRTC
 Third-party plugin support
 Federation or multi-tenant support

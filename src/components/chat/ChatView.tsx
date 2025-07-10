@@ -28,6 +28,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
   const { failedMessages, addFailedMessage, removeFailedMessage } = useFailedMessages('general')
 
   const [uploading, setUploading] = useState(false)
+  const [replyTo, setReplyTo] = useState<import('../../lib/supabase').Message | null>(null)
 
   const handleFocusRefresh = useCallback(async () => {
     // Let the visibility refresh hook handle client reset
@@ -45,7 +46,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     fileUrl?: string
   ) => {
     try {
-      await sendMessage(content, type, fileUrl)
+      await sendMessage(content, type, fileUrl, replyTo?.id)
+      setReplyTo(null)
     } catch {
       toast.error('Failed to send message')
       addFailedMessage({ id: Date.now().toString(), type: type || 'text', content: content, dataUrl: fileUrl })
@@ -111,6 +113,10 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
         }}
         sending={sending}
         uploading={uploading}
+        onReply={(id) => {
+          const msg = messages.find(m => m.id === id)
+          if (msg) setReplyTo(msg)
+        }}
       />
 
       {/* Desktop Message Input */}
@@ -120,6 +126,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
           placeholder="Type a message"
           cacheKey="general"
           onUploadStatusChange={setUploading}
+          replyTo={replyTo as any}
+          onCancelReply={() => setReplyTo(null)}
         />
       </div>
 
@@ -134,6 +142,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
           className="border-t"
           cacheKey="general"
           onUploadStatusChange={setUploading}
+          replyTo={replyTo as any}
+          onCancelReply={() => setReplyTo(null)}
         />
       </MobileChatFooter>
     </motion.div>

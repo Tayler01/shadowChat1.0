@@ -6,12 +6,13 @@ import { useTyping } from '../../hooks/useTyping'
 import { groupMessagesByDate, cn, shouldGroupMessage } from '../../lib/utils'
 import { MessageItem } from './MessageItem'
 import type { FailedMessage } from '../../hooks/useFailedMessages'
+import type { Message } from '../../lib/supabase'
 import { FailedMessageItem } from './FailedMessageItem'
 import toast from 'react-hot-toast'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 
 interface MessageListProps {
-  onReply?: (messageId: string, content: string) => void
+  onReply?: (messageId: string) => void
   failedMessages?: FailedMessage[]
   onResend?: (msg: FailedMessage) => void
   sending?: boolean
@@ -33,6 +34,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
   const { typingUsers } = useTyping('general')
   const containerRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
+  const [openThreads, setOpenThreads] = useState<Record<string, boolean>>({})
 
   const handleScroll = useCallback(() => {
     const el = containerRef.current
@@ -52,7 +54,29 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     }
   }, [])
 
-  const groupedMessages = useMemo(() => groupMessagesByDate(messages), [messages])
+  const toggleThread = useCallback((id: string) => {
+    setOpenThreads(prev => ({ ...prev, [id]: !prev[id] }))
+  }, [])
+
+  const messageMap = useMemo(() => {
+    const map = new Map<string, any>()
+    messages.forEach(m => map.set(m.id, m))
+    return map
+  }, [messages])
+
+  const repliesMap = useMemo(() => {
+    const map = new Map<string, any[]>()
+    messages.forEach(m => {
+      if (m.reply_to) {
+        const arr = map.get(m.reply_to) || []
+        arr.push(m)
+        map.set(m.reply_to, arr)
+      }
+    })
+    return map
+  }, [messages])
+
+  const groupedMessages = useMemo(() => groupMessagesByDate(messages.filter(m => !m.reply_to)), [messages])
 
   // Scroll to bottom when messages or typing users change
   useEffect(() => {
@@ -78,6 +102,46 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
       toast.error('Failed to delete message')
     }
   }
+
+  const renderMessages = useCallback(
+    (msgs: Message[], depth = 0) =>
+      msgs.map((message, idx) => {
+        const prev = msgs[idx - 1]
+        const isGrouped = shouldGroupMessage(message, prev)
+        const replies = repliesMap.get(message.id) || []
+        return (
+          <div
+            key={message.id}
+            className={cn(isGrouped ? 'pt-1 pb-1' : 'pt-4 pb-1', depth > 0 && 'ml-4 border-l pl-4')}
+          >
+            <MessageItem
+              message={message}
+              previousMessage={prev}
+              repliedMessage={message.reply_to ? messageMap.get(message.reply_to) : undefined}
+              onReply={(id) => onReply?.(id)}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onTogglePin={togglePin}
+              onToggleReaction={toggleReaction}
+              containerRef={containerRef}
+            />
+            {replies.length > 0 && (
+              <div className="mt-1 ml-4">
+                <button
+                  type="button"
+                  onClick={() => toggleThread(message.id)}
+                  className="text-xs text-gray-500"
+                >
+                  {openThreads[message.id] ? 'Hide replies' : `${replies.length} replies`}
+                </button>
+                {openThreads[message.id] && renderMessages(replies, depth + 1)}
+              </div>
+            )}
+          </div>
+        )
+      }),
+    [repliesMap, openThreads, onReply, handleEdit, handleDelete, togglePin, toggleReaction, toggleThread, messageMap]
+  )
 
   if (loading) {
     return (
@@ -111,24 +175,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
             <span className="mx-2 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{group.date}</span>
             <hr className="flex-grow border-t border-gray-300 dark:border-gray-700" />
           </div>
-          {group.messages.map((message, idx) => {
-            const prev = group.messages[idx - 1]
-            const isGrouped = shouldGroupMessage(message, prev)
-            return (
-              <div key={message.id} className={cn(isGrouped ? 'pt-1 pb-1' : 'pt-4 pb-1')}>
-                <MessageItem
-                  message={message}
-                  previousMessage={prev}
-                  onReply={onReply}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onTogglePin={togglePin}
-                  onToggleReaction={toggleReaction}
-                  containerRef={containerRef}
-                />
-              </div>
-            )
-          })}
+          {renderMessages(group.messages)}
         </React.Fragment>
       ))}
 
