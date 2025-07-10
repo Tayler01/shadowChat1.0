@@ -4,6 +4,7 @@ import { Send, Smile, Command, Plus, Mic } from 'lucide-react'
 import { useTyping } from '../../hooks/useTyping'
 import { Button } from '../ui/Button'
 import { processSlashCommand, slashCommands } from '../../lib/utils'
+import type { ChatMessage } from '../../lib/supabase'
 import { uploadVoiceMessage, uploadChatFile } from '../../lib/supabase'
 import type { EmojiPickerProps, EmojiClickData } from '../../types'
 import { useEmojiPicker } from '../../hooks/useEmojiPicker'
@@ -22,6 +23,7 @@ interface MessageInputProps {
   className?: string
   cacheKey?: string
   onUploadStatusChange?: (uploading: boolean) => void
+  messages?: ChatMessage[]
 }
 
 export const MessageInput: React.FC<MessageInputProps> = ({
@@ -30,7 +32,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   disabled = false,
   className = '',
   cacheKey = 'general',
-  onUploadStatusChange = () => {}
+  onUploadStatusChange = () => {},
+  messages = []
 }) => {
   const { draft, setDraft, clear } = useDraft(cacheKey)
   const [message, setMessage] = useState(draft)
@@ -123,7 +126,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
 
     // Process slash commands
-    const processedMessage = processSlashCommand(message.trim())
+    const processedMessage = await processSlashCommand(message.trim(), messages)
     const finalMessage = processedMessage || message.trim()
 
     try {

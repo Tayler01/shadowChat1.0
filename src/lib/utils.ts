@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import type { ChatMessage } from './supabase'
+import { summarizeConversation } from './ai'
 
 export function getReadableTextColor(hexColor: string) {
   if (!hexColor) return '#000'
@@ -102,7 +103,7 @@ export function shouldGroupMessage(current: ChatMessage, previous?: ChatMessage)
 export interface SlashCommand {
   command: string
   description: string
-  handler: (args: string) => string
+  handler: (args: string, messages: ChatMessage[]) => string | Promise<string>
 }
 
 export const slashCommands: SlashCommand[] = [
@@ -120,10 +121,17 @@ export const slashCommands: SlashCommand[] = [
     command: '/giphy',
     description: 'Search for a GIF',
     handler: (args: string) => `🎬 *Searching for "${args}" GIF...*`
+  },
+  {
+    command: '/summary',
+    description: 'Summarize recent messages',
+    handler: async (_args: string, messages: ChatMessage[]) => {
+      return summarizeConversation(messages.slice(-20))
+    }
   }
 ]
 
-export function processSlashCommand(input: string): string | null {
+export async function processSlashCommand(input: string, messages: ChatMessage[]): Promise<string | null> {
   const trimmed = input.trim()
   if (!trimmed.startsWith('/')) return null
 
@@ -133,6 +141,6 @@ export function processSlashCommand(input: string): string | null {
   const slashCommand = slashCommands.find(cmd => cmd.command === command)
   if (!slashCommand) return null
 
-  return slashCommand.handler(args)
+  return await slashCommand.handler(args, messages)
 }
 

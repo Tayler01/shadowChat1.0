@@ -120,6 +120,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
           placeholder="Type a message"
           cacheKey="general"
           onUploadStatusChange={setUploading}
+          messages={messages}
         />
       </div>
 
@@ -134,6 +135,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
           className="border-t"
           cacheKey="general"
           onUploadStatusChange={setUploading}
+          messages={messages}
         />
       </MobileChatFooter>
     </motion.div>

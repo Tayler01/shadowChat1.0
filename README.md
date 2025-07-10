@@ -9,7 +9,7 @@ Grouped message bubbles with optimized UI (shows avatar only on first message in
 Editable and deletable messages, secured with row-level security (RLS)
 Pinned messages for announcements or important information
 Emoji reactions, toggled with live updates
-Slash command system (/shrug, /me, /giphy) with a pluggable command registry
+Slash command system (/shrug, /me, /giphy, /summary) with a pluggable command registry
 Typing indicators displayed in real-time using broadcast channels
 Sticky date headers that remain visible while scrolling
 "Jump to Latest" button appears when new messages arrive and you're not at the bottom
@@ -121,6 +121,7 @@ View moderation logs
 VITE_SUPABASE_URL=<your Supabase project URL>
 VITE_SUPABASE_ANON_KEY=<your Supabase anon key>
 VITE_PRESENCE_INTERVAL_MS=30000 # optional
+VITE_OPENAI_KEY=<your OpenAI API key> # for /summary
 --- ## Getting Started
 
 # Clone the repo
