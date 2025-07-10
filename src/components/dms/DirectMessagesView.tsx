@@ -63,6 +63,15 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
     }
   }, [initialConversation, currentConversation, markAsRead])
 
+  // Ensure unread badge clears when the current conversation is viewed
+  useEffect(() => {
+    if (!currentConversation) return
+    const conv = conversations.find(c => c.id === currentConversation)
+    if (conv && conv.unread_count && conv.unread_count > 0) {
+      markAsRead(currentConversation)
+    }
+  }, [currentConversation, conversations, markAsRead])
+
   const handleUserSelect = async (user: { username: string }) => {
     try {
       const conversationId = await startConversation(user.username)
