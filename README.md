@@ -125,8 +125,6 @@ VITE_SUPABASE_URL=<your Supabase project URL>
 VITE_SUPABASE_ANON_KEY=<your Supabase anon key>
 VITE_PRESENCE_INTERVAL_MS=30000 # optional
 VITE_OPENAI_KEY=<your OpenAI API key> # for /summary and suggestions and tone analysis
-FCM_SERVICE_ACCOUNT=<Firebase service account JSON> # for push notifications
-SUPABASE_SERVICE_ROLE_KEY=<your Supabase service role key>
 
 --- ## Getting Started
 
