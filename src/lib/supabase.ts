@@ -85,9 +85,6 @@ export function createFreshSupabaseClient() {
           eventsPerSecond: 50,
         },
       },
-      global: {
-        fetch: loggingFetch,
-      },
     })
     ;(client as any).__storageKey = uniqueStorageKey
     return client
@@ -129,9 +126,6 @@ if (!globalRef.__supabaseClient) {
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true,
-      },
-      global: {
-        fetch: loggingFetch,
       },
     })
   } catch {
