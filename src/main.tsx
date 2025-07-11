@@ -6,7 +6,12 @@ import './index.css';
 import { AuthProvider } from './hooks/useAuth';
 import { ThemeProvider } from './hooks/useTheme';
 
-if ('serviceWorker' in navigator) {
+// Only register service worker in production environments that support it
+// StackBlitz and similar development environments don't support service workers
+if ('serviceWorker' in navigator && 
+    !window.location.hostname.includes('stackblitz') && 
+    !window.location.hostname.includes('webcontainer') &&
+    import.meta.env.PROD) {
   navigator.serviceWorker
     .register('/firebase-messaging-sw.js')
     .catch((err) => console.error('Service worker registration failed', err));
