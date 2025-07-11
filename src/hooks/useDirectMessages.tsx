@@ -18,6 +18,7 @@ import {
   refreshSessionLocked,
 } from '../lib/supabase';
 import { MESSAGE_FETCH_LIMIT } from '../config';
+import { useMessageSounds } from './useMessageSounds';
 import { useAuth } from './useAuth';
 import { useVisibilityRefresh } from './useVisibilityRefresh';
 
@@ -46,6 +47,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
   const [loading, setLoading] = useState(true);
   const [currentConversation, setCurrentConversation] = useState<string | null>(null);
   const { user } = useAuth();
+  const { play } = useMessageSounds();
 
   // Reset function for page refocus
   const resetWithFreshClient = useCallback(async () => {
@@ -121,6 +123,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
             missing = true
             return prev
           })
+          if (payload.new.sender_id !== user.id) play()
           if (missing) {
             fetchDMConversations().then(setConversations)
           }
