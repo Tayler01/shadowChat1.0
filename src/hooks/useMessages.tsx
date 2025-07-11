@@ -11,6 +11,7 @@ import { MESSAGE_FETCH_LIMIT } from '../config';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
 import { useVisibilityRefresh } from './useVisibilityRefresh';
+import { useMessageSounds } from './useMessageSounds';
 
 const STORED_MESSAGE_LIMIT = 200;
 
@@ -137,6 +138,7 @@ function useProvideMessages(): MessagesContextValue {
   const [hasMore, setHasMore] = useState(true);
   const { user } = useAuth();
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const { play } = useMessageSounds();
   const subscribeRef = useRef<() => RealtimeChannel>();
   const clientResetRef = useRef<() => Promise<void>>();
 
@@ -417,13 +419,14 @@ function useProvideMessages(): MessagesContextValue {
                 if (exists) {
                   return prev;
                 }
-                
+
                 // Add new message to the end
                 const updated = [...prev, newMessage as Message];
-                
+
                 // Force a new array reference to ensure React detects the change
                 return updated.slice();
               });
+              if (!isFromCurrentUser) play();
             }
           } catch (error) {
             throw error;
@@ -441,6 +444,7 @@ function useProvideMessages(): MessagesContextValue {
             if (exists) return prev;
             return [...prev, newMessage];
           });
+          if (!isFromCurrentUser) play();
         })
         .on(
           'postgres_changes',

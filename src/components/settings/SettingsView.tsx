@@ -5,7 +5,6 @@ import {
   Moon,
   Sun,
   Volume2,
-  VolumeX,
   Palette,
   Shield,
   Database,
@@ -23,6 +22,7 @@ import { usePushNotifications } from '../../hooks/usePushNotifications'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useSuggestionsEnabled } from '../../hooks/useSuggestedReplies'
 import { useToneAnalysisEnabled } from '../../hooks/useToneAnalysisEnabled'
+import { useMessageSounds, MessageSound } from '../../hooks/useMessageSounds'
 
 interface SettingsViewProps {
   onToggleSidebar: () => void
@@ -31,7 +31,12 @@ interface SettingsViewProps {
 export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) => {
   const { enabled: notifications, setEnabled: setNotifications } =
     usePushNotifications()
-  const [sounds, setSounds] = useState(true)
+  const {
+    enabled: sounds,
+    setEnabled: setSounds,
+    sound,
+    setSound,
+  } = useMessageSounds()
   const [showDangerZone, setShowDangerZone] = useState(false)
   const { scheme, setScheme } = useTheme()
   const isDesktop = useIsDesktop()
@@ -152,7 +157,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
                         {setting.description}
                       </p>
                     </div>
-                    
+
                     <button
                       onClick={() => setting.onChange(!setting.enabled)}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
@@ -170,6 +175,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
                     </button>
                   </div>
                 ))}
+                {section.title === 'Audio' && (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium text-gray-900 dark:text-gray-100">Message Sound</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Choose the notification sound</p>
+                    </div>
+                    <select
+                      value={sound}
+                      onChange={(e) => setSound(e.target.value as MessageSound)}
+                      className="bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 text-sm rounded-md p-1"
+                      aria-label="Select message sound"
+                    >
+                      <option value="chime">Chime</option>
+                      <option value="pop">Pop</option>
+                    </select>
+                  </div>
+                )}
               </div>
             </div>
           ))}
