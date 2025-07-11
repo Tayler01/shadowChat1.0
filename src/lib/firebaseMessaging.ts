@@ -2,24 +2,37 @@ import { initializeApp } from 'firebase/app'
 import { getMessaging, getToken, onMessage, deleteToken } from 'firebase/messaging'
 import { supabase } from './supabase'
 
-const firebaseConfig = {
-  apiKey: 'AIzaSyDwEGv1PRl9GLZwE-QdCnXCEiFn-fRPZt0',
-  authDomain: 'shadowchat-99822.firebaseapp.com',
-  projectId: 'shadowchat-99822',
-  storageBucket: 'shadowchat-99822.firebasestorage.app',
-  messagingSenderId: '255265121159',
-  appId: '1:255265121159:web:4806c7207776bd5af9a922',
-}
+let messaging: ReturnType<typeof getMessaging> | null = null
+let vapidKey: string | null = null
 
-const app = initializeApp(firebaseConfig)
-const messaging = getMessaging(app)
+async function initMessaging() {
+  if (messaging) return messaging
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
+  const functionsUrl = supabaseUrl
+    ? supabaseUrl.replace('.supabase.co', '.functions.supabase.co')
+    : ''
+
+  const res = await fetch(`${functionsUrl}/firebase-config`)
+  if (!res.ok) {
+    throw new Error('Failed to load Firebase configuration')
+  }
+
+  const { firebaseConfig, vapidKey: key } = await res.json()
+  const app = initializeApp(firebaseConfig)
+  messaging = getMessaging(app)
+  vapidKey = key || null
+  return messaging
+}
 
 let registration: ServiceWorkerRegistration | null = null
 
 async function ensureRegistration() {
   if (registration) return registration
   if ('serviceWorker' in navigator) {
-    registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js')
+    registration = await navigator.serviceWorker.register(
+      `/firebase-messaging-sw.js?supabaseUrl=${encodeURIComponent(import.meta.env.VITE_SUPABASE_URL)}`,
+    )
     return registration
   }
   throw new Error('Service workers are not supported in this browser')
@@ -27,16 +40,18 @@ async function ensureRegistration() {
 
 export const requestPushPermission = async () => {
   try {
-    const reg = await ensureRegistration()
-    const token = await getToken(messaging, {
-      vapidKey: 'BCJ5-S1a_rhX_QJqB3pRAykTCpWFv1IhmUd1NSL0GgYp7-X0GkyO00lXGfPd3hFMP7HOwDWNh6iIustKcSNlfS8',
+    const [msg, reg] = await Promise.all([initMessaging(), ensureRegistration()])
+    const token = await getToken(msg, {
+      vapidKey: vapidKey || undefined,
       serviceWorkerRegistration: reg,
     })
 
     if (token) {
       console.log('Push token:', token)
 
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
       if (!user) return
 
       const { error } = await supabase
@@ -48,7 +63,7 @@ export const requestPushPermission = async () => {
             platform: 'web',
             last_seen: new Date().toISOString(),
           },
-          { onConflict: 'user_id,platform' }
+          { onConflict: 'user_id,platform' },
         )
 
       if (error) {
@@ -64,12 +79,14 @@ export const requestPushPermission = async () => {
 
 export const deletePushToken = async () => {
   try {
-    await deleteToken(messaging)
+    const msg = await initMessaging()
+    await deleteToken(msg)
   } catch (err) {
     console.error('Failed to delete push token', err)
   }
 }
 
-export const onForegroundMessage = (callback: (payload: any) => void) => {
-  onMessage(messaging, callback)
+export const onForegroundMessage = async (callback: (payload: any) => void) => {
+  const msg = await initMessaging()
+  onMessage(msg, callback)
 }

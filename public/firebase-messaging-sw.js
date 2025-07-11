@@ -1,20 +1,27 @@
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
 
-firebase.initializeApp({
-  apiKey: 'AIzaSyDwEGv1PRl9GLZwE-QdCnXCEiFn-fRPZt0',
-  authDomain: 'shadowchat-99822.firebaseapp.com',
-  projectId: 'shadowchat-99822',
-  messagingSenderId: '255265121159',
-  appId: '1:255265121159:web:4806c7207776bd5af9a922',
-});
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', () => self.clients.claim());
 
-const messaging = firebase.messaging();
+(async () => {
+  const params = new URL(self.location.href).searchParams;
+  const supabaseUrl = params.get('supabaseUrl') || '';
+  const functionsUrl = supabaseUrl
+    ? supabaseUrl.replace('.supabase.co', '.functions.supabase.co')
+    : '';
 
-messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received background message ', payload);
-  self.registration.showNotification(payload.notification.title, {
-    body: payload.notification.body,
-    icon: '/icons/icon-192.png',
+  const res = await fetch(`${functionsUrl}/firebase-config`);
+  const { firebaseConfig } = await res.json();
+
+  firebase.initializeApp(firebaseConfig);
+  const messaging = firebase.messaging();
+
+  messaging.onBackgroundMessage((payload) => {
+    console.log('[firebase-messaging-sw.js] Received background message ', payload);
+    self.registration.showNotification(payload.notification.title, {
+      body: payload.notification.body,
+      icon: '/icons/icon-192.png',
+    });
   });
-});
+})();

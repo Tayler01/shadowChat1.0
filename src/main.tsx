@@ -13,7 +13,7 @@ if ('serviceWorker' in navigator &&
     !window.location.hostname.includes('webcontainer') &&
     import.meta.env.PROD) {
   navigator.serviceWorker
-    .register('/firebase-messaging-sw.js')
+    .register(`/firebase-messaging-sw.js?supabaseUrl=${encodeURIComponent(import.meta.env.VITE_SUPABASE_URL)}`)
     .catch((err) => console.error('Service worker registration failed', err));
 }
 
