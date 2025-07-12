@@ -11,8 +11,6 @@ import { MESSAGE_FETCH_LIMIT } from '../config';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
 import { useVisibilityRefresh } from './useVisibilityRefresh';
-import { useSoundEffects } from './useSoundEffects';
-import { playMessageSound } from '../lib/playMessageSound';
 
 const STORED_MESSAGE_LIMIT = 200;
 
@@ -141,7 +139,6 @@ function useProvideMessages(): MessagesContextValue {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const subscribeRef = useRef<() => RealtimeChannel>();
   const clientResetRef = useRef<() => Promise<void>>();
-  const { enabled: soundEnabled, sound } = useSoundEffects();
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -420,16 +417,13 @@ function useProvideMessages(): MessagesContextValue {
                 if (exists) {
                   return prev;
                 }
-
+                
                 // Add new message to the end
                 const updated = [...prev, newMessage as Message];
-
+                
                 // Force a new array reference to ensure React detects the change
                 return updated.slice();
               });
-              if (!isFromCurrentUser && soundEnabled) {
-                playMessageSound(sound);
-              }
             }
           } catch (error) {
             throw error;
@@ -447,9 +441,6 @@ function useProvideMessages(): MessagesContextValue {
             if (exists) return prev;
             return [...prev, newMessage];
           });
-          if (!isFromCurrentUser && soundEnabled) {
-            playMessageSound(sound);
-          }
         })
         .on(
           'postgres_changes',
@@ -571,7 +562,7 @@ function useProvideMessages(): MessagesContextValue {
       }
       channelRef.current = null;
     };
-  }, [user, fetchMessages, soundEnabled, sound]);
+  }, [user, fetchMessages]);
 
   const sendMessage = useCallback(async (
     content: string,
