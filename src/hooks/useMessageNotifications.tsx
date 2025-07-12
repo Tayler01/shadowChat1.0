@@ -3,11 +3,14 @@ import toast from 'react-hot-toast'
 import { supabase, getWorkingClient } from '../lib/supabase'
 import { useAuth } from './useAuth'
 import { useIsDesktop } from './useIsDesktop'
+import { useSoundEffects } from './useSoundEffects'
+import { playMessageSound } from '../lib/playMessageSound'
 import { MessageNotification } from '../components/notifications/MessageNotification'
 
 export function useMessageNotifications(onOpenConversation: (id: string) => void) {
   const { user } = useAuth()
   const isDesktop = useIsDesktop()
+  const { enabled: soundEnabled, sound } = useSoundEffects()
 
   useEffect(() => {
     if (!user) return
@@ -42,6 +45,9 @@ export function useMessageNotifications(onOpenConversation: (id: string) => void
                 desktop={isDesktop}
               />
             ))
+            if (soundEnabled) {
+              playMessageSound(sound)
+            }
           }
         }
       )
@@ -50,5 +56,5 @@ export function useMessageNotifications(onOpenConversation: (id: string) => void
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user, onOpenConversation, isDesktop])
+  }, [user, onOpenConversation, isDesktop, soundEnabled, sound])
 }
