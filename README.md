@@ -34,6 +34,8 @@ Profiles are visible in messages, hover cards, and dedicated profile pages.
 Incoming direct messages trigger popup toasts if the user is not on that thread.
 A global badge indicator on the sidebar highlights unread conversations.
 Read tracking is done via Supabase and synced using the useDMNotifications hook.
+Optional sound effects notify you of new messages. You can choose a sound and
+the preference is remembered across sessions.
 ### Message Reactions
 Emoji reactions can be toggled on any message.
 Stored in a reactions object on the message record.

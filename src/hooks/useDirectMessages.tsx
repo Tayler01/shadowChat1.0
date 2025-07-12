@@ -20,6 +20,8 @@ import {
 import { MESSAGE_FETCH_LIMIT } from '../config';
 import { useAuth } from './useAuth';
 import { useVisibilityRefresh } from './useVisibilityRefresh';
+import { useSoundEffects } from './useSoundEffects';
+import { playMessageSound } from '../lib/playMessageSound';
 
 interface DirectMessagesContextValue {
   conversations: DMConversation[];
@@ -46,6 +48,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
   const [loading, setLoading] = useState(true);
   const [currentConversation, setCurrentConversation] = useState<string | null>(null);
   const { user } = useAuth();
+  const { enabled: soundEnabled, sound } = useSoundEffects();
 
   // Reset function for page refocus
   const resetWithFreshClient = useCallback(async () => {
@@ -124,6 +127,9 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
           if (missing) {
             fetchDMConversations().then(setConversations)
           }
+          if (payload.new.sender_id !== user.id && soundEnabled) {
+            playMessageSound(sound)
+          }
         }
       )
       .on(
@@ -159,7 +165,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user, soundEnabled, sound]);
 
   const {
     messages,
@@ -311,7 +317,7 @@ export function useConversationMessages(conversationId: string | null) {
     clientResetRef.current = resetWithFreshClient;
     
     fetchMessages();
-  }, [conversationId, user]);
+  }, [conversationId, user, soundEnabled, sound]);
 
   const loadOlderMessages = useCallback(async () => {
     if (loadingMore || !hasMore || !conversationId) return;
@@ -386,6 +392,9 @@ export function useConversationMessages(conversationId: string | null) {
                   .from('dm_messages')
                   .update({ read_at: new Date().toISOString() })
                   .eq('id', data.id);
+              }
+              if (user && data.sender_id !== user.id && soundEnabled) {
+                playMessageSound(sound);
               }
             }
           }

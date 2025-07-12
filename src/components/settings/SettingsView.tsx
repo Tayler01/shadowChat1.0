@@ -22,6 +22,7 @@ import { useTheme, colorSchemes, ColorScheme } from '../../hooks/useTheme'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useSuggestionsEnabled } from '../../hooks/useSuggestedReplies'
 import { useToneAnalysisEnabled } from '../../hooks/useToneAnalysisEnabled'
+import { useSoundEffects } from '../../hooks/useSoundEffects'
 
 interface SettingsViewProps {
   onToggleSidebar: () => void
@@ -29,7 +30,7 @@ interface SettingsViewProps {
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) => {
   const [notifications, setNotifications] = useState(true)
-  const [sounds, setSounds] = useState(true)
+  const { enabled: sounds, setEnabled: setSounds, sound, setSound } = useSoundEffects()
   const [showDangerZone, setShowDangerZone] = useState(false)
   const { scheme, setScheme } = useTheme()
   const isDesktop = useIsDesktop()
@@ -77,7 +78,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
           enabled: sounds,
           onChange: setSounds
         }
-      ]
+      ],
+      extra: (
+        <div className="flex items-center justify-between mt-4">
+          <div>
+            <h3 className="font-medium text-gray-900 dark:text-gray-100">Message Sound</h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Choose your notification sound</p>
+          </div>
+          <select
+            value={sound}
+            onChange={e => setSound(e.target.value as any)}
+            className="ml-2 border rounded-md px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+          >
+            <option value="beep1">Beep 1</option>
+            <option value="beep2">Beep 2</option>
+          </select>
+        </div>
+      )
     },
     {
       title: 'AI',
@@ -168,6 +185,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
                     </button>
                   </div>
                 ))}
+                {section.extra}
               </div>
             </div>
           ))}
