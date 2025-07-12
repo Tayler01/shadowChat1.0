@@ -23,3 +23,13 @@ test('changing scheme updates document.classList', () => {
   expect(document.documentElement.classList.contains('teal')).toBe(true);
   expect(document.documentElement.classList.contains('indigo')).toBe(false);
 });
+
+test('supports additional color schemes', () => {
+  const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
+
+  act(() => {
+    result.current.setScheme('violet');
+  });
+
+  expect(document.documentElement.classList.contains('violet')).toBe(true);
+});

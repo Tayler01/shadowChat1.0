@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 
-export type ColorScheme = 'indigo' | 'teal' | 'rose'
+export type ColorScheme =
+  | 'indigo'
+  | 'teal'
+  | 'rose'
+  | 'violet'
+  | 'orange'
+  | 'contrast'
 
 interface ThemeContextValue {
   scheme: ColorScheme
@@ -13,6 +19,9 @@ export const colorSchemes: Record<ColorScheme, { start: string; end: string }> =
   indigo: { start: '#6366f1', end: '#8b5cf6' },
   teal: { start: '#14b8a6', end: '#10b981' },
   rose: { start: '#f43f5e', end: '#d946ef' },
+  violet: { start: '#7c3aed', end: '#a855f7' },
+  orange: { start: '#f97316', end: '#fb923c' },
+  contrast: { start: '#000000', end: '#000000' },
 }
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -25,7 +34,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     document.documentElement.dataset.scheme = scheme
-    document.documentElement.classList.remove('indigo', 'teal', 'rose')
+    document.documentElement.classList.remove(
+      ...(Object.keys(colorSchemes) as ColorScheme[])
+    )
     document.documentElement.classList.add(scheme)
     localStorage.setItem('colorScheme', scheme)
   }, [scheme])
