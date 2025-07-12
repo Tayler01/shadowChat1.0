@@ -269,7 +269,9 @@ function useProvideMessages(): MessagesContextValue {
             );
           } catch {}
         }
-        setMessages(trimVisibleMessages(allMessagesRef.current));
+        // When loading older messages, display the full list instead of
+        // trimming to the newest messages so users can scroll back further
+        setMessages(allMessagesRef.current);
         setHasMore(data.length === MESSAGE_FETCH_LIMIT);
       } else {
         setHasMore(false);
