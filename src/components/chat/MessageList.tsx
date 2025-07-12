@@ -36,11 +36,27 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
   const prevHeightRef = useRef(0)
   const prevScrollTopRef = useRef(0)
   const [autoScroll, setAutoScroll] = useState(true)
+
+  const { messageMap, childrenMap, rootMessages } = useMemo(() => {
+    const msgMap = new Map<string, Message>()
+    const childMap = new Map<string, Message[]>()
+    const roots: Message[] = []
+    messages.forEach(m => {
+      msgMap.set(m.id, m)
+      if (m.reply_to) {
+        if (!childMap.has(m.reply_to)) childMap.set(m.reply_to, [])
+        childMap.get(m.reply_to)!.push(m)
+      } else {
+        roots.push(m)
+      }
+    })
+    return { messageMap: msgMap, childrenMap: childMap, rootMessages: roots }
+  }, [messages])
+
   const [collapsed, setCollapsed] = useState<Set<string>>(() => {
     const initialCollapsed = new Set<string>()
-    messages.forEach(m => {
-      if (m.reply_to) return
-      const replies = messages.filter(r => r.reply_to === m.id)
+    rootMessages.forEach(m => {
+      const replies = childrenMap.get(m.id) || []
       if (replies.length > 0) {
         const allAI = replies.every(r => r.message_type === 'command')
         if (!allAI) {
@@ -51,32 +67,12 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     return initialCollapsed
   })
 
-  const messageMap = useMemo(() => {
-    const map = new Map<string, Message>()
-    messages.forEach(m => map.set(m.id, m))
-    return map
-  }, [messages])
-
-  const childrenMap = useMemo(() => {
-    const map = new Map<string, Message[]>()
-    messages.forEach(m => {
-      if (m.reply_to) {
-        if (!map.has(m.reply_to)) map.set(m.reply_to, [])
-        map.get(m.reply_to)!.push(m)
-      }
-    })
-    return map
-  }, [messages])
-
-  const rootMessages = useMemo(() => messages.filter(m => !m.reply_to), [messages])
-
   // Update collapsed state when messages change to include new threads
   useEffect(() => {
     setCollapsed(prev => {
       const newCollapsed = new Set(prev)
-      messages.forEach(m => {
-        if (m.reply_to) return
-        const replies = messages.filter(r => r.reply_to === m.id)
+      rootMessages.forEach(m => {
+        const replies = childrenMap.get(m.id) || []
         if (replies.length > 0 && !prev.has(m.id)) {
           const allAI = replies.every(r => r.message_type === 'command')
           if (!allAI) {
@@ -86,7 +82,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
       })
       return newCollapsed
     })
-  }, [messages])
+  }, [messages, childrenMap, rootMessages])
 
   const toggleThread = (id: string) => {
     setCollapsed(prev => {
