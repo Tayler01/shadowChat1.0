@@ -127,7 +127,11 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     if (!el) return
     if (!loadingMore && prevHeightRef.current) {
       const diff = el.scrollHeight - prevHeightRef.current
-      el.scrollTop = prevScrollTopRef.current + diff
+      if (prevScrollTopRef.current <= 0) {
+        el.scrollTop = diff
+      } else {
+        el.scrollTop = prevScrollTopRef.current + diff
+      }
       prevHeightRef.current = 0
       prevScrollTopRef.current = 0
     }
