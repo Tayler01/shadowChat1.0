@@ -37,6 +37,27 @@
   --color-accent-light: #fdf2f8;
 }
 
+:root[data-scheme='violet'] {
+  --color-primary-start: #7c3aed;
+  --color-primary-end: #a855f7;
+  --color-accent: #7c3aed;
+  --color-accent-light: #ede9fe;
+}
+
+:root[data-scheme='orange'] {
+  --color-primary-start: #f97316;
+  --color-primary-end: #fb923c;
+  --color-accent: #f97316;
+  --color-accent-light: #ffedd5;
+}
+
+:root[data-scheme='contrast'] {
+  --color-primary-start: #000000;
+  --color-primary-end: #000000;
+  --color-accent: #000000;
+  --color-accent-light: #ffffff;
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
