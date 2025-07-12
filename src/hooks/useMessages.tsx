@@ -13,6 +13,17 @@ import { useAuth } from './useAuth';
 import { useVisibilityRefresh } from './useVisibilityRefresh';
 
 const STORED_MESSAGE_LIMIT = 200;
+const VISIBLE_MESSAGE_LIMIT = 40;
+
+export const trimVisibleMessages = (all: Message[]) => {
+  const pinned: Message[] = [];
+  const unpinned: Message[] = [];
+  for (const m of all) {
+    if (m.pinned) pinned.push(m);
+    else unpinned.push(m);
+  }
+  return [...pinned, ...unpinned.slice(-VISIBLE_MESSAGE_LIMIT)];
+};
 
 // --- Helper functions extracted from sendMessage workflow ---
 export const prepareMessageData = (
@@ -116,7 +127,7 @@ interface MessagesContextValue {
 const MessagesContext = createContext<MessagesContextValue | undefined>(undefined);
 
 function useProvideMessages(): MessagesContextValue {
-  const initialMessages = (() => {
+  const initialAllMessages = (() => {
     if (typeof localStorage !== 'undefined') {
       try {
         const stored = localStorage.getItem('chatHistory');
@@ -130,7 +141,10 @@ function useProvideMessages(): MessagesContextValue {
     return [] as Message[];
   })();
 
+  const initialMessages = trimVisibleMessages(initialAllMessages);
+
   const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const allMessagesRef = useRef<Message[]>(initialAllMessages);
   const [loading, setLoading] = useState(initialMessages.length === 0);
   const [sending, setSending] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -176,55 +190,43 @@ function useProvideMessages(): MessagesContextValue {
       } else if (data.length > 0) {
         const pinnedIds = new Set((pinnedRes.data || []).map(m => m.id));
 
-        setMessages(prev => {
-          if (prev.length === 0) {
-            if (typeof localStorage !== 'undefined') {
-              try {
-                localStorage.setItem(
-                  'chatHistory',
-                  JSON.stringify(data.slice(-STORED_MESSAGE_LIMIT))
-                );
-              } catch {}
-            }
-            return data as Message[];
-          }
+        let merged: Message[] = [];
 
+        if (allMessagesRef.current.length === 0) {
+          merged = data as Message[];
+        } else {
           const mergedMap = new Map<string, Message>();
 
-          // Replace or update existing messages
-          prev.forEach(m => {
+          allMessagesRef.current.forEach(m => {
             const fetched = data.find(d => d.id === m.id);
             let updated = m;
-
             if (fetched) {
               updated = fetched as Message;
             } else if (m.pinned && !pinnedIds.has(m.id)) {
               updated = { ...m, pinned: false, pinned_by: null, pinned_at: null } as Message;
             }
-
             mergedMap.set(updated.id, updated);
           });
 
-          // Add new messages
           data.forEach(d => {
             if (!mergedMap.has(d.id)) {
               mergedMap.set(d.id, d as Message);
             }
           });
 
-          const merged = Array.from(mergedMap.values());
+          merged = Array.from(mergedMap.values());
+        }
 
-          if (typeof localStorage !== 'undefined') {
-            try {
-              localStorage.setItem(
-                'chatHistory',
-                JSON.stringify(merged.slice(-STORED_MESSAGE_LIMIT))
-              );
-            } catch {}
-          }
-
-          return merged;
-        });
+        allMessagesRef.current = merged;
+        if (typeof localStorage !== 'undefined') {
+          try {
+            localStorage.setItem(
+              'chatHistory',
+              JSON.stringify(merged.slice(-STORED_MESSAGE_LIMIT))
+            );
+          } catch {}
+        }
+        setMessages(trimVisibleMessages(merged));
       }
     } catch (error) {
       throw error;
@@ -256,11 +258,18 @@ function useProvideMessages(): MessagesContextValue {
 
       if (data && data.length > 0) {
         const newMessages = data.reverse();
-        setMessages(prev => {
-          const pinned = prev.filter(m => m.pinned);
-          const rest = prev.filter(m => !m.pinned);
-          return [...pinned, ...newMessages, ...rest];
-        });
+        const pinned = allMessagesRef.current.filter(m => m.pinned);
+        const rest = allMessagesRef.current.filter(m => !m.pinned);
+        allMessagesRef.current = [...pinned, ...newMessages, ...rest];
+        if (typeof localStorage !== 'undefined') {
+          try {
+            localStorage.setItem(
+              'chatHistory',
+              JSON.stringify(allMessagesRef.current.slice(-STORED_MESSAGE_LIMIT))
+            );
+          } catch {}
+        }
+        setMessages(trimVisibleMessages(allMessagesRef.current));
         setHasMore(data.length === MESSAGE_FETCH_LIMIT);
       } else {
         setHasMore(false);
@@ -344,7 +353,7 @@ function useProvideMessages(): MessagesContextValue {
       try {
         localStorage.setItem(
           'chatHistory',
-          JSON.stringify(messages.slice(-STORED_MESSAGE_LIMIT))
+          JSON.stringify(allMessagesRef.current.slice(-STORED_MESSAGE_LIMIT))
         );
       } catch {
         // ignore storage errors
@@ -412,17 +421,18 @@ function useProvideMessages(): MessagesContextValue {
               const logPrefix = isFromCurrentUser ? '📨 [REALTIME-SELF]' : '📨 [REALTIME-OTHER]';
 
               setMessages(prev => {
-                // Check if message already exists to avoid duplicates
-                const exists = prev.find(msg => msg.id === newMessage.id);
-                if (exists) {
-                  return prev;
+                const exists = allMessagesRef.current.find(m => m.id === newMessage.id);
+                if (exists) return prev;
+                allMessagesRef.current = [...allMessagesRef.current, newMessage as Message];
+                if (typeof localStorage !== 'undefined') {
+                  try {
+                    localStorage.setItem(
+                      'chatHistory',
+                      JSON.stringify(allMessagesRef.current.slice(-STORED_MESSAGE_LIMIT))
+                    );
+                  } catch {}
                 }
-                
-                // Add new message to the end
-                const updated = [...prev, newMessage as Message];
-                
-                // Force a new array reference to ensure React detects the change
-                return updated.slice();
+                return trimVisibleMessages(allMessagesRef.current);
               });
             }
           } catch (error) {
@@ -437,9 +447,18 @@ function useProvideMessages(): MessagesContextValue {
           const logPrefix = isFromCurrentUser ? '📡 [BROADCAST-SELF]' : '📡 [BROADCAST-OTHER]';
           
           setMessages(prev => {
-            const exists = prev.find(m => m.id === newMessage.id);
+            const exists = allMessagesRef.current.find(m => m.id === newMessage.id);
             if (exists) return prev;
-            return [...prev, newMessage];
+            allMessagesRef.current = [...allMessagesRef.current, newMessage];
+            if (typeof localStorage !== 'undefined') {
+              try {
+                localStorage.setItem(
+                  'chatHistory',
+                  JSON.stringify(allMessagesRef.current.slice(-STORED_MESSAGE_LIMIT))
+                );
+              } catch {}
+            }
+            return trimVisibleMessages(allMessagesRef.current);
           });
         })
         .on(
@@ -468,13 +487,23 @@ function useProvideMessages(): MessagesContextValue {
 
               if (updatedMessage) {
                 setMessages(prev => {
-                  const index = prev.findIndex(msg => msg.id === updatedMessage.id);
-                  if (index !== -1) {
-                    return prev.map(msg =>
-                      msg.id === updatedMessage.id ? (updatedMessage as Message) : msg
+                  const idx = allMessagesRef.current.findIndex(m => m.id === updatedMessage.id);
+                  if (idx !== -1) {
+                    allMessagesRef.current = allMessagesRef.current.map(m =>
+                      m.id === updatedMessage.id ? (updatedMessage as Message) : m
                     );
+                  } else {
+                    allMessagesRef.current = [...allMessagesRef.current, updatedMessage as Message];
                   }
-                  return [...prev, updatedMessage as Message];
+                  if (typeof localStorage !== 'undefined') {
+                    try {
+                      localStorage.setItem(
+                        'chatHistory',
+                        JSON.stringify(allMessagesRef.current.slice(-STORED_MESSAGE_LIMIT))
+                      );
+                    } catch {}
+                  }
+                  return trimVisibleMessages(allMessagesRef.current);
                 });
               }
             } catch (error) {
@@ -490,9 +519,18 @@ function useProvideMessages(): MessagesContextValue {
             table: 'messages'
           },
           (payload) => {
-            setMessages(prev =>
-              prev.filter(msg => msg.id !== payload.old.id)
-            );
+            setMessages(prev => {
+              allMessagesRef.current = allMessagesRef.current.filter(m => m.id !== payload.old.id);
+              if (typeof localStorage !== 'undefined') {
+                try {
+                  localStorage.setItem(
+                    'chatHistory',
+                    JSON.stringify(allMessagesRef.current.slice(-STORED_MESSAGE_LIMIT))
+                  );
+                } catch {}
+              }
+              return trimVisibleMessages(allMessagesRef.current);
+            });
           }
         )
         .subscribe(async (status, err) => {
@@ -621,11 +659,18 @@ function useProvideMessages(): MessagesContextValue {
         inserted = data as Message;
 
         setMessages(prev => {
-          const exists = prev.find(m => m.id === data.id);
-          if (exists) {
-            return prev;
+          const exists = allMessagesRef.current.find(m => m.id === data.id);
+          if (exists) return prev;
+          allMessagesRef.current = [...allMessagesRef.current, data as Message];
+          if (typeof localStorage !== 'undefined') {
+            try {
+              localStorage.setItem(
+                'chatHistory',
+                JSON.stringify(allMessagesRef.current.slice(-STORED_MESSAGE_LIMIT))
+              );
+            } catch {}
           }
-          return [...prev, data as Message];
+          return trimVisibleMessages(allMessagesRef.current);
         });
 
         if (channelRef.current?.state === 'joined') {
