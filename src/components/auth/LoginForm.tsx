@@ -62,7 +62,7 @@ export function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[var(--color-accent-light)] via-white to-white">
+    <div className="min-h-[100dvh] flex items-center justify-center bg-gradient-to-br from-[var(--color-accent-light)] via-white to-white">
       <div className="max-w-md w-full mx-4">
         <div className="bg-white rounded-2xl shadow-2xl p-8 space-y-6">
           {/* Header */}
