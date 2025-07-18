@@ -20,6 +20,7 @@ import {
 import { MESSAGE_FETCH_LIMIT } from '../config';
 import { useAuth } from './useAuth';
 import { useVisibilityRefresh } from './useVisibilityRefresh';
+import { useSoundEffects } from './useSoundEffects';
 
 interface DirectMessagesContextValue {
   conversations: DMConversation[];
@@ -46,6 +47,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
   const [loading, setLoading] = useState(true);
   const [currentConversation, setCurrentConversation] = useState<string | null>(null);
   const { user } = useAuth();
+  const { playMessage } = useSoundEffects();
 
   // Reset function for page refocus
   const resetWithFreshClient = useCallback(async () => {
@@ -123,6 +125,9 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
           })
           if (missing) {
             fetchDMConversations().then(setConversations)
+          }
+          if (payload.new.sender_id !== user.id) {
+            playMessage()
           }
         }
       )
@@ -382,6 +387,7 @@ export function useConversationMessages(conversationId: string | null) {
 
               // Mark as read if not sent by current user
               if (user && data.sender_id !== user.id) {
+                playMessage();
                 await workingClient
                   .from('dm_messages')
                   .update({ read_at: new Date().toISOString() })

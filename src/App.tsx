@@ -12,6 +12,7 @@ import { MobileNav } from './components/layout/MobileNav'
 import { useIsDesktop } from './hooks/useIsDesktop'
 import { useMessageNotifications } from './hooks/useMessageNotifications'
 import { ClientResetProvider } from './hooks/ClientResetContext'
+import { SoundEffectsProvider } from './hooks/useSoundEffects'
 import { ConnectivityBanner } from './components/ui/ConnectivityBanner'
 
 type View = 'chat' | 'dms' | 'profile' | 'settings'
@@ -96,6 +97,7 @@ function App() {
   return (
     <AuthGuard>
       <ClientResetProvider>
+        <SoundEffectsProvider>
         <MessagesProvider>
           <DirectMessagesProvider>
           <div className="h-screen overflow-hidden flex flex-col md:flex-row bg-gray-100 dark:bg-gray-900">
@@ -141,6 +143,7 @@ function App() {
         </div>
         </DirectMessagesProvider>
       </MessagesProvider>
+      </SoundEffectsProvider>
       </ClientResetProvider>
     </AuthGuard>
   )
