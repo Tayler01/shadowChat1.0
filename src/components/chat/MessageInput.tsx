@@ -6,7 +6,7 @@ import { Button } from '../ui/Button'
 import { processSlashCommand, slashCommands } from '../../lib/utils'
 import type { ChatMessage } from '../../lib/supabase'
 import { uploadVoiceMessage, uploadChatFile } from '../../lib/supabase'
-import type { EmojiPickerProps, EmojiClickData } from '../../types'
+import type { EmojiClickData } from '../../types'
 import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import { RecordingIndicator } from '../ui/RecordingIndicator'
 import { useDraft } from '../../hooks/useDraft'
@@ -62,7 +62,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
-  const { enabled: suggestionsEnabled, setEnabled: _set } = useSuggestionsEnabled()
+  const { enabled: suggestionsEnabled } = useSuggestionsEnabled()
   const { suggestions } = useSuggestedReplies(messages, suggestionsEnabled)
 
   // Handle typing indicators
@@ -164,9 +164,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             await onSendMessage(answer, 'command', undefined, sent?.id)
           }
         } catch {
+          // ignore AI errors
         }
       }
     } catch (err) {
+      console.error(err)
     }
     // Keep focus on the textarea so the mobile keyboard stays open
     textareaRef.current?.focus()
@@ -233,6 +235,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           onCancelReply?.()
         })
         .catch(err => {
+          console.error(err)
         })
         .finally(() => onUploadStatusChange(false))
     }
@@ -256,6 +259,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           onCancelReply?.()
         })
         .catch(err => {
+          console.error(err)
         })
         .finally(() => onUploadStatusChange(false))
     }
@@ -278,6 +282,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           onSendMessage(url, 'audio', undefined, replyingTo?.id)
           onCancelReply?.()
         } catch (err) {
+          console.error(err)
         } finally {
           onUploadStatusChange(false)
           mediaStreamRef.current = null
@@ -288,6 +293,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       mediaRecorderRef.current = recorder
       setRecording(true)
     } catch (err) {
+      console.error(err)
       toast.error('Microphone access was denied')
       setRecording(false)
     }
@@ -378,14 +384,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               type="button"
               onClick={() => {
                 // Clean the suggestion text by removing quotes and numbering
-                const cleanText = s.replace(/^[\d\.\)\-\s]*["']?|["']?$/g, '').trim()
+                const cleanText = s.replace(/^[\d.)-\s]*["']?|["']?$/g, '').trim()
                 setMessage(cleanText)
                 textareaRef.current?.focus()
               }}
               className="px-3 py-1 rounded-full text-sm bg-gray-200 dark:bg-gray-700"
             >
               {/* Display the original suggestion but insert cleaned version */}
-              {s.replace(/^[\d\.\)\-\s]*["']?|["']?$/g, '').trim()}
+              {s.replace(/^[\d.)-\s]*["']?|["']?$/g, '').trim()}
             </button>
           ))}
         </div>

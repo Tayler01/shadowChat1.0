@@ -48,8 +48,9 @@ export function LoginForm() {
           toast.success('Account created! Please check your email to confirm your account.');
         }
       }
-    } catch (error: any) {
-      toast.error(error.message || 'An error occurred');
+    } catch (error: unknown) {
+      const err = error as Error | { message?: string };
+      toast.error(err.message || 'An error occurred');
     }
   };
 

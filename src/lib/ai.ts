@@ -61,7 +61,7 @@ export async function getSuggestedReplies(messages: ChatMessage[]): Promise<stri
   try {
     const parsed = JSON.parse(content)
     if (Array.isArray(parsed)) {
-      return parsed.map((s: any) => String(s))
+      return parsed.map(s => String(s))
     }
   } catch {
     // ignore JSON parse errors

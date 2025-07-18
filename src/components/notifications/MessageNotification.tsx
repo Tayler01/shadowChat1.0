@@ -1,9 +1,10 @@
 import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Avatar } from '../ui/Avatar'
+import type { Toast } from 'react-hot-toast'
 
 interface MessageNotificationProps {
-  t: any
+  t: Toast
   content: string
   sender: {
     display_name?: string

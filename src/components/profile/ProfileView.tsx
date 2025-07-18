@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Camera, Edit3, Save, X, Upload, Menu } from 'lucide-react'
+import { Camera, Edit3, Save, X, Menu } from 'lucide-react'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useAuth } from '../../hooks/useAuth'
 import { fetchUserStats } from '../../lib/supabase'
@@ -58,7 +58,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
       try {
         const counts = await fetchUserStats(profile.id)
         if (active) setStats(counts)
-      } catch {
+      } catch (err) {
+        console.error(err)
         // ignore
       }
     }
@@ -73,7 +74,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
     try {
       await uploadAvatar(file)
       toast.success('Avatar updated!')
-    } catch {
+    } catch (err) {
+      console.error(err)
       toast.error('Failed to upload avatar')
     } finally {
       setUploadingAvatar(false)
@@ -88,7 +90,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
     try {
       await uploadBanner(file)
       toast.success('Banner updated!')
-    } catch {
+    } catch (err) {
+      console.error(err)
       toast.error('Failed to upload banner')
     } finally {
       setUploadingBanner(false)
@@ -104,7 +107,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
       await updateProfile(formData)
       setIsEditing(false)
       toast.success('Profile updated successfully!')
-    } catch {
+    } catch (err) {
+      console.error(err)
       toast.error('Failed to update profile')
     } finally {
       setLoading(false)

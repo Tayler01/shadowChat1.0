@@ -2,10 +2,7 @@ import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Bell,
-  Moon,
-  Sun,
   Volume2,
-  VolumeX,
   Palette,
   Shield,
   Database,
@@ -49,7 +46,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
     try {
       await signOut()
       toast.success('Signed out successfully')
-    } catch {
+    } catch (err) {
+      console.error(err)
       toast.error('Failed to sign out')
     }
   }
