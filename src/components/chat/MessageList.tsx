@@ -96,6 +96,22 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     })
   }
 
+  const jumpToMessage = useCallback((id: string) => {
+    setCollapsed(prev => {
+      const newSet = new Set(prev)
+      newSet.delete(id)
+      return newSet
+    })
+    const el = document.getElementById(`message-${id}`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('ring-2', 'ring-[var(--color-accent)]')
+      setTimeout(() => {
+        el.classList.remove('ring-2', 'ring-[var(--color-accent)]')
+      }, 2000)
+    }
+  }, [])
+
   const handleScroll = useCallback(() => {
     const el = containerRef.current
     if (!el) return
@@ -183,6 +199,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
           onDelete={handleDelete}
           onTogglePin={togglePin}
           onToggleReaction={toggleReaction}
+          onJumpToMessage={jumpToMessage}
           containerRef={containerRef}
         />
         {replies.length > 0 && (

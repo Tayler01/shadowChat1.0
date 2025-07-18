@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { MessageItem } from '../src/components/chat/MessageItem'
 import type { Message } from '../src/lib/supabase'
@@ -44,6 +45,7 @@ test('renders image message', () => {
       onDelete={async () => {}}
       onTogglePin={async () => {}}
       onToggleReaction={async () => {}}
+      onJumpToMessage={() => {}}
       containerRef={React.createRef()}
     />
   )
@@ -66,6 +68,7 @@ test('renders audio message', () => {
       onDelete={async () => {}}
       onTogglePin={async () => {}}
       onToggleReaction={async () => {}}
+      onJumpToMessage={() => {}}
       containerRef={React.createRef()}
     />
   )
@@ -90,6 +93,7 @@ test('renders file message', () => {
       onDelete={async () => {}}
       onTogglePin={async () => {}}
       onToggleReaction={async () => {}}
+      onJumpToMessage={() => {}}
       containerRef={React.createRef()}
     />
   )
@@ -114,6 +118,7 @@ test('renders audio file preview', () => {
       onDelete={async () => {}}
       onTogglePin={async () => {}}
       onToggleReaction={async () => {}}
+      onJumpToMessage={() => {}}
       containerRef={React.createRef()}
     />
   )
@@ -130,6 +135,7 @@ test('icon buttons have aria-labels', () => {
       onDelete={async () => {}}
       onTogglePin={async () => {}}
       onToggleReaction={async () => {}}
+      onJumpToMessage={() => {}}
       containerRef={React.createRef()}
     />
   )
@@ -152,6 +158,7 @@ test('applies user color to message bubble', () => {
       onDelete={async () => {}}
       onTogglePin={async () => {}}
       onToggleReaction={async () => {}}
+      onJumpToMessage={() => {}}
       containerRef={React.createRef()}
     />
   )
@@ -174,6 +181,7 @@ test('shows tone indicator emoji', () => {
       onDelete={async () => {}}
       onTogglePin={async () => {}}
       onToggleReaction={async () => {}}
+      onJumpToMessage={() => {}}
       containerRef={React.createRef()}
     />
   )
@@ -197,9 +205,33 @@ test('hides tone indicator when disabled', () => {
       onDelete={async () => {}}
       onTogglePin={async () => {}}
       onToggleReaction={async () => {}}
+      onJumpToMessage={() => {}}
       containerRef={React.createRef()}
     />
   )
 
   expect(screen.queryByTestId('tone-indicator')).toBeNull()
+})
+
+test('clicking reply preview triggers jump callback', async () => {
+  const parent = { ...baseMessage, id: 'p1', content: 'parent', message_type: 'text' } as Message
+  const reply = { ...baseMessage, id: 'c1', content: 'child', message_type: 'text', reply_to: 'p1' } as Message
+  const cb = jest.fn()
+
+  render(
+    <MessageItem
+      message={reply}
+      parentMessage={parent}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+      onJumpToMessage={cb}
+      containerRef={React.createRef()}
+    />
+  )
+
+  const btn = screen.getByRole('button', { name: /replying to/i })
+  await userEvent.click(btn)
+  expect(cb).toHaveBeenCalledWith('p1')
 })
