@@ -96,6 +96,28 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
     reaction.volume = 0.5
     reaction.load()
     reactionAudioRef.current = reaction
+
+    // Unlock audio playback on first user interaction (required on mobile)
+    const unlock = () => {
+      ;[messageAudioRef.current, reactionAudioRef.current].forEach(a => {
+        if (!a) return
+        try {
+          a.play().catch(() => {})
+          a.pause()
+          a.currentTime = 0
+        } catch {
+          // ignore errors
+        }
+      })
+      document.removeEventListener('touchstart', unlock)
+      document.removeEventListener('click', unlock)
+    }
+    document.addEventListener('touchstart', unlock, { once: true })
+    document.addEventListener('click', unlock, { once: true })
+    return () => {
+      document.removeEventListener('touchstart', unlock)
+      document.removeEventListener('click', unlock)
+    }
   }, [urls])
 
   const play = useCallback(

@@ -481,8 +481,19 @@ function useProvideMessages(): MessagesContextValue {
                     const newList = prev.map(msg =>
                       msg.id === updatedMessage.id ? (updatedMessage as Message) : msg
                     )
-                    if (changed && updatedMessage.user_id !== user.id) {
-                      playReaction()
+                    if (changed) {
+                      const prevUsers = prevMessage.reactions || {}
+                      const currUsers = updatedMessage.reactions || {}
+                      const changedByCurrent = Object.keys({ ...prevUsers, ...currUsers }).some(e => {
+                        const before = prevUsers[e]?.users || []
+                        const after = currUsers[e]?.users || []
+                        const beforeHas = before.includes(user.id)
+                        const afterHas = after.includes(user.id)
+                        return beforeHas !== afterHas
+                      })
+                      if (!changedByCurrent) {
+                        playReaction()
+                      }
                     }
                     return newList
                   }
@@ -780,8 +791,6 @@ function useProvideMessages(): MessagesContextValue {
       if (error) {
         throw error;
       }
-
-      playReaction();
       
     } catch (error) {
       throw error;
