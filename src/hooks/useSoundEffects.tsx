@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { getWorkingClient } from '../lib/supabase'
 
 interface SoundEffectsContextValue {
   enabled: boolean
@@ -9,7 +10,6 @@ interface SoundEffectsContextValue {
 
 const SoundEffectsContext = createContext<SoundEffectsContextValue | undefined>(undefined)
 
-// Default sound URLs - these should be accessible from your public folder
 const defaultUrls = {
   message: '/sounds/message.mp3',
   reaction: '/sounds/reaction.mp3'
@@ -26,7 +26,6 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
   })
 
   const [urls, setUrls] = useState(defaultUrls)
-  const [audioCache, setAudioCache] = useState<Record<string, HTMLAudioElement>>({})
 
   useEffect(() => {
     try {
@@ -36,55 +35,43 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
     }
   }, [enabled])
 
-  // Preload and cache audio files
   useEffect(() => {
-    const cache: Record<string, HTMLAudioElement> = {}
-    
-    Object.entries(urls).forEach(([key, url]) => {
-      if (url) {
-        try {
-          const audio = new Audio(url)
-          audio.preload = 'auto'
-          audio.volume = 0.5
-          cache[key] = audio
-        } catch (error) {
-          console.warn(`Failed to preload ${key} sound:`, error)
+    ;(async () => {
+      try {
+        const client = await getWorkingClient()
+        const { data, error } = await client
+          .from('notification_sounds')
+          .select('name, url')
+        if (!error && data) {
+          const map = { ...defaultUrls }
+          data.forEach((row: any) => {
+            if (row.name === 'message') map.message = row.url
+            if (row.name === 'reaction') map.reaction = row.url
+          })
+          setUrls(map)
         }
+      } catch {
+        // ignore fetch errors
       }
-    })
-    
-    setAudioCache(cache)
-  }, [urls])
+    })()
+  }, [])
 
   const play = useCallback(
-    (soundType: string) => {
-      if (!enabled) return
-      
-      const audio = audioCache[soundType]
-      if (!audio) {
-        console.warn(`Sound ${soundType} not found in cache`)
-        return
-      }
-      
+    (url: string) => {
+      if (!enabled || !url) return
       try {
-        // Reset audio to beginning in case it was played before
-        audio.currentTime = 0
-        const playPromise = audio.play()
-        
-        if (playPromise !== undefined) {
-          playPromise.catch(error => {
-            console.warn(`Failed to play ${soundType} sound:`, error)
-          })
-        }
-      } catch (error) {
-        console.warn(`Error playing ${soundType} sound:`, error)
+        const audio = new Audio(url)
+        audio.volume = 0.5 // Set reasonable volume
+        audio.play().catch(() => {})
+      } catch {
+        // ignore playback errors
       }
     },
-    [enabled, audioCache]
+    [enabled]
   )
 
-  const playMessage = useCallback(() => play('message'), [play])
-  const playReaction = useCallback(() => play('reaction'), [play])
+  const playMessage = useCallback(() => play(urls.message), [play, urls])
+  const playReaction = useCallback(() => play(urls.reaction), [play, urls])
 
   return { enabled, setEnabled, playMessage, playReaction }
 }

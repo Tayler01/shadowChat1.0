@@ -1,6 +1,0 @@
-# This is a placeholder for the message sound file
-# You need to add actual MP3 files here:
-# - public/sounds/message.mp3
-# - public/sounds/reaction.mp3
-
-# For now, the code will use online sound URLs as fallback
