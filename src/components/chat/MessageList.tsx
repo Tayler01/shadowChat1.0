@@ -142,8 +142,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
   const scrollToBottom = useCallback(() => {
     if (containerRef.current) {
       containerRef.current.scrollTo({
-        top: containerRef.current.scrollHeight,
-        behavior: 'smooth'
+        top: containerRef.current.scrollHeight
       })
       setAutoScroll(true)
     }
