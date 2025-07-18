@@ -36,11 +36,12 @@ interface MessageItemProps {
   onDelete: (messageId: string) => Promise<void>
   onTogglePin: (messageId: string) => Promise<void>
   onToggleReaction: (messageId: string, emoji: string) => Promise<void>
+  onJumpToMessage?: (messageId: string) => void
   containerRef?: React.RefObject<HTMLDivElement>
 }
 
 export const MessageItem: React.FC<MessageItemProps> = React.memo(
-  ({ message, previousMessage, parentMessage, onReply, onEdit, onDelete, onTogglePin, onToggleReaction, containerRef }) => {
+  ({ message, previousMessage, parentMessage, onReply, onEdit, onDelete, onTogglePin, onToggleReaction, onJumpToMessage, containerRef }) => {
     const { profile } = useAuth()
     const [isEditing, setIsEditing] = useState(false)
     const [editContent, setEditContent] = useState(message.content)
@@ -194,6 +195,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     return (
       <>
         <motion.div
+          id={`message-${message.id}`}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className={cn('group flex space-x-3 ml-2')}
@@ -257,9 +259,17 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
             <>
               <div className="relative inline-block max-w-full group/message">
                 {parentMessage && (
-                  <div className="text-xs text-gray-500 mb-1">
-                    Replying to {parentMessage.user?.display_name || 'Unknown'}: {parentMessage.content.slice(0, 30)}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onJumpToMessage?.(parentMessage.id)}
+                    className="text-xs text-gray-500 mb-1 hover:underline text-left"
+                    aria-label="View parent message"
+                  >
+                    Replying to {parentMessage.user?.display_name || 'Unknown'}:
+                    {' '}
+                    {parentMessage.content.slice(0, 30)}
+                    {parentMessage.content.length > 30 ? '...' : ''}
+                  </button>
                 )}
                 <div
                   className={cn(
