@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { getWorkingClient } from '../lib/supabase'
 
 interface SoundEffectsContextValue {
   enabled: boolean
@@ -8,12 +9,6 @@ interface SoundEffectsContextValue {
 }
 
 const SoundEffectsContext = createContext<SoundEffectsContextValue | undefined>(undefined)
-
-// Default sound URLs - these should be accessible from your public folder
-const defaultUrls = {
-  message: '/sounds/message.mp3',
-  reaction: '/sounds/reaction.mp3'
-}
 
 function useProvideSoundEffects(): SoundEffectsContextValue {
   const [enabled, setEnabled] = useState(() => {
@@ -25,8 +20,9 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
     return true
   })
 
-  const [urls, setUrls] = useState(defaultUrls)
+  const [urls, setUrls] = useState<Record<string, string>>({})
   const [audioCache, setAudioCache] = useState<Record<string, HTMLAudioElement>>({})
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     try {
@@ -36,8 +32,47 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
     }
   }, [enabled])
 
+  // Fetch sound URLs from Supabase
+  useEffect(() => {
+    const fetchSoundUrls = async () => {
+      try {
+        const client = await getWorkingClient()
+        const { data, error } = await client
+          .from('notification_sounds')
+          .select('name, url')
+        
+        if (error) {
+          console.warn('Failed to fetch notification sounds:', error)
+          // Use fallback URLs if database fetch fails
+          setUrls({
+            message: '/sounds/message.mp3',
+            reaction: '/sounds/reaction.mp3'
+          })
+        } else if (data) {
+          const urlMap: Record<string, string> = {}
+          data.forEach(sound => {
+            urlMap[sound.name] = sound.url
+          })
+          setUrls(urlMap)
+        }
+      } catch (error) {
+        console.warn('Error fetching notification sounds:', error)
+        // Use fallback URLs
+        setUrls({
+          message: '/sounds/message.mp3',
+          reaction: '/sounds/reaction.mp3'
+        })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSoundUrls()
+  }, [])
   // Preload and cache audio files
   useEffect(() => {
+    if (loading || Object.keys(urls).length === 0) return
+    
     const cache: Record<string, HTMLAudioElement> = {}
     
     Object.entries(urls).forEach(([key, url]) => {
@@ -46,6 +81,7 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
           const audio = new Audio(url)
           audio.preload = 'auto'
           audio.volume = 0.5
+          audio.crossOrigin = 'anonymous' // For external URLs
           cache[key] = audio
         } catch (error) {
           console.warn(`Failed to preload ${key} sound:`, error)
@@ -54,7 +90,7 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
     })
     
     setAudioCache(cache)
-  }, [urls])
+  }, [urls, loading])
 
   const play = useCallback(
     (soundType: string) => {
@@ -62,7 +98,7 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
       
       const audio = audioCache[soundType]
       if (!audio) {
-        console.warn(`Sound ${soundType} not found in cache`)
+        console.warn(`Sound ${soundType} not found in cache. Available sounds:`, Object.keys(audioCache))
         return
       }
       
@@ -73,7 +109,12 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
         
         if (playPromise !== undefined) {
           playPromise.catch(error => {
-            console.warn(`Failed to play ${soundType} sound:`, error)
+            // Handle common autoplay policy errors
+            if (error.name === 'NotAllowedError') {
+              console.warn(`Autoplay blocked for ${soundType} sound. User interaction required.`)
+            } else {
+              console.warn(`Failed to play ${soundType} sound:`, error)
+            }
           })
         }
       } catch (error) {
