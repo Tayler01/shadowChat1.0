@@ -97,21 +97,31 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     })
   }
 
-  const jumpToMessage = useCallback((id: string) => {
-    setCollapsed(prev => {
-      const newSet = new Set(prev)
-      newSet.delete(id)
-      return newSet
-    })
-    const el = document.getElementById(`message-${id}`)
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      el.classList.add('ring-2', 'ring-[var(--color-accent)]')
-      setTimeout(() => {
-        el.classList.remove('ring-2', 'ring-[var(--color-accent)]')
-      }, 2000)
-    }
-  }, [])
+  const jumpToMessage = useCallback(
+    (id: string) => {
+      setCollapsed(prev => {
+        const newSet = new Set(prev)
+        let current = messageMap.get(id)
+        // Expand all ancestor threads so the message is visible
+        while (current && current.reply_to) {
+          newSet.delete(current.reply_to)
+          current = messageMap.get(current.reply_to)
+        }
+        newSet.delete(id)
+        return newSet
+      })
+
+      const el = document.getElementById(`message-${id}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        el.classList.add('ring-2', 'ring-[var(--color-accent)]')
+        setTimeout(() => {
+          el.classList.remove('ring-2', 'ring-[var(--color-accent)]')
+        }, 2000)
+      }
+    },
+    [messageMap]
+  )
 
   const handleScroll = useCallback(() => {
     const el = containerRef.current
