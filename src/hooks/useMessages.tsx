@@ -184,7 +184,9 @@ function useProvideMessages(): MessagesContextValue {
                   'chatHistory',
                   JSON.stringify(data.slice(-STORED_MESSAGE_LIMIT))
                 );
-              } catch {}
+              } catch {
+                // ignore storage errors
+              }
             }
             return data as Message[];
           }
@@ -220,7 +222,9 @@ function useProvideMessages(): MessagesContextValue {
                 'chatHistory',
                 JSON.stringify(merged.slice(-STORED_MESSAGE_LIMIT))
               );
-            } catch {}
+            } catch {
+              // ignore storage errors
+            }
           }
 
           return merged;

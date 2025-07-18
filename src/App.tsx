@@ -66,7 +66,6 @@ function App() {
       case 'chat':
         return (
           <ChatView
-            onToggleSidebar={toggleSidebar}
             currentView={currentView}
             onViewChange={setCurrentView}
           />
@@ -87,7 +86,6 @@ function App() {
       default:
         return (
           <ChatView
-            onToggleSidebar={toggleSidebar}
             currentView={currentView}
             onViewChange={setCurrentView}
           />

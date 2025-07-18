@@ -7,7 +7,6 @@ import {
   Trash2,
   Reply,
   MoreHorizontal,
-  ThumbsUp,
   Plus,
   Copy,
   Check,

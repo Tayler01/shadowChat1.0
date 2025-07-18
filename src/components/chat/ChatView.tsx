@@ -16,15 +16,14 @@ import {
 import { useVisibilityRefresh } from '../../hooks/useVisibilityRefresh'
 
 interface ChatViewProps {
-  onToggleSidebar: () => void
   currentView: 'chat' | 'dms' | 'profile' | 'settings'
   onViewChange: (view: 'chat' | 'dms' | 'profile' | 'settings') => void
 }
 
-export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView, onViewChange }) => {
+export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange }) => {
   const { messages, sendMessage, sending, togglePin, toggleReaction } = useMessages()
   const pinnedMessages = messages.filter(m => m.pinned)
-  const { status: resetStatus, lastResetTime } = useClientReset()
+  const { status: resetStatus } = useClientReset()
   const { failedMessages, addFailedMessage, removeFailedMessage } = useFailedMessages('general')
 
   const [uploading, setUploading] = useState(false)
@@ -35,6 +34,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ onToggleSidebar, currentView
     try {
       await ensureSession()
     } catch {
+      // ignore refresh errors
     }
   }, [])
 

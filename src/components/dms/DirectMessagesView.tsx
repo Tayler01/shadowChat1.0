@@ -4,7 +4,6 @@ import {
   MessageSquare,
   Plus,
   ArrowLeft,
-  Menu,
   ArrowDown
 } from 'lucide-react'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
@@ -81,7 +80,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
         setSearchUsername('')
         toast.success('Conversation started!')
       }
-    } catch {
+    } catch (error) {
+      console.error(error)
       toast.error(error instanceof Error ? error.message : 'Failed to start conversation')
     }
   }
@@ -93,7 +93,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
   ) => {
     try {
       await sendMessage(content, type, fileUrl)
-    } catch {
+    } catch (error) {
+      console.error(error)
       toast.error('Failed to send message')
       addFailedMessage({ id: Date.now().toString(), type: type || 'text', content, dataUrl: fileUrl })
     }

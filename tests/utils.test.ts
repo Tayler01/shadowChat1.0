@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { shouldGroupMessage } from '../src/lib/utils';
 
 describe('shouldGroupMessage', () => {

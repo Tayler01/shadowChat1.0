@@ -85,8 +85,9 @@ export function shouldGroupMessage(current: ChatMessage, previous?: ChatMessage)
   if (!previous) return false
 
   // Determine ids for chat or DM messages
-  const currentId = (current as any).user_id ?? (current as any).sender_id
-  const previousId = (previous as any).user_id ?? (previous as any).sender_id
+  const currentId = 'user_id' in current ? current.user_id : current.sender_id
+  const previousId =
+    previous && ('user_id' in previous ? previous.user_id : previous.sender_id)
 
   // Only group messages if they are from the same sender and sent within a
   // short time window (default: 5 minutes)
