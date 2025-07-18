@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from 'react'
 import { getWorkingClient } from '../lib/supabase'
 
 interface SoundEffectsContextValue {
@@ -12,7 +19,7 @@ const SoundEffectsContext = createContext<SoundEffectsContextValue | undefined>(
 
 const defaultUrls = {
   message: '/sounds/message.mp3',
-  reaction: '/sounds/reaction.mp3'
+  reaction: '/sounds/reaction.mp3',
 }
 
 function useProvideSoundEffects(): SoundEffectsContextValue {
@@ -25,7 +32,23 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
     return true
   })
 
-  const [urls, setUrls] = useState(defaultUrls)
+  const [urls, setUrls] = useState(() => {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('notificationSoundUrls')
+        if (raw) {
+          const parsed = JSON.parse(raw) as Record<string, string>
+          return { ...defaultUrls, ...parsed }
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
+    return defaultUrls
+  })
+
+  const messageAudioRef = useRef<HTMLAudioElement | null>(null)
+  const reactionAudioRef = useRef<HTMLAudioElement | null>(null)
 
   useEffect(() => {
     try {
@@ -44,11 +67,16 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
           .select('name, url')
         if (!error && data) {
           const map = { ...defaultUrls }
-          data.forEach((row: any) => {
+          data.forEach((row: { name: string; url: string }) => {
             if (row.name === 'message') map.message = row.url
             if (row.name === 'reaction') map.reaction = row.url
           })
           setUrls(map)
+          try {
+            localStorage.setItem('notificationSoundUrls', JSON.stringify(map))
+          } catch {
+            // ignore storage errors
+          }
         }
       } catch {
         // ignore fetch errors
@@ -56,12 +84,25 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
     })()
   }, [])
 
+  useEffect(() => {
+    const message = new Audio(urls.message)
+    message.crossOrigin = 'anonymous'
+    message.volume = 0.5
+    message.load()
+    messageAudioRef.current = message
+
+    const reaction = new Audio(urls.reaction)
+    reaction.crossOrigin = 'anonymous'
+    reaction.volume = 0.5
+    reaction.load()
+    reactionAudioRef.current = reaction
+  }, [urls])
+
   const play = useCallback(
-    (url: string) => {
-      if (!enabled || !url) return
+    (audio?: HTMLAudioElement) => {
+      if (!enabled || !audio) return
       try {
-        const audio = new Audio(url)
-        audio.volume = 0.5 // Set reasonable volume
+        audio.currentTime = 0
         audio.play().catch(() => {})
       } catch {
         // ignore playback errors
@@ -70,8 +111,8 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
     [enabled]
   )
 
-  const playMessage = useCallback(() => play(urls.message), [play, urls])
-  const playReaction = useCallback(() => play(urls.reaction), [play, urls])
+  const playMessage = useCallback(() => play(messageAudioRef.current), [play])
+  const playReaction = useCallback(() => play(reactionAudioRef.current), [play])
 
   return { enabled, setEnabled, playMessage, playReaction }
 }
