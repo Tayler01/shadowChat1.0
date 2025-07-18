@@ -61,12 +61,13 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
       if (!enabled || !url) return
       try {
         const audio = new Audio(url)
+        audio.volume = 0.5 // Set reasonable volume
         audio.play().catch(() => {})
       } catch {
         // ignore playback errors
       }
     },
-    [enabled, urls]
+    [enabled]
   )
 
   const playMessage = useCallback(() => play(urls.message), [play, urls])
