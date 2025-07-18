@@ -119,8 +119,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({ onToggle
   const scrollToBottom = useCallback(() => {
     if (messagesRef.current) {
       messagesRef.current.scrollTo({
-        top: messagesRef.current.scrollHeight,
-        behavior: 'smooth'
+        top: messagesRef.current.scrollHeight
       })
       setAutoScroll(true)
     }
