@@ -5,6 +5,7 @@ import { useMessages } from '../../hooks/useMessages'
 import { useTyping } from '../../hooks/useTyping'
 import { groupMessagesByDate, cn, shouldGroupMessage } from '../../lib/utils'
 import { MessageItem } from './MessageItem'
+import { ThreadReplyLink } from './ThreadReplyLink'
 import type { FailedMessage } from '../../hooks/useFailedMessages'
 import { FailedMessageItem } from './FailedMessageItem'
 import toast from 'react-hot-toast'
@@ -132,9 +133,24 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     }
   }, [])
 
+  const replyLinkMessages = useMemo(() => {
+    return messages
+      .filter(m => m.reply_to && messageMap.get(m.reply_to))
+      .map(m => ({
+        ...m,
+        parent: messageMap.get(m.reply_to!)!,
+        isReplyLink: true,
+      })) as Array<Message & { parent: Message; isReplyLink: boolean }>
+  }, [messages, messageMap])
+
+  const combinedMessages = useMemo(() => {
+    const all = [...rootMessages, ...replyLinkMessages]
+    return all.sort((a, b) => a.created_at.localeCompare(b.created_at))
+  }, [rootMessages, replyLinkMessages])
+
   const groupedMessages = useMemo(
-    () => groupMessagesByDate(rootMessages),
-    [rootMessages]
+    () => groupMessagesByDate(combinedMessages as any[]),
+    [combinedMessages]
   )
 
   // Maintain scroll position when older messages are prepended
@@ -258,12 +274,20 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
             <span className="mx-2 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{group.date}</span>
             <hr className="flex-grow border-t border-gray-300 dark:border-gray-700" />
           </div>
-          {group.messages.map((message, idx) => {
-            const prev = group.messages[idx - 1]
+          {group.messages.map((message: any, idx) => {
+            const prev = group.messages[idx - 1] as any
             const isGrouped = shouldGroupMessage(message, prev)
             return (
               <div key={message.id} className={cn(isGrouped ? 'pt-1 pb-1' : 'pt-4 pb-1')}>
-                {renderThread(message, 0, prev)}
+                {message.isReplyLink ? (
+                  <ThreadReplyLink
+                    message={message}
+                    parent={message.parent}
+                    onJumpToMessage={jumpToMessage}
+                  />
+                ) : (
+                  renderThread(message, 0, prev)
+                )}
               </div>
             )
           })}
