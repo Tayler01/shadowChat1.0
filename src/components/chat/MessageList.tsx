@@ -111,14 +111,17 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
         return newSet
       })
 
-      const el = document.getElementById(`message-${id}`)
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        el.classList.add('ring-2', 'ring-[var(--color-accent)]')
-        setTimeout(() => {
-          el.classList.remove('ring-2', 'ring-[var(--color-accent)]')
-        }, 2000)
-      }
+      // Wait for the DOM to update before scrolling
+      requestAnimationFrame(() => {
+        const el = document.getElementById(`message-${id}`)
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          el.classList.add('ring-2', 'ring-[var(--color-accent)]')
+          setTimeout(() => {
+            el.classList.remove('ring-2', 'ring-[var(--color-accent)]')
+          }, 2000)
+        }
+      })
     },
     [messageMap]
   )
