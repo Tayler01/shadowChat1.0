@@ -142,6 +142,22 @@ function useProvideMessages(): MessagesContextValue {
   const subscribeRef = useRef<() => RealtimeChannel>();
   const clientResetRef = useRef<() => Promise<void>>();
 
+  const addNewMessage = useCallback(
+    (msg: Message) => {
+      let added = false;
+      setMessages(prev => {
+        const exists = prev.some(m => m.id === msg.id);
+        if (exists) return prev;
+        added = true;
+        return [...prev, msg];
+      });
+      if (added && user && msg.user_id !== user.id) {
+        playMessage();
+      }
+    },
+    [playMessage, user]
+  );
+
   const fetchMessages = useCallback(async () => {
     try {
       const workingClient = await getWorkingClient();
@@ -417,15 +433,7 @@ function useProvideMessages(): MessagesContextValue {
               const isFromCurrentUser = newMessage.user_id === user.id;
               const logPrefix = isFromCurrentUser ? '📨 [REALTIME-SELF]' : '📨 [REALTIME-OTHER]';
 
-              setMessages(prev => {
-                const exists = prev.find(msg => msg.id === newMessage.id)
-                if (exists) return prev
-                const updated = [...prev, newMessage as Message]
-                return updated.slice()
-              })
-              if (!isFromCurrentUser) {
-                playMessage()
-              }
+              addNewMessage(newMessage as Message)
             }
           } catch (error) {
             throw error;
@@ -438,14 +446,7 @@ function useProvideMessages(): MessagesContextValue {
           const isFromCurrentUser = newMessage.user_id === user.id;
           const logPrefix = isFromCurrentUser ? '📡 [BROADCAST-SELF]' : '📡 [BROADCAST-OTHER]';
           
-          setMessages(prev => {
-            const exists = prev.find(m => m.id === newMessage.id)
-            if (exists) return prev
-            return [...prev, newMessage]
-          })
-          if (!isFromCurrentUser) {
-            playMessage()
-          }
+          addNewMessage(newMessage as Message)
         })
         .on(
           'postgres_changes',
@@ -643,13 +644,7 @@ function useProvideMessages(): MessagesContextValue {
       if (data) {
         inserted = data as Message;
 
-        setMessages(prev => {
-          const exists = prev.find(m => m.id === data.id);
-          if (exists) {
-            return prev;
-          }
-          return [...prev, data as Message];
-        });
+        addNewMessage(data as Message);
 
         if (channelRef.current?.state === 'joined') {
           channelRef.current.send({
