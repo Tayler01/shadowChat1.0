@@ -32,15 +32,16 @@ export const ThreadReplyLink: React.FC<ThreadReplyLinkProps> = ({
           </span>
         </div>
         <div className="text-sm text-gray-700 dark:text-gray-300 break-words">
-          {message.content}
+          {message.content.slice(0, 40)}
+          {message.content.length > 40 ? '...' : ''}
         </div>
         <button
           type="button"
           onClick={() => onJumpToMessage(parent.id)}
           className="text-xs text-blue-600 dark:text-blue-400 mt-1 hover:underline"
         >
-          In reply to {parent.user?.display_name || 'Unknown'}: {parent.content.slice(0, 30)}
-          {parent.content.length > 30 ? '...' : ''}
+          In reply to {parent.user?.display_name || 'Unknown'}: {parent.content.slice(0, 40)}
+          {parent.content.length > 40 ? '...' : ''}
         </button>
       </div>
     </div>
