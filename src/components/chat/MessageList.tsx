@@ -116,6 +116,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
         const el = document.getElementById(`message-${id}`)
         if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          setAutoScroll(false)
           el.classList.add('ring-2', 'ring-[var(--color-accent)]')
           setTimeout(() => {
             el.classList.remove('ring-2', 'ring-[var(--color-accent)]')
