@@ -19,6 +19,7 @@ import { useTheme, colorSchemes, ColorScheme } from '../../hooks/useTheme'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useSuggestionsEnabled } from '../../hooks/useSuggestedReplies'
 import { useToneAnalysisEnabled } from '../../hooks/useToneAnalysisEnabled'
+import { useSoundEffects } from '../../hooks/useSoundEffects'
 
 interface SettingsViewProps {
   onToggleSidebar: () => void
@@ -26,7 +27,7 @@ interface SettingsViewProps {
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) => {
   const [notifications, setNotifications] = useState(true)
-  const [sounds, setSounds] = useState(true)
+  const { enabled: sounds, setEnabled: setSounds } = useSoundEffects()
   const [showDangerZone, setShowDangerZone] = useState(false)
   const { scheme, setScheme } = useTheme()
   const isDesktop = useIsDesktop()

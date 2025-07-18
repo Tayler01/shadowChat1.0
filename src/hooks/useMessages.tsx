@@ -11,6 +11,7 @@ import { MESSAGE_FETCH_LIMIT } from '../config';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
 import { useVisibilityRefresh } from './useVisibilityRefresh';
+import { useSoundEffects } from './useSoundEffects';
 
 const STORED_MESSAGE_LIMIT = 200;
 
@@ -136,6 +137,7 @@ function useProvideMessages(): MessagesContextValue {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const { user } = useAuth();
+  const { playMessage, playReaction } = useSoundEffects();
   const channelRef = useRef<RealtimeChannel | null>(null);
   const subscribeRef = useRef<() => RealtimeChannel>();
   const clientResetRef = useRef<() => Promise<void>>();
@@ -416,18 +418,14 @@ function useProvideMessages(): MessagesContextValue {
               const logPrefix = isFromCurrentUser ? '📨 [REALTIME-SELF]' : '📨 [REALTIME-OTHER]';
 
               setMessages(prev => {
-                // Check if message already exists to avoid duplicates
-                const exists = prev.find(msg => msg.id === newMessage.id);
-                if (exists) {
-                  return prev;
-                }
-                
-                // Add new message to the end
-                const updated = [...prev, newMessage as Message];
-                
-                // Force a new array reference to ensure React detects the change
-                return updated.slice();
-              });
+                const exists = prev.find(msg => msg.id === newMessage.id)
+                if (exists) return prev
+                const updated = [...prev, newMessage as Message]
+                return updated.slice()
+              })
+              if (!isFromCurrentUser) {
+                playMessage()
+              }
             }
           } catch (error) {
             throw error;
@@ -441,10 +439,13 @@ function useProvideMessages(): MessagesContextValue {
           const logPrefix = isFromCurrentUser ? '📡 [BROADCAST-SELF]' : '📡 [BROADCAST-OTHER]';
           
           setMessages(prev => {
-            const exists = prev.find(m => m.id === newMessage.id);
-            if (exists) return prev;
-            return [...prev, newMessage];
-          });
+            const exists = prev.find(m => m.id === newMessage.id)
+            if (exists) return prev
+            return [...prev, newMessage]
+          })
+          if (!isFromCurrentUser) {
+            playMessage()
+          }
         })
         .on(
           'postgres_changes',
@@ -472,14 +473,21 @@ function useProvideMessages(): MessagesContextValue {
 
               if (updatedMessage) {
                 setMessages(prev => {
-                  const index = prev.findIndex(msg => msg.id === updatedMessage.id);
+                  const index = prev.findIndex(msg => msg.id === updatedMessage.id)
                   if (index !== -1) {
-                    return prev.map(msg =>
+                    const prevMessage = prev[index]
+                    const changed =
+                      JSON.stringify(prevMessage.reactions) !== JSON.stringify(updatedMessage.reactions)
+                    const newList = prev.map(msg =>
                       msg.id === updatedMessage.id ? (updatedMessage as Message) : msg
-                    );
+                    )
+                    if (changed && updatedMessage.user_id !== user.id) {
+                      playReaction()
+                    }
+                    return newList
                   }
-                  return [...prev, updatedMessage as Message];
-                });
+                  return [...prev, updatedMessage as Message]
+                })
               }
             } catch (error) {
               throw error;
@@ -772,6 +780,8 @@ function useProvideMessages(): MessagesContextValue {
       if (error) {
         throw error;
       }
+
+      playReaction();
       
     } catch (error) {
       throw error;
