@@ -4,7 +4,8 @@ import React, {
   useEffect,
   useState,
   useCallback,
-  useRef
+  useRef,
+  useMemo
 } from 'react';
 import { Message, ensureSession, refreshSessionLocked, getWorkingClient, recreateSupabaseClient, supabase, resetRealtimeConnection } from '../lib/supabase';
 import { MESSAGE_FETCH_LIMIT } from '../config';
@@ -95,22 +96,18 @@ export const refreshSessionAndRetry = async (messageData: {
   };
 };
 
+// Memoized context value to prevent unnecessary re-renders
 interface MessagesContextValue {
   messages: Message[];
   loading: boolean;
-  sending: boolean;
-  loadingMore: boolean;
   hasMore: boolean;
-  sendMessage: (
-    content: string,
-    type?: 'text' | 'command' | 'audio' | 'image' | 'file',
-    fileUrl?: string,
-    replyTo?: string
-  ) => Promise<Message | null>;
-  editMessage: (id: string, content: string) => Promise<void>;
-  deleteMessage: (id: string) => Promise<void>;
-  toggleReaction: (id: string, emoji: string) => Promise<void>;
-  togglePin: (id: string) => Promise<void>;
+  loadingMore: boolean;
+  pinnedMessages: Message[];
+  sendMessage: (content: string, type?: 'text' | 'command' | 'audio' | 'image' | 'file', fileUrl?: string, replyTo?: string) => Promise<void>;
+  editMessage: (messageId: string, content: string) => Promise<void>;
+  deleteMessage: (messageId: string) => Promise<void>;
+  toggleReaction: (messageId: string, emoji: string) => Promise<void>;
+  togglePin: (messageId: string) => Promise<void>;
   loadOlderMessages: () => Promise<void>;
 }
 
@@ -142,21 +139,61 @@ function useProvideMessages(): MessagesContextValue {
   const subscribeRef = useRef<() => RealtimeChannel>();
   const clientResetRef = useRef<() => Promise<void>>();
 
+  // Memoize pinned messages to prevent unnecessary recalculations
+  const pinnedMessages = useMemo(() => 
+    messages.filter(m => m.pinned), 
+    [messages]
+  );
+
+  // Optimized message addition with reduced re-renders
   const addNewMessage = useCallback(
     (msg: Message) => {
-      let added = false;
       setMessages(prev => {
-        const exists = prev.some(m => m.id === msg.id);
-        if (exists) return prev;
-        added = true;
+        // Check if message already exists to prevent duplicates
+        const existingIndex = prev.findIndex(m => m.id === msg.id);
+        if (existingIndex !== -1) {
+          // Update existing message if it changed
+          if (JSON.stringify(prev[existingIndex]) === JSON.stringify(msg)) {
+            return prev; // No change, return same reference
+          }
+          const newMessages = [...prev];
+          newMessages[existingIndex] = msg;
+          return newMessages;
+        }
+        
+        // Add new message and play sound if not from current user
+        if (user && msg.user_id !== user.id) {
+          // Use setTimeout to avoid blocking UI updates
+          setTimeout(() => playMessage(), 0);
+        }
+        
         return [...prev, msg];
       });
-      if (added && user && msg.user_id !== user.id) {
-        playMessage();
-      }
     },
     [playMessage, user]
   );
+
+  // Batch message updates for better performance
+  const batchUpdateMessages = useCallback((updates: Message[]) => {
+    if (updates.length === 0) return;
+    
+    setMessages(prev => {
+      const messageMap = new Map(prev.map(m => [m.id, m]));
+      let hasChanges = false;
+      
+      updates.forEach(update => {
+        if (!messageMap.has(update.id) || 
+            JSON.stringify(messageMap.get(update.id)) !== JSON.stringify(update)) {
+          messageMap.set(update.id, update);
+          hasChanges = true;
+        }
+      });
+      
+      return hasChanges ? Array.from(messageMap.values()).sort((a, b) => 
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      ) : prev;
+    });
+  }, []);
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -473,6 +510,7 @@ function useProvideMessages(): MessagesContextValue {
               }
 
               if (updatedMessage) {
+                batchUpdateMessages([updatedMessage as Message]);
                 setMessages(prev => {
                   const index = prev.findIndex(msg => msg.id === updatedMessage.id)
                   if (index !== -1) {
@@ -586,14 +624,14 @@ function useProvideMessages(): MessagesContextValue {
       }
       channelRef.current = null;
     };
-  }, [user, fetchMessages]);
+  }, [user, fetchMessages, addNewMessage, batchUpdateMessages, setMessages, playReaction]);
 
   const sendMessage = useCallback(async (
     content: string,
     messageType: 'text' | 'command' | 'audio' | 'image' | 'file' = 'text',
     fileUrl?: string,
     replyTo?: string
-  ): Promise<Message | null> => {
+  ): Promise<void> => {
     const timestamp = new Date().toISOString();
     const logPrefix = `🚀 [MESSAGES] [${timestamp}] sendMessage`;
 
@@ -679,8 +717,7 @@ function useProvideMessages(): MessagesContextValue {
     } finally {
       setSending(false);
     }
-    return inserted;
-  }, [user]);
+  }, [user, addNewMessage, fetchMessages]);
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
     if (!user) return;
@@ -830,21 +867,36 @@ function useProvideMessages(): MessagesContextValue {
       fetchMessages();
       throw error;
     }
-  }, [user, messages]);
+  }, [user, messages, fetchMessages]);
 
-  return {
+  // Memoize the context value to prevent unnecessary re-renders
+  const contextValue = useMemo<MessagesContextValue>(() => ({
     messages,
     loading,
-    sending,
-    loadingMore,
     hasMore,
+    loadingMore,
+    pinnedMessages,
     sendMessage,
     editMessage,
     deleteMessage,
     toggleReaction,
     togglePin,
     loadOlderMessages,
-  };
+  }), [
+    messages,
+    loading,
+    hasMore,
+    loadingMore,
+    pinnedMessages,
+    sendMessage,
+    editMessage,
+    deleteMessage,
+    toggleReaction,
+    togglePin,
+    loadOlderMessages,
+  ]);
+
+  return contextValue;
 }
 
 export function MessagesProvider({ children }: { children: React.ReactNode }) {
