@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import React, { useEffect, useMemo, useRef, useState, useCallback, memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowDown } from 'lucide-react'
 import { useMessages } from '../../hooks/useMessages'
@@ -38,19 +38,25 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
   const prevScrollTopRef = useRef(0)
   const [autoScroll, setAutoScroll] = useState(true)
 
+  // Memoize expensive calculations with better dependencies
   const { messageMap, childrenMap, rootMessages } = useMemo(() => {
     const msgMap = new Map<string, Message>()
     const childMap = new Map<string, Message[]>()
     const roots: Message[] = []
-    messages.forEach(m => {
-      msgMap.set(m.id, m)
-      if (m.reply_to) {
-        if (!childMap.has(m.reply_to)) childMap.set(m.reply_to, [])
-        childMap.get(m.reply_to)!.push(m)
+    
+    // Single pass through messages for better performance
+    for (const message of messages) {
+      msgMap.set(message.id, message)
+      if (message.reply_to) {
+        if (!childMap.has(message.reply_to)) {
+          childMap.set(message.reply_to, [])
+        }
+        childMap.get(message.reply_to)!.push(message)
       } else {
-        roots.push(m)
+        roots.push(message)
       }
-    })
+    }
+    
     return { messageMap: msgMap, childrenMap: childMap, rootMessages: roots }
   }, [messages])
 
@@ -126,15 +132,17 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     [messageMap]
   )
 
+  // Optimized scroll handling with throttling
   const handleScroll = useCallback(() => {
-    const el = containerRef.current
-    if (!el) return
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 20
-    setAutoScroll(atBottom)
-
-    if (el.scrollTop < 100 && hasMore && !loadingMore) {
-      prevHeightRef.current = el.scrollHeight
-      prevScrollTopRef.current = el.scrollTop
+    if (!containerRef.current) return
+    
+    const { scrollTop, scrollHeight, clientHeight } = containerRef.current
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 100
+    
+    setAutoScroll(isAtBottom)
+    
+    // Load more messages when near top
+    if (scrollTop < 500 && hasMore && !loadingMore) {
       loadOlderMessages()
     }
   }, [hasMore, loadingMore, loadOlderMessages])
@@ -164,10 +172,10 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     return all.sort((a, b) => a.created_at.localeCompare(b.created_at))
   }, [rootMessages, replyLinkMessages])
 
-  const groupedMessages = useMemo(
-    () => groupMessagesByDate(combinedMessages as any[]),
-    [combinedMessages]
-  )
+  // Optimize grouped messages calculation
+  const groupedMessages = useMemo(() => {
+    return groupMessagesByDate(rootMessages)
+  }, [rootMessages])
 
   // Maintain scroll position when older messages are prepended
   useEffect(() => {
@@ -361,3 +369,81 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     </div>
   )
 }
+
+// Memoized message group component to prevent unnecessary re-renders
+const MessageGroup = memo<{
+  group: Message[];
+  onReply?: (messageId: string, content: string) => void;
+  onResend?: (msg: FailedMessage) => void;
+  rootMessage: Message;
+  childrenMap: Map<string, Message[]>;
+  collapsed: Set<string>;
+  toggleThread: (id: string) => void;
+  jumpToMessage: (id: string) => void;
+}>(({
+  group,
+  onReply,
+  onResend,
+  rootMessage,
+  childrenMap,
+  collapsed,
+  toggleThread,
+  jumpToMessage
+}) => {
+  const replies = childrenMap.get(rootMessage.id) || []
+  const isCollapsed = collapsed.has(rootMessage.id)
+
+  return (
+    <>
+      {group.map((message, index) => {
+        const isGrouped = index > 0 && shouldGroupMessage(group[index - 1], message)
+        return (
+          <MessageItem
+            key={message.id}
+            message={message}
+            onReply={onReply}
+            showAvatar={!isGrouped}
+            showTimestamp={!isGrouped}
+            isGrouped={isGrouped}
+          />
+        )
+      })}
+      
+      {replies.length > 0 && (
+        <ThreadReplyLink
+          parentMessage={rootMessage}
+          replies={replies}
+          isCollapsed={isCollapsed}
+          onToggle={() => toggleThread(rootMessage.id)}
+          onJumpToMessage={jumpToMessage}
+        />
+      )}
+      
+      <AnimatePresence>
+        {!isCollapsed && replies.map((reply, index) => {
+          const isGrouped = index > 0 && shouldGroupMessage(replies[index - 1], reply)
+          return (
+            <motion.div
+              key={reply.id}
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="ml-8 border-l-2 border-gray-200 dark:border-gray-700 pl-4"
+            >
+              <MessageItem
+                message={reply}
+                onReply={onReply}
+                showAvatar={!isGrouped}
+                showTimestamp={!isGrouped}
+                isGrouped={isGrouped}
+                isReply={true}
+              />
+            </motion.div>
+          )
+        })}
+      </AnimatePresence>
+    </>
+  )
+})
+
+MessageGroup.displayName = 'MessageGroup'

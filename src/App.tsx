@@ -1,19 +1,22 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, Suspense, lazy } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { AuthGuard } from './components/auth/AuthGuard'
 import { Sidebar } from './components/layout/Sidebar'
 import { ChatView } from './components/chat/ChatView'
-import { DirectMessagesView } from './components/dms/DirectMessagesView'
-import { ProfileView } from './components/profile/ProfileView'
-import { SettingsView } from './components/settings/SettingsView'
-import { MessagesProvider } from './hooks/useMessages'
-import { DirectMessagesProvider } from './hooks/useDirectMessages'
 import { MobileNav } from './components/layout/MobileNav'
 import { useIsDesktop } from './hooks/useIsDesktop'
 import { useMessageNotifications } from './hooks/useMessageNotifications'
 import { ClientResetProvider } from './hooks/ClientResetContext'
 import { SoundEffectsProvider } from './hooks/useSoundEffects'
 import { ConnectivityBanner } from './components/ui/ConnectivityBanner'
+import { MessagesProvider } from './hooks/useMessages'
+import { DirectMessagesProvider } from './hooks/useDirectMessages'
+import { LoadingSpinner } from './components/ui/LoadingSpinner'
+
+// Lazy load heavy components
+const DirectMessagesView = lazy(() => import('./components/dms/DirectMessagesView').then(module => ({ default: module.DirectMessagesView })))
+const ProfileView = lazy(() => import('./components/profile/ProfileView').then(module => ({ default: module.ProfileView })))
+const SettingsView = lazy(() => import('./components/settings/SettingsView').then(module => ({ default: module.SettingsView })))
 
 type View = 'chat' | 'dms' | 'profile' | 'settings'
 
@@ -73,17 +76,27 @@ function App() {
         )
       case 'dms':
         return (
-          <DirectMessagesView
-            onToggleSidebar={toggleSidebar}
-            currentView={currentView}
-            onViewChange={setCurrentView}
-            initialConversation={dmTarget || undefined}
-          />
+          <Suspense fallback={<div className="flex items-center justify-center h-full"><LoadingSpinner /></div>}>
+            <DirectMessagesView
+              onToggleSidebar={toggleSidebar}
+              currentView={currentView}
+              onViewChange={setCurrentView}
+              initialConversation={dmTarget || undefined}
+            />
+          </Suspense>
         )
       case 'profile':
-        return <ProfileView onToggleSidebar={toggleSidebar} />
+        return (
+          <Suspense fallback={<div className="flex items-center justify-center h-full"><LoadingSpinner /></div>}>
+            <ProfileView onToggleSidebar={toggleSidebar} />
+          </Suspense>
+        )
       case 'settings':
-        return <SettingsView onToggleSidebar={toggleSidebar} />
+        return (
+          <Suspense fallback={<div className="flex items-center justify-center h-full"><LoadingSpinner /></div>}>
+            <SettingsView onToggleSidebar={toggleSidebar} />
+          </Suspense>
+        )
       default:
         return (
           <ChatView
