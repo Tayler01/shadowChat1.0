@@ -1,11 +1,6 @@
-import React, { useState, useEffect } from 'react'
-import { Toaster } from 'react-hot-toast'
+import React, { useState, useEffect, Suspense } from 'react'
 import { AuthGuard } from './components/auth/AuthGuard'
 import { Sidebar } from './components/layout/Sidebar'
-import { ChatView } from './components/chat/ChatView'
-import { DirectMessagesView } from './components/dms/DirectMessagesView'
-import { ProfileView } from './components/profile/ProfileView'
-import { SettingsView } from './components/settings/SettingsView'
 import { MessagesProvider } from './hooks/useMessages'
 import { DirectMessagesProvider } from './hooks/useDirectMessages'
 import { MobileNav } from './components/layout/MobileNav'
@@ -14,6 +9,13 @@ import { useMessageNotifications } from './hooks/useMessageNotifications'
 import { ClientResetProvider } from './hooks/ClientResetContext'
 import { SoundEffectsProvider } from './hooks/useSoundEffects'
 import { ConnectivityBanner } from './components/ui/ConnectivityBanner'
+import { Toaster } from 'react-hot-toast'
+
+// Lazy-load the heavy view modules so they are only fetched when needed.
+const ChatView = React.lazy(() => import('./components/chat/ChatView'))
+const DirectMessagesView = React.lazy(() => import('./components/dms/DirectMessagesView'))
+const ProfileView = React.lazy(() => import('./components/profile/ProfileView'))
+const SettingsView = React.lazy(() => import('./components/settings/SettingsView'))
 
 type View = 'chat' | 'dms' | 'profile' | 'settings'
 
@@ -121,7 +123,10 @@ function App() {
           )}
 
           <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-            {renderCurrentView()}
+            {/* Defer loading of the selected view until it is requested */}
+            <Suspense fallback={<div className="flex-1 flex items-center justify-center">Loading…</div>}>
+              {renderCurrentView()}
+            </Suspense>
           </main>
 
           {/* Mobile bottom navigation */}

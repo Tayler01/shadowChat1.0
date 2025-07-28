@@ -7,4 +7,17 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  build: {
+    sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          supabase: ['@supabase/supabase-js'],
+          framerMotion: ['framer-motion'],
+          emojiPicker: ['emoji-picker-react'],
+          sentiment: ['sentiment'],
+        },
+      },
+    },
+  },
 });
