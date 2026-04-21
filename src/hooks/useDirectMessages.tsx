@@ -17,6 +17,7 @@ import {
   markDMMessagesRead,
   fetchDMConversations,
   refreshSessionLocked,
+  resetRealtimeConnection,
 } from '../lib/supabase';
 import { triggerDMPushNotification } from '../lib/push';
 import { MESSAGE_FETCH_LIMIT } from '../config';
@@ -52,149 +53,268 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
   const { user } = useAuth();
   const { playMessage } = useSoundEffects();
   const currentConversationRef = useRef<string | null>(null);
+  const conversationsChannelRef = useRef<RealtimeChannel | null>(null);
+  const conversationsSubscribeRef = useRef<(() => Promise<RealtimeChannel>) | null>(null);
 
   useEffect(() => {
     currentConversationRef.current = currentConversation;
   }, [currentConversation]);
 
-  // Reset function for page refocus
-  const resetWithFreshClient = useCallback(async () => {
+  const refreshConversations = useCallback(async () => {
     try {
-      // Refetch conversations with new client
       const convs = await fetchDMConversations();
       setConversations(convs);
-      
     } catch {
+      setConversations([]);
+    } finally {
+      setLoading(false);
     }
   }, []);
+
+  const resetWithFreshClient = useCallback(async () => {
+    await refreshConversations();
+
+    const existingChannel = conversationsChannelRef.current;
+    const realtimeClient = getRealtimeClient();
+    if (
+      existingChannel &&
+      realtimeClient?.removeChannel &&
+      typeof realtimeClient.removeChannel === 'function'
+    ) {
+      try {
+        realtimeClient.removeChannel(existingChannel);
+      } catch {
+        // ignore channel cleanup failures
+      }
+    }
+
+    conversationsChannelRef.current = null;
+
+    if (conversationsSubscribeRef.current) {
+      try {
+        const newChannel = await conversationsSubscribeRef.current();
+        conversationsChannelRef.current = newChannel;
+      } catch {
+        // ignore resubscribe failures and wait for the next refresh
+      }
+    }
+  }, [refreshConversations]);
+
+  useVisibilityRefresh(() => {
+    void resetWithFreshClient();
+  });
 
   // Fetch conversations
   useEffect(() => {
     if (!user) return;
 
-    const fetchData = async () => {
-      try {
-        const convs = await fetchDMConversations();
-        setConversations(convs);
-      } catch {
-        setConversations([]);
-      }
-      setLoading(false);
-    };
-
-    fetchData();
-  }, [user]);
+    void refreshConversations();
+  }, [refreshConversations, user]);
 
   // Subscribe to real-time updates
   useEffect(() => {
     if (!user) return;
 
-    const realtimeClient = getRealtimeClient();
-    if (!realtimeClient?.channel) return;
+    let channel: RealtimeChannel | null = null;
+    let disposed = false;
 
-    const channel = realtimeClient
-      .channel('dm_messages')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'dm_messages',
-        },
-        (payload: any) => {
-          // Update conversations when new message arrives
-          let missing = false
-          setConversations(prev => {
-            const convIndex = prev.findIndex(c => c.id === payload.new.conversation_id)
-            if (convIndex >= 0) {
-              const updated = [...prev]
-              const isCurrent =
-                payload.new.conversation_id === currentConversationRef.current
-              let unread = updated[convIndex].unread_count
-              if (payload.new.sender_id !== user.id) {
-                unread = isCurrent ? 0 : (unread || 0) + 1
-              }
+    const subscribeToChannel = async (): Promise<RealtimeChannel> => {
+      const realtimeClient =
+        (await getWorkingClient().catch(() => getRealtimeClient())) ||
+        getRealtimeClient();
 
-              updated[convIndex] = {
-                ...updated[convIndex],
-                last_message_at: payload.new.created_at,
-                last_message: {
-                  id: payload.new.id,
-                  conversation_id: payload.new.conversation_id,
-                  sender_id: payload.new.sender_id,
-                  content: payload.new.content,
-                  message_type: payload.new.message_type ?? 'text',
-                  audio_url: payload.new.audio_url ?? undefined,
-                  file_url: payload.new.file_url ?? undefined,
-                  read_at: payload.new.read_at,
-                  reactions: payload.new.reactions,
-                  edited_at: payload.new.edited_at,
-                  created_at: payload.new.created_at,
-                  updated_at: payload.new.updated_at ?? payload.new.created_at,
-                },
-                unread_count: unread,
+      if (!realtimeClient?.channel || typeof realtimeClient.channel !== 'function') {
+        throw new Error('Realtime client unavailable');
+      }
+
+      const nextChannel = realtimeClient
+        .channel(`dm_messages:${user.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'dm_messages',
+          },
+          (payload: any) => {
+            let missing = false;
+
+            setConversations(prev => {
+              const convIndex = prev.findIndex(c => c.id === payload.new.conversation_id);
+              if (convIndex >= 0) {
+                const updated = [...prev];
+                const isCurrent =
+                  payload.new.conversation_id === currentConversationRef.current;
+                let unread = updated[convIndex].unread_count;
+                if (payload.new.sender_id !== user.id) {
+                  unread = isCurrent ? 0 : (unread || 0) + 1;
+                }
+
+                updated[convIndex] = {
+                  ...updated[convIndex],
+                  last_message_at: payload.new.created_at,
+                  last_message: {
+                    id: payload.new.id,
+                    conversation_id: payload.new.conversation_id,
+                    sender_id: payload.new.sender_id,
+                    content: payload.new.content,
+                    message_type: payload.new.message_type ?? 'text',
+                    audio_url: payload.new.audio_url ?? undefined,
+                    file_url: payload.new.file_url ?? undefined,
+                    read_at: payload.new.read_at,
+                    reactions: payload.new.reactions,
+                    edited_at: payload.new.edited_at,
+                    created_at: payload.new.created_at,
+                    updated_at: payload.new.updated_at ?? payload.new.created_at,
+                  },
+                  unread_count: unread,
+                };
+                const [moved] = updated.splice(convIndex, 1);
+                updated.unshift(moved);
+                return updated;
               }
-              // Move to top
-              const [moved] = updated.splice(convIndex, 1)
-              updated.unshift(moved)
-              return updated
+              missing = true;
+              return prev;
+            });
+
+            void refreshConversations();
+
+            if (payload.new.sender_id !== user.id) {
+              playMessage();
             }
-            missing = true
-            return prev
-          })
-          if (missing) {
-            fetchDMConversations().then(setConversations)
-          }
-          if (payload.new.sender_id !== user.id) {
-            playMessage()
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'dm_messages',
-        },
-        (payload: any) => {
-          setConversations(prev => {
-            const convIndex = prev.findIndex(c => c.id === payload.new.conversation_id);
-            if (convIndex >= 0 && prev[convIndex].last_message?.id === payload.new.id) {
-              const updated = [...prev];
-              updated[convIndex] = {
-                ...updated[convIndex],
-                last_message: {
-                  ...updated[convIndex].last_message!,
-                  reactions: payload.new.reactions,
-                  content: payload.new.content,
-                  read_at: payload.new.read_at,
-                  edited_at: payload.new.edited_at,
-                },
-              };
-              return updated;
+
+            if (missing) {
+              void refreshConversations();
             }
-            return prev;
-          });
-        }
-      )
-      .subscribe();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'dm_messages',
+          },
+          (payload: any) => {
+            setConversations(prev => {
+              const convIndex = prev.findIndex(c => c.id === payload.new.conversation_id);
+              if (convIndex >= 0 && prev[convIndex].last_message?.id === payload.new.id) {
+                const updated = [...prev];
+                updated[convIndex] = {
+                  ...updated[convIndex],
+                  last_message: {
+                    ...updated[convIndex].last_message!,
+                    reactions: payload.new.reactions,
+                    content: payload.new.content,
+                    read_at: payload.new.read_at,
+                    edited_at: payload.new.edited_at,
+                  },
+                };
+                return updated;
+              }
+              return prev;
+            });
+          }
+        )
+        .subscribe(async (status: string) => {
+          if (disposed) return;
+
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            try {
+              await resetRealtimeConnection();
+              await refreshConversations();
+            } catch {
+              // ignore reset failures and try a plain resubscribe below
+            }
+          }
+
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            const activeChannel = conversationsChannelRef.current;
+            if (
+              activeChannel &&
+              realtimeClient.removeChannel &&
+              typeof realtimeClient.removeChannel === 'function'
+            ) {
+              try {
+                realtimeClient.removeChannel(activeChannel);
+              } catch {
+                // ignore cleanup failures
+              }
+            }
+
+            conversationsChannelRef.current = null;
+
+            window.setTimeout(() => {
+              if (disposed) return;
+              subscribeToChannel()
+                .then(resubscribedChannel => {
+                  channel = resubscribedChannel;
+                  conversationsChannelRef.current = resubscribedChannel;
+                })
+                .catch(() => {
+                  // ignore resubscribe failures and wait for the next refresh
+                });
+            }, status === 'CLOSED' ? 1000 : 1500);
+          }
+        });
+
+      return nextChannel;
+    };
+
+    conversationsSubscribeRef.current = subscribeToChannel;
+
+    subscribeToChannel()
+      .then(newChannel => {
+        channel = newChannel;
+        conversationsChannelRef.current = newChannel;
+      })
+      .catch(() => {
+        // ignore realtime boot errors and rely on manual refresh/resubscribe paths
+      });
 
     return () => {
-      if (channel && realtimeClient?.removeChannel) {
-        realtimeClient.removeChannel(channel);
+      disposed = true;
+      conversationsSubscribeRef.current = null;
+      const realtimeClient = getRealtimeClient();
+      const activeChannel = channel || conversationsChannelRef.current;
+      if (
+        activeChannel &&
+        realtimeClient?.removeChannel &&
+        typeof realtimeClient.removeChannel === 'function'
+      ) {
+        try {
+          realtimeClient.removeChannel(activeChannel);
+        } catch {
+          // ignore cleanup failures
+        }
       }
+      conversationsChannelRef.current = null;
     };
-  }, [user, playMessage]);
+  }, [playMessage, refreshConversations, user]);
 
   const {
     messages,
     sending,
-    sendMessage,
+    sendMessage: sendConversationMessage,
     loadingMore,
     hasMore,
     loadOlderMessages,
   } = useConversationMessages(currentConversation);
+
+  const sendMessage = useCallback(
+    async (
+      content: string,
+      messageType?: 'text' | 'command' | 'audio' | 'image' | 'file',
+      fileUrl?: string
+    ) => {
+      const message = await sendConversationMessage(content, messageType, fileUrl);
+      if (message) {
+        void refreshConversations();
+      }
+      return message;
+    },
+    [refreshConversations, sendConversationMessage]
+  );
 
   const startConversation = useCallback(async (username: string) => {
     if (!user) return null;
@@ -233,7 +353,8 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
         c.id === conversationId ? { ...c, unread_count: 0 } : c
       )
     );
-  }, []);
+    void refreshConversations();
+  }, [refreshConversations]);
 
   return {
     conversations,
@@ -386,6 +507,7 @@ export function useConversationMessages(conversationId: string | null) {
     if (!getRealtimeClient()?.channel) return;
 
     let channel: RealtimeChannel | null = null;
+    let disposed = false;
 
     const subscribeToChannel = (): RealtimeChannel => {
       const realtimeClient = getRealtimeClient()
@@ -461,7 +583,45 @@ export function useConversationMessages(conversationId: string | null) {
             }
           }
         )
-        .subscribe();
+        .subscribe(async (status: string) => {
+          if (disposed) return;
+
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            try {
+              await resetRealtimeConnection();
+            } catch {
+              // ignore reset failures and fall back to resubscribe below
+            }
+          }
+
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            const activeChannel = channelRef.current;
+            if (
+              activeChannel &&
+              realtimeClient.removeChannel &&
+              typeof realtimeClient.removeChannel === 'function'
+            ) {
+              try {
+                realtimeClient.removeChannel(activeChannel);
+              } catch {
+                // ignore cleanup failures
+              }
+            }
+
+            channelRef.current = null;
+
+            window.setTimeout(() => {
+              if (disposed) return;
+              try {
+                const resubscribedChannel = subscribeToChannel();
+                channel = resubscribedChannel;
+                channelRef.current = resubscribedChannel;
+              } catch {
+                // ignore resubscribe failures and wait for the next visibility refresh
+              }
+            }, status === 'CLOSED' ? 1000 : 1500);
+          }
+        });
 
       return newChannel;
     };
@@ -470,10 +630,12 @@ export function useConversationMessages(conversationId: string | null) {
     subscribeRef.current = subscribeToChannel;
     channelRef.current = channel;
     return () => {
+      disposed = true;
       const realtimeClient = getRealtimeClient();
       if (channel && realtimeClient?.removeChannel) {
         realtimeClient.removeChannel(channel);
       }
+      channelRef.current = null;
     };
   }, [conversationId, user, playMessage]);
 

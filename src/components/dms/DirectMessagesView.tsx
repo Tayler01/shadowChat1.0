@@ -81,7 +81,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   useEffect(() => {
     if (!currentConversation) return
     const conv = conversations.find(c => c.id === currentConversation)
-    if (conv && conv.unread_count && conv.unread_count > 0) {
+    if (conv && (conv.unread_count || 0) > 0) {
       markAsRead(currentConversation)
     }
   }, [currentConversation, conversations, markAsRead])
@@ -312,7 +312,10 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
             </div>
           ) : (
             <div className="space-y-1 p-2">
-              {conversations.map(conversation => (
+              {conversations.map(conversation => {
+                const unreadCount = conversation.unread_count || 0
+
+                return (
                 <motion.button
                   key={conversation.id}
                   initial={{ opacity: 0, x: -20 }}
@@ -325,33 +328,21 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                       : 'border-transparent hover:border-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.03)]'
                   }`}
                 >
-                  <div className="flex items-center space-x-3">
-                    <div className="relative">
-                      <Avatar
-                        src={conversation.other_user?.avatar_url}
-                        alt={conversation.other_user?.display_name || 'Unknown User'}
-                        size="md"
-                        color={conversation.other_user?.color}
-                        status={conversation.other_user?.status}
-                        showStatus
-                      />
-                      {conversation.unread_count && conversation.unread_count > 0 && (
-                        <div className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full border border-[rgba(215,170,70,0.3)] bg-[rgba(215,170,70,0.14)] text-xs text-[var(--text-gold)]">
-                          {conversation.unread_count}
-                        </div>
-                      )}
-                    </div>
+                  <div className="flex items-start gap-3">
+                    <Avatar
+                      src={conversation.other_user?.avatar_url}
+                      alt={conversation.other_user?.display_name || 'Unknown User'}
+                      size="md"
+                      color={conversation.other_user?.color}
+                      status={conversation.other_user?.status}
+                      showStatus
+                    />
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
                         <span className="truncate font-medium text-[var(--text-primary)]">
                           {conversation.other_user?.display_name}
                         </span>
-                        {conversation.last_message && (
-                          <span className="text-xs text-[var(--text-muted)]">
-                            {formatTime(conversation.last_message.created_at)}
-                          </span>
-                        )}
                       </div>
 
                       <div className="flex items-center justify-between">
@@ -366,9 +357,23 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                         </p>
                       )}
                     </div>
+
+                    <div className="ml-auto flex min-w-[3.5rem] shrink-0 flex-col items-end gap-2 text-right">
+                      {conversation.last_message && (
+                        <span className="text-xs text-[var(--text-muted)]">
+                          {formatTime(conversation.last_message.created_at)}
+                        </span>
+                      )}
+                      {unreadCount > 0 && (
+                        <span className="inline-flex min-w-[1.75rem] items-center justify-center rounded-full border border-[rgba(215,170,70,0.3)] bg-[rgba(215,170,70,0.14)] px-2 py-0.5 text-xs font-medium text-[var(--text-gold)]">
+                          {unreadCount > 99 ? '99+' : unreadCount}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </motion.button>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
