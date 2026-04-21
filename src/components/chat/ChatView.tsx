@@ -65,19 +65,30 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange })
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 text-sm"
+      className="flex h-full flex-col bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.05),transparent_26%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] text-sm"
     >
       {/* Header */}
-      <div className="flex-shrink-0 px-6 py-5 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between">
+      <div className="glass-panel-strong flex-shrink-0 border-b border-[var(--border-panel)] px-6 py-5">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
             {/* Menu button removed on mobile */}
             {/* Header title */}
             <div className="flex items-center space-x-4">
               <div>
-                <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                <h1 className="text-xl font-semibold text-[var(--text-primary)]">
                   General Chat
                 </h1>
+                <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
+                  Lounge Channel
+                </p>
+              </div>
+              <div className="hidden items-center gap-2 lg:flex">
+                <span className="rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                  Live feed
+                </span>
+                <span className="rounded-full border border-[rgba(215,170,70,0.16)] bg-[rgba(215,170,70,0.08)] px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--text-gold)]">
+                  {messages.length} messages loaded
+                </span>
               </div>
               {pinnedMessages.length > 0 && (
                 <PinnedMessagesBar
@@ -91,9 +102,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange })
           </div>
 
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-              <Users className="w-4 h-4" />
-              <span>Online</span>
+            <div className="flex items-center space-x-2 rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5 text-sm text-[var(--text-muted)]">
+              <Users className="h-4 w-4" />
+              <span>Live now</span>
               <ClientResetIndicator status={resetStatus} />
             </div>
           </div>
@@ -125,15 +136,17 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange })
 
       {/* Desktop Message Input */}
       <div className="hidden md:block">
-        <MessageInput
-          onSendMessage={handleSendMessage}
-          placeholder='Try "@ai" to ask AI anything'
-          cacheKey="general"
-          onUploadStatusChange={setUploading}
-          messages={messages}
-          replyingTo={replyTo || undefined}
-          onCancelReply={() => setReplyTo(null)}
-        />
+        <div className="mx-auto w-full max-w-6xl">
+          <MessageInput
+            onSendMessage={handleSendMessage}
+            placeholder='Try "@ai" to ask AI anything'
+            cacheKey="general"
+            onUploadStatusChange={setUploading}
+            messages={messages}
+            replyingTo={replyTo || undefined}
+            onCancelReply={() => setReplyTo(null)}
+          />
+        </div>
       </div>
 
       {/* Mobile Message Input with Navigation */}
@@ -144,7 +157,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange })
         <MessageInput
           onSendMessage={handleSendMessage}
           placeholder='Try "@ai" to ask AI anything'
-          className="border-t"
+          className="border-t border-[var(--border-panel)]"
           cacheKey="general"
           onUploadStatusChange={setUploading}
           messages={messages}

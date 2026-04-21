@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { supabase, getWorkingClient } from '../lib/supabase'
+import { getRealtimeClient, getWorkingClient } from '../lib/supabase'
 import { useAuth } from './useAuth'
 import { useIsDesktop } from './useIsDesktop'
 import { MessageNotification } from '../components/notifications/MessageNotification'
@@ -12,12 +12,15 @@ export function useMessageNotifications(onOpenConversation: (id: string) => void
   useEffect(() => {
     if (!user) return
 
-    const channel = supabase
+    const realtimeClient = getRealtimeClient()
+    if (!realtimeClient?.channel) return
+
+    const channel = realtimeClient
       .channel('dm_notifications')
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'dm_messages' },
-        async payload => {
+        async (payload: any) => {
           if (payload.new.sender_id === user.id) return
 
           const working = await getWorkingClient()
@@ -29,15 +32,26 @@ export function useMessageNotifications(onOpenConversation: (id: string) => void
             .eq('id', payload.new.id)
             .single()
 
-          if (data) {
+          const message = data as unknown as {
+            id: string
+            content: string
+            conversation_id: string
+            sender?: {
+              display_name?: string
+              avatar_url?: string
+              color?: string
+            }
+          } | null
+
+          if (message) {
             toast.custom(t => (
               <MessageNotification
                 t={t}
-                content={data.content}
-                sender={data.sender || {}}
+                content={message.content}
+                sender={message.sender || {}}
                 onClick={() => {
                   toast.dismiss(t.id)
-                  onOpenConversation(data.conversation_id)
+                  onOpenConversation(message.conversation_id)
                 }}
                 desktop={isDesktop}
               />
@@ -48,7 +62,9 @@ export function useMessageNotifications(onOpenConversation: (id: string) => void
       .subscribe()
 
     return () => {
-      supabase.removeChannel(channel)
+      if (channel && realtimeClient?.removeChannel) {
+        realtimeClient.removeChannel(channel)
+      }
     }
   }, [user, onOpenConversation, isDesktop])
 }

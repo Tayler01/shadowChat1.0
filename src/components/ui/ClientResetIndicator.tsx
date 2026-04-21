@@ -13,19 +13,19 @@ export const ClientResetIndicator: React.FC<ClientResetIndicatorProps> = ({
     switch (status) {
       case 'resetting':
         return {
-          color: 'bg-red-500',
+          color: 'bg-[var(--state-warning)]',
           animate: true
         }
       case 'error':
         return {
-          color: 'bg-orange-500',
+          color: 'bg-[var(--state-danger)]',
           animate: false
         }
       case 'success':
       case 'idle':
       default:
         return {
-          color: 'bg-green-500',
+          color: 'bg-[var(--state-success)]',
           animate: false
         }
     }

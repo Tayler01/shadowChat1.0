@@ -29,22 +29,22 @@ export const FileAttachment: React.FC<FileAttachmentProps> = ({ url, meta }) => 
         <iframe
           src={url}
           title={name}
-          className="w-full h-48 rounded border mb-2"
+          className="mb-2 h-48 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.02)]"
         />
       )}
       {previewAudio && (
         <audio controls src={url} className="w-full mt-1 mb-2" />
       )}
-      <div className="flex items-center space-x-2">
-        <FileText className="w-4 h-4 flex-shrink-0" />
-        <a href={url} download className="text-blue-600 underline break-all">
+      <div className="glass-panel flex items-center space-x-2 rounded-[var(--radius-md)] px-3 py-2">
+        <FileText className="h-4 w-4 flex-shrink-0 text-[var(--text-gold)]" />
+        <a href={url} download className="break-all text-[var(--text-gold)] underline decoration-[rgba(215,170,70,0.45)] underline-offset-2">
           {name}
         </a>
         {size > 0 && (
-          <span className="text-xs text-gray-500">({formatBytes(size)})</span>
+          <span className="text-xs text-[var(--text-muted)]">({formatBytes(size)})</span>
         )}
         {!previewDocument && !previewAudio && type && (
-          <span className="text-xs text-gray-500">{type}</span>
+          <span className="text-xs text-[var(--text-muted)]">{type}</span>
         )}
       </div>
     </div>

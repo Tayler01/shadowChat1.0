@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import { recreateSupabaseClient, forceSessionRestore, getWorkingClient } from '../lib/supabase'
 export function useVisibilityRefresh(onVisible?: () => void, delayMs = 200) {
   useEffect(() => {
     const handler = async () => {
@@ -25,5 +24,5 @@ export function useVisibilityRefresh(onVisible?: () => void, delayMs = 200) {
     
     document.addEventListener('visibilitychange', handler)
     return () => document.removeEventListener('visibilitychange', handler)
-  }, [onVisible])
+  }, [delayMs, onVisible])
 }

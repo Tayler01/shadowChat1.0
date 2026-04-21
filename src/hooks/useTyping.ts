@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { getWorkingClient } from '../lib/supabase'
+import { getRealtimeClient, getWorkingClient } from '../lib/supabase'
 import { useAuth } from './useAuth'
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
 
@@ -11,6 +11,7 @@ interface TypingUser {
 
 export const useTyping = (channelName: string = 'general') => {
   const { user } = useAuth()
+  const userId = user?.id
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([])
   const [isTyping, setIsTyping] = useState(false)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
@@ -21,18 +22,18 @@ export const useTyping = (channelName: string = 'general') => {
     let channel: RealtimeChannel | null = null;
 
     const setupChannel = async () => {
-      const client = await getWorkingClient();
+      const client = await getWorkingClient().catch(() => getRealtimeClient());
+      if (!client?.channel) return;
       clientRef.current = client;
       channel = client.channel(`typing:${channelName}`);
       channelRef.current = channel;
 
       // Listen for typing events
-      channel
-      .on('broadcast', { event: 'typing' }, (payload) => {
+      channel?.on('broadcast', { event: 'typing' }, (payload) => {
         const { user: typingUser, typing } = payload.payload
 
         // Ignore events from the current user
-        if (typingUser.id === user?.id) return
+        if (typingUser.id === userId) return
 
         setTypingUsers(prev => {
           if (typing) {
@@ -64,7 +65,7 @@ export const useTyping = (channelName: string = 'general') => {
         clientRef.current.removeChannel(channel);
       }
     }
-  }, [channelName])
+  }, [channelName, userId])
 
   const stopTyping = useCallback(async () => {
     if (!isTyping || !user) return

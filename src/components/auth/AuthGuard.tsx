@@ -12,12 +12,15 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
   if (loading) {
     return (
-      <div className="min-h-[100dvh] flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
-        <div className="text-center space-y-4">
+      <div className="flex min-h-[100dvh] items-center justify-center bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.08),transparent_30%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))]">
+        <div className="glass-panel-strong max-w-sm space-y-4 rounded-[var(--radius-xl)] px-10 py-9 text-center">
           <LoadingSpinner size="lg" />
-          <p className="text-gray-600">Loading...</p>
+          <div>
+            <p className="text-lg font-medium text-[var(--text-primary)]">Restoring your workspace</p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">Loading messages, presence, and account state.</p>
+          </div>
           {error && (
-            <p className="text-red-600 text-sm">Error: {error}</p>
+            <p className="text-sm text-red-300">Error: {error}</p>
           )}
         </div>
       </div>

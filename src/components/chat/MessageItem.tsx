@@ -24,8 +24,6 @@ import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import { useToneAnalysis } from '../../hooks/useToneAnalysis'
 import { useToneAnalysisEnabled } from '../../hooks/useToneAnalysisEnabled'
 
-const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '🙏']
-
 interface MessageItemProps {
   message: Message
   previousMessage?: Message
@@ -37,6 +35,20 @@ interface MessageItemProps {
   onToggleReaction: (messageId: string, emoji: string) => Promise<void>
   onJumpToMessage?: (messageId: string) => void
   containerRef?: React.RefObject<HTMLDivElement>
+}
+
+const getToneEmoji = (tone: string) => {
+  if (tone === 'positive') return '\u{1F60A}'
+  if (tone === 'negative') return '\u2639\uFE0F'
+  return '\u{1F610}'
+}
+
+const normalizeEmojiValue = (emoji: string) => {
+  const value = emoji.trim()
+
+  if (value === '??' || value === '??1') return '\u{1F44D}'
+
+  return value
 }
 
 export const MessageItem: React.FC<MessageItemProps> = React.memo(
@@ -62,12 +74,11 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const isOwner = profile?.id === message.user_id
     const isAIMessage = message.message_type === 'command'
 
-    const bubbleColor = isAIMessage ? undefined : message.user?.color
+    const bubbleColor = undefined
     const bubbleStyle = bubbleColor
       ? { backgroundColor: bubbleColor, color: getReadableTextColor(bubbleColor) }
       : undefined
     const { tone } = toneEnabled ? analyzeTone(message.content) : { tone: 'neutral' }
-    const toneEmoji = tone === 'positive' ? '😊' : tone === 'negative' ? '☹️' : '😐'
 
     const handleMouseEnterReactions = () => {
       if (reactionTimeoutRef.current) {
@@ -197,7 +208,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
           id={`message-${message.id}`}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className={cn('group flex space-x-3 ml-2')}
+          className={cn('group ml-2 flex space-x-3')}
         >
         {/* Avatar */}
         <div className="flex-shrink-0 w-10">
@@ -217,14 +228,14 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         <div className="flex-1 min-w-0">
           {!isGrouped && (
             <div className="flex items-baseline space-x-2 mb-1">
-              <span className="font-semibold text-gray-900 dark:text-gray-100">
+              <span className="font-semibold text-[var(--text-primary)]">
                 {message.user?.display_name}
               </span>
-              <span className="text-xs text-gray-500 dark:text-gray-400">
+              <span className="text-xs text-[var(--text-muted)]">
                 {formatTime(message.created_at)}
               </span>
               {message.edited_at && (
-                <span className="text-xs text-gray-400 dark:text-gray-500">
+                <span className="text-xs text-[var(--text-muted)]/80">
                   (edited)
                 </span>
               )}
@@ -236,7 +247,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
               <textarea
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
-                className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 resize-none"
+                className="obsidian-input w-full resize-none rounded-[var(--radius-md)] p-3"
                 rows={2}
               />
               <div className="flex space-x-2">
@@ -261,7 +272,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   <button
                     type="button"
                     onClick={() => onJumpToMessage?.(parentMessage.id)}
-                    className="text-xs text-gray-500 mb-1 hover:underline text-left"
+                    className="mb-1 text-left text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text-gold)] hover:underline"
                     aria-label="View parent message"
                   >
                     Replying to {parentMessage.user?.display_name || 'Unknown'}:
@@ -272,12 +283,12 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 )}
                 <div
                   className={cn(
-                    'relative peer rounded-xl px-3 py-2 break-words space-y-1',
+                    'relative peer space-y-1 break-words rounded-[var(--radius-md)] px-3 py-2 shadow-[var(--shadow-panel)]',
                     isAIMessage
-                      ? 'bg-[var(--color-accent-light)] border-l-4 border-[var(--color-accent)] text-black dark:text-black font-bold'
+                      ? 'border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.08),rgba(255,255,255,0.03)_24%,rgba(13,15,16,0.98)_100%)] text-[var(--text-primary)]'
                       : bubbleStyle
                       ? ''
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                      : 'border border-[var(--border-subtle)] bg-[var(--bg-panel)] text-[var(--text-primary)]'
                   )}
                   style={bubbleStyle}
                 >
@@ -292,17 +303,17 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     <img
                       src={message.file_url}
                       alt="uploaded image"
-                      className="mt-1 max-w-xs rounded cursor-pointer"
+                      className="mt-1 max-w-xs cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-subtle)]"
                       onClick={() => setShowImageModal(true)}
                     />
                   ) : message.message_type === 'file' && message.file_url ? (
                     <FileAttachment url={message.file_url} meta={message.content} />
                   ) : (
-                    <span>
+                    <span className={cn(isAIMessage && 'font-medium')}>
                       {message.content}
                       {toneEnabled && (
                         <span data-testid="tone-indicator" className="ml-1">
-                          {toneEmoji}
+                          {getToneEmoji(tone)}
                         </span>
                       )}
                     </span>
@@ -314,7 +325,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowActions(!showActions)}
-                    className="opacity-0 group-hover/message:opacity-70 hover:opacity-100 transition-opacity hover:text-[var(--color-accent)]"
+                    className="opacity-0 transition-opacity group-hover/message:opacity-70 hover:opacity-100 hover:text-[var(--text-gold)]"
                     aria-label="Message actions"
                     type="button"
                   >
@@ -335,12 +346,12 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                           initial={{ opacity: 0, scale: 0.95 }}
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.95 }}
-                          className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50 min-w-[160px]"
+                          className="glass-panel-strong z-50 min-w-[160px] rounded-[var(--radius-md)] py-1"
                         >
 
                           <button
                             onClick={handleCopyMessage}
-                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                            className="flex w-full items-center space-x-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)]"
                             type="button"
                           >
                             <Copy className="w-4 h-4" />
@@ -353,7 +364,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                                 onReply(message.id, message.content)
                                 setShowActions(false)
                               }}
-                              className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                              className="flex w-full items-center space-x-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)]"
                               type="button"
                             >
                               <Reply className="w-4 h-4" />
@@ -369,7 +380,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                                   setEditContent(message.content)
                                   setShowActions(false)
                                 }}
-                                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                                className="flex w-full items-center space-x-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)]"
                                 type="button"
                               >
                                 <Edit3 className="w-4 h-4" />
@@ -381,7 +392,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                                   onDelete(message.id)
                                   setShowActions(false)
                                 }}
-                                className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-red-600 dark:text-red-400 flex items-center space-x-2"
+                                className="flex w-full items-center space-x-2 px-3 py-2 text-left text-sm text-red-300 transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-red-100"
                                 type="button"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -392,7 +403,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
 
                           <button
                             onClick={handlePinToggle}
-                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center space-x-2"
+                            className="flex w-full items-center space-x-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)]"
                             type="button"
                           >
                             {message.pinned ? (
@@ -410,13 +421,13 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
 
                 {/* Emoji picker positioned just above message bubble */}
                 <div 
-                  className={`absolute -top-10 left-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-full shadow px-2 py-1 space-x-1 z-10 transition-opacity duration-200 ${
+                  className={`glass-panel absolute -top-10 left-4 z-10 space-x-1 rounded-full px-2 py-1 transition-opacity duration-200 ${
                     showQuickReactions ? 'flex opacity-100' : 'hidden opacity-0'
                   }`}
                   onMouseEnter={handleMouseEnterReactions}
                   onMouseLeave={handleMouseLeaveReactions}
                 >
-                  {QUICK_REACTIONS.map(e => (
+                  {['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F389}', '\u{1F64F}'].map(e => (
                     <button
                       key={e}
                       onClick={() => handleReaction(e)}
@@ -497,13 +508,13 @@ export const MessageReactions: React.FC<{
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
             onClick={() => onReact(emoji)}
-            className={`inline-flex items-center space-x-1 text-xs rounded-full transition-colors ${
+            className={`inline-flex items-center space-x-1 rounded-full border px-1.5 py-0.5 text-xs transition-colors ${
               isReacted
-                ? 'text-blue-800 dark:text-blue-200 hover:bg-blue-100 dark:hover:bg-blue-900'
-                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                ? 'border-[var(--border-glow)] bg-[rgba(215,170,70,0.14)] text-[var(--text-gold)]'
+                : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)] text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.08)]'
             }`}
           >
-            <span>{emoji}</span>
+            <span>{normalizeEmojiValue(emoji)}</span>
             <span className="text-[0.5em]">{data.count}</span>
           </motion.button>
         )

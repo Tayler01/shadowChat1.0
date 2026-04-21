@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { supabase, User, updateUserPresence, getWorkingClient } from '../lib/supabase';
 import { PRESENCE_INTERVAL_MS } from '../config';
@@ -84,10 +85,10 @@ function useProvideAuth() {
             setUser(null);
           }
         }
-      } catch {
+      } catch (err) {
         
         // Check if this is the specific "user not found" error from invalid JWT
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
         if (errorMessage.includes('User from sub claim in JWT does not exist')) {
           // Clear the invalid session
           await authSignOut();
@@ -111,7 +112,7 @@ function useProvideAuth() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (event: string, session: any) => {
         // Skip if we're still doing initial load or component is unmounted
         if (!initialLoadRef.current || !mountedRef.current) {
           return;
@@ -186,9 +187,10 @@ function useProvideAuth() {
     setError(null);
     try {
       await authSignIn({ email, password });
-    } catch {
-      setError(error instanceof Error ? error.message : 'Sign in failed');
-      throw error;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Sign in failed';
+      setError(message);
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -217,9 +219,10 @@ function useProvideAuth() {
       }
       
       return result;
-    } catch {
-      setError(error instanceof Error ? error.message : 'Sign up failed');
-      throw error;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Sign up failed';
+      setError(message);
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -230,9 +233,10 @@ function useProvideAuth() {
     setError(null);
     try {
       await authSignOut();
-    } catch {
-      setError(error instanceof Error ? error.message : 'Sign out failed');
-      throw error;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Sign out failed';
+      setError(message);
+      throw err;
     } finally {
       // Clear cached chat history and failed message queues on sign out
       if (typeof localStorage !== 'undefined') {
@@ -259,9 +263,10 @@ function useProvideAuth() {
       const updatedUser = await updateUserProfile(updates);
       setUser(updatedUser);
       return updatedUser;
-    } catch {
-      setError(error instanceof Error ? error.message : 'Profile update failed');
-      throw error;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Profile update failed';
+      setError(message);
+      throw err;
     }
   };
 
@@ -271,9 +276,10 @@ function useProvideAuth() {
       const url = await uploadUserAvatar(file);
       setUser(prev => (prev ? { ...prev, avatar_url: url } : prev));
       return url;
-    } catch {
-      setError(error instanceof Error ? error.message : 'Avatar upload failed');
-      throw error;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Avatar upload failed';
+      setError(message);
+      throw err;
     }
   };
 
@@ -283,9 +289,10 @@ function useProvideAuth() {
       const url = await uploadUserBanner(file);
       setUser(prev => (prev ? { ...prev, banner_url: url } : prev));
       return url;
-    } catch {
-      setError(error instanceof Error ? error.message : 'Banner upload failed');
-      throw error;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Banner upload failed';
+      setError(message);
+      throw err;
     }
   };
 

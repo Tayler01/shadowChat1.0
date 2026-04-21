@@ -1,10 +1,14 @@
 import { supabase } from './supabase'
-import type { User } from '@supabase/supabase-js'
+import type { User as SupabaseAuthUser } from '@supabase/supabase-js'
+import type { User as AppUser } from './supabase'
 
 const AVATAR_BUCKET = 'avatars'
 const BANNER_BUCKET = 'banners'
 
-export interface AuthUser extends User {
+const PROFILE_RETRY_DELAY_MS = 250
+const PROFILE_RETRY_ATTEMPTS = 8
+
+export interface AuthUser extends SupabaseAuthUser {
   user_metadata: {
     username?: string
     display_name?: string
@@ -24,63 +28,87 @@ export interface SignInData {
   password: string
 }
 
-export const signUp = async ({ email, password, username, displayName }: SignUpData) => {
-  // First check if username is taken
-  const { data: existingUser } = await supabase
-    .from('users')
-    .select('username')
-    .eq('username', username)
-    .maybeSingle()
+export interface SignUpResult {
+  user: SupabaseAuthUser | null
+  profile: AppUser | null
+  session: unknown | null
+}
 
-  if (existingUser) {
+const wait = (ms: number) =>
+  new Promise(resolve => setTimeout(resolve, ms))
+
+const fetchUserProfileWithRetry = async (userId: string): Promise<AppUser | null> => {
+  for (let attempt = 0; attempt < PROFILE_RETRY_ATTEMPTS; attempt += 1) {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (data) {
+      return data as unknown as AppUser
+    }
+
+    if (error && error.code !== 'PGRST116') {
+      throw error
+    }
+
+    if (attempt < PROFILE_RETRY_ATTEMPTS - 1) {
+      await wait(PROFILE_RETRY_DELAY_MS)
+    }
+  }
+
+  return null
+}
+
+export const signUp = async ({
+  email,
+  password,
+  username,
+  displayName,
+}: SignUpData): Promise<SignUpResult> => {
+  const normalizedUsername = username.trim().toLowerCase()
+
+  if (!normalizedUsername) {
+    throw new Error('Username is required')
+  }
+
+  const { data: isAvailable, error: availabilityError } = await supabase.rpc(
+    'is_username_available',
+    { candidate: normalizedUsername }
+  )
+
+  if (availabilityError) throw availabilityError
+  if (isAvailable === false) {
     throw new Error('Username is already taken')
   }
 
-  // Create auth user
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
       data: {
-        username,
-        display_name: displayName,
+        username: normalizedUsername,
+        display_name: displayName.trim(),
       }
     }
   })
 
   if (error) throw error
-
-  // Create profile in users table
-  if (data.user) {
-    const { error: profileError } = await supabase
-      .from('users')
-      .insert({
-        id: data.user.id,
-        email: data.user.email!,
-        username,
-        display_name: displayName,
-        status: 'online'
-      })
-
-    if (profileError) {
-      // Ignore duplicate key errors caused by race conditions with the
-      // auth state change handler which may also insert the profile.
-      if (profileError.code !== '23505') {
-        throw profileError
-      }
-    }
-
-    // If user is confirmed (auto-login), fetch and return the profile
-    if (data.session) {
-      const profile = await getUserProfile(data.user.id)
-      return { user: data.user, profile, session: data.session }
-    }
-
-    // If email confirmation is required, return user data without profile
-    return { user: data.user, profile: null, session: null }
+  if (!data.user) {
+    return { user: null, profile: null, session: null }
   }
 
-  return { user: null, profile: null, session: null }
+  if (data.session) {
+    const profile = await fetchUserProfileWithRetry(data.user.id)
+    if (!profile) {
+      throw new Error('Account created, but profile setup did not complete. Please try signing in again.')
+    }
+
+    return { user: data.user, profile, session: data.session }
+  }
+
+  return { user: data.user, profile: null, session: null }
 }
 
 export const signIn = async ({ email, password }: SignInData) => {
@@ -91,7 +119,6 @@ export const signIn = async ({ email, password }: SignInData) => {
 
   if (error) throw error
 
-  // Update user status to online
   if (data.user) {
     await supabase
       .from('users')
@@ -104,9 +131,8 @@ export const signIn = async ({ email, password }: SignInData) => {
 
 export const signOut = async () => {
   const { data: { user } } = await supabase.auth.getUser()
-  
+
   if (user) {
-    // Update status to offline before signing out
     await supabase
       .from('users')
       .update({ status: 'offline' })
@@ -117,90 +143,26 @@ export const signOut = async () => {
   if (error) throw error
 }
 
-export const getCurrentUser = async () => {
-
+export const getCurrentUser = async (): Promise<AppUser | null> => {
   try {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    // Handle the specific "user not found" error from invalid JWT
+
     if (authError && authError.message?.includes('User from sub claim in JWT does not exist')) {
-      await supabase.auth.signOut();
-      return null;
-    }
-    
-    if (authError) {
-      return null;
-    }
-    
-    if (!user) return null
-
-    
-    const { data: profile, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-
-
-    if (error && error.code === 'PGRST116') {
-      // Profile doesn't exist, create it
-      
-      const userData = {
-        id: user.id,
-        email: user.email!,
-        username: user.user_metadata?.username || user.email?.split('@')[0] || `user_${user.id.slice(0, 8)}`,
-        display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || 'User',
-        status: 'online'
-      };
-      
-      
-      const { error: insertError } = await supabase
-        .from('users')
-        .insert(userData)
-      
-      if (insertError) {
-        // If user already exists (race condition), just fetch it
-        if (insertError.code === '23505') {
-          const { data: existingProfile, error: fetchError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', user.id)
-            .single()
-          
-          if (fetchError) {
-            return null;
-          }
-          
-          return existingProfile;
-        } else {
-          return null;
-        }
-      }
-      
-      
-      // Fetch the newly created profile
-      const { data: newProfile, error: fetchError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-      
-      if (fetchError) {
-        return null
-      }
-      
-      return newProfile
-    } else if (error) {
-      return null;
+      await supabase.auth.signOut()
+      return null
     }
 
-    return profile
+    if (authError || !user) {
+      return null
+    }
+
+    return await fetchUserProfileWithRetry(user.id)
   } catch {
-    return null;
+    return null
   }
 }
 
-export const getUserProfile = async (userId: string) => {
+export const getUserProfile = async (userId: string): Promise<AppUser | null> => {
   const { data, error } = await supabase
     .from('users')
     .select('*')
@@ -208,7 +170,7 @@ export const getUserProfile = async (userId: string) => {
     .maybeSingle()
 
   if (error) throw error
-  return data
+  return data as unknown as AppUser | null
 }
 
 export const updateUserProfile = async (updates: Partial<{
@@ -218,7 +180,7 @@ export const updateUserProfile = async (updates: Partial<{
   status: 'online' | 'away' | 'busy' | 'offline';
   avatar_url: string;
   banner_url: string;
-}>) => {
+}>): Promise<AppUser> => {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
@@ -230,15 +192,17 @@ export const updateUserProfile = async (updates: Partial<{
     .single()
 
   if (error) throw error
-  return data
+  return data as unknown as AppUser
 }
 
 export const uploadUserAvatar = async (file: File) => {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
+
   const filePath = `${user.id}/${Date.now()}_${file.name}`
   const { error } = await supabase.storage.from(AVATAR_BUCKET).upload(filePath, file, { upsert: true })
   if (error) throw error
+
   const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(filePath)
   await updateUserProfile({ avatar_url: data.publicUrl })
   return data.publicUrl
@@ -247,9 +211,11 @@ export const uploadUserAvatar = async (file: File) => {
 export const uploadUserBanner = async (file: File) => {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
+
   const filePath = `${user.id}/${Date.now()}_${file.name}`
   const { error } = await supabase.storage.from(BANNER_BUCKET).upload(filePath, file, { upsert: true })
   if (error) throw error
+
   const { data } = supabase.storage.from(BANNER_BUCKET).getPublicUrl(filePath)
   await updateUserProfile({ banner_url: data.publicUrl })
   return data.publicUrl

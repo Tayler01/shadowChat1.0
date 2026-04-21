@@ -13,7 +13,7 @@ export const FailedMessageItem: React.FC<Props> = ({ message, onResend }) => {
   return (
     <div className="flex space-x-2 items-start ml-12 my-2">
       <div className="bg-red-100 dark:bg-red-900/40 rounded-xl px-3 py-2">
-        {message.type === 'text' && <div>{message.content}</div>}
+        {(message.type === 'text' || message.type === 'command') && <div>{message.content}</div>}
         {message.type === 'image' && message.dataUrl && (
           <img
             src={message.dataUrl}

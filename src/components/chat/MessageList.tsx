@@ -221,7 +221,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     const isCollapsed = collapsed.has(message.id)
 
     return (
-      <div key={message.id} className={cn(depth > 0 ? 'ml-6 border-l pl-3' : '')}>
+      <div key={message.id} className={cn(depth > 0 ? 'ml-6 border-l border-[var(--border-subtle)] pl-3' : '')}>
         <MessageItem
           message={message}
           previousMessage={prev}
@@ -239,7 +239,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
             <button
               type="button"
               onClick={() => toggleThread(message.id)}
-              className="text-xs text-gray-500"
+              className="text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text-gold)]"
             >
               {isCollapsed
                 ? `Show ${replies.length} repl${replies.length > 1 ? 'ies' : 'y'}`
@@ -261,9 +261,9 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-gray-500 dark:text-gray-400">Loading messages...</div>
-          <div className="text-xs text-gray-400 mt-2">Debug: {messages.length} messages in state</div>
+        <div className="glass-panel rounded-[var(--radius-xl)] px-8 py-6 text-center">
+          <div className="text-[var(--text-secondary)]">Loading the conversation...</div>
+          <div className="mt-2 text-xs text-[var(--text-muted)]">Pulling in the latest messages and thread state.</div>
         </div>
       </div>
     )
@@ -273,11 +273,12 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className="relative flex-1 w-full overflow-y-auto overflow-x-hidden p-4 md:p-2 pb-[calc(env(safe-area-inset-bottom)_+_24rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
+      className="relative flex-1 w-full overflow-y-auto overflow-x-hidden px-4 pb-[calc(env(safe-area-inset-bottom)_+_24rem)] pt-4 md:px-3 md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
     >
+      <div className="mx-auto w-full max-w-6xl">
 
       {loadingMore && (
-        <div className="flex justify-center py-2 text-gray-500 text-sm">
+        <div className="flex justify-center py-2 text-sm text-[var(--text-muted)]">
           <LoadingSpinner size="sm" /> Loading more...
         </div>
       )}
@@ -286,9 +287,9 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
       {groupedMessages.map((group, index) => (
         <React.Fragment key={`${group.date}-${index}`}>
           <div className="flex items-center my-2">
-            <hr className="flex-grow border-t border-gray-300 dark:border-gray-700" />
-            <span className="mx-2 text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{group.date}</span>
-            <hr className="flex-grow border-t border-gray-300 dark:border-gray-700" />
+            <hr className="flex-grow border-t border-[var(--border-panel)]" />
+            <span className="mx-2 whitespace-nowrap rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-1 text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">{group.date}</span>
+            <hr className="flex-grow border-t border-[var(--border-panel)]" />
           </div>
           {group.messages.map((message: any, idx) => {
             const prev = group.messages[idx - 1] as any
@@ -315,7 +316,7 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
       ))}
 
       {(uploading || sending) && (
-        <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+        <div className="flex items-center space-x-2 text-sm text-[var(--text-muted)]">
           <LoadingSpinner size="sm" />
           <span>{uploading ? 'Uploading...' : 'Sending...'}</span>
         </div>
@@ -327,16 +328,16 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="mt-2 flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400"
+            className="mt-2 flex items-center space-x-2 text-sm text-[var(--text-muted)]"
           >
             <div className="flex space-x-1">
-              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+              <div className="h-2 w-2 animate-bounce rounded-full bg-[var(--gold-3)]" />
               <div
-                className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                className="h-2 w-2 animate-bounce rounded-full bg-[var(--gold-3)]"
                 style={{ animationDelay: '0.1s' }}
               />
               <div
-                className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                className="h-2 w-2 animate-bounce rounded-full bg-[var(--gold-3)]"
                 style={{ animationDelay: '0.2s' }}
               />
             </div>
@@ -353,11 +354,12 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
           type="button"
           onClick={scrollToBottom}
           aria-label="Jump to latest"
-          className="fixed bottom-[calc(env(safe-area-inset-bottom)_+_10rem)] md:bottom-32 right-4 bg-[var(--color-accent)] text-white p-2 rounded-full shadow-lg hover:bg-opacity-90 z-50"
+          className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)_+_10rem)] z-50 rounded-full border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] p-2 text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)] transition-transform hover:-translate-y-0.5 md:bottom-32"
         >
           <ArrowDown className="w-5 h-5" />
         </button>
       )}
+      </div>
     </div>
   )
 }

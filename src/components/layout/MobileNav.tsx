@@ -29,25 +29,25 @@ export function MobileNav({ currentView, onViewChange, className }: MobileNavPro
 
   return (
     <nav
-      className={`md:hidden bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 h-16 ${
+      className={`glass-panel-strong h-[4.15rem] border-t border-[var(--border-panel)] backdrop-blur-xl md:hidden ${
         className || 'fixed bottom-0 inset-x-0 z-50'
       }`}
     >
-      <ul className="flex justify-around">
+      <ul className="flex h-full justify-around px-1.5">
         {navItems.map(item => (
-          <li key={item.id} className="relative">
+          <li key={item.id} className="relative flex-1">
             <button
               onClick={() => onViewChange(item.id)}
-              className={`flex flex-col items-center py-2 text-xs focus:outline-none w-full ${
+              className={`flex h-full w-full flex-col items-center justify-center rounded-[var(--radius-md)] px-1 py-1.5 text-[10px] focus:outline-none transition-all ${
                 currentView === item.id
-                  ? 'text-[var(--color-accent)]'
-                  : 'text-gray-500 dark:text-gray-400'
+                  ? 'bg-[rgba(255,255,255,0.04)] text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)]'
+                  : 'text-[var(--text-muted)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[var(--text-primary)]'
               }`}
             >
-              <span className="relative">
-                <item.icon className="w-5 h-5" />
+              <span className="relative mb-1 flex h-8 w-8 items-center justify-center rounded-full">
+                <item.icon className="w-[1.15rem] h-[1.15rem]" />
                 {item.badge && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] leading-none px-1 rounded-full">
+                  <span className="absolute -right-1 -top-1 rounded-full border border-[rgba(215,170,70,0.3)] bg-[rgba(215,170,70,0.14)] px-1 text-[10px] leading-none text-[var(--text-gold)]">
                     {item.badge}
                   </span>
                 )}

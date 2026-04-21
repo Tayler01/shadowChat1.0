@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, {
   createContext,
   useContext,
@@ -20,6 +21,12 @@ const SoundEffectsContext = createContext<SoundEffectsContextValue | undefined>(
 const defaultUrls = {
   message: '/sounds/message.mp3',
   reaction: '/sounds/reaction.mp3',
+}
+
+const isUsableSoundUrl = (value: unknown): value is string => {
+  if (typeof value !== 'string' || !value.trim()) return false
+  if (value.includes('example.com')) return false
+  return value.startsWith('/') || /^https?:\/\//i.test(value)
 }
 
 function useProvideSoundEffects(): SoundEffectsContextValue {
@@ -67,9 +74,9 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
           .select('name, url')
         if (!error && data) {
           const map = { ...defaultUrls }
-          data.forEach((row: { name: string; url: string }) => {
-            if (row.name === 'message') map.message = row.url
-            if (row.name === 'reaction') map.reaction = row.url
+          ;(data as Array<{ name?: unknown; url?: unknown }>).forEach(row => {
+            if (row.name === 'message' && isUsableSoundUrl(row.url)) map.message = row.url
+            if (row.name === 'reaction' && isUsableSoundUrl(row.url)) map.reaction = row.url
           })
           setUrls(map)
           try {
@@ -121,7 +128,7 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
   }, [urls])
 
   const play = useCallback(
-    (audio?: HTMLAudioElement) => {
+    (audio: HTMLAudioElement | null | undefined) => {
       if (!enabled || !audio) return
       try {
         audio.currentTime = 0

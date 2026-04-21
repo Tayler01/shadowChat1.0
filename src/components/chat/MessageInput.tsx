@@ -20,7 +20,7 @@ interface MessageInputProps {
     type?: 'text' | 'command' | 'audio' | 'image' | 'file',
     fileUrl?: string,
     replyTo?: string
-  ) => Promise<void> | void
+  ) => Promise<ChatMessage | null | void> | ChatMessage | null | void
   placeholder?: string
   disabled?: boolean
   className?: string
@@ -181,7 +181,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }
 
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
 
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -316,10 +316,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   return (
     <div
-      className={`relative p-4 md:p-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 ${className}`}
+      className={`relative border-t border-[var(--border-panel)] bg-[linear-gradient(180deg,rgba(16,18,19,0.94),rgba(10,11,12,0.98))] px-3 pb-3 pt-2.5 md:p-3 ${className}`}
     >
       {replyingTo && (
-        <div className="mb-2 flex items-center justify-between text-xs bg-gray-100 dark:bg-gray-700 rounded px-2 py-1">
+        <div className="mb-2 flex items-center justify-between rounded-[var(--radius-xs)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] shadow-[var(--shadow-panel)]">
           <span className="truncate">Replying to: {replyingTo.content.slice(0, 30)}</span>
           <button type="button" onClick={onCancelReply} aria-label="Cancel reply">
             <X className="w-3 h-3" />
@@ -334,12 +334,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="absolute bottom-full left-4 right-4 mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-40 overflow-y-auto"
+          className="glass-panel-strong absolute bottom-full left-4 right-4 mb-2 max-h-40 overflow-y-auto rounded-[var(--radius-md)]"
         >
           <div className="p-2">
             <div className="flex items-center space-x-2 mb-2">
-              <Command className="w-4 h-4 text-gray-500" />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              <Command className="w-4 h-4 text-[var(--text-muted)]" />
+              <span className="text-sm font-medium text-[var(--text-secondary)]">
                 Slash Commands
               </span>
             </div>
@@ -349,12 +349,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                 <button
                   key={cmd.command}
                   onClick={() => insertSlashCommand(cmd.command)}
-                  className="w-full text-left px-2 py-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                  className="w-full rounded-[var(--radius-xs)] px-2 py-1.5 text-left transition-colors hover:bg-[rgba(255,255,255,0.05)]"
                 >
-                  <div className="font-mono text-sm text-[var(--color-accent)]">
+                  <div className="font-mono text-sm text-[var(--text-gold)]">
                     {cmd.command}
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                  <div className="text-xs text-[var(--text-muted)]">
                     {cmd.description}
                   </div>
                 </button>
@@ -388,7 +388,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                 setMessage(cleanText)
                 textareaRef.current?.focus()
               }}
-              className="px-3 py-1 rounded-full text-sm bg-gray-200 dark:bg-gray-700"
+              className="rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-sm text-[var(--text-secondary)] transition-all hover:border-[var(--border-glow)] hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--text-gold)]"
             >
               {/* Display the original suggestion but insert cleaned version */}
               {s.replace(/^[\d.)-\s]*["']?|["']?$/g, '').trim()}
@@ -398,7 +398,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       )}
 
       {/* Input Form */}
-      <form onSubmit={handleSubmit} className="flex items-end space-x-3">
+      <form onSubmit={handleSubmit} className="flex items-end gap-2.5 md:gap-3">
         {/* Attachment Button */}
         <div ref={attachmentMenuRef} className="relative">
           <Button
@@ -406,24 +406,24 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             variant="ghost"
             size="sm"
             onClick={() => setShowAttachmentMenu(prev => !prev)}
-            className="h-12 w-12 p-0 rounded-xl"
+            className="h-11 w-11 rounded-xl p-0 md:h-12 md:w-12"
             aria-label="Add attachment"
           >
             <Plus className="w-4 h-4" />
           </Button>
           {showAttachmentMenu && (
-            <div className="absolute bottom-full left-0 mb-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded shadow-lg">
+            <div className="glass-panel absolute bottom-full left-0 mb-2 min-w-32 rounded-[var(--radius-sm)]">
               <button
                 type="button"
                 onClick={openImageUpload}
-                className="block w-full px-3 py-1.5 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="block w-full px-3 py-1.5 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)]"
               >
                 Image
               </button>
               <button
                 type="button"
                 onClick={openFileUpload}
-                className="block w-full px-3 py-1.5 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="block w-full px-3 py-1.5 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)]"
               >
                 File
               </button>
@@ -433,7 +433,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                   await startRecording()
                   setShowAttachmentMenu(false)
                 }}
-                className="md:hidden block w-full px-3 py-1.5 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="block w-full px-3 py-1.5 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)] md:hidden"
               >
                 Voice
               </button>
@@ -443,7 +443,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                   setShowEmojiPicker(true)
                   setShowAttachmentMenu(false)
                 }}
-                className="md:hidden block w-full px-3 py-1.5 text-sm text-left hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="block w-full px-3 py-1.5 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)] md:hidden"
               >
                 Emoji
               </button>
@@ -473,7 +473,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             placeholder={placeholder}
             disabled={disabled}
             rows={1}
-            className="w-full px-4 py-3 md:px-3 md:py-2 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] focus:border-[var(--color-accent)] resize-none max-h-32 no-scrollbar"
+            className="obsidian-input no-scrollbar max-h-32 w-full resize-none rounded-[var(--radius-md)] px-3.5 py-3 text-[var(--text-primary)] md:px-3 md:py-2"
           />
         </div>
 
@@ -482,10 +482,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           variant="ghost"
           size="sm"
           onClick={handleRecordClick}
-          className="hidden md:inline-flex h-12 w-12 p-0 rounded-xl"
+          className="hidden h-12 w-12 rounded-xl p-0 md:inline-flex"
           aria-label="Record audio"
         >
-          <Mic className={`w-4 h-4 ${recording ? 'text-red-600' : ''}`} />
+          <Mic className={`w-4 h-4 ${recording ? 'text-red-300' : ''}`} />
         </Button>
 
         <Button
@@ -493,7 +493,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           variant="ghost"
           size="sm"
           onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-          className="hidden md:inline-flex h-12 w-12 p-0 rounded-xl text-[var(--color-accent)]"
+          className="hidden h-12 w-12 rounded-xl p-0 text-[var(--text-gold)] md:inline-flex"
           aria-label="Insert emoji"
         >
           <Smile className="w-4 h-4" />
@@ -502,7 +502,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         <Button
           type="submit"
           disabled={!message.trim() || disabled}
-          className="h-12 w-12 p-0 rounded-xl"
+          className="h-11 w-11 rounded-xl p-0 md:h-12 md:w-12"
           aria-label="Send message"
           onMouseDown={e => e.preventDefault()}
         >

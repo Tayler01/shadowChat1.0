@@ -1,38 +1,17 @@
 import { createClient } from '@supabase/supabase-js'
+import {
+  VITE_SUPABASE_ANON_KEY,
+  VITE_SUPABASE_URL,
+} from './env'
 
-// Global debug flag used to gate verbose logging
-export const DEBUG = import.meta.env.VITE_DEBUG_LOGS === 'true' || import.meta.env.DEV === true
+type AnySupabaseClient = any
 
-// Custom fetch that logs all request and response details for debugging
 const loggingFetch: typeof fetch = async (input, init) => {
-  const url = typeof input === 'string' ? input : input.url
-  const method = init?.method ?? 'GET'
-  let headers: Record<string, string> = {}
-  if (init?.headers instanceof Headers) {
-    headers = Object.fromEntries(init.headers.entries())
-  } else if (init?.headers) {
-    headers = init.headers as Record<string, string>
-  }
-  const body = init?.body
-
-
-  try {
-    const response = await fetch(input, init)
-    const clone = response.clone()
-    let responseBody: string | undefined
-    try {
-      responseBody = await clone.text()
-    } catch {
-      responseBody = '<unreadable>'
-    }
-    return response
-  } catch (err) {
-    throw err
-  }
+  return fetch(input, init)
 }
 
-export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
-export const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+export const SUPABASE_URL = VITE_SUPABASE_URL
+export const SUPABASE_ANON_KEY = VITE_SUPABASE_ANON_KEY
 
 const supabaseUrl = SUPABASE_URL
 const supabaseAnonKey = SUPABASE_ANON_KEY
@@ -106,15 +85,15 @@ export function createFreshSupabaseClient() {
 }
 
 // Main client with default storage key
-export let supabase: ReturnType<typeof createClient>
+export let supabase: AnySupabaseClient
 
 declare global {
   // eslint-disable-next-line no-var
-  var __supabaseClient: ReturnType<typeof createClient> | undefined
+  var __supabaseClient: AnySupabaseClient | undefined
 }
 
 const globalRef = globalThis as typeof globalThis & {
-  __supabaseClient?: ReturnType<typeof createClient>
+  __supabaseClient?: AnySupabaseClient
 }
 
 if (!globalRef.__supabaseClient) {
@@ -160,19 +139,28 @@ export const getStoredRefreshToken = (): string | null => {
       parsed?.refreshToken ||
       null
     )
-  } catch (err) {
+  } catch {
     return null
   }
 }
 
 // Client management
 let currentSupabaseClient = supabase
-export const setSupabaseClient = (client: ReturnType<typeof createClient>) => {
+export const setSupabaseClient = (client: AnySupabaseClient) => {
   supabase = client
+  currentSupabaseClient = client
 }
-let fallbackClient: ReturnType<typeof createClient> | null = null
-let lastHealthCheck = 0
-const HEALTH_CHECK_INTERVAL = 10000 // 10 seconds
+let fallbackClient: AnySupabaseClient | null = null
+
+export const getRealtimeClient = (): AnySupabaseClient | null => {
+  return (
+    currentSupabaseClient ||
+    fallbackClient ||
+    globalRef.__supabaseClient ||
+    supabase ||
+    null
+  )
+}
 
 // Timeout helper
 const timeout = (ms: number) => new Promise((_, reject) => 
@@ -202,16 +190,12 @@ export const promoteFallbackToMain = async (): Promise<void> => {
     fallbackClient = null
     setSupabaseClient(currentSupabaseClient)
     purgeOldAuthKeys((currentSupabaseClient as any).__storageKey)
-    
-    // Reset health check timer to force immediate use of new main client
-    lastHealthCheck = 0
-    
   } catch {
   }
 }
 
 // Test client responsiveness
-const testClientResponsiveness = async (client: ReturnType<typeof createClient>, timeoutMs = 2000): Promise<boolean> => {
+const testClientResponsiveness = async (client: AnySupabaseClient, timeoutMs = 2000): Promise<boolean> => {
   if (!client) {
     return false
   }
@@ -228,7 +212,7 @@ const testClientResponsiveness = async (client: ReturnType<typeof createClient>,
 }
 
 // Destroy stale client before creating new ones
-const destroyClient = async (client: ReturnType<typeof createClient>) => {
+const destroyClient = async (client: AnySupabaseClient | null) => {
   if (!client) return
   
   try {
@@ -240,7 +224,7 @@ const destroyClient = async (client: ReturnType<typeof createClient>) => {
 }
 
 // Recreate client using stored token (mimics page reload)
-const recreateClientWithStoredToken = async (): Promise<ReturnType<typeof createClient>> => {
+const recreateClientWithStoredToken = async (): Promise<AnySupabaseClient> => {
   
   // Destroy old fallback client if it exists
   if (fallbackClient) {
@@ -258,80 +242,59 @@ const recreateClientWithStoredToken = async (): Promise<ReturnType<typeof create
 }
 
 // Centralized getWorkingClient that tracks and rotates clients
-export const getWorkingClient = async (): Promise<ReturnType<typeof createClient>> => {
-  const now = Date.now()
-  
-  // Only check health periodically to avoid excessive testing
-  if (now - lastHealthCheck > HEALTH_CHECK_INTERVAL) {
-    lastHealthCheck = now
-    
-    try {
-      // Test main client first
-      const mainClientWorks = await testClientResponsiveness(currentSupabaseClient, 2000)
-      
-      if (mainClientWorks) {
-        await destroyClient(fallbackClient)
-        fallbackClient = null
-        return currentSupabaseClient
-      }
-      
-      // Main client is stuck, create/use fallback
-      if (!fallbackClient) {
-        fallbackClient = await recreateClientWithStoredToken()
-      }
-      
-      // Test fallback client
-      const fallbackWorks = await testClientResponsiveness(fallbackClient, 2000)
-      
-      if (fallbackWorks) {
-        return fallbackClient
-      } else {
-        await destroyClient(fallbackClient)
-        fallbackClient = await recreateClientWithStoredToken()
-        return fallbackClient
-      }
-      
-    } catch {
-      return currentSupabaseClient // fallback to main client
-    }
-  }
-  
-  // Return current working client (main or fallback)
-  const client = fallbackClient || currentSupabaseClient
-  
-  // Final safeguard: ensure we always return a valid client
+export const getWorkingClient = async (): Promise<AnySupabaseClient> => {
+  const client =
+    currentSupabaseClient ||
+    fallbackClient ||
+    globalRef.__supabaseClient ||
+    supabase
+
   if (!client) {
-    return supabase
+    throw new Error('No Supabase client available')
   }
-  
+
   return client
 }
 
 // Force client recreation (simulates page reload)
-export const recreateSupabaseClient = async (): Promise<ReturnType<typeof createClient>> => {
-  
-  lastHealthCheck = 0 // Force health check on next call
-  
-  // Destroy old fallback client
-  if (fallbackClient) {
-    await destroyClient(fallbackClient)
+export const recreateSupabaseClient = async (): Promise<AnySupabaseClient> => {
+  const client = await getWorkingClient()
+
+  try {
+    const channels = client.getChannels?.() || []
+    channels.forEach((channel: any) => {
+      try {
+        client.removeChannel?.(channel)
+      } catch {
+        // ignore cleanup failures
+      }
+    })
+  } catch {
+    // ignore channel lookup failures
   }
-  
-  // Create new fallback client
-  fallbackClient = await recreateClientWithStoredToken()
-  
-  // Test the new client
-  const isResponsive = await testClientResponsiveness(fallbackClient, 3000)
-  
-  if (!isResponsive) {
-    throw new Error('New client is not responsive')
+
+  try {
+    client.realtime?.disconnect?.()
+  } catch {
+    // ignore disconnect failures
   }
-  
-  return fallbackClient
+
+  const restored = await restoreSessionIfNeeded(client)
+  if (!restored) {
+    await ensureSession(true).catch(() => false)
+  }
+
+  try {
+    client.realtime?.connect?.()
+  } catch {
+    // ignore reconnect failures
+  }
+
+  return client
 }
 
 // Restore session from localStorage to a fresh client
-export const restoreSessionIfNeeded = async (client: ReturnType<typeof createClient>): Promise<boolean> => {
+export const restoreSessionIfNeeded = async (client: AnySupabaseClient): Promise<boolean> => {
   
   try {
     const raw = localStorage.getItem(localStorageKey)
@@ -379,12 +342,8 @@ export const forceSessionRestore = async (): Promise<boolean> => {
     if (restored) {
       return true
     }
-    
-    // If restoration failed, try with a fresh client
-    const freshClient = await recreateSupabaseClient()
-    const restoredWithFresh = await restoreSessionIfNeeded(freshClient)
-    
-    return restoredWithFresh
+
+    return false
   } catch {
     return false
   }
@@ -415,7 +374,7 @@ export const refreshSessionLocked = async () => {
 
     const refresh = workingClient.auth
       .refreshSession()
-      .then((res) => {
+      .then((res: any) => {
         if (!res.data?.session) {
           throw new Error('Failed to refresh session')
         }
@@ -429,7 +388,7 @@ export const refreshSessionLocked = async () => {
         }
         return res
       })
-      .catch((err) => {
+      .catch((err: any) => {
         throw err
       })
     const timeoutPromise = new Promise<never>((_, reject) =>
@@ -471,7 +430,7 @@ export const resetRealtimeConnection = async () => {
   // Clean up existing channels on current client
   try {
     const channels = currentClient.getChannels?.() || []
-    channels.forEach(ch => {
+    channels.forEach((ch: any) => {
       try {
         if (currentClient.removeChannel && typeof currentClient.removeChannel === 'function') {
           currentClient.removeChannel(ch)
@@ -490,22 +449,8 @@ export const resetRealtimeConnection = async () => {
   } catch (err) {
   }
   
-  // Force recreation of client to get fresh bindings
-  const freshClient = await recreateSupabaseClient()
-  
-  if (!freshClient) {
-    return
-  }
-  
-  // Promote the fresh client to main if it's working
-  const isResponsive = await testClientResponsiveness(freshClient, 3000)
-  
-  if (isResponsive) {
-    await promoteFallbackToMain()
-  } else {
-  }
-  
-  // Get the working client (either the promoted fresh one or current)
+  // Reuse the existing client instead of creating another auth instance
+  await recreateSupabaseClient()
   const workingClient = await getWorkingClient()
   
   if (!workingClient) {
@@ -574,11 +519,14 @@ export interface Message {
   id: string
   user_id: string
   content: string
+  message_type: 'text' | 'command' | 'audio' | 'image' | 'file'
   audio_url?: string
   audio_duration?: number
   file_url?: string
   reactions: Record<string, { count: number; users: string[] }>
   pinned: boolean
+  pinned_by?: string | null
+  pinned_at?: string | null
   edited_at?: string
   reply_to?: string
   created_at: string
@@ -601,13 +549,16 @@ export interface DMMessage {
   conversation_id: string
   sender_id: string
   content: string
+  message_type: 'text' | 'command' | 'audio' | 'image' | 'file'
   audio_url?: string
   audio_duration?: number
   file_url?: string
   read_at?: string
+  read_by?: string[]
   reactions: Record<string, { count: number; users: string[] }>
   edited_at?: string
   created_at: string
+  updated_at: string
   sender?: User
 }
 
@@ -671,7 +622,7 @@ export const fetchDMConversations = async () => {
     if (userErr) {
     } else {
       usersMap = Object.fromEntries(
-        (usersData ?? []).map(u => [u.id, u as User])
+        (usersData ?? []).map((u: any) => [u.id, u as User])
       )
     }
   }
@@ -729,11 +680,11 @@ export const searchUsers = async (
   options?: { signal?: AbortSignal }
 ) => {
   const workingClient = await getWorkingClient()
-  const { data, error } = await workingClient.rpc(
-    'search_users',
-    { term },
-    options
-  )
+  let query = workingClient.rpc('search_users', { term })
+  if (options?.signal && typeof query.abortSignal === 'function') {
+    query = query.abortSignal(options.signal)
+  }
+  const { data, error } = await query
   if (error) {
     return [] as BasicUser[]
   }
@@ -742,12 +693,13 @@ export const searchUsers = async (
 
 export const fetchAllUsers = async (options?: { signal?: AbortSignal }) => {
   const workingClient = await getWorkingClient()
-  const { data, error } = await workingClient
+  let query = workingClient
     .from('users')
-    .select(
-      'id, username, display_name, avatar_url, color, status',
-      options
-    )
+    .select('id, username, display_name, avatar_url, color, status')
+  if (options?.signal && typeof query.abortSignal === 'function') {
+    query = query.abortSignal(options.signal)
+  }
+  const { data, error } = await query
   if (error) {
     return [] as BasicUser[]
   }

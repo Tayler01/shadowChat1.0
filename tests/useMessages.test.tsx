@@ -43,7 +43,7 @@ describe('helper functions', () => {
   });
 
   it('insertMessage inserts through supabase', async () => {
-    const insertMock = jest.fn(() => ({ select: () => ({ single: () => Promise.resolve({ data: { id: '1' }, error: null }) }) }));
+    const insertMock = jest.fn(() => ({ select: () => ({ single: () => Promise.resolve({ data: { id: '1' } as any, error: null }) }) }));
     (supabase.from as jest.Mock).mockReturnValueOnce({ insert: insertMock } as any);
 
     const { data, error } = await insertMessage({ user_id: 'u1', content: 'hi', message_type: 'text' });
@@ -53,7 +53,7 @@ describe('helper functions', () => {
   });
 
   it('refreshSessionAndRetry refreshes and retries insert', async () => {
-    const insertSpy = jest.spyOn(messagesModule, 'insertMessage').mockResolvedValueOnce({ data: { id: '1' }, error: null });
+    const insertSpy = jest.spyOn(messagesModule, 'insertMessage').mockResolvedValueOnce({ data: { id: '1' } as any, error: null });
     (supabase.auth.refreshSession as jest.Mock).mockResolvedValue({ data: { session: {} }, error: null });
 
     const { data, error } = await refreshSessionAndRetry({ user_id: 'u1', content: 'hi', message_type: 'text' });

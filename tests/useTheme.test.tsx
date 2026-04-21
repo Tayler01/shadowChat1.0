@@ -7,29 +7,38 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-test('defaults to indigo scheme', () => {
+test('defaults to obsidian-gold scheme', () => {
   const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
-  expect(result.current.scheme).toBe('indigo');
-  expect(document.documentElement.classList.contains('indigo')).toBe(true);
+  expect(result.current.scheme).toBe('obsidian-gold');
+  expect(document.documentElement.classList.contains('obsidian-gold')).toBe(true);
 });
 
 test('changing scheme updates document.classList', () => {
   const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
 
   act(() => {
-    result.current.setScheme('teal');
+    result.current.setScheme('obsidian-champagne');
   });
 
-  expect(document.documentElement.classList.contains('teal')).toBe(true);
-  expect(document.documentElement.classList.contains('indigo')).toBe(false);
+  expect(document.documentElement.classList.contains('obsidian-champagne')).toBe(true);
+  expect(document.documentElement.classList.contains('obsidian-gold')).toBe(false);
 });
 
 test('supports additional color schemes', () => {
   const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
 
   act(() => {
-    result.current.setScheme('violet');
+    result.current.setScheme('carbon-ivory');
   });
 
-  expect(document.documentElement.classList.contains('violet')).toBe(true);
+  expect(document.documentElement.classList.contains('carbon-ivory')).toBe(true);
+});
+
+test('maps legacy saved schemes to the new palette', () => {
+  localStorage.setItem('colorScheme', 'teal');
+
+  const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
+
+  expect(result.current.scheme).toBe('obsidian-champagne');
+  expect(document.documentElement.classList.contains('obsidian-champagne')).toBe(true);
 });

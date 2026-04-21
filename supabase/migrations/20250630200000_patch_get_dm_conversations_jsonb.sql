@@ -1,4 +1,6 @@
 -- Patch to ensure get_dm_conversations returns jsonb types
+DROP FUNCTION IF EXISTS get_dm_conversations();
+
 CREATE OR REPLACE FUNCTION get_dm_conversations()
 RETURNS TABLE (
   id uuid,

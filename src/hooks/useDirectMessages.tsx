@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, {
   useEffect,
   useState,
@@ -8,8 +9,8 @@ import React, {
 } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import {
-  supabase,
   getWorkingClient,
+  getRealtimeClient,
   DMConversation,
   DMMessage,
   getOrCreateDMConversation,
@@ -17,6 +18,7 @@ import {
   fetchDMConversations,
   refreshSessionLocked,
 } from '../lib/supabase';
+import { triggerDMPushNotification } from '../lib/push';
 import { MESSAGE_FETCH_LIMIT } from '../config';
 import { useAuth } from './useAuth';
 import { useVisibilityRefresh } from './useVisibilityRefresh';
@@ -28,6 +30,7 @@ interface DirectMessagesContextValue {
   currentConversation: string | null;
   setCurrentConversation: React.Dispatch<React.SetStateAction<string | null>>;
   messages: DMMessage[];
+  sending: boolean;
   loadingMore: boolean;
   hasMore: boolean;
   startConversation: (username: string) => Promise<string | null>;
@@ -48,6 +51,11 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
   const [currentConversation, setCurrentConversation] = useState<string | null>(null);
   const { user } = useAuth();
   const { playMessage } = useSoundEffects();
+  const currentConversationRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    currentConversationRef.current = currentConversation;
+  }, [currentConversation]);
 
   // Reset function for page refocus
   const resetWithFreshClient = useCallback(async () => {
@@ -65,19 +73,26 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     if (!user) return;
 
     const fetchData = async () => {
-      const convs = await fetchDMConversations();
-      setConversations(convs);
+      try {
+        const convs = await fetchDMConversations();
+        setConversations(convs);
+      } catch {
+        setConversations([]);
+      }
       setLoading(false);
     };
 
     fetchData();
-  }, [user, currentConversation]);
+  }, [user]);
 
   // Subscribe to real-time updates
   useEffect(() => {
     if (!user) return;
 
-    const channel = supabase
+    const realtimeClient = getRealtimeClient();
+    if (!realtimeClient?.channel) return;
+
+    const channel = realtimeClient
       .channel('dm_messages')
       .on(
         'postgres_changes',
@@ -86,7 +101,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
           schema: 'public',
           table: 'dm_messages',
         },
-        (payload) => {
+        (payload: any) => {
           // Update conversations when new message arrives
           let missing = false
           setConversations(prev => {
@@ -94,7 +109,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
             if (convIndex >= 0) {
               const updated = [...prev]
               const isCurrent =
-                payload.new.conversation_id === currentConversation
+                payload.new.conversation_id === currentConversationRef.current
               let unread = updated[convIndex].unread_count
               if (payload.new.sender_id !== user.id) {
                 unread = isCurrent ? 0 : (unread || 0) + 1
@@ -108,10 +123,14 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
                   conversation_id: payload.new.conversation_id,
                   sender_id: payload.new.sender_id,
                   content: payload.new.content,
+                  message_type: payload.new.message_type ?? 'text',
+                  audio_url: payload.new.audio_url ?? undefined,
+                  file_url: payload.new.file_url ?? undefined,
                   read_at: payload.new.read_at,
                   reactions: payload.new.reactions,
                   edited_at: payload.new.edited_at,
                   created_at: payload.new.created_at,
+                  updated_at: payload.new.updated_at ?? payload.new.created_at,
                 },
                 unread_count: unread,
               }
@@ -138,7 +157,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
           schema: 'public',
           table: 'dm_messages',
         },
-        (payload) => {
+        (payload: any) => {
           setConversations(prev => {
             const convIndex = prev.findIndex(c => c.id === payload.new.conversation_id);
             if (convIndex >= 0 && prev[convIndex].last_message?.id === payload.new.id) {
@@ -162,12 +181,15 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel && realtimeClient?.removeChannel) {
+        realtimeClient.removeChannel(channel);
+      }
     };
-  }, [user]);
+  }, [user, playMessage]);
 
   const {
     messages,
+    sending,
     sendMessage,
     loadingMore,
     hasMore,
@@ -188,11 +210,13 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
       throw error;
     }
 
-    if (!otherUser) {
+    const match = otherUser as { id: string } | null;
+
+    if (!match) {
       throw new Error('User not found');
     }
 
-    const conversation = await getOrCreateDMConversation(otherUser.id);
+    const conversation = await getOrCreateDMConversation(match.id);
     if (conversation) {
       const convs = await fetchDMConversations();
       setConversations(convs);
@@ -217,6 +241,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     currentConversation,
     setCurrentConversation,
     messages,
+    sending,
     loadingMore,
     hasMore,
     startConversation,
@@ -233,14 +258,18 @@ export function useConversationMessages(conversationId: string | null) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const { user } = useAuth();
+  const { playMessage } = useSoundEffects();
   const channelRef = useRef<RealtimeChannel | null>(null);
   const subscribeRef = useRef<() => RealtimeChannel>();
   const clientResetRef = useRef<() => Promise<void>>();
 
   const handleVisible = useCallback(() => {
     const channel = channelRef.current;
+    const realtimeClient = getRealtimeClient();
     if (channel && channel.state !== 'joined') {
-      supabase.removeChannel(channel);
+      if (realtimeClient?.removeChannel) {
+        realtimeClient.removeChannel(channel);
+      }
       const newChannel = subscribeRef.current?.();
       if (newChannel) {
         channelRef.current = newChannel;
@@ -297,7 +326,7 @@ export function useConversationMessages(conversationId: string | null) {
       if (error) {
       } else {
         setHasMore((data?.length || 0) === MESSAGE_FETCH_LIMIT);
-        setMessages((data || []).reverse());
+        setMessages(((data || []) as unknown as DMMessage[]).reverse());
         
         // Mark messages as read
         if (user) {
@@ -340,7 +369,7 @@ export function useConversationMessages(conversationId: string | null) {
       if (error) throw error;
 
       if (data && data.length > 0) {
-        const newMessages = data.reverse();
+        const newMessages = (data as unknown as DMMessage[]).reverse();
         setMessages(prev => [...newMessages, ...prev]);
         setHasMore(data.length === MESSAGE_FETCH_LIMIT);
       } else {
@@ -354,11 +383,17 @@ export function useConversationMessages(conversationId: string | null) {
   // Subscribe to real-time updates
   useEffect(() => {
     if (!conversationId) return;
+    if (!getRealtimeClient()?.channel) return;
 
     let channel: RealtimeChannel | null = null;
 
     const subscribeToChannel = (): RealtimeChannel => {
-      const newChannel = supabase
+      const realtimeClient = getRealtimeClient()
+      if (!realtimeClient?.channel) {
+        throw new Error('Realtime client unavailable')
+      }
+
+      const newChannel = realtimeClient
         .channel(`dm_messages:${conversationId}`)
         .on(
           'postgres_changes',
@@ -368,7 +403,7 @@ export function useConversationMessages(conversationId: string | null) {
             table: 'dm_messages',
             filter: `conversation_id=eq.${conversationId}`,
           },
-          async (payload) => {
+          async (payload: any) => {
             // Fetch the complete message with sender data
             const workingClient = await getWorkingClient();
             const { data } = await workingClient
@@ -380,18 +415,20 @@ export function useConversationMessages(conversationId: string | null) {
               .eq('id', payload.new.id)
               .single();
 
-            if (data) {
+            const message = data as unknown as DMMessage | null;
+
+            if (message) {
               setMessages(prev => {
-                return prev.some(m => m.id === data.id) ? prev : [...prev, data];
+                return prev.some(m => m.id === message.id) ? prev : [...prev, message];
               });
 
               // Mark as read if not sent by current user
-              if (user && data.sender_id !== user.id) {
+              if (user && message.sender_id !== user.id) {
                 playMessage();
                 await workingClient
                   .from('dm_messages')
                   .update({ read_at: new Date().toISOString() })
-                  .eq('id', data.id);
+                  .eq('id', message.id);
               }
             }
           }
@@ -404,7 +441,7 @@ export function useConversationMessages(conversationId: string | null) {
             table: 'dm_messages',
             filter: `conversation_id=eq.${conversationId}`,
           },
-          async (payload) => {
+          async (payload: any) => {
             const workingClient = await getWorkingClient();
             const { data } = await workingClient
               .from('dm_messages')
@@ -415,9 +452,11 @@ export function useConversationMessages(conversationId: string | null) {
               .eq('id', payload.new.id)
               .single();
 
-            if (data) {
+            const message = data as unknown as DMMessage | null;
+
+            if (message) {
               setMessages(prev =>
-                prev.map(m => (m.id === data.id ? data : m))
+                prev.map(m => (m.id === message.id ? message : m))
               );
             }
           }
@@ -431,9 +470,12 @@ export function useConversationMessages(conversationId: string | null) {
     subscribeRef.current = subscribeToChannel;
     channelRef.current = channel;
     return () => {
-      if (channel) supabase.removeChannel(channel);
+      const realtimeClient = getRealtimeClient();
+      if (channel && realtimeClient?.removeChannel) {
+        realtimeClient.removeChannel(channel);
+      }
     };
-  }, [conversationId, user]);
+  }, [conversationId, user, playMessage]);
 
   const sendMessage = useCallback(
     async (
@@ -442,7 +484,9 @@ export function useConversationMessages(conversationId: string | null) {
       fileUrl?: string
     ): Promise<DMMessage | null> => {
     
-      if (!user || !conversationId || !content.trim()) return null;
+      const trimmedContent = content.trim();
+      const requiresContent = messageType !== 'audio' && messageType !== 'image' && messageType !== 'file';
+      if (!user || !conversationId || (requiresContent && !trimmedContent)) return null;
 
       setSending(true);
       try {
@@ -453,9 +497,10 @@ export function useConversationMessages(conversationId: string | null) {
           .insert({
             conversation_id: conversationId,
             sender_id: user.id,
-            content: content.trim(),
+            content: messageType === 'audio' ? '' : trimmedContent,
             message_type: messageType,
             file_url: fileUrl,
+            ...(messageType === 'audio' ? { audio_url: trimmedContent } : {}),
           })
           .select(`
             *,
@@ -463,10 +508,10 @@ export function useConversationMessages(conversationId: string | null) {
           `)
           .single();
 
-        let finalData = data;
-        let finalError = error;
+        let finalData = data as unknown;
+        let finalError = error as any;
         if (finalError) {
-          if (finalError.status === 401 || /jwt|token|expired/i.test(finalError.message)) {
+          if (finalError.status === 401 || /jwt|token|expired/i.test(finalError.message ?? '')) {
             const { error: refreshError } = await refreshSessionLocked();
             if (!refreshError) {
               const retryClient = await getWorkingClient();
@@ -475,16 +520,17 @@ export function useConversationMessages(conversationId: string | null) {
                 .insert({
                   conversation_id: conversationId,
                   sender_id: user.id,
-                  content: content.trim(),
+                  content: messageType === 'audio' ? '' : trimmedContent,
                   message_type: messageType,
                   file_url: fileUrl,
+                  ...(messageType === 'audio' ? { audio_url: trimmedContent } : {}),
                 })
                 .select(`
                   *,
                   sender:users!sender_id(*)
                 `)
                 .single();
-              finalData = retry.data;
+              finalData = retry.data as unknown;
               finalError = retry.error;
             }
           }
@@ -492,9 +538,15 @@ export function useConversationMessages(conversationId: string | null) {
         }
 
         if (finalData) {
+          const message = finalData as DMMessage;
           // Optimistically add the sent message
-          setMessages(prev => [...prev, finalData as DMMessage]);
-          return finalData as DMMessage;
+          setMessages(prev => [...prev, message]);
+          if (message.id) {
+            triggerDMPushNotification(message.id).catch(() => {
+              // Push delivery should not block the DM send path.
+            });
+          }
+          return message;
         }
         return null;
       } catch (error) {

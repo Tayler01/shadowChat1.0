@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, {
   createContext,
   useContext,
@@ -6,7 +7,8 @@ import React, {
   useCallback,
   useRef
 } from 'react';
-import { Message, ensureSession, refreshSessionLocked, getWorkingClient, recreateSupabaseClient, supabase, resetRealtimeConnection } from '../lib/supabase';
+import { Message, ensureSession, refreshSessionLocked, getRealtimeClient, getWorkingClient, recreateSupabaseClient, supabase, resetRealtimeConnection } from '../lib/supabase';
+import { triggerGroupPushNotification } from '../lib/push';
 import { MESSAGE_FETCH_LIMIT } from '../config';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
@@ -14,6 +16,14 @@ import { useVisibilityRefresh } from './useVisibilityRefresh';
 import { useSoundEffects } from './useSoundEffects';
 
 const STORED_MESSAGE_LIMIT = 200;
+
+const dedupeMessagesById = (items: Message[]) => {
+  const map = new Map<string, Message>()
+  items.forEach(item => {
+    map.set(item.id, item)
+  })
+  return Array.from(map.values())
+}
 
 // --- Helper functions extracted from sendMessage workflow ---
 export const prepareMessageData = (
@@ -139,7 +149,7 @@ function useProvideMessages(): MessagesContextValue {
   const { user } = useAuth();
   const { playMessage, playReaction } = useSoundEffects();
   const channelRef = useRef<RealtimeChannel | null>(null);
-  const subscribeRef = useRef<() => RealtimeChannel>();
+  const subscribeRef = useRef<() => Promise<RealtimeChannel>>();
   const clientResetRef = useRef<() => Promise<void>>();
 
   const addNewMessage = useCallback(
@@ -184,15 +194,16 @@ function useProvideMessages(): MessagesContextValue {
           .limit(MESSAGE_FETCH_LIMIT),
       ]);
 
-      const fetchedMessages = (messagesRes.data || []).reverse();
+      const pinnedMessages = (pinnedRes.data || []) as unknown as Message[];
+      const fetchedMessages = ((messagesRes.data || []) as unknown as Message[]).reverse();
       setHasMore((messagesRes.data?.length || 0) === MESSAGE_FETCH_LIMIT);
-      const data = [...(pinnedRes.data || []), ...fetchedMessages];
+      const data = dedupeMessagesById([...pinnedMessages, ...fetchedMessages]);
       const error = pinnedRes.error || messagesRes.error;
 
       if (error) {
         throw error;
       } else if (data.length > 0) {
-        const pinnedIds = new Set((pinnedRes.data || []).map(m => m.id));
+        const pinnedIds = new Set(pinnedMessages.map(m => m.id));
 
         setMessages(prev => {
           if (prev.length === 0) {
@@ -206,7 +217,7 @@ function useProvideMessages(): MessagesContextValue {
                 // ignore storage errors
               }
             }
-            return data as Message[];
+            return data as unknown as Message[];
           }
 
           const mergedMap = new Map<string, Message>();
@@ -217,7 +228,7 @@ function useProvideMessages(): MessagesContextValue {
             let updated = m;
 
             if (fetched) {
-              updated = fetched as Message;
+              updated = fetched as unknown as Message;
             } else if (m.pinned && !pinnedIds.has(m.id)) {
               updated = { ...m, pinned: false, pinned_by: null, pinned_at: null } as Message;
             }
@@ -228,7 +239,7 @@ function useProvideMessages(): MessagesContextValue {
           // Add new messages
           data.forEach(d => {
             if (!mergedMap.has(d.id)) {
-              mergedMap.set(d.id, d as Message);
+              mergedMap.set(d.id, d as unknown as Message);
             }
           });
 
@@ -277,11 +288,11 @@ function useProvideMessages(): MessagesContextValue {
       if (error) throw error;
 
       if (data && data.length > 0) {
-        const newMessages = data.reverse();
+        const newMessages = (data as unknown as Message[]).reverse();
         setMessages(prev => {
           const pinned = prev.filter(m => m.pinned);
           const rest = prev.filter(m => !m.pinned);
-          return [...pinned, ...newMessages, ...rest];
+          return dedupeMessagesById([...pinned, ...newMessages, ...rest]);
         });
         setHasMore(data.length === MESSAGE_FETCH_LIMIT);
       } else {
@@ -335,9 +346,7 @@ function useProvideMessages(): MessagesContextValue {
           if (newChannel) {
             channelRef.current = newChannel;
           }
-        }).catch(error => {
-          throw error;
-        });
+        }).catch(() => {});
       }
     }
     
@@ -358,7 +367,7 @@ function useProvideMessages(): MessagesContextValue {
     // Store the reset function for visibility refresh
     clientResetRef.current = resetWithFreshClient;
     
-  }, [fetchMessages]);
+  }, [fetchMessages, resetWithFreshClient]);
 
   // Persist messages to localStorage whenever they change
   useEffect(() => {
@@ -387,14 +396,11 @@ function useProvideMessages(): MessagesContextValue {
     let currentClient: any = null;
 
     const subscribeToChannel = async (): Promise<RealtimeChannel> => {
-      currentClient = await getWorkingClient();
+      currentClient = await getWorkingClient().catch(() => getRealtimeClient());
+      currentClient = currentClient || getRealtimeClient();
       
-      if (!currentClient) {
-        throw new Error('No working Supabase client available');
-      }
-      
-      if (!currentClient.channel || typeof currentClient.channel !== 'function') {
-        throw new Error('Supabase client does not support realtime channels');
+      if (!currentClient?.channel || typeof currentClient.channel !== 'function') {
+        throw new Error('Realtime client unavailable');
       }
       
       const newChannel = currentClient
@@ -411,7 +417,7 @@ function useProvideMessages(): MessagesContextValue {
           schema: 'public',
           table: 'messages'
         },
-        async (payload) => {
+        async (payload: any) => {
           try {
             // Fetch the complete message with user data
             const workingClient = await getWorkingClient();
@@ -425,7 +431,7 @@ function useProvideMessages(): MessagesContextValue {
               .single();
 
             if (error) {
-              throw error;
+              return;
             }
 
             if (newMessage) {
@@ -433,13 +439,13 @@ function useProvideMessages(): MessagesContextValue {
               const isFromCurrentUser = newMessage.user_id === user.id;
               const logPrefix = isFromCurrentUser ? '📨 [REALTIME-SELF]' : '📨 [REALTIME-OTHER]';
 
-              addNewMessage(newMessage as Message)
+              addNewMessage(newMessage as unknown as Message)
             }
-          } catch (error) {
-            throw error;
+          } catch {
+            // ignore realtime fetch errors and wait for the next refresh
           }
         })
-        .on('broadcast', { event: 'new_message' }, (payload) => {
+        .on('broadcast', { event: 'new_message' }, (payload: any) => {
           const newMessage = payload.payload as Message;
           
           // Log broadcast message with clear indication if it's from another user
@@ -455,7 +461,7 @@ function useProvideMessages(): MessagesContextValue {
             schema: 'public',
             table: 'messages'
           },
-          async (payload) => {
+          async (payload: any) => {
             try {
               // Fetch the updated message with user data
               const workingClient = await getWorkingClient();
@@ -469,7 +475,7 @@ function useProvideMessages(): MessagesContextValue {
                 .single();
 
               if (error) {
-                throw error;
+                return;
               }
 
               if (updatedMessage) {
@@ -480,11 +486,11 @@ function useProvideMessages(): MessagesContextValue {
                     const changed =
                       JSON.stringify(prevMessage.reactions) !== JSON.stringify(updatedMessage.reactions)
                     const newList = prev.map(msg =>
-                      msg.id === updatedMessage.id ? (updatedMessage as Message) : msg
+                      msg.id === updatedMessage.id ? (updatedMessage as unknown as Message) : msg
                     )
                     if (changed) {
-                      const prevUsers = prevMessage.reactions || {}
-                      const currUsers = updatedMessage.reactions || {}
+                      const prevUsers = (prevMessage.reactions || {}) as Record<string, { users?: string[] }>
+                      const currUsers = (updatedMessage.reactions || {}) as Record<string, { users?: string[] }>
                       const changedByCurrent = Object.keys({ ...prevUsers, ...currUsers }).some(e => {
                         const before = prevUsers[e]?.users || []
                         const after = currUsers[e]?.users || []
@@ -498,11 +504,11 @@ function useProvideMessages(): MessagesContextValue {
                     }
                     return newList
                   }
-                  return [...prev, updatedMessage as Message]
+                  return [...prev, updatedMessage as unknown as Message]
                 })
               }
-            } catch (error) {
-              throw error;
+            } catch {
+              // ignore realtime update fetch errors and wait for the next refresh
             }
           }
         )
@@ -513,13 +519,13 @@ function useProvideMessages(): MessagesContextValue {
             schema: 'public',
             table: 'messages'
           },
-          (payload) => {
+          (payload: any) => {
             setMessages(prev =>
               prev.filter(msg => msg.id !== payload.old.id)
             );
           }
         )
-        .subscribe(async (status, err) => {
+        .subscribe(async (status: string, err: any) => {
           if (err) {
             // Handle specific binding mismatch error
             if (err.message && err.message.includes('mismatch between server and client bindings for postgres changes')) {
@@ -574,19 +580,23 @@ function useProvideMessages(): MessagesContextValue {
       return newChannel;
     };
 
-    subscribeToChannel().then(newChannel => {
-      channel = newChannel;
-      channelRef.current = newChannel;
-    });
+    subscribeToChannel()
+      .then(newChannel => {
+        channel = newChannel;
+        channelRef.current = newChannel;
+      })
+      .catch(() => {});
     subscribeRef.current = subscribeToChannel;
 
     return () => {
       if (channel && currentClient && currentClient.removeChannel && typeof currentClient.removeChannel === 'function') {
         currentClient.removeChannel(channel);
+      } else if (channel && getRealtimeClient()?.removeChannel) {
+        getRealtimeClient()?.removeChannel(channel);
       }
       channelRef.current = null;
     };
-  }, [user, fetchMessages]);
+  }, [addNewMessage, playReaction, user]);
 
   const sendMessage = useCallback(async (
     content: string,
@@ -599,7 +609,7 @@ function useProvideMessages(): MessagesContextValue {
 
     // Text messages require content, but image/audio messages may provide just a file URL
     if (!user || (!content.trim() && !fileUrl)) {
-      return;
+      return null;
     }
 
     setSending(true);
@@ -642,9 +652,15 @@ function useProvideMessages(): MessagesContextValue {
       }
 
       if (data) {
-        inserted = data as Message;
+        inserted = data as unknown as Message;
 
-        addNewMessage(data as Message);
+        addNewMessage(data as unknown as Message);
+
+        if (data.id) {
+          triggerGroupPushNotification(data.id).catch(() => {
+            // Push delivery should never block the visible send path.
+          });
+        }
 
         if (channelRef.current?.state === 'joined') {
           channelRef.current.send({
@@ -680,7 +696,7 @@ function useProvideMessages(): MessagesContextValue {
       setSending(false);
     }
     return inserted;
-  }, [user]);
+  }, [addNewMessage, fetchMessages, user]);
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
     if (!user) return;
@@ -830,7 +846,7 @@ function useProvideMessages(): MessagesContextValue {
       fetchMessages();
       throw error;
     }
-  }, [user, messages]);
+  }, [fetchMessages, messages, user]);
 
   return {
     messages,

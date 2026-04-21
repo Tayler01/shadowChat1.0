@@ -27,3 +27,11 @@ dist-ssr
 # Bolt data
 .bolt/
 **/supabase_discarded_migrations/
+
+# Local Netlify folder
+.netlify
+
+# Local QA and temporary tooling output
+output/
+.playwright-cli/
+supabase/.temp/

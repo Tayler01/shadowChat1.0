@@ -11,17 +11,17 @@ interface ImageModalProps {
 export const ImageModal: React.FC<ImageModalProps> = ({ open, src, alt, onClose }) => {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="relative max-w-full max-h-full">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--bg-overlay)] backdrop-blur-md">
+      <div className="popup-surface relative max-h-full max-w-full rounded-[var(--radius-xl)] p-3">
         <button
-          className="absolute top-2 right-2 p-1 bg-black/70 rounded-full text-white"
+          className="popup-close absolute right-3 top-3 rounded-full p-1"
           onClick={onClose}
           aria-label="Close image"
           type="button"
         >
           <X className="w-5 h-5" />
         </button>
-        <img src={src} alt={alt} className="max-w-screen max-h-screen rounded" />
+        <img src={src} alt={alt} className="max-h-[90vh] max-w-[90vw] rounded-[var(--radius-lg)]" />
       </div>
     </div>
   )

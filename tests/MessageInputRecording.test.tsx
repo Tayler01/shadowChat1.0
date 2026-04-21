@@ -5,7 +5,7 @@ import { MessageInput } from '../src/components/chat/MessageInput'
 import toast from 'react-hot-toast'
 
 jest.mock('react-hot-toast', () => {
-  const toastFn = jest.fn()
+  const toastFn = jest.fn() as any
   toastFn.error = jest.fn()
   toastFn.success = jest.fn()
   return { __esModule: true, default: toastFn }

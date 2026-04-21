@@ -19,10 +19,10 @@ const sizeClasses = {
 };
 
 const statusColors = {
-  online: 'bg-green-500',
-  away: 'bg-yellow-500',
-  busy: 'bg-red-500',
-  offline: 'bg-gray-400',
+  online: 'bg-[var(--state-success)]',
+  away: 'bg-[var(--state-warning)]',
+  busy: 'bg-[var(--state-danger)]',
+  offline: 'bg-[var(--state-muted)]',
 };
 
 export function Avatar({
@@ -45,10 +45,10 @@ export function Avatar({
         ${sizeClasses[size]}
         rounded-full
         overflow-hidden
-        ${color ? '' : 'bg-gradient-to-br from-blue-500 to-purple-600'}
+        ${color ? '' : 'border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.12),rgba(255,255,255,0.04)_26%,rgba(14,16,17,0.98)_100%)]'}
         flex items-center justify-center
-        text-white font-medium
-        ring-2 ring-white
+        text-[var(--text-gold)] font-medium
+        ring-2 ring-[rgba(255,255,255,0.08)]
         transition-all duration-200 hover:scale-105
       `}
         style={color ? { backgroundColor: color } : undefined}

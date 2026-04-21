@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useClientReset } from './ClientResetContext'
 
 export function useConnectivity() {
@@ -6,7 +6,7 @@ export function useConnectivity() {
   const [offline, setOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false)
   const intervalRef = useRef<number | null>(null)
 
-  const checkConnectivity = async () => {
+  const checkConnectivity = useCallback(async () => {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       setOffline(true)
       return
@@ -33,7 +33,7 @@ export function useConnectivity() {
     } catch {
       setOffline(true)
     }
-  }
+  }, [manualReset, offline])
 
   useEffect(() => {
     const handleOnline = () => {
@@ -49,7 +49,7 @@ export function useConnectivity() {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
     }
-  }, [])
+  }, [checkConnectivity])
 
   useEffect(() => {
     if (offline) {
@@ -60,7 +60,7 @@ export function useConnectivity() {
       clearInterval(intervalRef.current)
       intervalRef.current = null
     }
-  }, [offline])
+  }, [checkConnectivity, offline])
 
   return { offline }
 }

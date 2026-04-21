@@ -1,61 +1,90 @@
 import type { ChatMessage } from './supabase'
+import {
+  SUPABASE_ANON_KEY,
+  SUPABASE_URL,
+  ensureSession,
+  getWorkingClient,
+  supabase,
+} from './supabase'
 
-// Build the Supabase functions URL from the main project URL
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
-const functionsUrl = supabaseUrl
-  ? supabaseUrl.replace('.supabase.co', '.functions.supabase.co')
-  : ''
+interface OpenAIMessage {
+  role: 'system' | 'user'
+  content: string
+}
 
-export async function summarizeConversation(messages: ChatMessage[]): Promise<string> {
-  if (!functionsUrl) {
-    throw new Error('Missing Supabase configuration')
+interface OpenAIChoice {
+  message?: {
+    content?: string
+  }
+}
+
+interface OpenAIResponse {
+  choices?: OpenAIChoice[]
+}
+
+const invokeOpenAI = async (
+  messages: OpenAIMessage[],
+  model = 'gpt-4o-mini'
+): Promise<OpenAIResponse> => {
+  const hasSession = await ensureSession()
+  if (!hasSession) {
+    throw new Error('Authentication required')
   }
 
-  const payload = {
-    model: 'gpt-3.5-turbo',
-    messages: [
-      { role: 'system', content: 'Summarize the following conversation in a short paragraph.' },
-      ...messages.map(m => ({ role: 'user', content: m.content }))
-    ]
+  const workingClient = await getWorkingClient()
+  const [
+    { data: workingSessionData },
+    { data: persistentSessionData },
+  ] = await Promise.all([
+    workingClient.auth.getSession(),
+    supabase.auth.getSession(),
+  ])
+
+  const accessToken =
+    workingSessionData.session?.access_token ||
+    persistentSessionData.session?.access_token
+
+  if (!accessToken) {
+    throw new Error('Authentication required')
   }
-  const res = await fetch(`${functionsUrl}/openai-chat`, {
+
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/openai-chat`, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      Authorization: `Bearer ${accessToken}`,
+      apikey: SUPABASE_ANON_KEY,
+      'Content-Type': 'application/json',
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({ model, messages }),
   })
 
-  const data = await res.json()
+  if (!response.ok) {
+    const text = await response.text()
+    throw new Error(text || `OpenAI function failed with status ${response.status}`)
+  }
+
+  return (await response.json()) as OpenAIResponse
+}
+
+export async function summarizeConversation(messages: ChatMessage[]): Promise<string> {
+  const data = await invokeOpenAI([
+    { role: 'system', content: 'Summarize the following conversation in a short paragraph.' },
+    ...messages.map(m => ({ role: 'user' as const, content: m.content }))
+  ])
+
   return data.choices?.[0]?.message?.content?.trim() || ''
 }
 
 export async function getSuggestedReplies(messages: ChatMessage[]): Promise<string[]> {
-  if (!functionsUrl) {
-    throw new Error('Missing Supabase configuration')
-  }
-
-  const payload = {
-    model: 'gpt-3.5-turbo',
-    messages: [
-      {
-        role: 'system',
-        content:
-          'Provide three short reply suggestions as a JSON array of strings for continuing this conversation.'
-      },
-      ...messages.map(m => ({ role: 'user', content: m.content }))
-    ]
-  }
-
-  const res = await fetch(`${functionsUrl}/openai-chat`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
+  const data = await invokeOpenAI([
+    {
+      role: 'system',
+      content:
+        'Provide three short reply suggestions as a JSON array of strings for continuing this conversation.'
     },
-    body: JSON.stringify(payload)
-  })
+    ...messages.map(m => ({ role: 'user' as const, content: m.content }))
+  ])
 
-  const data = await res.json()
   const content = data.choices?.[0]?.message?.content?.trim() || '[]'
 
   try {
@@ -71,30 +100,14 @@ export async function getSuggestedReplies(messages: ChatMessage[]): Promise<stri
 }
 
 export async function askQuestion(question: string): Promise<string> {
-  if (!functionsUrl) {
-    throw new Error('Missing Supabase configuration')
-  }
-
-  const payload = {
-    model: 'gpt-3.5-turbo',
-    messages: [
-      {
-        role: 'system',
-        content:
-          'You are a helpful assistant participating in a group chat. Provide a concise answer to the user question.'
-      },
-      { role: 'user', content: question }
-    ]
-  }
-
-  const res = await fetch(`${functionsUrl}/openai-chat`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
+  const data = await invokeOpenAI([
+    {
+      role: 'system',
+      content:
+        'You are a helpful assistant participating in a group chat. Provide a concise answer to the user question.'
     },
-    body: JSON.stringify(payload)
-  })
+    { role: 'user', content: question }
+  ])
 
-  const data = await res.json()
   return data.choices?.[0]?.message?.content?.trim() || ''
 }

@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 export interface FailedMessage {
   id: string
-  type: 'text' | 'image' | 'audio' | 'file'
+  type: 'text' | 'command' | 'image' | 'audio' | 'file'
   content: string
   dataUrl?: string
   fileName?: string

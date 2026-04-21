@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { renderHook, act } from '@testing-library/react'
 import { useUserSearch } from '../src/hooks/useUserSearch'
 import { searchUsers } from '../src/lib/supabase'

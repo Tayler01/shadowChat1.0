@@ -45,14 +45,14 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
   }
 
   return (
-    <div className="relative p-2 rounded-md bg-white dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 flex items-start group">
+    <div className="glass-panel relative flex items-start rounded-[var(--radius-md)] p-3 group">
       <div className="flex-1 min-w-0 space-y-1">
         <MessageReactions
           message={message}
           onReact={handleReaction}
           className="text-[0.65rem]"
         />
-        <div className="text-sm text-gray-900 dark:text-gray-100 break-words">
+        <div className="break-words text-sm text-[var(--text-primary)]">
           <strong>{message.user?.display_name}:</strong>{' '}
           {message.message_type === 'audio' ? (
             <audio controls src={message.audio_url} className="mt-1 max-w-full" />
@@ -65,21 +65,21 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
             <button
               key={e}
               onClick={() => handleReaction(e)}
-              className="text-base hover:scale-110 transition-transform"
+              className="text-base transition-transform hover:scale-110"
             >
               {e}
             </button>
           ))}
           <button
             onClick={() => setShowPicker(!showPicker)}
-            className="text-base hover:scale-110 transition-transform"
+            className="text-base text-[var(--text-secondary)] transition-transform hover:scale-110 hover:text-[var(--text-gold)]"
             aria-label="Add reaction"
           >
             <Plus className="w-4 h-4" />
           </button>
         </div>
         {showPicker && Picker && (
-          <div ref={pickerRef} className="absolute z-50 top-full mt-2">
+          <div ref={pickerRef} className="absolute top-full z-50 mt-2">
             <Picker
               onEmojiClick={handleSelect}
               width={320}
@@ -94,7 +94,7 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
         size="sm"
         onClick={() => onUnpin(message.id)}
         aria-label="Unpin message"
-        className="ml-2 text-gray-500 dark:text-gray-400 hover:text-[var(--color-accent)]"
+        className="ml-2 text-[var(--text-muted)] hover:text-[var(--text-gold)]"
       >
         <PinOff className="w-4 h-4" />
       </Button>

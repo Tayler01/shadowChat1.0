@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageSquare, Users, User, Settings, Plus, Moon, Sun, X } from 'lucide-react';
+import { MessageSquare, Users, User, Settings, Moon, Sun, X } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
 import { useAuth } from '../../hooks/useAuth';
 import { useDirectMessages } from '../../hooks/useDirectMessages';
@@ -57,48 +57,51 @@ export function Sidebar({
 
   return (
     <div
-      className={`w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full fixed inset-y-0 left-0 z-40 transform transition-transform md:relative md:translate-x-0 ${
+      className={`glass-panel-strong fixed inset-y-0 left-0 z-40 flex h-full w-64 transform flex-col border-r border-[var(--border-panel)] transition-transform md:relative md:translate-x-0 ${
         isOpen ? '' : '-translate-x-full'
       }`}
     >
       <button
         onClick={onClose}
-        className="absolute top-2 right-2 p-2 rounded-md text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 md:hidden"
+        className="absolute right-2 top-2 rounded-[var(--radius-sm)] p-2 text-[var(--text-muted)] transition-colors hover:bg-[rgba(255,255,255,0.04)] hover:text-[var(--text-primary)] md:hidden"
         aria-label="Close sidebar"
       >
         <X className="w-4 h-4" />
       </button>
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="border-b border-[var(--border-panel)] px-6 py-5">
         <div className="flex items-center space-x-3">
-          <div className="p-2 bg-gradient-to-r from-[var(--color-primary-start)] to-[var(--color-primary-end)] rounded-lg">
-            <MessageSquare className="w-6 h-6 text-white" />
+          <div className="rounded-[var(--radius-md)] border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.16),rgba(215,170,70,0.1)_34%,rgba(122,89,24,0.42)_100%)] p-2.5 shadow-[var(--shadow-gold-soft)]">
+            <MessageSquare className="h-6 w-6 text-[var(--text-gold)]" />
           </div>
           <div>
-            <h1 className="font-bold text-xl text-gray-900 dark:text-gray-100">ShadowChat</h1>
+            <h1 className="text-xl font-bold tracking-[0.04em] text-[var(--text-primary)]">ShadowChat</h1>
+            <p className="text-xs uppercase tracking-[0.22em] text-[var(--text-muted)]">Private Console</p>
           </div>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-6 py-4 space-y-2">
+      <nav className="flex-1 space-y-2 px-4 py-5">
         {navItems.map((item) => (
           <button
             key={item.id}
             onClick={() => onViewChange(item.id)}
             className={`
-              w-full flex items-center space-x-3 px-3 py-2 rounded-lg
-              transition-all duration-200
+              flex w-full items-center space-x-3 rounded-[var(--radius-md)] px-3 py-3
+              border transition-all duration-[var(--dur-med)]
               ${currentView === item.id
-                ? 'bg-[var(--color-accent-light)] dark:bg-gray-700 text-[var(--color-accent)] border-l-4 border-[var(--color-accent)]'
-                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
+                ? 'border-[var(--border-glow)] bg-[rgba(255,255,255,0.05)] text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)]'
+                : 'border-transparent text-[var(--text-secondary)] hover:border-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[var(--text-primary)]'
               }
             `}
           >
-            <item.icon className="w-5 h-5" />
+            <span className={`rounded-[var(--radius-sm)] p-2 ${currentView === item.id ? 'bg-[rgba(215,170,70,0.12)]' : 'bg-[rgba(255,255,255,0.03)]'}`}>
+              <item.icon className="h-4 w-4" />
+            </span>
             <span className="font-medium">{item.label}</span>
             {item.badge && (
-              <span className="ml-auto bg-red-500 text-white text-xs px-2 py-1 rounded-full min-w-[20px] text-center">
+              <span className="ml-auto min-w-[20px] rounded-full border border-[rgba(215,170,70,0.3)] bg-[rgba(215,170,70,0.14)] px-2 py-1 text-center text-xs text-[var(--text-gold)]">
                 {item.badge}
               </span>
             )}
@@ -109,35 +112,43 @@ export function Sidebar({
       </nav>
 
       {/* User Profile */}
-      <div className="px-6 py-7 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex items-center space-x-3">
-          <Avatar
-            src={user?.avatar_url}
-            alt={user?.full_name || 'You'}
-            size="md"
-            color={user?.color}
-            status={user?.status}
-            showStatus
-          />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-              {user?.full_name}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-              @{user?.username}
-            </p>
+      <div className="border-t border-[var(--border-panel)] px-4 py-4">
+        <div className="glass-panel rounded-[var(--radius-lg)] px-4 py-3">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Signed in</span>
+            <button
+              onClick={onToggleDarkMode}
+              className="rounded-[var(--radius-sm)] p-2 text-[var(--text-muted)] transition-colors hover:bg-[rgba(255,255,255,0.04)] hover:text-[var(--text-gold)]"
+              aria-label="Toggle dark mode"
+            >
+              {isDarkMode ? (
+                <Sun className="w-4 h-4" />
+              ) : (
+                <Moon className="w-4 h-4" />
+              )}
+            </button>
           </div>
-          <button
-            onClick={onToggleDarkMode}
-            className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-            aria-label="Toggle dark mode"
-          >
-            {isDarkMode ? (
-              <Sun className="w-4 h-4" />
-            ) : (
-              <Moon className="w-4 h-4" />
-            )}
-          </button>
+          <div className="flex items-center space-x-3">
+            <Avatar
+              src={user?.avatar_url}
+              alt={user?.display_name || 'You'}
+              size="md"
+              color={user?.color}
+              status={user?.status}
+              showStatus
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-[var(--text-primary)]">
+                {user?.display_name}
+              </p>
+              <p className="truncate text-xs text-[var(--text-muted)]">
+                @{user?.username}
+              </p>
+              <p className="mt-1 truncate text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                {user?.status || 'offline'}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
