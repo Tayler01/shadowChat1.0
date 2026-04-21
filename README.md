@@ -1,202 +1,150 @@
-# 🧠 Realtime Chat Platform — React + Supabase + TypeScript ## Overview
-This project is a full-featured, production-ready realtime messaging application built with React, TypeScript, and Supabase. It provides a modern, extensible foundation for both public group chat and private direct messaging (DMs), wrapped in a highly polished user interface. Designed to be responsive, modular, and fast, this app is suitable for team collaboration, social networking, gaming communities, or custom internal messaging tools.
+# ShadowChat 1.0
 
-The app combines Supabase’s backend power (PostgreSQL, Realtime, Auth, Storage, Edge Functions) with a finely-tuned React frontend using TailwindCSS, Framer Motion, and component-level hooks to manage presence, message flow, and UI transitions.
+ShadowChat 1.0 is a premium dark realtime chat app built with React, TypeScript, Vite, and Supabase. It combines a public group chat, private direct messages, profile customization, AI-assisted chat utilities, and browser push notifications behind a polished black-and-gold interface.
 
---- ## Key Features ### Realtime Group Chat
-Streamed messages with automatic updates via Supabase Realtime channels
-Grouped message bubbles with optimized UI (shows avatar only on first message in a burst)
-Editable and deletable messages, secured with row-level security (RLS)
-Pinned messages for announcements or important information
-Emoji reactions, toggled with live updates
-Slash command system (/shrug, /me, /giphy, /summary) with a pluggable command registry
-Typing indicators displayed in real-time using broadcast channels
-Sticky date headers that remain visible while scrolling
-"Jump to Latest" button appears when new messages arrive and you're not at the bottom
-### Direct Messaging (DMs)
-1-on-1 private chats using dedicated DM tables and RLS policies
-Unread tracking with live badge updates and local fallback
-Toast preview notifications for new incoming messages (if not viewing that thread)
-Search and initiate new conversations via username
-Double-tap a user in search to start a new conversation if one doesn't already exist
-Live presence updates in DMs (online/away indicators)
-Message read status stored with read_at timestamps per message
-### User Presence System
-Presence is tracked using the update_user_last_active() RPC and Supabase triggers.
-The system listens to users table updates and visually reflects active/inactive status.
-Presence pings occur at a configurable interval (default 30s), with the value VITE_PRESENCE_INTERVAL_MS.
-### User Profiles
-Users can view and edit their display name, handle, status message, and custom chat color.
-Avatars and banner images are uploaded via Supabase Storage and updated in real-time.
-Presence status options: Online, AFK, Busy, Offline.
-Profiles are visible in messages, hover cards, and dedicated profile pages.
-### Notifications
-Incoming direct messages trigger popup toasts if the user is not on that thread.
-A global badge indicator on the sidebar highlights unread conversations.
-Read tracking is done via Supabase and synced using the useDMNotifications hook.
-### Message Reactions
-Emoji reactions can be toggled on any message.
-Stored in a reactions object on the message record.
-Reaction logic is managed via a toggle_message_reaction() Supabase function.
-### Slash Commands
-Slash commands are typed into the message input and processed client-side.
-Commands include:
-/shrug → ¯\_(ツ)_/¯
-/giphy <term> → Shows a random gif (mock or via real integration)
-/me → Emotes as the current user
-Additional commands can be added dynamically with handler functions.
---- ## Supabase Schema ### Tables
-users: id, name, avatar_url, banner_url, last_active, status, color
-messages: id, user_id, content, inserted_at, reactions, pinned
-dm_conversations: id, participants[], last_message_at
-dm_messages: id, conversation_id, sender_id, content, read_at
-### Functions
+The project is already wired for hosted Supabase and Netlify deployment. It is designed to behave like a product app, not a demo: realtime messaging, uploads, presence, settings, DMs, and notification flows are all first-class parts of the codebase.
 
-CREATE OR REPLACE FUNCTION update_user_last_active()
-RETURNS void AS $$
-BEGIN
-  UPDATE users SET last_active = now() WHERE id = auth.uid();
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+## Stack
 
-GRANT EXECUTE ON FUNCTION update_user_last_active() TO authenticated;
-toggle_message_reaction(message_id, emoji) — toggles reactions per user
-### Row-Level Security (RLS)
-Messages can only be read/modified by the sender
-DMs can only be accessed by participants
-User profiles can only be modified by the owner
-### Triggers
-A trigger on dm_messages updates the last_message_at timestamp on the corresponding conversation
---- ## Advanced UI / UX Features ### Navigation
-Persistent sidebar navigation with icons for Chat, DMs, Profile, and Settings
-Collapsible on mobile and tablet
-Menu buttons in each view header toggle the sidebar on small screens
-Sidebar shows unread message badges and typing indicators
-### Dark Mode
-Theme toggle available in settings
-Stored in localStorage to persist across sessions
-Signing out clears cached chat history and failed message queues
-### Typing Indicators
-When a user types, a typing event is broadcast to the channel
-Other users in that room see "User is typing..."
-### Emoji Picker
-Message input supports emoji selection with a visual emoji picker
-Reactions also use this picker
-### Sticky Headers
-Date dividers and typing status bars remain sticky while scrolling chat
-### Mobile Responsiveness
-Fully responsive layout
-Swipeable interactions for switching tabs and triggering modals
-Mobile-first optimizations on message input and layout
---- ## Media & Uploads
-Users can upload avatars, banners, and files via drag-and-drop or file picker
-Upload progress is shown via animated loaders
-Supported formats:
-Images (JPG, PNG, WebP, GIF)
-Documents (PDF, TXT)
-Audio messages (OGG, MP3)
-Uploads stored in Supabase Storage and linked via signed URLs
---- ## Global Search
-Global message search by keyword
-Filters:
-By user
-By date range
-By conversation
-Message results are highlighted and jump-to enabled
---- ## AI-Ready Features
-Thread summarization using OpenAI GPT
+- React 18
+- TypeScript
+- Vite
+- Tailwind CSS
+- Framer Motion
+- Supabase Auth, Postgres, Realtime, Storage, and Edge Functions
+- Netlify for static hosting
+- Jest + Testing Library for unit and hook coverage
+- Playwright for headed browser debugging and smoke validation
 
-Tone analysis to detect emotional content
-AI replies and auto-suggested responses (implemented)
+## What The App Includes
 
-Moderation engine to flag offensive or inappropriate content
-Smart mentions or entity linking to user profiles, topics, or commands
---- ## Security & Moderation
-Per-user RLS security enforced at database level
-Admins and moderators have elevated read/write access
-Ability to:
-Block or mute users
-Delete or edit flagged content
-View moderation logs
-(Planned) GPT moderation pipeline to detect spam, hate speech, etc.
---- ## Environment Configuration
+- Realtime group chat
+- Realtime direct messages
+- Unread tracking and in-app DM notifications
+- User profiles with avatar, banner, status, and theme color
+- File, image, and voice-message uploads
+- Message reactions, pinning, editing, and deletion
+- Slash commands and reply/thread affordances
+- AI reply and summary hooks through a secured Supabase Edge Function
+- Browser push notifications for DMs and group chat
+- PWA/service-worker foundation for installed mobile and desktop web experiences
+- Premium obsidian-and-gold design system across desktop and mobile
 
-VITE_SUPABASE_URL=<your Supabase project URL>
-VITE_SUPABASE_ANON_KEY=<your Supabase anon key>
-VITE_PRESENCE_INTERVAL_MS=30000 # optional
-VITE_OPENAI_KEY=<your OpenAI API key> # for /summary and suggestions and tone analysis
+## Current Project Shape
 
---- ## Getting Started
+Frontend lives under [`src`](C:/repos/chat2.0/src).
 
-# Clone the repo
-git clone https://github.com/Tayler01/shadowChat1.0.git
-cd shadowChat1.0
+- [`App.tsx`](C:/repos/chat2.0/src/App.tsx) owns high-level view switching and app chrome.
+- [`src/components`](C:/repos/chat2.0/src/components) contains view and UI components grouped by domain.
+- [`src/hooks`](C:/repos/chat2.0/src/hooks) contains most stateful app behavior.
+- [`src/lib`](C:/repos/chat2.0/src/lib) contains Supabase, auth, push, AI, env, and utility layers.
 
-# Install dependencies
+Backend lives under [`supabase`](C:/repos/chat2.0/supabase).
+
+- [`supabase/migrations`](C:/repos/chat2.0/supabase/migrations) is the source of truth for schema and policies.
+- [`supabase/functions/openai-chat`](C:/repos/chat2.0/supabase/functions/openai-chat/index.ts) handles authenticated AI requests.
+- [`supabase/functions/send-push`](C:/repos/chat2.0/supabase/functions/send-push/index.ts) sends web push notifications.
+
+Tests live under [`tests`](C:/repos/chat2.0/tests).
+
+## Quick Start
+
+1. Install dependencies.
+2. Create a Supabase project.
+3. Add frontend env vars.
+4. Link the repo to Supabase and push migrations.
+5. Start the app.
+
+```powershell
 npm install
-# This pulls in the `sentiment` package used for tone analysis
-
-# Lint the code
+Copy-Item .env.example .env
 npm run lint
-
-# Run tests
-npm test
-
-# Apply Supabase migrations
-npx supabase db push
-
-# This will also create the `avatars`, `banners`, `message-media`, and `chat-uploads` storage buckets
-# along with the row-level security policies needed for uploads.
-# Run the same command in production to ensure the bucket exists
-
-# Start the dev server
+npx tsc --noEmit -p tsconfig.app.json
+npm run build
 npm run dev
-
-# AI suggested replies
-OpenAI-powered reply suggestions appear above the message box. Toggle this feature in **Settings → AI → Suggested Replies**.
-Tone indicators next to messages can be disabled under **Settings → AI → Tone Indicators**.
---- ## Testing & CI/CD ### Testing Stack
-Jest for unit tests
-React Testing Library for DOM interaction
-Coverage includes:
-Message posting
-Reaction toggles
-Auth flow
-Presence pings
-Profile updates
-### Continuous Integration
-GitHub Actions pipeline:
-Run lint, type-check, and test on pull request
-Deploy to Netlify or Vercel on merge to main
-Optional: Slack/Discord webhook alerts
-
---- ## Troubleshooting Realtime Connections
-
-If realtime channels stop updating after a manual session refresh, call the `resetRealtimeConnection` helper to re-authenticate the websocket:
-
-```ts
-import { resetRealtimeConnection } from './src/lib/supabase'
-
-await resetRealtimeConnection()
 ```
 
-This disconnects the realtime client, reconnects it and sets the auth token
-from the current session.
+For the full setup flow, use [docs/SETUP_GUIDE.md](C:/repos/chat2.0/docs/SETUP_GUIDE.md:1).
 
-Fresh clients store auth tokens under keys prefixed with
-`sb-${projectRef}-auth-token-fresh-<unique-id>` where the unique id is
-generated via `crypto.randomUUID()` when available. The library automatically
-purges old keys whenever a new fresh client is created or promoted so stale
-entries do not linger in `localStorage`.
+## Environment Variables
 
---- ## Future Features
-Push notifications (web + mobile)
-Offline drafts and local caching (message history cached on load)
-Threaded replies and collapsible chains
-Video or voice rooms using WebRTC
-Third-party plugin support
-Federation or multi-tenant support
---- ## Final Summary
-This project is a complete, secure, customizable real-time messaging platform with deep integration of Supabase services. It emphasizes rich interaction, clean UX, and modern engineering practices. Designed to be deployable from scratch or expanded into a full product, it can power both niche internal tools and production-grade social chat networks.
+Frontend env values live in [`.env`](C:/repos/chat2.0/.env.example:1).
 
-Built by developers for developers — with customization, scaling, and polish in mind.
+Required:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+
+Common optional values:
+
+- `VITE_PRESENCE_INTERVAL_MS`
+- `VITE_MESSAGE_FETCH_LIMIT`
+- `VITE_DEBUG_LOGS`
+- `VITE_WEB_PUSH_PUBLIC_KEY`
+- `VITE_OPENAI_KEY` only if you intentionally add a client-side AI key path
+
+Supabase Edge Function secrets are separate from `.env`. The project uses:
+
+- `OPENAI_API_KEY` or `OPENAI_KEY`
+- `WEB_PUSH_PUBLIC_KEY`
+- `WEB_PUSH_PRIVATE_KEY`
+- `WEB_PUSH_SUBJECT`
+
+## Core Commands
+
+```powershell
+npm run dev
+npm run build
+npm run lint
+npm test
+npx tsc --noEmit -p tsconfig.app.json
+npx vite preview
+```
+
+## Realtime, Push, and AI Notes
+
+- Realtime depends on the migrations having been pushed to the target Supabase project.
+- Browser push depends on the service worker, VAPID keys, the `send-push` edge function, and at least one active subscription row.
+- AI features depend on the `openai-chat` edge function and a configured OpenAI secret on Supabase.
+- iPhone web push requires the app to be installed to the Home Screen. Android and Windows work through supported browsers/PWAs.
+
+## Testing And Debugging
+
+The minimum quality gates for normal code changes are:
+
+```powershell
+npm run lint
+npx tsc --noEmit -p tsconfig.app.json
+npm run build
+```
+
+For deeper testing guidance, including headed Playwright debugging, use [docs/TESTING_GUIDE.md](C:/repos/chat2.0/docs/TESTING_GUIDE.md:1).
+
+## Deployment
+
+Production is hosted on Netlify and the backend is hosted on Supabase.
+
+- Netlify config: [netlify.toml](C:/repos/chat2.0/netlify.toml:1)
+- Deployment guide: [docs/DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1)
+
+## Documentation Map
+
+- [AGENTS.md](C:/repos/chat2.0/AGENTS.md:1): agent-focused working guide for coding, testing, and debugging
+- [docs/SETUP_GUIDE.md](C:/repos/chat2.0/docs/SETUP_GUIDE.md:1): first-time local and hosted setup
+- [docs/TESTING_GUIDE.md](C:/repos/chat2.0/docs/TESTING_GUIDE.md:1): lint, typecheck, unit tests, smoke tests, and Playwright usage
+- [docs/DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1): GitHub, Netlify, and Supabase deployment workflow
+- [docs/ARCHITECTURE.md](C:/repos/chat2.0/docs/ARCHITECTURE.md:1): codebase map and key data flows
+- [docs/LIQUID_GOLD_DARK_REWORK.md](C:/repos/chat2.0/docs/LIQUID_GOLD_DARK_REWORK.md:1): design-direction history
+- [docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md](C:/repos/chat2.0/docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md:1): notification planning notes
+
+## Status
+
+This repo is active product code, not a skeleton starter. Before changing behavior, read the relevant hook and lib layers, especially:
+
+- [src/hooks/useMessages.tsx](C:/repos/chat2.0/src/hooks/useMessages.tsx:1)
+- [src/hooks/useDirectMessages.tsx](C:/repos/chat2.0/src/hooks/useDirectMessages.tsx:1)
+- [src/hooks/useAuth.tsx](C:/repos/chat2.0/src/hooks/useAuth.tsx:1)
+- [src/lib/supabase.ts](C:/repos/chat2.0/src/lib/supabase.ts:1)
+- [src/lib/push.ts](C:/repos/chat2.0/src/lib/push.ts:1)
+
+That is where most of the realtime, session, push, and chat behavior is coordinated.
