@@ -96,6 +96,19 @@ npm test -- --runInBand
 - [`supabase/migrations`](C:/repos/chat2.0/supabase/migrations): canonical schema and policy history
 - [`supabase/functions/openai-chat/index.ts`](C:/repos/chat2.0/supabase/functions/openai-chat/index.ts:1): authenticated AI proxy
 - [`supabase/functions/send-push/index.ts`](C:/repos/chat2.0/supabase/functions/send-push/index.ts:1): DM and group push delivery
+- [`supabase/functions/bridge-register/index.ts`](C:/repos/chat2.0/supabase/functions/bridge-register/index.ts:1): bridge device registration
+- [`supabase/functions/bridge-pairing-begin/index.ts`](C:/repos/chat2.0/supabase/functions/bridge-pairing-begin/index.ts:1): pairing-code issuance
+- [`supabase/functions/bridge-pairing-status/index.ts`](C:/repos/chat2.0/supabase/functions/bridge-pairing-status/index.ts:1): device polling for approval state
+- [`supabase/functions/bridge-session-exchange/index.ts`](C:/repos/chat2.0/supabase/functions/bridge-session-exchange/index.ts:1): bridge control-plane session issuance
+- [`supabase/functions/bridge-session-refresh/index.ts`](C:/repos/chat2.0/supabase/functions/bridge-session-refresh/index.ts:1): bridge control-plane session rotation
+- [`supabase/functions/bridge-pairing-revoke/index.ts`](C:/repos/chat2.0/supabase/functions/bridge-pairing-revoke/index.ts:1): remote revoke and device wipe
+- [`supabase/functions/bridge-heartbeat/index.ts`](C:/repos/chat2.0/supabase/functions/bridge-heartbeat/index.ts:1): bridge health ping
+
+### ESP Bridge Firmware
+
+- [`firmware/esp-bridge`](C:/repos/chat2.0/firmware/esp-bridge): ESP-IDF firmware workspace for the `ESP32-S3` bridge spike
+- [`firmware/esp-bridge/main/main.c`](C:/repos/chat2.0/firmware/esp-bridge/main/main.c:1): current serial admin shell, Wi-Fi onboarding, and backend control-plane calls
+- [`firmware/esp-bridge/README.md`](C:/repos/chat2.0/firmware/esp-bridge/README.md:1): firmware setup, build, and command reference
 - future bridge work will also add bridge-specific control-plane functions under [`supabase/functions`](C:/repos/chat2.0/supabase/functions)
 
 ## Working Rules
@@ -127,6 +140,17 @@ Check [`src/index.css`](C:/repos/chat2.0/src/index.css:1) and nearby components 
 ### 3. Treat Migrations As Source Of Truth
 
 Do not describe schema behavior from memory. Read the relevant migration or helper function first.
+
+### 3a. Treat Bridge Docs As Source Of Truth For Firmware Work
+
+Before changing ESP bridge behavior, read the bridge planning stack in this order:
+
+- [docs/ESP_BRIDGE_FEATURE_ROADMAP.md](C:/repos/chat2.0/docs/ESP_BRIDGE_FEATURE_ROADMAP.md:1)
+- [docs/ESP_BRIDGE_DOCUMENTATION_REVIEW.md](C:/repos/chat2.0/docs/ESP_BRIDGE_DOCUMENTATION_REVIEW.md:1)
+- [docs/ESP_BRIDGE_PHASE0_IMPLEMENTATION_BRIEF.md](C:/repos/chat2.0/docs/ESP_BRIDGE_PHASE0_IMPLEMENTATION_BRIEF.md:1)
+- [docs/ESP_BRIDGE_SESSION_ISSUANCE_AND_PAIRING_EXCHANGE.md](C:/repos/chat2.0/docs/ESP_BRIDGE_SESSION_ISSUANCE_AND_PAIRING_EXCHANGE.md:1)
+
+Keep `Phase 0` firmware serial-first and do not assume the future local dashboard or full local app transport already exists.
 
 ### 4. Prefer Preview For Visual QA
 

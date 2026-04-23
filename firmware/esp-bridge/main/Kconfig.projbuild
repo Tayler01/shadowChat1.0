@@ -1,0 +1,30 @@
+menu "ShadowChat Bridge"
+
+config BRIDGE_SUPABASE_URL
+    string "Supabase project URL"
+    default ""
+    help
+        Base project URL, for example https://example.supabase.co
+
+config BRIDGE_SUPABASE_ANON_KEY
+    string "Supabase anon key"
+    default ""
+    help
+        Anonymous API key used to invoke public bridge Edge Functions.
+
+config BRIDGE_HARDWARE_MODEL
+    string "Bridge hardware model"
+    default "esp32-s3"
+
+config BRIDGE_FIRMWARE_VERSION
+    string "Bridge firmware version"
+    default "0.1.0-phase0"
+
+config BRIDGE_DEVICE_SERIAL
+    string "Bridge device serial override"
+    default ""
+    help
+        Optional stable device serial override. Leave blank to derive a serial
+        from the ESP MAC address at runtime.
+
+endmenu
