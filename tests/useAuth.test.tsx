@@ -1,4 +1,4 @@
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, act, waitFor, type RenderHookResult } from '@testing-library/react';
 import { AuthProvider, useAuth } from '../src/hooks/useAuth';
 import { supabase } from '../src/lib/supabase';
 import * as auth from '../src/lib/auth';
@@ -36,7 +36,7 @@ type SupabaseMock = jest.Mocked<typeof supabase>;
 const authModule = auth as jest.Mocked<typeof auth>;
 
 const renderUseAuth = async () => {
-  let rendered: ReturnType<typeof renderHook<typeof useAuth>> | null = null;
+  let rendered: RenderHookResult<ReturnType<typeof useAuth>, undefined> | null = null;
 
   await act(async () => {
     rendered = renderHook(() => useAuth(), { wrapper: AuthProvider });
