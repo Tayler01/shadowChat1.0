@@ -325,7 +325,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowActions(!showActions)}
-                    className="opacity-0 transition-opacity group-hover/message:opacity-70 hover:opacity-100 hover:text-[var(--text-gold)]"
+                    className="opacity-70 transition-opacity hover:opacity-100 hover:text-[var(--text-gold)] md:opacity-0 md:group-hover/message:opacity-70"
                     aria-label="Message actions"
                     type="button"
                   >
@@ -356,6 +356,31 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                           >
                             <Copy className="w-4 h-4" />
                             <span>Copy</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              void handleReaction('\u{1F44D}')
+                              setShowActions(false)
+                            }}
+                            className="flex w-full items-center space-x-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)]"
+                            type="button"
+                            aria-label="React with thumbs up"
+                          >
+                            <span className="text-base leading-none">{'\u{1F44D}'}</span>
+                            <span>React</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              setShowReactionPicker(true)
+                              setShowActions(false)
+                            }}
+                            className="flex w-full items-center space-x-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)]"
+                            type="button"
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span>Add Reaction</span>
                           </button>
 
                           {onReply && (
@@ -433,6 +458,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                       onClick={() => handleReaction(e)}
                       className="text-base hover:scale-110 transition-transform"
                       type="button"
+                      aria-label={`React with ${normalizeEmojiValue(e)}`}
                     >
                       {e}
                     </button>
@@ -513,6 +539,7 @@ export const MessageReactions: React.FC<{
                 ? 'border-[var(--border-glow)] bg-[rgba(215,170,70,0.14)] text-[var(--text-gold)]'
                 : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)] text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.08)]'
             }`}
+            aria-label={`Reaction ${normalizeEmojiValue(emoji)} count ${data.count}`}
           >
             <span>{normalizeEmojiValue(emoji)}</span>
             <span className="text-[0.5em]">{data.count}</span>

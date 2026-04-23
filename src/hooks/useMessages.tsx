@@ -620,14 +620,6 @@ function useProvideMessages(): MessagesContextValue {
       throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
     }
 
-    // Log current session tokens and user details for debugging
-    try {
-      const workingClient = await getWorkingClient();
-      const { data: { session } } = await workingClient.auth.getSession();
-    } catch (tokenErr) {
-      throw tokenErr;
-    }
-
     const messageData = prepareMessageData(
       user.id,
       content,

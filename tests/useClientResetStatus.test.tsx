@@ -4,7 +4,8 @@ import {
   recreateSupabaseClient,
   forceSessionRestore,
   getWorkingClient,
-  promoteFallbackToMain
+  promoteFallbackToMain,
+  ensureSession,
 } from '../src/lib/supabase'
 
 jest.mock('../src/lib/supabase', () => {
@@ -19,7 +20,8 @@ jest.mock('../src/lib/supabase', () => {
     recreateSupabaseClient: jest.fn().mockResolvedValue(undefined),
     forceSessionRestore: jest.fn().mockResolvedValue(true),
     getWorkingClient: jest.fn().mockResolvedValue(workingClient),
-    promoteFallbackToMain: jest.fn().mockResolvedValue(undefined)
+    promoteFallbackToMain: jest.fn().mockResolvedValue(undefined),
+    ensureSession: jest.fn().mockResolvedValue(true),
   }
 })
 
@@ -38,16 +40,14 @@ test('queues simultaneous manual resets', async () => {
   expect((recreateSupabaseClient as jest.Mock)).toHaveBeenCalledTimes(1)
 })
 
-test('visibility change does not trigger duplicate reset', async () => {
+test('visibility change no longer auto-triggers a comprehensive reset', async () => {
   const { result } = renderHook(() => useClientResetStatus())
 
   await act(async () => {
-    const p = result.current.manualReset()
     Object.defineProperty(document, 'hidden', { value: false, configurable: true })
     document.dispatchEvent(new Event('visibilitychange'))
-    await p
   })
 
-  expect((recreateSupabaseClient as jest.Mock)).toHaveBeenCalledTimes(1)
+  expect((recreateSupabaseClient as jest.Mock)).not.toHaveBeenCalled()
 })
 

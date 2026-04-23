@@ -32,7 +32,6 @@ test('renders children after retry', () => {
   );
 
   expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: /try again/i }));
 
   rerender(
     <ErrorBoundary>
@@ -40,6 +39,7 @@ test('renders children after retry', () => {
     </ErrorBoundary>
   );
 
+  fireEvent.click(screen.getByRole('button', { name: /try again/i }));
   expect(screen.getByText('Child')).toBeInTheDocument();
   (console.error as jest.Mock).mockRestore();
 });

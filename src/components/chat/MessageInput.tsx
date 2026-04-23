@@ -89,14 +89,18 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   // Handle clicks outside attachment menu
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (attachmentMenuRef.current && !attachmentMenuRef.current.contains(event.target as Node)) {
+      if (
+        showAttachmentMenu &&
+        attachmentMenuRef.current &&
+        !attachmentMenuRef.current.contains(event.target as Node)
+      ) {
         setShowAttachmentMenu(false)
       }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [showAttachmentMenu])
 
   // Track recording duration
   useEffect(() => {
@@ -227,43 +231,57 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    e.target.value = ''
     if (file) {
       onUploadStatusChange(true)
-      uploadChatFile(file)
-        .then(url => {
-          onSendMessage('', 'image', url, replyingTo?.id)
+      ;(async () => {
+        try {
+          const url = await uploadChatFile(file)
+          const sent = await onSendMessage('', 'image', url, replyingTo?.id)
+          if (sent === null) {
+            toast.error('Failed to send image')
+            return
+          }
           onCancelReply?.()
-        })
-        .catch(err => {
+        } catch (err) {
           console.error(err)
-        })
-        .finally(() => onUploadStatusChange(false))
+          toast.error('Failed to send image')
+        } finally {
+          onUploadStatusChange(false)
+        }
+      })()
     }
-    e.target.value = ''
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    e.target.value = ''
     if (file) {
       onUploadStatusChange(true)
-      uploadChatFile(file)
-        .then(url => {
+      ;(async () => {
+        try {
+          const url = await uploadChatFile(file)
           const messageType = file.type.startsWith('image/') ? 'image' : 'file'
           const meta = JSON.stringify({ name: file.name, size: file.size, type: file.type })
-          onSendMessage(
+          const sent = await onSendMessage(
             messageType === 'image' ? '' : meta,
             messageType as any,
             url,
             replyingTo?.id
           )
+          if (sent === null) {
+            toast.error('Failed to send attachment')
+            return
+          }
           onCancelReply?.()
-        })
-        .catch(err => {
+        } catch (err) {
           console.error(err)
-        })
-        .finally(() => onUploadStatusChange(false))
+          toast.error('Failed to send attachment')
+        } finally {
+          onUploadStatusChange(false)
+        }
+      })()
     }
-    e.target.value = ''
   }
 
   const startRecording = async () => {
@@ -279,10 +297,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         try {
           onUploadStatusChange(true)
           const url = await uploadVoiceMessage(blob, mimeType)
-          onSendMessage(url, 'audio', undefined, replyingTo?.id)
+          const sent = await onSendMessage(url, 'audio', undefined, replyingTo?.id)
+          if (sent === null) {
+            toast.error('Failed to send voice message')
+            return
+          }
           onCancelReply?.()
         } catch (err) {
           console.error(err)
+          toast.error('Failed to send voice message')
         } finally {
           onUploadStatusChange(false)
           mediaStreamRef.current = null
@@ -454,12 +477,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             accept="image/*"
             ref={imageInputRef}
             onChange={handleImageChange}
+            data-upload-kind="image"
             className="hidden"
           />
           <input
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
+            data-upload-kind="file"
             className="hidden"
           />
         </div>

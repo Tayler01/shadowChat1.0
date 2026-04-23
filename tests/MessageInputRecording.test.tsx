@@ -30,6 +30,7 @@ jest.mock('../src/hooks/useDraft', () => ({
 }))
 
 test('shows toast and resets when microphone access denied', async () => {
+  jest.spyOn(console, 'error').mockImplementation(() => {})
   Object.defineProperty(navigator, 'mediaDevices', {
     value: { getUserMedia: jest.fn().mockRejectedValue(new Error('denied')) },
     configurable: true
@@ -45,4 +46,5 @@ test('shows toast and resets when microphone access denied', async () => {
 
   expect((toast as any).error).toHaveBeenCalledWith('Microphone access was denied')
   expect(screen.queryByText(/Recording/)).not.toBeInTheDocument()
+  ;(console.error as jest.Mock).mockRestore()
 })

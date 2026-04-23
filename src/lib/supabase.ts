@@ -5,6 +5,14 @@ import {
 } from './env'
 
 type AnySupabaseClient = any
+type SessionResponse = {
+  data: { session: any }
+  error: any
+}
+type RefreshSessionResponse = {
+  data: { session: any }
+  error: any
+}
 
 const loggingFetch: typeof fetch = async (input, init) => {
   return fetch(input, init)
@@ -167,6 +175,34 @@ const timeout = (ms: number) => new Promise((_, reject) =>
   setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms)
 )
 
+const SESSION_LOOKUP_TIMEOUT_MS = 4000
+const SESSION_REFRESH_TIMEOUT_MS = 10000
+
+export const withTimeout = async <T>(
+  promise: Promise<T>,
+  ms: number,
+  message: string
+): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(message)), ms)
+    ),
+  ]) as Promise<T>
+}
+
+export const getSessionWithTimeout = async (
+  client?: AnySupabaseClient,
+  timeoutMs = SESSION_LOOKUP_TIMEOUT_MS
+): Promise<SessionResponse> => {
+  const targetClient = client ?? (await getWorkingClient())
+  return withTimeout(
+    targetClient.auth.getSession(),
+    timeoutMs,
+    `Session lookup timeout after ${timeoutMs}ms`
+  ) as Promise<SessionResponse>
+}
+
 // Promote fallback client to main client
 export const promoteFallbackToMain = async (): Promise<void> => {
   
@@ -281,7 +317,19 @@ export const recreateSupabaseClient = async (): Promise<AnySupabaseClient> => {
 
   const restored = await restoreSessionIfNeeded(client)
   if (!restored) {
-    await ensureSession(true).catch(() => false)
+    const storedToken = getStoredRefreshToken()
+    if (storedToken) {
+      try {
+        const refreshResult = (await withTimeout(
+          client.auth.refreshSession(),
+          SESSION_REFRESH_TIMEOUT_MS,
+          `Session refresh timeout after ${SESSION_REFRESH_TIMEOUT_MS}ms`
+        )) as RefreshSessionResponse
+        client.realtime?.setAuth?.(refreshResult.data?.session?.access_token || '')
+      } catch {
+        // ignore refresh failures during client recreation
+      }
+    }
   }
 
   try {
@@ -332,7 +380,7 @@ export const forceSessionRestore = async (): Promise<boolean> => {
     const workingClient = await getWorkingClient()
     
     // First check if we already have a session
-    const { data: { session }, error } = await workingClient.auth.getSession()
+    const { data: { session }, error } = await getSessionWithTimeout(workingClient)
     if (!error && session) {
       return true
     }
@@ -358,14 +406,101 @@ export const clearRefreshSessionPromise = () => {
   refreshSessionPromise = null
 }
 
+export const recoverSessionAfterResume = async (): Promise<boolean> => {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return false
+  }
+
+  const storedToken = getStoredRefreshToken()
+
+  const attemptRecovery = async (client: AnySupabaseClient) => {
+    const restored = await restoreSessionIfNeeded(client)
+    if (restored) {
+      try {
+        const { data: { session } } = await getSessionWithTimeout(client)
+        client.realtime.setAuth(session?.access_token || '')
+      } catch {
+        // ignore lookup failures after a successful local restore
+      }
+      try {
+        client.realtime.connect?.()
+      } catch {
+        // ignore reconnect failures
+      }
+      return true
+    }
+
+    if (!storedToken) {
+      return false
+    }
+
+    try {
+      const refreshResult = (await withTimeout(
+        client.auth.refreshSession(),
+        SESSION_REFRESH_TIMEOUT_MS,
+        `Session refresh timeout after ${SESSION_REFRESH_TIMEOUT_MS}ms`
+      )) as RefreshSessionResponse
+
+      if (refreshResult.data?.session) {
+        client.realtime.setAuth(refreshResult.data.session.access_token || '')
+        try {
+          client.realtime.connect?.()
+        } catch {
+          // ignore reconnect failures
+        }
+        return true
+      }
+    } catch {
+      // ignore refresh failures and fall through to a client recreation
+    }
+
+    return false
+  }
+
+  try {
+    const currentClient = await getWorkingClient()
+    if (await attemptRecovery(currentClient)) {
+      return true
+    }
+  } catch {
+    // ignore and try a client recreation below
+  }
+
+  try {
+    await recreateSupabaseClient()
+    const refreshedClient = await getWorkingClient()
+    return attemptRecovery(refreshedClient)
+  } catch {
+    return false
+  }
+}
+
 export const refreshSessionLocked = async () => {
   if (!refreshSessionPromise) {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       return Promise.reject(new Error('Offline: cannot refresh session'))
     }
 
-    const workingClient = await getWorkingClient()
-    const { data: { session }, error } = await workingClient.auth.getSession()
+    let workingClient = await getWorkingClient()
+    let session: any = null
+    let error: any = null
+
+    try {
+      const sessionResult = await getSessionWithTimeout(workingClient)
+      session = sessionResult.data.session
+      error = sessionResult.error
+    } catch (sessionError) {
+      const recovered = await recoverSessionAfterResume()
+      if (!recovered) {
+        return Promise.reject(sessionError)
+      }
+
+      workingClient = await getWorkingClient()
+      const sessionResult = await getSessionWithTimeout(workingClient)
+      session = sessionResult.data.session
+      error = sessionResult.error
+    }
+
     const storedToken = getStoredRefreshToken()
     
     if (!session && !storedToken) {
@@ -391,13 +526,11 @@ export const refreshSessionLocked = async () => {
       .catch((err: any) => {
         throw err
       })
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(
-        () => reject(new Error('Session refresh timeout after 10 seconds')),
-        10000
-      )
-    )
-    refreshSessionPromise = (Promise.race([refresh, timeoutPromise]) as Promise<{
+    refreshSessionPromise = (withTimeout(
+      refresh,
+      SESSION_REFRESH_TIMEOUT_MS,
+      `Session refresh timeout after ${SESSION_REFRESH_TIMEOUT_MS}ms`
+    ) as Promise<{
       data: any
       error: any
     }>)
@@ -425,7 +558,7 @@ export const resetRealtimeConnection = async () => {
     return
   }
   
-  const { data: { session } } = await currentClient.auth.getSession()
+  const { data: { session } } = await getSessionWithTimeout(currentClient)
   
   // Clean up existing channels on current client
   try {
@@ -709,15 +842,40 @@ export const fetchAllUsers = async (options?: { signal?: AbortSignal }) => {
 // Helper function to ensure valid session before database operations
 export const ensureSession = async (force = false) => {
   try {
-    const workingClient = await getWorkingClient()
-    const { data: { session }, error } = await workingClient.auth.getSession()
+    let workingClient = await getWorkingClient()
+    let session: any = null
+    let error: any = null
+
+    try {
+      const sessionResult = await getSessionWithTimeout(workingClient)
+      session = sessionResult.data.session
+      error = sessionResult.error
+    } catch {
+      const recovered = await recoverSessionAfterResume()
+      if (!recovered) {
+        return false
+      }
+      workingClient = await getWorkingClient()
+      const sessionResult = await getSessionWithTimeout(workingClient)
+      session = sessionResult.data.session
+      error = sessionResult.error
+    }
 
     if (error) {
       return false
     }
 
     if (!session) {
-      return false
+      const recovered = await recoverSessionAfterResume()
+      if (!recovered) {
+        return false
+      }
+      const recoveredClient = await getWorkingClient()
+      const recoveredSessionResult = await getSessionWithTimeout(recoveredClient)
+      session = recoveredSessionResult.data.session
+      if (!session) {
+        return false
+      }
     }
     
     // Check if session is expired or about to expire (within 5 minutes)

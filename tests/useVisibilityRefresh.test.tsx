@@ -1,7 +1,7 @@
 import { renderHook, act } from '@testing-library/react'
 import { useVisibilityRefresh } from '../src/hooks/useVisibilityRefresh'
 
-test('runs callback on visibility change when document becomes visible', () => {
+test('runs callback on visibility change when document becomes visible', async () => {
   jest.useFakeTimers()
   const cb = jest.fn()
   renderHook(() => useVisibilityRefresh(cb, 200))
@@ -9,7 +9,10 @@ test('runs callback on visibility change when document becomes visible', () => {
   act(() => {
     document.dispatchEvent(new Event('visibilitychange'))
   })
-  jest.runAllTimers()
+  await act(async () => {
+    jest.advanceTimersByTime(200)
+    await Promise.resolve()
+  })
   expect(cb).toHaveBeenCalled()
   jest.useRealTimers()
 })

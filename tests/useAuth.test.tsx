@@ -1,7 +1,11 @@
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import { AuthProvider, useAuth } from '../src/hooks/useAuth';
 import { supabase } from '../src/lib/supabase';
 import * as auth from '../src/lib/auth';
+
+jest.mock('../src/config', () => ({
+  PRESENCE_INTERVAL_MS: 30000,
+}));
 
 jest.mock('../src/lib/supabase', () => {
   return {
@@ -16,6 +20,9 @@ jest.mock('../src/lib/supabase', () => {
         signOut: jest.fn(),
       },
     },
+    getWorkingClient: jest.fn(),
+    ensureSession: jest.fn(),
+    getSessionWithTimeout: jest.fn(),
     updateUserPresence: jest.fn(),
   };
 });
@@ -46,6 +53,25 @@ beforeEach(() => {
     maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
     rpc: jest.fn().mockReturnThis(),
   } as any));
+  const { getWorkingClient } = jest.requireMock('../src/lib/supabase') as { getWorkingClient: jest.Mock };
+  const {
+    ensureSession,
+    getSessionWithTimeout,
+  } = jest.requireMock('../src/lib/supabase') as {
+    ensureSession: jest.Mock;
+    getSessionWithTimeout: jest.Mock;
+  };
+  ensureSession.mockResolvedValue(false);
+  getSessionWithTimeout.mockResolvedValue({ data: { session: null }, error: null });
+  getWorkingClient.mockResolvedValue({
+    auth: {
+      getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      signOut: jest.fn().mockResolvedValue({ error: null }),
+    },
+    realtime: {
+      setAuth: jest.fn(),
+    },
+  });
 });
 
 test('signIn calls auth.signIn', async () => {
@@ -62,11 +88,37 @@ test('signIn calls auth.signIn', async () => {
   expect(result.current.error).toBeNull();
 });
 
+test('initial session bootstrap loads a user when recovery succeeds', async () => {
+  const profile = { id: '1', username: 'user' } as any;
+  authModule.getCurrentUser.mockResolvedValue(profile);
+
+  const {
+    ensureSession,
+    getSessionWithTimeout,
+  } = jest.requireMock('../src/lib/supabase') as {
+    ensureSession: jest.Mock;
+    getSessionWithTimeout: jest.Mock;
+  };
+  ensureSession.mockResolvedValue(true);
+  getSessionWithTimeout.mockResolvedValue({
+    data: { session: { access_token: 'token', user: { id: '1' } } },
+    error: null,
+  });
+
+  const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  expect(authModule.getCurrentUser).toHaveBeenCalled();
+  expect(result.current.user).toEqual(profile);
+});
+
 test('signUp sets user when session returned', async () => {
   const profile = { id: '1' } as any;
   authModule.signUp.mockResolvedValue({ session: {}, profile, user: {} } as any);
 
   const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+
+  await waitFor(() => expect(result.current.loading).toBe(false));
 
   await act(async () => {
     await result.current.signUp('x@y.com', 'pw', { full_name: 'X', username: 'user' });
@@ -78,7 +130,7 @@ test('signUp sets user when session returned', async () => {
     username: 'user',
     displayName: 'X',
   });
-  expect(result.current.user).toEqual(profile);
+  await waitFor(() => expect(result.current.user).toEqual(profile));
 });
 
 test('signOut calls auth.signOut', async () => {
@@ -94,9 +146,19 @@ test('signOut calls auth.signOut', async () => {
 });
 
 test('uploadAvatar calls auth.uploadUserAvatar', async () => {
+  const profile = { id: '1' } as any;
+  authModule.signUp.mockResolvedValue({ session: {}, profile, user: {} } as any);
   authModule.uploadUserAvatar.mockResolvedValue('url');
 
   const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+
+  await waitFor(() => expect(result.current.loading).toBe(false));
+
+  await act(async () => {
+    await result.current.signUp('x@y.com', 'pw', { full_name: 'X', username: 'user' });
+  });
+
+  await waitFor(() => expect(result.current.user).toEqual(profile));
 
   await act(async () => {
     await result.current.uploadAvatar(new File(['x'], 'a.png', { type: 'image/png' }));
@@ -106,9 +168,19 @@ test('uploadAvatar calls auth.uploadUserAvatar', async () => {
 });
 
 test('uploadBanner calls auth.uploadUserBanner', async () => {
+  const profile = { id: '1' } as any;
+  authModule.signUp.mockResolvedValue({ session: {}, profile, user: {} } as any);
   authModule.uploadUserBanner.mockResolvedValue('url');
 
   const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+
+  await waitFor(() => expect(result.current.loading).toBe(false));
+
+  await act(async () => {
+    await result.current.signUp('x@y.com', 'pw', { full_name: 'X', username: 'user' });
+  });
+
+  await waitFor(() => expect(result.current.user).toEqual(profile));
 
   await act(async () => {
     await result.current.uploadBanner(new File(['x'], 'b.png', { type: 'image/png' }));

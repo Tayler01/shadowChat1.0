@@ -27,5 +27,15 @@ test('createFreshSupabaseClient purges previous keys', () => {
   const client = createFreshSupabaseClient();
   const key = (client as any).__storageKey;
   expect(localStorage.getItem(`${prefix}stale`)).toBeNull();
-  expect(localStorage.getItem(key)).not.toBeNull();
+  expect(key).toContain(prefix);
+  expect(createClient).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.any(String),
+    expect.objectContaining({
+      auth: expect.objectContaining({
+        storageKey: key,
+        persistSession: false,
+      }),
+    })
+  );
 });

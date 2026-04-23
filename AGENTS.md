@@ -127,7 +127,45 @@ Use `--runInBand` on Windows to reduce flakiness and keep output easier to read.
 
 ### Playwright Debugging
 
-This repo does not keep Playwright specs as the main workflow. For ad hoc browser debugging, use inline Node scripts with the installed `playwright` package or the Codex Playwright wrapper.
+This repo does not keep Playwright specs as the main workflow. Prefer the repo smoke runner for dependable browser checks, then fall back to inline scripts or the Codex Playwright wrapper for custom debugging.
+
+Primary smoke command:
+
+```powershell
+npm run qa:smoke
+```
+
+Headed mode:
+
+```powershell
+npm run qa:smoke:headed
+```
+
+Run a specific scenario:
+
+```powershell
+npm run qa:smoke:dm
+```
+
+Run the resume/background-send repro:
+
+```powershell
+npm run qa:smoke:resume
+```
+
+For custom flags, call the script directly:
+
+```powershell
+node scripts/playwright-smoke.mjs --scenario=auth,dm --run-name=my-check
+```
+
+Run the broader end-to-end sweep:
+
+```powershell
+npm run qa:smoke:full
+```
+
+If you have changed the app code and need a fresh preview build instead of reusing an already-running server, add `--no-reuse-server`.
 
 Recommended local visual-debug loop:
 

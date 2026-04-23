@@ -1,40 +1,55 @@
-import { renderHook, act } from '@testing-library/react';
-import { useTyping } from '../src/hooks/useTyping';
-import { useAuth } from '../src/hooks/useAuth';
-import { supabase } from '../src/lib/supabase';
+import { renderHook, act } from '@testing-library/react'
 
-jest.mock('../src/hooks/useAuth');
-jest.mock('../src/lib/supabase', () => {
-  return {
-    supabase: {
-      from: jest.fn(),
-      channel: jest.fn(),
-      removeChannel: jest.fn(),
-      auth: { getSession: jest.fn(), refreshSession: jest.fn() },
-    },
-  };
-});
+jest.mock('../src/hooks/useAuth', () => ({
+  useAuth: jest.fn(),
+}))
 
-type SupabaseMock = jest.Mocked<typeof supabase>;
+jest.mock('../src/lib/supabase', () => ({
+  getWorkingClient: jest.fn(),
+  getRealtimeClient: jest.fn(),
+}))
+
+import { useTyping } from '../src/hooks/useTyping'
+import { useAuth } from '../src/hooks/useAuth'
+import { getRealtimeClient, getWorkingClient } from '../src/lib/supabase'
+
+const buildChannel = (send = jest.fn()) => ({
+  on: jest.fn().mockReturnThis(),
+  subscribe: jest.fn().mockReturnThis(),
+  send,
+})
 
 beforeEach(() => {
-  jest.resetAllMocks();
-  (useAuth as jest.Mock).mockReturnValue({ user: { id: 'u1', username: 'u', display_name: 'U' } });
+  jest.resetAllMocks()
+  jest.useFakeTimers()
 
-  const sb = supabase as SupabaseMock;
-  sb.channel.mockReturnValue({ on: jest.fn().mockReturnThis(), subscribe: jest.fn(), send: jest.fn() } as any);
-  sb.removeChannel.mockResolvedValue();
-});
+  ;(useAuth as jest.Mock).mockReturnValue({
+    user: { id: 'u1', username: 'u', display_name: 'U' },
+  })
+})
+
+afterEach(() => {
+  jest.runOnlyPendingTimers()
+  jest.useRealTimers()
+})
 
 test('startTyping sends typing true broadcast', async () => {
-  const sendMock = jest.fn();
-  (supabase.channel as jest.Mock).mockReturnValueOnce({ on: jest.fn().mockReturnThis(), subscribe: jest.fn(), send: sendMock } as any);
+  const sendMock = jest.fn()
+  const channel = buildChannel(sendMock)
+  const client = { channel: jest.fn(() => channel), removeChannel: jest.fn() }
 
-  const { result } = renderHook(() => useTyping('general'));
+  ;(getWorkingClient as jest.Mock).mockResolvedValue(client)
+  ;(getRealtimeClient as jest.Mock).mockReturnValue(client)
+
+  const { result } = renderHook(() => useTyping('general'))
 
   await act(async () => {
-    await result.current.startTyping();
-  });
+    await Promise.resolve()
+  })
+
+  await act(async () => {
+    await result.current.startTyping()
+  })
 
   expect(sendMock).toHaveBeenCalledWith({
     type: 'broadcast',
@@ -43,21 +58,36 @@ test('startTyping sends typing true broadcast', async () => {
       user: { id: 'u1', username: 'u', display_name: 'U' },
       typing: true,
     },
-  });
-  expect(result.current.isTyping).toBe(true);
-});
+  })
+  expect(result.current.isTyping).toBe(true)
+})
 
 test('stopTyping sends typing false broadcast', async () => {
-  const sendMock = jest.fn();
-  (supabase.channel as jest.Mock).mockReturnValueOnce({ on: jest.fn().mockReturnThis(), subscribe: jest.fn(), send: sendMock } as any);
+  const sendMock = jest.fn()
+  const channel = buildChannel(sendMock)
+  const client = { channel: jest.fn(() => channel), removeChannel: jest.fn() }
 
-  const { result } = renderHook(() => useTyping('general'));
+  ;(getWorkingClient as jest.Mock).mockResolvedValue(client)
+  ;(getRealtimeClient as jest.Mock).mockReturnValue(client)
+
+  const { result } = renderHook(() => useTyping('general'))
 
   await act(async () => {
-    await result.current.startTyping();
-    await result.current.stopTyping();
-  });
+    await Promise.resolve()
+  })
 
-  expect(sendMock).toHaveBeenCalledWith(expect.objectContaining({ payload: expect.objectContaining({ typing: false }) }));
-  expect(result.current.isTyping).toBe(false);
-});
+  await act(async () => {
+    await result.current.startTyping()
+  })
+
+  await act(async () => {
+    await result.current.stopTyping()
+  })
+
+  expect(sendMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      payload: expect.objectContaining({ typing: false }),
+    })
+  )
+  expect(result.current.isTyping).toBe(false)
+})

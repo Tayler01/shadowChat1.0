@@ -16,6 +16,7 @@ import {
   getOrCreateDMConversation,
   markDMMessagesRead,
   fetchDMConversations,
+  ensureSession,
   refreshSessionLocked,
   resetRealtimeConnection,
 } from '../lib/supabase';
@@ -384,6 +385,88 @@ export function useConversationMessages(conversationId: string | null) {
   const subscribeRef = useRef<() => RealtimeChannel>();
   const clientResetRef = useRef<() => Promise<void>>();
 
+  const insertConversationMessage = useCallback(
+    async (
+      payload: {
+        conversation_id: string;
+        sender_id: string;
+        content: string;
+        message_type: 'text' | 'command' | 'audio' | 'image' | 'file';
+        file_url?: string;
+        audio_url?: string;
+      }
+    ) => {
+      const workingClient = await getWorkingClient();
+      const insertPromise = workingClient
+        .from('dm_messages')
+        .insert(payload)
+        .select(`
+            *,
+            sender:users!sender_id(*)
+          `)
+        .single();
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error('DM message insert timeout after 10 seconds')),
+          10000
+        )
+      );
+
+      return Promise.race([insertPromise, timeoutPromise]) as Promise<{
+        data: DMMessage | null;
+        error: any;
+      }>;
+    },
+    []
+  );
+
+  const markVisibleMessagesRead = useCallback(
+    async (pendingMessages: DMMessage[]) => {
+      if (!conversationId || !user) return
+
+      const unreadIds = pendingMessages
+        .filter(
+          message =>
+            message.sender_id !== user.id &&
+            !(message.read_by ?? []).includes(user.id)
+        )
+        .map(message => message.id)
+
+      if (unreadIds.length === 0) {
+        return
+      }
+
+      const readAt = new Date().toISOString()
+      const unreadIdSet = new Set(unreadIds)
+
+      await markDMMessagesRead(conversationId)
+
+      setMessages(prev =>
+        prev.map(message => {
+          if (!unreadIdSet.has(message.id)) {
+            return message
+          }
+
+          const readBy = message.read_by ?? []
+          if (readBy.includes(user.id)) {
+            return {
+              ...message,
+              read_at: message.read_at ?? readAt,
+            }
+          }
+
+          return {
+            ...message,
+            read_at: message.read_at ?? readAt,
+            read_by: [...readBy, user.id],
+          }
+        })
+      )
+    },
+    [conversationId, user]
+  )
+
   const handleVisible = useCallback(() => {
     const channel = channelRef.current;
     const realtimeClient = getRealtimeClient();
@@ -446,18 +529,10 @@ export function useConversationMessages(conversationId: string | null) {
 
       if (error) {
       } else {
+        const fetchedMessages = ((data || []) as unknown as DMMessage[]).reverse()
         setHasMore((data?.length || 0) === MESSAGE_FETCH_LIMIT);
-        setMessages(((data || []) as unknown as DMMessage[]).reverse());
-        
-        // Mark messages as read
-        if (user) {
-          await workingClient
-            .from('dm_messages')
-            .update({ read_at: new Date().toISOString() })
-            .eq('conversation_id', conversationId)
-            .neq('sender_id', user.id)
-            .is('read_at', null);
-        }
+        setMessages(fetchedMessages);
+        await markVisibleMessagesRead(fetchedMessages)
       }
       setLoading(false);
     };
@@ -466,7 +541,7 @@ export function useConversationMessages(conversationId: string | null) {
     clientResetRef.current = resetWithFreshClient;
     
     fetchMessages();
-  }, [conversationId, user]);
+  }, [conversationId, markVisibleMessagesRead, user]);
 
   const loadOlderMessages = useCallback(async () => {
     if (loadingMore || !hasMore || !conversationId) return;
@@ -547,10 +622,7 @@ export function useConversationMessages(conversationId: string | null) {
               // Mark as read if not sent by current user
               if (user && message.sender_id !== user.id) {
                 playMessage();
-                await workingClient
-                  .from('dm_messages')
-                  .update({ read_at: new Date().toISOString() })
-                  .eq('id', message.id);
+                await markVisibleMessagesRead([message])
               }
             }
           }
@@ -637,7 +709,7 @@ export function useConversationMessages(conversationId: string | null) {
       }
       channelRef.current = null;
     };
-  }, [conversationId, user, playMessage]);
+  }, [conversationId, markVisibleMessagesRead, user, playMessage]);
 
   const sendMessage = useCallback(
     async (
@@ -652,48 +724,38 @@ export function useConversationMessages(conversationId: string | null) {
 
       setSending(true);
       try {
-        const workingClient = await getWorkingClient();
-        
-        const { data, error } = await workingClient
-          .from('dm_messages')
-          .insert({
-            conversation_id: conversationId,
-            sender_id: user.id,
-            content: messageType === 'audio' ? '' : trimmedContent,
-            message_type: messageType,
-            file_url: fileUrl,
-            ...(messageType === 'audio' ? { audio_url: trimmedContent } : {}),
-          })
-          .select(`
-            *,
-            sender:users!sender_id(*)
-          `)
-          .single();
+        const sessionValid = await ensureSession();
+        if (!sessionValid) {
+          throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
+        }
+
+        const insertPayload = {
+          conversation_id: conversationId,
+          sender_id: user.id,
+          content: messageType === 'audio' ? '' : trimmedContent,
+          message_type: messageType,
+          file_url: fileUrl,
+          ...(messageType === 'audio' ? { audio_url: trimmedContent } : {}),
+        };
+
+        const { data, error } = await insertConversationMessage(insertPayload);
 
         let finalData = data as unknown;
         let finalError = error as any;
         if (finalError) {
           if (finalError.status === 401 || /jwt|token|expired/i.test(finalError.message ?? '')) {
-            const { error: refreshError } = await refreshSessionLocked();
-            if (!refreshError) {
-              const retryClient = await getWorkingClient();
-              const retry = await retryClient
-                .from('dm_messages')
-                .insert({
-                  conversation_id: conversationId,
-                  sender_id: user.id,
-                  content: messageType === 'audio' ? '' : trimmedContent,
-                  message_type: messageType,
-                  file_url: fileUrl,
-                  ...(messageType === 'audio' ? { audio_url: trimmedContent } : {}),
-                })
-                .select(`
-                  *,
-                  sender:users!sender_id(*)
-                `)
-                .single();
+            const forcedSessionValid = await ensureSession(true);
+            if (forcedSessionValid) {
+              const retry = await insertConversationMessage(insertPayload);
               finalData = retry.data as unknown;
               finalError = retry.error;
+            } else {
+              const { error: refreshError } = await refreshSessionLocked();
+              if (!refreshError) {
+                const retry = await insertConversationMessage(insertPayload);
+                finalData = retry.data as unknown;
+                finalError = retry.error;
+              }
             }
           }
           if (finalError) throw finalError;
@@ -716,7 +778,7 @@ export function useConversationMessages(conversationId: string | null) {
       } finally {
         setSending(false);
       }
-    }, [user, conversationId]);
+    }, [user, conversationId, insertConversationMessage]);
 
   return {
     messages,

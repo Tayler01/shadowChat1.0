@@ -5,6 +5,15 @@ import { MessageItem } from '../src/components/chat/MessageItem'
 import type { Message } from '../src/lib/supabase'
 import { useToneAnalysisEnabled } from '../src/hooks/useToneAnalysisEnabled'
 
+jest.mock('../src/config', () => ({
+  PRESENCE_INTERVAL_MS: 30000,
+  MESSAGE_FETCH_LIMIT: 40,
+}))
+
+jest.mock('../src/hooks/useAuth', () => ({
+  useAuth: () => ({ user: { id: 'u1' } }),
+}))
+
 jest.mock('../src/hooks/useToneAnalysisEnabled')
 
 const mockedToneEnabled = useToneAnalysisEnabled as jest.MockedFunction<typeof useToneAnalysisEnabled>
@@ -144,9 +153,10 @@ test('icon buttons have aria-labels', () => {
   expect(addReaction).toBeInTheDocument()
 })
 
-test('applies user color to message bubble', () => {
+test('applies user color to the avatar', () => {
   const colored = {
     ...baseMessage,
+    message_type: 'text',
     content: 'hello',
     user: { ...baseMessage.user, color: '#ff0000' }
   } as Message
@@ -163,8 +173,8 @@ test('applies user color to message bubble', () => {
     />
   )
 
-  const msg = screen.getByText('hello')
-  expect(msg.parentElement).toHaveStyle('background-color: #ff0000')
+  const avatarInitial = screen.getByText('A')
+  expect(avatarInitial.parentElement).toHaveStyle('background-color: #ff0000')
 })
 
 test('shows tone indicator emoji', () => {
@@ -231,7 +241,7 @@ test('clicking reply preview triggers jump callback', async () => {
     />
   )
 
-  const btn = screen.getByRole('button', { name: /replying to/i })
+  const btn = screen.getByRole('button', { name: /view parent message/i })
   await userEvent.click(btn)
   expect(cb).toHaveBeenCalledWith('p1')
 })

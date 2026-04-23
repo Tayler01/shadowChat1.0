@@ -57,7 +57,6 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const [showNewConversation, setShowNewConversation] = useState(false)
   const [searchUsername, setSearchUsername] = useState('')
   const [startingUsername, setStartingUsername] = useState<string | null>(null)
-  const [lastConversation, setLastConversation] = useState<string | null>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
   const [autoScroll, setAutoScroll] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -132,7 +131,6 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   }
 
   const handleConversationSelect = (conversationId: string) => {
-    setLastConversation(conversationId)
     setCurrentConversation(conversationId)
     markAsRead(conversationId)
   }
@@ -201,13 +199,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => {
-                    if (lastConversation) {
-                      setCurrentConversation(lastConversation)
-                    } else {
-                      onViewChange('chat')
-                    }
-                  }}
+                  onClick={() => onViewChange('chat')}
                   className="mr-2"
                   aria-label="Back"
                 >

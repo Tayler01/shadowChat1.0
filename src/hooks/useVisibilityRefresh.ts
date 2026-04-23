@@ -10,8 +10,9 @@ export function useVisibilityRefresh(onVisible?: () => void, delayMs = 200) {
             await new Promise(res => setTimeout(res, delayMs))
           }
 
-          // The comprehensive reset is now handled by useClientResetStatus
-          // This just triggers the component callbacks for message refetch, etc.
+          // Keep resume handling lightweight here so message lists can refetch
+          // and realtime subscriptions can resubscribe without recreating auth
+          // state on every foreground event.
           onVisible?.()
           
           

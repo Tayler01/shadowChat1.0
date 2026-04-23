@@ -4,10 +4,39 @@ import { useAuth } from '../src/hooks/useAuth';
 import * as dmModule from '../src/hooks/useDirectMessages';
 import * as searchModule from '../src/hooks/useUserSearch';
 import * as allUsersModule from '../src/hooks/useAllUsers';
-import { supabase, getOrCreateDMConversation } from '../src/lib/supabase';
+import {
+  fetchDMConversations,
+  getOrCreateDMConversation,
+  getRealtimeClient,
+  getWorkingClient,
+  ensureSession,
+  markDMMessagesRead,
+  refreshSessionLocked,
+  resetRealtimeConnection,
+  supabase,
+} from '../src/lib/supabase';
 import { DirectMessagesView } from '../src/components/dms/DirectMessagesView';
+import { triggerDMPushNotification } from '../src/lib/push';
 
 jest.mock('../src/hooks/useAuth');
+jest.mock('../src/hooks/useVisibilityRefresh', () => ({
+  useVisibilityRefresh: jest.fn(),
+}));
+jest.mock('../src/hooks/useSoundEffects', () => ({
+  useSoundEffects: () => ({ playMessage: jest.fn() }),
+}));
+jest.mock('../src/hooks/useTyping', () => ({
+  useTyping: () => ({ typingUsers: [], startTyping: jest.fn(), stopTyping: jest.fn() }),
+}));
+jest.mock('../src/hooks/useIsDesktop', () => ({
+  useIsDesktop: jest.fn(() => true),
+}));
+jest.mock('../src/lib/push', () => ({
+  triggerDMPushNotification: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../src/config', () => ({
+  MESSAGE_FETCH_LIMIT: 40,
+}));
 jest.mock('../src/lib/supabase', () => {
   return {
     supabase: {
@@ -16,32 +45,80 @@ jest.mock('../src/lib/supabase', () => {
       removeChannel: jest.fn(),
       auth: { getSession: jest.fn(), refreshSession: jest.fn() },
     },
+    getWorkingClient: jest.fn(),
+    getRealtimeClient: jest.fn(),
     fetchDMConversations: jest.fn().mockResolvedValue([]),
     getOrCreateDMConversation: jest.fn(),
     markDMMessagesRead: jest.fn(),
+    ensureSession: jest.fn().mockResolvedValue(true),
+    refreshSessionLocked: jest.fn(),
+    resetRealtimeConnection: jest.fn(),
   };
 });
 
 type SupabaseMock = jest.Mocked<typeof supabase>;
+type WorkingClient = {
+  from: jest.Mock;
+  channel: jest.Mock;
+  removeChannel: jest.Mock;
+  auth: {
+    getSession: jest.Mock;
+    refreshSession: jest.Mock;
+  };
+};
+
+const createQuery = (overrides: Record<string, unknown> = {}) => {
+  const query: Record<string, any> = {
+    select: jest.fn(() => query),
+    single: jest.fn().mockResolvedValue({ data: [], error: null }),
+    maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+    order: jest.fn(() => query),
+    limit: jest.fn(() => query),
+    update: jest.fn(() => query),
+    delete: jest.fn(() => query),
+    eq: jest.fn(() => query),
+    neq: jest.fn(() => query),
+    is: jest.fn(() => query),
+    insert: jest.fn(() => query),
+    contains: jest.fn(() => query),
+  };
+
+  Object.assign(query, overrides);
+  return query;
+};
+
+let workingClient: WorkingClient;
 
 beforeEach(() => {
   jest.resetAllMocks();
   (useAuth as jest.Mock).mockReturnValue({ user: { id: 'u1' } });
 
+  workingClient = {
+    from: jest.fn(() => createQuery()),
+    channel: jest.fn(() => ({
+      on: jest.fn().mockReturnThis(),
+      subscribe: jest.fn(),
+      send: jest.fn(),
+      state: 'joined',
+    })),
+    removeChannel: jest.fn(),
+    auth: {
+      getSession: jest.fn(),
+      refreshSession: jest.fn(),
+    },
+  };
+
+  (getWorkingClient as jest.Mock).mockResolvedValue(workingClient);
+  (getRealtimeClient as jest.Mock).mockReturnValue(workingClient);
+  (fetchDMConversations as jest.Mock).mockResolvedValue([]);
+  (markDMMessagesRead as jest.Mock).mockResolvedValue(undefined);
+  (ensureSession as jest.Mock).mockResolvedValue(true);
+  (refreshSessionLocked as jest.Mock).mockResolvedValue({ data: { session: {} }, error: null });
+  (resetRealtimeConnection as jest.Mock).mockResolvedValue(undefined);
+  (triggerDMPushNotification as jest.Mock).mockResolvedValue(undefined);
+
   const sb = supabase as SupabaseMock;
-  sb.from.mockImplementation(() => ({
-    insert: jest.fn().mockReturnThis(),
-    select: jest.fn().mockReturnThis(),
-    single: jest.fn().mockResolvedValue({ data: [], error: null }),
-    order: jest.fn().mockReturnThis(),
-    limit: jest.fn().mockReturnThis(),
-    update: jest.fn().mockReturnThis(),
-    delete: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockReturnThis(),
-    contains: jest.fn().mockReturnThis(),
-    maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
-    rpc: jest.fn().mockReturnThis(),
-  } as any));
+  sb.from.mockImplementation(() => createQuery() as any);
   sb.channel.mockReturnValue({ on: jest.fn().mockReturnThis(), subscribe: jest.fn(), send: jest.fn(), state: 'joined' } as any);
   sb.removeChannel.mockResolvedValue();
 });
@@ -58,62 +135,29 @@ test('sendMessage retries on 401 error', async () => {
     }),
   }));
 
-  const sb = supabase as SupabaseMock;
-  sb.from.mockImplementation(() => ({
-    insert: jest.fn().mockReturnThis(),
-    select: jest.fn().mockReturnThis(),
-    single: jest.fn().mockResolvedValue({ data: [], error: null }),
-    order: jest.fn().mockReturnThis(),
-    limit: jest.fn().mockReturnThis(),
-    update: jest.fn().mockReturnThis(),
-    delete: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockReturnThis(),
-    contains: jest.fn().mockReturnThis(),
-    maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
-    rpc: jest.fn().mockReturnThis(),
-  } as any));
-
   const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider });
+
+  await waitFor(() => expect(result.current.loading).toBe(false));
 
   await act(async () => {
     result.current.setCurrentConversation('conv1');
   });
 
-  sb.from.mockClear();
-  (sb.from as jest.Mock).mockImplementationOnce(() => ({
-    insert: insertFail,
-    select: jest.fn().mockReturnThis(),
-    single: jest.fn().mockResolvedValue({ data: [], error: null }),
-    order: jest.fn().mockReturnThis(),
-    limit: jest.fn().mockReturnThis(),
-    update: jest.fn().mockReturnThis(),
-    delete: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockReturnThis(),
-    contains: jest.fn().mockReturnThis(),
-    maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
-    rpc: jest.fn().mockReturnThis(),
-  } as any)).mockImplementationOnce(() => ({
-    insert: insertSuccess,
-    select: jest.fn().mockReturnThis(),
-    single: jest.fn().mockResolvedValue({ data: [], error: null }),
-    order: jest.fn().mockReturnThis(),
-    limit: jest.fn().mockReturnThis(),
-    update: jest.fn().mockReturnThis(),
-    delete: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockReturnThis(),
-    contains: jest.fn().mockReturnThis(),
-    maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
-    rpc: jest.fn().mockReturnThis(),
-  } as any));
-
-  sb.auth.refreshSession.mockResolvedValue({ data: { session: {} }, error: null } as any);
+  workingClient.from.mockClear();
+  workingClient.from
+    .mockReturnValueOnce(createQuery({ insert: insertFail }) as any)
+    .mockReturnValueOnce(createQuery({ insert: insertSuccess }) as any);
+  (ensureSession as jest.Mock)
+    .mockResolvedValueOnce(true)
+    .mockResolvedValueOnce(true);
 
   await act(async () => {
     await result.current.sendMessage('hello');
   });
 
   expect(insertFail).toHaveBeenCalled();
-  expect(sb.auth.refreshSession).toHaveBeenCalled();
+  expect(ensureSession).toHaveBeenNthCalledWith(1);
+  expect(ensureSession).toHaveBeenNthCalledWith(2, true);
   expect(insertSuccess).toHaveBeenCalled();
 });
 
@@ -121,14 +165,17 @@ test('sends audio message with proper type', async () => {
   const insertFn = jest.fn(() => ({
     select: () => ({ single: () => Promise.resolve({ data: { id: '1' }, error: null }) })
   }));
-  const sb = supabase as SupabaseMock;
-  sb.from.mockReturnValueOnce({ insert: insertFn } as any);
 
   const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider });
+
+  await waitFor(() => expect(result.current.loading).toBe(false));
 
   await act(async () => {
     result.current.setCurrentConversation('conv1');
   });
+
+  workingClient.from.mockClear();
+  workingClient.from.mockImplementationOnce(() => createQuery({ insert: insertFn }) as any);
 
   await act(async () => {
     await result.current.sendMessage('https://example.com/a.webm', 'audio');
@@ -137,32 +184,23 @@ test('sends audio message with proper type', async () => {
   expect(insertFn).toHaveBeenCalledWith({
     conversation_id: 'conv1',
     sender_id: 'u1',
-    content: 'https://example.com/a.webm',
+    content: '',
     message_type: 'audio',
+    audio_url: 'https://example.com/a.webm',
   });
 });
 
 test('startConversation sets currentConversation', async () => {
-  const sb = supabase as SupabaseMock;
   const maybeSingle = jest.fn().mockResolvedValue({ data: { id: 'u2' }, error: null });
-  sb.from.mockImplementationOnce(() => ({
-    insert: jest.fn().mockReturnThis(),
-    select: jest.fn().mockReturnThis(),
-    single: jest.fn().mockResolvedValue({ data: [], error: null }),
-    order: jest.fn().mockReturnThis(),
-    limit: jest.fn().mockReturnThis(),
-    update: jest.fn().mockReturnThis(),
-    delete: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockReturnThis(),
-    contains: jest.fn().mockReturnThis(),
-    maybeSingle,
-    rpc: jest.fn().mockReturnThis(),
-  } as any));
+  workingClient.from.mockImplementationOnce(() => createQuery({ maybeSingle }) as any);
 
   const conversation = { id: 'c1' } as any;
   (getOrCreateDMConversation as jest.Mock).mockResolvedValue(conversation);
+  (fetchDMConversations as jest.Mock).mockResolvedValue([{ id: 'c1' }]);
 
   const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider });
+
+  await waitFor(() => expect(result.current.loading).toBe(false));
 
   await act(async () => {
     const id = await result.current.startConversation('bob');
@@ -174,24 +212,50 @@ test('startConversation sets currentConversation', async () => {
 });
 
 test('startConversation throws when user not found', async () => {
-  const sb = supabase as SupabaseMock;
-  sb.from.mockImplementationOnce(() => ({
-    insert: jest.fn().mockReturnThis(),
-    select: jest.fn().mockReturnThis(),
-    single: jest.fn().mockResolvedValue({ data: [], error: null }),
-    order: jest.fn().mockReturnThis(),
-    limit: jest.fn().mockReturnThis(),
-    update: jest.fn().mockReturnThis(),
-    delete: jest.fn().mockReturnThis(),
-    eq: jest.fn().mockReturnThis(),
-    contains: jest.fn().mockReturnThis(),
+  workingClient.from.mockImplementationOnce(() => createQuery({
     maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
-    rpc: jest.fn().mockReturnThis(),
-  } as any));
+  }) as any);
 
   const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider });
 
+  await waitFor(() => expect(result.current.loading).toBe(false));
+
   await expect(result.current.startConversation('missing')).rejects.toThrow('User not found');
+});
+
+test('marks visible unread messages as read through the RPC helper', async () => {
+  const unreadMessage = {
+    id: 'm1',
+    conversation_id: 'conv1',
+    sender_id: 'u2',
+    content: 'hello',
+    message_type: 'text',
+    read_by: null,
+    created_at: '2026-04-21T12:00:00.000Z',
+    updated_at: '2026-04-21T12:00:00.000Z',
+    reactions: {},
+  };
+
+  workingClient.from.mockImplementation(() =>
+    createQuery({
+      select: jest.fn(function () { return this; }),
+      eq: jest.fn(function () { return this; }),
+      order: jest.fn(function () { return this; }),
+      limit: jest.fn().mockResolvedValue({ data: [unreadMessage], error: null }),
+    }) as any
+  );
+
+  const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider });
+
+  await waitFor(() => expect(result.current.loading).toBe(false));
+
+  await act(async () => {
+    result.current.setCurrentConversation('conv1');
+  });
+
+  await waitFor(() => {
+    expect(markDMMessagesRead).toHaveBeenCalledWith('conv1');
+  });
 });
 
 describe('DirectMessagesView user search', () => {
@@ -251,7 +315,7 @@ describe('DirectMessagesView user search', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /start new conversation/i }));
-    fireEvent.change(screen.getByPlaceholderText(/enter username/i), { target: { value: 'bob' } });
+    fireEvent.change(screen.getByPlaceholderText(/search by username/i), { target: { value: 'bob' } });
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /bob/i }));
@@ -262,7 +326,8 @@ describe('DirectMessagesView user search', () => {
   });
 
   test('shows user not found error', async () => {
-    searchSpy.mockReturnValueOnce({ results: [], loading: false, error: 'User not found' });
+    searchSpy.mockReturnValue({ results: [], loading: false, error: 'User not found' });
+    allSpy.mockReturnValue({ users: [], loading: false, error: null });
 
     render(
       <DirectMessagesView
@@ -273,7 +338,7 @@ describe('DirectMessagesView user search', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /start new conversation/i }));
-    fireEvent.change(screen.getByPlaceholderText(/enter username/i), { target: { value: 'alice' } });
+    fireEvent.change(screen.getByPlaceholderText(/search by username/i), { target: { value: 'alice' } });
 
     expect(await screen.findByText(/user not found/i)).toBeInTheDocument();
     expect(startConversationMock).not.toHaveBeenCalled();
@@ -300,5 +365,25 @@ describe('DirectMessagesView user search', () => {
 
     expect(screen.getByRole('button', { name: /bob/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /alice/i })).toBeInTheDocument();
+  });
+
+  test('mobile inbox back button returns to chat', async () => {
+    const onViewChange = jest.fn();
+    const { useIsDesktop } = jest.requireMock('../src/hooks/useIsDesktop') as {
+      useIsDesktop: jest.Mock
+    };
+    useIsDesktop.mockReturnValue(false);
+
+    render(
+      <DirectMessagesView
+        onToggleSidebar={() => {}}
+        currentView="dms"
+        onViewChange={onViewChange}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^back$/i }));
+
+    expect(onViewChange).toHaveBeenCalledWith('chat');
   });
 });

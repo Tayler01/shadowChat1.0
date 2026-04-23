@@ -20,7 +20,8 @@ export const FileAttachment: React.FC<FileAttachmentProps> = ({ url, meta }) => 
     // ignore
   }
 
-  const previewDocument = type === 'application/pdf' || type.startsWith('text/')
+  const previewDocument = type === 'application/pdf'
+  const previewText = type.startsWith('text/')
   const previewAudio = type.startsWith('audio/')
 
   return (
@@ -31,6 +32,11 @@ export const FileAttachment: React.FC<FileAttachmentProps> = ({ url, meta }) => 
           title={name}
           className="mb-2 h-48 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.02)]"
         />
+      )}
+      {previewText && (
+        <div className="mb-2 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-sm text-[var(--text-secondary)]">
+          Text files open cleanly from the attachment link below.
+        </div>
       )}
       {previewAudio && (
         <audio controls src={url} className="w-full mt-1 mb-2" />

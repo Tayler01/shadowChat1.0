@@ -15,8 +15,9 @@ beforeEach(() => {
 test('fetches suggestions when enabled', async () => {
   const mock = getSuggestedReplies as GetMock
   mock.mockResolvedValue(['hi'])
+  const messages = [{ id: '1', content: 'hello' } as any]
 
-  const { result } = renderHook(() => useSuggestedReplies([{ id: '1', content: 'hello' } as any], true))
+  const { result } = renderHook(() => useSuggestedReplies(messages, true))
 
   await act(async () => {
     await Promise.resolve()
@@ -28,8 +29,9 @@ test('fetches suggestions when enabled', async () => {
 
 test('does not fetch when disabled', async () => {
   const mock = getSuggestedReplies as GetMock
+  const messages = [{ id: '1', content: 'hello' } as any]
 
-  const { result } = renderHook(() => useSuggestedReplies([{ id: '1', content: 'hello' } as any], false))
+  const { result } = renderHook(() => useSuggestedReplies(messages, false))
 
   await act(async () => {
     await Promise.resolve()

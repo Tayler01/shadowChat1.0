@@ -1,5 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
 import { MessageInput } from '../src/components/chat/MessageInput'
 import { askQuestion } from '../src/lib/ai'
@@ -27,10 +26,12 @@ test('ai mention sends query and posts response', async () => {
   render(<MessageInput onSendMessage={onSend} messages={[]} />)
 
   const textarea = screen.getByRole('textbox')
-  await userEvent.type(textarea, '@ai what is up?')
-  await userEvent.keyboard('{Enter}')
+  await act(async () => {
+    fireEvent.change(textarea, { target: { value: '@ai what is up?' } })
+    fireEvent.keyDown(textarea, { key: 'Enter', code: 'Enter' })
+  })
 
   expect(askQuestion).toHaveBeenCalledWith('what is up?')
   await waitFor(() => expect(onSend).toHaveBeenCalledTimes(2))
-  expect(onSend).toHaveBeenNthCalledWith(2, 'the answer', 'command')
+  expect(onSend).toHaveBeenNthCalledWith(2, 'the answer', 'command', undefined, undefined)
 })

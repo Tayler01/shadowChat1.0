@@ -1,6 +1,13 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { supabase, User, updateUserPresence, getWorkingClient } from '../lib/supabase';
+import {
+  supabase,
+  User,
+  updateUserPresence,
+  getWorkingClient,
+  ensureSession,
+  getSessionWithTimeout,
+} from '../lib/supabase';
 import { PRESENCE_INTERVAL_MS } from '../config';
 import {
   signIn as authSignIn,
@@ -47,8 +54,16 @@ function useProvideAuth() {
       
       
       try {
+        const sessionReady = await ensureSession();
+        if (!sessionReady) {
+          if (mountedRef.current) {
+            setUser(null);
+          }
+          return;
+        }
+
         const workingClient = await getWorkingClient();
-        const { data: { session }, error: sessionError } = await workingClient.auth.getSession();
+        const { data: { session }, error: sessionError } = await getSessionWithTimeout(workingClient);
         // Ensure realtime uses the latest access token
         workingClient.realtime.setAuth(session?.access_token || '');
         

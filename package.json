@@ -8,7 +8,15 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "jest"
+    "test": "jest",
+    "qa:smoke": "node scripts/playwright-smoke.mjs",
+    "qa:smoke:headed": "node scripts/playwright-smoke.mjs --headed",
+    "qa:smoke:auth": "node scripts/playwright-smoke.mjs --scenario=auth",
+    "qa:smoke:dm": "node scripts/playwright-smoke.mjs --scenario=dm",
+    "qa:smoke:resume": "node scripts/playwright-smoke.mjs --scenario=resume-send",
+    "qa:smoke:mobile": "node scripts/playwright-smoke.mjs --scenario=mobile-dm-back",
+    "qa:smoke:full": "node scripts/playwright-smoke.mjs --scenario=full",
+    "qa:smoke:full:headed": "node scripts/playwright-smoke.mjs --scenario=full --headed"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

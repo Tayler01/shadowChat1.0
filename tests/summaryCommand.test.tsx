@@ -1,5 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
 import { MessageInput } from '../src/components/chat/MessageInput'
 import { summarizeConversation } from '../src/lib/ai'
@@ -32,9 +31,13 @@ test('summary slash command calls API and sends result', async () => {
   )
 
   const textarea = screen.getByRole('textbox')
-  await userEvent.type(textarea, '/summary')
-  await userEvent.keyboard('{Enter}')
+  await act(async () => {
+    fireEvent.change(textarea, { target: { value: '/summary' } })
+    fireEvent.keyDown(textarea, { key: 'Enter', code: 'Enter' })
+  })
 
   expect(summarizeConversation).toHaveBeenCalled()
-  await waitFor(() => expect(onSend).toHaveBeenCalledWith('summary text'))
+  await waitFor(() =>
+    expect(onSend).toHaveBeenCalledWith('summary text', 'text', undefined, undefined)
+  )
 })

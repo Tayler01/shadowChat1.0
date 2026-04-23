@@ -3,6 +3,15 @@ import React from 'react'
 import { PinnedMessageItem } from '../src/components/chat/PinnedMessageItem'
 import type { Message } from '../src/lib/supabase'
 
+jest.mock('../src/config', () => ({
+  PRESENCE_INTERVAL_MS: 30000,
+  MESSAGE_FETCH_LIMIT: 40,
+}))
+
+jest.mock('../src/hooks/useAuth', () => ({
+  useAuth: () => ({ user: { id: 'u1' } }),
+}))
+
 const message = {
   id: 'm1',
   user_id: 'u1',

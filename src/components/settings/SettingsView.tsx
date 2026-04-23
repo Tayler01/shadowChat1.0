@@ -290,8 +290,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
                     </div>
                     
                     <button
+                      type="button"
                       onClick={() => void setting.onChange(!setting.enabled)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full border transition-all ${
+                      role="switch"
+                      aria-checked={setting.enabled}
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full border transition-all ${
                         setting.enabled
                           ? 'border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] shadow-[var(--shadow-gold-soft)]'
                           : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.05)]'
@@ -369,8 +372,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
                           </div>
 
                           <button
+                            type="button"
                             onClick={() => void setting.onChange(!setting.enabled)}
                             disabled={pushSaving}
+                            role="switch"
+                            aria-checked={setting.enabled}
                             className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full border transition-all ${
                               setting.enabled
                                 ? 'border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] shadow-[var(--shadow-gold-soft)]'
