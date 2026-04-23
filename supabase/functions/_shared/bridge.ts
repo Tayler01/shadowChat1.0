@@ -2,7 +2,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4'
 
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type, x-bridge-access-token',
 }
 
 export const json = (body: unknown, status = 200) =>
@@ -116,3 +117,12 @@ export const createBridgeSessionMaterial = async () => {
 
 export const getFutureIso = (minutesFromNow: number) =>
   new Date(Date.now() + minutesFromNow * 60_000).toISOString()
+
+export const isExpiredIso = (value: string | null | undefined, now = Date.now()) => {
+  if (!value) {
+    return false
+  }
+
+  const expiresAt = new Date(value).getTime()
+  return Number.isFinite(expiresAt) && expiresAt <= now
+}

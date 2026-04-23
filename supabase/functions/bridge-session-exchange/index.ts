@@ -52,7 +52,7 @@ serve(async req => {
 
     const { data: codeRow, error: codeError } = await supabase
       .from('bridge_pairing_codes')
-      .select('id, status, expires_at, consumed_at')
+      .select('id, status, expires_at, consumed_at, session_exchanged_at')
       .eq('device_id', deviceId)
       .eq('code', pairingCode)
       .maybeSingle()
@@ -67,6 +67,10 @@ serve(async req => {
 
     if (codeRow.status !== 'consumed') {
       return json({ error: 'Pairing is not ready for session exchange' }, 409)
+    }
+
+    if (codeRow.session_exchanged_at) {
+      return json({ error: 'Pairing code has already been exchanged' }, 409)
     }
 
     const { data: pairing, error: pairingError } = await supabase
@@ -89,6 +93,23 @@ serve(async req => {
     const timestamp = new Date().toISOString()
     const expiresAt = getFutureIso(60)
     const sessionMaterial = await createBridgeSessionMaterial()
+
+    const { data: exchangeLock, error: exchangeLockError } = await supabase
+      .from('bridge_pairing_codes')
+      .update({ session_exchanged_at: timestamp })
+      .eq('id', codeRow.id)
+      .eq('status', 'consumed')
+      .is('session_exchanged_at', null)
+      .select('id')
+      .maybeSingle()
+
+    if (exchangeLockError) {
+      throw exchangeLockError
+    }
+
+    if (!exchangeLock) {
+      return json({ error: 'Pairing code has already been exchanged' }, 409)
+    }
 
     await supabase
       .from('bridge_device_sessions')

@@ -1,0 +1,29 @@
+project_id = "chat2-0"
+
+# Bridge functions perform their own endpoint-level authentication:
+# - device bootstrap endpoints use device id, pairing code, and bridge token checks
+# - user approval/revoke endpoints validate the caller's Supabase user token in code
+# This keeps ESP firmware calls compatible with the serial-first Phase 0 contract.
+[functions.bridge-register]
+verify_jwt = false
+
+[functions.bridge-pairing-begin]
+verify_jwt = false
+
+[functions.bridge-pairing-status]
+verify_jwt = false
+
+[functions.bridge-session-exchange]
+verify_jwt = false
+
+[functions.bridge-session-refresh]
+verify_jwt = false
+
+[functions.bridge-heartbeat]
+verify_jwt = false
+
+[functions.bridge-pairing-approve]
+verify_jwt = false
+
+[functions.bridge-pairing-revoke]
+verify_jwt = false

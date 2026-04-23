@@ -6,6 +6,7 @@ import {
   getFutureIso,
   getSupabaseAdmin,
   hashToken,
+  isExpiredIso,
   json,
   normalizeText,
   readJson,
@@ -39,7 +40,7 @@ serve(async req => {
 
     const { data: session, error: sessionError } = await supabase
       .from('bridge_device_sessions')
-      .select('id, device_id, user_id, status, refresh_token_hash')
+      .select('id, device_id, user_id, status, refresh_token_hash, expires_at')
       .eq('device_id', deviceId)
       .eq('status', 'active')
       .eq('refresh_token_hash', refreshTokenHash)
@@ -51,6 +52,31 @@ serve(async req => {
 
     if (!session) {
       return json({ error: 'Invalid bridge refresh token' }, 401)
+    }
+
+    if (isExpiredIso(session.expires_at)) {
+      const timestamp = new Date().toISOString()
+
+      await supabase
+        .from('bridge_device_sessions')
+        .update({
+          status: 'expired',
+        })
+        .eq('id', session.id)
+
+      await supabase
+        .from('bridge_audit_events')
+        .insert({
+          device_id: deviceId,
+          user_id: session.user_id,
+          event_type: 'session_expired',
+          event_payload: {
+            bridge_session_id: session.id,
+            expired_at: session.expires_at,
+          },
+        })
+
+      return json({ error: 'Bridge refresh token has expired' }, 401)
     }
 
     const { data: pairing, error: pairingError } = await supabase
