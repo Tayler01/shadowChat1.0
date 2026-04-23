@@ -88,6 +88,12 @@ Run the resume/background-send repro:
 npm run qa:smoke:resume
 ```
 
+Run the same check against production:
+
+```powershell
+node scripts/playwright-smoke.mjs --base-url=https://shadowchat-1-0.netlify.app --scenario=auth,resume-send --run-name=prod-check
+```
+
 Run the broader end-to-end sweep:
 
 ```powershell
@@ -132,6 +138,16 @@ Current smoke scenarios:
 - `mobile-settings-visual`: checks the mobile settings layout and notification toggle geometry
 
 Disposable accounts are the most deterministic option. Reused env-backed accounts can carry old threads and unread state from earlier runs.
+
+### iPhone Home Screen Note
+
+The iPhone Home Screen app should be treated as a distinct runtime when debugging auth or realtime issues. A flow that passes in Safari can still fail in standalone mode if session recovery or auth-state callbacks are blocking.
+
+Important guardrails:
+
+- do not put async Supabase work directly inside `supabase.auth.onAuthStateChange(...)`
+- prefer Supabase’s documented `worker: true` and heartbeat reconnect behavior before inventing custom client recreation logic
+- verify resume/send after deploy, not only in local preview
 
 ### Headed Smoke Script Pattern
 
@@ -205,6 +221,7 @@ Examples:
 - Push delivery cannot be fully trusted in incognito-style automation contexts.
 - Real notification delivery still needs at least one normal browser/device validation.
 - Preview mode is more stable than hot-reload mode for visual and realtime verification.
+- Browser automation is a strong regression signal for resume issues, but final confidence for iPhone Home Screen behavior still comes from one real-device validation pass.
 
 ## Useful Files While Testing
 

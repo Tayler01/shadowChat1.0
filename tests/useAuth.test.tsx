@@ -35,6 +35,17 @@ jest.mock('../src/lib/auth');
 type SupabaseMock = jest.Mocked<typeof supabase>;
 const authModule = auth as jest.Mocked<typeof auth>;
 
+const renderUseAuth = async () => {
+  let rendered: ReturnType<typeof renderHook<typeof useAuth>> | null = null;
+
+  await act(async () => {
+    rendered = renderHook(() => useAuth(), { wrapper: AuthProvider });
+    await Promise.resolve();
+  });
+
+  return rendered!;
+};
+
 beforeEach(() => {
   jest.resetAllMocks();
 
@@ -80,7 +91,8 @@ beforeEach(() => {
 test('signIn calls auth.signIn', async () => {
   authModule.signIn.mockResolvedValue({} as any);
 
-  const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+  const { result } = await renderUseAuth();
+  await waitFor(() => expect(result.current.loading).toBe(false));
 
   await act(async () => {
     await result.current.signIn('a@test.com', 'pw');
@@ -108,7 +120,7 @@ test('initial session bootstrap loads a user when recovery succeeds', async () =
     error: null,
   });
 
-  const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+  const { result } = await renderUseAuth();
 
   await waitFor(() => expect(result.current.loading).toBe(false));
   expect(authModule.getCurrentUser).toHaveBeenCalled();
@@ -119,7 +131,7 @@ test('signUp sets user when session returned', async () => {
   const profile = { id: '1' } as any;
   authModule.signUp.mockResolvedValue({ session: {}, profile, user: {} } as any);
 
-  const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+  const { result } = await renderUseAuth();
 
   await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -139,7 +151,8 @@ test('signUp sets user when session returned', async () => {
 test('signOut calls auth.signOut', async () => {
   authModule.signOut.mockResolvedValue();
 
-  const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+  const { result } = await renderUseAuth();
+  await waitFor(() => expect(result.current.loading).toBe(false));
 
   await act(async () => {
     await result.current.signOut();
@@ -153,7 +166,7 @@ test('uploadAvatar calls auth.uploadUserAvatar', async () => {
   authModule.signUp.mockResolvedValue({ session: {}, profile, user: {} } as any);
   authModule.uploadUserAvatar.mockResolvedValue('url');
 
-  const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+  const { result } = await renderUseAuth();
 
   await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -175,7 +188,7 @@ test('uploadBanner calls auth.uploadUserBanner', async () => {
   authModule.signUp.mockResolvedValue({ session: {}, profile, user: {} } as any);
   authModule.uploadUserBanner.mockResolvedValue('url');
 
-  const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
+  const { result } = await renderUseAuth();
 
   await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -218,7 +231,7 @@ test('auth state changes defer profile loading until after the callback returns'
     return { data: { subscription: { unsubscribe: jest.fn() } } } as any;
   });
 
-  renderHook(() => useAuth(), { wrapper: AuthProvider });
+  await renderUseAuth();
 
   await waitFor(() => expect(ensureSession).toHaveBeenCalled());
   expect(authCallback).not.toBeNull();

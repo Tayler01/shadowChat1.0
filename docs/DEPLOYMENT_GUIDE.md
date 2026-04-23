@@ -21,6 +21,12 @@ npm run build
 
 If the change affects realtime or UI behavior, also run a headed browser smoke before shipping.
 
+If the change affects auth, session recovery, or mobile resume behavior, also run:
+
+```powershell
+node scripts/playwright-smoke.mjs --scenario=auth,resume-send --headed --no-reuse-server
+```
+
 ## GitHub Push
 
 ```powershell
@@ -86,7 +92,14 @@ After deploy, verify:
 3. DM list loads
 4. Realtime group message works
 5. Realtime DM works
-6. Settings page renders cleanly on mobile and desktop
+6. Resume-send works after a background/foreground cycle
+7. Settings page renders cleanly on mobile and desktop
+
+Recommended production smoke:
+
+```powershell
+node scripts/playwright-smoke.mjs --base-url=https://shadowchat-1-0.netlify.app --scenario=auth,resume-send --run-name=prod-postdeploy
+```
 
 ## Production Gotchas
 
@@ -105,3 +118,12 @@ The frontend deploy can be healthy while push still fails if:
 ### Realtime Looks Stale
 
 The frontend deploy can be healthy while realtime still fails if the target Supabase project is not on the latest migrations.
+
+### iPhone Home Screen Still Hangs After Resume
+
+If sends still hang only in the installed Home Screen app:
+
+- verify the deployed build contains the latest `useAuth` and `supabase` session changes
+- confirm no async Supabase work has been reintroduced inside `onAuthStateChange`
+- rerun the production `auth,resume-send` smoke
+- then do a real-device Home Screen validation pass, because iOS standalone mode can diverge from normal Safari behavior

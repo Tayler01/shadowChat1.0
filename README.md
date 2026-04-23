@@ -107,6 +107,7 @@ npx vite preview
 - Browser push depends on the service worker, VAPID keys, the `send-push` edge function, and at least one active subscription row.
 - AI features depend on the `openai-chat` edge function and a configured OpenAI secret on Supabase.
 - iPhone web push requires the app to be installed to the Home Screen. Android and Windows work through supported browsers/PWAs.
+- iPhone Home Screen resume behavior now depends on the session/realtime hardening in [`src/lib/supabase.ts`](C:/repos/chat2.0/src/lib/supabase.ts:1) and the deferred auth callback flow in [`src/hooks/useAuth.tsx`](C:/repos/chat2.0/src/hooks/useAuth.tsx:1). Avoid reintroducing async Supabase calls directly inside `onAuthStateChange`.
 
 ## Testing And Debugging
 
@@ -134,6 +135,7 @@ Production is hosted on Netlify and the backend is hosted on Supabase.
 - [docs/TESTING_GUIDE.md](C:/repos/chat2.0/docs/TESTING_GUIDE.md:1): lint, typecheck, unit tests, smoke tests, and Playwright usage
 - [docs/DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1): GitHub, Netlify, and Supabase deployment workflow
 - [docs/ARCHITECTURE.md](C:/repos/chat2.0/docs/ARCHITECTURE.md:1): codebase map and key data flows
+- [docs/STABILITY_AND_QA_UPDATES_2026-04.md](C:/repos/chat2.0/docs/STABILITY_AND_QA_UPDATES_2026-04.md:1): stabilization work, QA improvements, and mobile resume fixes completed before the next feature phase
 - [docs/LIQUID_GOLD_DARK_REWORK.md](C:/repos/chat2.0/docs/LIQUID_GOLD_DARK_REWORK.md:1): design-direction history
 - [docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md](C:/repos/chat2.0/docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md:1): notification planning notes
 
