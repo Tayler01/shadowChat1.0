@@ -539,17 +539,17 @@ These still need deeper design before implementation:
 
 The next planning outputs should be:
 
-1. `Bridge protocol draft`
+1. [ESP Bridge Protocol Draft](C:/repos/chat2.0/docs/ESP_BRIDGE_PROTOCOL_DRAFT.md:1)
 - local command and event model between PC and ESP
 
-2. `Pairing flow spec`
+2. [ESP Bridge Pairing Flow Spec](C:/repos/chat2.0/docs/ESP_BRIDGE_PAIRING_FLOW_SPEC.md:1)
 - how a bridge becomes authorized for one user
 
-3. `V1 TUI UX spec`
+3. [ESP Bridge TUI UX Spec](C:/repos/chat2.0/docs/ESP_BRIDGE_TUI_UX_SPEC.md:1)
 - screens, navigation, keyboard shortcuts, color rules, and command grammar
 
-4. `Backend schema proposal`
+4. [ESP Bridge Backend Schema Proposal](C:/repos/chat2.0/docs/ESP_BRIDGE_BACKEND_SCHEMA_PROPOSAL.md:1)
 - device, pairing, and update-manifest schema additions
 
-5. `Phase 0 spike checklist`
+5. [ESP Bridge Phase 0 Spike Checklist](C:/repos/chat2.0/docs/ESP_BRIDGE_PHASE0_SPIKE_CHECKLIST.md:1)
 - exact prototype success criteria and test plan
