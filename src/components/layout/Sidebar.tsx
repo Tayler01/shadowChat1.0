@@ -69,14 +69,15 @@ export function Sidebar({
         <X className="w-4 h-4" />
       </button>
       {/* Header */}
-      <div className="border-b border-[var(--border-panel)] px-5 py-5">
-        <div className="flex flex-col gap-2">
-          <img
-            src="/icons/header-logo.png"
-            alt="SHADO"
-            className="h-20 w-full object-contain object-left"
-          />
-          <p className="text-xs uppercase tracking-[0.22em] text-[var(--text-muted)]">Private Console</p>
+      <div className="border-b border-[var(--border-panel)] px-6 py-5">
+        <div className="flex items-center space-x-3">
+          <div className="rounded-[var(--radius-md)] border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.16),rgba(215,170,70,0.1)_34%,rgba(122,89,24,0.42)_100%)] p-2.5 shadow-[var(--shadow-gold-soft)]">
+            <MessageSquare className="h-6 w-6 text-[var(--text-gold)]" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold tracking-[0.04em] text-[var(--text-primary)]">ShadowChat</h1>
+            <p className="text-xs uppercase tracking-[0.22em] text-[var(--text-muted)]">Private Console</p>
+          </div>
         </div>
       </div>
 

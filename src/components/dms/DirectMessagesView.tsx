@@ -206,7 +206,12 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   <ArrowLeft className="w-4 h-4" />
                 </Button>
               )}
-              <div>
+              <div className="min-w-0">
+                <img
+                  src="/icons/header-logo.png"
+                  alt="SHADO"
+                  className="mb-2 h-11 w-40 object-contain object-left md:h-14 md:w-48"
+                />
                 <h2 className="text-lg font-semibold text-[var(--text-primary)]">
                   Direct Messages
                 </h2>
@@ -403,6 +408,11 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                     @{currentConv.other_user?.username} {'\u2022'} {currentConv.other_user?.status}
                   </p>
                 </div>
+                <img
+                  src="/icons/header-logo.png"
+                  alt="SHADO"
+                  className="ml-auto h-9 w-28 object-contain object-right md:h-11 md:w-36"
+                />
               </div>
             </div>
 
