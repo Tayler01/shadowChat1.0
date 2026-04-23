@@ -113,6 +113,45 @@ Inside `chat group` or `chat dm <recipient_user_id>`, plain lines are sent as ch
 
 The serial reader accepts lines up to `1023` bytes. Longer lines are discarded as a whole line so overflow fragments are not accidentally executed as commands.
 
+## Windows Chat TUI Client
+
+The Phase 0 Windows-side chat client lives at [tools/bridge-tui/bridge-tui.ps1](C:/repos/chat2.0/tools/bridge-tui/bridge-tui.ps1:1). It opens the ESP serial port, enters chat mode, renders compact group/DM messages, and auto-polls the active thread.
+
+Run the default group-chat TUI:
+
+```powershell
+npm run bridge:tui
+```
+
+For custom ports or flags, call the PowerShell script directly.
+
+Run a DM thread:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1 -Port COM3 -Mode dm -DmRecipientUserId <recipient_user_id>
+```
+
+Run a no-message smoke check against the connected bridge:
+
+```powershell
+npm run bridge:tui:smoke
+```
+
+TUI commands:
+
+```text
+/poll
+/group
+/dm <recipient_user_id>
+/status
+/admin
+/chat
+/help
+/quit
+```
+
+Plain text sends to the active chat thread. `/admin` switches into the raw firmware admin shell; `/chat` returns to the last chat thread.
+
 ## Phase 0 Notes
 
 - Wi-Fi credentials and bridge tokens are currently stored in plain NVS for spike speed.

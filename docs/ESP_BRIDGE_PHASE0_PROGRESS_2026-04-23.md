@@ -68,6 +68,11 @@ Implemented and pushed on `main`:
   - plain-line message sending
   - slash commands for poll, thread switching, help, and admin return
   - overflow-safe 1023-byte input line handling
+- Windows-side Phase 0 chat TUI client at [tools/bridge-tui/bridge-tui.ps1](C:/repos/chat2.0/tools/bridge-tui/bridge-tui.ps1:1) with:
+  - group and DM chat modes
+  - interval polling
+  - raw admin shell escape
+  - no-message smoke validation mode
 
 ### Build Validation
 
@@ -95,7 +100,7 @@ These parts are still open:
 
 - direct Supabase user-session minting on device
 - realtime bridge session ownership on device
-- full Windows-side chat TUI
+- polished Windows-side chat TUI
 - structured local protocol framing between Windows and bridge firmware
 - automatic receive loop with device-side cursors/checkpoints
 
@@ -103,7 +108,7 @@ These parts are still open:
 
 The next implementation steps should happen in this order:
 
-1. Build the Windows-side chat-first TUI client against the ESP serial shell/protocol.
+1. Harden the Windows-side TUI into a richer split-pane experience with saved preferences and cleaner input rendering.
 2. Add a receive strategy for realtime or near-realtime updates:
    - Realtime WebSocket ownership on device, or
    - short polling/long polling over bridge data-plane functions for the first TUI.
@@ -130,8 +135,9 @@ What exists today is:
 - live group chat send/poll proof through bridge-scoped data-plane functions
 - live DM send/poll proof through bridge-scoped data-plane functions
 - a first ESP-side chat mode over serial for group chat and one active DM thread
+- a first Windows-side chat TUI client over the ESP serial shell
 
-What does **not** exist yet is the polished Windows-side chat TUI experience.
+What does **not** exist yet is the polished, structured-protocol Windows-side chat TUI experience.
 
 That is the next milestone.
 
@@ -161,6 +167,7 @@ Verified against the linked Supabase project:
 - `dm poll`
 - `chat group`
 - `chat dm <recipient_user_id>`
+- Windows TUI `-Smoke`
 
 Important implementation discoveries:
 

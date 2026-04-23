@@ -16,6 +16,8 @@
     "qa:smoke:resume": "node scripts/playwright-smoke.mjs --scenario=resume-send",
     "qa:smoke:mobile": "node scripts/playwright-smoke.mjs --scenario=mobile-dm-back",
     "qa:smoke:full": "node scripts/playwright-smoke.mjs --scenario=full",
+    "bridge:tui": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1",
+    "bridge:tui:smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1 -Port COM3 -Smoke",
     "qa:smoke:full:headed": "node scripts/playwright-smoke.mjs --scenario=full --headed"
   },
   "dependencies": {
