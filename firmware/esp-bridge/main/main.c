@@ -335,11 +335,24 @@ static void bridge_command_help(void) {
     printf("  wifi set <ssid> <password>\n");
     printf("  wifi connect\n");
     printf("  bridge register\n");
+    printf("  bridge wipe\n");
     printf("  pair begin\n");
     printf("  pair status\n");
     printf("  session exchange\n");
     printf("  session refresh\n");
     printf("  bridge heartbeat\n\n");
+}
+
+static void bridge_clear_pairing_state(void) {
+    bridge_set_runtime_string(s_bridge_state.device_status, sizeof(s_bridge_state.device_status), "unpaired");
+    bridge_set_runtime_string(s_bridge_state.pairing_code, sizeof(s_bridge_state.pairing_code), "");
+    bridge_set_runtime_string(s_bridge_state.access_token, sizeof(s_bridge_state.access_token), "");
+    bridge_set_runtime_string(s_bridge_state.refresh_token, sizeof(s_bridge_state.refresh_token), "");
+
+    bridge_save_string("device_status", s_bridge_state.device_status);
+    bridge_save_string("pairing_code", "");
+    bridge_save_string("access_token", "");
+    bridge_save_string("refresh_token", "");
 }
 
 static void bridge_command_status(void) {
@@ -630,6 +643,39 @@ static void bridge_command_heartbeat(void) {
     bridge_print_response("bridge-heartbeat", &response);
 }
 
+static void bridge_command_wipe(void) {
+    bool backend_wipe_attempted = false;
+
+    if (s_bridge_state.wifi_connected && s_bridge_state.device_id[0] != '\0' && s_bridge_state.refresh_token[0] != '\0') {
+        char body[320];
+        snprintf(
+            body,
+            sizeof(body),
+            "{\"deviceId\":\"%s\",\"mode\":\"device_wipe\",\"refreshToken\":\"%s\"}",
+            s_bridge_state.device_id,
+            s_bridge_state.refresh_token
+        );
+
+        bridge_http_response_t response = {0};
+        esp_err_t err = bridge_http_post_json("bridge-pairing-revoke", body, NULL, &response);
+        backend_wipe_attempted = true;
+
+        if (err != ESP_OK) {
+            printf("bridge-pairing-revoke failed: %s\n", esp_err_to_name(err));
+        } else {
+            bridge_print_response("bridge-pairing-revoke", &response);
+        }
+    } else {
+        printf("Skipping backend wipe; device is offline or has no stored bridge session.\n");
+    }
+
+    bridge_clear_pairing_state();
+    printf(
+        "Local bridge pairing/session material cleared%s\n",
+        backend_wipe_attempted ? "" : " without backend confirmation"
+    );
+}
+
 static void bridge_shell_task(void *arg) {
     char line[256];
     bool prompt_pending = true;
@@ -686,6 +732,8 @@ static void bridge_shell_task(void *arg) {
             bridge_command_register();
         } else if (strcmp(command, "bridge") == 0 && subcommand && strcmp(subcommand, "heartbeat") == 0) {
             bridge_command_heartbeat();
+        } else if (strcmp(command, "bridge") == 0 && subcommand && strcmp(subcommand, "wipe") == 0) {
+            bridge_command_wipe();
         } else if (strcmp(command, "pair") == 0 && subcommand && strcmp(subcommand, "begin") == 0) {
             bridge_command_pair_begin();
         } else if (strcmp(command, "pair") == 0 && subcommand && strcmp(subcommand, "status") == 0) {

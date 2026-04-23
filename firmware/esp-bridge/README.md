@@ -83,6 +83,7 @@ status
 wifi set <ssid> <password>
 wifi connect
 bridge register
+bridge wipe
 pair begin
 pair status
 session exchange
@@ -96,6 +97,5 @@ bridge heartbeat
 - Production work should move this toward encrypted NVS, signed OTA, and stronger device hardening already captured in the roadmap docs.
 - The next firmware milestone after this scaffold is:
   - local pairing UX polish
-  - device-side revoke/wipe command
   - bridge session failure handling
   - real data-plane auth proof for group chat and DMs
