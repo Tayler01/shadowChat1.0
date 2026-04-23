@@ -6,6 +6,43 @@ This file is the working handbook for agentic contributors operating inside this
 
 Ship product-quality improvements to ShadowChat without breaking realtime chat, DMs, auth, uploads, push notifications, or the premium dark UI language.
 
+## Current Feature Focus
+
+The current major planning and upcoming implementation track is the `ESP bridge` feature for an airgapped Windows PC.
+
+High-level direction:
+
+- `ESP32-S3` bridge
+- `USB CDC serial` local link
+- no general internet access for the connected PC
+- `chat-first TUI` plus a separate `admin shell`
+- bridge-specific pairing and session lifecycle
+- realtime group chat and full DMs
+
+Before implementing bridge work, read the bridge planning set in this order:
+
+1. [docs/ESP_BRIDGE_FEATURE_ROADMAP.md](C:/repos/chat2.0/docs/ESP_BRIDGE_FEATURE_ROADMAP.md:1)
+2. [docs/ESP_BRIDGE_DOCUMENTATION_REVIEW.md](C:/repos/chat2.0/docs/ESP_BRIDGE_DOCUMENTATION_REVIEW.md:1)
+3. [docs/ESP_BRIDGE_AUTH_MODEL_SPEC.md](C:/repos/chat2.0/docs/ESP_BRIDGE_AUTH_MODEL_SPEC.md:1)
+4. [docs/ESP_BRIDGE_SESSION_ISSUANCE_AND_PAIRING_EXCHANGE.md](C:/repos/chat2.0/docs/ESP_BRIDGE_SESSION_ISSUANCE_AND_PAIRING_EXCHANGE.md:1)
+5. [docs/ESP_BRIDGE_BACKEND_IMPLEMENTATION_PROPOSAL.md](C:/repos/chat2.0/docs/ESP_BRIDGE_BACKEND_IMPLEMENTATION_PROPOSAL.md:1)
+6. [docs/ESP_BRIDGE_PHASE0_IMPLEMENTATION_BRIEF.md](C:/repos/chat2.0/docs/ESP_BRIDGE_PHASE0_IMPLEMENTATION_BRIEF.md:1)
+
+Supporting docs:
+
+- [docs/ESP_BRIDGE_PROTOCOL_DRAFT.md](C:/repos/chat2.0/docs/ESP_BRIDGE_PROTOCOL_DRAFT.md:1)
+- [docs/ESP_BRIDGE_PAIRING_FLOW_SPEC.md](C:/repos/chat2.0/docs/ESP_BRIDGE_PAIRING_FLOW_SPEC.md:1)
+- [docs/ESP_BRIDGE_BACKEND_SCHEMA_PROPOSAL.md](C:/repos/chat2.0/docs/ESP_BRIDGE_BACKEND_SCHEMA_PROPOSAL.md:1)
+- [docs/ESP_BRIDGE_PHASE0_SPIKE_CHECKLIST.md](C:/repos/chat2.0/docs/ESP_BRIDGE_PHASE0_SPIKE_CHECKLIST.md:1)
+- [docs/ESP_BRIDGE_TUI_UX_SPEC.md](C:/repos/chat2.0/docs/ESP_BRIDGE_TUI_UX_SPEC.md:1)
+
+When starting bridge implementation work:
+
+- treat the bridge control plane as a new backend domain
+- prefer Edge Functions for pairing and session lifecycle
+- prefer existing authenticated Supabase data access for chat and DMs until the auth path is proven
+- do not assume a dashboard/browser transport exists in `v1`
+
 ## Non-Negotiable Checks
 
 Run these after meaningful code changes:
@@ -59,6 +96,7 @@ npm test -- --runInBand
 - [`supabase/migrations`](C:/repos/chat2.0/supabase/migrations): canonical schema and policy history
 - [`supabase/functions/openai-chat/index.ts`](C:/repos/chat2.0/supabase/functions/openai-chat/index.ts:1): authenticated AI proxy
 - [`supabase/functions/send-push/index.ts`](C:/repos/chat2.0/supabase/functions/send-push/index.ts:1): DM and group push delivery
+- future bridge work will also add bridge-specific control-plane functions under [`supabase/functions`](C:/repos/chat2.0/supabase/functions)
 
 ## Working Rules
 
@@ -244,6 +282,7 @@ For a clean working environment, see:
 - [docs/SETUP_GUIDE.md](C:/repos/chat2.0/docs/SETUP_GUIDE.md:1)
 - [docs/TESTING_GUIDE.md](C:/repos/chat2.0/docs/TESTING_GUIDE.md:1)
 - [docs/DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1)
+- bridge planning and implementation docs listed in `Current Feature Focus`
 
 ## Before Shipping
 
