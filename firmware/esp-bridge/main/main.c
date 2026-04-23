@@ -194,8 +194,8 @@ static esp_err_t bridge_wifi_apply_credentials(void) {
     }
 
     wifi_config_t wifi_config = {0};
-    snprintf((char *)wifi_config.sta.ssid, sizeof(wifi_config.sta.ssid), "%s", s_bridge_state.wifi_ssid);
-    snprintf((char *)wifi_config.sta.password, sizeof(wifi_config.sta.password), "%s", s_bridge_state.wifi_password);
+    strlcpy((char *)wifi_config.sta.ssid, s_bridge_state.wifi_ssid, sizeof(wifi_config.sta.ssid));
+    strlcpy((char *)wifi_config.sta.password, s_bridge_state.wifi_password, sizeof(wifi_config.sta.password));
     wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
     wifi_config.sta.pmf_cfg.capable = true;
     wifi_config.sta.pmf_cfg.required = false;

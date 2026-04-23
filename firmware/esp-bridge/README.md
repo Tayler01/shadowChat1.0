@@ -19,6 +19,16 @@ This firmware spike intentionally focuses on the lowest-risk device path first:
 
 It does **not** implement the final chat TUI yet, and it does **not** implement Supabase data-plane messaging auth yet. The current exchange and refresh flow is for the bridge control plane only, matching the current backend proof state.
 
+## Current Build Baseline
+
+The current spike is configured for a `4 MB` flash layout with:
+
+- `factory`
+- `ota_0`
+- `ota_1`
+
+That keeps OTA planning in the project without assuming a larger flash size than the first spike needs.
+
 ## Why USB Serial/JTAG First
 
 The bridge roadmap and documentation review called out two likely serial paths on `ESP32-S3`:
@@ -39,6 +49,13 @@ We can revisit TinyUSB later if `v1` needs a richer composite USB transport.
 
 - ESP-IDF installed locally
 - target set to `esp32s3`
+
+This workspace has been build-validated locally with `ESP-IDF v5.3.1` using:
+
+```powershell
+idf.py set-target esp32s3
+idf.py build
+```
 
 ## Configure
 
