@@ -586,20 +586,23 @@ These still need deeper design before implementation:
 
 The next planning outputs should be:
 
-1. [ESP Bridge Protocol Draft](C:/repos/chat2.0/docs/ESP_BRIDGE_PROTOCOL_DRAFT.md:1)
+1. [ESP Bridge Auth Model Spec](C:/repos/chat2.0/docs/ESP_BRIDGE_AUTH_MODEL_SPEC.md:1)
+- concrete `v1` auth/session model, pairing implications, revocation, and realtime ownership
+
+2. [ESP Bridge Protocol Draft](C:/repos/chat2.0/docs/ESP_BRIDGE_PROTOCOL_DRAFT.md:1)
 - local command and event model between PC and ESP
 
-2. [ESP Bridge Pairing Flow Spec](C:/repos/chat2.0/docs/ESP_BRIDGE_PAIRING_FLOW_SPEC.md:1)
+3. [ESP Bridge Pairing Flow Spec](C:/repos/chat2.0/docs/ESP_BRIDGE_PAIRING_FLOW_SPEC.md:1)
 - how a bridge becomes authorized for one user
 
-3. [ESP Bridge TUI UX Spec](C:/repos/chat2.0/docs/ESP_BRIDGE_TUI_UX_SPEC.md:1)
+4. [ESP Bridge TUI UX Spec](C:/repos/chat2.0/docs/ESP_BRIDGE_TUI_UX_SPEC.md:1)
 - screens, navigation, keyboard shortcuts, color rules, and command grammar
 
-4. [ESP Bridge Backend Schema Proposal](C:/repos/chat2.0/docs/ESP_BRIDGE_BACKEND_SCHEMA_PROPOSAL.md:1)
+5. [ESP Bridge Backend Schema Proposal](C:/repos/chat2.0/docs/ESP_BRIDGE_BACKEND_SCHEMA_PROPOSAL.md:1)
 - device, pairing, and update-manifest schema additions
 
-5. [ESP Bridge Phase 0 Spike Checklist](C:/repos/chat2.0/docs/ESP_BRIDGE_PHASE0_SPIKE_CHECKLIST.md:1)
+6. [ESP Bridge Phase 0 Spike Checklist](C:/repos/chat2.0/docs/ESP_BRIDGE_PHASE0_SPIKE_CHECKLIST.md:1)
 - exact prototype success criteria and test plan
 
-6. [ESP Bridge Documentation Review](C:/repos/chat2.0/docs/ESP_BRIDGE_DOCUMENTATION_REVIEW.md:1)
+7. [ESP Bridge Documentation Review](C:/repos/chat2.0/docs/ESP_BRIDGE_DOCUMENTATION_REVIEW.md:1)
 - official-platform constraints and implementation guardrails that shape the roadmap
