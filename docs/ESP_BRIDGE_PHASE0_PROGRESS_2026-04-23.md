@@ -35,7 +35,8 @@ Current backend status:
 - pairing lifecycle exists
 - bridge-scoped control-plane token lifecycle exists
 - refresh, revoke, and heartbeat exist
-- data-plane Supabase user-session minting is still not proven
+- bridge-scoped group chat and DM data-plane Edge Function proof exists
+- direct Supabase user-session minting remains intentionally unproven
 
 ### Firmware Workspace
 
@@ -56,6 +57,11 @@ Implemented and pushed on `main`:
   - `session exchange`
   - `session refresh`
   - `bridge heartbeat`
+  - `bridge wipe`
+  - `group send`
+  - `group poll`
+  - `dm send`
+  - `dm poll`
 
 ### Build Validation
 
@@ -81,47 +87,30 @@ Current firmware build baseline:
 
 These parts are still open:
 
-- flashing to a real `ESP32-S3` board from this workspace
-- confirming the admin shell on actual hardware
-- end-to-end Wi-Fi onboarding on device
-- end-to-end pairing against the live backend from device
-- real device-side revoke/wipe flow command
-- real Supabase data-plane auth proof for:
-  - group chat send/receive
-  - DM send/receive
+- direct Supabase user-session minting on device
 - realtime bridge session ownership on device
 - chat TUI
+- polished local protocol framing for longer interactive text input
 
 ## Immediate Next Steps
 
 The next implementation steps should happen in this order:
 
-1. Connect a real `ESP32-S3` board and detect the correct `COM` port.
-2. Flash the current firmware with:
-
-```powershell
-idf.py -p COMx flash monitor
-```
-
-3. Verify the admin shell appears over USB Serial/JTAG.
-4. Run and capture:
-   - `wifi set <ssid> <password>`
-   - `wifi connect`
-   - `bridge register`
-   - `pair begin`
-5. Confirm pairing approval from a real authenticated ShadowChat session.
-6. Run:
-   - `pair status`
-   - `session exchange`
-   - `session refresh`
-   - `bridge heartbeat`
-7. Add a device-side `revoke/wipe` shell command.
-8. Decide and implement the real data-plane auth proof path.
-9. Prove one group message send/receive and one DM send/receive from device.
+1. Replace the raw admin-shell smoke commands with a small chat-first TUI loop.
+2. Add a cleaner serial framing/input path so longer message text cannot be split into accidental commands.
+3. Decide whether Phase 1 should keep the narrow bridge data-plane Edge Functions or pursue direct Supabase user-session minting.
+4. Add a receive strategy for realtime or near-realtime updates:
+   - Realtime WebSocket ownership on device, or
+   - short polling/long polling over bridge data-plane functions for the first TUI.
+5. Add device-side message cursor/checkpoint storage.
+6. Add production-hardening follow-ups:
+   - encrypted NVS
+   - signed OTA
+   - more explicit redaction/sanitized serial output
 
 ## Current Honest Status
 
-The project is now past planning-only work.
+The project is now past planning-only work and past control-plane-only proof.
 
 What exists today is:
 
@@ -129,7 +118,45 @@ What exists today is:
 - a real backend control plane
 - a real ESP-IDF firmware workspace
 - a successful local `esp32s3` firmware build
+- a real ESP32-S3 hardware proof over `USB Serial/JTAG`
+- live Wi-Fi onboarding against `Camper1407`
+- live backend register, pairing, session exchange, refresh, heartbeat, and wipe proof
+- live group chat send/poll proof through bridge-scoped data-plane functions
+- live DM send/poll proof through bridge-scoped data-plane functions
 
-What does **not** exist yet is a hardware-proven messaging bridge.
+What does **not** exist yet is a polished chat-first bridge experience.
 
 That is the next milestone.
+
+## Hardware Proof Captured On 2026-04-23
+
+Board:
+
+- `ESP32-S3`
+- Windows port: `COM3`
+- USB path: `USB Serial/JTAG`
+- derived bridge serial: `esp32s3-348518ABF584`
+- backend device id: `a091ab7f-88de-4b8b-befb-9d8a53d9ff60`
+
+Verified against the linked Supabase project:
+
+- `bridge register`
+- `pair begin`
+- authenticated `bridge-pairing-approve`
+- `pair status`
+- `session exchange`
+- `session refresh`
+- `bridge heartbeat`
+- `bridge wipe`
+- `group send`
+- `group poll`
+- `dm send`
+- `dm poll`
+
+Important implementation discoveries:
+
+- shell task stack needed to be increased for HTTPS/TLS calls
+- ESP HTTP response bodies needed to be collected through the HTTP event callback
+- token-bearing session responses must be redacted before printing to serial
+- raw line-oriented serial input can split longer text and should be replaced before TUI work
+- returning full joined user profiles exposed too much data, so bridge data-plane functions now return minimal display profile fields

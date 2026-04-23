@@ -27,3 +27,15 @@ verify_jwt = false
 
 [functions.bridge-pairing-revoke]
 verify_jwt = false
+
+[functions.bridge-group-send]
+verify_jwt = false
+
+[functions.bridge-group-poll]
+verify_jwt = false
+
+[functions.bridge-dm-send]
+verify_jwt = false
+
+[functions.bridge-dm-poll]
+verify_jwt = false

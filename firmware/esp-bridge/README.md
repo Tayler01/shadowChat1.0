@@ -89,6 +89,10 @@ pair status
 session exchange
 session refresh
 bridge heartbeat
+group send <text>
+group poll
+dm send <recipient_user_id> <text>
+dm poll <recipient_user_id>
 ```
 
 ## Phase 0 Notes
@@ -98,4 +102,4 @@ bridge heartbeat
 - The next firmware milestone after this scaffold is:
   - local pairing UX polish
   - bridge session failure handling
-  - real data-plane auth proof for group chat and DMs
+  - realtime bridge receive path

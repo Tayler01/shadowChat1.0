@@ -101,6 +101,42 @@ static void bridge_set_runtime_string(char *target, size_t target_size, const ch
     snprintf(target, target_size, "%s", value);
 }
 
+static char *bridge_json_string_body(const char *key_a, const char *value_a, const char *key_b, const char *value_b) {
+    cJSON *json = cJSON_CreateObject();
+    if (!json) {
+        return NULL;
+    }
+
+    cJSON_AddStringToObject(json, key_a, value_a ? value_a : "");
+    cJSON_AddStringToObject(json, key_b, value_b ? value_b : "");
+
+    char *body = cJSON_PrintUnformatted(json);
+    cJSON_Delete(json);
+    return body;
+}
+
+static char *bridge_json_three_string_body(
+    const char *key_a,
+    const char *value_a,
+    const char *key_b,
+    const char *value_b,
+    const char *key_c,
+    const char *value_c
+) {
+    cJSON *json = cJSON_CreateObject();
+    if (!json) {
+        return NULL;
+    }
+
+    cJSON_AddStringToObject(json, key_a, value_a ? value_a : "");
+    cJSON_AddStringToObject(json, key_b, value_b ? value_b : "");
+    cJSON_AddStringToObject(json, key_c, value_c ? value_c : "");
+
+    char *body = cJSON_PrintUnformatted(json);
+    cJSON_Delete(json);
+    return body;
+}
+
 static void bridge_load_persisted_state(void) {
     bridge_load_string("wifi_ssid", s_bridge_state.wifi_ssid, sizeof(s_bridge_state.wifi_ssid));
     bridge_load_string("wifi_password", s_bridge_state.wifi_password, sizeof(s_bridge_state.wifi_password));
@@ -341,6 +377,10 @@ static void bridge_command_help(void) {
     printf("  session exchange\n");
     printf("  session refresh\n");
     printf("  bridge heartbeat\n\n");
+    printf("  group send <text>\n");
+    printf("  group poll\n\n");
+    printf("  dm send <recipient_user_id> <text>\n");
+    printf("  dm poll <recipient_user_id>\n\n");
 }
 
 static void bridge_clear_pairing_state(void) {
@@ -676,6 +716,119 @@ static void bridge_command_wipe(void) {
     );
 }
 
+static void bridge_command_group_send(const char *content) {
+    if (!content || content[0] == '\0') {
+        printf("usage: group send <text>\n");
+        return;
+    }
+
+    if (!s_bridge_state.wifi_connected || s_bridge_state.device_id[0] == '\0' || s_bridge_state.access_token[0] == '\0') {
+        printf("Device must be paired and have stored access material before group send\n");
+        return;
+    }
+
+    char *body = bridge_json_string_body("deviceId", s_bridge_state.device_id, "content", content);
+    if (!body) {
+        printf("Failed to build group message payload\n");
+        return;
+    }
+
+    bridge_http_response_t response = {0};
+    esp_err_t err = bridge_http_post_json("bridge-group-send", body, s_bridge_state.access_token, &response);
+    free(body);
+
+    if (err != ESP_OK) {
+        printf("bridge-group-send failed: %s\n", esp_err_to_name(err));
+        return;
+    }
+
+    bridge_print_response("bridge-group-send", &response);
+}
+
+static void bridge_command_group_poll(void) {
+    if (!s_bridge_state.wifi_connected || s_bridge_state.device_id[0] == '\0' || s_bridge_state.access_token[0] == '\0') {
+        printf("Device must be paired and have stored access material before group poll\n");
+        return;
+    }
+
+    char body[96];
+    snprintf(body, sizeof(body), "{\"deviceId\":\"%s\",\"limit\":5}", s_bridge_state.device_id);
+
+    bridge_http_response_t response = {0};
+    esp_err_t err = bridge_http_post_json("bridge-group-poll", body, s_bridge_state.access_token, &response);
+    if (err != ESP_OK) {
+        printf("bridge-group-poll failed: %s\n", esp_err_to_name(err));
+        return;
+    }
+
+    bridge_print_response("bridge-group-poll", &response);
+}
+
+static void bridge_command_dm_send(const char *recipient_user_id, const char *content) {
+    if (!recipient_user_id || recipient_user_id[0] == '\0' || !content || content[0] == '\0') {
+        printf("usage: dm send <recipient_user_id> <text>\n");
+        return;
+    }
+
+    if (!s_bridge_state.wifi_connected || s_bridge_state.device_id[0] == '\0' || s_bridge_state.access_token[0] == '\0') {
+        printf("Device must be paired and have stored access material before DM send\n");
+        return;
+    }
+
+    char *body = bridge_json_three_string_body(
+        "deviceId",
+        s_bridge_state.device_id,
+        "recipientUserId",
+        recipient_user_id,
+        "content",
+        content
+    );
+    if (!body) {
+        printf("Failed to build DM payload\n");
+        return;
+    }
+
+    bridge_http_response_t response = {0};
+    esp_err_t err = bridge_http_post_json("bridge-dm-send", body, s_bridge_state.access_token, &response);
+    free(body);
+
+    if (err != ESP_OK) {
+        printf("bridge-dm-send failed: %s\n", esp_err_to_name(err));
+        return;
+    }
+
+    bridge_print_response("bridge-dm-send", &response);
+}
+
+static void bridge_command_dm_poll(const char *recipient_user_id) {
+    if (!recipient_user_id || recipient_user_id[0] == '\0') {
+        printf("usage: dm poll <recipient_user_id>\n");
+        return;
+    }
+
+    if (!s_bridge_state.wifi_connected || s_bridge_state.device_id[0] == '\0' || s_bridge_state.access_token[0] == '\0') {
+        printf("Device must be paired and have stored access material before DM poll\n");
+        return;
+    }
+
+    char *body = bridge_json_string_body("deviceId", s_bridge_state.device_id, "recipientUserId", recipient_user_id);
+    if (!body) {
+        printf("Failed to build DM poll payload\n");
+        return;
+    }
+
+    bridge_http_response_t response = {0};
+    esp_err_t err = bridge_http_post_json("bridge-dm-poll", body, s_bridge_state.access_token, &response);
+    free(body);
+
+    if (err != ESP_OK) {
+        printf("bridge-dm-poll failed: %s\n", esp_err_to_name(err));
+        return;
+    }
+
+    bridge_print_response("bridge-dm-poll", &response);
+}
+
 static void bridge_shell_task(void *arg) {
     char line[256];
     bool prompt_pending = true;
@@ -734,6 +887,24 @@ static void bridge_shell_task(void *arg) {
             bridge_command_heartbeat();
         } else if (strcmp(command, "bridge") == 0 && subcommand && strcmp(subcommand, "wipe") == 0) {
             bridge_command_wipe();
+        } else if (strcmp(command, "group") == 0 && subcommand && strcmp(subcommand, "send") == 0) {
+            char *content = save_ptr;
+            while (content && *content == ' ') {
+                content++;
+            }
+            bridge_command_group_send(content);
+        } else if (strcmp(command, "group") == 0 && subcommand && strcmp(subcommand, "poll") == 0) {
+            bridge_command_group_poll();
+        } else if (strcmp(command, "dm") == 0 && subcommand && strcmp(subcommand, "send") == 0) {
+            char *recipient_user_id = strtok_r(NULL, " ", &save_ptr);
+            char *content = save_ptr;
+            while (content && *content == ' ') {
+                content++;
+            }
+            bridge_command_dm_send(recipient_user_id, content);
+        } else if (strcmp(command, "dm") == 0 && subcommand && strcmp(subcommand, "poll") == 0) {
+            char *recipient_user_id = strtok_r(NULL, " ", &save_ptr);
+            bridge_command_dm_poll(recipient_user_id);
         } else if (strcmp(command, "pair") == 0 && subcommand && strcmp(subcommand, "begin") == 0) {
             bridge_command_pair_begin();
         } else if (strcmp(command, "pair") == 0 && subcommand && strcmp(subcommand, "status") == 0) {

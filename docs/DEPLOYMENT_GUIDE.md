@@ -70,6 +70,10 @@ supabase functions deploy bridge-session-refresh --no-verify-jwt
 supabase functions deploy bridge-heartbeat --no-verify-jwt
 supabase functions deploy bridge-pairing-approve --no-verify-jwt
 supabase functions deploy bridge-pairing-revoke --no-verify-jwt
+supabase functions deploy bridge-group-send --no-verify-jwt
+supabase functions deploy bridge-group-poll --no-verify-jwt
+supabase functions deploy bridge-dm-send --no-verify-jwt
+supabase functions deploy bridge-dm-poll --no-verify-jwt
 ```
 
 The bridge functions keep JWT verification disabled at the Supabase function gateway because the firmware bootstrap calls do not carry a browser user token. User-sensitive bridge operations validate the caller's Supabase session inside the function, while device-sensitive operations validate pairing codes or bridge control-plane tokens.

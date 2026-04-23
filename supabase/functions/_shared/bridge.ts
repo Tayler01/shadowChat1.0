@@ -126,3 +126,84 @@ export const isExpiredIso = (value: string | null | undefined, now = Date.now())
   const expiresAt = new Date(value).getTime()
   return Number.isFinite(expiresAt) && expiresAt <= now
 }
+
+export type BridgeSessionAuth = {
+  bridgeSessionId: string
+  deviceId: string
+  userId: string
+}
+
+export const authenticateBridgeAccessToken = async (
+  deviceId: string,
+  accessToken: string,
+) => {
+  if (!deviceId || !accessToken) {
+    return { error: badRequest('deviceId and accessToken are required') }
+  }
+
+  const supabase = getSupabaseAdmin()
+  const accessTokenHash = await hashToken(accessToken)
+
+  const { data: session, error: sessionError } = await supabase
+    .from('bridge_device_sessions')
+    .select('id, device_id, user_id, status, expires_at')
+    .eq('device_id', deviceId)
+    .eq('status', 'active')
+    .eq('access_token_hash', accessTokenHash)
+    .maybeSingle()
+
+  if (sessionError) {
+    throw sessionError
+  }
+
+  if (!session) {
+    return { error: unauthorized('Invalid bridge access token') }
+  }
+
+  if (isExpiredIso(session.expires_at)) {
+    await supabase
+      .from('bridge_device_sessions')
+      .update({ status: 'expired' })
+      .eq('id', session.id)
+
+    await supabase
+      .from('bridge_audit_events')
+      .insert({
+        device_id: deviceId,
+        user_id: session.user_id,
+        event_type: 'session_expired',
+        event_payload: {
+          bridge_session_id: session.id,
+          expired_at: session.expires_at,
+        },
+      })
+
+    return { error: unauthorized('Bridge access token has expired') }
+  }
+
+  const { data: pairing, error: pairingError } = await supabase
+    .from('bridge_pairings')
+    .select('id')
+    .eq('device_id', deviceId)
+    .eq('user_id', session.user_id)
+    .eq('status', 'paired')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (pairingError) {
+    throw pairingError
+  }
+
+  if (!pairing) {
+    return { error: forbidden('Bridge pairing is no longer active') }
+  }
+
+  return {
+    auth: {
+      bridgeSessionId: session.id as string,
+      deviceId,
+      userId: session.user_id as string,
+    } satisfies BridgeSessionAuth,
+  }
+}
