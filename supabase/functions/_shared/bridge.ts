@@ -77,3 +77,42 @@ export const generatePairingCode = (length = 8) => {
   const random = crypto.getRandomValues(new Uint8Array(length))
   return Array.from(random, byte => alphabet[byte % alphabet.length]).join('')
 }
+
+const base64UrlEncode = (bytes: Uint8Array) =>
+  btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '')
+
+export const generateOpaqueToken = (prefix: string, byteLength = 32) => {
+  const bytes = crypto.getRandomValues(new Uint8Array(byteLength))
+  return `${prefix}_${base64UrlEncode(bytes)}`
+}
+
+const hexEncode = (bytes: Uint8Array) =>
+  Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
+
+export const hashToken = async (value: string) => {
+  const encoded = new TextEncoder().encode(value)
+  const digest = await crypto.subtle.digest('SHA-256', encoded)
+  return hexEncode(new Uint8Array(digest))
+}
+
+export const createBridgeSessionMaterial = async () => {
+  const accessToken = generateOpaqueToken('bacc')
+  const refreshToken = generateOpaqueToken('brfr')
+  const [accessTokenHash, refreshTokenHash] = await Promise.all([
+    hashToken(accessToken),
+    hashToken(refreshToken),
+  ])
+
+  return {
+    accessToken,
+    refreshToken,
+    accessTokenHash,
+    refreshTokenHash,
+  }
+}
+
+export const getFutureIso = (minutesFromNow: number) =>
+  new Date(Date.now() + minutesFromNow * 60_000).toISOString()
