@@ -44,9 +44,64 @@ function useProvideAuth() {
   const [error, setError] = useState<string | null>(null);
   const initialLoadRef = useRef(false);
   const mountedRef = useRef(true);
+  const authChangeTaskRef = useRef(0);
 
   useEffect(() => {
     mountedRef.current = true;
+
+    const applyRealtimeAuth = (accessToken?: string | null) => {
+      try {
+        supabase.realtime.setAuth(accessToken || '');
+      } catch {
+        // ignore realtime auth propagation failures
+      }
+    };
+
+    const handleDeferredAuthChange = async (event: string, session: any) => {
+      if (!mountedRef.current) {
+        return;
+      }
+
+      const taskId = ++authChangeTaskRef.current;
+      applyRealtimeAuth(session?.access_token);
+
+      if (event === 'SIGNED_OUT') {
+        if (mountedRef.current) {
+          setUser(null);
+        }
+        return;
+      }
+
+      if (event === 'TOKEN_REFRESHED') {
+        return;
+      }
+
+      if (!session?.user) {
+        if (mountedRef.current) {
+          setUser(null);
+        }
+        return;
+      }
+
+      try {
+        const profile = await getCurrentUser();
+        if (!mountedRef.current || authChangeTaskRef.current !== taskId) {
+          return;
+        }
+
+        if (profile) {
+          setUser(profile);
+          setError(null);
+        } else {
+          setUser(null);
+        }
+      } catch {
+        if (mountedRef.current && authChangeTaskRef.current === taskId) {
+          setError('Failed to load user profile. Please try signing in again.');
+          setUser(null);
+        }
+      }
+    };
     
     // Get initial session
     const getInitialSession = async () => {
@@ -65,7 +120,7 @@ function useProvideAuth() {
         const workingClient = await getWorkingClient();
         const { data: { session }, error: sessionError } = await getSessionWithTimeout(workingClient);
         // Ensure realtime uses the latest access token
-        workingClient.realtime.setAuth(session?.access_token || '');
+        applyRealtimeAuth(session?.access_token);
         
         // Handle the specific "user not found" error from invalid JWT
         if (sessionError && sessionError.message?.includes('User from sub claim in JWT does not exist')) {
@@ -127,40 +182,18 @@ function useProvideAuth() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: string, session: any) => {
+      (event: string, session: any) => {
         // Skip if we're still doing initial load or component is unmounted
         if (!initialLoadRef.current || !mountedRef.current) {
           return;
         }
 
-        // Update realtime auth token whenever session changes
-        try {
-          const workingClient = await getWorkingClient();
-          workingClient.realtime.setAuth(session?.access_token || '');
-        } catch (err) {
-        }
-
-        
-          if (event === 'SIGNED_OUT') {
-            if (mountedRef.current) setUser(null);
-          } else if (session?.user) {
-            try {
-              const profile = await getCurrentUser();
-              if (profile) {
-                if (mountedRef.current) setUser(profile);
-              } else {
-                if (mountedRef.current) setUser(null);
-              }
-          } catch {
-            if (mountedRef.current) {
-              setError('Failed to load user profile. Please try signing in again.');
-              setUser(null);
-            }
-          }
-          } else {
-            // No authenticated user in the session
-            if (mountedRef.current) setUser(null);
-        }
+        // Supabase warns against awaiting more Supabase calls inside this
+        // callback because it can deadlock auth operations. Defer the work
+        // until after the callback returns.
+        window.setTimeout(() => {
+          void handleDeferredAuthChange(event, session);
+        }, 0);
       }
     );
 

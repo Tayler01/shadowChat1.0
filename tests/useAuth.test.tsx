@@ -13,6 +13,9 @@ jest.mock('../src/lib/supabase', () => {
       from: jest.fn(),
       channel: jest.fn(),
       removeChannel: jest.fn(),
+      realtime: {
+        setAuth: jest.fn(),
+      },
       auth: {
         getSession: jest.fn(),
         onAuthStateChange: jest.fn(),
@@ -187,4 +190,54 @@ test('uploadBanner calls auth.uploadUserBanner', async () => {
   });
 
   expect(authModule.uploadUserBanner).toHaveBeenCalled();
+});
+
+test('auth state changes defer profile loading until after the callback returns', async () => {
+  jest.useFakeTimers();
+
+  const profile = { id: '1', username: 'user' } as any;
+  authModule.getCurrentUser.mockResolvedValue(profile);
+
+  const {
+    ensureSession,
+    getSessionWithTimeout,
+  } = jest.requireMock('../src/lib/supabase') as {
+    ensureSession: jest.Mock;
+    getSessionWithTimeout: jest.Mock;
+  };
+  ensureSession.mockResolvedValue(true);
+  getSessionWithTimeout.mockResolvedValue({
+    data: { session: null },
+    error: null,
+  });
+
+  let authCallback: ((event: string, session: any) => void) | null = null;
+  const sb = supabase as SupabaseMock;
+  sb.auth.onAuthStateChange.mockImplementation((callback: any) => {
+    authCallback = callback;
+    return { data: { subscription: { unsubscribe: jest.fn() } } } as any;
+  });
+
+  renderHook(() => useAuth(), { wrapper: AuthProvider });
+
+  await waitFor(() => expect(ensureSession).toHaveBeenCalled());
+  expect(authCallback).not.toBeNull();
+
+  act(() => {
+    authCallback?.('SIGNED_IN', {
+      access_token: 'token-1',
+      user: { id: '1' },
+    });
+  });
+
+  expect(authModule.getCurrentUser).not.toHaveBeenCalled();
+
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(0);
+  });
+
+  await waitFor(() => expect(authModule.getCurrentUser).toHaveBeenCalled());
+  expect(sb.realtime.setAuth).toHaveBeenCalledWith('token-1');
+
+  jest.useRealTimers();
 });
