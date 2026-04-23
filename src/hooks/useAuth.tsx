@@ -7,6 +7,8 @@ import {
   getWorkingClient,
   ensureSession,
   getSessionWithTimeout,
+  getStoredRefreshToken,
+  recoverSessionAfterResume,
 } from '../lib/supabase';
 import { PRESENCE_INTERVAL_MS } from '../config';
 import {
@@ -37,6 +39,10 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+const AUTH_RESTORE_RETRY_DELAYS_MS = [0, 450, 1200, 2400];
+
+const wait = (ms: number) =>
+  new Promise(resolve => window.setTimeout(resolve, ms));
 
 function useProvideAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -102,6 +108,36 @@ function useProvideAuth() {
         }
       }
     };
+
+    const restoreSessionForLaunch = async () => {
+      const hasStoredRefreshToken = Boolean(getStoredRefreshToken());
+      const delays = hasStoredRefreshToken ? AUTH_RESTORE_RETRY_DELAYS_MS : [0];
+
+      for (let attempt = 0; attempt < delays.length; attempt += 1) {
+        if (!mountedRef.current) {
+          return false;
+        }
+
+        const delay = delays[attempt];
+        if (delay > 0) {
+          await wait(delay);
+        }
+
+        const sessionReady = await ensureSession(attempt > 0);
+        if (sessionReady) {
+          return true;
+        }
+
+        if (hasStoredRefreshToken) {
+          const recovered = await recoverSessionAfterResume();
+          if (recovered) {
+            return true;
+          }
+        }
+      }
+
+      return false;
+    };
     
     // Get initial session
     const getInitialSession = async () => {
@@ -109,7 +145,7 @@ function useProvideAuth() {
       
       
       try {
-        const sessionReady = await ensureSession();
+        const sessionReady = await restoreSessionForLaunch();
         if (!sessionReady) {
           if (mountedRef.current) {
             setUser(null);

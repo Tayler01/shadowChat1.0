@@ -29,6 +29,12 @@ interface DirectMessagesViewProps {
   currentView: 'chat' | 'dms' | 'profile' | 'settings'
   onViewChange: (view: 'chat' | 'dms' | 'profile' | 'settings') => void
   initialConversation?: string
+  initialMessageId?: string
+}
+
+type PendingUnreadJump = {
+  conversationId: string
+  unreadCount: number
 }
 
 export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
@@ -36,6 +42,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   currentView,
   onViewChange,
   initialConversation,
+  initialMessageId,
 }) => {
   const { profile } = useAuth()
   const isDesktop = useIsDesktop()
@@ -58,16 +65,19 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const [searchUsername, setSearchUsername] = useState('')
   const [startingUsername, setStartingUsername] = useState<string | null>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
+  const pendingUnreadJumpRef = useRef<PendingUnreadJump | null>(null)
+  const initialTargetJumpDoneRef = useRef<string | null>(null)
   const [autoScroll, setAutoScroll] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [unreadJumpToken, setUnreadJumpToken] = useState(0)
+  const [firstUnreadDMMessageId, setFirstUnreadDMMessageId] = useState<string | null>(null)
   const { typingUsers } = useTyping(currentConversation ? `dm-${currentConversation}` : 'none')
 
   useEffect(() => {
     if (initialConversation && currentConversation !== initialConversation) {
       setCurrentConversation(initialConversation)
-      markAsRead(initialConversation)
     }
-  }, [initialConversation, currentConversation, markAsRead, setCurrentConversation])
+  }, [initialConversation, currentConversation, setCurrentConversation])
 
   useEffect(() => {
     if (!isDesktop || initialConversation || currentConversation || conversations.length === 0) {
@@ -81,6 +91,11 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     if (!currentConversation) return
     const conv = conversations.find(c => c.id === currentConversation)
     if (conv && (conv.unread_count || 0) > 0) {
+      pendingUnreadJumpRef.current = {
+        conversationId: currentConversation,
+        unreadCount: conv.unread_count || 0,
+      }
+      setUnreadJumpToken(token => token + 1)
       markAsRead(currentConversation)
     }
   }, [currentConversation, conversations, markAsRead])
@@ -132,7 +147,6 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
 
   const handleConversationSelect = (conversationId: string) => {
     setCurrentConversation(conversationId)
-    markAsRead(conversationId)
   }
 
   const handleScroll = useCallback(() => {
@@ -156,14 +170,76 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   }, [])
 
   useEffect(() => {
+    setAutoScroll(true)
+    setFirstUnreadDMMessageId(null)
+    initialTargetJumpDoneRef.current = null
+  }, [currentConversation])
+
+  useEffect(() => {
     if (autoScroll && messagesRef.current) {
       messagesRef.current.scrollTop = messagesRef.current.scrollHeight
     }
   }, [messages, currentConversation, autoScroll])
 
   useEffect(() => {
-    setAutoScroll(true)
-  }, [currentConversation])
+    const pending = pendingUnreadJumpRef.current
+    if (
+      initialMessageId ||
+      !pending ||
+      pending.conversationId !== currentConversation ||
+      pending.unreadCount <= 0 ||
+      messages.length === 0
+    ) {
+      return
+    }
+
+    const firstUnreadIndex = Math.max(messages.length - pending.unreadCount, 0)
+    const anchorIndex = Math.max(firstUnreadIndex - 1, 0)
+    const anchorMessage = messages[anchorIndex]
+    const firstUnreadMessage = messages[firstUnreadIndex] ?? messages[0]
+    if (!anchorMessage) {
+      return
+    }
+
+    setFirstUnreadDMMessageId(firstUnreadMessage?.id ?? null)
+    setAutoScroll(false)
+    pendingUnreadJumpRef.current = null
+
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`dm-message-${anchorMessage.id}`)
+      el?.scrollIntoView({ block: 'start' })
+    })
+  }, [currentConversation, initialMessageId, messages, unreadJumpToken])
+
+  useEffect(() => {
+    if (
+      !initialMessageId ||
+      initialTargetJumpDoneRef.current === initialMessageId ||
+      messages.length === 0
+    ) {
+      return
+    }
+
+    const target = messages.find(message => message.id === initialMessageId)
+    if (!target) {
+      return
+    }
+
+    initialTargetJumpDoneRef.current = initialMessageId
+    pendingUnreadJumpRef.current = null
+    setFirstUnreadDMMessageId(null)
+    setAutoScroll(false)
+
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`dm-message-${initialMessageId}`)
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('ring-2', 'ring-[rgba(34,197,94,0.55)]')
+      window.setTimeout(() => {
+        el.classList.remove('ring-2', 'ring-[rgba(34,197,94,0.55)]')
+      }, 2200)
+    })
+  }, [initialMessageId, messages])
 
   const currentConv = conversations.find(c => c.id === currentConversation)
   const showConversationList = isDesktop || !currentConversation
@@ -206,13 +282,13 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   <ArrowLeft className="w-4 h-4" />
                 </Button>
               )}
-              <div className="flex min-w-0 items-center gap-3">
+              <div className="relative flex min-h-10 min-w-0 items-center gap-3">
                 <img
                   src="/icons/header-logo.png"
                   alt="SHADO"
-                  className="h-9 w-24 shrink-0 object-contain object-left md:hidden"
+                  className="absolute -left-5 top-1/2 h-[4.5rem] w-32 -translate-y-1/2 object-contain object-left sm:-left-6 sm:w-36 md:hidden"
                 />
-                <div className="min-w-0">
+                <div className="min-w-0 pl-24 sm:pl-28 md:pl-0">
                   <h2 className="text-base font-semibold text-[var(--text-primary)] md:text-lg">
                     Direct Messages
                   </h2>
@@ -448,8 +524,19 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   : undefined
 
                 return (
+                  <React.Fragment key={message.id}>
+                  {firstUnreadDMMessageId === message.id && (
+                    <div className="my-3 flex items-center gap-3">
+                      <hr className="flex-grow border-t border-[rgba(34,197,94,0.24)]" />
+                      <span className="rounded-full border border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.08)] px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-[#86efac]">
+                        Unread
+                      </span>
+                      <hr className="flex-grow border-t border-[rgba(34,197,94,0.24)]" />
+                    </div>
+                  )}
                   <motion.div
                     key={message.id}
+                    id={`dm-message-${message.id}`}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${
@@ -500,6 +587,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                       </div>
                     </div>
                   </motion.div>
+                  </React.Fragment>
                 )
               })}
 

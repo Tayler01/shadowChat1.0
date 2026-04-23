@@ -368,7 +368,7 @@ const sendDmPush = async (
   const sender = getActor(dmMessage.sender)
   const senderLabel = getActorLabel(sender)
   const preview = getMessagePreview(dmMessage)
-  const route = `/?view=dms&conversation=${dmMessage.conversation_id}`
+  const route = `/?view=dms&conversation=${dmMessage.conversation_id}&message=${dmMessage.id}`
   const dedupeKey = `dm:${dmMessage.id}:${recipientId}`
   const badgeCount = await getUnreadBadgeCount(supabase, recipientId)
 
@@ -483,7 +483,7 @@ const sendGroupPush = async (
   const sender = getActor(groupMessage.user)
   const senderLabel = getActorLabel(sender)
   const preview = getMessagePreview(groupMessage)
-  const route = '/?view=chat'
+  const route = `/?view=chat&message=${groupMessage.id}`
 
   const perRecipientResults = await Promise.all(
     eligibleRecipients.map(async (prefs) => {

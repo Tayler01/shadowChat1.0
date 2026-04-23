@@ -18,9 +18,10 @@ import { useVisibilityRefresh } from '../../hooks/useVisibilityRefresh'
 interface ChatViewProps {
   currentView: 'chat' | 'dms' | 'profile' | 'settings'
   onViewChange: (view: 'chat' | 'dms' | 'profile' | 'settings') => void
+  initialMessageId?: string
 }
 
-export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange }) => {
+export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, initialMessageId }) => {
   const { messages, sendMessage, sending, togglePin, toggleReaction } = useMessages()
   const pinnedMessages = messages.filter(m => m.pinned)
   const { status: resetStatus } = useClientReset()
@@ -73,13 +74,13 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange })
           <div className="flex items-center space-x-3">
             {/* Menu button removed on mobile */}
             {/* Header title */}
-            <div className="flex items-center gap-3 md:gap-4">
+            <div className="relative flex min-h-10 items-center gap-3 md:gap-4">
               <img
                 src="/icons/header-logo.png"
                 alt="SHADO"
-                className="h-9 w-24 shrink-0 object-contain object-left md:hidden"
+                className="absolute -left-5 top-1/2 h-[4.5rem] w-32 -translate-y-1/2 object-contain object-left sm:-left-6 sm:w-36 md:hidden"
               />
-              <div>
+              <div className="pl-24 sm:pl-28 md:pl-0">
                 <h1 className="text-lg font-semibold text-[var(--text-primary)] md:text-xl">
                   General Chat
                 </h1>
@@ -107,9 +108,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange })
           </div>
 
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2 rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5 text-sm text-[var(--text-muted)]">
+            <div className="flex items-center space-x-2 rounded-full border border-[rgba(34,197,94,0.24)] bg-[rgba(34,197,94,0.08)] px-3 py-1.5 text-sm text-[#86efac]">
               <Users className="h-4 w-4" />
-              <span>Live now</span>
+              <span className="hidden sm:inline">Live now</span>
               <ClientResetIndicator status={resetStatus} />
             </div>
           </div>
@@ -137,6 +138,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange })
         }}
         sending={sending}
         uploading={uploading}
+        initialMessageId={initialMessageId}
       />
 
       {/* Desktop Message Input */}

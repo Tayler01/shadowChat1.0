@@ -73,21 +73,27 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close()
 
   const data = event.notification.data || {}
-  const targetUrl = data.url || data.route || '/'
+  let targetUrl = data.url || data.route || '/'
+  if (data.type === 'dm_message' && data.conversationId && data.messageId) {
+    targetUrl = `/?view=dms&conversation=${encodeURIComponent(data.conversationId)}&message=${encodeURIComponent(data.messageId)}`
+  } else if (data.type === 'group_message' && data.messageId) {
+    targetUrl = `/?view=chat&message=${encodeURIComponent(data.messageId)}`
+  }
+  const targetHref = new URL(targetUrl, self.location.origin).href
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
         if ('focus' in client) {
           if ('navigate' in client) {
-            client.navigate(targetUrl)
+            client.navigate(targetHref)
           }
           return client.focus()
         }
       }
 
       if (self.clients.openWindow) {
-        return self.clients.openWindow(targetUrl)
+        return self.clients.openWindow(targetHref)
       }
 
       return undefined

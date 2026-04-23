@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
-import { updateAppBadge } from '../../lib/appBadge'
+import { refreshAppBadge, updateAppBadge } from '../../lib/appBadge'
 
 export function AppBadgeSync() {
   const { conversations } = useDirectMessages()
@@ -11,11 +11,12 @@ export function AppBadgeSync() {
 
   useEffect(() => {
     void updateAppBadge(totalUnread)
+    void refreshAppBadge(totalUnread)
   }, [totalUnread])
 
   useEffect(() => {
     const syncBadge = () => {
-      void updateAppBadge(totalUnread)
+      void refreshAppBadge(totalUnread)
     }
 
     window.addEventListener('focus', syncBadge)
@@ -27,6 +28,16 @@ export function AppBadgeSync() {
       window.removeEventListener('pageshow', syncBadge)
       document.removeEventListener('visibilitychange', syncBadge)
     }
+  }, [totalUnread])
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void refreshAppBadge(totalUnread)
+      }
+    }, 30000)
+
+    return () => window.clearInterval(interval)
   }, [totalUnread])
 
   return null

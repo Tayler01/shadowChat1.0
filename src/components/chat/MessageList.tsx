@@ -11,6 +11,7 @@ import { FailedMessageItem } from './FailedMessageItem'
 import toast from 'react-hot-toast'
 import type { Message } from '../../lib/supabase'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
+import { useAuth } from '../../hooks/useAuth'
 
 interface MessageListProps {
   onReply?: (messageId: string, content: string) => void
@@ -18,9 +19,17 @@ interface MessageListProps {
   onResend?: (msg: FailedMessage) => void
   sending?: boolean
   uploading?: boolean
+  initialMessageId?: string
 }
 
-export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessages = [], onResend, sending = false, uploading = false }) => {
+export const MessageList: React.FC<MessageListProps> = ({
+  onReply,
+  failedMessages = [],
+  onResend,
+  sending = false,
+  uploading = false,
+  initialMessageId,
+}) => {
   const {
     messages,
     loading,
@@ -33,10 +42,19 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     hasMore
   } = useMessages()
   const { typingUsers } = useTyping('general')
+  const { profile } = useAuth()
   const containerRef = useRef<HTMLDivElement>(null)
   const prevHeightRef = useRef(0)
   const prevScrollTopRef = useRef(0)
+  const initialUnreadJumpDoneRef = useRef(false)
+  const initialTargetJumpDoneRef = useRef<string | null>(null)
+  const lastSeenMessageIdRef = useRef<string | null>(null)
   const [autoScroll, setAutoScroll] = useState(true)
+  const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(null)
+  const lastSeenStorageKey = useMemo(
+    () => (profile?.id ? `shadowchat:general:last-seen:${profile.id}` : null),
+    [profile?.id]
+  )
 
   const { messageMap, childrenMap, rootMessages } = useMemo(() => {
     const msgMap = new Map<string, Message>()
@@ -169,6 +187,22 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
     [combinedMessages]
   )
 
+  useEffect(() => {
+    initialUnreadJumpDoneRef.current = false
+    initialTargetJumpDoneRef.current = null
+    setFirstUnreadMessageId(null)
+    if (!lastSeenStorageKey || typeof localStorage === 'undefined') {
+      lastSeenMessageIdRef.current = null
+      return
+    }
+
+    try {
+      lastSeenMessageIdRef.current = localStorage.getItem(lastSeenStorageKey)
+    } catch {
+      lastSeenMessageIdRef.current = null
+    }
+  }, [lastSeenStorageKey])
+
   // Maintain scroll position when older messages are prepended
   useEffect(() => {
     const el = containerRef.current
@@ -191,6 +225,87 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
       containerRef.current.scrollTop = containerRef.current.scrollHeight
     }
   }, [messages, typingUsers, autoScroll])
+
+  useEffect(() => {
+    if (
+      loading ||
+      initialMessageId ||
+      initialUnreadJumpDoneRef.current ||
+      combinedMessages.length === 0
+    ) {
+      return
+    }
+
+    initialUnreadJumpDoneRef.current = true
+
+    const lastSeenId = lastSeenMessageIdRef.current
+    const lastSeenIndex = lastSeenId
+      ? combinedMessages.findIndex(message => message.id === lastSeenId)
+      : -1
+
+    if (lastSeenIndex >= 0 && lastSeenIndex < combinedMessages.length - 1) {
+      const firstUnread = combinedMessages[lastSeenIndex + 1]
+      setFirstUnreadMessageId(firstUnread.id)
+      setAutoScroll(false)
+
+      requestAnimationFrame(() => {
+        const el = document.getElementById(`message-${lastSeenId}`)
+        el?.scrollIntoView({ block: 'start' })
+      })
+      return
+    }
+
+    setFirstUnreadMessageId(null)
+  }, [combinedMessages, initialMessageId, loading])
+
+  useEffect(() => {
+    if (
+      loading ||
+      !initialMessageId ||
+      initialTargetJumpDoneRef.current === initialMessageId ||
+      combinedMessages.length === 0
+    ) {
+      return
+    }
+
+    const target = combinedMessages.find(message => message.id === initialMessageId)
+    if (!target) {
+      return
+    }
+
+    initialTargetJumpDoneRef.current = initialMessageId
+    setFirstUnreadMessageId(null)
+    setAutoScroll(false)
+
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`message-${initialMessageId}`)
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('ring-2', 'ring-[rgba(34,197,94,0.55)]')
+      window.setTimeout(() => {
+        el.classList.remove('ring-2', 'ring-[rgba(34,197,94,0.55)]')
+      }, 2200)
+    })
+  }, [combinedMessages, initialMessageId, loading])
+
+  useEffect(() => {
+    if (
+      !lastSeenStorageKey ||
+      loading ||
+      !autoScroll ||
+      !initialUnreadJumpDoneRef.current ||
+      combinedMessages.length === 0 ||
+      (typeof document !== 'undefined' && document.visibilityState !== 'visible')
+    ) {
+      return
+    }
+
+    try {
+      localStorage.setItem(lastSeenStorageKey, combinedMessages[combinedMessages.length - 1].id)
+    } catch {
+      // Ignore storage failures; the feed will still behave like normal chat.
+    }
+  }, [autoScroll, combinedMessages, lastSeenStorageKey, loading])
 
   const handleEdit = async (messageId: string, content: string) => {
     try {
@@ -295,17 +410,28 @@ export const MessageList: React.FC<MessageListProps> = ({ onReply, failedMessage
             const prev = group.messages[idx - 1] as any
             const isGrouped = shouldGroupMessage(message, prev)
             return (
-              <div key={message.id} className={cn(isGrouped ? 'pt-1 pb-1' : 'pt-4 pb-1')}>
-                {message.isReplyLink ? (
-                  <ThreadReplyLink
-                    message={message}
-                    parent={message.parent}
-                    onJumpToMessage={jumpToMessage}
-                  />
-                ) : (
-                  renderThread(message, 0, prev)
+              <React.Fragment key={message.id}>
+                {firstUnreadMessageId === message.id && (
+                  <div className="my-3 flex items-center gap-3">
+                    <hr className="flex-grow border-t border-[rgba(34,197,94,0.24)]" />
+                    <span className="rounded-full border border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.08)] px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-[#86efac]">
+                      Unread
+                    </span>
+                    <hr className="flex-grow border-t border-[rgba(34,197,94,0.24)]" />
+                  </div>
                 )}
-              </div>
+                <div className={cn(isGrouped ? 'pt-1 pb-1' : 'pt-4 pb-1')}>
+                  {message.isReplyLink ? (
+                    <ThreadReplyLink
+                      message={message}
+                      parent={message.parent}
+                      onJumpToMessage={jumpToMessage}
+                    />
+                  ) : (
+                    renderThread(message, 0, prev)
+                  )}
+                </div>
+              </React.Fragment>
             )
           })}
         </React.Fragment>

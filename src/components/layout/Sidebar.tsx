@@ -69,14 +69,13 @@ export function Sidebar({
         <X className="w-4 h-4" />
       </button>
       {/* Header */}
-      <div className="border-b border-[var(--border-panel)] px-5 py-5">
-        <div className="flex flex-col gap-2">
+      <div className="border-b border-[var(--border-panel)] px-5 py-6">
+        <div className="flex flex-col">
           <img
             src="/icons/header-logo.png"
             alt="SHADO"
-            className="h-20 w-full object-contain object-left"
+            className="h-24 w-full object-contain object-left"
           />
-          <p className="text-xs uppercase tracking-[0.22em] text-[var(--text-muted)]">Private Console</p>
         </div>
       </div>
 

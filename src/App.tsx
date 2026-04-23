@@ -40,7 +40,7 @@ const isView = (value: string | null): value is View => (
 
 const getInitialLocationState = () => {
   if (typeof window === 'undefined') {
-    return { view: 'chat' as View, conversation: null as string | null }
+    return { view: 'chat' as View, conversation: null as string | null, message: null as string | null }
   }
 
   const params = new URLSearchParams(window.location.search)
@@ -49,6 +49,7 @@ const getInitialLocationState = () => {
   return {
     view: isView(nextView) ? nextView : ('chat' as View),
     conversation: nextView === 'dms' ? params.get('conversation') : null,
+    message: params.get('message'),
   }
 }
 
@@ -70,6 +71,7 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const isDesktop = useIsDesktop()
   const [dmTarget, setDmTarget] = useState<string | null>(() => getInitialLocationState().conversation)
+  const [messageTarget, setMessageTarget] = useState<string | null>(() => getInitialLocationState().message)
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('darkMode')
@@ -107,6 +109,7 @@ function App() {
       const params = new URLSearchParams(window.location.search)
       const nextView = params.get('view')
       const nextConversation = params.get('conversation')
+      const nextMessage = params.get('message')
 
       if (isView(nextView)) {
         setCurrentView(nextView)
@@ -117,6 +120,8 @@ function App() {
       } else if (nextView !== 'dms') {
         setDmTarget(null)
       }
+
+      setMessageTarget((nextView === 'dms' && nextConversation) || nextView === 'chat' ? nextMessage : null)
     }
 
     window.addEventListener('popstate', applyUrlState)
@@ -128,16 +133,21 @@ function App() {
 
   useMessageNotifications((conversationId) => {
     setDmTarget(conversationId)
+    setMessageTarget(null)
     setCurrentView('dms')
   })
 
   const closeSidebar = () => setSidebarOpen(false)
 
-  useEffect(() => {
-    if (currentView === 'dms' && dmTarget) {
+  const handleViewChange = (view: View) => {
+    setCurrentView(view)
+    if (view !== 'dms') {
       setDmTarget(null)
     }
-  }, [currentView, dmTarget])
+    if (view !== currentView) {
+      setMessageTarget(null)
+    }
+  }
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -145,7 +155,13 @@ function App() {
     const url = new URL(window.location.href)
 
     if (currentView === 'chat') {
-      url.searchParams.delete('view')
+      if (messageTarget) {
+        url.searchParams.set('view', 'chat')
+        url.searchParams.set('message', messageTarget)
+      } else {
+        url.searchParams.delete('view')
+        url.searchParams.delete('message')
+      }
       url.searchParams.delete('conversation')
     } else {
       url.searchParams.set('view', currentView)
@@ -154,10 +170,15 @@ function App() {
       } else {
         url.searchParams.delete('conversation')
       }
+      if (messageTarget) {
+        url.searchParams.set('message', messageTarget)
+      } else {
+        url.searchParams.delete('message')
+      }
     }
 
     window.history.replaceState({}, '', url)
-  }, [currentView, dmTarget])
+  }, [currentView, dmTarget, messageTarget])
 
   const renderCurrentView = () => {
     switch (currentView) {
@@ -165,7 +186,8 @@ function App() {
         return (
           <ChatView
             currentView={currentView}
-            onViewChange={setCurrentView}
+            onViewChange={handleViewChange}
+            initialMessageId={messageTarget || undefined}
           />
         )
       case 'dms':
@@ -173,8 +195,9 @@ function App() {
           <DirectMessagesView
             onToggleSidebar={toggleSidebar}
             currentView={currentView}
-            onViewChange={setCurrentView}
+            onViewChange={handleViewChange}
             initialConversation={dmTarget || undefined}
+            initialMessageId={messageTarget || undefined}
           />
         )
       case 'profile':
@@ -185,7 +208,8 @@ function App() {
         return (
           <ChatView
             currentView={currentView}
-            onViewChange={setCurrentView}
+            onViewChange={handleViewChange}
+            initialMessageId={messageTarget || undefined}
           />
         )
     }
@@ -203,7 +227,7 @@ function App() {
           {isDesktop && (
             <Sidebar
               currentView={currentView}
-              onViewChange={setCurrentView}
+              onViewChange={handleViewChange}
               isDarkMode={isDarkMode}
               onToggleDarkMode={toggleDarkMode}
               isOpen={sidebarOpen}
@@ -226,7 +250,7 @@ function App() {
 
           {/* Mobile bottom navigation */}
           {currentView !== 'chat' && currentView !== 'dms' && (
-            <MobileNav currentView={currentView} onViewChange={setCurrentView} />
+            <MobileNav currentView={currentView} onViewChange={handleViewChange} />
           )}
 
           <Toaster

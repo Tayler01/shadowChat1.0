@@ -1,3 +1,5 @@
+import { getWorkingClient } from './supabase'
+
 type BadgeNavigator = Navigator & {
   setAppBadge?: (contents?: number) => Promise<void>
   clearAppBadge?: () => Promise<void>
@@ -51,4 +53,37 @@ export const updateAppBadge = async (count: number) => {
   }
 
   await postBadgeCountToServiceWorker(normalizedCount)
+}
+
+export const fetchUnreadAppBadgeCount = async () => {
+  const workingClient = await getWorkingClient()
+  const {
+    data: { user },
+    error: userError,
+  } = await workingClient.auth.getUser()
+
+  if (userError || !user) {
+    return 0
+  }
+
+  const { data, error } = await workingClient.rpc('count_unread_dm_messages', {
+    target_user_id: user.id,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return normalizeBadgeCount(Number(data ?? 0))
+}
+
+export const refreshAppBadge = async (fallbackCount = 0) => {
+  try {
+    const count = await fetchUnreadAppBadgeCount()
+    await updateAppBadge(count)
+    return count
+  } catch {
+    await updateAppBadge(fallbackCount)
+    return normalizeBadgeCount(fallbackCount)
+  }
 }
