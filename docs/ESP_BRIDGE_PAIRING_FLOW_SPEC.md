@@ -9,6 +9,7 @@ This document proposes how a single bridge device becomes authorized for one Sha
 - revocable device access
 - recoverable if device is reset or transferred
 - no backend credentials exposed to the offline PC
+- no copied browser session living on the bridge
 
 ## V1 Recommendation
 
@@ -20,9 +21,9 @@ High-level flow:
 2. Admin shell requests `pairing.begin`.
 3. Bridge receives a short-lived pairing code from backend.
 4. User enters or approves that code from a trusted already-online ShadowChat session.
-5. Backend issues bridge-scoped credentials or pairing state.
+5. Backend issues bridge-scoped credentials or bridge-specific session state.
 6. Bridge stores secure pairing state locally.
-7. Bridge transitions to paired/ready state.
+7. Bridge transitions to paired and ready state.
 
 ## States
 
@@ -65,6 +66,7 @@ Likely entities:
 - `bridge_devices`
 - `bridge_pairings`
 - `bridge_pairing_codes`
+- possibly `bridge_device_sessions`
 
 ## Data Model Draft
 
@@ -98,15 +100,31 @@ Likely entities:
 
 ## Credential Model
 
-The bridge should not store the user’s normal browser session directly if a more scoped credential can be used.
+The bridge should not store the user's normal browser session directly if a more scoped credential can be used.
 
 Preferred direction:
 
 - bridge-specific scoped token
 - revocable independently of other user sessions
 - limited to bridge-approved operations
+- stored only on the bridge, never exposed to the PC-side client
 
 If a scoped token is not available immediately, the design should still aim toward it.
+
+Documentation-backed reason:
+
+- Supabase sessions use short-lived access tokens plus single-use refresh tokens
+- copying or "sharing" a browser session onto the bridge is the wrong mental model and adds avoidable lifecycle risk
+
+## Local Storage Requirement
+
+The bridge should treat pairing material as sensitive persisted state.
+
+Planned production direction:
+
+- encrypted NVS for stored pairing and device material
+- flash encryption enabled in production
+- signed firmware path so local secrets are not guarded only by obscurity
 
 ## Local UX Requirements
 
@@ -124,7 +142,7 @@ Must support:
 When unpaired:
 
 - should not try to enter normal chat mode
-- should show a simple “bridge not paired” state
+- should show a simple "bridge not paired" state
 - should direct the user to the admin shell
 
 ## Error Cases
@@ -146,3 +164,6 @@ When unpaired:
 - whether pairing approval is done in the main ShadowChat app or a dedicated bridge-management page
 - how bridge device names are set and displayed
 - whether device-to-user binding is permanent until explicit revoke or can be rotated silently
+- whether the issued bridge credential is best represented as:
+  - a bridge-specific session managed through Supabase auth semantics
+  - a bridge-specific signed token exchanged through an Edge Function or custom backend surface

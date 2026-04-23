@@ -116,6 +116,17 @@ Reasoning:
 - simple mental model for support and troubleshooting
 - reliable fit for both TUI and admin shell
 
+### Documentation-Backed Transport Guardrail
+
+The official ESP32-S3 USB docs show two different practical paths:
+
+- fixed-function `USB Serial/JTAG`
+- configurable `USB Device Stack`/TinyUSB `CDC-ACM`
+
+For `Phase 0` and likely `v1`, we should default to the simplest dependable serial path and avoid silently assuming richer composite USB behavior. Future local dashboard or richer-app work can revisit transport expansion after the serial bridge is proven.
+
+This is an implementation recommendation inferred from the platform docs, not a hard requirement imposed by Espressif.
+
 ### Deferred Link Options
 
 Potential later exploration:
@@ -125,6 +136,20 @@ Potential later exploration:
 - richer local app delivery path
 
 These should be deferred until the core security model is proven.
+
+## Documentation-Backed Guardrails
+
+The current roadmap should be read together with [ESP Bridge Documentation Review](C:/repos/chat2.0/docs/ESP_BRIDGE_DOCUMENTATION_REVIEW.md:1).
+
+The highest-impact guardrails from the reviewed platform docs are:
+
+- `v1` should stay serial-first and should not assume a browser-capable local transport yet
+- the bridge should not depend on sleep behavior that destabilizes the local USB link
+- Windows should be treated as friendly to inbox CDC drivers but not as a true zero-click auto-launch target
+- Wi-Fi onboarding can stay in the admin shell for `v1`
+- production planning should assume `Secure Boot v2`, flash encryption, NVS encryption, and signed HTTPS OTA with rollback handling
+- bridge auth should use a bridge-specific credential model rather than copying a browser session onto the device
+- realtime design must own heartbeat and token refresh behavior explicitly
 
 ## Security Model
 
@@ -140,6 +165,18 @@ This feature lives or dies on the security boundary. The bridge must be a backen
 - Device identity and user pairing stored securely on device
 - Signed firmware update flow
 - Signed local asset/app update flow when added
+
+### Production Security Baseline
+
+The production-oriented baseline should assume:
+
+- `Secure Boot v2`
+- flash encryption
+- encrypted NVS for bridge credentials and Wi-Fi material
+- HTTPS OTA with certificate validation
+- OTA post-boot validation and rollback handling
+
+That sequence follows the official Espressif security and OTA guidance and should be treated as the expected direction even if the earliest spike does not turn every part on immediately.
 
 ### Trust Boundaries
 
@@ -196,7 +233,7 @@ This feature lives or dies on the security boundary. The bridge must be a backen
 - safe reset and wipe actions
 
 5. `Future Local Dashboard`
-- lightweight local HTML interface served by the bridge
+- lightweight local HTML interface exposed through a later transport or host-assisted local layer
 - status and chat overview
 - eventually a simpler GUI path for users who do not want the TUI
 
@@ -292,6 +329,7 @@ Do not overload the chat TUI with operational complexity. The admin shell exists
 - revocable bridge identity
 - safe re-pair flow
 - wipe and recover flow
+- no browser-session cloning onto the bridge
 
 ### Open Design Area
 
@@ -316,6 +354,7 @@ The exact pairing UX still needs design. Candidate patterns include:
 - basic presence/status display
 - local outbound queue during brief reconnect windows
 - system feedback when bridge is degraded
+- explicit token-refresh handling for the realtime connection
 
 ## Updates
 
@@ -327,6 +366,7 @@ Updates are a first-class requirement, not a post-launch convenience.
 - manual update command from admin shell
 - signed package validation
 - rollback/recovery strategy
+- HTTPS transport with certificate verification
 
 ### Local UI Asset Update Requirements
 
@@ -337,6 +377,12 @@ Planned foundation for:
 - later full local app bundle delivery
 
 The bridge should own the version check and pull process. The PC should not fetch updates directly from the internet.
+
+Important constraint:
+
+- a serial-only `v1` does not automatically provide a browser transport for a local dashboard
+
+So local dashboard and full local app delivery remain valid roadmap items, but they should be treated as later transport or host-integration work rather than hidden `v1` obligations.
 
 ## Backend Work Needed
 
@@ -358,7 +404,7 @@ This feature will likely require backend additions beyond the current browser-fo
 - `bridge_update_manifests`
 - `bridge_audit_events`
 
-This should be designed carefully against the existing Supabase auth/session model.
+This should be designed carefully against the existing Supabase auth and session model. The bridge should not be treated as a normal browser client with copied session material.
 
 ## Phased Roadmap
 
@@ -412,10 +458,11 @@ Goal:
 
 Deliverables:
 
-- local device-hosted HTML dashboard
+- constrained local dashboard path
 - chat status pages
 - basic messaging UI
 - DM inbox overview
+- explicit transport or host-helper decision for how the PC opens the dashboard without gaining general internet access
 
 Exit criteria:
 
@@ -553,3 +600,6 @@ The next planning outputs should be:
 
 5. [ESP Bridge Phase 0 Spike Checklist](C:/repos/chat2.0/docs/ESP_BRIDGE_PHASE0_SPIKE_CHECKLIST.md:1)
 - exact prototype success criteria and test plan
+
+6. [ESP Bridge Documentation Review](C:/repos/chat2.0/docs/ESP_BRIDGE_DOCUMENTATION_REVIEW.md:1)
+- official-platform constraints and implementation guardrails that shape the roadmap

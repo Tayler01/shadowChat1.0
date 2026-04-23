@@ -24,6 +24,17 @@ The protocol must never become a generic network tunnel. It exists only to expos
 
 - `USB CDC serial`
 
+### Recommended Implementation Baseline
+
+For the earliest bridge spike, we should assume a straightforward serial link first and avoid tying `v1` to composite USB behavior.
+
+Based on the ESP32-S3 platform docs, the first spike should explicitly evaluate whether the local serial path is implemented with:
+
+- the fixed-function `USB Serial/JTAG` controller
+- TinyUSB `CDC-ACM`
+
+The protocol itself should stay transport-neutral enough that this choice can be finalized during `Phase 0`.
+
 ### Framing Recommendation
 
 - line-delimited JSON (`NDJSON`)
@@ -56,6 +67,7 @@ There should also be `responses` to correlate command outcomes.
 ```json
 {
   "type": "command",
+  "protocol_version": "1.0",
   "id": "cmd-001",
   "action": "chat.send_message",
   "payload": {}
@@ -67,6 +79,7 @@ There should also be `responses` to correlate command outcomes.
 ```json
 {
   "type": "response",
+  "protocol_version": "1.0",
   "id": "cmd-001",
   "ok": true,
   "payload": {}
@@ -78,10 +91,25 @@ There should also be `responses` to correlate command outcomes.
 ```json
 {
   "type": "event",
+  "protocol_version": "1.0",
   "event": "chat.message_received",
   "payload": {}
 }
 ```
+
+### Hello Response Requirements
+
+`bridge.hello` should return enough information for a local client to adapt without guessing:
+
+- `protocol_version`
+- `device_id`
+- `hardware_model`
+- `firmware_version`
+- `transport`
+- `capabilities`
+- `pairing_state`
+- `chat_available`
+- `admin_available`
 
 ## Required Command Groups
 
@@ -147,6 +175,8 @@ There should also be `responses` to correlate command outcomes.
 
 ### Connectivity Events
 
+- `transport.connected`
+- `transport.disconnected`
 - `wifi.connected`
 - `wifi.disconnected`
 - `backend.connected`
@@ -160,6 +190,7 @@ There should also be `responses` to correlate command outcomes.
 - `pairing.pending`
 - `pairing.completed`
 - `pairing.revoked`
+- `pairing.failed`
 
 ### Chat Events
 
@@ -175,6 +206,12 @@ There should also be `responses` to correlate command outcomes.
 - `update.downloading`
 - `update.ready`
 - `update.failed`
+
+### Auth Events
+
+- `auth.token_expiring`
+- `auth.token_refreshed`
+- `auth.revoked`
 
 ## Message Payload Drafts
 
@@ -252,6 +289,7 @@ Responses should return structured errors.
 - `WIFI_NOT_CONFIGURED`
 - `BACKEND_UNAVAILABLE`
 - `REALTIME_UNAVAILABLE`
+- `AUTH_REFRESH_FAILED`
 - `INVALID_COMMAND`
 - `INVALID_PAYLOAD`
 - `UPDATE_IN_PROGRESS`
@@ -276,6 +314,7 @@ The same protocol should support two local clients.
 - no command for arbitrary TCP forwarding
 - no command for raw backend query execution
 - no generic HTTP proxy behavior
+- no command that exposes raw Supabase credentials or session material to the PC
 
 Every command should map to a specific bridge-approved action.
 
@@ -286,10 +325,33 @@ Every command should map to a specific bridge-approved action.
 - bounded payload size
 - explicit max message length
 - explicit timeout and retry handling on the bridge side
+- explicit line-length limit to prevent serial framing abuse
+
+## Realtime Runtime Requirements
+
+The bridge runtime must own realtime health explicitly.
+
+Documentation-backed requirements:
+
+- the realtime connection must keep heartbeats within the server's expected interval
+- if JWTs rotate, the bridge must update the realtime connection with the new token
+- token refresh failure should be surfaced as a bridge-level degraded state, not a silent hang
+
+The exact implementation may use `supabase-js` or a lower-level client, but the runtime contract stays the same.
+
+## Future Local UI Note
+
+This protocol is intended to support:
+
+- `v1` serial chat and admin clients directly
+- later host-assisted or transport-expanded GUI clients
+
+It should not assume that a browser can speak to the bridge directly in `v1`. That depends on a later transport or host-integration decision.
 
 ## Open Questions
 
-- exact serial baud and buffering strategy
+- whether `Phase 0` should use `USB Serial/JTAG` or TinyUSB `CDC-ACM` as the concrete serial path
+- exact buffering strategy and back-pressure behavior
 - whether local history fetches are paged or windowed
-- whether protocol version negotiation is needed in `v1`
+- whether protocol version negotiation beyond `bridge.hello` is needed in `v1`
 - whether admin shell and chat TUI share one session or use separate local channels
