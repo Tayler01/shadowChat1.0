@@ -17,8 +17,10 @@ import {
   markDMMessagesRead,
   fetchDMConversations,
   ensureSession,
+  recoverSessionAfterResume,
   refreshSessionLocked,
   resetRealtimeConnection,
+  withTimeout,
 } from '../lib/supabase';
 import { triggerDMPushNotification } from '../lib/push';
 import { MESSAGE_FETCH_LIMIT } from '../config';
@@ -46,6 +48,7 @@ interface DirectMessagesContextValue {
 }
 
 const DirectMessagesContext = createContext<DirectMessagesContextValue | undefined>(undefined);
+const SEND_OPERATION_TIMEOUT_MS = 12000;
 
 function useProvideDirectMessages(): DirectMessagesContextValue {
   const [conversations, setConversations] = useState<DMConversation[]>([]);
@@ -724,56 +727,64 @@ export function useConversationMessages(conversationId: string | null) {
 
       setSending(true);
       try {
-        const sessionValid = await ensureSession();
-        if (!sessionValid) {
-          throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
-        }
-
-        const insertPayload = {
-          conversation_id: conversationId,
-          sender_id: user.id,
-          content: messageType === 'audio' ? '' : trimmedContent,
-          message_type: messageType,
-          file_url: fileUrl,
-          ...(messageType === 'audio' ? { audio_url: trimmedContent } : {}),
-        };
-
-        const { data, error } = await insertConversationMessage(insertPayload);
-
-        let finalData = data as unknown;
-        let finalError = error as any;
-        if (finalError) {
-          if (finalError.status === 401 || /jwt|token|expired/i.test(finalError.message ?? '')) {
-            const forcedSessionValid = await ensureSession(true);
-            if (forcedSessionValid) {
-              const retry = await insertConversationMessage(insertPayload);
-              finalData = retry.data as unknown;
-              finalError = retry.error;
-            } else {
-              const { error: refreshError } = await refreshSessionLocked();
-              if (!refreshError) {
-                const retry = await insertConversationMessage(insertPayload);
-                finalData = retry.data as unknown;
-                finalError = retry.error;
-              }
+        return await withTimeout(
+          (async () => {
+            const sessionValid = await ensureSession();
+            if (!sessionValid) {
+              throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
             }
-          }
-          if (finalError) throw finalError;
-        }
 
-        if (finalData) {
-          const message = finalData as DMMessage;
-          // Optimistically add the sent message
-          setMessages(prev => [...prev, message]);
-          if (message.id) {
-            triggerDMPushNotification(message.id).catch(() => {
-              // Push delivery should not block the DM send path.
-            });
-          }
-          return message;
-        }
-        return null;
+            const insertPayload = {
+              conversation_id: conversationId,
+              sender_id: user.id,
+              content: messageType === 'audio' ? '' : trimmedContent,
+              message_type: messageType,
+              file_url: fileUrl,
+              ...(messageType === 'audio' ? { audio_url: trimmedContent } : {}),
+            };
+
+            const { data, error } = await insertConversationMessage(insertPayload);
+
+            let finalData = data as unknown;
+            let finalError = error as any;
+            if (finalError) {
+              if (finalError.status === 401 || /jwt|token|expired/i.test(finalError.message ?? '')) {
+                const forcedSessionValid = await ensureSession(true);
+                if (forcedSessionValid) {
+                  const retry = await insertConversationMessage(insertPayload);
+                  finalData = retry.data as unknown;
+                  finalError = retry.error;
+                } else {
+                  const { error: refreshError } = await refreshSessionLocked();
+                  if (!refreshError) {
+                    const retry = await insertConversationMessage(insertPayload);
+                    finalData = retry.data as unknown;
+                    finalError = retry.error;
+                  }
+                }
+              }
+              if (finalError) throw finalError;
+            }
+
+            if (finalData) {
+              const message = finalData as DMMessage;
+              // Optimistically add the sent message
+              setMessages(prev => [...prev, message]);
+              if (message.id) {
+                triggerDMPushNotification(message.id).catch(() => {
+                  // Push delivery should not block the DM send path.
+                });
+              }
+              return message;
+            }
+            return null;
+          })(),
+          SEND_OPERATION_TIMEOUT_MS,
+          'Message send timed out while reconnecting. Please try again.'
+        );
       } catch (error) {
+        await recoverSessionAfterResume().catch(() => false);
+        await resetRealtimeConnection().catch(() => undefined);
         throw error;
       } finally {
         setSending(false);

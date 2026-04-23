@@ -18,6 +18,9 @@ const loggingFetch: typeof fetch = async (input, init) => {
   return fetch(input, init)
 }
 
+const shouldUseRealtimeWorker =
+  typeof window !== 'undefined' && typeof Worker !== 'undefined'
+
 export const SUPABASE_URL = VITE_SUPABASE_URL
 export const SUPABASE_ANON_KEY = VITE_SUPABASE_ANON_KEY
 
@@ -53,6 +56,21 @@ export const purgeOldAuthKeys = (activeKey?: string) => {
   })
 }
 
+const attachRealtimeHeartbeat = (client: AnySupabaseClient) => {
+  try {
+    client.realtime.onHeartbeat?.((status: string) => {
+      if (
+        (status === 'disconnected' || status === 'timeout') &&
+        (typeof navigator === 'undefined' || navigator.onLine)
+      ) {
+        client.realtime.connect?.()
+      }
+    })
+  } catch {
+    // ignore heartbeat hook failures on unsupported runtimes
+  }
+}
+
 // Create fresh client with unique storage key to avoid conflicts
 export function createFreshSupabaseClient() {
   const uniqueStorageKey = `sb-${projectRef}-auth-token-fresh-${
@@ -68,6 +86,7 @@ export function createFreshSupabaseClient() {
         persistSession: false,
       },
       realtime: {
+        worker: shouldUseRealtimeWorker,
         params: {
           eventsPerSecond: 50,
         },
@@ -76,6 +95,7 @@ export function createFreshSupabaseClient() {
         fetch: loggingFetch,
       },
     })
+    attachRealtimeHeartbeat(client)
     ;(client as any).__storageKey = uniqueStorageKey
     return client
   } catch {
@@ -86,7 +106,11 @@ export function createFreshSupabaseClient() {
         autoRefreshToken: false,
         persistSession: false,
       },
+      realtime: {
+        worker: shouldUseRealtimeWorker,
+      },
     })
+    attachRealtimeHeartbeat(client)
     ;(client as any).__storageKey = uniqueStorageKey
     return client
   }
@@ -108,6 +132,7 @@ if (!globalRef.__supabaseClient) {
   try {
     globalRef.__supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
       realtime: {
+        worker: shouldUseRealtimeWorker,
         params: {
           eventsPerSecond: 50,
         },
@@ -121,6 +146,7 @@ if (!globalRef.__supabaseClient) {
         fetch: loggingFetch,
       },
     })
+    attachRealtimeHeartbeat(globalRef.__supabaseClient)
   } catch {
     // Create a minimal fallback client
     globalRef.__supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
@@ -129,7 +155,11 @@ if (!globalRef.__supabaseClient) {
         persistSession: true,
         detectSessionInUrl: true,
       },
+      realtime: {
+        worker: shouldUseRealtimeWorker,
+      },
     })
+    attachRealtimeHeartbeat(globalRef.__supabaseClient)
   }
 }
 
@@ -177,6 +207,7 @@ const timeout = (ms: number) => new Promise((_, reject) =>
 
 const SESSION_LOOKUP_TIMEOUT_MS = 4000
 const SESSION_REFRESH_TIMEOUT_MS = 10000
+const SESSION_SET_TIMEOUT_MS = 5000
 
 export const withTimeout = async <T>(
   promise: Promise<T>,
@@ -356,10 +387,14 @@ export const restoreSessionIfNeeded = async (client: AnySupabaseClient): Promise
     const accessToken = stored.currentSession?.access_token || stored.access_token || ''
 
     
-    const { data, error } = await client.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    })
+    const { data, error } = (await withTimeout(
+      client.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      }),
+      SESSION_SET_TIMEOUT_MS,
+      `Session set timeout after ${SESSION_SET_TIMEOUT_MS}ms`
+    )) as RefreshSessionResponse
 
     if (error) {
       return false
@@ -401,26 +436,29 @@ export const forceSessionRestore = async (): Promise<boolean> => {
 // network requests. Any callers will await the same promise while a refresh is
 // in flight.
 let refreshSessionPromise: Promise<{ data: any; error: any }> | null = null
+let resumeRecoveryPromise: Promise<boolean> | null = null
 
 export const clearRefreshSessionPromise = () => {
   refreshSessionPromise = null
 }
 
 export const recoverSessionAfterResume = async (): Promise<boolean> => {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    return false
+  if (resumeRecoveryPromise) {
+    return resumeRecoveryPromise
   }
 
-  const storedToken = getStoredRefreshToken()
+  resumeRecoveryPromise = (async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return false
+    }
 
-  const attemptRecovery = async (client: AnySupabaseClient) => {
-    const restored = await restoreSessionIfNeeded(client)
-    if (restored) {
+    const storedToken = getStoredRefreshToken()
+
+    const applyRecoveredSession = async (client: AnySupabaseClient, accessToken?: string | null) => {
       try {
-        const { data: { session } } = await getSessionWithTimeout(client)
-        client.realtime.setAuth(session?.access_token || '')
+        client.realtime.setAuth(accessToken || '')
       } catch {
-        // ignore lookup failures after a successful local restore
+        // ignore auth propagation failures
       }
       try {
         client.realtime.connect?.()
@@ -430,49 +468,57 @@ export const recoverSessionAfterResume = async (): Promise<boolean> => {
       return true
     }
 
-    if (!storedToken) {
+    const attemptRecovery = async (client: AnySupabaseClient) => {
+      if (storedToken) {
+        try {
+          const refreshResult = (await withTimeout(
+            client.auth.refreshSession(),
+            SESSION_REFRESH_TIMEOUT_MS,
+            `Session refresh timeout after ${SESSION_REFRESH_TIMEOUT_MS}ms`
+          )) as RefreshSessionResponse
+
+          if (refreshResult.data?.session) {
+            return applyRecoveredSession(client, refreshResult.data.session.access_token)
+          }
+        } catch {
+          // ignore refresh failures and fall through to local restore
+        }
+      }
+
+      const restored = await restoreSessionIfNeeded(client)
+      if (restored) {
+        try {
+          const { data: { session } } = await getSessionWithTimeout(client)
+          return applyRecoveredSession(client, session?.access_token)
+        } catch {
+          return applyRecoveredSession(client)
+        }
+      }
+
       return false
     }
 
     try {
-      const refreshResult = (await withTimeout(
-        client.auth.refreshSession(),
-        SESSION_REFRESH_TIMEOUT_MS,
-        `Session refresh timeout after ${SESSION_REFRESH_TIMEOUT_MS}ms`
-      )) as RefreshSessionResponse
-
-      if (refreshResult.data?.session) {
-        client.realtime.setAuth(refreshResult.data.session.access_token || '')
-        try {
-          client.realtime.connect?.()
-        } catch {
-          // ignore reconnect failures
-        }
+      const currentClient = await getWorkingClient()
+      if (await attemptRecovery(currentClient)) {
         return true
       }
     } catch {
-      // ignore refresh failures and fall through to a client recreation
+      // ignore and try a client recreation below
     }
 
-    return false
-  }
-
-  try {
-    const currentClient = await getWorkingClient()
-    if (await attemptRecovery(currentClient)) {
-      return true
+    try {
+      await recreateSupabaseClient()
+      const refreshedClient = await getWorkingClient()
+      return attemptRecovery(refreshedClient)
+    } catch {
+      return false
     }
-  } catch {
-    // ignore and try a client recreation below
-  }
+  })().finally(() => {
+    resumeRecoveryPromise = null
+  })
 
-  try {
-    await recreateSupabaseClient()
-    const refreshedClient = await getWorkingClient()
-    return attemptRecovery(refreshedClient)
-  } catch {
-    return false
-  }
+  return resumeRecoveryPromise
 }
 
 export const refreshSessionLocked = async () => {

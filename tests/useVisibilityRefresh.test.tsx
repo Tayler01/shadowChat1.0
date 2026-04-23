@@ -1,5 +1,16 @@
 import { renderHook, act } from '@testing-library/react'
+import { waitFor } from '@testing-library/react'
 import { useVisibilityRefresh } from '../src/hooks/useVisibilityRefresh'
+
+jest.mock('../src/lib/supabase', () => ({
+  getRealtimeClient: jest.fn(() => ({
+    realtime: {
+      connect: jest.fn(),
+    },
+  })),
+  recreateSupabaseClient: jest.fn().mockResolvedValue(undefined),
+  recoverSessionAfterResume: jest.fn().mockResolvedValue(true),
+}))
 
 test('runs callback on visibility change when document becomes visible', async () => {
   jest.useFakeTimers()
@@ -10,9 +21,9 @@ test('runs callback on visibility change when document becomes visible', async (
     document.dispatchEvent(new Event('visibilitychange'))
   })
   await act(async () => {
-    jest.advanceTimersByTime(200)
     await Promise.resolve()
+    await jest.advanceTimersByTimeAsync(200)
   })
-  expect(cb).toHaveBeenCalled()
+  await waitFor(() => expect(cb).toHaveBeenCalled())
   jest.useRealTimers()
 })

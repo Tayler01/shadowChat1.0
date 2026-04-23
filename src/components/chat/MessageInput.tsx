@@ -173,6 +173,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       }
     } catch (err) {
       console.error(err)
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : 'Failed to send message'
+      toast.error(message)
     }
     // Keep focus on the textarea so the mobile keyboard stays open
     textareaRef.current?.focus()

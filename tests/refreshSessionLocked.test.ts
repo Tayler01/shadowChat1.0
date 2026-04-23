@@ -56,6 +56,11 @@ test('ensureSession recovers when the first session lookup hangs after resume', 
     error: null,
   });
   // @ts-ignore
+  supabase.auth.refreshSession = jest.fn().mockResolvedValue({
+    data: { session: { access_token: 'restored-token', expires_at: expiresAt } },
+    error: null,
+  });
+  // @ts-ignore
   supabase.realtime.setAuth = jest.fn();
   // @ts-ignore
   supabase.realtime.connect = jest.fn();
@@ -64,7 +69,7 @@ test('ensureSession recovers when the first session lookup hangs after resume', 
   await jest.advanceTimersByTimeAsync(4000);
 
   await expect(pending).resolves.toBe(true);
-  expect(supabase.auth.setSession).toHaveBeenCalled();
+  expect(supabase.auth.refreshSession).toHaveBeenCalled();
   expect(supabase.realtime.setAuth).toHaveBeenCalledWith('restored-token');
 
   localStorage.removeItem(localStorageKey);

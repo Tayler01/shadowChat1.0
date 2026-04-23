@@ -112,10 +112,20 @@ export const signUp = async ({
 }
 
 export const signIn = async ({ email, password }: SignInData) => {
-  const { data, error } = await supabase.auth.signInWithPassword({
+  let { data, error } = await supabase.auth.signInWithPassword({
     email,
     password
   })
+
+  if (error && /refresh token|jwt|session|token/i.test(error.message || '')) {
+    await supabase.auth.signOut().catch(() => undefined)
+    const retry = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+    data = retry.data
+    error = retry.error
+  }
 
   if (error) throw error
 

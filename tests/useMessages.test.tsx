@@ -13,6 +13,7 @@ import {
   ensureSession,
   getWorkingClient,
   getRealtimeClient,
+  recoverSessionAfterResume,
   refreshSessionLocked,
   resetRealtimeConnection,
 } from '../src/lib/supabase';
@@ -41,9 +42,11 @@ jest.mock('../src/lib/supabase', () => {
     },
     getWorkingClient: jest.fn(),
     getRealtimeClient: jest.fn(),
+    recoverSessionAfterResume: jest.fn().mockResolvedValue(true),
     refreshSessionLocked: jest.fn(),
     resetRealtimeConnection: jest.fn(),
     ensureSession: jest.fn(),
+    withTimeout: jest.fn((promise: Promise<unknown>) => promise),
   };
 });
 
@@ -97,6 +100,7 @@ const configureWorkingClient = () => {
 
   (getWorkingClient as jest.Mock).mockResolvedValue(workingClient);
   (getRealtimeClient as jest.Mock).mockReturnValue(workingClient);
+  (recoverSessionAfterResume as jest.Mock).mockResolvedValue(true);
   (refreshSessionLocked as jest.Mock).mockResolvedValue({
     data: { session: {} },
     error: null,

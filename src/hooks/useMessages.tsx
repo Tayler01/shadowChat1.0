@@ -7,7 +7,18 @@ import React, {
   useCallback,
   useRef
 } from 'react';
-import { Message, ensureSession, refreshSessionLocked, getRealtimeClient, getWorkingClient, recreateSupabaseClient, supabase, resetRealtimeConnection } from '../lib/supabase';
+import {
+  Message,
+  ensureSession,
+  refreshSessionLocked,
+  getRealtimeClient,
+  getWorkingClient,
+  recreateSupabaseClient,
+  supabase,
+  resetRealtimeConnection,
+  recoverSessionAfterResume,
+  withTimeout,
+} from '../lib/supabase';
 import { triggerGroupPushNotification } from '../lib/push';
 import { MESSAGE_FETCH_LIMIT } from '../config';
 import type { RealtimeChannel } from '@supabase/supabase-js';
@@ -16,6 +27,7 @@ import { useVisibilityRefresh } from './useVisibilityRefresh';
 import { useSoundEffects } from './useSoundEffects';
 
 const STORED_MESSAGE_LIMIT = 200;
+const SEND_OPERATION_TIMEOUT_MS = 12000;
 
 const dedupeMessagesById = (items: Message[]) => {
   const map = new Map<string, Message>()
@@ -613,60 +625,59 @@ function useProvideMessages(): MessagesContextValue {
     }
 
     setSending(true);
-
-    // Ensure we have a valid session before attempting database operations
-    const sessionValid = await ensureSession();
-    if (!sessionValid) {
-      throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
-    }
-
-    const messageData = prepareMessageData(
-      user.id,
-      content,
-      messageType,
-      fileUrl,
-      replyTo
-    );
-
     let inserted: Message | null = null;
 
-    const attemptSend = async () => {
-      let { data, error } = await insertMessage(messageData);
-
-      if (error && (error.status === 401 || /jwt|token|expired/i.test(error.message))) {
-        const retry = await refreshSessionAndRetry(messageData);
-        data = retry.data;
-        error = retry.error;
+    const executeSend = async () => {
+      // Ensure we have a valid session before attempting database operations
+      const sessionValid = await ensureSession();
+      if (!sessionValid) {
+        throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
       }
 
-      if (error) {
-        throw error;
-      }
+      const messageData = prepareMessageData(
+        user.id,
+        content,
+        messageType,
+        fileUrl,
+        replyTo
+      );
 
-      if (data) {
-        inserted = data as unknown as Message;
+      const attemptSend = async () => {
+        let { data, error } = await insertMessage(messageData);
 
-        addNewMessage(data as unknown as Message);
-
-        if (data.id) {
-          triggerGroupPushNotification(data.id).catch(() => {
-            // Push delivery should never block the visible send path.
-          });
+        if (error && (error.status === 401 || /jwt|token|expired/i.test(error.message))) {
+          const retry = await refreshSessionAndRetry(messageData);
+          data = retry.data;
+          error = retry.error;
         }
 
-        if (channelRef.current?.state === 'joined') {
-          channelRef.current.send({
-            type: 'broadcast',
-            event: 'new_message',
-            payload: data,
-          });
+        if (error) {
+          throw error;
         }
 
-        fetchMessages();
-      }
-    };
+        if (data) {
+          inserted = data as unknown as Message;
 
-    try {
+          addNewMessage(data as unknown as Message);
+
+          if (data.id) {
+            triggerGroupPushNotification(data.id).catch(() => {
+              // Push delivery should never block the visible send path.
+            });
+          }
+
+          if (channelRef.current?.state === 'joined') {
+            channelRef.current.send({
+              type: 'broadcast',
+              event: 'new_message',
+              payload: data,
+            });
+          }
+
+          fetchMessages();
+        }
+      };
+
       let lastError: any = null;
       for (let i = 0; i < 3; i++) {
         try {
@@ -684,6 +695,18 @@ function useProvideMessages(): MessagesContextValue {
       if (lastError) {
         throw lastError;
       }
+    };
+
+    try {
+      await withTimeout(
+        executeSend(),
+        SEND_OPERATION_TIMEOUT_MS,
+        'Message send timed out while reconnecting. Please try again.'
+      );
+    } catch (error) {
+      await recoverSessionAfterResume().catch(() => false);
+      await resetRealtimeConnection().catch(() => undefined);
+      throw error;
     } finally {
       setSending(false);
     }
