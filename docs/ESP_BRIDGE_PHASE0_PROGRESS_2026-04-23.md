@@ -62,6 +62,12 @@ Implemented and pushed on `main`:
   - `group poll`
   - `dm send`
   - `dm poll`
+  - `chat group`
+  - `chat dm <recipient_user_id>`
+- serial chat mode with:
+  - plain-line message sending
+  - slash commands for poll, thread switching, help, and admin return
+  - overflow-safe 1023-byte input line handling
 
 ### Build Validation
 
@@ -89,21 +95,21 @@ These parts are still open:
 
 - direct Supabase user-session minting on device
 - realtime bridge session ownership on device
-- chat TUI
-- polished local protocol framing for longer interactive text input
+- full Windows-side chat TUI
+- structured local protocol framing between Windows and bridge firmware
+- automatic receive loop with device-side cursors/checkpoints
 
 ## Immediate Next Steps
 
 The next implementation steps should happen in this order:
 
-1. Replace the raw admin-shell smoke commands with a small chat-first TUI loop.
-2. Add a cleaner serial framing/input path so longer message text cannot be split into accidental commands.
-3. Decide whether Phase 1 should keep the narrow bridge data-plane Edge Functions or pursue direct Supabase user-session minting.
-4. Add a receive strategy for realtime or near-realtime updates:
+1. Build the Windows-side chat-first TUI client against the ESP serial shell/protocol.
+2. Add a receive strategy for realtime or near-realtime updates:
    - Realtime WebSocket ownership on device, or
    - short polling/long polling over bridge data-plane functions for the first TUI.
-5. Add device-side message cursor/checkpoint storage.
-6. Add production-hardening follow-ups:
+3. Add device-side message cursor/checkpoint storage.
+4. Decide whether Phase 1 should keep the narrow bridge data-plane Edge Functions or pursue direct Supabase user-session minting.
+5. Add production-hardening follow-ups:
    - encrypted NVS
    - signed OTA
    - more explicit redaction/sanitized serial output
@@ -123,8 +129,9 @@ What exists today is:
 - live backend register, pairing, session exchange, refresh, heartbeat, and wipe proof
 - live group chat send/poll proof through bridge-scoped data-plane functions
 - live DM send/poll proof through bridge-scoped data-plane functions
+- a first ESP-side chat mode over serial for group chat and one active DM thread
 
-What does **not** exist yet is a polished chat-first bridge experience.
+What does **not** exist yet is the polished Windows-side chat TUI experience.
 
 That is the next milestone.
 
@@ -152,11 +159,13 @@ Verified against the linked Supabase project:
 - `group poll`
 - `dm send`
 - `dm poll`
+- `chat group`
+- `chat dm <recipient_user_id>`
 
 Important implementation discoveries:
 
 - shell task stack needed to be increased for HTTPS/TLS calls
 - ESP HTTP response bodies needed to be collected through the HTTP event callback
 - token-bearing session responses must be redacted before printing to serial
-- raw line-oriented serial input can split longer text and should be replaced before TUI work
+- raw line-oriented serial input can split longer text; current firmware now discards oversized lines as a whole line instead of executing fragments
 - returning full joined user profiles exposed too much data, so bridge data-plane functions now return minimal display profile fields

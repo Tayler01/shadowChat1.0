@@ -16,8 +16,12 @@ This firmware spike intentionally focuses on the lowest-risk device path first:
   - `bridge-session-exchange`
   - `bridge-session-refresh`
   - `bridge-heartbeat`
+- backend data-plane smoke calls for:
+  - group send/poll
+  - DM send/poll
+- chat-first serial mode for group chat and one active DM thread
 
-It does **not** implement the final chat TUI yet, and it does **not** implement Supabase data-plane messaging auth yet. The current exchange and refresh flow is for the bridge control plane only, matching the current backend proof state.
+It does **not** implement the final local TUI yet. The current chat mode is an ESP serial-first Phase 0 proof that uses bridge-scoped Edge Functions for group and DM send/poll.
 
 ## Current Build Baseline
 
@@ -93,7 +97,21 @@ group send <text>
 group poll
 dm send <recipient_user_id> <text>
 dm poll <recipient_user_id>
+chat group
+chat dm <recipient_user_id>
 ```
+
+Inside `chat group` or `chat dm <recipient_user_id>`, plain lines are sent as chat messages. Slash commands are reserved for mode control:
+
+```text
+/poll
+/dm <recipient_user_id>
+/group
+/admin
+/help
+```
+
+The serial reader accepts lines up to `1023` bytes. Longer lines are discarded as a whole line so overflow fragments are not accidentally executed as commands.
 
 ## Phase 0 Notes
 
@@ -102,4 +120,5 @@ dm poll <recipient_user_id>
 - The next firmware milestone after this scaffold is:
   - local pairing UX polish
   - bridge session failure handling
-  - realtime bridge receive path
+  - near-realtime bridge receive loop
+  - richer local TUI framing on the Windows side

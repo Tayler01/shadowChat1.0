@@ -22,6 +22,7 @@
 
 #define BRIDGE_WIFI_CONNECTED_BIT BIT0
 #define BRIDGE_HTTP_BUFFER_SIZE 4096
+#define BRIDGE_SHELL_LINE_SIZE 1024
 #define BRIDGE_STORAGE_NAMESPACE "bridge_cfg"
 #define BRIDGE_SHELL_TASK_STACK_SIZE 16384
 
@@ -47,6 +48,12 @@ typedef struct {
     char body[BRIDGE_HTTP_BUFFER_SIZE];
     size_t body_length;
 } bridge_http_response_t;
+
+typedef enum {
+    BRIDGE_CHAT_MODE_ADMIN = 0,
+    BRIDGE_CHAT_MODE_GROUP,
+    BRIDGE_CHAT_MODE_DM,
+} bridge_chat_mode_t;
 
 static EventGroupHandle_t s_wifi_event_group;
 static bridge_state_t s_bridge_state;
@@ -364,6 +371,102 @@ static cJSON *bridge_parse_json_body(const bridge_http_response_t *response) {
     return cJSON_Parse(response->body);
 }
 
+static const char *bridge_json_string_or_empty(cJSON *object, const char *key) {
+    cJSON *value = cJSON_GetObjectItemCaseSensitive(object, key);
+    return cJSON_IsString(value) && value->valuestring ? value->valuestring : "";
+}
+
+static const char *bridge_profile_label(cJSON *profile, const char *fallback_id) {
+    if (cJSON_IsObject(profile)) {
+        const char *display_name = bridge_json_string_or_empty(profile, "display_name");
+        const char *full_name = bridge_json_string_or_empty(profile, "full_name");
+        const char *username = bridge_json_string_or_empty(profile, "username");
+        const char *id = bridge_json_string_or_empty(profile, "id");
+
+        if (display_name[0] != '\0') {
+            return display_name;
+        }
+
+        if (full_name[0] != '\0') {
+            return full_name;
+        }
+
+        if (username[0] != '\0') {
+            return username;
+        }
+
+        if (id[0] != '\0') {
+            return id;
+        }
+    }
+
+    return fallback_id && fallback_id[0] != '\0' ? fallback_id : "unknown";
+}
+
+static bool bridge_print_message_list(const bridge_http_response_t *response, bool dm_messages) {
+    cJSON *json = bridge_parse_json_body(response);
+    if (!json) {
+        return false;
+    }
+
+    cJSON *messages = cJSON_GetObjectItemCaseSensitive(json, "messages");
+    if (!cJSON_IsArray(messages)) {
+        cJSON_Delete(json);
+        return false;
+    }
+
+    int count = cJSON_GetArraySize(messages);
+    if (count == 0) {
+        printf("(no messages)\n");
+        cJSON_Delete(json);
+        return true;
+    }
+
+    cJSON *message = NULL;
+    cJSON_ArrayForEach(message, messages) {
+        const char *created_at = bridge_json_string_or_empty(message, "created_at");
+        const char *content = bridge_json_string_or_empty(message, "content");
+        const char *sender_id = bridge_json_string_or_empty(message, dm_messages ? "sender_id" : "user_id");
+        cJSON *profile = cJSON_GetObjectItemCaseSensitive(message, dm_messages ? "sender" : "user");
+
+        printf(
+            "%s | %s: %s\n",
+            created_at[0] ? created_at : "(unknown time)",
+            bridge_profile_label(profile, sender_id),
+            content
+        );
+    }
+
+    cJSON_Delete(json);
+    return true;
+}
+
+static void bridge_print_sent_summary(const bridge_http_response_t *response, bool dm_message) {
+    cJSON *json = bridge_parse_json_body(response);
+    if (!json) {
+        printf("sent\n");
+        return;
+    }
+
+    cJSON *message = cJSON_GetObjectItemCaseSensitive(json, "message");
+    const char *id = cJSON_IsObject(message) ? bridge_json_string_or_empty(message, "id") : "";
+    const char *conversation_id = bridge_json_string_or_empty(json, "conversationId");
+
+    if (dm_message && conversation_id[0] != '\0') {
+        printf("sent dm");
+        if (id[0] != '\0') {
+            printf(" %s", id);
+        }
+        printf(" in conversation %s\n", conversation_id);
+    } else if (id[0] != '\0') {
+        printf("sent message %s\n", id);
+    } else {
+        printf("sent\n");
+    }
+
+    cJSON_Delete(json);
+}
+
 static void bridge_command_help(void) {
     printf("\nShadowChat Bridge admin shell\n");
     printf("  help\n");
@@ -381,6 +484,18 @@ static void bridge_command_help(void) {
     printf("  group poll\n\n");
     printf("  dm send <recipient_user_id> <text>\n");
     printf("  dm poll <recipient_user_id>\n\n");
+    printf("  chat group\n");
+    printf("  chat dm <recipient_user_id>\n\n");
+}
+
+static void bridge_chat_help(void) {
+    printf("\nShadowChat chat mode\n");
+    printf("  type a message and press Enter to send\n");
+    printf("  /poll                 fetch latest messages\n");
+    printf("  /dm <recipient_id>    switch to a DM thread\n");
+    printf("  /group                switch to group chat\n");
+    printf("  /admin                return to the admin shell\n");
+    printf("  /help                 show this help\n\n");
 }
 
 static void bridge_clear_pairing_state(void) {
@@ -716,21 +831,29 @@ static void bridge_command_wipe(void) {
     );
 }
 
-static void bridge_command_group_send(const char *content) {
-    if (!content || content[0] == '\0') {
-        printf("usage: group send <text>\n");
-        return;
+static bool bridge_has_access_material(const char *action) {
+    if (!s_bridge_state.wifi_connected || s_bridge_state.device_id[0] == '\0' || s_bridge_state.access_token[0] == '\0') {
+        printf("Device must be paired and have stored access material before %s\n", action);
+        return false;
     }
 
-    if (!s_bridge_state.wifi_connected || s_bridge_state.device_id[0] == '\0' || s_bridge_state.access_token[0] == '\0') {
-        printf("Device must be paired and have stored access material before group send\n");
-        return;
+    return true;
+}
+
+static bool bridge_send_group_message(const char *content, bool compact_output) {
+    if (!content || content[0] == '\0') {
+        printf("usage: group send <text>\n");
+        return false;
+    }
+
+    if (!bridge_has_access_material("group send")) {
+        return false;
     }
 
     char *body = bridge_json_string_body("deviceId", s_bridge_state.device_id, "content", content);
     if (!body) {
         printf("Failed to build group message payload\n");
-        return;
+        return false;
     }
 
     bridge_http_response_t response = {0};
@@ -739,16 +862,25 @@ static void bridge_command_group_send(const char *content) {
 
     if (err != ESP_OK) {
         printf("bridge-group-send failed: %s\n", esp_err_to_name(err));
-        return;
+        return false;
     }
 
-    bridge_print_response("bridge-group-send", &response);
+    if (compact_output && response.status_code >= 200 && response.status_code < 300) {
+        bridge_print_sent_summary(&response, false);
+    } else {
+        bridge_print_response("bridge-group-send", &response);
+    }
+
+    return response.status_code >= 200 && response.status_code < 300;
 }
 
-static void bridge_command_group_poll(void) {
-    if (!s_bridge_state.wifi_connected || s_bridge_state.device_id[0] == '\0' || s_bridge_state.access_token[0] == '\0') {
-        printf("Device must be paired and have stored access material before group poll\n");
-        return;
+static void bridge_command_group_send(const char *content) {
+    bridge_send_group_message(content, false);
+}
+
+static bool bridge_poll_group_messages(bool compact_output) {
+    if (!bridge_has_access_material("group poll")) {
+        return false;
     }
 
     char body[96];
@@ -758,21 +890,32 @@ static void bridge_command_group_poll(void) {
     esp_err_t err = bridge_http_post_json("bridge-group-poll", body, s_bridge_state.access_token, &response);
     if (err != ESP_OK) {
         printf("bridge-group-poll failed: %s\n", esp_err_to_name(err));
-        return;
+        return false;
     }
 
-    bridge_print_response("bridge-group-poll", &response);
+    if (compact_output && response.status_code >= 200 && response.status_code < 300) {
+        if (!bridge_print_message_list(&response, false)) {
+            bridge_print_response("bridge-group-poll", &response);
+        }
+    } else {
+        bridge_print_response("bridge-group-poll", &response);
+    }
+
+    return response.status_code >= 200 && response.status_code < 300;
 }
 
-static void bridge_command_dm_send(const char *recipient_user_id, const char *content) {
+static void bridge_command_group_poll(void) {
+    bridge_poll_group_messages(false);
+}
+
+static bool bridge_send_dm_message(const char *recipient_user_id, const char *content, bool compact_output) {
     if (!recipient_user_id || recipient_user_id[0] == '\0' || !content || content[0] == '\0') {
         printf("usage: dm send <recipient_user_id> <text>\n");
-        return;
+        return false;
     }
 
-    if (!s_bridge_state.wifi_connected || s_bridge_state.device_id[0] == '\0' || s_bridge_state.access_token[0] == '\0') {
-        printf("Device must be paired and have stored access material before DM send\n");
-        return;
+    if (!bridge_has_access_material("DM send")) {
+        return false;
     }
 
     char *body = bridge_json_three_string_body(
@@ -785,7 +928,7 @@ static void bridge_command_dm_send(const char *recipient_user_id, const char *co
     );
     if (!body) {
         printf("Failed to build DM payload\n");
-        return;
+        return false;
     }
 
     bridge_http_response_t response = {0};
@@ -794,27 +937,36 @@ static void bridge_command_dm_send(const char *recipient_user_id, const char *co
 
     if (err != ESP_OK) {
         printf("bridge-dm-send failed: %s\n", esp_err_to_name(err));
-        return;
+        return false;
     }
 
-    bridge_print_response("bridge-dm-send", &response);
+    if (compact_output && response.status_code >= 200 && response.status_code < 300) {
+        bridge_print_sent_summary(&response, true);
+    } else {
+        bridge_print_response("bridge-dm-send", &response);
+    }
+
+    return response.status_code >= 200 && response.status_code < 300;
 }
 
-static void bridge_command_dm_poll(const char *recipient_user_id) {
+static void bridge_command_dm_send(const char *recipient_user_id, const char *content) {
+    bridge_send_dm_message(recipient_user_id, content, false);
+}
+
+static bool bridge_poll_dm_messages(const char *recipient_user_id, bool compact_output) {
     if (!recipient_user_id || recipient_user_id[0] == '\0') {
         printf("usage: dm poll <recipient_user_id>\n");
-        return;
+        return false;
     }
 
-    if (!s_bridge_state.wifi_connected || s_bridge_state.device_id[0] == '\0' || s_bridge_state.access_token[0] == '\0') {
-        printf("Device must be paired and have stored access material before DM poll\n");
-        return;
+    if (!bridge_has_access_material("DM poll")) {
+        return false;
     }
 
     char *body = bridge_json_string_body("deviceId", s_bridge_state.device_id, "recipientUserId", recipient_user_id);
     if (!body) {
         printf("Failed to build DM poll payload\n");
-        return;
+        return false;
     }
 
     bridge_http_response_t response = {0};
@@ -823,36 +975,185 @@ static void bridge_command_dm_poll(const char *recipient_user_id) {
 
     if (err != ESP_OK) {
         printf("bridge-dm-poll failed: %s\n", esp_err_to_name(err));
+        return false;
+    }
+
+    if (compact_output && response.status_code >= 200 && response.status_code < 300) {
+        if (!bridge_print_message_list(&response, true)) {
+            bridge_print_response("bridge-dm-poll", &response);
+        }
+    } else {
+        bridge_print_response("bridge-dm-poll", &response);
+    }
+
+    return response.status_code >= 200 && response.status_code < 300;
+}
+
+static void bridge_command_dm_poll(const char *recipient_user_id) {
+    bridge_poll_dm_messages(recipient_user_id, false);
+}
+
+static const char *bridge_prompt_for_mode(bridge_chat_mode_t chat_mode) {
+    switch (chat_mode) {
+    case BRIDGE_CHAT_MODE_GROUP:
+        return "chat:group> ";
+    case BRIDGE_CHAT_MODE_DM:
+        return "chat:dm> ";
+    case BRIDGE_CHAT_MODE_ADMIN:
+    default:
+        return "bridge> ";
+    }
+}
+
+static void bridge_enter_group_chat(bridge_chat_mode_t *chat_mode) {
+    *chat_mode = BRIDGE_CHAT_MODE_GROUP;
+    printf("Entered group chat. Type /help for chat commands or /admin for the admin shell.\n");
+    bridge_poll_group_messages(true);
+}
+
+static void bridge_enter_dm_chat(
+    bridge_chat_mode_t *chat_mode,
+    char *recipient_user_id,
+    size_t recipient_size,
+    const char *next_recipient_user_id
+) {
+    if (!next_recipient_user_id || next_recipient_user_id[0] == '\0') {
+        printf("usage: chat dm <recipient_user_id>\n");
         return;
     }
 
-    bridge_print_response("bridge-dm-poll", &response);
+    bridge_set_runtime_string(recipient_user_id, recipient_size, next_recipient_user_id);
+    *chat_mode = BRIDGE_CHAT_MODE_DM;
+    printf("Entered DM chat with %s. Type /help for chat commands or /admin for the admin shell.\n", recipient_user_id);
+    bridge_poll_dm_messages(recipient_user_id, true);
+}
+
+static bool bridge_handle_chat_line(
+    bridge_chat_mode_t *chat_mode,
+    char *recipient_user_id,
+    size_t recipient_size,
+    char *line
+) {
+    if (line[0] == '/') {
+        if (strcmp(line, "/help") == 0) {
+            bridge_chat_help();
+        } else if (strcmp(line, "/admin") == 0 || strcmp(line, "/back") == 0 || strcmp(line, "/quit") == 0) {
+            *chat_mode = BRIDGE_CHAT_MODE_ADMIN;
+            printf("Returned to admin shell.\n");
+        } else if (strcmp(line, "/group") == 0) {
+            bridge_enter_group_chat(chat_mode);
+        } else if (strncmp(line, "/dm ", 4) == 0) {
+            char *next_recipient_user_id = line + 4;
+            while (*next_recipient_user_id == ' ') {
+                next_recipient_user_id++;
+            }
+            bridge_enter_dm_chat(chat_mode, recipient_user_id, recipient_size, next_recipient_user_id);
+        } else if (strcmp(line, "/poll") == 0) {
+            if (*chat_mode == BRIDGE_CHAT_MODE_GROUP) {
+                bridge_poll_group_messages(true);
+            } else if (*chat_mode == BRIDGE_CHAT_MODE_DM) {
+                bridge_poll_dm_messages(recipient_user_id, true);
+            }
+        } else {
+            printf("Unknown chat command. Type /help.\n");
+        }
+
+        return true;
+    }
+
+    if (*chat_mode == BRIDGE_CHAT_MODE_GROUP) {
+        bridge_send_group_message(line, true);
+    } else if (*chat_mode == BRIDGE_CHAT_MODE_DM) {
+        bridge_send_dm_message(recipient_user_id, line, true);
+    }
+
+    return true;
+}
+
+static bool bridge_read_shell_line(char *line, size_t line_size, bool *overflowed) {
+    static char pending_line[BRIDGE_SHELL_LINE_SIZE];
+    static size_t pending_length = 0;
+    static bool discarding_oversized_line = false;
+
+    if (overflowed) {
+        *overflowed = false;
+    }
+
+    if (!line || line_size == 0) {
+        return false;
+    }
+
+    while (true) {
+        int ch = fgetc(stdin);
+        if (ch == EOF) {
+            return false;
+        }
+
+        if (ch == '\n' || ch == '\r') {
+            if (discarding_oversized_line) {
+                discarding_oversized_line = false;
+                pending_length = 0;
+                line[0] = '\0';
+                if (overflowed) {
+                    *overflowed = true;
+                }
+                return true;
+            }
+
+            pending_line[pending_length] = '\0';
+            snprintf(line, line_size, "%s", pending_line);
+            pending_length = 0;
+            return true;
+        }
+
+        if (discarding_oversized_line) {
+            continue;
+        }
+
+        if (pending_length >= sizeof(pending_line) - 1 || pending_length >= line_size - 1) {
+            discarding_oversized_line = true;
+            pending_length = 0;
+            continue;
+        }
+
+        pending_line[pending_length++] = (char)ch;
+    }
 }
 
 static void bridge_shell_task(void *arg) {
-    char line[256];
+    char line[BRIDGE_SHELL_LINE_SIZE];
+    char active_dm_recipient_user_id[64] = {0};
+    bridge_chat_mode_t chat_mode = BRIDGE_CHAT_MODE_ADMIN;
     bool prompt_pending = true;
 
     bridge_command_help();
 
     while (true) {
         if (prompt_pending) {
-            printf("bridge> ");
+            printf("%s", bridge_prompt_for_mode(chat_mode));
             fflush(stdout);
             prompt_pending = false;
         }
 
-        if (fgets(line, sizeof(line), stdin) == NULL) {
+        bool line_overflowed = false;
+        if (!bridge_read_shell_line(line, sizeof(line), &line_overflowed)) {
             vTaskDelay(pdMS_TO_TICKS(100));
             continue;
         }
 
-        size_t length = strlen(line);
-        while (length > 0 && (line[length - 1] == '\n' || line[length - 1] == '\r')) {
-            line[--length] = '\0';
+        if (line_overflowed) {
+            printf("Input line is too long. Limit is %d bytes; discarded the whole line.\n", BRIDGE_SHELL_LINE_SIZE - 1);
+            prompt_pending = true;
+            continue;
         }
 
-        if (length == 0) {
+        if (line[0] == '\0') {
+            prompt_pending = true;
+            continue;
+        }
+
+        if (chat_mode != BRIDGE_CHAT_MODE_ADMIN) {
+            bridge_handle_chat_line(&chat_mode, active_dm_recipient_user_id, sizeof(active_dm_recipient_user_id), line);
             prompt_pending = true;
             continue;
         }
@@ -905,6 +1206,16 @@ static void bridge_shell_task(void *arg) {
         } else if (strcmp(command, "dm") == 0 && subcommand && strcmp(subcommand, "poll") == 0) {
             char *recipient_user_id = strtok_r(NULL, " ", &save_ptr);
             bridge_command_dm_poll(recipient_user_id);
+        } else if (strcmp(command, "chat") == 0 && subcommand && strcmp(subcommand, "group") == 0) {
+            bridge_enter_group_chat(&chat_mode);
+        } else if (strcmp(command, "chat") == 0 && subcommand && strcmp(subcommand, "dm") == 0) {
+            char *recipient_user_id = strtok_r(NULL, " ", &save_ptr);
+            bridge_enter_dm_chat(
+                &chat_mode,
+                active_dm_recipient_user_id,
+                sizeof(active_dm_recipient_user_id),
+                recipient_user_id
+            );
         } else if (strcmp(command, "pair") == 0 && subcommand && strcmp(subcommand, "begin") == 0) {
             bridge_command_pair_begin();
         } else if (strcmp(command, "pair") == 0 && subcommand && strcmp(subcommand, "status") == 0) {
