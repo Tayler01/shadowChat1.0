@@ -68,6 +68,20 @@ Important domains:
 - [`openai-chat`](C:/repos/chat2.0/supabase/functions/openai-chat/index.ts:1): validates caller session and proxies allowed AI requests to OpenAI
 - [`send-push`](C:/repos/chat2.0/supabase/functions/send-push/index.ts:1): validates caller session, looks up recipients, enforces notification preferences, and sends web push payloads
 
+## Planned External System
+
+The next planned major feature is an `ESP bridge` for airgapped Windows PCs.
+
+This is not implemented yet, but the roadmap is defined in [docs/ESP_BRIDGE_FEATURE_ROADMAP.md](C:/repos/chat2.0/docs/ESP_BRIDGE_FEATURE_ROADMAP.md:1).
+
+Planned high-level shape:
+
+- ESP device connects to Wi-Fi and approved ShadowChat backend services
+- offline Windows PC connects only to the device over a wired local transport
+- PC receives no general internet access
+- device provides a chat-first TUI, a separate admin shell, and later a lightweight local dashboard
+- future richer local app delivery still remains behind the same bridge security boundary
+
 ## Important Runtime Flows
 
 ### Sign In
