@@ -23,6 +23,7 @@
 #define BRIDGE_WIFI_CONNECTED_BIT BIT0
 #define BRIDGE_HTTP_BUFFER_SIZE 4096
 #define BRIDGE_STORAGE_NAMESPACE "bridge_cfg"
+#define BRIDGE_SHELL_TASK_STACK_SIZE 16384
 
 static const char *TAG = "shadowchat_bridge";
 static esp_event_handler_instance_t s_wifi_any_id_handler;
@@ -44,6 +45,7 @@ typedef struct {
 typedef struct {
     int status_code;
     char body[BRIDGE_HTTP_BUFFER_SIZE];
+    size_t body_length;
 } bridge_http_response_t;
 
 static EventGroupHandle_t s_wifi_event_group;
@@ -216,6 +218,25 @@ static bool bridge_wait_for_wifi(int timeout_ms) {
     return (bits & BRIDGE_WIFI_CONNECTED_BIT) != 0;
 }
 
+static esp_err_t bridge_http_event_handler(esp_http_client_event_t *event) {
+    if (event->event_id != HTTP_EVENT_ON_DATA || event->user_data == NULL || event->data == NULL) {
+        return ESP_OK;
+    }
+
+    bridge_http_response_t *response = (bridge_http_response_t *)event->user_data;
+    size_t remaining = sizeof(response->body) - response->body_length - 1;
+    if (remaining == 0) {
+        return ESP_OK;
+    }
+
+    size_t copy_length = event->data_len < remaining ? event->data_len : remaining;
+    memcpy(response->body + response->body_length, event->data, copy_length);
+    response->body_length += copy_length;
+    response->body[response->body_length] = '\0';
+
+    return ESP_OK;
+}
+
 static esp_err_t bridge_http_post_json(
     const char *path,
     const char *json_body,
@@ -230,11 +251,17 @@ static esp_err_t bridge_http_post_json(
     char url[320];
     snprintf(url, sizeof(url), "%s/functions/v1/%s", CONFIG_BRIDGE_SUPABASE_URL, path);
 
+    if (out != NULL) {
+        memset(out, 0, sizeof(*out));
+    }
+
     esp_http_client_config_t config = {
         .url = url,
         .method = HTTP_METHOD_POST,
         .timeout_ms = 15000,
         .crt_bundle_attach = esp_crt_bundle_attach,
+        .event_handler = bridge_http_event_handler,
+        .user_data = out,
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config);
@@ -257,13 +284,7 @@ static esp_err_t bridge_http_post_json(
     }
 
     if (out != NULL) {
-        memset(out, 0, sizeof(*out));
         out->status_code = esp_http_client_get_status_code(client);
-        int read = esp_http_client_read_response(client, out->body, sizeof(out->body) - 1);
-        if (read < 0) {
-            read = 0;
-        }
-        out->body[read] = '\0';
     }
 
     esp_http_client_cleanup(client);
@@ -273,7 +294,29 @@ static esp_err_t bridge_http_post_json(
 static void bridge_print_response(const char *label, const bridge_http_response_t *response) {
     printf("%s: HTTP %d\n", label, response->status_code);
     if (response->body[0] != '\0') {
-        printf("%s\n", response->body);
+        cJSON *json = cJSON_Parse(response->body);
+        if (json) {
+            cJSON *access_token = cJSON_GetObjectItemCaseSensitive(json, "accessToken");
+            cJSON *refresh_token = cJSON_GetObjectItemCaseSensitive(json, "refreshToken");
+
+            if (cJSON_IsString(access_token)) {
+                cJSON_SetValuestring(access_token, "(redacted)");
+            }
+
+            if (cJSON_IsString(refresh_token)) {
+                cJSON_SetValuestring(refresh_token, "(redacted)");
+            }
+
+            char *redacted = cJSON_PrintUnformatted(json);
+            if (redacted) {
+                printf("%s\n", redacted);
+                free(redacted);
+            }
+
+            cJSON_Delete(json);
+        } else {
+            printf("%s\n", response->body);
+        }
     }
 }
 
@@ -589,12 +632,16 @@ static void bridge_command_heartbeat(void) {
 
 static void bridge_shell_task(void *arg) {
     char line[256];
+    bool prompt_pending = true;
 
     bridge_command_help();
 
     while (true) {
-        printf("bridge> ");
-        fflush(stdout);
+        if (prompt_pending) {
+            printf("bridge> ");
+            fflush(stdout);
+            prompt_pending = false;
+        }
 
         if (fgets(line, sizeof(line), stdin) == NULL) {
             vTaskDelay(pdMS_TO_TICKS(100));
@@ -607,6 +654,7 @@ static void bridge_shell_task(void *arg) {
         }
 
         if (length == 0) {
+            prompt_pending = true;
             continue;
         }
 
@@ -649,6 +697,8 @@ static void bridge_shell_task(void *arg) {
         } else {
             printf("Unknown command. Type 'help'.\n");
         }
+
+        prompt_pending = true;
     }
 }
 
@@ -675,5 +725,5 @@ void app_main(void) {
         bridge_wifi_apply_credentials();
     }
 
-    xTaskCreate(bridge_shell_task, "bridge_shell", 8192, NULL, 5, NULL);
+    xTaskCreate(bridge_shell_task, "bridge_shell", BRIDGE_SHELL_TASK_STACK_SIZE, NULL, 5, NULL);
 }
