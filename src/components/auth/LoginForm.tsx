@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { MessageSquare, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -69,6 +69,11 @@ export function LoginForm() {
         <div className="hidden items-end lg:flex">
           <div className="max-w-xl space-y-6 pb-6">
             <div className="space-y-3">
+              <img
+                src="/icons/header-logo.png"
+                alt="SHADO"
+                className="h-28 w-80 object-contain object-left"
+              />
               <span className="inline-flex rounded-full border border-[rgba(215,170,70,0.16)] bg-[rgba(215,170,70,0.08)] px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--text-gold)]">
                 Real-time private chat
               </span>
@@ -102,10 +107,12 @@ export function LoginForm() {
         <div className="glass-panel-strong space-y-6 rounded-[var(--radius-xl)] p-8">
           {/* Header */}
           <div className="text-center">
-            <div className="flex justify-center mb-4">
-            <div className="rounded-[var(--radius-lg)] border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_34%,rgba(122,89,24,0.46)_100%)] p-3 shadow-[var(--shadow-gold-cta)]">
-                <MessageSquare className="h-8 w-8 text-[var(--text-gold)]" />
-              </div>
+            <div className="mb-4 flex justify-center">
+              <img
+                src="/icons/header-logo.png"
+                alt="SHADO"
+                className="h-20 w-56 object-contain"
+              />
             </div>
             <h1 className="text-2xl font-bold text-[var(--text-primary)]">
               {isLogin ? 'Welcome Back' : 'Join the Chat'}

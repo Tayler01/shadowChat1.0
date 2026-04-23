@@ -206,20 +206,22 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   <ArrowLeft className="w-4 h-4" />
                 </Button>
               )}
-              <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-3">
                 <img
                   src="/icons/header-logo.png"
                   alt="SHADO"
-                  className="mb-2 h-11 w-40 object-contain object-left md:h-14 md:w-48"
+                  className="h-9 w-24 shrink-0 object-contain object-left md:hidden"
                 />
-                <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-                  Direct Messages
-                </h2>
-                {!isDesktop && (
-                  <p className="text-xs text-[var(--text-muted)]">
-                    Open a thread instantly or jump back into recent chats.
-                  </p>
-                )}
+                <div className="min-w-0">
+                  <h2 className="text-base font-semibold text-[var(--text-primary)] md:text-lg">
+                    Direct Messages
+                  </h2>
+                  {!isDesktop && (
+                    <p className="truncate text-[11px] text-[var(--text-muted)]">
+                      Open a thread or jump back in.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
             <Button
@@ -411,7 +413,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 <img
                   src="/icons/header-logo.png"
                   alt="SHADO"
-                  className="ml-auto h-9 w-28 object-contain object-right md:h-11 md:w-36"
+                  className="ml-auto h-8 w-20 shrink-0 object-contain object-right md:hidden"
                 />
               </div>
             </div>

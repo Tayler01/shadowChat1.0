@@ -73,17 +73,17 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange })
           <div className="flex items-center space-x-3">
             {/* Menu button removed on mobile */}
             {/* Header title */}
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-4">
+            <div className="flex items-center gap-3 md:gap-4">
               <img
                 src="/icons/header-logo.png"
                 alt="SHADO"
-                className="h-11 w-40 object-contain object-left md:h-14 md:w-48"
+                className="h-9 w-24 shrink-0 object-contain object-left md:hidden"
               />
               <div>
-                <h1 className="text-xl font-semibold text-[var(--text-primary)]">
+                <h1 className="text-lg font-semibold text-[var(--text-primary)] md:text-xl">
                   General Chat
                 </h1>
-                <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
+                <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)] md:text-xs md:tracking-[0.18em]">
                   Lounge Channel
                 </p>
               </div>
