@@ -40,6 +40,7 @@ Important limitation:
 
 - iPhone web push requires the web app to be installed to the Home Screen
 - do not promise generic browser-tab push on iPhone
+- Home Screen icon badges are best-effort and require notification permission; users can disable badge display in iOS notification settings
 
 ### Android
 
@@ -71,16 +72,18 @@ Relevant existing pieces:
 
 - [src/hooks/useMessageNotifications.tsx](/C:/repos/chat2.0/src/hooks/useMessageNotifications.tsx:1) already shows foreground toast notifications for incoming DMs
 - [src/components/notifications/MessageNotification.tsx](/C:/repos/chat2.0/src/components/notifications/MessageNotification.tsx:1) already renders a desktop-style toast UI
-- [src/components/settings/SettingsView.tsx](/C:/repos/chat2.0/src/components/settings/SettingsView.tsx:1) already exposes a `Push Notifications` toggle in the UI, but it is local UI state only
+- [src/components/settings/SettingsView.tsx](/C:/repos/chat2.0/src/components/settings/SettingsView.tsx:1) exposes push notification setup and status
+- [public/sw.js](/C:/repos/chat2.0/public/sw.js:1) handles Web Push display, notification click routing, and app badge updates
+- [public/manifest.webmanifest](/C:/repos/chat2.0/public/manifest.webmanifest:1) defines the installed app identity
+- [supabase/functions/send-push/index.ts](/C:/repos/chat2.0/supabase/functions/send-push/index.ts:1) delivers Web Push with VAPID
+- [src/components/notifications/AppBadgeSync.tsx](/C:/repos/chat2.0/src/components/notifications/AppBadgeSync.tsx:1) mirrors unread DM count to the installed app icon when supported
 
-Missing today:
+Still open:
 
-- no service worker
-- no web app manifest
-- no push subscription storage
-- no persisted notification preferences
-- no push event pipeline
-- no Edge Function for Web Push delivery
+- richer retry/diagnostic reporting for failed push endpoints
+- mention/reply/reaction notification event types
+- group unread tracking if group chat badge counts become product scope
+- production mobile QA on iOS Home Screen, Android install, and Windows PWA
 
 ## Architecture
 
@@ -104,10 +107,11 @@ Flow:
 2. Browser requests notification permission
 3. Browser creates a `PushSubscription`
 4. Client stores the subscription in Supabase
-5. Supabase emits notification-worthy events
-6. Supabase Edge Function sends Web Push using VAPID
+5. The message sender path or bridge Edge Function dispatches a notification-worthy event
+6. The `send-push` Edge Function sends Web Push using VAPID
 7. Service worker receives push and shows a notification
 8. Notification click opens the app and routes to the right screen
+9. The app and service worker update the app icon badge from unread DM count when the Badging API is available
 
 ## PWA Requirements
 

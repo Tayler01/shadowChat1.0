@@ -1,8 +1,10 @@
 {
   "name": "Shadow Chat",
   "short_name": "ShadowChat",
+  "id": "/",
   "description": "Private realtime chat with direct messages, presence, and notifications.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#080909",
   "theme_color": "#0d0f10",

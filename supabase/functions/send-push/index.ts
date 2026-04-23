@@ -14,6 +14,12 @@ const corsHeaders = {
 
 type PushEventType = 'dm_message' | 'group_message'
 
+type SendPushRequestBody = {
+  type?: PushEventType
+  messageId?: string
+  senderUserId?: string
+}
+
 type NotificationPrefs = {
   user_id: string
   dm_enabled?: boolean
@@ -117,7 +123,7 @@ const isMuted = (prefs: { mute_until: string | null }) => {
   return new Date(prefs.mute_until).getTime() > Date.now()
 }
 
-const authenticateRequest = async (req: Request) => {
+const authenticateRequest = async (req: Request, body: SendPushRequestBody) => {
   const authorization = req.headers.get('Authorization') ?? ''
   if (!authorization.startsWith('Bearer ')) {
     return { error: unauthorized('Authentication required') }
@@ -125,11 +131,21 @@ const authenticateRequest = async (req: Request) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Supabase environment variables are not configured')
   }
 
   const token = authorization.replace(/^Bearer\s+/i, '')
+  if (serviceRoleKey && token === serviceRoleKey) {
+    const senderUserId = typeof body?.senderUserId === 'string' ? body.senderUserId : ''
+    if (!senderUserId) {
+      return { error: unauthorized('senderUserId is required for service-role push dispatch') }
+    }
+
+    return { userId: senderUserId }
+  }
+
   const authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -193,6 +209,23 @@ const getActiveSubscriptions = async (
   }
 
   return (data ?? []) as StoredSubscription[]
+}
+
+const getUnreadBadgeCount = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  userId: string
+) => {
+  const { data, error } = await supabase.rpc('count_unread_dm_messages', {
+    target_user_id: userId,
+  })
+
+  if (error) {
+    console.error('Failed to load unread badge count', error)
+    return undefined
+  }
+
+  const count = Number(data ?? 0)
+  return Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0
 }
 
 const upsertNotificationEvent = async (
@@ -337,6 +370,7 @@ const sendDmPush = async (
   const preview = getMessagePreview(dmMessage)
   const route = `/?view=dms&conversation=${dmMessage.conversation_id}`
   const dedupeKey = `dm:${dmMessage.id}:${recipientId}`
+  const badgeCount = await getUnreadBadgeCount(supabase, recipientId)
 
   const eventRecord = await upsertNotificationEvent(supabase, {
     user_id: recipientId,
@@ -349,6 +383,7 @@ const sendDmPush = async (
       body: preview,
       route,
       sender_id: authUserId,
+      badge_count: badgeCount,
     },
   }, dedupeKey)
 
@@ -361,6 +396,8 @@ const sendDmPush = async (
       title: senderLabel,
       body: preview,
       tag: `dm:${dmMessage.conversation_id}`,
+      badgeCount,
+      unreadCount: badgeCount,
       data: {
         url: route,
         route,
@@ -368,6 +405,8 @@ const sendDmPush = async (
         conversationId: dmMessage.conversation_id,
         messageId: dmMessage.id,
         senderId: authUserId,
+        badgeCount,
+        unreadCount: badgeCount,
       },
     }),
     options: {
@@ -461,6 +500,7 @@ const sendGroupPush = async (
       }
 
       const dedupeKey = `group:${groupMessage.id}:${prefs.user_id}`
+      const badgeCount = await getUnreadBadgeCount(supabase, prefs.user_id)
       const eventRecord = await upsertNotificationEvent(
         supabase,
         {
@@ -473,6 +513,7 @@ const sendGroupPush = async (
             body: preview,
             route,
             sender_id: authUserId,
+            badge_count: badgeCount,
           },
         },
         dedupeKey
@@ -494,12 +535,16 @@ const sendGroupPush = async (
           title: `${senderLabel} in General Chat`,
           body: preview,
           tag: `group:${groupMessage.id}`,
+          badgeCount,
+          unreadCount: badgeCount,
           data: {
             url: route,
             route,
             type: 'group_message',
             messageId: groupMessage.id,
             senderId: authUserId,
+            badgeCount,
+            unreadCount: badgeCount,
           },
         }),
         options: {
@@ -549,12 +594,12 @@ serve(async (req) => {
   }
 
   try {
-    const auth = await authenticateRequest(req)
+    const body = await req.json() as SendPushRequestBody
+    const auth = await authenticateRequest(req, body)
     if ('error' in auth) {
       return auth.error
     }
 
-    const body = await req.json()
     const type = body?.type as PushEventType | undefined
     const messageId = typeof body?.messageId === 'string' ? body.messageId : ''
 

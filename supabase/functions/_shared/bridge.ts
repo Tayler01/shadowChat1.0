@@ -38,6 +38,41 @@ export const getSupabaseAdmin = () => {
   })
 }
 
+export const triggerPushDispatch = async (
+  type: 'dm_message' | 'group_message',
+  messageId: string,
+  senderUserId: string,
+) => {
+  const { supabaseUrl, serviceRoleKey } = getEnv()
+
+  try {
+    const response = await fetch(`${supabaseUrl}/functions/v1/send-push`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        type,
+        messageId,
+        senderUserId,
+      }),
+    })
+
+    if (!response.ok) {
+      console.error('Bridge push dispatch failed', {
+        type,
+        messageId,
+        status: response.status,
+        body: await response.text().catch(() => ''),
+      })
+    }
+  } catch (error) {
+    console.error('Bridge push dispatch failed', error)
+  }
+}
+
 export const authenticateRequest = async (req: Request) => {
   const authorization = req.headers.get('Authorization') ?? ''
   if (!authorization.startsWith('Bearer ')) {

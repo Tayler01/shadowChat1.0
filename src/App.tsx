@@ -12,6 +12,7 @@ import { ClientResetProvider } from './hooks/ClientResetContext'
 import { SoundEffectsProvider } from './hooks/useSoundEffects'
 import { ConnectivityBanner } from './components/ui/ConnectivityBanner'
 import { LoadingSpinner } from './components/ui/LoadingSpinner'
+import { AppBadgeSync } from './components/notifications/AppBadgeSync'
 
 const DirectMessagesView = lazy(() =>
   import('./components/dms/DirectMessagesView').then(module => ({
@@ -196,6 +197,7 @@ function App() {
         <SoundEffectsProvider>
         <MessagesProvider>
           <DirectMessagesProvider>
+          <AppBadgeSync />
           <div className="flex h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.08),transparent_28%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] md:flex-row">
           <ConnectivityBanner />
           {isDesktop && (

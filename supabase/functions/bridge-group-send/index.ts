@@ -7,6 +7,7 @@ import {
   json,
   normalizeText,
   readJson,
+  triggerPushDispatch,
 } from '../_shared/bridge.ts'
 
 type BridgeGroupSendPayload = {
@@ -94,6 +95,8 @@ serve(async req => {
           message_id: message.id,
         },
       })
+
+    await triggerPushDispatch('group_message', message.id as string, bridgeAuth.auth.userId)
 
     return json({
       ok: true,

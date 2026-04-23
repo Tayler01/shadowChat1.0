@@ -6,6 +6,42 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim())
 })
 
+const normalizeBadgeCount = (value) => {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return 0
+  }
+
+  return Math.floor(numeric)
+}
+
+const getPayloadBadgeCount = (payload) => {
+  const count = payload.badgeCount ?? payload.unreadCount ?? payload.data?.badgeCount ?? payload.data?.unreadCount
+  if (count === undefined || count === null) {
+    return null
+  }
+
+  return normalizeBadgeCount(count)
+}
+
+const updateAppBadge = async (count) => {
+  if (!self.navigator) {
+    return
+  }
+
+  const normalizedCount = normalizeBadgeCount(count)
+
+  try {
+    if (normalizedCount > 0 && 'setAppBadge' in self.navigator) {
+      await self.navigator.setAppBadge(normalizedCount)
+    } else if (normalizedCount === 0 && 'clearAppBadge' in self.navigator) {
+      await self.navigator.clearAppBadge()
+    }
+  } catch {
+    // Badging is best-effort; notification delivery should continue.
+  }
+}
+
 self.addEventListener('push', (event) => {
   let payload = {}
 
@@ -24,7 +60,13 @@ self.addEventListener('push', (event) => {
     data: payload.data || payload,
   }
 
-  event.waitUntil(self.registration.showNotification(title, options))
+  const tasks = [self.registration.showNotification(title, options)]
+  const badgeCount = getPayloadBadgeCount(payload)
+  if (badgeCount !== null) {
+    tasks.push(updateAppBadge(badgeCount))
+  }
+
+  event.waitUntil(Promise.all(tasks))
 })
 
 self.addEventListener('notificationclick', (event) => {
@@ -56,5 +98,10 @@ self.addEventListener('notificationclick', (event) => {
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting()
+  } else if (event.data?.type === 'SHADOWCHAT_BADGE_UPDATE') {
+    const task = updateAppBadge(event.data.count)
+    if (event.waitUntil) {
+      event.waitUntil(task)
+    }
   }
 })
