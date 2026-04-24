@@ -203,3 +203,20 @@ Verified on `COM3` against device `a091ab7f-88de-4b8b-befb-9d8a53d9ff60`:
   - recovery returned `autoApprovedRecovery: true` and exchanged fresh session material without iPhone approval
   - all later passes continued to send/poll group and DM traffic successfully
 - the Windows TUI smoke harness now waits longer around send/poll operations and verifies admin-shell sync before sending chat mode commands, after an earlier soak attempt exposed serial desync and valid-but-slow DM sends
+- the firmware now supports an opt-in structured serial protocol:
+  - `protocol on|off|status` in the admin shell
+  - `/protocol on|off` in chat mode
+  - line-delimited `@scb:{...}` events for status, mode, sent, and message frames
+- the Windows TUI enables structured protocol by default, parses protocol frames, and hides them from the user transcript
+- the Windows TUI now renders a split wide-terminal layout with:
+  - left status/navigation panel
+  - right chat transcript
+  - fixed input row
+  - protocol/live receive/send state
+- `/live` now toggles near-realtime polling for the active group or DM thread
+- after updating stored Wi-Fi credentials from the current Windows profile `Camper1407`, a foreground smoke on `2026-04-24` passed:
+  - structured protocol enablement
+  - auto-approved `session recover`
+  - group send/poll
+  - DM send/poll to `@caleb`
+  - bridge status with Wi-Fi and session material stored

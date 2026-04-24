@@ -67,12 +67,110 @@ typedef enum {
 static EventGroupHandle_t s_wifi_event_group;
 static bridge_state_t s_bridge_state;
 static bool s_wifi_reconfiguring;
+static bool s_protocol_enabled;
 
 static bool bridge_ensure_wifi_connected(const char *action);
 
 static const char *BRIDGE_CURSOR_GROUP_MESSAGE_ID_KEY = "cur_group_id";
 static const char *BRIDGE_CURSOR_DM_RECIPIENT_KEY = "cur_dm_rec";
 static const char *BRIDGE_CURSOR_DM_MESSAGE_ID_KEY = "cur_dm_id";
+
+static void bridge_protocol_emit(cJSON *event) {
+    if (!s_protocol_enabled || !event) {
+        return;
+    }
+
+    char *line = cJSON_PrintUnformatted(event);
+    if (!line) {
+        return;
+    }
+
+    printf("@scb:%s\n", line);
+    free(line);
+}
+
+static void bridge_protocol_emit_mode(const char *mode, const char *recipient_user_id) {
+    cJSON *event = cJSON_CreateObject();
+    if (!event) {
+        return;
+    }
+
+    cJSON_AddStringToObject(event, "type", "mode");
+    cJSON_AddStringToObject(event, "mode", mode ? mode : "unknown");
+    if (recipient_user_id && recipient_user_id[0] != '\0') {
+        cJSON_AddStringToObject(event, "recipientUserId", recipient_user_id);
+    }
+
+    bridge_protocol_emit(event);
+    cJSON_Delete(event);
+}
+
+static void bridge_protocol_emit_status(void) {
+    cJSON *event = cJSON_CreateObject();
+    if (!event) {
+        return;
+    }
+
+    cJSON_AddStringToObject(event, "type", "status");
+    cJSON_AddStringToObject(event, "hardwareModel", CONFIG_BRIDGE_HARDWARE_MODEL);
+    cJSON_AddStringToObject(event, "firmwareVersion", CONFIG_BRIDGE_FIRMWARE_VERSION);
+    cJSON_AddStringToObject(event, "deviceSerial", s_bridge_state.device_serial);
+    cJSON_AddStringToObject(event, "deviceId", s_bridge_state.device_id[0] ? s_bridge_state.device_id : "");
+    cJSON_AddStringToObject(event, "deviceStatus", s_bridge_state.device_status[0] ? s_bridge_state.device_status : "");
+    cJSON_AddStringToObject(event, "wifiSsid", s_bridge_state.wifi_ssid[0] ? s_bridge_state.wifi_ssid : "");
+    cJSON_AddBoolToObject(event, "wifiConnected", s_bridge_state.wifi_connected);
+    cJSON_AddBoolToObject(event, "hasAccessToken", s_bridge_state.access_token[0] != '\0');
+    cJSON_AddBoolToObject(event, "hasRefreshToken", s_bridge_state.refresh_token[0] != '\0');
+    cJSON_AddBoolToObject(event, "hasRecoveryToken", s_bridge_state.recovery_token[0] != '\0');
+    cJSON_AddStringToObject(event, "authUserId", s_bridge_state.auth_user_id[0] ? s_bridge_state.auth_user_id : "");
+    cJSON_AddStringToObject(event, "sessionExpiresAt", s_bridge_state.session_expires_at[0] ? s_bridge_state.session_expires_at : "");
+    cJSON_AddStringToObject(event, "authExpiresAt", s_bridge_state.auth_expires_at[0] ? s_bridge_state.auth_expires_at : "");
+
+    bridge_protocol_emit(event);
+    cJSON_Delete(event);
+}
+
+static void bridge_protocol_emit_message(
+    const char *thread,
+    const char *id,
+    const char *created_at,
+    const char *sender_id,
+    const char *sender_label,
+    const char *content
+) {
+    cJSON *event = cJSON_CreateObject();
+    if (!event) {
+        return;
+    }
+
+    cJSON_AddStringToObject(event, "type", "message");
+    cJSON_AddStringToObject(event, "thread", thread ? thread : "unknown");
+    cJSON_AddStringToObject(event, "id", id ? id : "");
+    cJSON_AddStringToObject(event, "createdAt", created_at ? created_at : "");
+    cJSON_AddStringToObject(event, "senderId", sender_id ? sender_id : "");
+    cJSON_AddStringToObject(event, "senderLabel", sender_label ? sender_label : "");
+    cJSON_AddStringToObject(event, "content", content ? content : "");
+
+    bridge_protocol_emit(event);
+    cJSON_Delete(event);
+}
+
+static void bridge_protocol_emit_sent(const char *thread, const char *id, const char *conversation_id) {
+    cJSON *event = cJSON_CreateObject();
+    if (!event) {
+        return;
+    }
+
+    cJSON_AddStringToObject(event, "type", "sent");
+    cJSON_AddStringToObject(event, "thread", thread ? thread : "unknown");
+    cJSON_AddStringToObject(event, "id", id ? id : "");
+    if (conversation_id && conversation_id[0] != '\0') {
+        cJSON_AddStringToObject(event, "conversationId", conversation_id);
+    }
+
+    bridge_protocol_emit(event);
+    cJSON_Delete(event);
+}
 
 static void bridge_save_string(const char *key, const char *value) {
     nvs_handle_t handle;
@@ -704,6 +802,7 @@ static const char *bridge_message_time_label(const char *created_at, char *buffe
 
 static bool bridge_print_message_list(
     const bridge_http_response_t *response,
+    const char *thread,
     bool dm_messages,
     char *cursor_message_id,
     size_t cursor_message_id_size,
@@ -737,13 +836,15 @@ static bool bridge_print_message_list(
         const char *sender_id = bridge_json_string_or_empty(message, dm_messages ? "sender_id" : "user_id");
         cJSON *profile = cJSON_GetObjectItemCaseSensitive(message, dm_messages ? "sender" : "user");
         char time_label[12] = {0};
+        const char *sender_label = bridge_profile_label(profile, sender_id);
 
         printf(
             "%s | %s: %s\n",
             bridge_message_time_label(created_at, time_label, sizeof(time_label)),
-            bridge_profile_label(profile, sender_id),
+            sender_label,
             content
         );
+        bridge_protocol_emit_message(thread, id, created_at, sender_id, sender_label, content);
 
         if (id[0] != '\0' && cursor_message_id && cursor_message_id_size > 0) {
             bridge_set_runtime_string(cursor_message_id, cursor_message_id_size, id);
@@ -790,6 +891,8 @@ static void bridge_print_sent_summary(const bridge_http_response_t *response, bo
     } else {
         printf("sent\n");
     }
+
+    bridge_protocol_emit_sent(dm_message ? "dm" : "group", id, conversation_id);
 
     cJSON *push_dispatch = cJSON_GetObjectItemCaseSensitive(json, "pushDispatch");
     if (cJSON_IsObject(push_dispatch)) {
@@ -882,6 +985,7 @@ static void bridge_command_help(void) {
     printf("  session refresh\n");
     printf("  session recover\n");
     printf("  bridge heartbeat\n\n");
+    printf("  protocol on|off|status\n\n");
     printf("  group send <text>\n");
     printf("  group poll\n\n");
     printf("  dm send <recipient_user_id|@username> <text>\n");
@@ -898,6 +1002,7 @@ static void bridge_chat_help(void) {
     printf("  /dm <recipient|@name> switch to a DM thread\n");
     printf("  /group                switch to group chat\n");
     printf("  /status               show bridge status\n");
+    printf("  /protocol on|off      enable or disable structured TUI events\n");
     printf("  /admin                return to the admin shell\n");
     printf("  /help                 show this help\n\n");
 }
@@ -963,6 +1068,29 @@ static void bridge_command_status(void) {
     printf("  auth_refresh_token: %s\n", s_bridge_state.auth_refresh_token[0] ? "(stored)" : "(none)");
     printf("  session_expires_at: %s\n", s_bridge_state.session_expires_at[0] ? s_bridge_state.session_expires_at : "(none)");
     printf("  auth_expires_at: %s\n\n", s_bridge_state.auth_expires_at[0] ? s_bridge_state.auth_expires_at : "(none)");
+    bridge_protocol_emit_status();
+}
+
+static void bridge_command_protocol(const char *mode) {
+    if (!mode || mode[0] == '\0' || strcmp(mode, "status") == 0) {
+        printf("Structured protocol events are %s\n", s_protocol_enabled ? "on" : "off");
+        return;
+    }
+
+    if (strcmp(mode, "on") == 0) {
+        s_protocol_enabled = true;
+        printf("Structured protocol events enabled\n");
+        bridge_protocol_emit_status();
+        return;
+    }
+
+    if (strcmp(mode, "off") == 0) {
+        printf("Structured protocol events disabled\n");
+        s_protocol_enabled = false;
+        return;
+    }
+
+    printf("usage: protocol on|off|status\n");
 }
 
 static void bridge_command_wifi_set(const char *ssid, const char *password) {
@@ -1672,7 +1800,7 @@ static bool bridge_poll_group_messages(
     }
 
     if (response.status_code >= 200 && response.status_code < 300) {
-        if (bridge_print_message_list(&response, false, cursor_message_id, cursor_message_id_size, print_empty)) {
+        if (bridge_print_message_list(&response, "group", false, cursor_message_id, cursor_message_id_size, print_empty)) {
             if (cursor_message_id && cursor_message_id_size > 0) {
                 bridge_save_group_cursor(cursor_message_id);
             }
@@ -1789,7 +1917,7 @@ static bool bridge_poll_dm_messages(
     }
 
     if (response.status_code >= 200 && response.status_code < 300) {
-        if (bridge_print_message_list(&response, true, cursor_message_id, cursor_message_id_size, print_empty)) {
+        if (bridge_print_message_list(&response, "dm", true, cursor_message_id, cursor_message_id_size, print_empty)) {
             if (cursor_message_id && cursor_message_id_size > 0) {
                 bridge_save_dm_cursor(recipient_user_id, cursor_message_id);
             }
@@ -1867,6 +1995,7 @@ static void bridge_enter_group_chat(
 ) {
     *chat_mode = BRIDGE_CHAT_MODE_GROUP;
     printf("Entered group chat. Type /help for chat commands or /admin for the admin shell.\n");
+    bridge_protocol_emit_mode("group", NULL);
     bool has_saved_cursor = group_cursor_message_id && group_cursor_message_id[0] != '\0';
     if (has_saved_cursor) {
         printf("Resuming group chat from saved cursor.\n");
@@ -1911,6 +2040,7 @@ static void bridge_enter_dm_chat(
     bridge_save_dm_cursor(dm_cursor_recipient_user_id, dm_cursor_message_id);
     *chat_mode = BRIDGE_CHAT_MODE_DM;
     printf("Entered DM chat with %s. Type /help for chat commands or /admin for the admin shell.\n", recipient_user_id);
+    bridge_protocol_emit_mode("dm", recipient_user_id);
     if (has_saved_cursor) {
         printf("Resuming DM chat from saved cursor.\n");
     }
@@ -1942,6 +2072,7 @@ static bool bridge_handle_chat_line(
         } else if (strcmp(line, "/admin") == 0 || strcmp(line, "/back") == 0 || strcmp(line, "/quit") == 0) {
             *chat_mode = BRIDGE_CHAT_MODE_ADMIN;
             printf("Returned to admin shell.\n");
+            bridge_protocol_emit_mode("admin", NULL);
         } else if (strcmp(line, "/group") == 0) {
             bridge_enter_group_chat(chat_mode, group_cursor_message_id, group_cursor_message_id_size);
         } else if (strncmp(line, "/dm ", 4) == 0) {
@@ -1967,6 +2098,8 @@ static bool bridge_handle_chat_line(
             }
         } else if (strcmp(line, "/status") == 0) {
             bridge_command_status();
+        } else if (strncmp(line, "/protocol ", 10) == 0) {
+            bridge_command_protocol(line + 10);
         } else {
             printf("Unknown chat command. Type /help.\n");
         }
@@ -2106,8 +2239,11 @@ static void bridge_shell_task(void *arg) {
             bridge_command_help();
         } else if (strcmp(command, "/admin") == 0 || strcmp(command, "/back") == 0 || strcmp(command, "/quit") == 0) {
             printf("Already in admin shell.\n");
+            bridge_protocol_emit_mode("admin", NULL);
         } else if (strcmp(command, "status") == 0) {
             bridge_command_status();
+        } else if (strcmp(command, "protocol") == 0) {
+            bridge_command_protocol(subcommand);
         } else if (strcmp(command, "wifi") == 0 && subcommand && strcmp(subcommand, "set") == 0) {
             char ssid[33] = {0};
             char password[65] = {0};

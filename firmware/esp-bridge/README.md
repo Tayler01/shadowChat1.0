@@ -96,6 +96,7 @@ session exchange
 session refresh
 session recover
 bridge heartbeat
+protocol on|off|status
 group send <text>
 group poll
 dm send <recipient_user_id|@username> <text>
@@ -110,6 +111,7 @@ Inside `chat group` or `chat dm <recipient_user_id>`, plain lines are sent as ch
 /poll
 /dm <recipient_user_id|@username>
 /group
+/protocol on|off
 /admin
 /help
 ```
@@ -147,7 +149,9 @@ TUI commands:
 /group
 /dm <recipient_user_id|@username>
 /poll-interval <seconds>
+/live on|off
 /status
+/protocol on|off
 /admin
 /chat
 /prefs
@@ -166,6 +170,10 @@ chat dm @caleb
 ```
 
 Plain text sends to the active chat thread. `/admin` switches into the raw firmware admin shell; `/chat` returns to the last chat thread. The TUI status bar refreshes bridge health with `/status` in the active chat mode, so Wi-Fi and session state stay visible without forcing a thread switch. Use `/status-interval <seconds>` to change that cadence, or `0` for manual status refresh only.
+
+The TUI now enables the firmware's opt-in structured serial protocol with `protocol on`. Protocol frames are line-delimited JSON prefixed with `@scb:` and are used for message, mode, sent, and status events. The human-readable admin shell remains the default when protocol mode is not enabled, so normal serial monitors stay clean. Use `-NoProtocol` or `/protocol off` to fall back to text parsing.
+
+Interactive mode renders a split console layout on wide terminals: a left status/navigation panel with Wi-Fi, device, session, auth, protocol, send, and receive state, plus a right transcript pane and fixed input row. `/live` toggles near-realtime polling for the active group or DM thread without leaving the chat view.
 
 When entering `chat group` or `chat dm` for the first time, the bridge prints the latest messages and stores the last message as the active cursor. Chat cursors are persisted in NVS, so after reboot or flash the bridge resumes from the saved group cursor or saved DM cursor and fetches only newer messages. Follow-up `/poll` calls in chat mode also request only messages after that cursor, so the TUI auto-poll loop stays quiet until new group or DM traffic arrives. Admin `group poll` and `dm poll` still show the latest messages without using the chat cursor.
 

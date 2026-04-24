@@ -7,6 +7,7 @@ param(
     [string]$DmRecipientUserId = "",
     [int]$PollSeconds = 6,
     [int]$StatusSeconds = 45,
+    [switch]$NoProtocol,
     [switch]$NoAutoPoll,
     [switch]$Smoke,
     [switch]$NoAnsi,
@@ -69,7 +70,8 @@ function Save-BridgeTuiPreferences {
         dmRecipientUserId = $script:dmRecipientUserId
         pollSeconds = $PollSeconds
         statusSeconds = $StatusSeconds
-        noAutoPoll = [bool]$NoAutoPoll
+        noAutoPoll = -not $script:liveReceive
+        protocolEnabled = [bool]$script:protocolEnabled
         transcriptLines = $script:transcriptLimit
         updatedAt = [DateTime]::UtcNow.ToString("o")
     } | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $Path -Encoding UTF8
@@ -132,6 +134,13 @@ if ($loadedPreferences) {
     if (-not $PSBoundParameters.ContainsKey("NoAutoPoll") -and $loadedPreferences.noAutoPoll) {
         $NoAutoPoll = [bool]$loadedPreferences.noAutoPoll
     }
+    if (
+        -not $PSBoundParameters.ContainsKey("NoProtocol") -and
+        ($loadedPreferences.PSObject.Properties.Name -contains "protocolEnabled") -and
+        $null -ne $loadedPreferences.protocolEnabled
+    ) {
+        $NoProtocol = -not [bool]$loadedPreferences.protocolEnabled
+    }
     if (-not $PSBoundParameters.ContainsKey("TranscriptLines") -and $loadedPreferences.transcriptLines) {
         $TranscriptLines = [int]$loadedPreferences.transcriptLines
     }
@@ -152,6 +161,9 @@ $script:renderDirty = $true
 $script:lastRenderAt = [DateTime]::MinValue
 $script:lastRxAt = $null
 $script:lastStatus = "starting"
+$script:protocolEnabled = -not $NoProtocol
+$script:liveReceive = -not $NoAutoPoll
+$script:lastSentAt = $null
 $script:seenMessageLines = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 $script:pollMarkerPending = $false
 $script:quietStatusPending = $false
@@ -162,6 +174,7 @@ $script:bridgeHealth = [ordered]@{
     device = "unknown"
     session = "unknown"
     auth = "unknown"
+    serial = "unknown"
 }
 
 function Use-Color {
@@ -276,6 +289,119 @@ function Update-BridgeHealthFromStatusLine {
     }
 }
 
+function Get-ProtocolString {
+    param(
+        [object]$Event,
+        [string]$Name,
+        [string]$Fallback = ""
+    )
+
+    if ($Event -and ($Event.PSObject.Properties.Name -contains $Name) -and $null -ne $Event.$Name) {
+        return [string]$Event.$Name
+    }
+
+    return $Fallback
+}
+
+function Format-ProtocolMessageLine {
+    param([object]$Event)
+
+    $createdAt = Get-ProtocolString $Event "createdAt" "(unknown time)"
+    $timeLabel = $createdAt
+    if ($createdAt -match "^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}") {
+        $timeLabel = $createdAt.Substring(11, 8)
+    }
+
+    $sender = Get-ProtocolString $Event "senderLabel" (Get-ProtocolString $Event "senderId" "unknown")
+    $content = Get-ProtocolString $Event "content" ""
+    return "$timeLabel | ${sender}: $content"
+}
+
+function Update-BridgeHealthFromProtocol {
+    param([object]$Event)
+
+    $wifiConnected = $null
+    if ($Event.PSObject.Properties.Name -contains "wifiConnected") {
+        $wifiConnected = [bool]$Event.wifiConnected
+    }
+
+    if ($null -ne $wifiConnected) {
+        $script:bridgeHealth.wifi = if ($wifiConnected) { "yes" } else { "no" }
+    }
+
+    $deviceStatus = Get-ProtocolString $Event "deviceStatus"
+    if ($deviceStatus) {
+        $script:bridgeHealth.device = $deviceStatus
+    }
+
+    $sessionExpiresAt = Get-ProtocolString $Event "sessionExpiresAt"
+    if ($sessionExpiresAt) {
+        $script:bridgeHealth.session = $sessionExpiresAt
+    }
+
+    $authExpiresAt = Get-ProtocolString $Event "authExpiresAt"
+    if ($authExpiresAt) {
+        $script:bridgeHealth.auth = $authExpiresAt
+    }
+
+    $script:bridgeHealth.serial = "protocol"
+}
+
+function Try-HandleProtocolLine {
+    param([string]$Line)
+
+    if ($Line -notlike "@scb:*") {
+        return $false
+    }
+
+    $payload = $Line.Substring(5)
+    try {
+        $event = $payload | ConvertFrom-Json
+    } catch {
+        Add-TranscriptLine "Protocol parse error: $($_.Exception.Message)"
+        Request-Render
+        return $true
+    }
+
+    $type = Get-ProtocolString $event "type"
+    if ($type -eq "status") {
+        Update-BridgeHealthFromProtocol $event
+        Request-Render
+        return $true
+    }
+
+    if ($type -eq "mode") {
+        $mode = Get-ProtocolString $event "mode"
+        if ($mode -in @("group", "dm", "admin")) {
+            $script:bridgeHealth.serial = "protocol"
+        }
+        Request-Render
+        return $true
+    }
+
+    if ($type -eq "message") {
+        $line = Format-ProtocolMessageLine $event
+        if ($script:seenMessageLines.Add($line)) {
+            if ($script:pollMarkerPending) {
+                Add-TranscriptLine "----- new messages -----"
+                $script:pollMarkerPending = $false
+            }
+            Add-TranscriptLine $line
+        }
+        $script:lastRxAt = [DateTime]::UtcNow
+        Request-Render
+        return $true
+    }
+
+    if ($type -eq "sent") {
+        $script:lastSentAt = [DateTime]::UtcNow
+        Request-Render
+        return $true
+    }
+
+    return $true
+}
+
 function Request-Render {
     $script:renderDirty = $true
 }
@@ -348,6 +474,49 @@ function Get-HealthLabel {
     return "wifi: $wifi | device: $device | session: $session | auth: $auth"
 }
 
+function Get-SidebarLines {
+    $pollLabel = if ($script:liveReceive) { "live: ${PollSeconds}s" } else { "live: paused" }
+    $rxLabel = if ($script:lastRxAt) { $script:lastRxAt.ToLocalTime().ToString("HH:mm:ss") } else { "none" }
+    $sentLabel = if ($script:lastSentAt) { $script:lastSentAt.ToLocalTime().ToString("HH:mm:ss") } else { "none" }
+    $protocolLabel = if ($script:protocolEnabled) { $script:bridgeHealth.serial } else { "off" }
+
+    return @(
+        "SHADOWCHAT BRIDGE",
+        "",
+        "mode  $(Get-ModeLabel)",
+        "port  $Port",
+        "poll  $pollLabel",
+        "rx    $rxLabel",
+        "sent  $sentLabel",
+        "proto $protocolLabel",
+        "",
+        "wifi  $($script:bridgeHealth.wifi)",
+        "dev   $($script:bridgeHealth.device)",
+        "sess  $(Get-ExpiryHealthLabel $script:bridgeHealth.session)",
+        "auth  $(Get-ExpiryHealthLabel $script:bridgeHealth.auth)",
+        "",
+        "Tab       swap",
+        "/dm name  DM",
+        "/group    group",
+        "/live     toggle",
+        "/admin    shell"
+    )
+}
+
+function Write-LayoutRow {
+    param(
+        [string]$Left,
+        [string]$Right,
+        [int]$LeftWidth,
+        [int]$RightWidth,
+        [ConsoleColor]$RightColor
+    )
+
+    Write-Ui (Fit-Text $Left $LeftWidth) ([ConsoleColor]::DarkYellow) -NoNewline
+    Write-Ui " | " ([ConsoleColor]::DarkGray) -NoNewline
+    Write-Ui (Fit-Text $Right $RightWidth) $RightColor
+}
+
 function Render-Layout {
     param([switch]$Force)
 
@@ -371,8 +540,12 @@ function Render-Layout {
     $height = [Math]::Max(12, [Console]::WindowHeight)
     $bodyHeight = [Math]::Max(4, $height - 6)
     $divider = "-" * $width
-    $pollLabel = if ($NoAutoPoll) { "poll: manual" } else { "poll: ${PollSeconds}s" }
+    $pollLabel = if ($script:liveReceive) { "live: ${PollSeconds}s" } else { "live: paused" }
     $rxLabel = if ($script:lastRxAt) { "rx: $($script:lastRxAt.ToLocalTime().ToString("HH:mm:ss"))" } else { "rx: none" }
+    $useSplit = $width -ge 88
+    $leftWidth = if ($useSplit) { 26 } else { 0 }
+    $rightWidth = if ($useSplit) { $width - $leftWidth - 3 } else { $width }
+    $sidebarLines = if ($useSplit) { Get-SidebarLines } else { @() }
 
     [Console]::SetCursorPosition(0, 0)
     Write-Ui (Fit-Text "ShadowChat Bridge TUI | $Port @ $BaudRate | $(Get-ModeLabel) | $pollLabel | $rxLabel | $(Get-HealthLabel)" $width) ([ConsoleColor]::Yellow)
@@ -381,11 +554,20 @@ function Render-Layout {
     $start = [Math]::Max(0, $script:transcript.Count - $bodyHeight)
     for ($i = 0; $i -lt $bodyHeight; $i++) {
         $index = $start + $i
+        $left = if ($useSplit -and $i -lt $sidebarLines.Count) { $sidebarLines[$i] } else { "" }
         if ($index -lt $script:transcript.Count) {
             $line = $script:transcript[$index]
-            Write-Ui (Fit-Text $line $width) (Get-LineColor $line)
+            if ($useSplit) {
+                Write-LayoutRow $left $line $leftWidth $rightWidth (Get-LineColor $line)
+            } else {
+                Write-Ui (Fit-Text $line $width) (Get-LineColor $line)
+            }
         } else {
-            Write-Ui (" " * $width)
+            if ($useSplit) {
+                Write-LayoutRow $left "" $leftWidth $rightWidth ([ConsoleColor]::Gray)
+            } else {
+                Write-Ui (" " * $width)
+            }
         }
     }
 
@@ -399,6 +581,10 @@ function Write-BridgeLine {
 
     $clean = Normalize-BridgeLine $Line
     if ([string]::IsNullOrWhiteSpace($clean)) {
+        return
+    }
+
+    if (Try-HandleProtocolLine $clean) {
         return
     }
 
@@ -620,6 +806,18 @@ function Sync-BridgeAdmin {
     throw "Could not sync bridge into admin shell before starting smoke."
 }
 
+function Enable-StructuredProtocol {
+    if (-not $script:protocolEnabled) {
+        $script:bridgeHealth.serial = "text"
+        return
+    }
+
+    Send-BridgeLine "protocol on"
+    $script:bridgeHealth.serial = "requested"
+    Start-Sleep -Milliseconds 150
+    Read-SerialOutput
+}
+
 function Show-Help {
     $lines = @(
         "",
@@ -630,8 +828,10 @@ function Show-Help {
         "  /dm <recipient|@name> switch to a DM",
         "  Tab                   toggle group and last DM",
         "  /poll-interval <sec>  change auto-poll interval",
+        "  /live on|off          toggle near-realtime polling",
         "  /status-interval <sec> change health refresh interval",
         "  /status               show bridge status",
+        "  /protocol on|off      toggle structured serial events",
         "  /admin                enter raw admin shell mode",
         "  /chat                 return from admin shell to chat",
         "  /prefs                show active preferences",
@@ -661,7 +861,8 @@ function Show-Preferences {
         "  dm_recipient_user_id: $(if ($script:dmRecipientUserId) { $script:dmRecipientUserId } else { "(none)" })",
         "  poll_seconds: $PollSeconds",
         "  status_seconds: $StatusSeconds",
-        "  auto_poll: $(-not $NoAutoPoll)",
+        "  live_receive: $script:liveReceive",
+        "  protocol_enabled: $script:protocolEnabled",
         "  health: $(Get-HealthLabel)",
         "  transcript_lines: $script:transcriptLimit"
     )
@@ -708,6 +909,34 @@ function Process-InputLine {
         Add-TranscriptLine "Auto-poll interval set to $nextInterval seconds"
         Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
         Request-Render
+    } elseif ($Line -eq "/live") {
+        $script:liveReceive = -not $script:liveReceive
+        Add-TranscriptLine "Live receive polling $(if ($script:liveReceive) { "enabled" } else { "paused" })"
+        Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
+        Request-Render
+    } elseif ($Line -eq "/live on" -or $Line -eq "/autopoll on") {
+        $script:liveReceive = $true
+        Add-TranscriptLine "Live receive polling enabled"
+        Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
+        Request-Render
+    } elseif ($Line -eq "/live off" -or $Line -eq "/autopoll off") {
+        $script:liveReceive = $false
+        Add-TranscriptLine "Live receive polling paused"
+        Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
+        Request-Render
+    } elseif ($Line -eq "/protocol on") {
+        $script:protocolEnabled = $true
+        Send-BridgeLine $(if ($script:currentMode -eq "admin") { "protocol on" } else { "/protocol on" })
+        Add-TranscriptLine "Structured serial protocol requested"
+        Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
+        Request-Render
+    } elseif ($Line -eq "/protocol off") {
+        Send-BridgeLine $(if ($script:currentMode -eq "admin") { "protocol off" } else { "/protocol off" })
+        $script:protocolEnabled = $false
+        $script:bridgeHealth.serial = "off"
+        Add-TranscriptLine "Structured serial protocol disabled"
+        Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
+        Request-Render
     } elseif ($Line -match "^/status-interval\s+(\d+)$") {
         $nextInterval = [Math]::Max(0, [int]$Matches[1])
         Set-Variable -Name StatusSeconds -Scope Script -Value $nextInterval
@@ -738,6 +967,9 @@ function Process-InputLine {
         Send-BridgeLine $Line
     } else {
         Send-BridgeLine $Line
+        $script:lastSentAt = [DateTime]::UtcNow
+        $script:lastPollAt = [DateTime]::UtcNow.AddSeconds(-[Math]::Max(1, $PollSeconds - 1))
+        Request-Render
     }
 }
 
@@ -785,6 +1017,7 @@ function Assert-SmokeTranscriptHealthy {
 function Run-Smoke {
     Write-Ui "Running bridge TUI smoke on $Port..." ([ConsoleColor]::Yellow)
     Sync-BridgeAdmin
+    Enable-StructuredProtocol
 
     $smokeDmRecipient = if (-not [string]::IsNullOrWhiteSpace($SmokeDmRecipientUserId)) {
         $SmokeDmRecipientUserId
@@ -878,6 +1111,7 @@ function Run-Interactive {
         Write-Ui "Opening $Port at $BaudRate baud..." ([ConsoleColor]::Yellow)
     }
     Sync-BridgeAdmin
+    Enable-StructuredProtocol
     Invoke-StatusCommand -Quiet
     Start-Sleep -Milliseconds 250
     Read-SerialOutput
@@ -893,7 +1127,7 @@ function Run-Interactive {
     while ($script:running) {
         Read-SerialOutput
 
-        if (-not $NoAutoPoll -and ($script:currentMode -eq "group" -or $script:currentMode -eq "dm")) {
+        if ($script:liveReceive -and ($script:currentMode -eq "group" -or $script:currentMode -eq "dm")) {
             $elapsed = [DateTime]::UtcNow - $script:lastPollAt
             if ($elapsed.TotalSeconds -ge $PollSeconds) {
                 Invoke-Poll
