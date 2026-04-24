@@ -67,6 +67,12 @@ static EventGroupHandle_t s_wifi_event_group;
 static bridge_state_t s_bridge_state;
 static bool s_wifi_reconfiguring;
 
+static bool bridge_ensure_wifi_connected(const char *action);
+
+static const char *BRIDGE_CURSOR_GROUP_MESSAGE_ID_KEY = "cur_group_id";
+static const char *BRIDGE_CURSOR_DM_RECIPIENT_KEY = "cur_dm_rec";
+static const char *BRIDGE_CURSOR_DM_MESSAGE_ID_KEY = "cur_dm_id";
+
 static void bridge_save_string(const char *key, const char *value) {
     nvs_handle_t handle;
     if (nvs_open(BRIDGE_STORAGE_NAMESPACE, NVS_READWRITE, &handle) != ESP_OK) {
@@ -115,6 +121,40 @@ static void bridge_set_runtime_string(char *target, size_t target_size, const ch
     }
 
     snprintf(target, target_size, "%s", value);
+}
+
+static void bridge_load_chat_cursors(
+    char *group_cursor_message_id,
+    size_t group_cursor_message_id_size,
+    char *dm_cursor_recipient_user_id,
+    size_t dm_cursor_recipient_size,
+    char *dm_cursor_message_id,
+    size_t dm_cursor_message_id_size
+) {
+    bridge_load_string(BRIDGE_CURSOR_GROUP_MESSAGE_ID_KEY, group_cursor_message_id, group_cursor_message_id_size);
+    bridge_load_string(BRIDGE_CURSOR_DM_RECIPIENT_KEY, dm_cursor_recipient_user_id, dm_cursor_recipient_size);
+    bridge_load_string(BRIDGE_CURSOR_DM_MESSAGE_ID_KEY, dm_cursor_message_id, dm_cursor_message_id_size);
+}
+
+static void bridge_save_group_cursor(const char *message_id) {
+    if (message_id && message_id[0] != '\0') {
+        bridge_save_string(BRIDGE_CURSOR_GROUP_MESSAGE_ID_KEY, message_id);
+    }
+}
+
+static void bridge_save_dm_cursor(const char *recipient_user_id, const char *message_id) {
+    bridge_save_string(BRIDGE_CURSOR_DM_RECIPIENT_KEY, recipient_user_id);
+    bridge_save_string(BRIDGE_CURSOR_DM_MESSAGE_ID_KEY, message_id);
+}
+
+static void bridge_clear_dm_cursor(void) {
+    bridge_save_string(BRIDGE_CURSOR_DM_RECIPIENT_KEY, "");
+    bridge_save_string(BRIDGE_CURSOR_DM_MESSAGE_ID_KEY, "");
+}
+
+static void bridge_clear_chat_cursors(void) {
+    bridge_save_string(BRIDGE_CURSOR_GROUP_MESSAGE_ID_KEY, "");
+    bridge_clear_dm_cursor();
 }
 
 static char *bridge_json_string_body(const char *key_a, const char *value_a, const char *key_b, const char *value_b) {
@@ -871,6 +911,7 @@ static void bridge_clear_pairing_state(void) {
     bridge_save_string("auth_user_id", "");
     bridge_save_string("auth_expires_at", "");
     bridge_save_string("session_expires_at", "");
+    bridge_clear_chat_cursors();
 }
 
 static void bridge_clear_session_material(void) {
@@ -1138,6 +1179,10 @@ static void bridge_command_session_exchange(void) {
 
     bridge_print_response("bridge-session-exchange", &response);
 
+    if (response.status_code < 200 || response.status_code >= 300) {
+        return;
+    }
+
     cJSON *json = bridge_parse_json_body(&response);
     if (!json) {
         return;
@@ -1394,8 +1439,12 @@ static void bridge_startup_recovery_task(void *arg) {
 }
 
 static void bridge_command_heartbeat(void) {
-    if (!s_bridge_state.wifi_connected || s_bridge_state.device_id[0] == '\0' || s_bridge_state.access_token[0] == '\0') {
+    if (s_bridge_state.device_id[0] == '\0' || s_bridge_state.access_token[0] == '\0') {
         printf("Device must have stored access material before heartbeat\n");
+        return;
+    }
+
+    if (!bridge_ensure_wifi_connected("heartbeat")) {
         return;
     }
 
@@ -1460,13 +1509,39 @@ static void bridge_command_wipe(void) {
     );
 }
 
+static bool bridge_ensure_wifi_connected(const char *action) {
+    if (s_bridge_state.wifi_connected) {
+        return true;
+    }
+
+    if (s_bridge_state.wifi_ssid[0] == '\0') {
+        printf("Wi-Fi is not configured. Use: wifi set <ssid> <password>\n");
+        return false;
+    }
+
+    printf("Wi-Fi is disconnected; reconnecting before %s\n", action);
+    esp_err_t err = bridge_wifi_apply_credentials();
+    if (err != ESP_OK) {
+        printf("Wi-Fi reconnect failed before %s: %s\n", action, esp_err_to_name(err));
+        return false;
+    }
+
+    if (!bridge_wait_for_wifi(30000)) {
+        printf("Wi-Fi reconnect timed out before %s\n", action);
+        return false;
+    }
+
+    printf("Wi-Fi reconnected\n");
+    return true;
+}
+
 static bool bridge_has_access_material(const char *action) {
-    if (!s_bridge_state.wifi_connected || s_bridge_state.device_id[0] == '\0' || s_bridge_state.access_token[0] == '\0') {
+    if (s_bridge_state.device_id[0] == '\0' || s_bridge_state.access_token[0] == '\0') {
         printf("Device must be paired and have stored access material before %s\n", action);
         return false;
     }
 
-    return true;
+    return bridge_ensure_wifi_connected(action);
 }
 
 static bool bridge_send_group_message(const char *content, bool compact_output) {
@@ -1557,7 +1632,11 @@ static bool bridge_poll_group_messages(
     }
 
     if (response.status_code >= 200 && response.status_code < 300) {
-        if (!bridge_print_message_list(&response, false, cursor_message_id, cursor_message_id_size, print_empty)) {
+        if (bridge_print_message_list(&response, false, cursor_message_id, cursor_message_id_size, print_empty)) {
+            if (cursor_message_id && cursor_message_id_size > 0) {
+                bridge_save_group_cursor(cursor_message_id);
+            }
+        } else {
             bridge_print_response("bridge-group-poll", &response);
         }
     } else {
@@ -1670,7 +1749,11 @@ static bool bridge_poll_dm_messages(
     }
 
     if (response.status_code >= 200 && response.status_code < 300) {
-        if (!bridge_print_message_list(&response, true, cursor_message_id, cursor_message_id_size, print_empty)) {
+        if (bridge_print_message_list(&response, true, cursor_message_id, cursor_message_id_size, print_empty)) {
+            if (cursor_message_id && cursor_message_id_size > 0) {
+                bridge_save_dm_cursor(recipient_user_id, cursor_message_id);
+            }
+        } else {
             bridge_print_response("bridge-dm-poll", &response);
         }
     } else {
@@ -1744,7 +1827,17 @@ static void bridge_enter_group_chat(
 ) {
     *chat_mode = BRIDGE_CHAT_MODE_GROUP;
     printf("Entered group chat. Type /help for chat commands or /admin for the admin shell.\n");
-    bridge_poll_group_messages(true, false, group_cursor_message_id, group_cursor_message_id_size, true);
+    bool has_saved_cursor = group_cursor_message_id && group_cursor_message_id[0] != '\0';
+    if (has_saved_cursor) {
+        printf("Resuming group chat from saved cursor.\n");
+    }
+    bridge_poll_group_messages(
+        true,
+        has_saved_cursor,
+        group_cursor_message_id,
+        group_cursor_message_id_size,
+        !has_saved_cursor
+    );
 }
 
 static void bridge_enter_dm_chat(
@@ -1762,18 +1855,33 @@ static void bridge_enter_dm_chat(
         return;
     }
 
-    if (
+    bool has_saved_cursor = (
         dm_cursor_recipient_user_id &&
-        strcmp(dm_cursor_recipient_user_id, next_recipient_user_id) != 0
-    ) {
+        dm_cursor_message_id &&
+        strcmp(dm_cursor_recipient_user_id, next_recipient_user_id) == 0 &&
+        dm_cursor_message_id[0] != '\0'
+    );
+
+    if (!has_saved_cursor) {
         bridge_set_runtime_string(dm_cursor_message_id, dm_cursor_message_id_size, "");
     }
 
     bridge_set_runtime_string(recipient_user_id, recipient_size, next_recipient_user_id);
     bridge_set_runtime_string(dm_cursor_recipient_user_id, dm_cursor_recipient_size, next_recipient_user_id);
+    bridge_save_dm_cursor(dm_cursor_recipient_user_id, dm_cursor_message_id);
     *chat_mode = BRIDGE_CHAT_MODE_DM;
     printf("Entered DM chat with %s. Type /help for chat commands or /admin for the admin shell.\n", recipient_user_id);
-    bridge_poll_dm_messages(recipient_user_id, true, false, dm_cursor_message_id, dm_cursor_message_id_size, true);
+    if (has_saved_cursor) {
+        printf("Resuming DM chat from saved cursor.\n");
+    }
+    bridge_poll_dm_messages(
+        recipient_user_id,
+        true,
+        has_saved_cursor,
+        dm_cursor_message_id,
+        dm_cursor_message_id_size,
+        !has_saved_cursor
+    );
 }
 
 static bool bridge_handle_chat_line(
@@ -1893,6 +2001,15 @@ static void bridge_shell_task(void *arg) {
     char dm_cursor_message_id[64] = {0};
     bridge_chat_mode_t chat_mode = BRIDGE_CHAT_MODE_ADMIN;
     bool prompt_pending = true;
+
+    bridge_load_chat_cursors(
+        group_cursor_message_id,
+        sizeof(group_cursor_message_id),
+        dm_cursor_recipient_user_id,
+        sizeof(dm_cursor_recipient_user_id),
+        dm_cursor_message_id,
+        sizeof(dm_cursor_message_id)
+    );
 
     bridge_command_help();
 
