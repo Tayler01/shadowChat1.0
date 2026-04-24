@@ -251,7 +251,7 @@ function Normalize-BridgeLine {
 function Get-LineColor {
     param([string]$Line)
 
-    if ($Line -match "^(?:\d{4}-\d{2}-\d{2}T.*|\d{2}:\d{2}:\d{2}|\(unknown time\)) \| ([^:]+): (.*)$") {
+    if ($Line -match "^(?:DM \| )?(?:\d{4}-\d{2}-\d{2}T.*|\d{2}:\d{2}:\d{2}|\(unknown time\)) \| ([^:]+): (.*)$") {
         $sender = $Matches[1]
         if (Test-OwnBridgeMessageSender $sender) {
             return [ConsoleColor]::Cyan
@@ -300,6 +300,13 @@ function Add-MessageLine {
     while ($script:messages.Count -gt $script:transcriptLimit) {
         $script:messages.RemoveAt(0)
     }
+}
+
+function Clear-MessagePane {
+    $script:messages.Clear()
+    $script:seenMessageLines.Clear()
+    $script:seenMessageIds.Clear()
+    $script:pollMarkerPending = $false
 }
 
 function Add-LiveFeedLine {
@@ -394,13 +401,13 @@ function Switch-NextConversation {
 function Test-BridgeMessageLine {
     param([string]$Line)
 
-    return $Line -match "^(?:\d{4}-\d{2}-\d{2}T.*|\d{2}:\d{2}:\d{2}|\(unknown time\)) \| [^:]+: .+"
+    return $Line -match "^(?:DM \| )?(?:\d{4}-\d{2}-\d{2}T.*|\d{2}:\d{2}:\d{2}|\(unknown time\)) \| [^:]+: .+"
 }
 
 function Get-BridgeMessageParts {
     param([string]$Line)
 
-    if ($Line -match "^(?<time>\d{4}-\d{2}-\d{2}T.*|\d{2}:\d{2}:\d{2}|\(unknown time\)) \| (?<sender>[^:]+): (?<content>.*)$") {
+    if ($Line -match "^(?:DM \| )?(?<time>\d{4}-\d{2}-\d{2}T.*|\d{2}:\d{2}:\d{2}|\(unknown time\)) \| (?<sender>[^:]+): (?<content>.*)$") {
         return [pscustomobject]@{
             Time = $Matches.time
             Sender = $Matches.sender
@@ -493,7 +500,9 @@ function Format-ProtocolMessageLine {
 
     $sender = Get-ProtocolString $Event "senderLabel" (Get-ProtocolString $Event "senderId" "unknown")
     $content = Get-ProtocolString $Event "content" ""
-    return "$timeLabel | ${sender}: $content"
+    $thread = Get-ProtocolString $Event "thread" "message"
+    $prefix = if ($thread -eq "dm") { "DM | " } else { "" }
+    return "${prefix}$timeLabel | ${sender}: $content"
 }
 
 function Update-BridgeHealthFromProtocol {
@@ -600,10 +609,6 @@ function Try-HandleProtocolLine {
     if ($type -eq "sent") {
         $script:lastSentAt = [DateTime]::UtcNow
         $thread = Get-ProtocolString $event "thread" "message"
-        $id = Get-ProtocolString $event "id"
-        if ($id) {
-            $script:seenMessageIds.Add($id) | Out-Null
-        }
         Add-LiveFeedLine "sent: $thread"
         Request-Render
         return $true
@@ -970,6 +975,8 @@ function Enter-BridgeMode {
     if ($NextMode -eq "group") {
         & $ensureAdminMode
         $script:currentMode = "group"
+        $script:dmRecipientUserId = ""
+        Clear-MessagePane
         Send-BridgeLine "chat group"
         $script:lastPollAt = [DateTime]::UtcNow
         Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
@@ -987,6 +994,7 @@ function Enter-BridgeMode {
         $script:currentMode = "dm"
         $script:dmRecipientUserId = $RecipientUserId
         Add-RecentDm $RecipientUserId
+        Clear-MessagePane
         Send-BridgeLine "chat dm $RecipientUserId"
         $script:lastPollAt = [DateTime]::UtcNow
         Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
@@ -998,6 +1006,7 @@ function Enter-BridgeMode {
         Send-BridgeLine "/admin"
     }
     $script:currentMode = "admin"
+    Clear-MessagePane
     Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
     Request-Render
 }

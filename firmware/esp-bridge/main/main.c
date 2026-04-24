@@ -164,7 +164,8 @@ static void bridge_protocol_emit_message(
     const char *created_at,
     const char *sender_id,
     const char *sender_label,
-    const char *content
+    const char *content,
+    const char *conversation_id
 ) {
     cJSON *event = cJSON_CreateObject();
     if (!event) {
@@ -178,6 +179,9 @@ static void bridge_protocol_emit_message(
     cJSON_AddStringToObject(event, "senderId", sender_id ? sender_id : "");
     cJSON_AddStringToObject(event, "senderLabel", sender_label ? sender_label : "");
     cJSON_AddStringToObject(event, "content", content ? content : "");
+    if (conversation_id && conversation_id[0] != '\0') {
+        cJSON_AddStringToObject(event, "conversationId", conversation_id);
+    }
 
     bridge_protocol_emit(event);
     cJSON_Delete(event);
@@ -862,17 +866,21 @@ static bool bridge_print_message_list(
         const char *created_at = bridge_json_string_or_empty(message, "created_at");
         const char *content = bridge_json_string_or_empty(message, "content");
         const char *sender_id = bridge_json_string_or_empty(message, dm_messages ? "sender_id" : "user_id");
+        const char *conversation_id = dm_messages ? bridge_json_string_or_empty(message, "conversation_id") : "";
         cJSON *profile = cJSON_GetObjectItemCaseSensitive(message, dm_messages ? "sender" : "user");
         char time_label[12] = {0};
         const char *sender_label = bridge_profile_label(profile, sender_id);
 
-        printf(
-            "%s | %s: %s\n",
-            bridge_message_time_label(created_at, time_label, sizeof(time_label)),
-            sender_label,
-            content
-        );
-        bridge_protocol_emit_message(thread, id, created_at, sender_id, sender_label, content);
+        if (s_protocol_enabled) {
+            bridge_protocol_emit_message(thread, id, created_at, sender_id, sender_label, content, conversation_id);
+        } else {
+            printf(
+                "%s | %s: %s\n",
+                bridge_message_time_label(created_at, time_label, sizeof(time_label)),
+                sender_label,
+                content
+            );
+        }
 
         if (id[0] != '\0' && cursor_message_id && cursor_message_id_size > 0) {
             bridge_set_runtime_string(cursor_message_id, cursor_message_id_size, id);
@@ -1969,12 +1977,13 @@ static void bridge_realtime_emit_record(const char *thread, cJSON *record) {
     const char *created_at = bridge_json_string_or_empty(record, "created_at");
     const char *content = bridge_json_string_or_empty(record, "content");
     const char *sender_id = bridge_json_string_or_empty(record, strcmp(thread, "dm") == 0 ? "sender_id" : "user_id");
+    const char *conversation_id = strcmp(thread, "dm") == 0 ? bridge_json_string_or_empty(record, "conversation_id") : "";
     char time_label[12] = {0};
     char sender_label_buffer[80] = {0};
     const char *sender_label = bridge_lookup_profile_label(sender_id, sender_label_buffer, sizeof(sender_label_buffer));
 
     if (s_protocol_enabled) {
-        bridge_protocol_emit_message(thread, id, created_at, sender_id, sender_label, content);
+        bridge_protocol_emit_message(thread, id, created_at, sender_id, sender_label, content, conversation_id);
     } else {
         printf(
             "%s | %s: %s\n",
@@ -2341,7 +2350,7 @@ static bool bridge_poll_group_messages(
             cursor_message_id
         );
     } else {
-        snprintf(body, sizeof(body), "{\"deviceId\":\"%s\",\"limit\":5}", s_bridge_state.device_id);
+        snprintf(body, sizeof(body), "{\"deviceId\":\"%s\",\"limit\":10}", s_bridge_state.device_id);
     }
 
     bridge_http_response_t response = {0};
@@ -2552,16 +2561,12 @@ static void bridge_enter_group_chat(
     *chat_mode = BRIDGE_CHAT_MODE_GROUP;
     printf("Entered group chat. Type /help for chat commands or /admin for the admin shell.\n");
     bridge_protocol_emit_mode("group", NULL);
-    bool has_saved_cursor = group_cursor_message_id && group_cursor_message_id[0] != '\0';
-    if (has_saved_cursor) {
-        printf("Resuming group chat from saved cursor.\n");
-    }
     bridge_poll_group_messages(
         true,
-        has_saved_cursor,
+        false,
         group_cursor_message_id,
         group_cursor_message_id_size,
-        !has_saved_cursor
+        true
     );
 }
 
@@ -2580,14 +2585,11 @@ static void bridge_enter_dm_chat(
         return;
     }
 
-    bool has_saved_cursor = (
-        dm_cursor_recipient_user_id &&
-        dm_cursor_message_id &&
-        strcmp(dm_cursor_recipient_user_id, next_recipient_user_id) == 0 &&
-        dm_cursor_message_id[0] != '\0'
-    );
-
-    if (!has_saved_cursor) {
+    if (
+        !dm_cursor_recipient_user_id ||
+        !dm_cursor_message_id ||
+        strcmp(dm_cursor_recipient_user_id, next_recipient_user_id) != 0
+    ) {
         bridge_set_runtime_string(dm_cursor_message_id, dm_cursor_message_id_size, "");
     }
 
@@ -2597,16 +2599,13 @@ static void bridge_enter_dm_chat(
     *chat_mode = BRIDGE_CHAT_MODE_DM;
     printf("Entered DM chat with %s. Type /help for chat commands or /admin for the admin shell.\n", recipient_user_id);
     bridge_protocol_emit_mode("dm", recipient_user_id);
-    if (has_saved_cursor) {
-        printf("Resuming DM chat from saved cursor.\n");
-    }
     bridge_poll_dm_messages(
         recipient_user_id,
         true,
-        has_saved_cursor,
+        false,
         dm_cursor_message_id,
         dm_cursor_message_id_size,
-        !has_saved_cursor
+        true
     );
 }
 
