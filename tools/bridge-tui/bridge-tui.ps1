@@ -468,6 +468,31 @@ function Read-SerialOutput {
     }
 }
 
+function Wait-ForTranscriptPattern {
+    param(
+        [string]$Pattern,
+        [int]$Seconds = 5,
+        [switch]$Quiet
+    )
+
+    $startIndex = $script:transcript.Count
+    $deadline = [DateTime]::UtcNow.AddSeconds($Seconds)
+    while ([DateTime]::UtcNow -lt $deadline) {
+        Read-SerialOutput -Quiet:$Quiet
+        $newLines = @()
+        if ($script:transcript.Count -gt $startIndex) {
+            $newLines = $script:transcript[$startIndex..($script:transcript.Count - 1)]
+        }
+        $joined = $newLines -join "`n"
+        if ($joined -match $Pattern) {
+            return $true
+        }
+        Start-Sleep -Milliseconds 100
+    }
+
+    return $false
+}
+
 function Send-BridgeLine {
     param([string]$Line)
 
@@ -583,12 +608,16 @@ function Invoke-AdminCommand {
 }
 
 function Sync-BridgeAdmin {
-    for ($i = 0; $i -lt 2; $i++) {
+    Read-SerialOutput -Quiet
+    for ($i = 0; $i -lt 4; $i++) {
         Send-BridgeLine "/admin"
-        Start-Sleep -Milliseconds 500
-        Read-SerialOutput -Quiet
+        if (Wait-ForTranscriptPattern "(Returned to admin shell|Already in admin shell|bridge>\\s*)" 3) {
+            $script:currentMode = "admin"
+            return
+        }
     }
-    $script:currentMode = "admin"
+
+    throw "Could not sync bridge into admin shell before starting smoke."
 }
 
 function Show-Help {
@@ -717,10 +746,16 @@ function Connect-Serial {
     $portInstance.Encoding = $script:utf8NoBom
     $portInstance.NewLine = "`n"
     $portInstance.ReadTimeout = 50
-    $portInstance.WriteTimeout = 2000
+    $portInstance.WriteTimeout = 10000
     $portInstance.DtrEnable = $false
     $portInstance.RtsEnable = $false
     $portInstance.Open()
+    try {
+        $portInstance.DiscardInBuffer()
+        $portInstance.DiscardOutBuffer()
+    } catch {
+        # Some serial drivers do not support discard immediately after open.
+    }
     return $portInstance
 }
 
@@ -765,14 +800,14 @@ function Run-Smoke {
         Enter-BridgeMode "group"
     }
 
-    Wait-BridgeOutput 5
+    Wait-BridgeOutput 7
 
     if ($script:currentMode -eq "group" -and -not [string]::IsNullOrWhiteSpace($SmokeGroupText)) {
         Write-Ui "Smoke sending group message..." ([ConsoleColor]::Yellow)
         Send-BridgeLine $SmokeGroupText
-        Wait-BridgeOutput 6
+        Wait-BridgeOutput 12
         Invoke-Poll
-        Wait-BridgeOutput 6
+        Wait-BridgeOutput 10
 
         $groupTranscript = $script:transcript -join "`n"
         if ($groupTranscript -notmatch [regex]::Escape($SmokeGroupText)) {
@@ -782,20 +817,20 @@ function Run-Smoke {
 
     if ($script:currentMode -ne "admin") {
         Invoke-Poll
-        Wait-BridgeOutput 5
+        Wait-BridgeOutput 8
     }
 
     if (-not [string]::IsNullOrWhiteSpace($smokeDmRecipient)) {
         Write-Ui "Smoke checking DM thread..." ([ConsoleColor]::Yellow)
         Enter-BridgeMode "dm" $smokeDmRecipient
-        Wait-BridgeOutput 5
+        Wait-BridgeOutput 7
 
         if (-not [string]::IsNullOrWhiteSpace($SmokeDmText)) {
             Write-Ui "Smoke sending DM..." ([ConsoleColor]::Yellow)
             Send-BridgeLine $SmokeDmText
-            Wait-BridgeOutput 6
+            Wait-BridgeOutput 12
             Invoke-Poll
-            Wait-BridgeOutput 6
+            Wait-BridgeOutput 10
 
             $dmTranscript = $script:transcript -join "`n"
             if ($dmTranscript -notmatch [regex]::Escape($SmokeDmText)) {
@@ -803,12 +838,12 @@ function Run-Smoke {
             }
         } else {
             Invoke-Poll
-            Wait-BridgeOutput 5
+            Wait-BridgeOutput 8
         }
     }
 
     Invoke-AdminCommand "status"
-    Wait-BridgeOutput 3
+    Wait-BridgeOutput 5
 
     $joined = $script:transcript -join "`n"
     Assert-SmokeTranscriptHealthy $joined

@@ -197,3 +197,9 @@ Verified on `COM3` against device `a091ab7f-88de-4b8b-befb-9d8a53d9ff60`:
   - later recovery uses the stored recovery token to auto-approve a short-lived pairing code and immediately run `session exchange`
 - successful self-recovery test returned `autoApprovedRecovery: true`, exchanged fresh access/refresh/auth material, and reported `recovery_token: (stored)` in firmware status
 - follow-up TUI smoke passed group send/poll, DM send/poll, status, and cursor resume after self-recovery
+- a foreground soak on `2026-04-24` completed 12 consecutive TUI smoke passes:
+  - each pass sent and polled one group message and one DM to `@caleb`
+  - pass 4 intentionally ran `session recover`
+  - recovery returned `autoApprovedRecovery: true` and exchanged fresh session material without iPhone approval
+  - all later passes continued to send/poll group and DM traffic successfully
+- the Windows TUI smoke harness now waits longer around send/poll operations and verifies admin-shell sync before sending chat mode commands, after an earlier soak attempt exposed serial desync and valid-but-slow DM sends
