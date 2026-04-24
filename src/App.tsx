@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect, useState } from 'react'
+import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { AuthGuard } from './components/auth/AuthGuard'
 import { Sidebar } from './components/layout/Sidebar'
@@ -33,24 +33,34 @@ const SettingsView = lazy(() =>
 )
 
 type View = 'chat' | 'dms' | 'profile' | 'settings'
+type LocationState = {
+  view: View
+  conversation: string | null
+  message: string | null
+}
 
 const isView = (value: string | null): value is View => (
   value === 'chat' || value === 'dms' || value === 'profile' || value === 'settings'
 )
 
-const getInitialLocationState = () => {
-  if (typeof window === 'undefined') {
-    return { view: 'chat' as View, conversation: null as string | null, message: null as string | null }
-  }
-
-  const params = new URLSearchParams(window.location.search)
+const getLocationStateFromUrl = (url: URL): LocationState => {
+  const params = new URLSearchParams(url.search)
   const nextView = params.get('view')
+  const view = isView(nextView) ? nextView : ('chat' as View)
 
   return {
-    view: isView(nextView) ? nextView : ('chat' as View),
-    conversation: nextView === 'dms' ? params.get('conversation') : null,
-    message: params.get('message'),
+    view,
+    conversation: view === 'dms' ? params.get('conversation') : null,
+    message: view === 'dms' || view === 'chat' ? params.get('message') : null,
   }
+}
+
+const getInitialLocationState = (): LocationState => {
+  if (typeof window === 'undefined') {
+    return { view: 'chat', conversation: null, message: null }
+  }
+
+  return getLocationStateFromUrl(new URL(window.location.href))
 }
 
 function ViewLoadingState() {
@@ -102,34 +112,48 @@ function App() {
     setSidebarOpen((prev) => !prev)
   }
 
+  const applyLocationState = useCallback((locationState: LocationState) => {
+    setCurrentView(locationState.view)
+    setDmTarget(locationState.conversation)
+    setMessageTarget(locationState.message)
+  }, [])
+
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const applyUrlState = () => {
-      const params = new URLSearchParams(window.location.search)
-      const nextView = params.get('view')
-      const nextConversation = params.get('conversation')
-      const nextMessage = params.get('message')
+      applyLocationState(getLocationStateFromUrl(new URL(window.location.href)))
+    }
 
-      if (isView(nextView)) {
-        setCurrentView(nextView)
+    const applyServiceWorkerNotificationClick = (event: MessageEvent) => {
+      if (event.data?.type !== 'SHADOWCHAT_NOTIFICATION_CLICK') {
+        return
       }
 
-      if (nextView === 'dms' && nextConversation) {
-        setDmTarget(nextConversation)
-      } else if (nextView !== 'dms') {
-        setDmTarget(null)
+      const route = event.data.targetHref || event.data.targetUrl || event.data.data?.route || event.data.data?.url
+      if (typeof route !== 'string') {
+        return
       }
 
-      setMessageTarget((nextView === 'dms' && nextConversation) || nextView === 'chat' ? nextMessage : null)
+      const nextUrl = new URL(route, window.location.origin)
+      if (nextUrl.origin !== window.location.origin) {
+        return
+      }
+
+      window.history.replaceState({}, '', nextUrl)
+      applyLocationState(getLocationStateFromUrl(nextUrl))
     }
 
     window.addEventListener('popstate', applyUrlState)
+    window.addEventListener('pageshow', applyUrlState)
+    navigator.serviceWorker?.addEventListener('message', applyServiceWorkerNotificationClick)
 
     return () => {
       window.removeEventListener('popstate', applyUrlState)
+      window.removeEventListener('pageshow', applyUrlState)
+      navigator.serviceWorker?.removeEventListener('message', applyServiceWorkerNotificationClick)
     }
-  }, [])
+  }, [applyLocationState])
 
   useMessageNotifications((conversationId) => {
     setDmTarget(conversationId)

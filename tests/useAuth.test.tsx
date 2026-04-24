@@ -26,6 +26,8 @@ jest.mock('../src/lib/supabase', () => {
     getWorkingClient: jest.fn(),
     ensureSession: jest.fn(),
     getSessionWithTimeout: jest.fn(),
+    getStoredRefreshToken: jest.fn(),
+    recoverSessionAfterResume: jest.fn(),
     updateUserPresence: jest.fn(),
   };
 });
@@ -71,12 +73,18 @@ beforeEach(() => {
   const {
     ensureSession,
     getSessionWithTimeout,
+    getStoredRefreshToken,
+    recoverSessionAfterResume,
   } = jest.requireMock('../src/lib/supabase') as {
     ensureSession: jest.Mock;
     getSessionWithTimeout: jest.Mock;
+    getStoredRefreshToken: jest.Mock;
+    recoverSessionAfterResume: jest.Mock;
   };
   ensureSession.mockResolvedValue(false);
   getSessionWithTimeout.mockResolvedValue({ data: { session: null }, error: null });
+  getStoredRefreshToken.mockReturnValue(null);
+  recoverSessionAfterResume.mockResolvedValue(false);
   getWorkingClient.mockResolvedValue({
     auth: {
       getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),

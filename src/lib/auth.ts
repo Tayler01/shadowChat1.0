@@ -7,6 +7,8 @@ const BANNER_BUCKET = 'banners'
 
 const PROFILE_RETRY_DELAY_MS = 250
 const PROFILE_RETRY_ATTEMPTS = 8
+const AUTH_USER_LOOKUP_TIMEOUT_MS = 5000
+const PROFILE_LOOKUP_TIMEOUT_MS = 6000
 
 export interface AuthUser extends SupabaseAuthUser {
   user_metadata: {
@@ -37,13 +39,26 @@ export interface SignUpResult {
 const wait = (ms: number) =>
   new Promise(resolve => setTimeout(resolve, ms))
 
+const withTimeout = async <T>(promise: PromiseLike<T>, ms: number, message: string): Promise<T> => (
+  Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      globalThis.setTimeout(() => reject(new Error(message)), ms)
+    }),
+  ]) as Promise<T>
+)
+
 const fetchUserProfileWithRetry = async (userId: string): Promise<AppUser | null> => {
   for (let attempt = 0; attempt < PROFILE_RETRY_ATTEMPTS; attempt += 1) {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle()
+    const { data, error } = await withTimeout<{ data: AppUser | null; error: any }>(
+      supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle() as PromiseLike<{ data: AppUser | null; error: any }>,
+      PROFILE_LOOKUP_TIMEOUT_MS,
+      `Profile lookup timeout after ${PROFILE_LOOKUP_TIMEOUT_MS}ms`
+    )
 
     if (data) {
       return data as unknown as AppUser
@@ -155,7 +170,17 @@ export const signOut = async () => {
 
 export const getCurrentUser = async (): Promise<AppUser | null> => {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await withTimeout<{
+      data: { user: SupabaseAuthUser | null }
+      error: any
+    }>(
+      supabase.auth.getUser() as PromiseLike<{
+        data: { user: SupabaseAuthUser | null }
+        error: any
+      }>,
+      AUTH_USER_LOOKUP_TIMEOUT_MS,
+      `Auth user lookup timeout after ${AUTH_USER_LOOKUP_TIMEOUT_MS}ms`
+    )
 
     if (authError && authError.message?.includes('User from sub claim in JWT does not exist')) {
       await supabase.auth.signOut()

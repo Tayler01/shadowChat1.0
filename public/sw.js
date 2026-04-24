@@ -103,15 +103,43 @@ self.addEventListener('notificationclick', (event) => {
   }
   const targetHref = new URL(targetUrl, self.location.origin).href
 
+  const sendClickIntent = (client) => {
+    if (!client || !('postMessage' in client)) {
+      return
+    }
+
+    client.postMessage({
+      type: 'SHADOWCHAT_NOTIFICATION_CLICK',
+      targetUrl,
+      targetHref,
+      data,
+    })
+  }
+
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
-      for (const client of clients) {
-        if ('focus' in client) {
-          if ('navigate' in client) {
-            client.navigate(targetHref)
-          }
-          return client.focus()
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (clients) => {
+      const appClient = clients.find((client) => {
+        try {
+          return new URL(client.url).origin === self.location.origin
+        } catch {
+          return false
         }
+      })
+
+      if (appClient && 'focus' in appClient) {
+        sendClickIntent(appClient)
+
+        let focusedClient = appClient
+        if ('navigate' in appClient) {
+          try {
+            focusedClient = await appClient.navigate(targetHref) || appClient
+          } catch {
+            focusedClient = appClient
+          }
+        }
+
+        sendClickIntent(focusedClient)
+        return focusedClient.focus()
       }
 
       if (self.clients.openWindow) {
