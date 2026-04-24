@@ -846,6 +846,7 @@ static void bridge_chat_help(void) {
     printf("  /poll                 fetch latest messages\n");
     printf("  /dm <recipient|@name> switch to a DM thread\n");
     printf("  /group                switch to group chat\n");
+    printf("  /status               show bridge status\n");
     printf("  /admin                return to the admin shell\n");
     printf("  /help                 show this help\n\n");
 }
@@ -1816,6 +1817,8 @@ static bool bridge_handle_chat_line(
             } else if (*chat_mode == BRIDGE_CHAT_MODE_DM) {
                 bridge_poll_dm_messages(recipient_user_id, true, true, dm_cursor_message_id, dm_cursor_message_id_size, false);
             }
+        } else if (strcmp(line, "/status") == 0) {
+            bridge_command_status();
         } else {
             printf("Unknown chat command. Type /help.\n");
         }

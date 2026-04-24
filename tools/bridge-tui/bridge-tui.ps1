@@ -6,6 +6,7 @@ param(
     [string]$Mode = "group",
     [string]$DmRecipientUserId = "",
     [int]$PollSeconds = 6,
+    [int]$StatusSeconds = 45,
     [switch]$NoAutoPoll,
     [switch]$Smoke,
     [switch]$NoAnsi,
@@ -67,6 +68,7 @@ function Save-BridgeTuiPreferences {
         mode = $script:currentMode
         dmRecipientUserId = $script:dmRecipientUserId
         pollSeconds = $PollSeconds
+        statusSeconds = $StatusSeconds
         noAutoPoll = [bool]$NoAutoPoll
         transcriptLines = $script:transcriptLimit
         updatedAt = [DateTime]::UtcNow.ToString("o")
@@ -120,6 +122,13 @@ if ($loadedPreferences) {
     if (-not $PSBoundParameters.ContainsKey("PollSeconds") -and $loadedPreferences.pollSeconds) {
         $PollSeconds = [int]$loadedPreferences.pollSeconds
     }
+    if (
+        -not $PSBoundParameters.ContainsKey("StatusSeconds") -and
+        ($loadedPreferences.PSObject.Properties.Name -contains "statusSeconds") -and
+        $null -ne $loadedPreferences.statusSeconds
+    ) {
+        $StatusSeconds = [int]$loadedPreferences.statusSeconds
+    }
     if (-not $PSBoundParameters.ContainsKey("NoAutoPoll") -and $loadedPreferences.noAutoPoll) {
         $NoAutoPoll = [bool]$loadedPreferences.noAutoPoll
     }
@@ -133,6 +142,7 @@ $script:incomingBuffer = ""
 $script:currentMode = $Mode
 $script:dmRecipientUserId = $DmRecipientUserId
 $script:lastPollAt = [DateTime]::MinValue
+$script:lastStatusAt = [DateTime]::MinValue
 $script:running = $true
 $script:inputBuffer = ""
 $script:transcript = New-Object System.Collections.Generic.List[string]
@@ -143,6 +153,16 @@ $script:lastRenderAt = [DateTime]::MinValue
 $script:lastRxAt = $null
 $script:lastStatus = "starting"
 $script:seenMessageLines = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+$script:pollMarkerPending = $false
+$script:quietStatusPending = $false
+$script:statusCaptureActive = $false
+$script:statusCaptureQuiet = $false
+$script:bridgeHealth = [ordered]@{
+    wifi = "unknown"
+    device = "unknown"
+    session = "unknown"
+    auth = "unknown"
+}
 
 function Use-Color {
     return -not $NoAnsi -and -not [Console]::IsOutputRedirected
@@ -216,6 +236,10 @@ function Get-LineColor {
         return [ConsoleColor]::Yellow
     }
 
+    if ($Line -match "^-+ new messages -+$") {
+        return [ConsoleColor]::Magenta
+    }
+
     if ($Line -match "^\s{2}[a-zA-Z_]+:") {
         return [ConsoleColor]::DarkGray
     }
@@ -236,6 +260,20 @@ function Test-BridgeMessageLine {
     param([string]$Line)
 
     return $Line -match "^(?:\d{4}-\d{2}-\d{2}T.*|\d{2}:\d{2}:\d{2}|\(unknown time\)) \| [^:]+: .+"
+}
+
+function Update-BridgeHealthFromStatusLine {
+    param([string]$Line)
+
+    if ($Line -match "^\s{2}wifi_connected:\s*(.+)$") {
+        $script:bridgeHealth.wifi = $Matches[1].Trim()
+    } elseif ($Line -match "^\s{2}device_status:\s*(.+)$") {
+        $script:bridgeHealth.device = $Matches[1].Trim()
+    } elseif ($Line -match "^\s{2}session_expires_at:\s*(.+)$") {
+        $script:bridgeHealth.session = $Matches[1].Trim()
+    } elseif ($Line -match "^\s{2}auth_expires_at:\s*(.+)$") {
+        $script:bridgeHealth.auth = $Matches[1].Trim()
+    }
 }
 
 function Request-Render {
@@ -280,6 +318,36 @@ function Get-ModeLabel {
     return "GROUP"
 }
 
+function Get-ExpiryHealthLabel {
+    param([string]$Value)
+
+    if ([string]::IsNullOrWhiteSpace($Value) -or $Value -eq "(none)") {
+        return "missing"
+    }
+
+    try {
+        $expiresAt = [DateTimeOffset]::Parse($Value).UtcDateTime
+        $remaining = $expiresAt - [DateTime]::UtcNow
+        if ($remaining.TotalSeconds -le 0) {
+            return "expired"
+        }
+        if ($remaining.TotalMinutes -lt 10) {
+            return "$([Math]::Max(1, [int][Math]::Ceiling($remaining.TotalMinutes)))m"
+        }
+        return "ok"
+    } catch {
+        return "unknown"
+    }
+}
+
+function Get-HealthLabel {
+    $wifi = $script:bridgeHealth.wifi
+    $device = $script:bridgeHealth.device
+    $session = Get-ExpiryHealthLabel $script:bridgeHealth.session
+    $auth = Get-ExpiryHealthLabel $script:bridgeHealth.auth
+    return "wifi: $wifi | device: $device | session: $session | auth: $auth"
+}
+
 function Render-Layout {
     param([switch]$Force)
 
@@ -307,7 +375,7 @@ function Render-Layout {
     $rxLabel = if ($script:lastRxAt) { "rx: $($script:lastRxAt.ToLocalTime().ToString("HH:mm:ss"))" } else { "rx: none" }
 
     [Console]::SetCursorPosition(0, 0)
-    Write-Ui (Fit-Text "ShadowChat Bridge TUI | $Port @ $BaudRate | $(Get-ModeLabel) | $pollLabel | $rxLabel" $width) ([ConsoleColor]::Yellow)
+    Write-Ui (Fit-Text "ShadowChat Bridge TUI | $Port @ $BaudRate | $(Get-ModeLabel) | $pollLabel | $rxLabel | $(Get-HealthLabel)" $width) ([ConsoleColor]::Yellow)
     Write-Ui $divider ([ConsoleColor]::DarkGray)
 
     $start = [Math]::Max(0, $script:transcript.Count - $bodyHeight)
@@ -334,9 +402,35 @@ function Write-BridgeLine {
         return
     }
 
+    if ($script:statusCaptureActive -and $clean -notmatch "^\s{2}[a-zA-Z_]+:") {
+        $script:statusCaptureActive = $false
+        $script:statusCaptureQuiet = $false
+    }
+
+    if ($clean -eq "Bridge status") {
+        $script:statusCaptureActive = $true
+        $script:statusCaptureQuiet = $script:quietStatusPending
+        $script:quietStatusPending = $false
+        if ($script:statusCaptureQuiet) {
+            Request-Render
+            return
+        }
+    } elseif ($script:statusCaptureActive -and $clean -match "^\s{2}[a-zA-Z_]+:") {
+        Update-BridgeHealthFromStatusLine $clean
+        if ($script:statusCaptureQuiet) {
+            Request-Render
+            return
+        }
+    }
+
     if ((Test-BridgeMessageLine $clean) -and -not $script:seenMessageLines.Add($clean)) {
         $script:lastRxAt = [DateTime]::UtcNow
         return
+    }
+
+    if ((Test-BridgeMessageLine $clean) -and $script:pollMarkerPending) {
+        Add-TranscriptLine "----- new messages -----"
+        $script:pollMarkerPending = $false
     }
 
     Add-TranscriptLine $clean
@@ -440,9 +534,26 @@ function Enter-BridgeMode {
 
 function Invoke-Poll {
     if ($script:currentMode -eq "group" -or $script:currentMode -eq "dm") {
+        $script:pollMarkerPending = $true
         Send-BridgeLine "/poll"
         $script:lastPollAt = [DateTime]::UtcNow
     }
+}
+
+function Invoke-StatusCommand {
+    param([switch]$Quiet)
+
+    if ($Quiet) {
+        $script:quietStatusPending = $true
+    }
+
+    if ($script:currentMode -eq "admin") {
+        Send-BridgeLine "status"
+    } else {
+        Send-BridgeLine "/status"
+    }
+
+    $script:lastStatusAt = [DateTime]::UtcNow
 }
 
 function Invoke-AdminCommand {
@@ -472,9 +583,11 @@ function Invoke-AdminCommand {
 }
 
 function Sync-BridgeAdmin {
-    Send-BridgeLine "/admin"
-    Start-Sleep -Milliseconds 250
-    Read-SerialOutput -Quiet
+    for ($i = 0; $i -lt 2; $i++) {
+        Send-BridgeLine "/admin"
+        Start-Sleep -Milliseconds 500
+        Read-SerialOutput -Quiet
+    }
     $script:currentMode = "admin"
 }
 
@@ -486,7 +599,9 @@ function Show-Help {
         "  /poll                 refresh active chat",
         "  /group                switch to group chat",
         "  /dm <recipient|@name> switch to a DM",
+        "  Tab                   toggle group and last DM",
         "  /poll-interval <sec>  change auto-poll interval",
+        "  /status-interval <sec> change health refresh interval",
         "  /status               show bridge status",
         "  /admin                enter raw admin shell mode",
         "  /chat                 return from admin shell to chat",
@@ -516,7 +631,9 @@ function Show-Preferences {
         "  mode: $script:currentMode",
         "  dm_recipient_user_id: $(if ($script:dmRecipientUserId) { $script:dmRecipientUserId } else { "(none)" })",
         "  poll_seconds: $PollSeconds",
+        "  status_seconds: $StatusSeconds",
         "  auto_poll: $(-not $NoAutoPoll)",
+        "  health: $(Get-HealthLabel)",
         "  transcript_lines: $script:transcriptLimit"
     )
 
@@ -562,6 +679,12 @@ function Process-InputLine {
         Add-TranscriptLine "Auto-poll interval set to $nextInterval seconds"
         Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
         Request-Render
+    } elseif ($Line -match "^/status-interval\s+(\d+)$") {
+        $nextInterval = [Math]::Max(0, [int]$Matches[1])
+        Set-Variable -Name StatusSeconds -Scope Script -Value $nextInterval
+        Add-TranscriptLine "Health refresh interval set to $(if ($nextInterval -eq 0) { "manual" } else { "$nextInterval seconds" })"
+        Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
+        Request-Render
     } elseif ($Line -eq "/group") {
         Enter-BridgeMode "group"
     } elseif ($Line -match "^/dm\s+(.+)$") {
@@ -575,7 +698,7 @@ function Process-InputLine {
             Enter-BridgeMode "group"
         }
     } elseif ($Line -eq "/status") {
-        Invoke-AdminCommand "status"
+        Invoke-StatusCommand
     } elseif ($Line -eq "/prefs") {
         Show-Preferences
     } elseif ($Line -eq "/save") {
@@ -720,6 +843,9 @@ function Run-Interactive {
         Write-Ui "Opening $Port at $BaudRate baud..." ([ConsoleColor]::Yellow)
     }
     Sync-BridgeAdmin
+    Invoke-StatusCommand -Quiet
+    Start-Sleep -Milliseconds 250
+    Read-SerialOutput
 
     if ($Mode -eq "dm") {
         Enter-BridgeMode "dm" $DmRecipientUserId
@@ -736,6 +862,13 @@ function Run-Interactive {
             $elapsed = [DateTime]::UtcNow - $script:lastPollAt
             if ($elapsed.TotalSeconds -ge $PollSeconds) {
                 Invoke-Poll
+            }
+        }
+
+        if ($StatusSeconds -gt 0) {
+            $statusElapsed = [DateTime]::UtcNow - $script:lastStatusAt
+            if ($statusElapsed.TotalSeconds -ge $StatusSeconds) {
+                Invoke-StatusCommand -Quiet
             }
         }
 
