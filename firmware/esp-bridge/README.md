@@ -157,6 +157,13 @@ Plain text sends to the active chat thread. `/admin` switches into the raw firmw
 
 The TUI stores optional preferences in `%LOCALAPPDATA%\ShadowChatBridge\bridge-tui.json` on Windows. Use `/save` inside the TUI, or launch with `-SavePreferences`, to remember the active port, mode, DM recipient, poll interval, and transcript length. Use `-ResetPreferences` to discard saved defaults.
 
+Smoke mode now uses UTF-8 serial I/O and can validate send/poll flows:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1 -Port COM3 -Smoke -SmokeGroupText "bridge smoke"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1 -Port COM3 -Smoke -Mode dm -SmokeDmRecipientUserId "<user_id>" -SmokeDmText "bridge dm smoke"
+```
+
 The firmware retries bridge-authenticated heartbeat, group, and DM data-plane calls once after refreshing the bridge session when it receives an auth-expired response. If refresh fails, the command reports the refresh failure and leaves the device in its current paired state for manual recovery.
 
 For recovery from expired or revoked local session material, run `pair begin` on the bridge, approve the new code from ShadowChat Settings > ESP Bridge, then run `session exchange` on the bridge. The backend accepts a new pending pairing request from an already-paired physical bridge so a device with stale local tokens can be recovered without direct database cleanup.

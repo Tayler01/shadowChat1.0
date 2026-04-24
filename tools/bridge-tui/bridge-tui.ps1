@@ -12,11 +12,17 @@ param(
     [switch]$SavePreferences,
     [switch]$ResetPreferences,
     [string]$PreferencesPath = "",
-    [int]$TranscriptLines = 200
+    [int]$TranscriptLines = 200,
+    [string]$SmokeGroupText = "",
+    [string]$SmokeDmRecipientUserId = "",
+    [string]$SmokeDmText = ""
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$script:utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = $script:utf8NoBom
+$OutputEncoding = $script:utf8NoBom
 
 function Get-DefaultPreferencesPath {
     $root = if ($env:LOCALAPPDATA) {
@@ -362,7 +368,17 @@ function Enter-BridgeMode {
         [string]$RecipientUserId = ""
     )
 
+    $ensureAdminMode = {
+        if ($script:currentMode -ne "admin") {
+            Send-BridgeLine "/admin"
+            Start-Sleep -Milliseconds 150
+            Read-SerialOutput
+            $script:currentMode = "admin"
+        }
+    }
+
     if ($NextMode -eq "group") {
+        & $ensureAdminMode
         $script:currentMode = "group"
         Send-BridgeLine "chat group"
         $script:lastPollAt = [DateTime]::UtcNow
@@ -376,6 +392,7 @@ function Enter-BridgeMode {
             return
         }
 
+        & $ensureAdminMode
         $script:currentMode = "dm"
         $script:dmRecipientUserId = $RecipientUserId
         Send-BridgeLine "chat dm $RecipientUserId"
@@ -543,6 +560,7 @@ function Process-InputLine {
 
 function Connect-Serial {
     $portInstance = [System.IO.Ports.SerialPort]::new($Port, $BaudRate)
+    $portInstance.Encoding = $script:utf8NoBom
     $portInstance.NewLine = "`n"
     $portInstance.ReadTimeout = 50
     $portInstance.WriteTimeout = 2000
@@ -552,49 +570,94 @@ function Connect-Serial {
     return $portInstance
 }
 
+function Wait-BridgeOutput {
+    param([int]$Seconds)
+
+    $deadline = [DateTime]::UtcNow.AddSeconds($Seconds)
+    while ([DateTime]::UtcNow -lt $deadline) {
+        Read-SerialOutput
+        Start-Sleep -Milliseconds 100
+    }
+}
+
+function Assert-SmokeTranscriptHealthy {
+    param([string]$Transcript)
+
+    if ($Transcript -notmatch "Bridge status" -or $Transcript -notmatch "wifi_connected: yes") {
+        throw "Smoke check did not observe bridge status with Wi-Fi connected."
+    }
+
+    $failurePattern = "(?im)(HTTP\s+(401|403|5\d\d)|Invalid bridge access token|Bridge access token has expired|ESP_ERR_HTTP_CONNECT|failed:|Unknown command|timed out)"
+    if ($Transcript -match $failurePattern) {
+        throw "Smoke check observed bridge errors in the transcript."
+    }
+}
+
 function Run-Smoke {
     Write-Ui "Running bridge TUI smoke on $Port..." ([ConsoleColor]::Yellow)
     Sync-BridgeAdmin
 
+    $smokeDmRecipient = if (-not [string]::IsNullOrWhiteSpace($SmokeDmRecipientUserId)) {
+        $SmokeDmRecipientUserId
+    } else {
+        $DmRecipientUserId
+    }
+
     if ($Mode -eq "dm") {
-        Enter-BridgeMode "dm" $DmRecipientUserId
+        Enter-BridgeMode "dm" $smokeDmRecipient
     } elseif ($Mode -eq "admin") {
         Enter-BridgeMode "admin"
     } else {
         Enter-BridgeMode "group"
     }
 
-    $deadline = [DateTime]::UtcNow.AddSeconds(5)
-    while ([DateTime]::UtcNow -lt $deadline) {
-        Read-SerialOutput
-        Start-Sleep -Milliseconds 100
+    Wait-BridgeOutput 5
+
+    if ($script:currentMode -eq "group" -and -not [string]::IsNullOrWhiteSpace($SmokeGroupText)) {
+        Write-Ui "Smoke sending group message..." ([ConsoleColor]::Yellow)
+        Send-BridgeLine $SmokeGroupText
+        Wait-BridgeOutput 6
+        Invoke-Poll
+        Wait-BridgeOutput 6
+
+        $groupTranscript = $script:transcript -join "`n"
+        if ($groupTranscript -notmatch [regex]::Escape($SmokeGroupText)) {
+            throw "Smoke check did not observe the sent group message in poll output."
+        }
     }
 
     if ($script:currentMode -ne "admin") {
         Invoke-Poll
-        $deadline = [DateTime]::UtcNow.AddSeconds(5)
-        while ([DateTime]::UtcNow -lt $deadline) {
-            Read-SerialOutput
-            Start-Sleep -Milliseconds 100
+        Wait-BridgeOutput 5
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($smokeDmRecipient)) {
+        Write-Ui "Smoke checking DM thread..." ([ConsoleColor]::Yellow)
+        Enter-BridgeMode "dm" $smokeDmRecipient
+        Wait-BridgeOutput 5
+
+        if (-not [string]::IsNullOrWhiteSpace($SmokeDmText)) {
+            Write-Ui "Smoke sending DM..." ([ConsoleColor]::Yellow)
+            Send-BridgeLine $SmokeDmText
+            Wait-BridgeOutput 6
+            Invoke-Poll
+            Wait-BridgeOutput 6
+
+            $dmTranscript = $script:transcript -join "`n"
+            if ($dmTranscript -notmatch [regex]::Escape($SmokeDmText)) {
+                throw "Smoke check did not observe the sent DM in poll output."
+            }
+        } else {
+            Invoke-Poll
+            Wait-BridgeOutput 5
         }
     }
 
     Invoke-AdminCommand "status"
-    $deadline = [DateTime]::UtcNow.AddSeconds(3)
-    while ([DateTime]::UtcNow -lt $deadline) {
-        Read-SerialOutput
-        Start-Sleep -Milliseconds 100
-    }
+    Wait-BridgeOutput 3
 
     $joined = $script:transcript -join "`n"
-    if ($joined -notmatch "Bridge status" -or $joined -notmatch "wifi_connected: yes") {
-        throw "Smoke check did not observe bridge status with Wi-Fi connected."
-    }
-
-    $failurePattern = "(?im)(HTTP\s+(401|403|5\d\d)|Invalid bridge access token|Bridge access token has expired|ESP_ERR_HTTP_CONNECT|failed:|Unknown command|timed out)"
-    if ($joined -match $failurePattern) {
-        throw "Smoke check observed bridge errors in the transcript."
-    }
+    Assert-SmokeTranscriptHealthy $joined
 
     if ($script:currentMode -ne "admin") {
         Send-BridgeLine "/admin"
