@@ -178,7 +178,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1 -Port COM3 -Smoke -Mode dm -SmokeDmRecipientUserId "<user_id>" -SmokeDmText "bridge dm smoke"
 ```
 
-The firmware refreshes stored bridge session material before heartbeat, group, DM, and user-search calls when the stored session expiry is within five minutes. It also retries bridge-authenticated calls once after refreshing when it receives an auth-expired response. If refresh fails, the command reports the refresh failure and leaves the device in its current paired state for manual recovery.
+On boot, the firmware waits for stored Wi-Fi to reconnect and checks the stored bridge/auth session material. If session material is missing or close to expiry, it refreshes automatically so the bridge is ready for chat after a reboot or flash. It also refreshes stored bridge session material before heartbeat, group, DM, and user-search calls when the stored session expiry is within five minutes, and retries bridge-authenticated calls once after refreshing when it receives an auth-expired response. If refresh fails, the command reports the refresh failure and leaves the device in its current paired state for manual recovery.
 
 If local access or refresh tokens become invalid, run `session recover`. The bridge will create a fresh pairing code, clear stale local session material, and prompt you to approve the code in ShadowChat Settings > ESP Bridge before running `session exchange`.
 

@@ -27,6 +27,7 @@
 #define BRIDGE_STORAGE_NAMESPACE "bridge_cfg"
 #define BRIDGE_SHELL_TASK_STACK_SIZE 32768
 #define BRIDGE_SESSION_REFRESH_LEEWAY_SECONDS 300
+#define BRIDGE_STARTUP_WIFI_WAIT_MS 45000
 
 static const char *TAG = "shadowchat_bridge";
 static esp_event_handler_instance_t s_wifi_any_id_handler;
@@ -1316,6 +1317,36 @@ static bool bridge_session_refresh_due(void) {
     return difftime(expires_at, now) <= BRIDGE_SESSION_REFRESH_LEEWAY_SECONDS;
 }
 
+static bool bridge_auth_refresh_due(void) {
+    if (s_bridge_state.auth_expires_at[0] == '\0') {
+        return false;
+    }
+
+    time_t now = time(NULL);
+    if (now < 1700000000) {
+        return false;
+    }
+
+    time_t expires_at = 0;
+    if (!bridge_parse_iso_utc(s_bridge_state.auth_expires_at, &expires_at)) {
+        return false;
+    }
+
+    return difftime(expires_at, now) <= BRIDGE_SESSION_REFRESH_LEEWAY_SECONDS;
+}
+
+static bool bridge_startup_session_refresh_due(void) {
+    return s_bridge_state.access_token[0] == '\0' ||
+        s_bridge_state.refresh_token[0] == '\0' ||
+        s_bridge_state.auth_access_token[0] == '\0' ||
+        s_bridge_state.auth_refresh_token[0] == '\0' ||
+        s_bridge_state.auth_user_id[0] == '\0' ||
+        s_bridge_state.session_expires_at[0] == '\0' ||
+        s_bridge_state.auth_expires_at[0] == '\0' ||
+        bridge_session_refresh_due() ||
+        bridge_auth_refresh_due();
+}
+
 static bool bridge_ensure_fresh_session(const char *action) {
     if (!bridge_session_refresh_due()) {
         return true;
@@ -1323,6 +1354,42 @@ static bool bridge_ensure_fresh_session(const char *action) {
 
     printf("Bridge session expires soon; refreshing before %s\n", action);
     return bridge_refresh_session_material(true);
+}
+
+static void bridge_startup_recovery_task(void *arg) {
+    (void)arg;
+
+    if (s_bridge_state.wifi_ssid[0] == '\0' || s_bridge_state.device_id[0] == '\0') {
+        vTaskDelete(NULL);
+        return;
+    }
+
+    if (!bridge_wait_for_wifi(BRIDGE_STARTUP_WIFI_WAIT_MS)) {
+        printf("Startup session check skipped: Wi-Fi did not connect within %d seconds\n", BRIDGE_STARTUP_WIFI_WAIT_MS / 1000);
+        vTaskDelete(NULL);
+        return;
+    }
+
+    if (s_bridge_state.refresh_token[0] == '\0') {
+        if (strcmp(s_bridge_state.device_status, "paired") == 0) {
+            printf("Startup session check: no bridge refresh token is stored. Run: session recover\n");
+        }
+        vTaskDelete(NULL);
+        return;
+    }
+
+    if (!bridge_startup_session_refresh_due()) {
+        printf("Startup session check: stored bridge session is ready\n");
+        vTaskDelete(NULL);
+        return;
+    }
+
+    printf("Startup session check: refreshing stored bridge/auth session material\n");
+    if (!bridge_refresh_session_material(true)) {
+        printf("Startup session refresh failed. If Wi-Fi is online, run: session recover\n");
+    }
+
+    vTaskDelete(NULL);
 }
 
 static void bridge_command_heartbeat(void) {
@@ -1977,5 +2044,6 @@ void app_main(void) {
         bridge_wifi_apply_credentials();
     }
 
+    xTaskCreate(bridge_startup_recovery_task, "bridge_startup_recovery", BRIDGE_SHELL_TASK_STACK_SIZE, NULL, 4, NULL);
     xTaskCreate(bridge_shell_task, "bridge_shell", BRIDGE_SHELL_TASK_STACK_SIZE, NULL, 5, NULL);
 }
