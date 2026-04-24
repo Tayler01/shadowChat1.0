@@ -14,6 +14,7 @@
 #include "esp_mac.h"
 #include "esp_netif.h"
 #include "esp_system.h"
+#include "esp_websocket_client.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
@@ -28,6 +29,12 @@
 #define BRIDGE_SHELL_TASK_STACK_SIZE 32768
 #define BRIDGE_SESSION_REFRESH_LEEWAY_SECONDS 300
 #define BRIDGE_STARTUP_WIFI_WAIT_MS 45000
+#define BRIDGE_REALTIME_TASK_STACK_SIZE 24576
+#define BRIDGE_REALTIME_WS_URL_SIZE 640
+#define BRIDGE_REALTIME_RX_BUFFER_SIZE 6144
+#define BRIDGE_REALTIME_HEARTBEAT_MS 25000
+#define BRIDGE_REALTIME_TOKEN_CHECK_MS 30000
+#define BRIDGE_REALTIME_TOPIC "realtime:bridge-chat"
 
 static const char *TAG = "shadowchat_bridge";
 static esp_event_handler_instance_t s_wifi_any_id_handler;
@@ -68,6 +75,15 @@ static EventGroupHandle_t s_wifi_event_group;
 static bridge_state_t s_bridge_state;
 static bool s_wifi_reconfiguring;
 static bool s_protocol_enabled;
+static esp_websocket_client_handle_t s_realtime_client;
+static TaskHandle_t s_realtime_task_handle;
+static bool s_realtime_requested;
+static bool s_realtime_connected;
+static bool s_realtime_joined;
+static uint32_t s_realtime_ref;
+static char s_realtime_last_error[96];
+static char s_realtime_rx_buffer[BRIDGE_REALTIME_RX_BUFFER_SIZE];
+static size_t s_realtime_rx_length;
 
 static bool bridge_ensure_wifi_connected(const char *action);
 
@@ -125,6 +141,10 @@ static void bridge_protocol_emit_status(void) {
     cJSON_AddStringToObject(event, "authUserId", s_bridge_state.auth_user_id[0] ? s_bridge_state.auth_user_id : "");
     cJSON_AddStringToObject(event, "sessionExpiresAt", s_bridge_state.session_expires_at[0] ? s_bridge_state.session_expires_at : "");
     cJSON_AddStringToObject(event, "authExpiresAt", s_bridge_state.auth_expires_at[0] ? s_bridge_state.auth_expires_at : "");
+    cJSON_AddBoolToObject(event, "realtimeRequested", s_realtime_requested);
+    cJSON_AddBoolToObject(event, "realtimeConnected", s_realtime_connected);
+    cJSON_AddBoolToObject(event, "realtimeJoined", s_realtime_joined);
+    cJSON_AddStringToObject(event, "realtimeLastError", s_realtime_last_error);
 
     bridge_protocol_emit(event);
     cJSON_Delete(event);
@@ -986,6 +1006,7 @@ static void bridge_command_help(void) {
     printf("  session recover\n");
     printf("  bridge heartbeat\n\n");
     printf("  protocol on|off|status\n\n");
+    printf("  realtime start|stop|status\n\n");
     printf("  group send <text>\n");
     printf("  group poll\n\n");
     printf("  dm send <recipient_user_id|@username> <text>\n");
@@ -1003,11 +1024,15 @@ static void bridge_chat_help(void) {
     printf("  /group                switch to group chat\n");
     printf("  /status               show bridge status\n");
     printf("  /protocol on|off      enable or disable structured TUI events\n");
+    printf("  /realtime on|off      toggle Supabase Realtime receive\n");
     printf("  /admin                return to the admin shell\n");
     printf("  /help                 show this help\n\n");
 }
 
 static void bridge_clear_pairing_state(void) {
+    s_realtime_requested = false;
+    s_realtime_connected = false;
+    s_realtime_joined = false;
     bridge_set_runtime_string(s_bridge_state.device_status, sizeof(s_bridge_state.device_status), "unpaired");
     bridge_set_runtime_string(s_bridge_state.pairing_code, sizeof(s_bridge_state.pairing_code), "");
     bridge_set_runtime_string(s_bridge_state.access_token, sizeof(s_bridge_state.access_token), "");
@@ -1033,6 +1058,9 @@ static void bridge_clear_pairing_state(void) {
 }
 
 static void bridge_clear_session_material(void) {
+    s_realtime_requested = false;
+    s_realtime_connected = false;
+    s_realtime_joined = false;
     bridge_set_runtime_string(s_bridge_state.access_token, sizeof(s_bridge_state.access_token), "");
     bridge_set_runtime_string(s_bridge_state.refresh_token, sizeof(s_bridge_state.refresh_token), "");
     bridge_set_runtime_string(s_bridge_state.auth_access_token, sizeof(s_bridge_state.auth_access_token), "");
@@ -1624,10 +1652,11 @@ static void bridge_command_heartbeat(void) {
     snprintf(
         body,
         sizeof(body),
-        "{\"deviceId\":\"%s\",\"firmwareVersion\":\"%s\",\"connectionHealth\":{\"pairStatus\":\"%s\",\"backendConnected\":true,\"realtimeConnected\":false,\"lastRefreshAt\":null}}",
+        "{\"deviceId\":\"%s\",\"firmwareVersion\":\"%s\",\"connectionHealth\":{\"pairStatus\":\"%s\",\"backendConnected\":true,\"realtimeConnected\":%s,\"lastRefreshAt\":null}}",
         s_bridge_state.device_id,
         CONFIG_BRIDGE_FIRMWARE_VERSION,
-        s_bridge_state.device_status[0] ? s_bridge_state.device_status : "unknown"
+        s_bridge_state.device_status[0] ? s_bridge_state.device_status : "unknown",
+        s_realtime_connected ? "true" : "false"
     );
 
     bridge_http_response_t response = {0};
@@ -1710,6 +1739,440 @@ static bool bridge_has_access_material(const char *action) {
     }
 
     return bridge_ensure_wifi_connected(action);
+}
+
+static void bridge_realtime_set_error(const char *message) {
+    bridge_set_runtime_string(s_realtime_last_error, sizeof(s_realtime_last_error), message ? message : "");
+}
+
+static bool bridge_realtime_build_url(char *buffer, size_t buffer_size) {
+    if (!buffer || buffer_size == 0) {
+        return false;
+    }
+
+    if (!CONFIG_BRIDGE_SUPABASE_URL[0] || !CONFIG_BRIDGE_SUPABASE_ANON_KEY[0]) {
+        bridge_realtime_set_error("backend config missing");
+        return false;
+    }
+
+    char base[320] = {0};
+    const char *source = CONFIG_BRIDGE_SUPABASE_URL;
+    if (strncmp(source, "https://", 8) == 0) {
+        snprintf(base, sizeof(base), "wss://%s", source + 8);
+    } else if (strncmp(source, "http://", 7) == 0) {
+        snprintf(base, sizeof(base), "ws://%s", source + 7);
+    } else {
+        snprintf(base, sizeof(base), "wss://%s", source);
+    }
+
+    size_t length = strlen(base);
+    while (length > 0 && base[length - 1] == '/') {
+        base[length - 1] = '\0';
+        length--;
+    }
+
+    int written = snprintf(
+        buffer,
+        buffer_size,
+        "%s/realtime/v1/websocket?apikey=%s&vsn=1.0.0",
+        base,
+        CONFIG_BRIDGE_SUPABASE_ANON_KEY
+    );
+    return written > 0 && (size_t)written < buffer_size;
+}
+
+static bool bridge_realtime_send_event(const char *topic, const char *event_name, cJSON *payload) {
+    if (!s_realtime_client || !s_realtime_connected) {
+        cJSON_Delete(payload);
+        return false;
+    }
+
+    cJSON *envelope = cJSON_CreateObject();
+    if (!envelope) {
+        cJSON_Delete(payload);
+        return false;
+    }
+
+    char ref[16];
+    snprintf(ref, sizeof(ref), "%lu", (unsigned long)++s_realtime_ref);
+    cJSON_AddStringToObject(envelope, "topic", topic ? topic : BRIDGE_REALTIME_TOPIC);
+    cJSON_AddStringToObject(envelope, "event", event_name ? event_name : "");
+    cJSON_AddItemToObject(envelope, "payload", payload ? payload : cJSON_CreateObject());
+    cJSON_AddStringToObject(envelope, "ref", ref);
+    if (event_name && strcmp(event_name, "phx_join") == 0) {
+        cJSON_AddStringToObject(envelope, "join_ref", ref);
+    }
+
+    char *line = cJSON_PrintUnformatted(envelope);
+    cJSON_Delete(envelope);
+    if (!line) {
+        return false;
+    }
+
+    int result = esp_websocket_client_send_text(s_realtime_client, line, strlen(line), pdMS_TO_TICKS(5000));
+    free(line);
+    return result >= 0;
+}
+
+static cJSON *bridge_realtime_change_filter(const char *table) {
+    cJSON *filter = cJSON_CreateObject();
+    if (!filter) {
+        return NULL;
+    }
+
+    cJSON_AddStringToObject(filter, "event", "INSERT");
+    cJSON_AddStringToObject(filter, "schema", "public");
+    cJSON_AddStringToObject(filter, "table", table);
+    return filter;
+}
+
+static bool bridge_realtime_join_channel(void) {
+    cJSON *payload = cJSON_CreateObject();
+    cJSON *config = cJSON_CreateObject();
+    cJSON *changes = cJSON_CreateArray();
+    cJSON *broadcast = cJSON_CreateObject();
+    cJSON *presence = cJSON_CreateObject();
+    if (!payload || !config || !changes || !broadcast || !presence) {
+        cJSON_Delete(payload);
+        cJSON_Delete(config);
+        cJSON_Delete(changes);
+        cJSON_Delete(broadcast);
+        cJSON_Delete(presence);
+        return false;
+    }
+
+    cJSON_AddItemToArray(changes, bridge_realtime_change_filter("messages"));
+    cJSON_AddItemToArray(changes, bridge_realtime_change_filter("dm_messages"));
+    cJSON_AddBoolToObject(broadcast, "self", false);
+    cJSON_AddStringToObject(presence, "key", "");
+    cJSON_AddItemToObject(config, "broadcast", broadcast);
+    cJSON_AddItemToObject(config, "presence", presence);
+    cJSON_AddItemToObject(config, "postgres_changes", changes);
+    cJSON_AddItemToObject(payload, "config", config);
+    cJSON_AddStringToObject(payload, "access_token", s_bridge_state.auth_access_token);
+
+    return bridge_realtime_send_event(BRIDGE_REALTIME_TOPIC, "phx_join", payload);
+}
+
+static bool bridge_realtime_send_access_token(void) {
+    cJSON *payload = cJSON_CreateObject();
+    if (!payload) {
+        return false;
+    }
+
+    cJSON_AddStringToObject(payload, "access_token", s_bridge_state.auth_access_token);
+    return bridge_realtime_send_event(BRIDGE_REALTIME_TOPIC, "access_token", payload);
+}
+
+static bool bridge_realtime_send_heartbeat(void) {
+    return bridge_realtime_send_event("phoenix", "heartbeat", cJSON_CreateObject());
+}
+
+static void bridge_realtime_emit_record(const char *thread, cJSON *record) {
+    if (!cJSON_IsObject(record)) {
+        return;
+    }
+
+    const char *id = bridge_json_string_or_empty(record, "id");
+    const char *created_at = bridge_json_string_or_empty(record, "created_at");
+    const char *content = bridge_json_string_or_empty(record, "content");
+    const char *sender_id = bridge_json_string_or_empty(record, strcmp(thread, "dm") == 0 ? "sender_id" : "user_id");
+    const char *sender_label = (strcmp(sender_id, s_bridge_state.auth_user_id) == 0) ? "ESP Bridge" : sender_id;
+    char time_label[12] = {0};
+
+    if (s_protocol_enabled) {
+        bridge_protocol_emit_message(thread, id, created_at, sender_id, sender_label, content);
+    } else {
+        printf(
+            "%s | %s: %s\n",
+            bridge_message_time_label(created_at, time_label, sizeof(time_label)),
+            sender_label[0] ? sender_label : "unknown",
+            content
+        );
+    }
+
+    if (id[0] != '\0' && strcmp(thread, "group") == 0) {
+        bridge_save_group_cursor(id);
+    }
+}
+
+static void bridge_realtime_handle_json(const char *payload) {
+    cJSON *json = cJSON_Parse(payload);
+    if (!json) {
+        bridge_realtime_set_error("invalid realtime json");
+        return;
+    }
+
+    const char *topic = bridge_json_string_or_empty(json, "topic");
+    const char *event_name = bridge_json_string_or_empty(json, "event");
+    cJSON *event_payload = cJSON_GetObjectItemCaseSensitive(json, "payload");
+
+    if (strcmp(event_name, "phx_reply") == 0 && strcmp(topic, BRIDGE_REALTIME_TOPIC) == 0) {
+        const char *status = bridge_json_string_or_empty(event_payload, "status");
+        if (strcmp(status, "ok") == 0) {
+            s_realtime_joined = true;
+            bridge_realtime_set_error("");
+            printf("Realtime channel joined\n");
+            bridge_protocol_emit_status();
+        } else if (status[0] != '\0') {
+            s_realtime_joined = false;
+            bridge_realtime_set_error(status);
+            printf("Realtime channel join failed: %s\n", status);
+            bridge_protocol_emit_status();
+        }
+        cJSON_Delete(json);
+        return;
+    }
+
+    if (strcmp(event_name, "postgres_changes") != 0 || !cJSON_IsObject(event_payload)) {
+        cJSON_Delete(json);
+        return;
+    }
+
+    cJSON *data = cJSON_GetObjectItemCaseSensitive(event_payload, "data");
+    if (!cJSON_IsObject(data)) {
+        data = event_payload;
+    }
+
+    const char *table = bridge_json_string_or_empty(data, "table");
+    if (table[0] == '\0') {
+        table = bridge_json_string_or_empty(event_payload, "table");
+    }
+
+    cJSON *record = cJSON_GetObjectItemCaseSensitive(data, "record");
+    if (!cJSON_IsObject(record)) {
+        record = cJSON_GetObjectItemCaseSensitive(data, "new");
+    }
+    if (!cJSON_IsObject(record)) {
+        record = cJSON_GetObjectItemCaseSensitive(event_payload, "record");
+    }
+
+    if (strcmp(table, "messages") == 0) {
+        bridge_realtime_emit_record("group", record);
+    } else if (strcmp(table, "dm_messages") == 0) {
+        bridge_realtime_emit_record("dm", record);
+    }
+
+    cJSON_Delete(json);
+}
+
+static void bridge_realtime_handle_data(const esp_websocket_event_data_t *data) {
+    if (!data || data->op_code != 0x1 || data->data_len <= 0) {
+        return;
+    }
+
+    if (data->payload_offset == 0) {
+        s_realtime_rx_length = 0;
+    }
+
+    if (s_realtime_rx_length + (size_t)data->data_len >= sizeof(s_realtime_rx_buffer)) {
+        s_realtime_rx_length = 0;
+        bridge_realtime_set_error("realtime frame too large");
+        return;
+    }
+
+    memcpy(s_realtime_rx_buffer + s_realtime_rx_length, data->data_ptr, data->data_len);
+    s_realtime_rx_length += data->data_len;
+
+    if (!data->fin && data->payload_offset + data->data_len < data->payload_len) {
+        return;
+    }
+
+    s_realtime_rx_buffer[s_realtime_rx_length] = '\0';
+    bridge_realtime_handle_json(s_realtime_rx_buffer);
+    s_realtime_rx_length = 0;
+}
+
+static void bridge_realtime_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
+    (void)handler_args;
+    (void)base;
+
+    esp_websocket_event_data_t *data = (esp_websocket_event_data_t *)event_data;
+    switch (event_id) {
+    case WEBSOCKET_EVENT_CONNECTED:
+        s_realtime_connected = true;
+        s_realtime_joined = false;
+        bridge_realtime_set_error("");
+        printf("Realtime WebSocket connected\n");
+        bridge_protocol_emit_status();
+        if (!bridge_realtime_join_channel()) {
+            bridge_realtime_set_error("join send failed");
+        }
+        break;
+    case WEBSOCKET_EVENT_DISCONNECTED:
+    case WEBSOCKET_EVENT_CLOSED:
+        s_realtime_connected = false;
+        s_realtime_joined = false;
+        printf("Realtime WebSocket disconnected\n");
+        bridge_protocol_emit_status();
+        break;
+    case WEBSOCKET_EVENT_ERROR:
+        s_realtime_connected = false;
+        s_realtime_joined = false;
+        if (data) {
+            snprintf(
+                s_realtime_last_error,
+                sizeof(s_realtime_last_error),
+                "ws error %d/%d",
+                (int)data->error_handle.error_type,
+                data->error_handle.esp_ws_handshake_status_code
+            );
+        } else {
+            bridge_realtime_set_error("ws error");
+        }
+        printf("Realtime WebSocket error: %s\n", s_realtime_last_error);
+        bridge_protocol_emit_status();
+        break;
+    case WEBSOCKET_EVENT_DATA:
+        bridge_realtime_handle_data(data);
+        break;
+    default:
+        break;
+    }
+}
+
+static void bridge_realtime_task(void *arg) {
+    (void)arg;
+
+    char url[BRIDGE_REALTIME_WS_URL_SIZE];
+    while (s_realtime_requested) {
+        s_realtime_connected = false;
+        s_realtime_joined = false;
+
+        if (!bridge_has_access_material("realtime")) {
+            vTaskDelay(pdMS_TO_TICKS(10000));
+            continue;
+        }
+        if (!bridge_ensure_fresh_session("realtime")) {
+            bridge_realtime_set_error("session refresh failed");
+            vTaskDelay(pdMS_TO_TICKS(10000));
+            continue;
+        }
+        if (!s_bridge_state.auth_access_token[0]) {
+            bridge_realtime_set_error("missing auth token");
+            vTaskDelay(pdMS_TO_TICKS(10000));
+            continue;
+        }
+        if (!bridge_realtime_build_url(url, sizeof(url))) {
+            vTaskDelay(pdMS_TO_TICKS(10000));
+            continue;
+        }
+
+        esp_websocket_client_config_t config = {
+            .uri = url,
+            .buffer_size = 4096,
+            .task_stack = 8192,
+            .network_timeout_ms = 10000,
+            .reconnect_timeout_ms = 5000,
+            .ping_interval_sec = 20,
+            .crt_bundle_attach = esp_crt_bundle_attach,
+        };
+
+        esp_websocket_client_handle_t client = esp_websocket_client_init(&config);
+        if (!client) {
+            bridge_realtime_set_error("client init failed");
+            vTaskDelay(pdMS_TO_TICKS(10000));
+            continue;
+        }
+
+        s_realtime_client = client;
+        esp_websocket_register_events(client, WEBSOCKET_EVENT_ANY, bridge_realtime_event_handler, NULL);
+        esp_err_t err = esp_websocket_client_start(client);
+        if (err != ESP_OK) {
+            snprintf(s_realtime_last_error, sizeof(s_realtime_last_error), "start failed %s", esp_err_to_name(err));
+            esp_websocket_client_destroy(client);
+            s_realtime_client = NULL;
+            vTaskDelay(pdMS_TO_TICKS(10000));
+            continue;
+        }
+
+        TickType_t last_heartbeat = 0;
+        TickType_t last_token_check = 0;
+        while (s_realtime_requested) {
+            TickType_t now = xTaskGetTickCount();
+            if (s_realtime_connected && s_realtime_joined) {
+                if (last_heartbeat == 0 || (now - last_heartbeat) >= pdMS_TO_TICKS(BRIDGE_REALTIME_HEARTBEAT_MS)) {
+                    bridge_realtime_send_heartbeat();
+                    last_heartbeat = now;
+                }
+                if (last_token_check == 0 || (now - last_token_check) >= pdMS_TO_TICKS(BRIDGE_REALTIME_TOKEN_CHECK_MS)) {
+                    if (bridge_ensure_fresh_session("realtime token refresh")) {
+                        bridge_realtime_send_access_token();
+                    }
+                    last_token_check = now;
+                }
+            }
+            vTaskDelay(pdMS_TO_TICKS(500));
+        }
+
+        esp_websocket_client_stop(client);
+        esp_websocket_client_destroy(client);
+        s_realtime_client = NULL;
+    }
+
+    s_realtime_connected = false;
+    s_realtime_joined = false;
+    s_realtime_task_handle = NULL;
+    bridge_protocol_emit_status();
+    vTaskDelete(NULL);
+}
+
+static void bridge_command_realtime(const char *mode) {
+    if (!mode || mode[0] == '\0' || strcmp(mode, "status") == 0) {
+        printf(
+            "Realtime: requested=%s connected=%s joined=%s%s%s\n",
+            s_realtime_requested ? "yes" : "no",
+            s_realtime_connected ? "yes" : "no",
+            s_realtime_joined ? "yes" : "no",
+            s_realtime_last_error[0] ? " error=" : "",
+            s_realtime_last_error
+        );
+        bridge_protocol_emit_status();
+        return;
+    }
+
+    if (strcmp(mode, "start") == 0 || strcmp(mode, "on") == 0) {
+        if (s_realtime_task_handle) {
+            printf("Realtime is already running\n");
+            bridge_protocol_emit_status();
+            return;
+        }
+
+        s_realtime_requested = true;
+        bridge_realtime_set_error("");
+        BaseType_t created = xTaskCreate(
+            bridge_realtime_task,
+            "bridge_realtime",
+            BRIDGE_REALTIME_TASK_STACK_SIZE,
+            NULL,
+            5,
+            &s_realtime_task_handle
+        );
+        if (created != pdPASS) {
+            s_realtime_requested = false;
+            s_realtime_task_handle = NULL;
+            bridge_realtime_set_error("task create failed");
+            printf("Realtime task could not start\n");
+        } else {
+            printf("Realtime WebSocket starting\n");
+        }
+        bridge_protocol_emit_status();
+        return;
+    }
+
+    if (strcmp(mode, "stop") == 0 || strcmp(mode, "off") == 0) {
+        s_realtime_requested = false;
+        s_realtime_connected = false;
+        s_realtime_joined = false;
+        if (s_realtime_client) {
+            esp_websocket_client_close(s_realtime_client, pdMS_TO_TICKS(1000));
+        }
+        printf("Realtime WebSocket stopping\n");
+        bridge_protocol_emit_status();
+        return;
+    }
+
+    printf("usage: realtime start|stop|status\n");
 }
 
 static bool bridge_send_group_message(const char *content, bool compact_output) {
@@ -2100,6 +2563,10 @@ static bool bridge_handle_chat_line(
             bridge_command_status();
         } else if (strncmp(line, "/protocol ", 10) == 0) {
             bridge_command_protocol(line + 10);
+        } else if (strncmp(line, "/realtime ", 10) == 0) {
+            bridge_command_realtime(line + 10);
+        } else if (strcmp(line, "/realtime") == 0) {
+            bridge_command_realtime("status");
         } else {
             printf("Unknown chat command. Type /help.\n");
         }
@@ -2244,6 +2711,8 @@ static void bridge_shell_task(void *arg) {
             bridge_command_status();
         } else if (strcmp(command, "protocol") == 0) {
             bridge_command_protocol(subcommand);
+        } else if (strcmp(command, "realtime") == 0) {
+            bridge_command_realtime(subcommand);
         } else if (strcmp(command, "wifi") == 0 && subcommand && strcmp(subcommand, "set") == 0) {
             char ssid[33] = {0};
             char password[65] = {0};

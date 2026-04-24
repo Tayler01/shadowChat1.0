@@ -168,8 +168,10 @@ $script:lastRxAt = $null
 $script:lastStatus = "starting"
 $script:protocolEnabled = -not $NoProtocol
 $script:liveReceive = -not $NoAutoPoll
+$script:realtimeConnected = $false
 $script:lastSentAt = $null
 $script:seenMessageLines = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+$script:seenMessageIds = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 $script:pollMarkerPending = $false
 $script:quietStatusPending = $false
 $script:statusCaptureActive = $false
@@ -180,6 +182,8 @@ $script:bridgeHealth = [ordered]@{
     session = "unknown"
     auth = "unknown"
     serial = "unknown"
+    realtime = "unknown"
+    realtimeError = ""
 }
 
 if ($loadedPreferences -and ($loadedPreferences.PSObject.Properties.Name -contains "recentDms") -and $loadedPreferences.recentDms) {
@@ -496,6 +500,30 @@ function Update-BridgeHealthFromProtocol {
         $script:bridgeHealth.auth = $authExpiresAt
     }
 
+    if ($Event.PSObject.Properties.Name -contains "realtimeConnected") {
+        $script:realtimeConnected = [bool]$Event.realtimeConnected
+    }
+
+    if ($Event.PSObject.Properties.Name -contains "realtimeJoined") {
+        $joined = [bool]$Event.realtimeJoined
+        $requested = $false
+        if ($Event.PSObject.Properties.Name -contains "realtimeRequested") {
+            $requested = [bool]$Event.realtimeRequested
+        }
+
+        $script:bridgeHealth.realtime = if ($script:realtimeConnected -and $joined) {
+            "joined"
+        } elseif ($script:realtimeConnected) {
+            "connected"
+        } elseif ($requested) {
+            "connecting"
+        } else {
+            "off"
+        }
+    }
+
+    $realtimeError = Get-ProtocolString $Event "realtimeLastError"
+    $script:bridgeHealth.realtimeError = if ($realtimeError) { $realtimeError } else { "" }
     $script:bridgeHealth.serial = "protocol"
 }
 
@@ -535,7 +563,9 @@ function Try-HandleProtocolLine {
 
     if ($type -eq "message") {
         $line = Format-ProtocolMessageLine $event
-        if ($script:seenMessageLines.Add($line)) {
+        $id = Get-ProtocolString $event "id"
+        $isNewMessage = if ($id) { $script:seenMessageIds.Add($id) } else { $script:seenMessageLines.Add($line) }
+        if ($isNewMessage -and $script:seenMessageLines.Add($line)) {
             $script:pollMarkerPending = $false
             Add-MessageLine $line
         }
@@ -547,6 +577,10 @@ function Try-HandleProtocolLine {
     if ($type -eq "sent") {
         $script:lastSentAt = [DateTime]::UtcNow
         $thread = Get-ProtocolString $event "thread" "message"
+        $id = Get-ProtocolString $event "id"
+        if ($id) {
+            $script:seenMessageIds.Add($id) | Out-Null
+        }
         Add-LiveFeedLine "sent: $thread"
         Request-Render
         return $true
@@ -624,11 +658,17 @@ function Get-HealthLabel {
     $device = $script:bridgeHealth.device
     $session = Get-ExpiryHealthLabel $script:bridgeHealth.session
     $auth = Get-ExpiryHealthLabel $script:bridgeHealth.auth
-    return "wifi: $wifi | device: $device | session: $session | auth: $auth"
+    return "wifi: $wifi | device: $device | session: $session | auth: $auth | rt: $($script:bridgeHealth.realtime)"
 }
 
 function Get-SidebarLines {
-    $pollLabel = if ($script:liveReceive) { "live: ${PollSeconds}s" } else { "live: paused" }
+    $pollLabel = if ($script:realtimeConnected) {
+        "fallback idle"
+    } elseif ($script:liveReceive) {
+        "fallback ${PollSeconds}s"
+    } else {
+        "fallback off"
+    }
     $rxLabel = if ($script:lastRxAt) { $script:lastRxAt.ToLocalTime().ToString("HH:mm:ss") } else { "none" }
     $sentLabel = if ($script:lastSentAt) { $script:lastSentAt.ToLocalTime().ToString("HH:mm:ss") } else { "none" }
     $protocolLabel = if ($script:protocolEnabled) { $script:bridgeHealth.serial } else { "off" }
@@ -642,6 +682,7 @@ function Get-SidebarLines {
         "rx    $rxLabel",
         "sent  $sentLabel",
         "proto $protocolLabel",
+        "rt    $($script:bridgeHealth.realtime)",
         "",
         "wifi  $($script:bridgeHealth.wifi)",
         "dev   $($script:bridgeHealth.device)",
@@ -1009,6 +1050,9 @@ function Enable-StructuredProtocol {
     $script:bridgeHealth.serial = "requested"
     Start-Sleep -Milliseconds 150
     Read-SerialOutput
+    Send-BridgeLine "realtime start"
+    Start-Sleep -Milliseconds 150
+    Read-SerialOutput
 }
 
 function Show-Help {
@@ -1024,6 +1068,7 @@ function Show-Help {
         "  Tab                   cycle group and recent DMs",
         "  /poll-interval <sec>  change auto-poll interval",
         "  /live on|off          toggle near-realtime polling",
+        "  /realtime on|off      toggle WebSocket receive",
         "  /status-interval <sec> change health refresh interval",
         "  /status               show bridge status",
         "  /protocol on|off      toggle structured serial events",
@@ -1132,6 +1177,20 @@ function Process-InputLine {
         $script:bridgeHealth.serial = "off"
         Add-LiveFeedLine "Structured serial protocol disabled"
         Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
+        Request-Render
+    } elseif ($Line -eq "/realtime" -or $Line -eq "/realtime status") {
+        Send-BridgeLine $(if ($script:currentMode -eq "admin") { "realtime status" } else { "/realtime status" })
+        Add-LiveFeedLine "Realtime status requested"
+        Request-Render
+    } elseif ($Line -eq "/realtime on" -or $Line -eq "/realtime start") {
+        Send-BridgeLine $(if ($script:currentMode -eq "admin") { "realtime start" } else { "/realtime start" })
+        Add-LiveFeedLine "Realtime WebSocket requested"
+        Request-Render
+    } elseif ($Line -eq "/realtime off" -or $Line -eq "/realtime stop") {
+        Send-BridgeLine $(if ($script:currentMode -eq "admin") { "realtime stop" } else { "/realtime stop" })
+        $script:realtimeConnected = $false
+        $script:bridgeHealth.realtime = "off"
+        Add-LiveFeedLine "Realtime WebSocket stopping"
         Request-Render
     } elseif ($Line -match "^/status-interval\s+(\d+)$") {
         $nextInterval = [Math]::Max(0, [int]$Matches[1])
@@ -1330,7 +1389,7 @@ function Run-Interactive {
     while ($script:running) {
         Read-SerialOutput
 
-        if ($script:liveReceive -and ($script:currentMode -eq "group" -or $script:currentMode -eq "dm")) {
+        if ($script:liveReceive -and -not $script:realtimeConnected -and ($script:currentMode -eq "group" -or $script:currentMode -eq "dm")) {
             $elapsed = [DateTime]::UtcNow - $script:lastPollAt
             if ($elapsed.TotalSeconds -ge $PollSeconds) {
                 Invoke-Poll

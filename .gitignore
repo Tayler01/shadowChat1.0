@@ -36,5 +36,6 @@ output/
 .playwright-cli/
 supabase/.temp/
 firmware/esp-bridge/build/
+firmware/esp-bridge/managed_components/
 firmware/esp-bridge/sdkconfig
 firmware/esp-bridge/sdkconfig.old
