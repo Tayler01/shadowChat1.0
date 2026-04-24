@@ -78,9 +78,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
               <img
                 src="/icons/header-logo.png"
                 alt="SHADO"
-                className="absolute -left-5 top-1/2 h-[4.5rem] w-32 -translate-y-1/2 object-contain object-left sm:-left-6 sm:w-36 md:hidden"
+                className="absolute -left-12 top-1/2 h-[5.75rem] w-44 -translate-y-1/2 object-contain object-left sm:-left-14 sm:w-48 md:hidden"
               />
-              <div className="pl-24 sm:pl-28 md:pl-0">
+              <div className="pl-28 sm:pl-32 md:pl-0">
                 <h1 className="text-lg font-semibold text-[var(--text-primary)] md:text-xl">
                   General Chat
                 </h1>
@@ -108,7 +108,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
           </div>
 
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2 rounded-full border border-[rgba(34,197,94,0.24)] bg-[rgba(34,197,94,0.08)] px-3 py-1.5 text-sm text-[#86efac]">
+            <div className="flex items-center space-x-2 rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5 text-sm text-[var(--text-muted)]">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Live now</span>
               <ClientResetIndicator status={resetStatus} />

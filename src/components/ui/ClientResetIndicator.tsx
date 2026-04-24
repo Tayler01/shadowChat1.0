@@ -25,7 +25,7 @@ export const ClientResetIndicator: React.FC<ClientResetIndicatorProps> = ({
       case 'idle':
       default:
         return {
-          color: 'bg-[var(--state-success)]',
+          color: 'bg-[#22c55e] shadow-[0_0_10px_rgba(34,197,94,0.55)]',
           animate: false
         }
     }

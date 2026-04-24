@@ -69,8 +69,8 @@ export function Sidebar({
         <X className="w-4 h-4" />
       </button>
       {/* Header */}
-      <div className="border-b border-[var(--border-panel)] px-5 py-6">
-        <div className="flex flex-col">
+      <div className="flex h-20 items-center overflow-visible border-b border-[var(--border-panel)] px-5">
+        <div className="flex w-full items-center">
           <img
             src="/icons/header-logo.png"
             alt="SHADO"

@@ -286,9 +286,9 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 <img
                   src="/icons/header-logo.png"
                   alt="SHADO"
-                  className="absolute -left-5 top-1/2 h-[4.5rem] w-32 -translate-y-1/2 object-contain object-left sm:-left-6 sm:w-36 md:hidden"
+                  className="absolute -left-12 top-1/2 h-[5.75rem] w-44 -translate-y-1/2 object-contain object-left sm:-left-14 sm:w-48 md:hidden"
                 />
-                <div className="min-w-0 pl-24 sm:pl-28 md:pl-0">
+                <div className="min-w-0 pl-28 sm:pl-32 md:pl-0">
                   <h2 className="text-base font-semibold text-[var(--text-primary)] md:text-lg">
                     Direct Messages
                   </h2>
