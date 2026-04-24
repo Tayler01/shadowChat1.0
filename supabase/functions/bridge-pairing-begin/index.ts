@@ -1,7 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import {
   badRequest,
-  conflict,
   corsHeaders,
   forbidden,
   generatePairingCode,
@@ -66,10 +65,6 @@ serve(async req => {
       throw pairingLookupError
     }
 
-    if (activePairing) {
-      return conflict('Bridge device is already paired')
-    }
-
     await supabase
       .from('bridge_pairing_codes')
       .update({ status: 'revoked' })
@@ -127,6 +122,7 @@ serve(async req => {
       expiresAt,
       pairingRequestId,
       status: 'pairing_pending',
+      wasAlreadyPaired: Boolean(activePairing),
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'

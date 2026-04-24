@@ -8,11 +8,104 @@ param(
     [int]$PollSeconds = 6,
     [switch]$NoAutoPoll,
     [switch]$Smoke,
-    [switch]$NoAnsi
+    [switch]$NoAnsi,
+    [switch]$SavePreferences,
+    [switch]$ResetPreferences,
+    [string]$PreferencesPath = "",
+    [int]$TranscriptLines = 200
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+function Get-DefaultPreferencesPath {
+    $root = if ($env:LOCALAPPDATA) {
+        Join-Path $env:LOCALAPPDATA "ShadowChatBridge"
+    } else {
+        Join-Path $HOME ".shadowchat-bridge"
+    }
+
+    return Join-Path $root "bridge-tui.json"
+}
+
+function Read-BridgeTuiPreferences {
+    param([string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path -LiteralPath $Path)) {
+        return $null
+    }
+
+    try {
+        return Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+    } catch {
+        Write-Warning "Ignoring unreadable bridge TUI preferences at $Path"
+        return $null
+    }
+}
+
+function Save-BridgeTuiPreferences {
+    param([string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return
+    }
+
+    $parent = Split-Path -Parent $Path
+    if (-not [string]::IsNullOrWhiteSpace($parent)) {
+        New-Item -ItemType Directory -Force -Path $parent | Out-Null
+    }
+
+    [pscustomobject]@{
+        port = $Port
+        baudRate = $BaudRate
+        mode = $script:currentMode
+        dmRecipientUserId = $script:dmRecipientUserId
+        pollSeconds = $PollSeconds
+        noAutoPoll = [bool]$NoAutoPoll
+        transcriptLines = $script:transcriptLimit
+        updatedAt = [DateTime]::UtcNow.ToString("o")
+    } | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $Path -Encoding UTF8
+}
+
+$script:preferencesPath = if ([string]::IsNullOrWhiteSpace($PreferencesPath)) {
+    Get-DefaultPreferencesPath
+} else {
+    $PreferencesPath
+}
+
+if ($ResetPreferences -and (Test-Path -LiteralPath $script:preferencesPath)) {
+    Remove-Item -LiteralPath $script:preferencesPath -Force
+}
+
+$loadedPreferences = if (-not $ResetPreferences) {
+    Read-BridgeTuiPreferences -Path $script:preferencesPath
+} else {
+    $null
+}
+
+if ($loadedPreferences) {
+    if (-not $PSBoundParameters.ContainsKey("Port") -and $loadedPreferences.port) {
+        $Port = [string]$loadedPreferences.port
+    }
+    if (-not $PSBoundParameters.ContainsKey("BaudRate") -and $loadedPreferences.baudRate) {
+        $BaudRate = [int]$loadedPreferences.baudRate
+    }
+    if (-not $PSBoundParameters.ContainsKey("Mode") -and $loadedPreferences.mode) {
+        $Mode = [string]$loadedPreferences.mode
+    }
+    if (-not $PSBoundParameters.ContainsKey("DmRecipientUserId") -and $loadedPreferences.dmRecipientUserId) {
+        $DmRecipientUserId = [string]$loadedPreferences.dmRecipientUserId
+    }
+    if (-not $PSBoundParameters.ContainsKey("PollSeconds") -and $loadedPreferences.pollSeconds) {
+        $PollSeconds = [int]$loadedPreferences.pollSeconds
+    }
+    if (-not $PSBoundParameters.ContainsKey("NoAutoPoll") -and $loadedPreferences.noAutoPoll) {
+        $NoAutoPoll = [bool]$loadedPreferences.noAutoPoll
+    }
+    if (-not $PSBoundParameters.ContainsKey("TranscriptLines") -and $loadedPreferences.transcriptLines) {
+        $TranscriptLines = [int]$loadedPreferences.transcriptLines
+    }
+}
 
 $script:serial = $null
 $script:incomingBuffer = ""
@@ -22,6 +115,12 @@ $script:lastPollAt = [DateTime]::MinValue
 $script:running = $true
 $script:inputBuffer = ""
 $script:transcript = New-Object System.Collections.Generic.List[string]
+$script:transcriptLimit = [Math]::Max(40, $TranscriptLines)
+$script:layoutEnabled = $false
+$script:renderDirty = $true
+$script:lastRenderAt = [DateTime]::MinValue
+$script:lastRxAt = $null
+$script:lastStatus = "starting"
 
 function Use-Color {
     return -not $NoAnsi -and -not [Console]::IsOutputRedirected
@@ -71,6 +170,134 @@ function Normalize-BridgeLine {
     return $clean.TrimEnd()
 }
 
+function Get-LineColor {
+    param([string]$Line)
+
+    if ($Line -match "^\d{4}-\d{2}-\d{2}T.* \| ([^:]+): (.*)$") {
+        $sender = $Matches[1]
+        if ($sender -like "bridge*") {
+            return [ConsoleColor]::Cyan
+        }
+
+        return [ConsoleColor]::Green
+    }
+
+    if ($Line -match "^(sent message|sent dm)") {
+        return [ConsoleColor]::Cyan
+    }
+
+    if ($Line -match "(failed|error|too long|Unknown command|timed out)") {
+        return [ConsoleColor]::Red
+    }
+
+    if ($Line -match "^(Entered|Returned|ShadowChat|Bridge status|\(no messages\)|Saved|Preferences)") {
+        return [ConsoleColor]::Yellow
+    }
+
+    if ($Line -match "^\s{2}[a-zA-Z_]+:") {
+        return [ConsoleColor]::DarkGray
+    }
+
+    return [ConsoleColor]::Gray
+}
+
+function Add-TranscriptLine {
+    param([string]$Line)
+
+    $script:transcript.Add($Line) | Out-Null
+    while ($script:transcript.Count -gt $script:transcriptLimit) {
+        $script:transcript.RemoveAt(0)
+    }
+}
+
+function Request-Render {
+    $script:renderDirty = $true
+}
+
+function Fit-Text {
+    param(
+        [string]$Text,
+        [int]$Width
+    )
+
+    if ($Width -le 0) {
+        return ""
+    }
+
+    $clean = Remove-Ansi $Text
+    if ($clean.Length -le $Width) {
+        return $clean.PadRight($Width)
+    }
+
+    if ($Width -le 3) {
+        return $clean.Substring(0, $Width)
+    }
+
+    return ($clean.Substring(0, $Width - 3) + "...")
+}
+
+function Get-ModeLabel {
+    if ($script:currentMode -eq "dm") {
+        if ([string]::IsNullOrWhiteSpace($script:dmRecipientUserId)) {
+            return "DM"
+        }
+
+        return "DM $($script:dmRecipientUserId)"
+    }
+
+    if ($script:currentMode -eq "admin") {
+        return "ADMIN"
+    }
+
+    return "GROUP"
+}
+
+function Render-Layout {
+    param([switch]$Force)
+
+    if (-not $script:layoutEnabled) {
+        return
+    }
+
+    $now = [DateTime]::UtcNow
+    if (-not $Force -and -not $script:renderDirty -and (($now - $script:lastRenderAt).TotalMilliseconds -lt 1000)) {
+        return
+    }
+
+    if (-not $Force -and (($now - $script:lastRenderAt).TotalMilliseconds -lt 80)) {
+        return
+    }
+
+    $script:lastRenderAt = $now
+    $script:renderDirty = $false
+
+    $width = [Math]::Max(40, [Console]::WindowWidth)
+    $height = [Math]::Max(12, [Console]::WindowHeight)
+    $bodyHeight = [Math]::Max(4, $height - 6)
+    $divider = "-" * $width
+    $pollLabel = if ($NoAutoPoll) { "poll: manual" } else { "poll: ${PollSeconds}s" }
+    $rxLabel = if ($script:lastRxAt) { "rx: $($script:lastRxAt.ToLocalTime().ToString("HH:mm:ss"))" } else { "rx: none" }
+
+    [Console]::SetCursorPosition(0, 0)
+    Write-Ui (Fit-Text "ShadowChat Bridge TUI | $Port @ $BaudRate | $(Get-ModeLabel) | $pollLabel | $rxLabel" $width) ([ConsoleColor]::Yellow)
+    Write-Ui $divider ([ConsoleColor]::DarkGray)
+
+    $start = [Math]::Max(0, $script:transcript.Count - $bodyHeight)
+    for ($i = 0; $i -lt $bodyHeight; $i++) {
+        $index = $start + $i
+        if ($index -lt $script:transcript.Count) {
+            $line = $script:transcript[$index]
+            Write-Ui (Fit-Text $line $width) (Get-LineColor $line)
+        } else {
+            Write-Ui (" " * $width)
+        }
+    }
+
+    Write-Ui $divider ([ConsoleColor]::DarkGray)
+    $promptLine = "$(Get-Prompt)$($script:inputBuffer)"
+    Write-Ui (Fit-Text $promptLine $width) ([ConsoleColor]::White) -NoNewline
+}
+
 function Write-BridgeLine {
     param([string]$Line)
 
@@ -79,26 +306,15 @@ function Write-BridgeLine {
         return
     }
 
-    $script:transcript.Add($clean) | Out-Null
+    Add-TranscriptLine $clean
+    $script:lastRxAt = [DateTime]::UtcNow
 
-    if ($clean -match "^\d{4}-\d{2}-\d{2}T.* \| ([^:]+): (.*)$") {
-        $sender = $Matches[1]
-        if ($sender -like "bridge*") {
-            Write-Ui $clean ([ConsoleColor]::Cyan)
-        } else {
-            Write-Ui $clean ([ConsoleColor]::Green)
-        }
-    } elseif ($clean -match "^(sent message|sent dm)") {
-        Write-Ui $clean ([ConsoleColor]::Cyan)
-    } elseif ($clean -match "(failed|error|too long|Unknown command|timed out)") {
-        Write-Ui $clean ([ConsoleColor]::Red)
-    } elseif ($clean -match "^(Entered|Returned|ShadowChat|Bridge status|\(no messages\))") {
-        Write-Ui $clean ([ConsoleColor]::Yellow)
-    } elseif ($clean -match "^\s{2}[a-zA-Z_]+:") {
-        Write-Ui $clean ([ConsoleColor]::DarkGray)
-    } else {
-        Write-Ui $clean ([ConsoleColor]::Gray)
+    if ($script:layoutEnabled) {
+        Request-Render
+        return
     }
+
+    Write-Ui $clean (Get-LineColor $clean)
 }
 
 function Read-SerialOutput {
@@ -132,7 +348,11 @@ function Send-BridgeLine {
         throw "Serial port is not open."
     }
 
-    $script:serial.WriteLine($Line)
+    try {
+        $script:serial.WriteLine($Line)
+    } catch {
+        throw "Could not write to $Port. Close other serial monitors, reset the ESP bridge, and try again. $($_.Exception.Message)"
+    }
 }
 
 function Enter-BridgeMode {
@@ -146,6 +366,7 @@ function Enter-BridgeMode {
         $script:currentMode = "group"
         Send-BridgeLine "chat group"
         $script:lastPollAt = [DateTime]::UtcNow
+        Request-Render
         return
     }
 
@@ -159,6 +380,7 @@ function Enter-BridgeMode {
         $script:dmRecipientUserId = $RecipientUserId
         Send-BridgeLine "chat dm $RecipientUserId"
         $script:lastPollAt = [DateTime]::UtcNow
+        Request-Render
         return
     }
 
@@ -166,6 +388,7 @@ function Enter-BridgeMode {
         Send-BridgeLine "/admin"
     }
     $script:currentMode = "admin"
+    Request-Render
 }
 
 function Invoke-Poll {
@@ -209,17 +432,56 @@ function Sync-BridgeAdmin {
 }
 
 function Show-Help {
-    Write-Ui ""
-    Write-Ui "ShadowChat Bridge TUI" ([ConsoleColor]::Yellow)
-    Write-Ui "  Plain text sends to the active chat thread."
-    Write-Ui "  /poll                 refresh active chat"
-    Write-Ui "  /group                switch to group chat"
-    Write-Ui "  /dm <recipient_id>    switch to a DM"
-    Write-Ui "  /status               show bridge status"
-    Write-Ui "  /admin                enter raw admin shell mode"
-    Write-Ui "  /chat                 return from admin shell to chat"
-    Write-Ui "  /quit                 exit"
-    Write-Ui ""
+    $lines = @(
+        "",
+        "ShadowChat Bridge TUI",
+        "  Plain text sends to the active chat thread.",
+        "  /poll                 refresh active chat",
+        "  /group                switch to group chat",
+        "  /dm <recipient_id>    switch to a DM",
+        "  /poll-interval <sec>  change auto-poll interval",
+        "  /status               show bridge status",
+        "  /admin                enter raw admin shell mode",
+        "  /chat                 return from admin shell to chat",
+        "  /prefs                show active preferences",
+        "  /save                 save current preferences",
+        "  /quit                 exit",
+        ""
+    )
+
+    foreach ($line in $lines) {
+        if ($script:layoutEnabled) {
+            Add-TranscriptLine $line
+        } else {
+            Write-Ui $line ($(if ($line -eq "ShadowChat Bridge TUI") { [ConsoleColor]::Yellow } else { [ConsoleColor]::Gray }))
+        }
+    }
+
+    Request-Render
+}
+
+function Show-Preferences {
+    $lines = @(
+        "Preferences",
+        "  path: $script:preferencesPath",
+        "  port: $Port",
+        "  baud_rate: $BaudRate",
+        "  mode: $script:currentMode",
+        "  dm_recipient_user_id: $(if ($script:dmRecipientUserId) { $script:dmRecipientUserId } else { "(none)" })",
+        "  poll_seconds: $PollSeconds",
+        "  auto_poll: $(-not $NoAutoPoll)",
+        "  transcript_lines: $script:transcriptLimit"
+    )
+
+    foreach ($line in $lines) {
+        if ($script:layoutEnabled) {
+            Add-TranscriptLine $line
+        } else {
+            Write-Ui $line ([ConsoleColor]::Yellow)
+        }
+    }
+
+    Request-Render
 }
 
 function Get-Prompt {
@@ -247,6 +509,11 @@ function Process-InputLine {
         $script:running = $false
     } elseif ($Line -eq "/poll") {
         Invoke-Poll
+    } elseif ($Line -match "^/poll-interval\s+(\d+)$") {
+        $nextInterval = [Math]::Max(2, [int]$Matches[1])
+        Set-Variable -Name PollSeconds -Scope Script -Value $nextInterval
+        Add-TranscriptLine "Auto-poll interval set to $nextInterval seconds"
+        Request-Render
     } elseif ($Line -eq "/group") {
         Enter-BridgeMode "group"
     } elseif ($Line -match "^/dm\s+(.+)$") {
@@ -261,6 +528,12 @@ function Process-InputLine {
         }
     } elseif ($Line -eq "/status") {
         Invoke-AdminCommand "status"
+    } elseif ($Line -eq "/prefs") {
+        Show-Preferences
+    } elseif ($Line -eq "/save") {
+        Save-BridgeTuiPreferences -Path $script:preferencesPath
+        Add-TranscriptLine "Saved preferences to $script:preferencesPath"
+        Request-Render
     } elseif ($script:currentMode -eq "admin") {
         Send-BridgeLine $Line
     } else {
@@ -318,6 +591,11 @@ function Run-Smoke {
         throw "Smoke check did not observe bridge status with Wi-Fi connected."
     }
 
+    $failurePattern = "(?im)(HTTP\s+(401|403|5\d\d)|Invalid bridge access token|Bridge access token has expired|ESP_ERR_HTTP_CONNECT|failed:|Unknown command|timed out)"
+    if ($joined -match $failurePattern) {
+        throw "Smoke check observed bridge errors in the transcript."
+    }
+
     if ($script:currentMode -ne "admin") {
         Send-BridgeLine "/admin"
         Start-Sleep -Milliseconds 250
@@ -333,8 +611,20 @@ function Run-Interactive {
         throw "Interactive mode needs a real console. Use -Smoke for non-interactive checks."
     }
 
+    $script:layoutEnabled = Use-Color
+    if ($script:layoutEnabled) {
+        [Console]::CursorVisible = $false
+        [Console]::Clear()
+    }
+
     Show-Help
-    Write-Ui "Opening $Port at $BaudRate baud..." ([ConsoleColor]::Yellow)
+    if ($script:layoutEnabled) {
+        Add-TranscriptLine "Opening $Port at $BaudRate baud..."
+        Request-Render
+        Render-Layout -Force
+    } else {
+        Write-Ui "Opening $Port at $BaudRate baud..." ([ConsoleColor]::Yellow)
+    }
     Sync-BridgeAdmin
 
     if ($Mode -eq "dm") {
@@ -355,18 +645,26 @@ function Run-Interactive {
             }
         }
 
+        if ($script:layoutEnabled) {
+            Render-Layout
+        }
+
         if ([Console]::KeyAvailable) {
             $key = [Console]::ReadKey($true)
 
             if ($key.Key -eq [ConsoleKey]::Enter) {
-                Write-Host ""
                 $line = $script:inputBuffer
                 $script:inputBuffer = ""
+                Request-Render
                 Process-InputLine $line
             } elseif ($key.Key -eq [ConsoleKey]::Backspace) {
                 if ($script:inputBuffer.Length -gt 0) {
                     $script:inputBuffer = $script:inputBuffer.Substring(0, $script:inputBuffer.Length - 1)
-                    Write-Host -NoNewline "`b `b"
+                    if ($script:layoutEnabled) {
+                        Request-Render
+                    } else {
+                        Write-Host -NoNewline "`b `b"
+                    }
                 }
             } elseif ($key.Key -eq [ConsoleKey]::Tab) {
                 if ($script:currentMode -eq "group" -and -not [string]::IsNullOrWhiteSpace($script:dmRecipientUserId)) {
@@ -376,9 +674,13 @@ function Run-Interactive {
                 }
             } elseif ($key.KeyChar -and -not [char]::IsControl($key.KeyChar)) {
                 $script:inputBuffer += $key.KeyChar
-                Write-Host -NoNewline $key.KeyChar
+                if ($script:layoutEnabled) {
+                    Request-Render
+                } else {
+                    Write-Host -NoNewline $key.KeyChar
+                }
             }
-        } elseif ($script:inputBuffer.Length -eq 0) {
+        } elseif (-not $script:layoutEnabled -and $script:inputBuffer.Length -eq 0) {
             Write-Host -NoNewline (Get-Prompt)
             Start-Sleep -Milliseconds 120
             if ($script:inputBuffer.Length -eq 0) {
@@ -387,8 +689,12 @@ function Run-Interactive {
                 Write-Host -NoNewline "`r"
             }
         } else {
-            Start-Sleep -Milliseconds 60
+            Start-Sleep -Milliseconds 40
         }
+    }
+
+    if ($SavePreferences) {
+        Save-BridgeTuiPreferences -Path $script:preferencesPath
     }
 }
 
@@ -401,6 +707,10 @@ try {
         Run-Interactive
     }
 } finally {
+    if ($script:layoutEnabled) {
+        [Console]::CursorVisible = $true
+        Write-Host ""
+    }
     if ($script:serial -and $script:serial.IsOpen) {
         $script:serial.Close()
     }

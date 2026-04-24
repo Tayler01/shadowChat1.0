@@ -549,7 +549,7 @@ static void bridge_command_wifi_connect(void) {
     }
 
     printf("Connecting to Wi-Fi...\n");
-    if (bridge_wait_for_wifi(15000)) {
+    if (bridge_wait_for_wifi(30000)) {
         printf("Wi-Fi connected\n");
     } else {
         printf("Wi-Fi connect timed out\n");
@@ -726,10 +726,12 @@ static void bridge_command_session_exchange(void) {
     cJSON_Delete(json);
 }
 
-static void bridge_command_session_refresh(void) {
+static bool bridge_refresh_session_material(bool compact_output) {
     if (!s_bridge_state.wifi_connected || s_bridge_state.device_id[0] == '\0' || s_bridge_state.refresh_token[0] == '\0') {
-        printf("Device must have stored refresh material before refresh\n");
-        return;
+        if (!compact_output) {
+            printf("Device must have stored refresh material before refresh\n");
+        }
+        return false;
     }
 
     char body[256];
@@ -745,31 +747,70 @@ static void bridge_command_session_refresh(void) {
     esp_err_t err = bridge_http_post_json("bridge-session-refresh", body, NULL, &response);
     if (err != ESP_OK) {
         printf("bridge-session-refresh failed: %s\n", esp_err_to_name(err));
-        return;
+        return false;
     }
 
-    bridge_print_response("bridge-session-refresh", &response);
+    if (!compact_output) {
+        bridge_print_response("bridge-session-refresh", &response);
+    }
+
+    if (response.status_code < 200 || response.status_code >= 300) {
+        if (compact_output) {
+            printf("bridge-session-refresh failed: HTTP %d\n", response.status_code);
+        }
+        return false;
+    }
 
     cJSON *json = bridge_parse_json_body(&response);
     if (!json) {
-        return;
+        return false;
     }
 
     cJSON *access_token = cJSON_GetObjectItemCaseSensitive(json, "accessToken");
     cJSON *refresh_token = cJSON_GetObjectItemCaseSensitive(json, "refreshToken");
 
-    if (cJSON_IsString(access_token) && access_token->valuestring) {
-        bridge_set_runtime_string(s_bridge_state.access_token, sizeof(s_bridge_state.access_token), access_token->valuestring);
-        bridge_save_string("access_token", s_bridge_state.access_token);
+    if (!cJSON_IsString(access_token) || !access_token->valuestring || !cJSON_IsString(refresh_token) || !refresh_token->valuestring) {
+        printf("bridge-session-refresh response did not include complete session material\n");
+        cJSON_Delete(json);
+        return false;
     }
 
-    if (cJSON_IsString(refresh_token) && refresh_token->valuestring) {
-        bridge_set_runtime_string(s_bridge_state.refresh_token, sizeof(s_bridge_state.refresh_token), refresh_token->valuestring);
-        bridge_save_string("refresh_token", s_bridge_state.refresh_token);
-    }
+    bridge_set_runtime_string(s_bridge_state.access_token, sizeof(s_bridge_state.access_token), access_token->valuestring);
+    bridge_save_string("access_token", s_bridge_state.access_token);
 
-    printf("Rotated bridge control-plane session material\n");
+    bridge_set_runtime_string(s_bridge_state.refresh_token, sizeof(s_bridge_state.refresh_token), refresh_token->valuestring);
+    bridge_save_string("refresh_token", s_bridge_state.refresh_token);
+
+    printf("%s\n", compact_output ? "Refreshed bridge control-plane session material" : "Rotated bridge control-plane session material");
     cJSON_Delete(json);
+    return true;
+}
+
+static void bridge_command_session_refresh(void) {
+    bridge_refresh_session_material(false);
+}
+
+static bool bridge_response_auth_failed(const bridge_http_response_t *response) {
+    if (!response) {
+        return false;
+    }
+
+    if (response->status_code == 401 || response->status_code == 403) {
+        return true;
+    }
+
+    return strstr(response->body, "expired") != NULL ||
+        strstr(response->body, "Invalid bridge access token") != NULL ||
+        strstr(response->body, "Bridge access token") != NULL;
+}
+
+static bool bridge_refresh_and_retry_allowed(const char *action, const bridge_http_response_t *response) {
+    if (!bridge_response_auth_failed(response)) {
+        return false;
+    }
+
+    printf("%s auth failed; refreshing bridge session and retrying once\n", action);
+    return bridge_refresh_session_material(true);
 }
 
 static void bridge_command_heartbeat(void) {
@@ -790,6 +831,10 @@ static void bridge_command_heartbeat(void) {
 
     bridge_http_response_t response = {0};
     esp_err_t err = bridge_http_post_json("bridge-heartbeat", body, s_bridge_state.access_token, &response);
+    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-heartbeat", &response)) {
+        response = (bridge_http_response_t){0};
+        err = bridge_http_post_json("bridge-heartbeat", body, s_bridge_state.access_token, &response);
+    }
     if (err != ESP_OK) {
         printf("bridge-heartbeat failed: %s\n", esp_err_to_name(err));
         return;
@@ -858,8 +903,12 @@ static bool bridge_send_group_message(const char *content, bool compact_output) 
 
     bridge_http_response_t response = {0};
     esp_err_t err = bridge_http_post_json("bridge-group-send", body, s_bridge_state.access_token, &response);
-    free(body);
+    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-group-send", &response)) {
+        response = (bridge_http_response_t){0};
+        err = bridge_http_post_json("bridge-group-send", body, s_bridge_state.access_token, &response);
+    }
 
+    free(body);
     if (err != ESP_OK) {
         printf("bridge-group-send failed: %s\n", esp_err_to_name(err));
         return false;
@@ -888,6 +937,10 @@ static bool bridge_poll_group_messages(bool compact_output) {
 
     bridge_http_response_t response = {0};
     esp_err_t err = bridge_http_post_json("bridge-group-poll", body, s_bridge_state.access_token, &response);
+    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-group-poll", &response)) {
+        response = (bridge_http_response_t){0};
+        err = bridge_http_post_json("bridge-group-poll", body, s_bridge_state.access_token, &response);
+    }
     if (err != ESP_OK) {
         printf("bridge-group-poll failed: %s\n", esp_err_to_name(err));
         return false;
@@ -933,8 +986,12 @@ static bool bridge_send_dm_message(const char *recipient_user_id, const char *co
 
     bridge_http_response_t response = {0};
     esp_err_t err = bridge_http_post_json("bridge-dm-send", body, s_bridge_state.access_token, &response);
-    free(body);
+    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-dm-send", &response)) {
+        response = (bridge_http_response_t){0};
+        err = bridge_http_post_json("bridge-dm-send", body, s_bridge_state.access_token, &response);
+    }
 
+    free(body);
     if (err != ESP_OK) {
         printf("bridge-dm-send failed: %s\n", esp_err_to_name(err));
         return false;
@@ -971,8 +1028,12 @@ static bool bridge_poll_dm_messages(const char *recipient_user_id, bool compact_
 
     bridge_http_response_t response = {0};
     esp_err_t err = bridge_http_post_json("bridge-dm-poll", body, s_bridge_state.access_token, &response);
-    free(body);
+    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-dm-poll", &response)) {
+        response = (bridge_http_response_t){0};
+        err = bridge_http_post_json("bridge-dm-poll", body, s_bridge_state.access_token, &response);
+    }
 
+    free(body);
     if (err != ESP_OK) {
         printf("bridge-dm-poll failed: %s\n", esp_err_to_name(err));
         return false;
@@ -1166,8 +1227,10 @@ static void bridge_shell_task(void *arg) {
             continue;
         }
 
-        if (strcmp(command, "help") == 0) {
+        if (strcmp(command, "help") == 0 || strcmp(command, "/help") == 0) {
             bridge_command_help();
+        } else if (strcmp(command, "/admin") == 0 || strcmp(command, "/back") == 0 || strcmp(command, "/quit") == 0) {
+            printf("Already in admin shell.\n");
         } else if (strcmp(command, "status") == 0) {
             bridge_command_status();
         } else if (strcmp(command, "wifi") == 0 && subcommand && strcmp(subcommand, "set") == 0) {

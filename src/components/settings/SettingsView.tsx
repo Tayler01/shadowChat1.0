@@ -10,7 +10,8 @@ import {
   Trash2,
   AlertTriangle,
   Menu,
-  Brain
+  Brain,
+  KeyRound
 } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { useAuth } from '../../hooks/useAuth'
@@ -21,6 +22,7 @@ import { useSuggestionsEnabled } from '../../hooks/useSuggestedReplies'
 import { useToneAnalysisEnabled } from '../../hooks/useToneAnalysisEnabled'
 import { useSoundEffects } from '../../hooks/useSoundEffects'
 import { usePushNotifications } from '../../hooks/usePushNotifications'
+import { approveBridgePairing } from '../../lib/bridge'
 import { NotificationSetupModal } from './NotificationSetupModal'
 
 interface SettingsViewProps {
@@ -37,6 +39,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
   const [showDangerZone, setShowDangerZone] = useState(false)
   const [showNotificationSetup, setShowNotificationSetup] = useState(false)
   const [installPromptEvent, setInstallPromptEvent] = useState<BeforeInstallPromptEvent | null>(null)
+  const [bridgePairingCode, setBridgePairingCode] = useState('')
+  const [bridgePairingLoading, setBridgePairingLoading] = useState(false)
+  const [lastBridgeDeviceId, setLastBridgeDeviceId] = useState('')
   const { scheme, setScheme } = useTheme()
   const isDesktop = useIsDesktop()
   const { signOut } = useAuth()
@@ -182,6 +187,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
     await installPromptEvent.prompt()
     await installPromptEvent.userChoice.catch(() => null)
     setInstallPromptEvent(null)
+  }
+
+  const handleApproveBridgePairing = async () => {
+    try {
+      setBridgePairingLoading(true)
+      const approval = await approveBridgePairing(bridgePairingCode)
+      setLastBridgeDeviceId(approval.deviceId)
+      setBridgePairingCode('')
+      toast.success('Bridge pairing approved')
+    } catch (err) {
+      console.error(err)
+      toast.error(err instanceof Error ? err.message : 'Failed to approve bridge pairing')
+    } finally {
+      setBridgePairingLoading(false)
+    }
   }
 
   const settingSections = [
@@ -423,6 +443,51 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
               )}
             </div>
           ))}
+
+          <div className="glass-panel rounded-[var(--radius-lg)] p-5 sm:p-6">
+            <div className="mb-4 flex items-center space-x-3">
+              <KeyRound className="h-5 w-5 text-[var(--text-muted)]" />
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                ESP Bridge
+              </h2>
+            </div>
+
+            <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+                <label className="min-w-0 flex-1">
+                  <span className="mb-2 block text-sm font-medium text-[var(--text-primary)]">
+                    Pairing code
+                  </span>
+                  <input
+                    value={bridgePairingCode}
+                    onChange={(event) => setBridgePairingCode(event.target.value.toUpperCase())}
+                    placeholder="ABCDEFGH"
+                    autoCapitalize="characters"
+                    spellCheck={false}
+                    className="w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(0,0,0,0.28)] px-4 py-3 font-mono text-sm uppercase tracking-[0.18em] text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--border-glow)]"
+                  />
+                </label>
+                <Button
+                  onClick={() => void handleApproveBridgePairing()}
+                  disabled={bridgePairingLoading || bridgePairingCode.trim().length < 4}
+                  variant="secondary"
+                  className="w-full justify-center lg:w-auto"
+                >
+                  <KeyRound className="mr-3 h-4 w-4" />
+                  {bridgePairingLoading ? 'Approving' : 'Approve Bridge'}
+                </Button>
+              </div>
+
+              <p className="mt-3 text-sm text-[var(--text-muted)]">
+                Enter the code shown by the ESP bridge to bind it to this signed-in account.
+              </p>
+              {lastBridgeDeviceId && (
+                <p className="mt-3 break-all text-xs uppercase tracking-[0.14em] text-[var(--text-gold)]">
+                  Approved: {lastBridgeDeviceId}
+                </p>
+              )}
+            </div>
+          </div>
 
           {/* Appearance */}
           <div className="glass-panel rounded-[var(--radius-lg)] p-5 sm:p-6">

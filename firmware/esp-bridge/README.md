@@ -143,14 +143,23 @@ TUI commands:
 /poll
 /group
 /dm <recipient_user_id>
+/poll-interval <seconds>
 /status
 /admin
 /chat
+/prefs
+/save
 /help
 /quit
 ```
 
 Plain text sends to the active chat thread. `/admin` switches into the raw firmware admin shell; `/chat` returns to the last chat thread.
+
+The TUI stores optional preferences in `%LOCALAPPDATA%\ShadowChatBridge\bridge-tui.json` on Windows. Use `/save` inside the TUI, or launch with `-SavePreferences`, to remember the active port, mode, DM recipient, poll interval, and transcript length. Use `-ResetPreferences` to discard saved defaults.
+
+The firmware retries bridge-authenticated heartbeat, group, and DM data-plane calls once after refreshing the bridge session when it receives an auth-expired response. If refresh fails, the command reports the refresh failure and leaves the device in its current paired state for manual recovery.
+
+For recovery from expired or revoked local session material, run `pair begin` on the bridge, approve the new code from ShadowChat Settings > ESP Bridge, then run `session exchange` on the bridge. The backend accepts a new pending pairing request from an already-paired physical bridge so a device with stale local tokens can be recovered without direct database cleanup.
 
 ## Phase 0 Notes
 
