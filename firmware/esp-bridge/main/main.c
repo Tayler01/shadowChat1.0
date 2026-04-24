@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "cJSON.h"
 #include "esp_crt_bundle.h"
@@ -25,6 +26,7 @@
 #define BRIDGE_SHELL_LINE_SIZE 1024
 #define BRIDGE_STORAGE_NAMESPACE "bridge_cfg"
 #define BRIDGE_SHELL_TASK_STACK_SIZE 16384
+#define BRIDGE_SESSION_REFRESH_LEEWAY_SECONDS 300
 
 static const char *TAG = "shadowchat_bridge";
 static esp_event_handler_instance_t s_wifi_any_id_handler;
@@ -45,6 +47,7 @@ typedef struct {
     char auth_refresh_token[1024];
     char auth_user_id[64];
     char auth_expires_at[48];
+    char session_expires_at[48];
 } bridge_state_t;
 
 typedef struct {
@@ -160,6 +163,7 @@ static void bridge_load_persisted_state(void) {
     bridge_load_string("auth_refresh_token", s_bridge_state.auth_refresh_token, sizeof(s_bridge_state.auth_refresh_token));
     bridge_load_string("auth_user_id", s_bridge_state.auth_user_id, sizeof(s_bridge_state.auth_user_id));
     bridge_load_string("auth_expires_at", s_bridge_state.auth_expires_at, sizeof(s_bridge_state.auth_expires_at));
+    bridge_load_string("session_expires_at", s_bridge_state.session_expires_at, sizeof(s_bridge_state.session_expires_at));
 }
 
 static void bridge_derive_device_serial(void) {
@@ -403,6 +407,14 @@ static const char *bridge_json_string_or_empty(cJSON *object, const char *key) {
     return cJSON_IsString(value) && value->valuestring ? value->valuestring : "";
 }
 
+static void bridge_store_session_expiry_from_json(cJSON *json) {
+    cJSON *expires_at = cJSON_GetObjectItemCaseSensitive(json, "expiresAt");
+    if (cJSON_IsString(expires_at) && expires_at->valuestring) {
+        bridge_set_runtime_string(s_bridge_state.session_expires_at, sizeof(s_bridge_state.session_expires_at), expires_at->valuestring);
+        bridge_save_string("session_expires_at", s_bridge_state.session_expires_at);
+    }
+}
+
 static void bridge_store_supabase_auth_from_json(cJSON *json) {
     cJSON *supabase_auth = cJSON_GetObjectItemCaseSensitive(json, "supabaseAuth");
     if (!cJSON_IsObject(supabase_auth)) {
@@ -462,6 +474,31 @@ static const char *bridge_profile_label(cJSON *profile, const char *fallback_id)
     return fallback_id && fallback_id[0] != '\0' ? fallback_id : "unknown";
 }
 
+static const char *bridge_profile_handle_label(cJSON *profile, const char *fallback_id, char *buffer, size_t buffer_size) {
+    if (cJSON_IsObject(profile)) {
+        const char *username = bridge_json_string_or_empty(profile, "username");
+        if (username[0] != '\0') {
+            snprintf(buffer, buffer_size, "@%s", username);
+            return buffer;
+        }
+    }
+
+    return bridge_profile_label(profile, fallback_id);
+}
+
+static const char *bridge_message_time_label(const char *created_at, char *buffer, size_t buffer_size) {
+    if (!created_at || created_at[0] == '\0') {
+        return "(unknown time)";
+    }
+
+    if (strlen(created_at) >= 19 && created_at[10] == 'T' && buffer_size >= 9) {
+        snprintf(buffer, buffer_size, "%.8s", created_at + 11);
+        return buffer;
+    }
+
+    return created_at;
+}
+
 static bool bridge_print_message_list(const bridge_http_response_t *response, bool dm_messages) {
     cJSON *json = bridge_parse_json_body(response);
     if (!json) {
@@ -487,10 +524,11 @@ static bool bridge_print_message_list(const bridge_http_response_t *response, bo
         const char *content = bridge_json_string_or_empty(message, "content");
         const char *sender_id = bridge_json_string_or_empty(message, dm_messages ? "sender_id" : "user_id");
         cJSON *profile = cJSON_GetObjectItemCaseSensitive(message, dm_messages ? "sender" : "user");
+        char time_label[12] = {0};
 
         printf(
             "%s | %s: %s\n",
-            created_at[0] ? created_at : "(unknown time)",
+            bridge_message_time_label(created_at, time_label, sizeof(time_label)),
             bridge_profile_label(profile, sender_id),
             content
         );
@@ -498,6 +536,11 @@ static bool bridge_print_message_list(const bridge_http_response_t *response, bo
 
     cJSON_Delete(json);
     return true;
+}
+
+static int bridge_json_int_or_negative(cJSON *object, const char *key) {
+    cJSON *value = cJSON_GetObjectItemCaseSensitive(object, key);
+    return cJSON_IsNumber(value) ? value->valueint : -1;
 }
 
 static void bridge_print_sent_summary(const bridge_http_response_t *response, bool dm_message) {
@@ -510,17 +553,58 @@ static void bridge_print_sent_summary(const bridge_http_response_t *response, bo
     cJSON *message = cJSON_GetObjectItemCaseSensitive(json, "message");
     const char *id = cJSON_IsObject(message) ? bridge_json_string_or_empty(message, "id") : "";
     const char *conversation_id = bridge_json_string_or_empty(json, "conversationId");
+    cJSON *recipient = cJSON_GetObjectItemCaseSensitive(json, "recipient");
+    char recipient_label[80] = {0};
 
-    if (dm_message && conversation_id[0] != '\0') {
+    if (dm_message) {
+        const char *fallback_recipient_id = bridge_json_string_or_empty(json, "recipientUserId");
         printf("sent dm");
+        if (cJSON_IsObject(recipient) || fallback_recipient_id[0] != '\0') {
+            printf(" to %s", bridge_profile_handle_label(recipient, fallback_recipient_id, recipient_label, sizeof(recipient_label)));
+        }
         if (id[0] != '\0') {
             printf(" %s", id);
         }
-        printf(" in conversation %s\n", conversation_id);
+        if (conversation_id[0] != '\0') {
+            printf(" in conversation %s", conversation_id);
+        }
+        printf("\n");
     } else if (id[0] != '\0') {
-        printf("sent message %s\n", id);
+        printf("sent group message %s\n", id);
     } else {
         printf("sent\n");
+    }
+
+    cJSON *push_dispatch = cJSON_GetObjectItemCaseSensitive(json, "pushDispatch");
+    if (cJSON_IsObject(push_dispatch)) {
+        if (dm_message) {
+            int delivered_count = bridge_json_int_or_negative(push_dispatch, "deliveredCount");
+            int removed_subscriptions = bridge_json_int_or_negative(push_dispatch, "removedSubscriptions");
+            if (delivered_count >= 0) {
+                printf("push delivered: %d", delivered_count);
+                if (removed_subscriptions > 0) {
+                    printf(" (removed %d stale subscription%s)", removed_subscriptions, removed_subscriptions == 1 ? "" : "s");
+                }
+                printf("\n");
+            }
+        } else {
+            int delivered_recipients = bridge_json_int_or_negative(push_dispatch, "deliveredRecipients");
+            int delivered_subscriptions = bridge_json_int_or_negative(push_dispatch, "deliveredSubscriptions");
+            int removed_subscriptions = bridge_json_int_or_negative(push_dispatch, "removedSubscriptions");
+            if (delivered_recipients >= 0 || delivered_subscriptions >= 0) {
+                printf(
+                    "push delivered: %d subscription%s to %d recipient%s",
+                    delivered_subscriptions >= 0 ? delivered_subscriptions : 0,
+                    delivered_subscriptions == 1 ? "" : "s",
+                    delivered_recipients >= 0 ? delivered_recipients : 0,
+                    delivered_recipients == 1 ? "" : "s"
+                );
+                if (removed_subscriptions > 0) {
+                    printf(" (removed %d stale subscription%s)", removed_subscriptions, removed_subscriptions == 1 ? "" : "s");
+                }
+                printf("\n");
+            }
+        }
     }
 
     cJSON_Delete(json);
@@ -607,6 +691,7 @@ static void bridge_clear_pairing_state(void) {
     bridge_set_runtime_string(s_bridge_state.auth_refresh_token, sizeof(s_bridge_state.auth_refresh_token), "");
     bridge_set_runtime_string(s_bridge_state.auth_user_id, sizeof(s_bridge_state.auth_user_id), "");
     bridge_set_runtime_string(s_bridge_state.auth_expires_at, sizeof(s_bridge_state.auth_expires_at), "");
+    bridge_set_runtime_string(s_bridge_state.session_expires_at, sizeof(s_bridge_state.session_expires_at), "");
 
     bridge_save_string("device_status", s_bridge_state.device_status);
     bridge_save_string("pairing_code", "");
@@ -616,6 +701,7 @@ static void bridge_clear_pairing_state(void) {
     bridge_save_string("auth_refresh_token", "");
     bridge_save_string("auth_user_id", "");
     bridge_save_string("auth_expires_at", "");
+    bridge_save_string("session_expires_at", "");
 }
 
 static void bridge_command_status(void) {
@@ -633,6 +719,7 @@ static void bridge_command_status(void) {
     printf("  auth_user_id: %s\n", s_bridge_state.auth_user_id[0] ? s_bridge_state.auth_user_id : "(none)");
     printf("  auth_access_token: %s\n", s_bridge_state.auth_access_token[0] ? "(stored)" : "(none)");
     printf("  auth_refresh_token: %s\n", s_bridge_state.auth_refresh_token[0] ? "(stored)" : "(none)");
+    printf("  session_expires_at: %s\n", s_bridge_state.session_expires_at[0] ? s_bridge_state.session_expires_at : "(none)");
     printf("  auth_expires_at: %s\n\n", s_bridge_state.auth_expires_at[0] ? s_bridge_state.auth_expires_at : "(none)");
 }
 
@@ -835,6 +922,7 @@ static void bridge_command_session_exchange(void) {
     }
 
     bridge_store_supabase_auth_from_json(json);
+    bridge_store_session_expiry_from_json(json);
     printf("Stored bridge control-plane and ESP auth session material\n");
     cJSON_Delete(json);
 }
@@ -895,6 +983,7 @@ static bool bridge_refresh_session_material(bool compact_output) {
     bridge_save_string("refresh_token", s_bridge_state.refresh_token);
 
     bridge_store_supabase_auth_from_json(json);
+    bridge_store_session_expiry_from_json(json);
     printf("%s\n", compact_output ? "Refreshed bridge control-plane and ESP auth session material" : "Rotated bridge control-plane and ESP auth session material");
     cJSON_Delete(json);
     return true;
@@ -927,9 +1016,73 @@ static bool bridge_refresh_and_retry_allowed(const char *action, const bridge_ht
     return bridge_refresh_session_material(true);
 }
 
+static bool bridge_parse_iso_utc(const char *iso, time_t *out) {
+    if (!iso || iso[0] == '\0' || !out) {
+        return false;
+    }
+
+    int year = 0;
+    int month = 0;
+    int day = 0;
+    int hour = 0;
+    int minute = 0;
+    int second = 0;
+    if (sscanf(iso, "%d-%d-%dT%d:%d:%d", &year, &month, &day, &hour, &minute, &second) != 6) {
+        return false;
+    }
+
+    struct tm parsed = {0};
+    parsed.tm_year = year - 1900;
+    parsed.tm_mon = month - 1;
+    parsed.tm_mday = day;
+    parsed.tm_hour = hour;
+    parsed.tm_min = minute;
+    parsed.tm_sec = second;
+    parsed.tm_isdst = -1;
+
+    time_t parsed_time = mktime(&parsed);
+    if (parsed_time == (time_t)-1) {
+        return false;
+    }
+
+    *out = parsed_time;
+    return true;
+}
+
+static bool bridge_session_refresh_due(void) {
+    if (s_bridge_state.session_expires_at[0] == '\0') {
+        return false;
+    }
+
+    time_t now = time(NULL);
+    if (now < 1700000000) {
+        return false;
+    }
+
+    time_t expires_at = 0;
+    if (!bridge_parse_iso_utc(s_bridge_state.session_expires_at, &expires_at)) {
+        return false;
+    }
+
+    return difftime(expires_at, now) <= BRIDGE_SESSION_REFRESH_LEEWAY_SECONDS;
+}
+
+static bool bridge_ensure_fresh_session(const char *action) {
+    if (!bridge_session_refresh_due()) {
+        return true;
+    }
+
+    printf("Bridge session expires soon; refreshing before %s\n", action);
+    return bridge_refresh_session_material(true);
+}
+
 static void bridge_command_heartbeat(void) {
     if (!s_bridge_state.wifi_connected || s_bridge_state.device_id[0] == '\0' || s_bridge_state.access_token[0] == '\0') {
         printf("Device must have stored access material before heartbeat\n");
+        return;
+    }
+
+    if (!bridge_ensure_fresh_session("heartbeat")) {
         return;
     }
 
@@ -1000,12 +1153,17 @@ static bool bridge_has_access_material(const char *action) {
 }
 
 static bool bridge_send_group_message(const char *content, bool compact_output) {
+    (void)compact_output;
+
     if (!content || content[0] == '\0') {
         printf("usage: group send <text>\n");
         return false;
     }
 
     if (!bridge_has_access_material("group send")) {
+        return false;
+    }
+    if (!bridge_ensure_fresh_session("group send")) {
         return false;
     }
 
@@ -1028,7 +1186,7 @@ static bool bridge_send_group_message(const char *content, bool compact_output) 
         return false;
     }
 
-    if (compact_output && response.status_code >= 200 && response.status_code < 300) {
+    if (response.status_code >= 200 && response.status_code < 300) {
         bridge_print_sent_summary(&response, false);
     } else {
         bridge_print_response("bridge-group-send", &response);
@@ -1042,7 +1200,12 @@ static void bridge_command_group_send(const char *content) {
 }
 
 static bool bridge_poll_group_messages(bool compact_output) {
+    (void)compact_output;
+
     if (!bridge_has_access_material("group poll")) {
+        return false;
+    }
+    if (!bridge_ensure_fresh_session("group poll")) {
         return false;
     }
 
@@ -1060,7 +1223,7 @@ static bool bridge_poll_group_messages(bool compact_output) {
         return false;
     }
 
-    if (compact_output && response.status_code >= 200 && response.status_code < 300) {
+    if (response.status_code >= 200 && response.status_code < 300) {
         if (!bridge_print_message_list(&response, false)) {
             bridge_print_response("bridge-group-poll", &response);
         }
@@ -1076,12 +1239,17 @@ static void bridge_command_group_poll(void) {
 }
 
 static bool bridge_send_dm_message(const char *recipient_user_id, const char *content, bool compact_output) {
+    (void)compact_output;
+
     if (!recipient_user_id || recipient_user_id[0] == '\0' || !content || content[0] == '\0') {
         printf("usage: dm send <recipient_user_id> <text>\n");
         return false;
     }
 
     if (!bridge_has_access_material("DM send")) {
+        return false;
+    }
+    if (!bridge_ensure_fresh_session("DM send")) {
         return false;
     }
 
@@ -1111,7 +1279,7 @@ static bool bridge_send_dm_message(const char *recipient_user_id, const char *co
         return false;
     }
 
-    if (compact_output && response.status_code >= 200 && response.status_code < 300) {
+    if (response.status_code >= 200 && response.status_code < 300) {
         bridge_print_sent_summary(&response, true);
     } else {
         bridge_print_response("bridge-dm-send", &response);
@@ -1125,12 +1293,17 @@ static void bridge_command_dm_send(const char *recipient_user_id, const char *co
 }
 
 static bool bridge_poll_dm_messages(const char *recipient_user_id, bool compact_output) {
+    (void)compact_output;
+
     if (!recipient_user_id || recipient_user_id[0] == '\0') {
         printf("usage: dm poll <recipient_user_id>\n");
         return false;
     }
 
     if (!bridge_has_access_material("DM poll")) {
+        return false;
+    }
+    if (!bridge_ensure_fresh_session("DM poll")) {
         return false;
     }
 
@@ -1153,7 +1326,7 @@ static bool bridge_poll_dm_messages(const char *recipient_user_id, bool compact_
         return false;
     }
 
-    if (compact_output && response.status_code >= 200 && response.status_code < 300) {
+    if (response.status_code >= 200 && response.status_code < 300) {
         if (!bridge_print_message_list(&response, true)) {
             bridge_print_response("bridge-dm-poll", &response);
         }
@@ -1175,6 +1348,9 @@ static void bridge_command_users_search(const char *query) {
     }
 
     if (!bridge_has_access_material("users search")) {
+        return;
+    }
+    if (!bridge_ensure_fresh_session("users search")) {
         return;
     }
 

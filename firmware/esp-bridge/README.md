@@ -95,17 +95,17 @@ session refresh
 bridge heartbeat
 group send <text>
 group poll
-dm send <recipient_user_id> <text>
-dm poll <recipient_user_id>
+dm send <recipient_user_id|@username> <text>
+dm poll <recipient_user_id|@username>
 chat group
-chat dm <recipient_user_id>
+chat dm <recipient_user_id|@username>
 ```
 
 Inside `chat group` or `chat dm <recipient_user_id>`, plain lines are sent as chat messages. Slash commands are reserved for mode control:
 
 ```text
 /poll
-/dm <recipient_user_id>
+/dm <recipient_user_id|@username>
 /group
 /admin
 /help
@@ -164,7 +164,7 @@ chat dm @caleb
 
 Plain text sends to the active chat thread. `/admin` switches into the raw firmware admin shell; `/chat` returns to the last chat thread.
 
-The TUI stores optional preferences in `%LOCALAPPDATA%\ShadowChatBridge\bridge-tui.json` on Windows. Use `/save` inside the TUI, or launch with `-SavePreferences`, to remember the active port, mode, DM recipient, poll interval, and transcript length. Use `-ResetPreferences` to discard saved defaults.
+The TUI stores preferences in `%LOCALAPPDATA%\ShadowChatBridge\bridge-tui.json` on Windows. Mode changes, DM recipient changes, and poll interval changes are saved automatically outside smoke mode; use `/save` for an explicit save, or `-ResetPreferences` to discard saved defaults.
 
 Smoke mode now uses UTF-8 serial I/O and can validate send/poll flows:
 
@@ -173,7 +173,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1 -Port COM3 -Smoke -Mode dm -SmokeDmRecipientUserId "<user_id>" -SmokeDmText "bridge dm smoke"
 ```
 
-The firmware retries bridge-authenticated heartbeat, group, and DM data-plane calls once after refreshing the bridge session when it receives an auth-expired response. If refresh fails, the command reports the refresh failure and leaves the device in its current paired state for manual recovery.
+The firmware refreshes stored bridge session material before heartbeat, group, DM, and user-search calls when the stored session expiry is within five minutes. It also retries bridge-authenticated calls once after refreshing when it receives an auth-expired response. If refresh fails, the command reports the refresh failure and leaves the device in its current paired state for manual recovery.
 
 For recovery from expired or revoked local session material, run `pair begin` on the bridge, approve the new code from ShadowChat Settings > ESP Bridge, then run `session exchange` on the bridge. The backend accepts a new pending pairing request from an already-paired physical bridge so a device with stale local tokens can be recovered without direct database cleanup.
 

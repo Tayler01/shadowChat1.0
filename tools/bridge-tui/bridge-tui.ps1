@@ -73,6 +73,21 @@ function Save-BridgeTuiPreferences {
     } | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $Path -Encoding UTF8
 }
 
+function Save-BridgeTuiPreferencesQuiet {
+    param([string]$Path)
+
+    if ($Smoke) {
+        return
+    }
+
+    try {
+        Save-BridgeTuiPreferences -Path $Path
+    } catch {
+        Add-TranscriptLine "Could not save preferences: $($_.Exception.Message)"
+        Request-Render
+    }
+}
+
 $script:preferencesPath = if ([string]::IsNullOrWhiteSpace($PreferencesPath)) {
     Get-DefaultPreferencesPath
 } else {
@@ -127,6 +142,7 @@ $script:renderDirty = $true
 $script:lastRenderAt = [DateTime]::MinValue
 $script:lastRxAt = $null
 $script:lastStatus = "starting"
+$script:seenMessageLines = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 
 function Use-Color {
     return -not $NoAnsi -and -not [Console]::IsOutputRedirected
@@ -179,7 +195,7 @@ function Normalize-BridgeLine {
 function Get-LineColor {
     param([string]$Line)
 
-    if ($Line -match "^\d{4}-\d{2}-\d{2}T.* \| ([^:]+): (.*)$") {
+    if ($Line -match "^(?:\d{4}-\d{2}-\d{2}T.*|\d{2}:\d{2}:\d{2}|\(unknown time\)) \| ([^:]+): (.*)$") {
         $sender = $Matches[1]
         if ($sender -like "bridge*") {
             return [ConsoleColor]::Cyan
@@ -188,7 +204,7 @@ function Get-LineColor {
         return [ConsoleColor]::Green
     }
 
-    if ($Line -match "^(sent message|sent dm)") {
+    if ($Line -match "^(sent group message|sent message|sent dm|push delivered)") {
         return [ConsoleColor]::Cyan
     }
 
@@ -214,6 +230,12 @@ function Add-TranscriptLine {
     while ($script:transcript.Count -gt $script:transcriptLimit) {
         $script:transcript.RemoveAt(0)
     }
+}
+
+function Test-BridgeMessageLine {
+    param([string]$Line)
+
+    return $Line -match "^(?:\d{4}-\d{2}-\d{2}T.*|\d{2}:\d{2}:\d{2}|\(unknown time\)) \| [^:]+: .+"
 }
 
 function Request-Render {
@@ -312,6 +334,11 @@ function Write-BridgeLine {
         return
     }
 
+    if ((Test-BridgeMessageLine $clean) -and -not $script:seenMessageLines.Add($clean)) {
+        $script:lastRxAt = [DateTime]::UtcNow
+        return
+    }
+
     Add-TranscriptLine $clean
     $script:lastRxAt = [DateTime]::UtcNow
 
@@ -382,6 +409,7 @@ function Enter-BridgeMode {
         $script:currentMode = "group"
         Send-BridgeLine "chat group"
         $script:lastPollAt = [DateTime]::UtcNow
+        Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
         Request-Render
         return
     }
@@ -397,6 +425,7 @@ function Enter-BridgeMode {
         $script:dmRecipientUserId = $RecipientUserId
         Send-BridgeLine "chat dm $RecipientUserId"
         $script:lastPollAt = [DateTime]::UtcNow
+        Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
         Request-Render
         return
     }
@@ -405,6 +434,7 @@ function Enter-BridgeMode {
         Send-BridgeLine "/admin"
     }
     $script:currentMode = "admin"
+    Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
     Request-Render
 }
 
@@ -530,6 +560,7 @@ function Process-InputLine {
         $nextInterval = [Math]::Max(2, [int]$Matches[1])
         Set-Variable -Name PollSeconds -Scope Script -Value $nextInterval
         Add-TranscriptLine "Auto-poll interval set to $nextInterval seconds"
+        Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
         Request-Render
     } elseif ($Line -eq "/group") {
         Enter-BridgeMode "group"
