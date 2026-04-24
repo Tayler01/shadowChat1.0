@@ -73,8 +73,9 @@ function Save-BridgeTuiPreferences {
         noAutoPoll = -not $script:liveReceive
         protocolEnabled = [bool]$script:protocolEnabled
         transcriptLines = $script:transcriptLimit
+        recentDms = @($script:recentDms)
         updatedAt = [DateTime]::UtcNow.ToString("o")
-    } | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $Path -Encoding UTF8
+    } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $Path -Encoding UTF8
 }
 
 function Save-BridgeTuiPreferencesQuiet {
@@ -157,6 +158,7 @@ $script:inputBuffer = ""
 $script:transcript = New-Object System.Collections.Generic.List[string]
 $script:messages = New-Object System.Collections.Generic.List[string]
 $script:liveFeed = New-Object System.Collections.Generic.List[string]
+$script:recentDms = New-Object System.Collections.Generic.List[string]
 $script:transcriptLimit = [Math]::Max(40, $TranscriptLines)
 $script:liveFeedLimit = [Math]::Max(40, [Math]::Min(160, $TranscriptLines))
 $script:layoutEnabled = $false
@@ -178,6 +180,19 @@ $script:bridgeHealth = [ordered]@{
     session = "unknown"
     auth = "unknown"
     serial = "unknown"
+}
+
+if ($loadedPreferences -and ($loadedPreferences.PSObject.Properties.Name -contains "recentDms") -and $loadedPreferences.recentDms) {
+    foreach ($recentDm in @($loadedPreferences.recentDms)) {
+        $value = [string]$recentDm
+        if (-not [string]::IsNullOrWhiteSpace($value) -and -not $script:recentDms.Contains($value)) {
+            $script:recentDms.Add($value) | Out-Null
+        }
+    }
+}
+
+if (-not [string]::IsNullOrWhiteSpace($script:dmRecipientUserId) -and -not $script:recentDms.Contains($script:dmRecipientUserId)) {
+    $script:recentDms.Add($script:dmRecipientUserId) | Out-Null
 }
 
 function Use-Color {
@@ -290,6 +305,63 @@ function Add-LiveFeedLine {
     while ($script:liveFeed.Count -gt $script:liveFeedLimit) {
         $script:liveFeed.RemoveAt(0)
     }
+}
+
+function Add-RecentDm {
+    param([string]$Recipient)
+
+    if ([string]::IsNullOrWhiteSpace($Recipient)) {
+        return
+    }
+
+    $normalized = $Recipient.Trim()
+    for ($i = $script:recentDms.Count - 1; $i -ge 0; $i--) {
+        if ([string]::Equals($script:recentDms[$i], $normalized, [StringComparison]::OrdinalIgnoreCase)) {
+            $script:recentDms.RemoveAt($i)
+        }
+    }
+
+    $script:recentDms.Insert(0, $normalized)
+    while ($script:recentDms.Count -gt 8) {
+        $script:recentDms.RemoveAt($script:recentDms.Count - 1)
+    }
+}
+
+function Show-RecentDms {
+    if ($script:recentDms.Count -eq 0) {
+        Add-LiveFeedLine "Recent DMs: none yet"
+    } else {
+        Add-LiveFeedLine "Recent DMs"
+        for ($i = 0; $i -lt $script:recentDms.Count; $i++) {
+            Add-LiveFeedLine "  $($i + 1). $($script:recentDms[$i])"
+        }
+    }
+
+    Request-Render
+}
+
+function Switch-NextConversation {
+    if ($script:currentMode -eq "group" -and $script:recentDms.Count -gt 0) {
+        Enter-BridgeMode "dm" $script:recentDms[0]
+        return
+    }
+
+    if ($script:currentMode -eq "dm" -and $script:recentDms.Count -gt 1) {
+        $currentIndex = -1
+        for ($i = 0; $i -lt $script:recentDms.Count; $i++) {
+            if ([string]::Equals($script:recentDms[$i], $script:dmRecipientUserId, [StringComparison]::OrdinalIgnoreCase)) {
+                $currentIndex = $i
+                break
+            }
+        }
+
+        if ($currentIndex -ge 0 -and $currentIndex -lt ($script:recentDms.Count - 1)) {
+            Enter-BridgeMode "dm" $script:recentDms[$currentIndex + 1]
+            return
+        }
+    }
+
+    Enter-BridgeMode "group"
 }
 
 function Test-BridgeMessageLine {
@@ -577,6 +649,8 @@ function Get-SidebarLines {
         "auth  $(Get-ExpiryHealthLabel $script:bridgeHealth.auth)",
         "",
         "Tab       swap",
+        "/users    find",
+        "/dms      recent",
         "/dm name  DM",
         "/group    group",
         "/live     toggle",
@@ -832,6 +906,7 @@ function Enter-BridgeMode {
         & $ensureAdminMode
         $script:currentMode = "dm"
         $script:dmRecipientUserId = $RecipientUserId
+        Add-RecentDm $RecipientUserId
         Send-BridgeLine "chat dm $RecipientUserId"
         $script:lastPollAt = [DateTime]::UtcNow
         Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
@@ -897,6 +972,20 @@ function Invoke-AdminCommand {
     }
 }
 
+function Invoke-UsersSearch {
+    param([string]$Query)
+
+    if ([string]::IsNullOrWhiteSpace($Query)) {
+        Add-LiveFeedLine "Usage: /users <name_or_username>"
+        Request-Render
+        return
+    }
+
+    Add-LiveFeedLine "Searching users: $Query"
+    Invoke-AdminCommand "users search $Query"
+    Request-Render
+}
+
 function Sync-BridgeAdmin {
     Read-SerialOutput -Quiet
     for ($i = 0; $i -lt 4; $i++) {
@@ -930,7 +1019,9 @@ function Show-Help {
         "  /poll                 refresh active chat",
         "  /group                switch to group chat",
         "  /dm <recipient|@name> switch to a DM",
-        "  Tab                   toggle group and last DM",
+        "  /users <name>         search users in the side feed",
+        "  /dms                  show recent DM targets",
+        "  Tab                   cycle group and recent DMs",
         "  /poll-interval <sec>  change auto-poll interval",
         "  /live on|off          toggle near-realtime polling",
         "  /status-interval <sec> change health refresh interval",
@@ -963,6 +1054,7 @@ function Show-Preferences {
         "  baud_rate: $BaudRate",
         "  mode: $script:currentMode",
         "  dm_recipient_user_id: $(if ($script:dmRecipientUserId) { $script:dmRecipientUserId } else { "(none)" })",
+        "  recent_dms: $(if ($script:recentDms.Count) { $script:recentDms -join ", " } else { "(none)" })",
         "  poll_seconds: $PollSeconds",
         "  status_seconds: $StatusSeconds",
         "  live_receive: $script:liveReceive",
@@ -1051,6 +1143,13 @@ function Process-InputLine {
         Enter-BridgeMode "group"
     } elseif ($Line -match "^/dm\s+(.+)$") {
         Enter-BridgeMode "dm" $Matches[1].Trim()
+    } elseif ($Line -match "^/users\s+(.+)$") {
+        Invoke-UsersSearch $Matches[1].Trim()
+    } elseif ($Line -eq "/users") {
+        Add-LiveFeedLine "Usage: /users <name_or_username>"
+        Request-Render
+    } elseif ($Line -eq "/dms") {
+        Show-RecentDms
     } elseif ($Line -eq "/admin") {
         Enter-BridgeMode "admin"
     } elseif ($Line -eq "/chat") {
@@ -1267,11 +1366,7 @@ function Run-Interactive {
                     }
                 }
             } elseif ($key.Key -eq [ConsoleKey]::Tab) {
-                if ($script:currentMode -eq "group" -and -not [string]::IsNullOrWhiteSpace($script:dmRecipientUserId)) {
-                    Enter-BridgeMode "dm" $script:dmRecipientUserId
-                } else {
-                    Enter-BridgeMode "group"
-                }
+                Switch-NextConversation
             } elseif ($key.KeyChar -and -not [char]::IsControl($key.KeyChar)) {
                 $script:inputBuffer += $key.KeyChar
                 if ($script:layoutEnabled) {

@@ -148,6 +148,8 @@ TUI commands:
 /poll
 /group
 /dm <recipient_user_id|@username>
+/users <name_or_username>
+/dms
 /poll-interval <seconds>
 /live on|off
 /status
@@ -174,6 +176,8 @@ Plain text sends to the active chat thread. `/admin` switches into the raw firmw
 The TUI now enables the firmware's opt-in structured serial protocol with `protocol on`. Protocol frames are line-delimited JSON prefixed with `@scb:` and are used for message, mode, sent, and status events. The human-readable admin shell remains the default when protocol mode is not enabled, so normal serial monitors stay clean. Use `-NoProtocol` or `/protocol off` to fall back to text parsing.
 
 Interactive mode renders a split console layout on wide terminals. The center pane is reserved for recent chat messages only, while status, admin output, protocol activity, and other live feed details stay in a side pane. Messages from the ESP bridge user are right-aligned and cyan; everyone else's messages stay left-aligned and green. The input row has a blinking cursor so the entry field remains visually obvious while incoming messages redraw. `/live` toggles near-realtime polling for the active group or DM thread without leaving the chat view.
+
+Use `/users <name_or_username>` to search users without permanently leaving the active chat; results appear in the side live feed. The TUI remembers recent DM targets in preferences, `/dms` lists them, and Tab cycles through group chat plus recent DMs.
 
 When entering `chat group` or `chat dm` for the first time, the bridge prints the latest messages and stores the last message as the active cursor. Chat cursors are persisted in NVS, so after reboot or flash the bridge resumes from the saved group cursor or saved DM cursor and fetches only newer messages. Follow-up `/poll` calls in chat mode also request only messages after that cursor, so the TUI auto-poll loop stays quiet until new group or DM traffic arrives. Admin `group poll` and `dm poll` still show the latest messages without using the chat cursor.
 

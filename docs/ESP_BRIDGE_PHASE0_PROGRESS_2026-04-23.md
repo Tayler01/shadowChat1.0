@@ -216,6 +216,8 @@ Verified on `COM3` against device `a091ab7f-88de-4b8b-befb-9d8a53d9ff60`:
   - blinking text-entry cursor
   - protocol/live receive/send state
 - `/live` now toggles near-realtime polling for the active group or DM thread
+- `/users <name>` searches users from the TUI and keeps results in the side live-feed pane
+- `/dms` lists recent DM targets saved in TUI preferences, and Tab cycles through group chat plus recent DMs
 - after updating stored Wi-Fi credentials from the current Windows profile `Camper1407`, a foreground smoke on `2026-04-24` passed:
   - structured protocol enablement
   - auto-approved `session recover`
