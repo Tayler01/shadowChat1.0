@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import {
   authenticateBridgeAccessToken,
+  badRequest,
   corsHeaders,
   getSupabaseAdmin,
   json,
@@ -12,6 +13,7 @@ type BridgeGroupPollPayload = {
   deviceId?: string
   limit?: number
   since?: string
+  sinceMessageId?: string
 }
 
 const MESSAGE_SELECT = `
@@ -57,7 +59,8 @@ serve(async req => {
     const deviceId = normalizeText(body?.deviceId)
     const accessToken = normalizeText(req.headers.get('X-Bridge-Access-Token'))
     const limit = Math.min(Math.max(Number(body?.limit ?? 10) || 10, 1), 50)
-    const since = normalizeText(body?.since)
+    let since = normalizeText(body?.since)
+    const sinceMessageId = normalizeText(body?.sinceMessageId)
 
     const bridgeAuth = await authenticateBridgeAccessToken(deviceId, accessToken)
     if ('error' in bridgeAuth) {
@@ -65,14 +68,35 @@ serve(async req => {
     }
 
     const supabase = getSupabaseAdmin()
+    if (sinceMessageId) {
+      const { data: cursorMessage, error: cursorError } = await supabase
+        .from('messages')
+        .select('created_at')
+        .eq('id', sinceMessageId)
+        .maybeSingle()
+
+      if (cursorError) {
+        throw cursorError
+      }
+
+      if (!cursorMessage?.created_at) {
+        return badRequest('sinceMessageId is not a valid group message')
+      }
+
+      since = cursorMessage.created_at
+    }
+
     let query = supabase
       .from('messages')
       .select(MESSAGE_SELECT)
-      .order('created_at', { ascending: false })
       .limit(limit)
 
     if (since) {
-      query = query.gt('created_at', since)
+      query = query
+        .gt('created_at', since)
+        .order('created_at', { ascending: true })
+    } else {
+      query = query.order('created_at', { ascending: false })
     }
 
     const { data, error } = await query
@@ -84,7 +108,7 @@ serve(async req => {
     return json({
       ok: true,
       deviceId,
-      messages: [...(data ?? [])].reverse(),
+      messages: since ? (data ?? []) : [...(data ?? [])].reverse(),
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'

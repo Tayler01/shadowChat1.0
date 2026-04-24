@@ -164,6 +164,8 @@ chat dm @caleb
 
 Plain text sends to the active chat thread. `/admin` switches into the raw firmware admin shell; `/chat` returns to the last chat thread.
 
+When entering `chat group` or `chat dm`, the bridge prints the latest messages and stores the last message as the active cursor. Follow-up `/poll` calls in chat mode request only messages after that cursor, so the TUI auto-poll loop stays quiet until new group or DM traffic arrives. Admin `group poll` and `dm poll` still show the latest messages without using the chat cursor.
+
 The TUI stores preferences in `%LOCALAPPDATA%\ShadowChatBridge\bridge-tui.json` on Windows. Mode changes, DM recipient changes, and poll interval changes are saved automatically outside smoke mode; use `/save` for an explicit save, or `-ResetPreferences` to discard saved defaults.
 
 Smoke mode now uses UTF-8 serial I/O and can validate send/poll flows:

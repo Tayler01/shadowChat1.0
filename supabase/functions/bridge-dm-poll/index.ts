@@ -15,6 +15,9 @@ type BridgeDmPollPayload = {
   recipientUserId?: string
   conversationId?: string
   limit?: number
+  since?: string
+  sinceMessageId?: string
+  markRead?: boolean
 }
 
 const DM_MESSAGE_SELECT = `
@@ -59,6 +62,9 @@ serve(async req => {
     let conversationId = normalizeText(body?.conversationId)
     const accessToken = normalizeText(req.headers.get('X-Bridge-Access-Token'))
     const limit = Math.min(Math.max(Number(body?.limit ?? 10) || 10, 1), 50)
+    let since = normalizeText(body?.since)
+    const sinceMessageId = normalizeText(body?.sinceMessageId)
+    const markRead = body?.markRead !== false
 
     const bridgeAuth = await authenticateBridgeAccessToken(deviceId, accessToken)
     if ('error' in bridgeAuth) {
@@ -119,15 +125,59 @@ serve(async req => {
       return badRequest('Conversation is not available to this bridge')
     }
 
-    const { data, error } = await supabase
+    if (sinceMessageId) {
+      const { data: cursorMessage, error: cursorError } = await supabase
+        .from('dm_messages')
+        .select('created_at')
+        .eq('id', sinceMessageId)
+        .eq('conversation_id', conversationId)
+        .maybeSingle()
+
+      if (cursorError) {
+        throw cursorError
+      }
+
+      if (!cursorMessage?.created_at) {
+        return badRequest('sinceMessageId is not valid for this DM conversation')
+      }
+
+      since = cursorMessage.created_at
+    }
+
+    let query = supabase
       .from('dm_messages')
       .select(DM_MESSAGE_SELECT)
       .eq('conversation_id', conversationId)
-      .order('created_at', { ascending: false })
       .limit(limit)
+
+    if (since) {
+      query = query
+        .gt('created_at', since)
+        .order('created_at', { ascending: true })
+    } else {
+      query = query.order('created_at', { ascending: false })
+    }
+
+    const { data, error } = await query
 
     if (error) {
       throw error
+    }
+
+    let markedReadCount = 0
+    if (markRead) {
+      const { count, error: markReadError } = await supabase
+        .from('dm_messages')
+        .update({ read_at: new Date().toISOString() }, { count: 'exact' })
+        .eq('conversation_id', conversationId)
+        .neq('sender_id', bridgeAuth.auth.userId)
+        .is('read_at', null)
+
+      if (markReadError) {
+        throw markReadError
+      }
+
+      markedReadCount = count ?? 0
     }
 
     return json({
@@ -135,7 +185,8 @@ serve(async req => {
       deviceId,
       conversationId,
       recipient,
-      messages: [...(data ?? [])].reverse(),
+      markedReadCount,
+      messages: since ? (data ?? []) : [...(data ?? [])].reverse(),
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
