@@ -233,7 +233,7 @@ function Get-LineColor {
 
     if ($Line -match "^(?:\d{4}-\d{2}-\d{2}T.*|\d{2}:\d{2}:\d{2}|\(unknown time\)) \| ([^:]+): (.*)$") {
         $sender = $Matches[1]
-        if ($sender -like "bridge*") {
+        if (Test-OwnBridgeMessageSender $sender) {
             return [ConsoleColor]::Cyan
         }
 
@@ -296,6 +296,63 @@ function Test-BridgeMessageLine {
     param([string]$Line)
 
     return $Line -match "^(?:\d{4}-\d{2}-\d{2}T.*|\d{2}:\d{2}:\d{2}|\(unknown time\)) \| [^:]+: .+"
+}
+
+function Get-BridgeMessageParts {
+    param([string]$Line)
+
+    if ($Line -match "^(?<time>\d{4}-\d{2}-\d{2}T.*|\d{2}:\d{2}:\d{2}|\(unknown time\)) \| (?<sender>[^:]+): (?<content>.*)$") {
+        return [pscustomobject]@{
+            Time = $Matches.time
+            Sender = $Matches.sender
+            Content = $Matches.content
+        }
+    }
+
+    return $null
+}
+
+function Test-OwnBridgeMessageSender {
+    param([string]$Sender)
+
+    if ([string]::IsNullOrWhiteSpace($Sender)) {
+        return $false
+    }
+
+    return $Sender -match "^(ESP Bridge|bridge|esp_)" -or $Sender -match "ABF584"
+}
+
+function Test-OwnBridgeMessageLine {
+    param([string]$Line)
+
+    $parts = Get-BridgeMessageParts $Line
+    return $parts -and (Test-OwnBridgeMessageSender $parts.Sender)
+}
+
+function Format-MessagePaneLine {
+    param(
+        [string]$Line,
+        [int]$Width
+    )
+
+    if ($Width -le 0) {
+        return ""
+    }
+
+    $clean = Remove-Ansi $Line
+    if ($clean.Length -gt $Width) {
+        if ($Width -le 3) {
+            $clean = $clean.Substring(0, $Width)
+        } else {
+            $clean = $clean.Substring(0, $Width - 3) + "..."
+        }
+    }
+
+    if (Test-OwnBridgeMessageLine $Line) {
+        return $clean.PadLeft($Width)
+    }
+
+    return $clean.PadRight($Width)
 }
 
 function Update-BridgeHealthFromStatusLine {
@@ -544,6 +601,17 @@ function Write-FitSegment {
     Write-Ui (Fit-Text $Text $Width) $Color -NoNewline:$NoNewline
 }
 
+function Write-MessageSegment {
+    param(
+        [string]$Text,
+        [int]$Width,
+        [switch]$NoNewline
+    )
+
+    $color = Get-LineColor $Text
+    Write-Ui (Format-MessagePaneLine $Text $Width) $color -NoNewline:$NoNewline
+}
+
 function Render-Layout {
     param([switch]$Force)
 
@@ -593,15 +661,15 @@ function Render-Layout {
         if ($useThreePane) {
             Write-FitSegment $statusLine $statusWidth ([ConsoleColor]::DarkYellow) -NoNewline
             Write-Ui " | " ([ConsoleColor]::DarkGray) -NoNewline
-            Write-FitSegment $messageLine $messageWidth (Get-LineColor $messageLine) -NoNewline
+            Write-MessageSegment $messageLine $messageWidth -NoNewline
             Write-Ui " | " ([ConsoleColor]::DarkGray) -NoNewline
             Write-FitSegment $feedLine $feedWidth (Get-LineColor $feedLine)
         } elseif ($useTwoPane) {
-            Write-FitSegment $messageLine $messageWidth (Get-LineColor $messageLine) -NoNewline
+            Write-MessageSegment $messageLine $messageWidth -NoNewline
             Write-Ui " | " ([ConsoleColor]::DarkGray) -NoNewline
             Write-FitSegment $feedLine $feedWidth (Get-LineColor $feedLine)
         } else {
-            Write-FitSegment $messageLine $width (Get-LineColor $messageLine)
+            Write-MessageSegment $messageLine $width
         }
     }
 

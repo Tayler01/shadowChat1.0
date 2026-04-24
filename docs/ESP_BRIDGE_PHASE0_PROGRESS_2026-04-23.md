@@ -210,6 +210,7 @@ Verified on `COM3` against device `a091ab7f-88de-4b8b-befb-9d8a53d9ff60`:
 - the Windows TUI enables structured protocol by default, parses protocol frames, and hides them from the user transcript
 - the Windows TUI now renders a split wide-terminal layout with:
   - center recent-message pane with chat messages only
+  - ESP bridge messages right-aligned and cyan, with other users left-aligned and green
   - side live-feed pane for status, admin output, protocol activity, and other operational noise
   - fixed input row
   - blinking text-entry cursor
