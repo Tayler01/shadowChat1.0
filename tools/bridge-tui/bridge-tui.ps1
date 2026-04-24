@@ -87,7 +87,7 @@ function Save-BridgeTuiPreferencesQuiet {
     try {
         Save-BridgeTuiPreferences -Path $Path
     } catch {
-        Add-TranscriptLine "Could not save preferences: $($_.Exception.Message)"
+        Add-LiveFeedLine "Could not save preferences: $($_.Exception.Message)"
         Request-Render
     }
 }
@@ -155,7 +155,10 @@ $script:lastStatusAt = [DateTime]::MinValue
 $script:running = $true
 $script:inputBuffer = ""
 $script:transcript = New-Object System.Collections.Generic.List[string]
+$script:messages = New-Object System.Collections.Generic.List[string]
+$script:liveFeed = New-Object System.Collections.Generic.List[string]
 $script:transcriptLimit = [Math]::Max(40, $TranscriptLines)
+$script:liveFeedLimit = [Math]::Max(40, [Math]::Min(160, $TranscriptLines))
 $script:layoutEnabled = $false
 $script:renderDirty = $true
 $script:lastRenderAt = [DateTime]::MinValue
@@ -269,6 +272,26 @@ function Add-TranscriptLine {
     }
 }
 
+function Add-MessageLine {
+    param([string]$Line)
+
+    Add-TranscriptLine $Line
+    $script:messages.Add($Line) | Out-Null
+    while ($script:messages.Count -gt $script:transcriptLimit) {
+        $script:messages.RemoveAt(0)
+    }
+}
+
+function Add-LiveFeedLine {
+    param([string]$Line)
+
+    Add-TranscriptLine $Line
+    $script:liveFeed.Add($Line) | Out-Null
+    while ($script:liveFeed.Count -gt $script:liveFeedLimit) {
+        $script:liveFeed.RemoveAt(0)
+    }
+}
+
 function Test-BridgeMessageLine {
     param([string]$Line)
 
@@ -358,7 +381,7 @@ function Try-HandleProtocolLine {
     try {
         $event = $payload | ConvertFrom-Json
     } catch {
-        Add-TranscriptLine "Protocol parse error: $($_.Exception.Message)"
+        Add-LiveFeedLine "Protocol parse error: $($_.Exception.Message)"
         Request-Render
         return $true
     }
@@ -366,6 +389,7 @@ function Try-HandleProtocolLine {
     $type = Get-ProtocolString $event "type"
     if ($type -eq "status") {
         Update-BridgeHealthFromProtocol $event
+        Add-LiveFeedLine "status: $(Get-HealthLabel)"
         Request-Render
         return $true
     }
@@ -374,6 +398,7 @@ function Try-HandleProtocolLine {
         $mode = Get-ProtocolString $event "mode"
         if ($mode -in @("group", "dm", "admin")) {
             $script:bridgeHealth.serial = "protocol"
+            Add-LiveFeedLine "mode: $mode"
         }
         Request-Render
         return $true
@@ -382,11 +407,8 @@ function Try-HandleProtocolLine {
     if ($type -eq "message") {
         $line = Format-ProtocolMessageLine $event
         if ($script:seenMessageLines.Add($line)) {
-            if ($script:pollMarkerPending) {
-                Add-TranscriptLine "----- new messages -----"
-                $script:pollMarkerPending = $false
-            }
-            Add-TranscriptLine $line
+            $script:pollMarkerPending = $false
+            Add-MessageLine $line
         }
         $script:lastRxAt = [DateTime]::UtcNow
         Request-Render
@@ -395,6 +417,8 @@ function Try-HandleProtocolLine {
 
     if ($type -eq "sent") {
         $script:lastSentAt = [DateTime]::UtcNow
+        $thread = Get-ProtocolString $event "thread" "message"
+        Add-LiveFeedLine "sent: $thread"
         Request-Render
         return $true
     }
@@ -503,18 +527,21 @@ function Get-SidebarLines {
     )
 }
 
-function Write-LayoutRow {
+function Get-InputLine {
+    $cursorOn = (([DateTime]::UtcNow.Millisecond / 500) -lt 1)
+    $cursor = if ($cursorOn) { "_" } else { " " }
+    return "$(Get-Prompt)$($script:inputBuffer)$cursor"
+}
+
+function Write-FitSegment {
     param(
-        [string]$Left,
-        [string]$Right,
-        [int]$LeftWidth,
-        [int]$RightWidth,
-        [ConsoleColor]$RightColor
+        [string]$Text,
+        [int]$Width,
+        [ConsoleColor]$Color = [ConsoleColor]::Gray,
+        [switch]$NoNewline
     )
 
-    Write-Ui (Fit-Text $Left $LeftWidth) ([ConsoleColor]::DarkYellow) -NoNewline
-    Write-Ui " | " ([ConsoleColor]::DarkGray) -NoNewline
-    Write-Ui (Fit-Text $Right $RightWidth) $RightColor
+    Write-Ui (Fit-Text $Text $Width) $Color -NoNewline:$NoNewline
 }
 
 function Render-Layout {
@@ -525,7 +552,7 @@ function Render-Layout {
     }
 
     $now = [DateTime]::UtcNow
-    if (-not $Force -and -not $script:renderDirty -and (($now - $script:lastRenderAt).TotalMilliseconds -lt 1000)) {
+    if (-not $Force -and -not $script:renderDirty -and (($now - $script:lastRenderAt).TotalMilliseconds -lt 350)) {
         return
     }
 
@@ -542,37 +569,44 @@ function Render-Layout {
     $divider = "-" * $width
     $pollLabel = if ($script:liveReceive) { "live: ${PollSeconds}s" } else { "live: paused" }
     $rxLabel = if ($script:lastRxAt) { "rx: $($script:lastRxAt.ToLocalTime().ToString("HH:mm:ss"))" } else { "rx: none" }
-    $useSplit = $width -ge 88
-    $leftWidth = if ($useSplit) { 26 } else { 0 }
-    $rightWidth = if ($useSplit) { $width - $leftWidth - 3 } else { $width }
-    $sidebarLines = if ($useSplit) { Get-SidebarLines } else { @() }
+    $useThreePane = $width -ge 118
+    $useTwoPane = -not $useThreePane -and $width -ge 82
+    $statusWidth = if ($useThreePane) { 24 } else { 0 }
+    $feedWidth = if ($useThreePane) { 34 } elseif ($useTwoPane) { 30 } else { 0 }
+    $separatorWidth = if ($useThreePane) { 6 } elseif ($useTwoPane) { 3 } else { 0 }
+    $messageWidth = $width - $statusWidth - $feedWidth - $separatorWidth
+    $statusLines = if ($useThreePane) { Get-SidebarLines } else { @() }
+    $messageStart = [Math]::Max(0, $script:messages.Count - $bodyHeight)
+    $feedStart = [Math]::Max(0, $script:liveFeed.Count - $bodyHeight)
 
     [Console]::SetCursorPosition(0, 0)
     Write-Ui (Fit-Text "ShadowChat Bridge TUI | $Port @ $BaudRate | $(Get-ModeLabel) | $pollLabel | $rxLabel | $(Get-HealthLabel)" $width) ([ConsoleColor]::Yellow)
     Write-Ui $divider ([ConsoleColor]::DarkGray)
 
-    $start = [Math]::Max(0, $script:transcript.Count - $bodyHeight)
     for ($i = 0; $i -lt $bodyHeight; $i++) {
-        $index = $start + $i
-        $left = if ($useSplit -and $i -lt $sidebarLines.Count) { $sidebarLines[$i] } else { "" }
-        if ($index -lt $script:transcript.Count) {
-            $line = $script:transcript[$index]
-            if ($useSplit) {
-                Write-LayoutRow $left $line $leftWidth $rightWidth (Get-LineColor $line)
-            } else {
-                Write-Ui (Fit-Text $line $width) (Get-LineColor $line)
-            }
+        $messageIndex = $messageStart + $i
+        $feedIndex = $feedStart + $i
+        $statusLine = if ($i -lt $statusLines.Count) { $statusLines[$i] } else { "" }
+        $messageLine = if ($messageIndex -lt $script:messages.Count) { $script:messages[$messageIndex] } else { "" }
+        $feedLine = if ($feedIndex -lt $script:liveFeed.Count) { $script:liveFeed[$feedIndex] } else { "" }
+
+        if ($useThreePane) {
+            Write-FitSegment $statusLine $statusWidth ([ConsoleColor]::DarkYellow) -NoNewline
+            Write-Ui " | " ([ConsoleColor]::DarkGray) -NoNewline
+            Write-FitSegment $messageLine $messageWidth (Get-LineColor $messageLine) -NoNewline
+            Write-Ui " | " ([ConsoleColor]::DarkGray) -NoNewline
+            Write-FitSegment $feedLine $feedWidth (Get-LineColor $feedLine)
+        } elseif ($useTwoPane) {
+            Write-FitSegment $messageLine $messageWidth (Get-LineColor $messageLine) -NoNewline
+            Write-Ui " | " ([ConsoleColor]::DarkGray) -NoNewline
+            Write-FitSegment $feedLine $feedWidth (Get-LineColor $feedLine)
         } else {
-            if ($useSplit) {
-                Write-LayoutRow $left "" $leftWidth $rightWidth ([ConsoleColor]::Gray)
-            } else {
-                Write-Ui (" " * $width)
-            }
+            Write-FitSegment $messageLine $width (Get-LineColor $messageLine)
         }
     }
 
     Write-Ui $divider ([ConsoleColor]::DarkGray)
-    $promptLine = "$(Get-Prompt)$($script:inputBuffer)"
+    $promptLine = Get-InputLine
     Write-Ui (Fit-Text $promptLine $width) ([ConsoleColor]::White) -NoNewline
 }
 
@@ -609,18 +643,20 @@ function Write-BridgeLine {
         }
     }
 
-    if ((Test-BridgeMessageLine $clean) -and -not $script:seenMessageLines.Add($clean)) {
+    $isMessageLine = Test-BridgeMessageLine $clean
+
+    if ($isMessageLine -and -not $script:seenMessageLines.Add($clean)) {
         $script:lastRxAt = [DateTime]::UtcNow
         return
     }
 
-    if ((Test-BridgeMessageLine $clean) -and $script:pollMarkerPending) {
-        Add-TranscriptLine "----- new messages -----"
+    if ($isMessageLine) {
         $script:pollMarkerPending = $false
+        Add-MessageLine $clean
+        $script:lastRxAt = [DateTime]::UtcNow
+    } else {
+        Add-LiveFeedLine $clean
     }
-
-    Add-TranscriptLine $clean
-    $script:lastRxAt = [DateTime]::UtcNow
 
     if ($script:layoutEnabled) {
         Request-Render
@@ -842,7 +878,7 @@ function Show-Help {
 
     foreach ($line in $lines) {
         if ($script:layoutEnabled) {
-            Add-TranscriptLine $line
+            Add-LiveFeedLine $line
         } else {
             Write-Ui $line ($(if ($line -eq "ShadowChat Bridge TUI") { [ConsoleColor]::Yellow } else { [ConsoleColor]::Gray }))
         }
@@ -869,7 +905,7 @@ function Show-Preferences {
 
     foreach ($line in $lines) {
         if ($script:layoutEnabled) {
-            Add-TranscriptLine $line
+            Add-LiveFeedLine $line
         } else {
             Write-Ui $line ([ConsoleColor]::Yellow)
         }
@@ -906,41 +942,41 @@ function Process-InputLine {
     } elseif ($Line -match "^/poll-interval\s+(\d+)$") {
         $nextInterval = [Math]::Max(2, [int]$Matches[1])
         Set-Variable -Name PollSeconds -Scope Script -Value $nextInterval
-        Add-TranscriptLine "Auto-poll interval set to $nextInterval seconds"
+        Add-LiveFeedLine "Auto-poll interval set to $nextInterval seconds"
         Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
         Request-Render
     } elseif ($Line -eq "/live") {
         $script:liveReceive = -not $script:liveReceive
-        Add-TranscriptLine "Live receive polling $(if ($script:liveReceive) { "enabled" } else { "paused" })"
+        Add-LiveFeedLine "Live receive polling $(if ($script:liveReceive) { "enabled" } else { "paused" })"
         Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
         Request-Render
     } elseif ($Line -eq "/live on" -or $Line -eq "/autopoll on") {
         $script:liveReceive = $true
-        Add-TranscriptLine "Live receive polling enabled"
+        Add-LiveFeedLine "Live receive polling enabled"
         Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
         Request-Render
     } elseif ($Line -eq "/live off" -or $Line -eq "/autopoll off") {
         $script:liveReceive = $false
-        Add-TranscriptLine "Live receive polling paused"
+        Add-LiveFeedLine "Live receive polling paused"
         Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
         Request-Render
     } elseif ($Line -eq "/protocol on") {
         $script:protocolEnabled = $true
         Send-BridgeLine $(if ($script:currentMode -eq "admin") { "protocol on" } else { "/protocol on" })
-        Add-TranscriptLine "Structured serial protocol requested"
+        Add-LiveFeedLine "Structured serial protocol requested"
         Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
         Request-Render
     } elseif ($Line -eq "/protocol off") {
         Send-BridgeLine $(if ($script:currentMode -eq "admin") { "protocol off" } else { "/protocol off" })
         $script:protocolEnabled = $false
         $script:bridgeHealth.serial = "off"
-        Add-TranscriptLine "Structured serial protocol disabled"
+        Add-LiveFeedLine "Structured serial protocol disabled"
         Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
         Request-Render
     } elseif ($Line -match "^/status-interval\s+(\d+)$") {
         $nextInterval = [Math]::Max(0, [int]$Matches[1])
         Set-Variable -Name StatusSeconds -Scope Script -Value $nextInterval
-        Add-TranscriptLine "Health refresh interval set to $(if ($nextInterval -eq 0) { "manual" } else { "$nextInterval seconds" })"
+        Add-LiveFeedLine "Health refresh interval set to $(if ($nextInterval -eq 0) { "manual" } else { "$nextInterval seconds" })"
         Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
         Request-Render
     } elseif ($Line -eq "/group") {
@@ -961,7 +997,7 @@ function Process-InputLine {
         Show-Preferences
     } elseif ($Line -eq "/save") {
         Save-BridgeTuiPreferences -Path $script:preferencesPath
-        Add-TranscriptLine "Saved preferences to $script:preferencesPath"
+        Add-LiveFeedLine "Saved preferences to $script:preferencesPath"
         Request-Render
     } elseif ($script:currentMode -eq "admin") {
         Send-BridgeLine $Line
@@ -1104,7 +1140,7 @@ function Run-Interactive {
 
     Show-Help
     if ($script:layoutEnabled) {
-        Add-TranscriptLine "Opening $Port at $BaudRate baud..."
+        Add-LiveFeedLine "Opening $Port at $BaudRate baud..."
         Request-Render
         Render-Layout -Force
     } else {

@@ -209,9 +209,10 @@ Verified on `COM3` against device `a091ab7f-88de-4b8b-befb-9d8a53d9ff60`:
   - line-delimited `@scb:{...}` events for status, mode, sent, and message frames
 - the Windows TUI enables structured protocol by default, parses protocol frames, and hides them from the user transcript
 - the Windows TUI now renders a split wide-terminal layout with:
-  - left status/navigation panel
-  - right chat transcript
+  - center recent-message pane with chat messages only
+  - side live-feed pane for status, admin output, protocol activity, and other operational noise
   - fixed input row
+  - blinking text-entry cursor
   - protocol/live receive/send state
 - `/live` now toggles near-realtime polling for the active group or DM thread
 - after updating stored Wi-Fi credentials from the current Windows profile `Camper1407`, a foreground smoke on `2026-04-24` passed:
