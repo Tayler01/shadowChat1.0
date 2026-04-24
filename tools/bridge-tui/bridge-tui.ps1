@@ -176,6 +176,7 @@ $script:pollMarkerPending = $false
 $script:quietStatusPending = $false
 $script:statusCaptureActive = $false
 $script:statusCaptureQuiet = $false
+$script:lastLiveStatusLine = ""
 $script:bridgeHealth = [ordered]@{
     wifi = "unknown"
     device = "unknown"
@@ -305,10 +306,32 @@ function Add-LiveFeedLine {
     param([string]$Line)
 
     Add-TranscriptLine $Line
+    if (Test-SuppressLiveFeedLine $Line) {
+        return
+    }
+
     $script:liveFeed.Add($Line) | Out-Null
     while ($script:liveFeed.Count -gt $script:liveFeedLimit) {
         $script:liveFeed.RemoveAt(0)
     }
+}
+
+function Test-SuppressLiveFeedLine {
+    param([string]$Line)
+
+    if ($Line -match "^[IWDVE] \(\d+\) (esp-x509-crt-bundle|websocket_client|HTTP_CLIENT):") {
+        return $true
+    }
+
+    if ($Line -like "status: *") {
+        if ($Line -eq $script:lastLiveStatusLine) {
+            return $true
+        }
+
+        $script:lastLiveStatusLine = $Line
+    }
+
+    return $false
 }
 
 function Add-RecentDm {
@@ -661,14 +684,30 @@ function Get-HealthLabel {
     return "wifi: $wifi | device: $device | session: $session | auth: $auth | rt: $($script:bridgeHealth.realtime)"
 }
 
-function Get-SidebarLines {
-    $pollLabel = if ($script:realtimeConnected) {
+function Get-LiveTransportLabel {
+    if ($script:realtimeConnected) {
+        return "live: realtime"
+    }
+
+    if ($script:liveReceive) {
+        return "live: ${PollSeconds}s"
+    }
+
+    return "live: paused"
+}
+
+function Get-PollFallbackLabel {
+    if ($script:realtimeConnected) {
         "fallback idle"
     } elseif ($script:liveReceive) {
         "fallback ${PollSeconds}s"
     } else {
         "fallback off"
     }
+}
+
+function Get-SidebarLines {
+    $pollLabel = Get-PollFallbackLabel
     $rxLabel = if ($script:lastRxAt) { $script:lastRxAt.ToLocalTime().ToString("HH:mm:ss") } else { "none" }
     $sentLabel = if ($script:lastSentAt) { $script:lastSentAt.ToLocalTime().ToString("HH:mm:ss") } else { "none" }
     $protocolLabel = if ($script:protocolEnabled) { $script:bridgeHealth.serial } else { "off" }
@@ -750,7 +789,7 @@ function Render-Layout {
     $height = [Math]::Max(12, [Console]::WindowHeight)
     $bodyHeight = [Math]::Max(4, $height - 6)
     $divider = "-" * $width
-    $pollLabel = if ($script:liveReceive) { "live: ${PollSeconds}s" } else { "live: paused" }
+    $pollLabel = Get-LiveTransportLabel
     $rxLabel = if ($script:lastRxAt) { "rx: $($script:lastRxAt.ToLocalTime().ToString("HH:mm:ss"))" } else { "rx: none" }
     $useThreePane = $width -ge 118
     $useTwoPane = -not $useThreePane -and $width -ge 82

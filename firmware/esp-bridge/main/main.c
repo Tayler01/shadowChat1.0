@@ -35,6 +35,7 @@
 #define BRIDGE_REALTIME_HEARTBEAT_MS 25000
 #define BRIDGE_REALTIME_TOKEN_CHECK_MS 30000
 #define BRIDGE_REALTIME_TOPIC "realtime:bridge-chat"
+#define BRIDGE_PROFILE_CACHE_SIZE 24
 
 static const char *TAG = "shadowchat_bridge";
 static esp_event_handler_instance_t s_wifi_any_id_handler;
@@ -71,6 +72,11 @@ typedef enum {
     BRIDGE_CHAT_MODE_DM,
 } bridge_chat_mode_t;
 
+typedef struct {
+    char user_id[64];
+    char label[80];
+} bridge_profile_cache_entry_t;
+
 static EventGroupHandle_t s_wifi_event_group;
 static bridge_state_t s_bridge_state;
 static bool s_wifi_reconfiguring;
@@ -84,6 +90,8 @@ static uint32_t s_realtime_ref;
 static char s_realtime_last_error[96];
 static char s_realtime_rx_buffer[BRIDGE_REALTIME_RX_BUFFER_SIZE];
 static size_t s_realtime_rx_length;
+static bridge_profile_cache_entry_t s_profile_cache[BRIDGE_PROFILE_CACHE_SIZE];
+static size_t s_profile_cache_next_index;
 
 static bool bridge_ensure_wifi_connected(const char *action);
 
@@ -1745,6 +1753,90 @@ static void bridge_realtime_set_error(const char *message) {
     bridge_set_runtime_string(s_realtime_last_error, sizeof(s_realtime_last_error), message ? message : "");
 }
 
+static const char *bridge_profile_cache_get(const char *user_id) {
+    if (!user_id || user_id[0] == '\0') {
+        return NULL;
+    }
+
+    for (size_t index = 0; index < BRIDGE_PROFILE_CACHE_SIZE; index++) {
+        if (strcmp(s_profile_cache[index].user_id, user_id) == 0 && s_profile_cache[index].label[0] != '\0') {
+            return s_profile_cache[index].label;
+        }
+    }
+
+    return NULL;
+}
+
+static void bridge_profile_cache_put(const char *user_id, const char *label) {
+    if (!user_id || user_id[0] == '\0' || !label || label[0] == '\0') {
+        return;
+    }
+
+    for (size_t index = 0; index < BRIDGE_PROFILE_CACHE_SIZE; index++) {
+        if (strcmp(s_profile_cache[index].user_id, user_id) == 0) {
+            bridge_set_runtime_string(s_profile_cache[index].label, sizeof(s_profile_cache[index].label), label);
+            return;
+        }
+    }
+
+    bridge_profile_cache_entry_t *entry = &s_profile_cache[s_profile_cache_next_index % BRIDGE_PROFILE_CACHE_SIZE];
+    bridge_set_runtime_string(entry->user_id, sizeof(entry->user_id), user_id);
+    bridge_set_runtime_string(entry->label, sizeof(entry->label), label);
+    s_profile_cache_next_index++;
+}
+
+static const char *bridge_lookup_profile_label(const char *user_id, char *buffer, size_t buffer_size) {
+    if (!user_id || user_id[0] == '\0') {
+        return "unknown";
+    }
+
+    if (strcmp(user_id, s_bridge_state.auth_user_id) == 0) {
+        return "ESP Bridge";
+    }
+
+    const char *cached = bridge_profile_cache_get(user_id);
+    if (cached) {
+        return cached;
+    }
+
+    if (!buffer || buffer_size == 0) {
+        return user_id;
+    }
+
+    snprintf(buffer, buffer_size, "%s", user_id);
+
+    if (!bridge_has_access_material("profile lookup") || !bridge_ensure_fresh_session("profile lookup")) {
+        return buffer;
+    }
+
+    char body[160];
+    snprintf(body, sizeof(body), "{\"deviceId\":\"%s\",\"userIds\":[\"%s\"]}", s_bridge_state.device_id, user_id);
+
+    bridge_http_response_t response = {0};
+    esp_err_t err = bridge_http_post_json("bridge-user-profile", body, s_bridge_state.access_token, &response);
+    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-user-profile", &response)) {
+        response = (bridge_http_response_t){0};
+        err = bridge_http_post_json("bridge-user-profile", body, s_bridge_state.access_token, &response);
+    }
+    if (err != ESP_OK || response.status_code < 200 || response.status_code >= 300) {
+        return buffer;
+    }
+
+    cJSON *json = bridge_parse_json_body(&response);
+    if (!json) {
+        return buffer;
+    }
+
+    cJSON *users = cJSON_GetObjectItemCaseSensitive(json, "users");
+    cJSON *profile = cJSON_IsArray(users) ? cJSON_GetArrayItem(users, 0) : NULL;
+    const char *label = bridge_profile_label(profile, user_id);
+    bridge_set_runtime_string(buffer, buffer_size, label);
+    bridge_profile_cache_put(user_id, buffer);
+
+    cJSON_Delete(json);
+    return buffer;
+}
+
 static bool bridge_realtime_build_url(char *buffer, size_t buffer_size) {
     if (!buffer || buffer_size == 0) {
         return false;
@@ -1877,8 +1969,9 @@ static void bridge_realtime_emit_record(const char *thread, cJSON *record) {
     const char *created_at = bridge_json_string_or_empty(record, "created_at");
     const char *content = bridge_json_string_or_empty(record, "content");
     const char *sender_id = bridge_json_string_or_empty(record, strcmp(thread, "dm") == 0 ? "sender_id" : "user_id");
-    const char *sender_label = (strcmp(sender_id, s_bridge_state.auth_user_id) == 0) ? "ESP Bridge" : sender_id;
     char time_label[12] = {0};
+    char sender_label_buffer[80] = {0};
+    const char *sender_label = bridge_lookup_profile_label(sender_id, sender_label_buffer, sizeof(sender_label_buffer));
 
     if (s_protocol_enabled) {
         bridge_protocol_emit_message(thread, id, created_at, sender_id, sender_label, content);
@@ -2061,7 +2154,7 @@ static void bridge_realtime_task(void *arg) {
         esp_websocket_client_config_t config = {
             .uri = url,
             .buffer_size = 4096,
-            .task_stack = 8192,
+            .task_stack = BRIDGE_REALTIME_TASK_STACK_SIZE,
             .network_timeout_ms = 10000,
             .reconnect_timeout_ms = 5000,
             .ping_interval_sec = 20,
