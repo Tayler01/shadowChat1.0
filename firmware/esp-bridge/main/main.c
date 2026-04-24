@@ -64,6 +64,7 @@ typedef enum {
 
 static EventGroupHandle_t s_wifi_event_group;
 static bridge_state_t s_bridge_state;
+static bool s_wifi_reconfiguring;
 
 static void bridge_save_string(const char *key, const char *value) {
     nvs_handle_t handle;
@@ -151,6 +152,87 @@ static char *bridge_json_three_string_body(
     return body;
 }
 
+static char *bridge_skip_spaces(char *value) {
+    while (value && *value == ' ') {
+        value++;
+    }
+    return value;
+}
+
+static void bridge_trim_trailing_spaces(char *value) {
+    if (!value) {
+        return;
+    }
+
+    size_t length = strlen(value);
+    while (length > 0 && value[length - 1] == ' ') {
+        value[length - 1] = '\0';
+        length--;
+    }
+}
+
+static bool bridge_read_shell_arg(char **input, char *output, size_t output_size) {
+    if (!input || !output || output_size == 0) {
+        return false;
+    }
+
+    char *cursor = bridge_skip_spaces(*input);
+    output[0] = '\0';
+    if (!cursor || *cursor == '\0') {
+        *input = cursor;
+        return false;
+    }
+
+    char quote = '\0';
+    if (*cursor == '"' || *cursor == '\'') {
+        quote = *cursor;
+        cursor++;
+    }
+
+    size_t out_index = 0;
+    while (*cursor != '\0') {
+        if (quote) {
+            if (*cursor == quote) {
+                cursor++;
+                break;
+            }
+        } else if (*cursor == ' ') {
+            break;
+        }
+
+        if (out_index < output_size - 1) {
+            output[out_index++] = *cursor;
+        }
+        cursor++;
+    }
+
+    output[out_index] = '\0';
+    *input = cursor;
+    return output[0] != '\0';
+}
+
+static bool bridge_read_shell_remainder(char **input, char *output, size_t output_size) {
+    if (!input || !output || output_size == 0) {
+        return false;
+    }
+
+    char *cursor = bridge_skip_spaces(*input);
+    output[0] = '\0';
+    if (!cursor || *cursor == '\0') {
+        *input = cursor;
+        return false;
+    }
+
+    if (*cursor == '"' || *cursor == '\'') {
+        return bridge_read_shell_arg(input, output, output_size);
+    }
+
+    snprintf(output, output_size, "%s", cursor);
+    bridge_trim_trailing_spaces(output);
+    *input = cursor + strlen(cursor);
+    return output[0] != '\0';
+}
+
 static char *bridge_dm_poll_body(const char *recipient_user_id, const char *since_message_id) {
     cJSON *json = cJSON_CreateObject();
     if (!json) {
@@ -221,10 +303,12 @@ static void bridge_wifi_event_handler(
             esp_wifi_connect();
         }
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        wifi_event_sta_disconnected_t *event = (wifi_event_sta_disconnected_t *)event_data;
         s_bridge_state.wifi_connected = false;
         xEventGroupClearBits(s_wifi_event_group, BRIDGE_WIFI_CONNECTED_BIT);
+        printf("Wi-Fi disconnected; reason=%d\n", event ? event->reason : -1);
 
-        if (s_bridge_state.wifi_ssid[0] != '\0') {
+        if (!s_wifi_reconfiguring && s_bridge_state.wifi_ssid[0] != '\0') {
             esp_wifi_connect();
         }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
@@ -276,8 +360,56 @@ static esp_err_t bridge_wifi_apply_credentials(void) {
     wifi_config.sta.pmf_cfg.capable = true;
     wifi_config.sta.pmf_cfg.required = false;
 
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-    return esp_wifi_connect();
+    s_wifi_reconfiguring = true;
+    xEventGroupClearBits(s_wifi_event_group, BRIDGE_WIFI_CONNECTED_BIT);
+    s_bridge_state.wifi_connected = false;
+
+    esp_err_t disconnect_err = esp_wifi_disconnect();
+    if (disconnect_err != ESP_OK && disconnect_err != ESP_ERR_WIFI_NOT_CONNECT) {
+        s_wifi_reconfiguring = false;
+        return disconnect_err;
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(250));
+
+    esp_err_t config_err = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
+    if (config_err != ESP_OK) {
+        s_wifi_reconfiguring = false;
+        return config_err;
+    }
+
+    esp_err_t connect_err = esp_wifi_connect();
+    s_wifi_reconfiguring = false;
+    if (connect_err == ESP_ERR_WIFI_CONN) {
+        return ESP_OK;
+    }
+
+    return connect_err;
+}
+
+static const char *bridge_wifi_auth_mode_name(wifi_auth_mode_t authmode) {
+    switch (authmode) {
+        case WIFI_AUTH_OPEN:
+            return "open";
+        case WIFI_AUTH_WEP:
+            return "wep";
+        case WIFI_AUTH_WPA_PSK:
+            return "wpa";
+        case WIFI_AUTH_WPA2_PSK:
+            return "wpa2";
+        case WIFI_AUTH_WPA_WPA2_PSK:
+            return "wpa/wpa2";
+        case WIFI_AUTH_WPA2_ENTERPRISE:
+            return "wpa2-enterprise";
+        case WIFI_AUTH_WPA3_PSK:
+            return "wpa3";
+        case WIFI_AUTH_WPA2_WPA3_PSK:
+            return "wpa2/wpa3";
+        case WIFI_AUTH_WAPI_PSK:
+            return "wapi";
+        default:
+            return "unknown";
+    }
 }
 
 static bool bridge_wait_for_wifi(int timeout_ms) {
@@ -687,13 +819,16 @@ static void bridge_command_help(void) {
     printf("  help\n");
     printf("  status\n");
     printf("  wifi set <ssid> <password>\n");
+    printf("  wifi set \"<ssid with spaces>\" \"<password with spaces>\"\n");
     printf("  wifi connect\n");
+    printf("  wifi scan\n");
     printf("  bridge register\n");
     printf("  bridge wipe\n");
     printf("  pair begin\n");
     printf("  pair status\n");
     printf("  session exchange\n");
     printf("  session refresh\n");
+    printf("  session recover\n");
     printf("  bridge heartbeat\n\n");
     printf("  group send <text>\n");
     printf("  group poll\n\n");
@@ -727,6 +862,24 @@ static void bridge_clear_pairing_state(void) {
 
     bridge_save_string("device_status", s_bridge_state.device_status);
     bridge_save_string("pairing_code", "");
+    bridge_save_string("access_token", "");
+    bridge_save_string("refresh_token", "");
+    bridge_save_string("auth_access_token", "");
+    bridge_save_string("auth_refresh_token", "");
+    bridge_save_string("auth_user_id", "");
+    bridge_save_string("auth_expires_at", "");
+    bridge_save_string("session_expires_at", "");
+}
+
+static void bridge_clear_session_material(void) {
+    bridge_set_runtime_string(s_bridge_state.access_token, sizeof(s_bridge_state.access_token), "");
+    bridge_set_runtime_string(s_bridge_state.refresh_token, sizeof(s_bridge_state.refresh_token), "");
+    bridge_set_runtime_string(s_bridge_state.auth_access_token, sizeof(s_bridge_state.auth_access_token), "");
+    bridge_set_runtime_string(s_bridge_state.auth_refresh_token, sizeof(s_bridge_state.auth_refresh_token), "");
+    bridge_set_runtime_string(s_bridge_state.auth_user_id, sizeof(s_bridge_state.auth_user_id), "");
+    bridge_set_runtime_string(s_bridge_state.auth_expires_at, sizeof(s_bridge_state.auth_expires_at), "");
+    bridge_set_runtime_string(s_bridge_state.session_expires_at, sizeof(s_bridge_state.session_expires_at), "");
+
     bridge_save_string("access_token", "");
     bridge_save_string("refresh_token", "");
     bridge_save_string("auth_access_token", "");
@@ -787,6 +940,50 @@ static void bridge_command_wifi_connect(void) {
     }
 }
 
+static void bridge_command_wifi_scan(void) {
+    wifi_scan_config_t scan_config = {0};
+    printf("Scanning nearby Wi-Fi networks...\n");
+
+    esp_err_t err = esp_wifi_scan_start(&scan_config, true);
+    if (err != ESP_OK) {
+        printf("Wi-Fi scan failed: %s\n", esp_err_to_name(err));
+        return;
+    }
+
+    uint16_t ap_count = 0;
+    err = esp_wifi_scan_get_ap_num(&ap_count);
+    if (err != ESP_OK) {
+        printf("Wi-Fi scan result count failed: %s\n", esp_err_to_name(err));
+        return;
+    }
+    printf("Found %u network%s\n", ap_count, ap_count == 1 ? "" : "s");
+
+    if (ap_count == 0) {
+        return;
+    }
+
+    wifi_ap_record_t ap_records[20] = {0};
+    uint16_t record_count = ap_count < 20 ? ap_count : 20;
+    err = esp_wifi_scan_get_ap_records(&record_count, ap_records);
+    if (err != ESP_OK) {
+        printf("Wi-Fi scan result read failed: %s\n", esp_err_to_name(err));
+        return;
+    }
+
+    for (uint16_t i = 0; i < record_count; i++) {
+        printf("  %2u. %-32s RSSI %4d  channel %2u  %s\n",
+            i + 1,
+            ap_records[i].ssid,
+            ap_records[i].rssi,
+            ap_records[i].primary,
+            bridge_wifi_auth_mode_name(ap_records[i].authmode));
+    }
+
+    if (ap_count > record_count) {
+        printf("  ... %u more not shown\n", ap_count - record_count);
+    }
+}
+
 static void bridge_command_register(void) {
     if (!s_bridge_state.wifi_connected) {
         printf("Wi-Fi is not connected\n");
@@ -833,10 +1030,10 @@ static void bridge_command_register(void) {
     cJSON_Delete(json);
 }
 
-static void bridge_command_pair_begin(void) {
+static bool bridge_command_pair_begin(void) {
     if (!s_bridge_state.wifi_connected || s_bridge_state.device_id[0] == '\0') {
         printf("Device must be registered and online before pairing begins\n");
-        return;
+        return false;
     }
 
     char body[128];
@@ -846,14 +1043,17 @@ static void bridge_command_pair_begin(void) {
     esp_err_t err = bridge_http_post_json("bridge-pairing-begin", body, NULL, &response);
     if (err != ESP_OK) {
         printf("bridge-pairing-begin failed: %s\n", esp_err_to_name(err));
-        return;
+        return false;
     }
 
     bridge_print_response("bridge-pairing-begin", &response);
+    if (response.status_code < 200 || response.status_code >= 300) {
+        return false;
+    }
 
     cJSON *json = bridge_parse_json_body(&response);
     if (!json) {
-        return;
+        return false;
     }
 
     cJSON *pairing_code = cJSON_GetObjectItemCaseSensitive(json, "pairingCode");
@@ -871,6 +1071,7 @@ static void bridge_command_pair_begin(void) {
     }
 
     cJSON_Delete(json);
+    return true;
 }
 
 static void bridge_command_pair_status(void) {
@@ -1027,6 +1228,18 @@ static bool bridge_refresh_session_material(bool compact_output) {
 
 static void bridge_command_session_refresh(void) {
     bridge_refresh_session_material(false);
+}
+
+static void bridge_command_session_recover(void) {
+    printf("Starting bridge session recovery. This keeps Wi-Fi and device registration, then issues a new pairing code.\n");
+    if (!bridge_command_pair_begin()) {
+        printf("Session recovery could not start. Fix Wi-Fi/registration first, then retry: session recover\n");
+        return;
+    }
+
+    bridge_clear_session_material();
+    printf("Old local session material cleared.\n");
+    printf("Approve the new code in ShadowChat Settings > ESP Bridge, then run: session exchange\n");
 }
 
 static bool bridge_response_auth_failed(const bridge_http_response_t *response) {
@@ -1669,17 +1882,16 @@ static void bridge_shell_task(void *arg) {
         } else if (strcmp(command, "status") == 0) {
             bridge_command_status();
         } else if (strcmp(command, "wifi") == 0 && subcommand && strcmp(subcommand, "set") == 0) {
-            char *ssid = strtok_r(NULL, " ", &save_ptr);
-            char *password = save_ptr;
-            while (password && *password == ' ') {
-                password++;
-            }
-            if (password && *password == '\0') {
-                password = NULL;
-            }
-            bridge_command_wifi_set(ssid, password);
+            char ssid[33] = {0};
+            char password[65] = {0};
+            char *args = save_ptr;
+            bool has_ssid = bridge_read_shell_arg(&args, ssid, sizeof(ssid));
+            bool has_password = bridge_read_shell_remainder(&args, password, sizeof(password));
+            bridge_command_wifi_set(has_ssid ? ssid : NULL, has_password ? password : NULL);
         } else if (strcmp(command, "wifi") == 0 && subcommand && strcmp(subcommand, "connect") == 0) {
             bridge_command_wifi_connect();
+        } else if (strcmp(command, "wifi") == 0 && subcommand && strcmp(subcommand, "scan") == 0) {
+            bridge_command_wifi_scan();
         } else if (strcmp(command, "bridge") == 0 && subcommand && strcmp(subcommand, "register") == 0) {
             bridge_command_register();
         } else if (strcmp(command, "bridge") == 0 && subcommand && strcmp(subcommand, "heartbeat") == 0) {
@@ -1732,6 +1944,8 @@ static void bridge_shell_task(void *arg) {
             bridge_command_session_exchange();
         } else if (strcmp(command, "session") == 0 && subcommand && strcmp(subcommand, "refresh") == 0) {
             bridge_command_session_refresh();
+        } else if (strcmp(command, "session") == 0 && subcommand && strcmp(subcommand, "recover") == 0) {
+            bridge_command_session_recover();
         } else {
             printf("Unknown command. Type 'help'.\n");
         }

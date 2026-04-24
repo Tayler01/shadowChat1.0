@@ -85,13 +85,16 @@ idf.py -p COMx flash monitor
 help
 status
 wifi set <ssid> <password>
+wifi set "<ssid with spaces>" "<password with spaces>"
 wifi connect
+wifi scan
 bridge register
 bridge wipe
 pair begin
 pair status
 session exchange
 session refresh
+session recover
 bridge heartbeat
 group send <text>
 group poll
@@ -176,6 +179,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.
 ```
 
 The firmware refreshes stored bridge session material before heartbeat, group, DM, and user-search calls when the stored session expiry is within five minutes. It also retries bridge-authenticated calls once after refreshing when it receives an auth-expired response. If refresh fails, the command reports the refresh failure and leaves the device in its current paired state for manual recovery.
+
+If local access or refresh tokens become invalid, run `session recover`. The bridge will create a fresh pairing code, clear stale local session material, and prompt you to approve the code in ShadowChat Settings > ESP Bridge before running `session exchange`.
 
 For recovery from expired or revoked local session material, run `pair begin` on the bridge, approve the new code from ShadowChat Settings > ESP Bridge, then run `session exchange` on the bridge. The backend accepts a new pending pairing request from an already-paired physical bridge so a device with stale local tokens can be recovered without direct database cleanup.
 
