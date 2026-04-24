@@ -3,6 +3,7 @@ import {
   authenticateRequest,
   badRequest,
   corsHeaders,
+  ensureBridgeUserForDevice,
   forbidden,
   getSupabaseAdmin,
   json,
@@ -68,7 +69,7 @@ serve(async req => {
 
     const { data: device, error: deviceError } = await supabase
       .from('bridge_devices')
-      .select('id, status')
+      .select('id, device_serial, status, bridge_user_id')
       .eq('id', codeRow.device_id)
       .maybeSingle()
 
@@ -85,6 +86,11 @@ serve(async req => {
     }
 
     const timestamp = new Date().toISOString()
+    const bridgeAccount = await ensureBridgeUserForDevice(supabase, {
+      id: device.id,
+      device_serial: device.device_serial,
+      bridge_user_id: device.bridge_user_id,
+    })
 
     await supabase
       .from('bridge_pairings')
@@ -101,6 +107,7 @@ serve(async req => {
       .insert({
         device_id: device.id,
         user_id: auth.userId,
+        bridge_user_id: bridgeAccount.bridgeUserId,
         status: 'paired',
         paired_at: timestamp,
       })
@@ -130,6 +137,7 @@ serve(async req => {
       .update({
         status: 'paired',
         paired_user_id: auth.userId,
+        bridge_user_id: bridgeAccount.bridgeUserId,
       })
       .eq('id', device.id)
 
@@ -141,6 +149,7 @@ serve(async req => {
         event_payload: {
           pairing_id: pairing.id,
           pairing_code_id: codeRow.id,
+          bridge_user_id: bridgeAccount.bridgeUserId,
         },
       },
       {
@@ -150,6 +159,7 @@ serve(async req => {
         event_payload: {
           pairing_id: pairing.id,
           pairing_code_id: codeRow.id,
+          bridge_user_id: bridgeAccount.bridgeUserId,
         },
       },
     ])
@@ -160,6 +170,10 @@ serve(async req => {
       pairingId: pairing.id,
       pairingStatus: 'paired',
       userId: auth.userId,
+      ownerUserId: auth.userId,
+      bridgeUserId: bridgeAccount.bridgeUserId,
+      bridgeUsername: bridgeAccount.username,
+      bridgeDisplayName: bridgeAccount.displayName,
       sessionExchangeReady: true,
     })
   } catch (error) {

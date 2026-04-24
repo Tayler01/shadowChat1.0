@@ -479,7 +479,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
               </div>
 
               <p className="mt-3 text-sm text-[var(--text-muted)]">
-                Enter the code shown by the ESP bridge to bind it to this signed-in account.
+                Enter the code shown by the ESP bridge to approve this account as owner. The ESP will send as its own device account.
               </p>
               {lastBridgeDeviceId && (
                 <p className="mt-3 break-all text-xs uppercase tracking-[0.14em] text-[var(--text-gold)]">

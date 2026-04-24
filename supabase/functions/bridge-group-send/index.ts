@@ -96,7 +96,7 @@ serve(async req => {
         },
       })
 
-    await triggerPushDispatch('group_message', message.id as string, bridgeAuth.auth.userId, {
+    const pushDispatch = await triggerPushDispatch('group_message', message.id as string, bridgeAuth.auth.userId, {
       origin: 'bridge',
       bridgeDeviceId: deviceId,
     })
@@ -105,6 +105,7 @@ serve(async req => {
       ok: true,
       deviceId,
       message,
+      pushDispatch,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'

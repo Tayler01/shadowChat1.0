@@ -38,7 +38,7 @@ serve(async req => {
 
     const { data: device, error: deviceError } = await supabase
       .from('bridge_devices')
-      .select('id, status, paired_user_id')
+      .select('id, status, paired_user_id, bridge_user_id')
       .eq('id', deviceId)
       .maybeSingle()
 
@@ -123,6 +123,8 @@ serve(async req => {
       pairingRequestId,
       status: 'pairing_pending',
       wasAlreadyPaired: Boolean(activePairing),
+      pairedUserId: device.paired_user_id,
+      bridgeUserId: device.bridge_user_id,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'

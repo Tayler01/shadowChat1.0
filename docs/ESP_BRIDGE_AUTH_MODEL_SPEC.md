@@ -6,11 +6,12 @@ It turns the earlier roadmap and documentation review into a concrete design dec
 
 ## Decision Summary
 
-`v1` should use a `bridge-specific first-party user session`.
+`v1` should use a `bridge-specific first-party user session` for a dedicated bridge user account.
 
 That means:
 
-- the bridge is authenticated to Supabase as the paired user
+- the bridge is owned/approved by the paired human user
+- the bridge is authenticated to Supabase as its own device user
 - the bridge does not reuse or clone the user's browser session
 - pairing creates a dedicated device session for that bridge
 - the bridge stores and refreshes its own access and refresh tokens
@@ -85,9 +86,13 @@ The chosen model must satisfy all of these:
 
 ## Core Auth Objects
 
-### 1. User Identity
+### 1. Owner User Identity
 
-The human ShadowChat account that owns the bridge.
+The human ShadowChat account that owns, approves, and revokes the bridge.
+
+### 1a. Bridge User Identity
+
+A normal ShadowChat account/profile created for the physical bridge device. Messages sent from the bridge use this identity, so the owner and other users can receive normal notifications from the ESP account.
 
 ### 2. Bridge Device Identity
 

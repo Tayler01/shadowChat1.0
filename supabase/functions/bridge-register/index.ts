@@ -37,7 +37,7 @@ serve(async req => {
 
     const { data: existing, error: lookupError } = await supabase
       .from('bridge_devices')
-      .select('id, status, paired_user_id')
+      .select('id, status, paired_user_id, bridge_user_id')
       .eq('device_serial', deviceSerial)
       .maybeSingle()
 
@@ -56,7 +56,7 @@ serve(async req => {
           last_seen_at: timestamp,
         })
         .eq('id', existing.id)
-        .select('id, status, paired_user_id, last_seen_at')
+        .select('id, status, paired_user_id, bridge_user_id, last_seen_at')
         .single()
 
       if (updateError) {
@@ -77,6 +77,7 @@ serve(async req => {
         deviceId: updated.id,
         status: updated.status,
         pairedUserId: updated.paired_user_id,
+        bridgeUserId: updated.bridge_user_id,
         lastSeenAt: updated.last_seen_at,
       })
     }
@@ -90,7 +91,7 @@ serve(async req => {
         status: 'unpaired',
         last_seen_at: timestamp,
       })
-      .select('id, status, paired_user_id, last_seen_at')
+      .select('id, status, paired_user_id, bridge_user_id, last_seen_at')
       .single()
 
     if (createError) {
@@ -111,6 +112,7 @@ serve(async req => {
       deviceId: created.id,
       status: created.status,
       pairedUserId: created.paired_user_id,
+      bridgeUserId: created.bridge_user_id,
       lastSeenAt: created.last_seen_at,
     })
   } catch (error) {

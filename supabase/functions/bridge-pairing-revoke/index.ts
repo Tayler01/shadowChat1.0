@@ -39,7 +39,7 @@ serve(async req => {
     const supabase = getSupabaseAdmin()
     const { data: device, error: deviceError } = await supabase
       .from('bridge_devices')
-      .select('id, paired_user_id, status')
+      .select('id, paired_user_id, bridge_user_id, status')
       .eq('id', deviceId)
       .maybeSingle()
 
@@ -63,7 +63,7 @@ serve(async req => {
       const refreshTokenHash = await hashToken(refreshToken)
       const { data: session, error: sessionError } = await supabase
         .from('bridge_device_sessions')
-        .select('id, user_id')
+        .select('id, user_id, owner_user_id')
         .eq('device_id', deviceId)
         .eq('status', 'active')
         .eq('refresh_token_hash', refreshTokenHash)
@@ -77,7 +77,7 @@ serve(async req => {
         return json({ error: 'Invalid bridge refresh token' }, 401)
       }
 
-      actorUserId = session.user_id
+      actorUserId = session.owner_user_id ?? session.user_id
       nextDeviceStatus = 'unpaired'
       eventType = 'device_wiped'
     } else {

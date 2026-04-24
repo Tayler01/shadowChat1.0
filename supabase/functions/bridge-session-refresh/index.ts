@@ -6,6 +6,7 @@ import {
   getFutureIso,
   getSupabaseAdmin,
   hashToken,
+  issueBridgeSupabaseSession,
   isExpiredIso,
   json,
   normalizeText,
@@ -40,7 +41,7 @@ serve(async req => {
 
     const { data: session, error: sessionError } = await supabase
       .from('bridge_device_sessions')
-      .select('id, device_id, user_id, status, refresh_token_hash, expires_at')
+      .select('id, device_id, user_id, owner_user_id, status, refresh_token_hash, expires_at')
       .eq('device_id', deviceId)
       .eq('status', 'active')
       .eq('refresh_token_hash', refreshTokenHash)
@@ -79,12 +80,21 @@ serve(async req => {
       return json({ error: 'Bridge refresh token has expired' }, 401)
     }
 
-    const { data: pairing, error: pairingError } = await supabase
+    let pairingQuery = supabase
       .from('bridge_pairings')
-      .select('id, status')
+      .select('id, user_id, bridge_user_id, status')
       .eq('device_id', deviceId)
-      .eq('user_id', session.user_id)
       .eq('status', 'paired')
+
+    if (session.owner_user_id) {
+      pairingQuery = pairingQuery
+        .eq('user_id', session.owner_user_id)
+        .eq('bridge_user_id', session.user_id)
+    } else {
+      pairingQuery = pairingQuery.eq('user_id', session.user_id)
+    }
+
+    const { data: pairing, error: pairingError } = await pairingQuery
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -100,6 +110,25 @@ serve(async req => {
     const timestamp = new Date().toISOString()
     const expiresAt = getFutureIso(60)
     const nextSessionMaterial = await createBridgeSessionMaterial()
+
+    const { data: bridgeProfile, error: bridgeProfileError } = await supabase
+      .from('users')
+      .select('id, email')
+      .eq('id', session.user_id)
+      .maybeSingle()
+
+    if (bridgeProfileError) {
+      throw bridgeProfileError
+    }
+
+    if (!bridgeProfile?.email) {
+      return json({ error: 'Bridge user profile is missing auth email' }, 409)
+    }
+
+    const supabaseAuth = await issueBridgeSupabaseSession(supabase, {
+      bridgeUserId: session.user_id,
+      email: bridgeProfile.email,
+    })
 
     const { error: updateError } = await supabase
       .from('bridge_device_sessions')
@@ -121,11 +150,12 @@ serve(async req => {
       .from('bridge_audit_events')
       .insert({
         device_id: deviceId,
-        user_id: session.user_id,
+        user_id: session.owner_user_id ?? session.user_id,
         event_type: 'session_refreshed',
         event_payload: {
           bridge_session_id: session.id,
           pairing_id: pairing.id,
+          bridge_user_id: session.user_id,
           control_plane_only: true,
         },
       })
@@ -136,11 +166,13 @@ serve(async req => {
       accessToken: nextSessionMaterial.accessToken,
       refreshToken: nextSessionMaterial.refreshToken,
       expiresAt,
+      supabaseAuth,
       sessionMetadata: {
         userId: session.user_id,
+        ownerUserId: session.owner_user_id,
         sessionType: 'bridge_control',
-        provisioningStatus: 'control_plane_only',
-        dataPlaneReady: false,
+        provisioningStatus: 'bridge_user_refreshed',
+        dataPlaneReady: true,
       },
     })
   } catch (error) {

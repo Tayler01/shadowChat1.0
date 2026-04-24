@@ -3,8 +3,10 @@ import {
   badRequest,
   corsHeaders,
   createBridgeSessionMaterial,
+  ensureBridgeUserForDevice,
   getFutureIso,
   getSupabaseAdmin,
+  issueBridgeSupabaseSession,
   json,
   normalizeText,
   notFound,
@@ -38,7 +40,7 @@ serve(async req => {
 
     const { data: device, error: deviceError } = await supabase
       .from('bridge_devices')
-      .select('id, status, paired_user_id')
+      .select('id, device_serial, status, paired_user_id, bridge_user_id')
       .eq('id', deviceId)
       .maybeSingle()
 
@@ -75,7 +77,7 @@ serve(async req => {
 
     const { data: pairing, error: pairingError } = await supabase
       .from('bridge_pairings')
-      .select('id, user_id, status, paired_at')
+      .select('id, user_id, bridge_user_id, status, paired_at')
       .eq('device_id', deviceId)
       .eq('status', 'paired')
       .order('created_at', { ascending: false })
@@ -93,6 +95,19 @@ serve(async req => {
     const timestamp = new Date().toISOString()
     const expiresAt = getFutureIso(60)
     const sessionMaterial = await createBridgeSessionMaterial()
+    const bridgeAccount = await ensureBridgeUserForDevice(supabase, {
+      id: device.id,
+      device_serial: device.device_serial,
+      bridge_user_id: pairing.bridge_user_id ?? device.bridge_user_id,
+    })
+    const supabaseAuth = await issueBridgeSupabaseSession(supabase, bridgeAccount)
+
+    if (pairing.bridge_user_id !== bridgeAccount.bridgeUserId) {
+      await supabase
+        .from('bridge_pairings')
+        .update({ bridge_user_id: bridgeAccount.bridgeUserId })
+        .eq('id', pairing.id)
+    }
 
     const { data: exchangeLock, error: exchangeLockError } = await supabase
       .from('bridge_pairing_codes')
@@ -124,7 +139,8 @@ serve(async req => {
       .from('bridge_device_sessions')
       .insert({
         device_id: deviceId,
-        user_id: pairing.user_id,
+        user_id: bridgeAccount.bridgeUserId,
+        owner_user_id: pairing.user_id,
         status: 'active',
         issued_at: timestamp,
         last_refresh_at: timestamp,
@@ -149,6 +165,7 @@ serve(async req => {
         event_payload: {
           pairing_id: pairing.id,
           bridge_session_id: session.id,
+          bridge_user_id: bridgeAccount.bridgeUserId,
           control_plane_only: true,
           pairing_code_id: codeRow.id,
         },
@@ -161,14 +178,18 @@ serve(async req => {
       accessToken: sessionMaterial.accessToken,
       refreshToken: sessionMaterial.refreshToken,
       expiresAt,
+      supabaseAuth,
       sessionMetadata: {
-        userId: pairing.user_id,
+        userId: bridgeAccount.bridgeUserId,
+        ownerUserId: pairing.user_id,
+        bridgeUsername: bridgeAccount.username,
+        bridgeDisplayName: bridgeAccount.displayName,
         sessionType: 'bridge_control',
-        provisioningStatus: 'control_plane_only',
-        dataPlaneReady: false,
+        provisioningStatus: 'bridge_user_issued',
+        dataPlaneReady: true,
         notes: [
-          'Control-plane session issued successfully.',
-          'Supabase user-scoped data-plane session minting is still a separate proof step.',
+          'Control-plane session issued successfully for the dedicated bridge user.',
+          'Supabase user-scoped auth material is included for bridge-owned data-plane work.',
         ],
       },
     })

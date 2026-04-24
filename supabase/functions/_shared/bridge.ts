@@ -38,6 +38,23 @@ export const getSupabaseAdmin = () => {
   })
 }
 
+const sanitizePushDispatchBody = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(sanitizePushDispatchBody)
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+        key,
+        key === 'endpoint' ? '(redacted)' : sanitizePushDispatchBody(entry),
+      ]),
+    )
+  }
+
+  return value
+}
+
 export const triggerPushDispatch = async (
   type: 'dm_message' | 'group_message',
   messageId: string,
@@ -63,16 +80,36 @@ export const triggerPushDispatch = async (
       }),
     })
 
+    const responseText = await response.text().catch(() => '')
+    let body: unknown = responseText
+    if (responseText) {
+      try {
+        body = sanitizePushDispatchBody(JSON.parse(responseText))
+      } catch {
+        body = responseText
+      }
+    }
+
     if (!response.ok) {
       console.error('Bridge push dispatch failed', {
         type,
         messageId,
         status: response.status,
-        body: await response.text().catch(() => ''),
+        body,
       })
+    }
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      body,
     }
   } catch (error) {
     console.error('Bridge push dispatch failed', error)
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Unknown push dispatch error',
+    }
   }
 }
 
@@ -169,6 +206,155 @@ export type BridgeSessionAuth = {
   bridgeSessionId: string
   deviceId: string
   userId: string
+  ownerUserId: string | null
+}
+
+type BridgeDeviceIdentity = {
+  id: string
+  device_serial: string
+  bridge_user_id?: string | null
+}
+
+const getBridgeAccountSlug = (value: string) => {
+  const slug = value
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 32)
+
+  return slug || 'device'
+}
+
+const getBridgeAccountEmail = (deviceId: string) =>
+  `bridge-${deviceId.replace(/-/g, '')}@devices.shadowchat.local`
+
+const getBridgeAccountUsername = (device: BridgeDeviceIdentity) =>
+  `esp_${getBridgeAccountSlug(device.device_serial || device.id)}`
+
+const getBridgeAccountDisplayName = (device: BridgeDeviceIdentity) =>
+  `ESP Bridge ${device.device_serial ? device.device_serial.slice(-6).toUpperCase() : device.id.slice(0, 8)}`
+
+export const ensureBridgeUserForDevice = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  device: BridgeDeviceIdentity,
+) => {
+  const email = getBridgeAccountEmail(device.id)
+  const username = getBridgeAccountUsername(device)
+  const displayName = getBridgeAccountDisplayName(device)
+  let bridgeUserId = device.bridge_user_id ?? null
+
+  if (!bridgeUserId) {
+    const { data: existingProfile, error: existingProfileError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle()
+
+    if (existingProfileError) {
+      throw existingProfileError
+    }
+
+    bridgeUserId = existingProfile?.id ?? null
+  }
+
+  if (!bridgeUserId) {
+    const initialPassword = generateOpaqueToken('bpwd', 48)
+    const { data: createdUser, error: createUserError } = await supabase.auth.admin.createUser({
+      email,
+      password: initialPassword,
+      email_confirm: true,
+      user_metadata: {
+        username,
+        display_name: displayName,
+        full_name: displayName,
+        account_type: 'esp_bridge',
+        bridge_device_id: device.id,
+      },
+    })
+
+    if (createUserError) {
+      throw createUserError
+    }
+
+    bridgeUserId = createdUser.user?.id ?? null
+  }
+
+  if (!bridgeUserId) {
+    throw new Error('Unable to create bridge user account')
+  }
+
+  const { error: profileError } = await supabase
+    .from('users')
+    .upsert({
+      id: bridgeUserId,
+      email,
+      username,
+      display_name: displayName,
+      full_name: displayName,
+      color: '#D4AF37',
+      chat_color: '#D4AF37',
+      status: 'online',
+      status_message: 'ESP bridge device',
+      last_active: new Date().toISOString(),
+    }, { onConflict: 'id' })
+
+  if (profileError) {
+    throw profileError
+  }
+
+  const { error: deviceUpdateError } = await supabase
+    .from('bridge_devices')
+    .update({ bridge_user_id: bridgeUserId })
+    .eq('id', device.id)
+
+  if (deviceUpdateError) {
+    throw deviceUpdateError
+  }
+
+  return {
+    bridgeUserId,
+    email,
+    username,
+    displayName,
+  }
+}
+
+export const issueBridgeSupabaseSession = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  account: { bridgeUserId: string; email: string },
+) => {
+  const password = generateOpaqueToken('bpwd', 48)
+  const { error: passwordError } = await supabase.auth.admin.updateUserById(
+    account.bridgeUserId,
+    { password },
+  )
+
+  if (passwordError) {
+    throw passwordError
+  }
+
+  const { supabaseUrl, supabaseAnonKey } = getEnv()
+  const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+
+  const { data, error } = await authClient.auth.signInWithPassword({
+    email: account.email,
+    password,
+  })
+
+  if (error || !data.session) {
+    throw error ?? new Error('Unable to issue bridge auth session')
+  }
+
+  return {
+    accessToken: data.session.access_token,
+    refreshToken: data.session.refresh_token,
+    expiresAt: data.session.expires_at
+      ? new Date(data.session.expires_at * 1000).toISOString()
+      : null,
+    userId: data.session.user.id,
+  }
 }
 
 export const authenticateBridgeAccessToken = async (
@@ -184,7 +370,7 @@ export const authenticateBridgeAccessToken = async (
 
   const { data: session, error: sessionError } = await supabase
     .from('bridge_device_sessions')
-    .select('id, device_id, user_id, status, expires_at')
+    .select('id, device_id, user_id, owner_user_id, status, expires_at')
     .eq('device_id', deviceId)
     .eq('status', 'active')
     .eq('access_token_hash', accessTokenHash)
@@ -219,12 +405,21 @@ export const authenticateBridgeAccessToken = async (
     return { error: unauthorized('Bridge access token has expired') }
   }
 
-  const { data: pairing, error: pairingError } = await supabase
+  let pairingQuery = supabase
     .from('bridge_pairings')
     .select('id')
     .eq('device_id', deviceId)
-    .eq('user_id', session.user_id)
     .eq('status', 'paired')
+
+  if (session.owner_user_id) {
+    pairingQuery = pairingQuery
+      .eq('user_id', session.owner_user_id)
+      .eq('bridge_user_id', session.user_id)
+  } else {
+    pairingQuery = pairingQuery.eq('user_id', session.user_id)
+  }
+
+  const { data: pairing, error: pairingError } = await pairingQuery
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -242,6 +437,7 @@ export const authenticateBridgeAccessToken = async (
       bridgeSessionId: session.id as string,
       deviceId,
       userId: session.user_id as string,
+      ownerUserId: session.owner_user_id as string | null,
     } satisfies BridgeSessionAuth,
   }
 }

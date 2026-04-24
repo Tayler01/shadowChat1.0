@@ -36,7 +36,7 @@ serve(async req => {
 
     const { data: device, error: deviceError } = await supabase
       .from('bridge_devices')
-      .select('id, status, paired_user_id, last_seen_at')
+      .select('id, status, paired_user_id, bridge_user_id, last_seen_at')
       .eq('id', deviceId)
       .maybeSingle()
 
@@ -74,7 +74,7 @@ serve(async req => {
 
     const { data: pairing, error: pairingError } = await supabase
       .from('bridge_pairings')
-      .select('id, user_id, status, paired_at, revoked_at')
+      .select('id, user_id, bridge_user_id, status, paired_at, revoked_at')
       .eq('device_id', deviceId)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -110,6 +110,8 @@ serve(async req => {
         ? {
             id: pairing.id,
             userId: pairing.user_id,
+            ownerUserId: pairing.user_id,
+            bridgeUserId: pairing.bridge_user_id,
             status: pairing.status,
             pairedAt: pairing.paired_at,
             revokedAt: pairing.revoked_at,
@@ -126,6 +128,8 @@ serve(async req => {
       expiresAt: codeRow.expires_at,
       consumedAt: codeRow.consumed_at,
       pairedUserId: device.paired_user_id,
+      ownerUserId: device.paired_user_id,
+      bridgeUserId: device.bridge_user_id,
       lastSeenAt: device.last_seen_at,
     })
   } catch (error) {

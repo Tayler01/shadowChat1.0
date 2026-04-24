@@ -698,13 +698,16 @@ const sendGroupPush = async (
     })
   )
 
-  const deliveredRecipients = perRecipientResults.filter((result) => result.delivered > 0).length
+  const getDeliveredCount = (result: Record<string, unknown>) =>
+    Number(result.deliveredCount ?? result.delivered ?? 0)
+
+  const deliveredRecipients = perRecipientResults.filter((result) => getDeliveredCount(result) > 0).length
   const deliveredSubscriptions = perRecipientResults.reduce(
-    (sum, result) => sum + result.delivered,
+    (sum, result) => sum + getDeliveredCount(result),
     0
   )
   const removedSubscriptions = perRecipientResults.reduce(
-    (sum, result) => sum + result.removedSubscriptions,
+    (sum, result) => sum + Number(result.removedSubscriptions ?? 0),
     0
   )
 

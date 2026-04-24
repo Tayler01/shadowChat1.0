@@ -21,7 +21,7 @@
 #include "nvs_flash.h"
 
 #define BRIDGE_WIFI_CONNECTED_BIT BIT0
-#define BRIDGE_HTTP_BUFFER_SIZE 4096
+#define BRIDGE_HTTP_BUFFER_SIZE 8192
 #define BRIDGE_SHELL_LINE_SIZE 1024
 #define BRIDGE_STORAGE_NAMESPACE "bridge_cfg"
 #define BRIDGE_SHELL_TASK_STACK_SIZE 16384
@@ -41,6 +41,10 @@ typedef struct {
     char pairing_code[32];
     char access_token[128];
     char refresh_token[128];
+    char auth_access_token[4096];
+    char auth_refresh_token[1024];
+    char auth_user_id[64];
+    char auth_expires_at[48];
 } bridge_state_t;
 
 typedef struct {
@@ -152,6 +156,10 @@ static void bridge_load_persisted_state(void) {
     bridge_load_string("pairing_code", s_bridge_state.pairing_code, sizeof(s_bridge_state.pairing_code));
     bridge_load_string("access_token", s_bridge_state.access_token, sizeof(s_bridge_state.access_token));
     bridge_load_string("refresh_token", s_bridge_state.refresh_token, sizeof(s_bridge_state.refresh_token));
+    bridge_load_string("auth_access_token", s_bridge_state.auth_access_token, sizeof(s_bridge_state.auth_access_token));
+    bridge_load_string("auth_refresh_token", s_bridge_state.auth_refresh_token, sizeof(s_bridge_state.auth_refresh_token));
+    bridge_load_string("auth_user_id", s_bridge_state.auth_user_id, sizeof(s_bridge_state.auth_user_id));
+    bridge_load_string("auth_expires_at", s_bridge_state.auth_expires_at, sizeof(s_bridge_state.auth_expires_at));
 }
 
 static void bridge_derive_device_serial(void) {
@@ -334,21 +342,40 @@ static esp_err_t bridge_http_post_json(
     return ESP_OK;
 }
 
+static bool bridge_is_sensitive_json_key(const char *key) {
+    if (!key) {
+        return false;
+    }
+
+    return strcmp(key, "accessToken") == 0 ||
+        strcmp(key, "refreshToken") == 0 ||
+        strcmp(key, "authAccessToken") == 0 ||
+        strcmp(key, "authRefreshToken") == 0 ||
+        strcmp(key, "password") == 0;
+}
+
+static void bridge_redact_sensitive_json(cJSON *item) {
+    if (!item) {
+        return;
+    }
+
+    if (cJSON_IsString(item) && bridge_is_sensitive_json_key(item->string)) {
+        cJSON_SetValuestring(item, "(redacted)");
+        return;
+    }
+
+    cJSON *child = NULL;
+    cJSON_ArrayForEach(child, item) {
+        bridge_redact_sensitive_json(child);
+    }
+}
+
 static void bridge_print_response(const char *label, const bridge_http_response_t *response) {
     printf("%s: HTTP %d\n", label, response->status_code);
     if (response->body[0] != '\0') {
         cJSON *json = cJSON_Parse(response->body);
         if (json) {
-            cJSON *access_token = cJSON_GetObjectItemCaseSensitive(json, "accessToken");
-            cJSON *refresh_token = cJSON_GetObjectItemCaseSensitive(json, "refreshToken");
-
-            if (cJSON_IsString(access_token)) {
-                cJSON_SetValuestring(access_token, "(redacted)");
-            }
-
-            if (cJSON_IsString(refresh_token)) {
-                cJSON_SetValuestring(refresh_token, "(redacted)");
-            }
+            bridge_redact_sensitive_json(json);
 
             char *redacted = cJSON_PrintUnformatted(json);
             if (redacted) {
@@ -374,6 +401,38 @@ static cJSON *bridge_parse_json_body(const bridge_http_response_t *response) {
 static const char *bridge_json_string_or_empty(cJSON *object, const char *key) {
     cJSON *value = cJSON_GetObjectItemCaseSensitive(object, key);
     return cJSON_IsString(value) && value->valuestring ? value->valuestring : "";
+}
+
+static void bridge_store_supabase_auth_from_json(cJSON *json) {
+    cJSON *supabase_auth = cJSON_GetObjectItemCaseSensitive(json, "supabaseAuth");
+    if (!cJSON_IsObject(supabase_auth)) {
+        return;
+    }
+
+    cJSON *auth_access_token = cJSON_GetObjectItemCaseSensitive(supabase_auth, "accessToken");
+    cJSON *auth_refresh_token = cJSON_GetObjectItemCaseSensitive(supabase_auth, "refreshToken");
+    cJSON *auth_user_id = cJSON_GetObjectItemCaseSensitive(supabase_auth, "userId");
+    cJSON *auth_expires_at = cJSON_GetObjectItemCaseSensitive(supabase_auth, "expiresAt");
+
+    if (cJSON_IsString(auth_access_token) && auth_access_token->valuestring) {
+        bridge_set_runtime_string(s_bridge_state.auth_access_token, sizeof(s_bridge_state.auth_access_token), auth_access_token->valuestring);
+        bridge_save_string("auth_access_token", s_bridge_state.auth_access_token);
+    }
+
+    if (cJSON_IsString(auth_refresh_token) && auth_refresh_token->valuestring) {
+        bridge_set_runtime_string(s_bridge_state.auth_refresh_token, sizeof(s_bridge_state.auth_refresh_token), auth_refresh_token->valuestring);
+        bridge_save_string("auth_refresh_token", s_bridge_state.auth_refresh_token);
+    }
+
+    if (cJSON_IsString(auth_user_id) && auth_user_id->valuestring) {
+        bridge_set_runtime_string(s_bridge_state.auth_user_id, sizeof(s_bridge_state.auth_user_id), auth_user_id->valuestring);
+        bridge_save_string("auth_user_id", s_bridge_state.auth_user_id);
+    }
+
+    if (cJSON_IsString(auth_expires_at) && auth_expires_at->valuestring) {
+        bridge_set_runtime_string(s_bridge_state.auth_expires_at, sizeof(s_bridge_state.auth_expires_at), auth_expires_at->valuestring);
+        bridge_save_string("auth_expires_at", s_bridge_state.auth_expires_at);
+    }
 }
 
 static const char *bridge_profile_label(cJSON *profile, const char *fallback_id) {
@@ -503,11 +562,19 @@ static void bridge_clear_pairing_state(void) {
     bridge_set_runtime_string(s_bridge_state.pairing_code, sizeof(s_bridge_state.pairing_code), "");
     bridge_set_runtime_string(s_bridge_state.access_token, sizeof(s_bridge_state.access_token), "");
     bridge_set_runtime_string(s_bridge_state.refresh_token, sizeof(s_bridge_state.refresh_token), "");
+    bridge_set_runtime_string(s_bridge_state.auth_access_token, sizeof(s_bridge_state.auth_access_token), "");
+    bridge_set_runtime_string(s_bridge_state.auth_refresh_token, sizeof(s_bridge_state.auth_refresh_token), "");
+    bridge_set_runtime_string(s_bridge_state.auth_user_id, sizeof(s_bridge_state.auth_user_id), "");
+    bridge_set_runtime_string(s_bridge_state.auth_expires_at, sizeof(s_bridge_state.auth_expires_at), "");
 
     bridge_save_string("device_status", s_bridge_state.device_status);
     bridge_save_string("pairing_code", "");
     bridge_save_string("access_token", "");
     bridge_save_string("refresh_token", "");
+    bridge_save_string("auth_access_token", "");
+    bridge_save_string("auth_refresh_token", "");
+    bridge_save_string("auth_user_id", "");
+    bridge_save_string("auth_expires_at", "");
 }
 
 static void bridge_command_status(void) {
@@ -521,7 +588,11 @@ static void bridge_command_status(void) {
     printf("  wifi_connected: %s\n", s_bridge_state.wifi_connected ? "yes" : "no");
     printf("  pairing_code: %s\n", s_bridge_state.pairing_code[0] ? s_bridge_state.pairing_code : "(none)");
     printf("  access_token: %s\n", s_bridge_state.access_token[0] ? "(stored)" : "(none)");
-    printf("  refresh_token: %s\n\n", s_bridge_state.refresh_token[0] ? "(stored)" : "(none)");
+    printf("  refresh_token: %s\n", s_bridge_state.refresh_token[0] ? "(stored)" : "(none)");
+    printf("  auth_user_id: %s\n", s_bridge_state.auth_user_id[0] ? s_bridge_state.auth_user_id : "(none)");
+    printf("  auth_access_token: %s\n", s_bridge_state.auth_access_token[0] ? "(stored)" : "(none)");
+    printf("  auth_refresh_token: %s\n", s_bridge_state.auth_refresh_token[0] ? "(stored)" : "(none)");
+    printf("  auth_expires_at: %s\n\n", s_bridge_state.auth_expires_at[0] ? s_bridge_state.auth_expires_at : "(none)");
 }
 
 static void bridge_command_wifi_set(const char *ssid, const char *password) {
@@ -722,7 +793,8 @@ static void bridge_command_session_exchange(void) {
         bridge_save_string("refresh_token", s_bridge_state.refresh_token);
     }
 
-    printf("Stored bridge control-plane session material\n");
+    bridge_store_supabase_auth_from_json(json);
+    printf("Stored bridge control-plane and ESP auth session material\n");
     cJSON_Delete(json);
 }
 
@@ -781,7 +853,8 @@ static bool bridge_refresh_session_material(bool compact_output) {
     bridge_set_runtime_string(s_bridge_state.refresh_token, sizeof(s_bridge_state.refresh_token), refresh_token->valuestring);
     bridge_save_string("refresh_token", s_bridge_state.refresh_token);
 
-    printf("%s\n", compact_output ? "Refreshed bridge control-plane session material" : "Rotated bridge control-plane session material");
+    bridge_store_supabase_auth_from_json(json);
+    printf("%s\n", compact_output ? "Refreshed bridge control-plane and ESP auth session material" : "Rotated bridge control-plane and ESP auth session material");
     cJSON_Delete(json);
     return true;
 }

@@ -6,6 +6,10 @@ export interface BridgePairingApproval {
   pairingId: string
   pairingStatus: 'paired'
   userId: string
+  ownerUserId?: string
+  bridgeUserId?: string
+  bridgeUsername?: string
+  bridgeDisplayName?: string
   sessionExchangeReady: boolean
 }
 
