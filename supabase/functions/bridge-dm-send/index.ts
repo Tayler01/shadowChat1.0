@@ -7,6 +7,7 @@ import {
   json,
   normalizeText,
   readJson,
+  resolveBridgeUserReference,
   triggerPushDispatch,
 } from '../_shared/bridge.ts'
 
@@ -85,11 +86,11 @@ serve(async req => {
   try {
     const body = await readJson<BridgeDmSendPayload>(req)
     const deviceId = normalizeText(body?.deviceId)
-    const recipientUserId = normalizeText(body?.recipientUserId)
+    const recipientUserReference = normalizeText(body?.recipientUserId)
     const content = normalizeText(body?.content)
     const accessToken = normalizeText(req.headers.get('X-Bridge-Access-Token'))
 
-    if (!recipientUserId || !content) {
+    if (!recipientUserReference || !content) {
       return badRequest('recipientUserId and content are required')
     }
 
@@ -98,11 +99,18 @@ serve(async req => {
       return bridgeAuth.error
     }
 
+    const supabase = getSupabaseAdmin()
+    const resolvedRecipient = await resolveBridgeUserReference(supabase, recipientUserReference)
+    if ('error' in resolvedRecipient) {
+      return resolvedRecipient.error
+    }
+
+    const recipientUserId = resolvedRecipient.user.id
+
     if (recipientUserId === bridgeAuth.auth.userId) {
       return badRequest('recipientUserId must be different from the paired user')
     }
 
-    const supabase = getSupabaseAdmin()
     const conversationId = await getOrCreateConversation(supabase, bridgeAuth.auth.userId, recipientUserId)
 
     const { data: message, error: insertError } = await supabase
@@ -143,6 +151,7 @@ serve(async req => {
       ok: true,
       deviceId,
       conversationId,
+      recipient: resolvedRecipient.user,
       message,
       pushDispatch,
     })

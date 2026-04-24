@@ -455,7 +455,7 @@ function Show-Help {
         "  Plain text sends to the active chat thread.",
         "  /poll                 refresh active chat",
         "  /group                switch to group chat",
-        "  /dm <recipient_id>    switch to a DM",
+        "  /dm <recipient|@name> switch to a DM",
         "  /poll-interval <sec>  change auto-poll interval",
         "  /status               show bridge status",
         "  /admin                enter raw admin shell mode",

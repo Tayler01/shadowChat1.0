@@ -7,6 +7,7 @@ import {
   json,
   normalizeText,
   readJson,
+  resolveBridgeUserReference,
 } from '../_shared/bridge.ts'
 
 type BridgeDmPollPayload = {
@@ -54,7 +55,7 @@ serve(async req => {
   try {
     const body = await readJson<BridgeDmPollPayload>(req)
     const deviceId = normalizeText(body?.deviceId)
-    const recipientUserId = normalizeText(body?.recipientUserId)
+    const recipientUserReference = normalizeText(body?.recipientUserId)
     let conversationId = normalizeText(body?.conversationId)
     const accessToken = normalizeText(req.headers.get('X-Bridge-Access-Token'))
     const limit = Math.min(Math.max(Number(body?.limit ?? 10) || 10, 1), 50)
@@ -64,14 +65,21 @@ serve(async req => {
       return bridgeAuth.error
     }
 
-    if (!conversationId && !recipientUserId) {
+    if (!conversationId && !recipientUserReference) {
       return badRequest('conversationId or recipientUserId is required')
     }
 
     const supabase = getSupabaseAdmin()
+    let recipient = null
 
     if (!conversationId) {
-      const participants = [bridgeAuth.auth.userId, recipientUserId].sort()
+      const resolvedRecipient = await resolveBridgeUserReference(supabase, recipientUserReference)
+      if ('error' in resolvedRecipient) {
+        return resolvedRecipient.error
+      }
+
+      recipient = resolvedRecipient.user
+      const participants = [bridgeAuth.auth.userId, resolvedRecipient.user.id].sort()
       const { data: conversation, error: conversationError } = await supabase
         .from('dm_conversations')
         .select('id')
@@ -91,6 +99,7 @@ serve(async req => {
         ok: true,
         deviceId,
         conversationId: null,
+        recipient,
         messages: [],
       })
     }
@@ -125,6 +134,7 @@ serve(async req => {
       ok: true,
       deviceId,
       conversationId,
+      recipient,
       messages: [...(data ?? [])].reverse(),
     })
   } catch (error) {

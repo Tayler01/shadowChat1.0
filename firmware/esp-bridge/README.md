@@ -125,10 +125,10 @@ npm run bridge:tui
 
 For custom ports or flags, call the PowerShell script directly.
 
-Run a DM thread:
+Run a DM thread by username or user id:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1 -Port COM3 -Mode dm -DmRecipientUserId <recipient_user_id>
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1 -Port COM3 -Mode dm -DmRecipientUserId @caleb
 ```
 
 Run a no-message smoke check against the connected bridge:
@@ -142,7 +142,7 @@ TUI commands:
 ```text
 /poll
 /group
-/dm <recipient_user_id>
+/dm <recipient_user_id|@username>
 /poll-interval <seconds>
 /status
 /admin
@@ -151,6 +151,15 @@ TUI commands:
 /save
 /help
 /quit
+```
+
+Admin shell commands also accept usernames for DMs:
+
+```text
+users search caleb
+dm send @caleb hello from the bridge
+dm poll @caleb
+chat dm @caleb
 ```
 
 Plain text sends to the active chat thread. `/admin` switches into the raw firmware admin shell; `/chat` returns to the last chat thread.

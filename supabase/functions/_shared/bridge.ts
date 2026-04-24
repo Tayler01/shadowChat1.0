@@ -202,6 +202,88 @@ export const isExpiredIso = (value: string | null | undefined, now = Date.now())
   return Number.isFinite(expiresAt) && expiresAt <= now
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+export type BridgeUserProfile = {
+  id: string
+  username: string | null
+  display_name: string | null
+  full_name?: string | null
+  avatar_url?: string | null
+  color?: string | null
+  chat_color?: string | null
+  status?: string | null
+  status_message?: string | null
+}
+
+export const normalizeUserReference = (value: unknown) =>
+  normalizeText(value).replace(/^@+/, '').trim()
+
+export const resolveBridgeUserReference = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  userReference: string,
+) => {
+  const normalized = normalizeUserReference(userReference)
+
+  if (!normalized) {
+    return { error: badRequest('recipient user is required') }
+  }
+
+  let query = supabase
+    .from('users')
+    .select('id, username, display_name, full_name, avatar_url, color, chat_color, status, status_message')
+
+  if (UUID_PATTERN.test(normalized)) {
+    query = query.eq('id', normalized)
+  } else {
+    query = query.ilike('username', normalized)
+  }
+
+  const { data, error } = await query.limit(2)
+
+  if (error) {
+    throw error
+  }
+
+  const matches = (data ?? []) as BridgeUserProfile[]
+
+  if (!matches.length) {
+    return { error: notFound(`User '${userReference}' was not found`) }
+  }
+
+  if (matches.length > 1) {
+    return { error: conflict(`User '${userReference}' matched more than one account`) }
+  }
+
+  return { user: matches[0] }
+}
+
+export const searchBridgeUsers = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  term: string,
+  limit = 8,
+) => {
+  const normalized = normalizeUserReference(term)
+
+  if (!normalized) {
+    return []
+  }
+
+  const safeLimit = Math.min(Math.max(limit, 1), 20)
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, username, display_name, full_name, avatar_url, color, chat_color, status, status_message')
+    .or(`username.ilike.%${normalized}%,display_name.ilike.%${normalized}%,full_name.ilike.%${normalized}%`)
+    .order('username', { ascending: true })
+    .limit(safeLimit)
+
+  if (error) {
+    throw error
+  }
+
+  return (data ?? []) as BridgeUserProfile[]
+}
+
 export type BridgeSessionAuth = {
   bridgeSessionId: string
   deviceId: string

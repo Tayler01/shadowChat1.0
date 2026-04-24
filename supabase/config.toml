@@ -40,6 +40,9 @@ verify_jwt = false
 [functions.bridge-dm-poll]
 verify_jwt = false
 
+[functions.bridge-user-search]
+verify_jwt = false
+
 # send-push authenticates either the signed-in user JWT or an internal
 # service-role dispatch from bridge functions. Disabling gateway JWT
 # verification lets the function enforce that mixed contract itself.

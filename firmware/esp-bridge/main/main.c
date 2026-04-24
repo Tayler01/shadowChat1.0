@@ -526,6 +526,46 @@ static void bridge_print_sent_summary(const bridge_http_response_t *response, bo
     cJSON_Delete(json);
 }
 
+static bool bridge_print_user_search_list(const bridge_http_response_t *response) {
+    cJSON *json = bridge_parse_json_body(response);
+    if (!json) {
+        return false;
+    }
+
+    cJSON *users = cJSON_GetObjectItemCaseSensitive(json, "users");
+    if (!cJSON_IsArray(users)) {
+        cJSON_Delete(json);
+        return false;
+    }
+
+    int count = cJSON_GetArraySize(users);
+    if (count == 0) {
+        printf("(no users found)\n");
+        cJSON_Delete(json);
+        return true;
+    }
+
+    cJSON *user = NULL;
+    cJSON_ArrayForEach(user, users) {
+        const char *id = bridge_json_string_or_empty(user, "id");
+        const char *username = bridge_json_string_or_empty(user, "username");
+        const char *display_name = bridge_json_string_or_empty(user, "display_name");
+        const char *status = bridge_json_string_or_empty(user, "status");
+
+        printf(
+            "@%s | %s | %s%s%s\n",
+            username[0] ? username : "(no username)",
+            display_name[0] ? display_name : "(no display name)",
+            id[0] ? id : "(no id)",
+            status[0] ? " | " : "",
+            status
+        );
+    }
+
+    cJSON_Delete(json);
+    return true;
+}
+
 static void bridge_command_help(void) {
     printf("\nShadowChat Bridge admin shell\n");
     printf("  help\n");
@@ -541,17 +581,18 @@ static void bridge_command_help(void) {
     printf("  bridge heartbeat\n\n");
     printf("  group send <text>\n");
     printf("  group poll\n\n");
-    printf("  dm send <recipient_user_id> <text>\n");
-    printf("  dm poll <recipient_user_id>\n\n");
+    printf("  dm send <recipient_user_id|@username> <text>\n");
+    printf("  dm poll <recipient_user_id|@username>\n");
+    printf("  users search <name_or_username>\n\n");
     printf("  chat group\n");
-    printf("  chat dm <recipient_user_id>\n\n");
+    printf("  chat dm <recipient_user_id|@username>\n\n");
 }
 
 static void bridge_chat_help(void) {
     printf("\nShadowChat chat mode\n");
     printf("  type a message and press Enter to send\n");
     printf("  /poll                 fetch latest messages\n");
-    printf("  /dm <recipient_id>    switch to a DM thread\n");
+    printf("  /dm <recipient|@name> switch to a DM thread\n");
     printf("  /group                switch to group chat\n");
     printf("  /admin                return to the admin shell\n");
     printf("  /help                 show this help\n\n");
@@ -1127,6 +1168,44 @@ static void bridge_command_dm_poll(const char *recipient_user_id) {
     bridge_poll_dm_messages(recipient_user_id, false);
 }
 
+static void bridge_command_users_search(const char *query) {
+    if (!query || query[0] == '\0') {
+        printf("usage: users search <name_or_username>\n");
+        return;
+    }
+
+    if (!bridge_has_access_material("users search")) {
+        return;
+    }
+
+    char *body = bridge_json_string_body("deviceId", s_bridge_state.device_id, "query", query);
+    if (!body) {
+        printf("Failed to build user search payload\n");
+        return;
+    }
+
+    bridge_http_response_t response = {0};
+    esp_err_t err = bridge_http_post_json("bridge-user-search", body, s_bridge_state.access_token, &response);
+    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-user-search", &response)) {
+        response = (bridge_http_response_t){0};
+        err = bridge_http_post_json("bridge-user-search", body, s_bridge_state.access_token, &response);
+    }
+
+    free(body);
+    if (err != ESP_OK) {
+        printf("bridge-user-search failed: %s\n", esp_err_to_name(err));
+        return;
+    }
+
+    if (response.status_code >= 200 && response.status_code < 300) {
+        if (!bridge_print_user_search_list(&response)) {
+            bridge_print_response("bridge-user-search", &response);
+        }
+    } else {
+        bridge_print_response("bridge-user-search", &response);
+    }
+}
+
 static const char *bridge_prompt_for_mode(bridge_chat_mode_t chat_mode) {
     switch (chat_mode) {
     case BRIDGE_CHAT_MODE_GROUP:
@@ -1152,7 +1231,7 @@ static void bridge_enter_dm_chat(
     const char *next_recipient_user_id
 ) {
     if (!next_recipient_user_id || next_recipient_user_id[0] == '\0') {
-        printf("usage: chat dm <recipient_user_id>\n");
+        printf("usage: chat dm <recipient_user_id|@username>\n");
         return;
     }
 
@@ -1342,6 +1421,12 @@ static void bridge_shell_task(void *arg) {
         } else if (strcmp(command, "dm") == 0 && subcommand && strcmp(subcommand, "poll") == 0) {
             char *recipient_user_id = strtok_r(NULL, " ", &save_ptr);
             bridge_command_dm_poll(recipient_user_id);
+        } else if (strcmp(command, "users") == 0 && subcommand && strcmp(subcommand, "search") == 0) {
+            char *query = save_ptr;
+            while (query && *query == ' ') {
+                query++;
+            }
+            bridge_command_users_search(query);
         } else if (strcmp(command, "chat") == 0 && subcommand && strcmp(subcommand, "group") == 0) {
             bridge_enter_group_chat(&chat_mode);
         } else if (strcmp(command, "chat") == 0 && subcommand && strcmp(subcommand, "dm") == 0) {
