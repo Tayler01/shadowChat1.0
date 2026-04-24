@@ -177,6 +177,7 @@ $script:quietStatusPending = $false
 $script:statusCaptureActive = $false
 $script:statusCaptureQuiet = $false
 $script:lastLiveStatusLine = ""
+$script:lastLiveFeedLineSuppressed = $false
 $script:bridgeHealth = [ordered]@{
     wifi = "unknown"
     device = "unknown"
@@ -314,9 +315,11 @@ function Add-LiveFeedLine {
 
     Add-TranscriptLine $Line
     if (Test-SuppressLiveFeedLine $Line) {
+        $script:lastLiveFeedLineSuppressed = $true
         return
     }
 
+    $script:lastLiveFeedLineSuppressed = $false
     $script:liveFeed.Add($Line) | Out-Null
     while ($script:liveFeed.Count -gt $script:liveFeedLimit) {
         $script:liveFeed.RemoveAt(0)
@@ -326,7 +329,7 @@ function Add-LiveFeedLine {
 function Test-SuppressLiveFeedLine {
     param([string]$Line)
 
-    if ($Line -match "^[IWDVE] \(\d+\) (esp-x509-crt-bundle|websocket_client|HTTP_CLIENT):") {
+    if ($Line -match "^[IWDVE] \(\d+\) (esp-x509-crt-bundle|websocket_client|HTTP_CLIENT|wifi|esp_netif|phy_init|event):") {
         return $true
     }
 
@@ -407,11 +410,13 @@ function Test-BridgeMessageLine {
 function Get-BridgeMessageParts {
     param([string]$Line)
 
-    if ($Line -match "^(?:DM \| )?(?<time>\d{4}-\d{2}-\d{2}T.*|\d{2}:\d{2}:\d{2}|\(unknown time\)) \| (?<sender>[^:]+): (?<content>.*)$") {
+    if ($Line -match "^(?<dm>DM \| )?(?<time>\d{4}-\d{2}-\d{2}T.*|\d{2}:\d{2}:\d{2}|\(unknown time\)) \| (?<sender>[^:]+): (?<content>.*)$") {
+        $isDm = $Matches.ContainsKey("dm") -and -not [string]::IsNullOrEmpty($Matches["dm"])
         return [pscustomobject]@{
-            Time = $Matches.time
-            Sender = $Matches.sender
-            Content = $Matches.content
+            Time = $Matches["time"]
+            Sender = $Matches["sender"]
+            Content = $Matches["content"]
+            IsDm = $isDm
         }
     }
 
@@ -459,6 +464,114 @@ function Format-MessagePaneLine {
     }
 
     return $clean.PadRight($Width)
+}
+
+function Split-TextForWidth {
+    param(
+        [string]$Text,
+        [int]$Width
+    )
+
+    if ($Width -le 0) {
+        return @("")
+    }
+
+    $remaining = (Remove-Ansi $Text).Trim()
+    if ([string]::IsNullOrEmpty($remaining)) {
+        return @("")
+    }
+
+    $lines = New-Object System.Collections.Generic.List[string]
+    while ($remaining.Length -gt $Width) {
+        $breakAt = $remaining.LastIndexOf(" ", [Math]::Min($Width, $remaining.Length - 1))
+        if ($breakAt -lt 1) {
+            $breakAt = $Width
+        }
+
+        $lines.Add($remaining.Substring(0, $breakAt).TrimEnd()) | Out-Null
+        $remaining = $remaining.Substring($breakAt).TrimStart()
+    }
+
+    if ($remaining.Length -gt 0) {
+        $lines.Add($remaining) | Out-Null
+    }
+
+    return $lines.ToArray()
+}
+
+function New-MessageRenderRow {
+    param(
+        [string]$Text,
+        [ConsoleColor]$Color,
+        [bool]$RightAlign = $false
+    )
+
+    return [pscustomobject]@{
+        Text = $Text
+        Color = $Color
+        RightAlign = $RightAlign
+    }
+}
+
+function Get-MessageRenderRows {
+    param([int]$Width)
+
+    $rows = New-Object System.Collections.Generic.List[object]
+    $contentWidth = [Math]::Max(8, [Math]::Min([Math]::Max(8, $Width - 4), 72))
+
+    foreach ($message in $script:messages) {
+        $parts = Get-BridgeMessageParts $message
+        if (-not $parts) {
+            $rows.Add((New-MessageRenderRow -Text $message -Color (Get-LineColor $message) -RightAlign $false)) | Out-Null
+            continue
+        }
+
+        $ownMessage = Test-OwnBridgeMessageSender $parts.Sender
+        $color = if ($ownMessage) { [ConsoleColor]::Cyan } else { [ConsoleColor]::Green }
+        $threadLabel = if ($parts.IsDm) { "DM | " } else { "" }
+        $sender = $parts.Sender
+        if ($ownMessage) {
+            $sender = "You"
+        }
+
+        $meta = "$threadLabel$sender  $($parts.Time)"
+        $rows.Add((New-MessageRenderRow -Text $meta -Color ([ConsoleColor]::DarkGray) -RightAlign $ownMessage)) | Out-Null
+
+        foreach ($line in (Split-TextForWidth $parts.Content $contentWidth)) {
+            $rows.Add((New-MessageRenderRow -Text $line -Color $color -RightAlign $ownMessage)) | Out-Null
+        }
+
+        $rows.Add((New-MessageRenderRow -Text "" -Color ([ConsoleColor]::DarkGray) -RightAlign $false)) | Out-Null
+    }
+
+    if ($rows.Count -gt 0 -and [string]::IsNullOrEmpty($rows[$rows.Count - 1].Text)) {
+        $rows.RemoveAt($rows.Count - 1)
+    }
+
+    return $rows.ToArray()
+}
+
+function Write-MessageRenderRow {
+    param(
+        [object]$Row,
+        [int]$Width,
+        [switch]$NoNewline
+    )
+
+    if (-not $Row) {
+        Write-FitSegment "" $Width ([ConsoleColor]::Gray) -NoNewline:$NoNewline
+        return
+    }
+
+    $text = Fit-Text $Row.Text $Width
+    if ($Row.RightAlign) {
+        $clean = Remove-Ansi $Row.Text
+        if ($clean.Length -lt $Width) {
+            $text = (" " * ($Width - $clean.Length)) + $clean
+        }
+    }
+
+    Write-Ui $text $Row.Color -NoNewline:$NoNewline
 }
 
 function Update-BridgeHealthFromStatusLine {
@@ -803,7 +916,8 @@ function Render-Layout {
     $separatorWidth = if ($useThreePane) { 6 } elseif ($useTwoPane) { 3 } else { 0 }
     $messageWidth = $width - $statusWidth - $feedWidth - $separatorWidth
     $statusLines = if ($useThreePane) { Get-SidebarLines } else { @() }
-    $messageStart = [Math]::Max(0, $script:messages.Count - $bodyHeight)
+    $messageRows = Get-MessageRenderRows $messageWidth
+    $messageStart = [Math]::Max(0, $messageRows.Count - $bodyHeight)
     $feedStart = [Math]::Max(0, $script:liveFeed.Count - $bodyHeight)
 
     [Console]::SetCursorPosition(0, 0)
@@ -814,21 +928,21 @@ function Render-Layout {
         $messageIndex = $messageStart + $i
         $feedIndex = $feedStart + $i
         $statusLine = if ($i -lt $statusLines.Count) { $statusLines[$i] } else { "" }
-        $messageLine = if ($messageIndex -lt $script:messages.Count) { $script:messages[$messageIndex] } else { "" }
+        $messageRow = if ($messageIndex -lt $messageRows.Count) { $messageRows[$messageIndex] } else { $null }
         $feedLine = if ($feedIndex -lt $script:liveFeed.Count) { $script:liveFeed[$feedIndex] } else { "" }
 
         if ($useThreePane) {
             Write-FitSegment $statusLine $statusWidth ([ConsoleColor]::DarkYellow) -NoNewline
             Write-Ui " | " ([ConsoleColor]::DarkGray) -NoNewline
-            Write-MessageSegment $messageLine $messageWidth -NoNewline
+            Write-MessageRenderRow $messageRow $messageWidth -NoNewline
             Write-Ui " | " ([ConsoleColor]::DarkGray) -NoNewline
             Write-FitSegment $feedLine $feedWidth (Get-LineColor $feedLine)
         } elseif ($useTwoPane) {
-            Write-MessageSegment $messageLine $messageWidth -NoNewline
+            Write-MessageRenderRow $messageRow $messageWidth -NoNewline
             Write-Ui " | " ([ConsoleColor]::DarkGray) -NoNewline
             Write-FitSegment $feedLine $feedWidth (Get-LineColor $feedLine)
         } else {
-            Write-MessageSegment $messageLine $width
+            Write-MessageRenderRow $messageRow $width
         }
     }
 
@@ -887,6 +1001,10 @@ function Write-BridgeLine {
 
     if ($script:layoutEnabled) {
         Request-Render
+        return
+    }
+
+    if (-not $isMessageLine -and $script:lastLiveFeedLineSuppressed) {
         return
     }
 
@@ -1412,12 +1530,13 @@ function Run-Interactive {
         [Console]::Clear()
     }
 
-    Show-Help
     if ($script:layoutEnabled) {
         Add-LiveFeedLine "Opening $Port at $BaudRate baud..."
+        Add-LiveFeedLine "Ready. Type /help for commands."
         Request-Render
         Render-Layout -Force
     } else {
+        Show-Help
         Write-Ui "Opening $Port at $BaudRate baud..." ([ConsoleColor]::Yellow)
     }
     Sync-BridgeAdmin
