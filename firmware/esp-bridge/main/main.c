@@ -44,6 +44,7 @@ typedef struct {
     char pairing_code[32];
     char access_token[128];
     char refresh_token[128];
+    char recovery_token[128];
     char auth_access_token[4096];
     char auth_refresh_token[1024];
     char auth_user_id[64];
@@ -301,6 +302,7 @@ static void bridge_load_persisted_state(void) {
     bridge_load_string("pairing_code", s_bridge_state.pairing_code, sizeof(s_bridge_state.pairing_code));
     bridge_load_string("access_token", s_bridge_state.access_token, sizeof(s_bridge_state.access_token));
     bridge_load_string("refresh_token", s_bridge_state.refresh_token, sizeof(s_bridge_state.refresh_token));
+    bridge_load_string("recovery_token", s_bridge_state.recovery_token, sizeof(s_bridge_state.recovery_token));
     bridge_load_string("auth_access_token", s_bridge_state.auth_access_token, sizeof(s_bridge_state.auth_access_token));
     bridge_load_string("auth_refresh_token", s_bridge_state.auth_refresh_token, sizeof(s_bridge_state.auth_refresh_token));
     bridge_load_string("auth_user_id", s_bridge_state.auth_user_id, sizeof(s_bridge_state.auth_user_id));
@@ -545,6 +547,7 @@ static bool bridge_is_sensitive_json_key(const char *key) {
 
     return strcmp(key, "accessToken") == 0 ||
         strcmp(key, "refreshToken") == 0 ||
+        strcmp(key, "recoveryToken") == 0 ||
         strcmp(key, "authAccessToken") == 0 ||
         strcmp(key, "authRefreshToken") == 0 ||
         strcmp(key, "password") == 0;
@@ -604,6 +607,14 @@ static void bridge_store_session_expiry_from_json(cJSON *json) {
     if (cJSON_IsString(expires_at) && expires_at->valuestring) {
         bridge_set_runtime_string(s_bridge_state.session_expires_at, sizeof(s_bridge_state.session_expires_at), expires_at->valuestring);
         bridge_save_string("session_expires_at", s_bridge_state.session_expires_at);
+    }
+}
+
+static void bridge_store_recovery_token_from_json(cJSON *json) {
+    cJSON *recovery_token = cJSON_GetObjectItemCaseSensitive(json, "recoveryToken");
+    if (cJSON_IsString(recovery_token) && recovery_token->valuestring) {
+        bridge_set_runtime_string(s_bridge_state.recovery_token, sizeof(s_bridge_state.recovery_token), recovery_token->valuestring);
+        bridge_save_string("recovery_token", s_bridge_state.recovery_token);
     }
 }
 
@@ -896,6 +907,7 @@ static void bridge_clear_pairing_state(void) {
     bridge_set_runtime_string(s_bridge_state.pairing_code, sizeof(s_bridge_state.pairing_code), "");
     bridge_set_runtime_string(s_bridge_state.access_token, sizeof(s_bridge_state.access_token), "");
     bridge_set_runtime_string(s_bridge_state.refresh_token, sizeof(s_bridge_state.refresh_token), "");
+    bridge_set_runtime_string(s_bridge_state.recovery_token, sizeof(s_bridge_state.recovery_token), "");
     bridge_set_runtime_string(s_bridge_state.auth_access_token, sizeof(s_bridge_state.auth_access_token), "");
     bridge_set_runtime_string(s_bridge_state.auth_refresh_token, sizeof(s_bridge_state.auth_refresh_token), "");
     bridge_set_runtime_string(s_bridge_state.auth_user_id, sizeof(s_bridge_state.auth_user_id), "");
@@ -906,6 +918,7 @@ static void bridge_clear_pairing_state(void) {
     bridge_save_string("pairing_code", "");
     bridge_save_string("access_token", "");
     bridge_save_string("refresh_token", "");
+    bridge_save_string("recovery_token", "");
     bridge_save_string("auth_access_token", "");
     bridge_save_string("auth_refresh_token", "");
     bridge_save_string("auth_user_id", "");
@@ -944,6 +957,7 @@ static void bridge_command_status(void) {
     printf("  pairing_code: %s\n", s_bridge_state.pairing_code[0] ? s_bridge_state.pairing_code : "(none)");
     printf("  access_token: %s\n", s_bridge_state.access_token[0] ? "(stored)" : "(none)");
     printf("  refresh_token: %s\n", s_bridge_state.refresh_token[0] ? "(stored)" : "(none)");
+    printf("  recovery_token: %s\n", s_bridge_state.recovery_token[0] ? "(stored)" : "(none)");
     printf("  auth_user_id: %s\n", s_bridge_state.auth_user_id[0] ? s_bridge_state.auth_user_id : "(none)");
     printf("  auth_access_token: %s\n", s_bridge_state.auth_access_token[0] ? "(stored)" : "(none)");
     printf("  auth_refresh_token: %s\n", s_bridge_state.auth_refresh_token[0] ? "(stored)" : "(none)");
@@ -1079,8 +1093,18 @@ static bool bridge_command_pair_begin(void) {
         return false;
     }
 
-    char body[128];
-    snprintf(body, sizeof(body), "{\"deviceId\":\"%s\"}", s_bridge_state.device_id);
+    char body[320];
+    if (s_bridge_state.recovery_token[0] != '\0') {
+        snprintf(
+            body,
+            sizeof(body),
+            "{\"deviceId\":\"%s\",\"recoveryToken\":\"%s\"}",
+            s_bridge_state.device_id,
+            s_bridge_state.recovery_token
+        );
+    } else {
+        snprintf(body, sizeof(body), "{\"deviceId\":\"%s\"}", s_bridge_state.device_id);
+    }
 
     bridge_http_response_t response = {0};
     esp_err_t err = bridge_http_post_json("bridge-pairing-begin", body, NULL, &response);
@@ -1101,11 +1125,16 @@ static bool bridge_command_pair_begin(void) {
 
     cJSON *pairing_code = cJSON_GetObjectItemCaseSensitive(json, "pairingCode");
     cJSON *status = cJSON_GetObjectItemCaseSensitive(json, "status");
+    cJSON *auto_approved_recovery = cJSON_GetObjectItemCaseSensitive(json, "autoApprovedRecovery");
 
     if (cJSON_IsString(pairing_code) && pairing_code->valuestring) {
         bridge_set_runtime_string(s_bridge_state.pairing_code, sizeof(s_bridge_state.pairing_code), pairing_code->valuestring);
         bridge_save_string("pairing_code", s_bridge_state.pairing_code);
-        printf("Pair this bridge from ShadowChat using code: %s\n", s_bridge_state.pairing_code);
+        if (cJSON_IsTrue(auto_approved_recovery)) {
+            printf("Bridge recovery approved from stored device recovery token. Code: %s\n", s_bridge_state.pairing_code);
+        } else {
+            printf("Pair this bridge from ShadowChat using code: %s\n", s_bridge_state.pairing_code);
+        }
     }
 
     if (cJSON_IsString(status) && status->valuestring) {
@@ -1155,10 +1184,10 @@ static void bridge_command_pair_status(void) {
     cJSON_Delete(json);
 }
 
-static void bridge_command_session_exchange(void) {
+static bool bridge_command_session_exchange(void) {
     if (!s_bridge_state.wifi_connected || s_bridge_state.device_id[0] == '\0' || s_bridge_state.pairing_code[0] == '\0') {
         printf("Device must be registered and paired before exchange\n");
-        return;
+        return false;
     }
 
     char body[192];
@@ -1174,18 +1203,18 @@ static void bridge_command_session_exchange(void) {
     esp_err_t err = bridge_http_post_json("bridge-session-exchange", body, NULL, &response);
     if (err != ESP_OK) {
         printf("bridge-session-exchange failed: %s\n", esp_err_to_name(err));
-        return;
+        return false;
     }
 
     bridge_print_response("bridge-session-exchange", &response);
 
     if (response.status_code < 200 || response.status_code >= 300) {
-        return;
+        return false;
     }
 
     cJSON *json = bridge_parse_json_body(&response);
     if (!json) {
-        return;
+        return false;
     }
 
     cJSON *access_token = cJSON_GetObjectItemCaseSensitive(json, "accessToken");
@@ -1203,10 +1232,12 @@ static void bridge_command_session_exchange(void) {
 
     bridge_store_supabase_auth_from_json(json);
     bridge_store_session_expiry_from_json(json);
+    bridge_store_recovery_token_from_json(json);
     bridge_set_runtime_string(s_bridge_state.device_status, sizeof(s_bridge_state.device_status), "paired");
     bridge_save_string("device_status", s_bridge_state.device_status);
     printf("Stored bridge control-plane and ESP auth session material\n");
     cJSON_Delete(json);
+    return true;
 }
 
 static bool bridge_refresh_session_material(bool compact_output) {
@@ -1284,8 +1315,17 @@ static void bridge_command_session_recover(void) {
         return;
     }
 
+    bool auto_recovery_ready = s_bridge_state.recovery_token[0] != '\0' && strcmp(s_bridge_state.device_status, "paired") == 0;
     bridge_clear_session_material();
     printf("Old local session material cleared.\n");
+    if (auto_recovery_ready) {
+        printf("Stored recovery token accepted. Exchanging a fresh bridge session now.\n");
+        if (!bridge_command_session_exchange()) {
+            printf("Automatic recovery exchange failed. Run: session recover\n");
+        }
+        return;
+    }
+
     printf("Approve the new code in ShadowChat Settings > ESP Bridge, then run: session exchange\n");
 }
 

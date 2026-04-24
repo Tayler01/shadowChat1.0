@@ -36,6 +36,7 @@ Current backend status:
 - bridge-scoped control-plane token lifecycle exists
 - refresh, revoke, and heartbeat exist
 - bridge-scoped group chat and DM data-plane Edge Function proof exists
+- already-approved bridges can recover expired local session material with a stored device recovery token after one owner-approved bootstrap exchange
 - direct Supabase user-session minting remains intentionally unproven
 
 ### Firmware Workspace
@@ -48,6 +49,8 @@ Implemented and pushed on `main`:
   - Wi-Fi SSID/password
   - bridge device state
   - bridge control-plane tokens
+  - bridge recovery token
+  - group and active-DM chat cursors
 - admin-shell commands for:
   - `wifi set`
   - `wifi connect`
@@ -102,7 +105,7 @@ These parts are still open:
 - realtime bridge session ownership on device
 - polished Windows-side chat TUI
 - structured local protocol framing between Windows and bridge firmware
-- automatic receive loop with device-side cursors/checkpoints
+- automatic receive loop beyond the current TUI polling loop
 
 ## Immediate Next Steps
 
@@ -112,9 +115,8 @@ The next implementation steps should happen in this order:
 2. Add a receive strategy for realtime or near-realtime updates:
    - Realtime WebSocket ownership on device, or
    - short polling/long polling over bridge data-plane functions for the first TUI.
-3. Add device-side message cursor/checkpoint storage.
-4. Decide whether Phase 1 should keep the narrow bridge data-plane Edge Functions or pursue direct Supabase user-session minting.
-5. Add production-hardening follow-ups:
+3. Decide whether Phase 1 should keep the narrow bridge data-plane Edge Functions or pursue direct Supabase user-session minting.
+4. Add production-hardening follow-ups:
    - encrypted NVS
    - signed OTA
    - more explicit redaction/sanitized serial output
@@ -130,12 +132,14 @@ What exists today is:
 - a real ESP-IDF firmware workspace
 - a successful local `esp32s3` firmware build
 - a real ESP32-S3 hardware proof over `USB Serial/JTAG`
-- live Wi-Fi onboarding against `Camper1407`
+- live Wi-Fi onboarding against the current iPhone hotspot
 - live backend register, pairing, session exchange, refresh, heartbeat, and wipe proof
 - live group chat send/poll proof through bridge-scoped data-plane functions
 - live DM send/poll proof through bridge-scoped data-plane functions
 - a first ESP-side chat mode over serial for group chat and one active DM thread
 - a first Windows-side chat TUI client over the ESP serial shell
+- persistent group/DM cursors across firmware flashes
+- a self-recovery path for already-approved bridges using a stored recovery token
 
 What does **not** exist yet is the polished, structured-protocol Windows-side chat TUI experience.
 
@@ -168,6 +172,7 @@ Verified against the linked Supabase project:
 - `chat group`
 - `chat dm <recipient_user_id>`
 - Windows TUI `-Smoke`
+- `session recover` with stored recovery-token auto-approval
 
 Important implementation discoveries:
 
@@ -176,3 +181,19 @@ Important implementation discoveries:
 - token-bearing session responses must be redacted before printing to serial
 - raw line-oriented serial input can split longer text; current firmware now discards oversized lines as a whole line instead of executing fragments
 - returning full joined user profiles exposed too much data, so bridge data-plane functions now return minimal display profile fields
+- bridge sessions expiring while the device is idle exposed the need for an already-approved recovery secret; the current backend now hashes that secret on `bridge_devices`, and the ESP stores only the plaintext copy in local NVS
+
+## Hardware Proof Captured On 2026-04-24
+
+Verified on `COM3` against device `a091ab7f-88de-4b8b-befb-9d8a53d9ff60`:
+
+- device has a dedicated bridge user identity: `ESP Bridge ABF584`
+- group messages and DMs to `@caleb` send successfully from the ESP user
+- push notifications for ESP-originated messages deliver through the existing `send-push` path
+- group and DM chat cursors persist across firmware flash and resume without replaying prior history
+- Wi-Fi reconnect is attempted on demand before bridge heartbeat/group/DM/user-search actions
+- `session recover` now has two modes:
+  - first bootstrap after this change still requires owner approval so the ESP can receive a recovery token
+  - later recovery uses the stored recovery token to auto-approve a short-lived pairing code and immediately run `session exchange`
+- successful self-recovery test returned `autoApprovedRecovery: true`, exchanged fresh access/refresh/auth material, and reported `recovery_token: (stored)` in firmware status
+- follow-up TUI smoke passed group send/poll, DM send/poll, status, and cursor resume after self-recovery

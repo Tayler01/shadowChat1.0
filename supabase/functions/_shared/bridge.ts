@@ -190,6 +190,16 @@ export const createBridgeSessionMaterial = async () => {
   }
 }
 
+export const createBridgeRecoveryMaterial = async () => {
+  const recoveryToken = generateOpaqueToken('brcv')
+  const recoveryTokenHash = await hashToken(recoveryToken)
+
+  return {
+    recoveryToken,
+    recoveryTokenHash,
+  }
+}
+
 export const getFutureIso = (minutesFromNow: number) =>
   new Date(Date.now() + minutesFromNow * 60_000).toISOString()
 

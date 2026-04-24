@@ -2,6 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import {
   badRequest,
   corsHeaders,
+  createBridgeRecoveryMaterial,
   createBridgeSessionMaterial,
   ensureBridgeUserForDevice,
   getFutureIso,
@@ -95,6 +96,7 @@ serve(async req => {
     const timestamp = new Date().toISOString()
     const expiresAt = getFutureIso(60)
     const sessionMaterial = await createBridgeSessionMaterial()
+    const recoveryMaterial = await createBridgeRecoveryMaterial()
     const bridgeAccount = await ensureBridgeUserForDevice(supabase, {
       id: device.id,
       device_serial: device.device_serial,
@@ -125,6 +127,15 @@ serve(async req => {
     if (!exchangeLock) {
       return json({ error: 'Pairing code has already been exchanged' }, 409)
     }
+
+    await supabase
+      .from('bridge_devices')
+      .update({
+        status: 'paired',
+        bridge_user_id: bridgeAccount.bridgeUserId,
+        recovery_token_hash: recoveryMaterial.recoveryTokenHash,
+      })
+      .eq('id', device.id)
 
     await supabase
       .from('bridge_device_sessions')
@@ -177,6 +188,7 @@ serve(async req => {
       bridgeSessionId: session.id,
       accessToken: sessionMaterial.accessToken,
       refreshToken: sessionMaterial.refreshToken,
+      recoveryToken: recoveryMaterial.recoveryToken,
       expiresAt,
       supabaseAuth,
       sessionMetadata: {

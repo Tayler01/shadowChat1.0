@@ -180,9 +180,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.
 
 On boot, the firmware waits for stored Wi-Fi to reconnect and checks the stored bridge/auth session material. If session material is missing or close to expiry, it refreshes automatically so the bridge is ready for chat after a reboot or flash. It also reconnects stored Wi-Fi on demand before heartbeat, group, DM, and user-search calls if the station dropped, refreshes stored bridge session material when the stored session expiry is within five minutes, and retries bridge-authenticated calls once after refreshing when it receives an auth-expired response. If refresh fails, the command reports the refresh failure and leaves the device in its current paired state for manual recovery.
 
-If local access or refresh tokens become invalid, run `session recover`. The bridge will create a fresh pairing code, clear stale local session material, and prompt you to approve the code in ShadowChat Settings > ESP Bridge before running `session exchange`.
+If local access or refresh tokens become invalid, run `session recover`. After the first owner-approved exchange, the bridge stores a device recovery token in NVS. Future recovery attempts use that token to auto-approve a short-lived recovery code and immediately exchange fresh session material without asking for iPhone approval again. If the bridge has no recovery token yet, recovery still prompts you to approve the code in ShadowChat Settings > ESP Bridge once, then `session exchange` stores the recovery token for later.
 
-For recovery from expired or revoked local session material, run `pair begin` on the bridge, approve the new code from ShadowChat Settings > ESP Bridge, then run `session exchange` on the bridge. The backend accepts a new pending pairing request from an already-paired physical bridge so a device with stale local tokens can be recovered without direct database cleanup.
+For manual recovery from expired or revoked local session material, run `pair begin` on the bridge, approve the new code from ShadowChat Settings > ESP Bridge, then run `session exchange` on the bridge. The backend accepts a new pending pairing request from an already-paired physical bridge so a device with stale local tokens can be recovered without direct database cleanup.
 
 ## Phase 0 Notes
 

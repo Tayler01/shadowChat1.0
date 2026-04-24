@@ -5,6 +5,7 @@ import {
   forbidden,
   generatePairingCode,
   getSupabaseAdmin,
+  hashToken,
   json,
   normalizeText,
   notFound,
@@ -13,6 +14,7 @@ import {
 
 type PairingBeginPayload = {
   deviceId?: string
+  recoveryToken?: string
 }
 
 const PAIRING_CODE_TTL_MINUTES = 10
@@ -29,6 +31,7 @@ serve(async req => {
   try {
     const body = await readJson<PairingBeginPayload>(req)
     const deviceId = normalizeText(body?.deviceId)
+    const recoveryToken = normalizeText(body?.recoveryToken)
 
     if (!deviceId) {
       return badRequest('deviceId is required')
@@ -38,7 +41,7 @@ serve(async req => {
 
     const { data: device, error: deviceError } = await supabase
       .from('bridge_devices')
-      .select('id, status, paired_user_id, bridge_user_id')
+      .select('id, status, paired_user_id, bridge_user_id, recovery_token_hash')
       .eq('id', deviceId)
       .maybeSingle()
 
@@ -71,9 +74,30 @@ serve(async req => {
       .eq('device_id', deviceId)
       .eq('status', 'pending')
 
+    const timestamp = new Date().toISOString()
+    const canRecoverWithToken = Boolean(
+      recoveryToken &&
+        device.recovery_token_hash &&
+        activePairing &&
+        device.paired_user_id &&
+        device.bridge_user_id,
+    )
+
+    if (recoveryToken && !canRecoverWithToken) {
+      return forbidden('Bridge recovery is not available for this device')
+    }
+
+    if (canRecoverWithToken) {
+      const recoveryTokenHash = await hashToken(recoveryToken)
+      if (recoveryTokenHash !== device.recovery_token_hash) {
+        return forbidden('Invalid bridge recovery token')
+      }
+    }
+
     let pairingCode = ''
     let pairingRequestId = ''
     const expiresAt = new Date(Date.now() + PAIRING_CODE_TTL_MINUTES * 60_000).toISOString()
+    const autoApprovedRecovery = canRecoverWithToken
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
       pairingCode = generatePairingCode()
@@ -82,8 +106,9 @@ serve(async req => {
         .insert({
           device_id: deviceId,
           code: pairingCode,
-          status: 'pending',
+          status: autoApprovedRecovery ? 'consumed' : 'pending',
           expires_at: expiresAt,
+          consumed_at: autoApprovedRecovery ? timestamp : null,
         })
         .select('id')
         .single()
@@ -104,15 +129,17 @@ serve(async req => {
 
     await supabase
       .from('bridge_devices')
-      .update({ status: 'pairing_pending' })
+      .update({ status: autoApprovedRecovery ? 'paired' : 'pairing_pending' })
       .eq('id', deviceId)
 
     await supabase.from('bridge_audit_events').insert({
       device_id: deviceId,
-      event_type: 'pairing_started',
+      user_id: autoApprovedRecovery ? device.paired_user_id : null,
+      event_type: autoApprovedRecovery ? 'pairing_recovery_auto_approved' : 'pairing_started',
       event_payload: {
         expires_at: expiresAt,
         pairing_request_id: pairingRequestId,
+        auto_approved_recovery: autoApprovedRecovery,
       },
     })
 
@@ -121,7 +148,10 @@ serve(async req => {
       pairingCode,
       expiresAt,
       pairingRequestId,
-      status: 'pairing_pending',
+      status: autoApprovedRecovery ? 'paired' : 'pairing_pending',
+      pairingCodeStatus: autoApprovedRecovery ? 'consumed' : 'pending',
+      autoApprovedRecovery,
+      sessionExchangeReady: autoApprovedRecovery,
       wasAlreadyPaired: Boolean(activePairing),
       pairedUserId: device.paired_user_id,
       bridgeUserId: device.bridge_user_id,
