@@ -42,6 +42,7 @@ export const triggerPushDispatch = async (
   type: 'dm_message' | 'group_message',
   messageId: string,
   senderUserId: string,
+  options: { origin?: 'bridge'; bridgeDeviceId?: string } = {},
 ) => {
   const { supabaseUrl, serviceRoleKey } = getEnv()
 
@@ -57,6 +58,8 @@ export const triggerPushDispatch = async (
         type,
         messageId,
         senderUserId,
+        origin: options.origin,
+        bridgeDeviceId: options.bridgeDeviceId,
       }),
     })
 

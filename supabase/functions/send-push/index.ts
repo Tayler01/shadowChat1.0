@@ -18,6 +18,8 @@ type SendPushRequestBody = {
   type?: PushEventType
   messageId?: string
   senderUserId?: string
+  origin?: 'app' | 'bridge'
+  bridgeDeviceId?: string
 }
 
 type NotificationPrefs = {
@@ -117,6 +119,9 @@ const getActor = <T extends { username: string | null; display_name: string | nu
 
 const getActorLabel = (actor: { username: string | null; display_name: string | null } | null) =>
   actor?.display_name || actor?.username || 'New message'
+
+const getPushOrigin = (body: SendPushRequestBody) =>
+  body.origin === 'bridge' ? 'bridge' : 'app'
 
 const isMuted = (prefs: { mute_until: string | null }) => {
   if (!prefs.mute_until) return false
@@ -300,7 +305,9 @@ const sendDmPush = async (
   supabase: ReturnType<typeof getSupabaseAdmin>,
   vapid: VapidKeys,
   authUserId: string,
-  messageId: string
+  messageId: string,
+  origin: 'app' | 'bridge',
+  bridgeDeviceId?: string
 ) => {
   const { data: message, error: messageError } = await supabase
     .from('dm_messages')
@@ -350,6 +357,12 @@ const sendDmPush = async (
     return json({ skipped: true, reason: 'No recipient found' })
   }
 
+  const sender = getActor(dmMessage.sender)
+  const senderLabel = getActorLabel(sender)
+  const preview = getMessagePreview(dmMessage)
+  const route = `/?view=dms&conversation=${dmMessage.conversation_id}&message=${dmMessage.id}`
+  let delivery: Record<string, unknown>
+
   const { data: preferences } = await supabase
     .from('notification_preferences')
     .select('user_id, dm_enabled, mute_until')
@@ -357,47 +370,127 @@ const sendDmPush = async (
     .maybeSingle()
 
   if (!preferences?.dm_enabled || isMuted(preferences)) {
-    return json({ skipped: true, reason: 'Recipient preferences disable DM push' })
+    delivery = { skipped: true, reason: 'Recipient preferences disable DM push' }
+  } else {
+    const subscriptions = await getActiveSubscriptions(supabase, recipientId)
+    if (!subscriptions.length) {
+      delivery = { skipped: true, reason: 'Recipient has no active push subscriptions' }
+    } else {
+      const dedupeKey = `dm:${dmMessage.id}:${recipientId}`
+      const badgeCount = await getUnreadBadgeCount(supabase, recipientId)
+
+      const eventRecord = await upsertNotificationEvent(supabase, {
+        user_id: recipientId,
+        type: 'dm_message',
+        entity_id: dmMessage.id,
+        conversation_id: dmMessage.conversation_id,
+        dm_message_id: dmMessage.id,
+        payload: {
+          title: senderLabel,
+          body: preview,
+          route,
+          sender_id: authUserId,
+          badge_count: badgeCount,
+        },
+      }, dedupeKey)
+
+      if (eventRecord.sent_at) {
+        delivery = { skipped: true, reason: 'Notification already sent' }
+      } else {
+        const pushMessage: PushMessage = {
+          data: JSON.stringify({
+            title: senderLabel,
+            body: preview,
+            tag: `dm:${dmMessage.conversation_id}`,
+            badgeCount,
+            unreadCount: badgeCount,
+            data: {
+              url: route,
+              route,
+              type: 'dm_message',
+              conversationId: dmMessage.conversation_id,
+              messageId: dmMessage.id,
+              senderId: authUserId,
+              badgeCount,
+              unreadCount: badgeCount,
+            },
+          }),
+          options: {
+            ttl: 300,
+            urgency: 'high',
+          },
+        }
+
+        delivery = await deliverPushToSubscriptions(supabase, vapid, subscriptions, pushMessage)
+
+        if (Number(delivery.deliveredCount ?? 0) > 0) {
+          await supabase
+            .from('notification_events')
+            .update({ sent_at: new Date().toISOString() })
+            .eq('id', eventRecord.id)
+        }
+      }
+    }
   }
 
-  const subscriptions = await getActiveSubscriptions(supabase, recipientId)
-  if (!subscriptions.length) {
-    return json({ skipped: true, reason: 'Recipient has no active push subscriptions' })
+  if (origin !== 'bridge') {
+    return json(delivery)
   }
 
-  const sender = getActor(dmMessage.sender)
-  const senderLabel = getActorLabel(sender)
-  const preview = getMessagePreview(dmMessage)
-  const route = `/?view=dms&conversation=${dmMessage.conversation_id}&message=${dmMessage.id}`
-  const dedupeKey = `dm:${dmMessage.id}:${recipientId}`
-  const badgeCount = await getUnreadBadgeCount(supabase, recipientId)
+  const { data: senderPreferences } = await supabase
+    .from('notification_preferences')
+    .select('user_id, dm_enabled, mute_until')
+    .eq('user_id', authUserId)
+    .maybeSingle()
 
-  const eventRecord = await upsertNotificationEvent(supabase, {
-    user_id: recipientId,
+  if (senderPreferences && isMuted(senderPreferences)) {
+    return json({
+      ...delivery,
+      bridgeSender: { skipped: true, reason: 'Sender notifications are muted' },
+    })
+  }
+
+  const senderSubscriptions = await getActiveSubscriptions(supabase, authUserId)
+  if (!senderSubscriptions.length) {
+    return json({
+      ...delivery,
+      bridgeSender: { skipped: true, reason: 'Sender has no active push subscriptions' },
+    })
+  }
+
+  const bridgeSenderDedupeKey = `dm:${dmMessage.id}:${authUserId}:bridge-sender`
+  const senderBadgeCount = await getUnreadBadgeCount(supabase, authUserId)
+  const bridgeSenderEvent = await upsertNotificationEvent(supabase, {
+    user_id: authUserId,
     type: 'dm_message',
     entity_id: dmMessage.id,
     conversation_id: dmMessage.conversation_id,
     dm_message_id: dmMessage.id,
     payload: {
-      title: senderLabel,
-      body: preview,
+      title: 'ShadowChat Bridge',
+      body: `Sent DM: ${preview}`,
       route,
       sender_id: authUserId,
-      badge_count: badgeCount,
+      badge_count: senderBadgeCount,
+      origin: 'bridge',
+      bridge_device_id: bridgeDeviceId,
     },
-  }, dedupeKey)
+  }, bridgeSenderDedupeKey)
 
-  if (eventRecord.sent_at) {
-    return json({ skipped: true, reason: 'Notification already sent' })
+  if (bridgeSenderEvent.sent_at) {
+    return json({
+      ...delivery,
+      bridgeSender: { skipped: true, reason: 'Notification already sent' },
+    })
   }
 
-  const pushMessage: PushMessage = {
+  const bridgeSenderPushMessage: PushMessage = {
     data: JSON.stringify({
-      title: senderLabel,
-      body: preview,
-      tag: `dm:${dmMessage.conversation_id}`,
-      badgeCount,
-      unreadCount: badgeCount,
+      title: 'ShadowChat Bridge',
+      body: `Sent DM: ${preview}`,
+      tag: `bridge-dm:${dmMessage.conversation_id}`,
+      badgeCount: senderBadgeCount,
+      unreadCount: senderBadgeCount,
       data: {
         url: route,
         route,
@@ -405,8 +498,10 @@ const sendDmPush = async (
         conversationId: dmMessage.conversation_id,
         messageId: dmMessage.id,
         senderId: authUserId,
-        badgeCount,
-        unreadCount: badgeCount,
+        badgeCount: senderBadgeCount,
+        unreadCount: senderBadgeCount,
+        origin: 'bridge',
+        bridgeDeviceId,
       },
     }),
     options: {
@@ -415,23 +510,33 @@ const sendDmPush = async (
     },
   }
 
-  const delivery = await deliverPushToSubscriptions(supabase, vapid, subscriptions, pushMessage)
+  const bridgeSenderDelivery = await deliverPushToSubscriptions(
+    supabase,
+    vapid,
+    senderSubscriptions,
+    bridgeSenderPushMessage
+  )
 
-  if (delivery.deliveredCount > 0) {
+  if (bridgeSenderDelivery.deliveredCount > 0) {
     await supabase
       .from('notification_events')
       .update({ sent_at: new Date().toISOString() })
-      .eq('id', eventRecord.id)
+      .eq('id', bridgeSenderEvent.id)
   }
 
-  return json(delivery)
+  return json({
+    ...delivery,
+    bridgeSender: bridgeSenderDelivery,
+  })
 }
 
 const sendGroupPush = async (
   supabase: ReturnType<typeof getSupabaseAdmin>,
   vapid: VapidKeys,
   authUserId: string,
-  messageId: string
+  messageId: string,
+  origin: 'app' | 'bridge',
+  bridgeDeviceId?: string
 ) => {
   const { data: message, error: messageError } = await supabase
     .from('messages')
@@ -476,6 +581,22 @@ const sendGroupPush = async (
     (prefs) => !isMuted(prefs)
   )
 
+  if (origin === 'bridge') {
+    const { data: senderPreferences } = await supabase
+      .from('notification_preferences')
+      .select('user_id, group_enabled, mute_until')
+      .eq('user_id', authUserId)
+      .maybeSingle()
+
+    if (!senderPreferences || !isMuted(senderPreferences)) {
+      eligibleRecipients.push({
+        user_id: authUserId,
+        group_enabled: true,
+        mute_until: senderPreferences?.mute_until ?? null,
+      })
+    }
+  }
+
   if (!eligibleRecipients.length) {
     return json({ skipped: true, reason: 'No recipients have group push enabled' })
   }
@@ -487,6 +608,7 @@ const sendGroupPush = async (
 
   const perRecipientResults = await Promise.all(
     eligibleRecipients.map(async (prefs) => {
+      const isBridgeSenderRecipient = origin === 'bridge' && prefs.user_id === authUserId
       const subscriptions = await getActiveSubscriptions(supabase, prefs.user_id)
       if (!subscriptions.length) {
         return {
@@ -501,6 +623,8 @@ const sendGroupPush = async (
 
       const dedupeKey = `group:${groupMessage.id}:${prefs.user_id}`
       const badgeCount = await getUnreadBadgeCount(supabase, prefs.user_id)
+      const title = isBridgeSenderRecipient ? 'ShadowChat Bridge' : `${senderLabel} in General Chat`
+      const body = isBridgeSenderRecipient ? `Sent to General Chat: ${preview}` : preview
       const eventRecord = await upsertNotificationEvent(
         supabase,
         {
@@ -509,11 +633,13 @@ const sendGroupPush = async (
           entity_id: groupMessage.id,
           message_id: groupMessage.id,
           payload: {
-            title: `${senderLabel} in General Chat`,
-            body: preview,
+            title,
+            body,
             route,
             sender_id: authUserId,
             badge_count: badgeCount,
+            origin: isBridgeSenderRecipient ? 'bridge' : undefined,
+            bridge_device_id: isBridgeSenderRecipient ? bridgeDeviceId : undefined,
           },
         },
         dedupeKey
@@ -532,9 +658,9 @@ const sendGroupPush = async (
 
       const pushMessage: PushMessage = {
         data: JSON.stringify({
-          title: `${senderLabel} in General Chat`,
-          body: preview,
-          tag: `group:${groupMessage.id}`,
+          title,
+          body,
+          tag: isBridgeSenderRecipient ? `bridge-group:${groupMessage.id}` : `group:${groupMessage.id}`,
           badgeCount,
           unreadCount: badgeCount,
           data: {
@@ -545,6 +671,8 @@ const sendGroupPush = async (
             senderId: authUserId,
             badgeCount,
             unreadCount: badgeCount,
+            origin: isBridgeSenderRecipient ? 'bridge' : undefined,
+            bridgeDeviceId: isBridgeSenderRecipient ? bridgeDeviceId : undefined,
           },
         }),
         options: {
@@ -602,6 +730,8 @@ serve(async (req) => {
 
     const type = body?.type as PushEventType | undefined
     const messageId = typeof body?.messageId === 'string' ? body.messageId : ''
+    const origin = getPushOrigin(body)
+    const bridgeDeviceId = typeof body?.bridgeDeviceId === 'string' ? body.bridgeDeviceId : undefined
 
     if (!messageId || (type !== 'dm_message' && type !== 'group_message')) {
       return json({ error: 'Unsupported notification payload' }, 400)
@@ -611,10 +741,10 @@ serve(async (req) => {
     const vapid = getVapidKeys()
 
     if (type === 'dm_message') {
-      return await sendDmPush(supabase, vapid, auth.userId, messageId)
+      return await sendDmPush(supabase, vapid, auth.userId, messageId, origin, bridgeDeviceId)
     }
 
-    return await sendGroupPush(supabase, vapid, auth.userId, messageId)
+    return await sendGroupPush(supabase, vapid, auth.userId, messageId, origin, bridgeDeviceId)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     return json({ error: message }, 500)

@@ -96,7 +96,10 @@ serve(async req => {
         },
       })
 
-    await triggerPushDispatch('group_message', message.id as string, bridgeAuth.auth.userId)
+    await triggerPushDispatch('group_message', message.id as string, bridgeAuth.auth.userId, {
+      origin: 'bridge',
+      bridgeDeviceId: deviceId,
+    })
 
     return json({
       ok: true,

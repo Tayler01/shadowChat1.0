@@ -134,7 +134,10 @@ serve(async req => {
         },
       })
 
-    await triggerPushDispatch('dm_message', message.id as string, bridgeAuth.auth.userId)
+    await triggerPushDispatch('dm_message', message.id as string, bridgeAuth.auth.userId, {
+      origin: 'bridge',
+      bridgeDeviceId: deviceId,
+    })
 
     return json({
       ok: true,
