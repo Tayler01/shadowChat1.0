@@ -622,7 +622,6 @@ const sendGroupPush = async (
       }
 
       const dedupeKey = `group:${groupMessage.id}:${prefs.user_id}`
-      const badgeCount = await getUnreadBadgeCount(supabase, prefs.user_id)
       const title = isBridgeSenderRecipient ? 'ShadowChat Bridge' : `${senderLabel} in General Chat`
       const body = isBridgeSenderRecipient ? `Sent to General Chat: ${preview}` : preview
       const eventRecord = await upsertNotificationEvent(
@@ -637,7 +636,6 @@ const sendGroupPush = async (
             body,
             route,
             sender_id: authUserId,
-            badge_count: badgeCount,
             origin: isBridgeSenderRecipient ? 'bridge' : undefined,
             bridge_device_id: isBridgeSenderRecipient ? bridgeDeviceId : undefined,
           },
@@ -661,16 +659,12 @@ const sendGroupPush = async (
           title,
           body,
           tag: isBridgeSenderRecipient ? `bridge-group:${groupMessage.id}` : `group:${groupMessage.id}`,
-          badgeCount,
-          unreadCount: badgeCount,
           data: {
             url: route,
             route,
             type: 'group_message',
             messageId: groupMessage.id,
             senderId: authUserId,
-            badgeCount,
-            unreadCount: badgeCount,
             origin: isBridgeSenderRecipient ? 'bridge' : undefined,
             bridgeDeviceId: isBridgeSenderRecipient ? bridgeDeviceId : undefined,
           },

@@ -16,6 +16,11 @@ const normalizeBadgeCount = (value) => {
 }
 
 const getPayloadBadgeCount = (payload) => {
+  const notificationType = payload.type ?? payload.data?.type
+  if (notificationType === 'group_message') {
+    return null
+  }
+
   const count = payload.badgeCount ?? payload.unreadCount ?? payload.data?.badgeCount ?? payload.data?.unreadCount
   if (count === undefined || count === null) {
     return null
