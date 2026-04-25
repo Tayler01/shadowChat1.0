@@ -537,7 +537,7 @@ function Get-MessageRenderRows {
         $meta = "$threadLabel$sender  $($parts.Time)"
         $rows.Add((New-MessageRenderRow -Text $meta -Color ([ConsoleColor]::DarkGray) -RightAlign $ownMessage)) | Out-Null
 
-        foreach ($line in (Split-TextForWidth $parts.Content $contentWidth)) {
+        foreach ($line in @(Split-TextForWidth $parts.Content $contentWidth)) {
             $rows.Add((New-MessageRenderRow -Text $line -Color $color -RightAlign $ownMessage)) | Out-Null
         }
 
@@ -916,7 +916,7 @@ function Render-Layout {
     $separatorWidth = if ($useThreePane) { 6 } elseif ($useTwoPane) { 3 } else { 0 }
     $messageWidth = $width - $statusWidth - $feedWidth - $separatorWidth
     $statusLines = if ($useThreePane) { Get-SidebarLines } else { @() }
-    $messageRows = Get-MessageRenderRows $messageWidth
+    $messageRows = @(Get-MessageRenderRows $messageWidth)
     $messageStart = [Math]::Max(0, $messageRows.Count - $bodyHeight)
     $feedStart = [Math]::Max(0, $script:liveFeed.Count - $bodyHeight)
 
