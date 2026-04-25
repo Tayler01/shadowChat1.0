@@ -164,12 +164,16 @@ $script:liveFeedLimit = [Math]::Max(40, [Math]::Min(160, $TranscriptLines))
 $script:layoutEnabled = $false
 $script:renderDirty = $true
 $script:lastRenderAt = [DateTime]::MinValue
+$script:messageScrollOffset = 0
 $script:lastRxAt = $null
 $script:lastStatus = "starting"
 $script:protocolEnabled = -not $NoProtocol
 $script:liveReceive = -not $NoAutoPoll
 $script:realtimeConnected = $false
+$script:realtimeBackfillPending = $false
 $script:lastSentAt = $null
+$script:unreadGroupCount = 0
+$script:unreadDmCount = 0
 $script:seenMessageLines = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 $script:seenMessageIds = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 $script:pollMarkerPending = $false
@@ -187,6 +191,7 @@ $script:bridgeHealth = [ordered]@{
     realtime = "unknown"
     realtimeError = ""
 }
+$script:lastRealtimeState = $script:bridgeHealth.realtime
 
 if ($loadedPreferences -and ($loadedPreferences.PSObject.Properties.Name -contains "recentDms") -and $loadedPreferences.recentDms) {
     foreach ($recentDm in @($loadedPreferences.recentDms)) {
@@ -303,11 +308,35 @@ function Add-MessageLine {
     }
 }
 
+function Reset-MessageScroll {
+    if ($script:messageScrollOffset -ne 0) {
+        $script:messageScrollOffset = 0
+        Request-Render
+    }
+}
+
+function Get-MessagePageSize {
+    return [Math]::Max(4, [Console]::WindowHeight - 6)
+}
+
+function Move-MessageScroll {
+    param([int]$Delta)
+
+    $script:messageScrollOffset = [Math]::Max(0, $script:messageScrollOffset + $Delta)
+    Request-Render
+}
+
+function Move-MessageScrollTop {
+    $script:messageScrollOffset = [int]::MaxValue
+    Request-Render
+}
+
 function Clear-MessagePane {
     $script:messages.Clear()
     $script:seenMessageLines.Clear()
     $script:seenMessageIds.Clear()
     $script:pollMarkerPending = $false
+    $script:messageScrollOffset = 0
 }
 
 function Add-LiveFeedLine {
@@ -375,6 +404,84 @@ function Show-RecentDms {
     }
 
     Request-Render
+}
+
+function Clear-UnreadForThread {
+    param([string]$Thread)
+
+    if ($Thread -eq "group") {
+        $script:unreadGroupCount = 0
+    } elseif ($Thread -eq "dm") {
+        $script:unreadDmCount = 0
+    }
+}
+
+function Get-UnreadSummaryLabel {
+    $parts = New-Object System.Collections.Generic.List[string]
+    if ($script:unreadGroupCount -gt 0) {
+        $parts.Add("group $script:unreadGroupCount") | Out-Null
+    }
+    if ($script:unreadDmCount -gt 0) {
+        $parts.Add("dm $script:unreadDmCount") | Out-Null
+    }
+
+    if ($parts.Count -eq 0) {
+        return ""
+    }
+
+    return " | unread: $($parts -join " ")"
+}
+
+function Get-UnreadSidebarLabel {
+    if ($script:unreadGroupCount -eq 0 -and $script:unreadDmCount -eq 0) {
+        return "none"
+    }
+
+    return "G:$script:unreadGroupCount D:$script:unreadDmCount"
+}
+
+function Test-MessageThreadActive {
+    param([string]$Thread)
+
+    if ($Thread -eq "group") {
+        return $script:currentMode -eq "group"
+    }
+
+    if ($Thread -eq "dm") {
+        return $script:currentMode -eq "dm"
+    }
+
+    return $true
+}
+
+function Register-InactiveUnread {
+    param(
+        [string]$Thread,
+        [string]$Sender
+    )
+
+    if (Test-OwnBridgeMessageSender $Sender) {
+        return $false
+    }
+
+    if (Test-MessageThreadActive $Thread) {
+        return $false
+    }
+
+    $senderLabel = if ([string]::IsNullOrWhiteSpace($Sender)) { "unknown" } else { $Sender }
+    if ($Thread -eq "group") {
+        $script:unreadGroupCount += 1
+        Add-LiveFeedLine "Unread group message from $senderLabel"
+        return $true
+    }
+
+    if ($Thread -eq "dm") {
+        $script:unreadDmCount += 1
+        Add-LiveFeedLine "Unread DM from $senderLabel"
+        return $true
+    }
+
+    return $false
 }
 
 function Switch-NextConversation {
@@ -602,6 +709,58 @@ function Get-ProtocolString {
     return $Fallback
 }
 
+function Queue-RealtimeBackfill {
+    param([string]$Reason)
+
+    if ($script:currentMode -ne "group" -and $script:currentMode -ne "dm") {
+        return
+    }
+
+    $script:realtimeBackfillPending = $true
+    if (-not [string]::IsNullOrWhiteSpace($Reason)) {
+        Add-LiveFeedLine $Reason
+    }
+}
+
+function Update-RealtimeTransition {
+    param(
+        [string]$Previous,
+        [string]$Next,
+        [string]$ErrorMessage = ""
+    )
+
+    if ($Previous -eq $Next) {
+        return
+    }
+
+    if ($Next -eq "joined") {
+        if ($Previous -in @("connected", "connecting", "off", "expired")) {
+            Queue-RealtimeBackfill "Realtime rejoined; backfilling current thread."
+        } elseif ($Previous -ne "unknown") {
+            Add-LiveFeedLine "Realtime joined."
+        }
+    } elseif ($Previous -eq "joined" -and $Next -ne "joined") {
+        $detail = if ([string]::IsNullOrWhiteSpace($ErrorMessage)) { "" } else { " ($ErrorMessage)" }
+        Add-LiveFeedLine "Realtime interrupted$detail; fallback polling is active."
+    } elseif ($Next -eq "connecting") {
+        Add-LiveFeedLine "Realtime connecting..."
+    }
+}
+
+function Invoke-PendingRealtimeBackfill {
+    if (-not $script:realtimeBackfillPending) {
+        return
+    }
+
+    if ($script:currentMode -ne "group" -and $script:currentMode -ne "dm") {
+        return
+    }
+
+    $script:realtimeBackfillPending = $false
+    Add-LiveFeedLine "Backfill polling $(Get-ModeLabel)."
+    Invoke-Poll
+}
+
 function Format-ProtocolMessageLine {
     param([object]$Event)
 
@@ -621,6 +780,7 @@ function Format-ProtocolMessageLine {
 function Update-BridgeHealthFromProtocol {
     param([object]$Event)
 
+    $previousRealtime = $script:bridgeHealth.realtime
     $wifiConnected = $null
     if ($Event.PSObject.Properties.Name -contains "wifiConnected") {
         $wifiConnected = [bool]$Event.wifiConnected
@@ -670,6 +830,9 @@ function Update-BridgeHealthFromProtocol {
     $realtimeError = Get-ProtocolString $Event "realtimeLastError"
     $script:bridgeHealth.realtimeError = if ($realtimeError) { $realtimeError } else { "" }
     $script:bridgeHealth.serial = "protocol"
+
+    Update-RealtimeTransition $previousRealtime $script:bridgeHealth.realtime $script:bridgeHealth.realtimeError
+    $script:lastRealtimeState = $script:bridgeHealth.realtime
 }
 
 function Try-HandleProtocolLine {
@@ -712,7 +875,11 @@ function Try-HandleProtocolLine {
         $isNewMessage = if ($id) { $script:seenMessageIds.Add($id) } else { $script:seenMessageLines.Add($line) }
         if ($isNewMessage -and $script:seenMessageLines.Add($line)) {
             $script:pollMarkerPending = $false
-            Add-MessageLine $line
+            $thread = Get-ProtocolString $event "thread" "message"
+            $sender = Get-ProtocolString $event "senderLabel" (Get-ProtocolString $event "senderId" "")
+            if (-not (Register-InactiveUnread $thread $sender)) {
+                Add-MessageLine $line
+            }
         }
         $script:lastRxAt = [DateTime]::UtcNow
         Request-Render
@@ -829,11 +996,14 @@ function Get-SidebarLines {
     $rxLabel = if ($script:lastRxAt) { $script:lastRxAt.ToLocalTime().ToString("HH:mm:ss") } else { "none" }
     $sentLabel = if ($script:lastSentAt) { $script:lastSentAt.ToLocalTime().ToString("HH:mm:ss") } else { "none" }
     $protocolLabel = if ($script:protocolEnabled) { $script:bridgeHealth.serial } else { "off" }
+    $scrollLabel = if ($script:messageScrollOffset -gt 0) { "+$script:messageScrollOffset" } else { "latest" }
 
     return @(
         "SHADOWCHAT BRIDGE",
         "",
         "mode  $(Get-ModeLabel)",
+        "unrd  $(Get-UnreadSidebarLabel)",
+        "view  $scrollLabel",
         "port  $Port",
         "poll  $pollLabel",
         "rx    $rxLabel",
@@ -847,6 +1017,8 @@ function Get-SidebarLines {
         "auth  $(Get-ExpiryHealthLabel $script:bridgeHealth.auth)",
         "",
         "Tab       swap",
+        "PgUp/Dn   scroll",
+        "End       latest",
         "/users    find",
         "/dms      recent",
         "/dm name  DM",
@@ -917,11 +1089,16 @@ function Render-Layout {
     $messageWidth = $width - $statusWidth - $feedWidth - $separatorWidth
     $statusLines = if ($useThreePane) { Get-SidebarLines } else { @() }
     $messageRows = @(Get-MessageRenderRows $messageWidth)
-    $messageStart = [Math]::Max(0, $messageRows.Count - $bodyHeight)
+    $maxScrollOffset = [Math]::Max(0, $messageRows.Count - $bodyHeight)
+    if ($script:messageScrollOffset -gt $maxScrollOffset) {
+        $script:messageScrollOffset = $maxScrollOffset
+    }
+    $messageStart = [Math]::Max(0, $messageRows.Count - $bodyHeight - $script:messageScrollOffset)
     $feedStart = [Math]::Max(0, $script:liveFeed.Count - $bodyHeight)
+    $scrollLabel = if ($script:messageScrollOffset -gt 0) { " | scroll: +$script:messageScrollOffset" } else { "" }
 
     [Console]::SetCursorPosition(0, 0)
-    Write-Ui (Fit-Text "ShadowChat Bridge TUI | $Port @ $BaudRate | $(Get-ModeLabel) | $pollLabel | $rxLabel | $(Get-HealthLabel)" $width) ([ConsoleColor]::Yellow)
+    Write-Ui (Fit-Text "ShadowChat Bridge TUI | $Port @ $BaudRate | $(Get-ModeLabel) | $pollLabel | $rxLabel$(Get-UnreadSummaryLabel)$scrollLabel | $(Get-HealthLabel)" $width) ([ConsoleColor]::Yellow)
     Write-Ui $divider ([ConsoleColor]::DarkGray)
 
     for ($i = 0; $i -lt $bodyHeight; $i++) {
@@ -1094,6 +1271,7 @@ function Enter-BridgeMode {
         & $ensureAdminMode
         $script:currentMode = "group"
         $script:dmRecipientUserId = ""
+        Clear-UnreadForThread "group"
         Clear-MessagePane
         Send-BridgeLine "chat group"
         $script:lastPollAt = [DateTime]::UtcNow
@@ -1112,6 +1290,7 @@ function Enter-BridgeMode {
         $script:currentMode = "dm"
         $script:dmRecipientUserId = $RecipientUserId
         Add-RecentDm $RecipientUserId
+        Clear-UnreadForThread "dm"
         Clear-MessagePane
         Send-BridgeLine "chat dm $RecipientUserId"
         $script:lastPollAt = [DateTime]::UtcNow
@@ -1232,6 +1411,8 @@ function Show-Help {
         "  /users <name>         search users in the side feed",
         "  /dms                  show recent DM targets",
         "  Tab                   cycle group and recent DMs",
+        "  PageUp/PageDown       scroll message history",
+        "  Home/End              oldest/latest visible messages",
         "  /poll-interval <sec>  change auto-poll interval",
         "  /live on|off          toggle near-realtime polling",
         "  /realtime on|off      toggle WebSocket receive",
@@ -1394,6 +1575,7 @@ function Process-InputLine {
     } elseif ($script:currentMode -eq "admin") {
         Send-BridgeLine $Line
     } else {
+        Reset-MessageScroll
         Send-BridgeLine $Line
         $script:lastSentAt = [DateTime]::UtcNow
         $script:lastPollAt = [DateTime]::UtcNow.AddSeconds(-[Math]::Max(1, $PollSeconds - 1))
@@ -1425,6 +1607,7 @@ function Wait-BridgeOutput {
     $deadline = [DateTime]::UtcNow.AddSeconds($Seconds)
     while ([DateTime]::UtcNow -lt $deadline) {
         Read-SerialOutput
+        Invoke-PendingRealtimeBackfill
         Start-Sleep -Milliseconds 100
     }
 }
@@ -1555,6 +1738,7 @@ function Run-Interactive {
 
     while ($script:running) {
         Read-SerialOutput
+        Invoke-PendingRealtimeBackfill
 
         if ($script:liveReceive -and -not $script:realtimeConnected -and ($script:currentMode -eq "group" -or $script:currentMode -eq "dm")) {
             $elapsed = [DateTime]::UtcNow - $script:lastPollAt
@@ -1593,6 +1777,14 @@ function Run-Interactive {
                 }
             } elseif ($key.Key -eq [ConsoleKey]::Tab) {
                 Switch-NextConversation
+            } elseif ($key.Key -eq [ConsoleKey]::PageUp) {
+                Move-MessageScroll (Get-MessagePageSize)
+            } elseif ($key.Key -eq [ConsoleKey]::PageDown) {
+                Move-MessageScroll (-1 * (Get-MessagePageSize))
+            } elseif ($key.Key -eq [ConsoleKey]::Home) {
+                Move-MessageScrollTop
+            } elseif ($key.Key -eq [ConsoleKey]::End) {
+                Reset-MessageScroll
             } elseif ($key.KeyChar -and -not [char]::IsControl($key.KeyChar)) {
                 $script:inputBuffer += $key.KeyChar
                 if ($script:layoutEnabled) {
