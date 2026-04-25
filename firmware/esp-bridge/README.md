@@ -96,6 +96,12 @@ session exchange
 session refresh
 session recover
 bridge heartbeat
+update check [firmware|windows_bundle|bootstrap]
+update apply [firmware]
+bundle check [windows_bundle|bootstrap]
+bundle get [windows_bundle|bootstrap]
+bootstrap help
+bootstrap script
 protocol on|off|status
 group send <text>
 group poll
@@ -117,6 +123,70 @@ Inside `chat group` or `chat dm <recipient_user_id>`, plain lines are sent as ch
 ```
 
 The serial reader accepts lines up to `1023` bytes. Longer lines are discarded as a whole line so overflow fragments are not accidentally executed as commands.
+
+## Update Checks
+
+The firmware checks the `stable` update channel at startup after stored Wi-Fi reconnects and session recovery/refresh has had a chance to run. Manual checks are available from the admin shell:
+
+```text
+update check
+update check firmware
+update check windows_bundle
+update check bootstrap
+update apply firmware
+```
+
+`update apply firmware` fetches the latest published firmware manifest, downloads the allowlisted artifact URL over HTTPS, streams it into the next ESP-IDF OTA partition, verifies the downloaded bytes against the manifest SHA-256, selects the new boot partition, and reboots. On the next boot, the firmware marks the image valid so ESP-IDF rollback state is cleared after a successful start.
+
+The manifest has a `signature` field reserved for production signing, but this milestone enforces SHA-256 integrity only. Do not treat firmware signature verification as complete until the device verifies a backend signing key before OTA apply.
+
+## Offline Windows Bundle Transfer
+
+The bridge can tunnel approved ShadowChat tool bundles to a Windows PC that has no direct internet connection.
+
+From a PC that already has this repo:
+
+```powershell
+npm run bridge:bundle -- -Port COM3 -Target windows_bundle -OutputPath output\bridge-downloads
+```
+
+From a bare PowerShell prompt after receiving the script:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\bridge-tui\bridge-bundle-receive.ps1 -Port COM3 -Target windows_bundle
+```
+
+The receiver opens the serial port, sends `bundle get windows_bundle`, reconstructs base64 chunk frames, writes the zip, and verifies SHA-256 before reporting success. The ESP never accepts an arbitrary URL from the PC; it only fetches artifacts returned by `bridge-update-check`.
+
+To create the current Windows tools package:
+
+```powershell
+npm run bridge:bundle:pack
+```
+
+## First-Plug Bootstrap
+
+When the ESP is plugged into a Windows PC that has no ShadowChat bridge tools yet, open any serial terminal at `115200` baud and run:
+
+```text
+bootstrap help
+```
+
+The ESP prints the no-internet setup sequence: connect Wi-Fi on the ESP, register/pair if needed, check the approved `windows_bundle`, and receive it through serial.
+
+If the PC does not have the receiver script yet, run:
+
+```text
+bootstrap script
+```
+
+Copy the text between `BEGIN SHADOWCHAT BRIDGE RECEIVER POWERSHELL` and `END SHADOWCHAT BRIDGE RECEIVER POWERSHELL` into `Receive-ShadowChatBridge.ps1`, then run it from PowerShell:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Receive-ShadowChatBridge.ps1 -Port COM3 -Output .
+```
+
+That minimal receiver asks the ESP to run `bundle get windows_bundle`, reconstructs the zip from serial frames, and checks the SHA-256 hash before reporting success.
 
 ## Windows Chat TUI Client
 
