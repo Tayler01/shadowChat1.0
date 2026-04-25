@@ -91,7 +91,7 @@ Acceptance:
 
 ## Milestone 6: Live ESP Validation And Ship
 
-Status: in progress
+Status: complete
 
 Deliverables:
 

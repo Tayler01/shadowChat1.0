@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-Milestone 6: Live ESP Validation And Ship
+Milestone 6: complete; next work is hardening and release automation.
 
 ## Completed
 
@@ -50,7 +50,13 @@ Milestone 6: Live ESP Validation And Ship
 
 ## In Progress
 
-- Final validation, documentation review, and GitHub push.
+- No active milestone in this track.
+
+## Pushed
+
+- Branch: `codex/esp-ota-offline-delivery`
+- Commit: `129a3c6` plus final tracker update
+- Remote: `origin/codex/esp-ota-offline-delivery`
 
 ## Validation Log
 
