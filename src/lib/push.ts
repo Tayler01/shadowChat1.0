@@ -128,6 +128,30 @@ const urlBase64ToUint8Array = (base64String: string) => {
   return outputArray
 }
 
+const arrayBufferToBase64Url = (buffer: ArrayBuffer | null) => {
+  if (!buffer) return ''
+
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  bytes.forEach(byte => {
+    binary += String.fromCharCode(byte)
+  })
+
+  return window.btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
+
+const isSubscriptionExpired = (subscription: PushSubscription) =>
+  typeof subscription.expirationTime === 'number' && subscription.expirationTime <= Date.now()
+
+const subscriptionMatchesCurrentVapidKey = (subscription: PushSubscription) => {
+  if (!VITE_WEB_PUSH_PUBLIC_KEY) return true
+
+  const currentKey = VITE_WEB_PUSH_PUBLIC_KEY.replace(/=+$/g, '')
+  const subscriptionKey = arrayBufferToBase64Url(subscription.options?.applicationServerKey ?? null)
+
+  return !subscriptionKey || subscriptionKey === currentKey
+}
+
 const inferPlatform = () => {
   if (typeof navigator === 'undefined') return 'unknown'
   const ua = navigator.userAgent.toLowerCase()
@@ -236,6 +260,20 @@ export const getNotificationGuidance = (
   }
 
   if (permission === 'granted') {
+    if (platform.os === 'android') {
+      return {
+        title: 'Notifications Are Enabled',
+        summary: 'This Android device is subscribed. If alerts still do not appear, refresh the subscription so Chrome or the installed app gets a fresh push endpoint.',
+        steps: [
+          'Keep notifications allowed for Shadow Chat in browser site settings.',
+          getSystemSettingsStep(platform),
+          'Tap Refresh Status, then turn Push Notifications off and back on if this device still does not receive alerts.',
+        ],
+        canRequestNow: false,
+        requiresInstall: false,
+      }
+    }
+
     return {
       title: 'Notifications Are Enabled',
       summary: 'This device is ready to receive Shadow Chat notifications.',
@@ -264,12 +302,21 @@ export const getNotificationGuidance = (
 
   return {
     title: 'Enable Notifications',
-    summary: 'Turn on push notifications so Shadow Chat can alert you about direct messages and important activity on this device.',
-    steps: [
-      'Tap Enable Notifications below.',
-      'Approve the browser permission prompt when it appears.',
-      getSystemSettingsStep(platform),
-    ],
+    summary: platform.os === 'android'
+      ? 'Turn on push notifications for this Android browser or installed app so Shadow Chat can alert you about direct messages.'
+      : 'Turn on push notifications so Shadow Chat can alert you about direct messages and important activity on this device.',
+    steps: platform.os === 'android'
+      ? [
+          'Tap Enable Notifications below.',
+          'Approve the browser permission prompt when it appears.',
+          'If Android asks too, allow notifications for Chrome or the installed Shadow Chat app.',
+          getSystemSettingsStep(platform),
+        ]
+      : [
+          'Tap Enable Notifications below.',
+          'Approve the browser permission prompt when it appears.',
+          getSystemSettingsStep(platform),
+        ],
     canRequestNow: true,
     requiresInstall: false,
   }
@@ -335,6 +382,24 @@ export const getCurrentPushSubscription = async () => {
   return registration.pushManager.getSubscription()
 }
 
+const getFreshPushSubscription = async (registration: ServiceWorkerRegistration) => {
+  let subscription = await registration.pushManager.getSubscription()
+
+  if (subscription && (isSubscriptionExpired(subscription) || !subscriptionMatchesCurrentVapidKey(subscription))) {
+    await subscription.unsubscribe().catch(() => false)
+    subscription = null
+  }
+
+  if (!subscription) {
+    subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VITE_WEB_PUSH_PUBLIC_KEY),
+    })
+  }
+
+  return subscription
+}
+
 export const syncPushSubscription = async (
   userId: string,
   subscription: PushSubscription,
@@ -388,14 +453,7 @@ export const enablePushForCurrentDevice = async (userId: string) => {
     throw new Error('Service worker registration failed.')
   }
 
-  let subscription = await registration.pushManager.getSubscription()
-  if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VITE_WEB_PUSH_PUBLIC_KEY),
-    })
-  }
-
+  const subscription = await getFreshPushSubscription(registration)
   await syncPushSubscription(userId, subscription, true)
 
   return subscription
@@ -426,7 +484,12 @@ export const syncCurrentDeviceSubscription = async (userId: string) => {
     return false
   }
 
-  const subscription = await getCurrentPushSubscription()
+  const registration = await registerPushServiceWorker()
+  if (!registration) {
+    return false
+  }
+
+  const subscription = await getFreshPushSubscription(registration)
   if (!subscription) {
     return false
   }

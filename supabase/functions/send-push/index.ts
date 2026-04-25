@@ -286,17 +286,17 @@ const deliverPushToSubscriptions = async (
     })
   )
 
-  const expiredSubscriptionIds = results
-    .filter((result) => result.status === 404 || result.status === 410)
+  const invalidSubscriptionIds = results
+    .filter((result) => [400, 401, 403, 404, 410].includes(result.status))
     .map((result) => result.id)
 
-  if (expiredSubscriptionIds.length) {
-    await supabase.from('push_subscriptions').delete().in('id', expiredSubscriptionIds)
+  if (invalidSubscriptionIds.length) {
+    await supabase.from('push_subscriptions').delete().in('id', invalidSubscriptionIds)
   }
 
   return {
     deliveredCount: results.filter((result) => result.ok).length,
-    removedSubscriptions: expiredSubscriptionIds.length,
+    removedSubscriptions: invalidSubscriptionIds.length,
     results,
   }
 }

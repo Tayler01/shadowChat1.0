@@ -3,6 +3,7 @@ const createQueryBuilder = () => {
     select: jest.fn(() => builder),
     insert: jest.fn(() => builder),
     update: jest.fn(() => builder),
+    upsert: jest.fn(async () => ({ error: null })),
     delete: jest.fn(() => builder),
     eq: jest.fn(() => builder),
     neq: jest.fn(() => builder),

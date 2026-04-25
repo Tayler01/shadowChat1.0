@@ -278,12 +278,12 @@ function App() {
           )}
 
           <Toaster
-            position={isDesktop ? 'top-right' : 'bottom-center'}
+            position={isDesktop ? 'top-right' : 'top-center'}
             containerStyle={
               isDesktop
                 ? undefined
                 : {
-                    bottom: 'calc(env(safe-area-inset-bottom) + 9rem)',
+                    top: 'calc(env(safe-area-inset-top) + 4.5rem)',
                     left: '1rem',
                     right: '1rem',
                   }
