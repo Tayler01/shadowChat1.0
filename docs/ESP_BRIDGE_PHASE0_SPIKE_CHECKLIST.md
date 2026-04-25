@@ -24,15 +24,17 @@ Prove that an ESP-based bridge can:
 
 Phase 0 is successful if all of the following are true:
 
-- device can boot to a usable admin shell
-- device can be configured onto Wi-Fi
-- device can authenticate to backend in a way that does not require copying a browser session onto the device
-- device can send one group-chat message
-- device can receive one realtime group-chat message
-- device can send one DM
-- device can receive one DM
-- Windows PC still has no general internet path through the device
-- Windows enumerates the device as a usable local serial interface without a custom driver install
+- [x] device can boot to a usable admin shell
+- [x] device can be configured onto Wi-Fi
+- [x] device can authenticate to backend in a way that does not require copying a browser session onto the device
+- [x] device can send one group-chat message
+- [x] device can receive one realtime group-chat message
+- [x] device can send one DM
+- [x] device can receive one DM
+- [x] Windows PC still has no general internet path through the device
+- [x] Windows enumerates the device as a usable local serial interface without a custom driver install
+
+Phase 0 status as of `2026-04-25`: success criteria are met on the current `ESP32-S3` hardware proof using `COM3`, `USB Serial/JTAG`, bridge-owned auth, Supabase Realtime receive, and the Windows PowerShell TUI.
 
 ## Prototype Deliverables
 
@@ -83,11 +85,18 @@ Phase 0 is successful if all of the following are true:
 
 ## Nice-To-Have Stretch Goals
 
-- basic unread indicator
-- minimal message history fetch
-- basic connection status reporting
-- reconnect feedback after backend loss
-- observe at least one token refresh or document how refresh will be proven next
+- [x] basic unread indicator
+- [x] minimal message history fetch
+- [x] basic connection status reporting
+- [x] reconnect feedback after backend loss
+- [x] observe at least one token refresh or document how refresh will be proven next
+
+Additional stretch proof captured:
+
+- stored recovery-token auto-approval after first owner-approved bootstrap
+- automatic recovery from expired local session material
+- three-hour foreground TUI soak with the bridge maintaining connection
+- regression test coverage for TUI layout/unread/scroll/reconnect helpers via `npm run bridge:tui:test`
 
 ## Explicit Non-Goals For Phase 0
 
@@ -114,8 +123,22 @@ Phase 0 is successful if all of the following are true:
 At the end of Phase 0 we should answer:
 
 1. Is realtime dependable enough to continue?
+   - Current answer: yes for Phase 0 and early Phase 1. A three-hour soak held connection; next proof should be overnight plus deliberate interruption testing.
 2. Is USB serial the right local transport for `v1`?
+   - Current answer: yes for the fallback and chat-first TUI. A richer dashboard may still need a PC-side host helper later.
 3. Does the bridge security model remain clean?
+   - Current answer: yes. The PC only gets explicit serial commands, the ESP owns backend credentials, and no generic proxy path exists.
 4. Are group chat and DMs both practical on the device?
+   - Current answer: yes. Group and DM send/receive have both passed smoke and interactive testing.
 5. What constraints are likely to shape `v1` scope?
+   - Current answer: credential hardening, serial UX, reconnect behavior, and OTA/update safety.
 6. Does the future dashboard and full-app direction require a second transport or a PC-side host helper?
+   - Current answer: likely yes for a rich local dashboard, but not required for the current chat-first TUI.
+
+Recommended next steps after the Phase 0 success decision:
+
+1. Polish TUI recovery/status copy and hide backend-ish auth chatter.
+2. Add explicit user-visible session refreshed/recovered notices.
+3. Run and document an overnight soak.
+4. Improve thread navigation with a `/threads` or recent-conversations view.
+5. Begin production-hardening work: encrypted NVS, signed OTA, and more formal recovery-token lifecycle handling.

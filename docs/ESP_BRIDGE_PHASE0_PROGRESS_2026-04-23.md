@@ -102,21 +102,29 @@ Current firmware build baseline:
 These parts are still open:
 
 - direct Supabase user-session minting on device
-- realtime bridge session ownership on device
-- polished Windows-side chat TUI
-- structured local protocol framing between Windows and bridge firmware
-- automatic receive loop beyond the current TUI polling loop
+- overnight or multi-day realtime soak
+- reconnect behavior across deliberate Wi-Fi/backend interruption
+- encrypted credential storage
+- signed OTA/update lifecycle
 
 ## Immediate Next Steps
 
 The next implementation steps should happen in this order:
 
-1. Harden the Windows-side TUI into a richer split-pane experience with saved preferences and cleaner input rendering.
-2. Add a receive strategy for realtime or near-realtime updates:
-   - Realtime WebSocket ownership on device, or
-   - short polling/long polling over bridge data-plane functions for the first TUI.
-3. Decide whether Phase 1 should keep the narrow bridge data-plane Edge Functions or pursue direct Supabase user-session minting.
-4. Add production-hardening follow-ups:
+1. Polish TUI recovery/status wording so session refresh and recovery show human-friendly messages such as `Session recovered automatically. Chat is live.`
+2. Add a visible session lifecycle notice for refresh/recovery events without leaking backend implementation details into the chat pane.
+3. Add an overnight soak checklist and capture a longer run:
+   - realtime joined for the full window
+   - group receive/send
+   - DM receive/send
+   - at least one session refresh or recovery event
+   - no duplicate message replay after reconnect
+4. Improve DM/thread navigation:
+   - `/threads` or equivalent recent conversation view
+   - unread state by thread
+   - faster switching without remembering usernames
+5. Decide whether Phase 1 should keep the narrow bridge data-plane Edge Functions or pursue direct Supabase user-session minting.
+6. Add production-hardening follow-ups:
    - encrypted NVS
    - signed OTA
    - more explicit redaction/sanitized serial output
@@ -141,9 +149,9 @@ What exists today is:
 - persistent group/DM cursors across firmware flashes
 - a self-recovery path for already-approved bridges using a stored recovery token
 
-What does **not** exist yet is the polished, structured-protocol Windows-side chat TUI experience.
+What does **not** exist yet is production hardening around encrypted local credential storage, OTA, and multi-day fault-injection testing.
 
-That is the next milestone.
+Those are the next durability milestones.
 
 ## Hardware Proof Captured On 2026-04-23
 
@@ -224,3 +232,37 @@ Verified on `COM3` against device `a091ab7f-88de-4b8b-befb-9d8a53d9ff60`:
   - group send/poll
   - DM send/poll to `@caleb`
   - bridge status with Wi-Fi and session material stored
+
+## Hardware Proof Captured On 2026-04-25
+
+Verified on `COM3` against device `a091ab7f-88de-4b8b-befb-9d8a53d9ff60`:
+
+- firmware build passed with `ESP-IDF v5.3.1`
+- firmware flash to the connected `ESP32-S3` succeeded
+- the device recovered from expired bridge session material using the stored recovery token
+- follow-up TUI smoke passed:
+  - structured protocol enablement
+  - realtime WebSocket start
+  - realtime channel join
+  - group send
+  - DM send to `@caleb`
+  - bridge status with fresh bridge/auth session material
+- session/auth expiry after recovery was refreshed to `2026-04-25T01:58:47Z`
+- foreground interactive soak ran for about `3` hours and maintained connection
+- no recurring `HTTP 401` / invalid-token loop was observed after the auto-recovery firmware was flashed
+- current TUI capabilities include:
+  - split-pane chat layout
+  - readable message grouping and wrapping
+  - ESP messages right-aligned as `You`
+  - inactive thread unread indicators
+  - PageUp/PageDown/Home/End scrollback
+  - realtime reconnect backfill polling
+  - PowerShell regression coverage through `npm run bridge:tui:test`
+
+Current next-step queue after the April 25 soak:
+
+1. TUI recovery/status copy polish.
+2. Explicit session refreshed/recovered user-visible event.
+3. Overnight soak checklist and longer run capture.
+4. Better DM/thread navigation with recent conversations and unread state.
+5. Production hardening plan for encrypted NVS, signed OTA, and recovery-token lifecycle.
