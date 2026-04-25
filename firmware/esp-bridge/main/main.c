@@ -1480,25 +1480,49 @@ static void bridge_command_session_refresh(void) {
     bridge_refresh_session_material(false);
 }
 
-static void bridge_command_session_recover(void) {
-    printf("Starting bridge session recovery. This keeps Wi-Fi and device registration, then issues a new pairing code.\n");
+static bool bridge_recover_session_material(bool compact_output) {
+    if (!s_bridge_state.wifi_connected || s_bridge_state.device_id[0] == '\0') {
+        if (!compact_output) {
+            printf("Device must be registered and online before session recovery\n");
+        }
+        return false;
+    }
+
+    if (s_bridge_state.recovery_token[0] == '\0') {
+        if (!compact_output) {
+            printf("No stored bridge recovery token is available. Start pairing again from ShadowChat.\n");
+        }
+        return false;
+    }
+
+    printf("%s\n", compact_output ? "Recovering expired bridge session from stored recovery token" : "Starting bridge session recovery. This keeps Wi-Fi and device registration, then issues a new pairing code.");
     if (!bridge_command_pair_begin()) {
         printf("Session recovery could not start. Fix Wi-Fi/registration first, then retry: session recover\n");
-        return;
+        return false;
     }
 
     bool auto_recovery_ready = s_bridge_state.recovery_token[0] != '\0' && strcmp(s_bridge_state.device_status, "paired") == 0;
-    bridge_clear_session_material();
-    printf("Old local session material cleared.\n");
-    if (auto_recovery_ready) {
-        printf("Stored recovery token accepted. Exchanging a fresh bridge session now.\n");
-        if (!bridge_command_session_exchange()) {
-            printf("Automatic recovery exchange failed. Run: session recover\n");
+    if (!auto_recovery_ready) {
+        if (!compact_output) {
+            printf("Approve the new code in ShadowChat Settings > ESP Bridge, then run: session exchange\n");
         }
-        return;
+        return false;
     }
 
-    printf("Approve the new code in ShadowChat Settings > ESP Bridge, then run: session exchange\n");
+    bridge_clear_session_material();
+    printf("Old local session material cleared.\n");
+
+    printf("Stored recovery token accepted. Exchanging a fresh bridge session now.\n");
+    if (!bridge_command_session_exchange()) {
+        printf("Automatic recovery exchange failed. Run: session recover\n");
+        return false;
+    }
+
+    return true;
+}
+
+static void bridge_command_session_recover(void) {
+    bridge_recover_session_material(false);
 }
 
 static bool bridge_response_auth_failed(const bridge_http_response_t *response) {
@@ -1521,7 +1545,12 @@ static bool bridge_refresh_and_retry_allowed(const char *action, const bridge_ht
     }
 
     printf("%s auth failed; refreshing bridge session and retrying once\n", action);
-    return bridge_refresh_session_material(true);
+    if (bridge_refresh_session_material(true)) {
+        return true;
+    }
+
+    printf("%s refresh failed; attempting recovery from stored bridge recovery token\n", action);
+    return bridge_recover_session_material(true);
 }
 
 static bool bridge_parse_iso_utc(const char *iso, time_t *out) {
@@ -1611,7 +1640,12 @@ static bool bridge_ensure_fresh_session(const char *action) {
     }
 
     printf("Bridge session expires soon; refreshing before %s\n", action);
-    return bridge_refresh_session_material(true);
+    if (bridge_refresh_session_material(true)) {
+        return true;
+    }
+
+    printf("Bridge session refresh failed before %s; attempting stored recovery\n", action);
+    return bridge_recover_session_material(true);
 }
 
 static void bridge_startup_recovery_task(void *arg) {
@@ -1630,7 +1664,12 @@ static void bridge_startup_recovery_task(void *arg) {
 
     if (s_bridge_state.refresh_token[0] == '\0') {
         if (strcmp(s_bridge_state.device_status, "paired") == 0) {
-            printf("Startup session check: no bridge refresh token is stored. Run: session recover\n");
+            printf("Startup session check: no bridge refresh token is stored\n");
+            if (s_bridge_state.recovery_token[0] != '\0') {
+                bridge_recover_session_material(true);
+            } else {
+                printf("No recovery token is stored. Run: session recover after approving a new code.\n");
+            }
         }
         vTaskDelete(NULL);
         return;
@@ -1644,7 +1683,10 @@ static void bridge_startup_recovery_task(void *arg) {
 
     printf("Startup session check: refreshing stored bridge/auth session material\n");
     if (!bridge_refresh_session_material(true)) {
-        printf("Startup session refresh failed. If Wi-Fi is online, run: session recover\n");
+        printf("Startup session refresh failed; attempting stored recovery\n");
+        if (!bridge_recover_session_material(true)) {
+            printf("Startup session recovery failed. If Wi-Fi is online, run: session recover\n");
+        }
     }
 
     vTaskDelete(NULL);
