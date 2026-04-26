@@ -52,7 +52,7 @@ serve(async req => {
 
     const provider = resolveProvider()
     const defaultModel = resolveDefaultModel(provider)
-    const allowedModels = resolveAllowedModels(defaultModel)
+    const allowedModels = resolveAllowedModels(defaultModel, provider)
     const { messages, model } = await req.json()
     const safeModel = typeof model === 'string' && allowedModels.has(model)
       ? model
@@ -132,12 +132,15 @@ const resolveDefaultModel = (provider: AIProvider) => {
   return DEFAULT_OPENAI_MODEL
 }
 
-const resolveAllowedModels = (defaultModel: string) => {
+const resolveAllowedModels = (defaultModel: string, provider: AIProvider) => {
   const configuredModels = parseCsv(Deno.env.get('AI_ALLOWED_MODELS'))
+  const providerDefaultModel = provider === 'openrouter'
+    ? DEFAULT_OPENROUTER_MODEL
+    : DEFAULT_OPENAI_MODEL
+
   return new Set([
     defaultModel,
-    DEFAULT_OPENROUTER_MODEL,
-    DEFAULT_OPENAI_MODEL,
+    providerDefaultModel,
     ...configuredModels,
   ])
 }
