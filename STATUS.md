@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-Milestone 6: complete; next work is hardening and release automation.
+Milestone 7: plug-and-play USB bootstrap drive is complete; branch is ready to push.
 
 ## Completed
 
@@ -47,10 +47,28 @@ Milestone 6: complete; next work is hardening and release automation.
 - Added `bootstrap script`, which prints a minimal PowerShell receiver script over serial for a PC that has no repo and no internet.
 - Built and flashed firmware with the bootstrap commands to `COM3`.
 - Live serial output confirmed `bootstrap help` and `bootstrap script` render usable instructions and script text.
+- Started plug-and-play USB bootstrap drive work on branch `codex/esp-plug-play-bootstrap`.
+- Added TinyUSB MSC bootstrap drive support with embedded `README.TXT`, `START.CMD`, `RECEIVE.PS1`, plus obvious setup aliases.
+- Added a dedicated `usb_boot` FAT partition for the ESP-hosted bootstrap files.
+- Added `bootstrap ping` so receiver scripts can auto-detect the bridge COM port before requesting `bundle get windows_bundle`.
+- Added a no-repo Windows bootstrap payload under `tools/bridge-bootstrap`.
+- Updated the bundle packer so the hosted Windows bundle also contains bootstrap scripts and instructions.
+- Built TinyUSB MSC-only firmware and proved Windows mounts the ESP as a FAT drive at `D:`.
+- Live Windows drive listing showed `README.TXT`, `START.CMD`, and `RECEIVE.PS1` served by the ESP.
+- Added TinyUSB CDC composite support so the target firmware exposes both the bootstrap drive and a serial console.
+- Composite firmware build succeeded with ESP-IDF v5.3.1.
+- Packed `windows_bundle` version `0.1.2-tools` with the no-repo bootstrap helpers.
+- Published `windows_bundle` version `0.1.2-tools` to Supabase Storage and the update manifest table.
+- Flashed the composite firmware image to the connected ESP32-S3 on `COM3`.
+- Published `windows_bundle` version `0.1.3-tools` with hardened receiver buffering, then revoked `0.1.2-tools` because its null `published_at` sorted ahead of newer manifests.
+- Published firmware versions `0.2.1-plug-play-bootstrap` and `0.2.2-plug-play-bootstrap` through Supabase Storage and manifests.
+- Applied firmware OTA from `0.2.0-ota-foundation` to `0.2.1-plug-play-bootstrap`, then from `0.2.1-plug-play-bootstrap` to `0.2.2-plug-play-bootstrap`.
+- Live Windows enumeration after OTA shows the composite bridge as both `COM4` and a FAT bootstrap drive at `D:`.
+- Live ESP-hosted receiver `D:\RECEIVE.PS1` downloaded `windows_bundle 0.1.3-tools` and verified SHA-256.
 
 ## In Progress
 
-- No active milestone in this track.
+- No active implementation work in this milestone.
 
 ## Pushed
 
@@ -183,6 +201,94 @@ Firmware final build/flash passed:
 shadowchat_bridge.bin binary size 0x103c60 bytes. Smallest app partition is 0x120000 bytes. 0x1c3a0 bytes (10%) free.
 ```
 
+Milestone 7 validation in progress:
+
+```powershell
+python C:\esp\esp-idf-v5.3.1\tools\idf.py build
+```
+
+Live MSC-only proof:
+
+```text
+Windows mounted TinyUSB Flash Storage USB Device as D:
+D:\README.TXT
+D:\START.CMD
+D:\RECEIVE.PS1
+```
+
+Composite build proof:
+
+```text
+shadowchat_bridge.bin binary size 0x116190 bytes. Smallest app partition is 0x120000 bytes. 0x9e70 bytes (3%) free.
+Warning: The smallest app partition is nearly full (3% free space left)!
+```
+
+Composite flash proof:
+
+```powershell
+python C:\esp\esp-idf-v5.3.1\tools\idf.py -p COM3 flash
+```
+
+```text
+Wrote 1139088 bytes at 0x00020000
+Hash of data verified.
+Hard resetting via RTS pin.
+```
+
+Published bootstrap-capable Windows bundle:
+
+```powershell
+npm run bridge:bundle:pack
+supabase --experimental storage cp output\bridge-bundles\shadowchat-bridge-tools-0.1.2-tools.zip ss:///bridge-artifacts/windows/0.1.2-tools/shadowchat-bridge-tools.zip --content-type application/zip --cache-control "max-age=31536000, immutable"
+```
+
+```text
+windows_bundle stable any 0.1.2-tools
+SHA256 f779d26630a1181f3995de84709b6838b9e8adb206b647413ba14c6ea1462861
+size 25465
+```
+
+Published hardened Windows bundle:
+
+```powershell
+npm run bridge:bundle:pack
+supabase --experimental storage cp output\bridge-bundles\shadowchat-bridge-tools-0.1.3-tools.zip ss:///bridge-artifacts/windows/0.1.3-tools/shadowchat-bridge-tools.zip --content-type application/zip --cache-control "max-age=31536000, immutable"
+```
+
+```text
+windows_bundle stable any 0.1.3-tools
+SHA256 065b18451b3aaea46f1ca129ebeb059ee05493c19d6cc2608329677b2e487f67
+size 25498
+```
+
+Live composite USB proof after normal reboot and OTA:
+
+```text
+COM4     USB Serial Device (COM4)
+D:       FAT 454656 bytes
+D:\README.TXT
+D:\START.CMD
+D:\RECEIVE.PS1
+D:\SETUP.CMD
+D:\AUTORUN.INF
+```
+
+Live drive-hosted receiver proof:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File D:\RECEIVE.PS1 -Output output\plug-play-test
+```
+
+```text
+Checking COM4...
+Using COM4
+Streaming windows_bundle 0.1.3-tools over serial. Keep the receiver open until bundleEnd.
+Receiving shadowchat-bridge-tools.zip to output\plug-play-test\shadowchat-bridge-tools.zip
+Bundle SHA-256 verified for 25498 bytes
+Transfer complete: output\plug-play-test\shadowchat-bridge-tools.zip
+SHA256: 065b18451b3aaea46f1ca129ebeb059ee05493c19d6cc2608329677b2e487f67
+```
+
 ## Failed Approaches / Notes
 
 - Do not use Netlify for ESP update artifacts; Netlify account credits previously disabled the site and update availability must not depend on that path.
@@ -194,3 +300,12 @@ shadowchat_bridge.bin binary size 0x103c60 bytes. Smallest app partition is 0x12
 - First bundle receiver test proved the transfer, but passing a new path like `output\bridge-downloads` was treated as a filename. The receiver now treats extensionless paths as directories; retest passed.
 - After a serial timeout, direct `status`/`help` produced no shell output. Reflashing the same firmware restored the serial shell, and the bundle receiver retest passed. Track if this repeats during larger transfers.
 - Attempted to capture the printed bootstrap script programmatically for syntax checking, but subsequent serial opens left the ESP reporting only `ESP-ROM:esp32s3-20210327` and no script markers. Treat this as a USB Serial/JTAG DTR/RTS handling issue in the ad hoc capture script; do not repeat that validation path until the receiver/open settings are hardened.
+- `f_setlabel("SHADOWBRDG")` is not linked in the current FATFS build, so the firmware does not set a volume label directly. Use visible root files and `AUTORUN.INF` metadata instead.
+- Long filenames failed on the ESP-hosted FAT volume during live MSC testing. Keep on-device bootstrap filenames 8.3-safe: `README.TXT`, `START.CMD`, `SETUP.CMD`, `RECEIVE.PS1`, and `AUTORUN.INF`.
+- MSC-only TinyUSB firmware successfully mounted as a Windows drive but removed the COM port, which prevents the receiver script and normal shell from working. The production target for this feature is composite MSC + CDC.
+- The composite build leaves only about 3% free in the smallest app partition. Before production, either trim firmware features, move to a larger flash/partition layout, or split optional USB bootstrap behavior behind release-specific builds.
+- Windows generally will not auto-execute USB drive scripts for security. The supported no-repo flow is plug in ESP, open the small ESP drive, and double-click `START.CMD` or `SETUP.CMD`.
+- A Kconfig help indentation mismatch caused one rebuild failure after a docstring polish edit. Fixed the help indentation before the next build.
+- Direct `idf.py flash` over the TinyUSB CDC app port does not enter the ROM bootloader. Use OTA for app-to-app updates, or hold BOOT for a manual ROM flash.
+- The initial drive-hosted receiver failed because the ESP emitted large bundle frames faster than PowerShell could drain its default serial buffer. Fixed with a 1 MB receiver buffer, 128-byte bundle chunks, and 35 ms firmware pacing.
+- Supabase manifest rows with null `published_at` sort ahead of dated rows when ordering descending. Revoked affected `0.1.2-tools` and `0.2.1-plug-play-bootstrap` manifests; release publishing should always set `published_at`.

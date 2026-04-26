@@ -18,7 +18,7 @@ config BRIDGE_HARDWARE_MODEL
 
 config BRIDGE_FIRMWARE_VERSION
     string "Bridge firmware version"
-    default "0.2.0-ota-foundation"
+    default "0.2.2-plug-play-bootstrap"
 
 config BRIDGE_UPDATE_CHANNEL
     string "Bridge update channel"
@@ -26,6 +26,17 @@ config BRIDGE_UPDATE_CHANNEL
     help
         Update manifest channel used for startup and manual firmware checks.
         Expected values are stable, beta, or dev.
+
+config BRIDGE_USB_BOOTSTRAP_MSC
+    bool "Expose first-plug bootstrap USB mass-storage drive"
+    default y
+    help
+        Initializes a small FAT partition as a USB MSC bootstrap drive containing
+        START.CMD, SETUP.CMD, README.TXT, and a PowerShell bundle receiver.
+
+        This requires an ESP32-S3 board whose exposed USB connector is routed to
+        the USB-OTG peripheral. Boards exposing only the fixed USB Serial/JTAG
+        path may keep the serial bootstrap commands but will not show the drive.
 
 config BRIDGE_DEVICE_SERIAL
     string "Bridge device serial override"
