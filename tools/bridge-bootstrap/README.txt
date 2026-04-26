@@ -9,6 +9,7 @@ Quick start:
 3. The ESP downloads only the approved ShadowChat windows_bundle manifest artifact.
 4. The script saves shadowchat-bridge-tools.zip in a ShadowChatBridge folder on
    your real Windows Desktop, verifies SHA-256, and opens File Explorer to it.
+   This works whether Desktop is local or redirected through OneDrive.
 
 If the script cannot find the ESP, open a serial console at 115200 baud and run:
   bootstrap help

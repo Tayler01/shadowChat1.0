@@ -72,6 +72,7 @@ Milestone 8: firmware space headroom.
 - Published `windows_bundle` version `0.1.4-tools` to Supabase Storage and manifests.
 - Published `windows_bundle` version `0.1.5-tools` after the bundled firmware README changed during documentation polish.
 - Published `windows_bundle` version `0.1.6-tools` with receiver admin-mode recovery before probe/download.
+- Published `windows_bundle` version `0.1.7-tools` with documentation clarifying that the default Desktop download works with or without OneDrive redirection.
 - Published firmware version `0.2.3-bootstrap-save-location` to Supabase Storage and manifests.
 - Published firmware version `0.2.4-bootstrap-admin-recover` with the same receiver admin-mode recovery embedded on the ESP drive.
 - Backfilled bridge manifest `published_at` values and pinned the hotfix manifests as latest so update checks do not get hidden behind older null-timestamp rows.
@@ -94,9 +95,10 @@ Milestone 8: firmware space headroom.
 
 ## Pushed
 
-- Branch: `codex/esp-firmware-space-headroom`
-- Commit: latest branch commit
-- Remote: `origin/codex/esp-firmware-space-headroom`
+- Branch: `main`
+- Commit: current `main`
+- Remote: `origin/main`
+- Merged ESP feature branches have been deleted locally and on GitHub.
 
 ## Validation Log
 
@@ -293,6 +295,14 @@ D:\START.CMD
 D:\RECEIVE.PS1
 D:\SETUP.CMD
 D:\AUTORUN.INF
+```
+
+Documentation refresh proof:
+
+```text
+windows_bundle stable any 0.1.7-tools
+SHA256 30e80fd118bd9482d426bb754a0ca9373960d4343d4bf67c858648ae6ce72a84
+size 26133
 ```
 
 Live drive-hosted receiver proof:

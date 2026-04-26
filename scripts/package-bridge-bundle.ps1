@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = "0.1.6-tools",
+    [string]$Version = "0.1.7-tools",
     [string]$OutputDirectory = "output/bridge-bundles"
 )
 
