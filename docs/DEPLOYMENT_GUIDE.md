@@ -94,6 +94,8 @@ Keep these configured in Supabase:
 
 `mistralai/mistral-nemo` is the current cheap paid OpenRouter test model. As of April 26, 2026, OpenRouter lists it around $0.01 per million input tokens and $0.03 per million output tokens. Recheck the [OpenRouter model catalog](https://openrouter.ai/models) and [pricing page](https://openrouter.ai/pricing) before changing this default.
 
+The `@ai` group-chat flow posts answers as the dedicated `Shado` assistant profile (`shado_ai`). Keep `SUPABASE_SERVICE_ROLE_KEY` configured for Edge Functions so `openai-chat` can create/repair that profile and insert Shado's answer.
+
 ## Frontend Env Requirements
 
 Netlify needs the frontend equivalents of:

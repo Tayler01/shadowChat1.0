@@ -84,6 +84,8 @@ Recommended OpenRouter test setup:
 
 The current cheap paid test model is `mistralai/mistral-nemo`. As of April 26, 2026, OpenRouter lists it around $0.01 per million input tokens and $0.03 per million output tokens. Recheck the [OpenRouter model catalog](https://openrouter.ai/models) and [pricing page](https://openrouter.ai/pricing) before changing production defaults.
 
+The `@ai` group-chat flow posts answers as a dedicated `Shado` assistant profile (`shado_ai`). The `openai-chat` Edge Function uses `SUPABASE_SERVICE_ROLE_KEY` to create or repair that profile and to insert Shado's answer without making it look like the requesting user wrote it.
+
 Legacy fallback, only if using OpenAI directly:
 
 - `OPENAI_API_KEY` or `OPENAI_KEY`

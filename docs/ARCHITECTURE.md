@@ -65,7 +65,7 @@ Important domains:
 
 ### Edge Functions
 
-- [`openai-chat`](C:/repos/chat2.0/supabase/functions/openai-chat/index.ts:1): validates caller session and proxies allowed AI requests to OpenRouter by default, with OpenAI kept as a legacy fallback
+- [`openai-chat`](C:/repos/chat2.0/supabase/functions/openai-chat/index.ts:1): validates caller session, proxies allowed AI requests to OpenRouter by default, and can post group-chat AI answers as the dedicated `Shado` assistant profile
 - [`send-push`](C:/repos/chat2.0/supabase/functions/send-push/index.ts:1): validates caller session, looks up recipients, enforces notification preferences, and sends web push payloads
 
 ## Planned External System

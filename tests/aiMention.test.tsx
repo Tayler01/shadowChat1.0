@@ -19,7 +19,7 @@ beforeEach(() => {
   jest.resetAllMocks()
 })
 
-test('ai mention sends query and posts response', async () => {
+test('ai mention sends query and lets backend post Shado response', async () => {
   const onSend = jest.fn()
   ;(askQuestion as jest.Mock).mockResolvedValue('the answer')
 
@@ -31,7 +31,7 @@ test('ai mention sends query and posts response', async () => {
     fireEvent.keyDown(textarea, { key: 'Enter', code: 'Enter' })
   })
 
-  expect(askQuestion).toHaveBeenCalledWith('what is up?')
-  await waitFor(() => expect(onSend).toHaveBeenCalledTimes(2))
-  expect(onSend).toHaveBeenNthCalledWith(2, 'the answer', 'command', undefined, undefined)
+  await waitFor(() => expect(onSend).toHaveBeenCalledTimes(1))
+  expect(onSend).toHaveBeenCalledWith('@ai what is up?', 'text', undefined, undefined)
+  expect(askQuestion).toHaveBeenCalledWith('what is up?', { postToChat: true })
 })

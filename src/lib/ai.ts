@@ -22,10 +22,15 @@ interface AIResponse {
   choices?: AIChoice[]
 }
 
+interface AskQuestionOptions {
+  postToChat?: boolean
+}
+
 const invokeAI = async (
   messages: AIMessage[],
-  model = 'mistralai/mistral-nemo'
+  options: { model?: string; postToChat?: boolean } = {}
 ): Promise<AIResponse> => {
+  const model = options.model ?? 'mistralai/mistral-nemo'
   const hasSession = await ensureSession()
   if (!hasSession) {
     throw new Error('Authentication required')
@@ -55,7 +60,11 @@ const invokeAI = async (
       apikey: SUPABASE_ANON_KEY,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ model, messages }),
+    body: JSON.stringify({
+      model,
+      messages,
+      postToChat: options.postToChat,
+    }),
   })
 
   if (!response.ok) {
@@ -99,7 +108,10 @@ export async function getSuggestedReplies(messages: ChatMessage[]): Promise<stri
   return content.split('\n').map((s: string) => s.trim()).filter(Boolean)
 }
 
-export async function askQuestion(question: string): Promise<string> {
+export async function askQuestion(
+  question: string,
+  options: AskQuestionOptions = {}
+): Promise<string> {
   const data = await invokeAI([
     {
       role: 'system',
@@ -107,7 +119,7 @@ export async function askQuestion(question: string): Promise<string> {
         'You are a helpful assistant participating in a group chat. Provide a concise answer to the user question.'
     },
     { role: 'user', content: question }
-  ])
+  ], { postToChat: options.postToChat })
 
   return data.choices?.[0]?.message?.content?.trim() || ''
 }

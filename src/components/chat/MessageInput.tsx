@@ -149,7 +149,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       : null
 
     try {
-      const sent = await onSendMessage(
+      await onSendMessage(
         finalMessage,
         'text',
         undefined,
@@ -163,10 +163,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
       if (aiMatch) {
         try {
-          const answer = await askQuestion(aiMatch)
-          if (answer) {
-            await onSendMessage(answer, 'command', undefined, sent?.id)
-          }
+          await askQuestion(aiMatch, { postToChat: true })
         } catch {
           // ignore AI errors
         }

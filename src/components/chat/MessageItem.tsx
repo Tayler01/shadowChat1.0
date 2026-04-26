@@ -72,7 +72,11 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
 
     const isGrouped = shouldGroupMessage(message, previousMessage)
     const isOwner = profile?.id === message.user_id
-    const isAIMessage = message.message_type === 'command'
+    const isShadoAI = message.user?.username === 'shado_ai'
+    const isAIMessage = isShadoAI || message.message_type === 'command'
+    const avatarSrc = isShadoAI
+      ? message.user?.avatar_url || '/icons/app-icon-192.png'
+      : message.user?.avatar_url
 
     const bubbleColor = undefined
     const bubbleStyle = bubbleColor
@@ -214,7 +218,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         <div className="flex-shrink-0 w-10">
           {!isGrouped && (
             <Avatar
-              src={message.user?.avatar_url}
+              src={avatarSrc}
               alt={message.user?.display_name || 'Unknown User'}
               size="md"
               color={message.user?.color}
