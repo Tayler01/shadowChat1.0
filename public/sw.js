@@ -31,7 +31,9 @@ const getPayloadBadgeCount = (payload) => {
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
-const updateAppBadge = async (count) => {
+let badgeUpdateVersion = 0
+
+const applyAppBadge = async (count) => {
   const badgeNavigator =
     self.navigator ||
     (typeof navigator !== 'undefined' ? navigator : null)
@@ -53,9 +55,16 @@ const updateAppBadge = async (count) => {
   }
 }
 
+const updateAppBadge = async (count) => {
+  badgeUpdateVersion += 1
+  await applyAppBadge(count)
+}
+
 const settleAppBadge = async (count) => {
   const normalizedCount = normalizeBadgeCount(count)
-  await updateAppBadge(normalizedCount)
+  badgeUpdateVersion += 1
+  const settleVersion = badgeUpdateVersion
+  await applyAppBadge(normalizedCount)
 
   if (normalizedCount === 0) {
     return
@@ -64,9 +73,15 @@ const settleAppBadge = async (count) => {
   // iOS can wake a Home Screen web app service worker in stages after a push.
   // Keeping retries inside waitUntil gives the icon badge more chances to stick.
   await wait(650)
-  await updateAppBadge(normalizedCount)
+  if (settleVersion !== badgeUpdateVersion) {
+    return
+  }
+  await applyAppBadge(normalizedCount)
   await wait(1800)
-  await updateAppBadge(normalizedCount)
+  if (settleVersion !== badgeUpdateVersion) {
+    return
+  }
+  await applyAppBadge(normalizedCount)
 }
 
 self.addEventListener('push', (event) => {
