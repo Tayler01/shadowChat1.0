@@ -73,6 +73,19 @@ Set Edge Function secrets before expecting AI or push features to work:
 
 ### AI
 
+Recommended OpenRouter test setup:
+
+- `OPENROUTER_API_KEY`
+- `AI_PROVIDER=openrouter`
+- `OPENROUTER_MODEL=mistralai/mistral-nemo`
+- `AI_ALLOWED_MODELS=mistralai/mistral-nemo`
+- `OPENROUTER_SITE_URL=https://shadowchat-1-0.netlify.app`
+- `OPENROUTER_APP_NAME=ShadowChat`
+
+The current cheap paid test model is `mistralai/mistral-nemo`. As of April 26, 2026, OpenRouter lists it around $0.01 per million input tokens and $0.03 per million output tokens. Recheck the [OpenRouter model catalog](https://openrouter.ai/models) and [pricing page](https://openrouter.ai/pricing) before changing production defaults.
+
+Legacy fallback, only if using OpenAI directly:
+
 - `OPENAI_API_KEY` or `OPENAI_KEY`
 
 ### Web Push
@@ -84,7 +97,12 @@ Set Edge Function secrets before expecting AI or push features to work:
 Example:
 
 ```powershell
-supabase secrets set OPENAI_API_KEY=YOUR_KEY
+supabase secrets set OPENROUTER_API_KEY=YOUR_OPENROUTER_KEY
+supabase secrets set AI_PROVIDER=openrouter
+supabase secrets set OPENROUTER_MODEL=mistralai/mistral-nemo
+supabase secrets set AI_ALLOWED_MODELS=mistralai/mistral-nemo
+supabase secrets set OPENROUTER_SITE_URL=https://shadowchat-1-0.netlify.app
+supabase secrets set OPENROUTER_APP_NAME=ShadowChat
 supabase secrets set WEB_PUSH_PUBLIC_KEY=YOUR_PUBLIC_KEY
 supabase secrets set WEB_PUSH_PRIVATE_KEY=YOUR_PRIVATE_KEY
 supabase secrets set WEB_PUSH_SUBJECT=https://your-app.example.com
@@ -137,7 +155,9 @@ npx vite preview --host 127.0.0.1 --port 4174
 
 ### AI Returns 500
 
-- `OPENAI_API_KEY` or `OPENAI_KEY` is missing on Supabase
+- `OPENROUTER_API_KEY` is missing on Supabase
+- `openai-chat` has not been redeployed after AI provider changes
+- OpenRouter credits, model access, or rate limits are blocking the request
 
 ### Push Setup Works But Nothing Delivers
 

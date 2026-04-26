@@ -4,10 +4,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const ALLOWED_MODELS = new Set(['gpt-4o-mini'])
-const DEFAULT_MODEL = 'gpt-4o-mini'
+const DEFAULT_OPENROUTER_MODEL = 'mistralai/mistral-nemo'
+const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini'
 const MAX_MESSAGES = 25
 const MAX_CONTENT_LENGTH = 8_000
+type AIProvider = 'openrouter' | 'openai'
 
 const unauthorized = (message: string) =>
   new Response(JSON.stringify({ error: message }), {
@@ -49,8 +50,13 @@ serve(async req => {
       return unauthorized('Invalid or expired session')
     }
 
+    const provider = resolveProvider()
+    const defaultModel = resolveDefaultModel(provider)
+    const allowedModels = resolveAllowedModels(defaultModel)
     const { messages, model } = await req.json()
-    const safeModel = ALLOWED_MODELS.has(model) ? model : DEFAULT_MODEL
+    const safeModel = typeof model === 'string' && allowedModels.has(model)
+      ? model
+      : defaultModel
     const safeMessages = Array.isArray(messages) ? messages.slice(0, MAX_MESSAGES) : []
 
     if (safeMessages.length === 0) {
@@ -63,17 +69,13 @@ serve(async req => {
       return { role, content }
     })
 
-    const openaiApiKey =
-      Deno.env.get('OPENAI_KEY') || Deno.env.get('OPENAI_API_KEY')
-    if (!openaiApiKey) {
-      throw new Error('OpenAI API key not configured')
-    }
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const aiConfig = resolveAIConfig(provider)
+    const response = await fetch(aiConfig.url, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${openaiApiKey}`,
+        Authorization: `Bearer ${aiConfig.apiKey}`,
         'Content-Type': 'application/json',
+        ...aiConfig.headers,
       },
       body: JSON.stringify({
         model: safeModel,
@@ -85,7 +87,7 @@ serve(async req => {
 
     if (!response.ok) {
       const error = await response.text()
-      throw new Error(`OpenAI API error: ${error}`)
+      throw new Error(`${aiConfig.label} API error: ${error}`)
     }
 
     const data = await response.json()
@@ -101,3 +103,73 @@ serve(async req => {
     })
   }
 })
+
+const parseCsv = (value: string | undefined) =>
+  (value ?? '')
+    .split(',')
+    .map(entry => entry.trim())
+    .filter(Boolean)
+
+const resolveProvider = (): AIProvider => {
+  const configured = (Deno.env.get('AI_PROVIDER') ?? '').trim().toLowerCase()
+  if (configured === 'openrouter' || configured === 'openai') {
+    return configured
+  }
+
+  return Deno.env.get('OPENROUTER_API_KEY') ? 'openrouter' : 'openai'
+}
+
+const resolveDefaultModel = (provider: AIProvider) => {
+  const configuredModel = Deno.env.get('AI_MODEL')
+  if (configuredModel) {
+    return configuredModel
+  }
+
+  if (provider === 'openrouter') {
+    return Deno.env.get('OPENROUTER_MODEL') || DEFAULT_OPENROUTER_MODEL
+  }
+
+  return DEFAULT_OPENAI_MODEL
+}
+
+const resolveAllowedModels = (defaultModel: string) => {
+  const configuredModels = parseCsv(Deno.env.get('AI_ALLOWED_MODELS'))
+  return new Set([
+    defaultModel,
+    DEFAULT_OPENROUTER_MODEL,
+    DEFAULT_OPENAI_MODEL,
+    ...configuredModels,
+  ])
+}
+
+const resolveAIConfig = (provider: AIProvider) => {
+  if (provider === 'openrouter') {
+    const apiKey = Deno.env.get('OPENROUTER_API_KEY')
+    if (!apiKey) {
+      throw new Error('OpenRouter API key not configured')
+    }
+
+    return {
+      apiKey,
+      label: 'OpenRouter',
+      url: 'https://openrouter.ai/api/v1/chat/completions',
+      headers: {
+        'HTTP-Referer':
+          Deno.env.get('OPENROUTER_SITE_URL') || 'https://shadowchat-1-0.netlify.app',
+        'X-OpenRouter-Title': Deno.env.get('OPENROUTER_APP_NAME') || 'ShadowChat',
+      },
+    }
+  }
+
+  const apiKey = Deno.env.get('OPENAI_KEY') || Deno.env.get('OPENAI_API_KEY')
+  if (!apiKey) {
+    throw new Error('AI API key not configured')
+  }
+
+  return {
+    apiKey,
+    label: 'OpenAI',
+    url: 'https://api.openai.com/v1/chat/completions',
+    headers: {},
+  }
+}

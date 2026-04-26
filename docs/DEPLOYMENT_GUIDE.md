@@ -82,10 +82,17 @@ The bridge functions keep JWT verification disabled at the Supabase function gat
 
 Keep these configured in Supabase:
 
-- `OPENAI_API_KEY` or `OPENAI_KEY`
+- `OPENROUTER_API_KEY`
+- `AI_PROVIDER=openrouter`
+- `OPENROUTER_MODEL=mistralai/mistral-nemo`
+- `AI_ALLOWED_MODELS=mistralai/mistral-nemo`
+- `OPENROUTER_SITE_URL=https://shadowchat-1-0.netlify.app`
+- `OPENROUTER_APP_NAME=ShadowChat`
 - `WEB_PUSH_PUBLIC_KEY`
 - `WEB_PUSH_PRIVATE_KEY`
 - `WEB_PUSH_SUBJECT`
+
+`mistralai/mistral-nemo` is the current cheap paid OpenRouter test model. As of April 26, 2026, OpenRouter lists it around $0.01 per million input tokens and $0.03 per million output tokens. Recheck the [OpenRouter model catalog](https://openrouter.ai/models) and [pricing page](https://openrouter.ai/pricing) before changing this default.
 
 ## Frontend Env Requirements
 
@@ -127,7 +134,7 @@ Production smoke requires the two stable, email-confirmed `PLAYWRIGHT_ACCOUNT_*`
 
 ### AI Not Working
 
-The frontend deploy can be healthy while AI still fails if the Supabase OpenAI secret is missing.
+The frontend deploy can be healthy while AI still fails if the Supabase `OPENROUTER_API_KEY` secret is missing, the `openai-chat` function was not redeployed, or the OpenRouter account has no usable credits/model access.
 
 ### Push Not Working
 

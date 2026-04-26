@@ -7,25 +7,25 @@ import {
   supabase,
 } from './supabase'
 
-interface OpenAIMessage {
+interface AIMessage {
   role: 'system' | 'user'
   content: string
 }
 
-interface OpenAIChoice {
+interface AIChoice {
   message?: {
     content?: string
   }
 }
 
-interface OpenAIResponse {
-  choices?: OpenAIChoice[]
+interface AIResponse {
+  choices?: AIChoice[]
 }
 
-const invokeOpenAI = async (
-  messages: OpenAIMessage[],
-  model = 'gpt-4o-mini'
-): Promise<OpenAIResponse> => {
+const invokeAI = async (
+  messages: AIMessage[],
+  model = 'mistralai/mistral-nemo'
+): Promise<AIResponse> => {
   const hasSession = await ensureSession()
   if (!hasSession) {
     throw new Error('Authentication required')
@@ -60,14 +60,14 @@ const invokeOpenAI = async (
 
   if (!response.ok) {
     const text = await response.text()
-    throw new Error(text || `OpenAI function failed with status ${response.status}`)
+    throw new Error(text || `AI function failed with status ${response.status}`)
   }
 
-  return (await response.json()) as OpenAIResponse
+  return (await response.json()) as AIResponse
 }
 
 export async function summarizeConversation(messages: ChatMessage[]): Promise<string> {
-  const data = await invokeOpenAI([
+  const data = await invokeAI([
     { role: 'system', content: 'Summarize the following conversation in a short paragraph.' },
     ...messages.map(m => ({ role: 'user' as const, content: m.content }))
   ])
@@ -76,7 +76,7 @@ export async function summarizeConversation(messages: ChatMessage[]): Promise<st
 }
 
 export async function getSuggestedReplies(messages: ChatMessage[]): Promise<string[]> {
-  const data = await invokeOpenAI([
+  const data = await invokeAI([
     {
       role: 'system',
       content:
@@ -100,7 +100,7 @@ export async function getSuggestedReplies(messages: ChatMessage[]): Promise<stri
 }
 
 export async function askQuestion(question: string): Promise<string> {
-  const data = await invokeOpenAI([
+  const data = await invokeAI([
     {
       role: 'system',
       content:

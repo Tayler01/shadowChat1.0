@@ -45,7 +45,7 @@ React UI
 - [`supabase.ts`](C:/repos/chat2.0/src/lib/supabase.ts:1): all Supabase client orchestration
 - [`auth.ts`](C:/repos/chat2.0/src/lib/auth.ts:1): auth API wrappers and profile bootstrap
 - [`push.ts`](C:/repos/chat2.0/src/lib/push.ts:1): browser push storage and dispatch wiring
-- [`ai.ts`](C:/repos/chat2.0/src/lib/ai.ts:1): AI function calls
+- [`ai.ts`](C:/repos/chat2.0/src/lib/ai.ts:1): authenticated AI function calls
 - [`utils.ts`](C:/repos/chat2.0/src/lib/utils.ts:1): shared formatting and UI helpers
 
 ## Backend Layers
@@ -65,7 +65,7 @@ Important domains:
 
 ### Edge Functions
 
-- [`openai-chat`](C:/repos/chat2.0/supabase/functions/openai-chat/index.ts:1): validates caller session and proxies allowed AI requests to OpenAI
+- [`openai-chat`](C:/repos/chat2.0/supabase/functions/openai-chat/index.ts:1): validates caller session and proxies allowed AI requests to OpenRouter by default, with OpenAI kept as a legacy fallback
 - [`send-push`](C:/repos/chat2.0/supabase/functions/send-push/index.ts:1): validates caller session, looks up recipients, enforces notification preferences, and sends web push payloads
 
 ## Planned External System
