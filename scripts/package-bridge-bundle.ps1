@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = "0.1.3-tools",
+    [string]$Version = "0.1.6-tools",
     [string]$OutputDirectory = "output/bridge-bundles"
 )
 
@@ -82,7 +82,40 @@ if (Test-Path -LiteralPath $zipPath) {
     Remove-Item -LiteralPath $zipPath -Force
 }
 
-Compress-Archive -Path (Join-Path $stagingRoot "*") -DestinationPath $zipPath -CompressionLevel Optimal
+Add-Type -AssemblyName System.IO.Compression
+
+$fixedTimestamp = [DateTimeOffset]::Parse("2026-04-26T00:00:00Z")
+$resolvedStagingRoot = (Resolve-Path -LiteralPath $stagingRoot).Path.TrimEnd("\", "/")
+$zipStream = [System.IO.File]::Open($zipPath, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+$archive = [System.IO.Compression.ZipArchive]::new($zipStream, [System.IO.Compression.ZipArchiveMode]::Create)
+
+try {
+    $files = Get-ChildItem -LiteralPath $stagingRoot -Recurse -File |
+        Sort-Object { $_.FullName.Substring($resolvedStagingRoot.Length).TrimStart("\", "/") }
+
+    foreach ($file in $files) {
+        $fullName = (Resolve-Path -LiteralPath $file.FullName).Path
+        $relativePath = $fullName.Substring($resolvedStagingRoot.Length).TrimStart("\", "/").Replace("\", "/")
+        $entry = $archive.CreateEntry($relativePath, [System.IO.Compression.CompressionLevel]::Optimal)
+        $entry.LastWriteTime = $fixedTimestamp
+
+        $sourceStream = [System.IO.File]::OpenRead($fullName)
+        try {
+            $entryStream = $entry.Open()
+            try {
+                $sourceStream.CopyTo($entryStream)
+            } finally {
+                $entryStream.Dispose()
+            }
+        } finally {
+            $sourceStream.Dispose()
+        }
+    }
+} finally {
+    $archive.Dispose()
+    $zipStream.Dispose()
+}
+
 $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zipPath).Hash.ToLowerInvariant()
 $size = (Get-Item -LiteralPath $zipPath).Length
 

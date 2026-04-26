@@ -18,7 +18,7 @@ config BRIDGE_HARDWARE_MODEL
 
 config BRIDGE_FIRMWARE_VERSION
     string "Bridge firmware version"
-    default "0.2.2-plug-play-bootstrap"
+    default "0.2.4-bootstrap-admin-recover"
 
 config BRIDGE_UPDATE_CHANNEL
     string "Bridge update channel"

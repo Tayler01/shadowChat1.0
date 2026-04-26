@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-Milestone 7: plug-and-play USB bootstrap drive is complete; branch is ready to push.
+Milestone 7 follow-up: plug-and-play USB bootstrap drive now makes the save location explicit and opens File Explorer after download.
 
 ## Completed
 
@@ -65,6 +65,18 @@ Milestone 7: plug-and-play USB bootstrap drive is complete; branch is ready to p
 - Applied firmware OTA from `0.2.0-ota-foundation` to `0.2.1-plug-play-bootstrap`, then from `0.2.1-plug-play-bootstrap` to `0.2.2-plug-play-bootstrap`.
 - Live Windows enumeration after OTA shows the composite bridge as both `COM4` and a FAT bootstrap drive at `D:`.
 - Live ESP-hosted receiver `D:\RECEIVE.PS1` downloaded `windows_bundle 0.1.3-tools` and verified SHA-256.
+- Updated the bootstrap receiver to save by default to Windows' real `Desktop\ShadowChatBridge` folder, which fixes OneDrive/Desktop redirection confusion.
+- Updated ESP drive scripts so `START.CMD`, `SETUP.CMD`, and `START-HERE.cmd` no longer force `%USERPROFILE%\Desktop`.
+- Updated the ESP-hosted README and receiver output to explicitly print the save folder and final ZIP path.
+- Updated the receiver to open File Explorer with the completed ZIP selected after SHA-256 verification.
+- Published `windows_bundle` version `0.1.4-tools` to Supabase Storage and manifests.
+- Published `windows_bundle` version `0.1.5-tools` after the bundled firmware README changed during documentation polish.
+- Published `windows_bundle` version `0.1.6-tools` with receiver admin-mode recovery before probe/download.
+- Published firmware version `0.2.3-bootstrap-save-location` to Supabase Storage and manifests.
+- Published firmware version `0.2.4-bootstrap-admin-recover` with the same receiver admin-mode recovery embedded on the ESP drive.
+- Backfilled bridge manifest `published_at` values and pinned the hotfix manifests as latest so update checks do not get hidden behind older null-timestamp rows.
+- Applied firmware OTA on the connected ESP32-S3 from `0.2.2-plug-play-bootstrap` to `0.2.3-bootstrap-save-location`, then to `0.2.4-bootstrap-admin-recover`.
+- Live ESP-hosted receiver `D:\RECEIVE.PS1` downloaded `windows_bundle 0.1.6-tools` to `C:\Users\tayle\OneDrive\Desktop\ShadowChatBridge\shadowchat-bridge-tools.zip`, verified SHA-256, and launched File Explorer selection.
 
 ## In Progress
 
@@ -72,9 +84,9 @@ Milestone 7: plug-and-play USB bootstrap drive is complete; branch is ready to p
 
 ## Pushed
 
-- Branch: `codex/esp-ota-offline-delivery`
-- Commit: `129a3c6` plus final tracker update
-- Remote: `origin/codex/esp-ota-offline-delivery`
+- Branch: `codex/esp-bootstrap-save-location`
+- Commit: pending
+- Remote: pending
 
 ## Validation Log
 
@@ -201,7 +213,7 @@ Firmware final build/flash passed:
 shadowchat_bridge.bin binary size 0x103c60 bytes. Smallest app partition is 0x120000 bytes. 0x1c3a0 bytes (10%) free.
 ```
 
-Milestone 7 validation in progress:
+Milestone 7 validation passed:
 
 ```powershell
 python C:\esp\esp-idf-v5.3.1\tools\idf.py build
@@ -289,6 +301,67 @@ Transfer complete: output\plug-play-test\shadowchat-bridge-tools.zip
 SHA256: 065b18451b3aaea46f1ca129ebeb059ee05493c19d6cc2608329677b2e487f67
 ```
 
+Save-location hotfix package/publish proof:
+
+```powershell
+npm run bridge:bundle:pack
+supabase --experimental storage cp output\bridge-bundles\shadowchat-bridge-tools-0.1.6-tools.zip ss:///bridge-artifacts/windows/0.1.6-tools/shadowchat-bridge-tools.zip --content-type application/zip --cache-control "max-age=31536000, immutable"
+supabase --experimental storage cp firmware\esp-bridge\build\shadowchat_bridge.bin ss:///bridge-artifacts/firmware/esp32-s3/0.2.4-bootstrap-admin-recover/shadowchat_bridge.bin --content-type application/octet-stream --cache-control "max-age=31536000, immutable"
+supabase db push --yes
+```
+
+```text
+windows_bundle stable any 0.1.6-tools
+SHA256 6ca4906698157d0d50b94de5327651b9737a03217638fdef37d8c20f6705085e
+size 25842
+
+firmware stable esp32-s3 0.2.4-bootstrap-admin-recover
+SHA256 05603470929b57b4210ea6e316026cdf72e4d4e6fba457aa66d7719d27890582
+size 1140176
+```
+
+Live update-check proof:
+
+```text
+windows_bundle currentVersion 0.1.5-tools -> latestVersion 0.1.6-tools
+firmware currentVersion 0.2.3-bootstrap-save-location -> latestVersion 0.2.4-bootstrap-admin-recover
+```
+
+Live OTA proof:
+
+```text
+Returned to admin shell.
+Update available for firmware: 0.2.3-bootstrap-save-location -> 0.2.4-bootstrap-admin-recover
+Downloading firmware 0.2.4-bootstrap-admin-recover to OTA partition ota_1 at 0x260000
+OTA download size: 1140176 bytes
+OTA SHA-256 verified for 1140176 bytes
+Firmware update staged. Rebooting into version 0.2.4-bootstrap-admin-recover.
+```
+
+Live default receiver proof:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File D:\RECEIVE.PS1
+```
+
+```text
+Saving ShadowChat bridge tools to:
+  C:\Users\tayle\OneDrive\Desktop\ShadowChatBridge
+Checking COM4...
+Using COM4
+Already in admin shell.
+Streaming windows_bundle 0.1.6-tools over serial. Keep the receiver open until bundleEnd.
+Downloading:
+  shadowchat-bridge-tools.zip
+To:
+  C:\Users\tayle\OneDrive\Desktop\ShadowChatBridge\shadowchat-bridge-tools.zip
+Bundle SHA-256 verified for 25842 bytes
+Download complete.
+Saved file:
+  C:\Users\tayle\OneDrive\Desktop\ShadowChatBridge\shadowchat-bridge-tools.zip
+SHA256: 6ca4906698157d0d50b94de5327651b9737a03217638fdef37d8c20f6705085e
+```
+
 ## Failed Approaches / Notes
 
 - Do not use Netlify for ESP update artifacts; Netlify account credits previously disabled the site and update availability must not depend on that path.
@@ -309,3 +382,7 @@ SHA256: 065b18451b3aaea46f1ca129ebeb059ee05493c19d6cc2608329677b2e487f67
 - Direct `idf.py flash` over the TinyUSB CDC app port does not enter the ROM bootloader. Use OTA for app-to-app updates, or hold BOOT for a manual ROM flash.
 - The initial drive-hosted receiver failed because the ESP emitted large bundle frames faster than PowerShell could drain its default serial buffer. Fixed with a 1 MB receiver buffer, 128-byte bundle chunks, and 35 ms firmware pacing.
 - Supabase manifest rows with null `published_at` sort ahead of dated rows when ordering descending. Revoked affected `0.1.2-tools` and `0.2.1-plug-play-bootstrap` manifests; release publishing should always set `published_at`.
+- The first save-location hotfix manifest publish used fixed timestamps that were older than one backfilled firmware row. Added a follow-up migration pinning `0.1.4-tools` and `0.2.3-bootstrap-save-location` to the newest publish time, then verified both update checks.
+- Documentation polish changed a file included in the Windows bundle after `0.1.4-tools` had already been published. Do not overwrite immutable storage objects; publish a new bundle version instead.
+- `Compress-Archive` produced timestamp-sensitive ZIP hashes. Replaced it with a deterministic sorted `ZipArchive` writer using fixed entry timestamps, then verified two consecutive `0.1.6-tools` packs produced the same SHA-256.
+- If the ESP is left in chat mode, a bare `bootstrap ping` can be treated as chat input. The receiver now sends `/admin` before `bootstrap ping` and before `bundle get windows_bundle`.

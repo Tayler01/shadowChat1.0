@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$Port = "",
-    [string]$Output = "."
+    [string]$Output = ""
 )
 
 Set-StrictMode -Version Latest
@@ -38,6 +38,8 @@ function Test-BridgePort {
         $serial.Open()
         Start-Sleep -Milliseconds 900
         $serial.DiscardInBuffer()
+        $serial.WriteLine("/admin")
+        Start-Sleep -Milliseconds 250
         $serial.WriteLine("bootstrap ping")
         $deadline = [DateTime]::UtcNow.AddSeconds(3)
         while ([DateTime]::UtcNow -lt $deadline) {
@@ -79,16 +81,37 @@ function Open-BridgePort {
     throw "Could not find the ShadowChat ESP bridge serial port. Open a serial console and run bootstrap help."
 }
 
+function Resolve-OutputFolder {
+    param([string]$Requested)
+
+    if ([string]::IsNullOrWhiteSpace($Requested)) {
+        $desktop = [Environment]::GetFolderPath("DesktopDirectory")
+        if ([string]::IsNullOrWhiteSpace($desktop)) {
+            $desktop = Join-Path $env:USERPROFILE "Desktop"
+        }
+        $Requested = Join-Path $desktop "ShadowChatBridge"
+    }
+
+    New-Item -ItemType Directory -Force -Path $Requested | Out-Null
+    return (Resolve-Path -LiteralPath $Requested).Path
+}
+
 $serial = $null
 $stream = $null
 $path = ""
 $expectedSha256 = ""
 $expectedSequence = 0
+$outputFolder = ""
 
 try {
-    New-Item -ItemType Directory -Force -Path $Output | Out-Null
+    $outputFolder = Resolve-OutputFolder -Requested $Output
+    Write-Host "Saving ShadowChat bridge tools to:"
+    Write-Host "  $outputFolder"
+    Write-Host ""
     $serial = Open-BridgePort -Requested $Port
     $serial.DiscardInBuffer()
+    $serial.WriteLine("/admin")
+    Start-Sleep -Milliseconds 250
     $serial.WriteLine("bundle get windows_bundle")
     $deadline = [DateTime]::UtcNow.AddMinutes(15)
 
@@ -117,11 +140,14 @@ try {
             } else {
                 "shadowchat-bridge-tools.zip"
             }
-            $path = Join-Path $Output $fileName
+            $path = Join-Path $outputFolder $fileName
             $expectedSha256 = [string]$frame.sha256
             $expectedSequence = 0
             $stream = [System.IO.File]::Open($path, [System.IO.FileMode]::Create, [System.IO.FileAccess]::Write)
-            Write-Host "Receiving $fileName to $path"
+            Write-Host "Downloading:"
+            Write-Host "  $fileName"
+            Write-Host "To:"
+            Write-Host "  $path"
         } elseif ($frame.type -eq "bundleChunk") {
             if ($null -eq $stream) {
                 throw "Received data before transfer start."
@@ -144,8 +170,17 @@ try {
             if ($expectedSha256 -and $actual -ne $expectedSha256.ToLowerInvariant()) {
                 throw "SHA mismatch. Expected $expectedSha256 got $actual"
             }
-            Write-Host "Transfer complete: $path"
+            Write-Host ""
+            Write-Host "Download complete."
+            Write-Host "Saved file:"
+            Write-Host "  $path"
             Write-Host "SHA256: $actual"
+            try {
+                Start-Process explorer.exe -ArgumentList "/select,`"$path`""
+            } catch {
+                Write-Host "Open this folder to find the zip:"
+                Write-Host "  $outputFolder"
+            }
             break
         }
     }

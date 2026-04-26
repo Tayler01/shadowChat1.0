@@ -183,7 +183,7 @@ or:
 SETUP.CMD
 ```
 
-The script auto-detects the bridge COM port with `bootstrap ping`, asks the ESP for the approved `windows_bundle`, reconstructs `shadowchat-bridge-tools.zip`, and verifies SHA-256. The PC does not receive general internet access; the ESP fetches only manifest-selected ShadowChat artifacts.
+The script auto-detects the bridge COM port with `bootstrap ping`, asks the ESP for the approved `windows_bundle`, reconstructs `shadowchat-bridge-tools.zip`, and verifies SHA-256. By default it saves the ZIP into `Desktop\ShadowChatBridge`, using Windows' real Desktop path even when Desktop is redirected to OneDrive, prints the full save path, and opens File Explorer with the completed ZIP selected. The PC does not receive general internet access; the ESP fetches only manifest-selected ShadowChat artifacts.
 
 If the ESP drive is unavailable, or if you are using a serial-only build, open any serial terminal at `115200` baud and run:
 
