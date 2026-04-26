@@ -2,6 +2,7 @@ import { renderHook, act, waitFor, type RenderHookResult } from '@testing-librar
 import { AuthProvider, useAuth } from '../src/hooks/useAuth';
 import { supabase } from '../src/lib/supabase';
 import * as auth from '../src/lib/auth';
+import { hasPhoneInstallOnboardingPending } from '../src/lib/phoneInstallOnboarding';
 
 jest.mock('../src/config', () => ({
   PRESENCE_INTERVAL_MS: 30000,
@@ -50,6 +51,7 @@ const renderUseAuth = async () => {
 
 beforeEach(() => {
   jest.resetAllMocks();
+  window.localStorage.clear();
 
   const sb = supabase as SupabaseMock;
   sb.auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
@@ -136,7 +138,7 @@ test('initial session bootstrap loads a user when recovery succeeds', async () =
 });
 
 test('signUp sets user when session returned', async () => {
-  const profile = { id: '1' } as any;
+  const profile = { id: '1', email: 'x@y.com' } as any;
   authModule.signUp.mockResolvedValue({ session: {}, profile, user: {} } as any);
 
   const { result } = await renderUseAuth();
@@ -154,6 +156,7 @@ test('signUp sets user when session returned', async () => {
     displayName: 'X',
   });
   await waitFor(() => expect(result.current.user).toEqual(profile));
+  expect(hasPhoneInstallOnboardingPending(profile)).toBe(true);
 });
 
 test('signOut calls auth.signOut', async () => {

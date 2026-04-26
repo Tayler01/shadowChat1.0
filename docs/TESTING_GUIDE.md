@@ -165,6 +165,20 @@ Important guardrails:
 - prefer Supabase's documented `worker: true` and heartbeat reconnect behavior before inventing custom client recreation logic
 - verify resume/send after deploy, not only in local preview
 
+### Phone Install Onboarding
+
+Use fresh disposable users for the new-account phone setup guide, then delete them after the run.
+
+Checks to cover:
+
+- sign up or seed the phone-install pending marker for the new temp account
+- verify the guide opens after first authenticated load
+- verify the iPhone tab shows Safari, Share, `Add to Home Screen`, and `Add`
+- verify the Android tab shows either the native `Install Now` path or Chrome menu fallback
+- verify Settings exposes `Phone App Setup` and can reopen the same guide
+
+The stable `PLAYWRIGHT_ACCOUNT_*` users should stay out of this test so routine smoke runs are not blocked by onboarding. See [docs/PHONE_INSTALL_ONBOARDING.md](C:/repos/chat2.0/docs/PHONE_INSTALL_ONBOARDING.md:1).
+
 ### Headed Smoke Script Pattern
 
 For one-off exploration, inline scripts are still fine:

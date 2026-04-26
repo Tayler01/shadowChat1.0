@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Bell,
@@ -11,7 +11,8 @@ import {
   AlertTriangle,
   Menu,
   Brain,
-  KeyRound
+  KeyRound,
+  Smartphone
 } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { useAuth } from '../../hooks/useAuth'
@@ -22,29 +23,27 @@ import { useSuggestionsEnabled } from '../../hooks/useSuggestedReplies'
 import { useToneAnalysisEnabled } from '../../hooks/useToneAnalysisEnabled'
 import { useSoundEffects } from '../../hooks/useSoundEffects'
 import { usePushNotifications } from '../../hooks/usePushNotifications'
+import { usePwaInstallPrompt } from '../../hooks/usePwaInstallPrompt'
 import { approveBridgePairing } from '../../lib/bridge'
 import { NotificationSetupModal } from './NotificationSetupModal'
+import { PhoneInstallGuide } from '../onboarding/PhoneInstallGuide'
 
 interface SettingsViewProps {
   onToggleSidebar: () => void
-}
-
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) => {
   const { enabled: sounds, setEnabled: setSounds } = useSoundEffects()
   const [showDangerZone, setShowDangerZone] = useState(false)
   const [showNotificationSetup, setShowNotificationSetup] = useState(false)
-  const [installPromptEvent, setInstallPromptEvent] = useState<BeforeInstallPromptEvent | null>(null)
+  const [showPhoneInstallGuide, setShowPhoneInstallGuide] = useState(false)
   const [bridgePairingCode, setBridgePairingCode] = useState('')
   const [bridgePairingLoading, setBridgePairingLoading] = useState(false)
   const [lastBridgeDeviceId, setLastBridgeDeviceId] = useState('')
   const { scheme, setScheme } = useTheme()
   const isDesktop = useIsDesktop()
   const { signOut } = useAuth()
+  const { canInstall, promptInstall } = usePwaInstallPrompt()
   const { enabled: suggestionsEnabled, setEnabled: setSuggestionsEnabled } = useSuggestionsEnabled()
   const { enabled: toneEnabled, setEnabled: setToneEnabled } = useToneAnalysisEnabled()
   const {
@@ -64,19 +63,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
     updatePreference,
     refreshState,
   } = usePushNotifications()
-
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (event: Event) => {
-      event.preventDefault()
-      setInstallPromptEvent(event as BeforeInstallPromptEvent)
-    }
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-    }
-  }, [])
 
   const devicePushEnabled = subscribed
   const notificationPreferenceSettings = useMemo(
@@ -178,15 +164,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
     toast.success('Notification status refreshed')
   }
 
-  const handleInstallApp = async () => {
-    if (!installPromptEvent) {
-      toast('Use your browser menu to install Shadow Chat on this device.')
-      return
+  const handleInstallApp = async (): Promise<'accepted' | 'dismissed' | null> => {
+    const outcome = await promptInstall()
+
+    if (outcome === 'accepted') {
+      toast.success('Shadow Chat install started')
+      return outcome
     }
 
-    await installPromptEvent.prompt()
-    await installPromptEvent.userChoice.catch(() => null)
-    setInstallPromptEvent(null)
+    if (outcome === 'dismissed') {
+      toast('Install dismissed. You can reopen phone setup any time.')
+      return outcome
+    }
+
+    if (!canInstall) {
+      toast('Use your browser menu to install Shadow Chat on this device.')
+      return null
+    }
+
+    return outcome
+  }
+
+  const handleNotificationInstall = async () => {
+    await handleInstallApp()
   }
 
   const handleApproveBridgePairing = async () => {
@@ -446,6 +446,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
 
           <div className="glass-panel rounded-[var(--radius-lg)] p-5 sm:p-6">
             <div className="mb-4 flex items-center space-x-3">
+              <Smartphone className="h-5 w-5 text-[var(--text-muted)]" />
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                Phone App Setup
+              </h2>
+            </div>
+
+            <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="font-medium text-[var(--text-primary)]">
+                    Add Shadow Chat to this phone
+                  </h3>
+                  <p className="mt-1 text-sm text-[var(--text-muted)]">
+                    Reopen the guided iPhone or Android Home Screen setup any time.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setShowPhoneInstallGuide(true)}
+                  variant="secondary"
+                  className="w-full justify-center sm:w-auto"
+                >
+                  <Smartphone className="mr-3 h-4 w-4" />
+                  Open Phone Setup
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="glass-panel rounded-[var(--radius-lg)] p-5 sm:p-6">
+            <div className="mb-4 flex items-center space-x-3">
               <KeyRound className="h-5 w-5 text-[var(--text-muted)]" />
               <h2 className="text-lg font-semibold text-[var(--text-primary)]">
                 ESP Bridge
@@ -640,10 +670,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
         guidance={guidance}
         guidanceText={guidanceText}
         saving={pushSaving}
-        canInstall={Boolean(installPromptEvent)}
+        canInstall={canInstall}
         onClose={() => setShowNotificationSetup(false)}
         onEnable={handleEnableFromModal}
         onRefresh={handleRefreshNotificationStatus}
+        onInstall={handleNotificationInstall}
+      />
+      <PhoneInstallGuide
+        open={showPhoneInstallGuide}
+        canInstall={canInstall}
+        onClose={() => setShowPhoneInstallGuide(false)}
+        onComplete={() => setShowPhoneInstallGuide(false)}
         onInstall={handleInstallApp}
       />
     </motion.div>

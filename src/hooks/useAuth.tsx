@@ -20,6 +20,7 @@ import {
   uploadUserAvatar,
   uploadUserBanner,
 } from '../lib/auth';
+import { markPhoneInstallOnboardingPending } from '../lib/phoneInstallOnboarding';
 
 interface AuthContextValue {
   user: User | null;
@@ -294,6 +295,8 @@ function useProvideAuth() {
         username: userData.username,
         displayName: userData.full_name,
       });
+
+      markPhoneInstallOnboardingPending(email, result.user?.id || result.profile?.id);
       
       // If user is auto-confirmed (has session), set user immediately
       if (result.session && result.profile) {

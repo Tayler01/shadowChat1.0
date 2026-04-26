@@ -137,6 +137,7 @@ After setup, verify:
 4. File/image upload works
 5. Profile updates persist
 6. Push settings screen renders
+7. New-account phone setup opens after signup or first sign-in from the same browser
 
 ## 8. Optional Preview Mode
 
@@ -146,6 +147,17 @@ For production-style local QA:
 npm run build
 npx vite preview --host 127.0.0.1 --port 4174
 ```
+
+## 9. End-User Phone Setup
+
+New accounts get a guided Home Screen setup modal. The guide is intentionally simple:
+
+- iPhone: open in Safari, tap Share, tap `Add to Home Screen`, tap `Add`
+- Android: tap `Install Now` when Chrome exposes the native prompt, or use the Chrome menu and choose `Install app` / `Add to Home screen`
+
+Users can reopen the guide from Settings under `Phone App Setup`.
+
+For implementation and QA details, see [docs/PHONE_INSTALL_ONBOARDING.md](C:/repos/chat2.0/docs/PHONE_INSTALL_ONBOARDING.md:1).
 
 ## Common Setup Problems
 
