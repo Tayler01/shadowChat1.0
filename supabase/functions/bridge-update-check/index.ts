@@ -39,6 +39,7 @@ type BridgeUpdateManifest = {
 
 const TARGETS = new Set(['firmware', 'windows_bundle', 'bootstrap'])
 const CHANNELS = new Set(['stable', 'beta', 'dev'])
+const UNSIGNED_DEV_SIGNATURE = 'dev-unsigned-sha256-only'
 
 const parseVersionParts = (value: string) => {
   const match = value.match(/^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/)
@@ -73,6 +74,68 @@ const isUpdateAvailable = (currentVersion: string, latestVersion: string) => {
   return comparison < 0
 }
 
+const isCurrentVersionAllowed = (currentVersion: string, minCurrentVersion: string | null) => {
+  if (!minCurrentVersion) return true
+  if (!currentVersion) return false
+
+  const comparison = compareVersions(currentVersion, minCurrentVersion)
+  if (comparison === null) {
+    return currentVersion === minCurrentVersion
+  }
+
+  return comparison >= 0
+}
+
+const isValidSha256 = (value: string) => /^[a-f0-9]{64}$/i.test(value)
+
+const signatureStatus = (signature: string | null) => {
+  if (!signature) return 'missing'
+  if (signature === UNSIGNED_DEV_SIGNATURE) return 'unsigned-dev-placeholder'
+  return 'present'
+}
+
+const publishedAtMs = (manifest: BridgeUpdateManifest) => {
+  if (!manifest.published_at) return 0
+  const parsed = Date.parse(manifest.published_at)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+const compareManifestPriority = (hardwareModel: string) => (
+  left: BridgeUpdateManifest,
+  right: BridgeUpdateManifest
+) => {
+  const leftExact = left.hardware_model === hardwareModel ? 1 : 0
+  const rightExact = right.hardware_model === hardwareModel ? 1 : 0
+  if (leftExact !== rightExact) {
+    return rightExact - leftExact
+  }
+
+  const versionComparison = compareVersions(left.version, right.version)
+  if (versionComparison !== null && versionComparison !== 0) {
+    return versionComparison > 0 ? -1 : 1
+  }
+
+  const publishedComparison = publishedAtMs(right) - publishedAtMs(left)
+  if (publishedComparison !== 0) {
+    return publishedComparison
+  }
+
+  return right.version.localeCompare(left.version)
+}
+
+const chooseManifest = (
+  manifests: BridgeUpdateManifest[],
+  hardwareModel: string,
+  currentVersion: string
+) => {
+  const eligible = manifests.filter(manifest =>
+    isValidSha256(manifest.artifact_sha256) &&
+    isCurrentVersionAllowed(currentVersion, manifest.min_current_version)
+  )
+
+  return [...eligible].sort(compareManifestPriority(hardwareModel))[0] ?? null
+}
+
 const toManifestResponse = (manifest: BridgeUpdateManifest) => ({
   id: manifest.id,
   target: manifest.target,
@@ -84,7 +147,9 @@ const toManifestResponse = (manifest: BridgeUpdateManifest) => ({
   artifactUrl: manifest.artifact_url,
   artifactPath: manifest.artifact_path,
   artifactSha256: manifest.artifact_sha256,
+  artifactSha256Valid: isValidSha256(manifest.artifact_sha256),
   signature: manifest.signature,
+  signatureStatus: signatureStatus(manifest.signature),
   sizeBytes: manifest.size_bytes,
   releaseNotes: manifest.release_notes,
   publishedAt: manifest.published_at,
@@ -150,14 +215,15 @@ serve(async req => {
       .eq('channel', channel)
       .in('hardware_model', ['any', hardwareModel])
       .eq('status', 'published')
-      .order('published_at', { ascending: false })
-      .limit(1)
+      .order('published_at', { ascending: false, nullsFirst: false })
+      .limit(50)
 
     if (error) {
       throw error
     }
 
-    const manifest = (data?.[0] ?? null) as BridgeUpdateManifest | null
+    const manifests = (data ?? []) as BridgeUpdateManifest[]
+    const manifest = chooseManifest(manifests, hardwareModel, currentVersion)
 
     if (!manifest) {
       return json({
@@ -169,7 +235,9 @@ serve(async req => {
         latestVersion: null,
         updateAvailable: false,
         manifest: null,
-        message: 'No published update manifest is available for this target.',
+        message: manifests.length === 0
+          ? 'No published update manifest is available for this target.'
+          : 'No published update manifest is eligible for this device version.',
       })
     }
 
@@ -190,6 +258,8 @@ serve(async req => {
             latest_version: manifest.version,
             update_available: updateAvailable,
             manifest_id: manifest.id,
+            manifest_hardware_model: manifest.hardware_model,
+            signature_status: signatureStatus(manifest.signature),
           },
         })
     }

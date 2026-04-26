@@ -83,7 +83,8 @@ cd C:\repos\chat2.0\firmware\esp-bridge
 idf.py set-target esp32s3
 idf.py menuconfig
 idf.py build
-idf.py -p COMx flash monitor
+$env:ESP_PORT='<scanned bridge COM port>'
+idf.py -p $env:ESP_PORT flash monitor
 ```
 
 ## Admin Shell Commands

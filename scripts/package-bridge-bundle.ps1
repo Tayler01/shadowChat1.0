@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = "0.1.9-tools",
+    [string]$Version = "0.1.10-tui-dm-routing",
     [string]$OutputDirectory = "output/bridge-bundles"
 )
 

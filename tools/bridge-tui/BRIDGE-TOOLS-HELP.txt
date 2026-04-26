@@ -67,9 +67,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\bridge-tui\bridge-tui.
 
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\bridge-tui\bridge-tui.ps1 -Mode dm -DmRecipientUserId @caleb
 
-Only specify a port if auto-detect cannot find the bridge:
+Only specify a port if auto-detect cannot find the bridge. Replace COMx with
+the bridge port Windows reports after scanning available serial ports:
 
-powershell -NoProfile -ExecutionPolicy Bypass -File tools\bridge-tui\bridge-tui.ps1 -Port COM4
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\bridge-tui\bridge-tui.ps1 -Port COMx
 
 Troubleshooting:
 

@@ -24,8 +24,8 @@ Milestone 9: plug-and-play tools polish and Android badge stability.
 - Added startup firmware update check after stored Wi-Fi reconnect/session refresh path.
 - Updated firmware README with update-check commands and current OTA boundary.
 - Built firmware successfully with ESP-IDF v5.3.1 using the managed Python environment.
-- Flashed the connected ESP32-S3 on `COM3`.
-- Live serial check on `COM3` returned: `No firmware update manifest: No published update manifest is available for this target.`
+- Flashed the connected ESP32-S3 on the scanned bridge COM port.
+- Live serial check on the scanned bridge COM port returned: `No firmware update manifest: No published update manifest is available for this target.`
 - Added Supabase Storage bucket bootstrap migration for `bridge-artifacts`.
 - Added firmware command `update apply [firmware]`.
 - Added HTTPS OTA artifact download into the next ESP-IDF OTA partition.
@@ -33,7 +33,7 @@ Milestone 9: plug-and-play tools polish and Android badge stability.
 - Added post-boot OTA validation with `esp_ota_mark_app_valid_cancel_rollback()`.
 - Published a temporary `0.1.1-ota-test` firmware manifest and artifact, then revoked that manifest after the live OTA test.
 - Live OTA on the connected ESP32-S3 succeeded from `0.1.0-phase0` to `0.1.1-ota-test`, verified SHA-256, rebooted from `ota_0`, and reported current on startup.
-- Rebuilt and flashed final working firmware `0.2.0-ota-foundation` to `COM3`.
+- Rebuilt and flashed final working firmware `0.2.0-ota-foundation` to the scanned bridge COM port.
 - Final live serial status reported `firmware_version: 0.2.0-ota-foundation`.
 - Added `bundle check [windows_bundle|bootstrap]` and `bundle get [windows_bundle|bootstrap]` firmware commands.
 - Added forced `@scb:` serial bundle frames: `bundleStart`, `bundleChunk`, and `bundleEnd`.
@@ -41,11 +41,11 @@ Milestone 9: plug-and-play tools polish and Android badge stability.
 - Added reproducible packer [scripts/package-bridge-bundle.ps1](C:/repos/chat2.0/scripts/package-bridge-bundle.ps1:1).
 - Added package scripts `bridge:bundle` and `bridge:bundle:pack`.
 - Published `windows_bundle` versions `0.1.0-tools` and `0.1.1-tools` to Supabase Storage and the update manifest table. `0.1.1-tools` is the latest live bundle.
-- Live ESP bundle transfer over `COM3` reconstructed `shadowchat-bridge-tools.zip` and verified SHA-256 on disk.
+- Live ESP bundle transfer over the scanned bridge COM port reconstructed `shadowchat-bridge-tools.zip` and verified SHA-256 on disk.
 - Added first-plug boot banner pointing users to `bootstrap help`.
 - Added `bootstrap help` with the offline setup sequence.
 - Added `bootstrap script`, which prints a minimal PowerShell receiver script over serial for a PC that has no repo and no internet.
-- Built and flashed firmware with the bootstrap commands to `COM3`.
+- Built and flashed firmware with the bootstrap commands to the scanned bridge COM port.
 - Live serial output confirmed `bootstrap help` and `bootstrap script` render usable instructions and script text.
 - Started plug-and-play USB bootstrap drive work on branch `codex/esp-plug-play-bootstrap`.
 - Added TinyUSB MSC bootstrap drive support with embedded `README.TXT`, `START.CMD`, `RECEIVE.PS1`, plus obvious setup aliases.
@@ -59,7 +59,7 @@ Milestone 9: plug-and-play tools polish and Android badge stability.
 - Composite firmware build succeeded with ESP-IDF v5.3.1.
 - Packed `windows_bundle` version `0.1.2-tools` with the no-repo bootstrap helpers.
 - Published `windows_bundle` version `0.1.2-tools` to Supabase Storage and the update manifest table.
-- Flashed the composite firmware image to the connected ESP32-S3 on `COM3`.
+- Flashed the composite firmware image to the connected ESP32-S3 on the scanned bridge COM port.
 - Published `windows_bundle` version `0.1.3-tools` with hardened receiver buffering, then revoked `0.1.2-tools` because its null `published_at` sorted ahead of newer manifests.
 - Published firmware versions `0.2.1-plug-play-bootstrap` and `0.2.2-plug-play-bootstrap` through Supabase Storage and manifests.
 - Applied firmware OTA from `0.2.0-ota-foundation` to `0.2.1-plug-play-bootstrap`, then from `0.2.1-plug-play-bootstrap` to `0.2.2-plug-play-bootstrap`.
@@ -98,7 +98,7 @@ Milestone 9: plug-and-play tools polish and Android badge stability.
 - Published firmware version `0.2.6-bootstrap-autodetect` with the auto-detecting serial-only fallback receiver script.
 - Applied firmware OTA on the connected ESP32-S3 from `0.2.5-space-headroom` to `0.2.6-bootstrap-autodetect`.
 - Live post-OTA status reported `firmware_version: 0.2.6-bootstrap-autodetect`.
-- Completed the manual full flash after the ESP was placed in ROM bootloader mode. The ROM device appeared as `COM3` with `VID_303A&PID_1001`.
+- Completed the manual full flash after the ESP was placed in ROM bootloader mode. The ROM bootloader port was found by scanning serial devices with `VID_303A&PID_1001`.
 - Verified the `0x140000` app-slot layout booted, but the `0x20000` `usb_boot` FAT partition was too small and reported `MSC filesystem mount failed: ESP_FAIL`.
 - Adjusted the full-flash partition layout to `0x130000` app slots and a `0x50000` `usb_boot` FAT partition.
 - Built and full-flashed firmware version `0.2.7-fat-headroom`, including erasing the new `usb_boot` region at `0x3b0000`.
@@ -145,7 +145,8 @@ Milestone 2 passed:
 ```powershell
 $env:IDF_PATH='C:\esp\esp-idf-v5.3.1'
 python C:\esp\esp-idf-v5.3.1\tools\idf.py build
-python C:\esp\esp-idf-v5.3.1\tools\idf.py -p COM3 flash
+$env:ESP_PORT='<scanned bridge COM port>'
+python C:\esp\esp-idf-v5.3.1\tools\idf.py -p $env:ESP_PORT flash
 ```
 
 Hardware smoke:
@@ -161,7 +162,8 @@ Milestone 3 passed:
 supabase db push --yes
 $env:IDF_PATH='C:\esp\esp-idf-v5.3.1'
 python C:\esp\esp-idf-v5.3.1\tools\idf.py build
-python C:\esp\esp-idf-v5.3.1\tools\idf.py -p COM3 flash
+$env:ESP_PORT='<scanned bridge COM port>'
+python C:\esp\esp-idf-v5.3.1\tools\idf.py -p $env:ESP_PORT flash
 supabase --experimental storage cp firmware\esp-bridge\build\shadowchat_bridge.bin ss:///bridge-artifacts/firmware/esp32-s3/0.1.1-ota-test/shadowchat_bridge.bin --content-type application/octet-stream --cache-control "max-age=31536000, immutable"
 ```
 
@@ -189,7 +191,7 @@ Milestone 4 passed:
 ```powershell
 npm run bridge:bundle:pack
 supabase --experimental storage cp output\bridge-bundles\shadowchat-bridge-tools-0.1.1-tools.zip ss:///bridge-artifacts/windows/0.1.1-tools/shadowchat-bridge-tools.zip --content-type application/zip --cache-control "max-age=31536000, immutable"
-powershell -NoProfile -ExecutionPolicy Bypass -File tools\bridge-tui\bridge-bundle-receive.ps1 -Port COM3 -Target windows_bundle -OutputPath output\bridge-downloads-final -TimeoutSeconds 180
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\bridge-tui\bridge-bundle-receive.ps1 -Target windows_bundle -OutputPath output\bridge-downloads-final -TimeoutSeconds 180
 ```
 
 Live bundle receiver smoke:
@@ -205,7 +207,8 @@ Milestone 5 passed:
 
 ```powershell
 python C:\esp\esp-idf-v5.3.1\tools\idf.py build
-python C:\esp\esp-idf-v5.3.1\tools\idf.py -p COM3 flash
+$env:ESP_PORT='<scanned bridge COM port>'
+python C:\esp\esp-idf-v5.3.1\tools\idf.py -p $env:ESP_PORT flash
 ```
 
 Live bootstrap smoke:
@@ -222,7 +225,7 @@ ShadowChat Bridge first-plug bootstrap
 
 bootstrap script
 ----- BEGIN SHADOWCHAT BRIDGE RECEIVER POWERSHELL -----
-param([string]$Port='COM3',[string]$Output='.')
+param([string]$Port='',[string]$Output='.')
 ...
 ----- END SHADOWCHAT BRIDGE RECEIVER POWERSHELL -----
 ```
@@ -269,7 +272,8 @@ Warning: The smallest app partition is nearly full (3% free space left)!
 Composite flash proof:
 
 ```powershell
-python C:\esp\esp-idf-v5.3.1\tools\idf.py -p COM3 flash
+$env:ESP_PORT='<scanned bridge COM port>'
+python C:\esp\esp-idf-v5.3.1\tools\idf.py -p $env:ESP_PORT flash
 ```
 
 ```text
@@ -519,7 +523,7 @@ firmware_version: 0.2.6-bootstrap-autodetect
 Full partition-table flash proof:
 
 ```text
-ROM bootloader serial: COM3
+ROM bootloader serial: scanned bootloader COM port
 USB ROM identity: VID_303A&PID_1001
 
 Wrote 20928 bytes at 0x00000000
@@ -586,6 +590,6 @@ size 1040160
 - `Compress-Archive` produced timestamp-sensitive ZIP hashes. Replaced it with a deterministic sorted `ZipArchive` writer using fixed entry timestamps, then verified two consecutive `0.1.6-tools` packs produced the same SHA-256.
 - If the ESP is left in chat mode, a bare `bootstrap ping` can be treated as chat input. The receiver now sends `/admin` before `bootstrap ping` and before `bundle get windows_bundle`.
 - OTA cannot rewrite the partition table. `0.2.5-space-headroom` can be OTA-applied because it still fits old app slots, but the enlarged `0x140000` slots only take effect after a manual full flash that includes the partition table.
-- A direct full-flash retry after TinyUSB composite firmware built successfully failed with `Failed to connect to ESP32-S3: No serial data received.` Do not retry normal `idf.py -p COM4 flash` until the board is placed in ROM bootloader mode with BOOT/RESET.
+- A direct full-flash retry after TinyUSB composite firmware built successfully failed with `Failed to connect to ESP32-S3: No serial data received.` Do not retry a normal `idf.py -p <scanned app COM port> flash` until the board is placed in ROM bootloader mode with BOOT/RESET.
 - `0.1.8-tools` was published successfully, but live receiver testing with `-OutputPath output\bridge-downloads-0.1.8` exposed that dotted directory names could be treated as filenames. Do not reuse that artifact; `0.1.9-tools` supersedes it.
 - The first successful partition-table full flash used `0x140000` app slots and a `0x20000` `usb_boot` partition. The app booted, but FAT/MSC mount failed because that partition was too small for the wear-leveling-backed FAT volume. Use the corrected `0.2.7-fat-headroom` layout instead.

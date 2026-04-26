@@ -90,6 +90,17 @@ const createQuery = (overrides: Record<string, unknown> = {}) => {
   return query;
 };
 
+const createDeferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((promiseResolve, promiseReject) => {
+    resolve = promiseResolve;
+    reject = promiseReject;
+  });
+
+  return { promise, resolve, reject };
+};
+
 let workingClient: WorkingClient;
 
 beforeEach(() => {
@@ -260,6 +271,64 @@ test('marks visible unread messages as read through the RPC helper', async () =>
   await waitFor(() => {
     expect(markDMMessagesRead).toHaveBeenCalledWith('conv1');
   });
+});
+
+test('ignores stale message fetches after switching conversations', async () => {
+  const staleFetch = createDeferred<{ data: unknown[]; error: null }>();
+  const conv1Message = {
+    id: 'm1',
+    conversation_id: 'conv1',
+    sender_id: 'u1',
+    content: 'old thread',
+    message_type: 'text',
+    created_at: '2026-04-21T12:00:00.000Z',
+    updated_at: '2026-04-21T12:00:00.000Z',
+    reactions: {},
+  };
+  const conv2Message = {
+    id: 'm2',
+    conversation_id: 'conv2',
+    sender_id: 'u1',
+    content: 'new thread',
+    message_type: 'text',
+    created_at: '2026-04-21T12:01:00.000Z',
+    updated_at: '2026-04-21T12:01:00.000Z',
+    reactions: {},
+  };
+
+  workingClient.from
+    .mockImplementationOnce(() =>
+      createQuery({
+        limit: jest.fn(() => staleFetch.promise),
+      }) as any
+    )
+    .mockImplementationOnce(() =>
+      createQuery({
+        limit: jest.fn().mockResolvedValue({ data: [conv2Message], error: null }),
+      }) as any
+    );
+
+  const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider });
+
+  await waitFor(() => expect(result.current.loading).toBe(false));
+
+  await act(async () => {
+    result.current.setCurrentConversation('conv1');
+  });
+
+  await waitFor(() => expect(workingClient.from).toHaveBeenCalledTimes(1));
+
+  await act(async () => {
+    result.current.setCurrentConversation('conv2');
+  });
+
+  await waitFor(() => expect(result.current.messages.map(message => message.id)).toEqual(['m2']));
+
+  await act(async () => {
+    staleFetch.resolve({ data: [conv1Message], error: null });
+  });
+
+  expect(result.current.messages.map(message => message.id)).toEqual(['m2']);
 });
 
 describe('DirectMessagesView user search', () => {

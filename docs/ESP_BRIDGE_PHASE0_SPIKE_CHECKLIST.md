@@ -34,7 +34,7 @@ Phase 0 is successful if all of the following are true:
 - [x] Windows PC still has no general internet path through the device
 - [x] Windows enumerates the device as a usable local serial interface without a custom driver install
 
-Phase 0 status as of `2026-04-25`: success criteria are met on the current `ESP32-S3` hardware proof using `COM3`, `USB Serial/JTAG`, bridge-owned auth, Supabase Realtime receive, and the Windows PowerShell TUI.
+Phase 0 status as of `2026-04-25`: success criteria are met on the current `ESP32-S3` hardware proof using a scanned/detected Windows COM port, `USB Serial/JTAG`, bridge-owned auth, Supabase Realtime receive, and the Windows PowerShell TUI.
 
 ## Prototype Deliverables
 

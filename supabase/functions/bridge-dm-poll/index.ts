@@ -166,18 +166,17 @@ serve(async req => {
 
     let markedReadCount = 0
     if (markRead) {
-      const { count, error: markReadError } = await supabase
-        .from('dm_messages')
-        .update({ read_at: new Date().toISOString() }, { count: 'exact' })
-        .eq('conversation_id', conversationId)
-        .neq('sender_id', bridgeAuth.auth.userId)
-        .is('read_at', null)
+      const { data: count, error: markReadError } = await supabase
+        .rpc('bridge_mark_dm_messages_read', {
+          p_conversation_id: conversationId,
+          p_reader_user_id: bridgeAuth.auth.userId,
+        })
 
       if (markReadError) {
         throw markReadError
       }
 
-      markedReadCount = count ?? 0
+      markedReadCount = Number(count ?? 0)
     }
 
     return json({

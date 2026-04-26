@@ -261,11 +261,16 @@ There should also be `responses` to correlate command outcomes.
       "sender_name": "tayler",
       "content": "reply text",
       "created_at": "2026-04-23T10:00:00Z",
+      "source": "realtime",
       "direction": "received"
     }
   }
 }
 ```
+
+For DM message events, include the conversation identifier and the message
+source (`poll`, `realtime`, or `send`) so the TUI can route inactive DM
+threads to unread state instead of rendering them in the currently open DM.
 
 ## Error Model
 

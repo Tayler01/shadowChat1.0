@@ -255,6 +255,7 @@ $script:realtimeBackfillPending = $false
 $script:lastSentAt = $null
 $script:unreadGroupCount = 0
 $script:unreadDmCount = 0
+$script:activeDmConversationId = ""
 $script:seenMessageLines = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 $script:seenMessageIds = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 $script:pollMarkerPending = $false
@@ -522,14 +523,25 @@ function Get-UnreadSidebarLabel {
 }
 
 function Test-MessageThreadActive {
-    param([string]$Thread)
+    param(
+        [string]$Thread,
+        [string]$ConversationId = ""
+    )
 
     if ($Thread -eq "group") {
         return $script:currentMode -eq "group"
     }
 
     if ($Thread -eq "dm") {
-        return $script:currentMode -eq "dm"
+        if ($script:currentMode -ne "dm") {
+            return $false
+        }
+
+        if ([string]::IsNullOrWhiteSpace($ConversationId) -or [string]::IsNullOrWhiteSpace($script:activeDmConversationId)) {
+            return $false
+        }
+
+        return [string]::Equals($script:activeDmConversationId, $ConversationId, [StringComparison]::OrdinalIgnoreCase)
     }
 
     return $true
@@ -538,14 +550,15 @@ function Test-MessageThreadActive {
 function Register-InactiveUnread {
     param(
         [string]$Thread,
-        [string]$Sender
+        [string]$Sender,
+        [string]$ConversationId = ""
     )
 
     if (Test-OwnBridgeMessageSender $Sender) {
         return $false
     }
 
-    if (Test-MessageThreadActive $Thread) {
+    if (Test-MessageThreadActive $Thread $ConversationId) {
         return $false
     }
 
@@ -957,8 +970,20 @@ function Try-HandleProtocolLine {
         if ($isNewMessage -and $script:seenMessageLines.Add($line)) {
             $script:pollMarkerPending = $false
             $thread = Get-ProtocolString $event "thread" "message"
+            $source = Get-ProtocolString $event "source" "unknown"
+            $conversationId = Get-ProtocolString $event "conversationId"
             $sender = Get-ProtocolString $event "senderLabel" (Get-ProtocolString $event "senderId" "")
-            if (-not (Register-InactiveUnread $thread $sender)) {
+            if (
+                $thread -eq "dm" -and
+                $source -eq "poll" -and
+                $script:currentMode -eq "dm" -and
+                -not [string]::IsNullOrWhiteSpace($conversationId) -and
+                [string]::IsNullOrWhiteSpace($script:activeDmConversationId)
+            ) {
+                $script:activeDmConversationId = $conversationId
+            }
+
+            if (-not (Register-InactiveUnread $thread $sender $conversationId)) {
                 Add-MessageLine $line
             }
         }
@@ -970,6 +995,12 @@ function Try-HandleProtocolLine {
     if ($type -eq "sent") {
         $script:lastSentAt = [DateTime]::UtcNow
         $thread = Get-ProtocolString $event "thread" "message"
+        if ($thread -eq "dm") {
+            $conversationId = Get-ProtocolString $event "conversationId"
+            if (-not [string]::IsNullOrWhiteSpace($conversationId)) {
+                $script:activeDmConversationId = $conversationId
+            }
+        }
         Add-LiveFeedLine "sent: $thread"
         Request-Render
         return $true
@@ -1352,6 +1383,7 @@ function Enter-BridgeMode {
         & $ensureAdminMode
         $script:currentMode = "group"
         $script:dmRecipientUserId = ""
+        $script:activeDmConversationId = ""
         Clear-UnreadForThread "group"
         Clear-MessagePane
         Send-BridgeLine "chat group"
@@ -1370,6 +1402,7 @@ function Enter-BridgeMode {
         & $ensureAdminMode
         $script:currentMode = "dm"
         $script:dmRecipientUserId = $RecipientUserId
+        $script:activeDmConversationId = ""
         Add-RecentDm $RecipientUserId
         Clear-UnreadForThread "dm"
         Clear-MessagePane

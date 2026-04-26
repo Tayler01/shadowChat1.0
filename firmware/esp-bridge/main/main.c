@@ -227,6 +227,7 @@ static void bridge_protocol_emit_update(
 
 static void bridge_protocol_emit_message(
     const char *thread,
+    const char *source,
     const char *id,
     const char *created_at,
     const char *sender_id,
@@ -241,6 +242,7 @@ static void bridge_protocol_emit_message(
 
     cJSON_AddStringToObject(event, "type", "message");
     cJSON_AddStringToObject(event, "thread", thread ? thread : "unknown");
+    cJSON_AddStringToObject(event, "source", source ? source : "unknown");
     cJSON_AddStringToObject(event, "id", id ? id : "");
     cJSON_AddStringToObject(event, "createdAt", created_at ? created_at : "");
     cJSON_AddStringToObject(event, "senderId", sender_id ? sender_id : "");
@@ -1057,7 +1059,7 @@ static bool bridge_print_message_list(
         const char *sender_label = bridge_profile_label(profile, sender_id);
 
         if (s_protocol_enabled) {
-            bridge_protocol_emit_message(thread, id, created_at, sender_id, sender_label, content, conversation_id);
+            bridge_protocol_emit_message(thread, "poll", id, created_at, sender_id, sender_label, content, conversation_id);
         } else {
             printf(
                 "%s | %s: %s\n",
@@ -2907,7 +2909,7 @@ static void bridge_realtime_emit_record(const char *thread, cJSON *record) {
     const char *sender_label = bridge_lookup_profile_label(sender_id, sender_label_buffer, sizeof(sender_label_buffer));
 
     if (s_protocol_enabled) {
-        bridge_protocol_emit_message(thread, id, created_at, sender_id, sender_label, content, conversation_id);
+        bridge_protocol_emit_message(thread, "realtime", id, created_at, sender_id, sender_label, content, conversation_id);
     } else {
         printf(
             "%s | %s: %s\n",

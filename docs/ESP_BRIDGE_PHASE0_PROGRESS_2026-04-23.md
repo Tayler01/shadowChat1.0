@@ -158,7 +158,7 @@ Those are the next durability milestones.
 Board:
 
 - `ESP32-S3`
-- Windows port: `COM3`
+- Windows port: scanned/detected bridge COM port
 - USB path: `USB Serial/JTAG`
 - derived bridge serial: `esp32s3-348518ABF584`
 - backend device id: `a091ab7f-88de-4b8b-befb-9d8a53d9ff60`
@@ -193,7 +193,7 @@ Important implementation discoveries:
 
 ## Hardware Proof Captured On 2026-04-24
 
-Verified on `COM3` against device `a091ab7f-88de-4b8b-befb-9d8a53d9ff60`:
+Verified on the scanned bridge COM port against device `a091ab7f-88de-4b8b-befb-9d8a53d9ff60`:
 
 - device has a dedicated bridge user identity: `ESP Bridge ABF584`
 - group messages and DMs to `@caleb` send successfully from the ESP user
@@ -235,7 +235,7 @@ Verified on `COM3` against device `a091ab7f-88de-4b8b-befb-9d8a53d9ff60`:
 
 ## Hardware Proof Captured On 2026-04-25
 
-Verified on `COM3` against device `a091ab7f-88de-4b8b-befb-9d8a53d9ff60`:
+Verified on the scanned bridge COM port against device `a091ab7f-88de-4b8b-befb-9d8a53d9ff60`:
 
 - firmware build passed with `ESP-IDF v5.3.1`
 - firmware flash to the connected `ESP32-S3` succeeded

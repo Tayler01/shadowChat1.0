@@ -49,16 +49,23 @@ Assert-True $rows[0].RightAlign "Own message metadata should right-align."
 $script:messages.Clear()
 $script:liveFeed.Clear()
 $script:currentMode = "group"
-Try-HandleProtocolLine '@scb:{"type":"message","thread":"dm","id":"fixture-dm-1","createdAt":"2026-04-24T23:00:00Z","senderId":"user-1","senderLabel":"Caleb","content":"inactive dm"}' | Out-Null
+Try-HandleProtocolLine '@scb:{"type":"message","thread":"dm","source":"realtime","conversationId":"conv-inactive","id":"fixture-dm-1","createdAt":"2026-04-24T23:00:00Z","senderId":"user-1","senderLabel":"Caleb","content":"inactive dm"}' | Out-Null
 Assert-Equal $script:messages.Count 0 "Inactive DM should not render in group pane."
 Assert-Equal $script:unreadDmCount 1 "Inactive DM should increment unread DM count."
 Assert-True ((Get-UnreadSummaryLabel) -match "dm 1") "Unread summary should include DM count."
 
 $script:currentMode = "dm"
 Clear-UnreadForThread "dm"
-Try-HandleProtocolLine '@scb:{"type":"message","thread":"dm","id":"fixture-dm-2","createdAt":"2026-04-24T23:00:01Z","senderId":"user-1","senderLabel":"Caleb","content":"active dm"}' | Out-Null
+Try-HandleProtocolLine '@scb:{"type":"message","thread":"dm","source":"poll","conversationId":"conv-active","id":"fixture-dm-2","createdAt":"2026-04-24T23:00:01Z","senderId":"user-1","senderLabel":"Caleb","content":"active dm"}' | Out-Null
 Assert-Equal $script:messages.Count 1 "Active DM should render in message pane."
 Assert-Equal $script:unreadDmCount 0 "Active DM should not leave unread count."
+
+Try-HandleProtocolLine '@scb:{"type":"message","thread":"dm","source":"realtime","conversationId":"conv-other","id":"fixture-dm-3","createdAt":"2026-04-24T23:00:02Z","senderId":"user-2","senderLabel":"Maya","content":"other dm"}' | Out-Null
+Assert-Equal $script:messages.Count 1 "Realtime DM from another conversation should not render in active DM pane."
+Assert-Equal $script:unreadDmCount 1 "Realtime DM from another conversation should increment unread DM count."
+
+Try-HandleProtocolLine '@scb:{"type":"message","thread":"dm","source":"realtime","conversationId":"conv-active","id":"fixture-dm-4","createdAt":"2026-04-24T23:00:03Z","senderId":"user-1","senderLabel":"Caleb","content":"active realtime dm"}' | Out-Null
+Assert-Equal $script:messages.Count 2 "Realtime DM for the active conversation should render in active DM pane."
 
 $script:messageScrollOffset = 0
 Move-MessageScroll 8

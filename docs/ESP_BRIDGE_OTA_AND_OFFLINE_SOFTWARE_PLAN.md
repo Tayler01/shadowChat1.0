@@ -199,3 +199,7 @@ Production hardening still needed:
 - larger app partition or feature trimming; TinyUSB composite leaves little room in the current 4 MB partition layout
 - larger bundle soak tests at slower serial speeds
 - automated release publishing instead of manual Storage upload plus REST manifest upsert
+
+For the operational versioning, artifact upload, manifest publishing, smoke,
+and rollback workflow, use
+[ESP Bridge Release Runbook](C:/repos/chat2.0/docs/ESP_BRIDGE_RELEASE_RUNBOOK.md:1).

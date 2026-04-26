@@ -389,6 +389,12 @@ export function useConversationMessages(conversationId: string | null) {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const subscribeRef = useRef<() => RealtimeChannel>();
   const clientResetRef = useRef<() => Promise<void>>();
+  const activeConversationIdRef = useRef<string | null>(conversationId);
+  const fetchRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    activeConversationIdRef.current = conversationId;
+  }, [conversationId]);
 
   const insertConversationMessage = useCallback(
     async (
@@ -448,6 +454,10 @@ export function useConversationMessages(conversationId: string | null) {
       await markDMMessagesRead(conversationId)
       void clearDMNotifications(conversationId)
 
+      if (activeConversationIdRef.current !== conversationId) {
+        return
+      }
+
       setMessages(prev =>
         prev.map(message => {
           if (!unreadIdSet.has(message.id)) {
@@ -474,22 +484,8 @@ export function useConversationMessages(conversationId: string | null) {
   )
 
   const handleVisible = useCallback(() => {
-    const channel = channelRef.current;
-    const realtimeClient = getRealtimeClient();
-    if (channel && channel.state !== 'joined') {
-      if (realtimeClient?.removeChannel) {
-        realtimeClient.removeChannel(channel);
-      }
-      const newChannel = subscribeRef.current?.();
-      if (newChannel) {
-        channelRef.current = newChannel;
-      }
-    }
-    
-    // Use reset function if available
     if (clientResetRef.current) {
-      clientResetRef.current();
-    } else {
+      void clientResetRef.current();
     }
   }, []);
 
@@ -497,56 +493,104 @@ export function useConversationMessages(conversationId: string | null) {
 
   // Fetch messages for conversation
   useEffect(() => {
-    const resetWithFreshClient = async () => {
-      if (!conversationId) return;
-      
-      try {
-        // Clean up old channel
-        if (channelRef.current) {
-          // Channel cleanup will be handled by the useEffect cleanup
-          channelRef.current = null;
-        }
-        
-        // Refetch messages and resubscribe
-        // This will be handled by the existing useEffect logic
-        
-      } catch {
-      }
-    };
-    
     if (!conversationId) {
+      fetchRequestIdRef.current += 1;
+      clientResetRef.current = undefined;
       setMessages([]);
+      setHasMore(true);
       setLoading(false);
       return;
     }
 
-    const fetchMessages = async () => {
-      const workingClient = await getWorkingClient();
-      const { data, error } = await workingClient
-        .from('dm_messages')
-        .select(
-          `
-          *,
-          sender:users!sender_id(*)
-        `)
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: false })
-        .limit(MESSAGE_FETCH_LIMIT);
+    let disposed = false;
 
-      if (error) {
-      } else {
-        const fetchedMessages = ((data || []) as unknown as DMMessage[]).reverse()
-        setHasMore((data?.length || 0) === MESSAGE_FETCH_LIMIT);
-        setMessages(fetchedMessages);
-        await markVisibleMessagesRead(fetchedMessages)
+    const fetchMessages = async () => {
+      const requestId = fetchRequestIdRef.current + 1;
+      fetchRequestIdRef.current = requestId;
+      setLoading(true);
+
+      try {
+        const workingClient = await getWorkingClient();
+        const { data, error } = await workingClient
+          .from('dm_messages')
+          .select(
+            `
+            *,
+            sender:users!sender_id(*)
+          `)
+          .eq('conversation_id', conversationId)
+          .order('created_at', { ascending: false })
+          .limit(MESSAGE_FETCH_LIMIT);
+
+        if (disposed || requestId !== fetchRequestIdRef.current) {
+          return;
+        }
+
+        if (error) {
+          setMessages([]);
+          setHasMore(false);
+        } else {
+          const fetchedMessages = ((data || []) as unknown as DMMessage[]).reverse()
+          setHasMore((data?.length || 0) === MESSAGE_FETCH_LIMIT);
+          setMessages(fetchedMessages);
+          await markVisibleMessagesRead(fetchedMessages).catch(() => undefined)
+        }
+      } catch {
+        if (!disposed && requestId === fetchRequestIdRef.current) {
+          setMessages([]);
+          setHasMore(false);
+        }
+      } finally {
+        if (!disposed && requestId === fetchRequestIdRef.current) {
+          setLoading(false);
+        }
       }
-      setLoading(false);
     };
 
-    // Store reset function
+    const resetWithFreshClient = async () => {
+      if (!conversationId || disposed) return;
+
+      const activeChannel = channelRef.current;
+      const realtimeClient = getRealtimeClient();
+      if (
+        activeChannel &&
+        realtimeClient?.removeChannel &&
+        typeof realtimeClient.removeChannel === 'function'
+      ) {
+        try {
+          realtimeClient.removeChannel(activeChannel);
+        } catch {
+          // ignore channel cleanup failures
+        }
+      }
+
+      channelRef.current = null;
+
+      try {
+        const newChannel = subscribeRef.current?.();
+        if (newChannel) {
+          channelRef.current = newChannel;
+        }
+      } catch {
+        // ignore resubscribe failures; the fetch still repairs visible state
+      }
+
+      await fetchMessages();
+    };
+
     clientResetRef.current = resetWithFreshClient;
-    
-    fetchMessages();
+
+    setMessages([]);
+    setHasMore(true);
+    void fetchMessages();
+
+    return () => {
+      disposed = true;
+      fetchRequestIdRef.current += 1;
+      if (clientResetRef.current === resetWithFreshClient) {
+        clientResetRef.current = undefined;
+      }
+    };
   }, [conversationId, markVisibleMessagesRead, user]);
 
   const loadOlderMessages = useCallback(async () => {
@@ -569,6 +613,10 @@ export function useConversationMessages(conversationId: string | null) {
         .limit(MESSAGE_FETCH_LIMIT);
 
       if (error) throw error;
+
+      if (activeConversationIdRef.current !== conversationId) {
+        return;
+      }
 
       if (data && data.length > 0) {
         const newMessages = (data as unknown as DMMessage[]).reverse();
@@ -620,6 +668,8 @@ export function useConversationMessages(conversationId: string | null) {
 
             const message = data as unknown as DMMessage | null;
 
+            if (disposed) return;
+
             if (message) {
               setMessages(prev => {
                 return prev.some(m => m.id === message.id) ? prev : [...prev, message];
@@ -653,6 +703,8 @@ export function useConversationMessages(conversationId: string | null) {
               .single();
 
             const message = data as unknown as DMMessage | null;
+
+            if (disposed) return;
 
             if (message) {
               setMessages(prev =>
