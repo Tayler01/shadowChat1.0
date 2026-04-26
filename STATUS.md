@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-Milestone 7 follow-up: plug-and-play USB bootstrap drive now makes the save location explicit and opens File Explorer after download.
+Milestone 8: firmware space headroom.
 
 ## Completed
 
@@ -77,6 +77,16 @@ Milestone 7 follow-up: plug-and-play USB bootstrap drive now makes the save loca
 - Backfilled bridge manifest `published_at` values and pinned the hotfix manifests as latest so update checks do not get hidden behind older null-timestamp rows.
 - Applied firmware OTA on the connected ESP32-S3 from `0.2.2-plug-play-bootstrap` to `0.2.3-bootstrap-save-location`, then to `0.2.4-bootstrap-admin-recover`.
 - Live ESP-hosted receiver `D:\RECEIVE.PS1` downloaded `windows_bundle 0.1.6-tools` to `C:\Users\tayle\OneDrive\Desktop\ShadowChatBridge\shadowchat-bridge-tools.zip`, verified SHA-256, and launched File Explorer selection.
+- Shrunk the ESP-hosted `usb_boot` FAT partition from `0x80000` to `0x20000`.
+- Grew each app slot from `0x120000` to `0x140000` while keeping `factory`, `ota_0`, and `ota_1`.
+- Enabled ESP-IDF size optimization for the bridge app defaults.
+- Bumped firmware version to `0.2.5-space-headroom`.
+- Built `0.2.5-space-headroom`; binary size dropped to `0xfdb40` bytes.
+- Confirmed the optimized app still fits the older live `0x120000` slots with `140480` bytes free, so it can be OTA-applied before a future full partition-table flash.
+- Published firmware version `0.2.5-space-headroom` to Supabase Storage and manifests.
+- Applied OTA on the connected ESP32-S3 from `0.2.4-bootstrap-admin-recover` to `0.2.5-space-headroom`.
+- Live status after OTA reported `firmware_version: 0.2.5-space-headroom`, Wi-Fi connected, session stored, auth stored, and `usb_bootstrap: MSC+CDC initialized`.
+- Confirmed Windows still enumerates the bridge as `COM4` plus the ESP bootstrap FAT drive at `D:`.
 
 ## In Progress
 
@@ -84,9 +94,9 @@ Milestone 7 follow-up: plug-and-play USB bootstrap drive now makes the save loca
 
 ## Pushed
 
-- Branch: `codex/esp-bootstrap-save-location`
-- Commit: pending
-- Remote: pending
+- Branch: `codex/esp-firmware-space-headroom`
+- Commit: latest branch commit
+- Remote: `origin/codex/esp-firmware-space-headroom`
 
 ## Validation Log
 
@@ -362,6 +372,71 @@ Saved file:
 SHA256: 6ca4906698157d0d50b94de5327651b9737a03217638fdef37d8c20f6705085e
 ```
 
+Milestone 8 build proof:
+
+```powershell
+python C:\esp\esp-idf-v5.3.1\tools\idf.py build
+```
+
+```text
+Partition table binary generated:
+factory  app factory 0x20000  1280K
+ota_0    app ota_0   0x160000 1280K
+ota_1    app ota_1   0x2a0000 1280K
+usb_boot data fat    0x3e0000 128K
+
+shadowchat_bridge.bin binary size 0xfdb40 bytes.
+Smallest app partition is 0x140000 bytes.
+0x424c0 bytes (21%) free.
+```
+
+Compatibility check against old live slot size:
+
+```text
+old 0x120000 slot free with optimized app: 140480 bytes
+new 0x140000 slot free with optimized app: 271552 bytes
+```
+
+Milestone 8 publish and live OTA proof:
+
+```powershell
+supabase --experimental storage cp firmware\esp-bridge\build\shadowchat_bridge.bin ss:///bridge-artifacts/firmware/esp32-s3/0.2.5-space-headroom/shadowchat_bridge.bin --content-type application/octet-stream --cache-control "max-age=31536000, immutable"
+supabase db push --yes
+```
+
+```text
+firmware stable esp32-s3 0.2.5-space-headroom
+SHA256 760e3a7ad8932beb00b014f49f95753388b92b7ff389b81cd796391d3aa01996
+size 1039168
+```
+
+```text
+Downloading firmware 0.2.5-space-headroom to OTA partition ota_0 at 0x140000
+OTA download size: 1039168 bytes
+OTA SHA-256 verified for 1039168 bytes
+Firmware update staged. Rebooting into version 0.2.5-space-headroom.
+```
+
+Live post-OTA status proof:
+
+```text
+firmware_version: 0.2.5-space-headroom
+wifi_connected: yes
+usb_bootstrap: MSC+CDC initialized
+```
+
+Live Windows enumeration proof:
+
+```text
+COM4     USB Serial Device (COM4)
+D:       FAT bootstrap drive
+D:\README.TXT
+D:\START.CMD
+D:\RECEIVE.PS1
+D:\SETUP.CMD
+D:\AUTORUN.INF
+```
+
 ## Failed Approaches / Notes
 
 - Do not use Netlify for ESP update artifacts; Netlify account credits previously disabled the site and update availability must not depend on that path.
@@ -386,3 +461,4 @@ SHA256: 6ca4906698157d0d50b94de5327651b9737a03217638fdef37d8c20f6705085e
 - Documentation polish changed a file included in the Windows bundle after `0.1.4-tools` had already been published. Do not overwrite immutable storage objects; publish a new bundle version instead.
 - `Compress-Archive` produced timestamp-sensitive ZIP hashes. Replaced it with a deterministic sorted `ZipArchive` writer using fixed entry timestamps, then verified two consecutive `0.1.6-tools` packs produced the same SHA-256.
 - If the ESP is left in chat mode, a bare `bootstrap ping` can be treated as chat input. The receiver now sends `/admin` before `bootstrap ping` and before `bundle get windows_bundle`.
+- OTA cannot rewrite the partition table. `0.2.5-space-headroom` can be OTA-applied because it still fits old app slots, but the enlarged `0x140000` slots only take effect after a manual full flash that includes the partition table.
