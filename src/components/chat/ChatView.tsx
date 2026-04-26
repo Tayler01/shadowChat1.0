@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Users } from 'lucide-react'
 import { useMessages } from '../../hooks/useMessages'
@@ -14,6 +14,7 @@ import {
   ensureSession,
 } from '../../lib/supabase'
 import { useVisibilityRefresh } from '../../hooks/useVisibilityRefresh'
+import { clearGroupNotifications } from '../../lib/appBadge'
 
 interface ChatViewProps {
   currentView: 'chat' | 'dms' | 'profile' | 'settings'
@@ -34,12 +35,17 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
     // Let the visibility refresh hook handle client reset
     try {
       await ensureSession()
+      await clearGroupNotifications()
     } catch {
       // ignore refresh errors
     }
   }, [])
 
   useVisibilityRefresh(handleFocusRefresh)
+
+  useEffect(() => {
+    void clearGroupNotifications()
+  }, [])
 
   const handleReply = useCallback((id: string, content: string) => {
     setReplyTo({ id, content })

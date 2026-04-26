@@ -190,4 +190,61 @@ describe('service worker app badge handling', () => {
     expect(closeOtherConversation).not.toHaveBeenCalled()
     expect(closeGroup).not.toHaveBeenCalled()
   })
+
+  it('closes group notifications without closing DM notifications', async () => {
+    const { listeners, notifications } = loadServiceWorker()
+    const closeGroup = jest.fn()
+    const closeBridgeGroup = jest.fn()
+    const closeDM = jest.fn()
+    const closeUnknown = jest.fn()
+    const pending: Promise<unknown>[] = []
+
+    notifications.push(
+      {
+        close: closeGroup,
+        data: {
+          messageId: 'group-message-a',
+          type: 'group_message',
+        },
+        tag: 'group:group-message-a',
+      },
+      {
+        close: closeBridgeGroup,
+        data: {
+          messageId: 'group-message-b',
+          type: 'group_message',
+        },
+        tag: 'bridge-group:group-message-b',
+      },
+      {
+        close: closeDM,
+        data: {
+          conversationId: 'conversation-a',
+          messageId: 'dm-message-a',
+          type: 'dm_message',
+        },
+        tag: 'dm:conversation-a',
+      },
+      {
+        close: closeUnknown,
+        data: {},
+        tag: 'misc',
+      }
+    )
+
+    listeners.message({
+      data: {
+        notificationType: 'group_message',
+        type: 'SHADOWCHAT_NOTIFICATIONS_CLEAR',
+      },
+      waitUntil: (task: Promise<unknown>) => pending.push(task),
+    })
+
+    await Promise.allSettled(pending)
+
+    expect(closeGroup).toHaveBeenCalledTimes(1)
+    expect(closeBridgeGroup).toHaveBeenCalledTimes(1)
+    expect(closeDM).not.toHaveBeenCalled()
+    expect(closeUnknown).not.toHaveBeenCalled()
+  })
 })

@@ -63,7 +63,7 @@ const updateAppBadge = async (count) => {
 const notificationMatchesClearRequest = (notification, request) => {
   const data = notification.data || {}
   const tag = notification.tag || ''
-  const notificationType = data.type || request.notificationType
+  const notificationType = data.type
 
   if (request.notificationType === 'dm_message') {
     const isDM =
@@ -72,6 +72,15 @@ const notificationMatchesClearRequest = (notification, request) => {
       tag.startsWith('bridge-dm:')
 
     if (!isDM) {
+      return false
+    }
+  } else if (request.notificationType === 'group_message') {
+    const isGroup =
+      notificationType === 'group_message' ||
+      tag.startsWith('group:') ||
+      tag.startsWith('bridge-group:')
+
+    if (!isGroup) {
       return false
     }
   } else if (request.notificationType && notificationType !== request.notificationType) {

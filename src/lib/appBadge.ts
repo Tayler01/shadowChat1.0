@@ -79,6 +79,14 @@ export const clearDMNotifications = async (conversationId: string, messageId?: s
   })
 }
 
+export const clearGroupNotifications = async (messageId?: string) => {
+  await postServiceWorkerMessage({
+    type: 'SHADOWCHAT_NOTIFICATIONS_CLEAR',
+    notificationType: 'group_message',
+    ...(messageId ? { messageId } : {}),
+  })
+}
+
 export const fetchUnreadAppBadgeCount = async () => {
   const workingClient = await getWorkingClient()
   const {
