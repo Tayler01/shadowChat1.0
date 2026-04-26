@@ -140,7 +140,7 @@ What the smoke runner does by default:
 
 When you have changed app code and want the latest build instead of the already-running preview, add `--no-reuse-server`.
 
-Production smoke is different from local smoke: it must use two stable, email-confirmed `PLAYWRIGHT_ACCOUNT_*` users because production signup can require email confirmation and return no active session. See [`docs/PRODUCTION_SMOKE_TESTING.md`](C:/repos/chat2.0/docs/PRODUCTION_SMOKE_TESTING.md:1) for account setup, commands, and artifact triage.
+Production smoke is different from local smoke: it must use the two stable, email-confirmed `PLAYWRIGHT_ACCOUNT_*` users from `.env.testing.local` because production signup can require email confirmation and return no active session. See [`docs/PRODUCTION_SMOKE_TESTING.md`](C:/repos/chat2.0/docs/PRODUCTION_SMOKE_TESTING.md:1) for canonical account details, setup, commands, and artifact triage.
 
 Current smoke scenarios:
 

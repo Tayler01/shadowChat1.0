@@ -23,6 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 .env
+.env.testing.local
 
 # Bolt data
 .bolt/

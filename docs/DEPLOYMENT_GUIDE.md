@@ -121,7 +121,7 @@ The default production smoke opens a visible browser. For CI-style environments 
 npm run qa:smoke:prod:headless
 ```
 
-Production smoke requires two stable, email-confirmed `PLAYWRIGHT_ACCOUNT_*` users. Disposable signup is not reliable against production when email confirmation is enabled. See [`docs/PRODUCTION_SMOKE_TESTING.md`](C:/repos/chat2.0/docs/PRODUCTION_SMOKE_TESTING.md:1).
+Production smoke requires the two stable, email-confirmed `PLAYWRIGHT_ACCOUNT_*` users from local `.env.testing.local` or CI secrets. Disposable signup is not reliable against production when email confirmation is enabled. See [`docs/PRODUCTION_SMOKE_TESTING.md`](C:/repos/chat2.0/docs/PRODUCTION_SMOKE_TESTING.md:1).
 
 ## Production Gotchas
 

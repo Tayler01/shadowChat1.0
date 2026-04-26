@@ -22,7 +22,10 @@ const taskKillCommand = process.platform === 'win32' ? 'taskkill' : null
 
 const args = parseArgs(process.argv.slice(2))
 const repoRoot = process.cwd()
-const envFileValues = await loadDotEnv(path.join(repoRoot, '.env'))
+const envFileValues = await loadDotEnvFiles([
+  path.join(repoRoot, '.env'),
+  path.join(repoRoot, '.env.testing.local'),
+])
 const config = buildConfig(args, envFileValues)
 const artifactDir = path.join(repoRoot, config.artifactDir)
 const logsDir = path.join(artifactDir, 'logs')
@@ -334,6 +337,16 @@ async function loadDotEnv(filePath) {
     }
 
     values[key] = value
+  }
+
+  return values
+}
+
+async function loadDotEnvFiles(filePaths) {
+  const values = {}
+
+  for (const filePath of filePaths) {
+    Object.assign(values, await loadDotEnv(filePath))
   }
 
   return values
