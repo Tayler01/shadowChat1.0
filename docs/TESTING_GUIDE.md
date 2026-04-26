@@ -88,10 +88,22 @@ Run the resume/background-send repro:
 npm run qa:smoke:resume
 ```
 
-Run the same check against production:
+Run the same check against production in a visible browser:
 
 ```powershell
-node scripts/playwright-smoke.mjs --base-url=https://shadowchat-1-0.netlify.app --scenario=auth,resume-send --run-name=prod-check
+npm run qa:smoke:prod
+```
+
+Run the explicit headed alias when you want the command name to say what it does:
+
+```powershell
+npm run qa:smoke:prod:headed
+```
+
+Run the production smoke headless only when the local or CI browser environment is known to be stable:
+
+```powershell
+npm run qa:smoke:prod:headless
 ```
 
 Run the broader end-to-end sweep:
@@ -111,7 +123,9 @@ Useful direct-script flags:
 - `--scenario=auth,dm,mobile-dm-back`
 - `--scenario=auth,resume-send`
 - `--headed`
+- `--slow-mo=300`
 - `--base-url=http://127.0.0.1:4174`
+- `--account-mode=env`
 - `--no-reuse-server`
 - `--skip-build`
 - `--run-name=my-check`
@@ -125,6 +139,8 @@ What the smoke runner does by default:
 - saves screenshots, logs, storage state, and a JSON summary under `output/playwright/<run-name>/`
 
 When you have changed app code and want the latest build instead of the already-running preview, add `--no-reuse-server`.
+
+Production smoke is different from local smoke: it must use two stable, email-confirmed `PLAYWRIGHT_ACCOUNT_*` users because production signup can require email confirmation and return no active session. See [`docs/PRODUCTION_SMOKE_TESTING.md`](C:/repos/chat2.0/docs/PRODUCTION_SMOKE_TESTING.md:1) for account setup, commands, and artifact triage.
 
 Current smoke scenarios:
 
@@ -146,7 +162,7 @@ The iPhone Home Screen app should be treated as a distinct runtime when debuggin
 Important guardrails:
 
 - do not put async Supabase work directly inside `supabase.auth.onAuthStateChange(...)`
-- prefer Supabase’s documented `worker: true` and heartbeat reconnect behavior before inventing custom client recreation logic
+- prefer Supabase's documented `worker: true` and heartbeat reconnect behavior before inventing custom client recreation logic
 - verify resume/send after deploy, not only in local preview
 
 ### Headed Smoke Script Pattern

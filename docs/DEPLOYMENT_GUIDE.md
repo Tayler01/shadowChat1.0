@@ -109,11 +109,19 @@ After deploy, verify:
 6. Resume-send works after a background/foreground cycle
 7. Settings page renders cleanly on mobile and desktop
 
-Recommended production smoke:
+Recommended production smoke for local post-deploy validation:
 
 ```powershell
-node scripts/playwright-smoke.mjs --base-url=https://shadowchat-1-0.netlify.app --scenario=auth,resume-send --run-name=prod-postdeploy
+npm run qa:smoke:prod
 ```
+
+The default production smoke opens a visible browser. For CI-style environments where headless Chromium is stable, use:
+
+```powershell
+npm run qa:smoke:prod:headless
+```
+
+Production smoke requires two stable, email-confirmed `PLAYWRIGHT_ACCOUNT_*` users. Disposable signup is not reliable against production when email confirmation is enabled. See [`docs/PRODUCTION_SMOKE_TESTING.md`](C:/repos/chat2.0/docs/PRODUCTION_SMOKE_TESTING.md:1).
 
 ## Production Gotchas
 
