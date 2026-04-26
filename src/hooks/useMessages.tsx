@@ -270,6 +270,16 @@ function useProvideMessages(): MessagesContextValue {
 
           return merged;
         });
+      } else {
+        setMessages([]);
+        setHasMore(false);
+        if (typeof localStorage !== 'undefined') {
+          try {
+            localStorage.removeItem('chatHistory');
+          } catch {
+            // ignore storage errors
+          }
+        }
       }
     } catch (error) {
       throw error;
