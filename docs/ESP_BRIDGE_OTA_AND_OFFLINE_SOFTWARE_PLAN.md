@@ -185,7 +185,7 @@ The current Windows tool bundle path is:
 
 ```powershell
 npm run bridge:bundle:pack
-npm run bridge:bundle -- -Port COM3 -Target windows_bundle
+npm run bridge:bundle -- -Target windows_bundle
 ```
 
 The ESP resolves `windows_bundle` from `bridge-update-check`, downloads only the manifest-selected artifact, emits `bundleStart`/`bundleChunk`/`bundleEnd` frames over serial, and the receiver verifies the reconstructed file hash before reporting success.

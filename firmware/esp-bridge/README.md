@@ -154,13 +154,13 @@ The bridge can tunnel approved ShadowChat tool bundles to a Windows PC that has 
 From a PC that already has this repo:
 
 ```powershell
-npm run bridge:bundle -- -Port COM3 -Target windows_bundle -OutputPath output\bridge-downloads
+npm run bridge:bundle -- -Target windows_bundle -OutputPath output\bridge-downloads
 ```
 
 From a bare PowerShell prompt after receiving the script:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools\bridge-tui\bridge-bundle-receive.ps1 -Port COM3 -Target windows_bundle
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\bridge-tui\bridge-bundle-receive.ps1 -Target windows_bundle
 ```
 
 The receiver opens the serial port, sends `bundle get windows_bundle`, reconstructs base64 chunk frames, writes the zip, and verifies SHA-256 before reporting success. The ESP never accepts an arbitrary URL from the PC; it only fetches artifacts returned by `bridge-update-check`.
@@ -204,7 +204,7 @@ bootstrap script
 Copy the text between `BEGIN SHADOWCHAT BRIDGE RECEIVER POWERSHELL` and `END SHADOWCHAT BRIDGE RECEIVER POWERSHELL` into `Receive-ShadowChatBridge.ps1`, then run it from PowerShell:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\Receive-ShadowChatBridge.ps1 -Port COM3 -Output .
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Receive-ShadowChatBridge.ps1 -Output .
 ```
 
 That minimal receiver asks the ESP to run `bundle get windows_bundle`, reconstructs the zip from serial frames, and checks the SHA-256 hash before reporting success.
@@ -219,12 +219,12 @@ Run the default group-chat TUI:
 npm run bridge:tui
 ```
 
-For custom ports or flags, call the PowerShell script directly.
+The TUI auto-detects the ESP bridge serial port. For custom ports or flags, call the PowerShell script directly.
 
 Run a DM thread by username or user id:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1 -Port COM3 -Mode dm -DmRecipientUserId @caleb
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1 -Mode dm -DmRecipientUserId @caleb
 ```
 
 Run a no-message smoke check against the connected bridge:
@@ -277,8 +277,8 @@ The TUI stores preferences in `%LOCALAPPDATA%\ShadowChatBridge\bridge-tui.json` 
 Smoke mode now uses UTF-8 serial I/O and can validate send/poll flows:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1 -Port COM3 -Smoke -SmokeGroupText "bridge smoke"
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1 -Port COM3 -Smoke -Mode dm -SmokeDmRecipientUserId "<user_id>" -SmokeDmText "bridge dm smoke"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1 -Smoke -SmokeGroupText "bridge smoke"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1 -Smoke -Mode dm -SmokeDmRecipientUserId "<user_id>" -SmokeDmText "bridge dm smoke"
 ```
 
 On boot, the firmware waits for stored Wi-Fi to reconnect and checks the stored bridge/auth session material. If session material is missing or close to expiry, it refreshes automatically so the bridge is ready for chat after a reboot or flash. It also reconnects stored Wi-Fi on demand before heartbeat, group, DM, and user-search calls if the station dropped, refreshes stored bridge session material when the stored session expiry is within five minutes, and retries bridge-authenticated calls once after refreshing when it receives an auth-expired response. If refresh fails and a recovery token is stored, the firmware auto-recovers by issuing a short-lived recovery pairing code and exchanging fresh session material without another approval.

@@ -2,7 +2,7 @@
 
 ## Current Milestone
 
-Milestone 8: firmware space headroom.
+Milestone 9: plug-and-play tools polish and Android badge stability.
 
 ## Completed
 
@@ -88,10 +88,22 @@ Milestone 8: firmware space headroom.
 - Applied OTA on the connected ESP32-S3 from `0.2.4-bootstrap-admin-recover` to `0.2.5-space-headroom`.
 - Live status after OTA reported `firmware_version: 0.2.5-space-headroom`, Wi-Fi connected, session stored, auth stored, and `usb_bootstrap: MSC+CDC initialized`.
 - Confirmed Windows still enumerates the bridge as `COM4` plus the ESP bootstrap FAT drive at `D:`.
+- Added auto-detect to the repo-side Windows bundle receiver so `bridge-bundle-receive.ps1` no longer defaults to a fixed COM port.
+- Added bundled `tools/bridge-tui/START-CHAT.CMD` as a double-click launcher for the chat TUI.
+- Added bundled `tools/bridge-tui/BRIDGE-TOOLS-HELP.txt` with tool descriptions, normal workflows, and troubleshooting notes.
+- Updated the Windows tools installer text, firmware README, and offline software plan so normal setup commands use port auto-detect instead of `-Port COMx`.
+- Updated the firmware's serial-only `bootstrap script` fallback so the printed receiver auto-detects the bridge port.
+- Published `windows_bundle` version `0.1.8-tools` with launcher/help/auto-detect changes, then superseded it with `0.1.9-tools` after live testing found an output path edge case.
+- Published `windows_bundle` version `0.1.9-tools` with corrected receiver output handling for directory names that contain dots.
+- Published firmware version `0.2.6-bootstrap-autodetect` with the auto-detecting serial-only fallback receiver script.
+- Applied firmware OTA on the connected ESP32-S3 from `0.2.5-space-headroom` to `0.2.6-bootstrap-autodetect`.
+- Live post-OTA status reported `firmware_version: 0.2.6-bootstrap-autodetect`.
+- Updated Android badge sync so a just-cleared local unread count is trusted briefly and stale launcher badge refreshes do not repaint a red dot right after opening a DM.
+- Added a focused `AppBadgeSync` regression test for the Android badge repaint behavior.
 
 ## In Progress
 
-- No active implementation work in this milestone.
+- Manual full flash for the new partition table is still pending. Direct `idf.py flash` over the TinyUSB CDC app port failed to enter ROM bootloader; use BOOT/RESET or hold BOOT while reconnecting before retrying the full flash.
 
 ## Pushed
 
@@ -447,6 +459,56 @@ D:\SETUP.CMD
 D:\AUTORUN.INF
 ```
 
+Milestone 9 validation passed:
+
+```powershell
+npm run bridge:bundle:pack
+npm run bridge:bundle:pack
+npm test -- --runInBand tests/AppBadgeSync.test.tsx
+npm run bridge:tui:test
+npm run lint
+npx tsc --noEmit -p tsconfig.app.json
+npm run build
+python C:\esp\esp-idf-v5.3.1\tools\idf.py build
+supabase db push --yes
+```
+
+Deterministic tools bundle proof:
+
+```text
+windows_bundle stable any 0.1.9-tools
+SHA256 5d123df78cc10faec0bed5db1f5a903be6d741fc2d77353804a0b114561bbccd
+size 29048
+```
+
+Live receiver proof with no explicit port:
+
+```text
+Auto-detecting ShadowChat bridge serial port...
+Checking COM4...
+Using COM4
+Streaming windows_bundle 0.1.9-tools over serial. Keep the receiver open until bundleEnd.
+Receiving windows_bundle 0.1.9-tools -> output\bridge-downloads-0.1.9\shadowchat-bridge-tools.zip (29048 bytes)
+Bundle SHA-256 verified for 29048 bytes
+Transfer complete: output\bridge-downloads-0.1.9\shadowchat-bridge-tools.zip
+SHA256: 5d123df78cc10faec0bed5db1f5a903be6d741fc2d77353804a0b114561bbccd
+```
+
+Firmware publish and live OTA proof:
+
+```text
+firmware stable esp32-s3 0.2.6-bootstrap-autodetect
+SHA256 17778abeb42eb3f6e8f2c2406036399fb26fa513368d0fd4d1c1a03cb029f0ec
+size 1040160
+
+Downloading firmware 0.2.6-bootstrap-autodetect to OTA partition ota_1 at 0x260000
+OTA download size: 1040160 bytes
+OTA SHA-256 verified for 1040160 bytes
+Firmware update staged. Rebooting into version 0.2.6-bootstrap-autodetect.
+
+firmware_version: 0.2.6-bootstrap-autodetect
+```
+
 ## Failed Approaches / Notes
 
 - Do not use Netlify for ESP update artifacts; Netlify account credits previously disabled the site and update availability must not depend on that path.
@@ -472,3 +534,5 @@ D:\AUTORUN.INF
 - `Compress-Archive` produced timestamp-sensitive ZIP hashes. Replaced it with a deterministic sorted `ZipArchive` writer using fixed entry timestamps, then verified two consecutive `0.1.6-tools` packs produced the same SHA-256.
 - If the ESP is left in chat mode, a bare `bootstrap ping` can be treated as chat input. The receiver now sends `/admin` before `bootstrap ping` and before `bundle get windows_bundle`.
 - OTA cannot rewrite the partition table. `0.2.5-space-headroom` can be OTA-applied because it still fits old app slots, but the enlarged `0x140000` slots only take effect after a manual full flash that includes the partition table.
+- A direct full-flash retry after TinyUSB composite firmware built successfully failed with `Failed to connect to ESP32-S3: No serial data received.` Do not retry normal `idf.py -p COM4 flash` until the board is placed in ROM bootloader mode with BOOT/RESET.
+- `0.1.8-tools` was published successfully, but live receiver testing with `-OutputPath output\bridge-downloads-0.1.8` exposed that dotted directory names could be treated as filenames. Do not reuse that artifact; `0.1.9-tools` supersedes it.

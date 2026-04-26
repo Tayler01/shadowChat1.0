@@ -17,7 +17,7 @@
     "qa:smoke:mobile": "node scripts/playwright-smoke.mjs --scenario=mobile-dm-back",
     "qa:smoke:full": "node scripts/playwright-smoke.mjs --scenario=full",
     "bridge:tui": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1",
-    "bridge:tui:smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1 -Port COM3 -Smoke",
+    "bridge:tui:smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1 -Smoke",
     "bridge:bundle": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-bundle-receive.ps1",
     "bridge:bundle:pack": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-bridge-bundle.ps1",
     "bridge:tui:test": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-bridge-tui-layout.ps1",

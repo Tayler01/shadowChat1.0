@@ -1237,14 +1237,29 @@ static void bridge_command_bootstrap_help(void) {
 
 static void bridge_command_bootstrap_script(void) {
     printf("\n----- BEGIN SHADOWCHAT BRIDGE RECEIVER POWERSHELL -----\n");
-    printf("param([string]$Port='COM3',[string]$Output='.')\n");
+    printf("param([string]$Port='',[string]$Output='.')\n");
     printf("$ErrorActionPreference='Stop'\n");
     printf("$enc=[Text.UTF8Encoding]::new($false)\n");
-    printf("$sp=[IO.Ports.SerialPort]::new($Port,115200,[IO.Ports.Parity]::None,8,[IO.Ports.StopBits]::One)\n");
-    printf("$sp.Encoding=$enc; $sp.NewLine=\"`n\"; $sp.ReadBufferSize=1048576; $sp.ReadTimeout=1000; $sp.WriteTimeout=3000\n");
+    printf("function Open-Bridge($Requested) {\n");
+    printf("  $ports=if ($Requested) { @($Requested) } else { [IO.Ports.SerialPort]::GetPortNames() | Sort-Object }\n");
+    printf("  foreach ($p in $ports) {\n");
+    printf("    Write-Host \"Checking $p...\"\n");
+    printf("    $s=[IO.Ports.SerialPort]::new($p,115200,[IO.Ports.Parity]::None,8,[IO.Ports.StopBits]::One)\n");
+    printf("    $s.Encoding=$enc; $s.NewLine=\"`n\"; $s.ReadBufferSize=1048576; $s.ReadTimeout=250; $s.WriteTimeout=1000; $s.DtrEnable=$true; $s.RtsEnable=$true\n");
+    printf("    try {\n");
+    printf("      $s.Open(); Start-Sleep -Milliseconds 900; $s.DiscardInBuffer(); $s.WriteLine('/admin'); Start-Sleep -Milliseconds 250; $s.WriteLine('bootstrap ping')\n");
+    printf("      $deadline=[DateTime]::UtcNow.AddSeconds(3)\n");
+    printf("      while ([DateTime]::UtcNow -lt $deadline) { try { if ($s.ReadLine() -match 'SHADOWCHAT_BRIDGE_READY') { Write-Host \"Using $p\"; return $s } } catch [System.TimeoutException] {} }\n");
+    printf("    } catch {}\n");
+    printf("    if ($s.IsOpen) { $s.Close() }; $s.Dispose()\n");
+    printf("  }\n");
+    printf("  throw 'Could not find the ShadowChat ESP bridge serial port.'\n");
+    printf("}\n");
+    printf("$sp=Open-Bridge $Port\n");
+    printf("$sp.ReadTimeout=1000; $sp.WriteTimeout=3000\n");
     printf("$fs=$null; $path=$null; $sha=''; $bytes=0\n");
     printf("try {\n");
-    printf("  $sp.Open(); Start-Sleep -Milliseconds 1200; $sp.DiscardInBuffer(); $sp.WriteLine('bundle get windows_bundle')\n");
+    printf("  $sp.DiscardInBuffer(); $sp.WriteLine('/admin'); Start-Sleep -Milliseconds 250; $sp.WriteLine('bundle get windows_bundle')\n");
     printf("  while ($true) {\n");
     printf("    try { $line=$sp.ReadLine() } catch [System.TimeoutException] { continue }\n");
     printf("    $line=$line.TrimEnd(\"`r\",\"`n\")\n");

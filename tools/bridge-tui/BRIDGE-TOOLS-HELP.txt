@@ -1,0 +1,80 @@
+ShadowChat Bridge Tools
+
+These tools are for a Windows PC that does not have direct internet access.
+The ESP bridge is the only networked device. It fetches approved ShadowChat
+artifacts and messages, then talks to this PC over USB serial.
+
+Files in this bundle:
+
+- tools\bridge-tui\START-CHAT.CMD
+  Double-click this to open the chat console. It auto-detects the ESP bridge
+serial port, so you do not need to know which COM number Windows chose.
+
+- tools\bridge-tui\bridge-tui.ps1
+  The main ShadowChat bridge chat console. It supports group chat, DMs,
+  recent-message loading, live/realtime updates when available, and an admin
+  shell for bridge commands.
+
+- tools\bridge-tui\bridge-bundle-receive.ps1
+  A receiver for approved software bundles. It asks the ESP to fetch the latest
+  allowed ShadowChat bundle, reconstructs the ZIP over serial, and verifies
+  SHA-256 before reporting success.
+
+- tools\bridge-bootstrap\START.CMD and SETUP.CMD
+  Bootstrap helpers like the tiny drive served directly by the ESP. They save
+  shadowchat-bridge-tools.zip into Desktop\ShadowChatBridge, print the exact
+  path, verify SHA-256, and open File Explorer.
+
+- firmware\esp-bridge\README.md
+  Firmware command reference, pairing/session notes, OTA notes, and troubleshooting.
+
+Quick start:
+
+1. Plug in the ESP bridge.
+2. Wait for Windows to show the USB serial device.
+3. Double-click tools\bridge-tui\START-CHAT.CMD.
+4. Use plain typing for the active chat thread.
+
+Useful chat console commands:
+
+/group
+  Switch to group chat.
+
+/dm @username
+  Switch to a direct message thread by username.
+
+/users name
+  Search for a user.
+
+/dms
+  Show recent direct message targets.
+
+/status
+  Show bridge Wi-Fi, device, session, and auth state.
+
+/admin
+  Enter the raw ESP admin shell.
+
+/chat
+  Return from the admin shell to the last chat thread.
+
+/help
+  Show commands inside the chat console.
+
+Manual launch examples:
+
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\bridge-tui\bridge-tui.ps1
+
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\bridge-tui\bridge-tui.ps1 -Mode dm -DmRecipientUserId @caleb
+
+Only specify a port if auto-detect cannot find the bridge:
+
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\bridge-tui\bridge-tui.ps1 -Port COM4
+
+Troubleshooting:
+
+- If auto-detect fails, close other serial tools and reconnect the ESP.
+- If the ESP was left in chat mode, the tools send /admin automatically before
+  probing.
+- If Windows changes the COM number, start the launcher again; it will scan.
+- The PC does not receive general internet access from the ESP.

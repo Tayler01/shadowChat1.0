@@ -852,6 +852,10 @@ export const markDMMessagesRead = async (conversationId: string) => {
   const { error } = await workingClient.rpc('mark_dm_messages_read', {
     conversation_id: conversationId
   })
+
+  if (error) {
+    throw error
+  }
 }
 
 export const searchUsers = async (

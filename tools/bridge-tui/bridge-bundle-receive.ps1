@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Port = "COM3",
+    [string]$Port = "",
     [int]$BaudRate = 115200,
     [ValidateSet("windows_bundle", "bootstrap")]
     [string]$Target = "windows_bundle",
@@ -57,11 +57,20 @@ function Resolve-OutputFile {
         return Join-Path $root $safeName
     }
 
+    $requestedExtension = [System.IO.Path]::GetExtension($RequestedPath)
+    $safeNameExtension = [System.IO.Path]::GetExtension($safeName)
+    $looksLikeFile = (
+        -not [string]::IsNullOrWhiteSpace($requestedExtension) -and
+        (
+            [string]::IsNullOrWhiteSpace($safeNameExtension) -or
+            $requestedExtension.Equals($safeNameExtension, [StringComparison]::OrdinalIgnoreCase)
+        )
+    )
     $looksLikeDirectory = (
         (Test-Path -LiteralPath $RequestedPath -PathType Container) -or
         $RequestedPath.EndsWith("\") -or
         $RequestedPath.EndsWith("/") -or
-        [string]::IsNullOrWhiteSpace([System.IO.Path]::GetExtension($RequestedPath))
+        -not $looksLikeFile
     )
 
     if ($looksLikeDirectory) {
@@ -97,6 +106,87 @@ function Read-BridgeFrame {
     }
 }
 
+function Test-BridgePortCandidate {
+    param(
+        [string]$Name,
+        [int]$Baud
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Name)) {
+        return $false
+    }
+
+    $probe = [System.IO.Ports.SerialPort]::new($Name, $Baud)
+    $probe.Encoding = $script:utf8NoBom
+    $probe.NewLine = "`n"
+    $probe.ReadTimeout = 250
+    $probe.WriteTimeout = 1000
+    $probe.DtrEnable = $true
+    $probe.RtsEnable = $true
+
+    try {
+        $probe.Open()
+        Start-Sleep -Milliseconds 900
+        $probe.DiscardInBuffer()
+        $probe.WriteLine("/admin")
+        Start-Sleep -Milliseconds 250
+        $probe.WriteLine("bootstrap ping")
+
+        $deadline = [DateTime]::UtcNow.AddSeconds(3)
+        while ([DateTime]::UtcNow -lt $deadline) {
+            try {
+                if ($probe.ReadLine() -match "SHADOWCHAT_BRIDGE_READY") {
+                    return $true
+                }
+            } catch [System.TimeoutException] {
+            }
+        }
+    } catch {
+        return $false
+    } finally {
+        if ($probe.IsOpen) {
+            $probe.Close()
+        }
+        $probe.Dispose()
+    }
+
+    return $false
+}
+
+function Resolve-BridgePort {
+    param(
+        [string]$Requested,
+        [int]$Baud,
+        [bool]$Explicit
+    )
+
+    if ($Explicit -and -not [string]::IsNullOrWhiteSpace($Requested)) {
+        return $Requested
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($Requested) -and (Test-BridgePortCandidate -Name $Requested -Baud $Baud)) {
+        return $Requested
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($Requested)) {
+        Write-Host "Requested bridge port $Requested did not answer. Auto-detecting..."
+    } else {
+        Write-Host "Auto-detecting ShadowChat bridge serial port..."
+    }
+
+    foreach ($candidate in ([System.IO.Ports.SerialPort]::GetPortNames() | Sort-Object)) {
+        Write-Host "Checking $candidate..."
+        if (Test-BridgePortCandidate -Name $candidate -Baud $Baud) {
+            Write-Host "Using $candidate"
+            return $candidate
+        }
+    }
+
+    throw "Could not find the ShadowChat ESP bridge serial port. Close other serial tools, reconnect the ESP, or run with -Port COMx."
+}
+
+$Port = Resolve-BridgePort -Requested $Port -Baud $BaudRate -Explicit $PSBoundParameters.ContainsKey("Port")
+
 $serial = [System.IO.Ports.SerialPort]::new($Port, $BaudRate, [System.IO.Ports.Parity]::None, 8, [System.IO.Ports.StopBits]::One)
 $serial.Encoding = $script:utf8NoBom
 $serial.NewLine = "`n"
@@ -122,6 +212,8 @@ try {
     $serial.DiscardInBuffer()
 
     Write-Host "Requesting $Target through the ESP bridge..."
+    $serial.WriteLine("/admin")
+    Start-Sleep -Milliseconds 300
     $serial.WriteLine("bundle get $Target")
 
     while (-not $completed) {

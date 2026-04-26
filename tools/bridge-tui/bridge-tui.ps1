@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Port = "COM3",
+    [string]$Port = "",
     [int]$BaudRate = 115200,
     [ValidateSet("group", "dm", "admin")]
     [string]$Mode = "group",
@@ -49,6 +49,85 @@ function Read-BridgeTuiPreferences {
         Write-Warning "Ignoring unreadable bridge TUI preferences at $Path"
         return $null
     }
+}
+
+function Test-BridgePortCandidate {
+    param(
+        [string]$Name,
+        [int]$Baud
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Name)) {
+        return $false
+    }
+
+    $probe = [System.IO.Ports.SerialPort]::new($Name, $Baud)
+    $probe.Encoding = $script:utf8NoBom
+    $probe.NewLine = "`n"
+    $probe.ReadTimeout = 250
+    $probe.WriteTimeout = 1000
+    $probe.DtrEnable = $true
+    $probe.RtsEnable = $true
+
+    try {
+        $probe.Open()
+        Start-Sleep -Milliseconds 900
+        $probe.DiscardInBuffer()
+        $probe.WriteLine("/admin")
+        Start-Sleep -Milliseconds 250
+        $probe.WriteLine("bootstrap ping")
+
+        $deadline = [DateTime]::UtcNow.AddSeconds(3)
+        while ([DateTime]::UtcNow -lt $deadline) {
+            try {
+                if ($probe.ReadLine() -match "SHADOWCHAT_BRIDGE_READY") {
+                    return $true
+                }
+            } catch [System.TimeoutException] {
+            }
+        }
+    } catch {
+        return $false
+    } finally {
+        if ($probe.IsOpen) {
+            $probe.Close()
+        }
+        $probe.Dispose()
+    }
+
+    return $false
+}
+
+function Resolve-BridgePort {
+    param(
+        [string]$Requested,
+        [int]$Baud,
+        [bool]$Explicit
+    )
+
+    if ($Explicit -and -not [string]::IsNullOrWhiteSpace($Requested)) {
+        return $Requested
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($Requested) -and (Test-BridgePortCandidate -Name $Requested -Baud $Baud)) {
+        return $Requested
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($Requested)) {
+        Write-Host "Saved bridge port $Requested did not answer. Auto-detecting..."
+    } else {
+        Write-Host "Auto-detecting ShadowChat bridge serial port..."
+    }
+
+    foreach ($candidate in ([System.IO.Ports.SerialPort]::GetPortNames() | Sort-Object)) {
+        Write-Host "Checking $candidate..."
+        if (Test-BridgePortCandidate -Name $candidate -Baud $Baud) {
+            Write-Host "Using $candidate"
+            return $candidate
+        }
+    }
+
+    throw "Could not find the ShadowChat ESP bridge serial port. Close other serial tools, reconnect the ESP, or run with -Port COMx."
 }
 
 function Save-BridgeTuiPreferences {
@@ -146,6 +225,8 @@ if ($loadedPreferences) {
         $TranscriptLines = [int]$loadedPreferences.transcriptLines
     }
 }
+
+$Port = Resolve-BridgePort -Requested $Port -Baud $BaudRate -Explicit:$PSBoundParameters.ContainsKey("Port")
 
 $script:serial = $null
 $script:incomingBuffer = ""

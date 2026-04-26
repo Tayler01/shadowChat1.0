@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = "0.1.7-tools",
+    [string]$Version = "0.1.9-tools",
     [string]$OutputDirectory = "output/bridge-bundles"
 )
 
@@ -26,6 +26,8 @@ New-Item -ItemType Directory -Force -Path $stagingRoot | Out-Null
 
 $items = @(
     @{ Source = "tools/bridge-tui/bridge-tui.ps1"; Destination = "tools/bridge-tui/bridge-tui.ps1" },
+    @{ Source = "tools/bridge-tui/START-CHAT.CMD"; Destination = "tools/bridge-tui/START-CHAT.CMD" },
+    @{ Source = "tools/bridge-tui/BRIDGE-TOOLS-HELP.txt"; Destination = "tools/bridge-tui/BRIDGE-TOOLS-HELP.txt" },
     @{ Source = "tools/bridge-tui/bridge-bundle-receive.ps1"; Destination = "tools/bridge-tui/bridge-bundle-receive.ps1" },
     @{ Source = "tools/bridge-bootstrap/START.CMD"; Destination = "tools/bridge-bootstrap/START.CMD" },
     @{ Source = "tools/bridge-bootstrap/SETUP.CMD"; Destination = "tools/bridge-bootstrap/SETUP.CMD" },
@@ -58,6 +60,8 @@ This bundle is intended for a Windows PC that does not have direct internet acce
 
 Included:
 - tools/bridge-tui/bridge-tui.ps1
+- tools/bridge-tui/START-CHAT.CMD
+- tools/bridge-tui/BRIDGE-TOOLS-HELP.txt
 - tools/bridge-tui/bridge-bundle-receive.ps1
 - tools/bridge-bootstrap/START.CMD
 - tools/bridge-bootstrap/SETUP.CMD
@@ -67,11 +71,17 @@ Included:
 
 Run the chat TUI:
 
-powershell -NoProfile -ExecutionPolicy Bypass -File tools\bridge-tui\bridge-tui.ps1 -Port COM3
+Double-click tools\bridge-tui\START-CHAT.CMD
+
+Or run it manually with auto-detect:
+
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\bridge-tui\bridge-tui.ps1
+
+Only specify -Port COMx if auto-detect cannot find the bridge.
 
 Receive a newer approved bundle through the ESP:
 
-powershell -NoProfile -ExecutionPolicy Bypass -File tools\bridge-tui\bridge-bundle-receive.ps1 -Port COM3
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\bridge-tui\bridge-bundle-receive.ps1
 
 The receiver only reconstructs artifacts selected by the ESP from ShadowChat update manifests.
 "@

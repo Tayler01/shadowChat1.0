@@ -96,7 +96,9 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
         unreadCount: conv.unread_count || 0,
       }
       setUnreadJumpToken(token => token + 1)
-      markAsRead(currentConversation)
+      void markAsRead(currentConversation).catch(() => {
+        pendingUnreadJumpRef.current = null
+      })
     }
   }, [currentConversation, conversations, markAsRead])
 
