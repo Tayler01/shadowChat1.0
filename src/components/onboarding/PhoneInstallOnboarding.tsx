@@ -29,7 +29,8 @@ export function PhoneInstallOnboarding() {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
-    if (shouldShowPhoneInstallOnboarding(profile, isInstalledApp())) {
+    if (profile && shouldShowPhoneInstallOnboarding(profile, isInstalledApp())) {
+      markPhoneInstallOnboardingSeen(profile)
       toast.dismiss()
       setOpen(true)
     }

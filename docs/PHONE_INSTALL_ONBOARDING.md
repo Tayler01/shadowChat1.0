@@ -6,7 +6,8 @@ Shadow Chat is a PWA. New accounts should be guided into adding it to their phon
 
 - Account creation marks phone setup as pending in local storage by email, and by user id when Supabase returns one.
 - After the new user has an active session, `PhoneInstallOnboarding` opens the guided setup modal unless the app is already running in standalone mode.
-- Closing the modal or tapping `I Added It` records the guide as seen for that user.
+- The first display records the guide as seen for that user, so it does not return on later logins even if the user refreshes or leaves before closing it.
+- Closing the modal or tapping `I Added It` only dismisses the current modal instance.
 - Settings keeps a `Phone App Setup` section so anyone can reopen the guide later.
 
 The onboarding marker is local to the browser that created the account. This avoids interrupting existing users and the stable Playwright smoke accounts.
