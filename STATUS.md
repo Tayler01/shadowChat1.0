@@ -6,6 +6,21 @@ Milestone 9: plug-and-play tools polish and Android badge stability.
 
 ## Completed
 
+- Released P0 DM routing/read-state fixes from commit `4f2e45b`.
+- Pushed `main` to `origin/main`.
+- Added [docs/ESP_BRIDGE_RELEASE_RUNBOOK.md](C:/repos/chat2.0/docs/ESP_BRIDGE_RELEASE_RUNBOOK.md:1) covering bridge versioning, artifact upload, manifest publishing, smoke checks, and rollback.
+- Uploaded firmware artifact `0.2.8-p0-dm-routing` to Supabase Storage path `firmware/esp32-s3/0.2.8-p0-dm-routing/shadowchat_bridge.bin`.
+- Firmware artifact SHA-256: `26338923502b1bcbfb78220d368208409bf26cf53d7c8e6b4706f97e16d568b6`; size: `1040176` bytes.
+- Uploaded Windows tools bundle `0.1.10-tui-dm-routing` to Supabase Storage path `windows/0.1.10-tui-dm-routing/shadowchat-bridge-tools.zip`.
+- Windows tools artifact SHA-256: `27d0e43fd7b85c2a68f2653db494ccd1f81f1222db8733b898c737908bd32545`; size: `29470` bytes.
+- Applied Supabase migrations `20260426090000_bridge_mark_dm_messages_read.sql` and `20260426144500_publish_bridge_p0_dm_routing.sql`.
+- Deployed Supabase Edge Functions `bridge-dm-poll` and `bridge-update-check` to project `shsqqouecvdoifzufkqm`.
+- Live `bridge-update-check` smoke returned firmware latest `0.2.8-p0-dm-routing` and Windows bundle latest `0.1.10-tui-dm-routing`, both with `updateAvailable: true` from previous versions.
+- Deployed Netlify production deploy `69ee2590933e0d42c4b64b57` to `https://shadowchat-1-0.netlify.app`.
+- Production Playwright smoke reached Netlify but could not complete disposable signup because production did not return an active session; stable `PLAYWRIGHT_ACCOUNT_*` smoke accounts are still needed for production auth/resume smoke.
+- Connected ESP bridge on scanned `COM4` recovered its expired bridge session, saw the firmware and Windows bundle manifests, and applied OTA from `0.2.7-fat-headroom` to `0.2.8-p0-dm-routing`.
+- Post-OTA serial status reported `firmware_version: 0.2.8-p0-dm-routing`, and `update check firmware` reported the device current for `stable`.
+- Real serial bundle receive downloaded `windows_bundle 0.1.10-tui-dm-routing` through the ESP and verified SHA-256 on disk.
 - Read repo instructions and bridge planning/status docs.
 - Confirmed validation commands from AGENTS.md, package scripts, and README.
 - Confirmed existing firmware partition layout includes `factory`, `ota_0`, and `ota_1`.
