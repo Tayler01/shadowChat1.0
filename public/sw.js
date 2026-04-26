@@ -60,6 +60,52 @@ const updateAppBadge = async (count) => {
   await applyAppBadge(count)
 }
 
+const notificationMatchesClearRequest = (notification, request) => {
+  const data = notification.data || {}
+  const tag = notification.tag || ''
+  const notificationType = data.type || request.notificationType
+
+  if (request.notificationType === 'dm_message') {
+    const isDM =
+      notificationType === 'dm_message' ||
+      tag.startsWith('dm:') ||
+      tag.startsWith('bridge-dm:')
+
+    if (!isDM) {
+      return false
+    }
+  } else if (request.notificationType && notificationType !== request.notificationType) {
+    return false
+  }
+
+  if (request.conversationId) {
+    const conversationTagMatches =
+      tag === `dm:${request.conversationId}` ||
+      tag === `bridge-dm:${request.conversationId}`
+
+    if (data.conversationId !== request.conversationId && !conversationTagMatches) {
+      return false
+    }
+  }
+
+  if (request.messageId && data.messageId !== request.messageId) {
+    return false
+  }
+
+  return true
+}
+
+const clearNotifications = async (request = {}) => {
+  if (!self.registration.getNotifications) {
+    return
+  }
+
+  const notifications = await self.registration.getNotifications()
+  notifications
+    .filter((notification) => notificationMatchesClearRequest(notification, request))
+    .forEach((notification) => notification.close())
+}
+
 const settleAppBadge = async (count) => {
   const normalizedCount = normalizeBadgeCount(count)
   badgeUpdateVersion += 1
@@ -176,6 +222,11 @@ self.addEventListener('message', (event) => {
     self.skipWaiting()
   } else if (event.data?.type === 'SHADOWCHAT_BADGE_UPDATE') {
     const task = updateAppBadge(event.data.count)
+    if (event.waitUntil) {
+      event.waitUntil(task)
+    }
+  } else if (event.data?.type === 'SHADOWCHAT_NOTIFICATIONS_CLEAR') {
+    const task = clearNotifications(event.data)
     if (event.waitUntil) {
       event.waitUntil(task)
     }

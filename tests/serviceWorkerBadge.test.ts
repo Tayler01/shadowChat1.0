@@ -12,6 +12,11 @@ const loadServiceWorker = () => {
   const listeners: ListenerMap = {}
   const setAppBadge = jest.fn().mockResolvedValue(undefined)
   const clearAppBadge = jest.fn().mockResolvedValue(undefined)
+  const notifications: Array<{
+    close: jest.Mock
+    data?: Record<string, unknown>
+    tag?: string
+  }> = []
 
   const selfMock = {
     addEventListener: jest.fn((type: string, listener: (event: any) => void) => {
@@ -30,6 +35,7 @@ const loadServiceWorker = () => {
       clearAppBadge,
     },
     registration: {
+      getNotifications: jest.fn().mockImplementation(() => Promise.resolve(notifications)),
       showNotification: jest.fn().mockResolvedValue(undefined),
     },
     skipWaiting: jest.fn().mockResolvedValue(undefined),
@@ -49,6 +55,7 @@ const loadServiceWorker = () => {
   return {
     clearAppBadge,
     listeners,
+    notifications,
     setAppBadge,
   }
 }
@@ -130,5 +137,57 @@ describe('service worker app badge handling', () => {
     expect(setAppBadge).toHaveBeenCalledWith(2)
     expect(setAppBadge.mock.calls.filter(([count]) => count === 1)).toHaveLength(1)
     expect(setAppBadge.mock.calls.filter(([count]) => count === 2)).toHaveLength(3)
+  })
+
+  it('closes only DM notifications for the conversation that was read', async () => {
+    const { listeners, notifications } = loadServiceWorker()
+    const closeReadConversation = jest.fn()
+    const closeOtherConversation = jest.fn()
+    const closeGroup = jest.fn()
+    const pending: Promise<unknown>[] = []
+
+    notifications.push(
+      {
+        close: closeReadConversation,
+        data: {
+          conversationId: 'conversation-a',
+          messageId: 'message-a',
+          type: 'dm_message',
+        },
+        tag: 'dm:conversation-a',
+      },
+      {
+        close: closeOtherConversation,
+        data: {
+          conversationId: 'conversation-b',
+          messageId: 'message-b',
+          type: 'dm_message',
+        },
+        tag: 'dm:conversation-b',
+      },
+      {
+        close: closeGroup,
+        data: {
+          messageId: 'group-message',
+          type: 'group_message',
+        },
+        tag: 'group:global',
+      }
+    )
+
+    listeners.message({
+      data: {
+        conversationId: 'conversation-a',
+        notificationType: 'dm_message',
+        type: 'SHADOWCHAT_NOTIFICATIONS_CLEAR',
+      },
+      waitUntil: (task: Promise<unknown>) => pending.push(task),
+    })
+
+    await Promise.allSettled(pending)
+
+    expect(closeReadConversation).toHaveBeenCalledTimes(1)
+    expect(closeOtherConversation).not.toHaveBeenCalled()
+    expect(closeGroup).not.toHaveBeenCalled()
   })
 })

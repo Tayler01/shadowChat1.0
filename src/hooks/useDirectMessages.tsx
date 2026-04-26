@@ -27,6 +27,7 @@ import { MESSAGE_FETCH_LIMIT } from '../config';
 import { useAuth } from './useAuth';
 import { useVisibilityRefresh } from './useVisibilityRefresh';
 import { useSoundEffects } from './useSoundEffects';
+import { clearDMNotifications } from '../lib/appBadge';
 
 interface DirectMessagesContextValue {
   conversations: DMConversation[];
@@ -352,6 +353,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
 
   const markAsRead = useCallback(async (conversationId: string) => {
     await markDMMessagesRead(conversationId);
+    void clearDMNotifications(conversationId);
     setConversations(prev =>
       prev.map(c =>
         c.id === conversationId ? { ...c, unread_count: 0 } : c
@@ -444,6 +446,7 @@ export function useConversationMessages(conversationId: string | null) {
       const unreadIdSet = new Set(unreadIds)
 
       await markDMMessagesRead(conversationId)
+      void clearDMNotifications(conversationId)
 
       setMessages(prev =>
         prev.map(message => {

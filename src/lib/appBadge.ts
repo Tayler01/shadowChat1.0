@@ -33,6 +33,21 @@ const postBadgeCountToServiceWorker = async (count: number) => {
   }
 }
 
+const postServiceWorkerMessage = async (message: Record<string, unknown>) => {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+    return
+  }
+
+  navigator.serviceWorker.controller?.postMessage(message)
+
+  try {
+    const registration = await navigator.serviceWorker.ready
+    registration.active?.postMessage(message)
+  } catch {
+    // Service worker messaging is best-effort and should never block chat.
+  }
+}
+
 export const updateAppBadge = async (count: number) => {
   const normalizedCount = normalizeBadgeCount(count)
 
@@ -53,6 +68,15 @@ export const updateAppBadge = async (count: number) => {
   }
 
   await postBadgeCountToServiceWorker(normalizedCount)
+}
+
+export const clearDMNotifications = async (conversationId: string, messageId?: string) => {
+  await postServiceWorkerMessage({
+    type: 'SHADOWCHAT_NOTIFICATIONS_CLEAR',
+    notificationType: 'dm_message',
+    conversationId,
+    ...(messageId ? { messageId } : {}),
+  })
 }
 
 export const fetchUnreadAppBadgeCount = async () => {
