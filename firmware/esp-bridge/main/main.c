@@ -6,6 +6,8 @@
 #include <time.h>
 
 #include "cJSON.h"
+#include "esp_ota_ops.h"
+#include "esp_partition.h"
 #include "esp_crt_bundle.h"
 #include "esp_err.h"
 #include "esp_event.h"
@@ -21,6 +23,8 @@
 #include "freertos/task.h"
 #include "nvs.h"
 #include "nvs_flash.h"
+#include "mbedtls/base64.h"
+#include "mbedtls/sha256.h"
 
 #define BRIDGE_WIFI_CONNECTED_BIT BIT0
 #define BRIDGE_HTTP_BUFFER_SIZE 8192
@@ -36,6 +40,9 @@
 #define BRIDGE_REALTIME_TOKEN_CHECK_MS 30000
 #define BRIDGE_REALTIME_TOPIC "realtime:bridge-chat"
 #define BRIDGE_PROFILE_CACHE_SIZE 24
+#define BRIDGE_OTA_BUFFER_SIZE 4096
+#define BRIDGE_BUNDLE_CHUNK_SIZE 384
+#define BRIDGE_BUNDLE_BASE64_SIZE (((BRIDGE_BUNDLE_CHUNK_SIZE + 2) / 3) * 4 + 1)
 
 static const char *TAG = "shadowchat_bridge";
 static esp_event_handler_instance_t s_wifi_any_id_handler;
@@ -66,6 +73,15 @@ typedef struct {
     size_t body_length;
 } bridge_http_response_t;
 
+typedef struct {
+    bool update_available;
+    char version[64];
+    char artifact_url[512];
+    char artifact_sha256[65];
+    char signature[512];
+    int size_bytes;
+} bridge_update_info_t;
+
 typedef enum {
     BRIDGE_CHAT_MODE_ADMIN = 0,
     BRIDGE_CHAT_MODE_GROUP,
@@ -94,6 +110,7 @@ static bridge_profile_cache_entry_t s_profile_cache[BRIDGE_PROFILE_CACHE_SIZE];
 static size_t s_profile_cache_next_index;
 
 static bool bridge_ensure_wifi_connected(const char *action);
+static bool bridge_command_update_check_target(const char *target, bool compact_output);
 
 static const char *BRIDGE_CURSOR_GROUP_MESSAGE_ID_KEY = "cur_group_id";
 static const char *BRIDGE_CURSOR_DM_RECIPIENT_KEY = "cur_dm_rec";
@@ -110,6 +127,21 @@ static void bridge_protocol_emit(cJSON *event) {
     }
 
     printf("@scb:%s\n", line);
+    free(line);
+}
+
+static void bridge_protocol_emit_forced(cJSON *event) {
+    if (!event) {
+        return;
+    }
+
+    char *line = cJSON_PrintUnformatted(event);
+    if (!line) {
+        return;
+    }
+
+    printf("@scb:%s\n", line);
+    fflush(stdout);
     free(line);
 }
 
@@ -153,6 +185,37 @@ static void bridge_protocol_emit_status(void) {
     cJSON_AddBoolToObject(event, "realtimeConnected", s_realtime_connected);
     cJSON_AddBoolToObject(event, "realtimeJoined", s_realtime_joined);
     cJSON_AddStringToObject(event, "realtimeLastError", s_realtime_last_error);
+
+    bridge_protocol_emit(event);
+    cJSON_Delete(event);
+}
+
+static void bridge_protocol_emit_update(
+    const char *target,
+    const char *channel,
+    bool update_available,
+    const char *current_version,
+    const char *latest_version,
+    const char *artifact_sha256,
+    int size_bytes,
+    const char *message
+) {
+    cJSON *event = cJSON_CreateObject();
+    if (!event) {
+        return;
+    }
+
+    cJSON_AddStringToObject(event, "type", "update");
+    cJSON_AddStringToObject(event, "target", target ? target : "firmware");
+    cJSON_AddStringToObject(event, "channel", channel ? channel : CONFIG_BRIDGE_UPDATE_CHANNEL);
+    cJSON_AddBoolToObject(event, "updateAvailable", update_available);
+    cJSON_AddStringToObject(event, "currentVersion", current_version ? current_version : "");
+    cJSON_AddStringToObject(event, "latestVersion", latest_version ? latest_version : "");
+    cJSON_AddStringToObject(event, "artifactSha256", artifact_sha256 ? artifact_sha256 : "");
+    if (size_bytes >= 0) {
+        cJSON_AddNumberToObject(event, "sizeBytes", size_bytes);
+    }
+    cJSON_AddStringToObject(event, "message", message ? message : "");
 
     bridge_protocol_emit(event);
     cJSON_Delete(event);
@@ -732,6 +795,92 @@ static const char *bridge_json_string_or_empty(cJSON *object, const char *key) {
     return cJSON_IsString(value) && value->valuestring ? value->valuestring : "";
 }
 
+static bool bridge_parse_update_info(cJSON *json, bridge_update_info_t *info) {
+    if (!json || !info) {
+        return false;
+    }
+
+    memset(info, 0, sizeof(*info));
+    info->size_bytes = -1;
+
+    cJSON *update_available = cJSON_GetObjectItemCaseSensitive(json, "updateAvailable");
+    cJSON *latest_version = cJSON_GetObjectItemCaseSensitive(json, "latestVersion");
+    cJSON *manifest = cJSON_GetObjectItemCaseSensitive(json, "manifest");
+
+    info->update_available = cJSON_IsTrue(update_available);
+    if (cJSON_IsString(latest_version) && latest_version->valuestring) {
+        bridge_set_runtime_string(info->version, sizeof(info->version), latest_version->valuestring);
+    }
+
+    if (!cJSON_IsObject(manifest)) {
+        return true;
+    }
+
+    cJSON *artifact_url = cJSON_GetObjectItemCaseSensitive(manifest, "artifactUrl");
+    cJSON *artifact_sha256 = cJSON_GetObjectItemCaseSensitive(manifest, "artifactSha256");
+    cJSON *signature = cJSON_GetObjectItemCaseSensitive(manifest, "signature");
+    cJSON *size = cJSON_GetObjectItemCaseSensitive(manifest, "sizeBytes");
+
+    if (cJSON_IsString(artifact_url) && artifact_url->valuestring) {
+        bridge_set_runtime_string(info->artifact_url, sizeof(info->artifact_url), artifact_url->valuestring);
+    }
+
+    if (cJSON_IsString(artifact_sha256) && artifact_sha256->valuestring) {
+        bridge_set_runtime_string(info->artifact_sha256, sizeof(info->artifact_sha256), artifact_sha256->valuestring);
+    }
+
+    if (cJSON_IsString(signature) && signature->valuestring) {
+        bridge_set_runtime_string(info->signature, sizeof(info->signature), signature->valuestring);
+    }
+
+    if (cJSON_IsNumber(size)) {
+        info->size_bytes = size->valueint;
+    }
+
+    return true;
+}
+
+static int bridge_hex_nibble(char value) {
+    if (value >= '0' && value <= '9') {
+        return value - '0';
+    }
+    if (value >= 'a' && value <= 'f') {
+        return value - 'a' + 10;
+    }
+    if (value >= 'A' && value <= 'F') {
+        return value - 'A' + 10;
+    }
+    return -1;
+}
+
+static bool bridge_sha256_hex_matches(const uint8_t digest[32], const char *expected_hex) {
+    if (!expected_hex || strlen(expected_hex) != 64) {
+        return false;
+    }
+
+    for (size_t i = 0; i < 32; i++) {
+        int high = bridge_hex_nibble(expected_hex[i * 2]);
+        int low = bridge_hex_nibble(expected_hex[i * 2 + 1]);
+        if (high < 0 || low < 0) {
+            return false;
+        }
+        if (digest[i] != (uint8_t)((high << 4) | low)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static void bridge_sha256_to_hex(const uint8_t digest[32], char out_hex[65]) {
+    static const char hex[] = "0123456789abcdef";
+    for (size_t i = 0; i < 32; i++) {
+        out_hex[i * 2] = hex[(digest[i] >> 4) & 0x0f];
+        out_hex[i * 2 + 1] = hex[digest[i] & 0x0f];
+    }
+    out_hex[64] = '\0';
+}
+
 static void bridge_store_session_expiry_from_json(cJSON *json) {
     cJSON *expires_at = cJSON_GetObjectItemCaseSensitive(json, "expiresAt");
     if (cJSON_IsString(expires_at) && expires_at->valuestring) {
@@ -1021,6 +1170,12 @@ static void bridge_command_help(void) {
     printf("  session refresh\n");
     printf("  session recover\n");
     printf("  bridge heartbeat\n\n");
+    printf("  update check [firmware|windows_bundle|bootstrap]\n");
+    printf("  update apply [firmware]\n\n");
+    printf("  bundle check [windows_bundle|bootstrap]\n");
+    printf("  bundle get [windows_bundle|bootstrap]\n\n");
+    printf("  bootstrap help\n");
+    printf("  bootstrap script\n\n");
     printf("  protocol on|off|status\n\n");
     printf("  realtime start|stop|status\n\n");
     printf("  group send <text>\n");
@@ -1030,6 +1185,65 @@ static void bridge_command_help(void) {
     printf("  users search <name_or_username>\n\n");
     printf("  chat group\n");
     printf("  chat dm <recipient_user_id|@username>\n\n");
+}
+
+static void bridge_command_bootstrap_help(void) {
+    printf("\nShadowChat Bridge first-plug bootstrap\n");
+    printf("  1. Open this serial console at 115200 baud.\n");
+    printf("  2. Connect the ESP to Wi-Fi: wifi set \"<ssid>\" \"<password>\" then wifi connect.\n");
+    printf("  3. If the bridge is new: bridge register, pair begin, approve in ShadowChat, session exchange.\n");
+    printf("  4. Check approved PC tools: bundle check windows_bundle.\n");
+    printf("  5. If this PC has no receiver script yet, run bootstrap script and save the printed PowerShell.\n");
+    printf("  6. Run that PowerShell script on the PC. It asks the ESP for bundle get windows_bundle and verifies SHA-256.\n");
+    printf("\nNo general internet is shared with the PC. The ESP fetches only ShadowChat manifests and artifacts.\n\n");
+}
+
+static void bridge_command_bootstrap_script(void) {
+    printf("\n----- BEGIN SHADOWCHAT BRIDGE RECEIVER POWERSHELL -----\n");
+    printf("param([string]$Port='COM3',[string]$Output='.')\n");
+    printf("$ErrorActionPreference='Stop'\n");
+    printf("$enc=[Text.UTF8Encoding]::new($false)\n");
+    printf("$sp=[IO.Ports.SerialPort]::new($Port,115200,[IO.Ports.Parity]::None,8,[IO.Ports.StopBits]::One)\n");
+    printf("$sp.Encoding=$enc; $sp.NewLine=\"`n\"; $sp.ReadTimeout=1000; $sp.WriteTimeout=3000\n");
+    printf("$fs=$null; $path=$null; $sha=''; $bytes=0\n");
+    printf("try {\n");
+    printf("  $sp.Open(); Start-Sleep -Milliseconds 1200; $sp.DiscardInBuffer(); $sp.WriteLine('bundle get windows_bundle')\n");
+    printf("  while ($true) {\n");
+    printf("    try { $line=$sp.ReadLine() } catch [System.TimeoutException] { continue }\n");
+    printf("    $line=$line.TrimEnd(\"`r\",\"`n\")\n");
+    printf("    if (-not $line.StartsWith('@scb:')) { if ($line) { Write-Host $line }; continue }\n");
+    printf("    $f=$line.Substring(5) | ConvertFrom-Json\n");
+    printf("    if ($f.type -eq 'bundleStart') {\n");
+    printf("      New-Item -ItemType Directory -Force -Path $Output | Out-Null\n");
+    printf("      $name=if ($f.filename) { [IO.Path]::GetFileName([string]$f.filename) } else { 'shadowchat-bridge-tools.zip' }\n");
+    printf("      $path=Join-Path $Output $name; $sha=[string]$f.sha256; $fs=[IO.File]::Open($path,[IO.FileMode]::Create,[IO.FileAccess]::Write)\n");
+    printf("      Write-Host \"Receiving $name to $path\"\n");
+    printf("    } elseif ($f.type -eq 'bundleChunk') {\n");
+    printf("      $data=[Convert]::FromBase64String([string]$f.data); $fs.Write($data,0,$data.Length); $bytes+=$data.Length\n");
+    printf("    } elseif ($f.type -eq 'bundleEnd') {\n");
+    printf("      if ($fs) { $fs.Dispose(); $fs=$null }\n");
+    printf("      if (-not [bool]$f.ok) { throw \"Bridge transfer failed: $($f.message)\" }\n");
+    printf("      $actual=(Get-FileHash -Algorithm SHA256 -LiteralPath $path).Hash.ToLowerInvariant()\n");
+    printf("      if ($sha -and $actual -ne $sha.ToLowerInvariant()) { throw \"SHA mismatch: $actual\" }\n");
+    printf("      Write-Host \"Transfer complete: $path\"; Write-Host \"SHA256: $actual\"; break\n");
+    printf("    }\n");
+    printf("  }\n");
+    printf("} finally { if ($fs) { $fs.Dispose() }; if ($sp.IsOpen) { $sp.Close() }; $sp.Dispose() }\n");
+    printf("----- END SHADOWCHAT BRIDGE RECEIVER POWERSHELL -----\n\n");
+}
+
+static void bridge_command_bootstrap(const char *subcommand) {
+    if (!subcommand || subcommand[0] == '\0' || strcmp(subcommand, "help") == 0) {
+        bridge_command_bootstrap_help();
+        return;
+    }
+
+    if (strcmp(subcommand, "script") == 0) {
+        bridge_command_bootstrap_script();
+        return;
+    }
+
+    printf("Unknown bootstrap command. Use: bootstrap help or bootstrap script\n");
 }
 
 static void bridge_chat_help(void) {
@@ -1651,13 +1865,19 @@ static bool bridge_ensure_fresh_session(const char *action) {
 static void bridge_startup_recovery_task(void *arg) {
     (void)arg;
 
-    if (s_bridge_state.wifi_ssid[0] == '\0' || s_bridge_state.device_id[0] == '\0') {
+    if (s_bridge_state.wifi_ssid[0] == '\0') {
         vTaskDelete(NULL);
         return;
     }
 
     if (!bridge_wait_for_wifi(BRIDGE_STARTUP_WIFI_WAIT_MS)) {
         printf("Startup session check skipped: Wi-Fi did not connect within %d seconds\n", BRIDGE_STARTUP_WIFI_WAIT_MS / 1000);
+        vTaskDelete(NULL);
+        return;
+    }
+
+    if (s_bridge_state.device_id[0] == '\0') {
+        bridge_command_update_check_target("firmware", true);
         vTaskDelete(NULL);
         return;
     }
@@ -1671,12 +1891,14 @@ static void bridge_startup_recovery_task(void *arg) {
                 printf("No recovery token is stored. Run: session recover after approving a new code.\n");
             }
         }
+        bridge_command_update_check_target("firmware", true);
         vTaskDelete(NULL);
         return;
     }
 
     if (!bridge_startup_session_refresh_due()) {
         printf("Startup session check: stored bridge session is ready\n");
+        bridge_command_update_check_target("firmware", true);
         vTaskDelete(NULL);
         return;
     }
@@ -1689,6 +1911,7 @@ static void bridge_startup_recovery_task(void *arg) {
         }
     }
 
+    bridge_command_update_check_target("firmware", true);
     vTaskDelete(NULL);
 }
 
@@ -1729,6 +1952,606 @@ static void bridge_command_heartbeat(void) {
     }
 
     bridge_print_response("bridge-heartbeat", &response);
+}
+
+static bool bridge_command_update_check_target(const char *target, bool compact_output) {
+    const char *safe_target = (target && target[0] != '\0') ? target : "firmware";
+    const char *current_version = strcmp(safe_target, "firmware") == 0 ? CONFIG_BRIDGE_FIRMWARE_VERSION : "";
+
+    if (!bridge_ensure_wifi_connected("update check")) {
+        return false;
+    }
+
+    bool use_bridge_auth = s_bridge_state.device_id[0] != '\0' && s_bridge_state.access_token[0] != '\0';
+    if (use_bridge_auth && !bridge_ensure_fresh_session("update check")) {
+        return false;
+    }
+
+    char body[448];
+    if (use_bridge_auth) {
+        snprintf(
+            body,
+            sizeof(body),
+            "{\"deviceId\":\"%s\",\"target\":\"%s\",\"channel\":\"%s\",\"hardwareModel\":\"%s\",\"currentVersion\":\"%s\"}",
+            s_bridge_state.device_id,
+            safe_target,
+            CONFIG_BRIDGE_UPDATE_CHANNEL,
+            CONFIG_BRIDGE_HARDWARE_MODEL,
+            current_version
+        );
+    } else {
+        snprintf(
+            body,
+            sizeof(body),
+            "{\"target\":\"%s\",\"channel\":\"%s\",\"hardwareModel\":\"%s\",\"currentVersion\":\"%s\"}",
+            safe_target,
+            CONFIG_BRIDGE_UPDATE_CHANNEL,
+            CONFIG_BRIDGE_HARDWARE_MODEL,
+            current_version
+        );
+    }
+
+    bridge_http_response_t response = {0};
+    esp_err_t err = bridge_http_post_json(
+        "bridge-update-check",
+        body,
+        use_bridge_auth ? s_bridge_state.access_token : NULL,
+        &response
+    );
+
+    if (use_bridge_auth && err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-update-check", &response)) {
+        response = (bridge_http_response_t){0};
+        err = bridge_http_post_json("bridge-update-check", body, s_bridge_state.access_token, &response);
+    }
+
+    if (err != ESP_OK) {
+        printf("bridge-update-check failed: %s\n", esp_err_to_name(err));
+        return false;
+    }
+
+    if (response.status_code < 200 || response.status_code >= 300) {
+        bridge_print_response("bridge-update-check", &response);
+        return false;
+    }
+
+    cJSON *json = bridge_parse_json_body(&response);
+    if (!json) {
+        printf("bridge-update-check returned an empty or invalid response\n");
+        return false;
+    }
+
+    cJSON *update_available = cJSON_GetObjectItemCaseSensitive(json, "updateAvailable");
+    cJSON *latest_version = cJSON_GetObjectItemCaseSensitive(json, "latestVersion");
+    cJSON *message = cJSON_GetObjectItemCaseSensitive(json, "message");
+    cJSON *manifest = cJSON_GetObjectItemCaseSensitive(json, "manifest");
+    const char *latest_version_text = cJSON_IsString(latest_version) && latest_version->valuestring
+        ? latest_version->valuestring
+        : "";
+    const char *message_text = cJSON_IsString(message) && message->valuestring
+        ? message->valuestring
+        : "";
+    const char *artifact_sha256_text = "";
+    int size_bytes = -1;
+
+    if (cJSON_IsObject(manifest)) {
+        cJSON *artifact_sha256 = cJSON_GetObjectItemCaseSensitive(manifest, "artifactSha256");
+        cJSON *size = cJSON_GetObjectItemCaseSensitive(manifest, "sizeBytes");
+        if (cJSON_IsString(artifact_sha256) && artifact_sha256->valuestring) {
+            artifact_sha256_text = artifact_sha256->valuestring;
+        }
+        if (cJSON_IsNumber(size)) {
+            size_bytes = size->valueint;
+        }
+    }
+
+    bool has_update = cJSON_IsTrue(update_available);
+    if (has_update) {
+        if (current_version[0] != '\0') {
+            printf("Update available for %s: %s -> %s\n", safe_target, current_version, latest_version_text[0] ? latest_version_text : "(unknown)");
+        } else {
+            printf("Update available for %s: %s\n", safe_target, latest_version_text[0] ? latest_version_text : "(unknown)");
+        }
+        if (artifact_sha256_text[0] != '\0') {
+            printf("  sha256: %s\n", artifact_sha256_text);
+        }
+        if (size_bytes >= 0) {
+            printf("  size: %d bytes\n", size_bytes);
+        }
+        if (strcmp(safe_target, "firmware") == 0) {
+            printf("  apply: run update apply firmware to download, verify, stage, and reboot\n");
+        } else {
+            printf("  download: run bundle get %s from the offline PC receiver\n", safe_target);
+        }
+    } else if (!compact_output) {
+        if (latest_version_text[0] != '\0') {
+            if (current_version[0] != '\0') {
+                printf("No %s update available. Current version %s is up to date for %s.\n", safe_target, current_version, CONFIG_BRIDGE_UPDATE_CHANNEL);
+            } else {
+                printf("No newer %s package is available for %s.\n", safe_target, CONFIG_BRIDGE_UPDATE_CHANNEL);
+            }
+        } else if (message_text[0] != '\0') {
+            printf("No %s update manifest: %s\n", safe_target, message_text);
+        } else {
+            printf("No %s update available.\n", safe_target);
+        }
+    } else if (latest_version_text[0] != '\0') {
+        printf("Startup update check: firmware is current (%s)\n", CONFIG_BRIDGE_FIRMWARE_VERSION);
+    } else {
+        printf("Startup update check: no published firmware manifest\n");
+    }
+
+    bridge_protocol_emit_update(
+        safe_target,
+        CONFIG_BRIDGE_UPDATE_CHANNEL,
+        has_update,
+        current_version,
+        latest_version_text,
+        artifact_sha256_text,
+        size_bytes,
+        message_text
+    );
+
+    cJSON_Delete(json);
+    return true;
+}
+
+static void bridge_command_update_check(const char *target) {
+    bridge_command_update_check_target(target, false);
+}
+
+static bool bridge_fetch_update_info(const char *target, bridge_update_info_t *info) {
+    const char *safe_target = (target && target[0] != '\0') ? target : "firmware";
+    const char *current_version = strcmp(safe_target, "firmware") == 0 ? CONFIG_BRIDGE_FIRMWARE_VERSION : "";
+
+    if (!info) {
+        return false;
+    }
+
+    if (!bridge_ensure_wifi_connected("update apply")) {
+        return false;
+    }
+
+    bool use_bridge_auth = s_bridge_state.device_id[0] != '\0' && s_bridge_state.access_token[0] != '\0';
+    if (use_bridge_auth && !bridge_ensure_fresh_session("update apply")) {
+        return false;
+    }
+
+    char body[448];
+    if (use_bridge_auth) {
+        snprintf(
+            body,
+            sizeof(body),
+            "{\"deviceId\":\"%s\",\"target\":\"%s\",\"channel\":\"%s\",\"hardwareModel\":\"%s\",\"currentVersion\":\"%s\"}",
+            s_bridge_state.device_id,
+            safe_target,
+            CONFIG_BRIDGE_UPDATE_CHANNEL,
+            CONFIG_BRIDGE_HARDWARE_MODEL,
+            current_version
+        );
+    } else {
+        snprintf(
+            body,
+            sizeof(body),
+            "{\"target\":\"%s\",\"channel\":\"%s\",\"hardwareModel\":\"%s\",\"currentVersion\":\"%s\"}",
+            safe_target,
+            CONFIG_BRIDGE_UPDATE_CHANNEL,
+            CONFIG_BRIDGE_HARDWARE_MODEL,
+            current_version
+        );
+    }
+
+    bridge_http_response_t response = {0};
+    esp_err_t err = bridge_http_post_json(
+        "bridge-update-check",
+        body,
+        use_bridge_auth ? s_bridge_state.access_token : NULL,
+        &response
+    );
+
+    if (use_bridge_auth && err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-update-check", &response)) {
+        response = (bridge_http_response_t){0};
+        err = bridge_http_post_json("bridge-update-check", body, s_bridge_state.access_token, &response);
+    }
+
+    if (err != ESP_OK) {
+        printf("bridge-update-check failed: %s\n", esp_err_to_name(err));
+        return false;
+    }
+
+    if (response.status_code < 200 || response.status_code >= 300) {
+        bridge_print_response("bridge-update-check", &response);
+        return false;
+    }
+
+    cJSON *json = bridge_parse_json_body(&response);
+    if (!json) {
+        printf("bridge-update-check returned an empty or invalid response\n");
+        return false;
+    }
+
+    bool parsed = bridge_parse_update_info(json, info);
+    cJSON_Delete(json);
+    return parsed;
+}
+
+static bool bridge_apply_firmware_update(const bridge_update_info_t *info) {
+    if (!info || !info->update_available) {
+        printf("No firmware update is available to apply.\n");
+        return false;
+    }
+
+    if (info->artifact_url[0] == '\0') {
+        printf("Firmware manifest does not include a direct artifact URL yet.\n");
+        return false;
+    }
+
+    if (info->artifact_sha256[0] == '\0') {
+        printf("Firmware manifest is missing artifactSha256; refusing OTA apply.\n");
+        return false;
+    }
+
+    const esp_partition_t *update_partition = esp_ota_get_next_update_partition(NULL);
+    if (!update_partition) {
+        printf("No OTA update partition is available.\n");
+        return false;
+    }
+
+    printf("Downloading firmware %s to OTA partition %s at 0x%lx\n",
+        info->version[0] ? info->version : "(unknown)",
+        update_partition->label,
+        (unsigned long)update_partition->address);
+
+    esp_http_client_config_t config = {
+        .url = info->artifact_url,
+        .method = HTTP_METHOD_GET,
+        .timeout_ms = 30000,
+        .crt_bundle_attach = esp_crt_bundle_attach,
+    };
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    if (!client) {
+        printf("Failed to initialize OTA HTTP client\n");
+        return false;
+    }
+
+    esp_ota_handle_t ota_handle = 0;
+    bool ota_started = false;
+    uint8_t *buffer = malloc(BRIDGE_OTA_BUFFER_SIZE);
+    if (!buffer) {
+        printf("Failed to allocate OTA download buffer\n");
+        esp_http_client_cleanup(client);
+        return false;
+    }
+
+    mbedtls_sha256_context sha_ctx;
+    mbedtls_sha256_init(&sha_ctx);
+    mbedtls_sha256_starts(&sha_ctx, 0);
+
+    bool ok = false;
+    int total_read = 0;
+
+    esp_err_t err = esp_http_client_open(client, 0);
+    if (err != ESP_OK) {
+        printf("OTA HTTP open failed: %s\n", esp_err_to_name(err));
+        goto cleanup;
+    }
+
+    int64_t content_length = esp_http_client_fetch_headers(client);
+    if (content_length > 0) {
+        printf("OTA download size: %lld bytes\n", content_length);
+    }
+
+    err = esp_ota_begin(update_partition, OTA_SIZE_UNKNOWN, &ota_handle);
+    if (err != ESP_OK) {
+        printf("esp_ota_begin failed: %s\n", esp_err_to_name(err));
+        goto cleanup;
+    }
+    ota_started = true;
+
+    while (true) {
+        int read_len = esp_http_client_read(client, (char *)buffer, BRIDGE_OTA_BUFFER_SIZE);
+        if (read_len < 0) {
+            printf("OTA HTTP read failed\n");
+            goto cleanup;
+        }
+        if (read_len == 0) {
+            break;
+        }
+
+        mbedtls_sha256_update(&sha_ctx, buffer, (size_t)read_len);
+        err = esp_ota_write(ota_handle, buffer, (size_t)read_len);
+        if (err != ESP_OK) {
+            printf("esp_ota_write failed: %s\n", esp_err_to_name(err));
+            goto cleanup;
+        }
+        total_read += read_len;
+    }
+
+    if (total_read <= 0) {
+        printf("OTA download produced no data\n");
+        goto cleanup;
+    }
+
+    uint8_t digest[32];
+    mbedtls_sha256_finish(&sha_ctx, digest);
+    if (!bridge_sha256_hex_matches(digest, info->artifact_sha256)) {
+        printf("OTA SHA-256 verification failed; refusing to boot downloaded image\n");
+        goto cleanup;
+    }
+
+    printf("OTA SHA-256 verified for %d bytes\n", total_read);
+
+    err = esp_ota_end(ota_handle);
+    ota_started = false;
+    if (err != ESP_OK) {
+        printf("esp_ota_end failed: %s\n", esp_err_to_name(err));
+        goto cleanup;
+    }
+
+    err = esp_ota_set_boot_partition(update_partition);
+    if (err != ESP_OK) {
+        printf("esp_ota_set_boot_partition failed: %s\n", esp_err_to_name(err));
+        goto cleanup;
+    }
+
+    printf("Firmware update staged. Rebooting into version %s.\n", info->version[0] ? info->version : "(unknown)");
+    ok = true;
+
+cleanup:
+    if (ota_started) {
+        esp_ota_abort(ota_handle);
+    }
+    mbedtls_sha256_free(&sha_ctx);
+    free(buffer);
+    esp_http_client_close(client);
+    esp_http_client_cleanup(client);
+
+    if (ok) {
+        vTaskDelay(pdMS_TO_TICKS(500));
+        esp_restart();
+    }
+
+    return ok;
+}
+
+static void bridge_command_update_apply(const char *target) {
+    const char *safe_target = (target && target[0] != '\0') ? target : "firmware";
+    if (strcmp(safe_target, "firmware") != 0) {
+        printf("update apply currently supports firmware only. Use update check %s for manifest visibility.\n", safe_target);
+        return;
+    }
+
+    bridge_update_info_t info = {0};
+    if (!bridge_fetch_update_info("firmware", &info)) {
+        return;
+    }
+
+    bridge_apply_firmware_update(&info);
+}
+
+static void bridge_artifact_filename(const char *artifact_url, char *out, size_t out_size) {
+    if (!out || out_size == 0) {
+        return;
+    }
+
+    bridge_set_runtime_string(out, out_size, "shadowchat-bridge-bundle.bin");
+
+    if (!artifact_url || artifact_url[0] == '\0') {
+        return;
+    }
+
+    const char *filename = strrchr(artifact_url, '/');
+    filename = filename ? filename + 1 : artifact_url;
+    if (filename[0] == '\0') {
+        return;
+    }
+
+    bridge_set_runtime_string(out, out_size, filename);
+    char *query = strchr(out, '?');
+    if (query) {
+        *query = '\0';
+    }
+}
+
+static void bridge_emit_bundle_end(
+    const char *target,
+    const bridge_update_info_t *info,
+    bool ok,
+    int total_read,
+    bool sha_matched,
+    const char *actual_sha256,
+    const char *message
+) {
+    cJSON *event = cJSON_CreateObject();
+    if (!event) {
+        return;
+    }
+
+    cJSON_AddStringToObject(event, "type", "bundleEnd");
+    cJSON_AddStringToObject(event, "target", target ? target : "windows_bundle");
+    cJSON_AddStringToObject(event, "version", info && info->version[0] ? info->version : "");
+    cJSON_AddBoolToObject(event, "ok", ok);
+    cJSON_AddNumberToObject(event, "bytes", total_read);
+    cJSON_AddBoolToObject(event, "sha256Matched", sha_matched);
+    cJSON_AddStringToObject(event, "sha256", actual_sha256 ? actual_sha256 : "");
+    cJSON_AddStringToObject(event, "expectedSha256", info && info->artifact_sha256[0] ? info->artifact_sha256 : "");
+    cJSON_AddStringToObject(event, "message", message ? message : "");
+    bridge_protocol_emit_forced(event);
+    cJSON_Delete(event);
+}
+
+static bool bridge_stream_bundle_artifact(const char *target, const bridge_update_info_t *info) {
+    const char *safe_target = (target && target[0] != '\0') ? target : "windows_bundle";
+
+    if (!info || !info->update_available) {
+        printf("No %s package is available to download.\n", safe_target);
+        return false;
+    }
+
+    if (info->artifact_url[0] == '\0') {
+        printf("%s manifest does not include a direct artifact URL.\n", safe_target);
+        return false;
+    }
+
+    if (info->artifact_sha256[0] == '\0') {
+        printf("%s manifest is missing artifactSha256; refusing transfer.\n", safe_target);
+        return false;
+    }
+
+    printf("Streaming %s %s over serial. Keep the receiver open until bundleEnd.\n",
+        safe_target,
+        info->version[0] ? info->version : "(unknown)");
+
+    esp_http_client_config_t config = {
+        .url = info->artifact_url,
+        .method = HTTP_METHOD_GET,
+        .timeout_ms = 30000,
+        .crt_bundle_attach = esp_crt_bundle_attach,
+    };
+
+    esp_http_client_handle_t client = esp_http_client_init(&config);
+    if (!client) {
+        printf("Failed to initialize bundle HTTP client\n");
+        return false;
+    }
+
+    uint8_t *buffer = malloc(BRIDGE_BUNDLE_CHUNK_SIZE);
+    uint8_t *encoded = malloc(BRIDGE_BUNDLE_BASE64_SIZE);
+    if (!buffer || !encoded) {
+        printf("Failed to allocate bundle transfer buffers\n");
+        free(buffer);
+        free(encoded);
+        esp_http_client_cleanup(client);
+        return false;
+    }
+
+    mbedtls_sha256_context sha_ctx;
+    mbedtls_sha256_init(&sha_ctx);
+    mbedtls_sha256_starts(&sha_ctx, 0);
+
+    bool ok = false;
+    int total_read = 0;
+    int sequence = 0;
+    char actual_sha256[65] = {0};
+    char filename[96] = {0};
+    bridge_artifact_filename(info->artifact_url, filename, sizeof(filename));
+
+    esp_err_t err = esp_http_client_open(client, 0);
+    if (err != ESP_OK) {
+        printf("Bundle HTTP open failed: %s\n", esp_err_to_name(err));
+        bridge_emit_bundle_end(safe_target, info, false, 0, false, "", "HTTP open failed");
+        goto cleanup;
+    }
+
+    int64_t content_length = esp_http_client_fetch_headers(client);
+
+    cJSON *start = cJSON_CreateObject();
+    if (start) {
+        cJSON_AddStringToObject(start, "type", "bundleStart");
+        cJSON_AddStringToObject(start, "target", safe_target);
+        cJSON_AddStringToObject(start, "version", info->version[0] ? info->version : "");
+        cJSON_AddStringToObject(start, "filename", filename);
+        cJSON_AddStringToObject(start, "sha256", info->artifact_sha256);
+        cJSON_AddNumberToObject(start, "sizeBytes", info->size_bytes >= 0 ? info->size_bytes : (double)content_length);
+        cJSON_AddNumberToObject(start, "chunkBytes", BRIDGE_BUNDLE_CHUNK_SIZE);
+        bridge_protocol_emit_forced(start);
+        cJSON_Delete(start);
+    }
+
+    while (true) {
+        int read_len = esp_http_client_read(client, (char *)buffer, BRIDGE_BUNDLE_CHUNK_SIZE);
+        if (read_len < 0) {
+            printf("Bundle HTTP read failed\n");
+            bridge_emit_bundle_end(safe_target, info, false, total_read, false, "", "HTTP read failed");
+            goto cleanup;
+        }
+        if (read_len == 0) {
+            break;
+        }
+
+        mbedtls_sha256_update(&sha_ctx, buffer, (size_t)read_len);
+
+        size_t encoded_len = 0;
+        int encode_result = mbedtls_base64_encode(encoded, BRIDGE_BUNDLE_BASE64_SIZE, &encoded_len, buffer, (size_t)read_len);
+        if (encode_result != 0 || encoded_len >= BRIDGE_BUNDLE_BASE64_SIZE) {
+            printf("Bundle base64 encoding failed\n");
+            bridge_emit_bundle_end(safe_target, info, false, total_read, false, "", "base64 encode failed");
+            goto cleanup;
+        }
+        encoded[encoded_len] = '\0';
+
+        cJSON *chunk = cJSON_CreateObject();
+        if (!chunk) {
+            printf("Failed to allocate bundle chunk event\n");
+            bridge_emit_bundle_end(safe_target, info, false, total_read, false, "", "chunk event allocation failed");
+            goto cleanup;
+        }
+
+        cJSON_AddStringToObject(chunk, "type", "bundleChunk");
+        cJSON_AddStringToObject(chunk, "target", safe_target);
+        cJSON_AddNumberToObject(chunk, "seq", sequence);
+        cJSON_AddNumberToObject(chunk, "bytes", read_len);
+        cJSON_AddStringToObject(chunk, "data", (const char *)encoded);
+        bridge_protocol_emit_forced(chunk);
+        cJSON_Delete(chunk);
+
+        total_read += read_len;
+        sequence++;
+        vTaskDelay(pdMS_TO_TICKS(2));
+    }
+
+    if (total_read <= 0) {
+        printf("Bundle download produced no data\n");
+        bridge_emit_bundle_end(safe_target, info, false, 0, false, "", "empty download");
+        goto cleanup;
+    }
+
+    uint8_t digest[32];
+    mbedtls_sha256_finish(&sha_ctx, digest);
+    bridge_sha256_to_hex(digest, actual_sha256);
+    bool sha_matched = bridge_sha256_hex_matches(digest, info->artifact_sha256);
+    if (!sha_matched) {
+        printf("Bundle SHA-256 verification failed after streaming\n");
+        bridge_emit_bundle_end(safe_target, info, false, total_read, false, actual_sha256, "sha256 mismatch");
+        goto cleanup;
+    }
+
+    printf("Bundle SHA-256 verified for %d bytes\n", total_read);
+    bridge_emit_bundle_end(safe_target, info, true, total_read, true, actual_sha256, "complete");
+    ok = true;
+
+cleanup:
+    mbedtls_sha256_free(&sha_ctx);
+    free(buffer);
+    free(encoded);
+    esp_http_client_close(client);
+    esp_http_client_cleanup(client);
+    return ok;
+}
+
+static void bridge_command_bundle_check(const char *target) {
+    const char *safe_target = (target && target[0] != '\0') ? target : "windows_bundle";
+    if (strcmp(safe_target, "windows_bundle") != 0 && strcmp(safe_target, "bootstrap") != 0) {
+        printf("bundle check supports windows_bundle or bootstrap.\n");
+        return;
+    }
+
+    bridge_command_update_check(safe_target);
+}
+
+static void bridge_command_bundle_get(const char *target) {
+    const char *safe_target = (target && target[0] != '\0') ? target : "windows_bundle";
+    if (strcmp(safe_target, "windows_bundle") != 0 && strcmp(safe_target, "bootstrap") != 0) {
+        printf("bundle get supports windows_bundle or bootstrap.\n");
+        return;
+    }
+
+    bridge_update_info_t info = {0};
+    if (!bridge_fetch_update_info(safe_target, &info)) {
+        return;
+    }
+
+    bridge_stream_bundle_artifact(safe_target, &info);
 }
 
 static void bridge_command_wipe(void) {
@@ -2864,6 +3687,20 @@ static void bridge_shell_task(void *arg) {
             bridge_command_heartbeat();
         } else if (strcmp(command, "bridge") == 0 && subcommand && strcmp(subcommand, "wipe") == 0) {
             bridge_command_wipe();
+        } else if (strcmp(command, "update") == 0 && subcommand && strcmp(subcommand, "check") == 0) {
+            char *target = strtok_r(NULL, " ", &save_ptr);
+            bridge_command_update_check(target);
+        } else if (strcmp(command, "update") == 0 && subcommand && strcmp(subcommand, "apply") == 0) {
+            char *target = strtok_r(NULL, " ", &save_ptr);
+            bridge_command_update_apply(target);
+        } else if (strcmp(command, "bundle") == 0 && subcommand && strcmp(subcommand, "check") == 0) {
+            char *target = strtok_r(NULL, " ", &save_ptr);
+            bridge_command_bundle_check(target);
+        } else if (strcmp(command, "bundle") == 0 && subcommand && strcmp(subcommand, "get") == 0) {
+            char *target = strtok_r(NULL, " ", &save_ptr);
+            bridge_command_bundle_get(target);
+        } else if (strcmp(command, "bootstrap") == 0) {
+            bridge_command_bootstrap(subcommand);
         } else if (strcmp(command, "group") == 0 && subcommand && strcmp(subcommand, "send") == 0) {
             char *content = save_ptr;
             while (content && *content == ' ') {
@@ -2931,12 +3768,25 @@ void app_main(void) {
     memset(&s_bridge_state, 0, sizeof(s_bridge_state));
     bridge_load_persisted_state();
     bridge_derive_device_serial();
+
+    const esp_partition_t *running_partition = esp_ota_get_running_partition();
+    esp_ota_img_states_t ota_state;
+    if (
+        running_partition &&
+        esp_ota_get_state_partition(running_partition, &ota_state) == ESP_OK &&
+        ota_state == ESP_OTA_IMG_PENDING_VERIFY
+    ) {
+        ESP_LOGI(TAG, "Marking OTA app valid after successful boot");
+        esp_ota_mark_app_valid_cancel_rollback();
+    }
+
     ESP_ERROR_CHECK(bridge_wifi_init());
 
     printf("\nShadowChat Bridge firmware booted\n");
     printf("USB path: ESP32-S3 USB Serial/JTAG console\n");
     printf("Device serial: %s\n", s_bridge_state.device_serial);
     printf("Backend URL: %s\n", CONFIG_BRIDGE_SUPABASE_URL[0] ? CONFIG_BRIDGE_SUPABASE_URL : "(not set)");
+    printf("First plug: type 'bootstrap help' for offline Windows setup and bundle download instructions.\n");
 
     if (s_bridge_state.wifi_ssid[0] != '\0') {
         printf("Attempting Wi-Fi reconnect for SSID '%s'\n", s_bridge_state.wifi_ssid);

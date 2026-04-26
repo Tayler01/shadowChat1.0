@@ -18,7 +18,14 @@ config BRIDGE_HARDWARE_MODEL
 
 config BRIDGE_FIRMWARE_VERSION
     string "Bridge firmware version"
-    default "0.1.0-phase0"
+    default "0.2.0-ota-foundation"
+
+config BRIDGE_UPDATE_CHANNEL
+    string "Bridge update channel"
+    default "stable"
+    help
+        Update manifest channel used for startup and manual firmware checks.
+        Expected values are stable, beta, or dev.
 
 config BRIDGE_DEVICE_SERIAL
     string "Bridge device serial override"
