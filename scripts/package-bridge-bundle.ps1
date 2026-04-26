@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = "0.1.1-tools",
+    [string]$Version = "0.1.3-tools",
     [string]$OutputDirectory = "output/bridge-bundles"
 )
 
@@ -27,6 +27,11 @@ New-Item -ItemType Directory -Force -Path $stagingRoot | Out-Null
 $items = @(
     @{ Source = "tools/bridge-tui/bridge-tui.ps1"; Destination = "tools/bridge-tui/bridge-tui.ps1" },
     @{ Source = "tools/bridge-tui/bridge-bundle-receive.ps1"; Destination = "tools/bridge-tui/bridge-bundle-receive.ps1" },
+    @{ Source = "tools/bridge-bootstrap/START.CMD"; Destination = "tools/bridge-bootstrap/START.CMD" },
+    @{ Source = "tools/bridge-bootstrap/SETUP.CMD"; Destination = "tools/bridge-bootstrap/SETUP.CMD" },
+    @{ Source = "tools/bridge-bootstrap/START-HERE.cmd"; Destination = "tools/bridge-bootstrap/START-HERE.cmd" },
+    @{ Source = "tools/bridge-bootstrap/Receive-ShadowChatBridge.ps1"; Destination = "tools/bridge-bootstrap/Receive-ShadowChatBridge.ps1" },
+    @{ Source = "tools/bridge-bootstrap/README.txt"; Destination = "tools/bridge-bootstrap/README.txt" },
     @{ Source = "firmware/esp-bridge/README.md"; Destination = "firmware/esp-bridge/README.md" },
     @{ Source = "docs/ESP_BRIDGE_OTA_AND_OFFLINE_SOFTWARE_PLAN.md"; Destination = "docs/ESP_BRIDGE_OTA_AND_OFFLINE_SOFTWARE_PLAN.md" }
 )
@@ -54,6 +59,9 @@ This bundle is intended for a Windows PC that does not have direct internet acce
 Included:
 - tools/bridge-tui/bridge-tui.ps1
 - tools/bridge-tui/bridge-bundle-receive.ps1
+- tools/bridge-bootstrap/START.CMD
+- tools/bridge-bootstrap/SETUP.CMD
+- tools/bridge-bootstrap/Receive-ShadowChatBridge.ps1
 - firmware/esp-bridge/README.md
 - docs/ESP_BRIDGE_OTA_AND_OFFLINE_SOFTWARE_PLAN.md
 

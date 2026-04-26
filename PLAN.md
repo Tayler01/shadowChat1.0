@@ -106,3 +106,22 @@ Acceptance:
 
 - every implemented path has a command transcript or test output
 - STATUS.md reflects the final state and next risks
+
+## Milestone 7: Plug-And-Play USB Bootstrap Drive
+
+Status: complete
+
+Deliverables:
+
+- TinyUSB composite device that exposes both a small read-only-style bootstrap drive and a CDC serial console
+- ESP-hosted `README.TXT`, `START.CMD`, `SETUP.CMD`, `RECEIVE.PS1`, and `AUTORUN.INF`
+- PC receiver that auto-detects the bridge COM port with `bootstrap ping`
+- no-repo/no-internet Windows flow: plug in ESP, open the ESP drive, double-click `START.CMD`, receive verified `windows_bundle`
+- documentation of the Windows auto-run boundary
+
+Acceptance:
+
+- Windows sees the ESP bootstrap files without any repo checkout
+- Windows also sees a serial port from the same plugged-in bridge
+- `START.CMD` reconstructs the approved `windows_bundle` and verifies SHA-256
+- docs explain that Windows will not automatically execute USB scripts, so the supported plug-and-play action is double-clicking the visible start script

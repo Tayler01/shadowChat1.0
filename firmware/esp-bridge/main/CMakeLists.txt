@@ -1,15 +1,20 @@
 idf_component_register(
-  SRCS "main.c"
+  SRCS
+    "main.c"
+    "bridge_usb_bootstrap.c"
   INCLUDE_DIRS "."
   REQUIRES
     app_update
     mbedtls
+    fatfs
     esp_event
     esp_http_client
     esp_https_ota
     esp_netif
+    esp_partition
     esp_websocket_client
     esp_wifi
     json
     nvs_flash
+    wear_levelling
 )

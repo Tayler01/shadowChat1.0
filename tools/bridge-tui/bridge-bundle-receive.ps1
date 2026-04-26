@@ -100,6 +100,7 @@ function Read-BridgeFrame {
 $serial = [System.IO.Ports.SerialPort]::new($Port, $BaudRate, [System.IO.Ports.Parity]::None, 8, [System.IO.Ports.StopBits]::One)
 $serial.Encoding = $script:utf8NoBom
 $serial.NewLine = "`n"
+$serial.ReadBufferSize = 1048576
 $serial.ReadTimeout = 1000
 $serial.WriteTimeout = 3000
 $serial.DtrEnable = $true

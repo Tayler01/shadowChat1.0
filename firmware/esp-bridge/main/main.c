@@ -26,6 +26,8 @@
 #include "mbedtls/base64.h"
 #include "mbedtls/sha256.h"
 
+#include "bridge_usb_bootstrap.h"
+
 #define BRIDGE_WIFI_CONNECTED_BIT BIT0
 #define BRIDGE_HTTP_BUFFER_SIZE 8192
 #define BRIDGE_SHELL_LINE_SIZE 1024
@@ -41,7 +43,8 @@
 #define BRIDGE_REALTIME_TOPIC "realtime:bridge-chat"
 #define BRIDGE_PROFILE_CACHE_SIZE 24
 #define BRIDGE_OTA_BUFFER_SIZE 4096
-#define BRIDGE_BUNDLE_CHUNK_SIZE 384
+#define BRIDGE_BUNDLE_CHUNK_SIZE 128
+#define BRIDGE_BUNDLE_CHUNK_PACE_MS 35
 #define BRIDGE_BUNDLE_BASE64_SIZE (((BRIDGE_BUNDLE_CHUNK_SIZE + 2) / 3) * 4 + 1)
 
 static const char *TAG = "shadowchat_bridge";
@@ -77,6 +80,7 @@ typedef struct {
     bool update_available;
     char version[64];
     char artifact_url[512];
+    char artifact_path[256];
     char artifact_sha256[65];
     char signature[512];
     int size_bytes;
@@ -795,6 +799,30 @@ static const char *bridge_json_string_or_empty(cJSON *object, const char *key) {
     return cJSON_IsString(value) && value->valuestring ? value->valuestring : "";
 }
 
+static void bridge_build_supabase_storage_url(const char *artifact_path, char *out, size_t out_size) {
+    if (!artifact_path || artifact_path[0] == '\0' || !out || out_size == 0 || CONFIG_BRIDGE_SUPABASE_URL[0] == '\0') {
+        return;
+    }
+
+    const char *base = CONFIG_BRIDGE_SUPABASE_URL;
+    size_t base_len = strlen(base);
+    while (base_len > 0 && base[base_len - 1] == '/') {
+        base_len--;
+    }
+
+    const char *path = artifact_path;
+    while (*path == '/') {
+        path++;
+    }
+
+    const char *bucket_prefix = "bridge-artifacts/";
+    if (strncmp(path, bucket_prefix, strlen(bucket_prefix)) == 0) {
+        path += strlen(bucket_prefix);
+    }
+
+    snprintf(out, out_size, "%.*s/storage/v1/object/public/bridge-artifacts/%s", (int)base_len, base, path);
+}
+
 static bool bridge_parse_update_info(cJSON *json, bridge_update_info_t *info) {
     if (!json || !info) {
         return false;
@@ -817,12 +845,20 @@ static bool bridge_parse_update_info(cJSON *json, bridge_update_info_t *info) {
     }
 
     cJSON *artifact_url = cJSON_GetObjectItemCaseSensitive(manifest, "artifactUrl");
+    cJSON *artifact_path = cJSON_GetObjectItemCaseSensitive(manifest, "artifactPath");
     cJSON *artifact_sha256 = cJSON_GetObjectItemCaseSensitive(manifest, "artifactSha256");
     cJSON *signature = cJSON_GetObjectItemCaseSensitive(manifest, "signature");
     cJSON *size = cJSON_GetObjectItemCaseSensitive(manifest, "sizeBytes");
 
     if (cJSON_IsString(artifact_url) && artifact_url->valuestring) {
         bridge_set_runtime_string(info->artifact_url, sizeof(info->artifact_url), artifact_url->valuestring);
+    }
+
+    if (cJSON_IsString(artifact_path) && artifact_path->valuestring) {
+        bridge_set_runtime_string(info->artifact_path, sizeof(info->artifact_path), artifact_path->valuestring);
+        if (info->artifact_url[0] == '\0') {
+            bridge_build_supabase_storage_url(info->artifact_path, info->artifact_url, sizeof(info->artifact_url));
+        }
     }
 
     if (cJSON_IsString(artifact_sha256) && artifact_sha256->valuestring) {
@@ -1195,6 +1231,7 @@ static void bridge_command_bootstrap_help(void) {
     printf("  4. Check approved PC tools: bundle check windows_bundle.\n");
     printf("  5. If this PC has no receiver script yet, run bootstrap script and save the printed PowerShell.\n");
     printf("  6. Run that PowerShell script on the PC. It asks the ESP for bundle get windows_bundle and verifies SHA-256.\n");
+    printf("  Plug-and-play target: compatible boards also expose START.CMD on a small USB drive.\n");
     printf("\nNo general internet is shared with the PC. The ESP fetches only ShadowChat manifests and artifacts.\n\n");
 }
 
@@ -1204,7 +1241,7 @@ static void bridge_command_bootstrap_script(void) {
     printf("$ErrorActionPreference='Stop'\n");
     printf("$enc=[Text.UTF8Encoding]::new($false)\n");
     printf("$sp=[IO.Ports.SerialPort]::new($Port,115200,[IO.Ports.Parity]::None,8,[IO.Ports.StopBits]::One)\n");
-    printf("$sp.Encoding=$enc; $sp.NewLine=\"`n\"; $sp.ReadTimeout=1000; $sp.WriteTimeout=3000\n");
+    printf("$sp.Encoding=$enc; $sp.NewLine=\"`n\"; $sp.ReadBufferSize=1048576; $sp.ReadTimeout=1000; $sp.WriteTimeout=3000\n");
     printf("$fs=$null; $path=$null; $sha=''; $bytes=0\n");
     printf("try {\n");
     printf("  $sp.Open(); Start-Sleep -Milliseconds 1200; $sp.DiscardInBuffer(); $sp.WriteLine('bundle get windows_bundle')\n");
@@ -1238,12 +1275,17 @@ static void bridge_command_bootstrap(const char *subcommand) {
         return;
     }
 
+    if (strcmp(subcommand, "ping") == 0) {
+        printf("SHADOWCHAT_BRIDGE_READY %s %s\n", CONFIG_BRIDGE_HARDWARE_MODEL, CONFIG_BRIDGE_FIRMWARE_VERSION);
+        return;
+    }
+
     if (strcmp(subcommand, "script") == 0) {
         bridge_command_bootstrap_script();
         return;
     }
 
-    printf("Unknown bootstrap command. Use: bootstrap help or bootstrap script\n");
+    printf("Unknown bootstrap command. Use: bootstrap help, bootstrap ping, or bootstrap script\n");
 }
 
 static void bridge_chat_help(void) {
@@ -1324,6 +1366,7 @@ static void bridge_command_status(void) {
     printf("  auth_user_id: %s\n", s_bridge_state.auth_user_id[0] ? s_bridge_state.auth_user_id : "(none)");
     printf("  auth_access_token: %s\n", s_bridge_state.auth_access_token[0] ? "(stored)" : "(none)");
     printf("  auth_refresh_token: %s\n", s_bridge_state.auth_refresh_token[0] ? "(stored)" : "(none)");
+    printf("  usb_bootstrap: %s\n", bridge_usb_bootstrap_status());
     printf("  session_expires_at: %s\n", s_bridge_state.session_expires_at[0] ? s_bridge_state.session_expires_at : "(none)");
     printf("  auth_expires_at: %s\n\n", s_bridge_state.auth_expires_at[0] ? s_bridge_state.auth_expires_at : "(none)");
     bridge_protocol_emit_status();
@@ -2456,6 +2499,7 @@ static bool bridge_stream_bundle_artifact(const char *target, const bridge_updat
         cJSON_AddNumberToObject(start, "chunkBytes", BRIDGE_BUNDLE_CHUNK_SIZE);
         bridge_protocol_emit_forced(start);
         cJSON_Delete(start);
+        vTaskDelay(pdMS_TO_TICKS(BRIDGE_BUNDLE_CHUNK_PACE_MS));
     }
 
     while (true) {
@@ -2497,7 +2541,7 @@ static bool bridge_stream_bundle_artifact(const char *target, const bridge_updat
 
         total_read += read_len;
         sequence++;
-        vTaskDelay(pdMS_TO_TICKS(2));
+        vTaskDelay(pdMS_TO_TICKS(BRIDGE_BUNDLE_CHUNK_PACE_MS));
     }
 
     if (total_read <= 0) {
@@ -3787,6 +3831,11 @@ void app_main(void) {
     printf("Device serial: %s\n", s_bridge_state.device_serial);
     printf("Backend URL: %s\n", CONFIG_BRIDGE_SUPABASE_URL[0] ? CONFIG_BRIDGE_SUPABASE_URL : "(not set)");
     printf("First plug: type 'bootstrap help' for offline Windows setup and bundle download instructions.\n");
+
+    esp_err_t usb_bootstrap_err = bridge_usb_bootstrap_init();
+    if (usb_bootstrap_err != ESP_OK) {
+        ESP_LOGW(TAG, "USB bootstrap drive unavailable: %s", esp_err_to_name(usb_bootstrap_err));
+    }
 
     if (s_bridge_state.wifi_ssid[0] != '\0') {
         printf("Attempting Wi-Fi reconnect for SSID '%s'\n", s_bridge_state.wifi_ssid);

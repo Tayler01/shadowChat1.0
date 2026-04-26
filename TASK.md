@@ -11,6 +11,7 @@ The ESP bridge must:
 - apply firmware updates over the air from a trusted manifest
 - expose a way for an offline Windows PC to obtain ESP-specific ShadowChat software and dependencies through the bridge without granting the PC general internet access
 - remain useful when first plugged in by presenting minimal setup instructions over the serial/admin path
+- present a small USB bootstrap drive on compatible ESP32-S3 boards so a no-repo Windows PC can start setup by double-clicking a visible script
 
 ## Hosting Decision
 

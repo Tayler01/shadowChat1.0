@@ -155,6 +155,20 @@ When plugged into a PC with no helper installed, the ESP must print enough instr
 
 True Windows auto-launch is not assumed.
 
+### Plug-And-Play Bootstrap Drive
+
+The improved first-plug path for compatible ESP32-S3 boards is a TinyUSB composite device:
+
+1. MSC exposes a tiny FAT drive with `README.TXT`, `START.CMD`, `SETUP.CMD`, `RECEIVE.PS1`, and `AUTORUN.INF`.
+2. CDC exposes a serial console from the same USB connection.
+3. `START.CMD` runs `RECEIVE.PS1`.
+4. `RECEIVE.PS1` scans COM ports and sends `bootstrap ping`.
+5. The bridge responds with `SHADOWCHAT_BRIDGE_READY`.
+6. The script requests `bundle get windows_bundle`.
+7. The ESP fetches only the approved manifest artifact, streams it over serial, and the script verifies SHA-256.
+
+Windows should not be expected to auto-execute `AUTORUN.INF` from removable media. The file is useful for drive metadata, but the supported user action is double-clicking the visible start script.
+
 ## Implemented State
 
 The current firmware implements:
@@ -164,6 +178,7 @@ The current firmware implements:
 - `bundle check [windows_bundle|bootstrap]`
 - `bundle get [windows_bundle|bootstrap]`
 - `bootstrap help`
+- `bootstrap ping`
 - `bootstrap script`
 
 The current Windows tool bundle path is:
@@ -175,11 +190,12 @@ npm run bridge:bundle -- -Port COM3 -Target windows_bundle
 
 The ESP resolves `windows_bundle` from `bridge-update-check`, downloads only the manifest-selected artifact, emits `bundleStart`/`bundleChunk`/`bundleEnd` frames over serial, and the receiver verifies the reconstructed file hash before reporting success.
 
-For first-plug PCs with no local tools, `bootstrap help` prints the setup flow and `bootstrap script` prints a minimal PowerShell receiver that can be copied out of any serial terminal. This gives the offline PC a bootstrap path without assuming a browser, dashboard, or preinstalled local app.
+For first-plug PCs with no local tools, compatible firmware exposes a small USB drive with a ready-to-run receiver. Serial-only fallback remains available: `bootstrap help` prints the setup flow and `bootstrap script` prints a minimal PowerShell receiver that can be copied out of any serial terminal. This gives the offline PC a bootstrap path without assuming a browser, dashboard, internet connection, or repo checkout.
 
 Production hardening still needed:
 
 - firmware signature verification before OTA apply
 - signed bundle verification in addition to SHA-256
+- larger app partition or feature trimming; TinyUSB composite leaves little room in the current 4 MB partition layout
 - larger bundle soak tests at slower serial speeds
 - automated release publishing instead of manual Storage upload plus REST manifest upsert

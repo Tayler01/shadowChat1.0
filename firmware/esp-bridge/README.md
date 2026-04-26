@@ -33,21 +33,26 @@ The current spike is configured for a `4 MB` flash layout with:
 
 That keeps OTA planning in the project without assuming a larger flash size than the first spike needs.
 
-## Why USB Serial/JTAG First
+## USB Bootstrap Path
 
-The bridge roadmap and documentation review called out two likely serial paths on `ESP32-S3`:
+The bridge roadmap and documentation review called out two likely local USB paths on `ESP32-S3`:
 
 - fixed-function `USB Serial/JTAG`
 - TinyUSB `CDC-ACM`
 
-For this first spike, the firmware uses `USB Serial/JTAG` because it is the simplest dependable serial-first path for:
+The first spike used `USB Serial/JTAG` because it was the simplest dependable serial-first path for:
 
 - admin shell bring-up
 - pairing proof
 - Wi-Fi onboarding
 - no-internet-to-PC transport discipline
 
-We can revisit TinyUSB later if `v1` needs a richer composite USB transport.
+The plug-and-play bootstrap milestone adds a TinyUSB composite target on compatible boards. It exposes:
+
+- a tiny FAT bootstrap drive with `README.TXT`, `START.CMD`, `SETUP.CMD`, `RECEIVE.PS1`, and `AUTORUN.INF`
+- a TinyUSB CDC serial console used by the receiver script and normal bridge shell
+
+Windows security policy should be expected to block true USB auto-run. The supported no-repo flow is to plug in the bridge, open the small ESP drive, and double-click `START.CMD` or `SETUP.CMD`.
 
 ## Build Requirements
 
@@ -166,7 +171,21 @@ npm run bridge:bundle:pack
 
 ## First-Plug Bootstrap
 
-When the ESP is plugged into a Windows PC that has no ShadowChat bridge tools yet, open any serial terminal at `115200` baud and run:
+On compatible TinyUSB builds, plugging the ESP into a Windows PC exposes a small bootstrap drive. Open that drive and double-click:
+
+```text
+START.CMD
+```
+
+or:
+
+```text
+SETUP.CMD
+```
+
+The script auto-detects the bridge COM port with `bootstrap ping`, asks the ESP for the approved `windows_bundle`, reconstructs `shadowchat-bridge-tools.zip`, and verifies SHA-256. The PC does not receive general internet access; the ESP fetches only manifest-selected ShadowChat artifacts.
+
+If the ESP drive is unavailable, or if you are using a serial-only build, open any serial terminal at `115200` baud and run:
 
 ```text
 bootstrap help
@@ -174,7 +193,7 @@ bootstrap help
 
 The ESP prints the no-internet setup sequence: connect Wi-Fi on the ESP, register/pair if needed, check the approved `windows_bundle`, and receive it through serial.
 
-If the PC does not have the receiver script yet, run:
+If the PC does not have the receiver script yet and the ESP drive is unavailable, run:
 
 ```text
 bootstrap script
