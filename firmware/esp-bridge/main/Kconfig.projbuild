@@ -18,7 +18,7 @@ config BRIDGE_HARDWARE_MODEL
 
 config BRIDGE_FIRMWARE_VERSION
     string "Bridge firmware version"
-        default "0.2.6-bootstrap-autodetect"
+        default "0.2.7-fat-headroom"
 
 config BRIDGE_UPDATE_CHANNEL
     string "Bridge update channel"

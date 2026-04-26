@@ -31,7 +31,7 @@ The current spike is configured for a `4 MB` flash layout with:
 - `ota_0`
 - `ota_1`
 
-Each app slot is `0x140000` bytes. The ESP-hosted `usb_boot` FAT partition is intentionally small (`0x20000` bytes) because it only serves the first-plug bootstrap files. This keeps factory plus A/B OTA while giving the firmware about 128 KB more slot room than the earlier `0x120000` layout.
+Each app slot is `0x130000` bytes. The ESP-hosted `usb_boot` FAT partition is `0x50000` bytes so the ESP FAT/wear-leveling stack has enough room to mount reliably while still keeping factory plus A/B OTA and more slot room than the earlier `0x120000` layout.
 
 OTA updates can replace the running app image, but they cannot rewrite the bootloader partition table. Devices already flashed with the older `0x120000` app-slot layout need one manual full flash before they gain the larger slots. The size-optimized `0.2.5-space-headroom` app still fits the older slots, so it can be OTA-applied safely as an intermediate step.
 

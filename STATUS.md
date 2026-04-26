@@ -98,12 +98,19 @@ Milestone 9: plug-and-play tools polish and Android badge stability.
 - Published firmware version `0.2.6-bootstrap-autodetect` with the auto-detecting serial-only fallback receiver script.
 - Applied firmware OTA on the connected ESP32-S3 from `0.2.5-space-headroom` to `0.2.6-bootstrap-autodetect`.
 - Live post-OTA status reported `firmware_version: 0.2.6-bootstrap-autodetect`.
+- Completed the manual full flash after the ESP was placed in ROM bootloader mode. The ROM device appeared as `COM3` with `VID_303A&PID_1001`.
+- Verified the `0x140000` app-slot layout booted, but the `0x20000` `usb_boot` FAT partition was too small and reported `MSC filesystem mount failed: ESP_FAIL`.
+- Adjusted the full-flash partition layout to `0x130000` app slots and a `0x50000` `usb_boot` FAT partition.
+- Built and full-flashed firmware version `0.2.7-fat-headroom`, including erasing the new `usb_boot` region at `0x3b0000`.
+- Live post-flash USB enumeration returned to ShadowChat app USB `VID_303A&PID_4001`, serial `COM4`, and FAT drive `D:`.
+- Live post-flash status reported `firmware_version: 0.2.7-fat-headroom` and `usb_bootstrap: MSC+CDC initialized`.
+- Published firmware version `0.2.7-fat-headroom` to Supabase Storage and manifests.
 - Updated Android badge sync so a just-cleared local unread count is trusted briefly and stale launcher badge refreshes do not repaint a red dot right after opening a DM.
 - Added a focused `AppBadgeSync` regression test for the Android badge repaint behavior.
 
 ## In Progress
 
-- Manual full flash for the new partition table is still pending. Direct `idf.py flash` over the TinyUSB CDC app port failed to enter ROM bootloader; use BOOT/RESET or hold BOOT while reconnecting before retrying the full flash.
+- No active implementation work in this milestone.
 
 ## Pushed
 
@@ -509,6 +516,51 @@ Firmware update staged. Rebooting into version 0.2.6-bootstrap-autodetect.
 firmware_version: 0.2.6-bootstrap-autodetect
 ```
 
+Full partition-table flash proof:
+
+```text
+ROM bootloader serial: COM3
+USB ROM identity: VID_303A&PID_1001
+
+Wrote 20928 bytes at 0x00000000
+Wrote 1040160 bytes at 0x00020000
+Wrote 3072 bytes at 0x00008000
+Wrote 8192 bytes at 0x0000f000
+Hash of data verified.
+```
+
+Corrected layout proof:
+
+```text
+factory app factory 0x20000  1216K
+ota_0   app ota_0   0x150000 1216K
+ota_1   app ota_1   0x280000 1216K
+usb_boot data fat   0x3b0000 320K
+
+shadowchat_bridge.bin binary size 0xfdf20 bytes.
+Smallest app partition is 0x130000 bytes.
+0x320e0 bytes (16%) free.
+```
+
+Live corrected flash proof:
+
+```text
+USB app identity: VID_303A&PID_4001
+Serial: COM4
+Drive: D: FAT, size 258048 bytes
+
+firmware_version: 0.2.7-fat-headroom
+usb_bootstrap: MSC+CDC initialized
+```
+
+Manifest proof:
+
+```text
+firmware stable esp32-s3 0.2.7-fat-headroom
+SHA256 c246e2cb573d3aa82129c0738b9065151ff14f27081fd81fb2131f718d586f24
+size 1040160
+```
+
 ## Failed Approaches / Notes
 
 - Do not use Netlify for ESP update artifacts; Netlify account credits previously disabled the site and update availability must not depend on that path.
@@ -536,3 +588,4 @@ firmware_version: 0.2.6-bootstrap-autodetect
 - OTA cannot rewrite the partition table. `0.2.5-space-headroom` can be OTA-applied because it still fits old app slots, but the enlarged `0x140000` slots only take effect after a manual full flash that includes the partition table.
 - A direct full-flash retry after TinyUSB composite firmware built successfully failed with `Failed to connect to ESP32-S3: No serial data received.` Do not retry normal `idf.py -p COM4 flash` until the board is placed in ROM bootloader mode with BOOT/RESET.
 - `0.1.8-tools` was published successfully, but live receiver testing with `-OutputPath output\bridge-downloads-0.1.8` exposed that dotted directory names could be treated as filenames. Do not reuse that artifact; `0.1.9-tools` supersedes it.
+- The first successful partition-table full flash used `0x140000` app slots and a `0x20000` `usb_boot` partition. The app booted, but FAT/MSC mount failed because that partition was too small for the wear-leveling-backed FAT volume. Use the corrected `0.2.7-fat-headroom` layout instead.
