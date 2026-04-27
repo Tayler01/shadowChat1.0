@@ -14,6 +14,7 @@ import { ConnectivityBanner } from './components/ui/ConnectivityBanner'
 import { LoadingSpinner } from './components/ui/LoadingSpinner'
 import { AppBadgeSync } from './components/notifications/AppBadgeSync'
 import { PhoneInstallOnboarding } from './components/onboarding/PhoneInstallOnboarding'
+import { useSessionResumeRecovery } from './hooks/useSessionResumeRecovery'
 
 const DirectMessagesView = lazy(() =>
   import('./components/dms/DirectMessagesView').then(module => ({
@@ -78,6 +79,7 @@ function ViewLoadingState() {
 }
 
 function App() {
+  useSessionResumeRecovery()
   const [currentView, setCurrentView] = useState<View>(() => getInitialLocationState().view)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const isDesktop = useIsDesktop()
