@@ -291,3 +291,9 @@ The firmware build passed locally and produced
 `firmware/esp-bridge/build/shadowchat_bridge.bin`. Software flashing from the
 running app did not enter the ROM bootloader, so the connected board still needs
 manual bootloader entry or a restored data link before it can receive this image.
+
+The deployed `bridge-pairing-begin` Edge Function now treats a stale or
+unavailable recovery token as a fresh owner-approved pairing request instead of
+returning `Bridge recovery is not available for this device`. This keeps older
+firmware from getting stuck when it sends a stored recovery token with manual
+`pair begin`; auto-approved recovery still requires the token hash to match.

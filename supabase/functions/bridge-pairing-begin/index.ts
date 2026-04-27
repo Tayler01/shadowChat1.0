@@ -84,20 +84,27 @@ serve(async req => {
     )
 
     if (recoveryToken && !canRecoverWithToken) {
-      return forbidden('Bridge recovery is not available for this device')
+      console.warn('Bridge recovery token was supplied but recovery is not available; falling back to fresh pairing', {
+        deviceId,
+        hasRecoveryHash: Boolean(device.recovery_token_hash),
+        hasActivePairing: Boolean(activePairing),
+        hasPairedUser: Boolean(device.paired_user_id),
+        hasBridgeUser: Boolean(device.bridge_user_id),
+      })
     }
 
+    let autoApprovedRecovery = false
     if (canRecoverWithToken) {
       const recoveryTokenHash = await hashToken(recoveryToken)
-      if (recoveryTokenHash !== device.recovery_token_hash) {
-        return forbidden('Invalid bridge recovery token')
+      autoApprovedRecovery = recoveryTokenHash === device.recovery_token_hash
+      if (!autoApprovedRecovery) {
+        console.warn('Bridge recovery token was rejected; falling back to fresh pairing', { deviceId })
       }
     }
 
     let pairingCode = ''
     let pairingRequestId = ''
     const expiresAt = new Date(Date.now() + PAIRING_CODE_TTL_MINUTES * 60_000).toISOString()
-    const autoApprovedRecovery = canRecoverWithToken
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
       pairingCode = generatePairingCode()
