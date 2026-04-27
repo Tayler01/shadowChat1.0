@@ -9,6 +9,7 @@ interface AuthGuardProps {
 
 export function AuthGuard({ children }: AuthGuardProps) {
   const { user, loading, error } = useAuth();
+  const isReconnecting = error?.startsWith('Still reconnecting');
 
   if (loading) {
     return (
@@ -20,7 +21,9 @@ export function AuthGuard({ children }: AuthGuardProps) {
             <p className="mt-1 text-sm text-[var(--text-secondary)]">Loading messages, presence, and account state.</p>
           </div>
           {error && (
-            <p className="text-sm text-red-300">Error: {error}</p>
+            <p className={`text-sm ${isReconnecting ? 'text-[var(--text-gold)]' : 'text-red-300'}`}>
+              {isReconnecting ? error : `Error: ${error}`}
+            </p>
           )}
         </div>
       </div>

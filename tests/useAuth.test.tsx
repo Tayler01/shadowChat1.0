@@ -137,6 +137,44 @@ test('initial session bootstrap loads a user when recovery succeeds', async () =
   expect(result.current.user).toEqual(profile);
 });
 
+test('initial session keeps retrying instead of logging out when a saved refresh token exists', async () => {
+  jest.useFakeTimers();
+
+  const {
+    ensureSession,
+    getStoredRefreshToken,
+    recoverSessionAfterResume,
+  } = jest.requireMock('../src/lib/supabase') as {
+    ensureSession: jest.Mock;
+    getStoredRefreshToken: jest.Mock;
+    recoverSessionAfterResume: jest.Mock;
+  };
+  getStoredRefreshToken.mockReturnValue('saved-refresh-token');
+  ensureSession.mockResolvedValue(false);
+  recoverSessionAfterResume.mockResolvedValue(false);
+
+  const { result, unmount } = await renderUseAuth();
+
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(5000);
+  });
+
+  expect(ensureSession).toHaveBeenCalledTimes(4);
+  expect(recoverSessionAfterResume).toHaveBeenCalledTimes(4);
+  expect(result.current.loading).toBe(true);
+  expect(result.current.user).toBeNull();
+  expect(result.current.error).toMatch(/Still reconnecting your saved session/);
+
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(10000);
+  });
+
+  expect(ensureSession.mock.calls.length).toBeGreaterThan(4);
+
+  unmount();
+  jest.useRealTimers();
+});
+
 test('signUp sets user when session returned', async () => {
   const profile = { id: '1', email: 'x@y.com' } as any;
   authModule.signUp.mockResolvedValue({ session: {}, profile, user: {} } as any);

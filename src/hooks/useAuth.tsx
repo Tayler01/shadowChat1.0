@@ -41,6 +41,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 const AUTH_RESTORE_RETRY_DELAYS_MS = [0, 450, 1200, 2400];
+const STORED_SESSION_RETRY_MS = 10000;
 
 const wait = (ms: number) =>
   new Promise(resolve => window.setTimeout(resolve, ms));
@@ -52,9 +53,17 @@ function useProvideAuth() {
   const initialLoadRef = useRef(false);
   const mountedRef = useRef(true);
   const authChangeTaskRef = useRef(0);
+  const restoreRetryTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
+
+    const clearRestoreRetry = () => {
+      if (restoreRetryTimeoutRef.current !== null) {
+        window.clearTimeout(restoreRetryTimeoutRef.current);
+        restoreRetryTimeoutRef.current = null;
+      }
+    };
 
     const applyRealtimeAuth = (accessToken?: string | null) => {
       try {
@@ -143,11 +152,39 @@ function useProvideAuth() {
     // Get initial session
     const getInitialSession = async () => {
       if (initialLoadRef.current) return;
+      clearRestoreRetry();
+      let keepRestoringStoredSession = false;
+
+      const continueStoredSessionRecovery = (message: string) => {
+        keepRestoringStoredSession = true;
+
+        if (!mountedRef.current) {
+          return;
+        }
+
+        setError(message);
+        setLoading(true);
+
+        restoreRetryTimeoutRef.current = window.setTimeout(() => {
+          restoreRetryTimeoutRef.current = null;
+          if (!mountedRef.current) {
+            return;
+          }
+
+          initialLoadRef.current = false;
+          void getInitialSession();
+        }, STORED_SESSION_RETRY_MS);
+      };
       
       
       try {
         const sessionReady = await restoreSessionForLaunch();
         if (!sessionReady) {
+          if (getStoredRefreshToken()) {
+            continueStoredSessionRecovery('Still reconnecting your saved session. Keep the app open and we will keep trying.');
+            return;
+          }
+
           if (mountedRef.current) {
             setUser(null);
           }
@@ -167,6 +204,11 @@ function useProvideAuth() {
         }
         
         if (sessionError) {
+          if (getStoredRefreshToken()) {
+            continueStoredSessionRecovery('Still reconnecting your saved session. Keep the app open and we will keep trying.');
+            return;
+          }
+
           if (mountedRef.current) {
             setError(sessionError.message);
             setUser(null);
@@ -178,10 +220,20 @@ function useProvideAuth() {
         if (session?.user) {
           try {
             const profile = await getCurrentUser();
+            if (!profile && getStoredRefreshToken()) {
+              continueStoredSessionRecovery('Still reconnecting your saved profile. Keep the app open and we will keep trying.');
+              return;
+            }
+
             if (mountedRef.current) {
               setUser(profile);
             }
           } catch {
+            if (getStoredRefreshToken()) {
+              continueStoredSessionRecovery('Still reconnecting your saved profile. Keep the app open and we will keep trying.');
+              return;
+            }
+
             if (mountedRef.current) {
               setError('Failed to load user profile. Please try refreshing the page.');
               setUser(null);
@@ -202,6 +254,11 @@ function useProvideAuth() {
           if (mountedRef.current) setUser(null);
           // Don't set this as an error since it's expected behavior
         } else {
+          if (getStoredRefreshToken()) {
+            continueStoredSessionRecovery('Still reconnecting your saved session. Keep the app open and we will keep trying.');
+            return;
+          }
+
           if (mountedRef.current) {
             setError(errorMessage);
             setUser(null);
@@ -209,9 +266,12 @@ function useProvideAuth() {
         }
       } finally {
         if (mountedRef.current) {
-          setLoading(false);
+          setLoading(keepRestoringStoredSession);
         }
-        initialLoadRef.current = true;
+        if (!keepRestoringStoredSession) {
+          clearRestoreRetry();
+          initialLoadRef.current = true;
+        }
       }
     };
 
@@ -236,6 +296,7 @@ function useProvideAuth() {
 
     return () => {
       mountedRef.current = false;
+      clearRestoreRetry();
       subscription.unsubscribe();
     };
   }, []);
