@@ -1,18 +1,23 @@
 # ESP Bridge TUI Production Readiness
 
 This document records the bridge TUI polish shipped in the `0.1.11` through
-`0.1.13` Windows tools bundles.
+`0.1.14` Windows tools bundles.
 
 ## Current Bundle
 
 Latest stable Windows tools bundle:
 
+- version: `0.1.14-ai-backfill-layout`
+- storage path: `windows/0.1.14-ai-backfill-layout/shadowchat-bridge-tools.zip`
+- SHA-256: `4acc39ccfd2d43ee5cb76a2d3cbb3d7f1d7bdaff55a1d32cf684cd54748fb757`
+- size: `31275` bytes
+
+Previous production-readiness bundle:
+
 - version: `0.1.13-two-pane-render-fix`
 - storage path: `windows/0.1.13-two-pane-render-fix/shadowchat-bridge-tools.zip`
 - SHA-256: `197f0ba1adab2608875b3fd95e664052ec4d550859879487f09e73a037463abd`
 - size: `30975` bytes
-
-Previous production-readiness bundle:
 
 - version: `0.1.12-data-link-labels`
 - storage path: `windows/0.1.12-data-link-labels/shadowchat-bridge-tools.zip`
@@ -33,6 +38,9 @@ The TUI should feel smooth, dependable, and chat-first:
 - long draft text keeps the active typing tail visible
 - normal typing updates only the input line instead of forcing a full layout repaint per key
 - group-chat `@ai`, `@shado`, and `@shado_ai` mentions ask Shado through the backend AI path
+- after sending chat text, the TUI runs short follow-up backfill polls so delayed Shado replies still appear when realtime is already joined
+- short chat histories sit near the input prompt instead of leaving a large empty area between the last message and the keyboard
+- malformed structured serial frames are handled by fallback polling instead of showing raw parser errors in the live feed
 - visible connectivity chrome uses data-link language such as `data link` and `link`
 - two-pane terminal widths render without strict-mode crashes
 

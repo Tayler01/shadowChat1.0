@@ -255,6 +255,9 @@ $script:liveReceive = -not $NoAutoPoll
 $script:realtimeConnected = $false
 $script:realtimeBackfillPending = $false
 $script:lastSentAt = $null
+$script:postSendBackfillUntil = [DateTime]::MinValue
+$script:postSendBackfillNextAt = [DateTime]::MinValue
+$script:protocolFrameSkipCount = 0
 $script:unreadGroupCount = 0
 $script:unreadDmCount = 0
 $script:activeDmConversationId = ""
@@ -825,6 +828,20 @@ function Get-MessageRenderRows {
     return $rows.ToArray()
 }
 
+function Get-MessageTopPadding {
+    param(
+        [int]$RowCount,
+        [int]$BodyHeight,
+        [int]$ScrollOffset
+    )
+
+    if ($ScrollOffset -gt 0) {
+        return 0
+    }
+
+    return [Math]::Max(0, $BodyHeight - $RowCount)
+}
+
 function Write-MessageRenderRow {
     param(
         [object]$Row,
@@ -928,6 +945,40 @@ function Invoke-PendingRealtimeBackfill {
     Invoke-Poll
 }
 
+function Queue-PostSendBackfill {
+    if ($script:currentMode -ne "group" -and $script:currentMode -ne "dm") {
+        return
+    }
+
+    $now = [DateTime]::UtcNow
+    $script:postSendBackfillUntil = $now.AddSeconds(24)
+    $script:postSendBackfillNextAt = $now.AddSeconds(2)
+}
+
+function Invoke-PostSendBackfill {
+    if ($script:postSendBackfillUntil -eq [DateTime]::MinValue) {
+        return
+    }
+
+    if ($script:currentMode -ne "group" -and $script:currentMode -ne "dm") {
+        $script:postSendBackfillUntil = [DateTime]::MinValue
+        return
+    }
+
+    $now = [DateTime]::UtcNow
+    if ($now -gt $script:postSendBackfillUntil) {
+        $script:postSendBackfillUntil = [DateTime]::MinValue
+        return
+    }
+
+    if ($now -lt $script:postSendBackfillNextAt) {
+        return
+    }
+
+    Invoke-Poll
+    $script:postSendBackfillNextAt = $now.AddSeconds(5)
+}
+
 function Format-ProtocolMessageLine {
     param([object]$Event)
 
@@ -1013,7 +1064,8 @@ function Try-HandleProtocolLine {
     try {
         $event = $payload | ConvertFrom-Json
     } catch {
-        Add-LiveFeedLine "Protocol parse error: $($_.Exception.Message)"
+        $script:protocolFrameSkipCount += 1
+        Queue-RealtimeBackfill "Protocol frame skipped; fallback polling is active."
         Request-Render
         return $true
     }
@@ -1287,7 +1339,7 @@ function Render-Layout {
     $script:lastLayoutWidth = $width
     $script:lastLayoutHeight = $height
 
-    $bodyHeight = [Math]::Max(4, $height - 6)
+    $bodyHeight = [Math]::Max(4, $height - 4)
     $divider = "-" * $width
     $pollLabel = Get-LiveTransportLabel
     $rxLabel = if ($script:lastRxAt) { "rx: $($script:lastRxAt.ToLocalTime().ToString("HH:mm:ss"))" } else { "rx: none" }
@@ -1304,6 +1356,7 @@ function Render-Layout {
         $script:messageScrollOffset = $maxScrollOffset
     }
     $messageStart = [Math]::Max(0, $messageRows.Count - $bodyHeight - $script:messageScrollOffset)
+    $messageTopPadding = Get-MessageTopPadding $messageRows.Count $bodyHeight $script:messageScrollOffset
     $feedStart = [Math]::Max(0, $script:liveFeed.Count - $bodyHeight)
     $scrollLabel = if ($script:messageScrollOffset -gt 0) { " | scroll: +$script:messageScrollOffset" } else { "" }
 
@@ -1312,10 +1365,10 @@ function Render-Layout {
     Write-Ui $divider ([ConsoleColor]::DarkGray)
 
     for ($i = 0; $i -lt $bodyHeight; $i++) {
-        $messageIndex = $messageStart + $i
+        $messageIndex = $messageStart + $i - $messageTopPadding
         $feedIndex = $feedStart + $i
         $statusLine = if ($i -lt $statusLines.Count) { $statusLines[$i] } else { "" }
-        $messageRow = if ($messageIndex -lt $messageRows.Count) { $messageRows[$messageIndex] } else { $null }
+        $messageRow = if ($messageIndex -ge 0 -and $messageIndex -lt $messageRows.Count) { $messageRows[$messageIndex] } else { $null }
         $feedLine = if ($feedIndex -lt $script:liveFeed.Count) { $script:liveFeed[$feedIndex] } else { "" }
 
         if ($useThreePane) {
@@ -1811,6 +1864,7 @@ function Process-InputLine {
         Send-BridgeLine $Line
         $script:lastSentAt = [DateTime]::UtcNow
         $script:lastPollAt = [DateTime]::UtcNow.AddSeconds(-[Math]::Max(1, $PollSeconds - 1))
+        Queue-PostSendBackfill
         Request-Render
     }
 }
@@ -1840,6 +1894,7 @@ function Wait-BridgeOutput {
     while ([DateTime]::UtcNow -lt $deadline) {
         Read-SerialOutput
         Invoke-PendingRealtimeBackfill
+        Invoke-PostSendBackfill
         Start-Sleep -Milliseconds 100
     }
 }
@@ -1971,6 +2026,7 @@ function Run-Interactive {
     while ($script:running) {
         Read-SerialOutput
         Invoke-PendingRealtimeBackfill
+        Invoke-PostSendBackfill
 
         if ($script:liveReceive -and -not $script:realtimeConnected -and ($script:currentMode -eq "group" -or $script:currentMode -eq "dm")) {
             $elapsed = [DateTime]::UtcNow - $script:lastPollAt

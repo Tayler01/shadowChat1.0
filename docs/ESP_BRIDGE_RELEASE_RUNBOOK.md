@@ -10,8 +10,8 @@ For the current TUI hardening details, see
 
 Use monotonic semantic-style versions with a short release label:
 
-- firmware: `0.2.10-link-repair`
-- Windows tools bundle: `0.1.13-two-pane-render-fix`
+- firmware: `0.2.11-protocol-flush`
+- Windows tools bundle: `0.1.14-ai-backfill-layout`
 - bootstrap bundle: `0.1.10-bootstrap-routing`
 
 Rules:
@@ -59,7 +59,7 @@ firmware/esp-bridge/build/shadowchat_bridge.bin
 Windows tools bundle:
 
 ```powershell
-npm run bridge:bundle:pack -- -Version 0.1.12-data-link-labels
+npm run bridge:bundle:pack -- -Version 0.1.14-ai-backfill-layout
 ```
 
 Record for each artifact:

@@ -134,6 +134,7 @@ static void bridge_protocol_emit(cJSON *event) {
     }
 
     printf("@scb:%s\n", line);
+    fflush(stdout);
     free(line);
 }
 

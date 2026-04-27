@@ -76,6 +76,11 @@ Add-MessageLine "23:10:00 | Caleb: two pane render"
 Assert-True ((@(if ($false) { Get-SidebarLines })).Count -eq 0) "Disabled sidebar output should stay array-shaped under strict mode."
 $script:layoutEnabled = $false
 
+$script:messageScrollOffset = 0
+Assert-Equal (Get-MessageTopPadding 5 12 0) 7 "Short message history should bottom-align near the prompt."
+Assert-Equal (Get-MessageTopPadding 16 12 0) 0 "Overflowing message history should not add top padding."
+Assert-Equal (Get-MessageTopPadding 5 12 3) 0 "Scrolled message history should not add top padding."
+
 $script:bridgeHealth.wifi = "yes"
 Assert-True ((Get-HealthLabel) -match "data link: established") "Health label should use data-link wording."
 Assert-True ((Get-HealthLabel) -notmatch "wifi|wi-fi") "Health label should not expose transport wording."
@@ -88,6 +93,13 @@ Assert-Equal (Format-TuiDisplayLine "Wi-Fi disconnected; reason=8") "Data link i
 $script:messages.Clear()
 $script:liveFeed.Clear()
 $script:currentMode = "group"
+$script:realtimeBackfillPending = $false
+Try-HandleProtocolLine '@scb:{"type":"message",' | Out-Null
+Assert-True $script:realtimeBackfillPending "Malformed protocol frames should queue fallback polling."
+Assert-True (($script:liveFeed -join "`n") -notmatch "Protocol parse error") "Malformed protocol frames should not expose raw parser errors in the TUI."
+$script:realtimeBackfillPending = $false
+$script:liveFeed.Clear()
+
 Try-HandleProtocolLine '@scb:{"type":"message","thread":"dm","source":"realtime","conversationId":"conv-inactive","id":"fixture-dm-1","createdAt":"2026-04-24T23:00:00Z","senderId":"user-1","senderLabel":"Caleb","content":"inactive dm"}' | Out-Null
 Assert-Equal $script:messages.Count 0 "Inactive DM should not render in group pane."
 Assert-Equal $script:unreadDmCount 1 "Inactive DM should increment unread DM count."
@@ -116,5 +128,11 @@ $script:currentMode = "group"
 $script:bridgeHealth.realtime = "connected"
 Try-HandleProtocolLine '@scb:{"type":"status","realtimeRequested":true,"realtimeConnected":true,"realtimeJoined":true,"realtimeLastError":""}' | Out-Null
 Assert-True $script:realtimeBackfillPending "Realtime rejoin should queue a backfill poll."
+
+$script:postSendBackfillUntil = [DateTime]::MinValue
+$script:postSendBackfillNextAt = [DateTime]::MinValue
+Queue-PostSendBackfill
+Assert-True ($script:postSendBackfillUntil -gt [DateTime]::UtcNow) "Sending chat text should schedule a short follow-up polling window."
+Assert-True ($script:postSendBackfillNextAt -gt [DateTime]::UtcNow) "Sending chat text should delay the first follow-up poll long enough for AI replies."
 
 Write-Host "Bridge TUI layout regression passed."

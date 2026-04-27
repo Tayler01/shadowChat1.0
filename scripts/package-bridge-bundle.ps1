@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = "0.1.13-two-pane-render-fix",
+    [string]$Version = "0.1.14-ai-backfill-layout",
     [string]$OutputDirectory = "output/bridge-bundles"
 )
 
