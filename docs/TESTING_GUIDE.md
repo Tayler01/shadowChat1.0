@@ -175,6 +175,8 @@ npm run bridge:tui:smoke
 
 For `@ai` validation, first deploy `openai-chat` and `bridge-group-send`, then send `@ai health check` in group chat from the TUI. The user message should send as the bridge profile and the answer should appear from Shado.
 
+The shipped TUI hardening and release/rollback notes live in [`docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md`](C:/repos/chat2.0/docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md:1).
+
 ### iPhone Home Screen Note
 
 The iPhone Home Screen app should be treated as a distinct runtime when debugging auth or realtime issues. A flow that passes in Safari can still fail in standalone mode if session recovery or auth-state callbacks are blocking.

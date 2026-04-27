@@ -3,6 +3,9 @@
 This runbook is the source of truth for shipping ESP bridge firmware and
 offline Windows tool updates through Supabase manifests.
 
+For the current TUI hardening details, see
+[ESP Bridge TUI Production Readiness](C:/repos/chat2.0/docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md:1).
+
 ## Versioning
 
 Use monotonic semantic-style versions with a short release label:
