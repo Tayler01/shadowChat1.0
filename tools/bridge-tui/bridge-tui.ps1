@@ -245,6 +245,8 @@ $script:liveFeedLimit = [Math]::Max(40, [Math]::Min(160, $TranscriptLines))
 $script:layoutEnabled = $false
 $script:renderDirty = $true
 $script:lastRenderAt = [DateTime]::MinValue
+$script:lastLayoutWidth = 0
+$script:lastLayoutHeight = 0
 $script:messageScrollOffset = 0
 $script:lastRxAt = $null
 $script:lastStatus = "starting"
@@ -319,6 +321,19 @@ function Remove-Ansi {
     param([string]$Text)
     $escape = [string][char]27
     return [regex]::Replace($Text, "$escape\[[0-9;?]*[ -/]*[@-~]", "")
+}
+
+function Get-DisplayText {
+    param([string]$Text)
+
+    if ($null -eq $Text) {
+        return ""
+    }
+
+    $clean = Remove-Ansi $Text
+    $clean = $clean -replace "[`r`n]+", " "
+    $clean = $clean -replace "`t", " "
+    return [regex]::Replace($clean, "[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", "")
 }
 
 function Redact-SecretText {
@@ -651,7 +666,7 @@ function Format-MessagePaneLine {
         return ""
     }
 
-    $clean = Remove-Ansi $Line
+    $clean = Get-DisplayText $Line
     if ($clean.Length -gt $Width) {
         if ($Width -le 3) {
             $clean = $clean.Substring(0, $Width)
@@ -677,7 +692,7 @@ function Split-TextForWidth {
         return @("")
     }
 
-    $remaining = (Remove-Ansi $Text).Trim()
+    $remaining = (Get-DisplayText $Text).Trim()
     if ([string]::IsNullOrEmpty($remaining)) {
         return @("")
     }
@@ -766,7 +781,7 @@ function Write-MessageRenderRow {
 
     $text = Fit-Text $Row.Text $Width
     if ($Row.RightAlign) {
-        $clean = Remove-Ansi $Row.Text
+        $clean = Get-DisplayText $Row.Text
         if ($clean.Length -lt $Width) {
             $text = (" " * ($Width - $clean.Length)) + $clean
         }
@@ -1131,6 +1146,7 @@ function Get-SidebarLines {
         "Tab       swap",
         "PgUp/Dn   scroll",
         "End       latest",
+        "@ai       Shado",
         "/users    find",
         "/dms      recent",
         "/dm name  DM",
@@ -1141,9 +1157,28 @@ function Get-SidebarLines {
 }
 
 function Get-InputLine {
-    $cursorOn = (([DateTime]::UtcNow.Millisecond / 500) -lt 1)
-    $cursor = if ($cursorOn) { "_" } else { " " }
-    return "$(Get-Prompt)$($script:inputBuffer)$cursor"
+    param([int]$Width = 0)
+
+    $prompt = Get-Prompt
+    $cursor = "_"
+    $buffer = Get-DisplayText $script:inputBuffer
+
+    if ($Width -le 0) {
+        return "$prompt$buffer$cursor"
+    }
+
+    $available = [Math]::Max(0, $Width - $prompt.Length - $cursor.Length)
+    $visible = $buffer
+    if ($buffer.Length -gt $available) {
+        if ($available -le 3) {
+            $visible = $buffer.Substring($buffer.Length - $available)
+        } else {
+            $tailLength = $available - 3
+            $visible = "..." + $buffer.Substring($buffer.Length - $tailLength)
+        }
+    }
+
+    return "$prompt$visible$cursor"
 }
 
 function Write-FitSegment {
@@ -1176,7 +1211,12 @@ function Render-Layout {
     }
 
     $now = [DateTime]::UtcNow
-    if (-not $Force -and -not $script:renderDirty -and (($now - $script:lastRenderAt).TotalMilliseconds -lt 350)) {
+    $terminalWidth = [Math]::Max(40, [Console]::WindowWidth)
+    $width = [Math]::Max(39, $terminalWidth - 1)
+    $height = [Math]::Max(12, [Console]::WindowHeight)
+    $resized = $width -ne $script:lastLayoutWidth -or $height -ne $script:lastLayoutHeight
+
+    if (-not $Force -and -not $script:renderDirty -and -not $resized) {
         return
     }
 
@@ -1186,15 +1226,15 @@ function Render-Layout {
 
     $script:lastRenderAt = $now
     $script:renderDirty = $false
+    $script:lastLayoutWidth = $width
+    $script:lastLayoutHeight = $height
 
-    $width = [Math]::Max(40, [Console]::WindowWidth)
-    $height = [Math]::Max(12, [Console]::WindowHeight)
     $bodyHeight = [Math]::Max(4, $height - 6)
     $divider = "-" * $width
     $pollLabel = Get-LiveTransportLabel
     $rxLabel = if ($script:lastRxAt) { "rx: $($script:lastRxAt.ToLocalTime().ToString("HH:mm:ss"))" } else { "rx: none" }
-    $useThreePane = $width -ge 118
-    $useTwoPane = -not $useThreePane -and $width -ge 82
+    $useThreePane = $width -ge 132
+    $useTwoPane = -not $useThreePane -and $width -ge 96
     $statusWidth = if ($useThreePane) { 24 } else { 0 }
     $feedWidth = if ($useThreePane) { 34 } elseif ($useTwoPane) { 30 } else { 0 }
     $separatorWidth = if ($useThreePane) { 6 } elseif ($useTwoPane) { 3 } else { 0 }
@@ -1236,8 +1276,25 @@ function Render-Layout {
     }
 
     Write-Ui $divider ([ConsoleColor]::DarkGray)
-    $promptLine = Get-InputLine
+    $promptLine = Get-InputLine $width
     Write-Ui (Fit-Text $promptLine $width) ([ConsoleColor]::White) -NoNewline
+}
+
+function Render-InputLine {
+    if (-not $script:layoutEnabled) {
+        return
+    }
+
+    $terminalWidth = [Math]::Max(40, [Console]::WindowWidth)
+    $width = [Math]::Max(39, $terminalWidth - 1)
+    $height = [Math]::Max(12, [Console]::WindowHeight)
+
+    try {
+        [Console]::SetCursorPosition(0, $height - 1)
+        Write-Ui (Fit-Text (Get-InputLine $width) $width) ([ConsoleColor]::White) -NoNewline
+    } catch {
+        Request-Render
+    }
 }
 
 function Write-BridgeLine {
@@ -1522,6 +1579,7 @@ function Show-Help {
         "  /poll                 refresh active chat",
         "  /group                switch to group chat",
         "  /dm <recipient|@name> switch to a DM",
+        "  @ai <question>       ask Shado in group chat",
         "  /users <name>         search users in the side feed",
         "  /dms                  show recent DM targets",
         "  Tab                   cycle group and recent DMs",
@@ -1878,13 +1936,17 @@ function Run-Interactive {
             if ($key.Key -eq [ConsoleKey]::Enter) {
                 $line = $script:inputBuffer
                 $script:inputBuffer = ""
-                Request-Render
+                if ($script:layoutEnabled) {
+                    Render-InputLine
+                } else {
+                    Request-Render
+                }
                 Process-InputLine $line
             } elseif ($key.Key -eq [ConsoleKey]::Backspace) {
                 if ($script:inputBuffer.Length -gt 0) {
                     $script:inputBuffer = $script:inputBuffer.Substring(0, $script:inputBuffer.Length - 1)
                     if ($script:layoutEnabled) {
-                        Request-Render
+                        Render-InputLine
                     } else {
                         Write-Host -NoNewline "`b `b"
                     }
@@ -1902,7 +1964,7 @@ function Run-Interactive {
             } elseif ($key.KeyChar -and -not [char]::IsControl($key.KeyChar)) {
                 $script:inputBuffer += $key.KeyChar
                 if ($script:layoutEnabled) {
-                    Request-Render
+                    Render-InputLine
                 } else {
                     Write-Host -NoNewline $key.KeyChar
                 }

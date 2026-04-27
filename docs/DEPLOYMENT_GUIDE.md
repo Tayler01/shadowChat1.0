@@ -98,6 +98,8 @@ Keep these configured in Supabase:
 
 The `@ai` group-chat flow posts answers as the dedicated `Shado` assistant profile (`shado_ai`). Keep `SUPABASE_SERVICE_ROLE_KEY` configured for Edge Functions so `openai-chat` can create/repair that profile and insert Shado's answer.
 
+Bridge TUI `@ai` support uses the same AI secrets through `bridge-group-send`, so deploy both `openai-chat` and `bridge-group-send` after changing shared AI code.
+
 ## Frontend Env Requirements
 
 Netlify needs the frontend equivalents of:

@@ -81,6 +81,8 @@ Should show:
 - content
 - clear distinction for self vs others
 - system messages inline but visually distinct
+- long messages wrapped across rows without dropping content
+- pane text clipped to the pane width so status/feed text cannot corrupt the chat area
 
 ### Input Bar
 
@@ -89,6 +91,7 @@ Should show:
 - current prompt
 - active thread
 - optional hint for `/help`
+- tail of long draft text while typing so the cursor/current words stay visible
 
 ## Chat TUI Navigation
 
@@ -119,6 +122,10 @@ These are user-facing commands, not admin commands.
 - `/dm`
 - `/threads`
 - `/emoji`
+
+Plain group-chat messages that start with `@ai`, `@shado`, or `@shado_ai` ask
+the backend AI assistant and should result in a Shado profile response when the
+OpenRouter/OpenAI secrets are configured.
 
 ### Non-Goals For Chat TUI Commands
 

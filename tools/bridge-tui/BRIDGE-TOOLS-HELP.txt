@@ -13,7 +13,8 @@ serial port, so you do not need to know which COM number Windows chose.
 - tools\bridge-tui\bridge-tui.ps1
   The main ShadowChat bridge chat console. It supports group chat, DMs,
   recent-message loading, live/realtime updates when available, and an admin
-  shell for bridge commands.
+  shell for bridge commands. Long chat messages wrap in the message pane, and
+  long draft text keeps the typing tail visible in the input bar.
 
 - tools\bridge-tui\bridge-bundle-receive.ps1
   A receiver for approved software bundles. It asks the ESP to fetch the latest
@@ -49,6 +50,10 @@ Useful chat console commands:
 /dms
   Show recent direct message targets.
 
+@ai question
+  Ask Shado from group chat. The message is sent normally, then Shado answers
+  as the dedicated AI profile when the backend AI key is configured.
+
 /status
   Show bridge Wi-Fi, device, session, and auth state.
 
@@ -78,4 +83,7 @@ Troubleshooting:
 - If the ESP was left in chat mode, the tools send /admin automatically before
   probing.
 - If Windows changes the COM number, start the launcher again; it will scan.
+- If a side pane looks crowded, widen the terminal or let the TUI collapse to
+  the simpler one/two-pane layout; pane text is clipped to avoid corrupting the
+  message area.
 - The PC does not receive general internet access from the ESP.

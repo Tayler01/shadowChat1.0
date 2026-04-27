@@ -4,8 +4,23 @@
 
 Milestone 9: plug-and-play tools polish and Android badge stability.
 
+## Current Live Device Note
+
+- `npm run bridge:tui:smoke` found the ESP on the scanned bridge COM port, but
+  the physical bridge could not complete smoke because its stored Wi-Fi
+  credentials are no longer authenticating. Reconfigure Wi-Fi from the admin
+  shell, then run `session recover`, `bundle check windows_bundle`, and
+  `bundle get windows_bundle` to pull `0.1.11-tui-smooth-ai`.
+
 ## Completed
 
+- Released Windows tools bundle `0.1.11-tui-smooth-ai` for the bridge TUI production-readiness pass.
+- Uploaded Windows tools artifact to Supabase Storage path `windows/0.1.11-tui-smooth-ai/shadowchat-bridge-tools.zip`.
+- Windows tools artifact SHA-256: `7485def9b4fbed2d86e2dc2ef53566250dd517f72eef135a0803d4e8eda69fff`; size: `30124` bytes.
+- Applied Supabase migration `20260427104500_publish_bridge_tools_0_1_11_tui_smooth_ai.sql`.
+- Deployed Supabase Edge Functions `openai-chat` and `bridge-group-send` with shared AI helper support for bridge TUI `@ai`.
+- Live `bridge-update-check` smoke returned Windows bundle latest `0.1.11-tui-smooth-ai` with `updateAvailable: true` from `0.1.10-tui-dm-routing`.
+- Live `openai-chat` smoke with a stable test account returned the expected `bridge ai ok` answer without posting to general chat.
 - Released P0 DM routing/read-state fixes from commit `4f2e45b`.
 - Pushed `main` to `origin/main`.
 - Added [docs/ESP_BRIDGE_RELEASE_RUNBOOK.md](C:/repos/chat2.0/docs/ESP_BRIDGE_RELEASE_RUNBOOK.md:1) covering bridge versioning, artifact upload, manifest publishing, smoke checks, and rollback.

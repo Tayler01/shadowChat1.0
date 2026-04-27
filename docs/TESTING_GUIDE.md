@@ -157,6 +157,24 @@ Current smoke scenarios:
 
 Disposable accounts are the most deterministic option. Reused env-backed accounts can carry old threads and unread state from earlier runs.
 
+### Bridge TUI
+
+Run the local layout regression after any PowerShell TUI change:
+
+```powershell
+npm run bridge:tui:test
+```
+
+That check covers long-message wrapping, side-feed clipping, long draft input visibility, DM routing, unread counts, scroll state, and realtime backfill flags.
+
+Live bridge smoke still requires a paired ESP on a scanned serial port:
+
+```powershell
+npm run bridge:tui:smoke
+```
+
+For `@ai` validation, first deploy `openai-chat` and `bridge-group-send`, then send `@ai health check` in group chat from the TUI. The user message should send as the bridge profile and the answer should appear from Shado.
+
 ### iPhone Home Screen Note
 
 The iPhone Home Screen app should be treated as a distinct runtime when debugging auth or realtime issues. A flow that passes in Safari can still fail in standalone mode if session recovery or auth-state callbacks are blocking.

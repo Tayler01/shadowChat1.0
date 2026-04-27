@@ -8,7 +8,7 @@ offline Windows tool updates through Supabase manifests.
 Use monotonic semantic-style versions with a short release label:
 
 - firmware: `0.2.8-p0-dm-routing`
-- Windows tools bundle: `0.1.10-tui-dm-routing`
+- Windows tools bundle: `0.1.11-tui-smooth-ai`
 - bootstrap bundle: `0.1.10-bootstrap-routing`
 
 Rules:
@@ -56,7 +56,7 @@ firmware/esp-bridge/build/shadowchat_bridge.bin
 Windows tools bundle:
 
 ```powershell
-npm run bridge:bundle:pack -- -Version 0.1.10-tui-dm-routing
+npm run bridge:bundle:pack -- -Version 0.1.11-tui-smooth-ai
 ```
 
 Record for each artifact:

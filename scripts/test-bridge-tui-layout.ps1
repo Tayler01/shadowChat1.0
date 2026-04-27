@@ -47,6 +47,26 @@ Assert-Equal $rows[0].Text "You  23:09:54" "Own message metadata should be norma
 Assert-True $rows[0].RightAlign "Own message metadata should right-align."
 
 $script:messages.Clear()
+$longMessage = (@("longmessage") * 36) -join " "
+Add-MessageLine "23:09:55 | Caleb: $longMessage"
+$longRows = @(Get-MessageRenderRows 52)
+Assert-True ($longRows.Count -gt 8) "Long messages should wrap into visible rows instead of being dropped."
+Assert-True (@($longRows | Where-Object { $_.Text -match "longmessage longmessage" }).Count -gt 0) "Wrapped rows should preserve long message content."
+foreach ($row in $longRows) {
+    Assert-True ((Fit-Text $row.Text 52).Length -eq 52) "Rendered message rows should fit the message pane width."
+}
+
+$script:liveFeed.Clear()
+Add-LiveFeedLine ("status: " + ("side-pane-value-" * 20))
+Assert-Equal (Fit-Text $script:liveFeed[0] 30).Length 30 "Side feed lines should be clipped to their pane width."
+
+$script:inputBuffer = "abcdefghijklmnopqrstuvwxyz0123456789"
+$compactInput = Get-InputLine 24
+Assert-True ($compactInput -match "\.\.\.") "Long input should keep the current typing tail visible."
+Assert-True ((Fit-Text $compactInput 24).Length -eq 24) "Input bar should fit the available terminal width."
+$script:inputBuffer = ""
+
+$script:messages.Clear()
 $script:liveFeed.Clear()
 $script:currentMode = "group"
 Try-HandleProtocolLine '@scb:{"type":"message","thread":"dm","source":"realtime","conversationId":"conv-inactive","id":"fixture-dm-1","createdAt":"2026-04-24T23:00:00Z","senderId":"user-1","senderLabel":"Caleb","content":"inactive dm"}' | Out-Null

@@ -1,5 +1,13 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import {
+  buildGroupAIRequest,
+  ensureShadoAIProfile,
+  extractAiMentionQuestion,
+  getAIAnswer,
+  insertShadoAIMessage,
+  requestAICompletion,
+} from '../_shared/ai.ts'
+import {
   authenticateBridgeAccessToken,
   badRequest,
   corsHeaders,
@@ -13,6 +21,7 @@ import {
 type BridgeGroupSendPayload = {
   deviceId?: string
   content?: string
+  model?: string
 }
 
 const MESSAGE_SELECT = `
@@ -57,6 +66,7 @@ serve(async req => {
     const body = await readJson<BridgeGroupSendPayload>(req)
     const deviceId = normalizeText(body?.deviceId)
     const content = normalizeText(body?.content)
+    const requestedModel = normalizeText(body?.model)
     const accessToken = normalizeText(req.headers.get('X-Bridge-Access-Token'))
 
     if (!content) {
@@ -100,12 +110,50 @@ serve(async req => {
       origin: 'bridge',
       bridgeDeviceId: deviceId,
     })
+    const aiQuestion = extractAiMentionQuestion(content)
+    let aiDispatch: unknown = null
+
+    if (aiQuestion) {
+      try {
+        const aiData = await requestAICompletion(
+          buildGroupAIRequest(aiQuestion),
+          requestedModel || undefined,
+        )
+        const answer = getAIAnswer(aiData)
+
+        if (answer) {
+          const shadoProfile = await ensureShadoAIProfile(supabase)
+          const shadoMessage = await insertShadoAIMessage(supabase, shadoProfile.id, answer)
+          aiDispatch = {
+            ok: true,
+            shadoMessage,
+          }
+        } else {
+          aiDispatch = {
+            ok: false,
+            error: 'AI returned an empty response',
+          }
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown AI error'
+        console.error('Bridge @ai dispatch failed', {
+          deviceId,
+          messageId: message.id,
+          error: errorMessage,
+        })
+        aiDispatch = {
+          ok: false,
+          error: errorMessage,
+        }
+      }
+    }
 
     return json({
       ok: true,
       deviceId,
       message,
       pushDispatch,
+      aiDispatch,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
