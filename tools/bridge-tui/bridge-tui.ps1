@@ -1297,7 +1297,7 @@ function Render-Layout {
     $feedWidth = if ($useThreePane) { 34 } elseif ($useTwoPane) { 30 } else { 0 }
     $separatorWidth = if ($useThreePane) { 6 } elseif ($useTwoPane) { 3 } else { 0 }
     $messageWidth = $width - $statusWidth - $feedWidth - $separatorWidth
-    $statusLines = if ($useThreePane) { Get-SidebarLines } else { @() }
+    $statusLines = @(if ($useThreePane) { Get-SidebarLines })
     $messageRows = @(Get-MessageRenderRows $messageWidth)
     $maxScrollOffset = [Math]::Max(0, $messageRows.Count - $bodyHeight)
     if ($script:messageScrollOffset -gt $maxScrollOffset) {

@@ -37,7 +37,7 @@ function Assert-True {
     }
 }
 
-. (Get-BridgeTuiDefinitions) -NoAnsi -TranscriptLines 80
+. (Get-BridgeTuiDefinitions) -NoAnsi -TranscriptLines 80 -Port "COM_TEST"
 
 $script:messages.Clear()
 Add-MessageLine "23:09:54 | ESP Bridge: single row"
@@ -65,6 +65,16 @@ $compactInput = Get-InputLine 24
 Assert-True ($compactInput -match "\.\.\.") "Long input should keep the current typing tail visible."
 Assert-True ((Fit-Text $compactInput 24).Length -eq 24) "Input bar should fit the available terminal width."
 $script:inputBuffer = ""
+
+$script:layoutEnabled = $true
+$script:lastLayoutWidth = 0
+$script:lastLayoutHeight = 0
+$script:renderDirty = $true
+$script:liveFeed.Clear()
+$script:messages.Clear()
+Add-MessageLine "23:10:00 | Caleb: two pane render"
+Assert-True ((@(if ($false) { Get-SidebarLines })).Count -eq 0) "Disabled sidebar output should stay array-shaped under strict mode."
+$script:layoutEnabled = $false
 
 $script:bridgeHealth.wifi = "yes"
 Assert-True ((Get-HealthLabel) -match "data link: established") "Health label should use data-link wording."

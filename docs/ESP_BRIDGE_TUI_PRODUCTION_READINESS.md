@@ -1,18 +1,23 @@
 # ESP Bridge TUI Production Readiness
 
-This document records the bridge TUI polish shipped in the `0.1.11` and
-`0.1.12` Windows tools bundles.
+This document records the bridge TUI polish shipped in the `0.1.11` through
+`0.1.13` Windows tools bundles.
 
 ## Current Bundle
 
 Latest stable Windows tools bundle:
 
+- version: `0.1.13-two-pane-render-fix`
+- storage path: `windows/0.1.13-two-pane-render-fix/shadowchat-bridge-tools.zip`
+- SHA-256: `197f0ba1adab2608875b3fd95e664052ec4d550859879487f09e73a037463abd`
+- size: `30975` bytes
+
+Previous production-readiness bundle:
+
 - version: `0.1.12-data-link-labels`
 - storage path: `windows/0.1.12-data-link-labels/shadowchat-bridge-tools.zip`
 - SHA-256: `fb1d17e63719f3be0ae98c31160919be324b79184dd1c016f601eba5208d51e5`
 - size: `30590` bytes
-
-Previous production-readiness bundle:
 
 - version: `0.1.11-tui-smooth-ai`
 - storage path: `windows/0.1.11-tui-smooth-ai/shadowchat-bridge-tools.zip`
@@ -29,6 +34,7 @@ The TUI should feel smooth, dependable, and chat-first:
 - normal typing updates only the input line instead of forcing a full layout repaint per key
 - group-chat `@ai`, `@shado`, and `@shado_ai` mentions ask Shado through the backend AI path
 - visible connectivity chrome uses data-link language such as `data link` and `link`
+- two-pane terminal widths render without strict-mode crashes
 
 Compatibility note: the TUI still recognizes legacy firmware protocol field
 names internally so existing devices keep working, but those raw labels are

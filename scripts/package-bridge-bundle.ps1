@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = "0.1.12-data-link-labels",
+    [string]$Version = "0.1.13-two-pane-render-fix",
     [string]$OutputDirectory = "output/bridge-bundles"
 )
 
