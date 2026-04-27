@@ -27,6 +27,8 @@ If the change affects auth, session recovery, or mobile resume behavior, also ru
 node scripts/playwright-smoke.mjs --scenario=auth,resume-send --headed --no-reuse-server
 ```
 
+For the current login persistence behavior, rollback checkpoints, and production smoke expectations, see [`docs/SESSION_PERSISTENCE_RUNBOOK.md`](C:/repos/chat2.0/docs/SESSION_PERSISTENCE_RUNBOOK.md:1).
+
 ## GitHub Push
 
 ```powershell

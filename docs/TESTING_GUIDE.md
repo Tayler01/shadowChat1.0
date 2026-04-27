@@ -142,6 +142,8 @@ When you have changed app code and want the latest build instead of the already-
 
 Production smoke is different from local smoke: it must use the two stable, email-confirmed `PLAYWRIGHT_ACCOUNT_*` users from `.env.testing.local` because production signup can require email confirmation and return no active session. See [`docs/PRODUCTION_SMOKE_TESTING.md`](C:/repos/chat2.0/docs/PRODUCTION_SMOKE_TESTING.md:1) for canonical account details, setup, commands, and artifact triage.
 
+Auth/session persistence checks and rollback notes live in [`docs/SESSION_PERSISTENCE_RUNBOOK.md`](C:/repos/chat2.0/docs/SESSION_PERSISTENCE_RUNBOOK.md:1). Use that runbook whenever a change touches saved sessions, mobile resume, auth restore, or realtime reconnect behavior.
+
 Current smoke scenarios:
 
 - `auth`: both accounts land in the authenticated app shell

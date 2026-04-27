@@ -65,6 +65,18 @@ Relevant files:
 - [src/lib/supabase.ts](C:/repos/chat2.0/src/lib/supabase.ts:1)
 - [src/hooks/useVisibilityRefresh.ts](C:/repos/chat2.0/src/hooks/useVisibilityRefresh.ts:1)
 
+### Session Persistence Hardening
+
+- Saved-session restore now stays in reconnect mode instead of showing the login form when a stored refresh token exists and mobile restore is temporarily slow.
+- A lightweight resume watchdog refreshes the saved session on foreground and online events without rebuilding realtime subscriptions.
+- Rollback checkpoints and required smoke checks are documented in [docs/SESSION_PERSISTENCE_RUNBOOK.md](C:/repos/chat2.0/docs/SESSION_PERSISTENCE_RUNBOOK.md:1).
+
+Relevant files:
+
+- [src/hooks/useAuth.tsx](C:/repos/chat2.0/src/hooks/useAuth.tsx:1)
+- [src/hooks/useSessionResumeRecovery.ts](C:/repos/chat2.0/src/hooks/useSessionResumeRecovery.ts:1)
+- [src/components/auth/AuthGuard.tsx](C:/repos/chat2.0/src/components/auth/AuthGuard.tsx:1)
+
 ### Home Screen iPhone Resume Deadlock
 
 - The critical Home Screen-specific fix was in auth state handling.
