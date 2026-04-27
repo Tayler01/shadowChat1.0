@@ -10,7 +10,7 @@ For the current TUI hardening details, see
 
 Use monotonic semantic-style versions with a short release label:
 
-- firmware: `0.2.8-p0-dm-routing`
+- firmware: `0.2.10-link-repair`
 - Windows tools bundle: `0.1.12-data-link-labels`
 - bootstrap bundle: `0.1.10-bootstrap-routing`
 

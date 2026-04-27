@@ -266,3 +266,28 @@ Current next-step queue after the April 25 soak:
 3. Overnight soak checklist and longer run capture.
 4. Better DM/thread navigation with recent conversations and unread state.
 5. Production hardening plan for encrypted NVS, signed OTA, and recovery-token lifecycle.
+
+## Link Diagnostics Captured On 2026-04-27
+
+The bridge failed to fetch the published Windows bundle because the physical ESP
+could not re-establish its stored Wi-Fi link before contacting Supabase. Re-saving
+the current Windows `Camper1407` profile password into the ESP did not resolve the
+failure; disconnect reasons included raw ESP-IDF codes `2`, `202`, and `205`.
+Windows was connected to `Camper1407` on a `5 GHz` BSSID at the time, while the
+ESP32-S3 station path can only use `2.4 GHz`.
+
+Firmware `0.2.10-link-repair` was built to make this class of failure easier
+to recover:
+
+- print named Wi-Fi disconnect reasons instead of numeric-only codes
+- add `wifi disconnect` to pause automatic reconnect attempts
+- let `wifi scan` pause the reconnect loop and show auth plus cipher details
+- enable GCMP support and set WPA3 SAE PWE to `BOTH` for mixed WPA2/WPA3 networks
+- keep manual `pair begin` as a fresh owner-approved pairing path even when a
+  stale recovery token is stored
+- clear a backend-rejected recovery token and tell the operator to pair fresh
+
+The firmware build passed locally and produced
+`firmware/esp-bridge/build/shadowchat_bridge.bin`. Software flashing from the
+running app did not enter the ROM bootloader, so the connected board still needs
+manual bootloader entry or a restored data link before it can receive this image.

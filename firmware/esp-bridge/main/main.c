@@ -100,6 +100,7 @@ typedef struct {
 static EventGroupHandle_t s_wifi_event_group;
 static bridge_state_t s_bridge_state;
 static bool s_wifi_reconfiguring;
+static bool s_wifi_reconnect_paused;
 static bool s_protocol_enabled;
 static esp_websocket_client_handle_t s_realtime_client;
 static TaskHandle_t s_realtime_task_handle;
@@ -115,6 +116,8 @@ static size_t s_profile_cache_next_index;
 
 static bool bridge_ensure_wifi_connected(const char *action);
 static bool bridge_command_update_check_target(const char *target, bool compact_output);
+static const char *bridge_wifi_disconnect_reason_name(int reason);
+static void bridge_clear_recovery_token(void);
 
 static const char *BRIDGE_CURSOR_GROUP_MESSAGE_ID_KEY = "cur_group_id";
 static const char *BRIDGE_CURSOR_DM_RECIPIENT_KEY = "cur_dm_rec";
@@ -548,9 +551,10 @@ static void bridge_wifi_event_handler(
         wifi_event_sta_disconnected_t *event = (wifi_event_sta_disconnected_t *)event_data;
         s_bridge_state.wifi_connected = false;
         xEventGroupClearBits(s_wifi_event_group, BRIDGE_WIFI_CONNECTED_BIT);
-        printf("Wi-Fi disconnected; reason=%d\n", event ? event->reason : -1);
+        int reason = event ? event->reason : -1;
+        printf("Wi-Fi disconnected; reason=%d (%s)\n", reason, bridge_wifi_disconnect_reason_name(reason));
 
-        if (!s_wifi_reconfiguring && s_bridge_state.wifi_ssid[0] != '\0') {
+        if (!s_wifi_reconfiguring && !s_wifi_reconnect_paused && s_bridge_state.wifi_ssid[0] != '\0') {
             esp_wifi_connect();
         }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
@@ -598,11 +602,16 @@ static esp_err_t bridge_wifi_apply_credentials(void) {
     wifi_config_t wifi_config = {0};
     strlcpy((char *)wifi_config.sta.ssid, s_bridge_state.wifi_ssid, sizeof(wifi_config.sta.ssid));
     strlcpy((char *)wifi_config.sta.password, s_bridge_state.wifi_password, sizeof(wifi_config.sta.password));
+    wifi_config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+    wifi_config.sta.sort_method = WIFI_CONNECT_AP_BY_SECURITY;
     wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
     wifi_config.sta.pmf_cfg.capable = true;
     wifi_config.sta.pmf_cfg.required = false;
+    wifi_config.sta.sae_pwe_h2e = WPA3_SAE_PWE_BOTH;
+    wifi_config.sta.failure_retry_cnt = 3;
 
     s_wifi_reconfiguring = true;
+    s_wifi_reconnect_paused = false;
     xEventGroupClearBits(s_wifi_event_group, BRIDGE_WIFI_CONNECTED_BIT);
     s_bridge_state.wifi_connected = false;
 
@@ -629,6 +638,99 @@ static esp_err_t bridge_wifi_apply_credentials(void) {
     return connect_err;
 }
 
+static const char *bridge_wifi_disconnect_reason_name(int reason) {
+    switch (reason) {
+        case WIFI_REASON_UNSPECIFIED:
+            return "unspecified";
+        case WIFI_REASON_AUTH_EXPIRE:
+            return "auth expired";
+        case WIFI_REASON_AUTH_LEAVE:
+            return "auth leave";
+        case WIFI_REASON_ASSOC_EXPIRE:
+            return "association expired";
+        case WIFI_REASON_ASSOC_TOOMANY:
+            return "AP client limit";
+        case WIFI_REASON_NOT_AUTHED:
+            return "not authenticated";
+        case WIFI_REASON_NOT_ASSOCED:
+            return "not associated";
+        case WIFI_REASON_ASSOC_LEAVE:
+            return "association leave";
+        case WIFI_REASON_ASSOC_NOT_AUTHED:
+            return "association without auth";
+        case WIFI_REASON_DISASSOC_PWRCAP_BAD:
+            return "power capability rejected";
+        case WIFI_REASON_DISASSOC_SUPCHAN_BAD:
+            return "unsupported channel";
+        case WIFI_REASON_BSS_TRANSITION_DISASSOC:
+            return "BSS transition";
+        case WIFI_REASON_IE_INVALID:
+            return "invalid IE";
+        case WIFI_REASON_MIC_FAILURE:
+            return "MIC failure";
+        case WIFI_REASON_4WAY_HANDSHAKE_TIMEOUT:
+            return "4-way handshake timeout";
+        case WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT:
+            return "group key update timeout";
+        case WIFI_REASON_IE_IN_4WAY_DIFFERS:
+            return "IE differs in 4-way";
+        case WIFI_REASON_GROUP_CIPHER_INVALID:
+            return "group cipher invalid";
+        case WIFI_REASON_PAIRWISE_CIPHER_INVALID:
+            return "pairwise cipher invalid";
+        case WIFI_REASON_AKMP_INVALID:
+            return "AKM invalid";
+        case WIFI_REASON_UNSUPP_RSN_IE_VERSION:
+            return "unsupported RSN version";
+        case WIFI_REASON_INVALID_RSN_IE_CAP:
+            return "invalid RSN capability";
+        case WIFI_REASON_802_1X_AUTH_FAILED:
+            return "802.1X auth failed";
+        case WIFI_REASON_CIPHER_SUITE_REJECTED:
+            return "cipher suite rejected";
+        case WIFI_REASON_TDLS_PEER_UNREACHABLE:
+            return "TDLS peer unreachable";
+        case WIFI_REASON_TDLS_UNSPECIFIED:
+            return "TDLS unspecified";
+        case WIFI_REASON_BAD_CIPHER_OR_AKM:
+            return "bad cipher or AKM";
+        case WIFI_REASON_TIMEOUT:
+            return "timeout";
+        case WIFI_REASON_PEER_INITIATED:
+            return "peer initiated";
+        case WIFI_REASON_AP_INITIATED:
+            return "AP initiated";
+        case WIFI_REASON_INVALID_PMKID:
+            return "invalid PMKID";
+        case WIFI_REASON_BEACON_TIMEOUT:
+            return "beacon timeout";
+        case WIFI_REASON_NO_AP_FOUND:
+            return "no AP found";
+        case WIFI_REASON_AUTH_FAIL:
+            return "auth failed";
+        case WIFI_REASON_ASSOC_FAIL:
+            return "association failed";
+        case WIFI_REASON_HANDSHAKE_TIMEOUT:
+            return "handshake timeout";
+        case WIFI_REASON_CONNECTION_FAIL:
+            return "connection failed";
+        case WIFI_REASON_ROAMING:
+            return "roaming";
+        case WIFI_REASON_ASSOC_COMEBACK_TIME_TOO_LONG:
+            return "association comeback too long";
+        case WIFI_REASON_SA_QUERY_TIMEOUT:
+            return "SA query timeout";
+        case WIFI_REASON_NO_AP_FOUND_W_COMPATIBLE_SECURITY:
+            return "no AP with compatible security";
+        case WIFI_REASON_NO_AP_FOUND_IN_AUTHMODE_THRESHOLD:
+            return "no AP meets auth threshold";
+        case WIFI_REASON_NO_AP_FOUND_IN_RSSI_THRESHOLD:
+            return "no AP meets RSSI threshold";
+        default:
+            return "unknown";
+    }
+}
+
 static const char *bridge_wifi_auth_mode_name(wifi_auth_mode_t authmode) {
     switch (authmode) {
         case WIFI_AUTH_OPEN:
@@ -649,6 +751,38 @@ static const char *bridge_wifi_auth_mode_name(wifi_auth_mode_t authmode) {
             return "wpa2/wpa3";
         case WIFI_AUTH_WAPI_PSK:
             return "wapi";
+        default:
+            return "unknown";
+    }
+}
+
+static const char *bridge_wifi_cipher_name(wifi_cipher_type_t cipher) {
+    switch (cipher) {
+        case WIFI_CIPHER_TYPE_NONE:
+            return "none";
+        case WIFI_CIPHER_TYPE_WEP40:
+            return "wep40";
+        case WIFI_CIPHER_TYPE_WEP104:
+            return "wep104";
+        case WIFI_CIPHER_TYPE_TKIP:
+            return "tkip";
+        case WIFI_CIPHER_TYPE_CCMP:
+            return "ccmp";
+        case WIFI_CIPHER_TYPE_TKIP_CCMP:
+            return "tkip/ccmp";
+        case WIFI_CIPHER_TYPE_AES_CMAC128:
+            return "aes-cmac128";
+        case WIFI_CIPHER_TYPE_SMS4:
+            return "sms4";
+        case WIFI_CIPHER_TYPE_GCMP:
+            return "gcmp";
+        case WIFI_CIPHER_TYPE_GCMP256:
+            return "gcmp256";
+        case WIFI_CIPHER_TYPE_AES_GMAC128:
+            return "aes-gmac128";
+        case WIFI_CIPHER_TYPE_AES_GMAC256:
+            return "aes-gmac256";
+        case WIFI_CIPHER_TYPE_UNKNOWN:
         default:
             return "unknown";
     }
@@ -1199,6 +1333,7 @@ static void bridge_command_help(void) {
     printf("  wifi set <ssid> <password>\n");
     printf("  wifi set \"<ssid with spaces>\" \"<password with spaces>\"\n");
     printf("  wifi connect\n");
+    printf("  wifi disconnect\n");
     printf("  wifi scan\n");
     printf("  bridge register\n");
     printf("  bridge wipe\n");
@@ -1367,6 +1502,11 @@ static void bridge_clear_session_material(void) {
     bridge_save_string("session_expires_at", "");
 }
 
+static void bridge_clear_recovery_token(void) {
+    bridge_set_runtime_string(s_bridge_state.recovery_token, sizeof(s_bridge_state.recovery_token), "");
+    bridge_save_string("recovery_token", "");
+}
+
 static void bridge_command_status(void) {
     printf("\nBridge status\n");
     printf("  hardware_model: %s\n", CONFIG_BRIDGE_HARDWARE_MODEL);
@@ -1443,13 +1583,61 @@ static void bridge_command_wifi_connect(void) {
     }
 }
 
+static void bridge_command_wifi_disconnect(void) {
+    s_wifi_reconnect_paused = true;
+    s_bridge_state.wifi_connected = false;
+    xEventGroupClearBits(s_wifi_event_group, BRIDGE_WIFI_CONNECTED_BIT);
+
+    esp_err_t err = esp_wifi_disconnect();
+    if (err != ESP_OK && err != ESP_ERR_WIFI_NOT_CONNECT) {
+        printf("Wi-Fi disconnect failed: %s\n", esp_err_to_name(err));
+        return;
+    }
+
+    printf("Wi-Fi disconnected; automatic reconnect is paused. Run wifi connect to reconnect.\n");
+}
+
+static void bridge_wifi_resume_after_scan(bool resume_after_scan) {
+    if (!resume_after_scan) {
+        printf("Automatic reconnect remains paused after scan. Run wifi connect to retry.\n");
+        return;
+    }
+
+    s_wifi_reconnect_paused = false;
+    if (s_bridge_state.wifi_ssid[0] == '\0') {
+        return;
+    }
+
+    esp_err_t reconnect_err = bridge_wifi_apply_credentials();
+    if (reconnect_err != ESP_OK) {
+        printf("Wi-Fi reconnect after scan failed: %s\n", esp_err_to_name(reconnect_err));
+        return;
+    }
+
+    printf("Wi-Fi reconnect resumed after scan\n");
+}
+
 static void bridge_command_wifi_scan(void) {
     wifi_scan_config_t scan_config = {0};
+    bool resume_after_scan = s_bridge_state.wifi_connected;
+
+    s_wifi_reconnect_paused = true;
+    s_bridge_state.wifi_connected = false;
+    xEventGroupClearBits(s_wifi_event_group, BRIDGE_WIFI_CONNECTED_BIT);
+
+    esp_err_t disconnect_err = esp_wifi_disconnect();
+    if (disconnect_err != ESP_OK && disconnect_err != ESP_ERR_WIFI_NOT_CONNECT) {
+        printf("Wi-Fi scan could not pause active connection: %s\n", esp_err_to_name(disconnect_err));
+        return;
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(750));
     printf("Scanning nearby Wi-Fi networks...\n");
 
     esp_err_t err = esp_wifi_scan_start(&scan_config, true);
     if (err != ESP_OK) {
         printf("Wi-Fi scan failed: %s\n", esp_err_to_name(err));
+        bridge_wifi_resume_after_scan(resume_after_scan);
         return;
     }
 
@@ -1457,11 +1645,13 @@ static void bridge_command_wifi_scan(void) {
     err = esp_wifi_scan_get_ap_num(&ap_count);
     if (err != ESP_OK) {
         printf("Wi-Fi scan result count failed: %s\n", esp_err_to_name(err));
+        bridge_wifi_resume_after_scan(resume_after_scan);
         return;
     }
     printf("Found %u network%s\n", ap_count, ap_count == 1 ? "" : "s");
 
     if (ap_count == 0) {
+        bridge_wifi_resume_after_scan(resume_after_scan);
         return;
     }
 
@@ -1470,21 +1660,26 @@ static void bridge_command_wifi_scan(void) {
     err = esp_wifi_scan_get_ap_records(&record_count, ap_records);
     if (err != ESP_OK) {
         printf("Wi-Fi scan result read failed: %s\n", esp_err_to_name(err));
+        bridge_wifi_resume_after_scan(resume_after_scan);
         return;
     }
 
     for (uint16_t i = 0; i < record_count; i++) {
-        printf("  %2u. %-32s RSSI %4d  channel %2u  %s\n",
+        printf("  %2u. %-32s RSSI %4d  channel %2u  %s  pairwise %s  group %s\n",
             i + 1,
             ap_records[i].ssid,
             ap_records[i].rssi,
             ap_records[i].primary,
-            bridge_wifi_auth_mode_name(ap_records[i].authmode));
+            bridge_wifi_auth_mode_name(ap_records[i].authmode),
+            bridge_wifi_cipher_name(ap_records[i].pairwise_cipher),
+            bridge_wifi_cipher_name(ap_records[i].group_cipher));
     }
 
     if (ap_count > record_count) {
         printf("  ... %u more not shown\n", ap_count - record_count);
     }
+
+    bridge_wifi_resume_after_scan(resume_after_scan);
 }
 
 static void bridge_command_register(void) {
@@ -1533,14 +1728,14 @@ static void bridge_command_register(void) {
     cJSON_Delete(json);
 }
 
-static bool bridge_command_pair_begin(void) {
+static bool bridge_command_pair_begin(bool use_recovery_token) {
     if (!s_bridge_state.wifi_connected || s_bridge_state.device_id[0] == '\0') {
         printf("Device must be registered and online before pairing begins\n");
         return false;
     }
 
     char body[320];
-    if (s_bridge_state.recovery_token[0] != '\0') {
+    if (use_recovery_token && s_bridge_state.recovery_token[0] != '\0') {
         snprintf(
             body,
             sizeof(body),
@@ -1561,6 +1756,17 @@ static bool bridge_command_pair_begin(void) {
 
     bridge_print_response("bridge-pairing-begin", &response);
     if (response.status_code < 200 || response.status_code >= 300) {
+        if (
+            use_recovery_token &&
+            (
+                strstr(response.body, "Bridge recovery is not available") != NULL ||
+                strstr(response.body, "Invalid bridge recovery token") != NULL
+            )
+        ) {
+            bridge_clear_recovery_token();
+            printf("Stored bridge recovery token is no longer accepted by the backend.\n");
+            printf("Start a fresh pairing with: pair begin\n");
+        }
         return false;
     }
 
@@ -1770,8 +1976,8 @@ static bool bridge_recover_session_material(bool compact_output) {
     }
 
     printf("%s\n", compact_output ? "Recovering expired bridge session from stored recovery token" : "Starting bridge session recovery. This keeps Wi-Fi and device registration, then issues a new pairing code.");
-    if (!bridge_command_pair_begin()) {
-        printf("Session recovery could not start. Fix Wi-Fi/registration first, then retry: session recover\n");
+    if (!bridge_command_pair_begin(true)) {
+        printf("Session recovery could not start. If data link is online, start a fresh pairing with: pair begin\n");
         return false;
     }
 
@@ -3740,6 +3946,8 @@ static void bridge_shell_task(void *arg) {
             bridge_command_wifi_set(has_ssid ? ssid : NULL, has_password ? password : NULL);
         } else if (strcmp(command, "wifi") == 0 && subcommand && strcmp(subcommand, "connect") == 0) {
             bridge_command_wifi_connect();
+        } else if (strcmp(command, "wifi") == 0 && subcommand && strcmp(subcommand, "disconnect") == 0) {
+            bridge_command_wifi_disconnect();
         } else if (strcmp(command, "wifi") == 0 && subcommand && strcmp(subcommand, "scan") == 0) {
             bridge_command_wifi_scan();
         } else if (strcmp(command, "bridge") == 0 && subcommand && strcmp(subcommand, "register") == 0) {
@@ -3801,7 +4009,7 @@ static void bridge_shell_task(void *arg) {
                 sizeof(dm_cursor_message_id)
             );
         } else if (strcmp(command, "pair") == 0 && subcommand && strcmp(subcommand, "begin") == 0) {
-            bridge_command_pair_begin();
+            bridge_command_pair_begin(false);
         } else if (strcmp(command, "pair") == 0 && subcommand && strcmp(subcommand, "status") == 0) {
             bridge_command_pair_status();
         } else if (strcmp(command, "session") == 0 && subcommand && strcmp(subcommand, "exchange") == 0) {

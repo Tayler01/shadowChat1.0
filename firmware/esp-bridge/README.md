@@ -95,6 +95,7 @@ status
 wifi set <ssid> <password>
 wifi set "<ssid with spaces>" "<password with spaces>"
 wifi connect
+wifi disconnect
 wifi scan
 bridge register
 bridge wipe
@@ -283,6 +284,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.
 ```
 
 On boot, the firmware waits for stored Wi-Fi to reconnect and checks the stored bridge/auth session material. If session material is missing or close to expiry, it refreshes automatically so the bridge is ready for chat after a reboot or flash. It also reconnects stored Wi-Fi on demand before heartbeat, group, DM, and user-search calls if the station dropped, refreshes stored bridge session material when the stored session expiry is within five minutes, and retries bridge-authenticated calls once after refreshing when it receives an auth-expired response. If refresh fails and a recovery token is stored, the firmware auto-recovers by issuing a short-lived recovery pairing code and exchanging fresh session material without another approval.
+
+If stored Wi-Fi starts failing before association, run `wifi disconnect` to pause the automatic reconnect loop, then `wifi scan` to print nearby 2.4 GHz networks with auth and cipher details. Disconnect logs include named reason codes such as `auth failed`, `connection failed`, or `no AP with compatible security` so setup issues can be diagnosed without looking up numeric ESP-IDF codes.
+
+Manual `pair begin` always starts a fresh owner-approved pairing. `session recover`
+is the command that uses a stored recovery token. If the backend no longer accepts
+that recovery token, the firmware clears it locally and tells the operator to run
+`pair begin`, approve the code, then run `session exchange`.
+
+On older firmware before `0.2.10-link-repair`, a stale stored recovery token is
+also sent by `pair begin`. If recovery is rejected with `Bridge recovery is not
+available for this device`, run `bridge wipe` to clear local bridge session
+material, then run `pair begin`, approve the new code in ShadowChat, and run
+`session exchange`. This clears local chat cursors on that device.
 
 If local access or refresh tokens become invalid, run `session recover`. After the first owner-approved exchange, the bridge stores a device recovery token in NVS. Future recovery attempts use that token to auto-approve a short-lived recovery code and immediately exchange fresh session material without asking for iPhone approval again. If the bridge has no recovery token yet, recovery still prompts you to approve the code in ShadowChat Settings > ESP Bridge once, then `session exchange` stores the recovery token for later.
 
