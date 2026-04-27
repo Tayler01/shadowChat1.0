@@ -7,10 +7,10 @@ Milestone 9: plug-and-play tools polish and Android badge stability.
 ## Current Live Device Note
 
 - `npm run bridge:tui:smoke` found the ESP on the scanned bridge COM port, but
-  the physical bridge could not complete smoke because its stored Wi-Fi
-  credentials are no longer authenticating. Reconfigure Wi-Fi from the admin
-  shell, then run `session recover`, `bundle check windows_bundle`, and
-  `bundle get windows_bundle` to pull `0.1.11-tui-smooth-ai`.
+  the physical bridge could not complete smoke because its stored data-link
+  credentials are no longer authenticating. Reconfigure the data link from the
+  admin shell, then run `session recover`, `bundle check windows_bundle`, and
+  `bundle get windows_bundle` to pull `0.1.12-data-link-labels`.
 
 ## Completed
 
@@ -21,6 +21,11 @@ Milestone 9: plug-and-play tools polish and Android badge stability.
 - Deployed Supabase Edge Functions `openai-chat` and `bridge-group-send` with shared AI helper support for bridge TUI `@ai`.
 - Live `bridge-update-check` smoke returned Windows bundle latest `0.1.11-tui-smooth-ai` with `updateAvailable: true` from `0.1.10-tui-dm-routing`.
 - Live `openai-chat` smoke with a stable test account returned the expected `bridge ai ok` answer without posting to general chat.
+- Released Windows tools bundle `0.1.12-data-link-labels` to remove transport wording from the TUI-facing status chrome.
+- Uploaded Windows tools artifact to Supabase Storage path `windows/0.1.12-data-link-labels/shadowchat-bridge-tools.zip`.
+- Windows tools artifact SHA-256: `fb1d17e63719f3be0ae98c31160919be324b79184dd1c016f601eba5208d51e5`; size: `30590` bytes.
+- Applied Supabase migration `20260427105700_publish_bridge_tools_0_1_12_data_link_labels.sql`.
+- Live `bridge-update-check` smoke returned Windows bundle latest `0.1.12-data-link-labels` with `updateAvailable: true` from `0.1.11-tui-smooth-ai`.
 - Released P0 DM routing/read-state fixes from commit `4f2e45b`.
 - Pushed `main` to `origin/main`.
 - Added [docs/ESP_BRIDGE_RELEASE_RUNBOOK.md](C:/repos/chat2.0/docs/ESP_BRIDGE_RELEASE_RUNBOOK.md:1) covering bridge versioning, artifact upload, manifest publishing, smoke checks, and rollback.

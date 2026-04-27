@@ -55,7 +55,7 @@ Useful chat console commands:
   as the dedicated AI profile when the backend AI key is configured.
 
 /status
-  Show bridge Wi-Fi, device, session, and auth state.
+  Show bridge data-link, device, session, and auth state.
 
 /admin
   Enter the raw ESP admin shell.

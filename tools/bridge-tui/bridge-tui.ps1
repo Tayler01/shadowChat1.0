@@ -470,6 +470,64 @@ function Test-SuppressLiveFeedLine {
     return $false
 }
 
+function Get-DataLinkLabel {
+    param([string]$Value)
+
+    $normalized = if ($Value) { $Value.Trim().ToLowerInvariant() } else { "" }
+    if ($normalized -in @("yes", "true", "connected", "online", "up", "established")) {
+        return "established"
+    }
+
+    if ($normalized -in @("no", "false", "disconnected", "offline", "down")) {
+        return "offline"
+    }
+
+    if ([string]::IsNullOrWhiteSpace($normalized) -or $normalized -eq "unknown") {
+        return "seeking"
+    }
+
+    return $Value
+}
+
+function Format-TuiDisplayLine {
+    param([string]$Line)
+
+    if ($Line -match "^\s{2}wifi_connected:\s*(.+)$") {
+        return "  data_link: $(Get-DataLinkLabel $Matches[1])"
+    }
+
+    if ($Line -match "^\s{2}wifi_ssid:\s*(.*)$") {
+        $profile = if ([string]::IsNullOrWhiteSpace($Matches[1]) -or $Matches[1] -eq "(none)") { "(none)" } else { "configured" }
+        return "  link_profile: $profile"
+    }
+
+    if ($Line -match "^Wi-Fi disconnected;\s*(.*)$") {
+        $detail = $Matches[1].Trim()
+        if ($detail) {
+            return "Data link interrupted; $detail"
+        }
+        return "Data link interrupted"
+    }
+
+    if ($Line -match "^Wi-Fi is disconnected;\s*(.*)$") {
+        $detail = $Matches[1].Trim()
+        if ($detail) {
+            return "Data link is offline; $detail"
+        }
+        return "Data link is offline"
+    }
+
+    if ($Line -match "^Connecting to Wi-Fi") {
+        return "Establishing data link..."
+    }
+
+    if ($Line -match "^Wi-Fi connected") {
+        return "Data link established"
+    }
+
+    return $Line
+}
+
 function Add-RecentDm {
     param([string]$Recipient)
 
@@ -1089,11 +1147,11 @@ function Get-ExpiryHealthLabel {
 }
 
 function Get-HealthLabel {
-    $wifi = $script:bridgeHealth.wifi
+    $dataLink = Get-DataLinkLabel $script:bridgeHealth.wifi
     $device = $script:bridgeHealth.device
     $session = Get-ExpiryHealthLabel $script:bridgeHealth.session
     $auth = Get-ExpiryHealthLabel $script:bridgeHealth.auth
-    return "wifi: $wifi | device: $device | session: $session | auth: $auth | rt: $($script:bridgeHealth.realtime)"
+    return "data link: $dataLink | device: $device | session: $session | auth: $auth | rt: $($script:bridgeHealth.realtime)"
 }
 
 function Get-LiveTransportLabel {
@@ -1138,7 +1196,7 @@ function Get-SidebarLines {
         "proto $protocolLabel",
         "rt    $($script:bridgeHealth.realtime)",
         "",
-        "wifi  $($script:bridgeHealth.wifi)",
+        "link  $(Get-DataLinkLabel $script:bridgeHealth.wifi)",
         "dev   $($script:bridgeHealth.device)",
         "sess  $(Get-ExpiryHealthLabel $script:bridgeHealth.session)",
         "auth  $(Get-ExpiryHealthLabel $script:bridgeHealth.auth)",
@@ -1337,12 +1395,14 @@ function Write-BridgeLine {
         return
     }
 
+    $displayLine = if ($isMessageLine) { $clean } else { Format-TuiDisplayLine $clean }
+
     if ($isMessageLine) {
         $script:pollMarkerPending = $false
-        Add-MessageLine $clean
+        Add-MessageLine $displayLine
         $script:lastRxAt = [DateTime]::UtcNow
     } else {
-        Add-LiveFeedLine $clean
+        Add-LiveFeedLine $displayLine
     }
 
     if ($script:layoutEnabled) {
@@ -1354,7 +1414,7 @@ function Write-BridgeLine {
         return
     }
 
-    Write-Ui $clean (Get-LineColor $clean)
+    Write-Ui $displayLine (Get-LineColor $displayLine)
 }
 
 function Read-SerialOutput {
@@ -1787,8 +1847,8 @@ function Wait-BridgeOutput {
 function Assert-SmokeTranscriptHealthy {
     param([string]$Transcript)
 
-    if ($Transcript -notmatch "Bridge status" -or $Transcript -notmatch "wifi_connected: yes") {
-        throw "Smoke check did not observe bridge status with Wi-Fi connected."
+    if ($Transcript -notmatch "Bridge status" -or $Transcript -notmatch "data_link: established") {
+        throw "Smoke check did not observe bridge status with the data link established."
     }
 
     $failurePattern = "(?im)(HTTP\s+(401|403|5\d\d)|Invalid bridge access token|Bridge access token has expired|ESP_ERR_HTTP_CONNECT|failed:|Unknown command|timed out)"

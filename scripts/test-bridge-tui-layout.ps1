@@ -66,6 +66,15 @@ Assert-True ($compactInput -match "\.\.\.") "Long input should keep the current 
 Assert-True ((Fit-Text $compactInput 24).Length -eq 24) "Input bar should fit the available terminal width."
 $script:inputBuffer = ""
 
+$script:bridgeHealth.wifi = "yes"
+Assert-True ((Get-HealthLabel) -match "data link: established") "Health label should use data-link wording."
+Assert-True ((Get-HealthLabel) -notmatch "wifi|wi-fi") "Health label should not expose transport wording."
+$sidebar = Get-SidebarLines
+Assert-True (($sidebar -join "`n") -match "link\s+established") "Sidebar should show a data-link state."
+Assert-True (($sidebar -join "`n") -notmatch "wifi|wi-fi") "Sidebar should not expose transport wording."
+Assert-Equal (Format-TuiDisplayLine "  wifi_connected: yes") "  data_link: established" "Raw bridge status should be translated for TUI display."
+Assert-Equal (Format-TuiDisplayLine "Wi-Fi disconnected; reason=8") "Data link interrupted; reason=8" "Raw bridge link errors should be translated for TUI display."
+
 $script:messages.Clear()
 $script:liveFeed.Clear()
 $script:currentMode = "group"

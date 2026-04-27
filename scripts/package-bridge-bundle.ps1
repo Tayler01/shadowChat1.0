@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = "0.1.11-tui-smooth-ai",
+    [string]$Version = "0.1.12-data-link-labels",
     [string]$OutputDirectory = "output/bridge-bundles"
 )
 

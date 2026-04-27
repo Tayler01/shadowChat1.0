@@ -25,7 +25,7 @@ Purpose:
 
 Purpose:
 
-- Wi-Fi setup
+- data-link setup
 - pairing
 - diagnostics
 - updates
@@ -60,7 +60,7 @@ Should show:
 
 - active mode: `CHAT`
 - connection state
-- Wi-Fi state
+- data-link state
 - backend/realtime state
 - paired user
 
@@ -133,7 +133,7 @@ Do not put setup-heavy operations here unless absolutely necessary.
 
 Avoid mixing:
 
-- Wi-Fi provisioning
+- data-link provisioning
 - firmware operations
 - deep diagnostics
 
@@ -192,8 +192,8 @@ Support:
 
 ### Responsibilities
 
-- `/wifi scan`
-- `/wifi connect`
+- `/link scan`
+- `/link connect`
 - `/pair`
 - `/status`
 - `/logs`
@@ -208,7 +208,7 @@ Admin shell should always be able to show:
 - firmware version
 - bridge device ID
 - paired user
-- Wi-Fi network
+- data-link profile
 - backend state
 - realtime state
 - update availability
