@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = "0.1.24-startup-sync",
+    [string]$Version = "0.1.30-clean-start",
     [string]$OutputDirectory = "output/bridge-bundles"
 )
 

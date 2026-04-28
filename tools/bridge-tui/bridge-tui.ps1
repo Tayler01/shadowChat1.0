@@ -25,9 +25,10 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 $script:utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+$script:serialDecoder = $script:utf8NoBom.GetDecoder()
 [Console]::OutputEncoding = $script:utf8NoBom
 $OutputEncoding = $script:utf8NoBom
-$script:tuiVersion = "0.1.24-startup-sync"
+$script:tuiVersion = "0.1.30-clean-start"
 $script:tuiVersionDate = "2026-04-28"
 
 function Get-DefaultPreferencesPath {
@@ -275,6 +276,7 @@ $script:lastStatus = "starting"
 $script:protocolEnabled = -not $NoProtocol
 $script:liveReceive = -not $NoAutoPoll
 $script:realtimeConnected = $false
+$script:realtimeStartIssued = $false
 $script:realtimeBackfillPending = $false
 $script:realtimeBackfillReason = ""
 $script:nextRealtimeBackfillAt = [DateTime]::MinValue
@@ -290,6 +292,11 @@ $script:unreadDmCount = 0
 $script:activeDmConversationId = ""
 $script:seenMessageLines = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
 $script:seenMessageIds = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+$script:latestSnapshotActive = $false
+$script:latestSnapshotStartedAt = [DateTime]::MinValue
+$script:latestSnapshotThread = ""
+$script:latestSnapshotConversationId = ""
+$script:latestSnapshotRecords = [System.Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
 $script:pollMarkerPending = $false
 $script:quietStatusPending = $false
 $script:statusCaptureActive = $false
@@ -560,7 +567,25 @@ function Complete-InitialSync {
     $script:initialSyncActive = $false
     $script:initialSyncSettledAt = [DateTime]::UtcNow
     Add-LiveFeedLine "Sync ready: $Reason"
+    Start-RealtimeReceive
     Request-Render
+}
+
+function Start-RealtimeReceive {
+    if (
+        -not $script:protocolEnabled -or
+        -not $script:liveReceive -or
+        -not $script:serial -or
+        -not $script:serial.IsOpen -or
+        $script:realtimeStartIssued -or
+        ($script:currentMode -ne "group" -and $script:currentMode -ne "dm")
+    ) {
+        return
+    }
+
+    $script:realtimeStartIssued = $true
+    Send-BridgeLine $(if ($script:currentMode -eq "admin") { "realtime start" } else { "/realtime start" })
+    Add-LiveFeedLine "Realtime WebSocket requested"
 }
 
 function Test-InitialSyncThreadMatch {
@@ -601,6 +626,17 @@ function Update-InitialSyncTimeout {
         } else {
             Complete-InitialSync "no latest rows before timeout"
         }
+    }
+}
+
+function Update-LatestSnapshotTimeout {
+    if (-not $script:latestSnapshotActive) {
+        return
+    }
+
+    $elapsed = [DateTime]::UtcNow - $script:latestSnapshotStartedAt
+    if ($elapsed.TotalMilliseconds -ge 1200) {
+        Commit-LatestSnapshot $script:latestSnapshotThread $script:latestSnapshotConversationId "loaded $($script:latestSnapshotRecords.Count) latest row(s)"
     }
 }
 
@@ -708,7 +744,7 @@ function Add-ProtocolMessageRecord {
         $script:historyExhausted = $false
         $script:historyBatchActive = $false
         $script:messageAppendPending = $false
-        return
+        return $id
     }
 
     if (Test-InitialSyncThreadMatch $Thread $ConversationId) {
@@ -719,6 +755,182 @@ function Add-ProtocolMessageRecord {
         ($sortTicks -eq $previousNewestTicks -and $sequence -gt $previousNewestSequence)
     $script:historyBatchActive = $false
     $script:messageAppendPending = $recordIsNew -and $recordIsAtNewestEdge -and $script:messageScrollOffset -eq 0
+    return $id
+}
+
+function Handle-ProtocolMessageEvent {
+    param(
+        [object]$Event,
+        [switch]$DeferRender
+    )
+
+    $line = Format-ProtocolMessageLine $Event
+    $id = Get-ProtocolString $Event "id"
+    $thread = Get-ProtocolString $Event "thread" "message"
+    $source = Get-ProtocolString $Event "source" "unknown"
+    $conversationId = Get-ProtocolString $Event "conversationId"
+    $isSnapshotMessage = $source -eq "poll" -and (Test-LatestSnapshotMatch $thread $conversationId)
+    $isNewMessage = if ($id) { $script:seenMessageIds.Add($id) } else { $script:seenMessageLines.Add($line) }
+    if (($isNewMessage -and $script:seenMessageLines.Add($line)) -or $isSnapshotMessage) {
+        $script:pollMarkerPending = $false
+        $sender = Get-ProtocolString $Event "senderLabel" (Get-ProtocolString $Event "senderId" "")
+        if (
+            $thread -eq "dm" -and
+            $source -eq "poll" -and
+            $script:currentMode -eq "dm" -and
+            -not [string]::IsNullOrWhiteSpace($conversationId) -and
+            [string]::IsNullOrWhiteSpace($script:activeDmConversationId)
+        ) {
+            $script:activeDmConversationId = $conversationId
+        }
+
+        if (-not (Register-InactiveUnread $thread $sender $conversationId)) {
+            $recordId = Add-ProtocolMessageRecord $Event $line $source $thread $conversationId
+            if ($isSnapshotMessage) {
+                Add-LatestSnapshotRecord $recordId
+            }
+        }
+    }
+    if (
+        $source -eq "poll" -and
+        (Test-InitialSyncThreadMatch $thread $conversationId) -and
+        $script:initialSyncResetSeen -and
+        $script:initialSyncMessageCount -gt 0 -and
+        -not $script:latestSnapshotActive
+    ) {
+        $script:initialSyncSettledAt = [DateTime]::UtcNow.AddMilliseconds(450)
+    }
+    $script:lastRxAt = [DateTime]::UtcNow
+    if (-not $DeferRender) {
+        Request-Render
+    }
+}
+
+function Reset-LatestSnapshot {
+    $script:latestSnapshotActive = $false
+    $script:latestSnapshotStartedAt = [DateTime]::MinValue
+    $script:latestSnapshotThread = ""
+    $script:latestSnapshotConversationId = ""
+    $script:latestSnapshotRecords.Clear()
+}
+
+function Start-LatestSnapshot {
+    param(
+        [string]$Thread,
+        [string]$ConversationId = ""
+    )
+
+    $script:latestSnapshotActive = $true
+    $script:latestSnapshotStartedAt = [DateTime]::UtcNow
+    $script:latestSnapshotThread = $Thread
+    $script:latestSnapshotConversationId = $ConversationId
+    $script:latestSnapshotRecords.Clear()
+}
+
+function Test-LatestSnapshotMatch {
+    param(
+        [string]$Thread,
+        [string]$ConversationId = ""
+    )
+
+    if (-not $script:latestSnapshotActive) {
+        return $false
+    }
+
+    if ($script:latestSnapshotThread -ne $Thread) {
+        return $false
+    }
+
+    if (
+        $Thread -eq "dm" -and
+        -not [string]::IsNullOrWhiteSpace($script:latestSnapshotConversationId) -and
+        -not [string]::IsNullOrWhiteSpace($ConversationId) -and
+        $script:latestSnapshotConversationId -ne $ConversationId
+    ) {
+        return $false
+    }
+
+    return $true
+}
+
+function Add-LatestSnapshotRecord {
+    param([string]$Id)
+
+    if ([string]::IsNullOrWhiteSpace($Id)) {
+        return
+    }
+
+    if ($script:messageRecords.ContainsKey($Id)) {
+        $script:latestSnapshotRecords[$Id] = $script:messageRecords[$Id]
+    }
+}
+
+function Rebuild-SeenMessagesFromStore {
+    $script:seenMessageIds.Clear()
+    $script:seenMessageLines.Clear()
+    foreach ($record in $script:messageRecords.Values) {
+        if (-not [string]::IsNullOrWhiteSpace([string]$record.Id) -and -not ([string]$record.Id).StartsWith("line:", [StringComparison]::Ordinal)) {
+            [void]$script:seenMessageIds.Add([string]$record.Id)
+        }
+        if (-not [string]::IsNullOrWhiteSpace([string]$record.Line)) {
+            [void]$script:seenMessageLines.Add([string]$record.Line)
+        }
+    }
+}
+
+function Commit-LatestSnapshot {
+    param(
+        [string]$Thread,
+        [string]$ConversationId = "",
+        [string]$Reason = "latest window"
+    )
+
+    if (-not (Test-LatestSnapshotMatch $Thread $ConversationId)) {
+        return
+    }
+
+    $messageWidth = Get-CurrentMessagePaneWidth
+    $previousRowCount = @(Get-MessageRenderRows $messageWidth).Count
+    $snapshotRecords = @($script:latestSnapshotRecords.Values | Sort-Object -Property SortTicks, Sequence)
+    $snapshotIds = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach ($record in $snapshotRecords) {
+        [void]$snapshotIds.Add([string]$record.Id)
+    }
+
+    $newestSnapshot = if ($snapshotRecords.Count -gt 0) { $snapshotRecords[-1] } else { $null }
+    $recordsToKeep = New-Object System.Collections.Generic.List[object]
+    if ($null -ne $newestSnapshot) {
+        foreach ($record in $script:messageRecords.Values) {
+            if ($snapshotIds.Contains([string]$record.Id)) {
+                continue
+            }
+            $isNewer = [Int64]$record.SortTicks -gt [Int64]$newestSnapshot.SortTicks -or (
+                [Int64]$record.SortTicks -eq [Int64]$newestSnapshot.SortTicks -and
+                [Int64]$record.Sequence -gt [Int64]$newestSnapshot.Sequence
+            )
+            if ($isNewer -and $record.Thread -eq $Thread) {
+                $recordsToKeep.Add($record) | Out-Null
+            }
+        }
+    }
+
+    $script:messageRecords.Clear()
+    foreach ($record in $snapshotRecords) {
+        $script:messageRecords[[string]$record.Id] = $record
+    }
+    foreach ($record in $recordsToKeep) {
+        $script:messageRecords[[string]$record.Id] = $record
+    }
+
+    Rebuild-SeenMessagesFromStore
+    Reset-LatestSnapshot
+    Sync-VisibleMessagesFromStore -PreserveScroll:($script:messageScrollOffset -gt 0) -PreviousRowCount $previousRowCount -MessageWidth $messageWidth
+    $script:pollMarkerPending = $false
+    $script:messageAppendPending = $script:messageScrollOffset -eq 0
+    if ($script:initialSyncActive -and (Test-InitialSyncThreadMatch $Thread $ConversationId)) {
+        Complete-InitialSync $Reason
+    }
+    Request-Render
 }
 
 function Add-HistoryMessageLine {
@@ -848,6 +1060,7 @@ function Clear-MessagePane {
     $script:historyInsertIndex = 0
     $script:initialSyncMessageCount = 0
     $script:initialSyncResetSeen = $false
+    Reset-LatestSnapshot
 }
 
 function Add-LiveFeedLine {
@@ -1308,6 +1521,42 @@ function Get-ProtocolString {
     return $Fallback
 }
 
+function Get-ProtocolInt {
+    param(
+        [object]$Event,
+        [string]$Name,
+        [int]$Fallback = 0
+    )
+
+    if ($Event -and ($Event.PSObject.Properties.Name -contains $Name) -and $null -ne $Event.$Name) {
+        try {
+            return [int]$Event.$Name
+        } catch {
+            return $Fallback
+        }
+    }
+
+    return $Fallback
+}
+
+function Get-ProtocolBool {
+    param(
+        [object]$Event,
+        [string]$Name,
+        [bool]$Fallback = $false
+    )
+
+    if ($Event -and ($Event.PSObject.Properties.Name -contains $Name) -and $null -ne $Event.$Name) {
+        try {
+            return [bool]$Event.$Name
+        } catch {
+            return $Fallback
+        }
+    }
+
+    return $Fallback
+}
+
 function Queue-RealtimeBackfill {
     param([string]$Reason)
 
@@ -1549,6 +1798,7 @@ function Try-HandleProtocolLine {
         if ($shouldReset) {
             $script:pollMarkerPending = $true
             $script:lastRxAt = [DateTime]::UtcNow
+            Start-LatestSnapshot $thread $conversationId
             if (Test-InitialSyncThreadMatch $thread $conversationId) {
                 $script:initialSyncResetSeen = $true
                 $script:initialSyncMessageCount = 0
@@ -1560,36 +1810,57 @@ function Try-HandleProtocolLine {
     }
 
     if ($type -eq "message") {
-        $line = Format-ProtocolMessageLine $event
-        $id = Get-ProtocolString $event "id"
-        $thread = Get-ProtocolString $event "thread" "message"
-        $source = Get-ProtocolString $event "source" "unknown"
-        $conversationId = Get-ProtocolString $event "conversationId"
-        $isNewMessage = if ($id) { $script:seenMessageIds.Add($id) } else { $script:seenMessageLines.Add($line) }
-        if ($isNewMessage -and $script:seenMessageLines.Add($line)) {
-            $script:pollMarkerPending = $false
-            $sender = Get-ProtocolString $event "senderLabel" (Get-ProtocolString $event "senderId" "")
-            if (
-                $thread -eq "dm" -and
-                $source -eq "poll" -and
-                $script:currentMode -eq "dm" -and
-                -not [string]::IsNullOrWhiteSpace($conversationId) -and
-                [string]::IsNullOrWhiteSpace($script:activeDmConversationId)
-            ) {
-                $script:activeDmConversationId = $conversationId
-            }
+        Handle-ProtocolMessageEvent $event
+        return $true
+    }
 
-            if (-not (Register-InactiveUnread $thread $sender $conversationId)) {
-                Add-ProtocolMessageRecord $event $line $source $thread $conversationId
-            }
+    if ($type -eq "messagesBatch") {
+        $thread = Get-ProtocolString $event "thread" "message"
+        $source = Get-ProtocolString $event "source" "poll"
+        $conversationId = Get-ProtocolString $event "conversationId"
+        $items = @()
+        if ($event.PSObject.Properties.Name -contains "messages" -and $null -ne $event.messages) {
+            $items = @($event.messages)
         }
-        if (
-            $source -eq "poll" -and
-            (Test-InitialSyncThreadMatch $thread $conversationId) -and
-            $script:initialSyncResetSeen -and
-            $script:initialSyncMessageCount -gt 0
-        ) {
-            $script:initialSyncSettledAt = [DateTime]::UtcNow.AddMilliseconds(450)
+
+        foreach ($item in $items) {
+            $itemConversationId = Get-ProtocolString $item "conversationId" $conversationId
+            $messageEvent = [pscustomobject]@{
+                type = "message"
+                thread = $thread
+                source = $source
+                id = Get-ProtocolString $item "id"
+                createdAt = Get-ProtocolString $item "createdAt"
+                senderId = Get-ProtocolString $item "senderId"
+                senderLabel = Get-ProtocolString $item "senderLabel"
+                content = Get-ProtocolString $item "content"
+                conversationId = $itemConversationId
+            }
+            Handle-ProtocolMessageEvent $messageEvent -DeferRender
+        }
+
+        $script:lastRxAt = [DateTime]::UtcNow
+        Request-Render
+        return $true
+    }
+
+    if ($type -eq "messagesSynced") {
+        $thread = Get-ProtocolString $event "thread" "message"
+        $conversationId = Get-ProtocolString $event "conversationId"
+        $source = Get-ProtocolString $event "source" "poll"
+        $count = Get-ProtocolInt $event "count" 0
+        $limit = Get-ProtocolInt $event "limit" 0
+        $replaceExisting = Get-ProtocolBool $event "replaceExisting" $false
+        if ($source -eq "poll" -and $replaceExisting) {
+            Commit-LatestSnapshot $thread $conversationId "loaded $count latest row(s)"
+        } elseif ($source -eq "history") {
+            $script:historyLoadPending = $false
+            $script:historyBatchActive = $false
+            if ($count -eq 0 -or ($limit -gt 0 -and $count -lt $limit)) {
+                $script:historyExhausted = $true
+            }
+        } elseif ($script:initialSyncActive -and (Test-InitialSyncThreadMatch $thread $conversationId)) {
+            Complete-InitialSync "loaded $count latest row(s)"
         }
         $script:lastRxAt = [DateTime]::UtcNow
         Request-Render
@@ -2096,7 +2367,25 @@ function Read-SerialOutput {
         return
     }
 
-    $chunk = $script:serial.ReadExisting()
+    $bytesToRead = $script:serial.BytesToRead
+    if ($bytesToRead -le 0) {
+        return
+    }
+
+    $byteBuffer = New-Object byte[] $bytesToRead
+    $bytesRead = $script:serial.Read($byteBuffer, 0, $bytesToRead)
+    if ($bytesRead -le 0) {
+        return
+    }
+
+    $charCount = $script:serialDecoder.GetCharCount($byteBuffer, 0, $bytesRead)
+    if ($charCount -le 0) {
+        return
+    }
+
+    $charBuffer = New-Object char[] $charCount
+    [void]$script:serialDecoder.GetChars($byteBuffer, 0, $bytesRead, $charBuffer, 0)
+    $chunk = -join $charBuffer
     if ([string]::IsNullOrEmpty($chunk)) {
         return
     }
@@ -2303,7 +2592,10 @@ function Enable-StructuredProtocol {
     $script:bridgeHealth.serial = "requested"
     Start-Sleep -Milliseconds 150
     Read-SerialOutput
-    Send-BridgeLine "realtime start"
+    Send-BridgeLine "realtime stop"
+    $script:realtimeStartIssued = $false
+    $script:realtimeConnected = $false
+    $script:bridgeHealth.realtime = "off"
     Start-Sleep -Milliseconds 150
     Read-SerialOutput
 }
@@ -2445,10 +2737,12 @@ function Process-InputLine {
         Request-Render
     } elseif ($Line -eq "/realtime on" -or $Line -eq "/realtime start") {
         Send-BridgeLine $(if ($script:currentMode -eq "admin") { "realtime start" } else { "/realtime start" })
+        $script:realtimeStartIssued = $true
         Add-LiveFeedLine "Realtime WebSocket requested"
         Request-Render
     } elseif ($Line -eq "/realtime off" -or $Line -eq "/realtime stop") {
         Send-BridgeLine $(if ($script:currentMode -eq "admin") { "realtime stop" } else { "/realtime stop" })
+        $script:realtimeStartIssued = $false
         $script:realtimeConnected = $false
         $script:bridgeHealth.realtime = "off"
         Add-LiveFeedLine "Realtime WebSocket stopping"
@@ -2500,6 +2794,11 @@ function Process-InputLine {
 
 function Connect-Serial {
     $portInstance = [System.IO.Ports.SerialPort]::new($Port, $BaudRate)
+    try {
+        $portInstance.ReadBufferSize = 65536
+    } catch {
+        # Some drivers reject buffer resizing; keep the platform default there.
+    }
     $portInstance.Encoding = $script:utf8NoBom
     $portInstance.NewLine = "`n"
     $portInstance.ReadTimeout = 50
@@ -2507,6 +2806,7 @@ function Connect-Serial {
     $portInstance.DtrEnable = $true
     $portInstance.RtsEnable = $true
     $portInstance.Open()
+    $script:serialDecoder = $script:utf8NoBom.GetDecoder()
     try {
         $portInstance.DiscardInBuffer()
         $portInstance.DiscardOutBuffer()
@@ -2530,6 +2830,7 @@ function Wait-BridgeOutput {
             $count = if ($script:initialSyncMessageCount -gt 0) { $script:initialSyncMessageCount } else { $script:messageRecords.Count }
             Complete-InitialSync "loaded $count latest row(s)"
         }
+        Update-LatestSnapshotTimeout
         Update-InitialSyncTimeout
         Invoke-PendingRealtimeBackfill
         Invoke-PostSendBackfill
@@ -2573,7 +2874,7 @@ function Assert-SmokeTranscriptHealthy {
         throw "Smoke check did not observe bridge status with the data link established."
     }
 
-    $failurePattern = "(?im)(HTTP\s+(401|403|5\d\d)|Invalid bridge access token|Bridge access token has expired|ESP_ERR_HTTP_CONNECT|failed:|Unknown command|timed out)"
+    $failurePattern = "(?im)(HTTP\s+(401|403|5\d\d)|Invalid bridge access token|Bridge access token has expired|ESP_ERR_HTTP_CONNECT|Failed to allocate|failed:|Unknown command|timed out)"
     if ($Transcript -match $failurePattern) {
         throw "Smoke check observed bridge errors in the transcript."
     }
@@ -2746,6 +3047,7 @@ function Run-Interactive {
             $count = if ($script:initialSyncMessageCount -gt 0) { $script:initialSyncMessageCount } else { $script:messageRecords.Count }
             Complete-InitialSync "loaded $count latest row(s)"
         }
+        Update-LatestSnapshotTimeout
         Update-InitialSyncTimeout
         Invoke-PendingRealtimeBackfill
         Invoke-PostSendBackfill

@@ -18,6 +18,11 @@ type BridgeGroupPollPayload = {
   beforeMessageId?: string
 }
 
+type MessageCursor = {
+  id: string
+  created_at: string
+}
+
 const MESSAGE_SELECT = `
   id,
   user_id,
@@ -41,9 +46,6 @@ const toBridgeMessage = (message: any) => {
     content: message.content,
     created_at: message.created_at,
     senderLabel,
-    user: {
-      display_name: senderLabel,
-    },
   }
 }
 
@@ -76,10 +78,10 @@ serve(async req => {
       return badRequest('Use either since/sinceMessageId or before/beforeMessageId, not both')
     }
 
-    const resolveMessageCreatedAt = async (messageId: string, label: string) => {
+    const resolveMessageCursor = async (messageId: string, label: string) => {
       const { data: cursorMessage, error: cursorError } = await supabase
         .from('messages')
-        .select('created_at')
+        .select('id, created_at')
         .eq('id', messageId)
         .maybeSingle()
 
@@ -91,23 +93,28 @@ serve(async req => {
         return badRequest(`${label} is not a valid group message`)
       }
 
-      return cursorMessage.created_at as string
+      return cursorMessage as MessageCursor
     }
 
+    let sinceCursor: MessageCursor | null = null
+    let beforeCursor: MessageCursor | null = null
+
     if (sinceMessageId) {
-      const resolved = await resolveMessageCreatedAt(sinceMessageId, 'sinceMessageId')
-      if (typeof resolved !== 'string') {
+      const resolved = await resolveMessageCursor(sinceMessageId, 'sinceMessageId')
+      if (!('created_at' in resolved)) {
         return resolved
       }
-      since = resolved
+      sinceCursor = resolved
+      since = resolved.created_at
     }
 
     if (beforeMessageId) {
-      const resolved = await resolveMessageCreatedAt(beforeMessageId, 'beforeMessageId')
-      if (typeof resolved !== 'string') {
+      const resolved = await resolveMessageCursor(beforeMessageId, 'beforeMessageId')
+      if (!('created_at' in resolved)) {
         return resolved
       }
-      before = resolved
+      beforeCursor = resolved
+      before = resolved.created_at
     }
 
     let query = supabase
@@ -115,11 +122,21 @@ serve(async req => {
       .select(MESSAGE_SELECT)
       .limit(limit)
 
-    if (since) {
+    if (sinceCursor) {
+      query = query
+        .or(`created_at.gt.${sinceCursor.created_at},and(created_at.eq.${sinceCursor.created_at},id.gt.${sinceCursor.id})`)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+    } else if (since) {
       query = query
         .gt('created_at', since)
         .order('created_at', { ascending: true })
         .order('id', { ascending: true })
+    } else if (beforeCursor) {
+      query = query
+        .or(`created_at.lt.${beforeCursor.created_at},and(created_at.eq.${beforeCursor.created_at},id.lt.${beforeCursor.id})`)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
     } else if (before) {
       query = query
         .lt('created_at', before)
@@ -137,12 +154,20 @@ serve(async req => {
       throw error
     }
 
-    const orderedMessages = since ? (data ?? []) : [...(data ?? [])].reverse()
+    const direction = since ? 'newer' : before ? 'older' : 'latest'
+    const orderedMessages = direction === 'newer' ? (data ?? []) : [...(data ?? [])].reverse()
+    const messages = orderedMessages.map(toBridgeMessage)
 
     return json({
       ok: true,
       deviceId,
-      messages: orderedMessages.map(toBridgeMessage),
+      direction,
+      limit,
+      count: messages.length,
+      hasMore: (data?.length ?? 0) === limit,
+      oldestMessageId: messages[0]?.id ?? null,
+      newestMessageId: messages.length > 0 ? messages[messages.length - 1].id : null,
+      messages,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'

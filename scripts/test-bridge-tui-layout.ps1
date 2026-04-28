@@ -93,8 +93,8 @@ Assert-Equal (Get-MessageTopPadding 5 12 3) 0 "Scrolled message history should n
 $script:bridgeHealth.wifi = "yes"
 Assert-True ((Get-HealthLabel) -match "data link: established") "Health label should use data-link wording."
 Assert-True ((Get-HealthLabel) -notmatch "wifi|wi-fi") "Health label should not expose transport wording."
-Assert-True ((Get-VersionLabel) -match "v0\.1\.24-startup-sync 2026-04-28") "Header version label should expose the running TUI bundle version."
-Assert-True (((Get-SidebarLines) -join "`n") -match "tools 0\.1\.24-startup-sync") "Sidebar should expose the running TUI bundle version."
+Assert-True ((Get-VersionLabel) -match "v0\.1\.30-clean-start 2026-04-28") "Header version label should expose the running TUI bundle version."
+Assert-True (((Get-SidebarLines) -join "`n") -match "tools 0\.1\.30-clean-start") "Sidebar should expose the running TUI bundle version."
 Start-InitialSync "group"
 Assert-Equal (Get-LiveTransportLabel) "syncing latest" "Startup should label the transport as syncing until the first latest window settles."
 Assert-True (((Get-SidebarLines) -join "`n") -match "sync\s+loading") "Sidebar should expose startup sync progress."
@@ -173,25 +173,24 @@ Reset-MessageFixture
 Start-InitialSync "group"
 Try-HandleProtocolLine '@scb:{"type":"messagesReset","thread":"group"}' | Out-Null
 Assert-True $script:initialSyncActive "Initial sync should remain active after latest-window reset until rows arrive or timeout."
-Try-HandleProtocolLine '@scb:{"type":"message","thread":"group","source":"poll","id":"fixture-sync-1","createdAt":"2026-04-24T23:00:03Z","senderId":"user-1","senderLabel":"Caleb","content":"sync row"}' | Out-Null
-Assert-True $script:initialSyncActive "Initial sync should debounce briefly after the first latest row."
-Assert-True ($script:initialSyncSettledAt -gt [DateTime]::UtcNow) "Initial sync should schedule a near-future settled time after first latest row."
-$script:initialSyncSettledAt = [DateTime]::UtcNow.AddMilliseconds(-1)
-if ($script:initialSyncActive -and $script:initialSyncSettledAt -ne [DateTime]::MinValue -and [DateTime]::UtcNow -ge $script:initialSyncSettledAt) {
-    Complete-InitialSync "test"
-}
-Assert-True (-not $script:initialSyncActive) "Initial sync should complete after the settle window elapses."
+Try-HandleProtocolLine '@scb:{"type":"messagesBatch","thread":"group","source":"poll","count":1,"replaceExisting":true,"messages":[{"id":"fixture-sync-1","createdAt":"2026-04-24T23:00:03Z","senderId":"user-1","senderLabel":"Caleb","content":"sync row"}]}' | Out-Null
+Assert-True $script:initialSyncActive "Initial sync should wait for latest-window completion after the first latest row."
+Assert-True $script:latestSnapshotActive "Latest-window rows should be buffered until the bridge emits completion."
+Try-HandleProtocolLine '@scb:{"type":"messagesSynced","thread":"group","source":"poll","count":1,"limit":30,"replaceExisting":true}' | Out-Null
+Assert-True (-not $script:initialSyncActive) "Initial sync should complete when the latest-window completion frame arrives."
 
 Reset-MessageFixture
 Try-HandleProtocolLine '@scb:{"type":"message","thread":"group","source":"poll","id":"fixture-group-old","createdAt":"2026-04-24T23:00:04Z","senderId":"user-1","senderLabel":"Caleb","content":"old visible row"}' | Out-Null
 Assert-Equal $script:messages.Count 1 "Fixture group message should render before latest refresh reset."
 Try-HandleProtocolLine '@scb:{"type":"messagesReset","thread":"group"}' | Out-Null
 Assert-Equal $script:messages.Count 1 "Latest refresh reset should not blank or replace the stable visible buffer before poll rows arrive."
-Try-HandleProtocolLine '@scb:{"type":"message","thread":"group","source":"poll","id":"fixture-group-new","createdAt":"2026-04-24T23:00:05Z","senderId":"user-2","senderLabel":"Ron","content":"new latest row"}' | Out-Null
+Try-HandleProtocolLine '@scb:{"type":"messagesBatch","thread":"group","source":"poll","count":1,"replaceExisting":true,"messages":[{"id":"fixture-group-new","createdAt":"2026-04-24T23:00:05Z","senderId":"user-2","senderLabel":"Ron","content":"new latest row"}]}' | Out-Null
 Assert-Equal $script:messages.Count 2 "Latest group refresh should reconcile into the deterministic message buffer."
 Assert-True ($script:messages[1] -match "new latest row") "Newest poll rows should remain at the bottom of the deterministic buffer."
+Try-HandleProtocolLine '@scb:{"type":"messagesSynced","thread":"group","source":"poll","count":1,"limit":30,"replaceExisting":true}' | Out-Null
+Assert-Equal $script:messages.Count 1 "Latest snapshot completion should replace stale rows with the authoritative latest window."
+Assert-True ($script:messages[0] -match "new latest row") "Latest snapshot completion should keep the fetched latest row."
 
-Try-HandleProtocolLine '@scb:{"type":"messagesReset","thread":"group"}' | Out-Null
 Try-HandleProtocolLine '@scb:{"type":"message","thread":"group","source":"poll","id":"fixture-group-stale","createdAt":"2026-04-24T22:00:00Z","senderId":"user-2","senderLabel":"Ron","content":"stale delayed poll"}' | Out-Null
 Assert-True ($script:messages[$script:messages.Count - 1] -match "new latest row") "A delayed stale poll should not take over the latest visible feed."
 
@@ -199,8 +198,7 @@ Reset-MessageFixture
 Try-HandleProtocolLine '@scb:{"type":"message","thread":"group","source":"poll","id":"fixture-group-current","createdAt":"2026-04-24T23:00:05Z","senderId":"user-2","senderLabel":"Ron","content":"current latest row"}' | Out-Null
 $script:historyLoadPending = $true
 $script:historyBatchActive = $false
-Try-HandleProtocolLine '@scb:{"type":"message","thread":"group","source":"history","id":"fixture-group-history-1","createdAt":"2026-04-24T22:59:01Z","senderId":"user-2","senderLabel":"Ron","content":"older first"}' | Out-Null
-Try-HandleProtocolLine '@scb:{"type":"message","thread":"group","source":"history","id":"fixture-group-history-2","createdAt":"2026-04-24T22:59:02Z","senderId":"user-2","senderLabel":"Ron","content":"older second"}' | Out-Null
+Try-HandleProtocolLine '@scb:{"type":"messagesBatch","thread":"group","source":"history","count":2,"replaceExisting":false,"messages":[{"id":"fixture-group-history-1","createdAt":"2026-04-24T22:59:01Z","senderId":"user-2","senderLabel":"Ron","content":"older first"},{"id":"fixture-group-history-2","createdAt":"2026-04-24T22:59:02Z","senderId":"user-2","senderLabel":"Ron","content":"older second"}]}' | Out-Null
 Assert-Equal $script:messages.Count 3 "History rows should prepend without replacing the current latest window."
 Assert-True ($script:messages[0] -match "older first") "History prepends should preserve chronological order within the fetched page."
 Assert-True ($script:messages[1] -match "older second") "History prepends should preserve chronological order across multiple rows."

@@ -10,8 +10,8 @@ For the current TUI hardening details, see
 
 Use monotonic semantic-style versions with a short release label:
 
-- firmware: `0.2.20-startup-window`
-- Windows tools bundle: `0.1.24-startup-sync`
+- firmware: `0.2.30-patient-sync`
+- Windows tools bundle: `0.1.30-clean-start`
 - bootstrap bundle: `0.1.10-bootstrap-routing`
 
 Rules:
@@ -79,7 +79,7 @@ firmware/esp-bridge/build/shadowchat_bridge.bin
 Windows tools bundle:
 
 ```powershell
-npm run bridge:bundle:pack -- -Version 0.1.24-startup-sync
+npm run bridge:bundle:pack -- -Version 0.1.30-clean-start
 ```
 
 Record for each artifact:

@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,9 +32,12 @@
 
 #define BRIDGE_WIFI_CONNECTED_BIT BIT0
 #define BRIDGE_HTTP_BUFFER_SIZE 32768
+#define BRIDGE_PROTOCOL_WRITE_CHUNK_SIZE 64
+#define BRIDGE_PROTOCOL_BATCH_CHUNK_MESSAGES 1
 #define BRIDGE_SHELL_LINE_SIZE 1024
 #define BRIDGE_STORAGE_NAMESPACE "bridge_cfg"
 #define BRIDGE_SHELL_TASK_STACK_SIZE 32768
+#define BRIDGE_PROTOCOL_FRAME_YIELD_MS 40
 #define BRIDGE_SESSION_REFRESH_LEEWAY_SECONDS 300
 #define BRIDGE_STARTUP_WIFI_WAIT_MS 45000
 #define BRIDGE_REALTIME_TASK_STACK_SIZE 24576
@@ -77,7 +81,20 @@ typedef struct {
     int status_code;
     char body[BRIDGE_HTTP_BUFFER_SIZE];
     size_t body_length;
+    bool truncated;
 } bridge_http_response_t;
+
+static bridge_http_response_t *bridge_http_response_create(void) {
+    bridge_http_response_t *response = calloc(1, sizeof(bridge_http_response_t));
+    if (!response) {
+        printf("Failed to allocate HTTP response buffer\n");
+    }
+    return response;
+}
+
+static void bridge_http_response_destroy(bridge_http_response_t *response) {
+    free(response);
+}
 
 typedef struct {
     bool update_available;
@@ -133,12 +150,59 @@ static const char *BRIDGE_CURSOR_GROUP_MESSAGE_ID_KEY = "cur_group_id";
 static const char *BRIDGE_CURSOR_DM_RECIPIENT_KEY = "cur_dm_rec";
 static const char *BRIDGE_CURSOR_DM_MESSAGE_ID_KEY = "cur_dm_id";
 
+static int bridge_log_vprintf(const char *format, va_list args) {
+    if (s_protocol_output_mutex) {
+        xSemaphoreTake(s_protocol_output_mutex, portMAX_DELAY);
+    }
+    int written = vprintf(format, args);
+    fflush(stdout);
+    if (s_protocol_output_mutex) {
+        xSemaphoreGive(s_protocol_output_mutex);
+    }
+    return written;
+}
+
 static void bridge_configure_log_output(void) {
+    esp_log_set_vprintf(bridge_log_vprintf);
     esp_log_level_set("esp-x509-crt-bundle", ESP_LOG_NONE);
     esp_log_level_set("transport_ws", ESP_LOG_NONE);
     esp_log_level_set("WEBSOCKET_CLIENT", ESP_LOG_NONE);
     esp_log_level_set("TRANSPORT_BASE", ESP_LOG_NONE);
     esp_log_level_set("esp-tls", ESP_LOG_NONE);
+    esp_log_level_set("tinyusb_msc_storage", ESP_LOG_NONE);
+}
+
+static void bridge_protocol_write_all(const char *data, size_t length) {
+    if (!data || length == 0) {
+        return;
+    }
+
+    size_t offset = 0;
+    while (offset < length) {
+        size_t chunk_size = length - offset;
+        if (chunk_size > BRIDGE_PROTOCOL_WRITE_CHUNK_SIZE) {
+            chunk_size = BRIDGE_PROTOCOL_WRITE_CHUNK_SIZE;
+        }
+        size_t written = fwrite(data + offset, 1, chunk_size, stdout);
+        fflush(stdout);
+        if (written > 0) {
+            offset += written;
+        }
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+}
+
+static void bridge_protocol_write_json_line(const char *line) {
+    if (!line) {
+        return;
+    }
+
+    static const char prefix[] = "@scb:";
+    static const char newline[] = "\n";
+    bridge_protocol_write_all(prefix, strlen(prefix));
+    bridge_protocol_write_all(line, strlen(line));
+    bridge_protocol_write_all(newline, strlen(newline));
+    fflush(stdout);
 }
 
 static void bridge_protocol_emit(cJSON *event) {
@@ -154,12 +218,12 @@ static void bridge_protocol_emit(cJSON *event) {
     if (s_protocol_output_mutex) {
         xSemaphoreTake(s_protocol_output_mutex, portMAX_DELAY);
     }
-    printf("@scb:%s\n", line);
-    fflush(stdout);
+    bridge_protocol_write_json_line(line);
     if (s_protocol_output_mutex) {
         xSemaphoreGive(s_protocol_output_mutex);
     }
     free(line);
+    vTaskDelay(pdMS_TO_TICKS(BRIDGE_PROTOCOL_FRAME_YIELD_MS));
 }
 
 static void bridge_protocol_emit_forced(cJSON *event) {
@@ -175,12 +239,12 @@ static void bridge_protocol_emit_forced(cJSON *event) {
     if (s_protocol_output_mutex) {
         xSemaphoreTake(s_protocol_output_mutex, portMAX_DELAY);
     }
-    printf("@scb:%s\n", line);
-    fflush(stdout);
+    bridge_protocol_write_json_line(line);
     if (s_protocol_output_mutex) {
         xSemaphoreGive(s_protocol_output_mutex);
     }
     free(line);
+    vTaskDelay(pdMS_TO_TICKS(BRIDGE_PROTOCOL_FRAME_YIELD_MS));
 }
 
 static void bridge_protocol_emit_mode(const char *mode, const char *recipient_user_id) {
@@ -290,6 +354,73 @@ static void bridge_protocol_emit_message(
     cJSON_Delete(event);
 }
 
+static bool bridge_protocol_add_message_to_array(
+    cJSON *messages,
+    const char *id,
+    const char *created_at,
+    const char *sender_id,
+    const char *sender_label,
+    const char *content,
+    const char *conversation_id
+) {
+    if (!messages) {
+        return false;
+    }
+
+    cJSON *item = cJSON_CreateObject();
+    if (!item) {
+        return false;
+    }
+
+    cJSON_AddStringToObject(item, "id", id ? id : "");
+    cJSON_AddStringToObject(item, "createdAt", created_at ? created_at : "");
+    cJSON_AddStringToObject(item, "senderId", sender_id ? sender_id : "");
+    cJSON_AddStringToObject(item, "senderLabel", sender_label ? sender_label : "");
+    cJSON_AddStringToObject(item, "content", content ? content : "");
+    if (conversation_id && conversation_id[0] != '\0') {
+        cJSON_AddStringToObject(item, "conversationId", conversation_id);
+    }
+
+    if (!cJSON_AddItemToArray(messages, item)) {
+        cJSON_Delete(item);
+        return false;
+    }
+
+    return true;
+}
+
+static void bridge_protocol_emit_messages_batch(
+    const char *thread,
+    const char *source,
+    const char *conversation_id,
+    cJSON *messages,
+    int count,
+    bool replace_existing
+) {
+    if (!messages) {
+        return;
+    }
+
+    cJSON *event = cJSON_CreateObject();
+    if (!event) {
+        cJSON_Delete(messages);
+        return;
+    }
+
+    cJSON_AddStringToObject(event, "type", "messagesBatch");
+    cJSON_AddStringToObject(event, "thread", thread ? thread : "unknown");
+    cJSON_AddStringToObject(event, "source", source ? source : "poll");
+    cJSON_AddNumberToObject(event, "count", count);
+    cJSON_AddBoolToObject(event, "replaceExisting", replace_existing);
+    if (conversation_id && conversation_id[0] != '\0') {
+        cJSON_AddStringToObject(event, "conversationId", conversation_id);
+    }
+    cJSON_AddItemToObject(event, "messages", messages);
+
+    bridge_protocol_emit(event);
+    cJSON_Delete(event);
+}
+
 static void bridge_protocol_emit_messages_reset(const char *thread, const char *conversation_id) {
     cJSON *event = cJSON_CreateObject();
     if (!event) {
@@ -298,6 +429,35 @@ static void bridge_protocol_emit_messages_reset(const char *thread, const char *
 
     cJSON_AddStringToObject(event, "type", "messagesReset");
     cJSON_AddStringToObject(event, "thread", thread ? thread : "unknown");
+    if (conversation_id && conversation_id[0] != '\0') {
+        cJSON_AddStringToObject(event, "conversationId", conversation_id);
+    }
+
+    bridge_protocol_emit(event);
+    cJSON_Delete(event);
+}
+
+static void bridge_protocol_emit_messages_synced(
+    const char *thread,
+    const char *conversation_id,
+    const char *source,
+    int count,
+    int limit,
+    bool has_more,
+    bool replace_existing
+) {
+    cJSON *event = cJSON_CreateObject();
+    if (!event) {
+        return;
+    }
+
+    cJSON_AddStringToObject(event, "type", "messagesSynced");
+    cJSON_AddStringToObject(event, "thread", thread ? thread : "unknown");
+    cJSON_AddStringToObject(event, "source", source ? source : "poll");
+    cJSON_AddNumberToObject(event, "count", count);
+    cJSON_AddNumberToObject(event, "limit", limit);
+    cJSON_AddBoolToObject(event, "hasMore", has_more);
+    cJSON_AddBoolToObject(event, "replaceExisting", replace_existing);
     if (conversation_id && conversation_id[0] != '\0') {
         cJSON_AddStringToObject(event, "conversationId", conversation_id);
     }
@@ -863,6 +1023,7 @@ static esp_err_t bridge_http_event_handler(esp_http_client_event_t *event) {
     bridge_http_response_t *response = (bridge_http_response_t *)event->user_data;
     size_t remaining = sizeof(response->body) - response->body_length - 1;
     if (remaining == 0) {
+        response->truncated = true;
         return ESP_OK;
     }
 
@@ -870,6 +1031,9 @@ static esp_err_t bridge_http_event_handler(esp_http_client_event_t *event) {
     memcpy(response->body + response->body_length, event->data, copy_length);
     response->body_length += copy_length;
     response->body[response->body_length] = '\0';
+    if (copy_length < event->data_len) {
+        response->truncated = true;
+    }
 
     return ESP_OK;
 }
@@ -959,6 +1123,10 @@ static void bridge_redact_sensitive_json(cJSON *item) {
 
 static void bridge_print_response(const char *label, const bridge_http_response_t *response) {
     printf("%s: HTTP %d\n", label, response->status_code);
+    if (response->truncated) {
+        printf("%s response truncated at %u bytes\n", label, (unsigned)response->body_length);
+        return;
+    }
     if (response->body[0] != '\0') {
         cJSON *json = cJSON_Parse(response->body);
         if (json) {
@@ -979,6 +1147,9 @@ static void bridge_print_response(const char *label, const bridge_http_response_
 
 static cJSON *bridge_parse_json_body(const bridge_http_response_t *response) {
     if (!response || response->body[0] == '\0') {
+        return NULL;
+    }
+    if (response->truncated) {
         return NULL;
     }
 
@@ -1217,6 +1388,7 @@ static bool bridge_print_message_list(
     size_t latest_cursor_message_id_size,
     char *oldest_cursor_message_id,
     size_t oldest_cursor_message_id_size,
+    int requested_limit,
     bool replace_existing,
     bool print_empty
 ) {
@@ -1233,8 +1405,12 @@ static bool bridge_print_message_list(
 
     int count = cJSON_GetArraySize(messages);
     if (count == 0) {
+        const char *empty_conversation_id = dm_messages ? bridge_json_string_or_empty(json, "conversationId") : "";
         if (s_protocol_enabled && replace_existing) {
-            bridge_protocol_emit_messages_reset(thread, "");
+            bridge_protocol_emit_messages_reset(thread, empty_conversation_id);
+        }
+        if (s_protocol_enabled) {
+            bridge_protocol_emit_messages_synced(thread, empty_conversation_id, source, 0, requested_limit, false, replace_existing);
         }
         if (print_empty) {
             printf("%s\n", source && strcmp(source, "history") == 0 ? "(no older messages)" : "(no messages)");
@@ -1253,6 +1429,12 @@ static bool bridge_print_message_list(
         bridge_protocol_emit_messages_reset(thread, reset_conversation_id);
     }
 
+    cJSON *batch_messages = NULL;
+    int batch_message_count = 0;
+    if (s_protocol_enabled) {
+        batch_messages = cJSON_CreateArray();
+    }
+
     cJSON *message = NULL;
     bool first_message = true;
     cJSON_ArrayForEach(message, messages) {
@@ -1263,10 +1445,23 @@ static bool bridge_print_message_list(
         const char *conversation_id = dm_messages ? bridge_json_string_or_empty(message, "conversation_id") : "";
         cJSON *profile = cJSON_GetObjectItemCaseSensitive(message, dm_messages ? "sender" : "user");
         char time_label[12] = {0};
-        const char *sender_label = bridge_profile_label(profile, sender_id);
+        const char *sender_label = bridge_json_string_or_empty(message, "senderLabel");
+        if (sender_label[0] == '\0') {
+            sender_label = bridge_profile_label(profile, sender_id);
+        }
 
         if (s_protocol_enabled) {
-            bridge_protocol_emit_message(thread, source ? source : "poll", id, created_at, sender_id, sender_label, content, conversation_id);
+            bool added_to_batch = bridge_protocol_add_message_to_array(batch_messages, id, created_at, sender_id, sender_label, content, conversation_id);
+            if (added_to_batch) {
+                batch_message_count++;
+                if (batch_message_count >= BRIDGE_PROTOCOL_BATCH_CHUNK_MESSAGES) {
+                    bridge_protocol_emit_messages_batch(thread, source, reset_conversation_id, batch_messages, batch_message_count, replace_existing);
+                    batch_messages = cJSON_CreateArray();
+                    batch_message_count = 0;
+                }
+            } else {
+                bridge_protocol_emit_message(thread, source ? source : "poll", id, created_at, sender_id, sender_label, content, conversation_id);
+            }
         } else {
             printf(
                 "%s | %s: %s\n",
@@ -1287,6 +1482,25 @@ static bool bridge_print_message_list(
         first_message = false;
     }
 
+    if (s_protocol_enabled) {
+        if (batch_messages && batch_message_count > 0) {
+            bridge_protocol_emit_messages_batch(thread, source, reset_conversation_id, batch_messages, batch_message_count, replace_existing);
+            batch_messages = NULL;
+        }
+        bridge_protocol_emit_messages_synced(
+            thread,
+            reset_conversation_id,
+            source,
+            count,
+            requested_limit,
+            requested_limit > 0 && count >= requested_limit,
+            replace_existing
+        );
+    }
+
+    if (batch_messages) {
+        cJSON_Delete(batch_messages);
+    }
     cJSON_Delete(json);
     return true;
 }
@@ -1798,17 +2012,23 @@ static void bridge_command_register(void) {
         CONFIG_BRIDGE_FIRMWARE_VERSION
     );
 
-    bridge_http_response_t response = {0};
-    esp_err_t err = bridge_http_post_json("bridge-register", body, NULL, &response);
-    if (err != ESP_OK) {
-        printf("bridge-register failed: %s\n", esp_err_to_name(err));
+    bridge_http_response_t *response = bridge_http_response_create();
+    if (!response) {
         return;
     }
 
-    bridge_print_response("bridge-register", &response);
+    esp_err_t err = bridge_http_post_json("bridge-register", body, NULL, response);
+    if (err != ESP_OK) {
+        printf("bridge-register failed: %s\n", esp_err_to_name(err));
+        bridge_http_response_destroy(response);
+        return;
+    }
 
-    cJSON *json = bridge_parse_json_body(&response);
+    bridge_print_response("bridge-register", response);
+
+    cJSON *json = bridge_parse_json_body(response);
     if (!json) {
+        bridge_http_response_destroy(response);
         return;
     }
 
@@ -1826,6 +2046,7 @@ static void bridge_command_register(void) {
     }
 
     cJSON_Delete(json);
+    bridge_http_response_destroy(response);
 }
 
 static bool bridge_command_pair_begin(bool use_recovery_token) {
@@ -1847,31 +2068,38 @@ static bool bridge_command_pair_begin(bool use_recovery_token) {
         snprintf(body, sizeof(body), "{\"deviceId\":\"%s\"}", s_bridge_state.device_id);
     }
 
-    bridge_http_response_t response = {0};
-    esp_err_t err = bridge_http_post_json("bridge-pairing-begin", body, NULL, &response);
-    if (err != ESP_OK) {
-        printf("bridge-pairing-begin failed: %s\n", esp_err_to_name(err));
+    bridge_http_response_t *response = bridge_http_response_create();
+    if (!response) {
         return false;
     }
 
-    bridge_print_response("bridge-pairing-begin", &response);
-    if (response.status_code < 200 || response.status_code >= 300) {
+    esp_err_t err = bridge_http_post_json("bridge-pairing-begin", body, NULL, response);
+    if (err != ESP_OK) {
+        printf("bridge-pairing-begin failed: %s\n", esp_err_to_name(err));
+        bridge_http_response_destroy(response);
+        return false;
+    }
+
+    bridge_print_response("bridge-pairing-begin", response);
+    if (response->status_code < 200 || response->status_code >= 300) {
         if (
             use_recovery_token &&
             (
-                strstr(response.body, "Bridge recovery is not available") != NULL ||
-                strstr(response.body, "Invalid bridge recovery token") != NULL
+                strstr(response->body, "Bridge recovery is not available") != NULL ||
+                strstr(response->body, "Invalid bridge recovery token") != NULL
             )
         ) {
             bridge_clear_recovery_token();
             printf("Stored bridge recovery token is no longer accepted by the backend.\n");
             printf("Start a fresh pairing with: pair begin\n");
         }
+        bridge_http_response_destroy(response);
         return false;
     }
 
-    cJSON *json = bridge_parse_json_body(&response);
+    cJSON *json = bridge_parse_json_body(response);
     if (!json) {
+        bridge_http_response_destroy(response);
         return false;
     }
 
@@ -1895,6 +2123,7 @@ static bool bridge_command_pair_begin(bool use_recovery_token) {
     }
 
     cJSON_Delete(json);
+    bridge_http_response_destroy(response);
     return true;
 }
 
@@ -1913,17 +2142,23 @@ static void bridge_command_pair_status(void) {
         s_bridge_state.pairing_code
     );
 
-    bridge_http_response_t response = {0};
-    esp_err_t err = bridge_http_post_json("bridge-pairing-status", body, NULL, &response);
-    if (err != ESP_OK) {
-        printf("bridge-pairing-status failed: %s\n", esp_err_to_name(err));
+    bridge_http_response_t *response = bridge_http_response_create();
+    if (!response) {
         return;
     }
 
-    bridge_print_response("bridge-pairing-status", &response);
+    esp_err_t err = bridge_http_post_json("bridge-pairing-status", body, NULL, response);
+    if (err != ESP_OK) {
+        printf("bridge-pairing-status failed: %s\n", esp_err_to_name(err));
+        bridge_http_response_destroy(response);
+        return;
+    }
 
-    cJSON *json = bridge_parse_json_body(&response);
+    bridge_print_response("bridge-pairing-status", response);
+
+    cJSON *json = bridge_parse_json_body(response);
     if (!json) {
+        bridge_http_response_destroy(response);
         return;
     }
 
@@ -1934,6 +2169,7 @@ static void bridge_command_pair_status(void) {
     }
 
     cJSON_Delete(json);
+    bridge_http_response_destroy(response);
 }
 
 static bool bridge_command_session_exchange(void) {
@@ -1951,21 +2187,28 @@ static bool bridge_command_session_exchange(void) {
         s_bridge_state.pairing_code
     );
 
-    bridge_http_response_t response = {0};
-    esp_err_t err = bridge_http_post_json("bridge-session-exchange", body, NULL, &response);
+    bridge_http_response_t *response = bridge_http_response_create();
+    if (!response) {
+        return false;
+    }
+
+    esp_err_t err = bridge_http_post_json("bridge-session-exchange", body, NULL, response);
     if (err != ESP_OK) {
         printf("bridge-session-exchange failed: %s\n", esp_err_to_name(err));
+        bridge_http_response_destroy(response);
         return false;
     }
 
-    bridge_print_response("bridge-session-exchange", &response);
+    bridge_print_response("bridge-session-exchange", response);
 
-    if (response.status_code < 200 || response.status_code >= 300) {
+    if (response->status_code < 200 || response->status_code >= 300) {
+        bridge_http_response_destroy(response);
         return false;
     }
 
-    cJSON *json = bridge_parse_json_body(&response);
+    cJSON *json = bridge_parse_json_body(response);
     if (!json) {
+        bridge_http_response_destroy(response);
         return false;
     }
 
@@ -1989,6 +2232,7 @@ static bool bridge_command_session_exchange(void) {
     bridge_save_string("device_status", s_bridge_state.device_status);
     printf("Stored bridge control-plane and ESP auth session material\n");
     cJSON_Delete(json);
+    bridge_http_response_destroy(response);
     return true;
 }
 
@@ -2009,26 +2253,33 @@ static bool bridge_refresh_session_material(bool compact_output) {
         s_bridge_state.refresh_token
     );
 
-    bridge_http_response_t response = {0};
-    esp_err_t err = bridge_http_post_json("bridge-session-refresh", body, NULL, &response);
+    bridge_http_response_t *response = bridge_http_response_create();
+    if (!response) {
+        return false;
+    }
+
+    esp_err_t err = bridge_http_post_json("bridge-session-refresh", body, NULL, response);
     if (err != ESP_OK) {
         printf("bridge-session-refresh failed: %s\n", esp_err_to_name(err));
+        bridge_http_response_destroy(response);
         return false;
     }
 
     if (!compact_output) {
-        bridge_print_response("bridge-session-refresh", &response);
+        bridge_print_response("bridge-session-refresh", response);
     }
 
-    if (response.status_code < 200 || response.status_code >= 300) {
+    if (response->status_code < 200 || response->status_code >= 300) {
         if (compact_output) {
-            printf("bridge-session-refresh failed: HTTP %d\n", response.status_code);
+            printf("bridge-session-refresh failed: HTTP %d\n", response->status_code);
         }
+        bridge_http_response_destroy(response);
         return false;
     }
 
-    cJSON *json = bridge_parse_json_body(&response);
+    cJSON *json = bridge_parse_json_body(response);
     if (!json) {
+        bridge_http_response_destroy(response);
         return false;
     }
 
@@ -2038,6 +2289,7 @@ static bool bridge_refresh_session_material(bool compact_output) {
     if (!cJSON_IsString(access_token) || !access_token->valuestring || !cJSON_IsString(refresh_token) || !refresh_token->valuestring) {
         printf("bridge-session-refresh response did not include complete session material\n");
         cJSON_Delete(json);
+        bridge_http_response_destroy(response);
         return false;
     }
 
@@ -2053,6 +2305,7 @@ static bool bridge_refresh_session_material(bool compact_output) {
     bridge_save_string("device_status", s_bridge_state.device_status);
     printf("%s\n", compact_output ? "Refreshed bridge control-plane and ESP auth session material" : "Rotated bridge control-plane and ESP auth session material");
     cJSON_Delete(json);
+    bridge_http_response_destroy(response);
     return true;
 }
 
@@ -2306,18 +2559,23 @@ static void bridge_command_heartbeat(void) {
         s_realtime_connected ? "true" : "false"
     );
 
-    bridge_http_response_t response = {0};
-    esp_err_t err = bridge_http_post_json("bridge-heartbeat", body, s_bridge_state.access_token, &response);
-    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-heartbeat", &response)) {
-        response = (bridge_http_response_t){0};
-        err = bridge_http_post_json("bridge-heartbeat", body, s_bridge_state.access_token, &response);
-    }
-    if (err != ESP_OK) {
-        printf("bridge-heartbeat failed: %s\n", esp_err_to_name(err));
+    bridge_http_response_t *response = bridge_http_response_create();
+    if (!response) {
         return;
     }
 
-    bridge_print_response("bridge-heartbeat", &response);
+    esp_err_t err = bridge_http_post_json("bridge-heartbeat", body, s_bridge_state.access_token, response);
+    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-heartbeat", response)) {
+        err = bridge_http_post_json("bridge-heartbeat", body, s_bridge_state.access_token, response);
+    }
+    if (err != ESP_OK) {
+        printf("bridge-heartbeat failed: %s\n", esp_err_to_name(err));
+        bridge_http_response_destroy(response);
+        return;
+    }
+
+    bridge_print_response("bridge-heartbeat", response);
+    bridge_http_response_destroy(response);
 }
 
 static bool bridge_command_update_check_target(const char *target, bool compact_output) {
@@ -2357,32 +2615,38 @@ static bool bridge_command_update_check_target(const char *target, bool compact_
         );
     }
 
-    bridge_http_response_t response = {0};
+    bridge_http_response_t *response = bridge_http_response_create();
+    if (!response) {
+        return false;
+    }
+
     esp_err_t err = bridge_http_post_json(
         "bridge-update-check",
         body,
         use_bridge_auth ? s_bridge_state.access_token : NULL,
-        &response
+        response
     );
 
-    if (use_bridge_auth && err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-update-check", &response)) {
-        response = (bridge_http_response_t){0};
-        err = bridge_http_post_json("bridge-update-check", body, s_bridge_state.access_token, &response);
+    if (use_bridge_auth && err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-update-check", response)) {
+        err = bridge_http_post_json("bridge-update-check", body, s_bridge_state.access_token, response);
     }
 
     if (err != ESP_OK) {
         printf("bridge-update-check failed: %s\n", esp_err_to_name(err));
+        bridge_http_response_destroy(response);
         return false;
     }
 
-    if (response.status_code < 200 || response.status_code >= 300) {
-        bridge_print_response("bridge-update-check", &response);
+    if (response->status_code < 200 || response->status_code >= 300) {
+        bridge_print_response("bridge-update-check", response);
+        bridge_http_response_destroy(response);
         return false;
     }
 
-    cJSON *json = bridge_parse_json_body(&response);
+    cJSON *json = bridge_parse_json_body(response);
     if (!json) {
         printf("bridge-update-check returned an empty or invalid response\n");
+        bridge_http_response_destroy(response);
         return false;
     }
 
@@ -2458,6 +2722,7 @@ static bool bridge_command_update_check_target(const char *target, bool compact_
     );
 
     cJSON_Delete(json);
+    bridge_http_response_destroy(response);
     return true;
 }
 
@@ -2506,37 +2771,44 @@ static bool bridge_fetch_update_info(const char *target, bridge_update_info_t *i
         );
     }
 
-    bridge_http_response_t response = {0};
+    bridge_http_response_t *response = bridge_http_response_create();
+    if (!response) {
+        return false;
+    }
+
     esp_err_t err = bridge_http_post_json(
         "bridge-update-check",
         body,
         use_bridge_auth ? s_bridge_state.access_token : NULL,
-        &response
+        response
     );
 
-    if (use_bridge_auth && err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-update-check", &response)) {
-        response = (bridge_http_response_t){0};
-        err = bridge_http_post_json("bridge-update-check", body, s_bridge_state.access_token, &response);
+    if (use_bridge_auth && err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-update-check", response)) {
+        err = bridge_http_post_json("bridge-update-check", body, s_bridge_state.access_token, response);
     }
 
     if (err != ESP_OK) {
         printf("bridge-update-check failed: %s\n", esp_err_to_name(err));
+        bridge_http_response_destroy(response);
         return false;
     }
 
-    if (response.status_code < 200 || response.status_code >= 300) {
-        bridge_print_response("bridge-update-check", &response);
+    if (response->status_code < 200 || response->status_code >= 300) {
+        bridge_print_response("bridge-update-check", response);
+        bridge_http_response_destroy(response);
         return false;
     }
 
-    cJSON *json = bridge_parse_json_body(&response);
+    cJSON *json = bridge_parse_json_body(response);
     if (!json) {
         printf("bridge-update-check returned an empty or invalid response\n");
+        bridge_http_response_destroy(response);
         return false;
     }
 
     bool parsed = bridge_parse_update_info(json, info);
     cJSON_Delete(json);
+    bridge_http_response_destroy(response);
     return parsed;
 }
 
@@ -2934,14 +3206,19 @@ static void bridge_command_wipe(void) {
             s_bridge_state.refresh_token
         );
 
-        bridge_http_response_t response = {0};
-        esp_err_t err = bridge_http_post_json("bridge-pairing-revoke", body, NULL, &response);
-        backend_wipe_attempted = true;
-
-        if (err != ESP_OK) {
-            printf("bridge-pairing-revoke failed: %s\n", esp_err_to_name(err));
+        bridge_http_response_t *response = bridge_http_response_create();
+        if (!response) {
+            printf("bridge-pairing-revoke skipped: no HTTP response buffer\n");
         } else {
-            bridge_print_response("bridge-pairing-revoke", &response);
+            esp_err_t err = bridge_http_post_json("bridge-pairing-revoke", body, NULL, response);
+            backend_wipe_attempted = true;
+
+            if (err != ESP_OK) {
+                printf("bridge-pairing-revoke failed: %s\n", esp_err_to_name(err));
+            } else {
+                bridge_print_response("bridge-pairing-revoke", response);
+            }
+            bridge_http_response_destroy(response);
         }
     } else {
         printf("Skipping backend wipe; device is offline or has no stored bridge session.\n");
@@ -3052,18 +3329,23 @@ static const char *bridge_lookup_profile_label(const char *user_id, char *buffer
     char body[160];
     snprintf(body, sizeof(body), "{\"deviceId\":\"%s\",\"userIds\":[\"%s\"]}", s_bridge_state.device_id, user_id);
 
-    bridge_http_response_t response = {0};
-    esp_err_t err = bridge_http_post_json("bridge-user-profile", body, s_bridge_state.access_token, &response);
-    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-user-profile", &response)) {
-        response = (bridge_http_response_t){0};
-        err = bridge_http_post_json("bridge-user-profile", body, s_bridge_state.access_token, &response);
-    }
-    if (err != ESP_OK || response.status_code < 200 || response.status_code >= 300) {
+    bridge_http_response_t *response = bridge_http_response_create();
+    if (!response) {
         return buffer;
     }
 
-    cJSON *json = bridge_parse_json_body(&response);
+    esp_err_t err = bridge_http_post_json("bridge-user-profile", body, s_bridge_state.access_token, response);
+    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-user-profile", response)) {
+        err = bridge_http_post_json("bridge-user-profile", body, s_bridge_state.access_token, response);
+    }
+    if (err != ESP_OK || response->status_code < 200 || response->status_code >= 300) {
+        bridge_http_response_destroy(response);
+        return buffer;
+    }
+
+    cJSON *json = bridge_parse_json_body(response);
     if (!json) {
+        bridge_http_response_destroy(response);
         return buffer;
     }
 
@@ -3074,6 +3356,7 @@ static const char *bridge_lookup_profile_label(const char *user_id, char *buffer
     bridge_profile_cache_put(user_id, buffer);
 
     cJSON_Delete(json);
+    bridge_http_response_destroy(response);
     return buffer;
 }
 
@@ -3530,26 +3813,33 @@ static bool bridge_send_group_message(const char *content, bool compact_output) 
         return false;
     }
 
-    bridge_http_response_t response = {0};
-    esp_err_t err = bridge_http_post_json("bridge-group-send", body, s_bridge_state.access_token, &response);
-    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-group-send", &response)) {
-        response = (bridge_http_response_t){0};
-        err = bridge_http_post_json("bridge-group-send", body, s_bridge_state.access_token, &response);
+    bridge_http_response_t *response = bridge_http_response_create();
+    if (!response) {
+        free(body);
+        return false;
+    }
+
+    esp_err_t err = bridge_http_post_json("bridge-group-send", body, s_bridge_state.access_token, response);
+    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-group-send", response)) {
+        err = bridge_http_post_json("bridge-group-send", body, s_bridge_state.access_token, response);
     }
 
     free(body);
     if (err != ESP_OK) {
         printf("bridge-group-send failed: %s\n", esp_err_to_name(err));
+        bridge_http_response_destroy(response);
         return false;
     }
 
-    if (response.status_code >= 200 && response.status_code < 300) {
-        bridge_print_sent_summary(&response, false);
+    bool ok = response->status_code >= 200 && response->status_code < 300;
+    if (ok) {
+        bridge_print_sent_summary(response, false);
     } else {
-        bridge_print_response("bridge-group-send", &response);
+        bridge_print_response("bridge-group-send", response);
     }
 
-    return response.status_code >= 200 && response.status_code < 300;
+    bridge_http_response_destroy(response);
+    return ok;
 }
 
 static void bridge_command_group_send(const char *content) {
@@ -3598,25 +3888,30 @@ static bool bridge_poll_group_messages(
         snprintf(body, sizeof(body), "{\"deviceId\":\"%s\",\"limit\":%d}", s_bridge_state.device_id, limit);
     }
 
-    bridge_http_response_t response = {0};
-    esp_err_t err = bridge_http_post_json("bridge-group-poll", body, s_bridge_state.access_token, &response);
-    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-group-poll", &response)) {
-        response = (bridge_http_response_t){0};
-        err = bridge_http_post_json("bridge-group-poll", body, s_bridge_state.access_token, &response);
-    }
-    if (err != ESP_OK) {
-        printf("bridge-group-poll failed: %s\n", esp_err_to_name(err));
+    bridge_http_response_t *response = bridge_http_response_create();
+    if (!response) {
         return false;
     }
 
-    if (response.status_code >= 200 && response.status_code < 300) {
+    esp_err_t err = bridge_http_post_json("bridge-group-poll", body, s_bridge_state.access_token, response);
+    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-group-poll", response)) {
+        err = bridge_http_post_json("bridge-group-poll", body, s_bridge_state.access_token, response);
+    }
+    if (err != ESP_OK) {
+        printf("bridge-group-poll failed: %s\n", esp_err_to_name(err));
+        bridge_http_response_destroy(response);
+        return false;
+    }
+
+    bool ok = response->status_code >= 200 && response->status_code < 300;
+    if (ok) {
         char *latest_cursor = direction == BRIDGE_POLL_OLDER ? NULL : latest_cursor_message_id;
         size_t latest_cursor_size = direction == BRIDGE_POLL_OLDER ? 0 : latest_cursor_message_id_size;
         char *oldest_cursor = direction == BRIDGE_POLL_NEWER ? NULL : oldest_cursor_message_id;
         size_t oldest_cursor_size = direction == BRIDGE_POLL_NEWER ? 0 : oldest_cursor_message_id_size;
         const char *source = direction == BRIDGE_POLL_OLDER ? "history" : "poll";
         if (bridge_print_message_list(
-                &response,
+                response,
                 "group",
                 false,
                 source,
@@ -3624,6 +3919,7 @@ static bool bridge_poll_group_messages(
                 latest_cursor_size,
                 oldest_cursor,
                 oldest_cursor_size,
+                limit,
                 direction == BRIDGE_POLL_LATEST,
                 print_empty
             )) {
@@ -3631,13 +3927,14 @@ static bool bridge_poll_group_messages(
                 bridge_save_group_cursor(latest_cursor_message_id);
             }
         } else {
-            bridge_print_response("bridge-group-poll", &response);
+            bridge_print_response("bridge-group-poll", response);
         }
     } else {
-        bridge_print_response("bridge-group-poll", &response);
+        bridge_print_response("bridge-group-poll", response);
     }
 
-    return response.status_code >= 200 && response.status_code < 300;
+    bridge_http_response_destroy(response);
+    return ok;
 }
 
 static void bridge_command_group_poll(void) {
@@ -3672,26 +3969,33 @@ static bool bridge_send_dm_message(const char *recipient_user_id, const char *co
         return false;
     }
 
-    bridge_http_response_t response = {0};
-    esp_err_t err = bridge_http_post_json("bridge-dm-send", body, s_bridge_state.access_token, &response);
-    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-dm-send", &response)) {
-        response = (bridge_http_response_t){0};
-        err = bridge_http_post_json("bridge-dm-send", body, s_bridge_state.access_token, &response);
+    bridge_http_response_t *response = bridge_http_response_create();
+    if (!response) {
+        free(body);
+        return false;
+    }
+
+    esp_err_t err = bridge_http_post_json("bridge-dm-send", body, s_bridge_state.access_token, response);
+    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-dm-send", response)) {
+        err = bridge_http_post_json("bridge-dm-send", body, s_bridge_state.access_token, response);
     }
 
     free(body);
     if (err != ESP_OK) {
         printf("bridge-dm-send failed: %s\n", esp_err_to_name(err));
+        bridge_http_response_destroy(response);
         return false;
     }
 
-    if (response.status_code >= 200 && response.status_code < 300) {
-        bridge_print_sent_summary(&response, true);
+    bool ok = response->status_code >= 200 && response->status_code < 300;
+    if (ok) {
+        bridge_print_sent_summary(response, true);
     } else {
-        bridge_print_response("bridge-dm-send", &response);
+        bridge_print_response("bridge-dm-send", response);
     }
 
-    return response.status_code >= 200 && response.status_code < 300;
+    bridge_http_response_destroy(response);
+    return ok;
 }
 
 static void bridge_command_dm_send(const char *recipient_user_id, const char *content) {
@@ -3733,27 +4037,33 @@ static bool bridge_poll_dm_messages(
         return false;
     }
 
-    bridge_http_response_t response = {0};
-    esp_err_t err = bridge_http_post_json("bridge-dm-poll", body, s_bridge_state.access_token, &response);
-    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-dm-poll", &response)) {
-        response = (bridge_http_response_t){0};
-        err = bridge_http_post_json("bridge-dm-poll", body, s_bridge_state.access_token, &response);
+    bridge_http_response_t *response = bridge_http_response_create();
+    if (!response) {
+        free(body);
+        return false;
+    }
+
+    esp_err_t err = bridge_http_post_json("bridge-dm-poll", body, s_bridge_state.access_token, response);
+    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-dm-poll", response)) {
+        err = bridge_http_post_json("bridge-dm-poll", body, s_bridge_state.access_token, response);
     }
 
     free(body);
     if (err != ESP_OK) {
         printf("bridge-dm-poll failed: %s\n", esp_err_to_name(err));
+        bridge_http_response_destroy(response);
         return false;
     }
 
-    if (response.status_code >= 200 && response.status_code < 300) {
+    bool ok = response->status_code >= 200 && response->status_code < 300;
+    if (ok) {
         char *latest_cursor = direction == BRIDGE_POLL_OLDER ? NULL : latest_cursor_message_id;
         size_t latest_cursor_size = direction == BRIDGE_POLL_OLDER ? 0 : latest_cursor_message_id_size;
         char *oldest_cursor = direction == BRIDGE_POLL_NEWER ? NULL : oldest_cursor_message_id;
         size_t oldest_cursor_size = direction == BRIDGE_POLL_NEWER ? 0 : oldest_cursor_message_id_size;
         const char *source = direction == BRIDGE_POLL_OLDER ? "history" : "poll";
         if (bridge_print_message_list(
-                &response,
+                response,
                 "dm",
                 true,
                 source,
@@ -3761,6 +4071,7 @@ static bool bridge_poll_dm_messages(
                 latest_cursor_size,
                 oldest_cursor,
                 oldest_cursor_size,
+                bridge_poll_limit_for_direction(direction),
                 direction == BRIDGE_POLL_LATEST,
                 print_empty
             )) {
@@ -3768,13 +4079,14 @@ static bool bridge_poll_dm_messages(
                 bridge_save_dm_cursor(recipient_user_id, latest_cursor_message_id);
             }
         } else {
-            bridge_print_response("bridge-dm-poll", &response);
+            bridge_print_response("bridge-dm-poll", response);
         }
     } else {
-        bridge_print_response("bridge-dm-poll", &response);
+        bridge_print_response("bridge-dm-poll", response);
     }
 
-    return response.status_code >= 200 && response.status_code < 300;
+    bridge_http_response_destroy(response);
+    return ok;
 }
 
 static void bridge_command_dm_poll(const char *recipient_user_id) {
@@ -3800,26 +4112,32 @@ static void bridge_command_users_search(const char *query) {
         return;
     }
 
-    bridge_http_response_t response = {0};
-    esp_err_t err = bridge_http_post_json("bridge-user-search", body, s_bridge_state.access_token, &response);
-    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-user-search", &response)) {
-        response = (bridge_http_response_t){0};
-        err = bridge_http_post_json("bridge-user-search", body, s_bridge_state.access_token, &response);
+    bridge_http_response_t *response = bridge_http_response_create();
+    if (!response) {
+        free(body);
+        return;
+    }
+
+    esp_err_t err = bridge_http_post_json("bridge-user-search", body, s_bridge_state.access_token, response);
+    if (err == ESP_OK && bridge_refresh_and_retry_allowed("bridge-user-search", response)) {
+        err = bridge_http_post_json("bridge-user-search", body, s_bridge_state.access_token, response);
     }
 
     free(body);
     if (err != ESP_OK) {
         printf("bridge-user-search failed: %s\n", esp_err_to_name(err));
+        bridge_http_response_destroy(response);
         return;
     }
 
-    if (response.status_code >= 200 && response.status_code < 300) {
-        if (!bridge_print_user_search_list(&response)) {
-            bridge_print_response("bridge-user-search", &response);
+    if (response->status_code >= 200 && response->status_code < 300) {
+        if (!bridge_print_user_search_list(response)) {
+            bridge_print_response("bridge-user-search", response);
         }
     } else {
-        bridge_print_response("bridge-user-search", &response);
+        bridge_print_response("bridge-user-search", response);
     }
+    bridge_http_response_destroy(response);
 }
 
 static const char *bridge_prompt_for_mode(bridge_chat_mode_t chat_mode) {
