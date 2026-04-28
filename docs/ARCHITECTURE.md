@@ -61,6 +61,7 @@ Important domains:
 - DM conversations and DM messages
 - reactions and pinning helpers
 - uploads and storage policies
+- user feedback submissions and private feedback attachments
 - push subscriptions and notification preferences
 
 ### Edge Functions

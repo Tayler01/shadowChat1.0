@@ -56,8 +56,13 @@ This project already includes:
 ### Schema
 
 ```powershell
-supabase db push
+supabase db push --yes
 ```
+
+Run schema deployment before publishing frontend changes that depend on new
+tables or buckets. For example, Settings feedback submissions require
+`public.feedback_submissions` and the private `feedback-attachments` Storage
+bucket before the production UI can submit reports.
 
 ### Edge Functions
 

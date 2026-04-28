@@ -9,6 +9,7 @@ import {
   Download,
   Trash2,
   AlertTriangle,
+  MessageSquarePlus,
   Menu,
   Brain,
   KeyRound,
@@ -26,6 +27,7 @@ import { usePwaInstallPrompt } from '../../hooks/usePwaInstallPrompt'
 import { approveBridgePairing } from '../../lib/bridge'
 import { NotificationSetupModal } from './NotificationSetupModal'
 import { PhoneInstallGuide } from '../onboarding/PhoneInstallGuide'
+import { FeedbackSubmissionModal } from './FeedbackSubmissionModal'
 
 interface SettingsViewProps {
   onToggleSidebar: () => void
@@ -36,6 +38,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
   const [showDangerZone, setShowDangerZone] = useState(false)
   const [showNotificationSetup, setShowNotificationSetup] = useState(false)
   const [showPhoneInstallGuide, setShowPhoneInstallGuide] = useState(false)
+  const [showFeedbackSubmission, setShowFeedbackSubmission] = useState(false)
   const [bridgePairingCode, setBridgePairingCode] = useState('')
   const [bridgePairingLoading, setBridgePairingLoading] = useState(false)
   const [lastBridgeDeviceId, setLastBridgeDeviceId] = useState('')
@@ -438,6 +441,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
 
           <div className="glass-panel rounded-[var(--radius-lg)] p-5 sm:p-6">
             <div className="mb-4 flex items-center space-x-3">
+              <MessageSquarePlus className="h-5 w-5 text-[var(--text-muted)]" />
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                Feedback
+              </h2>
+            </div>
+
+            <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="font-medium text-[var(--text-primary)]">
+                    Report a bug or suggest a feature
+                  </h3>
+                  <p className="mt-1 text-sm text-[var(--text-muted)]">
+                    Send a short request with optional screenshots or concept images.
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setShowFeedbackSubmission(true)}
+                  variant="secondary"
+                  className="w-full justify-center sm:w-auto"
+                >
+                  <MessageSquarePlus className="mr-3 h-4 w-4" />
+                  Send Feedback
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="glass-panel rounded-[var(--radius-lg)] p-5 sm:p-6">
+            <div className="mb-4 flex items-center space-x-3">
               <Smartphone className="h-5 w-5 text-[var(--text-muted)]" />
               <h2 className="text-lg font-semibold text-[var(--text-primary)]">
                 Phone App Setup
@@ -674,6 +707,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
         onClose={() => setShowPhoneInstallGuide(false)}
         onComplete={() => setShowPhoneInstallGuide(false)}
         onInstall={handleInstallApp}
+      />
+      <FeedbackSubmissionModal
+        open={showFeedbackSubmission}
+        onClose={() => setShowFeedbackSubmission(false)}
       />
     </motion.div>
   )
