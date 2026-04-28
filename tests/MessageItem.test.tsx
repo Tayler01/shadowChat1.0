@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { MessageItem } from '../src/components/chat/MessageItem'
@@ -180,6 +180,38 @@ test('applies user color to the avatar', () => {
 
   const avatarInitial = screen.getByText('A')
   expect(avatarInitial.parentElement).toHaveStyle('background-color: #ff0000')
+})
+
+test('opens a public profile popup from the message avatar', async () => {
+  const textMessage = {
+    ...baseMessage,
+    message_type: 'text',
+    content: 'hello',
+    user: {
+      ...baseMessage.user,
+      banner_url: 'https://example.com/banner.png',
+      status_message: 'Available for field work.',
+    },
+  } as Message
+
+  render(
+    <MessageItem
+      message={textMessage}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+      onJumpToMessage={() => {}}
+      containerRef={React.createRef()}
+    />
+  )
+
+  await act(async () => {
+    await userEvent.click(screen.getByRole('button', { name: /open alice's profile/i }))
+  })
+
+  expect(screen.getByRole('dialog', { name: /alice/i })).toBeInTheDocument()
+  expect(screen.getByText('Available for field work.')).toBeInTheDocument()
 })
 
 test('shows tone indicator emoji', () => {

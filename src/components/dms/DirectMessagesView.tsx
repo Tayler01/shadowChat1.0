@@ -17,13 +17,14 @@ import { MobileChatFooter } from '../layout/MobileChatFooter'
 import { FailedMessageItem } from '../chat/FailedMessageItem'
 import { FileAttachment } from '../chat/FileAttachment'
 import { MessageRichText } from '../chat/MessageRichText'
+import { PublicProfileDialog } from '../profile/PublicProfileDialog'
 import { useFailedMessages } from '../../hooks/useFailedMessages'
 import { formatTime, shouldGroupMessage, getReadableTextColor } from '../../lib/utils'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { useTyping } from '../../hooks/useTyping'
 import toast from 'react-hot-toast'
-import type { BasicUser } from '../../lib/supabase'
+import type { BasicUser, User } from '../../lib/supabase'
 
 interface DirectMessagesViewProps {
   onToggleSidebar: () => void
@@ -70,6 +71,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const initialTargetJumpDoneRef = useRef<string | null>(null)
   const [autoScroll, setAutoScroll] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [profileUser, setProfileUser] = useState<User | null>(null)
   const [unreadJumpToken, setUnreadJumpToken] = useState(0)
   const [firstUnreadDMMessageId, setFirstUnreadDMMessageId] = useState<string | null>(null)
   const { typingUsers } = useTyping(currentConversation ? `dm-${currentConversation}` : 'none')
@@ -552,12 +554,29 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                       }`}
                     >
                       {!isGrouped && !isOwn && (
-                        <Avatar
-                          src={message.sender?.avatar_url}
-                          alt={message.sender?.display_name || 'Unknown User'}
-                          size="sm"
-                          color={message.sender?.color}
-                        />
+                        message.sender ? (
+                          <button
+                            type="button"
+                            onClick={() => setProfileUser(message.sender ?? null)}
+                            className="rounded-full focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.32)]"
+                            aria-label={`Open ${message.sender.display_name || message.sender.username}'s profile`}
+                            aria-haspopup="dialog"
+                          >
+                            <Avatar
+                              src={message.sender?.avatar_url}
+                              alt={message.sender?.display_name || 'Unknown User'}
+                              size="sm"
+                              color={message.sender?.color}
+                              status={message.sender?.status}
+                              showStatus
+                            />
+                          </button>
+                        ) : (
+                          <Avatar
+                            alt="Unknown User"
+                            size="sm"
+                          />
+                        )
                       )}
 
                       <div
@@ -684,6 +703,11 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
           </div>
         )}
       </div>
+      <PublicProfileDialog
+        user={profileUser}
+        open={Boolean(profileUser)}
+        onClose={() => setProfileUser(null)}
+      />
     </div>
   )
 }

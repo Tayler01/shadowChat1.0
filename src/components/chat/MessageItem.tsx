@@ -16,8 +16,9 @@ import { ImageModal } from '../ui/ImageModal'
 import { Button } from '../ui/Button'
 import { FileAttachment } from './FileAttachment'
 import { MessageRichText } from './MessageRichText'
+import { PublicProfileDialog } from '../profile/PublicProfileDialog'
 import { formatTime, shouldGroupMessage, cn, getReadableTextColor } from '../../lib/utils'
-import type { Message } from '../../lib/supabase'
+import type { Message, User } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
 import type { EmojiClickData } from '../../types'
@@ -67,6 +68,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const actionsRef = useRef<HTMLDivElement>(null)
     const menuRef = useRef<HTMLDivElement>(null)
     const [showQuickReactions, setShowQuickReactions] = useState(false)
+    const [profileUser, setProfileUser] = useState<User | null>(null)
     const reactionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const analyzeTone = useToneAnalysis()
     const { enabled: toneEnabled } = useToneAnalysisEnabled()
@@ -218,14 +220,30 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         {/* Avatar */}
         <div className="flex-shrink-0 w-10">
           {!isGrouped && (
-            <Avatar
-              src={avatarSrc}
-              alt={message.user?.display_name || 'Unknown User'}
-              size="md"
-              color={message.user?.color}
-              status={message.user?.status}
-              showStatus
-            />
+            message.user ? (
+              <button
+                type="button"
+                onClick={() => setProfileUser(message.user ?? null)}
+                className="rounded-full focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.32)]"
+                aria-label={`Open ${message.user.display_name || message.user.username}'s profile`}
+                aria-haspopup="dialog"
+              >
+                <Avatar
+                  src={avatarSrc}
+                  alt={message.user?.display_name || 'Unknown User'}
+                  size="md"
+                  color={message.user?.color}
+                  status={message.user?.status}
+                  showStatus
+                />
+              </button>
+            ) : (
+              <Avatar
+                src={avatarSrc}
+                alt="Unknown User"
+                size="md"
+              />
+            )
           )}
         </div>
 
@@ -510,6 +528,11 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
           src={message.file_url || ''}
           alt="uploaded image"
           onClose={() => setShowImageModal(false)}
+        />
+        <PublicProfileDialog
+          user={profileUser}
+          open={Boolean(profileUser)}
+          onClose={() => setProfileUser(null)}
         />
       </>
     )
