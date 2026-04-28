@@ -16,6 +16,7 @@ import { MessageInput } from '../chat/MessageInput'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import { FailedMessageItem } from '../chat/FailedMessageItem'
 import { FileAttachment } from '../chat/FileAttachment'
+import { MessageRichText } from '../chat/MessageRichText'
 import { useFailedMessages } from '../../hooks/useFailedMessages'
 import { formatTime, shouldGroupMessage, getReadableTextColor } from '../../lib/utils'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
@@ -580,7 +581,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                         ) : message.message_type === 'file' && message.file_url ? (
                           <FileAttachment url={message.file_url} meta={message.content} />
                         ) : (
-                          <p className="break-words text-sm">{message.content}</p>
+                          <MessageRichText content={message.content} className="text-sm" />
                         )}
                         <p className={`mt-1 text-xs ${isOwn ? 'text-[var(--text-gold)]/85' : 'text-[var(--text-muted)]'}`}>
                           {formatTime(message.created_at)}

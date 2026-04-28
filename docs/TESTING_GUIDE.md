@@ -43,6 +43,7 @@ Do browser validation when changing:
 - realtime subscriptions
 - DM unread behavior
 - message sending
+- clickable links or link previews
 - uploads
 - auth/session recovery
 - mobile navigation or composer layout
@@ -154,6 +155,8 @@ Current smoke scenarios:
 - `profile-visual`: captures the desktop profile screen for visual review
 - `mobile-dm-back`: validates the mobile DM thread back flow
 - `mobile-settings-visual`: checks the mobile settings layout and notification toggle geometry
+
+For link preview changes, verify a local preview build with a signed-in account and send a message containing a public `https://` URL. The message should keep the link clickable immediately, then load one preview card without rerendering the whole chat thread. Test at least one generic Open Graph link and one `x.com`/`twitter.com` link because X metadata can arrive through the oEmbed fallback.
 
 Disposable accounts are the most deterministic option. Reused env-backed accounts can carry old threads and unread state from earlier runs.
 

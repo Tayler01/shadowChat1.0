@@ -15,6 +15,7 @@ import { Avatar } from '../ui/Avatar'
 import { ImageModal } from '../ui/ImageModal'
 import { Button } from '../ui/Button'
 import { FileAttachment } from './FileAttachment'
+import { MessageRichText } from './MessageRichText'
 import { formatTime, shouldGroupMessage, cn, getReadableTextColor } from '../../lib/utils'
 import type { Message } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -313,14 +314,16 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   ) : message.message_type === 'file' && message.file_url ? (
                     <FileAttachment url={message.file_url} meta={message.content} />
                   ) : (
-                    <span className={cn(isAIMessage && 'font-medium')}>
-                      {message.content}
+                    <div className={cn(isAIMessage && 'font-medium')}>
+                      <MessageRichText
+                        content={message.content}
+                      />
                       {toneEnabled && (
                         <span data-testid="tone-indicator" className="ml-1">
                           {getToneEmoji(tone)}
                         </span>
                       )}
-                    </span>
+                    </div>
                   )}
                 </div>
                 {/* Actions */}

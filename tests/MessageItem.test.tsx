@@ -15,6 +15,11 @@ jest.mock('../src/hooks/useAuth', () => ({
 }))
 
 jest.mock('../src/hooks/useToneAnalysisEnabled')
+jest.mock('../src/lib/linkPreview', () => ({
+  tokenizeMessageText: jest.requireActual('../src/lib/linkPreview').tokenizeMessageText,
+  extractFirstMessageUrl: jest.requireActual('../src/lib/linkPreview').extractFirstMessageUrl,
+  fetchLinkPreview: jest.fn(() => Promise.resolve(null)),
+}))
 
 const mockedToneEnabled = useToneAnalysisEnabled as jest.MockedFunction<typeof useToneAnalysisEnabled>
 
@@ -221,6 +226,31 @@ test('hides tone indicator when disabled', () => {
   )
 
   expect(screen.queryByTestId('tone-indicator')).toBeNull()
+})
+
+test('renders message links as clickable anchors', () => {
+  mockedToneEnabled.mockReturnValue({ enabled: false, setEnabled: jest.fn() })
+  const textMessage = {
+    ...baseMessage,
+    message_type: 'text',
+    content: 'check https://x.com/shadow/status/123',
+  } as Message
+
+  render(
+    <MessageItem
+      message={textMessage}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+      onJumpToMessage={() => {}}
+      containerRef={React.createRef()}
+    />
+  )
+
+  const link = screen.getByRole('link', { name: 'https://x.com/shadow/status/123' })
+  expect(link).toHaveAttribute('href', 'https://x.com/shadow/status/123')
+  expect(link).toHaveAttribute('target', '_blank')
 })
 
 test('clicking reply preview triggers jump callback', async () => {

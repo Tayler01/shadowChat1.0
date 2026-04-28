@@ -76,6 +76,7 @@ supabase functions deploy bridge-group-send --no-verify-jwt
 supabase functions deploy bridge-group-poll --no-verify-jwt
 supabase functions deploy bridge-dm-send --no-verify-jwt
 supabase functions deploy bridge-dm-poll --no-verify-jwt
+supabase functions deploy link-preview --no-verify-jwt
 ```
 
 The bridge functions keep JWT verification disabled at the Supabase function gateway because the firmware bootstrap calls do not carry a browser user token. User-sensitive bridge operations validate the caller's Supabase session inside the function, while device-sensitive operations validate pairing codes or bridge control-plane tokens.
@@ -100,6 +101,8 @@ The `@ai` group-chat flow posts answers as the dedicated `Shado` assistant profi
 
 Bridge TUI `@ai` support uses the same AI secrets through `bridge-group-send`, so deploy both `openai-chat` and `bridge-group-send` after changing shared AI code.
 
+Chat link previews use the `link-preview` Edge Function. Deploy it with `--no-verify-jwt`; the function validates the signed-in user's bearer token in code before fetching remote metadata.
+
 ## Frontend Env Requirements
 
 Netlify needs the frontend equivalents of:
@@ -121,6 +124,7 @@ After deploy, verify:
 5. Realtime DM works
 6. Resume-send works after a background/foreground cycle
 7. Settings page renders cleanly on mobile and desktop
+8. A message containing an `https://` or `www.` link renders as a clickable link and loads a compact preview card
 
 Recommended production smoke for local post-deploy validation:
 
