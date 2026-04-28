@@ -20,30 +20,30 @@ const MESSAGE_SELECT = `
   id,
   user_id,
   content,
-  message_type,
-  edited_at,
-  pinned,
-  pinned_by,
-  pinned_at,
-  reply_to,
-  reactions,
   created_at,
-  updated_at,
-  audio_url,
-  audio_duration,
-  file_url,
   user:users!user_id(
-    id,
-    username,
     display_name,
     full_name,
-    avatar_url,
-    color,
-    chat_color,
-    status,
-    status_message
+    username
   )
 `
+
+const getProfileLabel = (profile: any, fallbackId: string) =>
+  profile?.display_name || profile?.full_name || profile?.username || fallbackId
+
+const toBridgeMessage = (message: any) => {
+  const senderLabel = getProfileLabel(message.user, message.user_id)
+  return {
+    id: message.id,
+    user_id: message.user_id,
+    content: message.content,
+    created_at: message.created_at,
+    senderLabel,
+    user: {
+      display_name: senderLabel,
+    },
+  }
+}
 
 serve(async req => {
   if (req.method === 'OPTIONS') {
@@ -58,7 +58,7 @@ serve(async req => {
     const body = await readJson<BridgeGroupPollPayload>(req)
     const deviceId = normalizeText(body?.deviceId)
     const accessToken = normalizeText(req.headers.get('X-Bridge-Access-Token'))
-    const limit = Math.min(Math.max(Number(body?.limit ?? 10) || 10, 1), 50)
+    const limit = Math.min(Math.max(Number(body?.limit ?? 10) || 10, 1), 10)
     let since = normalizeText(body?.since)
     const sinceMessageId = normalizeText(body?.sinceMessageId)
 
@@ -105,10 +105,12 @@ serve(async req => {
       throw error
     }
 
+    const orderedMessages = since ? (data ?? []) : [...(data ?? [])].reverse()
+
     return json({
       ok: true,
       deviceId,
-      messages: since ? (data ?? []) : [...(data ?? [])].reverse(),
+      messages: orderedMessages.map(toBridgeMessage),
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'

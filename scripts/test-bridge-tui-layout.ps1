@@ -84,6 +84,8 @@ Assert-Equal (Get-MessageTopPadding 5 12 3) 0 "Scrolled message history should n
 $script:bridgeHealth.wifi = "yes"
 Assert-True ((Get-HealthLabel) -match "data link: established") "Health label should use data-link wording."
 Assert-True ((Get-HealthLabel) -notmatch "wifi|wi-fi") "Health label should not expose transport wording."
+Assert-True ((Get-VersionLabel) -match "v0\.1\.20-fragment-filter 2026-04-28") "Header version label should expose the running TUI bundle version."
+Assert-True (((Get-SidebarLines) -join "`n") -match "tools 0\.1\.20-fragment-filter") "Sidebar should expose the running TUI bundle version."
 $sidebar = Get-SidebarLines
 Assert-True (($sidebar -join "`n") -match "link\s+established") "Sidebar should show a data-link state."
 Assert-True (($sidebar -join "`n") -notmatch "wifi|wi-fi") "Sidebar should not expose transport wording."
@@ -99,6 +101,20 @@ Assert-True $script:realtimeBackfillPending "Malformed protocol frames should qu
 Assert-True (($script:liveFeed -join "`n") -notmatch "Protocol parse error") "Malformed protocol frames should not expose raw parser errors in the TUI."
 $script:realtimeBackfillPending = $false
 $script:liveFeed.Clear()
+
+Write-BridgeLine 'E (2412469) transport_ws: Error read data'
+Assert-Equal $script:liveFeed.Count 0 "Low-level realtime transport noise should not render in the live feed."
+Assert-Equal $script:realtimeNoiseSkipCount 1 "Suppressed realtime transport noise should be counted."
+Assert-True $script:realtimeBackfillPending "Low-level realtime transport noise should queue fallback polling."
+$script:realtimeBackfillPending = $false
+
+Write-BridgeLine 'I (5658) wifi:new:<1,0>, old:<1,0>'
+Assert-Equal $script:liveFeed.Count 0 "Low-level link driver logs should not render in the live feed."
+Assert-Equal $script:realtimeNoiseSkipCount 2 "Suppressed link driver logs should be counted."
+
+Write-BridgeLine ',"createdAt":"2026-04-28T01:01:16.003518+00:00","senderId":"fixture"'
+Assert-Equal $script:liveFeed.Count 0 "Orphaned structured JSON fragments should not render in the live feed."
+Assert-Equal $script:realtimeNoiseSkipCount 3 "Suppressed structured JSON fragments should be counted."
 
 Try-HandleProtocolLine '@scb:{"type":"message","thread":"dm","source":"realtime","conversationId":"conv-inactive","id":"fixture-dm-1","createdAt":"2026-04-24T23:00:00Z","senderId":"user-1","senderLabel":"Caleb","content":"inactive dm"}' | Out-Null
 Assert-Equal $script:messages.Count 0 "Inactive DM should not render in group pane."
@@ -117,6 +133,16 @@ Assert-Equal $script:unreadDmCount 1 "Realtime DM from another conversation shou
 
 Try-HandleProtocolLine '@scb:{"type":"message","thread":"dm","source":"realtime","conversationId":"conv-active","id":"fixture-dm-4","createdAt":"2026-04-24T23:00:03Z","senderId":"user-1","senderLabel":"Caleb","content":"active realtime dm"}' | Out-Null
 Assert-Equal $script:messages.Count 2 "Realtime DM for the active conversation should render in active DM pane."
+
+$script:currentMode = "group"
+$script:messages.Clear()
+$script:seenMessageIds.Clear()
+Try-HandleProtocolLine '@scb:{"type":"message","thread":"group","source":"poll","id":"fixture-group-old","createdAt":"2026-04-24T23:00:04Z","senderId":"user-1","senderLabel":"Caleb","content":"old visible row"}' | Out-Null
+Assert-Equal $script:messages.Count 1 "Fixture group message should render before latest refresh reset."
+Try-HandleProtocolLine '@scb:{"type":"messagesReset","thread":"group"}' | Out-Null
+Assert-Equal $script:messages.Count 0 "Latest group refresh should replace the visible thread instead of appending random slices."
+Try-HandleProtocolLine '@scb:{"type":"message","thread":"group","source":"poll","id":"fixture-group-new","createdAt":"2026-04-24T23:00:05Z","senderId":"user-2","senderLabel":"Ron","content":"new latest row"}' | Out-Null
+Assert-Equal $script:messages.Count 1 "Latest group refresh should render the replacement message window."
 
 $script:messageScrollOffset = 0
 Move-MessageScroll 8

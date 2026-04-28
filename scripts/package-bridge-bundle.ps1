@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = "0.1.14-ai-backfill-layout",
+    [string]$Version = "0.1.20-fragment-filter",
     [string]$OutputDirectory = "output/bridge-bundles"
 )
 

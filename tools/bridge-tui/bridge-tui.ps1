@@ -25,6 +25,8 @@ $ErrorActionPreference = "Stop"
 $script:utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding = $script:utf8NoBom
 $OutputEncoding = $script:utf8NoBom
+$script:tuiVersion = "0.1.20-fragment-filter"
+$script:tuiVersionDate = "2026-04-28"
 
 function Get-DefaultPreferencesPath {
     $root = if ($env:LOCALAPPDATA) {
@@ -258,6 +260,7 @@ $script:lastSentAt = $null
 $script:postSendBackfillUntil = [DateTime]::MinValue
 $script:postSendBackfillNextAt = [DateTime]::MinValue
 $script:protocolFrameSkipCount = 0
+$script:realtimeNoiseSkipCount = 0
 $script:unreadGroupCount = 0
 $script:unreadDmCount = 0
 $script:activeDmConversationId = ""
@@ -305,8 +308,10 @@ function Write-Ui {
     )
 
     $previous = [Console]::ForegroundColor
+    $previousBackground = [Console]::BackgroundColor
     if (Use-Color) {
         [Console]::ForegroundColor = $Color
+        [Console]::BackgroundColor = [ConsoleColor]::Black
     }
 
     if ($NoNewline) {
@@ -317,6 +322,7 @@ function Write-Ui {
 
     if (Use-Color) {
         [Console]::ForegroundColor = $previous
+        [Console]::BackgroundColor = $previousBackground
     }
 }
 
@@ -459,6 +465,10 @@ function Test-SuppressLiveFeedLine {
     param([string]$Line)
 
     if ($Line -match "^[IWDVE] \(\d+\) (esp-x509-crt-bundle|websocket_client|HTTP_CLIENT|wifi|esp_netif|phy_init|event):") {
+        return $true
+    }
+
+    if (Test-NoisyRealtimeLine $Line) {
         return $true
     }
 
@@ -1065,7 +1075,7 @@ function Try-HandleProtocolLine {
         $event = $payload | ConvertFrom-Json
     } catch {
         $script:protocolFrameSkipCount += 1
-        Queue-RealtimeBackfill "Protocol frame skipped; fallback polling is active."
+        Queue-RealtimeBackfill
         Request-Render
         return $true
     }
@@ -1084,6 +1094,28 @@ function Try-HandleProtocolLine {
             $script:bridgeHealth.serial = "protocol"
             Add-LiveFeedLine "mode: $mode"
         }
+        Request-Render
+        return $true
+    }
+
+    if ($type -eq "messagesReset") {
+        $thread = Get-ProtocolString $event "thread" "message"
+        $conversationId = Get-ProtocolString $event "conversationId"
+        $shouldReset = $false
+        if ($thread -eq "group" -and $script:currentMode -eq "group") {
+            $shouldReset = $true
+        } elseif ($thread -eq "dm" -and $script:currentMode -eq "dm") {
+            $shouldReset = [string]::IsNullOrWhiteSpace($conversationId) -or
+                [string]::IsNullOrWhiteSpace($script:activeDmConversationId) -or
+                $conversationId -eq $script:activeDmConversationId
+        }
+
+        if ($shouldReset) {
+            Clear-MessagePane
+            $script:pollMarkerPending = $true
+            $script:lastRxAt = [DateTime]::UtcNow
+        }
+
         Request-Render
         return $true
     }
@@ -1132,6 +1164,28 @@ function Try-HandleProtocolLine {
     }
 
     return $true
+}
+
+function Test-NoisyRealtimeLine {
+    param([string]$Line)
+
+    if ([string]::IsNullOrWhiteSpace($Line)) {
+        return $false
+    }
+
+    return (
+        $Line -match "^\s*[EW]\s+\(\d+\)\s+transport_ws:" -or
+        $Line -match "^\s*[EW]\s+\(\d+\)\s+esp-tls:" -or
+        $Line -match "^\s*[EW]\s+\(\d+\)\s+TRANSPORT_BASE:" -or
+        $Line -match "^\s*[EW]\s+\(\d+\)\s+WEBSOCKET_CLIENT:" -or
+        $Line -match "^\s*[DIW]\s+\(\d+\)\s+wifi:" -or
+        $Line -match "^\s*[DIW]\s+\(\d+\)\s+esp_netif_handlers:" -or
+        $Line -match "^\s*[DIW]\s+\(\d+\)\s+tinyusb_msc_storage:" -or
+        $Line -match '^\s*,?"(?:type|thread|source|id|createdAt|senderId|senderLabel|content|conversationId)":' -or
+        $Line -match '^\s*"?[A-Fa-f0-9]{8,}","deviceId":"' -or
+        $Line -match '^\s*\{?"deviceId":"[A-Fa-f0-9-]+"' -or
+        $Line -match '^\s*"deviceId":"[A-Fa-f0-9-]+"'
+    )
 }
 
 function Request-Render {
@@ -1206,6 +1260,10 @@ function Get-HealthLabel {
     return "data link: $dataLink | device: $device | session: $session | auth: $auth | rt: $($script:bridgeHealth.realtime)"
 }
 
+function Get-VersionLabel {
+    return "v$script:tuiVersion $script:tuiVersionDate"
+}
+
 function Get-LiveTransportLabel {
     if ($script:realtimeConnected) {
         return "live: realtime"
@@ -1237,6 +1295,8 @@ function Get-SidebarLines {
 
     return @(
         "SHADOWCHAT BRIDGE",
+        "tools $script:tuiVersion",
+        "date  $script:tuiVersionDate",
         "",
         "mode  $(Get-ModeLabel)",
         "unrd  $(Get-UnreadSidebarLabel)",
@@ -1361,7 +1421,7 @@ function Render-Layout {
     $scrollLabel = if ($script:messageScrollOffset -gt 0) { " | scroll: +$script:messageScrollOffset" } else { "" }
 
     [Console]::SetCursorPosition(0, 0)
-    Write-Ui (Fit-Text "ShadowChat Bridge TUI | $Port @ $BaudRate | $(Get-ModeLabel) | $pollLabel | $rxLabel$(Get-UnreadSummaryLabel)$scrollLabel | $(Get-HealthLabel)" $width) ([ConsoleColor]::Yellow)
+    Write-Ui (Fit-Text "ShadowChat Bridge TUI $(Get-VersionLabel) | $Port @ $BaudRate | $(Get-ModeLabel) | $pollLabel | $rxLabel$(Get-UnreadSummaryLabel)$scrollLabel | $(Get-HealthLabel)" $width) ([ConsoleColor]::Yellow)
     Write-Ui $divider ([ConsoleColor]::DarkGray)
 
     for ($i = 0; $i -lt $bodyHeight; $i++) {
@@ -1417,6 +1477,13 @@ function Write-BridgeLine {
     }
 
     if (Try-HandleProtocolLine $clean) {
+        return
+    }
+
+    if (Test-NoisyRealtimeLine $clean) {
+        $script:realtimeNoiseSkipCount += 1
+        Queue-RealtimeBackfill
+        Request-Render
         return
     }
 
@@ -1875,8 +1942,8 @@ function Connect-Serial {
     $portInstance.NewLine = "`n"
     $portInstance.ReadTimeout = 50
     $portInstance.WriteTimeout = 10000
-    $portInstance.DtrEnable = $false
-    $portInstance.RtsEnable = $false
+    $portInstance.DtrEnable = $true
+    $portInstance.RtsEnable = $true
     $portInstance.Open()
     try {
         $portInstance.DiscardInBuffer()
@@ -1902,7 +1969,13 @@ function Wait-BridgeOutput {
 function Assert-SmokeTranscriptHealthy {
     param([string]$Transcript)
 
-    if ($Transcript -notmatch "Bridge status" -or $Transcript -notmatch "data_link: established") {
+    $hasTextStatus = $Transcript -match "Bridge status" -and $Transcript -match "data_link: established"
+    $hasProtocolStatus = (Get-DataLinkLabel $script:bridgeHealth.wifi) -eq "established" -and
+        $script:bridgeHealth.device -eq "paired" -and
+        $script:bridgeHealth.session -eq "ok" -and
+        $script:bridgeHealth.auth -eq "ok"
+
+    if (-not ($hasTextStatus -or $hasProtocolStatus)) {
         throw "Smoke check did not observe bridge status with the data link established."
     }
 

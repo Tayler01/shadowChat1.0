@@ -20,6 +20,7 @@
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "nvs.h"
 #include "nvs_flash.h"
@@ -113,6 +114,7 @@ static char s_realtime_rx_buffer[BRIDGE_REALTIME_RX_BUFFER_SIZE];
 static size_t s_realtime_rx_length;
 static bridge_profile_cache_entry_t s_profile_cache[BRIDGE_PROFILE_CACHE_SIZE];
 static size_t s_profile_cache_next_index;
+static SemaphoreHandle_t s_protocol_output_mutex;
 
 static bool bridge_ensure_wifi_connected(const char *action);
 static bool bridge_command_update_check_target(const char *target, bool compact_output);
@@ -122,6 +124,14 @@ static void bridge_clear_recovery_token(void);
 static const char *BRIDGE_CURSOR_GROUP_MESSAGE_ID_KEY = "cur_group_id";
 static const char *BRIDGE_CURSOR_DM_RECIPIENT_KEY = "cur_dm_rec";
 static const char *BRIDGE_CURSOR_DM_MESSAGE_ID_KEY = "cur_dm_id";
+
+static void bridge_configure_log_output(void) {
+    esp_log_level_set("esp-x509-crt-bundle", ESP_LOG_NONE);
+    esp_log_level_set("transport_ws", ESP_LOG_NONE);
+    esp_log_level_set("WEBSOCKET_CLIENT", ESP_LOG_NONE);
+    esp_log_level_set("TRANSPORT_BASE", ESP_LOG_NONE);
+    esp_log_level_set("esp-tls", ESP_LOG_NONE);
+}
 
 static void bridge_protocol_emit(cJSON *event) {
     if (!s_protocol_enabled || !event) {
@@ -133,8 +143,14 @@ static void bridge_protocol_emit(cJSON *event) {
         return;
     }
 
+    if (s_protocol_output_mutex) {
+        xSemaphoreTake(s_protocol_output_mutex, portMAX_DELAY);
+    }
     printf("@scb:%s\n", line);
     fflush(stdout);
+    if (s_protocol_output_mutex) {
+        xSemaphoreGive(s_protocol_output_mutex);
+    }
     free(line);
 }
 
@@ -148,8 +164,14 @@ static void bridge_protocol_emit_forced(cJSON *event) {
         return;
     }
 
+    if (s_protocol_output_mutex) {
+        xSemaphoreTake(s_protocol_output_mutex, portMAX_DELAY);
+    }
     printf("@scb:%s\n", line);
     fflush(stdout);
+    if (s_protocol_output_mutex) {
+        xSemaphoreGive(s_protocol_output_mutex);
+    }
     free(line);
 }
 
@@ -252,6 +274,22 @@ static void bridge_protocol_emit_message(
     cJSON_AddStringToObject(event, "senderId", sender_id ? sender_id : "");
     cJSON_AddStringToObject(event, "senderLabel", sender_label ? sender_label : "");
     cJSON_AddStringToObject(event, "content", content ? content : "");
+    if (conversation_id && conversation_id[0] != '\0') {
+        cJSON_AddStringToObject(event, "conversationId", conversation_id);
+    }
+
+    bridge_protocol_emit(event);
+    cJSON_Delete(event);
+}
+
+static void bridge_protocol_emit_messages_reset(const char *thread, const char *conversation_id) {
+    cJSON *event = cJSON_CreateObject();
+    if (!event) {
+        return;
+    }
+
+    cJSON_AddStringToObject(event, "type", "messagesReset");
+    cJSON_AddStringToObject(event, "thread", thread ? thread : "unknown");
     if (conversation_id && conversation_id[0] != '\0') {
         cJSON_AddStringToObject(event, "conversationId", conversation_id);
     }
@@ -1160,6 +1198,7 @@ static bool bridge_print_message_list(
     bool dm_messages,
     char *cursor_message_id,
     size_t cursor_message_id_size,
+    bool replace_existing,
     bool print_empty
 ) {
     cJSON *json = bridge_parse_json_body(response);
@@ -1175,11 +1214,24 @@ static bool bridge_print_message_list(
 
     int count = cJSON_GetArraySize(messages);
     if (count == 0) {
+        if (s_protocol_enabled && replace_existing) {
+            bridge_protocol_emit_messages_reset(thread, "");
+        }
         if (print_empty) {
             printf("(no messages)\n");
         }
         cJSON_Delete(json);
         return true;
+    }
+
+    const char *reset_conversation_id = "";
+    if (dm_messages) {
+        cJSON *first_message = cJSON_GetArrayItem(messages, 0);
+        reset_conversation_id = bridge_json_string_or_empty(first_message, "conversation_id");
+    }
+
+    if (s_protocol_enabled && replace_existing) {
+        bridge_protocol_emit_messages_reset(thread, reset_conversation_id);
     }
 
     cJSON *message = NULL;
@@ -3473,17 +3525,19 @@ static bool bridge_poll_group_messages(
         return false;
     }
 
+    int limit = new_only ? 10 : 10;
     char body[192];
     if (new_only && cursor_message_id && cursor_message_id[0] != '\0') {
         snprintf(
             body,
             sizeof(body),
-            "{\"deviceId\":\"%s\",\"limit\":10,\"sinceMessageId\":\"%s\"}",
+            "{\"deviceId\":\"%s\",\"limit\":%d,\"sinceMessageId\":\"%s\"}",
             s_bridge_state.device_id,
+            limit,
             cursor_message_id
         );
     } else {
-        snprintf(body, sizeof(body), "{\"deviceId\":\"%s\",\"limit\":10}", s_bridge_state.device_id);
+        snprintf(body, sizeof(body), "{\"deviceId\":\"%s\",\"limit\":%d}", s_bridge_state.device_id, limit);
     }
 
     bridge_http_response_t response = {0};
@@ -3498,7 +3552,7 @@ static bool bridge_poll_group_messages(
     }
 
     if (response.status_code >= 200 && response.status_code < 300) {
-        if (bridge_print_message_list(&response, "group", false, cursor_message_id, cursor_message_id_size, print_empty)) {
+        if (bridge_print_message_list(&response, "group", false, cursor_message_id, cursor_message_id_size, !new_only, print_empty)) {
             if (cursor_message_id && cursor_message_id_size > 0) {
                 bridge_save_group_cursor(cursor_message_id);
             }
@@ -3615,7 +3669,7 @@ static bool bridge_poll_dm_messages(
     }
 
     if (response.status_code >= 200 && response.status_code < 300) {
-        if (bridge_print_message_list(&response, "dm", true, cursor_message_id, cursor_message_id_size, print_empty)) {
+        if (bridge_print_message_list(&response, "dm", true, cursor_message_id, cursor_message_id_size, !new_only, print_empty)) {
             if (cursor_message_id && cursor_message_id_size > 0) {
                 bridge_save_dm_cursor(recipient_user_id, cursor_message_id);
             }
@@ -3780,9 +3834,9 @@ static bool bridge_handle_chat_line(
             );
         } else if (strcmp(line, "/poll") == 0) {
             if (*chat_mode == BRIDGE_CHAT_MODE_GROUP) {
-                bridge_poll_group_messages(true, true, group_cursor_message_id, group_cursor_message_id_size, false);
+                bridge_poll_group_messages(true, false, group_cursor_message_id, group_cursor_message_id_size, false);
             } else if (*chat_mode == BRIDGE_CHAT_MODE_DM) {
-                bridge_poll_dm_messages(recipient_user_id, true, true, dm_cursor_message_id, dm_cursor_message_id_size, false);
+                bridge_poll_dm_messages(recipient_user_id, true, false, dm_cursor_message_id, dm_cursor_message_id_size, false);
             }
         } else if (strcmp(line, "/status") == 0) {
             bridge_command_status();
@@ -4028,6 +4082,8 @@ static void bridge_shell_task(void *arg) {
 }
 
 void app_main(void) {
+    bridge_configure_log_output();
+
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -4036,6 +4092,7 @@ void app_main(void) {
     ESP_ERROR_CHECK(err);
 
     memset(&s_bridge_state, 0, sizeof(s_bridge_state));
+    s_protocol_output_mutex = xSemaphoreCreateMutex();
     bridge_load_persisted_state();
     bridge_derive_device_serial();
 

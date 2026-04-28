@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import {
   badRequest,
   corsHeaders,
-  createBridgeSessionMaterial,
+  generateOpaqueToken,
   getFutureIso,
   getSupabaseAdmin,
   hashToken,
@@ -109,7 +109,8 @@ serve(async req => {
 
     const timestamp = new Date().toISOString()
     const expiresAt = getFutureIso(60)
-    const nextSessionMaterial = await createBridgeSessionMaterial()
+    const nextAccessToken = generateOpaqueToken('bacc')
+    const nextAccessTokenHash = await hashToken(nextAccessToken)
 
     const { data: bridgeProfile, error: bridgeProfileError } = await supabase
       .from('users')
@@ -135,10 +136,8 @@ serve(async req => {
       .update({
         status: 'active',
         last_refresh_at: timestamp,
-        last_rotated_at: timestamp,
         expires_at: expiresAt,
-        access_token_hash: nextSessionMaterial.accessTokenHash,
-        refresh_token_hash: nextSessionMaterial.refreshTokenHash,
+        access_token_hash: nextAccessTokenHash,
       })
       .eq('id', session.id)
 
@@ -157,14 +156,15 @@ serve(async req => {
           pairing_id: pairing.id,
           bridge_user_id: session.user_id,
           control_plane_only: true,
+          stable_refresh_token: true,
         },
       })
 
     return json({
       deviceId,
       bridgeSessionId: session.id,
-      accessToken: nextSessionMaterial.accessToken,
-      refreshToken: nextSessionMaterial.refreshToken,
+      accessToken: nextAccessToken,
+      refreshToken,
       expiresAt,
       supabaseAuth,
       sessionMetadata: {

@@ -25,26 +25,31 @@ const DM_MESSAGE_SELECT = `
   conversation_id,
   sender_id,
   content,
-  read_at,
-  reactions,
-  edited_at,
   created_at,
-  message_type,
-  audio_url,
-  audio_duration,
-  file_url,
   sender:users!sender_id(
-    id,
-    username,
     display_name,
     full_name,
-    avatar_url,
-    color,
-    chat_color,
-    status,
-    status_message
+    username
   )
 `
+
+const getProfileLabel = (profile: any, fallbackId: string) =>
+  profile?.display_name || profile?.full_name || profile?.username || fallbackId
+
+const toBridgeMessage = (message: any) => {
+  const senderLabel = getProfileLabel(message.sender, message.sender_id)
+  return {
+    id: message.id,
+    conversation_id: message.conversation_id,
+    sender_id: message.sender_id,
+    content: message.content,
+    created_at: message.created_at,
+    senderLabel,
+    sender: {
+      display_name: senderLabel,
+    },
+  }
+}
 
 serve(async req => {
   if (req.method === 'OPTIONS') {
@@ -61,7 +66,7 @@ serve(async req => {
     const recipientUserReference = normalizeText(body?.recipientUserId)
     let conversationId = normalizeText(body?.conversationId)
     const accessToken = normalizeText(req.headers.get('X-Bridge-Access-Token'))
-    const limit = Math.min(Math.max(Number(body?.limit ?? 10) || 10, 1), 50)
+    const limit = Math.min(Math.max(Number(body?.limit ?? 10) || 10, 1), 10)
     let since = normalizeText(body?.since)
     const sinceMessageId = normalizeText(body?.sinceMessageId)
     const markRead = body?.markRead !== false
@@ -179,13 +184,15 @@ serve(async req => {
       markedReadCount = Number(count ?? 0)
     }
 
+    const orderedMessages = since ? (data ?? []) : [...(data ?? [])].reverse()
+
     return json({
       ok: true,
       deviceId,
       conversationId,
       recipient,
       markedReadCount,
-      messages: since ? (data ?? []) : [...(data ?? [])].reverse(),
+      messages: orderedMessages.map(toBridgeMessage),
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'

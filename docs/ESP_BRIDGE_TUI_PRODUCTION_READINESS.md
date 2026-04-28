@@ -1,18 +1,57 @@
 # ESP Bridge TUI Production Readiness
 
 This document records the bridge TUI polish shipped in the `0.1.11` through
-`0.1.14` Windows tools bundles.
+`0.1.20` Windows tools bundles.
 
 ## Current Bundle
 
 Latest stable Windows tools bundle:
 
+- version: `0.1.20-fragment-filter`
+- storage path: `windows/0.1.20-fragment-filter/shadowchat-bridge-tools.zip`
+- SHA-256: `3dae115f9f3a94f668f1b4b8157a3287803287fe8a7d8796a3c97ef9fab69a3c`
+- size: `31855` bytes
+
+Latest stable ESP32-S3 firmware:
+
+- version: `0.2.15-quiet-protocol`
+- storage path: `firmware/esp32-s3/0.2.15-quiet-protocol/shadowchat_bridge.bin`
+- SHA-256: `b0fc6c48290e21391dcc14b48b1b7a81f81b80612d2b1b280b2418f73947472c`
+- size: `1043312` bytes
+
+Previous stability bundles:
+
+- version: `0.1.19-link-log-filter`
+- storage path: `windows/0.1.19-link-log-filter/shadowchat-bridge-tools.zip`
+- SHA-256: `2c3f2c3a87a1c41b06e15b43b4ce727b5763b06b95131d72b6cc43f484ba318b`
+- size: `31814` bytes
+
+- version: `0.1.18-serial-stability`
+- storage path: `windows/0.1.18-serial-stability/shadowchat-bridge-tools.zip`
+- SHA-256: `b0dd0addaa1ed7ec38d2e89abd0d31e6f4224a4c806d255ce97e78554ff1b5b4`
+- size: `31764` bytes
+
+- version: `0.1.17-thread-refresh`
+- storage path: `windows/0.1.17-thread-refresh/shadowchat-bridge-tools.zip`
+- SHA-256: `4df5e9e37f9d6f9541c62ed3887a94abdc14f2acbe4c4b83dd5763c3f16eb03b`
+- size: `31695` bytes
+
+Previous production-readiness bundles:
+
+- version: `0.1.16-foreground-polish`
+- storage path: `windows/0.1.16-foreground-polish/shadowchat-bridge-tools.zip`
+- SHA-256: `6a950edd5bf86b1c2379bede736ac6175ebd4474065a2c2098c53d6b46ab17ee`
+- size: `31572` bytes
+
+- version: `0.1.15-latest-feed-version`
+- storage path: `windows/0.1.15-latest-feed-version/shadowchat-bridge-tools.zip`
+- SHA-256: `36343f4474d8d56aca184230e18545a4762cb6ecb37a01e4433c46c1b86f3cba`
+- size: `31541` bytes
+
 - version: `0.1.14-ai-backfill-layout`
 - storage path: `windows/0.1.14-ai-backfill-layout/shadowchat-bridge-tools.zip`
 - SHA-256: `4acc39ccfd2d43ee5cb76a2d3cbb3d7f1d7bdaff55a1d32cf684cd54748fb757`
 - size: `31275` bytes
-
-Previous production-readiness bundle:
 
 - version: `0.1.13-two-pane-render-fix`
 - storage path: `windows/0.1.13-two-pane-render-fix/shadowchat-bridge-tools.zip`
@@ -40,7 +79,16 @@ The TUI should feel smooth, dependable, and chat-first:
 - group-chat `@ai`, `@shado`, and `@shado_ai` mentions ask Shado through the backend AI path
 - after sending chat text, the TUI runs short follow-up backfill polls so delayed Shado replies still appear when realtime is already joined
 - short chat histories sit near the input prompt instead of leaving a large empty area between the last message and the keyboard
-- malformed structured serial frames are handled by fallback polling instead of showing raw parser errors in the live feed
+- the running tools version and release date are visible in the header and sidebar
+- the header puts version/date first enough to remain visible in foreground Windows Terminal testing
+- TUI writes use a black terminal-cell background for stronger contrast in transparent terminals
+- malformed structured serial frames and low-level realtime transport fragments are handled by fallback polling instead of showing raw parser or socket errors in the live feed
+- full latest-window polls replace the visible group or DM thread instead of appending partial slices, so the pane does not look like a random mix of old and new messages
+- bridge session refresh keeps the hardware refresh token stable while rotating access tokens, reducing refresh races between realtime and polling
+- compact bridge poll responses cap at ten messages and carry only TUI-needed sender fields, keeping ESP HTTP buffers and serial bursts dependable
+- firmware serializes structured `@scb` output across tasks and suppresses low-level TLS/certificate/websocket logs that could split protocol frames
+- the TUI opens the bridge serial port with the stable DTR/RTS settings used by direct device validation
+- low-level link-driver startup lines and orphaned structured JSON fragments are filtered out of the live feed while fallback polling repairs the visible thread
 - visible connectivity chrome uses data-link language such as `data link` and `link`
 - two-pane terminal widths render without strict-mode crashes
 
