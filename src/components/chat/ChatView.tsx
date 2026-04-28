@@ -72,7 +72,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex h-full flex-col bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.05),transparent_26%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] text-sm"
+      className="flex h-full min-h-0 flex-col bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.05),transparent_26%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] text-sm"
     >
       {/* Header */}
       <div className="glass-panel-strong flex-shrink-0 border-b border-[var(--border-panel)] px-6 py-5">

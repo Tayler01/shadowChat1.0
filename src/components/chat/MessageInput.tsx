@@ -126,6 +126,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
+      if (message.length === 0) {
+        return
+      }
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
     }
   }, [message])

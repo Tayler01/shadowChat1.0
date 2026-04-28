@@ -262,7 +262,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   })
 
   return (
-    <div className="flex h-full bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.05),transparent_28%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))]">
+    <div className="flex h-full min-h-0 bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.05),transparent_28%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))]">
       <motion.div
         initial={{ x: -320 }}
         animate={{ x: 0 }}
@@ -380,7 +380,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
           )}
         </AnimatePresence>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {conversations.length === 0 ? (
             <div className="p-6 text-center text-[var(--text-muted)]">
               <MessageSquare className="mx-auto mb-2 h-8 w-8 opacity-50" />
@@ -456,7 +456,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
         </div>
       </motion.div>
 
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col">
         {currentConversation && currentConv ? (
           <>
             <div className="glass-panel-strong flex-shrink-0 border-b border-[var(--border-panel)] px-6 py-4">
@@ -499,7 +499,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
             <div
               ref={messagesRef}
               onScroll={handleScroll}
-              className="relative flex-1 w-full overflow-y-auto overflow-x-hidden p-4 space-y-3 pb-[calc(env(safe-area-inset-bottom)_+_10.5rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
+              className="relative flex-1 min-h-0 w-full space-y-3 overflow-y-auto overflow-x-hidden px-4 pb-[calc(env(safe-area-inset-bottom)_+_9.5rem)] pt-4 md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
             >
               <div className="mx-auto w-full max-w-4xl space-y-3">
               {loadingMore && (
@@ -637,7 +637,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   type="button"
                   onClick={scrollToBottom}
                   aria-label="Jump to latest"
-                  className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)_+_10rem)] z-50 rounded-full border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] p-2 text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)] transition-transform hover:-translate-y-0.5 md:bottom-32"
+                  className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)_+_9.25rem)] z-50 rounded-full border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] p-2 text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)] transition-transform hover:-translate-y-0.5 md:bottom-32"
                 >
                   <ArrowDown className="w-5 h-5" />
                 </button>

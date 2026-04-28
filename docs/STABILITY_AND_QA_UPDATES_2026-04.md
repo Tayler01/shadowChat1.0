@@ -36,6 +36,23 @@ Relevant files:
 
 - [src/components/dms/DirectMessagesView.tsx](C:/repos/chat2.0/src/components/dms/DirectMessagesView.tsx:1)
 
+### Mobile Chat Viewport Density
+
+- Mobile group chat no longer keeps a `24rem` bottom scroll reserve after the latest message.
+- Group and DM threads now reserve only the fixed mobile composer/navigation height plus a small visible buffer, while still honoring `env(safe-area-inset-bottom)`.
+- Empty message inputs now stay one row tall instead of expanding to the wrapped placeholder text, which was making narrow DM composers taller than necessary.
+- The app shell uses a `100dvh`-backed viewport class so mobile browser chrome changes do not leave the chat surface sized from stale `100vh`.
+- Production-preview visual checks on iPhone 13 and Pixel 5 measured about `15px` between the latest group message and the composer, and about `6px` in a DM thread.
+
+Relevant files:
+
+- [src/App.tsx](C:/repos/chat2.0/src/App.tsx:1)
+- [src/index.css](C:/repos/chat2.0/src/index.css:1)
+- [src/components/chat/MessageList.tsx](C:/repos/chat2.0/src/components/chat/MessageList.tsx:1)
+- [src/components/chat/MessageInput.tsx](C:/repos/chat2.0/src/components/chat/MessageInput.tsx:1)
+- [src/components/dms/DirectMessagesView.tsx](C:/repos/chat2.0/src/components/dms/DirectMessagesView.tsx:1)
+- [src/components/layout/MobileChatFooter.tsx](C:/repos/chat2.0/src/components/layout/MobileChatFooter.tsx:1)
+
 ### DM Reaction Schema Alignment
 
 - DM reactions no longer rely on the broken assumption that DM message ids can live in the channel-message foreign key.

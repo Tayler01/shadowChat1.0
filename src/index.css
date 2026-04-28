@@ -195,8 +195,16 @@ html, body, #root {
   overflow: hidden;
 }
 
+.app-viewport {
+  height: 100vh;
+}
+
 @supports (height: 100dvh) {
   html, body, #root {
+    height: 100dvh;
+  }
+
+  .app-viewport {
     height: 100dvh;
   }
 }

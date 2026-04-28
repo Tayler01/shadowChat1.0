@@ -250,7 +250,7 @@ function App() {
           <DirectMessagesProvider>
           <AppBadgeSync />
           <PhoneInstallOnboarding />
-          <div className="flex h-screen flex-col overflow-hidden bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.08),transparent_28%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] md:flex-row">
+          <div className="app-viewport flex flex-col overflow-hidden bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.08),transparent_28%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] md:flex-row">
           <ConnectivityBanner />
           {isDesktop && (
             <Sidebar
@@ -270,7 +270,7 @@ function App() {
             />
           )}
 
-          <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <main className="flex-1 flex min-h-0 flex-col min-w-0 overflow-hidden">
             <Suspense fallback={<ViewLoadingState />}>
               {renderCurrentView()}
             </Suspense>
