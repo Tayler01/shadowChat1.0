@@ -10,13 +10,7 @@ import { Input } from '../ui/Input'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import toast from 'react-hot-toast'
 import type { UserStatus } from '../../types'
-
-const statusOptions: { value: UserStatus; label: string; color: string }[] = [
-  { value: 'online', label: 'Online', color: 'bg-[var(--state-success)]' },
-  { value: 'away', label: 'Away', color: 'bg-[var(--state-warning)]' },
-  { value: 'busy', label: 'Busy', color: 'bg-[var(--state-danger)]' },
-  { value: 'offline', label: 'Offline', color: 'bg-[var(--state-muted)]' }
-]
+import { getPresenceOption, presenceOptions } from '../../lib/presence'
 
 const colorOptions = [
   '#d7aa46', '#c99642', '#b88646', '#9f7340', '#8f6a37',
@@ -244,18 +238,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
                       Status
                     </label>
                     <div className="grid grid-cols-2 gap-2">
-                      {statusOptions.map((option) => (
+                      {presenceOptions.map((option) => (
                         <button
                           key={option.value}
                           onClick={() => setFormData(prev => ({ ...prev, status: option.value }))}
                           className={`rounded-[var(--radius-md)] border p-3 transition-colors ${
                             formData.status === option.value
-                              ? 'border-[var(--border-glow)] bg-[rgba(255,255,255,0.06)] shadow-[var(--shadow-gold-soft)]'
+                              ? option.selectedClass
                               : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] hover:border-[var(--border-panel)] hover:bg-[rgba(255,255,255,0.05)]'
                           }`}
                         >
                           <div className="flex items-center space-x-2">
-                            <div className={`w-3 h-3 rounded-full ${option.color}`} />
+                            <div className={`w-3 h-3 rounded-full ${option.dotClass}`} />
                             <span className="text-sm font-medium text-[var(--text-primary)]">
                               {option.label}
                             </span>
@@ -324,11 +318,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
 
                   <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-2">
-                      <div className={`w-3 h-3 rounded-full ${
-                        statusOptions.find(s => s.value === profile.status)?.color || 'bg-gray-500'
-                      }`} />
+                      <div className={`w-3 h-3 rounded-full ${getPresenceOption(profile.status).dotClass}`} />
                       <span className="text-sm text-[var(--text-secondary)]">
-                        {statusOptions.find(s => s.value === profile.status)?.label || 'Unknown'}
+                        {getPresenceOption(profile.status).label}
                       </span>
                     </div>
                     
@@ -418,10 +410,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
                 <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
                   <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">Current status</div>
                   <div className="mt-2 flex items-center gap-2 text-sm text-[var(--text-primary)]">
-                    <div className={`h-3 w-3 rounded-full ${
-                      statusOptions.find(s => s.value === profile.status)?.color || 'bg-gray-500'
-                    }`} />
-                    <span>{statusOptions.find(s => s.value === profile.status)?.label || 'Unknown'}</span>
+                    <div className={`h-3 w-3 rounded-full ${getPresenceOption(profile.status).dotClass}`} />
+                    <span>{getPresenceOption(profile.status).label}</span>
                   </div>
                 </div>
 

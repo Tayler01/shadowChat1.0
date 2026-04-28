@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getPresenceOption } from '../../lib/presence';
 
 interface AvatarProps {
   src?: string;
@@ -18,13 +19,6 @@ const sizeClasses = {
   xl: 'w-16 h-16 text-xl',
 };
 
-const statusColors = {
-  online: 'bg-[var(--state-success)]',
-  away: 'bg-[var(--state-warning)]',
-  busy: 'bg-[var(--state-danger)]',
-  offline: 'bg-[var(--state-muted)]',
-};
-
 export function Avatar({
   src,
   alt,
@@ -37,6 +31,7 @@ export function Avatar({
 }: AvatarProps) {
   const [imageError, setImageError] = useState(false);
   const initials = fallback || alt.split(' ').map(n => n[0]).join('').toUpperCase();
+  const presence = getPresenceOption(status);
   
   return (
     <div className={`relative inline-block ${className}`}>
@@ -68,9 +63,12 @@ export function Avatar({
       {showStatus && status && (
         <div className={`
           absolute -bottom-0.5 -right-0.5
-          w-3 h-3 rounded-full border-2 border-white
-          ${statusColors[status]}
-        `} />
+          w-3 h-3 rounded-full border-2 border-[var(--bg-shell)]
+          ${presence.dotClass}
+        `}
+          role="img"
+          aria-label={`${presence.label} status`}
+        />
       )}
     </div>
   );
