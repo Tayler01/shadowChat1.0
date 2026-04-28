@@ -30,7 +30,7 @@
 #include "bridge_usb_bootstrap.h"
 
 #define BRIDGE_WIFI_CONNECTED_BIT BIT0
-#define BRIDGE_HTTP_BUFFER_SIZE 8192
+#define BRIDGE_HTTP_BUFFER_SIZE 32768
 #define BRIDGE_SHELL_LINE_SIZE 1024
 #define BRIDGE_STORAGE_NAMESPACE "bridge_cfg"
 #define BRIDGE_SHELL_TASK_STACK_SIZE 32768
@@ -47,6 +47,8 @@
 #define BRIDGE_BUNDLE_CHUNK_SIZE 128
 #define BRIDGE_BUNDLE_CHUNK_PACE_MS 35
 #define BRIDGE_BUNDLE_BASE64_SIZE (((BRIDGE_BUNDLE_CHUNK_SIZE + 2) / 3) * 4 + 1)
+#define BRIDGE_POLL_LATEST_LIMIT 30
+#define BRIDGE_POLL_INCREMENTAL_LIMIT 10
 
 static const char *TAG = "shadowchat_bridge";
 static esp_event_handler_instance_t s_wifi_any_id_handler;
@@ -92,6 +94,12 @@ typedef enum {
     BRIDGE_CHAT_MODE_GROUP,
     BRIDGE_CHAT_MODE_DM,
 } bridge_chat_mode_t;
+
+typedef enum {
+    BRIDGE_POLL_LATEST = 0,
+    BRIDGE_POLL_NEWER,
+    BRIDGE_POLL_OLDER,
+} bridge_poll_direction_t;
 
 typedef struct {
     char user_id[64];
@@ -516,7 +524,11 @@ static bool bridge_read_shell_remainder(char **input, char *output, size_t outpu
     return output[0] != '\0';
 }
 
-static char *bridge_dm_poll_body(const char *recipient_user_id, const char *since_message_id) {
+static int bridge_poll_limit_for_direction(bridge_poll_direction_t direction) {
+    return direction == BRIDGE_POLL_LATEST ? BRIDGE_POLL_LATEST_LIMIT : BRIDGE_POLL_INCREMENTAL_LIMIT;
+}
+
+static char *bridge_dm_poll_body(const char *recipient_user_id, const char *cursor_message_id, bridge_poll_direction_t direction) {
     cJSON *json = cJSON_CreateObject();
     if (!json) {
         return NULL;
@@ -524,10 +536,14 @@ static char *bridge_dm_poll_body(const char *recipient_user_id, const char *sinc
 
     cJSON_AddStringToObject(json, "deviceId", s_bridge_state.device_id);
     cJSON_AddStringToObject(json, "recipientUserId", recipient_user_id ? recipient_user_id : "");
-    cJSON_AddNumberToObject(json, "limit", 10);
+    cJSON_AddNumberToObject(json, "limit", bridge_poll_limit_for_direction(direction));
     cJSON_AddBoolToObject(json, "markRead", true);
-    if (since_message_id && since_message_id[0] != '\0') {
-        cJSON_AddStringToObject(json, "sinceMessageId", since_message_id);
+    if (cursor_message_id && cursor_message_id[0] != '\0') {
+        cJSON_AddStringToObject(
+            json,
+            direction == BRIDGE_POLL_OLDER ? "beforeMessageId" : "sinceMessageId",
+            cursor_message_id
+        );
     }
 
     char *body = cJSON_PrintUnformatted(json);
@@ -1196,8 +1212,11 @@ static bool bridge_print_message_list(
     const bridge_http_response_t *response,
     const char *thread,
     bool dm_messages,
-    char *cursor_message_id,
-    size_t cursor_message_id_size,
+    const char *source,
+    char *latest_cursor_message_id,
+    size_t latest_cursor_message_id_size,
+    char *oldest_cursor_message_id,
+    size_t oldest_cursor_message_id_size,
     bool replace_existing,
     bool print_empty
 ) {
@@ -1218,7 +1237,7 @@ static bool bridge_print_message_list(
             bridge_protocol_emit_messages_reset(thread, "");
         }
         if (print_empty) {
-            printf("(no messages)\n");
+            printf("%s\n", source && strcmp(source, "history") == 0 ? "(no older messages)" : "(no messages)");
         }
         cJSON_Delete(json);
         return true;
@@ -1235,6 +1254,7 @@ static bool bridge_print_message_list(
     }
 
     cJSON *message = NULL;
+    bool first_message = true;
     cJSON_ArrayForEach(message, messages) {
         const char *id = bridge_json_string_or_empty(message, "id");
         const char *created_at = bridge_json_string_or_empty(message, "created_at");
@@ -1246,7 +1266,7 @@ static bool bridge_print_message_list(
         const char *sender_label = bridge_profile_label(profile, sender_id);
 
         if (s_protocol_enabled) {
-            bridge_protocol_emit_message(thread, "poll", id, created_at, sender_id, sender_label, content, conversation_id);
+            bridge_protocol_emit_message(thread, source ? source : "poll", id, created_at, sender_id, sender_label, content, conversation_id);
         } else {
             printf(
                 "%s | %s: %s\n",
@@ -1256,9 +1276,15 @@ static bool bridge_print_message_list(
             );
         }
 
-        if (id[0] != '\0' && cursor_message_id && cursor_message_id_size > 0) {
-            bridge_set_runtime_string(cursor_message_id, cursor_message_id_size, id);
+        if (id[0] != '\0') {
+            if (latest_cursor_message_id && latest_cursor_message_id_size > 0) {
+                bridge_set_runtime_string(latest_cursor_message_id, latest_cursor_message_id_size, id);
+            }
+            if (first_message && oldest_cursor_message_id && oldest_cursor_message_id_size > 0) {
+                bridge_set_runtime_string(oldest_cursor_message_id, oldest_cursor_message_id_size, id);
+            }
         }
+        first_message = false;
     }
 
     cJSON_Delete(json);
@@ -1300,6 +1326,24 @@ static void bridge_print_sent_summary(const bridge_http_response_t *response, bo
         printf("sent group message %s\n", id);
     } else {
         printf("sent\n");
+    }
+
+    if (s_protocol_enabled && cJSON_IsObject(message)) {
+        const char *created_at = bridge_json_string_or_empty(message, "created_at");
+        const char *content = bridge_json_string_or_empty(message, "content");
+        const char *sender_id = bridge_json_string_or_empty(message, dm_message ? "sender_id" : "user_id");
+        cJSON *profile = cJSON_GetObjectItemCaseSensitive(message, dm_message ? "sender" : "user");
+        const char *sender_label = bridge_profile_label(profile, sender_id);
+        bridge_protocol_emit_message(
+            dm_message ? "dm" : "group",
+            "sent",
+            id,
+            created_at,
+            sender_id,
+            sender_label,
+            content,
+            conversation_id
+        );
     }
 
     bridge_protocol_emit_sent(dm_message ? "dm" : "group", id, conversation_id);
@@ -1405,9 +1449,11 @@ static void bridge_command_help(void) {
     printf("  protocol on|off|status\n\n");
     printf("  realtime start|stop|status\n\n");
     printf("  group send <text>\n");
-    printf("  group poll\n\n");
+    printf("  group poll\n");
+    printf("  group history <before_message_id>\n\n");
     printf("  dm send <recipient_user_id|@username> <text>\n");
     printf("  dm poll <recipient_user_id|@username>\n");
+    printf("  dm history <recipient_user_id|@username> <before_message_id>\n");
     printf("  users search <name_or_username>\n\n");
     printf("  chat group\n");
     printf("  chat dm <recipient_user_id|@username>\n\n");
@@ -1497,6 +1543,7 @@ static void bridge_chat_help(void) {
     printf("\nShadowChat chat mode\n");
     printf("  type a message and press Enter to send\n");
     printf("  /poll                 fetch latest messages\n");
+    printf("  /history              fetch older messages before the visible window\n");
     printf("  /dm <recipient|@name> switch to a DM thread\n");
     printf("  /group                switch to group chat\n");
     printf("  /status               show bridge status\n");
@@ -3511,9 +3558,11 @@ static void bridge_command_group_send(const char *content) {
 
 static bool bridge_poll_group_messages(
     bool compact_output,
-    bool new_only,
-    char *cursor_message_id,
-    size_t cursor_message_id_size,
+    bridge_poll_direction_t direction,
+    char *latest_cursor_message_id,
+    size_t latest_cursor_message_id_size,
+    char *oldest_cursor_message_id,
+    size_t oldest_cursor_message_id_size,
     bool print_empty
 ) {
     (void)compact_output;
@@ -3525,16 +3574,25 @@ static bool bridge_poll_group_messages(
         return false;
     }
 
-    int limit = new_only ? 10 : 10;
+    int limit = bridge_poll_limit_for_direction(direction);
     char body[192];
-    if (new_only && cursor_message_id && cursor_message_id[0] != '\0') {
+    if (direction == BRIDGE_POLL_NEWER && latest_cursor_message_id && latest_cursor_message_id[0] != '\0') {
         snprintf(
             body,
             sizeof(body),
             "{\"deviceId\":\"%s\",\"limit\":%d,\"sinceMessageId\":\"%s\"}",
             s_bridge_state.device_id,
             limit,
-            cursor_message_id
+            latest_cursor_message_id
+        );
+    } else if (direction == BRIDGE_POLL_OLDER && oldest_cursor_message_id && oldest_cursor_message_id[0] != '\0') {
+        snprintf(
+            body,
+            sizeof(body),
+            "{\"deviceId\":\"%s\",\"limit\":%d,\"beforeMessageId\":\"%s\"}",
+            s_bridge_state.device_id,
+            limit,
+            oldest_cursor_message_id
         );
     } else {
         snprintf(body, sizeof(body), "{\"deviceId\":\"%s\",\"limit\":%d}", s_bridge_state.device_id, limit);
@@ -3552,9 +3610,25 @@ static bool bridge_poll_group_messages(
     }
 
     if (response.status_code >= 200 && response.status_code < 300) {
-        if (bridge_print_message_list(&response, "group", false, cursor_message_id, cursor_message_id_size, !new_only, print_empty)) {
-            if (cursor_message_id && cursor_message_id_size > 0) {
-                bridge_save_group_cursor(cursor_message_id);
+        char *latest_cursor = direction == BRIDGE_POLL_OLDER ? NULL : latest_cursor_message_id;
+        size_t latest_cursor_size = direction == BRIDGE_POLL_OLDER ? 0 : latest_cursor_message_id_size;
+        char *oldest_cursor = direction == BRIDGE_POLL_NEWER ? NULL : oldest_cursor_message_id;
+        size_t oldest_cursor_size = direction == BRIDGE_POLL_NEWER ? 0 : oldest_cursor_message_id_size;
+        const char *source = direction == BRIDGE_POLL_OLDER ? "history" : "poll";
+        if (bridge_print_message_list(
+                &response,
+                "group",
+                false,
+                source,
+                latest_cursor,
+                latest_cursor_size,
+                oldest_cursor,
+                oldest_cursor_size,
+                direction == BRIDGE_POLL_LATEST,
+                print_empty
+            )) {
+            if (latest_cursor_message_id && latest_cursor_message_id_size > 0 && direction != BRIDGE_POLL_OLDER) {
+                bridge_save_group_cursor(latest_cursor_message_id);
             }
         } else {
             bridge_print_response("bridge-group-poll", &response);
@@ -3567,7 +3641,7 @@ static bool bridge_poll_group_messages(
 }
 
 static void bridge_command_group_poll(void) {
-    bridge_poll_group_messages(false, false, NULL, 0, true);
+    bridge_poll_group_messages(false, BRIDGE_POLL_LATEST, NULL, 0, NULL, 0, true);
 }
 
 static bool bridge_send_dm_message(const char *recipient_user_id, const char *content, bool compact_output) {
@@ -3627,9 +3701,11 @@ static void bridge_command_dm_send(const char *recipient_user_id, const char *co
 static bool bridge_poll_dm_messages(
     const char *recipient_user_id,
     bool compact_output,
-    bool new_only,
-    char *cursor_message_id,
-    size_t cursor_message_id_size,
+    bridge_poll_direction_t direction,
+    char *latest_cursor_message_id,
+    size_t latest_cursor_message_id_size,
+    char *oldest_cursor_message_id,
+    size_t oldest_cursor_message_id_size,
     bool print_empty
 ) {
     (void)compact_output;
@@ -3648,7 +3724,9 @@ static bool bridge_poll_dm_messages(
 
     char *body = bridge_dm_poll_body(
         recipient_user_id,
-        (new_only && cursor_message_id && cursor_message_id[0] != '\0') ? cursor_message_id : NULL
+        (direction == BRIDGE_POLL_NEWER && latest_cursor_message_id && latest_cursor_message_id[0] != '\0') ? latest_cursor_message_id :
+            ((direction == BRIDGE_POLL_OLDER && oldest_cursor_message_id && oldest_cursor_message_id[0] != '\0') ? oldest_cursor_message_id : NULL),
+        direction
     );
     if (!body) {
         printf("Failed to build DM poll payload\n");
@@ -3669,9 +3747,25 @@ static bool bridge_poll_dm_messages(
     }
 
     if (response.status_code >= 200 && response.status_code < 300) {
-        if (bridge_print_message_list(&response, "dm", true, cursor_message_id, cursor_message_id_size, !new_only, print_empty)) {
-            if (cursor_message_id && cursor_message_id_size > 0) {
-                bridge_save_dm_cursor(recipient_user_id, cursor_message_id);
+        char *latest_cursor = direction == BRIDGE_POLL_OLDER ? NULL : latest_cursor_message_id;
+        size_t latest_cursor_size = direction == BRIDGE_POLL_OLDER ? 0 : latest_cursor_message_id_size;
+        char *oldest_cursor = direction == BRIDGE_POLL_NEWER ? NULL : oldest_cursor_message_id;
+        size_t oldest_cursor_size = direction == BRIDGE_POLL_NEWER ? 0 : oldest_cursor_message_id_size;
+        const char *source = direction == BRIDGE_POLL_OLDER ? "history" : "poll";
+        if (bridge_print_message_list(
+                &response,
+                "dm",
+                true,
+                source,
+                latest_cursor,
+                latest_cursor_size,
+                oldest_cursor,
+                oldest_cursor_size,
+                direction == BRIDGE_POLL_LATEST,
+                print_empty
+            )) {
+            if (latest_cursor_message_id && latest_cursor_message_id_size > 0 && direction != BRIDGE_POLL_OLDER) {
+                bridge_save_dm_cursor(recipient_user_id, latest_cursor_message_id);
             }
         } else {
             bridge_print_response("bridge-dm-poll", &response);
@@ -3684,7 +3778,7 @@ static bool bridge_poll_dm_messages(
 }
 
 static void bridge_command_dm_poll(const char *recipient_user_id) {
-    bridge_poll_dm_messages(recipient_user_id, false, false, NULL, 0, true);
+    bridge_poll_dm_messages(recipient_user_id, false, BRIDGE_POLL_LATEST, NULL, 0, NULL, 0, true);
 }
 
 static void bridge_command_users_search(const char *query) {
@@ -3743,16 +3837,20 @@ static const char *bridge_prompt_for_mode(bridge_chat_mode_t chat_mode) {
 static void bridge_enter_group_chat(
     bridge_chat_mode_t *chat_mode,
     char *group_cursor_message_id,
-    size_t group_cursor_message_id_size
+    size_t group_cursor_message_id_size,
+    char *group_history_cursor_message_id,
+    size_t group_history_cursor_message_id_size
 ) {
     *chat_mode = BRIDGE_CHAT_MODE_GROUP;
     printf("Entered group chat. Type /help for chat commands or /admin for the admin shell.\n");
     bridge_protocol_emit_mode("group", NULL);
     bridge_poll_group_messages(
         true,
-        false,
+        BRIDGE_POLL_LATEST,
         group_cursor_message_id,
         group_cursor_message_id_size,
+        group_history_cursor_message_id,
+        group_history_cursor_message_id_size,
         true
     );
 }
@@ -3765,7 +3863,9 @@ static void bridge_enter_dm_chat(
     char *dm_cursor_recipient_user_id,
     size_t dm_cursor_recipient_size,
     char *dm_cursor_message_id,
-    size_t dm_cursor_message_id_size
+    size_t dm_cursor_message_id_size,
+    char *dm_history_cursor_message_id,
+    size_t dm_history_cursor_message_id_size
 ) {
     if (!next_recipient_user_id || next_recipient_user_id[0] == '\0') {
         printf("usage: chat dm <recipient_user_id|@username>\n");
@@ -3778,6 +3878,7 @@ static void bridge_enter_dm_chat(
         strcmp(dm_cursor_recipient_user_id, next_recipient_user_id) != 0
     ) {
         bridge_set_runtime_string(dm_cursor_message_id, dm_cursor_message_id_size, "");
+        bridge_set_runtime_string(dm_history_cursor_message_id, dm_history_cursor_message_id_size, "");
     }
 
     bridge_set_runtime_string(recipient_user_id, recipient_size, next_recipient_user_id);
@@ -3789,9 +3890,11 @@ static void bridge_enter_dm_chat(
     bridge_poll_dm_messages(
         recipient_user_id,
         true,
-        false,
+        BRIDGE_POLL_LATEST,
         dm_cursor_message_id,
         dm_cursor_message_id_size,
+        dm_history_cursor_message_id,
+        dm_history_cursor_message_id_size,
         true
     );
 }
@@ -3802,10 +3905,14 @@ static bool bridge_handle_chat_line(
     size_t recipient_size,
     char *group_cursor_message_id,
     size_t group_cursor_message_id_size,
+    char *group_history_cursor_message_id,
+    size_t group_history_cursor_message_id_size,
     char *dm_cursor_recipient_user_id,
     size_t dm_cursor_recipient_size,
     char *dm_cursor_message_id,
     size_t dm_cursor_message_id_size,
+    char *dm_history_cursor_message_id,
+    size_t dm_history_cursor_message_id_size,
     char *line
 ) {
     if (line[0] == '/') {
@@ -3816,7 +3923,13 @@ static bool bridge_handle_chat_line(
             printf("Returned to admin shell.\n");
             bridge_protocol_emit_mode("admin", NULL);
         } else if (strcmp(line, "/group") == 0) {
-            bridge_enter_group_chat(chat_mode, group_cursor_message_id, group_cursor_message_id_size);
+            bridge_enter_group_chat(
+                chat_mode,
+                group_cursor_message_id,
+                group_cursor_message_id_size,
+                group_history_cursor_message_id,
+                group_history_cursor_message_id_size
+            );
         } else if (strncmp(line, "/dm ", 4) == 0) {
             char *next_recipient_user_id = line + 4;
             while (*next_recipient_user_id == ' ') {
@@ -3830,13 +3943,63 @@ static bool bridge_handle_chat_line(
                 dm_cursor_recipient_user_id,
                 dm_cursor_recipient_size,
                 dm_cursor_message_id,
-                dm_cursor_message_id_size
+                dm_cursor_message_id_size,
+                dm_history_cursor_message_id,
+                dm_history_cursor_message_id_size
             );
         } else if (strcmp(line, "/poll") == 0) {
             if (*chat_mode == BRIDGE_CHAT_MODE_GROUP) {
-                bridge_poll_group_messages(true, false, group_cursor_message_id, group_cursor_message_id_size, false);
+                bridge_poll_group_messages(
+                    true,
+                    BRIDGE_POLL_LATEST,
+                    group_cursor_message_id,
+                    group_cursor_message_id_size,
+                    group_history_cursor_message_id,
+                    group_history_cursor_message_id_size,
+                    false
+                );
             } else if (*chat_mode == BRIDGE_CHAT_MODE_DM) {
-                bridge_poll_dm_messages(recipient_user_id, true, false, dm_cursor_message_id, dm_cursor_message_id_size, false);
+                bridge_poll_dm_messages(
+                    recipient_user_id,
+                    true,
+                    BRIDGE_POLL_LATEST,
+                    dm_cursor_message_id,
+                    dm_cursor_message_id_size,
+                    dm_history_cursor_message_id,
+                    dm_history_cursor_message_id_size,
+                    false
+                );
+            }
+        } else if (strcmp(line, "/history") == 0 || strcmp(line, "/older") == 0) {
+            if (*chat_mode == BRIDGE_CHAT_MODE_GROUP) {
+                if (!group_history_cursor_message_id || group_history_cursor_message_id[0] == '\0') {
+                    printf("(no older messages)\n");
+                } else {
+                    bridge_poll_group_messages(
+                        true,
+                        BRIDGE_POLL_OLDER,
+                        group_cursor_message_id,
+                        group_cursor_message_id_size,
+                        group_history_cursor_message_id,
+                        group_history_cursor_message_id_size,
+                        true
+                    );
+                }
+            } else if (*chat_mode == BRIDGE_CHAT_MODE_DM) {
+                if (!dm_history_cursor_message_id || dm_history_cursor_message_id[0] == '\0') {
+                    printf("(no older messages)\n");
+                } else {
+                    bridge_poll_dm_messages(
+                        recipient_user_id,
+                        true,
+                        BRIDGE_POLL_OLDER,
+                        dm_cursor_message_id,
+                        dm_cursor_message_id_size,
+                        dm_history_cursor_message_id,
+                        dm_history_cursor_message_id_size,
+                        true
+                    );
+                }
             }
         } else if (strcmp(line, "/status") == 0) {
             bridge_command_status();
@@ -3916,8 +4079,10 @@ static void bridge_shell_task(void *arg) {
     char line[BRIDGE_SHELL_LINE_SIZE];
     char active_dm_recipient_user_id[64] = {0};
     char group_cursor_message_id[64] = {0};
+    char group_history_cursor_message_id[64] = {0};
     char dm_cursor_recipient_user_id[64] = {0};
     char dm_cursor_message_id[64] = {0};
+    char dm_history_cursor_message_id[64] = {0};
     bridge_chat_mode_t chat_mode = BRIDGE_CHAT_MODE_ADMIN;
     bool prompt_pending = true;
 
@@ -3963,10 +4128,14 @@ static void bridge_shell_task(void *arg) {
                 sizeof(active_dm_recipient_user_id),
                 group_cursor_message_id,
                 sizeof(group_cursor_message_id),
+                group_history_cursor_message_id,
+                sizeof(group_history_cursor_message_id),
                 dm_cursor_recipient_user_id,
                 sizeof(dm_cursor_recipient_user_id),
                 dm_cursor_message_id,
                 sizeof(dm_cursor_message_id),
+                dm_history_cursor_message_id,
+                sizeof(dm_history_cursor_message_id),
                 line
             );
             prompt_pending = true;
@@ -4033,6 +4202,22 @@ static void bridge_shell_task(void *arg) {
             bridge_command_group_send(content);
         } else if (strcmp(command, "group") == 0 && subcommand && strcmp(subcommand, "poll") == 0) {
             bridge_command_group_poll();
+        } else if (strcmp(command, "group") == 0 && subcommand && strcmp(subcommand, "history") == 0) {
+            char *before_message_id = strtok_r(NULL, " ", &save_ptr);
+            if (!before_message_id || before_message_id[0] == '\0') {
+                printf("usage: group history <before_message_id>\n");
+            } else {
+                bridge_set_runtime_string(group_history_cursor_message_id, sizeof(group_history_cursor_message_id), before_message_id);
+                bridge_poll_group_messages(
+                    false,
+                    BRIDGE_POLL_OLDER,
+                    group_cursor_message_id,
+                    sizeof(group_cursor_message_id),
+                    group_history_cursor_message_id,
+                    sizeof(group_history_cursor_message_id),
+                    true
+                );
+            }
         } else if (strcmp(command, "dm") == 0 && subcommand && strcmp(subcommand, "send") == 0) {
             char *recipient_user_id = strtok_r(NULL, " ", &save_ptr);
             char *content = save_ptr;
@@ -4043,6 +4228,24 @@ static void bridge_shell_task(void *arg) {
         } else if (strcmp(command, "dm") == 0 && subcommand && strcmp(subcommand, "poll") == 0) {
             char *recipient_user_id = strtok_r(NULL, " ", &save_ptr);
             bridge_command_dm_poll(recipient_user_id);
+        } else if (strcmp(command, "dm") == 0 && subcommand && strcmp(subcommand, "history") == 0) {
+            char *recipient_user_id = strtok_r(NULL, " ", &save_ptr);
+            char *before_message_id = strtok_r(NULL, " ", &save_ptr);
+            if (!recipient_user_id || !before_message_id || before_message_id[0] == '\0') {
+                printf("usage: dm history <recipient_user_id|@username> <before_message_id>\n");
+            } else {
+                bridge_set_runtime_string(dm_history_cursor_message_id, sizeof(dm_history_cursor_message_id), before_message_id);
+                bridge_poll_dm_messages(
+                    recipient_user_id,
+                    false,
+                    BRIDGE_POLL_OLDER,
+                    dm_cursor_message_id,
+                    sizeof(dm_cursor_message_id),
+                    dm_history_cursor_message_id,
+                    sizeof(dm_history_cursor_message_id),
+                    true
+                );
+            }
         } else if (strcmp(command, "users") == 0 && subcommand && strcmp(subcommand, "search") == 0) {
             char *query = save_ptr;
             while (query && *query == ' ') {
@@ -4050,7 +4253,13 @@ static void bridge_shell_task(void *arg) {
             }
             bridge_command_users_search(query);
         } else if (strcmp(command, "chat") == 0 && subcommand && strcmp(subcommand, "group") == 0) {
-            bridge_enter_group_chat(&chat_mode, group_cursor_message_id, sizeof(group_cursor_message_id));
+            bridge_enter_group_chat(
+                &chat_mode,
+                group_cursor_message_id,
+                sizeof(group_cursor_message_id),
+                group_history_cursor_message_id,
+                sizeof(group_history_cursor_message_id)
+            );
         } else if (strcmp(command, "chat") == 0 && subcommand && strcmp(subcommand, "dm") == 0) {
             char *recipient_user_id = strtok_r(NULL, " ", &save_ptr);
             bridge_enter_dm_chat(
@@ -4061,7 +4270,9 @@ static void bridge_shell_task(void *arg) {
                 dm_cursor_recipient_user_id,
                 sizeof(dm_cursor_recipient_user_id),
                 dm_cursor_message_id,
-                sizeof(dm_cursor_message_id)
+                sizeof(dm_cursor_message_id),
+                dm_history_cursor_message_id,
+                sizeof(dm_history_cursor_message_id)
             );
         } else if (strcmp(command, "pair") == 0 && subcommand && strcmp(subcommand, "begin") == 0) {
             bridge_command_pair_begin(false);

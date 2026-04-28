@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = "0.1.20-fragment-filter",
+    [string]$Version = "0.1.24-startup-sync",
     [string]$OutputDirectory = "output/bridge-bundles"
 )
 

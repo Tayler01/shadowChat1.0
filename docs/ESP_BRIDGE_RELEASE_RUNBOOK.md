@@ -10,8 +10,8 @@ For the current TUI hardening details, see
 
 Use monotonic semantic-style versions with a short release label:
 
-- firmware: `0.2.15-quiet-protocol`
-- Windows tools bundle: `0.1.20-fragment-filter`
+- firmware: `0.2.20-startup-window`
+- Windows tools bundle: `0.1.24-startup-sync`
 - bootstrap bundle: `0.1.10-bootstrap-routing`
 
 Rules:
@@ -22,6 +22,11 @@ Rules:
 - Firmware versions must match `CONFIG_BRIDGE_FIRMWARE_VERSION` in
   [firmware/esp-bridge/main/Kconfig.projbuild](C:/repos/chat2.0/firmware/esp-bridge/main/Kconfig.projbuild:1)
   and [firmware/esp-bridge/sdkconfig.defaults](C:/repos/chat2.0/firmware/esp-bridge/sdkconfig.defaults:1).
+- Firmware versions must also match the active generated config file
+  [firmware/esp-bridge/sdkconfig](C:/repos/chat2.0/firmware/esp-bridge/sdkconfig:1)
+  when that file already exists locally. ESP-IDF builds use this active file,
+  so changing only `sdkconfig.defaults` is not enough after the workspace has
+  been configured.
 - Windows bundle versions must be passed to
   [scripts/package-bridge-bundle.ps1](C:/repos/chat2.0/scripts/package-bridge-bundle.ps1:1).
 - Do not reuse a published version. If a release needs a fix, publish the next
@@ -42,11 +47,26 @@ npm run bridge:tui:test
 Build firmware with the ESP-IDF environment:
 
 ```powershell
-$env:PATH='C:\Users\tayle\.espressif\python_env\idf5.3_py3.13_env\Scripts;' + $env:PATH
+$env:PATH='C:\Users\tayle\.espressif\python_env\idf5.3_py3.12_env\Scripts;' + $env:PATH
 . C:\esp\esp-idf-v5.3.1\export.ps1
 cd C:\repos\chat2.0\firmware\esp-bridge
 idf.py build
 ```
+
+Before uploading firmware, verify the embedded version from the build output,
+not from memory:
+
+```powershell
+Select-String -Path build\config\sdkconfig.h -Pattern 'CONFIG_BRIDGE_FIRMWARE_VERSION'
+Get-FileHash -Algorithm SHA256 build\shadowchat_bridge.bin
+(Get-Item build\shadowchat_bridge.bin).Length
+```
+
+The `CONFIG_BRIDGE_FIRMWARE_VERSION` value in
+`build\config\sdkconfig.h` must exactly match the firmware version in the
+manifest you are about to publish. If it does not match, stop, fix
+`Kconfig.projbuild`, `sdkconfig.defaults`, and the active `sdkconfig`, rebuild,
+and re-check the generated header before upload.
 
 ## Build Artifacts
 
@@ -59,7 +79,7 @@ firmware/esp-bridge/build/shadowchat_bridge.bin
 Windows tools bundle:
 
 ```powershell
-npm run bridge:bundle:pack -- -Version 0.1.20-fragment-filter
+npm run bridge:bundle:pack -- -Version 0.1.24-startup-sync
 ```
 
 Record for each artifact:
@@ -105,6 +125,12 @@ Push the migrations:
 supabase db push --yes
 ```
 
+Never publish or upload a corrected firmware binary over an already-published
+version path. If a manifest or artifact was published with the wrong embedded
+version string, immediately cut the next patch version, publish a new storage
+path and manifest row, and optionally revoke the bad row. The historical bad
+artifact must remain immutable so deployed-device audit trails stay clear.
+
 ## Deploy Functions
 
 Deploy any changed bridge functions after their dependent migrations:
@@ -132,6 +158,18 @@ Then manually update one device before considering the release complete:
 update apply firmware
 bundle get windows_bundle
 ```
+
+After OTA, verify the device reports the exact newly published firmware
+version:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\bridge-tui\bridge-tui.ps1 -Port COM4 -RunAdminCommand "status"
+```
+
+The `firmware_version` line must match the manifest version. If the OTA applied
+but the reported version did not change, the active `sdkconfig` likely carried
+an old `CONFIG_BRIDGE_FIRMWARE_VERSION`; publish a new patch version instead of
+reusing the old one.
 
 Expected safety properties:
 

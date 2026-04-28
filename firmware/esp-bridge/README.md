@@ -17,8 +17,8 @@ This firmware spike intentionally focuses on the lowest-risk device path first:
   - `bridge-session-refresh`
   - `bridge-heartbeat`
 - backend data-plane smoke calls for:
-  - group send/poll
-  - DM send/poll
+  - group send/poll/history
+  - DM send/poll/history
 - chat-first serial mode for group chat and one active DM thread
 
 It does **not** implement the final local TUI yet. The current chat mode is an ESP serial-first Phase 0 proof that uses bridge-scoped Edge Functions for group and DM send/poll.
@@ -68,6 +68,20 @@ idf.py set-target esp32s3
 idf.py build
 ```
 
+Important release rule: after the workspace has been configured, ESP-IDF builds
+from the active `sdkconfig`, not only from `sdkconfig.defaults`. For every
+firmware release, keep the version in `main/Kconfig.projbuild`,
+`sdkconfig.defaults`, and `sdkconfig` aligned, then verify the generated build
+header before upload:
+
+```powershell
+Select-String -Path build\config\sdkconfig.h -Pattern 'CONFIG_BRIDGE_FIRMWARE_VERSION'
+```
+
+The reported value must match the manifest version exactly. If a firmware
+artifact was already published with the wrong embedded version label, do not
+overwrite that artifact. Cut and publish the next patch version.
+
 ## Configure
 
 Use `menuconfig` to set:
@@ -114,8 +128,10 @@ bootstrap script
 protocol on|off|status
 group send <text>
 group poll
+group history <before_message_id>
 dm send <recipient_user_id|@username> <text>
 dm poll <recipient_user_id|@username>
+dm history <recipient_user_id|@username> <before_message_id>
 chat group
 chat dm <recipient_user_id|@username>
 ```
@@ -124,6 +140,8 @@ Inside `chat group` or `chat dm <recipient_user_id>`, plain lines are sent as ch
 
 ```text
 /poll
+/history
+/older
 /dm <recipient_user_id|@username>
 /group
 /protocol on|off
@@ -269,6 +287,8 @@ Plain text sends to the active chat thread. `/admin` switches into the raw firmw
 The TUI now enables the firmware's opt-in structured serial protocol with `protocol on`. Protocol frames are line-delimited JSON prefixed with `@scb:` and are used for message, mode, sent, and status events. The human-readable admin shell remains the default when protocol mode is not enabled, so normal serial monitors stay clean. Use `-NoProtocol` or `/protocol off` to fall back to text parsing.
 
 Interactive mode renders a split console layout on wide terminals. The center pane is reserved for recent chat messages only, while status, admin output, protocol activity, and other live feed details stay in a side pane. Messages from the ESP bridge user are right-aligned and cyan; everyone else's messages stay left-aligned and green. The input row has a blinking cursor so the entry field remains visually obvious while incoming messages redraw. `/live` toggles near-realtime polling for the active group or DM thread without leaving the chat view.
+
+Startup and manual latest-window polls request up to 30 messages so the TUI opens with a useful recent transcript. Incremental repair polls and `/history` paging continue to request ten rows at a time to keep serial bursts responsive.
 
 Use `/users <name_or_username>` to search users without permanently leaving the active chat; results appear in the side live feed. The TUI remembers recent DM targets in preferences, `/dms` lists them, and Tab cycles through group chat plus recent DMs.
 

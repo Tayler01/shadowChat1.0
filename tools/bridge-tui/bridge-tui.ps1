@@ -15,6 +15,8 @@ param(
     [switch]$ResetPreferences,
     [string]$PreferencesPath = "",
     [int]$TranscriptLines = 200,
+    [string[]]$RunAdminCommand = @(),
+    [int]$RunAdminWaitSeconds = 0,
     [string]$SmokeGroupText = "",
     [string]$SmokeDmRecipientUserId = "",
     [string]$SmokeDmText = ""
@@ -25,7 +27,7 @@ $ErrorActionPreference = "Stop"
 $script:utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 [Console]::OutputEncoding = $script:utf8NoBom
 $OutputEncoding = $script:utf8NoBom
-$script:tuiVersion = "0.1.20-fragment-filter"
+$script:tuiVersion = "0.1.24-startup-sync"
 $script:tuiVersionDate = "2026-04-28"
 
 function Get-DefaultPreferencesPath {
@@ -240,6 +242,8 @@ $script:running = $true
 $script:inputBuffer = ""
 $script:transcript = New-Object System.Collections.Generic.List[string]
 $script:messages = New-Object System.Collections.Generic.List[string]
+$script:messageRecords = [System.Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
+$script:messageRecordSequence = 0
 $script:liveFeed = New-Object System.Collections.Generic.List[string]
 $script:recentDms = New-Object System.Collections.Generic.List[string]
 $script:transcriptLimit = [Math]::Max(40, $TranscriptLines)
@@ -249,6 +253,22 @@ $script:renderDirty = $true
 $script:lastRenderAt = [DateTime]::MinValue
 $script:lastLayoutWidth = 0
 $script:lastLayoutHeight = 0
+$script:lastMessagePaneX = 0
+$script:lastMessagePaneWidth = 0
+$script:lastMessageBodyHeight = 0
+$script:lastRenderedMessageRowCount = 0
+$script:messageAppendPending = $false
+$script:initialSyncActive = $false
+$script:initialSyncStartedAt = [DateTime]::MinValue
+$script:initialSyncSettledAt = [DateTime]::MinValue
+$script:initialSyncMessageCount = 0
+$script:initialSyncResetSeen = $false
+$script:initialSyncThread = ""
+$script:initialSyncConversationId = ""
+$script:historyLoadPending = $false
+$script:historyExhausted = $false
+$script:historyBatchActive = $false
+$script:historyInsertIndex = 0
 $script:messageScrollOffset = 0
 $script:lastRxAt = $null
 $script:lastStatus = "starting"
@@ -256,9 +276,13 @@ $script:protocolEnabled = -not $NoProtocol
 $script:liveReceive = -not $NoAutoPoll
 $script:realtimeConnected = $false
 $script:realtimeBackfillPending = $false
+$script:realtimeBackfillReason = ""
+$script:nextRealtimeBackfillAt = [DateTime]::MinValue
+$script:lastRealtimeBackfillAt = [DateTime]::MinValue
 $script:lastSentAt = $null
 $script:postSendBackfillUntil = [DateTime]::MinValue
 $script:postSendBackfillNextAt = [DateTime]::MinValue
+$script:postSendBackfillCount = 0
 $script:protocolFrameSkipCount = 0
 $script:realtimeNoiseSkipCount = 0
 $script:unreadGroupCount = 0
@@ -360,6 +384,99 @@ function Normalize-BridgeLine {
     return $clean.TrimEnd()
 }
 
+function Split-BridgeProtocolSegments {
+    param([string]$Line)
+
+    if ([string]::IsNullOrWhiteSpace($Line) -or $Line -notmatch "@scb:") {
+        return @($Line)
+    }
+
+    $segments = New-Object System.Collections.Generic.List[string]
+    $index = 0
+    while ($index -lt $Line.Length) {
+        $start = $Line.IndexOf("@scb:", $index, [StringComparison]::Ordinal)
+        if ($start -lt 0) {
+            $tail = $Line.Substring($index).Trim()
+            if (-not [string]::IsNullOrWhiteSpace($tail)) {
+                $segments.Add($tail) | Out-Null
+            }
+            break
+        }
+
+        if ($start -gt $index) {
+            $prefix = $Line.Substring($index, $start - $index).Trim()
+            if (-not [string]::IsNullOrWhiteSpace($prefix)) {
+                $segments.Add($prefix) | Out-Null
+            }
+        }
+
+        $payloadStart = $start + 5
+        if ($payloadStart -ge $Line.Length -or $Line[$payloadStart] -ne "{") {
+            $nextStart = $Line.IndexOf("@scb:", $payloadStart, [StringComparison]::Ordinal)
+            if ($nextStart -lt 0) {
+                $segments.Add($Line.Substring($start).Trim()) | Out-Null
+                break
+            }
+            $segments.Add($Line.Substring($start, $nextStart - $start).Trim()) | Out-Null
+            $index = $nextStart
+            continue
+        }
+
+        $depth = 0
+        $inString = $false
+        $escaped = $false
+        $end = -1
+        $nextProtocolStart = -1
+        for ($i = $payloadStart; $i -lt $Line.Length; $i++) {
+            if (-not $inString -and $i -gt $payloadStart -and $Line.IndexOf("@scb:", $i, [StringComparison]::Ordinal) -eq $i) {
+                $nextProtocolStart = $i
+                break
+            }
+
+            $char = $Line[$i]
+            if ($inString) {
+                if ($escaped) {
+                    $escaped = $false
+                } elseif ($char -eq "\") {
+                    $escaped = $true
+                } elseif ($char -eq '"') {
+                    $inString = $false
+                }
+                continue
+            }
+
+            if ($char -eq '"') {
+                $inString = $true
+            } elseif ($char -eq "{") {
+                $depth += 1
+            } elseif ($char -eq "}") {
+                $depth -= 1
+                if ($depth -eq 0) {
+                    $end = $i
+                    break
+                }
+            }
+        }
+
+        if ($end -ge 0) {
+            $segments.Add($Line.Substring($start, $end - $start + 1)) | Out-Null
+            $index = $end + 1
+            continue
+        }
+
+        if ($nextProtocolStart -gt $start) {
+            $segments.Add($Line.Substring($start, $nextProtocolStart - $start).Trim()) | Out-Null
+            $index = $nextProtocolStart
+            continue
+        }
+
+        $segments.Add($Line.Substring($start).Trim()) | Out-Null
+        break
+    }
+
+    return $segments.ToArray()
+}
+
 function Get-LineColor {
     param([string]$Line)
 
@@ -408,10 +525,230 @@ function Add-MessageLine {
     param([string]$Line)
 
     Add-TranscriptLine $Line
+    $script:historyBatchActive = $false
     $script:messages.Add($Line) | Out-Null
+    $script:messageAppendPending = $true
     while ($script:messages.Count -gt $script:transcriptLimit) {
         $script:messages.RemoveAt(0)
+        $script:messageAppendPending = $false
     }
+}
+
+function Start-InitialSync {
+    param(
+        [string]$Thread,
+        [string]$ConversationId = ""
+    )
+
+    $script:initialSyncActive = $true
+    $script:initialSyncStartedAt = [DateTime]::UtcNow
+    $script:initialSyncSettledAt = [DateTime]::MinValue
+    $script:initialSyncMessageCount = 0
+    $script:initialSyncResetSeen = $false
+    $script:initialSyncThread = $Thread
+    $script:initialSyncConversationId = $ConversationId
+    Request-Render
+}
+
+function Complete-InitialSync {
+    param([string]$Reason = "ready")
+
+    if (-not $script:initialSyncActive) {
+        return
+    }
+
+    $script:initialSyncActive = $false
+    $script:initialSyncSettledAt = [DateTime]::UtcNow
+    Add-LiveFeedLine "Sync ready: $Reason"
+    Request-Render
+}
+
+function Test-InitialSyncThreadMatch {
+    param(
+        [string]$Thread,
+        [string]$ConversationId = ""
+    )
+
+    if (-not $script:initialSyncActive) {
+        return $false
+    }
+
+    if ($script:initialSyncThread -ne $Thread) {
+        return $false
+    }
+
+    if (
+        $Thread -eq "dm" -and
+        -not [string]::IsNullOrWhiteSpace($script:initialSyncConversationId) -and
+        -not [string]::IsNullOrWhiteSpace($ConversationId) -and
+        $script:initialSyncConversationId -ne $ConversationId
+    ) {
+        return $false
+    }
+
+    return $true
+}
+
+function Update-InitialSyncTimeout {
+    if (-not $script:initialSyncActive) {
+        return
+    }
+
+    $elapsed = [DateTime]::UtcNow - $script:initialSyncStartedAt
+    if ($elapsed.TotalSeconds -ge 8) {
+        if ($script:messageRecords.Count -gt 0) {
+            Complete-InitialSync "loaded $($script:messageRecords.Count) cached row(s)"
+        } else {
+            Complete-InitialSync "no latest rows before timeout"
+        }
+    }
+}
+
+function Get-MessageSortTicks {
+    param([string]$CreatedAt)
+
+    if (-not [string]::IsNullOrWhiteSpace($CreatedAt)) {
+        try {
+            return [DateTimeOffset]::Parse($CreatedAt).UtcTicks
+        } catch {
+            # Fall through to a sequence-backed key for legacy text rows.
+        }
+    }
+
+    return [DateTimeOffset]::UtcNow.UtcTicks
+}
+
+function Get-NewestMessageRecord {
+    if ($script:messageRecords.Count -eq 0) {
+        return $null
+    }
+
+    return @($script:messageRecords.Values | Sort-Object -Property SortTicks, Sequence | Select-Object -Last 1)[0]
+}
+
+function Sync-VisibleMessagesFromStore {
+    param(
+        [switch]$PreserveScroll,
+        [int]$PreviousRowCount = -1,
+        [int]$MessageWidth = 0
+    )
+
+    if ($MessageWidth -le 0) {
+        $MessageWidth = Get-CurrentMessagePaneWidth
+    }
+
+    if ($PreviousRowCount -lt 0) {
+        $PreviousRowCount = @(Get-MessageRenderRows $MessageWidth).Count
+    }
+
+    $script:messages.Clear()
+    $orderedRecords = @($script:messageRecords.Values | Sort-Object -Property SortTicks, Sequence)
+    foreach ($record in $orderedRecords) {
+        $script:messages.Add($record.Line) | Out-Null
+    }
+
+    $afterRowCount = @(Get-MessageRenderRows $MessageWidth).Count
+    if ($PreserveScroll -and $script:messageScrollOffset -gt 0) {
+        $script:messageScrollOffset += [Math]::Max(0, $afterRowCount - $PreviousRowCount)
+    }
+}
+
+function Add-ProtocolMessageRecord {
+    param(
+        [object]$Event,
+        [string]$Line,
+        [string]$Source,
+        [string]$Thread,
+        [string]$ConversationId
+    )
+
+    Add-TranscriptLine $Line
+
+    $messageWidth = Get-CurrentMessagePaneWidth
+    $beforeRowCount = @(Get-MessageRenderRows $messageWidth).Count
+    $previousNewest = Get-NewestMessageRecord
+    $previousNewestTicks = if ($previousNewest) { [Int64]$previousNewest.SortTicks } else { [Int64]::MinValue }
+    $previousNewestSequence = if ($previousNewest) { [Int64]$previousNewest.Sequence } else { [Int64]::MinValue }
+
+    $id = Get-ProtocolString $Event "id"
+    if ([string]::IsNullOrWhiteSpace($id)) {
+        $script:messageRecordSequence += 1
+        $id = "line:$($script:messageRecordSequence):$Line"
+    }
+
+    $createdAt = Get-ProtocolString $Event "createdAt"
+    $sortTicks = Get-MessageSortTicks $createdAt
+    $recordIsNew = -not $script:messageRecords.ContainsKey($id)
+    if ($recordIsNew) {
+        $script:messageRecordSequence += 1
+    }
+
+    $sequence = if ($recordIsNew) {
+        $script:messageRecordSequence
+    } else {
+        $script:messageRecords[$id].Sequence
+    }
+
+    $script:messageRecords[$id] = [pscustomobject]@{
+        Id = $id
+        Line = $Line
+        CreatedAt = $createdAt
+        SortTicks = $sortTicks
+        Sequence = $sequence
+        Source = $Source
+        Thread = $Thread
+        ConversationId = $ConversationId
+    }
+
+    $isHistory = $Source -eq "history"
+    Sync-VisibleMessagesFromStore -PreserveScroll:$isHistory -PreviousRowCount $beforeRowCount -MessageWidth $messageWidth
+
+    if ($isHistory) {
+        $script:historyLoadPending = $false
+        $script:historyExhausted = $false
+        $script:historyBatchActive = $false
+        $script:messageAppendPending = $false
+        return
+    }
+
+    if (Test-InitialSyncThreadMatch $Thread $ConversationId) {
+        $script:initialSyncMessageCount += 1
+    }
+
+    $recordIsAtNewestEdge = $sortTicks -gt $previousNewestTicks -or
+        ($sortTicks -eq $previousNewestTicks -and $sequence -gt $previousNewestSequence)
+    $script:historyBatchActive = $false
+    $script:messageAppendPending = $recordIsNew -and $recordIsAtNewestEdge -and $script:messageScrollOffset -eq 0
+}
+
+function Add-HistoryMessageLine {
+    param([string]$Line)
+
+    Add-TranscriptLine $Line
+    $messageWidth = Get-CurrentMessagePaneWidth
+    $beforeRowCount = @(Get-MessageRenderRows $messageWidth).Count
+
+    if (-not $script:historyBatchActive) {
+        $script:historyBatchActive = $true
+        $script:historyInsertIndex = 0
+    }
+
+    $insertAt = [Math]::Min($script:historyInsertIndex, $script:messages.Count)
+    $script:messages.Insert($insertAt, $Line)
+    $script:historyInsertIndex += 1
+
+    while ($script:messages.Count -gt $script:transcriptLimit) {
+        $script:messages.RemoveAt($script:messages.Count - 1)
+    }
+
+    $afterRowCount = @(Get-MessageRenderRows $messageWidth).Count
+    if ($script:messageScrollOffset -gt 0) {
+        $script:messageScrollOffset += [Math]::Max(1, $afterRowCount - $beforeRowCount)
+    }
+
+    $script:historyLoadPending = $false
+    $script:historyExhausted = $false
+    $script:messageAppendPending = $false
 }
 
 function Reset-MessageScroll {
@@ -421,28 +758,96 @@ function Reset-MessageScroll {
     }
 }
 
+function Get-SafeConsoleWidth {
+    try {
+        return [Math]::Max(40, [Console]::WindowWidth)
+    } catch {
+        return 120
+    }
+}
+
+function Get-SafeConsoleHeight {
+    try {
+        return [Math]::Max(12, [Console]::WindowHeight)
+    } catch {
+        return 40
+    }
+}
+
 function Get-MessagePageSize {
-    return [Math]::Max(4, [Console]::WindowHeight - 6)
+    return [Math]::Max(4, (Get-SafeConsoleHeight) - 6)
+}
+
+function Get-CurrentMessagePaneWidth {
+    $terminalWidth = Get-SafeConsoleWidth
+    $width = [Math]::Max(39, $terminalWidth - 1)
+    $useThreePane = $width -ge 132
+    $useTwoPane = -not $useThreePane -and $width -ge 96
+    $statusWidth = if ($useThreePane) { 24 } else { 0 }
+    $feedWidth = if ($useThreePane) { 34 } elseif ($useTwoPane) { 30 } else { 0 }
+    $separatorWidth = if ($useThreePane) { 6 } elseif ($useTwoPane) { 3 } else { 0 }
+    return [Math]::Max(8, $width - $statusWidth - $feedWidth - $separatorWidth)
+}
+
+function Get-MaxMessageScrollOffset {
+    $rows = @(Get-MessageRenderRows (Get-CurrentMessagePaneWidth))
+    return [Math]::Max(0, $rows.Count - [Math]::Max(4, (Get-SafeConsoleHeight) - 4))
+}
+
+function Request-HistoryLoad {
+    if ($script:currentMode -ne "group" -and $script:currentMode -ne "dm") {
+        return
+    }
+
+    if ($script:historyLoadPending -or $script:historyExhausted) {
+        return
+    }
+
+    if (-not $script:serial -or -not $script:serial.IsOpen) {
+        return
+    }
+
+    $script:historyLoadPending = $true
+    $script:historyBatchActive = $false
+    $script:historyInsertIndex = 0
+    Add-LiveFeedLine "Loading older $(Get-ModeLabel) messages..."
+    Send-BridgeLine "/history"
+    Request-Render
 }
 
 function Move-MessageScroll {
     param([int]$Delta)
 
-    $script:messageScrollOffset = [Math]::Max(0, $script:messageScrollOffset + $Delta)
+    $previousOffset = $script:messageScrollOffset
+    $maxOffset = Get-MaxMessageScrollOffset
+    $script:messageScrollOffset = [Math]::Max(0, [Math]::Min($maxOffset, $script:messageScrollOffset + $Delta))
+    if ($Delta -gt 0 -and $script:messageScrollOffset -ge $maxOffset -and $previousOffset -ge $maxOffset - 1) {
+        Request-HistoryLoad
+    }
     Request-Render
 }
 
 function Move-MessageScrollTop {
-    $script:messageScrollOffset = [int]::MaxValue
+    $script:messageScrollOffset = Get-MaxMessageScrollOffset
+    Request-HistoryLoad
     Request-Render
 }
 
 function Clear-MessagePane {
     $script:messages.Clear()
+    $script:messageRecords.Clear()
     $script:seenMessageLines.Clear()
     $script:seenMessageIds.Clear()
     $script:pollMarkerPending = $false
     $script:messageScrollOffset = 0
+    $script:messageAppendPending = $false
+    $script:lastRenderedMessageRowCount = 0
+    $script:historyLoadPending = $false
+    $script:historyExhausted = $false
+    $script:historyBatchActive = $false
+    $script:historyInsertIndex = 0
+    $script:initialSyncMessageCount = 0
+    $script:initialSyncResetSeen = $false
 }
 
 function Add-LiveFeedLine {
@@ -910,7 +1315,20 @@ function Queue-RealtimeBackfill {
         return
     }
 
+    $now = [DateTime]::UtcNow
+    $minDelaySeconds = if ($script:bridgeHealth.realtime -eq "joined") { 8 } else { 2 }
+    $cooldownSeconds = if ($script:bridgeHealth.realtime -eq "joined") { 20 } else { 6 }
+
+    if (
+        $script:lastRealtimeBackfillAt -ne [DateTime]::MinValue -and
+        ($now - $script:lastRealtimeBackfillAt).TotalSeconds -lt $cooldownSeconds
+    ) {
+        return
+    }
+
     $script:realtimeBackfillPending = $true
+    $script:nextRealtimeBackfillAt = $now.AddSeconds($minDelaySeconds)
+    $script:realtimeBackfillReason = if ([string]::IsNullOrWhiteSpace($Reason)) { "realtime repair" } else { $Reason }
     if (-not [string]::IsNullOrWhiteSpace($Reason)) {
         Add-LiveFeedLine $Reason
     }
@@ -950,8 +1368,14 @@ function Invoke-PendingRealtimeBackfill {
         return
     }
 
+    $now = [DateTime]::UtcNow
+    if ($script:nextRealtimeBackfillAt -ne [DateTime]::MinValue -and $now -lt $script:nextRealtimeBackfillAt) {
+        return
+    }
+
     $script:realtimeBackfillPending = $false
-    Add-LiveFeedLine "Backfill polling $(Get-ModeLabel)."
+    $script:nextRealtimeBackfillAt = [DateTime]::MinValue
+    $script:lastRealtimeBackfillAt = $now
     Invoke-Poll
 }
 
@@ -961,8 +1385,9 @@ function Queue-PostSendBackfill {
     }
 
     $now = [DateTime]::UtcNow
-    $script:postSendBackfillUntil = $now.AddSeconds(24)
-    $script:postSendBackfillNextAt = $now.AddSeconds(2)
+    $script:postSendBackfillUntil = $now.AddSeconds(30)
+    $script:postSendBackfillNextAt = $now.AddSeconds(4)
+    $script:postSendBackfillCount = 0
 }
 
 function Invoke-PostSendBackfill {
@@ -985,8 +1410,19 @@ function Invoke-PostSendBackfill {
         return
     }
 
+    if ($script:bridgeHealth.realtime -eq "joined" -and $script:postSendBackfillCount -ge 3) {
+        $script:postSendBackfillUntil = [DateTime]::MinValue
+        return
+    }
+
     Invoke-Poll
-    $script:postSendBackfillNextAt = $now.AddSeconds(5)
+    $script:postSendBackfillCount += 1
+    $nextDelay = switch ($script:postSendBackfillCount) {
+        1 { 8 }
+        2 { 12 }
+        default { 16 }
+    }
+    $script:postSendBackfillNextAt = $now.AddSeconds($nextDelay)
 }
 
 function Format-ProtocolMessageLine {
@@ -1111,9 +1547,12 @@ function Try-HandleProtocolLine {
         }
 
         if ($shouldReset) {
-            Clear-MessagePane
             $script:pollMarkerPending = $true
             $script:lastRxAt = [DateTime]::UtcNow
+            if (Test-InitialSyncThreadMatch $thread $conversationId) {
+                $script:initialSyncResetSeen = $true
+                $script:initialSyncMessageCount = 0
+            }
         }
 
         Request-Render
@@ -1123,12 +1562,12 @@ function Try-HandleProtocolLine {
     if ($type -eq "message") {
         $line = Format-ProtocolMessageLine $event
         $id = Get-ProtocolString $event "id"
+        $thread = Get-ProtocolString $event "thread" "message"
+        $source = Get-ProtocolString $event "source" "unknown"
+        $conversationId = Get-ProtocolString $event "conversationId"
         $isNewMessage = if ($id) { $script:seenMessageIds.Add($id) } else { $script:seenMessageLines.Add($line) }
         if ($isNewMessage -and $script:seenMessageLines.Add($line)) {
             $script:pollMarkerPending = $false
-            $thread = Get-ProtocolString $event "thread" "message"
-            $source = Get-ProtocolString $event "source" "unknown"
-            $conversationId = Get-ProtocolString $event "conversationId"
             $sender = Get-ProtocolString $event "senderLabel" (Get-ProtocolString $event "senderId" "")
             if (
                 $thread -eq "dm" -and
@@ -1141,8 +1580,16 @@ function Try-HandleProtocolLine {
             }
 
             if (-not (Register-InactiveUnread $thread $sender $conversationId)) {
-                Add-MessageLine $line
+                Add-ProtocolMessageRecord $event $line $source $thread $conversationId
             }
+        }
+        if (
+            $source -eq "poll" -and
+            (Test-InitialSyncThreadMatch $thread $conversationId) -and
+            $script:initialSyncResetSeen -and
+            $script:initialSyncMessageCount -gt 0
+        ) {
+            $script:initialSyncSettledAt = [DateTime]::UtcNow.AddMilliseconds(450)
         }
         $script:lastRxAt = [DateTime]::UtcNow
         Request-Render
@@ -1265,7 +1712,11 @@ function Get-VersionLabel {
 }
 
 function Get-LiveTransportLabel {
-    if ($script:realtimeConnected) {
+    if ($script:initialSyncActive) {
+        return "syncing latest"
+    }
+
+    if ($script:bridgeHealth.realtime -eq "joined") {
         return "live: realtime"
     }
 
@@ -1277,7 +1728,11 @@ function Get-LiveTransportLabel {
 }
 
 function Get-PollFallbackLabel {
-    if ($script:realtimeConnected) {
+    if ($script:initialSyncActive) {
+        return "syncing"
+    }
+
+    if ($script:bridgeHealth.realtime -eq "joined") {
         "fallback idle"
     } elseif ($script:liveReceive) {
         "fallback ${PollSeconds}s"
@@ -1292,6 +1747,8 @@ function Get-SidebarLines {
     $sentLabel = if ($script:lastSentAt) { $script:lastSentAt.ToLocalTime().ToString("HH:mm:ss") } else { "none" }
     $protocolLabel = if ($script:protocolEnabled) { $script:bridgeHealth.serial } else { "off" }
     $scrollLabel = if ($script:messageScrollOffset -gt 0) { "+$script:messageScrollOffset" } else { "latest" }
+    $historyLabel = if ($script:historyLoadPending) { "loading" } elseif ($script:historyExhausted) { "start" } else { "ready" }
+    $syncLabel = if ($script:initialSyncActive) { "loading" } elseif ($script:initialSyncSettledAt -ne [DateTime]::MinValue) { "ready" } else { "idle" }
 
     return @(
         "SHADOWCHAT BRIDGE",
@@ -1301,6 +1758,8 @@ function Get-SidebarLines {
         "mode  $(Get-ModeLabel)",
         "unrd  $(Get-UnreadSidebarLabel)",
         "view  $scrollLabel",
+        "sync  $syncLabel",
+        "hist  $historyLabel",
         "port  $Port",
         "poll  $pollLabel",
         "rx    $rxLabel",
@@ -1373,6 +1832,67 @@ function Write-MessageSegment {
     Write-Ui (Format-MessagePaneLine $Text $Width) $color -NoNewline:$NoNewline
 }
 
+function Try-RenderMessageFeedAppend {
+    param(
+        [int]$MessageX,
+        [int]$MessageWidth,
+        [int]$BodyHeight,
+        [int]$TerminalWidth,
+        [int]$TerminalHeight
+    )
+
+    if (-not $script:messageAppendPending -or $script:messageScrollOffset -ne 0) {
+        return $false
+    }
+
+    if ($script:lastRenderedMessageRowCount -lt $BodyHeight) {
+        return $false
+    }
+
+    if (
+        $MessageX -ne $script:lastMessagePaneX -or
+        $MessageWidth -ne $script:lastMessagePaneWidth -or
+        $BodyHeight -ne $script:lastMessageBodyHeight
+    ) {
+        return $false
+    }
+
+    $messageRows = @(Get-MessageRenderRows $MessageWidth)
+    $delta = $messageRows.Count - $script:lastRenderedMessageRowCount
+    if ($delta -le 0 -or $delta -gt $BodyHeight) {
+        return $false
+    }
+
+    try {
+        $bodyTop = 2
+        $copyHeight = $BodyHeight - $delta
+        if ($copyHeight -gt 0) {
+            [Console]::MoveBufferArea($MessageX, $bodyTop + $delta, $MessageWidth, $copyHeight, $MessageX, $bodyTop)
+        }
+
+        $start = $messageRows.Count - $delta
+        for ($i = 0; $i -lt $delta; $i++) {
+            [Console]::SetCursorPosition($MessageX, $bodyTop + $copyHeight + $i)
+            Write-MessageRenderRow $messageRows[$start + $i] $MessageWidth -NoNewline
+        }
+
+        [Console]::SetCursorPosition(0, 0)
+        $pollLabel = Get-LiveTransportLabel
+        $rxLabel = if ($script:lastRxAt) { "rx: $($script:lastRxAt.ToLocalTime().ToString("HH:mm:ss"))" } else { "rx: none" }
+        Write-Ui (Fit-Text "ShadowChat Bridge TUI $(Get-VersionLabel) | $Port @ $BaudRate | $(Get-ModeLabel) | $pollLabel | $rxLabel$(Get-UnreadSummaryLabel) | $(Get-HealthLabel)" $TerminalWidth) ([ConsoleColor]::Yellow)
+        [Console]::SetCursorPosition(0, $TerminalHeight - 1)
+        Write-Ui (Fit-Text (Get-InputLine $TerminalWidth) $TerminalWidth) ([ConsoleColor]::White) -NoNewline
+
+        $script:lastRenderedMessageRowCount = $messageRows.Count
+        $script:messageAppendPending = $false
+        $script:renderDirty = $false
+        $script:lastRenderAt = [DateTime]::UtcNow
+        return $true
+    } catch {
+        return $false
+    }
+}
+
 function Render-Layout {
     param([switch]$Force)
 
@@ -1394,11 +1914,6 @@ function Render-Layout {
         return
     }
 
-    $script:lastRenderAt = $now
-    $script:renderDirty = $false
-    $script:lastLayoutWidth = $width
-    $script:lastLayoutHeight = $height
-
     $bodyHeight = [Math]::Max(4, $height - 4)
     $divider = "-" * $width
     $pollLabel = Get-LiveTransportLabel
@@ -1409,8 +1924,24 @@ function Render-Layout {
     $feedWidth = if ($useThreePane) { 34 } elseif ($useTwoPane) { 30 } else { 0 }
     $separatorWidth = if ($useThreePane) { 6 } elseif ($useTwoPane) { 3 } else { 0 }
     $messageWidth = $width - $statusWidth - $feedWidth - $separatorWidth
+    $messageX = if ($useThreePane) { $statusWidth + 3 } else { 0 }
+
+    if (-not $Force -and -not $resized -and (Try-RenderMessageFeedAppend $messageX $messageWidth $bodyHeight $width $height)) {
+        return
+    }
+
+    $script:lastRenderAt = $now
+    $script:renderDirty = $false
+    $script:lastLayoutWidth = $width
+    $script:lastLayoutHeight = $height
+
     $statusLines = @(if ($useThreePane) { Get-SidebarLines })
     $messageRows = @(Get-MessageRenderRows $messageWidth)
+    $script:lastMessagePaneX = $messageX
+    $script:lastMessagePaneWidth = $messageWidth
+    $script:lastMessageBodyHeight = $bodyHeight
+    $script:lastRenderedMessageRowCount = $messageRows.Count
+    $script:messageAppendPending = $false
     $maxScrollOffset = [Math]::Max(0, $messageRows.Count - $bodyHeight)
     if ($script:messageScrollOffset -gt $maxScrollOffset) {
         $script:messageScrollOffset = $maxScrollOffset
@@ -1476,6 +2007,16 @@ function Write-BridgeLine {
         return
     }
 
+    $segments = @(Split-BridgeProtocolSegments $clean)
+    if ($segments.Count -gt 1 -or ($segments.Count -eq 1 -and $segments[0] -ne $clean)) {
+        foreach ($segment in $segments) {
+            if (-not [string]::IsNullOrWhiteSpace($segment)) {
+                Write-BridgeLine $segment
+            }
+        }
+        return
+    }
+
     if (Try-HandleProtocolLine $clean) {
         return
     }
@@ -1485,6 +2026,17 @@ function Write-BridgeLine {
         Queue-RealtimeBackfill
         Request-Render
         return
+    }
+
+    if ($clean -eq "(no older messages)") {
+        $script:historyLoadPending = $false
+        $script:historyExhausted = $true
+        $script:historyBatchActive = $false
+    }
+
+    if ($script:initialSyncActive -and $clean -eq "(no messages)") {
+        $script:initialSyncResetSeen = $true
+        $script:initialSyncSettledAt = [DateTime]::UtcNow
     }
 
     if ($script:statusCaptureActive -and $clean -notmatch "^\s{2}[a-zA-Z_]+:") {
@@ -1623,6 +2175,8 @@ function Enter-BridgeMode {
         $script:activeDmConversationId = ""
         Clear-UnreadForThread "group"
         Clear-MessagePane
+        Start-InitialSync "group"
+        Add-LiveFeedLine "Syncing latest GROUP messages..."
         Send-BridgeLine "chat group"
         $script:lastPollAt = [DateTime]::UtcNow
         Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
@@ -1643,6 +2197,8 @@ function Enter-BridgeMode {
         Add-RecentDm $RecipientUserId
         Clear-UnreadForThread "dm"
         Clear-MessagePane
+        Start-InitialSync "dm"
+        Add-LiveFeedLine "Syncing latest DM messages..."
         Send-BridgeLine "chat dm $RecipientUserId"
         $script:lastPollAt = [DateTime]::UtcNow
         Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
@@ -1655,6 +2211,7 @@ function Enter-BridgeMode {
     }
     $script:currentMode = "admin"
     Clear-MessagePane
+    Complete-InitialSync "admin"
     Save-BridgeTuiPreferencesQuiet -Path $script:preferencesPath
     Request-Render
 }
@@ -1756,7 +2313,9 @@ function Show-Help {
         "",
         "ShadowChat Bridge TUI",
         "  Plain text sends to the active chat thread.",
+        "  Startup waits for the first latest-window sync before marking live.",
         "  /poll                 refresh active chat",
+        "  /history              load older messages",
         "  /group                switch to group chat",
         "  /dm <recipient|@name> switch to a DM",
         "  @ai <question>       ask Shado in group chat",
@@ -1843,6 +2402,9 @@ function Process-InputLine {
         $script:running = $false
     } elseif ($Line -eq "/poll") {
         Invoke-Poll
+    } elseif ($Line -eq "/history" -or $Line -eq "/older") {
+        $script:historyExhausted = $false
+        Request-HistoryLoad
     } elseif ($Line -match "^/poll-interval\s+(\d+)$") {
         $nextInterval = [Math]::Max(2, [int]$Matches[1])
         Set-Variable -Name PollSeconds -Scope Script -Value $nextInterval
@@ -1960,20 +2522,52 @@ function Wait-BridgeOutput {
     $deadline = [DateTime]::UtcNow.AddSeconds($Seconds)
     while ([DateTime]::UtcNow -lt $deadline) {
         Read-SerialOutput
+        if (
+            $script:initialSyncActive -and
+            $script:initialSyncSettledAt -ne [DateTime]::MinValue -and
+            [DateTime]::UtcNow -ge $script:initialSyncSettledAt
+        ) {
+            $count = if ($script:initialSyncMessageCount -gt 0) { $script:initialSyncMessageCount } else { $script:messageRecords.Count }
+            Complete-InitialSync "loaded $count latest row(s)"
+        }
+        Update-InitialSyncTimeout
         Invoke-PendingRealtimeBackfill
         Invoke-PostSendBackfill
         Start-Sleep -Milliseconds 100
     }
 }
 
+function Get-AdminCommandWaitSeconds {
+    param([string]$Command)
+
+    if ($RunAdminWaitSeconds -gt 0) {
+        return $RunAdminWaitSeconds
+    }
+
+    $normalized = if ($Command) { $Command.Trim().ToLowerInvariant() } else { "" }
+    if ($normalized -like "bundle get*") {
+        return 900
+    }
+    if ($normalized -like "update apply*") {
+        return 240
+    }
+    if ($normalized -like "update check*" -or $normalized -like "bundle check*" -or $normalized -like "wifi scan*") {
+        return 30
+    }
+
+    return 8
+}
+
 function Assert-SmokeTranscriptHealthy {
     param([string]$Transcript)
 
     $hasTextStatus = $Transcript -match "Bridge status" -and $Transcript -match "data_link: established"
+    $sessionHealth = Get-ExpiryHealthLabel $script:bridgeHealth.session
+    $authHealth = Get-ExpiryHealthLabel $script:bridgeHealth.auth
     $hasProtocolStatus = (Get-DataLinkLabel $script:bridgeHealth.wifi) -eq "established" -and
         $script:bridgeHealth.device -eq "paired" -and
-        $script:bridgeHealth.session -eq "ok" -and
-        $script:bridgeHealth.auth -eq "ok"
+        $sessionHealth -notin @("missing", "expired") -and
+        $authHealth -notin @("missing", "expired")
 
     if (-not ($hasTextStatus -or $hasProtocolStatus)) {
         throw "Smoke check did not observe bridge status with the data link established."
@@ -1983,6 +2577,36 @@ function Assert-SmokeTranscriptHealthy {
     if ($Transcript -match $failurePattern) {
         throw "Smoke check observed bridge errors in the transcript."
     }
+}
+
+function Wait-ForSmokeHealth {
+    param([int]$Seconds = 15)
+
+    $deadline = [DateTime]::UtcNow.AddSeconds($Seconds)
+    $nextStatusAt = [DateTime]::MinValue
+    while ([DateTime]::UtcNow -lt $deadline) {
+        Read-SerialOutput
+
+        $sessionHealth = Get-ExpiryHealthLabel $script:bridgeHealth.session
+        $authHealth = Get-ExpiryHealthLabel $script:bridgeHealth.auth
+        if (
+            (Get-DataLinkLabel $script:bridgeHealth.wifi) -eq "established" -and
+            $script:bridgeHealth.device -eq "paired" -and
+            $sessionHealth -notin @("missing", "expired") -and
+            $authHealth -notin @("missing", "expired")
+        ) {
+            return $true
+        }
+
+        if ([DateTime]::UtcNow -ge $nextStatusAt) {
+            Invoke-StatusCommand -Quiet
+            $nextStatusAt = [DateTime]::UtcNow.AddSeconds(3)
+        }
+
+        Start-Sleep -Milliseconds 150
+    }
+
+    return $false
 }
 
 function Run-Smoke {
@@ -2005,6 +2629,7 @@ function Run-Smoke {
     }
 
     Wait-BridgeOutput 7
+    Wait-ForSmokeHealth 15 | Out-Null
 
     if ($script:currentMode -eq "group" -and -not [string]::IsNullOrWhiteSpace($SmokeGroupText)) {
         Write-Ui "Smoke sending group message..." ([ConsoleColor]::Yellow)
@@ -2046,8 +2671,8 @@ function Run-Smoke {
         }
     }
 
-    Invoke-AdminCommand "status"
-    Wait-BridgeOutput 5
+    Invoke-StatusCommand -Quiet
+    Wait-ForSmokeHealth 10 | Out-Null
 
     $joined = $script:transcript -join "`n"
     Assert-SmokeTranscriptHealthy $joined
@@ -2060,6 +2685,21 @@ function Run-Smoke {
     }
 
     Write-Ui "Bridge TUI smoke passed." ([ConsoleColor]::Green)
+}
+
+function Run-AdminCommands {
+    Sync-BridgeAdmin
+    Enable-StructuredProtocol
+
+    foreach ($command in @($RunAdminCommand)) {
+        if ([string]::IsNullOrWhiteSpace($command)) {
+            continue
+        }
+
+        Write-Ui "bridge> $command" ([ConsoleColor]::Yellow)
+        Send-BridgeLine $command
+        Wait-BridgeOutput (Get-AdminCommandWaitSeconds $command)
+    }
 }
 
 function Run-Interactive {
@@ -2098,10 +2738,19 @@ function Run-Interactive {
 
     while ($script:running) {
         Read-SerialOutput
+        if (
+            $script:initialSyncActive -and
+            $script:initialSyncSettledAt -ne [DateTime]::MinValue -and
+            [DateTime]::UtcNow -ge $script:initialSyncSettledAt
+        ) {
+            $count = if ($script:initialSyncMessageCount -gt 0) { $script:initialSyncMessageCount } else { $script:messageRecords.Count }
+            Complete-InitialSync "loaded $count latest row(s)"
+        }
+        Update-InitialSyncTimeout
         Invoke-PendingRealtimeBackfill
         Invoke-PostSendBackfill
 
-        if ($script:liveReceive -and -not $script:realtimeConnected -and ($script:currentMode -eq "group" -or $script:currentMode -eq "dm")) {
+        if (-not $script:initialSyncActive -and $script:liveReceive -and $script:bridgeHealth.realtime -ne "joined" -and ($script:currentMode -eq "group" -or $script:currentMode -eq "dm")) {
             $elapsed = [DateTime]::UtcNow - $script:lastPollAt
             if ($elapsed.TotalSeconds -ge $PollSeconds) {
                 Invoke-Poll
@@ -2179,7 +2828,9 @@ function Run-Interactive {
 try {
     $script:serial = Connect-Serial
 
-    if ($Smoke) {
+    if ($RunAdminCommand.Count -gt 0) {
+        Run-AdminCommands
+    } elseif ($Smoke) {
         Run-Smoke
     } else {
         Run-Interactive

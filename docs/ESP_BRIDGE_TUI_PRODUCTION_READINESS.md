@@ -1,25 +1,45 @@
 # ESP Bridge TUI Production Readiness
 
 This document records the bridge TUI polish shipped in the `0.1.11` through
-`0.1.20` Windows tools bundles.
+`0.1.24` Windows tools bundles.
 
 ## Current Bundle
 
 Latest stable Windows tools bundle:
 
+- version: `0.1.24-startup-sync`
+- storage path: `windows/0.1.24-startup-sync/shadowchat-bridge-tools.zip`
+- SHA-256: `d100991d94ec31a3bc09485eea27053bb6ef57d69b1f19a2c83ce59951a357cc`
+- size: `35699` bytes
+
+Latest stable ESP32-S3 firmware:
+
+- version: `0.2.20-startup-window`
+- storage path: `firmware/esp32-s3/0.2.20-startup-window/shadowchat_bridge.bin`
+- SHA-256: `9b6253b53f0084f39acbbf07fd3cff32255de76b69aef46fa7e0a2ec9cac13d8`
+- size: `1044976` bytes
+
+Previous stability bundles:
+
+- version: `0.1.23-stable-feed`
+- storage path: `windows/0.1.23-stable-feed/shadowchat-bridge-tools.zip`
+- SHA-256: `2f43ba85a575a4fc33810108b6e11f3c362f3d590684b4e3351fad926b20663d`
+- size: `34913` bytes
+
+- version: `0.1.22-stable-feed`
+- storage path: `windows/0.1.22-stable-feed/shadowchat-bridge-tools.zip`
+- SHA-256: `f4cb8d295a832ac1d343eb7c8c0e3094c2ae92149cfa80a8dd1b453982784641`
+- size: `34909` bytes
+
+- version: `0.1.21-realtime-feed`
+- storage path: `windows/0.1.21-realtime-feed/shadowchat-bridge-tools.zip`
+- SHA-256: `cfbff6791e4eb32c110553bc5e55309493a32f46911256ebeae050e08ee92c36`
+- size: `34032` bytes
+
 - version: `0.1.20-fragment-filter`
 - storage path: `windows/0.1.20-fragment-filter/shadowchat-bridge-tools.zip`
 - SHA-256: `3dae115f9f3a94f668f1b4b8157a3287803287fe8a7d8796a3c97ef9fab69a3c`
 - size: `31855` bytes
-
-Latest stable ESP32-S3 firmware:
-
-- version: `0.2.15-quiet-protocol`
-- storage path: `firmware/esp32-s3/0.2.15-quiet-protocol/shadowchat_bridge.bin`
-- SHA-256: `b0fc6c48290e21391dcc14b48b1b7a81f81b80612d2b1b280b2418f73947472c`
-- size: `1043312` bytes
-
-Previous stability bundles:
 
 - version: `0.1.19-link-log-filter`
 - storage path: `windows/0.1.19-link-log-filter/shadowchat-bridge-tools.zip`
@@ -85,10 +105,22 @@ The TUI should feel smooth, dependable, and chat-first:
 - malformed structured serial frames and low-level realtime transport fragments are handled by fallback polling instead of showing raw parser or socket errors in the live feed
 - full latest-window polls replace the visible group or DM thread instead of appending partial slices, so the pane does not look like a random mix of old and new messages
 - bridge session refresh keeps the hardware refresh token stable while rotating access tokens, reducing refresh races between realtime and polling
-- compact bridge poll responses cap at ten messages and carry only TUI-needed sender fields, keeping ESP HTTP buffers and serial bursts dependable
+- latest-window bridge polls load up to 30 rows for startup and manual refresh, while incremental repair and history polls stay capped at ten rows
+- firmware reserves a larger HTTP response buffer for 30-row latest windows so the ESP does not silently truncate the backend response before emitting message frames
 - firmware serializes structured `@scb` output across tasks and suppresses low-level TLS/certificate/websocket logs that could split protocol frames
 - the TUI opens the bridge serial port with the stable DTR/RTS settings used by direct device validation
 - low-level link-driver startup lines and orphaned structured JSON fragments are filtered out of the live feed while fallback polling repairs the visible thread
+- realtime repair polling is debounced and quiet, so malformed fragments do not flood the side feed with repeated backfill messages
+- the header only labels realtime as the active live transport after the WebSocket has joined the channel; connected-but-not-joined falls back to polling
+- when the chat pane is already full and the user is at the latest message, new message rows use a terminal-feed append path instead of repainting the whole message pane
+- PageUp and `/history` request older rows before the visible window, prepend them in order, and preserve the user's scroll position
+- recoverable structured serial bursts are split so adjacent `@scb` frames can still render live even when they arrive on the same serial line
+- latest-poll reset frames do not clear or replace the visible feed; poll, realtime, sent, and history frames reconcile into a timestamp-sorted message store
+- stale delayed poll rows cannot take over the bottom/latest view after startup or realtime repair
+- group and DM startup now show `syncing latest` and hold fallback repair polls until the first latest-window reset plus message batch has settled
+- empty latest-window startup syncs complete deterministically instead of letting older delayed rows become the visible bottom of the feed
+- firmware emits a full structured sent-message frame from successful group/DM sends, so local sends render immediately and later poll/realtime echoes dedupe cleanly
+- scripted admin commands keep short waits for normal checks while allowing longer windows for OTA apply and serial bundle transfer commands
 - visible connectivity chrome uses data-link language such as `data link` and `link`
 - two-pane terminal widths render without strict-mode crashes
 
@@ -103,12 +135,21 @@ Bridge AI support uses:
 - `supabase/functions/_shared/ai.ts`
 - `supabase/functions/openai-chat/index.ts`
 - `supabase/functions/bridge-group-send/index.ts`
+- `supabase/functions/bridge-group-poll/index.ts`
+- `supabase/functions/bridge-dm-poll/index.ts`
 
 Deploy both changed functions whenever shared AI code changes:
 
 ```powershell
 supabase functions deploy openai-chat --no-verify-jwt --use-api
 supabase functions deploy bridge-group-send --no-verify-jwt --use-api
+```
+
+Deploy both poll functions whenever history cursor behavior changes:
+
+```powershell
+supabase functions deploy bridge-group-poll --no-verify-jwt --use-api
+supabase functions deploy bridge-dm-poll --no-verify-jwt --use-api
 ```
 
 Required Supabase secrets:
@@ -153,6 +194,18 @@ and active/recoverable session:
 
 ```powershell
 npm run bridge:tui:smoke
+```
+
+For startup-sync or feed-order changes, run at least three direct COM-port
+starts plus one send probe:
+
+```powershell
+for ($i = 1; $i -le 3; $i++) {
+  powershell -NoProfile -ExecutionPolicy Bypass -File tools\bridge-tui\bridge-tui.ps1 -Port COM4 -Smoke
+}
+
+$token = "bridge startup sync $((Get-Date).ToUniversalTime().ToString('HHmmss'))"
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\bridge-tui\bridge-tui.ps1 -Port COM4 -Smoke -SmokeGroupText $token
 ```
 
 For AI smoke without posting to chat, sign in as a stable test account and call
