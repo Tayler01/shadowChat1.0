@@ -28,7 +28,7 @@ $script:utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 $script:serialDecoder = $script:utf8NoBom.GetDecoder()
 [Console]::OutputEncoding = $script:utf8NoBom
 $OutputEncoding = $script:utf8NoBom
-$script:tuiVersion = "0.1.30-clean-start"
+$script:tuiVersion = "0.1.31-kali-grid"
 $script:tuiVersionDate = "2026-04-28"
 
 function Get-DefaultPreferencesPath {
@@ -346,9 +346,9 @@ function Write-Ui {
     }
 
     if ($NoNewline) {
-        Write-Host -NoNewline $Text
+        [Console]::Write($Text)
     } else {
-        Write-Host $Text
+        [Console]::WriteLine($Text)
     }
 
     if (Use-Color) {
@@ -1978,6 +1978,101 @@ function Get-HealthLabel {
     return "data link: $dataLink | device: $device | session: $session | auth: $auth | rt: $($script:bridgeHealth.realtime)"
 }
 
+function Get-CompactHealthLabel {
+    $dataLink = Get-DataLinkLabel $script:bridgeHealth.wifi
+    $session = Get-ExpiryHealthLabel $script:bridgeHealth.session
+    $auth = Get-ExpiryHealthLabel $script:bridgeHealth.auth
+    return "link:$dataLink dev:$($script:bridgeHealth.device) sess:$session auth:$auth rt:$($script:bridgeHealth.realtime)"
+}
+
+function Get-WorkspaceBlock {
+    param(
+        [string]$Name,
+        [string]$Label,
+        [bool]$Active
+    )
+
+    if ($Active) {
+        return "[{0}:{1}*]" -f $Name, $Label
+    }
+
+    return "[{0}:{1}]" -f $Name, $Label
+}
+
+function Get-WorkspaceBar {
+    $groupActive = $script:currentMode -eq "group"
+    $dmActive = $script:currentMode -eq "dm"
+    $adminActive = $script:currentMode -eq "admin"
+    return @(
+        (Get-WorkspaceBlock "1" "g" $groupActive),
+        (Get-WorkspaceBlock "2" "dm" $dmActive),
+        (Get-WorkspaceBlock "3" "adm" $adminActive)
+    ) -join " "
+}
+
+function Get-TopBarLine {
+    param([int]$Width)
+
+    $rxLabel = if ($script:lastRxAt) { $script:lastRxAt.ToLocalTime().ToString("HH:mm:ss") } else { "none" }
+    $left = "$(Get-WorkspaceBar) shadowchat-bridge $(Get-VersionLabel)"
+    $right = "$Port@$BaudRate | $(Get-LiveTransportLabel) | rx:$rxLabel$(Get-UnreadSummaryLabel) | $(Get-CompactHealthLabel)"
+    $leftClean = Get-DisplayText $left
+    $rightClean = Get-DisplayText $right
+    if (($leftClean.Length + $rightClean.Length + 1) -le $Width) {
+        return $left + (" " * ($Width - $leftClean.Length - $rightClean.Length)) + $right
+    }
+
+    return Fit-Text "$left | $right" $Width
+}
+
+function Get-PanelTitle {
+    param(
+        [string]$Title,
+        [int]$Width
+    )
+
+    if ($Width -le 0) {
+        return ""
+    }
+
+    $label = "[$Title]"
+    if ($Width -le $label.Length) {
+        return Fit-Text $label $Width
+    }
+
+    return $label + ("-" * ($Width - $label.Length))
+}
+
+function Get-ChatPaneTitle {
+    $thread = if ($script:currentMode -eq "dm") { "dm" } elseif ($script:currentMode -eq "admin") { "admin" } else { "group" }
+    $scroll = if ($script:messageScrollOffset -gt 0) { "scroll +$script:messageScrollOffset" } else { "latest" }
+    return "chat:$thread $scroll"
+}
+
+function Get-PaneHeaderLine {
+    param(
+        [int]$Width,
+        [bool]$UseThreePane,
+        [bool]$UseTwoPane,
+        [int]$StatusWidth,
+        [int]$MessageWidth,
+        [int]$FeedWidth
+    )
+
+    if ($UseThreePane) {
+        return (Get-PanelTitle "sys" $StatusWidth) + " | " +
+            (Get-PanelTitle (Get-ChatPaneTitle) $MessageWidth) + " | " +
+            (Get-PanelTitle "events" $FeedWidth)
+    }
+
+    if ($UseTwoPane) {
+        return (Get-PanelTitle (Get-ChatPaneTitle) $MessageWidth) + " | " +
+            (Get-PanelTitle "events" $FeedWidth)
+    }
+
+    return Get-PanelTitle (Get-ChatPaneTitle) $Width
+}
+
 function Get-VersionLabel {
     return "v$script:tuiVersion $script:tuiVersionDate"
 }
@@ -2022,7 +2117,8 @@ function Get-SidebarLines {
     $syncLabel = if ($script:initialSyncActive) { "loading" } elseif ($script:initialSyncSettledAt -ne [DateTime]::MinValue) { "ready" } else { "idle" }
 
     return @(
-        "SHADOWCHAT BRIDGE",
+        "shadowchat-bridge",
+        "grid  $(Get-WorkspaceBar)",
         "tools $script:tuiVersion",
         "date  $script:tuiVersionDate",
         "",
@@ -2038,21 +2134,23 @@ function Get-SidebarLines {
         "proto $protocolLabel",
         "rt    $($script:bridgeHealth.realtime)",
         "",
+        "-- link",
         "link  $(Get-DataLinkLabel $script:bridgeHealth.wifi)",
         "dev   $($script:bridgeHealth.device)",
         "sess  $(Get-ExpiryHealthLabel $script:bridgeHealth.session)",
         "auth  $(Get-ExpiryHealthLabel $script:bridgeHealth.auth)",
         "",
-        "Tab       swap",
-        "PgUp/Dn   scroll",
-        "End       latest",
-        "@ai       Shado",
-        "/users    find",
-        "/dms      recent",
-        "/dm name  DM",
-        "/group    group",
-        "/live     toggle",
-        "/admin    shell"
+        "-- keys",
+        "Tab     focus",
+        "PgUpDn  scroll",
+        "End     latest",
+        "@ai     Shado",
+        "/users  find",
+        "/dms    recent",
+        "/dm     DM",
+        "/group  group",
+        "/live   toggle",
+        "/admin  shell"
     )
 }
 
@@ -2148,9 +2246,7 @@ function Try-RenderMessageFeedAppend {
         }
 
         [Console]::SetCursorPosition(0, 0)
-        $pollLabel = Get-LiveTransportLabel
-        $rxLabel = if ($script:lastRxAt) { "rx: $($script:lastRxAt.ToLocalTime().ToString("HH:mm:ss"))" } else { "rx: none" }
-        Write-Ui (Fit-Text "ShadowChat Bridge TUI $(Get-VersionLabel) | $Port @ $BaudRate | $(Get-ModeLabel) | $pollLabel | $rxLabel$(Get-UnreadSummaryLabel) | $(Get-HealthLabel)" $TerminalWidth) ([ConsoleColor]::Yellow)
+        Write-Ui (Get-TopBarLine $TerminalWidth) ([ConsoleColor]::Cyan)
         [Console]::SetCursorPosition(0, $TerminalHeight - 1)
         Write-Ui (Fit-Text (Get-InputLine $TerminalWidth) $TerminalWidth) ([ConsoleColor]::White) -NoNewline
 
@@ -2186,9 +2282,6 @@ function Render-Layout {
     }
 
     $bodyHeight = [Math]::Max(4, $height - 4)
-    $divider = "-" * $width
-    $pollLabel = Get-LiveTransportLabel
-    $rxLabel = if ($script:lastRxAt) { "rx: $($script:lastRxAt.ToLocalTime().ToString("HH:mm:ss"))" } else { "rx: none" }
     $useThreePane = $width -ge 132
     $useTwoPane = -not $useThreePane -and $width -ge 96
     $statusWidth = if ($useThreePane) { 24 } else { 0 }
@@ -2223,8 +2316,8 @@ function Render-Layout {
     $scrollLabel = if ($script:messageScrollOffset -gt 0) { " | scroll: +$script:messageScrollOffset" } else { "" }
 
     [Console]::SetCursorPosition(0, 0)
-    Write-Ui (Fit-Text "ShadowChat Bridge TUI $(Get-VersionLabel) | $Port @ $BaudRate | $(Get-ModeLabel) | $pollLabel | $rxLabel$(Get-UnreadSummaryLabel)$scrollLabel | $(Get-HealthLabel)" $width) ([ConsoleColor]::Yellow)
-    Write-Ui $divider ([ConsoleColor]::DarkGray)
+    Write-Ui (Get-TopBarLine $width) ([ConsoleColor]::Cyan)
+    Write-Ui (Get-PaneHeaderLine $width $useThreePane $useTwoPane $statusWidth $messageWidth $feedWidth) ([ConsoleColor]::DarkCyan)
 
     for ($i = 0; $i -lt $bodyHeight; $i++) {
         $messageIndex = $messageStart + $i - $messageTopPadding
@@ -2248,7 +2341,7 @@ function Render-Layout {
         }
     }
 
-    Write-Ui $divider ([ConsoleColor]::DarkGray)
+    Write-Ui ("-" * $width) ([ConsoleColor]::DarkGray)
     $promptLine = Get-InputLine $width
     Write-Ui (Fit-Text $promptLine $width) ([ConsoleColor]::White) -NoNewline
 }
@@ -2671,14 +2764,14 @@ function Show-Preferences {
 
 function Get-Prompt {
     if ($script:currentMode -eq "dm") {
-        return "dm> "
+        return 'scb:dm$ '
     }
 
     if ($script:currentMode -eq "admin") {
-        return "admin> "
+        return "scb:admin# "
     }
 
-    return "group> "
+    return 'scb:group$ '
 }
 
 function Process-InputLine {

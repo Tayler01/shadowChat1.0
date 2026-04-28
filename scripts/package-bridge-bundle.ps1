@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$Version = "0.1.30-clean-start",
+    [string]$Version = "0.1.31-kali-grid",
     [string]$OutputDirectory = "output/bridge-bundles"
 )
 

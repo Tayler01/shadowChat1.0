@@ -1,11 +1,18 @@
 # ESP Bridge TUI Production Readiness
 
 This document records the bridge TUI polish shipped in the `0.1.11` through
-`0.1.30` Windows tools bundles.
+`0.1.31` Windows tools bundles.
 
 ## Current Bundle
 
 Revoked Windows tools bundles:
+
+- version: `0.1.30-clean-start`
+- storage path: `windows/0.1.30-clean-start/shadowchat-bridge-tools.zip`
+- SHA-256: `494f6ac4f3cd2831ad76bce319968cf774ac8ed6e0b7e598a6f12fc2d3b0f478`
+- size: `37658` bytes
+- reason: superseded by the Kali/i3 visual polish bundle; startup sync behavior
+  remains the baseline for later bundles
 
 - version: `0.1.29-snapshot-first`
 - storage path: `windows/0.1.29-snapshot-first/shadowchat-bridge-tools.zip`
@@ -32,10 +39,10 @@ Revoked Windows tools bundles:
 
 Latest stable Windows tools bundle:
 
-- version: `0.1.30-clean-start`
-- storage path: `windows/0.1.30-clean-start/shadowchat-bridge-tools.zip`
-- SHA-256: `494f6ac4f3cd2831ad76bce319968cf774ac8ed6e0b7e598a6f12fc2d3b0f478`
-- size: `37658` bytes
+- version: `0.1.31-kali-grid`
+- storage path: `windows/0.1.31-kali-grid/shadowchat-bridge-tools.zip`
+- SHA-256: `43dd814d325c75df6989841dd5801365e3aaf3c31d6dc4cda6e4e7b53333fc5c`
+- size: `38177` bytes
 
 Latest stable ESP32-S3 firmware:
 
@@ -180,6 +187,9 @@ The TUI should feel smooth, dependable, and chat-first:
 - side/feed/status panes are clipped to their own width so they cannot corrupt the chat area
 - long draft text keeps the active typing tail visible
 - normal typing updates only the input line instead of forcing a full layout repaint per key
+- TUI writes use direct console output instead of `Write-Host`, reducing host overhead during full-pane redraws and append-only feed updates
+- the top chrome uses compact i3-style workspace blocks, a right-aligned status strip, and pane headers instead of a wordy single title line
+- the prompt uses an `scb:<mode>` shell shape so group, DM, and admin modes feel like a focused terminal workspace
 - group-chat `@ai`, `@shado`, and `@shado_ai` mentions ask Shado through the backend AI path
 - after sending chat text, the TUI runs short follow-up backfill polls so delayed Shado replies still appear when realtime is already joined
 - short chat histories sit near the input prompt instead of leaving a large empty area between the last message and the keyboard
