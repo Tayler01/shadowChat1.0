@@ -27,6 +27,7 @@ The project is already wired for hosted Supabase and Netlify deployment. It is d
 - Slash commands and reply/thread affordances
 - AI reply and summary hooks through a secured Supabase Edge Function
 - Browser push notifications for DMs and group chat
+- Settings feedback flow for bug reports and feature ideas with private image attachments
 - PWA/service-worker foundation for installed mobile and desktop web experiences
 - Premium obsidian-and-gold design system across desktop and mobile
 
@@ -44,6 +45,7 @@ Backend lives under [`supabase`](C:/repos/chat2.0/supabase).
 - [`supabase/migrations`](C:/repos/chat2.0/supabase/migrations) is the source of truth for schema and policies.
 - [`supabase/functions/openai-chat`](C:/repos/chat2.0/supabase/functions/openai-chat/index.ts) handles authenticated AI requests.
 - [`supabase/functions/send-push`](C:/repos/chat2.0/supabase/functions/send-push/index.ts) sends web push notifications.
+- Feedback submissions use `public.feedback_submissions` plus the private `feedback-attachments` Storage bucket.
 
 Tests live under [`tests`](C:/repos/chat2.0/tests).
 
@@ -101,6 +103,12 @@ npx tsc --noEmit -p tsconfig.app.json
 npx vite preview
 ```
 
+Run the full browser smoke after broad app changes or before a larger release handoff:
+
+```powershell
+node scripts/playwright-smoke.mjs --scenario=full --run-name=full-smoke-release --headed --slow-mo=100 --no-reuse-server
+```
+
 ## Realtime, Push, and AI Notes
 
 - Realtime depends on the migrations having been pushed to the target Supabase project.
@@ -135,6 +143,7 @@ Production is hosted on Netlify and the backend is hosted on Supabase.
 - [docs/TESTING_GUIDE.md](C:/repos/chat2.0/docs/TESTING_GUIDE.md:1): lint, typecheck, unit tests, smoke tests, and Playwright usage
 - [docs/DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1): GitHub, Netlify, and Supabase deployment workflow
 - [docs/ARCHITECTURE.md](C:/repos/chat2.0/docs/ARCHITECTURE.md:1): codebase map and key data flows
+- [docs/FEEDBACK_SUBMISSIONS.md](C:/repos/chat2.0/docs/FEEDBACK_SUBMISSIONS.md:1): Settings feedback flow, Supabase storage model, and validation notes
 - [docs/DEFERRED_FOLLOWUPS.md](C:/repos/chat2.0/docs/DEFERRED_FOLLOWUPS.md:1): small follow-up ideas preserved after pruning stale branches
 - [docs/ESP_BRIDGE_FEATURE_ROADMAP.md](C:/repos/chat2.0/docs/ESP_BRIDGE_FEATURE_ROADMAP.md:1): planning baseline and phased roadmap for the airgapped ESP bridge feature
 - [docs/ESP_BRIDGE_DOCUMENTATION_REVIEW.md](C:/repos/chat2.0/docs/ESP_BRIDGE_DOCUMENTATION_REVIEW.md:1): official platform constraints and implementation guardrails for bridge planning

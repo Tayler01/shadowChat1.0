@@ -113,6 +113,12 @@ Run the broader end-to-end sweep:
 npm run qa:smoke:full
 ```
 
+For release handoff or a major feature wrap-up, prefer a fresh headed preview run so stale preview assets cannot hide frontend regressions:
+
+```powershell
+node scripts/playwright-smoke.mjs --scenario=full --run-name=full-smoke-release --headed --slow-mo=100 --no-reuse-server
+```
+
 For custom flags, call the script directly:
 
 ```powershell
@@ -156,7 +162,16 @@ Current smoke scenarios:
 - `mobile-dm-back`: validates the mobile DM thread back flow
 - `mobile-settings-visual`: checks the mobile settings layout and notification toggle geometry
 
+Latest full release smoke recorded for the feedback submission release:
+
+- Date: April 28, 2026
+- Command: `node scripts/playwright-smoke.mjs --scenario=full --run-name=full-smoke-feedback-release-20260428 --headed --slow-mo=100 --no-reuse-server`
+- Result: passed all eight scenarios
+- Summary: `output/playwright/full-smoke-feedback-release-20260428/summary.json`
+
 For link preview changes, verify a local preview build with a signed-in account and send a message containing a public `https://` URL. The message should keep the link clickable immediately, then load one preview card without rerendering the whole chat thread. Test at least one generic Open Graph link and one `x.com`/`twitter.com` link because X metadata can arrive through the oEmbed fallback.
+
+For Settings feedback changes, verify the wizard from Settings, submit at least one bug or feature report with an image attachment, then query `public.feedback_submissions` as the same user and download the stored object from `feedback-attachments`. This confirms both table RLS and private Storage policy behavior.
 
 Disposable accounts are the most deterministic option. Reused env-backed accounts can carry old threads and unread state from earlier runs.
 

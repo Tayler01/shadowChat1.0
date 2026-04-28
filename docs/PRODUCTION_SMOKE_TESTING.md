@@ -78,6 +78,12 @@ Default direct equivalent:
 node scripts/playwright-smoke.mjs --base-url=https://shadowchat-1-0.netlify.app --scenario=auth,resume-send --account-mode=env --run-name=prod-postdeploy --headed --slow-mo=300
 ```
 
+Full production Settings check after a deploy:
+
+```powershell
+node scripts/playwright-smoke.mjs --base-url=https://shadowchat-1-0.netlify.app --scenario=settings --account-mode=env --run-name=prod-settings-postdeploy --headed --slow-mo=100 --skip-build
+```
+
 Headless direct equivalent:
 
 ```powershell
@@ -107,3 +113,10 @@ Common failure meanings:
 3. Run `npm run qa:smoke:prod`.
 4. Use `npm run qa:smoke:prod:headless` only for unattended environments where headless Chromium is stable.
 5. Keep the latest passing artifact path with the deploy notes.
+
+## Latest Feedback Release Checks
+
+April 28, 2026 post-deploy checks:
+
+- Production Settings smoke passed: `output/playwright/prod-feedback-settings-postdeploy/summary.json`
+- Production feedback E2E passed with a real submission row and private attachment download: `output/playwright/feedback-prod-e2e-1777419359750/summary.json`

@@ -130,6 +130,7 @@ After deploy, verify:
 6. Resume-send works after a background/foreground cycle
 7. Settings page renders cleanly on mobile and desktop
 8. A message containing an `https://` or `www.` link renders as a clickable link and loads a compact preview card
+9. Settings feedback can submit a bug or feature report with an image attachment after feedback schema changes
 
 Recommended production smoke for local post-deploy validation:
 
@@ -144,6 +145,12 @@ npm run qa:smoke:prod:headless
 ```
 
 Production smoke requires the two stable, email-confirmed `PLAYWRIGHT_ACCOUNT_*` users from local `.env.testing.local` or CI secrets. Disposable signup is not reliable against production when email confirmation is enabled. See [`docs/PRODUCTION_SMOKE_TESTING.md`](C:/repos/chat2.0/docs/PRODUCTION_SMOKE_TESTING.md:1).
+
+For larger releases, run the full headed local smoke from a fresh preview build and keep its artifact path in the release notes:
+
+```powershell
+node scripts/playwright-smoke.mjs --scenario=full --run-name=full-smoke-release --headed --slow-mo=100 --no-reuse-server
+```
 
 ## Production Gotchas
 

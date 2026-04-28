@@ -39,3 +39,26 @@ npx netlify deploy --prod
 The Netlify deploy must happen after the Supabase migration so the production
 Settings UI can upload to the `feedback-attachments` bucket and insert
 `feedback_submissions` rows.
+
+## End-To-End Validation
+
+For any change to this flow, verify all of the following:
+
+1. Open Settings in a signed-in browser session.
+2. Open **Send Feedback**.
+3. Submit one bug report or feature idea with an image attachment.
+4. Query `public.feedback_submissions` as the same user and confirm the title,
+   type, description, and attachment metadata.
+5. Download the attachment from `feedback-attachments` as the same user.
+6. Run the Settings smoke scenario or the full smoke suite.
+
+The April 28, 2026 release was verified with:
+
+```powershell
+node scripts/playwright-smoke.mjs --scenario=full --run-name=full-smoke-feedback-release-20260428 --headed --slow-mo=100 --no-reuse-server
+node scripts/playwright-smoke.mjs --base-url=https://shadowchat-1-0.netlify.app --scenario=settings --account-mode=env --run-name=prod-feedback-settings-postdeploy --headed --slow-mo=100 --skip-build
+```
+
+The production feedback E2E also created a real feedback row and downloaded the
+private image attachment. Its artifact summary is at
+`output/playwright/feedback-prod-e2e-1777419359750/summary.json`.
