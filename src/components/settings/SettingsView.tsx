@@ -20,7 +20,6 @@ import toast from 'react-hot-toast'
 import { useTheme, colorSchemes, ColorScheme } from '../../hooks/useTheme'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useSuggestionsEnabled } from '../../hooks/useSuggestedReplies'
-import { useToneAnalysisEnabled } from '../../hooks/useToneAnalysisEnabled'
 import { useSoundEffects } from '../../hooks/useSoundEffects'
 import { usePushNotifications } from '../../hooks/usePushNotifications'
 import { usePwaInstallPrompt } from '../../hooks/usePwaInstallPrompt'
@@ -45,7 +44,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
   const { signOut } = useAuth()
   const { canInstall, promptInstall } = usePwaInstallPrompt()
   const { enabled: suggestionsEnabled, setEnabled: setSuggestionsEnabled } = useSuggestionsEnabled()
-  const { enabled: toneEnabled, setEnabled: setToneEnabled } = useToneAnalysisEnabled()
   const {
     supported,
     canPrompt,
@@ -238,12 +236,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
           description: 'Show AI generated reply suggestions',
           enabled: suggestionsEnabled,
           onChange: setSuggestionsEnabled
-        },
-        {
-          label: 'Tone Indicators',
-          description: 'Show emoji tone of each message',
-          enabled: toneEnabled,
-          onChange: setToneEnabled
         }
       ]
     }

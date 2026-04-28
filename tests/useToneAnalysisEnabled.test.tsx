@@ -5,16 +5,24 @@ beforeEach(() => {
   localStorage.clear()
 })
 
-test('defaults to enabled', () => {
+test('defaults to disabled while the feature is dormant', () => {
   const { result } = renderHook(() => useToneAnalysisEnabled())
-  expect(result.current.enabled).toBe(true)
+  expect(result.current.enabled).toBe(false)
 })
 
-test('toggle updates localStorage', () => {
+test('does not enable the dormant feature', () => {
   const { result } = renderHook(() => useToneAnalysisEnabled())
   act(() => {
-    result.current.setEnabled(false)
+    result.current.setEnabled(true)
   })
   expect(localStorage.getItem('toneAnalysisEnabled')).toBe('false')
+  expect(result.current.enabled).toBe(false)
+})
+
+test('ignores previous enabled localStorage values', () => {
+  localStorage.setItem('toneAnalysisEnabled', 'true')
+
+  const { result } = renderHook(() => useToneAnalysisEnabled())
+
   expect(result.current.enabled).toBe(false)
 })

@@ -31,3 +31,4 @@ Near-future priorities from the full codebase audit, after the P0 fixes:
 15. Add an offline TUI outbox with retry and delivery status.
 16. Add update channels for stable, beta, local bundle, and rollback metadata.
 17. Implement per-conversation notification preferences shared across web, push, and bridge clients.
+18. Revisit the paused mood emoji / tone indicator feature with better UX, user control, and accuracy before exposing it again in Settings.

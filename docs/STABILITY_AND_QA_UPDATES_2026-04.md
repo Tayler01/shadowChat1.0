@@ -53,6 +53,17 @@ Relevant files:
 - [src/components/dms/DirectMessagesView.tsx](C:/repos/chat2.0/src/components/dms/DirectMessagesView.tsx:1)
 - [src/components/layout/MobileChatFooter.tsx](C:/repos/chat2.0/src/components/layout/MobileChatFooter.tsx:1)
 
+### Mood Emoji Paused
+
+- The message mood emoji / tone indicator feature is turned off in production until it gets further product and accuracy work.
+- The Settings toggle was removed so users cannot enable the unfinished experience from the production app.
+- The underlying tone analysis code remains in place for future development, but the enabled-state hook now defaults to off and ignores previously saved enabled values.
+
+Relevant files:
+
+- [src/hooks/useToneAnalysisEnabled.ts](C:/repos/chat2.0/src/hooks/useToneAnalysisEnabled.ts:1)
+- [src/components/settings/SettingsView.tsx](C:/repos/chat2.0/src/components/settings/SettingsView.tsx:1)
+
 ### DM Reaction Schema Alignment
 
 - DM reactions no longer rely on the broken assumption that DM message ids can live in the channel-message foreign key.
