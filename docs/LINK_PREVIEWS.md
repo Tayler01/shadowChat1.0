@@ -6,7 +6,7 @@ ShadowChat renders `http://`, `https://`, and `www.` URLs in group chat and DMs 
 
 - [src/lib/linkPreview.ts](C:/repos/chat2.0/src/lib/linkPreview.ts:1) tokenizes message text, normalizes safe URLs, de-duplicates in-flight preview requests, and caches successful previews in memory plus `localStorage`.
 - [src/components/chat/MessageRichText.tsx](C:/repos/chat2.0/src/components/chat/MessageRichText.tsx:1) renders safe React text/link nodes and the preview card.
-- [supabase/functions/link-preview/index.ts](C:/repos/chat2.0/supabase/functions/link-preview/index.ts:1) fetches Open Graph/Twitter metadata server-side so the browser does not depend on third-party CORS behavior.
+- [supabase/functions/link-preview/index.ts](C:/repos/chat2.0/supabase/functions/link-preview/index.ts:1) fetches Open Graph/Twitter metadata server-side so the browser does not depend on third-party CORS behavior. It preserves image thumbnails and marks video/player links so the card can show a video thumbnail badge.
 
 ## Security And Reliability
 
@@ -14,7 +14,8 @@ ShadowChat renders `http://`, `https://`, and `www.` URLs in group chat and DMs 
 - Only `http` and `https` URLs are accepted.
 - Localhost, `.local`, loopback, link-local, and private IPv4 targets are rejected before fetch. Redirect destinations are checked too.
 - Remote fetches use short timeouts and read at most 512 KB of HTML.
-- X/Twitter links try `publish.twitter.com/oembed` first, then fall back to Open Graph parsing.
+- X/Twitter links merge `publish.twitter.com/oembed` text with Open Graph image metadata when available, so post images or video thumbnails are not dropped.
+- YouTube and Vimeo links also use provider oEmbed fallbacks so video thumbnails still appear when the page HTML does not expose usable Open Graph metadata to the function.
 
 ## Deployment
 
@@ -41,7 +42,8 @@ Then use Playwright or a headed browser against `vite preview` to send:
 
 ```text
 https://x.com/OpenAI
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
 https://example.com
 ```
 
-The link text should be clickable immediately, and a single preview card should appear after metadata resolves.
+The link text should be clickable immediately, and a single preview card should appear after metadata resolves. Links with Open Graph/Twitter image metadata should show the image; video/player links should show the thumbnail with a compact `Video` badge.

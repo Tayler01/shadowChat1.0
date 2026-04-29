@@ -10,6 +10,7 @@ export type LinkPreview = {
   title?: string
   description?: string
   image?: string
+  mediaType?: 'image' | 'video' | 'link'
   siteName?: string
   provider?: string
 }

@@ -34,6 +34,28 @@ test('loads and renders a preview for the first message link', async () => {
   expect(screen.getByText('Latest posts from OpenAI.')).toBeInTheDocument()
 })
 
+test('renders preview images and video thumbnail labels', async () => {
+  mockedFetchPreview.mockResolvedValue({
+    url: 'https://example.com/video',
+    canonicalUrl: 'https://example.com/video',
+    title: 'Launch clip',
+    description: 'A short launch video.',
+    image: 'https://cdn.example.com/thumb.jpg',
+    mediaType: 'video',
+    siteName: 'Example Video',
+  })
+
+  render(<MessageRichText content="watch https://example.com/video" />)
+
+  await waitFor(() => {
+    expect(screen.getByRole('img', { name: /launch clip preview image/i })).toHaveAttribute(
+      'src',
+      'https://cdn.example.com/thumb.jpg'
+    )
+  })
+  expect(screen.getByText('Video')).toBeInTheDocument()
+})
+
 test('does not request metadata when preview rendering is disabled', () => {
   render(<MessageRichText content="see https://example.com" showPreview={false} />)
 

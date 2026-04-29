@@ -15,6 +15,7 @@ type LinkPreview = {
   title?: string
   description?: string
   image?: string
+  mediaType?: 'image' | 'video' | 'link'
   siteName?: string
   provider?: string
 }
@@ -161,6 +162,46 @@ const absolutize = (value: string | undefined, baseUrl: string) => {
   }
 }
 
+const getPreviewImage = (html: string, baseUrl: string) => {
+  const image = (
+    getMetaContent(html, 'og:image:secure_url') ||
+    getMetaContent(html, 'og:image:url') ||
+    getMetaContent(html, 'og:image') ||
+    getMetaContent(html, 'twitter:image:src') ||
+    getMetaContent(html, 'twitter:image') ||
+    getMetaContent(html, 'thumbnail') ||
+    getMetaContent(html, 'thumbnailUrl') ||
+    getMetaContent(html, 'video:thumbnail') ||
+    getMetaContent(html, 'og:video:thumbnail') ||
+    getMetaContent(html, 'og:video:secure_url:image')
+  )
+
+  return absolutize(image, baseUrl)
+}
+
+const inferMediaType = (html: string, hasImage: boolean): LinkPreview['mediaType'] => {
+  const type = [
+    getMetaContent(html, 'og:type'),
+    getMetaContent(html, 'twitter:card'),
+    getMetaContent(html, 'og:video'),
+    getMetaContent(html, 'og:video:url'),
+    getMetaContent(html, 'og:video:secure_url'),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+
+  if (/\b(video|movie|player|stream)\b/.test(type)) {
+    return 'video'
+  }
+
+  if (hasImage && /\b(image|photo|summary_large_image)\b/.test(type)) {
+    return 'image'
+  }
+
+  return hasImage ? 'image' : 'link'
+}
+
 const readLimitedText = async (response: Response, maxBytes = 512 * 1024) => {
   const reader = response.body?.getReader()
   if (!reader) return ''
@@ -194,16 +235,37 @@ const readLimitedText = async (response: Response, maxBytes = 512 * 1024) => {
   return new TextDecoder().decode(merged)
 }
 
-const fetchOEmbedPreview = async (url: URL): Promise<LinkPreview | null> => {
-  if (!/(^|\.)x\.com$|(^|\.)twitter\.com$/i.test(url.hostname)) {
-    return null
+const getOEmbedEndpoint = (url: URL) => {
+  const host = url.hostname.toLowerCase()
+
+  if (/(^|\.)x\.com$|(^|\.)twitter\.com$/i.test(host)) {
+    const endpoint = new URL('https://publish.twitter.com/oembed')
+    endpoint.searchParams.set('url', url.toString())
+    endpoint.searchParams.set('omit_script', '1')
+    return { endpoint, provider: 'X', mediaType: undefined as LinkPreview['mediaType'] }
   }
 
-  const endpoint = new URL('https://publish.twitter.com/oembed')
-  endpoint.searchParams.set('url', url.toString())
-  endpoint.searchParams.set('omit_script', '1')
+  if (/(^|\.)youtube\.com$|(^|\.)youtu\.be$/i.test(host)) {
+    const endpoint = new URL('https://www.youtube.com/oembed')
+    endpoint.searchParams.set('url', url.toString())
+    endpoint.searchParams.set('format', 'json')
+    return { endpoint, provider: 'YouTube', mediaType: 'video' as const }
+  }
 
-  const response = await fetch(endpoint, {
+  if (/(^|\.)vimeo\.com$/i.test(host)) {
+    const endpoint = new URL('https://vimeo.com/api/oembed.json')
+    endpoint.searchParams.set('url', url.toString())
+    return { endpoint, provider: 'Vimeo', mediaType: 'video' as const }
+  }
+
+  return null
+}
+
+const fetchOEmbedPreview = async (url: URL): Promise<LinkPreview | null> => {
+  const config = getOEmbedEndpoint(url)
+  if (!config) return null
+
+  const response = await fetch(config.endpoint, {
     signal: AbortSignal.timeout(3500),
     headers: {
       accept: 'application/json',
@@ -217,13 +279,19 @@ const fetchOEmbedPreview = async (url: URL): Promise<LinkPreview | null> => {
   const text = typeof data?.html === 'string'
     ? decodeHtml(data.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' '))
     : undefined
+  const title = typeof data?.title === 'string' ? decodeHtml(data.title) : text
 
   return {
     url: url.toString(),
     canonicalUrl: typeof data?.url === 'string' ? data.url : url.toString(),
-    title: text || 'Post on X',
-    siteName: 'X',
-    provider: 'X',
+    title: title || `Post on ${config.provider}`,
+    description: typeof data?.author_name === 'string' ? decodeHtml(data.author_name) : undefined,
+    image: typeof data?.thumbnail_url === 'string'
+      ? absolutize(data.thumbnail_url, url.toString())
+      : undefined,
+    mediaType: config.mediaType || (typeof data?.type === 'string' && data.type.toLowerCase().includes('video') ? 'video' : undefined),
+    siteName: typeof data?.provider_name === 'string' ? data.provider_name : config.provider,
+    provider: typeof data?.provider_name === 'string' ? data.provider_name : config.provider,
   }
 }
 
@@ -254,10 +322,7 @@ const fetchOpenGraphPreview = async (url: URL): Promise<LinkPreview> => {
   }
 
   const html = await readLimitedText(response)
-  const image = absolutize(
-    getMetaContent(html, 'og:image') || getMetaContent(html, 'twitter:image'),
-    finalUrl.toString()
-  )
+  const image = getPreviewImage(html, finalUrl.toString())
 
   return {
     url: url.toString(),
@@ -265,8 +330,26 @@ const fetchOpenGraphPreview = async (url: URL): Promise<LinkPreview> => {
     title: getTitle(html),
     description: getMetaContent(html, 'og:description') || getMetaContent(html, 'twitter:description') || getMetaContent(html, 'description'),
     image,
+    mediaType: inferMediaType(html, Boolean(image)),
     siteName: getMetaContent(html, 'og:site_name'),
     provider: finalUrl.hostname.replace(/^www\./i, ''),
+  }
+}
+
+const mergePreview = (primary: LinkPreview | null, fallback: LinkPreview | null): LinkPreview | null => {
+  if (!primary) return fallback
+  if (!fallback) return primary
+
+  return {
+    ...fallback,
+    ...primary,
+    canonicalUrl: primary.canonicalUrl || fallback.canonicalUrl,
+    title: primary.title || fallback.title,
+    description: primary.description || fallback.description,
+    image: primary.image || fallback.image,
+    mediaType: primary.mediaType || fallback.mediaType,
+    siteName: primary.siteName || fallback.siteName,
+    provider: primary.provider || fallback.provider,
   }
 }
 
@@ -293,7 +376,15 @@ serve(async req => {
     const url = normalizeUrl(body.url)
     await assertPublicHost(url)
 
-    const preview = await fetchOEmbedPreview(url) || await fetchOpenGraphPreview(url)
+    const [openGraphPreview, oEmbedPreview] = await Promise.all([
+      fetchOpenGraphPreview(url).catch(() => null),
+      fetchOEmbedPreview(url).catch(() => null),
+    ])
+    const preview = mergePreview(oEmbedPreview, openGraphPreview)
+
+    if (!preview) {
+      throw new Error('Unable to load link preview.')
+    }
 
     return json({
       ok: true,

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, Play } from 'lucide-react'
 import {
   extractFirstMessageUrl,
   fetchLinkPreview,
@@ -36,13 +36,19 @@ const LinkPreviewCard: React.FC<{ preview: LinkPreview }> = ({ preview }) => {
       aria-label={`Open link preview for ${preview.title || host}`}
     >
       {preview.image && (
-        <div className="aspect-[1.91/1] w-full overflow-hidden border-b border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)]">
+        <div className="relative aspect-[1.91/1] w-full overflow-hidden border-b border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)]">
           <img
             src={preview.image}
-            alt=""
+            alt={preview.title ? `${preview.title} preview image` : `${host} preview image`}
             loading="lazy"
             className="h-full w-full object-cover"
           />
+          {preview.mediaType === 'video' && (
+            <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,240,184,0.42)] bg-[rgba(0,0,0,0.62)] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-[rgb(255,240,184)] shadow-[0_8px_20px_rgba(0,0,0,0.35)]">
+              <Play className="h-3 w-3 fill-current" />
+              Video
+            </span>
+          )}
         </div>
       )}
       <div className="space-y-1.5 p-3">
