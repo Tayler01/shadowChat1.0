@@ -179,6 +179,46 @@ const getPreviewImage = (html: string, baseUrl: string) => {
   return absolutize(image, baseUrl)
 }
 
+const isXHost = (url: URL) => /(^|\.)x\.com$|(^|\.)twitter\.com$/i.test(url.hostname)
+
+const normalizeXMediaImage = (value: string) => {
+  const decoded = decodeHtml(value)
+    .replace(/\\u002F/gi, '/')
+    .replace(/\\\//g, '/')
+    .replace(/[),.]+$/g, '')
+
+  try {
+    const url = new URL(decoded)
+    if (url.hostname !== 'pbs.twimg.com' || !url.pathname.startsWith('/media/')) {
+      return undefined
+    }
+
+    if (url.searchParams.has('name')) {
+      url.searchParams.set('name', 'large')
+      return url.toString()
+    }
+
+    const normalized = url.toString()
+    return /:(?:large|small|medium|thumb|orig)$/i.test(normalized)
+      ? normalized
+      : `${normalized}:large`
+  } catch {
+    return undefined
+  }
+}
+
+const getXEmbeddedMediaImage = (html: string) => {
+  const normalizedHtml = html.replace(/\\u002F/gi, '/').replace(/\\\//g, '/')
+  const mediaUrls = normalizedHtml.match(/https?:\/\/pbs\.twimg\.com\/media\/[^\s"'<>\\)]+/gi) || []
+
+  for (const mediaUrl of mediaUrls) {
+    const image = normalizeXMediaImage(mediaUrl)
+    if (image) return image
+  }
+
+  return undefined
+}
+
 const inferMediaType = (html: string, hasImage: boolean): LinkPreview['mediaType'] => {
   const type = [
     getMetaContent(html, 'og:type'),
@@ -322,7 +362,8 @@ const fetchOpenGraphPreview = async (url: URL): Promise<LinkPreview> => {
   }
 
   const html = await readLimitedText(response)
-  const image = getPreviewImage(html, finalUrl.toString())
+  const image = getPreviewImage(html, finalUrl.toString()) ||
+    (isXHost(url) || isXHost(finalUrl) ? getXEmbeddedMediaImage(html) : undefined)
 
   return {
     url: url.toString(),
