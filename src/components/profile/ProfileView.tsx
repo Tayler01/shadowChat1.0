@@ -153,7 +153,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
               <div className="h-full w-full bg-[radial-gradient(circle_at_top_left,rgba(255,240,184,0.18),transparent_26%),linear-gradient(135deg,#17191c,#0f1112_58%,#34250c)]" />
             )}
             <button
-              className="absolute right-4 top-4 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[rgba(0,0,0,0.35)] p-2 text-[var(--text-primary)] transition-colors hover:border-[var(--border-glow)] hover:text-[var(--text-gold)]"
+              className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-sm)] border border-[rgba(255,240,184,0.46)] bg-[linear-gradient(180deg,rgba(255,240,184,0.24),rgba(215,170,70,0.18)_42%,rgba(43,30,8,0.78)_100%)] p-0 text-[var(--text-gold)] shadow-[0_10px_24px_rgba(0,0,0,0.38),0_0_0_1px_rgba(215,170,70,0.1)] transition-all hover:-translate-y-0.5 hover:border-[rgba(255,240,184,0.72)] hover:text-[rgb(255,240,184)]"
               aria-label="Change banner image"
               onClick={() => bannerInputRef.current?.click()}
             >
@@ -171,20 +171,20 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
           {/* Profile Info */}
           <div className="relative px-4 pb-5 sm:px-6 sm:pb-6">
             <div className="-mt-16 mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-              <div className="relative">
+              <div className="relative inline-flex h-20 w-20 items-center justify-center">
                 <Avatar
                   src={profile.avatar_url}
                   alt={profile.display_name}
                   size="xl"
                   color={profile.color}
-                  className="border-4 border-[var(--bg-panel-strong)]"
+                  className="border-4 border-[var(--bg-panel-strong)] shadow-[0_12px_28px_rgba(0,0,0,0.34)]"
                 />
                 <button
-                  className="absolute bottom-0 right-0 rounded-full border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] p-1.5 text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)] transition-transform hover:-translate-y-0.5"
+                  className="absolute -bottom-2 right-1 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(255,240,184,0.58)] bg-[linear-gradient(180deg,rgba(255,240,184,0.28),rgba(215,170,70,0.2)_42%,rgba(80,55,13,0.88)_100%)] p-0 text-[rgb(255,240,184)] shadow-[0_10px_22px_rgba(0,0,0,0.42),var(--shadow-gold-soft)] transition-all hover:-translate-y-0.5 hover:border-[rgba(255,248,220,0.82)]"
                   aria-label="Change avatar"
                   onClick={() => avatarInputRef.current?.click()}
                 >
-                  {uploadingAvatar ? <LoadingSpinner size="sm" /> : <Camera className="w-3 h-3" />}
+                  {uploadingAvatar ? <LoadingSpinner size="sm" /> : <Camera className="h-4 w-4" />}
                 </button>
                 <input
                   type="file"
@@ -226,12 +226,22 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
                     placeholder="Enter your display name"
                   />
 
-                  <Input
-                    label="Status Message"
-                    value={formData.status_message}
-                    onChange={(e) => setFormData(prev => ({ ...prev, status_message: e.target.value }))}
-                    placeholder="What's on your mind?"
-                  />
+                  <label className="block space-y-1">
+                    <span className="block text-sm font-medium text-[var(--text-secondary)]">
+                      Bio
+                    </span>
+                    <textarea
+                      value={formData.status_message}
+                      onChange={(e) => setFormData(prev => ({ ...prev, status_message: e.target.value }))}
+                      maxLength={280}
+                      rows={4}
+                      placeholder="Tell people who you are, what you are working on, or what you want them to know."
+                      className="obsidian-input min-h-[7rem] w-full resize-y rounded-[var(--radius-sm)] px-3.5 py-2.5 leading-6 placeholder:text-[var(--text-muted)] focus:outline-none"
+                    />
+                    <span className="block text-right text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      {formData.status_message.length}/280
+                    </span>
+                  </label>
 
                   <div>
                     <label className="mb-2 block text-sm font-medium text-[var(--text-secondary)]">
@@ -310,7 +320,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
 
                   {profile.status_message && (
                     <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)] p-4">
-                      <p className="text-[var(--text-secondary)]">
+                      <p className="whitespace-pre-wrap text-[var(--text-secondary)]">
                         {profile.status_message}
                       </p>
                     </div>
@@ -392,9 +402,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar }) => 
                   <div className="mt-2 text-base font-medium text-[var(--text-primary)]">@{profile.username}</div>
                 </div>
                 <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 sm:col-span-2">
-                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">Status message</div>
+                  <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">Bio</div>
                   <div className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-                    {profile.status_message?.trim() || 'No custom status message set yet.'}
+                    {profile.status_message?.trim() || 'No bio set yet.'}
                   </div>
                 </div>
               </div>
