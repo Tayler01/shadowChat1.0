@@ -1,10 +1,10 @@
 import React from 'react'
-import { MessageSquare, Users, User, Settings } from 'lucide-react'
+import { MessageSquare, Newspaper, Settings, Users } from 'lucide-react'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
 
 interface MobileNavProps {
-  currentView: 'chat' | 'dms' | 'profile' | 'settings'
-  onViewChange: (view: 'chat' | 'dms' | 'profile' | 'settings') => void
+  currentView: 'chat' | 'dms' | 'news' | 'settings'
+  onViewChange: (view: 'chat' | 'dms' | 'news' | 'settings') => void
   className?: string
 }
 
@@ -23,7 +23,7 @@ export function MobileNav({ currentView, onViewChange, className }: MobileNavPro
       label: 'DMs',
       badge: totalUnread > 0 ? totalUnread : null,
     },
-    { id: 'profile' as const, icon: User, label: 'Profile', badge: null },
+    { id: 'news' as const, icon: Newspaper, label: 'News', badge: null },
     { id: 'settings' as const, icon: Settings, label: 'Settings', badge: null },
   ]
 

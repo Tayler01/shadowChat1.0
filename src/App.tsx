@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { Toaster } from 'react-hot-toast'
 import { AuthGuard } from './components/auth/AuthGuard'
 import { Sidebar } from './components/layout/Sidebar'
@@ -22,19 +23,13 @@ const DirectMessagesView = lazy(() =>
   }))
 )
 
-const ProfileView = lazy(() =>
-  import('./components/profile/ProfileView').then(module => ({
-    default: module.ProfileView,
-  }))
-)
-
 const SettingsView = lazy(() =>
   import('./components/settings/SettingsView').then(module => ({
     default: module.SettingsView,
   }))
 )
 
-type View = 'chat' | 'dms' | 'profile' | 'settings'
+type View = 'chat' | 'dms' | 'news' | 'settings'
 type LocationState = {
   view: View
   conversation: string | null
@@ -42,19 +37,45 @@ type LocationState = {
 }
 
 const isView = (value: string | null): value is View => (
-  value === 'chat' || value === 'dms' || value === 'profile' || value === 'settings'
+  value === 'chat' || value === 'dms' || value === 'news' || value === 'settings'
 )
 
 const getLocationStateFromUrl = (url: URL): LocationState => {
   const params = new URLSearchParams(url.search)
   const nextView = params.get('view')
-  const view = isView(nextView) ? nextView : ('chat' as View)
+  const view = nextView === 'profile'
+    ? 'settings'
+    : isView(nextView) ? nextView : ('chat' as View)
 
   return {
     view,
     conversation: view === 'dms' ? params.get('conversation') : null,
     message: view === 'dms' || view === 'chat' ? params.get('message') : null,
   }
+}
+
+function NewsView() {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="flex h-full min-h-0 flex-col bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.08),transparent_26%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] px-4 py-6 pb-[calc(env(safe-area-inset-bottom)_+_6rem)] md:px-8"
+    >
+      <div className="mx-auto flex h-full w-full max-w-5xl items-center justify-center">
+        <div className="glass-panel-strong w-full max-w-xl rounded-[var(--radius-xl)] px-6 py-8 text-center shadow-[var(--shadow-panel-strong)] sm:px-10">
+          <p className="mb-3 text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">
+            ShadowChat News
+          </p>
+          <h1 className="text-3xl font-semibold text-[var(--text-primary)]">
+            Coming Soon
+          </h1>
+          <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
+            Product updates, release notes, and community announcements will live here.
+          </p>
+        </div>
+      </div>
+    </motion.div>
+  )
 }
 
 const getInitialLocationState = (): LocationState => {
@@ -227,8 +248,8 @@ function App() {
             initialMessageId={messageTarget || undefined}
           />
         )
-      case 'profile':
-        return <ProfileView onToggleSidebar={toggleSidebar} />
+      case 'news':
+        return <NewsView />
       case 'settings':
         return <SettingsView onToggleSidebar={toggleSidebar} />
       default:

@@ -1,12 +1,12 @@
 import React from 'react';
-import { MessageSquare, Users, User, Settings, Moon, Sun, X } from 'lucide-react';
+import { MessageSquare, Users, Newspaper, Settings, Moon, Sun, X } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
 import { useAuth } from '../../hooks/useAuth';
 import { useDirectMessages } from '../../hooks/useDirectMessages';
 
 interface SidebarProps {
-  currentView: 'chat' | 'dms' | 'profile' | 'settings';
-  onViewChange: (view: 'chat' | 'dms' | 'profile' | 'settings') => void;
+  currentView: 'chat' | 'dms' | 'news' | 'settings';
+  onViewChange: (view: 'chat' | 'dms' | 'news' | 'settings') => void;
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
   onNewDM?: () => void;
@@ -42,9 +42,9 @@ export function Sidebar({
       badge: totalUnread > 0 ? totalUnread : null,
     },
     {
-      id: 'profile' as const,
-      label: 'Profile',
-      icon: User,
+      id: 'news' as const,
+      label: 'News',
+      icon: Newspaper,
       badge: null,
     },
     {

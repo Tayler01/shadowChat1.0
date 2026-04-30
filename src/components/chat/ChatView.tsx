@@ -17,8 +17,8 @@ import { useVisibilityRefresh } from '../../hooks/useVisibilityRefresh'
 import { clearGroupNotifications } from '../../lib/appBadge'
 
 interface ChatViewProps {
-  currentView: 'chat' | 'dms' | 'profile' | 'settings'
-  onViewChange: (view: 'chat' | 'dms' | 'profile' | 'settings') => void
+  currentView: 'chat' | 'dms' | 'news' | 'settings'
+  onViewChange: (view: 'chat' | 'dms' | 'news' | 'settings') => void
   initialMessageId?: string
 }
 

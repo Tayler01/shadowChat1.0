@@ -28,8 +28,8 @@ import type { BasicUser, User } from '../../lib/supabase'
 
 interface DirectMessagesViewProps {
   onToggleSidebar: () => void
-  currentView: 'chat' | 'dms' | 'profile' | 'settings'
-  onViewChange: (view: 'chat' | 'dms' | 'profile' | 'settings') => void
+  currentView: 'chat' | 'dms' | 'news' | 'settings'
+  onViewChange: (view: 'chat' | 'dms' | 'news' | 'settings') => void
   initialConversation?: string
   initialMessageId?: string
 }
