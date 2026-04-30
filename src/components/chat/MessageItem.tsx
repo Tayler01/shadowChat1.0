@@ -62,6 +62,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const [showReactionPicker, setShowReactionPicker] = useState(false)
     const [openAbove, setOpenAbove] = useState(false)
     const [openRight, setOpenRight] = useState(false)
+    const [menuPlacementReady, setMenuPlacementReady] = useState(false)
     const [menuMaxHeight, setMenuMaxHeight] = useState<number | undefined>(undefined)
     const [showImageModal, setShowImageModal] = useState(false)
     const EmojiPicker = useEmojiPicker(showReactionPicker)
@@ -151,7 +152,10 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     }, [])
 
     useLayoutEffect(() => {
-      if (!showActions) return
+      if (!showActions) {
+        setMenuPlacementReady(false)
+        return
+      }
 
       const btnRect = actionsRef.current?.getBoundingClientRect()
       const containerRect = containerRef?.current?.getBoundingClientRect()
@@ -164,9 +168,16 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight)
         const viewportLeft = viewport?.offsetLeft ?? 0
         const viewportRight = viewportLeft + (viewport?.width ?? window.innerWidth)
+        const mobileFooterRect = window.innerWidth < 768
+          ? document.querySelector('[data-mobile-chat-footer="true"]')?.getBoundingClientRect()
+          : undefined
         const safeGap = 12
         const visibleTop = Math.max(viewportTop, containerRect?.top ?? viewportTop)
-        const visibleBottom = Math.min(viewportBottom, containerRect?.bottom ?? viewportBottom)
+        const visibleBottom = Math.min(
+          viewportBottom,
+          containerRect?.bottom ?? viewportBottom,
+          mobileFooterRect?.top ?? viewportBottom
+        )
         const menuHeight = menuRef.current.scrollHeight
         const menuWidth = menuRef.current.offsetWidth
 
@@ -188,6 +199,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         } else {
           setOpenRight(false)
         }
+
+        setMenuPlacementReady(true)
       }
     }, [showActions, containerRef])
 
@@ -288,7 +301,10 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
             </div>
           ) : (
             <>
-              <div className="relative inline-block max-w-full group/message">
+              <div
+                className="relative inline-block max-w-[calc(100%-3rem)] group/message md:max-w-full"
+                data-testid="message-bubble-shell"
+              >
                 {parentMessage && (
                   <button
                     type="button"
@@ -324,7 +340,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     <img
                       src={message.file_url}
                       alt="uploaded image"
-                      className="mt-1 max-w-xs cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-subtle)]"
+                      className="mt-1 max-w-full cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-subtle)] sm:max-w-xs"
                       onClick={() => setShowImageModal(true)}
                     />
                   ) : message.message_type === 'file' && message.file_url ? (
@@ -348,6 +364,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowActions(!showActions)}
+                    onPointerDown={event => event.preventDefault()}
+                    onMouseDown={event => event.preventDefault()}
                     className="opacity-70 transition-opacity hover:opacity-100 hover:text-[var(--text-gold)] md:opacity-0 md:group-hover/message:opacity-70"
                     aria-label="Message actions"
                     aria-expanded={showActions}
@@ -363,7 +381,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                         className={cn(
                           'absolute p-2 -m-2 z-50',
                           openAbove ? 'bottom-full mb-1' : 'top-full mt-1',
-                          openRight ? 'left-full ml-2' : 'right-0'
+                          openRight ? 'left-full ml-2' : 'right-0',
+                          !menuPlacementReady && 'invisible pointer-events-none'
                         )}
                         ref={menuRef}
                         role="menu"
