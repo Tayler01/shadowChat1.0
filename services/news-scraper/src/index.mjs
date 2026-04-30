@@ -180,11 +180,17 @@ const maybeSignInTruth = async page => {
   const credentials = getTruthCredentials()
   if (!credentials) return false
 
-  await page.goto('https://truthsocial.com/login', {
+  await page.goto('https://truthsocial.com/', {
     waitUntil: 'domcontentloaded',
     timeout: 35_000,
   })
   await page.waitForTimeout(2_000)
+
+  const landingSignInButton = page.getByRole('button', { name: /^Sign In$/i }).last()
+  if (await landingSignInButton.isVisible().catch(() => false)) {
+    await landingSignInButton.click()
+    await page.waitForTimeout(2_000)
+  }
 
   const usernameInput = page
     .locator('input[name="username"], input[name="email"], input[type="email"], input[autocomplete="username"]')
