@@ -367,7 +367,7 @@ const maybeSignInTruth = async page => {
 
 const scrapeX = async (browser, rawHandle, session = {}) => {
   const handle = cleanHandle(rawHandle)
-  const ownsContext = !session.xContext
+  const ownsContext = !session.shared
   const context = session.xContext || await newContext(browser)
   session.xContext = context
 
@@ -734,7 +734,7 @@ const runCycle = async supabase => {
   }
 
   const browser = await launchBrowser()
-  const session = {}
+  const session = { shared: true }
   try {
     for (const source of sources) {
       try {
