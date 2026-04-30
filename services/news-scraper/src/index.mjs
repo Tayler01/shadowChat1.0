@@ -117,6 +117,60 @@ const firstMeaningfulLine = text => {
   return (lines[0] || String(text || '').replace(/\s+/g, ' ').trim() || 'New post').slice(0, 180)
 }
 
+const toSortableId = value => {
+  try {
+    return BigInt(String(value || '').replace(/\D/g, ''))
+  } catch {
+    return null
+  }
+}
+
+const compareSnapshotsDesc = (left, right) => {
+  const leftId = toSortableId(left.externalId)
+  const rightId = toSortableId(right.externalId)
+
+  if (leftId !== null && rightId !== null && leftId !== rightId) {
+    return leftId > rightId ? -1 : 1
+  }
+
+  const leftDate = left.postedAt ? Date.parse(left.postedAt) : 0
+  const rightDate = right.postedAt ? Date.parse(right.postedAt) : 0
+  return rightDate - leftDate
+}
+
+const uniqueSnapshots = snapshots => {
+  const seen = new Set()
+  return snapshots.filter(snapshot => {
+    const key = `${snapshot.platform}:${snapshot.externalId}`
+    if (!snapshot?.externalId || seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+const selectSnapshotsToStore = (source, snapshots) => {
+  const sorted = uniqueSnapshots(snapshots).sort(compareSnapshotsDesc)
+  const latest = sorted[0] || null
+  const cursor = toSortableId(source.last_seen_external_id)
+
+  if (!latest) {
+    return { latest: null, toStore: [] }
+  }
+
+  if (cursor === null) {
+    return { latest, toStore: [latest] }
+  }
+
+  const toStore = sorted
+    .filter(snapshot => {
+      const snapshotId = toSortableId(snapshot.externalId)
+      return snapshotId !== null && snapshotId > cursor
+    })
+    .sort((left, right) => compareSnapshotsDesc(right, left))
+
+  return { latest, toStore }
+}
+
 const uniqueMedia = media => {
   const seen = new Set()
   return media.filter(item => {
@@ -174,6 +228,72 @@ const getTruthCredentials = () => {
   const username = process.env.TRUTH_USERNAME || process.env.TRUTH_EMAIL
   const password = process.env.TRUTH_PASSWORD
   return username && password ? { username, password } : null
+}
+
+const getXCredentials = () => {
+  const username = process.env.X_USERNAME || process.env.X_EMAIL
+  const password = process.env.X_PASSWORD
+  return username && password ? { username, password } : null
+}
+
+const maybeSignInX = async context => {
+  const credentials = getXCredentials()
+  if (!credentials) return false
+
+  const page = await context.newPage()
+  try {
+    await page.goto('https://x.com/i/flow/login', {
+      waitUntil: 'domcontentloaded',
+      timeout: 35_000,
+    })
+    await page.waitForTimeout(2_000)
+
+    const usernameInput = page
+      .locator('input[autocomplete="username"], input[name="text"], input[type="text"]')
+      .first()
+
+    if (!(await usernameInput.isVisible().catch(() => false))) {
+      const text = await page.locator('body').innerText({ timeout: 3_000 }).catch(() => '')
+      throw new Error(`X credentials are configured, but the login form was not found. url=${page.url()} text=${text.replace(/\s+/g, ' ').slice(0, 180)}`)
+    }
+
+    await usernameInput.fill(credentials.username)
+    await page.getByRole('button', { name: /^next$/i }).click().catch(async () => {
+      await usernameInput.press('Enter')
+    })
+    await page.waitForTimeout(2_000)
+
+    const verificationInput = page
+      .locator('input[data-testid="ocfEnterTextTextInput"], input[name="text"]')
+      .first()
+    const passwordInput = page.locator('input[name="password"], input[type="password"]').first()
+
+    if (
+      !(await passwordInput.isVisible().catch(() => false)) &&
+      process.env.X_EMAIL &&
+      await verificationInput.isVisible().catch(() => false)
+    ) {
+      await verificationInput.fill(process.env.X_EMAIL)
+      await page.getByRole('button', { name: /^next$/i }).click().catch(async () => {
+        await verificationInput.press('Enter')
+      })
+      await page.waitForTimeout(2_000)
+    }
+
+    if (!(await passwordInput.isVisible().catch(() => false))) {
+      const text = await page.locator('body').innerText({ timeout: 3_000 }).catch(() => '')
+      throw new Error(`X password step was not found. url=${page.url()} text=${text.replace(/\s+/g, ' ').slice(0, 180)}`)
+    }
+
+    await passwordInput.fill(credentials.password)
+    await page.getByRole('button', { name: /^(log in|sign in)$/i }).click().catch(async () => {
+      await passwordInput.press('Enter')
+    })
+    await page.waitForTimeout(Number(process.env.NEWS_X_LOGIN_SETTLE_MS || 6_000))
+    return !/\/i\/flow\/login/i.test(page.url())
+  } finally {
+    await page.close().catch(() => {})
+  }
 }
 
 const maybeSignInTruth = async page => {
@@ -245,9 +365,17 @@ const maybeSignInTruth = async page => {
   return true
 }
 
-const scrapeX = async (browser, rawHandle) => {
+const scrapeX = async (browser, rawHandle, session = {}) => {
   const handle = cleanHandle(rawHandle)
-  const context = await newContext(browser)
+  const ownsContext = !session.xContext
+  const context = session.xContext || await newContext(browser)
+  session.xContext = context
+
+  if (!session.xLoginAttempted) {
+    session.xLoginAttempted = true
+    session.xSignedIn = await maybeSignInX(context)
+  }
+
   const page = await context.newPage()
 
   try {
@@ -274,7 +402,10 @@ const scrapeX = async (browser, rawHandle) => {
           .map(link => link.getAttribute('href') || '')
           .filter(Boolean)
 
-        const statusHref = links.find(href => href.toLowerCase().includes(`/${target}/status/`)) || links[0]
+        const statusHref = links.find(href =>
+          href.toLowerCase().includes(`/${target}/status/`) &&
+          !/\/(analytics|photo|video)\b/i.test(href)
+        ) || links.find(href => !/\/(analytics|photo|video)\b/i.test(href)) || links[0]
         if (!statusHref) continue
 
         const match = statusHref.match(/\/([^/]+)\/status\/(\d+)/)
@@ -283,8 +414,12 @@ const scrapeX = async (browser, rawHandle) => {
         const authorHandle = match[1]
         const images = Array.from(article.querySelectorAll('img'))
           .map(img => img.currentSrc || img.src)
-          .filter(src => src && /pbs\.twimg\.com\/media\//i.test(src))
-          .map(src => ({ type: 'image', url: src, thumbnail_url: src }))
+          .filter(src => src && /pbs\.twimg\.com\/(media|ext_tw_video_thumb|amplify_video_thumb)\//i.test(src))
+          .map(src => ({
+            type: /video_thumb/i.test(src) ? 'video' : 'image',
+            url: src,
+            thumbnail_url: src,
+          }))
 
         const avatar = Array.from(article.querySelectorAll('img'))
           .map(img => img.currentSrc || img.src)
@@ -309,19 +444,18 @@ const scrapeX = async (browser, rawHandle) => {
           bodyText: text,
           media: images,
           isPinned,
+          postedAt: article.querySelector('time[datetime]')?.getAttribute('datetime') || null,
         })
       }
 
-      if (candidates.length) {
-        return candidates.find(candidate => !candidate.isPinned) || candidates[0]
-      }
+      if (candidates.length) return candidates
 
       const fallback = Array.from(document.querySelectorAll('a[href*="/status/"]'))
         .map(link => link.getAttribute('href') || '')
         .find(Boolean)
       const match = fallback?.match(/\/([^/]+)\/status\/(\d+)/)
       return match?.[2]
-        ? {
+        ? [{
             externalId: match[2],
             authorHandle: match[1],
             authorDisplayName: match[1],
@@ -329,22 +463,30 @@ const scrapeX = async (browser, rawHandle) => {
             sourceUrl: toAbsolute(fallback),
             bodyText: `${match[1]} posted on X`,
             media: [],
-          }
-        : null
+          }]
+        : []
     }, handle)
 
-    if (!raw?.externalId || !raw?.sourceUrl) {
+    if (!raw?.length) {
       throw new Error(`No X post could be extracted for @${handle}`)
     }
 
-    return makeSnapshot({
-      platform: 'x',
-      postKind: 'post',
-      ...raw,
-      raw: { extractedFrom: page.url(), handle },
-    })
+    return raw
+      .filter(item => item?.externalId && item?.sourceUrl)
+      .map(item => makeSnapshot({
+        platform: 'x',
+        postKind: 'post',
+        ...item,
+        raw: {
+          extractedFrom: page.url(),
+          handle,
+          isPinned: Boolean(item.isPinned),
+          signedIn: Boolean(session.xSignedIn),
+        },
+      }))
   } finally {
-    await context.close()
+    await page.close().catch(() => {})
+    if (ownsContext) await context.close()
   }
 }
 
@@ -354,7 +496,6 @@ const scrapeTruth = async (browser, rawHandle) => {
   const page = await context.newPage()
 
   try {
-    const signedIn = await maybeSignInTruth(page)
     await page.goto(`https://truthsocial.com/@${encodeURIComponent(handle)}`, {
       waitUntil: 'domcontentloaded',
       timeout: 35_000,
@@ -386,9 +527,7 @@ const scrapeTruth = async (browser, rawHandle) => {
       try {
         const account = await getJson(`/api/v1/accounts/lookup?acct=${encodeURIComponent(handle)}`)
         const statuses = await getJson(`/api/v1/accounts/${account.id}/statuses?exclude_replies=false&only_replies=false&with_muted=true&limit=10`)
-        const status = Array.isArray(statuses) ? statuses[0] : null
-        if (!status?.id) return null
-        return { mode: 'api', account, status }
+        return { mode: 'api', account, statuses: Array.isArray(statuses) ? statuses : [] }
       } catch (apiError) {
         const links = Array.from(document.querySelectorAll('a[href*="/posts/"]'))
           .map(link => ({
@@ -444,55 +583,56 @@ const scrapeTruth = async (browser, rawHandle) => {
           })
         }
 
-        return candidates[0] || {
+        return candidates.length ? { mode: 'dom', candidates } : {
           mode: 'error',
           apiError: apiError instanceof Error ? apiError.message : String(apiError),
         }
       }
     }, handle)
 
-    if (raw?.mode === 'dom' && raw.externalId && raw.sourceUrl) {
-      return makeSnapshot({
+    if (raw?.mode === 'dom' && raw.candidates?.length) {
+      return raw.candidates.map(candidate => makeSnapshot({
         platform: 'truth',
         postKind: 'post',
-        ...raw,
-        bodyText: cleanTruthText(raw.bodyText, raw.authorHandle, raw.authorDisplayName),
-        raw: { extractedFrom: page.url(), handle, apiError: raw.apiError, mode: 'dom' },
-      })
+        ...candidate,
+        bodyText: cleanTruthText(candidate.bodyText, candidate.authorHandle, candidate.authorDisplayName),
+        raw: { extractedFrom: page.url(), handle, apiError: candidate.apiError, mode: 'dom' },
+      }))
     }
 
-    if (!raw?.status?.id) {
+    if (!raw?.statuses?.length) {
       throw new Error(`No Truth Social post could be extracted for @${handle}${raw?.apiError ? ` (${raw.apiError})` : ''}`)
     }
 
-    const status = raw.status.reblog || raw.status
-    const account = raw.status.account || raw.account
-    const bodyText = stripHtml(status.content || status.spoiler_text || '')
-    const media = uniqueMedia((status.media_attachments || []).map(item => ({
-      type: item.type === 'video' || item.type === 'gifv' ? 'video' : 'image',
-      url: item.url || item.remote_url || item.preview_url,
-      thumbnail_url: item.preview_url || item.url,
-      alt: item.description || undefined,
-    })))
+    return raw.statuses.map(rawStatus => {
+      const status = rawStatus.reblog || rawStatus
+      const account = rawStatus.account || raw.account
+      const bodyText = stripHtml(status.content || status.spoiler_text || '')
+      const media = uniqueMedia((status.media_attachments || []).map(item => ({
+        type: item.type === 'video' || item.type === 'gifv' ? 'video' : 'image',
+        url: item.url || item.remote_url || item.preview_url,
+        thumbnail_url: item.preview_url || item.url,
+        alt: item.description || undefined,
+      })))
 
-    return makeSnapshot({
-      platform: 'truth',
-      externalId: raw.status.id,
-      postKind: raw.status.reblog ? 'retruth' : raw.status.in_reply_to_id ? 'reply' : 'post',
-      authorHandle: account.username || account.acct || handle,
-      authorDisplayName: stripHtml(account.display_name || account.username || handle),
-      authorAvatarUrl: account.avatar_static || account.avatar || null,
-      bodyText,
-      sourceUrl: raw.status.url || status.url || `https://truthsocial.com/@${handle}/posts/${raw.status.id}`,
-      media,
-      metrics: {
-        replies: raw.status.replies_count ?? status.replies_count,
-        boosts: raw.status.reblogs_count ?? status.reblogs_count,
-        favorites: raw.status.favourites_count ?? status.favourites_count,
-      },
-      raw: { status: raw.status, account: raw.account },
-      signedIn,
-      postedAt: raw.status.created_at || status.created_at || null,
+      return makeSnapshot({
+        platform: 'truth',
+        externalId: rawStatus.id,
+        postKind: rawStatus.reblog ? 'retruth' : rawStatus.in_reply_to_id ? 'reply' : 'post',
+        authorHandle: account.username || account.acct || handle,
+        authorDisplayName: stripHtml(account.display_name || account.username || handle),
+        authorAvatarUrl: account.avatar_static || account.avatar || null,
+        bodyText,
+        sourceUrl: rawStatus.url || status.url || `https://truthsocial.com/@${handle}/posts/${rawStatus.id}`,
+        media,
+        metrics: {
+          replies: rawStatus.replies_count ?? status.replies_count,
+          boosts: rawStatus.reblogs_count ?? status.reblogs_count,
+          favorites: rawStatus.favourites_count ?? status.favourites_count,
+        },
+        raw: { status: rawStatus, account: raw.account },
+        postedAt: rawStatus.created_at || status.created_at || null,
+      })
     })
   } finally {
     await context.close()
@@ -514,9 +654,9 @@ const classifySourceError = (source, error) => {
   }
 }
 
-const scrapeSource = async (browser, source) => {
+const scrapeSource = async (browser, source, session) => {
   if (source.platform === 'x') {
-    return scrapeX(browser, source.handle)
+    return scrapeX(browser, source.handle, session)
   }
 
   if (source.platform === 'truth') {
@@ -594,25 +734,30 @@ const runCycle = async supabase => {
   }
 
   const browser = await launchBrowser()
+  const session = {}
   try {
     for (const source of sources) {
       try {
-        const snapshot = await scrapeSource(browser, source)
-        const alreadySeen = source.last_seen_external_id === snapshot.externalId
+        const snapshots = await scrapeSource(browser, source, session)
+        const { latest, toStore } = selectSnapshotsToStore(source, snapshots)
 
-        if (!alreadySeen) {
+        if (!latest) {
+          throw new Error(`No snapshots extracted for ${source.platform}:${source.handle}`)
+        }
+
+        for (const snapshot of toStore) {
           await writeSnapshot(supabase, source, snapshot)
         }
 
         await updateSourceHealth(supabase, source.id, {
           last_success_at: new Date().toISOString(),
-          last_seen_external_id: snapshot.externalId,
-          last_seen_at: snapshot.postedAt || new Date().toISOString(),
+          last_seen_external_id: latest.externalId,
+          last_seen_at: latest.postedAt || new Date().toISOString(),
           last_error: null,
           health_status: 'ok',
-          external_account_id: source.external_account_id || snapshot.authorHandle,
+          external_account_id: source.external_account_id || latest.authorHandle,
         })
-        console.log(`${alreadySeen ? 'Skipped seen' : 'Stored'} ${snapshot.platform}:${snapshot.externalId} for ${source.handle}`)
+        console.log(`${toStore.length ? `Stored ${toStore.length}` : 'Skipped seen'} ${latest.platform}:${latest.externalId} for ${source.handle}`)
       } catch (error) {
         const healthPatch = classifySourceError(source, error)
         await updateSourceHealth(supabase, source.id, healthPatch)
@@ -620,6 +765,7 @@ const runCycle = async supabase => {
       }
     }
   } finally {
+    await session.xContext?.close().catch(() => {})
     await browser.close()
   }
 }
@@ -627,6 +773,11 @@ const runCycle = async supabase => {
 const runWorker = async () => {
   const supabase = createSupabaseClient()
   const interval = Number(process.env.NEWS_SCRAPE_INTERVAL_MS || DEFAULT_INTERVAL_MS)
+
+  if (process.argv.includes('--once')) {
+    await runCycle(supabase)
+    return
+  }
 
   while (true) {
     const startedAt = Date.now()
@@ -649,9 +800,11 @@ const runProof = async () => {
   try {
     const x = await scrapeX(browser, xHandle)
     const truth = await scrapeTruth(browser, truthHandle)
-    const ok = Boolean(x.externalId && x.bodyText && x.sourceUrl && truth.externalId && truth.bodyText && truth.sourceUrl)
+    const xLatest = uniqueSnapshots(x).sort(compareSnapshotsDesc)[0]
+    const truthLatest = uniqueSnapshots(truth).sort(compareSnapshotsDesc)[0]
+    const ok = Boolean(xLatest?.externalId && xLatest.bodyText && xLatest.sourceUrl && truthLatest?.externalId && truthLatest.bodyText && truthLatest.sourceUrl)
 
-    console.log(JSON.stringify({ ok, generatedAt: new Date().toISOString(), x, truth }, null, 2))
+    console.log(JSON.stringify({ ok, generatedAt: new Date().toISOString(), x: xLatest, xCandidates: x.length, truth: truthLatest, truthCandidates: truth.length }, null, 2))
     if (!ok) process.exitCode = 1
   } finally {
     await browser.close()

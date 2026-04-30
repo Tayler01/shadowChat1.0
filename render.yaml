@@ -20,9 +20,13 @@ services:
         sync: false
       - key: X_USERNAME
         sync: false
+      - key: X_EMAIL
+        sync: false
       - key: X_PASSWORD
         sync: false
       - key: TRUTH_USERNAME
+        sync: false
+      - key: TRUTH_EMAIL
         sync: false
       - key: TRUTH_PASSWORD
         sync: false

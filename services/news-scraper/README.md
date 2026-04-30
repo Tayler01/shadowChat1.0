@@ -25,6 +25,17 @@ Proof mode does not require Supabase credentials. It exits non-zero unless both 
 - `NEWS_SCRAPE_INTERVAL_MS` defaults to `90000`
 - `NEWS_SCRAPE_HEADLESS` defaults to `true`; set `false` only for local debugging
 - `PINCHTAB_CDP_URL` or `PINCHTAB_WS_ENDPOINT` may point the worker at a managed browser session
-- `X_USERNAME`, `X_PASSWORD`, `TRUTH_USERNAME`, and `TRUTH_PASSWORD` are reserved for later read-only login support and must stay server-only
+- `X_USERNAME`, `X_PASSWORD`, and optional `X_EMAIL` enable read-only X login for a more current timeline than logged-out profile pages expose
+- `TRUTH_USERNAME` or `TRUTH_EMAIL`, plus `TRUTH_PASSWORD`, are optional. The scraper now tries Truth's public profile/API path before attempting any login flow because hosted worker IPs may be blocked before the login form loads.
 
 The production container uses a Playwright browser image. Supabase Edge Functions stay short-lived; this worker owns polling and browser automation.
+
+## One-Cycle Worker Check
+
+```powershell
+$env:SUPABASE_URL="..."
+$env:SUPABASE_SERVICE_ROLE_KEY="..."
+node services/news-scraper/src/index.mjs --once
+```
+
+The worker stores only the latest visible post when a source has no cursor yet. After that, it stores every extracted post with a numeric ID newer than `news_sources.last_seen_external_id`, then advances the cursor to the newest extracted post.
