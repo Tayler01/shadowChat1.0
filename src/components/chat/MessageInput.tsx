@@ -16,6 +16,21 @@ import { askQuestion } from '../../lib/ai'
 
 const normalizeComposerValue = (value: string) => (value.trim().length === 0 ? '' : value)
 
+const getEmojiPickerDimensions = () => {
+  if (typeof window === 'undefined') return { width: 300, height: 360 }
+
+  if (window.innerWidth < 480) {
+    return { width: 280, height: Math.max(260, Math.min(320, window.innerHeight - 120)) }
+  }
+
+  return { width: 300, height: 360 }
+}
+
+const getEmojiPickerTheme = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+    ? 'dark'
+    : 'light'
+
 interface MessageInputProps {
   onSendMessage: (
     content: string,
@@ -66,6 +81,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const audioChunksRef = useRef<Blob[]>([])
   const { enabled: suggestionsEnabled } = useSuggestionsEnabled()
   const { suggestions } = useSuggestedReplies(messages, suggestionsEnabled)
+  const pickerDimensions = getEmojiPickerDimensions()
 
   const setComposerMessage = useCallback((value: string) => {
     const nextMessage = normalizeComposerValue(value)
@@ -443,12 +459,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
       {/* Emoji Picker */}
       {showEmojiPicker && EmojiPicker && (
-        <div ref={emojiPickerRef} className="absolute bottom-full right-0 mb-2">
+        <div
+          ref={emojiPickerRef}
+          className="absolute bottom-full left-1/2 z-[90] mb-2 max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] md:left-auto md:right-0 md:translate-x-0"
+        >
           <EmojiPicker
             onEmojiClick={insertEmoji}
-            width={320}
-            height={400}
-            theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
+            width={pickerDimensions.width}
+            height={pickerDimensions.height}
+            theme={getEmojiPickerTheme()}
           />
         </div>
       )}

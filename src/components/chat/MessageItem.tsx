@@ -53,6 +53,21 @@ const normalizeEmojiValue = (emoji: string) => {
   return value
 }
 
+const getEmojiPickerDimensions = () => {
+  if (typeof window === 'undefined') return { width: 300, height: 360 }
+
+  if (window.innerWidth < 480) {
+    return { width: 280, height: Math.max(260, Math.min(320, window.innerHeight - 120)) }
+  }
+
+  return { width: 300, height: 360 }
+}
+
+const getEmojiPickerTheme = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+    ? 'dark'
+    : 'light'
+
 export const MessageItem: React.FC<MessageItemProps> = React.memo(
   ({ message, previousMessage, parentMessage, onReply, onEdit, onDelete, onTogglePin, onToggleReaction, onJumpToMessage, containerRef }) => {
     const { profile } = useAuth()
@@ -74,6 +89,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const reactionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const analyzeTone = useToneAnalysis()
     const { enabled: toneEnabled } = useToneAnalysisEnabled()
+    const pickerDimensions = getEmojiPickerDimensions()
 
     const isGrouped = shouldGroupMessage(message, previousMessage)
     const isOwner = profile?.id === message.user_id
@@ -408,20 +424,6 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
 
                           <button
                             onClick={() => {
-                              void handleReaction('\u{1F44D}')
-                              setShowActions(false)
-                            }}
-                            className="flex w-full items-center space-x-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)]"
-                            type="button"
-                            aria-label="React with thumbs up"
-                            role="menuitem"
-                          >
-                            <span className="text-base leading-none">{'\u{1F44D}'}</span>
-                            <span>React</span>
-                          </button>
-
-                          <button
-                            onClick={() => {
                               setShowReactionPicker(true)
                               setShowActions(false)
                             }}
@@ -537,13 +539,13 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 {showReactionPicker && EmojiPicker && (
                   <div
                     ref={reactionPickerRef}
-                    className="absolute -top-46 left-1/2 -translate-x-1/2 z-50"
+                    className="fixed left-1/2 top-16 z-[90] max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] sm:absolute sm:bottom-full sm:left-1/2 sm:top-auto sm:mb-2"
                   >
                     <EmojiPicker
                       onEmojiClick={handleReactionSelect}
-                      width={320}
-                      height={400}
-                      theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
+                      width={pickerDimensions.width}
+                      height={pickerDimensions.height}
+                      theme={getEmojiPickerTheme()}
                     />
                   </div>
                 )}

@@ -17,6 +17,21 @@ const QUICK_REACTIONS = [
 
 const normalizeEmojiValue = (emoji: string) => emoji.trim()
 
+const getEmojiPickerDimensions = () => {
+  if (typeof window === 'undefined') return { width: 300, height: 360 }
+
+  if (window.innerWidth < 480) {
+    return { width: 280, height: Math.max(260, Math.min(320, window.innerHeight - 120)) }
+  }
+
+  return { width: 300, height: 360 }
+}
+
+const getEmojiPickerTheme = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+    ? 'dark'
+    : 'light'
+
 export function NewsReactionSummaryStrip({
   reactions,
   onReact,
@@ -74,6 +89,7 @@ export function NewsReactionBar({
   const EmojiPicker = useEmojiPicker(showPicker)
   const entries = Object.entries(reactions || {})
   const totalReactions = entries.reduce((sum, [, data]) => sum + data.count, 0)
+  const pickerDimensions = getEmojiPickerDimensions()
 
   useEffect(() => {
     if (!showPicker && !showMenu) return
@@ -121,7 +137,7 @@ export function NewsReactionBar({
         {showMenu && (
           <div
             role="menu"
-            className="absolute right-0 top-full z-40 mt-2 w-64 rounded-[var(--radius-md)] border border-[var(--border-panel)] bg-[linear-gradient(180deg,rgba(24,26,27,0.98),rgba(12,13,14,0.99))] p-2 shadow-[0_18px_48px_rgba(0,0,0,0.42)]"
+            className="absolute right-0 top-full z-40 mt-2 w-60 max-w-[calc(100vw-2rem)] rounded-[var(--radius-md)] border border-[var(--border-panel)] bg-[linear-gradient(180deg,rgba(24,26,27,0.98),rgba(12,13,14,0.99))] p-2 shadow-[0_18px_48px_rgba(0,0,0,0.42)] sm:w-64"
           >
             {entries.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-1.5 border-b border-[var(--border-subtle)] pb-2">
@@ -171,12 +187,15 @@ export function NewsReactionBar({
               </button>
             </div>
             {showPicker && EmojiPicker && (
-              <div ref={pickerRef} className="absolute bottom-full right-0 z-50 mb-2">
+              <div
+                ref={pickerRef}
+                className="fixed left-1/2 top-16 z-[90] max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] sm:absolute sm:bottom-full sm:left-auto sm:right-0 sm:top-auto sm:mb-2 sm:translate-x-0"
+              >
                 <EmojiPicker
                   onEmojiClick={handleSelect}
-                  width={320}
-                  height={380}
-                  theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
+                  width={pickerDimensions.width}
+                  height={pickerDimensions.height}
+                  theme={getEmojiPickerTheme()}
                 />
               </div>
             )}
@@ -232,12 +251,15 @@ export function NewsReactionBar({
         <Plus className="h-3.5 w-3.5" />
       </button>
       {showPicker && EmojiPicker && (
-        <div ref={pickerRef} className="absolute bottom-full left-0 z-50 mb-2">
+        <div
+          ref={pickerRef}
+          className="fixed left-1/2 top-16 z-[90] max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] sm:absolute sm:bottom-full sm:left-0 sm:top-auto sm:mb-2 sm:translate-x-0"
+        >
           <EmojiPicker
             onEmojiClick={handleSelect}
-            width={320}
-            height={380}
-            theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
+            width={pickerDimensions.width}
+            height={pickerDimensions.height}
+            theme={getEmojiPickerTheme()}
           />
         </div>
       )}

@@ -7,7 +7,22 @@ import type { EmojiClickData } from '../../types'
 import { MessageReactions } from './MessageItem'
 import { cn } from '../../lib/utils'
 
-const QUICK_REACTIONS = ['👍', '❤️', '😂', '🎉', '🙏']
+const QUICK_REACTIONS = ['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F389}', '\u{1F64F}']
+
+const getEmojiPickerDimensions = () => {
+  if (typeof window === 'undefined') return { width: 300, height: 360 }
+
+  if (window.innerWidth < 480) {
+    return { width: 280, height: Math.max(260, Math.min(320, window.innerHeight - 120)) }
+  }
+
+  return { width: 300, height: 360 }
+}
+
+const getEmojiPickerTheme = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+    ? 'dark'
+    : 'light'
 
 interface PinnedMessageItemProps {
   message: Message
@@ -23,6 +38,7 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
   const [showPicker, setShowPicker] = useState(false)
   const Picker = useEmojiPicker(showPicker)
   const pickerRef = useRef<HTMLDivElement>(null)
+  const pickerDimensions = getEmojiPickerDimensions()
 
   useEffect(() => {
     if (!showPicker) return
@@ -79,12 +95,15 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
           </button>
         </div>
         {showPicker && Picker && (
-          <div ref={pickerRef} className="absolute top-full z-50 mt-2">
+          <div
+            ref={pickerRef}
+            className="fixed left-1/2 top-16 z-[90] max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] sm:absolute sm:left-0 sm:top-full sm:mt-2 sm:translate-x-0"
+          >
             <Picker
               onEmojiClick={handleSelect}
-              width={320}
-              height={400}
-              theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
+              width={pickerDimensions.width}
+              height={pickerDimensions.height}
+              theme={getEmojiPickerTheme()}
             />
           </div>
         )}
