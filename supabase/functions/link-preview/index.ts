@@ -298,6 +298,25 @@ const getOEmbedEndpoint = (url: URL) => {
     return { endpoint, provider: 'Vimeo', mediaType: 'video' as const }
   }
 
+  const metaAccessToken = Deno.env.get('META_OEMBED_ACCESS_TOKEN') ||
+    (Deno.env.get('META_APP_ID') && Deno.env.get('META_APP_SECRET')
+      ? `${Deno.env.get('META_APP_ID')}|${Deno.env.get('META_APP_SECRET')}`
+      : undefined)
+
+  if (metaAccessToken && /(^|\.)instagram\.com$/i.test(host)) {
+    const endpoint = new URL('https://graph.facebook.com/v19.0/instagram_oembed')
+    endpoint.searchParams.set('url', url.toString())
+    endpoint.searchParams.set('access_token', metaAccessToken)
+    return { endpoint, provider: 'Instagram', mediaType: undefined as LinkPreview['mediaType'] }
+  }
+
+  if (metaAccessToken && /(^|\.)facebook\.com$|(^|\.)fb\.watch$/i.test(host)) {
+    const endpoint = new URL('https://graph.facebook.com/v19.0/oembed_post')
+    endpoint.searchParams.set('url', url.toString())
+    endpoint.searchParams.set('access_token', metaAccessToken)
+    return { endpoint, provider: 'Facebook', mediaType: undefined as LinkPreview['mediaType'] }
+  }
+
   return null
 }
 

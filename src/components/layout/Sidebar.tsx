@@ -3,6 +3,7 @@ import { MessageSquare, Users, Newspaper, Settings, Moon, Sun, X } from 'lucide-
 import { Avatar } from '../ui/Avatar';
 import { useAuth } from '../../hooks/useAuth';
 import { useDirectMessages } from '../../hooks/useDirectMessages';
+import { useNewsBadges } from '../../hooks/useNewsBadges';
 
 interface SidebarProps {
   currentView: 'chat' | 'dms' | 'news' | 'settings';
@@ -25,6 +26,7 @@ export function Sidebar({
 }: SidebarProps) {
   const { user } = useAuth();
   const { conversations } = useDirectMessages();
+  const { count: newsBadgeCount } = useNewsBadges();
 
   const totalUnread = conversations.reduce((sum, conv) => sum + (conv.unread_count || 0), 0);
 
@@ -45,7 +47,7 @@ export function Sidebar({
       id: 'news' as const,
       label: 'News',
       icon: Newspaper,
-      badge: null,
+      badge: newsBadgeCount > 0 ? newsBadgeCount : null,
     },
     {
       id: 'settings' as const,

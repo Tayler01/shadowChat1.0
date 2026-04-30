@@ -1,6 +1,39 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
 import { SettingsView } from '../src/components/settings/SettingsView'
+
+const mockUpsertSource = jest.fn()
+const mockSetSourceEnabled = jest.fn()
+const mockRefreshNewsAdmin = jest.fn()
+const mockUseNewsAdmin = jest.fn(() => ({
+  isAdmin: true,
+  sources: [
+    {
+      id: 'source-1',
+      platform: 'x',
+      handle: 'OpenAI',
+      normalized_handle: 'openai',
+      display_name: 'OpenAI',
+      profile_url: 'https://x.com/OpenAI',
+      external_account_id: null,
+      enabled: true,
+      last_checked_at: null,
+      last_success_at: null,
+      last_error: null,
+      health_status: 'pending',
+      scrape_config: {},
+      created_by: null,
+      created_at: '2026-04-30T00:00:00.000Z',
+      updated_at: '2026-04-30T00:00:00.000Z',
+    },
+  ],
+  loading: false,
+  saving: false,
+  error: null,
+  refresh: mockRefreshNewsAdmin,
+  upsertSource: mockUpsertSource,
+  setSourceEnabled: mockSetSourceEnabled,
+}))
 
 jest.mock('../src/hooks/useIsDesktop', () => ({
   useIsDesktop: () => true,
@@ -59,6 +92,10 @@ jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => ({ signOut: jest.fn() }),
 }))
 
+jest.mock('../src/hooks/useNewsAdmin', () => ({
+  useNewsAdmin: () => mockUseNewsAdmin(),
+}))
+
 jest.mock('../src/lib/bridge', () => ({
   approveBridgePairing: jest.fn(),
 }))
@@ -102,4 +139,25 @@ test('settings renders section hub and opens account profile detail', () => {
 
   fireEvent.click(screen.getByRole('button', { name: /settings/i }))
   expect(screen.getByRole('button', { name: /notifications & audio/i })).toBeInTheDocument()
+})
+
+test('settings admin panel manages news sources', () => {
+  render(<SettingsView onToggleSidebar={jest.fn()} />)
+
+  fireEvent.click(screen.getByRole('button', { name: /admin/i }))
+
+  expect(screen.getByRole('heading', { name: 'News Sources' })).toBeInTheDocument()
+  expect(screen.getByText('@openai')).toBeInTheDocument()
+
+  fireEvent.change(screen.getByLabelText(/handle/i), { target: { value: 'ShadoNews' } })
+  fireEvent.click(screen.getByRole('button', { name: /save/i }))
+
+  return waitFor(() => {
+    expect(mockUpsertSource).toHaveBeenCalledWith({
+      platform: 'x',
+      handle: 'ShadoNews',
+      displayName: undefined,
+      profileUrl: undefined,
+    })
+  })
 })

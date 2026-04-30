@@ -19,6 +19,8 @@
     "qa:smoke:prod:headed": "node scripts/playwright-smoke.mjs --base-url=https://shadowchat-1-0.netlify.app --scenario=auth,resume-send --account-mode=env --run-name=prod-postdeploy-headed --headed --slow-mo=300",
     "qa:smoke:mobile": "node scripts/playwright-smoke.mjs --scenario=mobile-dm-back",
     "qa:smoke:full": "node scripts/playwright-smoke.mjs --scenario=full",
+    "news:scrape:proof": "node services/news-scraper/src/index.mjs --proof",
+    "news:scraper": "node services/news-scraper/src/index.mjs",
     "bridge:tui": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1",
     "bridge:tui:smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1 -Smoke",
     "bridge:bundle": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-bundle-receive.ps1",

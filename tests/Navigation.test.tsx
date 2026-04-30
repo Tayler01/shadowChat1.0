@@ -7,6 +7,10 @@ jest.mock('../src/hooks/useDirectMessages', () => ({
   useDirectMessages: () => ({ conversations: [] }),
 }))
 
+jest.mock('../src/hooks/useNewsBadges', () => ({
+  useNewsBadges: () => ({ count: 4, refresh: jest.fn(), markSeen: jest.fn() }),
+}))
+
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => ({
     user: {
@@ -27,6 +31,7 @@ test('mobile navigation replaces profile with news', () => {
 
   fireEvent.click(screen.getByText('News'))
   expect(onViewChange).toHaveBeenCalledWith('news')
+  expect(screen.getByText('4')).toBeInTheDocument()
 })
 
 test('sidebar navigation replaces profile with news', () => {
@@ -47,4 +52,5 @@ test('sidebar navigation replaces profile with news', () => {
 
   fireEvent.click(screen.getByText('News'))
   expect(onViewChange).toHaveBeenCalledWith('news')
+  expect(screen.getByText('4')).toBeInTheDocument()
 })

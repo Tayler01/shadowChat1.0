@@ -713,6 +713,77 @@ export interface Message {
   user?: User
 }
 
+export type NewsPlatform = 'x' | 'truth'
+
+export type NewsReactionSummary = Record<string, { count: number; users: string[] }>
+
+export interface NewsSource {
+  id: string
+  platform: NewsPlatform
+  handle: string
+  normalized_handle?: string
+  display_name?: string | null
+  profile_url?: string | null
+  external_account_id?: string | null
+  enabled: boolean
+  scrape_interval_seconds: number
+  last_seen_external_id?: string | null
+  last_seen_at?: string | null
+  last_checked_at?: string | null
+  last_success_at?: string | null
+  health_status: 'pending' | 'ok' | 'degraded' | 'blocked' | 'error'
+  last_error?: string | null
+  created_by?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsFeedMedia {
+  type?: 'image' | 'video' | 'link'
+  url: string
+  thumbnail_url?: string
+  alt?: string
+}
+
+export interface NewsFeedItem {
+  id: string
+  source_id?: string | null
+  platform: NewsPlatform
+  external_id: string
+  post_kind: 'post' | 'reply' | 'repost' | 'quote' | 'retruth' | 'unknown'
+  author_handle: string
+  author_display_name?: string | null
+  author_avatar_url?: string | null
+  headline: string
+  body_text: string
+  source_url: string
+  canonical_url?: string | null
+  media: NewsFeedMedia[]
+  metrics: Record<string, unknown>
+  raw: Record<string, unknown>
+  reactions: NewsReactionSummary
+  posted_at?: string | null
+  detected_at: string
+  visible_day: string
+  hidden: boolean
+  hidden_by?: string | null
+  hidden_at?: string | null
+  created_at: string
+  updated_at: string
+  source?: NewsSource | null
+}
+
+export interface NewsChatMessage {
+  id: string
+  user_id: string
+  content: string
+  edited_at?: string | null
+  reactions: NewsReactionSummary
+  created_at: string
+  updated_at: string
+  user?: User
+}
+
 export interface DMConversation {
   id: string
   participants: string[]

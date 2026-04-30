@@ -1,0 +1,28 @@
+services:
+  - type: worker
+    name: shado-news-scraper
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./services/news-scraper/Dockerfile
+    dockerContext: .
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: NEWS_SCRAPE_INTERVAL_MS
+        value: "90000"
+      - key: NEWS_SCRAPE_HEADLESS
+        value: "true"
+      - key: PINCHTAB_CDP_URL
+        sync: false
+      - key: PINCHTAB_WS_ENDPOINT
+        sync: false
+      - key: X_USERNAME
+        sync: false
+      - key: X_PASSWORD
+        sync: false
+      - key: TRUTH_USERNAME
+        sync: false
+      - key: TRUTH_PASSWORD
+        sync: false

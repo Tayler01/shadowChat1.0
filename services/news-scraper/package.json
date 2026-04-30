@@ -1,0 +1,14 @@
+{
+  "name": "shado-news-scraper",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "proof": "node src/index.mjs --proof",
+    "start": "node src/index.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "playwright": "^1.59.1"
+  }
+}
