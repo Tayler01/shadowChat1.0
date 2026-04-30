@@ -1,0 +1,252 @@
+# News Tab And Scraper Runbook
+
+This document describes the shipped News tab, its Supabase backend, and the
+Render-hosted scraper that keeps the News Feed current.
+
+## Product Shape
+
+The News tab has two segmented sections:
+
+- `News Feed`: a shared today-only board populated by tracked X and Truth
+  Social accounts. Users can open a nearly full-screen post modal, react, copy
+  links, and share original links. Users cannot post messages in this feed.
+- `News Chat`: a separate public chat channel for news links and discussion.
+  It supports text, link previews, edits, deletes, and emoji reactions.
+
+The News tab is intentionally isolated from the general chat and DM tables so
+it does not disturb existing realtime contracts, bridge behavior, push, or
+message history.
+
+## Frontend Map
+
+- [src/components/news/NewsView.tsx](C:/repos/chat2.0/src/components/news/NewsView.tsx:1): top-level segmented News experience.
+- [src/components/news/NewsFeed.tsx](C:/repos/chat2.0/src/components/news/NewsFeed.tsx:1): today board rendering and refresh.
+- [src/components/news/NewsFeedItem.tsx](C:/repos/chat2.0/src/components/news/NewsFeedItem.tsx:1): compact feed tile.
+- [src/components/news/NewsFeedModal.tsx](C:/repos/chat2.0/src/components/news/NewsFeedModal.tsx:1): expanded post/media view.
+- [src/components/news/NewsChat.tsx](C:/repos/chat2.0/src/components/news/NewsChat.tsx:1): public News Chat channel.
+- [src/hooks/useNewsFeed.tsx](C:/repos/chat2.0/src/hooks/useNewsFeed.tsx:1): feed fetch, realtime, reactions, and seen state.
+- [src/hooks/useNewsChat.tsx](C:/repos/chat2.0/src/hooks/useNewsChat.tsx:1): chat fetch, realtime, send/edit/delete, reactions, and seen state.
+- [src/hooks/useNewsBadges.ts](C:/repos/chat2.0/src/hooks/useNewsBadges.ts:1): Sidebar/MobileNav badge count.
+- [src/hooks/useNewsAdmin.ts](C:/repos/chat2.0/src/hooks/useNewsAdmin.ts:1): admin source management.
+
+News source management lives in Settings under `News Sources`. It is shown only
+to users with the `news_admin` role.
+
+## Backend Map
+
+Canonical schema is in
+[supabase/migrations/20260430041621_news_tab_foundation.sql](C:/repos/chat2.0/supabase/migrations/20260430041621_news_tab_foundation.sql:1),
+with follow-up migrations for admin bootstrap and normalized source handles.
+
+Main tables:
+
+- `user_roles`: currently used for the `news_admin` role.
+- `news_sources`: tracked X/Truth accounts, cursors, health, and admin state.
+- `news_feed_items`: normalized post snapshots for the today board.
+- `news_feed_reactions`: per-user feed reactions, aggregated back onto items.
+- `news_chat_messages`: News Chat messages.
+- `news_chat_reactions`: per-user News Chat reactions, aggregated back onto messages.
+- `news_user_state`: per-user seen timestamps for feed/chat badge counts.
+
+Main RPCs:
+
+- `is_news_admin`
+- `upsert_news_source`
+- `set_news_source_enabled`
+- `hide_news_feed_item`
+- `toggle_news_feed_reaction`
+- `toggle_news_chat_reaction`
+- `mark_news_seen`
+- `count_news_badge_items`
+- `clear_expired_news_feed_items`
+
+Realtime publication includes `news_feed_items`, `news_chat_messages`, and
+`news_sources`.
+
+## Feed Lifecycle
+
+The scraper polls enabled rows in `news_sources`. It extracts multiple visible
+post candidates, sorts them by numeric external ID first and timestamp second,
+and compares them to `news_sources.last_seen_external_id`.
+
+Rules:
+
+- A source with no cursor stores only the latest visible post if it belongs to
+  the current Eastern day.
+- A source with a cursor stores every extracted candidate newer than the cursor
+  and belonging to the current Eastern day.
+- The cursor advances to the newest extracted post even if that post is not
+  stored because it is older than today's Eastern board.
+- `clear_expired_news_feed_items()` deletes feed items whose `visible_day` is
+  before the current `America/New_York` date.
+- Source cursors are not cleared daily, so old posts do not reappear after the
+  board resets.
+
+## Scraper Service
+
+The worker lives in [services/news-scraper](C:/repos/chat2.0/services/news-scraper).
+Production uses the Render blueprint in [render.yaml](C:/repos/chat2.0/render.yaml:1).
+
+Required Render secrets:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Recommended Render values:
+
+- `NEWS_SCRAPE_INTERVAL_MS=90000`
+- `NEWS_SCRAPE_HEADLESS=true`
+
+Optional browser/session values:
+
+- `PINCHTAB_CDP_URL`
+- `PINCHTAB_WS_ENDPOINT`
+- `X_USERNAME`
+- `X_EMAIL`
+- `X_PASSWORD`
+- `TRUTH_USERNAME`
+- `TRUTH_EMAIL`
+- `TRUTH_PASSWORD`
+- `NEWS_X_SHARED_CONTEXT=true`
+
+The default path launches a fresh Playwright browser per source. This costs more
+startup time but prevents one platform/session failure from poisoning every
+source in the cycle. `NEWS_X_SHARED_CONTEXT=true` is available only as an
+optimization experiment.
+
+## Local Commands
+
+Proof mode does not require Supabase credentials:
+
+```powershell
+npm run news:scrape:proof
+```
+
+Use specific proof handles:
+
+```powershell
+$env:NEWS_PROOF_X_HANDLE="OpenAI"
+$env:NEWS_PROOF_TRUTH_HANDLE="realDonaldTrump"
+npm run news:scrape:proof
+```
+
+Run one real Supabase-backed cycle:
+
+```powershell
+$env:SUPABASE_URL="https://YOUR_PROJECT_REF.supabase.co"
+$env:SUPABASE_SERVICE_ROLE_KEY="YOUR_SERVICE_ROLE_KEY"
+node services/news-scraper/src/index.mjs --once
+```
+
+Run the continuous worker locally:
+
+```powershell
+npm run news:scraper
+```
+
+## Production Verification
+
+Check source health:
+
+```sql
+select
+  platform,
+  handle,
+  enabled,
+  health_status,
+  last_checked_at,
+  last_success_at,
+  last_seen_external_id,
+  left(coalesce(last_error, ''), 220) as last_error
+from public.news_sources
+order by platform, handle;
+```
+
+Check today's feed:
+
+```sql
+select
+  platform,
+  author_handle,
+  external_id,
+  headline,
+  posted_at,
+  detected_at,
+  jsonb_array_length(media) as media_count
+from public.news_feed_items
+where visible_day = ((now() at time zone 'America/New_York')::date)
+  and hidden = false
+order by detected_at desc;
+```
+
+Check the worker cadence by watching Render logs for lines like:
+
+```text
+Stored 1 x:<external_id> for <handle>
+Skipped seen x:<external_id> for <handle>
+Source truth:<handle> failed: ...
+```
+
+## Known Platform Realities
+
+X logged-out profile pages can be partial or stale. Optional read-only X
+credentials improve the chance of seeing the current timeline, but this project
+does not use the paid X API.
+
+Truth Social exposes Mastodon-style public API routes, but hosted worker IPs
+can still be blocked before the profile/API path is usable. If a Truth source
+reports `blocked` from Render even with credentials configured, treat that as an
+infrastructure/network block and move the worker to a trusted browser/IP path
+such as PinchTab CDP/WebSocket or a different allowed host.
+
+As of April 30, 2026, the Render worker has been verified to recover X sources
+with the per-source browser isolation patch. The Truth Social source was still
+blocked by the hosted worker environment.
+
+## Troubleshooting
+
+`health_status = blocked` for Truth:
+
+- Confirm `TRUTH_USERNAME` or `TRUTH_EMAIL` and `TRUTH_PASSWORD` are present in
+  Render.
+- Redeploy/restart the worker after changing secrets.
+- If the same source still reports a block, use PinchTab or another trusted
+  browser host rather than repeatedly changing app code.
+
+X sources grab the first post but never update:
+
+- Confirm `NEWS_SCRAPE_INTERVAL_MS` is reasonable and Render logs show repeated
+  cycles.
+- Check `last_seen_external_id`; it should advance when a newer visible post is
+  extracted.
+- Add `X_USERNAME`, optional `X_EMAIL`, and `X_PASSWORD` if logged-out X pages
+  are stale.
+- Review `last_error` for login challenge, blocked page, or extraction errors.
+
+Old posts appear on the board:
+
+- Confirm the source had no cursor before it was added. The initial bootstrap
+  can store the latest visible post only if that post belongs to today Eastern.
+- Confirm the worker is running the current commit and the feed row has the
+  expected `visible_day`.
+
+Feed is empty but sources are `ok`:
+
+- The newest visible posts may be older than today's Eastern date. The cursor
+  still advances so those old posts do not backfill the board later.
+- Check `last_seen_at` and `last_success_at` to separate "no current post" from
+  scraper failure.
+
+Media does not display:
+
+- The feed hotlinks source media. If a provider expires or blocks a media URL,
+  the stored snapshot remains but the image may not render.
+- Verify `media` contains at least one object with a public `url` or
+  `thumbnail_url`.
+
+## Related Docs
+
+- [services/news-scraper/README.md](C:/repos/chat2.0/services/news-scraper/README.md:1)
+- [docs/LINK_PREVIEWS.md](C:/repos/chat2.0/docs/LINK_PREVIEWS.md:1)
+- [docs/DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1)
+- [docs/TESTING_GUIDE.md](C:/repos/chat2.0/docs/TESTING_GUIDE.md:1)

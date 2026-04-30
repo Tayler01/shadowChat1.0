@@ -36,6 +36,7 @@ Current coverage is strongest around:
 - thread reply and pinned message UI
 - session refresh and realtime reset helpers
 - theme and user search hooks
+- News tab segmentation and News Chat rendering
 
 ## When To Add Manual Browser QA
 
@@ -50,6 +51,7 @@ Do browser validation when changing:
 - mobile navigation or composer layout
 - theme and visual polish
 - push notification setup
+- News Feed layout, reaction menus, badges, and source-health admin UI
 
 ## Recommended Local Browser Loop
 
@@ -163,6 +165,12 @@ Current smoke scenarios:
 - `mobile-dm-back`: validates the mobile DM thread back flow
 - `mobile-settings-visual`: checks the mobile settings layout and notification toggle geometry
 
+News-specific Jest coverage currently lives in:
+
+- [tests/NewsView.test.tsx](C:/repos/chat2.0/tests/NewsView.test.tsx:1)
+- [tests/NewsChat.test.tsx](C:/repos/chat2.0/tests/NewsChat.test.tsx:1)
+- [tests/linkPreview.test.ts](C:/repos/chat2.0/tests/linkPreview.test.ts:1)
+
 Latest full release smoke recorded for the feedback submission release:
 
 - Date: April 28, 2026
@@ -171,6 +179,32 @@ Latest full release smoke recorded for the feedback submission release:
 - Summary: `output/playwright/full-smoke-feedback-release-20260428/summary.json`
 
 For link preview changes, verify a local preview build with a signed-in account and send a message containing a public `https://` URL. The message should keep the link clickable immediately, then load one preview card without rerendering the whole chat thread. Test at least one generic Open Graph link and one `x.com`/`twitter.com` link because X metadata can arrive through the oEmbed fallback.
+
+For News tab changes, verify both desktop and mobile:
+
+- News Feed and News Chat segmented switching
+- feed tile media placement, no empty image placeholders, and scrollable modal media
+- feed and chat reaction menus stay inside the viewport
+- selected reactions render as compact counts
+- News Chat send/edit/delete/reaction realtime between two signed-in users
+- News badges appear in Sidebar/MobileNav and clear after viewing the relevant section
+
+For News scraper changes, start with proof mode:
+
+```powershell
+npm run news:scrape:proof
+```
+
+Then run one real cycle with `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` set:
+
+```powershell
+node services/news-scraper/src/index.mjs --once
+```
+
+After the one-cycle check, query `news_sources` and today's `news_feed_items`.
+The source should update `last_checked_at`; successful sources should update
+`last_success_at`, `health_status`, and `last_seen_external_id`. Only current
+Eastern-day posts should appear on the board.
 
 For Settings feedback changes, verify the wizard from Settings, submit at least one bug or feature report with an image attachment, then query `public.feedback_submissions` as the same user and download the stored object from `feedback-attachments`. This confirms both table RLS and private Storage policy behavior.
 

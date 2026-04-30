@@ -1,6 +1,6 @@
 # Chat Link Previews
 
-ShadowChat renders `http://`, `https://`, and `www.` URLs in group chat and DMs as clickable links. The first URL in a text message can also load a compact preview card.
+ShadowChat renders `http://`, `https://`, and `www.` URLs in group chat, DMs, and News Chat as clickable links. The first URL in a text message can also load a compact preview card.
 
 ## Architecture
 
@@ -17,6 +17,7 @@ ShadowChat renders `http://`, `https://`, and `www.` URLs in group chat and DMs 
 - X/Twitter links merge `publish.twitter.com`/`publish.x.com` oEmbed text with image metadata. X often omits `og:image` from normal logged-out fetches even though iMessage-style preview crawlers receive a card image, so the function also extracts first-party `pbs.twimg.com/media/...` assets from public X post HTML and normalizes them to a large thumbnail.
 - If X removes those public media hints, the official fallback is X API v2 post lookup with `expansions=attachments.media_keys` and `media.fields=url,preview_image_url,type`, which requires a bearer token and should be added as a server-side secret before relying on it in production.
 - YouTube and Vimeo links also use provider oEmbed fallbacks so video thumbnails still appear when the page HTML does not expose usable Open Graph metadata to the function.
+- Facebook/Instagram/Meta oEmbed support can use `META_OEMBED_ACCESS_TOKEN`, or `META_APP_ID` plus `META_APP_SECRET`, as Supabase Edge Function secrets. Do not expose these values through frontend `VITE_*` env vars.
 
 ## Deployment
 

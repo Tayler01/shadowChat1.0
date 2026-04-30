@@ -9,6 +9,7 @@ This guide covers the recommended local and hosted setup flow for ShadowChat 1.0
 - A Supabase account and project
 - Supabase CLI
 - Netlify CLI only if you plan to deploy from the terminal
+- Render account only if you plan to run the production News scraper
 
 Useful checks:
 
@@ -115,7 +116,32 @@ supabase secrets set WEB_PUSH_SUBJECT=https://your-app.example.com
 ```powershell
 supabase functions deploy openai-chat --no-verify-jwt
 supabase functions deploy send-push --no-verify-jwt
+supabase functions deploy link-preview --no-verify-jwt
 ```
+
+Deploy bridge functions too when working on the ESP bridge or when a fresh
+Supabase project needs full feature parity:
+
+```powershell
+supabase functions deploy bridge-register --no-verify-jwt
+supabase functions deploy bridge-pairing-begin --no-verify-jwt
+supabase functions deploy bridge-pairing-status --no-verify-jwt
+supabase functions deploy bridge-session-exchange --no-verify-jwt
+supabase functions deploy bridge-session-refresh --no-verify-jwt
+supabase functions deploy bridge-heartbeat --no-verify-jwt
+supabase functions deploy bridge-pairing-approve --no-verify-jwt
+supabase functions deploy bridge-pairing-revoke --no-verify-jwt
+supabase functions deploy bridge-group-send --no-verify-jwt
+supabase functions deploy bridge-group-poll --no-verify-jwt
+supabase functions deploy bridge-dm-send --no-verify-jwt
+supabase functions deploy bridge-dm-poll --no-verify-jwt
+supabase functions deploy bridge-update-check --no-verify-jwt
+supabase functions deploy bridge-user-profile --no-verify-jwt
+supabase functions deploy bridge-user-search --no-verify-jwt
+```
+
+`link-preview` validates the signed-in user's bearer token inside the function
+while keeping gateway JWT verification disabled for deployment compatibility.
 
 ## 6. Start The App
 
@@ -127,7 +153,36 @@ Default Vite URL:
 
 - `http://localhost:5173`
 
-## 7. Verify Core Flows
+## 7. Optional News Scraper Setup
+
+The app can run locally without the News scraper, but News Feed ingestion needs
+the worker.
+
+Proof mode does not require Supabase credentials:
+
+```powershell
+npm run news:scrape:proof
+```
+
+For a real one-cycle local check, set server-only Supabase values in the shell:
+
+```powershell
+$env:SUPABASE_URL="https://YOUR_PROJECT_REF.supabase.co"
+$env:SUPABASE_SERVICE_ROLE_KEY="YOUR_SERVICE_ROLE_KEY"
+node services/news-scraper/src/index.mjs --once
+```
+
+Production uses [render.yaml](C:/repos/chat2.0/render.yaml:1). Required Render
+secrets are `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; optional source
+credentials are `X_USERNAME`, `X_EMAIL`, `X_PASSWORD`, `TRUTH_USERNAME`,
+`TRUTH_EMAIL`, and `TRUTH_PASSWORD`.
+
+News admins manage tracked sources from Settings > News Sources. The admin role
+is stored in `public.user_roles` as `news_admin`.
+
+Full runbook: [docs/NEWS_TAB_AND_SCRAPER.md](C:/repos/chat2.0/docs/NEWS_TAB_AND_SCRAPER.md:1).
+
+## 8. Verify Core Flows
 
 After setup, verify:
 
@@ -138,8 +193,12 @@ After setup, verify:
 5. Profile updates persist
 6. Push settings screen renders
 7. New-account phone setup opens after signup or first sign-in from the same browser
+8. News tab loads
+9. News Chat sends and receives a message
+10. A `news_admin` user can add/pause a News source in Settings
+11. If the scraper is configured, `news_sources.last_checked_at` updates after a worker cycle
 
-## 8. Optional Preview Mode
+## 9. Optional Preview Mode
 
 For production-style local QA:
 
@@ -148,7 +207,7 @@ npm run build
 npx vite preview --host 127.0.0.1 --port 4174
 ```
 
-## 9. End-User Phone Setup
+## 10. End-User Phone Setup
 
 New accounts get a guided Home Screen setup modal. The guide is intentionally simple:
 
@@ -178,6 +237,14 @@ For implementation and QA details, see [docs/PHONE_INSTALL_ONBOARDING.md](C:/rep
 - `send-push` function not deployed
 - VAPID secrets missing
 - browser/device has no active subscription row
+
+### News Feed Is Empty
+
+- no `news_sources` rows are enabled
+- the Render worker is stopped or missing `SUPABASE_SERVICE_ROLE_KEY`
+- newest visible source posts are older than today's Eastern date
+- X logged-out pages are stale and no X credentials are configured
+- Truth Social is blocking the hosted worker IP
 
 ### Realtime Looks Dead
 

@@ -1,5 +1,23 @@
 # ESP Bridge Update And Offline Software Plan
 
+## Current Documentation Track
+
+Status: active on April 30, 2026
+
+Deliverables:
+
+- refresh README and repo docs for the shipped News tab
+- document the Render News scraper deployment and troubleshooting path
+- document News setup, testing, production smoke, and link-preview secrets
+- keep the ESP bridge plan intact as the bridge-specific source of truth
+
+Acceptance:
+
+- a new contributor can find the News frontend, backend schema, worker, env vars,
+  commands, and known Truth Social blocking risk from the repo docs
+- production handoff clearly separates Netlify, Supabase, and Render deployment
+  responsibilities
+
 ## Milestone 1: Manifest Foundation
 
 Status: complete

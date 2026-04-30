@@ -1,11 +1,12 @@
 # Deployment Guide
 
-ShadowChat deploys as a static frontend on Netlify with Supabase as the hosted backend.
+ShadowChat deploys as a static frontend on Netlify with Supabase as the hosted backend. The News Feed scraper is a separate always-on Render worker.
 
 ## Production Pieces
 
 - Frontend hosting: Netlify
 - Backend: Supabase
+- News scraper: Render worker from [render.yaml](C:/repos/chat2.0/render.yaml:1)
 - Static build output: `dist`
 - Netlify config: [netlify.toml](C:/repos/chat2.0/netlify.toml:1)
 
@@ -28,6 +29,18 @@ node scripts/playwright-smoke.mjs --scenario=auth,resume-send --headed --no-reus
 ```
 
 For the current login persistence behavior, rollback checkpoints, and production smoke expectations, see [`docs/SESSION_PERSISTENCE_RUNBOOK.md`](C:/repos/chat2.0/docs/SESSION_PERSISTENCE_RUNBOOK.md:1).
+
+If the change affects News scraping, run:
+
+```powershell
+npm run news:scrape:proof
+```
+
+Then run one Supabase-backed cycle with service-role credentials in the shell or Render after deployment:
+
+```powershell
+node services/news-scraper/src/index.mjs --once
+```
 
 ## GitHub Push
 
@@ -81,6 +94,9 @@ supabase functions deploy bridge-group-send --no-verify-jwt
 supabase functions deploy bridge-group-poll --no-verify-jwt
 supabase functions deploy bridge-dm-send --no-verify-jwt
 supabase functions deploy bridge-dm-poll --no-verify-jwt
+supabase functions deploy bridge-update-check --no-verify-jwt
+supabase functions deploy bridge-user-profile --no-verify-jwt
+supabase functions deploy bridge-user-search --no-verify-jwt
 supabase functions deploy link-preview --no-verify-jwt
 ```
 
@@ -108,6 +124,48 @@ Bridge TUI `@ai` support uses the same AI secrets through `bridge-group-send`, s
 
 Chat link previews use the `link-preview` Edge Function. Deploy it with `--no-verify-jwt`; the function validates the signed-in user's bearer token in code before fetching remote metadata.
 
+Optional Meta/Facebook/Instagram previews can use these server-only secrets:
+
+- `META_OEMBED_ACCESS_TOKEN`
+- or `META_APP_ID` plus `META_APP_SECRET`
+
+Do not put provider preview tokens in frontend `VITE_*` env vars.
+
+## Render News Scraper Deployment
+
+The News scraper deploys from [render.yaml](C:/repos/chat2.0/render.yaml:1) as the `shado-news-scraper` Docker worker.
+
+Required Render secrets:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Expected Render values:
+
+- `NEWS_SCRAPE_INTERVAL_MS=90000`
+- `NEWS_SCRAPE_HEADLESS=true`
+
+Optional Render secrets:
+
+- `PINCHTAB_CDP_URL`
+- `PINCHTAB_WS_ENDPOINT`
+- `X_USERNAME`
+- `X_EMAIL`
+- `X_PASSWORD`
+- `TRUTH_USERNAME`
+- `TRUTH_EMAIL`
+- `TRUTH_PASSWORD`
+- `NEWS_X_SHARED_CONTEXT`
+
+Deploy notes:
+
+1. Push the commit to the branch Render watches.
+2. Confirm the Render worker build finishes and the service is running.
+3. Watch logs for `Stored`, `Skipped seen`, or `Source ... failed` lines.
+4. Query `news_sources` to confirm `last_checked_at`, `last_success_at`, `health_status`, and `last_seen_external_id`.
+
+Truth Social can block hosted worker IPs even with credentials configured. If Render shows a persistent `blocked` state for Truth, use a trusted remote browser path with `PINCHTAB_CDP_URL` or `PINCHTAB_WS_ENDPOINT` instead of exposing credentials to the browser client.
+
 ## Frontend Env Requirements
 
 Netlify needs the frontend equivalents of:
@@ -131,6 +189,10 @@ After deploy, verify:
 7. Settings page renders cleanly on mobile and desktop
 8. A message containing an `https://` or `www.` link renders as a clickable link and loads a compact preview card
 9. Settings feedback can submit a bug or feature report with an image attachment after feedback schema changes
+10. News tab loads, switches between News Feed and News Chat, and badges clear after viewing
+11. News Chat sends, edits, deletes, reacts, and renders link previews
+12. Settings > News Sources shows source health for a `news_admin` account
+13. Render worker has checked enabled sources since deploy and today's feed rows match current Eastern-day posts
 
 Recommended production smoke for local post-deploy validation:
 
@@ -169,6 +231,18 @@ The frontend deploy can be healthy while push still fails if:
 ### Realtime Looks Stale
 
 The frontend deploy can be healthy while realtime still fails if the target Supabase project is not on the latest migrations.
+
+### News Feed Is Stale
+
+The frontend deploy can be healthy while the News Feed is stale if:
+
+- the Render worker did not redeploy or is stopped
+- `SUPABASE_SERVICE_ROLE_KEY` is missing or rotated
+- source rows are disabled
+- X logged-out pages are stale and no X credentials are configured
+- Truth Social is blocking the worker IP
+
+Start with [docs/NEWS_TAB_AND_SCRAPER.md](C:/repos/chat2.0/docs/NEWS_TAB_AND_SCRAPER.md:1), then check `news_sources.last_checked_at`, `health_status`, and `last_error`.
 
 ### iPhone Home Screen Still Hangs After Resume
 

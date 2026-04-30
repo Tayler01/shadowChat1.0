@@ -1,5 +1,17 @@
 # ESP Bridge Update And Offline Software Status
 
+## Current Repository Note
+
+- April 30, 2026 documentation refresh is in progress for the shipped News tab,
+  Render News scraper, link previews, production deployment, setup, and testing
+  runbooks.
+- News is live as an isolated backend domain with `news_sources`,
+  `news_feed_items`, `news_chat_messages`, News reactions, badge state, and
+  Settings-based `news_admin` source controls.
+- X scraping is running through the Render worker with per-source browser
+  isolation. Truth Social remains a known hosted-worker blocking risk; use a
+  trusted remote browser path such as PinchTab if Render remains blocked.
+
 ## Current Milestone
 
 Milestone 9: plug-and-play tools polish and Android badge stability.

@@ -8,6 +8,18 @@ Ship product-quality improvements to ShadowChat without breaking realtime chat, 
 
 ## Current Feature Focus
 
+The shipped News tab and Render News scraper are now a live production surface.
+Before changing News behavior, read:
+
+1. [docs/NEWS_TAB_AND_SCRAPER.md](C:/repos/chat2.0/docs/NEWS_TAB_AND_SCRAPER.md:1)
+2. [services/news-scraper/README.md](C:/repos/chat2.0/services/news-scraper/README.md:1)
+3. [docs/LINK_PREVIEWS.md](C:/repos/chat2.0/docs/LINK_PREVIEWS.md:1)
+
+Treat News as an isolated backend domain. Do not reuse general `messages` or
+DM tables for News Feed or News Chat behavior. The News scraper runs on Render
+with service-role credentials; never expose scraper credentials or provider
+tokens in browser-visible `VITE_*` variables.
+
 The current major planning and upcoming implementation track is the `ESP bridge` feature for an airgapped Windows PC.
 
 High-level direction:
@@ -72,6 +84,10 @@ npm test -- --runInBand
 - [`src/hooks/useAuth.tsx`](C:/repos/chat2.0/src/hooks/useAuth.tsx:1): auth session, profile loading, sign-in/sign-up/sign-out
 - [`src/hooks/useMessages.tsx`](C:/repos/chat2.0/src/hooks/useMessages.tsx:1): group chat fetch, realtime, reactions, pinning, send flow
 - [`src/hooks/useDirectMessages.tsx`](C:/repos/chat2.0/src/hooks/useDirectMessages.tsx:1): DM conversations, realtime, unread counts, message loading
+- [`src/hooks/useNewsFeed.tsx`](C:/repos/chat2.0/src/hooks/useNewsFeed.tsx:1): News Feed fetch, realtime, reactions, and seen state
+- [`src/hooks/useNewsChat.tsx`](C:/repos/chat2.0/src/hooks/useNewsChat.tsx:1): News Chat fetch, realtime, send/edit/delete, reactions, and seen state
+- [`src/hooks/useNewsBadges.ts`](C:/repos/chat2.0/src/hooks/useNewsBadges.ts:1): News Sidebar/MobileNav badge counts
+- [`src/hooks/useNewsAdmin.ts`](C:/repos/chat2.0/src/hooks/useNewsAdmin.ts:1): Settings admin source controls
 - [`src/hooks/usePushNotifications.ts`](C:/repos/chat2.0/src/hooks/usePushNotifications.ts:1): browser push setup and preference state
 - [`src/hooks/useTheme.tsx`](C:/repos/chat2.0/src/hooks/useTheme.tsx:1): product theme selection and persistence
 - [`src/hooks/useTyping.ts`](C:/repos/chat2.0/src/hooks/useTyping.ts:1): typing indicators
@@ -87,6 +103,7 @@ npm test -- --runInBand
 
 - [`src/components/chat`](C:/repos/chat2.0/src/components/chat): group chat UI
 - [`src/components/dms`](C:/repos/chat2.0/src/components/dms): inbox and DM thread UI
+- [`src/components/news`](C:/repos/chat2.0/src/components/news): News Feed, News Chat, feed modal, and News reactions
 - [`src/components/profile`](C:/repos/chat2.0/src/components/profile): profile editing and presentation
 - [`src/components/settings`](C:/repos/chat2.0/src/components/settings): feature toggles, push setup, theme settings
 - [`src/components/layout`](C:/repos/chat2.0/src/components/layout): sidebar, mobile nav, shell controls
@@ -94,8 +111,10 @@ npm test -- --runInBand
 ### Backend Schema And Functions
 
 - [`supabase/migrations`](C:/repos/chat2.0/supabase/migrations): canonical schema and policy history
+- [`services/news-scraper`](C:/repos/chat2.0/services/news-scraper): Render Docker worker for News Feed ingestion
 - [`supabase/functions/openai-chat/index.ts`](C:/repos/chat2.0/supabase/functions/openai-chat/index.ts:1): authenticated AI proxy
 - [`supabase/functions/send-push/index.ts`](C:/repos/chat2.0/supabase/functions/send-push/index.ts:1): DM and group push delivery
+- [`supabase/functions/link-preview/index.ts`](C:/repos/chat2.0/supabase/functions/link-preview/index.ts:1): authenticated server-side link preview metadata fetcher
 - [`supabase/functions/bridge-register/index.ts`](C:/repos/chat2.0/supabase/functions/bridge-register/index.ts:1): bridge device registration
 - [`supabase/functions/bridge-pairing-begin/index.ts`](C:/repos/chat2.0/supabase/functions/bridge-pairing-begin/index.ts:1): pairing-code issuance
 - [`supabase/functions/bridge-pairing-status/index.ts`](C:/repos/chat2.0/supabase/functions/bridge-pairing-status/index.ts:1): device polling for approval state
