@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { ensureSession, getStoredRefreshToken } from '../lib/supabase'
+import { getStoredRefreshToken } from '../lib/supabase'
+import { runSessionRecovery, type SessionRecoveryReason } from '../lib/sessionRecovery'
 
 export function useSessionResumeRecovery(enabled = true, delayMs = 750) {
   const inFlightRef = useRef<Promise<void> | null>(null)
@@ -17,7 +18,7 @@ export function useSessionResumeRecovery(enabled = true, delayMs = 750) {
       }
     }
 
-    const scheduleRecovery = () => {
+    const scheduleRecovery = (reason: SessionRecoveryReason = 'resume') => {
       if (typeof document !== 'undefined' && document.hidden) {
         return
       }
@@ -34,7 +35,7 @@ export function useSessionResumeRecovery(enabled = true, delayMs = 750) {
           return
         }
 
-        inFlightRef.current = ensureSession()
+        inFlightRef.current = runSessionRecovery(reason)
           .catch(() => undefined)
           .then(() => undefined)
           .finally(() => {
@@ -43,17 +44,25 @@ export function useSessionResumeRecovery(enabled = true, delayMs = 750) {
       }, delayMs)
     }
 
-    document.addEventListener('visibilitychange', scheduleRecovery)
-    window.addEventListener('pageshow', scheduleRecovery)
-    window.addEventListener('focus', scheduleRecovery)
-    window.addEventListener('online', scheduleRecovery)
+    const handleVisible = () => scheduleRecovery('resume')
+    const handlePageShow = () => scheduleRecovery('resume')
+    const handleFocus = () => scheduleRecovery('focus')
+    const handleOnline = () => scheduleRecovery('online')
+    const handleResume = () => scheduleRecovery('resume')
+
+    document.addEventListener('visibilitychange', handleVisible)
+    document.addEventListener('resume', handleResume)
+    window.addEventListener('pageshow', handlePageShow)
+    window.addEventListener('focus', handleFocus)
+    window.addEventListener('online', handleOnline)
 
     return () => {
       clearScheduledRecovery()
-      document.removeEventListener('visibilitychange', scheduleRecovery)
-      window.removeEventListener('pageshow', scheduleRecovery)
-      window.removeEventListener('focus', scheduleRecovery)
-      window.removeEventListener('online', scheduleRecovery)
+      document.removeEventListener('visibilitychange', handleVisible)
+      document.removeEventListener('resume', handleResume)
+      window.removeEventListener('pageshow', handlePageShow)
+      window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('online', handleOnline)
     }
   }, [delayMs, enabled])
 }
