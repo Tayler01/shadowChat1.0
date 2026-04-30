@@ -29,6 +29,7 @@ The project is already wired for hosted Supabase and Netlify deployment. It is d
 - Browser push notifications for DMs and group chat
 - Settings feedback flow for bug reports and feature ideas with private image attachments
 - PWA/service-worker foundation for installed mobile and desktop web experiences
+- Simple app-reopen loading state with consistent `Loading Shado...` copy
 - Premium obsidian-and-gold design system across desktop and mobile
 
 ## Current Project Shape

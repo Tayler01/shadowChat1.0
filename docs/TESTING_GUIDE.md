@@ -29,6 +29,7 @@ npm test -- --runInBand tests/useDirectMessages.test.tsx
 Current coverage is strongest around:
 
 - auth hooks
+- auth-gated startup loading copy
 - group chat hooks
 - DM hooks
 - message input behavior

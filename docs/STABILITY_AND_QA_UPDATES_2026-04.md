@@ -117,6 +117,17 @@ Relevant files:
 - [src/hooks/useAuth.tsx](C:/repos/chat2.0/src/hooks/useAuth.tsx:1)
 - [src/lib/auth.ts](C:/repos/chat2.0/src/lib/auth.ts:1)
 
+### Startup Loading Clarity
+
+- The auth restore/reopen screen now uses one simple startup message: `Loading Shado...`.
+- The previous workspace-specific explanatory copy was removed so the app feels less busy while sessions, presence, and account state restore in the background.
+- The lazy view fallback now uses the same loading copy and gold circular spinner treatment for consistent app-wide loading states.
+
+Relevant files:
+
+- [src/components/auth/AuthGuard.tsx](C:/repos/chat2.0/src/components/auth/AuthGuard.tsx:1)
+- [src/App.tsx](C:/repos/chat2.0/src/App.tsx:1)
+
 ## QA And Test Improvements
 
 ### Jest Stability
@@ -127,6 +138,7 @@ Relevant files:
 
 Key tests:
 
+- [tests/AuthGuard.test.tsx](C:/repos/chat2.0/tests/AuthGuard.test.tsx:1)
 - [tests/useAuth.test.tsx](C:/repos/chat2.0/tests/useAuth.test.tsx:1)
 - [tests/refreshSessionLocked.test.ts](C:/repos/chat2.0/tests/refreshSessionLocked.test.ts:1)
 - [tests/useMessages.test.tsx](C:/repos/chat2.0/tests/useMessages.test.tsx:1)
