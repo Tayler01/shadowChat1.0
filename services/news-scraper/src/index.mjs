@@ -740,40 +740,40 @@ const runCycle = async supabase => {
     return
   }
 
-  const browser = await launchBrowser()
-  const session = { shared: process.env.NEWS_X_SHARED_CONTEXT === 'true' }
-  try {
-    for (const source of sources) {
-      try {
-        const snapshots = await scrapeSource(browser, source, session)
-        const { latest, toStore } = selectSnapshotsToStore(source, snapshots)
+  for (const source of sources) {
+    let browser
+    const session = { shared: process.env.NEWS_X_SHARED_CONTEXT === 'true' }
 
-        if (!latest) {
-          throw new Error(`No snapshots extracted for ${source.platform}:${source.handle}`)
-        }
+    try {
+      browser = await launchBrowser()
+      const snapshots = await scrapeSource(browser, source, session)
+      const { latest, toStore } = selectSnapshotsToStore(source, snapshots)
 
-        for (const snapshot of toStore) {
-          await writeSnapshot(supabase, source, snapshot)
-        }
-
-        await updateSourceHealth(supabase, source.id, {
-          last_success_at: new Date().toISOString(),
-          last_seen_external_id: latest.externalId,
-          last_seen_at: latest.postedAt || new Date().toISOString(),
-          last_error: null,
-          health_status: 'ok',
-          external_account_id: source.external_account_id || latest.authorHandle,
-        })
-        console.log(`${toStore.length ? `Stored ${toStore.length}` : 'Skipped seen'} ${latest.platform}:${latest.externalId} for ${source.handle}`)
-      } catch (error) {
-        const healthPatch = classifySourceError(source, error)
-        await updateSourceHealth(supabase, source.id, healthPatch)
-        console.error(`Source ${source.platform}:${source.handle} failed: ${healthPatch.last_error}`)
+      if (!latest) {
+        throw new Error(`No snapshots extracted for ${source.platform}:${source.handle}`)
       }
+
+      for (const snapshot of toStore) {
+        await writeSnapshot(supabase, source, snapshot)
+      }
+
+      await updateSourceHealth(supabase, source.id, {
+        last_success_at: new Date().toISOString(),
+        last_seen_external_id: latest.externalId,
+        last_seen_at: latest.postedAt || new Date().toISOString(),
+        last_error: null,
+        health_status: 'ok',
+        external_account_id: source.external_account_id || latest.authorHandle,
+      })
+      console.log(`${toStore.length ? `Stored ${toStore.length}` : 'Skipped seen'} ${latest.platform}:${latest.externalId} for ${source.handle}`)
+    } catch (error) {
+      const healthPatch = classifySourceError(source, error)
+      await updateSourceHealth(supabase, source.id, healthPatch)
+      console.error(`Source ${source.platform}:${source.handle} failed: ${healthPatch.last_error}`)
+    } finally {
+      await session.xContext?.close().catch(() => {})
+      await browser?.close().catch(() => {})
     }
-  } finally {
-    await session.xContext?.close().catch(() => {})
-    await browser.close()
   }
 }
 
