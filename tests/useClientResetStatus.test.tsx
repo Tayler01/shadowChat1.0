@@ -1,53 +1,43 @@
 import { renderHook, act } from '@testing-library/react'
 import { useClientResetStatus } from '../src/hooks/useClientResetStatus'
-import {
-  recreateSupabaseClient,
-  forceSessionRestore,
-  getWorkingClient,
-  promoteFallbackToMain,
-  ensureSession,
-} from '../src/lib/supabase'
+import { runRealtimeRecovery } from '../src/lib/realtimeRecovery'
+import { runSessionRecovery } from '../src/lib/sessionRecovery'
 
-jest.mock('../src/lib/supabase', () => {
-  const workingClient = {
-    auth: { getSession: jest.fn().mockResolvedValue({ data: { session: {} }, error: null }) },
-    from: jest.fn(() => ({
-      select: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockResolvedValue({ data: [], error: null })
-    }))
-  }
-  return {
-    recreateSupabaseClient: jest.fn().mockResolvedValue(undefined),
-    forceSessionRestore: jest.fn().mockResolvedValue(true),
-    getWorkingClient: jest.fn().mockResolvedValue(workingClient),
-    promoteFallbackToMain: jest.fn().mockResolvedValue(undefined),
-    ensureSession: jest.fn().mockResolvedValue(true),
-  }
-})
+jest.mock('../src/lib/sessionRecovery', () => ({
+  runSessionRecovery: jest.fn().mockResolvedValue({ ok: true, skipped: false, reason: 'manual' }),
+}))
 
+jest.mock('../src/lib/realtimeRecovery', () => ({
+  runRealtimeRecovery: jest.fn().mockResolvedValue({ ok: true, skipped: false, reason: 'manual' }),
+}))
 
 beforeEach(() => {
   jest.resetAllMocks()
+  ;(runSessionRecovery as jest.Mock).mockResolvedValue({ ok: true, skipped: false, reason: 'manual' })
+  ;(runRealtimeRecovery as jest.Mock).mockResolvedValue({ ok: true, skipped: false, reason: 'manual' })
 })
 
-test('queues simultaneous manual resets', async () => {
+test('queues simultaneous manual recoveries', async () => {
   const { result } = renderHook(() => useClientResetStatus())
 
   await act(async () => {
     await Promise.all([result.current.manualReset(), result.current.manualReset()])
   })
 
-  expect((recreateSupabaseClient as jest.Mock)).toHaveBeenCalledTimes(1)
+  expect(runSessionRecovery).toHaveBeenCalledTimes(1)
+  expect(runSessionRecovery).toHaveBeenCalledWith('manual')
+  expect(runRealtimeRecovery).toHaveBeenCalledTimes(1)
+  expect(runRealtimeRecovery).toHaveBeenCalledWith('manual', { sessionReady: true })
 })
 
-test('visibility change no longer auto-triggers a comprehensive reset', async () => {
-  const { result } = renderHook(() => useClientResetStatus())
+test('visibility change no longer triggers recovery work', async () => {
+  renderHook(() => useClientResetStatus())
 
   await act(async () => {
     Object.defineProperty(document, 'hidden', { value: false, configurable: true })
     document.dispatchEvent(new Event('visibilitychange'))
   })
 
-  expect((recreateSupabaseClient as jest.Mock)).not.toHaveBeenCalled()
+  expect(runSessionRecovery).not.toHaveBeenCalled()
+  expect(runRealtimeRecovery).not.toHaveBeenCalled()
 })
-

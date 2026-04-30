@@ -56,16 +56,12 @@ jest.mock('../src/hooks/ClientResetContext', () => ({
   useClientReset: () => ({ status: 'ok' }),
 }))
 
-jest.mock('../src/hooks/useVisibilityRefresh', () => ({
-  useVisibilityRefresh: jest.fn(),
-}))
-
-jest.mock('../src/lib/supabase', () => ({
-  ensureSession: jest.fn().mockResolvedValue(true),
-}))
-
 jest.mock('../src/lib/appBadge', () => ({
   clearGroupNotifications: jest.fn().mockResolvedValue(undefined),
+}))
+
+jest.mock('../src/lib/sessionRecovery', () => ({
+  SESSION_RECOVERY_EVENT: 'shadowchat:session-recovery',
 }))
 
 test('renders pinned messages only in the chat feed area', () => {

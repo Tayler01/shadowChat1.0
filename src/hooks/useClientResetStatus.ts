@@ -1,11 +1,6 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import {
-  recreateSupabaseClient,
-  forceSessionRestore,
-  getWorkingClient,
-  promoteFallbackToMain,
-  ensureSession,
-} from '../lib/supabase'
+import { useState, useCallback, useRef } from 'react'
+import { runRealtimeRecovery } from '../lib/realtimeRecovery'
+import { runSessionRecovery } from '../lib/sessionRecovery'
 
 // Promise used to queue reset requests across hook instances
 let resetPromise: Promise<boolean> | null = null
@@ -17,8 +12,7 @@ export function useClientResetStatus() {
   const [lastResetTime, setLastResetTime] = useState<Date | null>(null)
   const isResettingRef = useRef(false)
 
-  // Comprehensive reset function that matches the Test Auth button logic
-  const performComprehensiveReset = useCallback(async (): Promise<boolean> => {
+  const performRecovery = useCallback(async (): Promise<boolean> => {
     if (resetPromise) {
       return resetPromise
     }
@@ -27,40 +21,13 @@ export function useClientResetStatus() {
 
     resetPromise = (async () => {
       try {
-        // Step 1: Recreate the client (delete old, create new)
-        await recreateSupabaseClient()
-
-        // Step 2: Run auth restoration logic (like Check Auth button)
-        const authRestored = await forceSessionRestore()
-        if (authRestored) {
-        } else {
-        }
-
-        // Step 3: Verify the working client is ready
-        const sessionReady = await ensureSession()
-
-        if (sessionReady) {
-          const workingClient = await getWorkingClient()
-
-          // Step 4: Test basic database connectivity
-          try {
-            const testPromise = workingClient.from('users').select('id').limit(1)
-            const timeoutPromise = new Promise((_, reject) =>
-              setTimeout(() => reject(new Error('Database test timeout')), 3000)
-            )
-
-            await Promise.race([testPromise, timeoutPromise])
-
-            // Step 5: Promote the working fallback client to be the main client
-            await promoteFallbackToMain()
-
-            return true
-          } catch (dbError) {
-            return false
-          }
-        } else {
+        const sessionRecovery = await runSessionRecovery('manual')
+        if (!sessionRecovery.ok) {
           return false
         }
+
+        const realtimeRecovery = await runRealtimeRecovery('manual', { sessionReady: true })
+        return realtimeRecovery.ok
       } catch {
         return false
       } finally {
@@ -72,22 +39,11 @@ export function useClientResetStatus() {
     return resetPromise
   }, [])
 
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        setLastResetTime(new Date())
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [])
-
   const manualReset = useCallback(async () => {
     setStatus('resetting')
     setLastResetTime(new Date())
     
-    const resetSuccess = await performComprehensiveReset()
+    const resetSuccess = await performRecovery()
     
     if (resetSuccess) {
       setStatus('success')
@@ -96,7 +52,7 @@ export function useClientResetStatus() {
       setStatus('error')
       setTimeout(() => setStatus('idle'), 5000)
     }
-  }, [performComprehensiveReset])
+  }, [performRecovery])
 
   return {
     status,

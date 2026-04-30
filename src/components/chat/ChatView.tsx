@@ -10,11 +10,11 @@ import { MobileChatFooter } from '../layout/MobileChatFooter'
 import toast from 'react-hot-toast'
 import { ClientResetIndicator } from '../ui/ClientResetIndicator'
 import { useClientReset } from '../../hooks/ClientResetContext'
-import {
-  ensureSession,
-} from '../../lib/supabase'
-import { useVisibilityRefresh } from '../../hooks/useVisibilityRefresh'
 import { clearGroupNotifications } from '../../lib/appBadge'
+import {
+  SESSION_RECOVERY_EVENT,
+  type SessionRecoveryResult,
+} from '../../lib/sessionRecovery'
 
 interface ChatViewProps {
   currentView: 'chat' | 'dms' | 'news' | 'settings'
@@ -31,20 +31,20 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
   const [uploading, setUploading] = useState(false)
   const [replyTo, setReplyTo] = useState<{ id: string; content: string } | null>(null)
 
-  const handleFocusRefresh = useCallback(async () => {
-    // Let the visibility refresh hook handle client reset
-    try {
-      await ensureSession()
-      await clearGroupNotifications()
-    } catch {
-      // ignore refresh errors
-    }
-  }, [])
-
-  useVisibilityRefresh(handleFocusRefresh)
-
   useEffect(() => {
     void clearGroupNotifications()
+  }, [])
+
+  useEffect(() => {
+    const handleSessionRecovery = (event: Event) => {
+      const result = (event as CustomEvent<SessionRecoveryResult>).detail
+      if (result?.ok) {
+        void clearGroupNotifications()
+      }
+    }
+
+    window.addEventListener(SESSION_RECOVERY_EVENT, handleSessionRecovery)
+    return () => window.removeEventListener(SESSION_RECOVERY_EVENT, handleSessionRecovery)
   }, [])
 
   const handleReply = useCallback((id: string, content: string) => {

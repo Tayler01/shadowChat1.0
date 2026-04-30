@@ -500,17 +500,7 @@ export const recoverSessionAfterResume = async (): Promise<boolean> => {
 
     try {
       const currentClient = await getWorkingClient()
-      if (await attemptRecovery(currentClient)) {
-        return true
-      }
-    } catch {
-      // ignore and try a client recreation below
-    }
-
-    try {
-      await recreateSupabaseClient()
-      const refreshedClient = await getWorkingClient()
-      return attemptRecovery(refreshedClient)
+      return attemptRecovery(currentClient)
     } catch {
       return false
     }
@@ -597,8 +587,6 @@ export const forceRefreshSession = async () => {
 }
 
 export const resetRealtimeConnection = async () => {
-  
-  // Get current session before recreating client
   const currentClient = await getWorkingClient()
   if (!currentClient) {
     return
@@ -628,23 +616,15 @@ export const resetRealtimeConnection = async () => {
   } catch (err) {
   }
   
-  // Reuse the existing client instead of creating another auth instance
-  await recreateSupabaseClient()
-  const workingClient = await getWorkingClient()
-  
-  if (!workingClient) {
-    return
-  }
-  
   // Set auth token on realtime
-  if (workingClient.realtime && typeof workingClient.realtime.setAuth === 'function') {
-    workingClient.realtime.setAuth(session?.access_token || '')
+  if (currentClient.realtime && typeof currentClient.realtime.setAuth === 'function') {
+    currentClient.realtime.setAuth(session?.access_token || '')
   }
   
   // Connect realtime with fresh bindings
   try {
-    if (workingClient.realtime && typeof workingClient.realtime.connect === 'function') {
-      workingClient.realtime.connect()
+    if (currentClient.realtime && typeof currentClient.realtime.connect === 'function') {
+      currentClient.realtime.connect()
     }
   } catch (err) {
   }
