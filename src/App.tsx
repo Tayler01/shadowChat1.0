@@ -91,9 +91,9 @@ function ViewLoadingState() {
     <div className="flex flex-1 items-center justify-center bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.06),transparent_28%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))]">
       <div className="glass-panel rounded-[var(--radius-xl)] px-8 py-7 text-center text-[var(--text-muted)]">
         <div className="mb-3 flex justify-center">
-          <LoadingSpinner size="lg" />
+          <LoadingSpinner size="lg" className="text-[var(--text-gold)]" />
         </div>
-        <p className="text-sm text-[var(--text-secondary)]">Loading view...</p>
+        <p className="text-sm text-[var(--text-secondary)]">Loading Shado...</p>
       </div>
     </div>
   )
