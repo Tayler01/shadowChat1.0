@@ -180,27 +180,52 @@ const maybeSignInTruth = async page => {
   const credentials = getTruthCredentials()
   if (!credentials) return false
 
+  const findLoginInputs = () => ({
+    usernameInput: page
+      .locator('input[name="username"], input[name="email"], input[type="email"], input[autocomplete="username"], input[aria-label="Username"], input[placeholder="Username"]')
+      .first(),
+    passwordInput: page
+      .locator('input[name="password"], input[type="password"], input[autocomplete="current-password"], input[aria-label="Password"], input[placeholder="Password"]')
+      .first(),
+  })
+
   await page.goto('https://truthsocial.com/', {
     waitUntil: 'domcontentloaded',
     timeout: 35_000,
   })
-  await page.waitForTimeout(2_000)
+  await page.waitForTimeout(3_000)
 
-  const landingSignInButton = page.getByRole('button', { name: /^Sign In$/i }).last()
-  if (await landingSignInButton.isVisible().catch(() => false)) {
-    await landingSignInButton.click()
-    await page.waitForTimeout(2_000)
+  for (const cookieLabel of ['Decline All', 'Accept All', 'DECLINE ALL', 'ACCEPT ALL']) {
+    const cookieButton = page.getByRole('button', { name: cookieLabel }).first()
+    if (await cookieButton.isVisible().catch(() => false)) {
+      await cookieButton.click().catch(() => {})
+      await page.waitForTimeout(500)
+      break
+    }
   }
 
-  const usernameInput = page
-    .locator('input[name="username"], input[name="email"], input[type="email"], input[autocomplete="username"]')
-    .first()
-  const passwordInput = page
-    .locator('input[name="password"], input[type="password"], input[autocomplete="current-password"]')
-    .first()
+  let { usernameInput, passwordInput } = findLoginInputs()
 
   if (!(await usernameInput.isVisible().catch(() => false)) || !(await passwordInput.isVisible().catch(() => false))) {
-    throw new Error('Truth credentials are configured, but the login form was not found')
+    await page.evaluate(() => {
+      const buttons = Array.from(document.querySelectorAll('button, [role="button"], a'))
+      const visibleButtons = buttons.filter(element => {
+        const rect = element.getBoundingClientRect()
+        const style = window.getComputedStyle(element)
+        return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none'
+      })
+      const signIn = visibleButtons.reverse().find(element =>
+        /^sign in$/i.test((element.textContent || element.getAttribute('aria-label') || '').trim())
+      )
+      if (signIn instanceof HTMLElement) signIn.click()
+    })
+    await page.waitForTimeout(3_000)
+    ;({ usernameInput, passwordInput } = findLoginInputs())
+  }
+
+  if (!(await usernameInput.isVisible().catch(() => false)) || !(await passwordInput.isVisible().catch(() => false))) {
+    const text = await page.locator('body').innerText({ timeout: 3_000 }).catch(() => '')
+    throw new Error(`Truth credentials are configured, but the login form was not found. url=${page.url()} text=${text.replace(/\s+/g, ' ').slice(0, 180)}`)
   }
 
   await usernameInput.fill(credentials.username)
