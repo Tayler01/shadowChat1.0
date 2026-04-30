@@ -303,3 +303,56 @@ test('auth state changes defer profile loading until after the callback returns'
 
   jest.useRealTimers();
 });
+
+test('transient signed out auth event preserves the app shell while a saved refresh token can recover', async () => {
+  jest.useFakeTimers();
+
+  const profile = { id: '1', username: 'user' } as any;
+  authModule.getCurrentUser.mockResolvedValue(profile);
+
+  const {
+    ensureSession,
+    getSessionWithTimeout,
+    getStoredRefreshToken,
+    recoverSessionAfterResume,
+  } = jest.requireMock('../src/lib/supabase') as {
+    ensureSession: jest.Mock;
+    getSessionWithTimeout: jest.Mock;
+    getStoredRefreshToken: jest.Mock;
+    recoverSessionAfterResume: jest.Mock;
+  };
+  getStoredRefreshToken.mockReturnValue('saved-refresh-token');
+  ensureSession.mockResolvedValue(true);
+  getSessionWithTimeout.mockResolvedValue({
+    data: { session: { access_token: 'token-1', user: { id: '1' } } },
+    error: null,
+  });
+  recoverSessionAfterResume.mockResolvedValue(false);
+
+  let authCallback: ((event: string, session: any) => void) | null = null;
+  const sb = supabase as SupabaseMock;
+  sb.auth.onAuthStateChange.mockImplementation((callback: any) => {
+    authCallback = callback;
+    return { data: { subscription: { unsubscribe: jest.fn() } } } as any;
+  });
+
+  const { result } = await renderUseAuth();
+
+  await waitFor(() => expect(result.current.user).toEqual(profile));
+  expect(authCallback).not.toBeNull();
+
+  act(() => {
+    authCallback?.('SIGNED_OUT', null);
+  });
+
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(0);
+  });
+
+  await waitFor(() => expect(recoverSessionAfterResume).toHaveBeenCalled());
+  expect(result.current.user).toEqual(profile);
+  expect(result.current.loading).toBe(false);
+  expect(result.current.error).toMatch(/Still reconnecting your saved session/);
+
+  jest.useRealTimers();
+});

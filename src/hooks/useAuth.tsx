@@ -50,10 +50,26 @@ function useProvideAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const userRef = useRef<User | null>(null);
   const initialLoadRef = useRef(false);
   const mountedRef = useRef(true);
   const authChangeTaskRef = useRef(0);
+  const explicitSignOutRef = useRef(false);
+  const authChangeRecoveryRef = useRef<Promise<boolean> | null>(null);
   const restoreRetryTimeoutRef = useRef<number | null>(null);
+
+  const applyUser = (nextUser: User | null) => {
+    userRef.current = nextUser;
+    setUser(nextUser);
+  };
+
+  const updateUserState = (updater: (current: User | null) => User | null) => {
+    setUser(prev => {
+      const nextUser = updater(prev);
+      userRef.current = nextUser;
+      return nextUser;
+    });
+  };
 
   useEffect(() => {
     mountedRef.current = true;
@@ -73,6 +89,55 @@ function useProvideAuth() {
       }
     };
 
+    const recoverDeferredAuthChange = async (message: string) => {
+      if (explicitSignOutRef.current || !getStoredRefreshToken()) {
+        return false;
+      }
+
+      if (authChangeRecoveryRef.current) {
+        return authChangeRecoveryRef.current;
+      }
+
+      if (mountedRef.current) {
+        setError(message);
+        setLoading(userRef.current === null);
+      }
+
+      authChangeRecoveryRef.current = (async () => {
+        const recovered = await recoverSessionAfterResume().catch(() => false);
+        if (!mountedRef.current) {
+          return false;
+        }
+
+        if (recovered) {
+          const profile = await getCurrentUser();
+          if (!mountedRef.current) {
+            return false;
+          }
+
+          if (profile) {
+            applyUser(profile);
+            setError(null);
+            setLoading(false);
+            return true;
+          }
+        }
+
+        if (getStoredRefreshToken()) {
+          setLoading(userRef.current === null);
+          return false;
+        }
+
+        applyUser(null);
+        setLoading(false);
+        return false;
+      })().finally(() => {
+        authChangeRecoveryRef.current = null;
+      });
+
+      return authChangeRecoveryRef.current;
+    };
+
     const handleDeferredAuthChange = async (event: string, session: any) => {
       if (!mountedRef.current) {
         return;
@@ -82,19 +147,41 @@ function useProvideAuth() {
       applyRealtimeAuth(session?.access_token);
 
       if (event === 'SIGNED_OUT') {
-        if (mountedRef.current) {
-          setUser(null);
+        if (!explicitSignOutRef.current && getStoredRefreshToken()) {
+          await recoverDeferredAuthChange(
+            'Still reconnecting your saved session. Keep the app open and we will keep trying.'
+          );
+          return;
         }
+
+        if (mountedRef.current) {
+          applyUser(null);
+          setLoading(false);
+          setError(null);
+        }
+        explicitSignOutRef.current = false;
         return;
       }
 
       if (event === 'TOKEN_REFRESHED') {
+        if (mountedRef.current && userRef.current) {
+          setError(null);
+          setLoading(false);
+        }
         return;
       }
 
       if (!session?.user) {
+        if (getStoredRefreshToken()) {
+          await recoverDeferredAuthChange(
+            'Still reconnecting your saved session. Keep the app open and we will keep trying.'
+          );
+          return;
+        }
+
         if (mountedRef.current) {
-          setUser(null);
+          applyUser(null);
+          setLoading(false);
         }
         return;
       }
@@ -106,15 +193,25 @@ function useProvideAuth() {
         }
 
         if (profile) {
-          setUser(profile);
+          applyUser(profile);
           setError(null);
+          setLoading(false);
         } else {
-          setUser(null);
+          applyUser(null);
+          setLoading(false);
         }
       } catch {
         if (mountedRef.current && authChangeTaskRef.current === taskId) {
+          if (getStoredRefreshToken()) {
+            await recoverDeferredAuthChange(
+              'Still reconnecting your saved profile. Keep the app open and we will keep trying.'
+            );
+            return;
+          }
+
           setError('Failed to load user profile. Please try signing in again.');
-          setUser(null);
+          applyUser(null);
+          setLoading(false);
         }
       }
     };
@@ -186,7 +283,7 @@ function useProvideAuth() {
           }
 
           if (mountedRef.current) {
-            setUser(null);
+            applyUser(null);
           }
           return;
         }
@@ -199,7 +296,7 @@ function useProvideAuth() {
         // Handle the specific "user not found" error from invalid JWT
         if (sessionError && sessionError.message?.includes('User from sub claim in JWT does not exist')) {
           await workingClient.auth.signOut();
-          if (mountedRef.current) setUser(null);
+          if (mountedRef.current) applyUser(null);
           return;
         }
         
@@ -211,7 +308,7 @@ function useProvideAuth() {
 
           if (mountedRef.current) {
             setError(sessionError.message);
-            setUser(null);
+            applyUser(null);
           }
           return;
         }
@@ -226,7 +323,8 @@ function useProvideAuth() {
             }
 
             if (mountedRef.current) {
-              setUser(profile);
+              applyUser(profile);
+              setError(null);
             }
           } catch {
             if (getStoredRefreshToken()) {
@@ -236,12 +334,12 @@ function useProvideAuth() {
 
             if (mountedRef.current) {
               setError('Failed to load user profile. Please try refreshing the page.');
-              setUser(null);
+              applyUser(null);
             }
           }
         } else {
           if (mountedRef.current) {
-            setUser(null);
+            applyUser(null);
           }
         }
       } catch (err) {
@@ -251,7 +349,7 @@ function useProvideAuth() {
         if (errorMessage.includes('User from sub claim in JWT does not exist')) {
           // Clear the invalid session
           await authSignOut();
-          if (mountedRef.current) setUser(null);
+          if (mountedRef.current) applyUser(null);
           // Don't set this as an error since it's expected behavior
         } else {
           if (getStoredRefreshToken()) {
@@ -261,7 +359,7 @@ function useProvideAuth() {
 
           if (mountedRef.current) {
             setError(errorMessage);
-            setUser(null);
+            applyUser(null);
           }
         }
       } finally {
@@ -331,6 +429,7 @@ function useProvideAuth() {
   const signIn = async (email: string, password: string) => {
     setLoading(true);
     setError(null);
+    explicitSignOutRef.current = false;
     try {
       await authSignIn({ email, password });
     } catch (err) {
@@ -361,7 +460,7 @@ function useProvideAuth() {
       
       // If user is auto-confirmed (has session), set user immediately
       if (result.session && result.profile) {
-        setUser(result.profile);
+        applyUser(result.profile);
       } else if (result.user && !result.session) {
         // Don't set user yet, they need to confirm email
       }
@@ -379,8 +478,10 @@ function useProvideAuth() {
   const signOut = async () => {
     setLoading(true);
     setError(null);
+    explicitSignOutRef.current = true;
     try {
       await authSignOut();
+      applyUser(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign out failed';
       setError(message);
@@ -401,6 +502,7 @@ function useProvideAuth() {
       }
 
       setLoading(false);
+      explicitSignOutRef.current = false;
     }
   };
 
@@ -409,7 +511,7 @@ function useProvideAuth() {
 
     try {
       const updatedUser = await updateUserProfile(updates);
-      setUser(updatedUser);
+      applyUser(updatedUser);
       return updatedUser;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Profile update failed';
@@ -422,7 +524,7 @@ function useProvideAuth() {
     if (!user) return;
     try {
       const url = await uploadUserAvatar(file);
-      setUser(prev => (prev ? { ...prev, avatar_url: url } : prev));
+      updateUserState(prev => (prev ? { ...prev, avatar_url: url } : prev));
       return url;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Avatar upload failed';
@@ -435,7 +537,7 @@ function useProvideAuth() {
     if (!user) return;
     try {
       const url = await uploadUserBanner(file);
-      setUser(prev => (prev ? { ...prev, banner_url: url } : prev));
+      updateUserState(prev => (prev ? { ...prev, banner_url: url } : prev));
       return url;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Banner upload failed';
