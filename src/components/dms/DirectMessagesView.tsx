@@ -523,6 +523,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 const previousMessage = messages[index - 1]
                 const isGrouped = shouldGroupMessage(message, previousMessage)
                 const isOwn = message.sender_id === profile?.id
+                const isIncoming = !isOwn
+                const showIncomingAvatar = !isGrouped && !isOwn
                 const bubbleColor = undefined
                 const bubbleStyle = bubbleColor
                   ? { backgroundColor: bubbleColor, color: getReadableTextColor(bubbleColor) }
@@ -549,16 +551,18 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                     }`}
                   >
                     <div
-                      className={`flex max-w-[85%] items-end space-x-2 sm:max-w-xs lg:max-w-md ${
-                        isOwn ? 'flex-row-reverse space-x-reverse' : ''
+                      className={`relative ${
+                        isIncoming
+                          ? 'ml-4 max-w-[calc(85%_-_1rem)] sm:max-w-[calc(20rem_-_1rem)] lg:max-w-[calc(28rem_-_1rem)]'
+                          : 'max-w-[85%] sm:max-w-xs lg:max-w-md'
                       }`}
                     >
-                      {!isGrouped && !isOwn && (
+                      {showIncomingAvatar && (
                         message.sender ? (
                           <button
                             type="button"
                             onClick={() => setProfileUser(message.sender ?? null)}
-                            className="rounded-full focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.32)]"
+                            className="absolute left-0 top-0 z-10 rounded-full focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.32)]"
                             aria-label={`Open ${message.sender.display_name || message.sender.username}'s profile`}
                             aria-haspopup="dialog"
                           >
@@ -575,12 +579,13 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                           <Avatar
                             alt="Unknown User"
                             size="sm"
+                            className="absolute left-0 top-0 z-10"
                           />
                         )
                       )}
 
                       <div
-                        className={`rounded-2xl px-4 py-2 ${
+                        className={`rounded-2xl px-4 py-2 ${showIncomingAvatar ? 'mt-7' : ''} ${
                           bubbleStyle
                             ? ''
                             : isOwn

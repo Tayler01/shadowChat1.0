@@ -226,12 +226,11 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
           id={`message-${message.id}`}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className={cn('group ml-2 flex space-x-3')}
+          className="group relative ml-2 min-w-0 py-1"
         >
-        {/* Avatar */}
-        <div className="flex-shrink-0 w-10">
-          {!isGrouped && (
-            message.user ? (
+        {!isGrouped && (
+          <div className="absolute left-0 top-1 z-10">
+            {message.user ? (
               <button
                 type="button"
                 onClick={() => setProfileUser(message.user ?? null)}
@@ -254,14 +253,14 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 alt="Unknown User"
                 size="md"
               />
-            )
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* Message Content */}
         <div className="flex-1 min-w-0">
           {!isGrouped && (
-            <div className="flex items-baseline space-x-2 mb-1">
+            <div className="mb-1 flex min-h-8 items-end space-x-2 pl-11">
               <span className="font-semibold text-[var(--text-primary)]">
                 {message.user?.display_name}
               </span>
