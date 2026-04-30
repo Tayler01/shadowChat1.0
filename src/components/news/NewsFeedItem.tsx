@@ -1,7 +1,7 @@
 import React from 'react'
-import { ExternalLink, Play } from 'lucide-react'
-import { NewsReactionBar } from './NewsReactionBar'
-import { formatTime, cn } from '../../lib/utils'
+import { Play } from 'lucide-react'
+import { NewsReactionBar, NewsReactionSummaryStrip } from './NewsReactionBar'
+import { formatTime } from '../../lib/utils'
 import type { NewsFeedItem as NewsFeedItemType } from '../../lib/supabase'
 
 const platformLabel = (platform: NewsFeedItemType['platform']) =>
@@ -17,15 +17,37 @@ export function NewsFeedItem({
   onReact: (itemId: string, emoji: string) => void | Promise<void>
 }) {
   const media = item.media?.[0]
+  const hasReactions = Object.values(item.reactions || {}).some(reaction => reaction.count > 0)
 
   return (
-    <article className="group m-3 overflow-visible rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.018))] shadow-[var(--shadow-panel)] transition-colors hover:border-[rgba(215,170,70,0.24)] md:m-4">
+    <article className="group relative m-3 overflow-visible rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[linear-gradient(180deg,rgba(255,255,255,0.034),rgba(255,255,255,0.016))] shadow-[var(--shadow-panel)] transition-colors hover:border-[rgba(215,170,70,0.24)] md:m-4">
+      <NewsReactionBar
+        reactions={item.reactions}
+        onReact={emoji => onReact(item.id, emoji)}
+        variant="menu"
+        className="absolute right-2.5 top-2.5 z-20"
+      />
       <button
         type="button"
         onClick={() => onOpen(item)}
-        className="grid w-full gap-4 px-4 py-4 text-left transition-colors hover:bg-[rgba(255,255,255,0.025)] sm:grid-cols-[minmax(0,1fr)_9.5rem] md:grid-cols-[minmax(0,1fr)_12rem] md:px-5"
+        className="flex w-full gap-3 rounded-[var(--radius-lg)] px-4 pb-3.5 pt-4 pr-12 text-left transition-colors hover:bg-[rgba(255,255,255,0.022)] md:px-5 md:pb-4 md:pr-14"
       >
-        <div className="min-w-0">
+        {media && (
+          <div className="relative mt-0.5 flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden sm:h-20 sm:w-20">
+            <img
+              src={media.thumbnail_url || media.url}
+              alt={media.alt || item.headline}
+              className="max-h-full max-w-full rounded-[var(--radius-sm)] object-contain"
+            />
+            {media.type === 'video' && (
+              <span className="absolute left-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-[rgb(255,240,184)]">
+                <Play className="h-3 w-3 fill-current" />
+              </span>
+            )}
+          </div>
+        )}
+
+        <div className="min-w-0 flex-1">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <span className="rounded-full border border-[rgba(215,170,70,0.18)] bg-[rgba(215,170,70,0.08)] px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-[var(--text-gold)]">
               {platformLabel(item.platform)}
@@ -46,38 +68,17 @@ export function NewsFeedItem({
             </p>
           )}
         </div>
-
-        <div className={cn(
-          'relative aspect-[16/10] max-h-36 overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(0,0,0,0.28)] sm:block md:max-h-none',
-          !media && 'grid place-items-center'
-        )}>
-          {media ? (
-            <>
-              <img
-                src={media.thumbnail_url || media.url}
-                alt={media.alt || item.headline}
-                className="h-full w-full object-contain p-1 transition-transform duration-300 group-hover:scale-[1.02]"
-              />
-              {media.type === 'video' && (
-                <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full border border-[rgba(255,240,184,0.42)] bg-[rgba(0,0,0,0.62)] px-2 py-0.5 text-[10px] uppercase tracking-[0.1em] text-[rgb(255,240,184)]">
-                  <Play className="h-3 w-3 fill-current" />
-                  Video
-                </span>
-              )}
-            </>
-          ) : (
-            <ExternalLink className="h-6 w-6 text-[var(--text-muted)]" />
-          )}
-        </div>
       </button>
 
-      <div className="flex justify-end px-4 pb-4 md:px-5">
-        <NewsReactionBar
-          reactions={item.reactions}
-          onReact={emoji => onReact(item.id, emoji)}
-          variant="menu"
-        />
-      </div>
+      {hasReactions && (
+        <div className="px-4 pb-3 md:px-5">
+          <NewsReactionSummaryStrip
+            reactions={item.reactions}
+            onReact={emoji => onReact(item.id, emoji)}
+            className={media ? 'pl-[4.25rem] sm:pl-[5.75rem]' : undefined}
+          />
+        </div>
+      )}
     </article>
   )
 }

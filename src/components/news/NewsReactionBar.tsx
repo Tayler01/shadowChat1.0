@@ -17,6 +17,44 @@ const QUICK_REACTIONS = [
 
 const normalizeEmojiValue = (emoji: string) => emoji.trim()
 
+export function NewsReactionSummaryStrip({
+  reactions,
+  onReact,
+  className,
+}: {
+  reactions?: NewsReactionSummary
+  onReact: (emoji: string) => void | Promise<void>
+  className?: string
+}) {
+  const { profile } = useAuth()
+  const entries = Object.entries(reactions || {}).filter(([, data]) => data.count > 0)
+
+  if (!entries.length) return null
+
+  return (
+    <div className={cn('flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-xs', className)}>
+      {entries.map(([emoji, data]) => {
+        const isReacted = data.users?.includes(profile?.id ?? '')
+        return (
+          <button
+            key={emoji}
+            type="button"
+            onClick={() => void onReact(emoji)}
+            className={cn(
+              'inline-flex items-center gap-1 rounded-sm px-0.5 leading-none text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]',
+              isReacted && 'text-[var(--text-gold)]'
+            )}
+            aria-label={`Reaction ${normalizeEmojiValue(emoji)} count ${data.count}`}
+          >
+            <span>{normalizeEmojiValue(emoji)}</span>
+            <span>{data.count}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export function NewsReactionBar({
   reactions,
   onReact,
@@ -70,15 +108,14 @@ export function NewsReactionBar({
           type="button"
           onClick={() => setShowMenu(prev => !prev)}
           className={cn(
-            'inline-flex h-8 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.035)] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-glow)] hover:text-[var(--text-gold)]',
-            totalReactions > 0 ? 'min-w-12 gap-1 px-2 text-xs' : 'w-8'
+            'inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[rgba(255,255,255,0.055)] hover:text-[var(--text-gold)]',
+            totalReactions > 0 && 'text-[var(--text-secondary)]'
           )}
           aria-label="News reactions menu"
           aria-haspopup="menu"
           aria-expanded={showMenu}
         >
           <MoreHorizontal className="h-4 w-4" />
-          {totalReactions > 0 && <span>{totalReactions}</span>}
         </button>
 
         {showMenu && (

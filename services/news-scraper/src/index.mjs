@@ -9,7 +9,7 @@ const USER_AGENT =
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
 
-const cleanHandle = value => String(value || '').trim().replace(/^@+/, '')
+const cleanHandle = value => String(value || '').trim().replace(/^@+\s*/, '').trim()
 
 const getArgValue = name => {
   const index = process.argv.indexOf(name)
@@ -72,6 +72,38 @@ const cleanPostText = (text, authorHandle, authorDisplayName) => {
     .map(line => line.trim())
     .filter(Boolean)
     .filter(line => !isTimelineChromeLine(line, authorHandle, authorDisplayName))
+
+  return lines.join('\n').trim() || String(text || '').replace(/\s+/g, ' ').trim()
+}
+
+const isTruthChromeLine = (line, authorHandle, authorDisplayName) => {
+  const value = String(line || '').trim()
+  const lowered = value.toLowerCase()
+  const handle = cleanHandle(authorHandle).toLowerCase()
+  const display = String(authorDisplayName || '').trim().toLowerCase()
+
+  return (
+    !value ||
+    lowered === handle ||
+    lowered === `@${handle}` ||
+    (display && lowered === display) ||
+    lowered === 'truth' ||
+    lowered === 'retruth' ||
+    lowered === 'show more' ||
+    lowered === 'show thread' ||
+    lowered === 'follow' ||
+    /^\d+[smhd]$/i.test(value) ||
+    /^\d+[,.]?\d*[kmb]?$/i.test(value) ||
+    /^\d+[,.]?\d*[kmb]?\s+(replies|retruths|likes|views)$/i.test(value)
+  )
+}
+
+const cleanTruthText = (text, authorHandle, authorDisplayName) => {
+  const lines = String(text || '')
+    .split(/\n+/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .filter(line => !isTruthChromeLine(line, authorHandle, authorDisplayName))
 
   return lines.join('\n').trim() || String(text || '').replace(/\s+/g, ' ').trim()
 }
@@ -255,6 +287,13 @@ const scrapeTruth = async (browser, rawHandle) => {
 
     const raw = await page.evaluate(async targetHandle => {
       const handle = String(targetHandle || '').replace(/^@+/, '')
+      const toAbsolute = value => {
+        try {
+          return new URL(value, location.origin).toString()
+        } catch {
+          return null
+        }
+      }
       const getJson = async path => {
         const response = await fetch(path, {
           headers: {
@@ -268,15 +307,86 @@ const scrapeTruth = async (browser, rawHandle) => {
         return response.json()
       }
 
-      const account = await getJson(`/api/v1/accounts/lookup?acct=${encodeURIComponent(handle)}`)
-      const statuses = await getJson(`/api/v1/accounts/${account.id}/statuses?exclude_replies=false&only_replies=false&with_muted=true&limit=10`)
-      const status = Array.isArray(statuses) ? statuses[0] : null
-      if (!status?.id) return null
-      return { account, status }
+      try {
+        const account = await getJson(`/api/v1/accounts/lookup?acct=${encodeURIComponent(handle)}`)
+        const statuses = await getJson(`/api/v1/accounts/${account.id}/statuses?exclude_replies=false&only_replies=false&with_muted=true&limit=10`)
+        const status = Array.isArray(statuses) ? statuses[0] : null
+        if (!status?.id) return null
+        return { mode: 'api', account, status }
+      } catch (apiError) {
+        const links = Array.from(document.querySelectorAll('a[href*="/posts/"]'))
+          .map(link => ({
+            href: link.getAttribute('href') || '',
+            node: link,
+          }))
+          .filter(item => item.href)
+
+        const candidates = []
+        for (const link of links) {
+          const match = link.href.match(/\/@?([^/?#]+)\/posts\/(\d+)/i) || link.href.match(/\/posts\/(\d+)/i)
+          const externalId = match?.[2] || match?.[1]
+          if (!externalId) continue
+
+          let card = link.node.closest('article')
+          let current = link.node.parentElement
+          for (let depth = 0; depth < 9 && current; depth += 1) {
+            const text = (current.innerText || '').trim()
+            if (text.length > 30 && text.length < 5000) {
+              card = current
+            }
+            current = current.parentElement
+          }
+
+          const text = (card?.innerText || link.node.innerText || '').trim()
+          const images = Array.from(card?.querySelectorAll('img') || [])
+            .map(img => img.currentSrc || img.src)
+            .filter(src => src && !/avatar|profile|emoji|logo|badge/i.test(src))
+            .map(src => ({ type: 'image', url: src, thumbnail_url: src }))
+
+          const avatar = Array.from(card?.querySelectorAll('img') || [])
+            .map(img => img.currentSrc || img.src)
+            .find(src => src && /avatar|profile/i.test(src))
+
+          const lines = text.split(/\n+/).map(line => line.trim()).filter(Boolean)
+          const authorDisplayName = lines.find(line =>
+            !line.startsWith('@') &&
+            !/^truth$/i.test(line) &&
+            !/^\d+[smhd]$/i.test(line)
+          ) || handle
+
+          candidates.push({
+            mode: 'dom',
+            externalId,
+            authorHandle: handle,
+            authorDisplayName,
+            authorAvatarUrl: avatar || null,
+            sourceUrl: toAbsolute(link.href),
+            bodyText: text,
+            media: images,
+            postedAt: card?.querySelector('time[datetime]')?.getAttribute('datetime') || null,
+            apiError: apiError instanceof Error ? apiError.message : String(apiError),
+          })
+        }
+
+        return candidates[0] || {
+          mode: 'error',
+          apiError: apiError instanceof Error ? apiError.message : String(apiError),
+        }
+      }
     }, handle)
 
+    if (raw?.mode === 'dom' && raw.externalId && raw.sourceUrl) {
+      return makeSnapshot({
+        platform: 'truth',
+        postKind: 'post',
+        ...raw,
+        bodyText: cleanTruthText(raw.bodyText, raw.authorHandle, raw.authorDisplayName),
+        raw: { extractedFrom: page.url(), handle, apiError: raw.apiError, mode: 'dom' },
+      })
+    }
+
     if (!raw?.status?.id) {
-      throw new Error(`No Truth Social post could be extracted for @${handle}`)
+      throw new Error(`No Truth Social post could be extracted for @${handle}${raw?.apiError ? ` (${raw.apiError})` : ''}`)
     }
 
     const status = raw.status.reblog || raw.status

@@ -5,7 +5,7 @@ import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { MessageRichText } from '../chat/MessageRichText'
-import { NewsReactionBar } from './NewsReactionBar'
+import { NewsReactionBar, NewsReactionSummaryStrip } from './NewsReactionBar'
 import { useAuth } from '../../hooks/useAuth'
 import { useNewsChat } from '../../hooks/useNewsChat'
 import { formatTime } from '../../lib/utils'
@@ -49,7 +49,16 @@ function NewsChatRow({
         size="md"
         color={message.user?.color}
       />
-      <div className="min-w-0">
+      <div className="relative min-w-0 pr-10">
+        {!editing && (
+          <NewsReactionBar
+            reactions={message.reactions}
+            onReact={emoji => onReact(message.id, emoji)}
+            variant="menu"
+            className="absolute right-0 top-0"
+          />
+        )}
+
         <div className="mb-1 flex flex-wrap items-baseline gap-2">
           <span className="font-semibold text-[var(--text-primary)]">
             {message.user?.display_name || message.user?.username || 'Unknown'}
@@ -82,12 +91,15 @@ function NewsChatRow({
           </div>
         )}
 
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <NewsReactionBar
+        {!editing && (
+          <NewsReactionSummaryStrip
             reactions={message.reactions}
             onReact={emoji => onReact(message.id, emoji)}
-            variant="menu"
+            className="mt-1.5"
           />
+        )}
+
+        <div className="mt-2 flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => void copyMessage()}

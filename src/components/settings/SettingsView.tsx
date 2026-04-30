@@ -110,6 +110,12 @@ const sections: SettingsSection[] = [
   },
 ]
 
+const normalizeNewsHandleInput = (value: string) =>
+  value
+    .trim()
+    .replace(/^@+\s*/, '@')
+    .trim()
+
 function ToggleRow({
   label,
   description,
@@ -364,12 +370,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
   }
 
   const handleAddNewsSource = async () => {
-    if (!newsHandle.trim()) return
+    const normalizedHandle = normalizeNewsHandleInput(newsHandle)
+    if (!normalizedHandle) return
 
     try {
       await upsertSource({
         platform: newsPlatform,
-        handle: newsHandle.trim(),
+        handle: normalizedHandle,
         displayName: newsDisplayName.trim() || undefined,
         profileUrl: newsProfileUrl.trim() || undefined,
       })
@@ -679,6 +686,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
                 <input
                   value={newsHandle}
                   onChange={event => setNewsHandle(event.target.value)}
+                  onBlur={() => setNewsHandle(prev => normalizeNewsHandleInput(prev))}
                   placeholder="@account"
                   className="obsidian-input w-full rounded-[var(--radius-md)] px-3.5 py-3 text-sm"
                 />
@@ -704,7 +712,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
               <Button
                 type="button"
                 onClick={() => void handleAddNewsSource()}
-                disabled={!newsHandle.trim() || newsAdminSaving}
+                disabled={!normalizeNewsHandleInput(newsHandle) || newsAdminSaving}
                 loading={newsAdminSaving}
                 className="w-full justify-center lg:w-auto"
               >
