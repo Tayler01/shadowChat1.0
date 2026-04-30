@@ -62,6 +62,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const [showReactionPicker, setShowReactionPicker] = useState(false)
     const [openAbove, setOpenAbove] = useState(false)
     const [openRight, setOpenRight] = useState(false)
+    const [menuMaxHeight, setMenuMaxHeight] = useState<number | undefined>(undefined)
     const [showImageModal, setShowImageModal] = useState(false)
     const EmojiPicker = useEmojiPicker(showReactionPicker)
     const reactionPickerRef = useRef<HTMLDivElement>(null)
@@ -157,40 +158,37 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
 
       if (!btnRect) return
 
-      let openUp = false
-
-      if (containerRect) {
-        const center = containerRect.top + containerRect.height / 2
-        openUp = btnRect.top > center
-      }
-
       if (menuRef.current) {
-        const menuHeight = menuRef.current.offsetHeight
-        const spaceBelow = window.innerHeight - btnRect.bottom
-        const spaceAbove = btnRect.top
-
-        if (spaceBelow < menuHeight && spaceAbove > menuHeight) {
-          openUp = true
-        } else if (spaceBelow > menuHeight) {
-          openUp = false
-        }
-
+        const viewport = window.visualViewport
+        const viewportTop = viewport?.offsetTop ?? 0
+        const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight)
+        const viewportLeft = viewport?.offsetLeft ?? 0
+        const viewportRight = viewportLeft + (viewport?.width ?? window.innerWidth)
+        const safeGap = 12
+        const visibleTop = Math.max(viewportTop, containerRect?.top ?? viewportTop)
+        const visibleBottom = Math.min(viewportBottom, containerRect?.bottom ?? viewportBottom)
+        const menuHeight = menuRef.current.scrollHeight
         const menuWidth = menuRef.current.offsetWidth
-        const SIDEBAR_WIDTH = 256 // width of left sidebar on desktop
-        if (btnRect.left - menuWidth < SIDEBAR_WIDTH) {
+
+        const spaceBelow = Math.max(0, visibleBottom - btnRect.bottom - safeGap)
+        const spaceAbove = Math.max(0, btnRect.top - visibleTop - safeGap)
+        const openUp = spaceBelow < menuHeight && spaceAbove > spaceBelow
+        const availableSpace = openUp ? spaceAbove : spaceBelow
+
+        setOpenAbove(openUp)
+        setMenuMaxHeight(Math.floor(Math.min(360, Math.max(96, availableSpace))))
+
+        const desktopSidebarWidth = window.innerWidth >= 768 ? 256 : 0
+        const safeLeft = Math.max(viewportLeft + safeGap, desktopSidebarWidth)
+        const rightAlignedLeft = btnRect.right - menuWidth
+        const canOpenRight = btnRect.right + menuWidth + safeGap <= viewportRight
+
+        if (rightAlignedLeft < safeLeft && canOpenRight) {
           setOpenRight(true)
         } else {
           setOpenRight(false)
         }
-
-        if (window.innerWidth <= 768) {
-          requestAnimationFrame(() => {
-            menuRef.current?.scrollIntoView({ block: 'nearest' })
-          })
-        }
       }
-
-      setOpenAbove(openUp)
     }, [showActions, containerRef])
 
 
@@ -352,6 +350,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     onClick={() => setShowActions(!showActions)}
                     className="opacity-70 transition-opacity hover:opacity-100 hover:text-[var(--text-gold)] md:opacity-0 md:group-hover/message:opacity-70"
                     aria-label="Message actions"
+                    aria-expanded={showActions}
+                    aria-haspopup="menu"
                     type="button"
                   >
                     <MoreHorizontal className="w-4 h-4" />
@@ -366,18 +366,23 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                           openRight ? 'left-full ml-2' : 'right-0'
                         )}
                         ref={menuRef}
+                        role="menu"
+                        aria-label="Message options"
+                        data-testid="message-actions-menu"
                       >
                         <motion.div
                           initial={{ opacity: 0, scale: 0.95 }}
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0.95 }}
-                          className="glass-panel-strong z-50 min-w-[160px] rounded-[var(--radius-md)] py-1"
+                          className="glass-panel-strong z-50 min-w-[160px] overflow-y-auto overscroll-contain rounded-[var(--radius-md)] py-1"
+                          style={{ maxHeight: menuMaxHeight }}
                         >
 
                           <button
                             onClick={handleCopyMessage}
                             className="flex w-full items-center space-x-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)]"
                             type="button"
+                            role="menuitem"
                           >
                             <Copy className="w-4 h-4" />
                             <span>Copy</span>
@@ -391,6 +396,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                             className="flex w-full items-center space-x-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)]"
                             type="button"
                             aria-label="React with thumbs up"
+                            role="menuitem"
                           >
                             <span className="text-base leading-none">{'\u{1F44D}'}</span>
                             <span>React</span>
@@ -403,6 +409,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                             }}
                             className="flex w-full items-center space-x-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)]"
                             type="button"
+                            role="menuitem"
                           >
                             <Plus className="w-4 h-4" />
                             <span>Add Reaction</span>
@@ -416,6 +423,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                               }}
                               className="flex w-full items-center space-x-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)]"
                               type="button"
+                              role="menuitem"
                             >
                               <Reply className="w-4 h-4" />
                               <span>Reply</span>
@@ -432,6 +440,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                                 }}
                                 className="flex w-full items-center space-x-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)]"
                                 type="button"
+                                role="menuitem"
                               >
                                 <Edit3 className="w-4 h-4" />
                                 <span>Edit</span>
@@ -444,6 +453,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                                 }}
                                 className="flex w-full items-center space-x-2 px-3 py-2 text-left text-sm text-red-300 transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-red-100"
                                 type="button"
+                                role="menuitem"
                               >
                                 <Trash2 className="w-4 h-4" />
                                 <span>Delete</span>
@@ -455,6 +465,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                             onClick={handlePinToggle}
                             className="flex w-full items-center space-x-2 px-3 py-2 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)]"
                             type="button"
+                            role="menuitem"
                           >
                             {message.pinned ? (
                               <PinOff className="w-4 h-4" />

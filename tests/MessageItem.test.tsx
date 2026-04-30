@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { MessageItem } from '../src/components/chat/MessageItem'
@@ -306,4 +306,114 @@ test('clicking reply preview triggers jump callback', async () => {
   const btn = screen.getByRole('button', { name: /view parent message/i })
   await userEvent.click(btn)
   expect(cb).toHaveBeenCalledWith('p1')
+})
+
+test('opens the message actions menu upward near the mobile viewport bottom', async () => {
+  const container = document.createElement('div')
+  const containerRef = { current: container }
+  const rectSpy = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+  const originalInnerWidth = window.innerWidth
+  const originalInnerHeight = window.innerHeight
+  const originalVisualViewport = window.visualViewport
+  const originalScrollHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollHeight')
+  const originalOffsetWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth')
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 })
+  Object.defineProperty(window, 'visualViewport', {
+    configurable: true,
+    value: { offsetTop: 0, offsetLeft: 0, width: 390, height: 844 },
+  })
+  Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+    configurable: true,
+    get() {
+      return this.getAttribute('role') === 'menu' ? 260 : 0
+    },
+  })
+  Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+    configurable: true,
+    get() {
+      return this.getAttribute('role') === 'menu' ? 176 : 36
+    },
+  })
+
+  rectSpy.mockImplementation(function getMockRect(this: HTMLElement) {
+    if (this === container) {
+      return {
+        x: 0,
+        y: 72,
+        top: 72,
+        right: 390,
+        bottom: 560,
+        left: 0,
+        width: 390,
+        height: 488,
+        toJSON: () => {},
+      } as DOMRect
+    }
+
+    if (this.querySelector?.('[aria-label="Message actions"]')) {
+      return {
+        x: 320,
+        y: 522,
+        top: 522,
+        right: 356,
+        bottom: 558,
+        left: 320,
+        width: 36,
+        height: 36,
+        toJSON: () => {},
+      } as DOMRect
+    }
+
+    return {
+      x: 0,
+      y: 0,
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      width: 0,
+      height: 0,
+      toJSON: () => {},
+    } as DOMRect
+  })
+
+  try {
+    render(
+      <MessageItem
+        message={{ ...baseMessage, message_type: 'text', content: 'bottom edge message' } as Message}
+        onEdit={async () => {}}
+        onDelete={async () => {}}
+        onTogglePin={async () => {}}
+        onToggleReaction={async () => {}}
+        onJumpToMessage={() => {}}
+        containerRef={containerRef}
+      />
+    )
+
+    await act(async () => {
+      await userEvent.click(screen.getByRole('button', { name: /message actions/i }))
+    })
+
+    await waitFor(() => {
+      const menu = screen.getByRole('menu', { name: /message options/i })
+      expect(menu).toHaveClass('bottom-full')
+      expect(menu).not.toHaveClass('top-full')
+      expect(menu).not.toHaveClass('left-full')
+    })
+  } finally {
+    rectSpy.mockRestore()
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalInnerWidth })
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: originalInnerHeight })
+    Object.defineProperty(window, 'visualViewport', {
+      configurable: true,
+      value: originalVisualViewport,
+    })
+    if (originalScrollHeight) {
+      Object.defineProperty(HTMLElement.prototype, 'scrollHeight', originalScrollHeight)
+    }
+    if (originalOffsetWidth) {
+      Object.defineProperty(HTMLElement.prototype, 'offsetWidth', originalOffsetWidth)
+    }
+  }
 })
