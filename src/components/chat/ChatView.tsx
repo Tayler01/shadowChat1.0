@@ -102,14 +102,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
                   {messages.length} messages loaded
                 </span>
               </div>
-              {pinnedMessages.length > 0 && (
-                <PinnedMessagesBar
-                  messages={pinnedMessages}
-                  onUnpin={togglePin}
-                  onToggleReaction={toggleReaction}
-                  compact={true}
-                />
-              )}
             </div>
           </div>
 
@@ -123,14 +115,16 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
         </div>
       </div>
 
-      {/* Pinned messages on mobile */}
+      {/* Pinned messages */}
       {pinnedMessages.length > 0 && (
-        <div className="md:hidden px-4 pt-4">
+        <div className="px-4 pt-4 md:px-3">
+          <div className="mx-auto w-full max-w-6xl">
           <PinnedMessagesBar
             messages={pinnedMessages}
             onUnpin={togglePin}
             onToggleReaction={toggleReaction}
           />
+          </div>
         </div>
       )}
 

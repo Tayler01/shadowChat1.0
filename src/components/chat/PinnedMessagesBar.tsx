@@ -21,7 +21,11 @@ export function PinnedMessagesBar({
 
   if (compact) {
     return (
-      <div className={`flex items-center space-x-2 ${className || ''}`}>
+      <div
+        className={`flex items-center space-x-2 ${className || ''}`}
+        data-testid="pinned-messages-bar"
+        data-compact="true"
+      >
         <button
           onClick={() => onUnpin(messages[0].id)}
           className="cursor-pointer text-xs text-[var(--text-muted)] transition-colors hover:text-red-300"
@@ -49,7 +53,11 @@ export function PinnedMessagesBar({
   }
 
   return (
-    <div className={`glass-panel rounded-[var(--radius-lg)] p-4 ${className || ''}`}>
+    <div
+      className={`glass-panel rounded-[var(--radius-lg)] p-4 ${className || ''}`}
+      data-testid="pinned-messages-bar"
+      data-compact="false"
+    >
       <div className="space-y-2">
         {messages.map(message => (
           <PinnedMessageItem
