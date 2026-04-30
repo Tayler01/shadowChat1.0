@@ -138,6 +138,13 @@ const compareSnapshotsDesc = (left, right) => {
   return rightDate - leftDate
 }
 
+const belongsOnTodayBoard = snapshot => {
+  if (!snapshot.postedAt) return true
+  const postedAt = new Date(snapshot.postedAt)
+  if (Number.isNaN(postedAt.getTime())) return true
+  return getEasternDay(postedAt) === getEasternDay()
+}
+
 const uniqueSnapshots = snapshots => {
   const seen = new Set()
   return snapshots.filter(snapshot => {
@@ -158,13 +165,13 @@ const selectSnapshotsToStore = (source, snapshots) => {
   }
 
   if (cursor === null) {
-    return { latest, toStore: [latest] }
+    return { latest, toStore: belongsOnTodayBoard(latest) ? [latest] : [] }
   }
 
   const toStore = sorted
     .filter(snapshot => {
       const snapshotId = toSortableId(snapshot.externalId)
-      return snapshotId !== null && snapshotId > cursor
+      return snapshotId !== null && snapshotId > cursor && belongsOnTodayBoard(snapshot)
     })
     .sort((left, right) => compareSnapshotsDesc(right, left))
 
