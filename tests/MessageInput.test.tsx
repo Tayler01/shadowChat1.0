@@ -33,6 +33,7 @@ const { uploadChatFile } = jest.requireMock('../src/lib/supabase') as {
 
 beforeEach(() => {
   jest.resetAllMocks()
+  localStorage.clear()
 })
 
 test('stops media stream tracks when recording stops', async () => {
@@ -77,6 +78,28 @@ test('shows slash commands menu when only slash is typed', async () => {
     fireEvent.change(textarea, { target: { value: '/' } })
   })
   expect(screen.getByText(/Slash Commands/i)).toBeInTheDocument()
+})
+
+test('does not keep whitespace-only composer drafts', async () => {
+  render(<MessageInput onSendMessage={() => {}} />)
+  const textarea = screen.getByRole('textbox')
+
+  await act(async () => {
+    fireEvent.change(textarea, { target: { value: '   ' } })
+  })
+
+  expect(textarea).toHaveValue('')
+  await waitFor(() => {
+    expect(localStorage.getItem('draft-general')).toBeNull()
+  })
+})
+
+test('restores meaningful composer drafts', () => {
+  localStorage.setItem('draft-general', 'partial message')
+
+  render(<MessageInput onSendMessage={() => {}} />)
+
+  expect(screen.getByRole('textbox')).toHaveValue('partial message')
 })
 
 test('shows an error and keeps reply state when uploaded image send resolves to null', async () => {

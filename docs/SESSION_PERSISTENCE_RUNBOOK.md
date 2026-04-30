@@ -21,6 +21,29 @@ Relevant files:
 - [src/components/auth/AuthGuard.tsx](C:/repos/chat2.0/src/components/auth/AuthGuard.tsx:1)
 - [src/lib/supabase.ts](C:/repos/chat2.0/src/lib/supabase.ts:1)
 
+## Composer Draft Restore
+
+The group and DM composers persist unsent text through `useDraft`. Treat this as mobile-resume-sensitive behavior because the desktop and mobile composers can both be mounted with the same draft key while only one is visible.
+
+Current guardrails:
+
+- Whitespace-only drafts are treated as empty and removed from `localStorage`.
+- Mounted composer instances with the same draft key sync through the `shadowchat:draft-update` window event.
+- Empty draft cleanup on `pagehide` and hidden `visibilitychange` only runs for the visible composer, so a hidden desktop or mobile composer cannot wipe a real draft owned by the active composer.
+
+Regression checks:
+
+```powershell
+npx jest --runInBand --runTestsByPath tests/useDraft.test.tsx tests/MessageInput.test.tsx
+npm run build
+```
+
+For browser validation, use a mobile viewport and verify:
+
+- `localStorage.draft-general = "   "` reloads into an empty composer and removes the storage key.
+- A partial message typed through the visible composer survives reload.
+- Typing only spaces leaves the visible composer empty and no draft key stored.
+
 ## Rollback Checkpoints
 
 The changes were shipped as two small commits on `main`:

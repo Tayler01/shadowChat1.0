@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { Send, Smile, Command, Plus, Mic, X } from 'lucide-react'
 import { useTyping } from '../../hooks/useTyping'
@@ -13,6 +13,8 @@ import { useDraft } from '../../hooks/useDraft'
 import { useSuggestedReplies, useSuggestionsEnabled } from '../../hooks/useSuggestedReplies'
 import toast from 'react-hot-toast'
 import { askQuestion } from '../../lib/ai'
+
+const normalizeComposerValue = (value: string) => (value.trim().length === 0 ? '' : value)
 
 interface MessageInputProps {
   onSendMessage: (
@@ -64,6 +66,55 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const audioChunksRef = useRef<Blob[]>([])
   const { enabled: suggestionsEnabled } = useSuggestionsEnabled()
   const { suggestions } = useSuggestedReplies(messages, suggestionsEnabled)
+
+  const setComposerMessage = useCallback((value: string) => {
+    const nextMessage = normalizeComposerValue(value)
+    setMessage(nextMessage)
+    setDraft(nextMessage)
+    return nextMessage
+  }, [setDraft])
+
+  const isComposerVisible = useCallback(() => {
+    const element = textareaRef.current
+    if (!element) return false
+
+    const rect = element.getBoundingClientRect()
+    const styles = window.getComputedStyle(element)
+
+    return (
+      rect.width > 0 &&
+      rect.height > 0 &&
+      styles.display !== 'none' &&
+      styles.visibility !== 'hidden'
+    )
+  }, [])
+
+  useEffect(() => {
+    setMessage(draft)
+  }, [draft])
+
+  useEffect(() => {
+    const pruneEmptyDraft = () => {
+      if (!isComposerVisible()) return
+      if (message.trim()) return
+      setMessage('')
+      clear()
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        pruneEmptyDraft()
+      }
+    }
+
+    window.addEventListener('pagehide', pruneEmptyDraft)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('pagehide', pruneEmptyDraft)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [clear, isComposerVisible, message])
 
   // Handle typing indicators
   useEffect(() => {
@@ -199,9 +250,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value
-    setMessage(value)
-    setDraft(value)
+    const value = setComposerMessage(e.target.value)
 
     // Show slash commands as soon as the user types '/'
     if (value.startsWith('/')) {
@@ -213,13 +262,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   const insertEmoji = (emojiData: EmojiClickData) => {
     const emoji = emojiData.emoji
-    setMessage(prev => prev + emoji)
+    setComposerMessage(message + emoji)
     setShowEmojiPicker(false)
     textareaRef.current?.focus()
   }
 
   const insertSlashCommand = (command: string) => {
-    setMessage(command + ' ')
+    setComposerMessage(command + ' ')
     setShowSlashCommands(false)
     textareaRef.current?.focus()
   }
@@ -413,7 +462,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               onClick={() => {
                 // Clean the suggestion text by removing quotes and numbering
                 const cleanText = s.replace(/^[\d.)-\s]*["']?|["']?$/g, '').trim()
-                setMessage(cleanText)
+                setComposerMessage(cleanText)
                 textareaRef.current?.focus()
               }}
               className="rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-sm text-[var(--text-secondary)] transition-all hover:border-[var(--border-glow)] hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--text-gold)]"
@@ -502,6 +551,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={disabled}
+            autoComplete="off"
+            autoCorrect="on"
+            autoCapitalize="sentences"
+            name={`message-composer-${cacheKey}`}
             rows={1}
             className="obsidian-input no-scrollbar max-h-32 w-full resize-none rounded-[var(--radius-md)] px-3.5 py-3 text-[var(--text-primary)] md:px-3 md:py-2"
           />
