@@ -116,6 +116,25 @@ const normalizeNewsHandleInput = (value: string) =>
     .replace(/^@+\s*/, '@')
     .trim()
 
+const getNewsSourceHealthClass = (status: string) => {
+  if (status === 'ok') {
+    return 'border-[rgba(215,170,70,0.22)] bg-[rgba(215,170,70,0.08)] text-[var(--text-gold)]'
+  }
+
+  if (status === 'blocked') {
+    return 'border-[rgba(224,164,62,0.28)] bg-[rgba(224,164,62,0.1)] text-amber-100'
+  }
+
+  if (status === 'pending') {
+    return 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.035)] text-[var(--text-muted)]'
+  }
+
+  return 'border-[rgba(190,52,85,0.35)] bg-[rgba(87,14,28,0.18)] text-red-100'
+}
+
+const getNewsSourceMessageClass = (status: string) =>
+  status === 'blocked' ? 'text-amber-100/85' : 'text-red-200/80'
+
 function ToggleRow({
   label,
   description,
@@ -748,12 +767,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
                         </h3>
                         <span className="text-sm text-[var(--text-muted)]">@{source.normalized_handle || source.handle}</span>
                       </div>
-                      <p className="mt-2 text-xs text-[var(--text-muted)]">
-                        Health: {source.health_status}
+                      <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
+                        <span className={`rounded-full border px-2 py-0.5 uppercase tracking-[0.12em] ${getNewsSourceHealthClass(source.health_status)}`}>
+                          {source.health_status}
+                        </span>
                         {source.last_success_at ? ` / last ok ${new Date(source.last_success_at).toLocaleString()}` : ''}
                       </p>
                       {source.last_error && (
-                        <p className="mt-1 line-clamp-2 text-xs text-red-200/80">{source.last_error}</p>
+                        <p className={`mt-1 line-clamp-2 text-xs ${getNewsSourceMessageClass(source.health_status)}`}>{source.last_error}</p>
                       )}
                     </div>
                     <span className={`w-fit rounded-full border px-3 py-1 text-xs uppercase tracking-[0.12em] ${

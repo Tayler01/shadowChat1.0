@@ -170,6 +170,50 @@ const newContext = browser =>
     locale: 'en-US',
   })
 
+const getTruthCredentials = () => {
+  const username = process.env.TRUTH_USERNAME || process.env.TRUTH_EMAIL
+  const password = process.env.TRUTH_PASSWORD
+  return username && password ? { username, password } : null
+}
+
+const maybeSignInTruth = async page => {
+  const credentials = getTruthCredentials()
+  if (!credentials) return false
+
+  await page.goto('https://truthsocial.com/login', {
+    waitUntil: 'domcontentloaded',
+    timeout: 35_000,
+  })
+  await page.waitForTimeout(2_000)
+
+  const usernameInput = page
+    .locator('input[name="username"], input[name="email"], input[type="email"], input[autocomplete="username"]')
+    .first()
+  const passwordInput = page
+    .locator('input[name="password"], input[type="password"], input[autocomplete="current-password"]')
+    .first()
+
+  if (!(await usernameInput.isVisible().catch(() => false)) || !(await passwordInput.isVisible().catch(() => false))) {
+    throw new Error('Truth credentials are configured, but the login form was not found')
+  }
+
+  await usernameInput.fill(credentials.username)
+  await passwordInput.fill(credentials.password)
+
+  const submitButton = page
+    .locator('button[type="submit"], button:has-text("Log in"), button:has-text("Sign in")')
+    .first()
+
+  if (await submitButton.isVisible().catch(() => false)) {
+    await submitButton.click()
+  } else {
+    await passwordInput.press('Enter')
+  }
+
+  await page.waitForTimeout(Number(process.env.NEWS_TRUTH_LOGIN_SETTLE_MS || 6_000))
+  return true
+}
+
 const scrapeX = async (browser, rawHandle) => {
   const handle = cleanHandle(rawHandle)
   const context = await newContext(browser)
@@ -279,6 +323,7 @@ const scrapeTruth = async (browser, rawHandle) => {
   const page = await context.newPage()
 
   try {
+    const signedIn = await maybeSignInTruth(page)
     await page.goto(`https://truthsocial.com/@${encodeURIComponent(handle)}`, {
       waitUntil: 'domcontentloaded',
       timeout: 35_000,
@@ -415,10 +460,26 @@ const scrapeTruth = async (browser, rawHandle) => {
         favorites: raw.status.favourites_count ?? status.favourites_count,
       },
       raw: { status: raw.status, account: raw.account },
+      signedIn,
       postedAt: raw.status.created_at || status.created_at || null,
     })
   } finally {
     await context.close()
+  }
+}
+
+const classifySourceError = (source, error) => {
+  const rawMessage = error instanceof Error ? error.message : String(error)
+  if (source.platform === 'truth' && /\b403\b|forbidden/i.test(rawMessage)) {
+    return {
+      health_status: 'blocked',
+      last_error: 'Truth Social blocked public scraping from the worker. Add TRUTH_USERNAME and TRUTH_PASSWORD in Render, or pause this source.',
+    }
+  }
+
+  return {
+    health_status: 'error',
+    last_error: rawMessage.slice(0, 500),
   }
 }
 
@@ -522,12 +583,9 @@ const runCycle = async supabase => {
         })
         console.log(`${alreadySeen ? 'Skipped seen' : 'Stored'} ${snapshot.platform}:${snapshot.externalId} for ${source.handle}`)
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        await updateSourceHealth(supabase, source.id, {
-          last_error: message.slice(0, 500),
-          health_status: 'error',
-        })
-        console.error(`Source ${source.platform}:${source.handle} failed: ${message}`)
+        const healthPatch = classifySourceError(source, error)
+        await updateSourceHealth(supabase, source.id, healthPatch)
+        console.error(`Source ${source.platform}:${source.handle} failed: ${healthPatch.last_error}`)
       }
     }
   } finally {
