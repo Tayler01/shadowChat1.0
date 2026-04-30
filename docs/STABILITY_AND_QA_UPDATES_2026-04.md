@@ -122,6 +122,7 @@ Relevant files:
 - The auth restore/reopen screen now uses one simple startup message: `Loading Shado...`.
 - The previous workspace-specific explanatory copy was removed so the app feels less busy while sessions, presence, and account state restore in the background.
 - The lazy view fallback now uses the same loading copy and gold circular spinner treatment for consistent app-wide loading states.
+- Validation for the release included the focused `tests/AuthGuard.test.tsx` regression, full lint/typecheck/build, full Jest, and a headed production smoke for `auth,resume-send`.
 
 Relevant files:
 
