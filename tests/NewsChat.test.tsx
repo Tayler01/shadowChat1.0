@@ -107,6 +107,7 @@ test('news chat supports owner edits, deletes, and reactions', async () => {
   fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
   expect(mockDeleteMessage).toHaveBeenCalledWith('message-1')
 
-  fireEvent.click(screen.getByRole('button', { name: /reaction 🔥 count 2/i }))
+  fireEvent.click(screen.getByRole('button', { name: /news reactions menu/i }))
+  fireEvent.click(screen.getByRole('menuitem', { name: /\u{1F525}\s*2/u }))
   expect(mockToggleReaction).toHaveBeenCalledWith('message-1', '\u{1F525}')
 })

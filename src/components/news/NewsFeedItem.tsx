@@ -19,11 +19,11 @@ export function NewsFeedItem({
   const media = item.media?.[0]
 
   return (
-    <article className="group border-b border-[var(--border-panel)] last:border-b-0">
+    <article className="group m-3 overflow-visible rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.018))] shadow-[var(--shadow-panel)] transition-colors hover:border-[rgba(215,170,70,0.24)] md:m-4">
       <button
         type="button"
         onClick={() => onOpen(item)}
-        className="grid w-full gap-4 px-4 py-4 text-left transition-colors hover:bg-[rgba(255,255,255,0.035)] md:grid-cols-[minmax(0,1fr)_12rem] md:px-5"
+        className="grid w-full gap-4 px-4 py-4 text-left transition-colors hover:bg-[rgba(255,255,255,0.025)] sm:grid-cols-[minmax(0,1fr)_9.5rem] md:grid-cols-[minmax(0,1fr)_12rem] md:px-5"
       >
         <div className="min-w-0">
           <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -48,7 +48,7 @@ export function NewsFeedItem({
         </div>
 
         <div className={cn(
-          'relative hidden aspect-[1.91/1] overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)] md:block',
+          'relative aspect-[16/10] max-h-36 overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(0,0,0,0.28)] sm:block md:max-h-none',
           !media && 'grid place-items-center'
         )}>
           {media ? (
@@ -56,7 +56,7 @@ export function NewsFeedItem({
               <img
                 src={media.thumbnail_url || media.url}
                 alt={media.alt || item.headline}
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                className="h-full w-full object-contain p-1 transition-transform duration-300 group-hover:scale-[1.02]"
               />
               {media.type === 'video' && (
                 <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full border border-[rgba(255,240,184,0.42)] bg-[rgba(0,0,0,0.62)] px-2 py-0.5 text-[10px] uppercase tracking-[0.1em] text-[rgb(255,240,184)]">
@@ -71,10 +71,11 @@ export function NewsFeedItem({
         </div>
       </button>
 
-      <div className="px-4 pb-4 md:px-5">
+      <div className="flex justify-end px-4 pb-4 md:px-5">
         <NewsReactionBar
           reactions={item.reactions}
           onReact={emoji => onReact(item.id, emoji)}
+          variant="menu"
         />
       </div>
     </article>

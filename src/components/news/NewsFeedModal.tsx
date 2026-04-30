@@ -111,11 +111,11 @@ export function NewsFeedModal({
             <aside className="min-w-0 space-y-4">
               {primaryMedia ? (
                 <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.035)]">
-                  <div className="relative aspect-[4/3] bg-black/30">
+                  <div className="relative flex max-h-[72vh] min-h-48 items-center justify-center overflow-auto bg-black/30 p-2">
                     <img
                       src={primaryMedia.thumbnail_url || primaryMedia.url}
                       alt={primaryMedia.alt || item.headline}
-                      className="h-full w-full object-cover"
+                      className="max-h-[68vh] max-w-full object-contain"
                     />
                     {primaryMedia.type === 'video' && (
                       <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,240,184,0.42)] bg-[rgba(0,0,0,0.62)] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-[rgb(255,240,184)]">

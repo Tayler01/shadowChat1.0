@@ -86,6 +86,7 @@ function NewsChatRow({
           <NewsReactionBar
             reactions={message.reactions}
             onReact={emoji => onReact(message.id, emoji)}
+            variant="menu"
           />
           <button
             type="button"
