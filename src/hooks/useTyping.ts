@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { getRealtimeClient, getWorkingClient } from '../lib/supabase'
+import { runRealtimeRecovery } from '../lib/realtimeRecovery'
 import { useAuth } from './useAuth'
+import { useRealtimeRecovery } from './useRealtimeRecovery'
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
 
 interface TypingUser {
@@ -17,13 +19,36 @@ export const useTyping = (channelName: string = 'general') => {
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
   const channelRef = useRef<RealtimeChannel | null>(null)
   const clientRef = useRef<SupabaseClient | null>(null)
+  const subscribeRef = useRef<(() => Promise<RealtimeChannel | null>) | null>(null)
+
+  const resetTypingChannel = useCallback(async () => {
+    const activeChannel = channelRef.current
+    if (activeChannel && clientRef.current?.removeChannel) {
+      try {
+        clientRef.current.removeChannel(activeChannel)
+      } catch {
+        // ignore channel cleanup failures
+      }
+    }
+
+    channelRef.current = null
+    setTypingUsers([])
+
+    if (subscribeRef.current) {
+      channelRef.current = await subscribeRef.current().catch(() => null)
+    }
+  }, [])
+
+  useRealtimeRecovery(() => {
+    void resetTypingChannel()
+  })
 
   useEffect(() => {
     let channel: RealtimeChannel | null = null;
 
-    const setupChannel = async () => {
+    const setupChannel = async (): Promise<RealtimeChannel | null> => {
       const client = await getWorkingClient().catch(() => getRealtimeClient());
-      if (!client?.channel) return;
+      if (!client?.channel) return null;
       clientRef.current = client;
       channel = client.channel(`typing:${channelName}`);
       channelRef.current = channel;
@@ -55,12 +80,20 @@ export const useTyping = (channelName: string = 'general') => {
           }, 3000)
         }
       })
-      .subscribe()
+      .subscribe((status: string) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          void runRealtimeRecovery('channel-error')
+        }
+      })
+
+      return channel
     };
 
+    subscribeRef.current = setupChannel;
     setupChannel();
 
     return () => {
+      subscribeRef.current = null;
       if (channel && clientRef.current) {
         clientRef.current.removeChannel(channel);
       }

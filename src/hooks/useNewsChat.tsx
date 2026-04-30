@@ -6,7 +6,9 @@ import {
   getWorkingClient,
   type NewsChatMessage,
 } from '../lib/supabase'
+import { runRealtimeRecovery } from '../lib/realtimeRecovery'
 import { useAuth } from './useAuth'
+import { useRealtimeRecovery } from './useRealtimeRecovery'
 
 const CHAT_LIMIT = 120
 
@@ -26,6 +28,7 @@ export function useNewsChat() {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const channelRef = useRef<RealtimeChannel | null>(null)
+  const subscribeRef = useRef<(() => Promise<RealtimeChannel | null>) | null>(null)
 
   const fetchMessages = useCallback(async () => {
     try {
@@ -68,16 +71,39 @@ export function useNewsChat() {
     void fetchMessages()
   }, [fetchMessages])
 
+  const resetChatChannel = useCallback(async () => {
+    await fetchMessages()
+
+    const activeChannel = channelRef.current
+    const realtimeClient = getRealtimeClient()
+    if (activeChannel && realtimeClient?.removeChannel) {
+      try {
+        realtimeClient.removeChannel(activeChannel)
+      } catch {
+        // ignore channel cleanup failures
+      }
+    }
+
+    channelRef.current = null
+    if (subscribeRef.current) {
+      channelRef.current = await subscribeRef.current().catch(() => null)
+    }
+  }, [fetchMessages])
+
+  useRealtimeRecovery(() => {
+    void resetChatChannel()
+  })
+
   useEffect(() => {
     if (!user) return
 
     let channel: RealtimeChannel | null = null
     let currentClient: any = null
 
-    const subscribe = async () => {
+    const subscribe = async (): Promise<RealtimeChannel | null> => {
       currentClient = await getWorkingClient().catch(() => getRealtimeClient())
       currentClient = currentClient || getRealtimeClient()
-      if (!currentClient?.channel) return
+      if (!currentClient?.channel) return null
 
       channel = currentClient
         .channel('public:news_chat_messages')
@@ -108,14 +134,21 @@ export function useNewsChat() {
             setMessages(prev => prev.filter(message => message.id !== payload.old.id))
           }
         )
-        .subscribe()
+        .subscribe((status: string) => {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            void runRealtimeRecovery('channel-error')
+          }
+        })
 
       channelRef.current = channel
+      return channel
     }
 
+    subscribeRef.current = subscribe
     void subscribe()
 
     return () => {
+      subscribeRef.current = null
       if (channel && currentClient?.removeChannel) {
         currentClient.removeChannel(channel)
       }

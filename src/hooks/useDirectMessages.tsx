@@ -17,15 +17,14 @@ import {
   markDMMessagesRead,
   fetchDMConversations,
   ensureSession,
-  recoverSessionAfterResume,
   refreshSessionLocked,
-  resetRealtimeConnection,
   withTimeout,
 } from '../lib/supabase';
+import { runRealtimeRecovery } from '../lib/realtimeRecovery';
 import { triggerDMPushNotification } from '../lib/push';
 import { MESSAGE_FETCH_LIMIT } from '../config';
 import { useAuth } from './useAuth';
-import { useVisibilityRefresh } from './useVisibilityRefresh';
+import { useRealtimeRecovery } from './useRealtimeRecovery';
 import { useSoundEffects } from './useSoundEffects';
 import { clearDMNotifications } from '../lib/appBadge';
 
@@ -105,7 +104,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     }
   }, [refreshConversations]);
 
-  useVisibilityRefresh(() => {
+  useRealtimeRecovery(() => {
     void resetWithFreshClient();
   });
 
@@ -226,7 +225,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
 
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             try {
-              await resetRealtimeConnection();
+              await runRealtimeRecovery('channel-error');
               await refreshConversations();
             } catch {
               // ignore reset failures and try a plain resubscribe below
@@ -489,7 +488,7 @@ export function useConversationMessages(conversationId: string | null) {
     }
   }, []);
 
-  useVisibilityRefresh(handleVisible);
+  useRealtimeRecovery(handleVisible);
 
   // Fetch messages for conversation
   useEffect(() => {
@@ -718,7 +717,7 @@ export function useConversationMessages(conversationId: string | null) {
 
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             try {
-              await resetRealtimeConnection();
+              await runRealtimeRecovery('channel-error');
             } catch {
               // ignore reset failures and fall back to resubscribe below
             }
@@ -838,8 +837,7 @@ export function useConversationMessages(conversationId: string | null) {
           'Message send timed out while reconnecting. Please try again.'
         );
       } catch (error) {
-        await recoverSessionAfterResume().catch(() => false);
-        await resetRealtimeConnection().catch(() => undefined);
+        await runRealtimeRecovery('send-error').catch(() => undefined);
         throw error;
       } finally {
         setSending(false);

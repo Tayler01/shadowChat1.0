@@ -4,6 +4,7 @@ import {
   updateUserPresence,
 } from './supabase'
 import { refreshAppBadge } from './appBadge'
+import { runRealtimeRecovery } from './realtimeRecovery'
 
 export type SessionRecoveryReason =
   | 'startup'
@@ -58,6 +59,7 @@ export const runSessionRecovery = async (
       }
 
       await Promise.allSettled([
+        runRealtimeRecovery('session-recovery', { sessionReady: true }),
         updateUserPresence(),
         refreshAppBadge(),
       ])
@@ -82,4 +84,3 @@ export const runSessionRecovery = async (
 
   return recoveryPromise
 }
-

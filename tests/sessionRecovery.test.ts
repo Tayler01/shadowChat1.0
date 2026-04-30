@@ -5,6 +5,7 @@ import {
   updateUserPresence,
 } from '../src/lib/supabase'
 import { refreshAppBadge } from '../src/lib/appBadge'
+import { runRealtimeRecovery } from '../src/lib/realtimeRecovery'
 
 jest.mock('../src/lib/supabase', () => ({
   ensureSession: jest.fn(),
@@ -14,6 +15,10 @@ jest.mock('../src/lib/supabase', () => ({
 
 jest.mock('../src/lib/appBadge', () => ({
   refreshAppBadge: jest.fn(),
+}))
+
+jest.mock('../src/lib/realtimeRecovery', () => ({
+  runRealtimeRecovery: jest.fn(),
 }))
 
 beforeEach(() => {
@@ -26,6 +31,7 @@ beforeEach(() => {
   ;(ensureSession as jest.Mock).mockResolvedValue(true)
   ;(updateUserPresence as jest.Mock).mockResolvedValue(undefined)
   ;(refreshAppBadge as jest.Mock).mockResolvedValue(0)
+  ;(runRealtimeRecovery as jest.Mock).mockResolvedValue({ ok: true, skipped: false, reason: 'session-recovery' })
 })
 
 test('runs a single locked session recovery and refreshes visible app state', async () => {
@@ -42,6 +48,7 @@ test('runs a single locked session recovery and refreshes visible app state', as
   expect(first).toEqual({ ok: true, skipped: false, reason: 'resume' })
   expect(second).toEqual(first)
   expect(ensureSession).toHaveBeenCalledTimes(1)
+  expect(runRealtimeRecovery).toHaveBeenCalledWith('session-recovery', { sessionReady: true })
   expect(updateUserPresence).toHaveBeenCalledTimes(1)
   expect(refreshAppBadge).toHaveBeenCalledTimes(1)
   expect(events).toEqual([first])
@@ -59,4 +66,3 @@ test('skips recovery when no refresh token is saved', async () => {
 
   expect(ensureSession).not.toHaveBeenCalled()
 })
-

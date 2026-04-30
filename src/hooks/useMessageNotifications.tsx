@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import toast from 'react-hot-toast'
-import { getRealtimeClient, getWorkingClient, resetRealtimeConnection } from '../lib/supabase'
+import { getRealtimeClient, getWorkingClient } from '../lib/supabase'
+import { runRealtimeRecovery } from '../lib/realtimeRecovery'
 import { useAuth } from './useAuth'
 import { useIsDesktop } from './useIsDesktop'
-import { useVisibilityRefresh } from './useVisibilityRefresh'
+import { useRealtimeRecovery } from './useRealtimeRecovery'
 import { MessageNotification } from '../components/notifications/MessageNotification'
 
 export function useMessageNotifications(onOpenConversation: (id: string) => void) {
@@ -40,7 +41,7 @@ export function useMessageNotifications(onOpenConversation: (id: string) => void
     }
   }, [])
 
-  useVisibilityRefresh(() => {
+  useRealtimeRecovery(() => {
     void resetNotificationChannel()
   }, 350)
 
@@ -111,7 +112,7 @@ export function useMessageNotifications(onOpenConversation: (id: string) => void
 
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           try {
-            await resetRealtimeConnection()
+            await runRealtimeRecovery('channel-error')
           } catch {
             // fall back to a plain resubscribe below
           }

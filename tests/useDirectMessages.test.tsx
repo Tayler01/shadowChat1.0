@@ -11,17 +11,16 @@ import {
   getWorkingClient,
   ensureSession,
   markDMMessagesRead,
-  recoverSessionAfterResume,
   refreshSessionLocked,
-  resetRealtimeConnection,
   supabase,
 } from '../src/lib/supabase';
+import { runRealtimeRecovery } from '../src/lib/realtimeRecovery';
 import { DirectMessagesView } from '../src/components/dms/DirectMessagesView';
 import { triggerDMPushNotification } from '../src/lib/push';
 
 jest.mock('../src/hooks/useAuth');
-jest.mock('../src/hooks/useVisibilityRefresh', () => ({
-  useVisibilityRefresh: jest.fn(),
+jest.mock('../src/hooks/useRealtimeRecovery', () => ({
+  useRealtimeRecovery: jest.fn(),
 }));
 jest.mock('../src/hooks/useSoundEffects', () => ({
   useSoundEffects: () => ({ playMessage: jest.fn() }),
@@ -34,6 +33,9 @@ jest.mock('../src/hooks/useIsDesktop', () => ({
 }));
 jest.mock('../src/lib/push', () => ({
   triggerDMPushNotification: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../src/lib/realtimeRecovery', () => ({
+  runRealtimeRecovery: jest.fn().mockResolvedValue({ ok: true, skipped: false, reason: 'channel-error' }),
 }));
 jest.mock('../src/config', () => ({
   MESSAGE_FETCH_LIMIT: 40,
@@ -52,9 +54,7 @@ jest.mock('../src/lib/supabase', () => {
     getOrCreateDMConversation: jest.fn(),
     markDMMessagesRead: jest.fn(),
     ensureSession: jest.fn().mockResolvedValue(true),
-    recoverSessionAfterResume: jest.fn().mockResolvedValue(true),
     refreshSessionLocked: jest.fn(),
-    resetRealtimeConnection: jest.fn(),
     withTimeout: jest.fn((promise: Promise<unknown>) => promise),
   };
 });
@@ -127,9 +127,8 @@ beforeEach(() => {
   (fetchDMConversations as jest.Mock).mockResolvedValue([]);
   (markDMMessagesRead as jest.Mock).mockResolvedValue(undefined);
   (ensureSession as jest.Mock).mockResolvedValue(true);
-  (recoverSessionAfterResume as jest.Mock).mockResolvedValue(true);
   (refreshSessionLocked as jest.Mock).mockResolvedValue({ data: { session: {} }, error: null });
-  (resetRealtimeConnection as jest.Mock).mockResolvedValue(undefined);
+  (runRealtimeRecovery as jest.Mock).mockResolvedValue({ ok: true, skipped: false, reason: 'channel-error' });
   (triggerDMPushNotification as jest.Mock).mockResolvedValue(undefined);
 
   const sb = supabase as SupabaseMock;

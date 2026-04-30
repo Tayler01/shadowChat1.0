@@ -13,20 +13,22 @@ import {
   ensureSession,
   getWorkingClient,
   getRealtimeClient,
-  recoverSessionAfterResume,
   refreshSessionLocked,
-  resetRealtimeConnection,
 } from '../src/lib/supabase';
+import { runRealtimeRecovery } from '../src/lib/realtimeRecovery';
 
 jest.mock('../src/hooks/useAuth');
-jest.mock('../src/hooks/useVisibilityRefresh', () => ({
-  useVisibilityRefresh: jest.fn(),
+jest.mock('../src/hooks/useRealtimeRecovery', () => ({
+  useRealtimeRecovery: jest.fn(),
 }));
 jest.mock('../src/hooks/useSoundEffects', () => ({
   useSoundEffects: () => ({ playMessage: jest.fn(), playReaction: jest.fn() }),
 }));
 jest.mock('../src/lib/push', () => ({
   triggerGroupPushNotification: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../src/lib/realtimeRecovery', () => ({
+  runRealtimeRecovery: jest.fn().mockResolvedValue({ ok: true, skipped: false, reason: 'channel-error' }),
 }));
 jest.mock('../src/config', () => ({
   MESSAGE_FETCH_LIMIT: 40,
@@ -42,9 +44,7 @@ jest.mock('../src/lib/supabase', () => {
     },
     getWorkingClient: jest.fn(),
     getRealtimeClient: jest.fn(),
-    recoverSessionAfterResume: jest.fn().mockResolvedValue(true),
     refreshSessionLocked: jest.fn(),
-    resetRealtimeConnection: jest.fn(),
     ensureSession: jest.fn(),
     withTimeout: jest.fn((promise: Promise<unknown>) => promise),
   };
@@ -100,12 +100,11 @@ const configureWorkingClient = () => {
 
   (getWorkingClient as jest.Mock).mockResolvedValue(workingClient);
   (getRealtimeClient as jest.Mock).mockReturnValue(workingClient);
-  (recoverSessionAfterResume as jest.Mock).mockResolvedValue(true);
   (refreshSessionLocked as jest.Mock).mockResolvedValue({
     data: { session: {} },
     error: null,
   });
-  (resetRealtimeConnection as jest.Mock).mockResolvedValue(undefined);
+  (runRealtimeRecovery as jest.Mock).mockResolvedValue({ ok: true, skipped: false, reason: 'channel-error' });
 };
 
 beforeEach(() => {

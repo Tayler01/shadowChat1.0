@@ -13,17 +13,14 @@ import {
   refreshSessionLocked,
   getRealtimeClient,
   getWorkingClient,
-  recreateSupabaseClient,
-  supabase,
-  resetRealtimeConnection,
-  recoverSessionAfterResume,
   withTimeout,
 } from '../lib/supabase';
+import { runRealtimeRecovery } from '../lib/realtimeRecovery';
 import { triggerGroupPushNotification } from '../lib/push';
 import { MESSAGE_FETCH_LIMIT } from '../config';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
-import { useVisibilityRefresh } from './useVisibilityRefresh';
+import { useRealtimeRecovery } from './useRealtimeRecovery';
 import { useSoundEffects } from './useSoundEffects';
 
 const STORED_MESSAGE_LIMIT = 200;
@@ -380,7 +377,7 @@ function useProvideMessages(): MessagesContextValue {
     }
   }, [fetchMessages]);
 
-  useVisibilityRefresh(handleVisible);
+  useRealtimeRecovery(handleVisible);
 
   // Fetch initial messages
   useEffect(() => {
@@ -552,8 +549,7 @@ function useProvideMessages(): MessagesContextValue {
             // Handle specific binding mismatch error
             if (err.message && err.message.includes('mismatch between server and client bindings for postgres changes')) {
               try {
-                // Use resetRealtimeConnection to clear server-side bindings
-                await resetRealtimeConnection();
+                await runRealtimeRecovery('channel-error');
                 
                 // Use the comprehensive reset function
                 if (clientResetRef.current) {
@@ -573,8 +569,7 @@ function useProvideMessages(): MessagesContextValue {
           }
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             try {
-              // Use resetRealtimeConnection to clear server-side bindings
-              await resetRealtimeConnection();
+              await runRealtimeRecovery('channel-error');
               
               // Use the comprehensive reset function
               if (clientResetRef.current) {
@@ -714,8 +709,7 @@ function useProvideMessages(): MessagesContextValue {
         'Message send timed out while reconnecting. Please try again.'
       );
     } catch (error) {
-      await recoverSessionAfterResume().catch(() => false);
-      await resetRealtimeConnection().catch(() => undefined);
+      await runRealtimeRecovery('send-error').catch(() => undefined);
       throw error;
     } finally {
       setSending(false);
