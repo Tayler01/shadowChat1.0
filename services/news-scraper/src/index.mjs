@@ -378,7 +378,7 @@ const scrapeX = async (browser, rawHandle, session = {}) => {
   const context = session.xContext || await newContext(browser)
   session.xContext = context
 
-  if (!session.xLoginAttempted) {
+  if (ownsContext || !session.xLoginAttempted) {
     session.xLoginAttempted = true
     session.xSignedIn = await maybeSignInX(context)
   }
@@ -741,7 +741,7 @@ const runCycle = async supabase => {
   }
 
   const browser = await launchBrowser()
-  const session = { shared: true }
+  const session = { shared: process.env.NEWS_X_SHARED_CONTEXT === 'true' }
   try {
     for (const source of sources) {
       try {
