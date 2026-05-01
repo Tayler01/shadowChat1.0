@@ -302,6 +302,13 @@ const getXCredentials = () => {
 const getXSecondaryIdentifier = () =>
   process.env.X_SECONDARY_IDENTIFIER || process.env.X_EMAIL || process.env.X_USERNAME || null
 
+const hasSeededXCookieSession = () => Boolean(
+  process.env.NEWS_X_COOKIE_HEADER ||
+  process.env.X_COOKIE_HEADER ||
+  process.env.X_AUTH_TOKEN ||
+  process.env.X_CT0
+)
+
 const parseCookieHeader = header =>
   String(header || '')
     .split(';')
@@ -419,14 +426,19 @@ const maybeSignInX = async context => {
 
   const page = await context.newPage()
   try {
-    if (hasXAuthState()) {
+    if (hasXAuthState() || hasSeededXCookieSession()) {
       await page.goto('https://x.com/home', {
         waitUntil: 'domcontentloaded',
         timeout: 35_000,
       }).catch(() => {})
       await page.waitForTimeout(2_000)
       if (await isSignedInToX(page)) {
+        await saveXAuthState(context).catch(() => {})
         return true
+      }
+      if (hasSeededXCookieSession() && !credentials) {
+        const text = await getPageText(page)
+        throw new Error(`X cookie session was provided but was not accepted by X. Refresh X_AUTH_TOKEN/X_CT0 or NEWS_X_COOKIE_HEADER from a signed-in browser. url=${page.url()} text=${text.slice(0, 220)}`)
       }
     }
 
@@ -723,7 +735,7 @@ const scrapeX = async (browser, rawHandle, session = {}) => {
 const hasConfiguredXSession = () => Boolean(
   getXCredentials() ||
   hasXAuthState() ||
-  buildXCookieStorageState() ||
+  hasSeededXCookieSession() ||
   process.env.PINCHTAB_CDP_URL ||
   process.env.PINCHTAB_WS_ENDPOINT
 )
