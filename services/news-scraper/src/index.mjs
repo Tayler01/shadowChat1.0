@@ -1,10 +1,16 @@
 import { createClient } from '@supabase/supabase-js'
 import { chromium } from 'playwright'
 import { pathToFileURL } from 'node:url'
+import { existsSync } from 'node:fs'
+import { mkdir } from 'node:fs/promises'
+import path from 'node:path'
 
 const EASTERN_TIME_ZONE = 'America/New_York'
 const DEFAULT_INTERVAL_MS = 90_000
 const DEFAULT_SETTLE_MS = 8_000
+const DEFAULT_X_SCROLL_STEPS = 2
+const DEFAULT_X_SCROLL_SETTLE_MS = 1_500
+const DEFAULT_X_MAX_CANDIDATES = 20
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 
@@ -262,6 +268,20 @@ const newContext = browser =>
     locale: 'en-US',
   })
 
+const newXContext = browser => {
+  const options = {
+    viewport: { width: 1365, height: 900 },
+    userAgent: USER_AGENT,
+    locale: 'en-US',
+  }
+
+  if (hasXAuthState()) {
+    options.storageState = getXAuthStatePath()
+  }
+
+  return browser.newContext(options)
+}
+
 const getTruthCredentials = () => {
   const username = process.env.TRUTH_USERNAME || process.env.TRUTH_EMAIL
   const password = process.env.TRUTH_PASSWORD
@@ -274,12 +294,55 @@ const getXCredentials = () => {
   return username && password ? { username, password } : null
 }
 
+const getXAuthStatePath = () => {
+  const configured = process.env.NEWS_X_AUTH_STATE_PATH
+  if (configured) return configured
+  return path.resolve(process.cwd(), '.news-scraper', 'x-auth-state.json')
+}
+
+const hasXAuthState = () => existsSync(getXAuthStatePath())
+
+const saveXAuthState = async context => {
+  const authStatePath = getXAuthStatePath()
+  await mkdir(path.dirname(authStatePath), { recursive: true })
+  await context.storageState({ path: authStatePath })
+}
+
+const isSignedInToX = async page => {
+  if (/\/i\/flow\/login/i.test(page.url())) return false
+  const onHome = /^https:\/\/x\.com\/home(?:[/?#]|$)/i.test(page.url())
+  const composeVisible = await page
+    .locator('[data-testid="SideNav_NewTweet_Button"], a[href="/compose/post"], a[aria-label*="Post"]')
+    .first()
+    .isVisible({ timeout: 2_000 })
+    .catch(() => false)
+  const loginVisible = await page
+    .locator('a[href="/login"], a[href="/i/flow/login"], input[autocomplete="username"], input[name="password"]')
+    .first()
+    .isVisible({ timeout: 1_000 })
+    .catch(() => false)
+
+  return composeVisible || (onHome && !loginVisible)
+}
+
 const maybeSignInX = async context => {
   const credentials = getXCredentials()
-  if (!credentials) return false
 
   const page = await context.newPage()
   try {
+    if (hasXAuthState()) {
+      await page.goto('https://x.com/home', {
+        waitUntil: 'domcontentloaded',
+        timeout: 35_000,
+      }).catch(() => {})
+      await page.waitForTimeout(2_000)
+      if (await isSignedInToX(page)) {
+        return true
+      }
+    }
+
+    if (!credentials) return false
+
     await page.goto('https://x.com/i/flow/login', {
       waitUntil: 'domcontentloaded',
       timeout: 35_000,
@@ -328,7 +391,11 @@ const maybeSignInX = async context => {
       await passwordInput.press('Enter')
     })
     await page.waitForTimeout(Number(process.env.NEWS_X_LOGIN_SETTLE_MS || 6_000))
-    return !/\/i\/flow\/login/i.test(page.url())
+    const signedIn = await isSignedInToX(page)
+    if (signedIn) {
+      await saveXAuthState(context)
+    }
+    return signedIn
   } finally {
     await page.close().catch(() => {})
   }
@@ -406,7 +473,7 @@ const maybeSignInTruth = async page => {
 const scrapeX = async (browser, rawHandle, session = {}) => {
   const handle = cleanHandle(rawHandle)
   const ownsContext = !session.shared
-  const context = session.xContext || await newContext(browser)
+  const context = session.xContext || await newXContext(browser)
   session.xContext = context
 
   if (ownsContext || !session.xLoginAttempted) {
@@ -423,7 +490,14 @@ const scrapeX = async (browser, rawHandle, session = {}) => {
     })
     await page.waitForTimeout(Number(process.env.NEWS_SCRAPE_SETTLE_MS || DEFAULT_SETTLE_MS))
 
-    const raw = await page.evaluate(targetHandle => {
+    const scrollSteps = Number(process.env.NEWS_X_SCROLL_STEPS || DEFAULT_X_SCROLL_STEPS)
+    const scrollSettleMs = Number(process.env.NEWS_X_SCROLL_SETTLE_MS || DEFAULT_X_SCROLL_SETTLE_MS)
+    for (let index = 0; index < scrollSteps; index += 1) {
+      await page.mouse.wheel(0, 1600).catch(() => {})
+      await page.waitForTimeout(scrollSettleMs)
+    }
+
+    const raw = await page.evaluate(({ targetHandle, signedIn, maxCandidates }) => {
       const target = String(targetHandle || '').toLowerCase()
       const toAbsolute = value => {
         try {
@@ -483,10 +557,12 @@ const scrapeX = async (browser, rawHandle, session = {}) => {
           media: images,
           isPinned,
           postedAt: article.querySelector('time[datetime]')?.getAttribute('datetime') || null,
+          extractionMode: 'profile-dom',
+          signedIn,
         })
       }
 
-      if (candidates.length) return candidates
+      if (candidates.length) return candidates.slice(0, maxCandidates)
 
       const fallback = Array.from(document.querySelectorAll('a[href*="/status/"]'))
         .map(link => link.getAttribute('href') || '')
@@ -501,9 +577,15 @@ const scrapeX = async (browser, rawHandle, session = {}) => {
             sourceUrl: toAbsolute(fallback),
             bodyText: `${match[1]} posted on X`,
             media: [],
+            extractionMode: 'profile-link',
+            signedIn,
           }]
         : []
-    }, handle)
+    }, {
+      targetHandle: handle,
+      signedIn: Boolean(session.xSignedIn),
+      maxCandidates: Number(process.env.NEWS_X_MAX_CANDIDATES || DEFAULT_X_MAX_CANDIDATES),
+    })
 
     if (!raw?.length) {
       throw new Error(`No X post could be extracted for @${handle}`)
@@ -519,6 +601,7 @@ const scrapeX = async (browser, rawHandle, session = {}) => {
           handle,
           isPinned: Boolean(item.isPinned),
           signedIn: Boolean(session.xSignedIn),
+          extractionMode: item.extractionMode || 'profile-dom',
         },
       }))
   } finally {
@@ -526,6 +609,8 @@ const scrapeX = async (browser, rawHandle, session = {}) => {
     if (ownsContext) await context.close()
   }
 }
+
+const hasConfiguredXSession = () => Boolean(getXCredentials() || hasXAuthState() || process.env.PINCHTAB_CDP_URL || process.env.PINCHTAB_WS_ENDPOINT)
 
 const scrapeTruth = async (browser, rawHandle) => {
   const handle = cleanHandle(rawHandle)
@@ -791,9 +876,12 @@ const runCycle = async supabase => {
       }
 
       if (staleCursor) {
+        const configuredSessionHint = source.platform === 'x' && !hasConfiguredXSession()
+          ? ' No X credentials or trusted browser session are configured for the worker.'
+          : ''
         await updateSourceHealth(supabase, source.id, {
           last_success_at: new Date().toISOString(),
-          last_error: `Latest extracted ${source.platform}:${latest.externalId} is older than stored cursor ${source.last_seen_external_id}; the provider returned a stale timeline.`,
+          last_error: `Latest extracted ${source.platform}:${latest.externalId} is older than stored cursor ${source.last_seen_external_id}; the provider returned a stale timeline.${configuredSessionHint}`,
           health_status: 'degraded',
           external_account_id: source.external_account_id || latest.authorHandle,
         })
@@ -825,9 +913,88 @@ const runCycle = async supabase => {
   }
 }
 
+const runBackfill = async supabase => {
+  const hours = Number(getArgValue('--hours') || process.env.NEWS_BACKFILL_HOURS || 6)
+  const cutoff = Date.now() - Math.max(1, hours) * 60 * 60 * 1000
+  const { data: sources, error } = await supabase
+    .from('news_sources')
+    .select('*')
+    .eq('enabled', true)
+    .order('platform')
+    .order('handle')
+
+  if (error) throw error
+  if (!sources?.length) {
+    console.log('No enabled news sources.')
+    return
+  }
+
+  for (const source of sources) {
+    let browser
+    const session = { shared: process.env.NEWS_X_SHARED_CONTEXT === 'true' }
+
+    try {
+      browser = await launchBrowser()
+      const snapshots = await scrapeSource(browser, source, session)
+      const recentSnapshots = uniqueSnapshots(snapshots)
+        .filter(snapshot => {
+          if (!snapshot.postedAt) return true
+          const postedAt = Date.parse(snapshot.postedAt)
+          return Number.isNaN(postedAt) || postedAt >= cutoff
+        })
+        .sort((left, right) => compareSnapshotsDesc(right, left))
+
+      if (!recentSnapshots.length) {
+        await updateSourceHealth(supabase, source.id, {
+          last_success_at: new Date().toISOString(),
+          health_status: 'degraded',
+          last_error: `Backfill found no posts from the last ${hours} hours for ${source.platform}:${source.handle}.`,
+        })
+        console.log(`Backfill found no recent posts for ${source.platform}:${source.handle}`)
+        continue
+      }
+
+      for (const snapshot of recentSnapshots.filter(item => belongsOnTodayBoard(item))) {
+        await writeSnapshot(supabase, source, snapshot)
+      }
+
+      const newest = recentSnapshots.sort(compareSnapshotsDesc)[0]
+      const currentCursor = toSortableId(source.last_seen_external_id)
+      const newestId = toSortableId(newest.externalId)
+      const cursorPatch = newestId !== null && (currentCursor === null || newestId > currentCursor)
+        ? {
+            last_seen_external_id: newest.externalId,
+            last_seen_at: newest.postedAt || new Date().toISOString(),
+          }
+        : {}
+
+      await updateSourceHealth(supabase, source.id, {
+        last_success_at: new Date().toISOString(),
+        last_error: null,
+        health_status: 'ok',
+        external_account_id: source.external_account_id || newest.authorHandle,
+        ...cursorPatch,
+      })
+      console.log(`Backfilled ${recentSnapshots.length} ${source.platform} posts for ${source.handle}`)
+    } catch (error) {
+      const healthPatch = classifySourceError(source, error)
+      await updateSourceHealth(supabase, source.id, healthPatch)
+      console.error(`Backfill ${source.platform}:${source.handle} failed: ${healthPatch.last_error}`)
+    } finally {
+      await session.xContext?.close().catch(() => {})
+      await browser?.close().catch(() => {})
+    }
+  }
+}
+
 const runWorker = async () => {
   const supabase = createSupabaseClient()
   const interval = Number(process.env.NEWS_SCRAPE_INTERVAL_MS || DEFAULT_INTERVAL_MS)
+
+  if (process.argv.includes('--backfill')) {
+    await runBackfill(supabase)
+    return
+  }
 
   if (process.argv.includes('--once')) {
     await runCycle(supabase)

@@ -104,6 +104,9 @@ Optional browser/session values:
 - `X_USERNAME`
 - `X_EMAIL`
 - `X_PASSWORD`
+- `NEWS_X_AUTH_STATE_PATH`
+- `NEWS_X_SCROLL_STEPS`
+- `NEWS_X_MAX_CANDIDATES`
 - `TRUTH_USERNAME`
 - `TRUTH_EMAIL`
 - `TRUTH_PASSWORD`
@@ -113,6 +116,10 @@ The default path launches a fresh Playwright browser per source. This costs more
 startup time but prevents one platform/session failure from poisoning every
 source in the cycle. `NEWS_X_SHARED_CONTEXT=true` is available only as an
 optimization experiment.
+
+When X credentials are configured, the worker saves a successful login to
+`NEWS_X_AUTH_STATE_PATH` and reuses that browser storage on later cycles. This
+keeps Render from attempting a fresh login for every source on every poll.
 
 ## Local Commands
 
@@ -136,6 +143,14 @@ Run one real Supabase-backed cycle:
 $env:SUPABASE_URL="https://YOUR_PROJECT_REF.supabase.co"
 $env:SUPABASE_SERVICE_ROLE_KEY="YOUR_SERVICE_ROLE_KEY"
 node services/news-scraper/src/index.mjs --once
+```
+
+Backfill recently missed posts after fixing credentials/session access:
+
+```powershell
+$env:SUPABASE_URL="https://YOUR_PROJECT_REF.supabase.co"
+$env:SUPABASE_SERVICE_ROLE_KEY="YOUR_SERVICE_ROLE_KEY"
+node services/news-scraper/src/index.mjs --backfill --hours 6
 ```
 
 Run the continuous worker locally:
@@ -223,6 +238,8 @@ X sources grab the first post but never update:
   stale timeline, the worker is polling but X is serving old logged-out profile
   content. Add `X_USERNAME`, optional `X_EMAIL`, and `X_PASSWORD`, or route the
   worker through PinchTab/a trusted browser session.
+- After adding X credentials in Render, restart or redeploy the worker so it can
+  create and reuse its saved X auth state.
 - Pinned X posts are ignored for feed freshness. A pinned-only timeline is
   treated as degraded instead of being stored as a new feed item.
 - Add `X_USERNAME`, optional `X_EMAIL`, and `X_PASSWORD` if logged-out X pages

@@ -30,6 +30,9 @@ Proof mode does not require Supabase credentials. It exits non-zero unless both 
 - `NEWS_SCRAPE_HEADLESS` defaults to `true`; set `false` only for local debugging
 - `PINCHTAB_CDP_URL` or `PINCHTAB_WS_ENDPOINT` may point the worker at a managed browser session
 - `X_USERNAME`, `X_PASSWORD`, and optional `X_EMAIL` enable read-only X login for a more current timeline than logged-out profile pages expose
+- `NEWS_X_AUTH_STATE_PATH` defaults to `.news-scraper/x-auth-state.json`; the worker saves a successful X login here and reuses it on later cycles
+- `NEWS_X_SCROLL_STEPS` defaults to `2`; increase carefully if the worker needs to collect more visible X candidates per source
+- `NEWS_X_MAX_CANDIDATES` defaults to `20`
 - `TRUTH_USERNAME` or `TRUTH_EMAIL`, plus `TRUTH_PASSWORD`, are optional. The scraper now tries Truth's public profile/API path before attempting any login flow because hosted worker IPs may be blocked before the login form loads.
 - `NEWS_X_SHARED_CONTEXT` defaults to `false`; set `true` only when deliberately testing a shared X browser context optimization
 
@@ -44,6 +47,18 @@ node services/news-scraper/src/index.mjs --once
 ```
 
 The worker stores only the latest visible post when a source has no cursor yet. After that, it stores every extracted post with a numeric ID newer than `news_sources.last_seen_external_id`, then advances the cursor to the newest extracted post.
+
+To manually recover recently missed posts after fixing X credentials or a trusted
+browser session:
+
+```powershell
+$env:SUPABASE_URL="..."
+$env:SUPABASE_SERVICE_ROLE_KEY="..."
+node services/news-scraper/src/index.mjs --backfill --hours 6
+```
+
+Backfill inserts visible posts from the requested recent window and only advances
+a source cursor when the newest recovered post is newer than the stored cursor.
 
 ## Feed Rules
 
@@ -107,6 +122,8 @@ order by detected_at desc;
   X is serving old logged-out profile content. Add `X_USERNAME`, optional
   `X_EMAIL`, and `X_PASSWORD`, or route the worker through PinchTab/a trusted
   browser session.
+- After adding X credentials, restart/redeploy the Render worker so it can create
+  and reuse `NEWS_X_AUTH_STATE_PATH`.
 - Pinned X posts are ignored for feed freshness. A pinned-only timeline is
   marked degraded instead of being stored as a new post.
 - X source is stale: add `X_USERNAME`, optional `X_EMAIL`, and `X_PASSWORD` so

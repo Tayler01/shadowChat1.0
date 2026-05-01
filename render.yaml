@@ -24,6 +24,12 @@ services:
         sync: false
       - key: X_PASSWORD
         sync: false
+      - key: NEWS_X_AUTH_STATE_PATH
+        value: "/opt/render/project/src/.news-scraper/x-auth-state.json"
+      - key: NEWS_X_SCROLL_STEPS
+        value: "2"
+      - key: NEWS_X_MAX_CANDIDATES
+        value: "20"
       - key: TRUTH_USERNAME
         sync: false
       - key: TRUTH_EMAIL

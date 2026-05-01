@@ -92,3 +92,24 @@ test('advances source cursor only with newer snapshots', () => {
   assert.equal(result.toStore.length, 1)
   assert.equal(result.toStore[0].externalId, '250')
 })
+
+test('stores multiple newer snapshots in chronological insert order', () => {
+  const result = selectSnapshotsToStore(
+    { last_seen_external_id: '200' },
+    [
+      {
+        platform: 'x',
+        externalId: '300',
+        sourceUrl: 'https://x.com/example/status/300',
+      },
+      {
+        platform: 'x',
+        externalId: '250',
+        sourceUrl: 'https://x.com/example/status/250',
+      },
+    ]
+  )
+
+  assert.equal(result.cursorSnapshot.externalId, '300')
+  assert.deepEqual(result.toStore.map(item => item.externalId), ['250', '300'])
+})
