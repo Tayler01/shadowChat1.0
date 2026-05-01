@@ -219,6 +219,12 @@ X sources grab the first post but never update:
   cycles.
 - Check `last_seen_external_id`; it should advance when a newer visible post is
   extracted.
+- If `health_status = degraded` and `last_error` says the provider returned a
+  stale timeline, the worker is polling but X is serving old logged-out profile
+  content. Add `X_USERNAME`, optional `X_EMAIL`, and `X_PASSWORD`, or route the
+  worker through PinchTab/a trusted browser session.
+- Pinned X posts are ignored for feed freshness. A pinned-only timeline is
+  treated as degraded instead of being stored as a new feed item.
 - Add `X_USERNAME`, optional `X_EMAIL`, and `X_PASSWORD` if logged-out X pages
   are stale.
 - Review `last_error` for login challenge, blocked page, or extraction errors.

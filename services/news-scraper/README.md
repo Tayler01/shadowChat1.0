@@ -103,6 +103,12 @@ order by detected_at desc;
 
 - X source is `ok` but no board row: the newest visible post may be older than
   today's Eastern date.
+- X source is `degraded` with a stale timeline error: the worker is polling, but
+  X is serving old logged-out profile content. Add `X_USERNAME`, optional
+  `X_EMAIL`, and `X_PASSWORD`, or route the worker through PinchTab/a trusted
+  browser session.
+- Pinned X posts are ignored for feed freshness. A pinned-only timeline is
+  marked degraded instead of being stored as a new post.
 - X source is stale: add `X_USERNAME`, optional `X_EMAIL`, and `X_PASSWORD` so
   the worker can see a signed-in timeline instead of a logged-out profile page.
 - Truth source is `blocked`: Render's IP/browser path is likely blocked by

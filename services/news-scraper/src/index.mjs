@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { chromium } from 'playwright'
+import { pathToFileURL } from 'node:url'
 
 const EASTERN_TIME_ZONE = 'America/New_York'
 const DEFAULT_INTERVAL_MS = 90_000
@@ -155,27 +156,57 @@ const uniqueSnapshots = snapshots => {
   })
 }
 
-const selectSnapshotsToStore = (source, snapshots) => {
+export const filterXTimelineCandidates = (items, handle) => {
+  const candidates = Array.isArray(items) ? items.filter(item => item?.externalId && item?.sourceUrl) : []
+  const nonPinned = candidates.filter(item => !item.isPinned)
+
+  if (nonPinned.length) {
+    return nonPinned
+  }
+
+  if (candidates.some(item => item.isPinned)) {
+    const pinnedIds = candidates
+      .filter(item => item.isPinned)
+      .map(item => item.externalId)
+      .filter(Boolean)
+      .slice(0, 3)
+      .join(', ')
+    throw new Error(`Only pinned X posts could be extracted for @${handle}${pinnedIds ? ` (${pinnedIds})` : ''}`)
+  }
+
+  return candidates
+}
+
+export const selectSnapshotsToStore = (source, snapshots) => {
   const sorted = uniqueSnapshots(snapshots).sort(compareSnapshotsDesc)
   const latest = sorted[0] || null
   const cursor = toSortableId(source.last_seen_external_id)
 
   if (!latest) {
-    return { latest: null, toStore: [] }
+    return { latest: null, cursorSnapshot: null, toStore: [], staleCursor: false }
   }
 
   if (cursor === null) {
-    return { latest, toStore: belongsOnTodayBoard(latest) ? [latest] : [] }
+    return {
+      latest,
+      cursorSnapshot: latest,
+      toStore: belongsOnTodayBoard(latest) ? [latest] : [],
+      staleCursor: false,
+    }
   }
 
-  const toStore = sorted
-    .filter(snapshot => {
-      const snapshotId = toSortableId(snapshot.externalId)
-      return snapshotId !== null && snapshotId > cursor && belongsOnTodayBoard(snapshot)
-    })
+  const newerSnapshots = sorted.filter(snapshot => {
+    const snapshotId = toSortableId(snapshot.externalId)
+    return snapshotId !== null && snapshotId > cursor
+  })
+
+  const latestId = toSortableId(latest.externalId)
+  const cursorSnapshot = newerSnapshots[0] || (latestId !== null && latestId === cursor ? latest : null)
+  const toStore = newerSnapshots
+    .filter(snapshot => belongsOnTodayBoard(snapshot))
     .sort((left, right) => compareSnapshotsDesc(right, left))
 
-  return { latest, toStore }
+  return { latest, cursorSnapshot, toStore, staleCursor: !cursorSnapshot }
 }
 
 const uniqueMedia = media => {
@@ -478,8 +509,7 @@ const scrapeX = async (browser, rawHandle, session = {}) => {
       throw new Error(`No X post could be extracted for @${handle}`)
     }
 
-    return raw
-      .filter(item => item?.externalId && item?.sourceUrl)
+    return filterXTimelineCandidates(raw, handle)
       .map(item => makeSnapshot({
         platform: 'x',
         postKind: 'post',
@@ -648,6 +678,13 @@ const scrapeTruth = async (browser, rawHandle) => {
 
 const classifySourceError = (source, error) => {
   const rawMessage = error instanceof Error ? error.message : String(error)
+  if (source.platform === 'x' && /Only pinned X posts could be extracted/i.test(rawMessage)) {
+    return {
+      health_status: 'degraded',
+      last_error: `${rawMessage}. X returned a pinned-only logged-out timeline; configure X credentials or a trusted browser session so the scraper can see current posts.`,
+    }
+  }
+
   if (source.platform === 'truth' && /\b403\b|forbidden/i.test(rawMessage)) {
     return {
       health_status: 'blocked',
@@ -747,10 +784,21 @@ const runCycle = async supabase => {
     try {
       browser = await launchBrowser()
       const snapshots = await scrapeSource(browser, source, session)
-      const { latest, toStore } = selectSnapshotsToStore(source, snapshots)
+      const { latest, cursorSnapshot, toStore, staleCursor } = selectSnapshotsToStore(source, snapshots)
 
       if (!latest) {
         throw new Error(`No snapshots extracted for ${source.platform}:${source.handle}`)
+      }
+
+      if (staleCursor) {
+        await updateSourceHealth(supabase, source.id, {
+          last_success_at: new Date().toISOString(),
+          last_error: `Latest extracted ${source.platform}:${latest.externalId} is older than stored cursor ${source.last_seen_external_id}; the provider returned a stale timeline.`,
+          health_status: 'degraded',
+          external_account_id: source.external_account_id || latest.authorHandle,
+        })
+        console.log(`Skipped stale ${latest.platform}:${latest.externalId} for ${source.handle}; cursor remains ${source.last_seen_external_id}`)
+        continue
       }
 
       for (const snapshot of toStore) {
@@ -759,13 +807,13 @@ const runCycle = async supabase => {
 
       await updateSourceHealth(supabase, source.id, {
         last_success_at: new Date().toISOString(),
-        last_seen_external_id: latest.externalId,
-        last_seen_at: latest.postedAt || new Date().toISOString(),
+        last_seen_external_id: cursorSnapshot.externalId,
+        last_seen_at: cursorSnapshot.postedAt || new Date().toISOString(),
         last_error: null,
         health_status: 'ok',
-        external_account_id: source.external_account_id || latest.authorHandle,
+        external_account_id: source.external_account_id || cursorSnapshot.authorHandle,
       })
-      console.log(`${toStore.length ? `Stored ${toStore.length}` : 'Skipped seen'} ${latest.platform}:${latest.externalId} for ${source.handle}`)
+      console.log(`${toStore.length ? `Stored ${toStore.length}` : 'Skipped seen'} ${cursorSnapshot.platform}:${cursorSnapshot.externalId} for ${source.handle}`)
     } catch (error) {
       const healthPatch = classifySourceError(source, error)
       await updateSourceHealth(supabase, source.id, healthPatch)
@@ -802,12 +850,20 @@ const runWorker = async () => {
 const runProof = async () => {
   const xHandle = getArgValue('--x') || process.env.NEWS_PROOF_X_HANDLE || 'OpenAI'
   const truthHandle = getArgValue('--truth') || process.env.NEWS_PROOF_TRUTH_HANDLE || 'realDonaldTrump'
+  const xOnly = process.argv.includes('--x-only')
   const browser = await launchBrowser()
 
   try {
     const x = await scrapeX(browser, xHandle)
-    const truth = await scrapeTruth(browser, truthHandle)
     const xLatest = uniqueSnapshots(x).sort(compareSnapshotsDesc)[0]
+    if (xOnly) {
+      const ok = Boolean(xLatest?.externalId && xLatest.bodyText && xLatest.sourceUrl)
+      console.log(JSON.stringify({ ok, generatedAt: new Date().toISOString(), x: xLatest, xCandidates: x.length }, null, 2))
+      if (!ok) process.exitCode = 1
+      return
+    }
+
+    const truth = await scrapeTruth(browser, truthHandle)
     const truthLatest = uniqueSnapshots(truth).sort(compareSnapshotsDesc)[0]
     const ok = Boolean(xLatest?.externalId && xLatest.bodyText && xLatest.sourceUrl && truthLatest?.externalId && truthLatest.bodyText && truthLatest.sourceUrl)
 
@@ -818,12 +874,14 @@ const runProof = async () => {
   }
 }
 
-if (process.argv.includes('--proof')) {
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href
+
+if (isMain && process.argv.includes('--proof')) {
   runProof().catch(error => {
     console.error(error instanceof Error ? error.stack || error.message : error)
     process.exitCode = 1
   })
-} else {
+} else if (isMain) {
   runWorker().catch(error => {
     console.error(error instanceof Error ? error.stack || error.message : error)
     process.exitCode = 1
