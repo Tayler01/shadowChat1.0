@@ -297,11 +297,38 @@ const getXCredentials = () => {
 const getXSecondaryIdentifier = () =>
   process.env.X_SECONDARY_IDENTIFIER || process.env.X_EMAIL || process.env.X_USERNAME || null
 
+const getPageText = async page =>
+  (await page.locator('body').innerText({ timeout: 3_000 }).catch(() => '')).replace(/\s+/g, ' ').trim()
+
 const clickXNext = async (page, input) => {
-  await page.getByRole('button', { name: /^next$/i }).click({ timeout: 5_000 }).catch(async () => {
+  await page.getByRole('button', { name: /^next$/i }).last().click({ force: true, timeout: 5_000 }).catch(async () => {
     await input.press('Enter')
   })
 }
+
+const clickXLoginShell = async page => {
+  const loginName = /^(log in|sign in)$/i
+  for (const locator of [
+    page.getByRole('link', { name: loginName }).last(),
+    page.getByRole('button', { name: loginName }).last(),
+    page.locator('a[href="/login"], a[href="/i/flow/login"]').last(),
+  ]) {
+    if (await locator.isVisible().catch(() => false)) {
+      await locator.click({ force: true, timeout: 5_000 }).catch(() => {})
+      await page.waitForTimeout(2_000)
+      return true
+    }
+  }
+  return false
+}
+
+const findXTextInput = page =>
+  page
+    .locator('input[data-testid="ocfEnterTextTextInput"], input[autocomplete="username"], input[name="text"], input[type="text"]')
+    .first()
+
+const findXPasswordInput = page =>
+  page.locator('input[name="password"], input[type="password"]').first()
 
 const getXAuthStatePath = () => {
   const configured = process.env.NEWS_X_AUTH_STATE_PATH
@@ -358,9 +385,7 @@ const maybeSignInX = async context => {
     })
     await page.waitForTimeout(2_000)
 
-    let usernameInput = page
-      .locator('input[autocomplete="username"], input[name="text"], input[type="text"]')
-      .first()
+    let usernameInput = findXTextInput(page)
 
     if (!(await usernameInput.isVisible().catch(() => false))) {
       await page.goto('https://x.com/login', {
@@ -368,54 +393,54 @@ const maybeSignInX = async context => {
         timeout: 35_000,
       }).catch(() => {})
       await page.waitForTimeout(2_000)
-      usernameInput = page
-        .locator('input[autocomplete="username"], input[name="text"], input[type="text"]')
-        .first()
+      usernameInput = findXTextInput(page)
     }
 
     if (!(await usernameInput.isVisible().catch(() => false))) {
-      const signInLink = page.getByRole('link', { name: /^sign in$/i }).last()
-      const signInButton = page.getByRole('button', { name: /^sign in$/i }).last()
-      if (await signInLink.isVisible().catch(() => false)) {
-        await signInLink.click({ force: true, timeout: 5_000 })
-        await page.waitForTimeout(2_000)
-      } else if (await signInButton.isVisible().catch(() => false)) {
-        await signInButton.click({ force: true, timeout: 5_000 })
-        await page.waitForTimeout(2_000)
+      await clickXLoginShell(page)
+      usernameInput = findXTextInput(page)
+    }
+
+    if (!(await usernameInput.isVisible().catch(() => false))) {
+      const text = await getPageText(page)
+      throw new Error(`X credentials are configured, but the login form was not found. url=${page.url()} text=${text.slice(0, 220)}`)
+    }
+
+    const secondaryIdentifier = getXSecondaryIdentifier()
+    const identityAttempts = [
+      credentials.username,
+      secondaryIdentifier,
+    ].filter((value, index, values) => value && values.indexOf(value) === index)
+    let passwordInput = findXPasswordInput(page)
+
+    for (const identity of identityAttempts) {
+      if (await passwordInput.isVisible().catch(() => false)) break
+      const identityInput = findXTextInput(page)
+      if (!(await identityInput.isVisible().catch(() => false))) {
+        await clickXLoginShell(page)
       }
-      usernameInput = page
-        .locator('input[autocomplete="username"], input[name="text"], input[type="text"]')
-        .first()
+      const visibleInput = findXTextInput(page)
+      if (await visibleInput.isVisible().catch(() => false)) {
+        await visibleInput.fill(identity)
+        await clickXNext(page, visibleInput)
+      }
+      await page.waitForTimeout(2_000)
+      passwordInput = findXPasswordInput(page)
     }
-
-    if (!(await usernameInput.isVisible().catch(() => false))) {
-      const text = await page.locator('body').innerText({ timeout: 3_000 }).catch(() => '')
-      throw new Error(`X credentials are configured, but the login form was not found. url=${page.url()} text=${text.replace(/\s+/g, ' ').slice(0, 180)}`)
-    }
-
-    await usernameInput.fill(credentials.username)
-    await clickXNext(page, usernameInput)
-    await page.waitForTimeout(2_000)
-
-    let passwordInput = page.locator('input[name="password"], input[type="password"]').first()
 
     if (!(await passwordInput.isVisible().catch(() => false))) {
-      const secondaryIdentifier = getXSecondaryIdentifier()
-      const verificationInput = page
-        .locator('input[data-testid="ocfEnterTextTextInput"], input[name="text"]')
-        .first()
-
+      const verificationInput = findXTextInput(page)
       if (secondaryIdentifier && await verificationInput.isVisible().catch(() => false)) {
         await verificationInput.fill(secondaryIdentifier)
         await clickXNext(page, verificationInput)
+        await page.waitForTimeout(2_000)
+        passwordInput = findXPasswordInput(page)
       }
-      await page.waitForTimeout(2_000)
-      passwordInput = page.locator('input[name="password"], input[type="password"]').first()
     }
 
     if (!(await passwordInput.isVisible().catch(() => false))) {
-      const text = await page.locator('body').innerText({ timeout: 3_000 }).catch(() => '')
-      throw new Error(`X password step was not found. Set X_EMAIL or X_SECONDARY_IDENTIFIER in Render if X asks for a second identifier. url=${page.url()} text=${text.replace(/\s+/g, ' ').slice(0, 220)}`)
+      const text = await getPageText(page)
+      throw new Error(`X password step was not found. Confirm X_USERNAME is accepted by X and X_EMAIL or X_SECONDARY_IDENTIFIER matches the account challenge. url=${page.url()} text=${text.slice(0, 260)}`)
     }
 
     await passwordInput.fill(credentials.password)
