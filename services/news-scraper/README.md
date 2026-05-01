@@ -31,6 +31,7 @@ Proof mode does not require Supabase credentials. It exits non-zero unless both 
 - `PINCHTAB_CDP_URL` or `PINCHTAB_WS_ENDPOINT` may point the worker at a managed browser session
 - `X_USERNAME`, `X_PASSWORD`, and optional `X_EMAIL` enable read-only X login for a more current timeline than logged-out profile pages expose
 - `X_SECONDARY_IDENTIFIER` is optional; set it to the account email, phone, or username if X asks for an extra identifier before the password step
+- `X_AUTH_TOKEN` and `X_CT0`, or `NEWS_X_COOKIE_HEADER`, can seed a trusted signed-in browser session when X blocks hosted password login. Set these only as Render secrets.
 - `NEWS_X_AUTH_STATE_PATH` defaults to `.news-scraper/x-auth-state.json`; the worker saves a successful X login here and reuses it on later cycles
 - `NEWS_X_SCROLL_STEPS` defaults to `2`; increase carefully if the worker needs to collect more visible X candidates per source
 - `NEWS_X_MAX_CANDIDATES` defaults to `20`

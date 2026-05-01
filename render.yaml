@@ -26,6 +26,12 @@ services:
         sync: false
       - key: X_PASSWORD
         sync: false
+      - key: X_AUTH_TOKEN
+        sync: false
+      - key: X_CT0
+        sync: false
+      - key: NEWS_X_COOKIE_HEADER
+        sync: false
       - key: NEWS_X_AUTH_STATE_PATH
         value: "/opt/render/project/src/.news-scraper/x-auth-state.json"
       - key: NEWS_X_SCROLL_STEPS

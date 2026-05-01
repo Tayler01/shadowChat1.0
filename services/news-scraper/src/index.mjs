@@ -277,6 +277,11 @@ const newXContext = browser => {
 
   if (hasXAuthState()) {
     options.storageState = getXAuthStatePath()
+  } else {
+    const cookieStorageState = buildXCookieStorageState()
+    if (cookieStorageState) {
+      options.storageState = cookieStorageState
+    }
   }
 
   return browser.newContext(options)
@@ -296,6 +301,54 @@ const getXCredentials = () => {
 
 const getXSecondaryIdentifier = () =>
   process.env.X_SECONDARY_IDENTIFIER || process.env.X_EMAIL || process.env.X_USERNAME || null
+
+const parseCookieHeader = header =>
+  String(header || '')
+    .split(';')
+    .map(part => part.trim())
+    .filter(Boolean)
+    .map(part => {
+      const [name, ...valueParts] = part.split('=')
+      return {
+        name: name?.trim(),
+        value: valueParts.join('=').trim(),
+      }
+    })
+    .filter(cookie => cookie.name && cookie.value)
+
+const buildXCookieStorageState = () => {
+  const rawCookies = [
+    ...parseCookieHeader(process.env.NEWS_X_COOKIE_HEADER || process.env.X_COOKIE_HEADER),
+    process.env.X_AUTH_TOKEN ? { name: 'auth_token', value: process.env.X_AUTH_TOKEN } : null,
+    process.env.X_CT0 ? { name: 'ct0', value: process.env.X_CT0 } : null,
+  ].filter(Boolean)
+
+  const uniqueCookies = new Map()
+  for (const cookie of rawCookies) {
+    uniqueCookies.set(cookie.name, cookie)
+  }
+
+  const cookies = [...uniqueCookies.values()].flatMap(cookie => [
+    {
+      ...cookie,
+      domain: '.x.com',
+      path: '/',
+      httpOnly: cookie.name === 'auth_token',
+      secure: true,
+      sameSite: 'Lax',
+    },
+    {
+      ...cookie,
+      domain: '.twitter.com',
+      path: '/',
+      httpOnly: cookie.name === 'auth_token',
+      secure: true,
+      sameSite: 'Lax',
+    },
+  ])
+
+  return cookies.length ? { cookies, origins: [] } : null
+}
 
 const getPageText = async page =>
   (await page.locator('body').innerText({ timeout: 3_000 }).catch(() => '')).replace(/\s+/g, ' ').trim()
@@ -667,7 +720,13 @@ const scrapeX = async (browser, rawHandle, session = {}) => {
   }
 }
 
-const hasConfiguredXSession = () => Boolean(getXCredentials() || hasXAuthState() || process.env.PINCHTAB_CDP_URL || process.env.PINCHTAB_WS_ENDPOINT)
+const hasConfiguredXSession = () => Boolean(
+  getXCredentials() ||
+  hasXAuthState() ||
+  buildXCookieStorageState() ||
+  process.env.PINCHTAB_CDP_URL ||
+  process.env.PINCHTAB_WS_ENDPOINT
+)
 
 const scrapeTruth = async (browser, rawHandle) => {
   const handle = cleanHandle(rawHandle)

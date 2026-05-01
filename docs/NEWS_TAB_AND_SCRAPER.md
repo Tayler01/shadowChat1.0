@@ -105,6 +105,9 @@ Optional browser/session values:
 - `X_EMAIL`
 - `X_SECONDARY_IDENTIFIER`
 - `X_PASSWORD`
+- `X_AUTH_TOKEN`
+- `X_CT0`
+- `NEWS_X_COOKIE_HEADER`
 - `NEWS_X_AUTH_STATE_PATH`
 - `NEWS_X_SCROLL_STEPS`
 - `NEWS_X_MAX_CANDIDATES`
@@ -121,6 +124,8 @@ optimization experiment.
 When X credentials are configured, the worker saves a successful login to
 `NEWS_X_AUTH_STATE_PATH` and reuses that browser storage on later cycles. This
 keeps Render from attempting a fresh login for every source on every poll.
+If X blocks hosted password login, seed a trusted session with Render-only
+secrets: either `X_AUTH_TOKEN` plus `X_CT0`, or `NEWS_X_COOKIE_HEADER`.
 
 ## Local Commands
 
