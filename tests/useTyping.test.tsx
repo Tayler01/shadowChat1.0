@@ -9,13 +9,18 @@ jest.mock('../src/lib/supabase', () => ({
   getRealtimeClient: jest.fn(),
 }))
 
+jest.mock('../src/lib/realtimeRecovery', () => ({
+  runRealtimeRecovery: jest.fn().mockResolvedValue({ ok: true, skipped: false, reason: 'channel-error' }),
+}))
+
 import { useTyping } from '../src/hooks/useTyping'
 import { useAuth } from '../src/hooks/useAuth'
 import { getRealtimeClient, getWorkingClient } from '../src/lib/supabase'
+import { runRealtimeRecovery } from '../src/lib/realtimeRecovery'
 
-const buildChannel = (send = jest.fn()) => ({
+const buildChannel = (send = jest.fn(), subscribe = jest.fn().mockReturnThis()) => ({
   on: jest.fn().mockReturnThis(),
-  subscribe: jest.fn().mockReturnThis(),
+  subscribe,
   send,
 })
 
@@ -90,4 +95,58 @@ test('stopTyping sends typing false broadcast', async () => {
     })
   )
   expect(result.current.isTyping).toBe(false)
+})
+
+test('closed typing channel does not trigger global recovery', async () => {
+  let statusCallback: ((status: string) => void) | undefined
+  const channel = buildChannel(
+    jest.fn(),
+    jest.fn((callback: (status: string) => void) => {
+      statusCallback = callback
+      return channel
+    })
+  )
+  const client = { channel: jest.fn(() => channel), removeChannel: jest.fn() }
+
+  ;(getWorkingClient as jest.Mock).mockResolvedValue(client)
+  ;(getRealtimeClient as jest.Mock).mockReturnValue(client)
+
+  renderHook(() => useTyping('general'))
+
+  await act(async () => {
+    await Promise.resolve()
+  })
+
+  act(() => {
+    statusCallback?.('CLOSED')
+  })
+
+  expect(runRealtimeRecovery).not.toHaveBeenCalled()
+})
+
+test('timed out typing channel triggers global recovery', async () => {
+  let statusCallback: ((status: string) => void) | undefined
+  const channel = buildChannel(
+    jest.fn(),
+    jest.fn((callback: (status: string) => void) => {
+      statusCallback = callback
+      return channel
+    })
+  )
+  const client = { channel: jest.fn(() => channel), removeChannel: jest.fn() }
+
+  ;(getWorkingClient as jest.Mock).mockResolvedValue(client)
+  ;(getRealtimeClient as jest.Mock).mockReturnValue(client)
+
+  renderHook(() => useTyping('general'))
+
+  await act(async () => {
+    await Promise.resolve()
+  })
+
+  act(() => {
+    statusCallback?.('TIMED_OUT')
+  })
+
+  expect(runRealtimeRecovery).toHaveBeenCalledWith('channel-error')
 })

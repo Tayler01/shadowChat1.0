@@ -38,6 +38,10 @@ const postServiceWorkerMessage = async (message: Record<string, unknown>) => {
     return
   }
 
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') {
+    return
+  }
+
   navigator.serviceWorker.controller?.postMessage(message)
 
   try {

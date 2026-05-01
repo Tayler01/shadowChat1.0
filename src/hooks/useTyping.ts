@@ -81,7 +81,7 @@ export const useTyping = (channelName: string = 'general') => {
         }
       })
       .subscribe((status: string) => {
-        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           void runRealtimeRecovery('channel-error')
         }
       })

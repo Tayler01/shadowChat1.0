@@ -88,7 +88,7 @@ export function useNewsBadges() {
           () => void refresh()
         )
         .subscribe((status: string) => {
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             void runRealtimeRecovery('channel-error')
           }
         })

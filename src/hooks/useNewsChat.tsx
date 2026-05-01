@@ -135,7 +135,7 @@ export function useNewsChat() {
           }
         )
         .subscribe((status: string) => {
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             void runRealtimeRecovery('channel-error')
           }
         })
