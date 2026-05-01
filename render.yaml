@@ -44,3 +44,7 @@ services:
         sync: false
       - key: TRUTH_PASSWORD
         sync: false
+      - key: NEWS_TRUTH_COOKIE_HEADER
+        sync: false
+      - key: NEWS_TRUTH_AUTH_STATE_PATH
+        value: "/opt/render/project/src/.news-scraper/truth-auth-state.json"

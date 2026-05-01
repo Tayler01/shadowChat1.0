@@ -116,6 +116,8 @@ Optional browser/session values:
 - `TRUTH_USERNAME`
 - `TRUTH_EMAIL`
 - `TRUTH_PASSWORD`
+- `NEWS_TRUTH_COOKIE_HEADER`
+- `NEWS_TRUTH_AUTH_STATE_PATH`
 - `NEWS_X_SHARED_CONTEXT=true`
 
 The default path launches a fresh Playwright browser per source. This costs more
@@ -128,6 +130,8 @@ When X credentials are configured, the worker saves a successful login to
 keeps Render from attempting a fresh login for every source on every poll.
 If X blocks hosted password login, seed a trusted session with Render-only
 secrets: either `X_AUTH_TOKEN` plus `X_CT0`, or `NEWS_X_COOKIE_HEADER`.
+If Truth Social blocks hosted public scraping or password login, seed a signed-in
+session with the Render-only `NEWS_TRUTH_COOKIE_HEADER` secret.
 
 ## Local Commands
 
@@ -234,7 +238,8 @@ blocked by the hosted worker environment.
   Render.
 - Redeploy/restart the worker after changing secrets.
 - If the same source still reports a block, use PinchTab or another trusted
-  browser host rather than repeatedly changing app code.
+  browser host, or seed `NEWS_TRUTH_COOKIE_HEADER` from a signed-in browser
+  session, rather than repeatedly changing app code.
 
 X sources grab the first post but never update:
 

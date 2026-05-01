@@ -36,6 +36,8 @@ Proof mode does not require Supabase credentials. It exits non-zero unless both 
 - `NEWS_X_SCROLL_STEPS` defaults to `1`; increase carefully if the worker needs to collect more visible X candidates per source
 - `NEWS_X_MAX_CANDIDATES` defaults to `12`
 - `TRUTH_USERNAME` or `TRUTH_EMAIL`, plus `TRUTH_PASSWORD`, are optional. The scraper now tries Truth's public profile/API path before attempting any login flow because hosted worker IPs may be blocked before the login form loads.
+- `NEWS_TRUTH_COOKIE_HEADER` can seed a signed-in Truth Social browser session when hosted password login or public API access is blocked. Set it only as a Render secret.
+- `NEWS_TRUTH_AUTH_STATE_PATH` defaults to `.news-scraper/truth-auth-state.json`; the worker saves an accepted Truth session here and reuses it on later cycles.
 - `NEWS_X_SHARED_CONTEXT` defaults to `false`; set `true` only when deliberately testing a shared X browser context optimization
 
 The production container uses a Playwright browser image. Supabase Edge Functions stay short-lived; this worker owns polling and browser automation.
@@ -133,8 +135,9 @@ order by detected_at desc;
 - X source is stale: add `X_USERNAME`, optional `X_EMAIL`, and `X_PASSWORD` so
   the worker can see a signed-in timeline instead of a logged-out profile page.
 - Truth source is `blocked`: Render's IP/browser path is likely blocked by
-  Truth Social. Use `PINCHTAB_CDP_URL` or `PINCHTAB_WS_ENDPOINT`, or pause that
-  source until a trusted browser path is available.
+  Truth Social. Add `NEWS_TRUTH_COOKIE_HEADER` from a signed-in browser session,
+  use `PINCHTAB_CDP_URL` or `PINCHTAB_WS_ENDPOINT`, or pause that source until a
+  trusted browser path is available.
 - Repeated browser/context errors: keep the default per-source browser behavior
   and do not enable `NEWS_X_SHARED_CONTEXT` while debugging.
 

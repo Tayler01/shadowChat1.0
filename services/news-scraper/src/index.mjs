@@ -300,11 +300,49 @@ const newXContext = browser => {
   return browser.newContext(options)
 }
 
+const getTruthAuthStatePath = () => {
+  const configured = process.env.NEWS_TRUTH_AUTH_STATE_PATH
+  if (configured) return configured
+  return path.resolve(process.cwd(), '.news-scraper', 'truth-auth-state.json')
+}
+
+const hasTruthAuthState = () => existsSync(getTruthAuthStatePath())
+
+const saveTruthAuthState = async context => {
+  const authStatePath = getTruthAuthStatePath()
+  await mkdir(path.dirname(authStatePath), { recursive: true })
+  await context.storageState({ path: authStatePath })
+}
+
+const newTruthContext = browser => {
+  const options = {
+    viewport: { width: 1365, height: 900 },
+    userAgent: USER_AGENT,
+    locale: 'en-US',
+  }
+
+  if (hasTruthAuthState()) {
+    options.storageState = getTruthAuthStatePath()
+  } else {
+    const cookieStorageState = buildTruthCookieStorageState()
+    if (cookieStorageState) {
+      options.storageState = cookieStorageState
+    }
+  }
+
+  return browser.newContext(options)
+}
+
 const getTruthCredentials = () => {
   const username = process.env.TRUTH_USERNAME || process.env.TRUTH_EMAIL
   const password = process.env.TRUTH_PASSWORD
   return username && password ? { username, password } : null
 }
+
+const hasSeededTruthCookieSession = () => Boolean(
+  process.env.NEWS_TRUTH_COOKIE_HEADER ||
+  process.env.TRUTH_COOKIE_HEADER
+)
 
 const getXCredentials = () => {
   const username = process.env.X_USERNAME || process.env.X_EMAIL
@@ -336,39 +374,42 @@ const parseCookieHeader = header =>
     })
     .filter(cookie => cookie.name && cookie.value)
 
-const buildXCookieStorageState = () => {
-  const rawCookies = [
-    ...parseCookieHeader(process.env.NEWS_X_COOKIE_HEADER || process.env.X_COOKIE_HEADER),
-    process.env.X_AUTH_TOKEN ? { name: 'auth_token', value: process.env.X_AUTH_TOKEN } : null,
-    process.env.X_CT0 ? { name: 'ct0', value: process.env.X_CT0 } : null,
-  ].filter(Boolean)
-
+const buildCookieStorageState = (rawCookies, domains, httpOnlyNames = new Set()) => {
   const uniqueCookies = new Map()
-  for (const cookie of rawCookies) {
+  for (const cookie of rawCookies.filter(Boolean)) {
     uniqueCookies.set(cookie.name, cookie)
   }
 
-  const cookies = [...uniqueCookies.values()].flatMap(cookie => [
-    {
+  const cookies = [...uniqueCookies.values()].flatMap(cookie =>
+    domains.map(domain => ({
       ...cookie,
-      domain: '.x.com',
+      domain,
       path: '/',
-      httpOnly: cookie.name === 'auth_token',
+      httpOnly: httpOnlyNames.has(cookie.name),
       secure: true,
       sameSite: 'Lax',
-    },
-    {
-      ...cookie,
-      domain: '.twitter.com',
-      path: '/',
-      httpOnly: cookie.name === 'auth_token',
-      secure: true,
-      sameSite: 'Lax',
-    },
-  ])
+    }))
+  )
 
   return cookies.length ? { cookies, origins: [] } : null
 }
+
+const buildXCookieStorageState = () =>
+  buildCookieStorageState(
+    [
+      ...parseCookieHeader(process.env.NEWS_X_COOKIE_HEADER || process.env.X_COOKIE_HEADER),
+      process.env.X_AUTH_TOKEN ? { name: 'auth_token', value: process.env.X_AUTH_TOKEN } : null,
+      process.env.X_CT0 ? { name: 'ct0', value: process.env.X_CT0 } : null,
+    ],
+    ['.x.com', '.twitter.com'],
+    new Set(['auth_token'])
+  )
+
+const buildTruthCookieStorageState = () =>
+  buildCookieStorageState(
+    parseCookieHeader(process.env.NEWS_TRUTH_COOKIE_HEADER || process.env.TRUTH_COOKIE_HEADER),
+    ['.truthsocial.com', 'truthsocial.com']
+  )
 
 const getPageText = async page =>
   (await page.locator('body').innerText({ timeout: 3_000 }).catch(() => '')).replace(/\s+/g, ' ').trim()
@@ -536,8 +577,35 @@ const maybeSignInX = async context => {
   }
 }
 
-const maybeSignInTruth = async page => {
+const isSignedInToTruth = async page => {
+  const text = await getPageText(page)
+  const loginVisible = await page
+    .locator('input[name="username"], input[name="email"], input[type="email"], input[type="password"], button:has-text("Sign in"), button:has-text("Log in")')
+    .first()
+    .isVisible({ timeout: 1_000 })
+    .catch(() => false)
+  return !loginVisible && !/\b(sign in|log in|create account|join truth social)\b/i.test(text)
+}
+
+const maybeSignInTruth = async (page, context) => {
   const credentials = getTruthCredentials()
+
+  if (hasTruthAuthState() || hasSeededTruthCookieSession()) {
+    await page.goto('https://truthsocial.com/home', {
+      waitUntil: 'domcontentloaded',
+      timeout: 35_000,
+    }).catch(() => {})
+    await page.waitForTimeout(2_000)
+    if (await isSignedInToTruth(page)) {
+      await saveTruthAuthState(context).catch(() => {})
+      return true
+    }
+    if (hasSeededTruthCookieSession() && !credentials) {
+      const text = await getPageText(page)
+      throw new Error(`Truth cookie session was provided but was not accepted. Refresh NEWS_TRUTH_COOKIE_HEADER from a signed-in browser. url=${page.url()} text=${text.slice(0, 220)}`)
+    }
+  }
+
   if (!credentials) return false
 
   const findLoginInputs = () => ({
@@ -602,7 +670,11 @@ const maybeSignInTruth = async page => {
   }
 
   await page.waitForTimeout(Number(process.env.NEWS_TRUTH_LOGIN_SETTLE_MS || 6_000))
-  return true
+  const signedIn = await isSignedInToTruth(page)
+  if (signedIn) {
+    await saveTruthAuthState(context).catch(() => {})
+  }
+  return signedIn
 }
 
 const scrapeX = async (browser, rawHandle, session = {}) => {
@@ -755,10 +827,15 @@ const hasConfiguredXSession = () => Boolean(
 
 const scrapeTruth = async (browser, rawHandle) => {
   const handle = cleanHandle(rawHandle)
-  const context = await newContext(browser)
+  const context = await newTruthContext(browser)
   const page = await context.newPage()
+  let signedIn = false
 
   try {
+    if (getTruthCredentials() || hasTruthAuthState() || hasSeededTruthCookieSession()) {
+      signedIn = await maybeSignInTruth(page, context)
+    }
+
     await page.goto(`https://truthsocial.com/@${encodeURIComponent(handle)}`, {
       waitUntil: 'domcontentloaded',
       timeout: 35_000,
@@ -859,7 +936,7 @@ const scrapeTruth = async (browser, rawHandle) => {
         postKind: 'post',
         ...candidate,
         bodyText: cleanTruthText(candidate.bodyText, candidate.authorHandle, candidate.authorDisplayName),
-        raw: { extractedFrom: page.url(), handle, apiError: candidate.apiError, mode: 'dom' },
+        raw: { extractedFrom: page.url(), handle, apiError: candidate.apiError, mode: 'dom', signedIn },
       }))
     }
 
@@ -893,7 +970,7 @@ const scrapeTruth = async (browser, rawHandle) => {
           boosts: rawStatus.reblogs_count ?? status.reblogs_count,
           favorites: rawStatus.favourites_count ?? status.favourites_count,
         },
-        raw: { status: rawStatus, account: raw.account },
+        raw: { status: rawStatus, account: raw.account, signedIn },
         postedAt: rawStatus.created_at || status.created_at || null,
       })
     })
