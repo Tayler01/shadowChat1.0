@@ -2,7 +2,7 @@ services:
   - type: worker
     name: shado-news-scraper
     runtime: docker
-    plan: starter
+    plan: standard
     dockerfilePath: ./services/news-scraper/Dockerfile
     dockerContext: .
     envVars:
@@ -35,9 +35,9 @@ services:
       - key: NEWS_X_AUTH_STATE_PATH
         value: "/opt/render/project/src/.news-scraper/x-auth-state.json"
       - key: NEWS_X_SCROLL_STEPS
-        value: "2"
+        value: "1"
       - key: NEWS_X_MAX_CANDIDATES
-        value: "20"
+        value: "12"
       - key: TRUTH_USERNAME
         sync: false
       - key: TRUTH_EMAIL

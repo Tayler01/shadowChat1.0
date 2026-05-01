@@ -33,8 +33,8 @@ Proof mode does not require Supabase credentials. It exits non-zero unless both 
 - `X_SECONDARY_IDENTIFIER` is optional; set it to the account email, phone, or username if X asks for an extra identifier before the password step
 - `X_AUTH_TOKEN` and `X_CT0`, or `NEWS_X_COOKIE_HEADER`, can seed a trusted signed-in browser session when X blocks hosted password login. Set these only as Render secrets.
 - `NEWS_X_AUTH_STATE_PATH` defaults to `.news-scraper/x-auth-state.json`; the worker saves a successful X login here and reuses it on later cycles
-- `NEWS_X_SCROLL_STEPS` defaults to `2`; increase carefully if the worker needs to collect more visible X candidates per source
-- `NEWS_X_MAX_CANDIDATES` defaults to `20`
+- `NEWS_X_SCROLL_STEPS` defaults to `1`; increase carefully if the worker needs to collect more visible X candidates per source
+- `NEWS_X_MAX_CANDIDATES` defaults to `12`
 - `TRUTH_USERNAME` or `TRUTH_EMAIL`, plus `TRUTH_PASSWORD`, are optional. The scraper now tries Truth's public profile/API path before attempting any login flow because hosted worker IPs may be blocked before the login form loads.
 - `NEWS_X_SHARED_CONTEXT` defaults to `false`; set `true` only when deliberately testing a shared X browser context optimization
 
@@ -75,7 +75,9 @@ a source cursor when the newest recovered post is newer than the stored cursor.
 ## Render Deployment
 
 Production is defined in [../../render.yaml](C:/repos/chat2.0/render.yaml:1) as
-the `shado-news-scraper` worker.
+the `shado-news-scraper` worker. Browser scraping needs more than the 512 MB
+starter memory limit once signed-in X sessions are enabled, so the blueprint uses
+the `standard` plan.
 
 Deploy checklist:
 

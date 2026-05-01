@@ -96,6 +96,8 @@ Recommended Render values:
 
 - `NEWS_SCRAPE_INTERVAL_MS=90000`
 - `NEWS_SCRAPE_HEADLESS=true`
+- Render plan `standard` or larger. Signed-in Playwright/Chromium scraping can
+  exceed the 512 MB starter limit.
 
 Optional browser/session values:
 

@@ -8,9 +8,9 @@ import path from 'node:path'
 const EASTERN_TIME_ZONE = 'America/New_York'
 const DEFAULT_INTERVAL_MS = 90_000
 const DEFAULT_SETTLE_MS = 8_000
-const DEFAULT_X_SCROLL_STEPS = 2
+const DEFAULT_X_SCROLL_STEPS = 1
 const DEFAULT_X_SCROLL_SETTLE_MS = 1_500
-const DEFAULT_X_MAX_CANDIDATES = 20
+const DEFAULT_X_MAX_CANDIDATES = 12
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
 
@@ -257,7 +257,20 @@ const launchBrowser = async () => {
 
   return chromium.launch({
     headless: process.env.NEWS_SCRAPE_HEADLESS !== 'false',
-    args: ['--disable-blink-features=AutomationControlled'],
+    args: [
+      '--disable-blink-features=AutomationControlled',
+      '--disable-dev-shm-usage',
+      '--disable-extensions',
+      '--disable-gpu',
+      '--disable-background-networking',
+      '--disable-background-timer-throttling',
+      '--disable-renderer-backgrounding',
+      '--disable-sync',
+      '--metrics-recording-only',
+      '--mute-audio',
+      '--no-first-run',
+      '--no-sandbox',
+    ],
   })
 }
 
@@ -990,54 +1003,61 @@ const runCycle = async supabase => {
     return
   }
 
-  for (const source of sources) {
-    let browser
-    const session = { shared: process.env.NEWS_X_SHARED_CONTEXT === 'true' }
+  let browser
+  const session = { shared: true }
 
-    try {
-      browser = await launchBrowser()
-      const snapshots = await scrapeSource(browser, source, session)
-      const { latest, cursorSnapshot, toStore, staleCursor } = selectSnapshotsToStore(source, snapshots)
+  try {
+    browser = await launchBrowser()
+  } catch (error) {
+    throw new Error(`Failed to launch news scraper browser: ${error instanceof Error ? error.message : String(error)}`)
+  }
 
-      if (!latest) {
-        throw new Error(`No snapshots extracted for ${source.platform}:${source.handle}`)
-      }
+  try {
+    for (const source of sources) {
+      try {
+        const snapshots = await scrapeSource(browser, source, session)
+        const { latest, cursorSnapshot, toStore, staleCursor } = selectSnapshotsToStore(source, snapshots)
 
-      if (staleCursor) {
-        const configuredSessionHint = source.platform === 'x' && !hasConfiguredXSession()
-          ? ' No X credentials or trusted browser session are configured for the worker.'
-          : ''
+        if (!latest) {
+          throw new Error(`No snapshots extracted for ${source.platform}:${source.handle}`)
+        }
+
+        if (staleCursor) {
+          const configuredSessionHint = source.platform === 'x' && !hasConfiguredXSession()
+            ? ' No X credentials or trusted browser session are configured for the worker.'
+            : ''
+          await updateSourceHealth(supabase, source.id, {
+            last_success_at: new Date().toISOString(),
+            last_error: `Latest extracted ${source.platform}:${latest.externalId} is older than stored cursor ${source.last_seen_external_id}; the provider returned a stale timeline.${configuredSessionHint}`,
+            health_status: 'degraded',
+            external_account_id: source.external_account_id || latest.authorHandle,
+          })
+          console.log(`Skipped stale ${latest.platform}:${latest.externalId} for ${source.handle}; cursor remains ${source.last_seen_external_id}`)
+          continue
+        }
+
+        for (const snapshot of toStore) {
+          await writeSnapshot(supabase, source, snapshot)
+        }
+
         await updateSourceHealth(supabase, source.id, {
           last_success_at: new Date().toISOString(),
-          last_error: `Latest extracted ${source.platform}:${latest.externalId} is older than stored cursor ${source.last_seen_external_id}; the provider returned a stale timeline.${configuredSessionHint}`,
-          health_status: 'degraded',
-          external_account_id: source.external_account_id || latest.authorHandle,
+          last_seen_external_id: cursorSnapshot.externalId,
+          last_seen_at: cursorSnapshot.postedAt || new Date().toISOString(),
+          last_error: null,
+          health_status: 'ok',
+          external_account_id: source.external_account_id || cursorSnapshot.authorHandle,
         })
-        console.log(`Skipped stale ${latest.platform}:${latest.externalId} for ${source.handle}; cursor remains ${source.last_seen_external_id}`)
-        continue
+        console.log(`${toStore.length ? `Stored ${toStore.length}` : 'Skipped seen'} ${cursorSnapshot.platform}:${cursorSnapshot.externalId} for ${source.handle}`)
+      } catch (error) {
+        const healthPatch = classifySourceError(source, error)
+        await updateSourceHealth(supabase, source.id, healthPatch)
+        console.error(`Source ${source.platform}:${source.handle} failed: ${healthPatch.last_error}`)
       }
-
-      for (const snapshot of toStore) {
-        await writeSnapshot(supabase, source, snapshot)
-      }
-
-      await updateSourceHealth(supabase, source.id, {
-        last_success_at: new Date().toISOString(),
-        last_seen_external_id: cursorSnapshot.externalId,
-        last_seen_at: cursorSnapshot.postedAt || new Date().toISOString(),
-        last_error: null,
-        health_status: 'ok',
-        external_account_id: source.external_account_id || cursorSnapshot.authorHandle,
-      })
-      console.log(`${toStore.length ? `Stored ${toStore.length}` : 'Skipped seen'} ${cursorSnapshot.platform}:${cursorSnapshot.externalId} for ${source.handle}`)
-    } catch (error) {
-      const healthPatch = classifySourceError(source, error)
-      await updateSourceHealth(supabase, source.id, healthPatch)
-      console.error(`Source ${source.platform}:${source.handle} failed: ${healthPatch.last_error}`)
-    } finally {
-      await session.xContext?.close().catch(() => {})
-      await browser?.close().catch(() => {})
     }
+  } finally {
+    await session.xContext?.close().catch(() => {})
+    await browser?.close().catch(() => {})
   }
 }
 
