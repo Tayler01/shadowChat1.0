@@ -349,9 +349,35 @@ const maybeSignInX = async context => {
     })
     await page.waitForTimeout(2_000)
 
-    const usernameInput = page
+    let usernameInput = page
       .locator('input[autocomplete="username"], input[name="text"], input[type="text"]')
       .first()
+
+    if (!(await usernameInput.isVisible().catch(() => false))) {
+      await page.goto('https://x.com/login', {
+        waitUntil: 'domcontentloaded',
+        timeout: 35_000,
+      }).catch(() => {})
+      await page.waitForTimeout(2_000)
+      usernameInput = page
+        .locator('input[autocomplete="username"], input[name="text"], input[type="text"]')
+        .first()
+    }
+
+    if (!(await usernameInput.isVisible().catch(() => false))) {
+      const signInLink = page.getByRole('link', { name: /^sign in$/i }).last()
+      const signInButton = page.getByRole('button', { name: /^sign in$/i }).last()
+      if (await signInLink.isVisible().catch(() => false)) {
+        await signInLink.click({ force: true, timeout: 5_000 })
+        await page.waitForTimeout(2_000)
+      } else if (await signInButton.isVisible().catch(() => false)) {
+        await signInButton.click({ force: true, timeout: 5_000 })
+        await page.waitForTimeout(2_000)
+      }
+      usernameInput = page
+        .locator('input[autocomplete="username"], input[name="text"], input[type="text"]')
+        .first()
+    }
 
     if (!(await usernameInput.isVisible().catch(() => false))) {
       const text = await page.locator('body').innerText({ timeout: 3_000 }).catch(() => '')
