@@ -411,6 +411,26 @@ const buildTruthCookieStorageState = () =>
     ['.truthsocial.com', 'truthsocial.com']
   )
 
+const getTruthCookieHeader = () =>
+  process.env.NEWS_TRUTH_COOKIE_HEADER || process.env.TRUTH_COOKIE_HEADER || ''
+
+const fetchTruthJson = async pathOrUrl => {
+  const url = new URL(pathOrUrl, 'https://truthsocial.com')
+  const response = await fetch(url, {
+    headers: {
+      accept: 'application/json, text/plain, */*',
+      cookie: getTruthCookieHeader(),
+      referer: 'https://truthsocial.com/',
+      'user-agent': USER_AGENT,
+    },
+  })
+  const text = await response.text()
+  if (!response.ok) {
+    throw new Error(`${response.status} ${response.statusText}${text ? `: ${text.replace(/\s+/g, ' ').slice(0, 180)}` : ''}`)
+  }
+  return JSON.parse(text)
+}
+
 const getPageText = async page =>
   (await page.locator('body').innerText({ timeout: 3_000 }).catch(() => '')).replace(/\s+/g, ' ').trim()
 
@@ -825,6 +845,38 @@ const hasConfiguredXSession = () => Boolean(
   process.env.PINCHTAB_WS_ENDPOINT
 )
 
+const mapTruthStatuses = (raw, handle, signedIn, mode = 'api') =>
+  raw.statuses.map(rawStatus => {
+    const status = rawStatus.reblog || rawStatus
+    const account = rawStatus.account || raw.account
+    const bodyText = stripHtml(status.content || status.spoiler_text || '')
+    const media = uniqueMedia((status.media_attachments || []).map(item => ({
+      type: item.type === 'video' || item.type === 'gifv' ? 'video' : 'image',
+      url: item.url || item.remote_url || item.preview_url,
+      thumbnail_url: item.preview_url || item.url,
+      alt: item.description || undefined,
+    })))
+
+    return makeSnapshot({
+      platform: 'truth',
+      externalId: rawStatus.id,
+      postKind: rawStatus.reblog ? 'retruth' : rawStatus.in_reply_to_id ? 'reply' : 'post',
+      authorHandle: account.username || account.acct || handle,
+      authorDisplayName: stripHtml(account.display_name || account.username || handle),
+      authorAvatarUrl: account.avatar_static || account.avatar || null,
+      bodyText,
+      sourceUrl: rawStatus.url || status.url || `https://truthsocial.com/@${handle}/posts/${rawStatus.id}`,
+      media,
+      metrics: {
+        replies: rawStatus.replies_count ?? status.replies_count,
+        boosts: rawStatus.reblogs_count ?? status.reblogs_count,
+        favorites: rawStatus.favourites_count ?? status.favourites_count,
+      },
+      raw: { status: rawStatus, account: raw.account, signedIn, mode },
+      postedAt: rawStatus.created_at || status.created_at || null,
+    })
+  })
+
 const scrapeTruth = async (browser, rawHandle) => {
   const handle = cleanHandle(rawHandle)
   const context = await newTruthContext(browser)
@@ -832,6 +884,18 @@ const scrapeTruth = async (browser, rawHandle) => {
   let signedIn = false
 
   try {
+    if (hasSeededTruthCookieSession()) {
+      try {
+        const account = await fetchTruthJson(`/api/v1/accounts/lookup?acct=${encodeURIComponent(handle)}`)
+        const statuses = await fetchTruthJson(`/api/v1/accounts/${account.id}/statuses?exclude_replies=false&only_replies=false&with_muted=true&limit=10`)
+        if (Array.isArray(statuses) && statuses.length) {
+          return mapTruthStatuses({ mode: 'cookie-api', account, statuses }, handle, true, 'cookie-api')
+        }
+      } catch (cookieApiError) {
+        console.warn(`Truth cookie API failed for ${handle}: ${cookieApiError instanceof Error ? cookieApiError.message : String(cookieApiError)}`)
+      }
+    }
+
     if (getTruthCredentials() || hasTruthAuthState() || hasSeededTruthCookieSession()) {
       signedIn = await maybeSignInTruth(page, context)
     }
@@ -944,36 +1008,7 @@ const scrapeTruth = async (browser, rawHandle) => {
       throw new Error(`No Truth Social post could be extracted for @${handle}${raw?.apiError ? ` (${raw.apiError})` : ''}`)
     }
 
-    return raw.statuses.map(rawStatus => {
-      const status = rawStatus.reblog || rawStatus
-      const account = rawStatus.account || raw.account
-      const bodyText = stripHtml(status.content || status.spoiler_text || '')
-      const media = uniqueMedia((status.media_attachments || []).map(item => ({
-        type: item.type === 'video' || item.type === 'gifv' ? 'video' : 'image',
-        url: item.url || item.remote_url || item.preview_url,
-        thumbnail_url: item.preview_url || item.url,
-        alt: item.description || undefined,
-      })))
-
-      return makeSnapshot({
-        platform: 'truth',
-        externalId: rawStatus.id,
-        postKind: rawStatus.reblog ? 'retruth' : rawStatus.in_reply_to_id ? 'reply' : 'post',
-        authorHandle: account.username || account.acct || handle,
-        authorDisplayName: stripHtml(account.display_name || account.username || handle),
-        authorAvatarUrl: account.avatar_static || account.avatar || null,
-        bodyText,
-        sourceUrl: rawStatus.url || status.url || `https://truthsocial.com/@${handle}/posts/${rawStatus.id}`,
-        media,
-        metrics: {
-          replies: rawStatus.replies_count ?? status.replies_count,
-          boosts: rawStatus.reblogs_count ?? status.reblogs_count,
-          favorites: rawStatus.favourites_count ?? status.favourites_count,
-        },
-        raw: { status: rawStatus, account: raw.account, signedIn },
-        postedAt: rawStatus.created_at || status.created_at || null,
-      })
-    })
+    return mapTruthStatuses(raw, handle, signedIn)
   } finally {
     await context.close()
   }
@@ -989,9 +1024,12 @@ const classifySourceError = (source, error) => {
   }
 
   if (source.platform === 'truth' && /\b403\b|forbidden/i.test(rawMessage)) {
+    const cookieHint = hasSeededTruthCookieSession()
+      ? ' Truth cookie session is configured but was rejected by Truth/Cloudflare; refresh NEWS_TRUTH_COOKIE_HEADER and include all truthsocial.com cookies, especially Cloudflare cookies.'
+      : ' Add NEWS_TRUTH_COOKIE_HEADER from a signed-in browser session, or use a trusted browser path.'
     return {
       health_status: 'blocked',
-      last_error: 'Truth Social blocked public scraping from the worker. Add TRUTH_USERNAME and TRUTH_PASSWORD in Render, or pause this source.',
+      last_error: `Truth Social blocked public scraping from the worker.${cookieHint}`,
     }
   }
 
