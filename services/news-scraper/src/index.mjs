@@ -294,6 +294,15 @@ const getXCredentials = () => {
   return username && password ? { username, password } : null
 }
 
+const getXSecondaryIdentifier = () =>
+  process.env.X_SECONDARY_IDENTIFIER || process.env.X_EMAIL || process.env.X_USERNAME || null
+
+const clickXNext = async (page, input) => {
+  await page.getByRole('button', { name: /^next$/i }).click({ timeout: 5_000 }).catch(async () => {
+    await input.press('Enter')
+  })
+}
+
 const getXAuthStatePath = () => {
   const configured = process.env.NEWS_X_AUTH_STATE_PATH
   if (configured) return configured
@@ -385,31 +394,28 @@ const maybeSignInX = async context => {
     }
 
     await usernameInput.fill(credentials.username)
-    await page.getByRole('button', { name: /^next$/i }).click().catch(async () => {
-      await usernameInput.press('Enter')
-    })
+    await clickXNext(page, usernameInput)
     await page.waitForTimeout(2_000)
 
-    const verificationInput = page
-      .locator('input[data-testid="ocfEnterTextTextInput"], input[name="text"]')
-      .first()
-    const passwordInput = page.locator('input[name="password"], input[type="password"]').first()
+    let passwordInput = page.locator('input[name="password"], input[type="password"]').first()
 
-    if (
-      !(await passwordInput.isVisible().catch(() => false)) &&
-      process.env.X_EMAIL &&
-      await verificationInput.isVisible().catch(() => false)
-    ) {
-      await verificationInput.fill(process.env.X_EMAIL)
-      await page.getByRole('button', { name: /^next$/i }).click().catch(async () => {
-        await verificationInput.press('Enter')
-      })
+    if (!(await passwordInput.isVisible().catch(() => false))) {
+      const secondaryIdentifier = getXSecondaryIdentifier()
+      const verificationInput = page
+        .locator('input[data-testid="ocfEnterTextTextInput"], input[name="text"]')
+        .first()
+
+      if (secondaryIdentifier && await verificationInput.isVisible().catch(() => false)) {
+        await verificationInput.fill(secondaryIdentifier)
+        await clickXNext(page, verificationInput)
+      }
       await page.waitForTimeout(2_000)
+      passwordInput = page.locator('input[name="password"], input[type="password"]').first()
     }
 
     if (!(await passwordInput.isVisible().catch(() => false))) {
       const text = await page.locator('body').innerText({ timeout: 3_000 }).catch(() => '')
-      throw new Error(`X password step was not found. url=${page.url()} text=${text.replace(/\s+/g, ' ').slice(0, 180)}`)
+      throw new Error(`X password step was not found. Set X_EMAIL or X_SECONDARY_IDENTIFIER in Render if X asks for a second identifier. url=${page.url()} text=${text.replace(/\s+/g, ' ').slice(0, 220)}`)
     }
 
     await passwordInput.fill(credentials.password)

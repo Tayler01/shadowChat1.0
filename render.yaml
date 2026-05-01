@@ -22,6 +22,8 @@ services:
         sync: false
       - key: X_EMAIL
         sync: false
+      - key: X_SECONDARY_IDENTIFIER
+        sync: false
       - key: X_PASSWORD
         sync: false
       - key: NEWS_X_AUTH_STATE_PATH
