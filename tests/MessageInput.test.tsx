@@ -126,3 +126,50 @@ test('shows an error and keeps reply state when uploaded image send resolves to 
   expect(onCancelReply).not.toHaveBeenCalled()
   expect((toast as any).error).toHaveBeenCalledWith('Failed to send image')
 })
+
+test('sends selected videos as video attachments', async () => {
+  uploadChatFile.mockResolvedValueOnce('https://example.com/clip.mp4')
+  const onSendMessage = jest.fn().mockResolvedValue({ id: 'm1' })
+
+  const { container } = render(
+    <MessageInput
+      onSendMessage={onSendMessage}
+      replyingTo={{ id: 'parent', content: 'hello' }}
+    />
+  )
+
+  const videoInput = container.querySelector('input[type="file"][accept="video/*"]') as HTMLInputElement
+  const file = new File(['video'], 'clip.mp4', { type: 'video/mp4' })
+
+  fireEvent.change(videoInput, { target: { files: [file] } })
+
+  await waitFor(() => {
+    expect(onSendMessage).toHaveBeenCalledWith(
+      JSON.stringify({ name: 'clip.mp4', size: file.size, type: 'video/mp4' }),
+      'video',
+      'https://example.com/clip.mp4',
+      'parent'
+    )
+  })
+})
+
+test('auto-detects videos from the generic file picker', async () => {
+  uploadChatFile.mockResolvedValueOnce('https://example.com/movie.webm')
+  const onSendMessage = jest.fn().mockResolvedValue({ id: 'm1' })
+
+  const { container } = render(<MessageInput onSendMessage={onSendMessage} />)
+
+  const fileInput = container.querySelector('input[type="file"][data-upload-kind="file"]') as HTMLInputElement
+  const file = new File(['video'], 'movie.webm', { type: 'video/webm' })
+
+  fireEvent.change(fileInput, { target: { files: [file] } })
+
+  await waitFor(() => {
+    expect(onSendMessage).toHaveBeenCalledWith(
+      JSON.stringify({ name: 'movie.webm', size: file.size, type: 'video/webm' }),
+      'video',
+      'https://example.com/movie.webm',
+      undefined
+    )
+  })
+})

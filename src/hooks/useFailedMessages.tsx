@@ -1,8 +1,9 @@
+import type { ChatMessageType } from '../lib/supabase'
 import { useState } from 'react'
 
 export interface FailedMessage {
   id: string
-  type: 'text' | 'command' | 'image' | 'audio' | 'file'
+  type: ChatMessageType
   content: string
   dataUrl?: string
   fileName?: string

@@ -127,6 +127,21 @@ describe('helper functions', () => {
     });
   });
 
+  it('prepareMessageData stores video metadata and file url', () => {
+    const result = prepareMessageData(
+      'u1',
+      '{"name":"clip.mp4","size":5,"type":"video/mp4"}',
+      'video',
+      'https://example.com/clip.mp4'
+    );
+    expect(result).toEqual({
+      user_id: 'u1',
+      content: '{"name":"clip.mp4","size":5,"type":"video/mp4"}',
+      message_type: 'video',
+      file_url: 'https://example.com/clip.mp4',
+    });
+  });
+
   it('insertMessage inserts through supabase', async () => {
     const insertMock = jest.fn(() => ({ select: () => ({ single: () => Promise.resolve({ data: { id: '1' } as any, error: null }) }) }));
     workingClient.from.mockReturnValueOnce(createQuery({ insert: insertMock }) as any);

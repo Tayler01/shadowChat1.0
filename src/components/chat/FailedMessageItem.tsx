@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { FailedMessage } from '../../hooks/useFailedMessages'
 import { Button } from '../ui/Button'
 import { ImageModal } from '../ui/ImageModal'
+import { VideoAttachment } from './VideoAttachment'
 
 interface Props {
   message: FailedMessage
@@ -28,6 +29,9 @@ export const FailedMessageItem: React.FC<Props> = ({ message, onResend }) => {
               {message.fileName || 'Download file'}
             </a>
           </div>
+        )}
+        {message.type === 'video' && message.dataUrl && (
+          <VideoAttachment url={message.dataUrl} meta={message.content} />
         )}
         {message.type === 'audio' && message.dataUrl && (
           <audio controls src={message.dataUrl} className="max-w-xs" />

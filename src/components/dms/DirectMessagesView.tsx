@@ -16,6 +16,7 @@ import { MessageInput } from '../chat/MessageInput'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import { FailedMessageItem } from '../chat/FailedMessageItem'
 import { FileAttachment } from '../chat/FileAttachment'
+import { VideoAttachment } from '../chat/VideoAttachment'
 import { MessageRichText } from '../chat/MessageRichText'
 import { PublicProfileDialog } from '../profile/PublicProfileDialog'
 import { useFailedMessages } from '../../hooks/useFailedMessages'
@@ -24,7 +25,7 @@ import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { useTyping } from '../../hooks/useTyping'
 import toast from 'react-hot-toast'
-import type { BasicUser, User } from '../../lib/supabase'
+import type { BasicUser, ChatMessageType, User } from '../../lib/supabase'
 
 interface DirectMessagesViewProps {
   onToggleSidebar: () => void
@@ -138,7 +139,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
 
   const handleSendMessage = async (
     content: string,
-    type?: 'text' | 'command' | 'audio' | 'image' | 'file',
+    type?: ChatMessageType,
     fileUrl?: string
   ) => {
     try {
@@ -602,6 +603,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                             alt="uploaded"
                             className="mt-1 max-w-xs rounded-[var(--radius-md)] border border-[var(--border-subtle)]"
                           />
+                        ) : message.message_type === 'video' && message.file_url ? (
+                          <VideoAttachment url={message.file_url} meta={message.content} />
                         ) : message.message_type === 'file' && message.file_url ? (
                           <FileAttachment url={message.file_url} meta={message.content} />
                         ) : (

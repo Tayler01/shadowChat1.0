@@ -4,7 +4,7 @@ import { Send, Smile, Command, Plus, Mic, X } from 'lucide-react'
 import { useTyping } from '../../hooks/useTyping'
 import { Button } from '../ui/Button'
 import { processSlashCommand, slashCommands } from '../../lib/utils'
-import type { ChatMessage } from '../../lib/supabase'
+import type { ChatMessage, ChatMessageType } from '../../lib/supabase'
 import { uploadVoiceMessage, uploadChatFile } from '../../lib/supabase'
 import type { EmojiClickData } from '../../types'
 import { useEmojiPicker } from '../../hooks/useEmojiPicker'
@@ -34,7 +34,7 @@ const getEmojiPickerTheme = () =>
 interface MessageInputProps {
   onSendMessage: (
     content: string,
-    type?: 'text' | 'command' | 'audio' | 'image' | 'file',
+    type?: ChatMessageType,
     fileUrl?: string,
     replyTo?: string
   ) => Promise<ChatMessage | null | void> | ChatMessage | null | void
@@ -75,6 +75,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const emojiPickerRef = useRef<HTMLDivElement>(null)
   const attachmentMenuRef = useRef<HTMLDivElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
+  const videoInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
@@ -299,6 +300,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     setShowAttachmentMenu(false)
   }
 
+  const openVideoUpload = () => {
+    videoInputRef.current?.click()
+    setShowAttachmentMenu(false)
+  }
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -323,6 +329,31 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
   }
 
+  const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (file) {
+      onUploadStatusChange(true)
+      ;(async () => {
+        try {
+          const url = await uploadChatFile(file)
+          const meta = JSON.stringify({ name: file.name, size: file.size, type: file.type })
+          const sent = await onSendMessage(meta, 'video', url, replyingTo?.id)
+          if (sent === null) {
+            toast.error('Failed to send video')
+            return
+          }
+          onCancelReply?.()
+        } catch (err) {
+          console.error(err)
+          toast.error('Failed to send video')
+        } finally {
+          onUploadStatusChange(false)
+        }
+      })()
+    }
+  }
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -331,11 +362,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       ;(async () => {
         try {
           const url = await uploadChatFile(file)
-          const messageType = file.type.startsWith('image/') ? 'image' : 'file'
+          const messageType: ChatMessageType = file.type.startsWith('image/')
+            ? 'image'
+            : file.type.startsWith('video/')
+              ? 'video'
+              : 'file'
           const meta = JSON.stringify({ name: file.name, size: file.size, type: file.type })
           const sent = await onSendMessage(
             messageType === 'image' ? '' : meta,
-            messageType as any,
+            messageType,
             url,
             replyingTo?.id
           )
@@ -518,6 +553,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               </button>
               <button
                 type="button"
+                onClick={openVideoUpload}
+                className="block w-full px-3 py-1.5 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)]"
+              >
+                Video
+              </button>
+              <button
+                type="button"
                 onClick={openFileUpload}
                 className="block w-full px-3 py-1.5 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)]"
               >
@@ -551,6 +593,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             ref={imageInputRef}
             onChange={handleImageChange}
             data-upload-kind="image"
+            className="hidden"
+          />
+          <input
+            type="file"
+            accept="video/*"
+            ref={videoInputRef}
+            onChange={handleVideoChange}
+            data-upload-kind="video"
             className="hidden"
           />
           <input

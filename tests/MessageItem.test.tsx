@@ -91,6 +91,33 @@ test('renders audio message', () => {
   expect(audio).toHaveAttribute('src', audioMessage.audio_url)
 })
 
+test('renders video message', () => {
+  const videoMeta = JSON.stringify({ name: 'clip.mp4', size: 512, type: 'video/mp4' })
+  const videoMessage = {
+    ...baseMessage,
+    message_type: 'video',
+    content: videoMeta,
+    file_url: 'https://example.com/clip.mp4',
+  } as Message
+
+  const { container } = render(
+    <MessageItem
+      message={videoMessage}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+      onJumpToMessage={() => {}}
+      containerRef={React.createRef()}
+    />
+  )
+
+  const video = container.querySelector('video')
+  expect(video).toHaveAttribute('src', videoMessage.file_url)
+  expect(video).toHaveAttribute('controls')
+  expect(screen.getByRole('link', { name: /clip.mp4/i })).toHaveAttribute('href', videoMessage.file_url)
+})
+
 test('renders file message', () => {
   const fileMeta = JSON.stringify({ name: 'doc.txt', size: 10, type: 'text/plain' })
   const fileMessage = {

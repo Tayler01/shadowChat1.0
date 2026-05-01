@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 import {
   Message,
+  type ChatMessageType,
   ensureSession,
   refreshSessionLocked,
   getRealtimeClient,
@@ -38,7 +39,7 @@ const dedupeMessagesById = (items: Message[]) => {
 export const prepareMessageData = (
   userId: string,
   content: string,
-  messageType: 'text' | 'command' | 'audio' | 'image' | 'file',
+  messageType: ChatMessageType,
   fileUrl?: string,
   replyTo?: string
 ) => ({
@@ -53,7 +54,7 @@ export const prepareMessageData = (
 export const insertMessage = async (messageData: {
   user_id: string;
   content: string;
-  message_type: 'text' | 'command' | 'audio' | 'image' | 'file';
+  message_type: ChatMessageType;
   file_url?: string;
   audio_url?: string;
   reply_to?: string;
@@ -86,7 +87,7 @@ export const insertMessage = async (messageData: {
 export const refreshSessionAndRetry = async (messageData: {
   user_id: string;
   content: string;
-  message_type: 'text' | 'command' | 'audio' | 'image' | 'file';
+  message_type: ChatMessageType;
   file_url?: string;
   audio_url?: string;
   reply_to?: string;
@@ -122,7 +123,7 @@ interface MessagesContextValue {
   hasMore: boolean;
   sendMessage: (
     content: string,
-    type?: 'text' | 'command' | 'audio' | 'image' | 'file',
+    type?: ChatMessageType,
     fileUrl?: string,
     replyTo?: string
   ) => Promise<Message | null>;
@@ -617,7 +618,7 @@ function useProvideMessages(): MessagesContextValue {
 
   const sendMessage = useCallback(async (
     content: string,
-    messageType: 'text' | 'command' | 'audio' | 'image' | 'file' = 'text',
+    messageType: ChatMessageType = 'text',
     fileUrl?: string,
     replyTo?: string
   ): Promise<Message | null> => {

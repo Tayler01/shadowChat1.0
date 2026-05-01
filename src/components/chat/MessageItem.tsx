@@ -15,6 +15,7 @@ import { Avatar } from '../ui/Avatar'
 import { ImageModal } from '../ui/ImageModal'
 import { Button } from '../ui/Button'
 import { FileAttachment } from './FileAttachment'
+import { VideoAttachment } from './VideoAttachment'
 import { MessageRichText } from './MessageRichText'
 import { PublicProfileDialog } from '../profile/PublicProfileDialog'
 import { formatTime, shouldGroupMessage, cn, getReadableTextColor } from '../../lib/utils'
@@ -358,6 +359,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                       className="mt-1 max-w-full cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-subtle)] sm:max-w-xs"
                       onClick={() => setShowImageModal(true)}
                     />
+                  ) : message.message_type === 'video' && message.file_url ? (
+                    <VideoAttachment url={message.file_url} meta={message.content} />
                   ) : message.message_type === 'file' && message.file_url ? (
                     <FileAttachment url={message.file_url} meta={message.content} />
                   ) : (

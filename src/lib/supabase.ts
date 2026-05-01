@@ -674,11 +674,13 @@ export interface User {
   updated_at: string
 }
 
+export type ChatMessageType = 'text' | 'command' | 'audio' | 'image' | 'video' | 'file'
+
 export interface Message {
   id: string
   user_id: string
   content: string
-  message_type: 'text' | 'command' | 'audio' | 'image' | 'file'
+  message_type: ChatMessageType
   audio_url?: string
   audio_duration?: number
   file_url?: string
@@ -779,7 +781,7 @@ export interface DMMessage {
   conversation_id: string
   sender_id: string
   content: string
-  message_type: 'text' | 'command' | 'audio' | 'image' | 'file'
+  message_type: ChatMessageType
   audio_url?: string
   audio_duration?: number
   file_url?: string

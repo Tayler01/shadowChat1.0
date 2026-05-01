@@ -15,6 +15,7 @@ import {
   SESSION_RECOVERY_EVENT,
   type SessionRecoveryResult,
 } from '../../lib/sessionRecovery'
+import type { ChatMessageType } from '../../lib/supabase'
 
 interface ChatViewProps {
   currentView: 'chat' | 'dms' | 'news' | 'settings'
@@ -53,7 +54,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
 
   const handleSendMessage = async (
     content: string,
-    type?: 'text' | 'command' | 'audio' | 'image' | 'file',
+    type?: ChatMessageType,
     fileUrl?: string,
     replyToId?: string
   ) => {

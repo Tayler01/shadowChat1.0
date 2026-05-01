@@ -13,6 +13,7 @@ import {
   getRealtimeClient,
   DMConversation,
   DMMessage,
+  type ChatMessageType,
   getOrCreateDMConversation,
   markDMMessagesRead,
   fetchDMConversations,
@@ -40,7 +41,7 @@ interface DirectMessagesContextValue {
   startConversation: (username: string) => Promise<string | null>;
   sendMessage: (
     content: string,
-    messageType?: 'text' | 'command' | 'audio' | 'image' | 'file',
+    messageType?: ChatMessageType,
     fileUrl?: string
   ) => Promise<DMMessage | null>;
   markAsRead: (conversationId: string) => Promise<void>;
@@ -308,7 +309,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
   const sendMessage = useCallback(
     async (
       content: string,
-      messageType?: 'text' | 'command' | 'audio' | 'image' | 'file',
+      messageType?: ChatMessageType,
       fileUrl?: string
     ) => {
       const message = await sendConversationMessage(content, messageType, fileUrl);
@@ -401,7 +402,7 @@ export function useConversationMessages(conversationId: string | null) {
         conversation_id: string;
         sender_id: string;
         content: string;
-        message_type: 'text' | 'command' | 'audio' | 'image' | 'file';
+        message_type: ChatMessageType;
         file_url?: string;
         audio_url?: string;
       }
@@ -771,12 +772,12 @@ export function useConversationMessages(conversationId: string | null) {
   const sendMessage = useCallback(
     async (
       content: string,
-      messageType: 'text' | 'command' | 'audio' | 'image' | 'file' = 'text',
+      messageType: ChatMessageType = 'text',
       fileUrl?: string
     ): Promise<DMMessage | null> => {
     
       const trimmedContent = content.trim();
-      const requiresContent = messageType !== 'audio' && messageType !== 'image' && messageType !== 'file';
+      const requiresContent = messageType !== 'audio' && messageType !== 'image' && messageType !== 'video' && messageType !== 'file';
       if (!user || !conversationId || (requiresContent && !trimmedContent)) return null;
 
       setSending(true);
