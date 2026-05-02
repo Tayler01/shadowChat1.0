@@ -82,11 +82,13 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
             {/* Menu button removed on mobile */}
             {/* Header title */}
             <div className="relative flex min-w-0 items-center gap-2 md:gap-4">
-              <img
-                src="/icons/header-logo.png"
-                alt="SHADO"
-                className="h-8 w-16 flex-shrink-0 object-contain object-left sm:h-10 sm:w-20 md:hidden"
-              />
+              <span className="h-8 w-16 flex-shrink-0 overflow-visible sm:h-10 sm:w-20 md:hidden">
+                <img
+                  src="/icons/header-logo.png"
+                  alt="SHADO"
+                  className="h-full w-full origin-left scale-[1.3] object-contain object-left"
+                />
+              </span>
               <div className="min-w-0">
                 <h1 className="sr-only">General Chat</h1>
                 <p className="truncate text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)] sm:tracking-[0.18em] md:text-xs">
