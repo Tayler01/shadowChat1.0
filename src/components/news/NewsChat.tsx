@@ -12,6 +12,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useNewsChat } from '../../hooks/useNewsChat'
 import { formatTime } from '../../lib/utils'
 import { getBlockedActionMessage } from '../../lib/moderation'
+import { showActionErrorToast } from '../../lib/toastNotifications'
 import type { NewsChatMessage } from '../../lib/supabase'
 
 function NewsChatRow({
@@ -45,7 +46,7 @@ function NewsChatRow({
       setEditing(false)
     } catch (error) {
       const message = await getBlockedActionMessage('news_chat', error, 'Failed to update news message')
-      toast.error(message, { duration: message.startsWith('You are banned') ? 7000 : 4000 })
+      showActionErrorToast(message)
     }
   }
 
@@ -54,7 +55,7 @@ function NewsChatRow({
       await onReact(message.id, emoji)
     } catch (error) {
       const notice = await getBlockedActionMessage('news_chat', error, 'Failed to update reaction')
-      toast.error(notice, { duration: notice.startsWith('You are banned') ? 7000 : 4000 })
+      showActionErrorToast(notice)
     }
   }
 
@@ -63,7 +64,7 @@ function NewsChatRow({
       await onDelete(message.id)
     } catch (error) {
       const message = await getBlockedActionMessage('news_chat', error, 'Failed to delete news message')
-      toast.error(message, { duration: message.startsWith('You are banned') ? 7000 : 4000 })
+      showActionErrorToast(message)
     }
   }
 
@@ -208,7 +209,7 @@ export function NewsChat() {
       setDraft('')
     } catch (err) {
       const message = await getBlockedActionMessage('news_chat', err, 'Failed to send news message')
-      toast.error(message, { duration: message.startsWith('You are banned') ? 7000 : 4000 })
+      showActionErrorToast(message)
     }
   }
 

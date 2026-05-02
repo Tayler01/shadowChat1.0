@@ -111,6 +111,39 @@ function App() {
     localStorage.setItem('darkMode', isDarkMode.toString())
   }, [isDarkMode])
 
+  useEffect(() => {
+    if (typeof window === 'undefined' || isDesktop) return
+
+    const root = document.documentElement
+
+    const updateToastViewport = () => {
+      const viewport = window.visualViewport
+      const viewportHeight = viewport?.height ?? window.innerHeight
+      const viewportOffsetTop = viewport?.offsetTop ?? 0
+      const keyboardOpen = viewportHeight < window.innerHeight - 120
+      const topRem = keyboardOpen ? 0.75 : 4.5
+      const topSpacePx = viewportOffsetTop + topRem * 16
+
+      root.style.setProperty('--shadowchat-visual-viewport-height', `${viewportHeight}px`)
+      root.style.setProperty('--shadowchat-toast-top', `calc(${viewportOffsetTop}px + env(safe-area-inset-top) + ${topRem}rem)`)
+      root.style.setProperty('--shadowchat-toast-top-space', `${topSpacePx}px`)
+    }
+
+    updateToastViewport()
+    window.visualViewport?.addEventListener('resize', updateToastViewport)
+    window.visualViewport?.addEventListener('scroll', updateToastViewport)
+    window.addEventListener('resize', updateToastViewport)
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', updateToastViewport)
+      window.visualViewport?.removeEventListener('scroll', updateToastViewport)
+      window.removeEventListener('resize', updateToastViewport)
+      root.style.removeProperty('--shadowchat-visual-viewport-height')
+      root.style.removeProperty('--shadowchat-toast-top')
+      root.style.removeProperty('--shadowchat-toast-top-space')
+    }
+  }, [isDesktop])
+
 
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode)
@@ -291,9 +324,10 @@ function App() {
               isDesktop
                 ? undefined
                 : {
-                    top: 'calc(env(safe-area-inset-top) + 4.5rem)',
+                    top: 'var(--shadowchat-toast-top, calc(env(safe-area-inset-top) + 4.5rem))',
                     left: '1rem',
                     right: '1rem',
+                    maxHeight: 'calc(var(--shadowchat-visual-viewport-height, 100vh) - var(--shadowchat-toast-top-space, 5rem) - 1rem)',
                   }
             }
             toastOptions={{

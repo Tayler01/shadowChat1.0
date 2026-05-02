@@ -6,12 +6,12 @@ import { MessageInput } from './MessageInput'
 import { PinnedMessagesBar } from './PinnedMessagesBar'
 import { useFailedMessages } from '../../hooks/useFailedMessages'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
-import toast from 'react-hot-toast'
 import { useClientReset } from '../../hooks/ClientResetContext'
 import { ActiveUsersButton } from './ActiveUsersButton'
 import { WeatherWidget } from './WeatherWidget'
 import { clearGroupNotifications } from '../../lib/appBadge'
 import { getBlockedActionMessage, getCurrentUserChannelBan, formatChannelBanBlockMessage } from '../../lib/moderation'
+import { showActionErrorToast } from '../../lib/toastNotifications'
 import {
   SESSION_RECOVERY_EVENT,
   type SessionRecoveryResult,
@@ -66,12 +66,12 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
     } catch (error) {
       const activeBan = await getCurrentUserChannelBan('general_chat').catch(() => null)
       if (activeBan) {
-        toast.error(formatChannelBanBlockMessage(activeBan), { duration: 7000 })
+        showActionErrorToast(formatChannelBanBlockMessage(activeBan))
         return null
       }
 
       const message = await getBlockedActionMessage('general_chat', error, 'Failed to send message')
-      toast.error(message, { duration: message.startsWith('You are banned') ? 7000 : 4000 })
+      showActionErrorToast(message)
       addFailedMessage({ id: Date.now().toString(), type: type || 'text', content: content, dataUrl: fileUrl })
       return null
     }

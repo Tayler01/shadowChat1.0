@@ -29,6 +29,7 @@ import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import { useToneAnalysis } from '../../hooks/useToneAnalysis'
 import { useToneAnalysisEnabled } from '../../hooks/useToneAnalysisEnabled'
 import { getBlockedActionMessage } from '../../lib/moderation'
+import { showActionErrorToast } from '../../lib/toastNotifications'
 
 interface MessageItemProps {
   message: Message
@@ -141,7 +142,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         await onToggleReaction(message.id, emoji)
       } catch (error) {
         const notice = await getBlockedActionMessage('general_chat', error, 'Failed to update reaction')
-        toast.error(notice, { duration: notice.startsWith('You are banned') ? 7000 : 4000 })
+        showActionErrorToast(notice)
       }
     }
 

@@ -6,8 +6,8 @@ import { NewsFeedItem } from './NewsFeedItem'
 import { NewsFeedModal } from './NewsFeedModal'
 import { useNewsFeed } from '../../hooks/useNewsFeed'
 import { getBlockedActionMessage } from '../../lib/moderation'
+import { showActionErrorToast } from '../../lib/toastNotifications'
 import type { NewsFeedItem as NewsFeedItemType } from '../../lib/supabase'
-import toast from 'react-hot-toast'
 
 export function NewsFeed() {
   const { items, loading, error, refresh, toggleReaction } = useNewsFeed()
@@ -23,7 +23,7 @@ export function NewsFeed() {
       })
     } catch (error) {
       const message = await getBlockedActionMessage('news_feed', error, 'Failed to update reaction')
-      toast.error(message, { duration: message.startsWith('You are banned') ? 7000 : 4000 })
+      showActionErrorToast(message)
     }
   }
 

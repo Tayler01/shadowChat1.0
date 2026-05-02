@@ -15,6 +15,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { getBlockedActionMessage } from '../../lib/moderation'
+import { showActionErrorToast } from '../../lib/toastNotifications'
 
 interface MessageListProps {
   onReply?: (messageId: string, content: string) => void
@@ -316,7 +317,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       toast.success('Message updated')
     } catch (error) {
       const message = await getBlockedActionMessage('general_chat', error, 'Failed to update message')
-      toast.error(message, { duration: message.startsWith('You are banned') ? 7000 : 4000 })
+      showActionErrorToast(message)
     }
   }
 
@@ -326,7 +327,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       toast.success('Message deleted')
     } catch (error) {
       const message = await getBlockedActionMessage('general_chat', error, 'Failed to delete message')
-      toast.error(message, { duration: message.startsWith('You are banned') ? 7000 : 4000 })
+      showActionErrorToast(message)
     }
   }
 
