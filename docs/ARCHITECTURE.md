@@ -46,7 +46,7 @@ React UI
 - [`useNewsAdmin`](C:/repos/chat2.0/src/hooks/useNewsAdmin.ts:1): News source admin state and source upsert/toggle RPCs
 - [`useAdminAccess`](C:/repos/chat2.0/src/hooks/useAdminAccess.ts:1): full-admin/sub-admin access state and role updates
 - [`useWeatherPreference`](C:/repos/chat2.0/src/hooks/useWeatherPreference.ts:1): private per-user weather location load/save/clear
-- [`useWeatherForecast`](C:/repos/chat2.0/src/hooks/useWeatherForecast.ts:1): Open-Meteo forecast refresh for the header widget
+- [`useWeatherForecast`](C:/repos/chat2.0/src/hooks/useWeatherForecast.ts:1): Open-Meteo forecast refresh for the header widget after preference changes and on a periodic timer
 - [`usePushNotifications`](C:/repos/chat2.0/src/hooks/usePushNotifications.ts:1): push subscription UX
 - [`useTyping`](C:/repos/chat2.0/src/hooks/useTyping.ts:1): typing indicators
 - [`useTheme`](C:/repos/chat2.0/src/hooks/useTheme.tsx:1): design-system theme selection
@@ -137,8 +137,8 @@ rows. Users choose a location in Account & Profile settings; the General Chat
 header calls Open-Meteo directly for current conditions and forecast data.
 
 Weather preferences are not public profile data and are not in Supabase
-Realtime. The widget refreshes on preference changes and periodic forecast
-polling.
+Realtime. The widget has no manual refresh button; it refreshes on preference
+changes and periodic forecast polling.
 
 Full runbook: [docs/WEATHER_WIDGET.md](C:/repos/chat2.0/docs/WEATHER_WIDGET.md:1).
 
@@ -189,12 +189,13 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 
 ### Board Chat
 
-1. Signed-in user opens News Chat, Investing Chat, Learning Chat, or Crypto Chat from Boards
+1. Signed-in user opens News Chat, Investing Chat, Learning Chat, or Crypto Chat from the low-friction Boards bubble map
 2. Insert hits `board_chat_messages` with the selected `board_slug`
 3. `useBoardChat` receives realtime inserts/updates/deletes for that board
 4. Link text is tokenized client-side and metadata is fetched through `link-preview`
 5. Reactions are toggled through `toggle_board_chat_reaction`
 6. `user_read_cursors` tracks last read by `surface = 'board_chat'` and board slug
+7. The board content renders directly under the primary Boards header/back control with no duplicate subheader or manual refresh row
 
 ### Channel Ban Enforcement
 
@@ -229,6 +230,7 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 3. Subscription row is saved in Supabase
 4. Message send path calls the push trigger helper
 5. `send-push` edge function delivers to eligible recipient subscriptions
+6. Notification status rechecks automatically when the app returns to the foreground, so Settings does not expose a manual refresh button
 
 ## UI System
 

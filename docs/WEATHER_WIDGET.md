@@ -7,6 +7,8 @@ active-user count control.
 
 - The compact header pill shows only a weather icon and the current temperature.
 - Clicking it opens a popup with current conditions and a short forecast.
+- The popup has no manual refresh button; forecasts refresh after preference
+  changes and every ten minutes while the widget has a saved location.
 - The popup can route users directly to Account & Profile settings when no
   location is selected.
 - Location is personal to the signed-in user. It is not stored on public profile
@@ -42,8 +44,8 @@ Stored fields:
 
 RLS allows each authenticated user to select, insert, update, and delete only
 their own weather preference row. The table is intentionally not in the
-Supabase Realtime publication because weather settings are private and refresh
-on demand.
+Supabase Realtime publication because weather settings are private. The owning
+client reloads its preference and forecast through normal authenticated reads.
 
 ## Weather Provider
 
@@ -60,7 +62,7 @@ weather provider token should be added to a browser-visible `VITE_*` variable.
 - [`src/components/chat/WeatherWidget.tsx`](C:/repos/chat2.0/src/components/chat/WeatherWidget.tsx:1): compact header control and forecast popup.
 - [`src/components/settings/WeatherLocationSettings.tsx`](C:/repos/chat2.0/src/components/settings/WeatherLocationSettings.tsx:1): Account & Profile location picker.
 - [`src/hooks/useWeatherPreference.ts`](C:/repos/chat2.0/src/hooks/useWeatherPreference.ts:1): private preference load/save/clear hook.
-- [`src/hooks/useWeatherForecast.ts`](C:/repos/chat2.0/src/hooks/useWeatherForecast.ts:1): forecast refresh hook.
+- [`src/hooks/useWeatherForecast.ts`](C:/repos/chat2.0/src/hooks/useWeatherForecast.ts:1): forecast load and periodic refresh hook.
 - [`src/lib/weather.ts`](C:/repos/chat2.0/src/lib/weather.ts:1): Open-Meteo mapping and Supabase preference helpers.
 
 ## Validation
@@ -75,6 +77,7 @@ For UI changes, run a preview build and verify:
 
 1. Desktop General Chat header shows the compact weather pill.
 2. Weather popup opens and fits inside the viewport.
-3. Mobile General Chat header keeps the weather and active-user pills visible.
-4. Account & Profile shows the Weather Location card.
-5. Clearing a location returns the header popup to the settings prompt.
+3. Weather popup shows no refresh icon/button.
+4. Mobile General Chat header keeps the weather and active-user pills visible.
+5. Account & Profile shows the Weather Location card.
+6. Clearing a location returns the header popup to the settings prompt.

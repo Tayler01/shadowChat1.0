@@ -45,8 +45,8 @@ security-sensitive or high-churn operational data.
 | `news_chat_reactions` | Normalized News Chat reaction rows. | Do not publish. RPCs aggregate reactions back onto `news_chat_messages`, which is published. |
 | `news_feed_reactions` | Normalized News Feed reaction rows. | Do not publish. RPCs aggregate reactions back onto `news_feed_items`, which is published. |
 | `notification_events` | Push notification event/delivery/read tracking. | Do not publish. No live notification center currently subscribes to it. |
-| `notification_preferences` | Per-user push notification settings. | Do not publish. Settings are user-driven and refreshed on demand. |
+| `notification_preferences` | Per-user push notification settings. | Do not publish. Settings are user-driven and rechecked by the client on foreground/visibility events. |
 | `notification_sounds` | Static notification sound catalog. | Do not publish. Static lookup table. |
 | `push_subscriptions` | Browser push endpoints and keys. | Do not publish. Sensitive endpoint material. |
-| `user_weather_preferences` | Private per-user weather location and temperature-unit preference. | Do not publish. Personal setting refreshed on demand by the owning user only. |
+| `user_weather_preferences` | Private per-user weather location and temperature-unit preference. | Do not publish. Personal setting is loaded by the owning user only; forecast data refreshes client-side after preference changes and on a timer. |
 | `user_sessions` | App session tracking table. | Do not publish. Session lifecycle is auth-sensitive and not used for live UI. |

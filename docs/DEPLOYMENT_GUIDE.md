@@ -214,8 +214,8 @@ After deploy, verify:
 7. Settings page renders cleanly on mobile and desktop
 8. A message containing an `https://` or `www.` link renders as a clickable link and loads a compact preview card
 9. Settings feedback can submit a bug or feature report with an image attachment after feedback schema changes
-10. Boards tab loads the draggable bubble map and opens News Feed plus each chat board
-11. News Chat, Investing Chat, Learning Chat, and Crypto Chat send, edit, delete, react, and render link previews
+10. Boards tab loads the low-friction bubble map and opens News Feed plus each chat board
+11. News Chat, Investing Chat, Learning Chat, and Crypto Chat send, edit, delete, react, render link previews, and avoid duplicate subheaders/manual refresh rows
 12. Settings > Admin > News Sources shows source health for an `admin` or `sub_admin` account
 13. Render worker has checked enabled sources since deploy and today's feed rows match current Eastern-day posts
 14. General Chat header shows active-user count, active-user popup, and weather widget without mobile overlap

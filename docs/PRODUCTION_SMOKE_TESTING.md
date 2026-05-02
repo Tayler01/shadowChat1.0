@@ -112,8 +112,8 @@ Common failure meanings:
 2. Confirm local `.env.testing.local` or CI has both stable smoke accounts.
 3. Run `npm run qa:smoke:prod`.
 4. Use `npm run qa:smoke:prod:headless` only for unattended environments where headless Chromium is stable.
-5. Open the Boards tab with a stable account and confirm the board map, News Feed, and chat boards render.
-6. If the deploy touched News or Boards, verify Render worker health in `news_sources` and send one board-chat link to confirm previews.
+5. Open the Boards tab with a stable account and confirm the low-friction board map, News Feed, and chat boards render.
+6. If the deploy touched News or Boards, verify Render worker health in `news_sources`, send one board-chat link to confirm previews, and confirm opened boards do not show duplicate secondary headers or manual refresh controls.
 7. Open General Chat and confirm active-user count plus weather widget render without header overlap.
 8. Open Settings > Account & Profile and confirm Weather Location renders.
 9. If the deploy touched admin tools, verify Settings > Admin subpages with an operator account.
@@ -146,3 +146,12 @@ May 2, 2026 channel-ban moderation release:
 - Focused Jest passed: `npx jest --runInBand tests/PublicProfileDialog.test.tsx tests/MessageItem.test.tsx tests/useMessages.test.tsx tests/NewsChat.test.tsx`
 - Supabase migration `20260502070543_channel_bans_moderation.sql` applied and migration history aligned
 - Netlify Production Deploy workflow passed for commit `f868bce`
+
+## Latest Boards/Header Checks
+
+May 2, 2026 Boards header and bubble-motion adjustment:
+
+- Local gates passed: `npm run lint`, `npx tsc --noEmit -p tsconfig.app.json`, focused Jest, `npm run build`
+- Headed preview check passed against `npx vite preview --host 127.0.0.1 --port 4175 --strictPort`
+- Verified desktop/mobile Boards map, collision motion, News Chat/News Feed without duplicate subheaders, and removed visible refresh controls
+- Artifacts: `output/playwright/header-bubbles-adjustment/`

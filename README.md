@@ -28,7 +28,7 @@ The project is already wired for hosted Supabase and Netlify deployment. It is d
 - Message reactions, pinning, editing, and deletion
 - Slash commands and reply/thread affordances
 - AI reply and summary hooks through a secured Supabase Edge Function
-- Boards tab with a draggable board map, the existing News Feed, News Chat, Investing Chat, Learning Chat, Crypto Chat, and a coming-soon Art Board
+- Boards tab with a low-friction draggable bubble map, the existing News Feed, News Chat, Investing Chat, Learning Chat, Crypto Chat, and a coming-soon Art Board
 - App-wide admin/sub-admin access controls with role badges and operator-only tools
 - Operator-managed bans for General Chat, individual chat boards, and all app interaction
 - Admin-managed X/Truth Social source tracking from Settings
@@ -166,7 +166,8 @@ node scripts/playwright-smoke.mjs --scenario=full --run-name=full-smoke-release 
 - Active-user dots and the General Chat user-count popup depend on `user_presence`, `users.presence_visibility`, and the `update_user_last_active`, `list_presence_states`, and `get_active_users` RPCs.
 - News Feed realtime depends on the isolated News migrations, the `shado-news-scraper` Render worker, and the source health/cursor fields in `news_sources`.
 - Board chat realtime depends on `board_chat_messages`, `board_chat_reactions`, `user_read_cursors`, and `get_board_badge_counts`.
-- Weather preferences are private and refresh on demand. `user_weather_preferences` is not published to Supabase Realtime.
+- Board and feed detail views share the primary Boards header/back control and intentionally avoid redundant secondary headers or manual refresh buttons.
+- Weather preferences are private, and forecasts refresh automatically after preference changes and on a periodic timer. `user_weather_preferences` is not published to Supabase Realtime.
 - iPhone web push requires the app to be installed to the Home Screen. Android and Windows work through supported browsers/PWAs.
 - iPhone Home Screen resume behavior now depends on the session/realtime hardening in [`src/lib/supabase.ts`](C:/repos/chat2.0/src/lib/supabase.ts:1) and the deferred auth callback flow in [`src/hooks/useAuth.tsx`](C:/repos/chat2.0/src/hooks/useAuth.tsx:1). Avoid reintroducing async Supabase calls directly inside `onAuthStateChange`.
 

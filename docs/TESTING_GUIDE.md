@@ -185,6 +185,14 @@ Admin/weather focused Jest coverage currently lives in:
 - [tests/WeatherLocationSettings.test.tsx](C:/repos/chat2.0/tests/WeatherLocationSettings.test.tsx:1)
 - [tests/weather.test.ts](C:/repos/chat2.0/tests/weather.test.ts:1)
 
+Latest focused release smoke recorded for the Boards header and bubble-motion adjustment:
+
+- Date: May 2, 2026
+- Local gates: `npm run lint`, `npx tsc --noEmit -p tsconfig.app.json`, focused Jest, `npm run build`
+- Browser check: headed Chromium against `npx vite preview --host 127.0.0.1 --port 4175 --strictPort`
+- Coverage: desktop/mobile Boards map, low-friction bubble collision, News Chat and News Feed without duplicate subheaders, and removed visible refresh controls
+- Artifacts: `output/playwright/header-bubbles-adjustment/`
+
 Latest focused release smoke recorded for the weather widget release:
 
 - Date: May 2, 2026
@@ -205,8 +213,8 @@ For Boards changes, verify both desktop and mobile:
 
 - Boards nav label opens the bubble map, and old `view=news` URLs route to Boards
 - board bubbles show per-board unread counts and reset to the default layout when Boards is opened
-- dragging a bubble moves it and pushes overlapping bubbles aside without idle drift
-- News Feed and all chat boards open from their bubbles and have a clear back button
+- dragging a bubble gives it low-friction motion and can push nearby bubbles into a diminishing chain reaction
+- News Feed and all chat boards open from their bubbles, have a clear back button, and do not show duplicate secondary headers or manual refresh rows
 - feed tile media placement, no empty image placeholders, and scrollable modal media
 - feed and chat reaction menus stay inside the viewport
 - selected reactions render as compact counts
@@ -256,7 +264,7 @@ use that role-management control.
 For weather changes, verify General Chat header on desktop and mobile, the
 forecast popup, and Settings > Account & Profile > Weather Location. Weather
 preferences should be scoped to the signed-in user and should not appear on
-public profile data.
+public profile data. The forecast popup should not show a manual refresh button.
 
 Disposable accounts are the most deterministic option. Reused env-backed accounts can carry old threads and unread state from earlier runs.
 

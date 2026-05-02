@@ -8,7 +8,12 @@ the Render-hosted scraper that keeps the feed current.
 The old `News` tab has been rebuilt as `Boards`. Opening `view=news` still
 routes to Boards for compatibility, but the app now writes `view=boards`.
 
-The Boards landing surface is a draggable bubble map. Current boards are:
+The Boards landing surface is a low-friction draggable bubble map. Bubbles keep
+motion after a drag, bounce gently against bounds, and pass diminishing force to
+other bubbles on collision. The layout resets to the default arrangement each
+time users open Boards from navigation.
+
+Current boards are:
 
 - `News Feed`: a shared today-only feed board populated by tracked X and Truth
   Social accounts. Users can open a nearly full-screen post modal, react, copy
@@ -19,6 +24,10 @@ The Boards landing surface is a draggable bubble map. Current boards are:
   reactions.
 - `Art Board`: a static placeholder that currently renders `Coming soon`.
 
+Opened boards use the primary Boards header with a clear back button. The feed
+and chat surfaces intentionally do not render secondary title/refresh rows, so
+the content starts directly under the primary board header.
+
 News Feed remains intentionally isolated from the general chat, DMs, and board
 chat message tables so the scraper does not disturb realtime chat contracts,
 bridge behavior, push, or message history.
@@ -26,7 +35,7 @@ bridge behavior, push, or message history.
 ## Frontend Map
 
 - [src/components/boards/BoardsView.tsx](C:/repos/chat2.0/src/components/boards/BoardsView.tsx:1): top-level Boards experience.
-- [src/components/boards/BoardBubbleMap.tsx](C:/repos/chat2.0/src/components/boards/BoardBubbleMap.tsx:1): draggable board bubble map.
+- [src/components/boards/BoardBubbleMap.tsx](C:/repos/chat2.0/src/components/boards/BoardBubbleMap.tsx:1): low-friction draggable board bubble map with collision transfer.
 - [src/components/boards/BoardChat.tsx](C:/repos/chat2.0/src/components/boards/BoardChat.tsx:1): reusable board-chat surface.
 - [src/components/news/NewsFeed.tsx](C:/repos/chat2.0/src/components/news/NewsFeed.tsx:1): today board rendering and refresh.
 - [src/components/news/NewsFeedItem.tsx](C:/repos/chat2.0/src/components/news/NewsFeedItem.tsx:1): compact feed tile.
