@@ -1,6 +1,12 @@
 import { getWorkingClient } from './supabase'
 
-export type ChannelBanScope = 'general_chat' | 'news_chat' | 'news_feed'
+export type ChannelBanScope =
+  | 'general_chat'
+  | 'board_news_chat'
+  | 'board_investing_chat'
+  | 'board_learning_chat'
+  | 'board_crypto_chat'
+  | 'all_interaction'
 
 export interface UserChannelBan {
   id: string
@@ -27,19 +33,34 @@ export const CHANNEL_BANS_CHANGED_EVENT = 'shadowchat:channel-bans-changed'
 
 export const CHANNEL_BAN_OPTIONS: Array<{ scope: ChannelBanScope; label: string; description: string }> = [
   {
+    scope: 'all_interaction',
+    label: 'All Interaction',
+    description: 'Blocks posting, editing, deleting, and emoji reactions app-wide while leaving read access open.',
+  },
+  {
     scope: 'general_chat',
     label: 'General Chat',
     description: 'Blocks group channel messages, edits, and reactions.',
   },
   {
-    scope: 'news_chat',
+    scope: 'board_news_chat',
     label: 'News Chat',
-    description: 'Blocks News channel messages, edits, and reactions.',
+    description: 'Blocks News Chat messages, edits, deletes, and reactions.',
   },
   {
-    scope: 'news_feed',
-    label: 'News Feed',
-    description: 'Blocks reactions on News Feed articles.',
+    scope: 'board_investing_chat',
+    label: 'Investing Chat',
+    description: 'Blocks Investing Chat messages, edits, deletes, and reactions.',
+  },
+  {
+    scope: 'board_learning_chat',
+    label: 'Learning Chat',
+    description: 'Blocks Learning Chat messages, edits, deletes, and reactions.',
+  },
+  {
+    scope: 'board_crypto_chat',
+    label: 'Crypto Chat',
+    description: 'Blocks Crypto Chat messages, edits, deletes, and reactions.',
   },
 ]
 
@@ -138,7 +159,8 @@ export const getCurrentUserChannelBan = async (scope: ChannelBanScope) => {
   if (userError || !userResult.user) return null
 
   const bans = await listPublicUserChannelBans([userResult.user.id])
-  return bans.find(ban => ban.scope === scope) ?? null
+  return bans.find(ban => ban.scope === scope) ??
+    (scope === 'all_interaction' ? null : bans.find(ban => ban.scope === 'all_interaction') ?? null)
 }
 
 const getErrorText = (error: unknown) => {

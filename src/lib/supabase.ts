@@ -770,6 +770,18 @@ export interface NewsChatMessage {
   user?: User
 }
 
+export interface BoardChatMessage {
+  id: string
+  board_slug: string
+  user_id: string
+  content: string
+  edited_at?: string | null
+  reactions: NewsReactionSummary
+  created_at: string
+  updated_at: string
+  user?: User
+}
+
 export interface DMConversation {
   id: string
   participants: string[]

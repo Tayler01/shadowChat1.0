@@ -36,12 +36,11 @@ const buildNewsChatState = (messages = [baseMessage]) => ({
   editMessage: mockEditMessage,
   deleteMessage: mockDeleteMessage,
   toggleReaction: mockToggleReaction,
-  markSeen: jest.fn(),
 })
 const mockUseNewsChat = jest.fn(() => buildNewsChatState())
 
-jest.mock('../src/hooks/useNewsChat', () => ({
-  useNewsChat: () => mockUseNewsChat(),
+jest.mock('../src/hooks/useBoardChat', () => ({
+  useBoardChat: () => mockUseNewsChat(),
 }))
 
 jest.mock('../src/hooks/useAuth', () => ({
@@ -94,7 +93,7 @@ test('news chat renders messages and sends text links', async () => {
   expect(screen.getByText('Reporter')).toBeInTheDocument()
   expect(screen.getByText('Breaking link https://example.com/story')).toBeInTheDocument()
 
-  fireEvent.change(screen.getByPlaceholderText(/drop a link/i), {
+  fireEvent.change(screen.getByPlaceholderText(/drop a link or note in news chat/i), {
     target: { value: 'new story https://example.com/new' },
   })
   fireEvent.click(screen.getByRole('button', { name: /send news chat message/i }))
@@ -132,7 +131,7 @@ test('news chat leaves long comments readable and keeps reaction menu in its own
   render(<NewsChat />)
 
   expect(screen.getByText(longComment)).toBeInTheDocument()
-  expect(screen.getByTestId('news-chat-message-bubble')).toHaveClass('min-w-0')
-  expect(screen.getByTestId('news-chat-message-bubble')).toHaveClass('max-w-full')
+  expect(screen.getByTestId('board-chat-message-bubble')).toHaveClass('min-w-0')
+  expect(screen.getByTestId('board-chat-message-bubble')).toHaveClass('max-w-full')
   expect(screen.getByRole('button', { name: /news reactions menu/i }).parentElement).toHaveClass('shrink-0')
 })

@@ -112,8 +112,8 @@ Common failure meanings:
 2. Confirm local `.env.testing.local` or CI has both stable smoke accounts.
 3. Run `npm run qa:smoke:prod`.
 4. Use `npm run qa:smoke:prod:headless` only for unattended environments where headless Chromium is stable.
-5. Open the News tab with a stable account and confirm News Feed/News Chat render.
-6. If the deploy touched News, verify Render worker health in `news_sources` and send one News Chat link to confirm previews.
+5. Open the Boards tab with a stable account and confirm the board map, News Feed, and chat boards render.
+6. If the deploy touched News or Boards, verify Render worker health in `news_sources` and send one board-chat link to confirm previews.
 7. Open General Chat and confirm active-user count plus weather widget render without header overlap.
 8. Open Settings > Account & Profile and confirm Weather Location renders.
 9. If the deploy touched admin tools, verify Settings > Admin subpages with an operator account.

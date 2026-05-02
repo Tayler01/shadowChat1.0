@@ -88,6 +88,9 @@ locations.
 Channel bans require `public.user_channel_bans` plus the updated channel and
 reaction policies before the production moderation UI can reliably block
 participation.
+Boards require `public.board_catalog`, `public.board_chat_messages`,
+`public.board_chat_reactions`, and `get_board_badge_counts` before the
+production Boards UI can load chat boards or unread counts.
 
 Recent app-surface migrations to confirm in fresh projects:
 
@@ -97,6 +100,7 @@ Recent app-surface migrations to confirm in fresh projects:
 - `20260502034941_feedback_review_read_policy_consolidation.sql`: consolidated feedback read policies.
 - `20260502042003_user_weather_preferences.sql`: private per-user weather location preferences.
 - `20260502070543_channel_bans_moderation.sql`: profile-popup moderation controls and channel-ban enforcement.
+- `20260502193604_boards_domain.sql`: Boards catalog, reusable board-chat stream, per-board unread counts, and Boards moderation scopes.
 
 ### Edge Functions
 
@@ -210,15 +214,15 @@ After deploy, verify:
 7. Settings page renders cleanly on mobile and desktop
 8. A message containing an `https://` or `www.` link renders as a clickable link and loads a compact preview card
 9. Settings feedback can submit a bug or feature report with an image attachment after feedback schema changes
-10. News tab loads, switches between News Feed and News Chat, and badges clear after viewing
-11. News Chat sends, edits, deletes, reacts, and renders link previews
+10. Boards tab loads the draggable bubble map and opens News Feed plus each chat board
+11. News Chat, Investing Chat, Learning Chat, and Crypto Chat send, edit, delete, react, and render link previews
 12. Settings > Admin > News Sources shows source health for an `admin` or `sub_admin` account
 13. Render worker has checked enabled sources since deploy and today's feed rows match current Eastern-day posts
 14. General Chat header shows active-user count, active-user popup, and weather widget without mobile overlap
 15. Settings > Account & Profile can save or clear a weather location
 16. Settings > Admin > Feedback Review lists submitted feedback for an app operator
 17. An app operator can open another user's profile popup and see Channel bans
-18. A channel-banned user is blocked from the selected channel or board while DMs still work
+18. A channel-banned user is blocked from the selected channel, board, or all interaction while DMs and read access still work
 
 Recommended production smoke for local post-deploy validation:
 
@@ -270,9 +274,10 @@ require a project secret for the current browser-side integration.
 
 The frontend deploy can show moderation controls while enforcement still fails
 if the target Supabase project is missing
-`20260502070543_channel_bans_moderation.sql`. Confirm `supabase migration list`
-shows the migration on both local and remote, then retest General Chat, News
-Chat, News Feed reactions, and DMs.
+`20260502070543_channel_bans_moderation.sql` or
+`20260502193604_boards_domain.sql`. Confirm `supabase migration list` shows the
+migrations on both local and remote, then retest General Chat, board chats,
+News Feed reactions, and DMs.
 
 ### News Feed Is Stale
 

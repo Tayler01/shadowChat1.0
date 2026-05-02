@@ -6,6 +6,7 @@ import type { User } from '../src/lib/supabase'
 const mockUseAuth = jest.fn()
 const mockUseUserChannelBans = jest.fn()
 const mockSetUserChannelBans = jest.fn()
+const mockSetSubAdminStatus = jest.fn()
 const mockNotifyChannelBansChanged = jest.fn()
 const mockToastSuccess = jest.fn()
 const mockToastError = jest.fn()
@@ -18,6 +19,10 @@ jest.mock('../src/hooks/useUserChannelBans', () => ({
   useUserChannelBans: (...args: unknown[]) => mockUseUserChannelBans(...args),
 }))
 
+jest.mock('../src/lib/supabase', () => ({
+  setSubAdminStatus: (...args: unknown[]) => mockSetSubAdminStatus(...args),
+}))
+
 jest.mock('../src/lib/moderation', () => ({
   CHANNEL_BAN_OPTIONS: [
     {
@@ -26,14 +31,14 @@ jest.mock('../src/lib/moderation', () => ({
       description: 'Blocks group channel messages, edits, and reactions.',
     },
     {
-      scope: 'news_chat',
+      scope: 'board_news_chat',
       label: 'News Chat',
-      description: 'Blocks News channel messages, edits, and reactions.',
+      description: 'Blocks News Chat messages, edits, deletes, and reactions.',
     },
     {
-      scope: 'news_feed',
-      label: 'News Feed',
-      description: 'Blocks reactions on News Feed articles.',
+      scope: 'all_interaction',
+      label: 'All Interaction',
+      description: 'Blocks posting, editing, deleting, and emoji reactions app-wide while leaving read access open.',
     },
   ],
   CHANNEL_BAN_DURATIONS: [
@@ -45,14 +50,14 @@ jest.mock('../src/lib/moderation', () => ({
   ],
   getChannelBanLabel: (scope: string) => ({
     general_chat: 'General Chat',
-    news_chat: 'News Chat',
-    news_feed: 'News Feed',
+    board_news_chat: 'News Chat',
+    all_interaction: 'All Interaction',
   }[scope] ?? scope),
   formatChannelBanExpiry: () => 'Until May 2, 8:00 PM',
   describeChannelBanScopes: (bans: Array<{ scope: string }>) => bans.map(ban => ({
     general_chat: 'General Chat',
-    news_chat: 'News Chat',
-    news_feed: 'News Feed',
+    board_news_chat: 'News Chat',
+    all_interaction: 'All Interaction',
   }[ban.scope] ?? ban.scope)).join(', '),
   notifyChannelBansChanged: (...args: unknown[]) => mockNotifyChannelBansChanged(...args),
   setUserChannelBans: (...args: unknown[]) => mockSetUserChannelBans(...args),
@@ -91,6 +96,7 @@ beforeEach(() => {
   mockUseAuth.mockReturnValue({ profile: null })
   mockUseUserChannelBans.mockReturnValue({ bans: [], loading: false, refresh: jest.fn() })
   mockSetUserChannelBans.mockResolvedValue([])
+  mockSetSubAdminStatus.mockResolvedValue(undefined)
 })
 
 test('renders public profile details in a dialog', () => {
@@ -149,4 +155,20 @@ test('lets admins save channel ban selections from the profile dialog', async ()
   })
   expect(mockNotifyChannelBansChanged).toHaveBeenCalledWith(user.id)
   expect(mockToastSuccess).toHaveBeenCalledWith('Channel bans updated')
+})
+
+test('lets the full admin grant sub-admin access from the profile dialog', async () => {
+  const browserUser = userEvent.setup()
+  mockUseAuth.mockReturnValue({ profile: adminUser })
+
+  render(<PublicProfileDialog user={user} open onClose={jest.fn()} />)
+
+  await act(async () => {
+    await browserUser.click(screen.getByRole('button', { name: /make sub-admin/i }))
+  })
+
+  await waitFor(() => {
+    expect(mockSetSubAdminStatus).toHaveBeenCalledWith(user.id, true)
+  })
+  expect(mockToastSuccess).toHaveBeenCalledWith('Sub-admin access granted')
 })

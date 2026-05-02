@@ -7,8 +7,8 @@ jest.mock('../src/hooks/useDirectMessages', () => ({
   useDirectMessages: () => ({ conversations: [] }),
 }))
 
-jest.mock('../src/hooks/useNewsBadges', () => ({
-  useNewsBadges: () => ({ count: 4, refresh: jest.fn(), markSeen: jest.fn() }),
+jest.mock('../src/hooks/useBoardBadges', () => ({
+  useBoardBadges: () => ({ count: 4, refresh: jest.fn(), markFeedSeen: jest.fn(), countsByBoard: {} }),
 }))
 
 jest.mock('../src/hooks/useAuth', () => ({
@@ -22,19 +22,19 @@ jest.mock('../src/hooks/useAuth', () => ({
   }),
 }))
 
-test('mobile navigation replaces profile with news', () => {
+test('mobile navigation replaces profile with boards', () => {
   const onViewChange = jest.fn()
   render(<MobileNav currentView="chat" onViewChange={onViewChange} />)
 
-  expect(screen.getByText('News')).toBeInTheDocument()
+  expect(screen.getByText('Boards')).toBeInTheDocument()
   expect(screen.queryByText('Profile')).toBeNull()
 
-  fireEvent.click(screen.getByText('News'))
-  expect(onViewChange).toHaveBeenCalledWith('news')
+  fireEvent.click(screen.getByText('Boards'))
+  expect(onViewChange).toHaveBeenCalledWith('boards')
   expect(screen.getByText('4')).toBeInTheDocument()
 })
 
-test('sidebar navigation replaces profile with news', () => {
+test('sidebar navigation replaces profile with boards', () => {
   const onViewChange = jest.fn()
   render(
     <Sidebar
@@ -47,10 +47,10 @@ test('sidebar navigation replaces profile with news', () => {
     />
   )
 
-  expect(screen.getByText('News')).toBeInTheDocument()
+  expect(screen.getByText('Boards')).toBeInTheDocument()
   expect(screen.queryByText('Profile')).toBeNull()
 
-  fireEvent.click(screen.getByText('News'))
-  expect(onViewChange).toHaveBeenCalledWith('news')
+  fireEvent.click(screen.getByText('Boards'))
+  expect(onViewChange).toHaveBeenCalledWith('boards')
   expect(screen.getByText('4')).toBeInTheDocument()
 })

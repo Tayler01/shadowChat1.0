@@ -5,12 +5,12 @@ import { UserRoleBadge } from '../ui/UserRoleBadge';
 import { UserPresenceBadge } from '../ui/UserPresenceBadge';
 import { useAuth } from '../../hooks/useAuth';
 import { useDirectMessages } from '../../hooks/useDirectMessages';
-import { useNewsBadges } from '../../hooks/useNewsBadges';
+import { useBoardBadges } from '../../hooks/useBoardBadges';
 import { getPresenceStateLabel, usePresenceForUser } from '../../hooks/usePresence';
 
 interface SidebarProps {
-  currentView: 'chat' | 'dms' | 'news' | 'settings';
-  onViewChange: (view: 'chat' | 'dms' | 'news' | 'settings') => void;
+  currentView: 'chat' | 'dms' | 'boards' | 'settings';
+  onViewChange: (view: 'chat' | 'dms' | 'boards' | 'settings') => void;
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
   onNewDM?: () => void;
@@ -30,7 +30,7 @@ export function Sidebar({
   const { user } = useAuth();
   const myPresence = usePresenceForUser(user?.id);
   const { conversations } = useDirectMessages();
-  const { count: newsBadgeCount } = useNewsBadges();
+  const { count: boardsBadgeCount } = useBoardBadges();
   const myPresenceState =
     myPresence?.presence_state ||
     (user?.presence_visibility === 'invisible' ? 'invisible' : 'offline');
@@ -51,10 +51,10 @@ export function Sidebar({
       badge: totalUnread > 0 ? totalUnread : null,
     },
     {
-      id: 'news' as const,
-      label: 'News',
+      id: 'boards' as const,
+      label: 'Boards',
       icon: Newspaper,
-      badge: newsBadgeCount > 0 ? newsBadgeCount : null,
+      badge: boardsBadgeCount > 0 ? boardsBadgeCount : null,
     },
     {
       id: 'settings' as const,

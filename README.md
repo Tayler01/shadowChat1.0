@@ -1,6 +1,6 @@
 # ShadowChat 1.0
 
-ShadowChat 1.0 is a premium dark realtime chat app built with React, TypeScript, Vite, and Supabase. It combines a public group chat, private direct messages, a realtime News tab, admin tools, profile customization, AI-assisted chat utilities, browser push notifications, and a per-user weather widget behind a polished black-and-gold interface.
+ShadowChat 1.0 is a premium dark realtime chat app built with React, TypeScript, Vite, and Supabase. It combines a public group chat, private direct messages, a realtime Boards surface, admin tools, profile customization, AI-assisted chat utilities, browser push notifications, and a per-user weather widget behind a polished black-and-gold interface.
 
 The project is already wired for hosted Supabase and Netlify deployment. It is designed to behave like a product app, not a demo: realtime messaging, uploads, presence, settings, DMs, and notification flows are all first-class parts of the codebase.
 
@@ -28,12 +28,12 @@ The project is already wired for hosted Supabase and Netlify deployment. It is d
 - Message reactions, pinning, editing, and deletion
 - Slash commands and reply/thread affordances
 - AI reply and summary hooks through a secured Supabase Edge Function
-- News tab with a today-only tracked-source feed and a separate News Chat channel
+- Boards tab with a draggable board map, the existing News Feed, News Chat, Investing Chat, Learning Chat, Crypto Chat, and a coming-soon Art Board
 - App-wide admin/sub-admin access controls with role badges and operator-only tools
-- Operator-managed channel bans for General Chat, News Chat, and News Feed participation
+- Operator-managed bans for General Chat, individual chat boards, and all app interaction
 - Admin-managed X/Truth Social source tracking from Settings
 - Admin feedback review for submitted bugs, suggestions, and private attachments
-- Server-side link previews for chat and News Chat URLs
+- Server-side link previews for chat, DMs, and board chat URLs
 - Browser push notifications for DMs and group chat
 - Settings feedback flow for bug reports and feature ideas with private image attachments
 - Per-user Open-Meteo weather location preference and forecast popup
@@ -49,10 +49,11 @@ Frontend lives under [`src`](C:/repos/chat2.0/src).
 - [`src/components`](C:/repos/chat2.0/src/components) contains view and UI components grouped by domain.
 - [`src/hooks`](C:/repos/chat2.0/src/hooks) contains most stateful app behavior.
 - [`src/lib`](C:/repos/chat2.0/src/lib) contains Supabase, auth, push, AI, env, and utility layers.
-- [`src/components/news`](C:/repos/chat2.0/src/components/news) contains the News Feed, News Chat, feed item, reaction, and modal UI.
+- [`src/components/boards`](C:/repos/chat2.0/src/components/boards) contains the Boards map, board routing, and reusable board-chat UI.
+- [`src/components/news`](C:/repos/chat2.0/src/components/news) contains the News Feed, feed item, reaction, modal UI, and compatibility wrappers for older imports.
 - [`src/components/chat/WeatherWidget.tsx`](C:/repos/chat2.0/src/components/chat/WeatherWidget.tsx:1) contains the General Chat weather pill and forecast popup.
 - [`src/components/settings/WeatherLocationSettings.tsx`](C:/repos/chat2.0/src/components/settings/WeatherLocationSettings.tsx:1) contains the per-user weather location picker.
-- [`src/hooks/useNewsFeed.tsx`](C:/repos/chat2.0/src/hooks/useNewsFeed.tsx), [`src/hooks/useNewsChat.tsx`](C:/repos/chat2.0/src/hooks/useNewsChat.tsx), [`src/hooks/useNewsBadges.ts`](C:/repos/chat2.0/src/hooks/useNewsBadges.ts), and [`src/hooks/useNewsAdmin.ts`](C:/repos/chat2.0/src/hooks/useNewsAdmin.ts) own the News client behavior.
+- [`src/hooks/useBoardChat.tsx`](C:/repos/chat2.0/src/hooks/useBoardChat.tsx), [`src/hooks/useBoardBadges.ts`](C:/repos/chat2.0/src/hooks/useBoardBadges.ts), [`src/hooks/useNewsFeed.tsx`](C:/repos/chat2.0/src/hooks/useNewsFeed.tsx), and [`src/hooks/useNewsAdmin.ts`](C:/repos/chat2.0/src/hooks/useNewsAdmin.ts) own the Boards and News client behavior.
 - [`src/hooks/useAdminAccess.ts`](C:/repos/chat2.0/src/hooks/useAdminAccess.ts:1) owns admin/sub-admin access state.
 - [`src/hooks/useWeatherPreference.ts`](C:/repos/chat2.0/src/hooks/useWeatherPreference.ts:1), [`src/hooks/useWeatherForecast.ts`](C:/repos/chat2.0/src/hooks/useWeatherForecast.ts:1), and [`src/lib/weather.ts`](C:/repos/chat2.0/src/lib/weather.ts:1) own weather preference and forecast behavior.
 
@@ -61,11 +62,12 @@ Backend lives under [`supabase`](C:/repos/chat2.0/supabase).
 - [`supabase/migrations`](C:/repos/chat2.0/supabase/migrations) is the source of truth for schema and policies.
 - [`supabase/functions/openai-chat`](C:/repos/chat2.0/supabase/functions/openai-chat/index.ts) handles authenticated AI requests.
 - [`supabase/functions/send-push`](C:/repos/chat2.0/supabase/functions/send-push/index.ts) sends web push notifications.
-- [`supabase/functions/link-preview`](C:/repos/chat2.0/supabase/functions/link-preview/index.ts) fetches server-side metadata for chat and News Chat link cards.
+- [`supabase/functions/link-preview`](C:/repos/chat2.0/supabase/functions/link-preview/index.ts) fetches server-side metadata for chat, DM, and board-chat link cards.
 - News data lives in isolated `news_*` tables and RPCs from [`supabase/migrations/20260430041621_news_tab_foundation.sql`](C:/repos/chat2.0/supabase/migrations/20260430041621_news_tab_foundation.sql:1).
+- Boards use `public.board_catalog`, `public.board_chat_messages`, `public.board_chat_reactions`, and per-board `user_read_cursors`.
 - Feedback submissions use `public.feedback_submissions` plus the private `feedback-attachments` Storage bucket.
 - Admin roles use `public.user_roles`, `public.admin_role_audit`, `public.admin_role_notifications`, and the synced public `users.admin_role` badge field.
-- Channel bans use `public.user_channel_bans` plus RLS/RPC enforcement for General Chat, News Chat, and News Feed participation.
+- Channel bans use `public.user_channel_bans` plus RLS/RPC enforcement for General Chat, individual board chats, and all interaction.
 - Weather locations use private `public.user_weather_preferences` rows scoped by RLS to the owning user.
 
 Always-on background services live under [`services`](C:/repos/chat2.0/services).
@@ -163,7 +165,7 @@ node scripts/playwright-smoke.mjs --scenario=full --run-name=full-smoke-release 
 - AI features depend on the `openai-chat` edge function and configured Supabase AI provider secrets.
 - Active-user dots and the General Chat user-count popup depend on `user_presence`, `users.presence_visibility`, and the `update_user_last_active`, `list_presence_states`, and `get_active_users` RPCs.
 - News Feed realtime depends on the isolated News migrations, the `shado-news-scraper` Render worker, and the source health/cursor fields in `news_sources`.
-- News Chat link previews depend on the `link-preview` Edge Function, just like group chat and DMs.
+- Board chat realtime depends on `board_chat_messages`, `board_chat_reactions`, `user_read_cursors`, and `get_board_badge_counts`.
 - Weather preferences are private and refresh on demand. `user_weather_preferences` is not published to Supabase Realtime.
 - iPhone web push requires the app to be installed to the Home Screen. Android and Windows work through supported browsers/PWAs.
 - iPhone Home Screen resume behavior now depends on the session/realtime hardening in [`src/lib/supabase.ts`](C:/repos/chat2.0/src/lib/supabase.ts:1) and the deferred auth callback flow in [`src/hooks/useAuth.tsx`](C:/repos/chat2.0/src/hooks/useAuth.tsx:1). Avoid reintroducing async Supabase calls directly inside `onAuthStateChange`.
@@ -208,7 +210,7 @@ Production is hosted on Netlify, the backend is hosted on Supabase, and the News
 - [docs/ADMIN_ACCESS.md](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1): app-wide admin/sub-admin roles, badges, settings, and RPCs
 - [docs/CHANNEL_BANS.md](C:/repos/chat2.0/docs/CHANNEL_BANS.md:1): profile-popup moderation controls and database-enforced channel bans
 - [docs/WEATHER_WIDGET.md](C:/repos/chat2.0/docs/WEATHER_WIDGET.md:1): General Chat weather widget, private location preferences, and validation
-- [docs/NEWS_TAB_AND_SCRAPER.md](C:/repos/chat2.0/docs/NEWS_TAB_AND_SCRAPER.md:1): shipped News tab backend, scraper lifecycle, Render setup, and troubleshooting
+- [docs/NEWS_TAB_AND_SCRAPER.md](C:/repos/chat2.0/docs/NEWS_TAB_AND_SCRAPER.md:1): Boards-era News Feed backend, scraper lifecycle, Render setup, and troubleshooting
 - [services/news-scraper/README.md](C:/repos/chat2.0/services/news-scraper/README.md:1): worker-local command and environment reference
 - [docs/LINK_PREVIEWS.md](C:/repos/chat2.0/docs/LINK_PREVIEWS.md:1): server-side link preview architecture and validation
 - [docs/FEEDBACK_SUBMISSIONS.md](C:/repos/chat2.0/docs/FEEDBACK_SUBMISSIONS.md:1): Settings feedback flow, Supabase storage model, and validation notes

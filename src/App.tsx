@@ -29,13 +29,13 @@ const SettingsView = lazy(() =>
   }))
 )
 
-const NewsView = lazy(() =>
-  import('./components/news/NewsView').then(module => ({
-    default: module.NewsView,
+const BoardsView = lazy(() =>
+  import('./components/boards/BoardsView').then(module => ({
+    default: module.BoardsView,
   }))
 )
 
-type View = 'chat' | 'dms' | 'news' | 'settings'
+type View = 'chat' | 'dms' | 'boards' | 'settings'
 type LocationState = {
   view: View
   conversation: string | null
@@ -43,15 +43,21 @@ type LocationState = {
 }
 
 const isView = (value: string | null): value is View => (
-  value === 'chat' || value === 'dms' || value === 'news' || value === 'settings'
+  value === 'chat' || value === 'dms' || value === 'boards' || value === 'settings'
 )
+
+const normalizeViewParam = (value: string | null): View | null => {
+  if (value === 'news') return 'boards'
+  if (isView(value)) return value
+  return null
+}
 
 const getLocationStateFromUrl = (url: URL): LocationState => {
   const params = new URLSearchParams(url.search)
   const nextView = params.get('view')
   const view = nextView === 'profile'
     ? 'settings'
-    : isView(nextView) ? nextView : ('chat' as View)
+    : normalizeViewParam(nextView) ?? ('chat' as View)
 
   return {
     view,
@@ -86,6 +92,7 @@ function App() {
   useAdminRoleNotifications()
   useChannelBanExpirySweep()
   const [currentView, setCurrentView] = useState<View>(() => getInitialLocationState().view)
+  const [boardsResetKey, setBoardsResetKey] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const isDesktop = useIsDesktop()
   const [dmTarget, setDmTarget] = useState<string | null>(() => getInitialLocationState().conversation)
@@ -205,6 +212,9 @@ function App() {
   const closeSidebar = () => setSidebarOpen(false)
 
   const handleViewChange = (view: View) => {
+    if (view === 'boards') {
+      setBoardsResetKey(value => value + 1)
+    }
     setCurrentView(view)
     if (view !== 'dms') {
       setDmTarget(null)
@@ -265,8 +275,8 @@ function App() {
             initialMessageId={messageTarget || undefined}
           />
         )
-      case 'news':
-        return <NewsView />
+      case 'boards':
+        return <BoardsView resetKey={boardsResetKey} />
       case 'settings':
         return <SettingsView onToggleSidebar={toggleSidebar} />
       default:

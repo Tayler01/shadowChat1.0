@@ -19,8 +19,8 @@ import {
 import type { ChatMessageType } from '../../lib/supabase'
 
 interface ChatViewProps {
-  currentView: 'chat' | 'dms' | 'news' | 'settings'
-  onViewChange: (view: 'chat' | 'dms' | 'news' | 'settings') => void
+  currentView: 'chat' | 'dms' | 'boards' | 'settings'
+  onViewChange: (view: 'chat' | 'dms' | 'boards' | 'settings') => void
   initialMessageId?: string
 }
 

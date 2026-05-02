@@ -1,0 +1,184 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { RealtimeChannel } from '@supabase/supabase-js'
+import { getRealtimeClient, getWorkingClient } from '../lib/supabase'
+import { BOARD_DEFINITIONS } from '../lib/boards'
+import { runRealtimeRecovery } from '../lib/realtimeRecovery'
+import { useAuth } from './useAuth'
+import { useRealtimeRecovery } from './useRealtimeRecovery'
+
+interface BoardBadgeRow {
+  board_slug: string
+  unread_count: number
+  contributes_to_nav: boolean
+}
+
+const normalizeCount = (value: unknown) => {
+  const count = Number(value ?? 0)
+  return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0
+}
+
+const emptyCounts = () => (
+  Object.fromEntries(BOARD_DEFINITIONS.map(board => [board.slug, 0])) as Record<string, number>
+)
+
+export function useBoardBadges() {
+  const { user } = useAuth()
+  const [countsByBoard, setCountsByBoard] = useState<Record<string, number>>(() => emptyCounts())
+  const [navCount, setNavCount] = useState(0)
+  const channelRef = useRef<RealtimeChannel | null>(null)
+  const subscribeRef = useRef<(() => Promise<RealtimeChannel | null>) | null>(null)
+
+  const refresh = useCallback(async () => {
+    if (!user) {
+      const counts = emptyCounts()
+      setCountsByBoard(counts)
+      setNavCount(0)
+      return counts
+    }
+
+    try {
+      const workingClient = await getWorkingClient()
+      const { data, error } = await workingClient.rpc('get_board_badge_counts', {
+        target_user_id: user.id,
+      })
+      if (error) throw error
+
+      const rows = (data ?? []) as BoardBadgeRow[]
+      const nextCounts = emptyCounts()
+      let nextNavCount = 0
+
+      rows.forEach(row => {
+        const unreadCount = normalizeCount(row.unread_count)
+        nextCounts[row.board_slug] = unreadCount
+        if (row.contributes_to_nav) {
+          nextNavCount += unreadCount
+        }
+      })
+
+      setCountsByBoard(nextCounts)
+      setNavCount(nextNavCount)
+      return nextCounts
+    } catch {
+      const counts = emptyCounts()
+      setCountsByBoard(counts)
+      setNavCount(0)
+      return counts
+    }
+  }, [user])
+
+  useEffect(() => {
+    void refresh()
+  }, [refresh])
+
+  const resetBadgeChannel = useCallback(async () => {
+    await refresh()
+
+    const activeChannel = channelRef.current
+    const realtimeClient = getRealtimeClient()
+    if (activeChannel && realtimeClient?.removeChannel) {
+      try {
+        realtimeClient.removeChannel(activeChannel)
+      } catch {
+        // ignore channel cleanup failures
+      }
+    }
+
+    channelRef.current = null
+    if (subscribeRef.current) {
+      channelRef.current = await subscribeRef.current().catch(() => null)
+    }
+  }, [refresh])
+
+  useRealtimeRecovery(() => {
+    void resetBadgeChannel()
+  })
+
+  useEffect(() => {
+    if (!user) return
+
+    let channel: RealtimeChannel | null = null
+    let currentClient: any = null
+
+    const subscribe = async (): Promise<RealtimeChannel | null> => {
+      currentClient = await getWorkingClient().catch(() => getRealtimeClient())
+      currentClient = currentClient || getRealtimeClient()
+      if (!currentClient?.channel) return null
+
+      channel = currentClient
+        .channel('public:board_badges')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'board_chat_messages' },
+          () => void refresh()
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'board_catalog' },
+          () => void refresh()
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'news_feed_items' },
+          () => void refresh()
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'news_user_state',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => void refresh()
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'user_read_cursors',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload: any) => {
+            const row = (payload.new || payload.old) as { surface?: string } | undefined
+            if (row?.surface === 'board_chat') {
+              void refresh()
+            }
+          }
+        )
+        .subscribe((status: string) => {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            void runRealtimeRecovery('channel-error')
+          }
+        })
+
+      channelRef.current = channel
+      return channel
+    }
+
+    subscribeRef.current = subscribe
+    void subscribe()
+
+    return () => {
+      subscribeRef.current = null
+      if (channel && currentClient?.removeChannel) {
+        currentClient.removeChannel(channel)
+      }
+      channelRef.current = null
+    }
+  }, [refresh, user])
+
+  const markFeedSeen = useCallback(async () => {
+    const workingClient = await getWorkingClient()
+    await workingClient.rpc('mark_news_seen', { section: 'feed' })
+    await refresh()
+  }, [refresh])
+
+  return useMemo(() => ({
+    count: navCount,
+    navCount,
+    countsByBoard,
+    refresh,
+    markFeedSeen,
+  }), [countsByBoard, markFeedSeen, navCount, refresh])
+}

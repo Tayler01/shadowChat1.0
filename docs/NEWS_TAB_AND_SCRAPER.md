@@ -1,40 +1,52 @@
-# News Tab And Scraper Runbook
+# Boards News Feed And Scraper Runbook
 
-This document describes the shipped News tab, its Supabase backend, and the
-Render-hosted scraper that keeps the News Feed current.
+This document describes the shipped News Feed board, its Supabase backend, and
+the Render-hosted scraper that keeps the feed current.
 
 ## Product Shape
 
-The News tab has two segmented sections:
+The old `News` tab has been rebuilt as `Boards`. Opening `view=news` still
+routes to Boards for compatibility, but the app now writes `view=boards`.
 
-- `News Feed`: a shared today-only board populated by tracked X and Truth
+The Boards landing surface is a draggable bubble map. Current boards are:
+
+- `News Feed`: a shared today-only feed board populated by tracked X and Truth
   Social accounts. Users can open a nearly full-screen post modal, react, copy
   links, and share original links. Users cannot post messages in this feed.
-- `News Chat`: a separate public chat channel for news links and discussion.
-  It supports text, link previews, edits, deletes, and emoji reactions.
+- `News Chat`, `Investing Chat`, `Learning Chat`, and `Crypto Chat`: public
+  chat boards backed by the shared `board_chat_messages` table. They support
+  text, link previews, edits, deletes, read cursors, unread dividers, and emoji
+  reactions.
+- `Art Board`: a static placeholder that currently renders `Coming soon`.
 
-The News tab is intentionally isolated from the general chat and DM tables so
-it does not disturb existing realtime contracts, bridge behavior, push, or
-message history.
+News Feed remains intentionally isolated from the general chat, DMs, and board
+chat message tables so the scraper does not disturb realtime chat contracts,
+bridge behavior, push, or message history.
 
 ## Frontend Map
 
-- [src/components/news/NewsView.tsx](C:/repos/chat2.0/src/components/news/NewsView.tsx:1): top-level segmented News experience.
+- [src/components/boards/BoardsView.tsx](C:/repos/chat2.0/src/components/boards/BoardsView.tsx:1): top-level Boards experience.
+- [src/components/boards/BoardBubbleMap.tsx](C:/repos/chat2.0/src/components/boards/BoardBubbleMap.tsx:1): draggable board bubble map.
+- [src/components/boards/BoardChat.tsx](C:/repos/chat2.0/src/components/boards/BoardChat.tsx:1): reusable board-chat surface.
 - [src/components/news/NewsFeed.tsx](C:/repos/chat2.0/src/components/news/NewsFeed.tsx:1): today board rendering and refresh.
 - [src/components/news/NewsFeedItem.tsx](C:/repos/chat2.0/src/components/news/NewsFeedItem.tsx:1): compact feed tile.
 - [src/components/news/NewsFeedModal.tsx](C:/repos/chat2.0/src/components/news/NewsFeedModal.tsx:1): expanded post/media view.
-- [src/components/news/NewsChat.tsx](C:/repos/chat2.0/src/components/news/NewsChat.tsx:1): public News Chat channel.
+- [src/components/news/NewsView.tsx](C:/repos/chat2.0/src/components/news/NewsView.tsx:1): compatibility wrapper for older imports.
+- [src/components/news/NewsChat.tsx](C:/repos/chat2.0/src/components/news/NewsChat.tsx:1): compatibility wrapper for the News Chat board.
+- [src/hooks/useBoardChat.tsx](C:/repos/chat2.0/src/hooks/useBoardChat.tsx:1): generic board-chat fetch, realtime, send/edit/delete, reactions, and cursor-facing message shape.
+- [src/hooks/useBoardBadges.ts](C:/repos/chat2.0/src/hooks/useBoardBadges.ts:1): board unread counts and Sidebar/MobileNav badge count.
 - [src/hooks/useNewsFeed.tsx](C:/repos/chat2.0/src/hooks/useNewsFeed.tsx:1): feed fetch, realtime, reactions, and seen state.
-- [src/hooks/useNewsChat.tsx](C:/repos/chat2.0/src/hooks/useNewsChat.tsx:1): chat fetch, realtime, send/edit/delete, reactions, and seen state.
-- [src/hooks/useNewsBadges.ts](C:/repos/chat2.0/src/hooks/useNewsBadges.ts:1): Sidebar/MobileNav badge count.
+- [src/hooks/useNewsBadges.ts](C:/repos/chat2.0/src/hooks/useNewsBadges.ts:1): compatibility wrapper over board badges.
 - [src/hooks/useNewsAdmin.ts](C:/repos/chat2.0/src/hooks/useNewsAdmin.ts:1): admin source management.
 
 News source management lives in Settings > Admin > News Sources. It is shown
 only to app operators with the `admin` or `sub_admin` role. Operators can add,
 pause, re-enable, and delete tracked accounts from the scraper list. Full admins
-manage the sub-admin list from Settings > Admin > Admin Access. App operators
-can also channel-ban users from News Chat and News Feed reactions from the
-user's public profile popup.
+manage the sub-admin list from Settings > Admin > Admin Access or directly from
+a user's public profile popup. App operators can channel-ban users from General
+Chat, individual chat boards, or `All Interaction` from the user's public
+profile popup. Feed-specific bans are intentionally not exposed; `All
+Interaction` blocks feed emoji reactions while preserving read access.
 
 ## Backend Map
 
@@ -44,15 +56,22 @@ with follow-up migrations for admin bootstrap and normalized source handles.
 
 Main tables:
 
+- `board_catalog`: visible board metadata and moderation scope mapping.
+- `board_chat_messages`: shared message stream for News, Investing, Learning,
+  and Crypto chat boards.
+- `board_chat_reactions`: per-user board-chat reactions, aggregated back onto
+  `board_chat_messages`.
 - `user_roles`: app-wide admin role table for `admin` and `sub_admin`.
 - `news_sources`: tracked X/Truth accounts, cursors, health, and admin state.
 - `news_feed_items`: normalized post snapshots for the today board.
 - `news_feed_reactions`: per-user feed reactions, aggregated back onto items.
-- `news_chat_messages`: News Chat messages.
-- `news_chat_reactions`: per-user News Chat reactions, aggregated back onto messages.
+- `news_chat_messages`: legacy News Chat messages retained for compatibility.
+- `news_chat_reactions`: legacy News Chat reactions retained for compatibility.
 - `news_user_state`: per-user seen timestamps for feed/chat badge counts.
-- `user_channel_bans`: app-wide moderation records that can block News Chat
-  participation or News Feed reactions.
+- `user_read_cursors`: per-user chat read cursors. Board chat uses
+  `surface = 'board_chat'` and `scope_id = board slug`.
+- `user_channel_bans`: app-wide moderation records that can block General Chat,
+  individual chat boards, or all interaction.
 
 Main RPCs:
 
@@ -61,17 +80,18 @@ Main RPCs:
 - `set_news_source_enabled`
 - `hide_news_feed_item`
 - `toggle_news_feed_reaction`
-- `toggle_news_chat_reaction`
+- `toggle_board_chat_reaction`
+- `get_board_badge_counts`
 - `mark_news_seen`
 - `count_news_badge_items`
 - `clear_expired_news_feed_items`
 - `list_user_channel_bans`
 - `set_user_channel_bans`
 
-Realtime publication includes `news_feed_items`, `news_chat_messages`,
-`news_sources`, and `news_user_state`. The reaction detail tables are not
-published because their RPCs aggregate reaction state back onto the published
-parent rows.
+Realtime publication includes `news_feed_items`, `news_sources`,
+`news_user_state`, `board_catalog`, `board_chat_messages`, `user_read_cursors`,
+and `user_channel_bans`. The reaction detail tables are not published because
+their RPCs aggregate reaction state back onto the published parent rows.
 
 For the app-wide role model, see
 [docs/ADMIN_ACCESS.md](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1).

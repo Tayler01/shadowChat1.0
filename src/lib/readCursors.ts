@@ -1,6 +1,6 @@
 import { getWorkingClient } from './supabase'
 
-export type ReadSurface = 'general_chat' | 'news_chat' | 'dm' | (string & {})
+export type ReadSurface = 'general_chat' | 'news_chat' | 'board_chat' | 'dm' | (string & {})
 
 export interface UserReadCursor {
   user_id: string

@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { CalendarDays, Clock3, Ghost, LockKeyhole, Palette, ShieldAlert, UserRound, X } from 'lucide-react'
+import { CalendarDays, Clock3, Ghost, LockKeyhole, Palette, ShieldAlert, ShieldCheck, UserRound, X } from 'lucide-react'
 import type { User } from '../../lib/supabase'
+import { setSubAdminStatus } from '../../lib/supabase'
 import {
   CHANNEL_BAN_DURATIONS,
   CHANNEL_BAN_OPTIONS,
@@ -57,6 +58,8 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
   const { profile: currentProfile } = useAuth()
+  const targetUserId = user?.id ?? null
+  const targetUserAdminRole = user?.admin_role ?? null
   const livePresence = usePresenceForUser(user?.id)
   const {
     bans: publicBans,
@@ -70,17 +73,27 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   const [selectedBanScopes, setSelectedBanScopes] = useState<ChannelBanScope[]>([])
   const [banDuration, setBanDuration] = useState<ChannelBanDuration>('1440')
   const [banReason, setBanReason] = useState('')
+  const [localAdminRole, setLocalAdminRole] = useState(user?.admin_role ?? null)
+  const [adminRoleSaving, setAdminRoleSaving] = useState(false)
 
   const canModerate = Boolean(
     open &&
     user &&
     currentProfile &&
     currentProfile.id !== user.id &&
-    user.admin_role !== 'admin' &&
+    localAdminRole !== 'admin' &&
     (
       currentProfile.admin_role === 'admin' ||
-      (currentProfile.admin_role === 'sub_admin' && user.admin_role !== 'sub_admin')
+      (currentProfile.admin_role === 'sub_admin' && localAdminRole !== 'sub_admin')
     )
+  )
+
+  const canManageAdminRole = Boolean(
+    open &&
+    user &&
+    currentProfile?.admin_role === 'admin' &&
+    currentProfile.id !== user.id &&
+    localAdminRole !== 'admin'
   )
 
   const selectedScopeSet = useMemo(
@@ -154,6 +167,10 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   }, [open, onClose])
 
   useEffect(() => {
+    setLocalAdminRole(open && targetUserId ? targetUserAdminRole : null)
+  }, [open, targetUserAdminRole, targetUserId])
+
+  useEffect(() => {
     if (!open || !user) {
       setBanMenuOpen(false)
       setBanError(null)
@@ -215,6 +232,23 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
       toast.error(message)
     } finally {
       setBanSaving(false)
+    }
+  }
+
+  const toggleSubAdminAccess = async () => {
+    if (!user || !canManageAdminRole) return
+
+    const enable = localAdminRole !== 'sub_admin'
+    setAdminRoleSaving(true)
+
+    try {
+      await setSubAdminStatus(user.id, enable)
+      setLocalAdminRole(enable ? 'sub_admin' : null)
+      toast.success(enable ? 'Sub-admin access granted' : 'Sub-admin access removed')
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Unable to update admin access'))
+    } finally {
+      setAdminRoleSaving(false)
     }
   }
 
@@ -288,7 +322,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                 <div className="min-w-0 pb-2">
                   <h2 id="public-profile-title" className="flex min-w-0 items-center gap-2 text-2xl font-bold text-[var(--text-primary)]">
                     <span className="truncate">{user.display_name || user.username || 'Unknown User'}</span>
-                    <UserRoleBadge role={user.admin_role} className="mt-1" />
+                    <UserRoleBadge role={localAdminRole} className="mt-1" />
                     <UserPresenceBadge userId={user.id} presenceVisibility={user.presence_visibility} />
                   </h2>
                   <p className="truncate text-sm text-[var(--text-muted)]">@{user.username || 'unknown'}</p>
@@ -366,6 +400,34 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                         Reason: {activeBanReasons.join('; ')}
                       </p>
                     )}
+                  </section>
+                )}
+
+                {canManageAdminRole && (
+                  <section className="rounded-[var(--radius-md)] border border-[rgba(215,170,70,0.24)] bg-[rgba(215,170,70,0.055)] p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                          <ShieldCheck className="h-3.5 w-3.5 text-[var(--text-gold)]" />
+                          Admin Access
+                        </div>
+                        <p className="text-sm leading-6 text-[var(--text-secondary)]">
+                          {localAdminRole === 'sub_admin'
+                            ? 'This user has sub-admin access.'
+                            : 'Grant this user sub-admin access.'}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant={localAdminRole === 'sub_admin' ? 'danger' : 'secondary'}
+                        size="sm"
+                        loading={adminRoleSaving}
+                        onClick={() => void toggleSubAdminAccess()}
+                      >
+                        <ShieldCheck className="mr-2 h-4 w-4" />
+                        {localAdminRole === 'sub_admin' ? 'Remove sub-admin' : 'Make sub-admin'}
+                      </Button>
+                    </div>
                   </section>
                 )}
 

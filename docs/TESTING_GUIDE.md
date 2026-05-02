@@ -36,7 +36,7 @@ Current coverage is strongest around:
 - thread reply and pinned message UI
 - session refresh and realtime reset helpers
 - theme and user search hooks
-- News tab segmentation and News Chat rendering
+- Boards map routing and board-chat rendering
 - admin feedback review
 - weather widget and location settings
 
@@ -53,7 +53,7 @@ Do browser validation when changing:
 - mobile navigation or composer layout
 - theme and visual polish
 - push notification setup
-- News Feed layout, reaction menus, badges, and source-health admin UI
+- Boards map layout, per-board badges, News Feed layout, reaction menus, and source-health admin UI
 - admin access, admin subpages, role badges, or channel-ban moderation
 - active-user indicators or presence visibility
 - General Chat weather widget or Account & Profile weather location settings
@@ -170,7 +170,7 @@ Current smoke scenarios:
 - `mobile-dm-back`: validates the mobile DM thread back flow
 - `mobile-settings-visual`: checks the mobile settings layout and notification toggle geometry
 
-News-specific Jest coverage currently lives in:
+Boards/News-specific Jest coverage currently lives in:
 
 - [tests/NewsView.test.tsx](C:/repos/chat2.0/tests/NewsView.test.tsx:1)
 - [tests/NewsChat.test.tsx](C:/repos/chat2.0/tests/NewsChat.test.tsx:1)
@@ -201,14 +201,17 @@ Latest full release smoke recorded for the feedback submission release:
 
 For link preview changes, verify a local preview build with a signed-in account and send a message containing a public `https://` URL. The message should keep the link clickable immediately, then load one preview card without rerendering the whole chat thread. Test at least one generic Open Graph link and one `x.com`/`twitter.com` link because X metadata can arrive through the oEmbed fallback.
 
-For News tab changes, verify both desktop and mobile:
+For Boards changes, verify both desktop and mobile:
 
-- News Feed and News Chat segmented switching
+- Boards nav label opens the bubble map, and old `view=news` URLs route to Boards
+- board bubbles show per-board unread counts and reset to the default layout when Boards is opened
+- dragging a bubble moves it and pushes overlapping bubbles aside without idle drift
+- News Feed and all chat boards open from their bubbles and have a clear back button
 - feed tile media placement, no empty image placeholders, and scrollable modal media
 - feed and chat reaction menus stay inside the viewport
 - selected reactions render as compact counts
-- News Chat send/edit/delete/reaction realtime between two signed-in users
-- News badges appear in Sidebar/MobileNav and clear after viewing the relevant section
+- News Chat, Investing Chat, Learning Chat, and Crypto Chat send/edit/delete/reaction realtime between two signed-in users
+- Board bubbles show their own unread counts, the Boards nav badge combines chat-board counts only, and News Feed clears immediately after opening
 
 For News scraper changes, start with proof mode:
 
@@ -242,9 +245,13 @@ operator tools but cannot see Admin Access.
 For channel-ban moderation changes, verify an `admin` or `sub_admin` can open
 another user's profile popup from an avatar, open Channel bans, save timed and
 permanent scopes, clear all scopes, and cannot moderate the single full admin
-account. Then verify the target user is blocked from General Chat, News Chat,
-and/or News Feed reactions according to the selected scopes while DMs remain
-usable.
+account. Then verify the target user is blocked from General Chat, the selected
+chat boards, and/or all interaction according to the selected scopes while DMs
+remain usable and read access remains open.
+
+For profile admin-access changes, verify the full admin can grant/remove
+sub-admin access from a user's profile popup, and sub-admin users cannot see or
+use that role-management control.
 
 For weather changes, verify General Chat header on desktop and mobile, the
 forecast popup, and Settings > Account & Profile > Weather Location. Weather

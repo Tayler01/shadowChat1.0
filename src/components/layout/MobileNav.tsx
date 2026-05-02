@@ -1,17 +1,17 @@
 import React from 'react'
 import { MessageSquare, Newspaper, Settings, Users } from 'lucide-react'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
-import { useNewsBadges } from '../../hooks/useNewsBadges'
+import { useBoardBadges } from '../../hooks/useBoardBadges'
 
 interface MobileNavProps {
-  currentView: 'chat' | 'dms' | 'news' | 'settings'
-  onViewChange: (view: 'chat' | 'dms' | 'news' | 'settings') => void
+  currentView: 'chat' | 'dms' | 'boards' | 'settings'
+  onViewChange: (view: 'chat' | 'dms' | 'boards' | 'settings') => void
   className?: string
 }
 
 export function MobileNav({ currentView, onViewChange, className }: MobileNavProps) {
   const { conversations } = useDirectMessages()
-  const { count: newsBadgeCount } = useNewsBadges()
+  const { count: boardsBadgeCount } = useBoardBadges()
   const totalUnread = conversations.reduce(
     (sum, c) => sum + (c.unread_count || 0),
     0
@@ -26,10 +26,10 @@ export function MobileNav({ currentView, onViewChange, className }: MobileNavPro
       badge: totalUnread > 0 ? totalUnread : null,
     },
     {
-      id: 'news' as const,
+      id: 'boards' as const,
       icon: Newspaper,
-      label: 'News',
-      badge: newsBadgeCount > 0 ? newsBadgeCount : null,
+      label: 'Boards',
+      badge: boardsBadgeCount > 0 ? boardsBadgeCount : null,
     },
     { id: 'settings' as const, icon: Settings, label: 'Settings', badge: null },
   ]

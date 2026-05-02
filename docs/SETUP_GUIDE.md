@@ -180,8 +180,9 @@ credentials are `X_USERNAME`, `X_EMAIL`, `X_PASSWORD`, `TRUTH_USERNAME`,
 Admins and sub-admins manage tracked sources from Settings > Admin > News
 Sources. The admin class is stored in `public.user_roles` as `admin` or
 `sub_admin`; full admins can manage sub-admin access from Settings > Admin >
-Admin Access. Operators can also open another user's public profile popup to
-manage channel bans for General Chat, News Chat, and News Feed participation.
+Admin Access or from a user's profile popup. Operators can also open another
+user's public profile popup to manage channel bans for General Chat, individual
+chat boards, and all interaction.
 
 Full runbook: [docs/NEWS_TAB_AND_SCRAPER.md](C:/repos/chat2.0/docs/NEWS_TAB_AND_SCRAPER.md:1).
 Moderation runbook: [docs/CHANNEL_BANS.md](C:/repos/chat2.0/docs/CHANNEL_BANS.md:1).
@@ -207,15 +208,15 @@ After setup, verify:
 5. Profile updates persist
 6. Push settings screen renders
 7. New-account phone setup opens after signup or first sign-in from the same browser
-8. News tab loads
-9. News Chat sends and receives a message
+8. Boards tab loads the bubble map
+9. News Chat, Investing Chat, Learning Chat, and Crypto Chat send and receive messages
 10. An `admin` or `sub_admin` user can add, pause, enable, and delete a News source in Settings > Admin > News Sources
 11. If the scraper is configured, `news_sources.last_checked_at` updates after a worker cycle
-12. A full `admin` user can grant or remove sub-admin access from Settings > Admin > Admin Access
+12. A full `admin` user can grant or remove sub-admin access from Settings > Admin > Admin Access and from a profile popup
 13. Settings > Account & Profile can save and clear a weather location
 14. General Chat shows the weather widget and active-user count without overlapping on mobile
 15. An `admin` or `sub_admin` can open another user's profile popup and update channel-ban scopes
-16. A banned user cannot post/react in the selected channel or board, and can still use DMs
+16. A banned user cannot post/react in the selected channel, board, or all-interaction scope, and can still read content and use DMs
 
 ## 10. Optional Preview Mode
 

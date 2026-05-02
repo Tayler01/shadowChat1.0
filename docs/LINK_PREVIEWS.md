@@ -1,6 +1,6 @@
 # Chat Link Previews
 
-ShadowChat renders `http://`, `https://`, and `www.` URLs in group chat, DMs, and News Chat as clickable links. The first URL in a text message can also load a compact preview card.
+ShadowChat renders `http://`, `https://`, and `www.` URLs in group chat, DMs, and board chats as clickable links. The first URL in a text message can also load a compact preview card.
 
 ## Architecture
 

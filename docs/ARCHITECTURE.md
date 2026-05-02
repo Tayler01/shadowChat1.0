@@ -28,7 +28,8 @@ React UI
 
 - [`src/components/chat`](C:/repos/chat2.0/src/components/chat): group chat
 - [`src/components/dms`](C:/repos/chat2.0/src/components/dms): inbox and DM thread
-- [`src/components/news`](C:/repos/chat2.0/src/components/news): News Feed, News Chat, feed modal, and News reactions
+- [`src/components/boards`](C:/repos/chat2.0/src/components/boards): Boards map, board routing, and reusable chat boards
+- [`src/components/news`](C:/repos/chat2.0/src/components/news): News Feed, feed modal, reactions, and compatibility wrappers
 - [`src/components/profile`](C:/repos/chat2.0/src/components/profile): user profile experience
 - [`src/components/settings`](C:/repos/chat2.0/src/components/settings): sectioned settings, notification setup, feedback, admin tools, and weather location
 - [`src/components/layout`](C:/repos/chat2.0/src/components/layout): shell, nav, and responsive structure
@@ -39,8 +40,9 @@ React UI
 - [`useMessages`](C:/repos/chat2.0/src/hooks/useMessages.tsx:1): group chat state and realtime
 - [`useDirectMessages`](C:/repos/chat2.0/src/hooks/useDirectMessages.tsx:1): DM state and realtime
 - [`useNewsFeed`](C:/repos/chat2.0/src/hooks/useNewsFeed.tsx:1): News Feed fetch, realtime, reactions, modal data, and seen state
-- [`useNewsChat`](C:/repos/chat2.0/src/hooks/useNewsChat.tsx:1): News Chat fetch, realtime, send/edit/delete, reactions, and seen state
-- [`useNewsBadges`](C:/repos/chat2.0/src/hooks/useNewsBadges.ts:1): News unread/new-item badge counts
+- [`useBoardChat`](C:/repos/chat2.0/src/hooks/useBoardChat.tsx:1): shared board-chat fetch, realtime, send/edit/delete, and reactions
+- [`useBoardBadges`](C:/repos/chat2.0/src/hooks/useBoardBadges.ts:1): per-board unread counts and combined Boards nav badge
+- [`useNewsBadges`](C:/repos/chat2.0/src/hooks/useNewsBadges.ts:1): compatibility wrapper over board badges
 - [`useNewsAdmin`](C:/repos/chat2.0/src/hooks/useNewsAdmin.ts:1): News source admin state and source upsert/toggle RPCs
 - [`useAdminAccess`](C:/repos/chat2.0/src/hooks/useAdminAccess.ts:1): full-admin/sub-admin access state and role updates
 - [`useWeatherPreference`](C:/repos/chat2.0/src/hooks/useWeatherPreference.ts:1): private per-user weather location load/save/clear
@@ -71,11 +73,12 @@ Important domains:
 - group messages
 - DM conversations and DM messages
 - reactions and pinning helpers
-- isolated News sources, feed items, News Chat messages, News reactions, and News seen state
+- isolated News sources, feed items, feed reactions, and News seen state
+- Boards catalog, shared board-chat messages/reactions, and per-board read cursors
 - uploads and storage policies
 - user feedback submissions and private feedback attachments
 - app-wide admin/sub-admin roles, audit rows, and role-change notifications
-- channel bans for General Chat, News Chat, and News Feed participation
+- channel bans for General Chat, individual chat boards, and all interaction
 - foreground presence visibility and active-user state
 - private per-user weather preferences
 - push subscriptions and notification preferences
@@ -85,7 +88,7 @@ Important domains:
 
 - [`openai-chat`](C:/repos/chat2.0/supabase/functions/openai-chat/index.ts:1): validates caller session, proxies allowed AI requests to OpenRouter by default, and can post group-chat AI answers as the dedicated `Shado` assistant profile
 - [`send-push`](C:/repos/chat2.0/supabase/functions/send-push/index.ts:1): validates caller session, looks up recipients, enforces notification preferences, and sends web push payloads
-- [`link-preview`](C:/repos/chat2.0/supabase/functions/link-preview/index.ts:1): validates a signed-in bearer token, rejects unsafe targets, and fetches Open Graph/oEmbed metadata for chat and News Chat link cards
+- [`link-preview`](C:/repos/chat2.0/supabase/functions/link-preview/index.ts:1): validates a signed-in bearer token, rejects unsafe targets, and fetches Open Graph/oEmbed metadata for chat, DM, and board-chat link cards
 - [`bridge-*`](C:/repos/chat2.0/supabase/functions): bridge pairing, session lifecycle, profile/search, group/DM polling and sending, heartbeat, and update-check functions
 
 ### Background Workers
@@ -111,18 +114,18 @@ Full runbook: [docs/NEWS_TAB_AND_SCRAPER.md](C:/repos/chat2.0/docs/NEWS_TAB_AND_
 ### Admin Access
 
 Admin access is an app-wide role domain. The single full `admin` can grant or
-revoke `sub_admin` access from Settings > Admin > Admin Access. Sub-admins can
-use operator tools, including News Sources and Feedback Review, but cannot
-manage roles.
+revoke `sub_admin` access from Settings > Admin > Admin Access or from a user's
+public profile popup. Sub-admins can use operator tools, including News Sources
+and Feedback Review, but cannot manage roles.
 
 Role badges are intentionally public identity metadata. Full admins render with
 a gold shield and sub-admins render with a silver shield in chat/profile
 surfaces.
 
 Channel bans are an admin moderation subdomain exposed from another user's
-public profile popup. Operators can block General Chat, News Chat, and News
-Feed participation for timed or permanent durations. DMs are deliberately not
-part of channel-ban enforcement.
+public profile popup. Operators can block General Chat, individual chat boards,
+or all app interaction for timed or permanent durations. DMs are deliberately
+not part of channel-ban enforcement.
 
 Full runbook: [docs/ADMIN_ACCESS.md](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1).
 Moderation runbook: [docs/CHANNEL_BANS.md](C:/repos/chat2.0/docs/CHANNEL_BANS.md:1).
@@ -184,22 +187,23 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 5. `useNewsFeed` receives realtime inserts/updates and refreshes the board
 6. Reactions are toggled through `toggle_news_feed_reaction`
 
-### News Chat
+### Board Chat
 
-1. Signed-in user sends text in News Chat
-2. Insert hits `news_chat_messages`
-3. `useNewsChat` receives realtime inserts/updates/deletes
+1. Signed-in user opens News Chat, Investing Chat, Learning Chat, or Crypto Chat from Boards
+2. Insert hits `board_chat_messages` with the selected `board_slug`
+3. `useBoardChat` receives realtime inserts/updates/deletes for that board
 4. Link text is tokenized client-side and metadata is fetched through `link-preview`
-5. Reactions are toggled through `toggle_news_chat_reaction`
+5. Reactions are toggled through `toggle_board_chat_reaction`
+6. `user_read_cursors` tracks last read by `surface = 'board_chat'` and board slug
 
 ### Channel Ban Enforcement
 
 1. An app operator opens a user's public profile popup
 2. The profile popup loads active bans through `list_user_channel_bans`
 3. Operator saves scopes and duration through `set_user_channel_bans`
-4. RLS blocks banned inserts/updates in `messages` or `news_chat_messages`
-5. Reaction RPCs block banned group, News Chat, or News Feed reactions
-6. Existing user deletes remain allowed so old content can still be cleaned up
+4. RLS blocks banned inserts/updates in `messages` or `board_chat_messages`
+5. Reaction RPCs block banned group, board-chat, or all-interaction feed reactions
+6. General Chat receives the public Shado moderation notice with reason/duration
 
 ### Active Presence
 

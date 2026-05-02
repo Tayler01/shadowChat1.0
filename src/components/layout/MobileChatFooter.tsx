@@ -2,8 +2,8 @@ import React from 'react'
 import { MobileNav } from './MobileNav'
 
 interface MobileChatFooterProps {
-  currentView: 'chat' | 'dms' | 'news' | 'settings'
-  onViewChange: (view: 'chat' | 'dms' | 'news' | 'settings') => void
+  currentView: 'chat' | 'dms' | 'boards' | 'settings'
+  onViewChange: (view: 'chat' | 'dms' | 'boards' | 'settings') => void
   children: React.ReactNode
 }
 

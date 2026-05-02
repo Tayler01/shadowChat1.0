@@ -1,0 +1,338 @@
+import React, { useCallback, useRef, useState } from 'react'
+import { ArrowDown, Check, Copy, Edit3, Send, Trash2, X } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { Avatar } from '../ui/Avatar'
+import { Button } from '../ui/Button'
+import { LoadingSpinner } from '../ui/LoadingSpinner'
+import { MessageRichText } from '../chat/MessageRichText'
+import { NewsReactionBar, NewsReactionSummaryStrip } from '../news/NewsReactionBar'
+import { UserRoleBadge } from '../ui/UserRoleBadge'
+import { UserPresenceBadge } from '../ui/UserPresenceBadge'
+import { UnreadDivider } from '../chat/UnreadDivider'
+import { useAuth } from '../../hooks/useAuth'
+import { useBoardChat } from '../../hooks/useBoardChat'
+import { useReadCursor } from '../../hooks/useReadCursor'
+import { useUnreadScroll } from '../../hooks/useUnreadScroll'
+import { formatTime } from '../../lib/utils'
+import { getBlockedActionMessage } from '../../lib/moderation'
+import { showActionErrorToast } from '../../lib/toastNotifications'
+import type { BoardChatMessage } from '../../lib/supabase'
+import type { ChatBoardDefinition } from '../../lib/boards'
+
+function BoardChatRow({
+  board,
+  message,
+  onEdit,
+  onDelete,
+  onReact,
+}: {
+  board: ChatBoardDefinition
+  message: BoardChatMessage
+  onEdit: (id: string, content: string) => Promise<void>
+  onDelete: (id: string) => Promise<void>
+  onReact: (id: string, emoji: string) => Promise<void>
+}) {
+  const { profile } = useAuth()
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(message.content)
+  const isOwner = profile?.id === message.user_id
+
+  const copyMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content)
+      toast.success('Message copied')
+    } catch {
+      toast.error('Failed to copy message')
+    }
+  }
+
+  const saveEdit = async () => {
+    try {
+      await onEdit(message.id, draft)
+      setEditing(false)
+    } catch (error) {
+      const notice = await getBlockedActionMessage(
+        board.moderationScope,
+        error,
+        `Failed to update ${board.title} message`
+      )
+      showActionErrorToast(notice)
+    }
+  }
+
+  const reactToMessage = async (emoji: string) => {
+    try {
+      await onReact(message.id, emoji)
+    } catch (error) {
+      const notice = await getBlockedActionMessage(board.moderationScope, error, 'Failed to update reaction')
+      showActionErrorToast(notice)
+    }
+  }
+
+  const deleteMessage = async () => {
+    try {
+      await onDelete(message.id)
+    } catch (error) {
+      const notice = await getBlockedActionMessage(
+        board.moderationScope,
+        error,
+        `Failed to delete ${board.title} message`
+      )
+      showActionErrorToast(notice)
+    }
+  }
+
+  return (
+    <div
+      id={`board-chat-message-${board.slug}-${message.id}`}
+      className="group grid max-w-full grid-cols-[auto_minmax(0,1fr)_2rem] items-start gap-3 px-4 py-3 md:px-5"
+    >
+      <Avatar
+        src={message.user?.avatar_url}
+        alt={message.user?.display_name || 'Board user'}
+        size="md"
+        color={message.user?.color}
+        userId={message.user?.id}
+        presenceVisibility={message.user?.presence_visibility}
+        showStatus
+      />
+      <div className="min-w-0">
+        <div className="mb-1 flex flex-wrap items-baseline gap-2">
+          <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-[var(--text-primary)]">
+            <span className="truncate">{message.user?.display_name || message.user?.username || 'Unknown'}</span>
+            <UserRoleBadge role={message.user?.admin_role} />
+            <UserPresenceBadge userId={message.user?.id} presenceVisibility={message.user?.presence_visibility} />
+          </span>
+          <span className="text-xs text-[var(--text-muted)]">{formatTime(message.created_at)}</span>
+          {message.edited_at && <span className="text-xs text-[var(--text-muted)]">(edited)</span>}
+        </div>
+
+        {editing ? (
+          <div className="space-y-2">
+            <textarea
+              value={draft}
+              onChange={event => setDraft(event.target.value)}
+              className="obsidian-input min-h-20 w-full resize-none rounded-[var(--radius-md)] p-3 text-sm"
+            />
+            <div className="flex gap-2">
+              <Button type="button" size="sm" onClick={() => void saveEdit()} disabled={!draft.trim()}>
+                <Check className="mr-2 h-4 w-4" />
+                Save
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
+                <X className="mr-2 h-4 w-4" />
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div
+            data-testid="board-chat-message-bubble"
+            className="block w-fit min-w-0 max-w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] px-3 py-2 text-sm text-[var(--text-primary)] shadow-[var(--shadow-panel)]"
+          >
+            <MessageRichText content={message.content} />
+          </div>
+        )}
+
+        {!editing && (
+          <NewsReactionSummaryStrip
+            reactions={message.reactions}
+            onReact={reactToMessage}
+            className="mt-1.5"
+          />
+        )}
+
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void copyMessage()}
+            className="inline-flex h-7 items-center gap-1 rounded-full border border-transparent px-2 text-xs text-[var(--text-muted)] transition-colors hover:border-[var(--border-subtle)] hover:text-[var(--text-primary)]"
+            aria-label={`Copy ${board.title} message`}
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Copy
+          </button>
+          {isOwner && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setDraft(message.content)
+                  setEditing(true)
+                }}
+                className="inline-flex h-7 items-center gap-1 rounded-full border border-transparent px-2 text-xs text-[var(--text-muted)] transition-colors hover:border-[var(--border-subtle)] hover:text-[var(--text-primary)]"
+              >
+                <Edit3 className="h-3.5 w-3.5" />
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => void deleteMessage()}
+                className="inline-flex h-7 items-center gap-1 rounded-full border border-transparent px-2 text-xs text-red-200/80 transition-colors hover:border-[rgba(190,52,85,0.35)] hover:text-red-100"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+      <div className="relative flex h-8 w-8 justify-end">
+        {!editing && (
+          <NewsReactionBar
+            reactions={message.reactions}
+            onReact={reactToMessage}
+            variant="menu"
+            className="shrink-0"
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function BoardChat({ board }: { board: ChatBoardDefinition }) {
+  const { profile } = useAuth()
+  const {
+    messages,
+    loading,
+    sending,
+    error,
+    sendMessage,
+    editMessage,
+    deleteMessage,
+    toggleReaction,
+  } = useBoardChat(board.slug, board.title)
+  const [draft, setDraft] = useState('')
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const {
+    cursor,
+    loading: cursorLoading,
+    markRead,
+  } = useReadCursor('board_chat', board.slug, Boolean(profile?.id))
+
+  const markBoardRead = useCallback(
+    async (message: BoardChatMessage) => {
+      await markRead(message.id, message.created_at)
+    },
+    [markRead]
+  )
+
+  const {
+    autoScroll,
+    firstUnreadMessageId,
+    handleUnreadScroll,
+    scrollToBottom,
+  } = useUnreadScroll<BoardChatMessage>({
+    containerRef: scrollRef,
+    messages,
+    loading,
+    cursor,
+    cursorLoading,
+    enabled: Boolean(profile?.id),
+    surfaceKey: `board_chat:${board.slug}`,
+    getMessageId: message => message.id,
+    getMessageCreatedAt: message => message.created_at,
+    getElementId: id => `board-chat-message-${board.slug}-${id}`,
+    onMarkReadToLatest: markBoardRead,
+  })
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!draft.trim() || sending) return
+
+    try {
+      await sendMessage(draft)
+      setDraft('')
+    } catch (err) {
+      const notice = await getBlockedActionMessage(
+        board.moderationScope,
+        err,
+        `Failed to send ${board.title} message`
+      )
+      showActionErrorToast(notice)
+    }
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="border-b border-[var(--border-panel)] px-4 py-3 md:px-5">
+        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--text-primary)]">{board.title}</h2>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">Text and links only.</p>
+      </div>
+
+      <div className="relative min-h-0 flex-1">
+        <div ref={scrollRef} onScroll={handleUnreadScroll} className="h-full overflow-y-auto">
+          {loading ? (
+            <div className="flex h-full items-center justify-center p-8">
+              <LoadingSpinner size="lg" className="text-[var(--text-gold)]" />
+            </div>
+          ) : error ? (
+            <div className="m-4 rounded-[var(--radius-md)] border border-[rgba(190,52,85,0.35)] bg-[rgba(87,14,28,0.18)] p-4 text-sm text-red-100">
+              {error}
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="flex h-full items-center justify-center p-6 text-center text-sm text-[var(--text-muted)]">
+              No {board.title.toLowerCase()} messages yet.
+            </div>
+          ) : (
+            <div className="py-2">
+              {messages.map(message => (
+                <React.Fragment key={message.id}>
+                  {firstUnreadMessageId === message.id && (
+                    <UnreadDivider className="mx-4 md:mx-5" />
+                  )}
+                  <BoardChatRow
+                    board={board}
+                    message={message}
+                    onEdit={editMessage}
+                    onDelete={deleteMessage}
+                    onReact={toggleReaction}
+                  />
+                </React.Fragment>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {!autoScroll && (
+          <button
+            type="button"
+            onClick={() => scrollToBottom()}
+            aria-label="Jump to latest"
+            className="absolute bottom-4 right-4 z-20 rounded-full border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] p-2 text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)] transition-transform hover:-translate-y-0.5"
+          >
+            <ArrowDown className="h-5 w-5" />
+          </button>
+        )}
+      </div>
+
+      <form onSubmit={handleSubmit} className="border-t border-[var(--border-panel)] bg-[linear-gradient(180deg,rgba(16,18,19,0.94),rgba(10,11,12,0.98))] p-3">
+        <div className="flex items-end gap-2">
+          <textarea
+            value={draft}
+            onChange={event => setDraft(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault()
+                event.currentTarget.form?.requestSubmit()
+              }
+            }}
+            placeholder={`Drop a link or note in ${board.title}`}
+            rows={1}
+            className="obsidian-input max-h-28 min-h-11 flex-1 resize-none rounded-[var(--radius-md)] px-3.5 py-3 text-sm text-[var(--text-primary)]"
+          />
+          <Button
+            type="submit"
+            disabled={!draft.trim() || sending}
+            loading={sending}
+            className="h-11 w-11 rounded-xl p-0"
+            aria-label={`Send ${board.title} message`}
+          >
+            <Send className="h-5 w-5" />
+          </Button>
+        </div>
+      </form>
+    </div>
+  )
+}

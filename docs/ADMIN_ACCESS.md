@@ -27,14 +27,18 @@ The schema enforces exactly one full `admin` through
 
 Admin settings are split into subpages under Settings > Admin:
 
-- Admin Access: full-admin-only sub-admin management.
+- Admin Access: full-admin-only sub-admin management from the complete user
+  list.
 - ESP Bridge Pairing: operator bridge approval controls.
 - News Sources: operator add, pause, enable, and delete controls for tracked
   X/Truth Social accounts.
 - Feedback Review: operator review and deletion for submitted bugs and
   suggestions.
+- Public Profile Admin Access: full admins can grant or remove sub-admin access
+  from another user's profile popup.
 - Channel Bans: operator controls shown in another user's public profile popup
-  for General Chat, News Chat, and News Feed participation limits.
+  for General Chat, individual chat boards, and all-interaction participation
+  limits.
 
 ## Backend Surface
 

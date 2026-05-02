@@ -22,7 +22,7 @@ export function NewsFeed() {
         return updated || prev
       })
     } catch (error) {
-      const message = await getBlockedActionMessage('news_feed', error, 'Failed to update reaction')
+      const message = await getBlockedActionMessage('all_interaction', error, 'Failed to update reaction')
       showActionErrorToast(message)
     }
   }

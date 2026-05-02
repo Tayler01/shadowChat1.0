@@ -35,8 +35,8 @@ import { UnreadDivider } from '../chat/UnreadDivider'
 
 interface DirectMessagesViewProps {
   onToggleSidebar: () => void
-  currentView: 'chat' | 'dms' | 'news' | 'settings'
-  onViewChange: (view: 'chat' | 'dms' | 'news' | 'settings') => void
+  currentView: 'chat' | 'dms' | 'boards' | 'settings'
+  onViewChange: (view: 'chat' | 'dms' | 'boards' | 'settings') => void
   initialConversation?: string
   initialMessageId?: string
 }
