@@ -26,8 +26,10 @@ and read their own submissions. App operators can now read all submissions from
 operators receive short-lived signed URLs after the storage `SELECT` policy
 confirms their admin-class access.
 
-Admin review is currently read-only. Status editing, assignment, notifications,
-and moderation workflows are intentionally deferred.
+Admin review also allows operators to delete submitted bugs and suggestions.
+Deleting removes the `feedback_submissions` row first, then cleans up attached
+private images best-effort. Status editing, assignment, notifications, and
+moderation workflows are intentionally deferred.
 
 ## Deployment
 
@@ -58,7 +60,9 @@ For any change to this flow, verify all of the following:
 5. Download the attachment from `feedback-attachments` as the same user.
 6. Open **Settings > Admin > Feedback Review** as an app operator and confirm the
    row appears with its signed image attachment.
-7. Run the Settings smoke scenario or the full smoke suite.
+7. Open the submission detail modal and confirm the delete action removes it
+   from the list.
+8. Run the Settings smoke scenario or the full smoke suite.
 
 The April 28, 2026 release was verified with:
 

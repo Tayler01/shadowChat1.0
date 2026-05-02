@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import React from 'react'
 import { AdminFeedbackReview } from '../src/components/settings/AdminFeedbackReview'
 
 const mockRefresh = jest.fn()
+const mockDeleteSubmission = jest.fn()
 const mockUseAdminFeedback = jest.fn()
 
 jest.mock('../src/hooks/useAdminFeedback', () => ({
@@ -69,7 +70,9 @@ beforeEach(() => {
     ],
     loading: false,
     error: null,
+    deletingId: null,
     refresh: mockRefresh,
+    deleteSubmission: mockDeleteSubmission,
   })
 })
 
@@ -108,4 +111,18 @@ test('refreshes feedback submissions on command', () => {
   fireEvent.click(screen.getByRole('button', { name: /refresh feedback submissions/i }))
 
   expect(mockRefresh).toHaveBeenCalledTimes(1)
+})
+
+test('deletes a feedback submission after confirmation', async () => {
+  jest.spyOn(window, 'confirm').mockReturnValueOnce(true)
+  mockDeleteSubmission.mockResolvedValueOnce(undefined)
+  render(<AdminFeedbackReview />)
+
+  fireEvent.click(screen.getByRole('button', { name: /app crashes after upload/i }))
+  fireEvent.click(screen.getByRole('button', { name: /delete feedback submission/i }))
+
+  expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('App crashes after upload'))
+  await waitFor(() => {
+    expect(mockDeleteSubmission).toHaveBeenCalledWith(expect.objectContaining({ id: 'feedback-1' }))
+  })
 })

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import {
   Bug,
+  Trash2,
   ExternalLink,
   Image as ImageIcon,
   Lightbulb,
@@ -106,9 +107,13 @@ function AttachmentThumbs({ attachments, title }: { attachments: AdminFeedbackAt
 function FeedbackDetailModal({
   submission,
   onClose,
+  onDelete,
+  deleting,
 }: {
   submission: AdminFeedbackSubmission | null
   onClose: () => void
+  onDelete: (submission: AdminFeedbackSubmission) => void
+  deleting: boolean
 }) {
   if (!submission) return null
 
@@ -125,9 +130,22 @@ function FeedbackDetailModal({
               {submission.title}
             </h2>
           </div>
-          <Button type="button" variant="ghost" size="sm" onClick={onClose} aria-label="Close feedback submission">
-            <X className="h-4 w-4" />
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              type="button"
+              variant="danger"
+              size="sm"
+              loading={deleting}
+              onClick={() => onDelete(submission)}
+              aria-label="Delete feedback submission"
+            >
+              <Trash2 className="mr-1.5 h-4 w-4" />
+              Delete
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={onClose} aria-label="Close feedback submission">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
@@ -234,10 +252,22 @@ function FeedbackDetailModal({
 }
 
 export function AdminFeedbackReview() {
-  const { submissions, loading, error, refresh } = useAdminFeedback()
+  const { submissions, loading, error, deletingId, refresh, deleteSubmission } = useAdminFeedback()
   const [selectedSubmission, setSelectedSubmission] = useState<AdminFeedbackSubmission | null>(null)
   const [filter, setFilter] = useState<FeedbackFilter>('all')
   const [searchTerm, setSearchTerm] = useState('')
+
+  const handleDeleteSubmission = async (submission: AdminFeedbackSubmission) => {
+    const confirmed = window.confirm(`Delete "${submission.title}"? This removes the submission and any attached images.`)
+    if (!confirmed) return
+
+    try {
+      await deleteSubmission(submission)
+      setSelectedSubmission(null)
+    } catch {
+      // The hook surfaces the error in the panel.
+    }
+  }
 
   const filteredSubmissions = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
@@ -371,6 +401,8 @@ export function AdminFeedbackReview() {
       <FeedbackDetailModal
         submission={selectedSubmission}
         onClose={() => setSelectedSubmission(null)}
+        onDelete={(submission) => void handleDeleteSubmission(submission)}
+        deleting={Boolean(selectedSubmission && deletingId === selectedSubmission.id)}
       />
     </div>
   )

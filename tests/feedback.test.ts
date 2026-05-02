@@ -1,6 +1,7 @@
 import {
   FEEDBACK_ATTACHMENT_SIGNED_URL_SECONDS,
   FEEDBACK_ATTACHMENTS_BUCKET,
+  deleteAdminFeedbackSubmission,
   fetchAdminFeedbackSubmissions,
   submitFeedback,
   validateFeedbackSubmission,
@@ -10,6 +11,8 @@ const upload = jest.fn()
 const remove = jest.fn()
 const createSignedUrls = jest.fn()
 const insert = jest.fn()
+const deleteFeedback = jest.fn()
+const eqFeedback = jest.fn()
 const select = jest.fn()
 const single = jest.fn()
 const selectFeedback = jest.fn()
@@ -40,6 +43,7 @@ jest.mock('../src/lib/supabase', () => ({
 
       return {
         insert,
+        delete: deleteFeedback,
         select: selectFeedback,
       }
     }),
@@ -53,6 +57,8 @@ beforeEach(() => {
   single.mockResolvedValue({ data: { id: 'feedback-id' }, error: null })
   select.mockReturnValue({ single })
   insert.mockReturnValue({ select })
+  eqFeedback.mockResolvedValue({ error: null })
+  deleteFeedback.mockReturnValue({ eq: eqFeedback })
   limitFeedback.mockResolvedValue({ data: [], error: null })
   orderFeedback.mockReturnValue({ limit: limitFeedback })
   selectFeedback.mockReturnValue({ order: orderFeedback })
@@ -202,4 +208,23 @@ test('loads admin feedback submissions with signed private attachment URLs', asy
       }),
     ],
   }))
+})
+
+test('deletes admin feedback submissions and attached images', async () => {
+  await deleteAdminFeedbackSubmission({
+    id: 'feedback-1',
+    attachments: [
+      {
+        bucket: FEEDBACK_ATTACHMENTS_BUCKET,
+        path: 'user-id/feedback-1/1-upload.png',
+        name: 'upload.png',
+        size: 1200,
+        type: 'image/png',
+      },
+    ],
+  })
+
+  expect(remove).toHaveBeenCalledWith(['user-id/feedback-1/1-upload.png'])
+  expect(deleteFeedback).toHaveBeenCalled()
+  expect(eqFeedback).toHaveBeenCalledWith('id', 'feedback-1')
 })

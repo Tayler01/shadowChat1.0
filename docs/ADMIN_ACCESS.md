@@ -30,7 +30,8 @@ Admin settings are split into subpages under Settings > Admin:
 - Admin Access: full-admin-only sub-admin management.
 - ESP Bridge Pairing: operator bridge approval controls.
 - News Sources: operator source controls for tracked X/Truth Social accounts.
-- Feedback Review: operator read-only review for submitted bugs and suggestions.
+- Feedback Review: operator review and deletion for submitted bugs and
+  suggestions.
 
 ## Backend Surface
 

@@ -35,7 +35,7 @@ security-sensitive or high-churn operational data.
 | `bridge_pairing_codes` | Short-lived bridge pairing codes. | Do not publish. Sensitive short-lived data, polled by bridge status function. |
 | `bridge_pairings` | Device-to-user bridge pairing records. | Do not publish yet. Pairing lifecycle is handled by functions. |
 | `bridge_update_manifests` | Firmware/tools release metadata. | Do not publish. Firmware checks are request/response, not live UI. |
-| `feedback_submissions` | User feedback and attachments metadata. | Do not publish. User submit/read-own and operator review are on-demand, not live. |
+| `feedback_submissions` | User feedback and attachments metadata. | Do not publish. User submit/read-own plus operator review/delete are on-demand, not live. |
 | `message_reactions` | Normalized group-message reaction rows. | Do not publish. RPCs aggregate reactions back onto `messages`, which is published. |
 | `news_chat_reactions` | Normalized News Chat reaction rows. | Do not publish. RPCs aggregate reactions back onto `news_chat_messages`, which is published. |
 | `news_feed_reactions` | Normalized News Feed reaction rows. | Do not publish. RPCs aggregate reactions back onto `news_feed_items`, which is published. |

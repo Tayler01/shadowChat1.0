@@ -187,6 +187,34 @@ export const fetchAdminFeedbackSubmissions = async (): Promise<AdminFeedbackSubm
   })))
 }
 
+export const deleteAdminFeedbackSubmission = async (
+  submission: Pick<AdminFeedbackSubmission, 'id' | 'attachments'>
+): Promise<void> => {
+  const workingClient = await getWorkingClient()
+  const attachmentPaths = submission.attachments
+    .map(attachment => attachment.path)
+    .filter(Boolean)
+
+  const { error } = await workingClient
+    .from('feedback_submissions')
+    .delete()
+    .eq('id', submission.id)
+
+  if (error) {
+    throw error
+  }
+
+  if (attachmentPaths.length > 0) {
+    try {
+      await workingClient.storage
+        .from(FEEDBACK_ATTACHMENTS_BUCKET)
+        .remove(attachmentPaths)
+    } catch {
+      // The submission is already removed; orphan cleanup can be retried later.
+    }
+  }
+}
+
 export const buildFeedbackAttachmentPath = (
   userId: string,
   submissionId: string,
