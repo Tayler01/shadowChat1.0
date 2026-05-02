@@ -14,6 +14,7 @@ import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { useAuth } from '../../hooks/useAuth'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
+import { getBlockedActionMessage } from '../../lib/moderation'
 
 interface MessageListProps {
   onReply?: (messageId: string, content: string) => void
@@ -313,8 +314,9 @@ export const MessageList: React.FC<MessageListProps> = ({
     try {
       await editMessage(messageId, content)
       toast.success('Message updated')
-    } catch {
-      toast.error('Failed to update message')
+    } catch (error) {
+      const message = await getBlockedActionMessage('general_chat', error, 'Failed to update message')
+      toast.error(message, { duration: message.startsWith('You are banned') ? 7000 : 4000 })
     }
   }
 
@@ -322,8 +324,9 @@ export const MessageList: React.FC<MessageListProps> = ({
     try {
       await deleteMessage(messageId)
       toast.success('Message deleted')
-    } catch {
-      toast.error('Failed to delete message')
+    } catch (error) {
+      const message = await getBlockedActionMessage('general_chat', error, 'Failed to delete message')
+      toast.error(message, { duration: message.startsWith('You are banned') ? 7000 : 4000 })
     }
   }
 

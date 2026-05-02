@@ -9,6 +9,8 @@ import { VideoAttachment } from './VideoAttachment'
 import { cn } from '../../lib/utils'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
+import toast from 'react-hot-toast'
+import { getBlockedActionMessage } from '../../lib/moderation'
 
 const QUICK_REACTIONS = ['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F389}', '\u{1F64F}']
 
@@ -55,7 +57,12 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
   }, [showPicker])
 
   const handleReaction = async (emoji: string) => {
-    await onToggleReaction(message.id, emoji)
+    try {
+      await onToggleReaction(message.id, emoji)
+    } catch (error) {
+      const notice = await getBlockedActionMessage('general_chat', error, 'Failed to update reaction')
+      toast.error(notice, { duration: notice.startsWith('You are banned') ? 7000 : 4000 })
+    }
   }
 
   const handleSelect = (emojiData: EmojiClickData) => {

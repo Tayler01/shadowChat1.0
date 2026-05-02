@@ -4,13 +4,18 @@ import { PublicProfileDialog } from '../src/components/profile/PublicProfileDial
 import type { User } from '../src/lib/supabase'
 
 const mockUseAuth = jest.fn()
-const mockListUserChannelBans = jest.fn()
+const mockUseUserChannelBans = jest.fn()
 const mockSetUserChannelBans = jest.fn()
+const mockNotifyChannelBansChanged = jest.fn()
 const mockToastSuccess = jest.fn()
 const mockToastError = jest.fn()
 
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
+}))
+
+jest.mock('../src/hooks/useUserChannelBans', () => ({
+  useUserChannelBans: (...args: unknown[]) => mockUseUserChannelBans(...args),
 }))
 
 jest.mock('../src/lib/moderation', () => ({
@@ -43,7 +48,13 @@ jest.mock('../src/lib/moderation', () => ({
     news_chat: 'News Chat',
     news_feed: 'News Feed',
   }[scope] ?? scope),
-  listUserChannelBans: (...args: unknown[]) => mockListUserChannelBans(...args),
+  formatChannelBanExpiry: () => 'Until May 2, 8:00 PM',
+  describeChannelBanScopes: (bans: Array<{ scope: string }>) => bans.map(ban => ({
+    general_chat: 'General Chat',
+    news_chat: 'News Chat',
+    news_feed: 'News Feed',
+  }[ban.scope] ?? ban.scope)).join(', '),
+  notifyChannelBansChanged: (...args: unknown[]) => mockNotifyChannelBansChanged(...args),
   setUserChannelBans: (...args: unknown[]) => mockSetUserChannelBans(...args),
 }))
 
@@ -78,7 +89,7 @@ const adminUser = {
 beforeEach(() => {
   jest.clearAllMocks()
   mockUseAuth.mockReturnValue({ profile: null })
-  mockListUserChannelBans.mockResolvedValue([])
+  mockUseUserChannelBans.mockReturnValue({ bans: [], loading: false, refresh: jest.fn() })
   mockSetUserChannelBans.mockResolvedValue([])
 })
 
@@ -127,11 +138,15 @@ test('lets admins save channel ban selections from the profile dialog', async ()
     await browserUser.click(screen.getByLabelText(/general chat/i))
   })
   await act(async () => {
+    await browserUser.type(screen.getByLabelText(/public reason/i), 'Spam in the channel')
+  })
+  await act(async () => {
     await browserUser.click(screen.getByRole('button', { name: /save bans/i }))
   })
 
   await waitFor(() => {
-    expect(mockSetUserChannelBans).toHaveBeenCalledWith(user.id, ['general_chat'], 1440)
+    expect(mockSetUserChannelBans).toHaveBeenCalledWith(user.id, ['general_chat'], 1440, 'Spam in the channel')
   })
+  expect(mockNotifyChannelBansChanged).toHaveBeenCalledWith(user.id)
   expect(mockToastSuccess).toHaveBeenCalledWith('Channel bans updated')
 })

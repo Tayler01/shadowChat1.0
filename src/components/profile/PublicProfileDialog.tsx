@@ -1,20 +1,24 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { CalendarDays, Clock3, Ghost, Palette, ShieldAlert, UserRound, X } from 'lucide-react'
+import { CalendarDays, Clock3, Ghost, LockKeyhole, Palette, ShieldAlert, UserRound, X } from 'lucide-react'
 import type { User } from '../../lib/supabase'
 import {
   CHANNEL_BAN_DURATIONS,
   CHANNEL_BAN_OPTIONS,
+  describeChannelBanScopes,
+  formatChannelBanExpiry,
   getChannelBanLabel,
-  listUserChannelBans,
+  notifyChannelBansChanged,
   setUserChannelBans,
   type ChannelBanDuration,
   type ChannelBanScope,
+  type PublicUserChannelBan,
   type UserChannelBan,
 } from '../../lib/moderation'
 import { useAuth } from '../../hooks/useAuth'
 import { getPresenceStateLabel, usePresenceForUser } from '../../hooks/usePresence'
+import { useUserChannelBans } from '../../hooks/useUserChannelBans'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
@@ -41,18 +45,6 @@ const formatJoinDate = (value?: string) => {
   })
 }
 
-const formatBanExpiry = (value?: string | null) => {
-  if (!value) return 'permanent'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'timed'
-  return `until ${date.toLocaleString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })}`
-}
-
 const getErrorMessage = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : fallback
 
@@ -66,13 +58,18 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   const previousFocusRef = useRef<HTMLElement | null>(null)
   const { profile: currentProfile } = useAuth()
   const livePresence = usePresenceForUser(user?.id)
+  const {
+    bans: publicBans,
+    loading: publicBansLoading,
+    refresh: refreshPublicBans,
+  } = useUserChannelBans(open ? user?.id : null)
   const [banMenuOpen, setBanMenuOpen] = useState(false)
-  const [banLoading, setBanLoading] = useState(false)
   const [banSaving, setBanSaving] = useState(false)
   const [banError, setBanError] = useState<string | null>(null)
-  const [activeBans, setActiveBans] = useState<UserChannelBan[]>([])
+  const [activeBans, setActiveBans] = useState<Array<PublicUserChannelBan | UserChannelBan>>([])
   const [selectedBanScopes, setSelectedBanScopes] = useState<ChannelBanScope[]>([])
   const [banDuration, setBanDuration] = useState<ChannelBanDuration>('1440')
+  const [banReason, setBanReason] = useState('')
 
   const canModerate = Boolean(
     open &&
@@ -80,7 +77,10 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
     currentProfile &&
     currentProfile.id !== user.id &&
     user.admin_role !== 'admin' &&
-    (currentProfile.admin_role === 'admin' || currentProfile.admin_role === 'sub_admin')
+    (
+      currentProfile.admin_role === 'admin' ||
+      (currentProfile.admin_role === 'sub_admin' && user.admin_role !== 'sub_admin')
+    )
   )
 
   const selectedScopeSet = useMemo(
@@ -91,9 +91,13 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   const activeBanSummary = useMemo(() => {
     if (activeBans.length === 0) return 'No active channel bans'
     return activeBans
-      .map(ban => `${getChannelBanLabel(ban.scope)} ${formatBanExpiry(ban.expires_at)}`)
+      .map(ban => `${getChannelBanLabel(ban.scope)} ${formatChannelBanExpiry(ban.expires_at).toLowerCase()}`)
       .join(', ')
   }, [activeBans])
+
+  const activeBanReasons = useMemo(() => (
+    Array.from(new Set(activeBans.map(ban => ban.reason?.trim()).filter(Boolean) as string[]))
+  ), [activeBans])
 
   useEffect(() => {
     if (!open) return
@@ -150,40 +154,28 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   }, [open, onClose])
 
   useEffect(() => {
-    if (!open || !user || !canModerate) {
+    if (!open || !user) {
       setBanMenuOpen(false)
       setBanError(null)
       setActiveBans([])
       setSelectedBanScopes([])
+      setBanReason('')
       return
     }
 
-    let cancelled = false
-    setBanLoading(true)
     setBanError(null)
+    setActiveBans(publicBans)
 
-    listUserChannelBans(user.id)
-      .then(bans => {
-        if (cancelled) return
-        setActiveBans(bans)
-        setSelectedBanScopes(bans.map(ban => ban.scope))
-        const firstTimedBan = bans.find(ban => ban.expires_at)
-        setBanDuration(bans.length > 0 && !firstTimedBan ? 'permanent' : '1440')
-      })
-      .catch(error => {
-        if (cancelled) return
-        setBanError(getErrorMessage(error, 'Unable to load channel bans'))
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setBanLoading(false)
-        }
-      })
-
-    return () => {
-      cancelled = true
+    if (canModerate) {
+      setSelectedBanScopes(publicBans.map(ban => ban.scope))
+      const firstTimedBan = publicBans.find(ban => ban.expires_at)
+      setBanDuration(publicBans.length > 0 && !firstTimedBan ? 'permanent' : '1440')
+      setBanReason(publicBans[0]?.reason?.trim() || '')
+    } else {
+      setSelectedBanScopes([])
+      setBanReason('')
     }
-  }, [canModerate, open, user])
+  }, [canModerate, open, publicBans, user])
 
   const toggleBanScope = (scope: ChannelBanScope) => {
     setSelectedBanScopes(prev => (
@@ -196,15 +188,25 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   const saveChannelBans = async () => {
     if (!user || !canModerate) return
 
+    const trimmedReason = banReason.trim()
+    if ((selectedBanScopes.length > 0 || activeBans.length > 0) && !trimmedReason) {
+      const message = 'A public reason is required for channel ban changes'
+      setBanError(message)
+      toast.error(message)
+      return
+    }
+
     setBanSaving(true)
     setBanError(null)
 
     try {
       const durationMinutes =
         banDuration === 'permanent' ? null : Number.parseInt(banDuration, 10)
-      const nextBans = await setUserChannelBans(user.id, selectedBanScopes, durationMinutes)
+      const nextBans = await setUserChannelBans(user.id, selectedBanScopes, durationMinutes, trimmedReason)
       setActiveBans(nextBans)
       setSelectedBanScopes(nextBans.map(ban => ban.scope))
+      notifyChannelBansChanged(user.id)
+      void refreshPublicBans(true)
       setBanMenuOpen(false)
       toast.success(nextBans.length > 0 ? 'Channel bans updated' : 'Channel bans cleared')
     } catch (error) {
@@ -340,6 +342,33 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                   </dl>
                 </section>
 
+                {activeBans.length > 0 && (
+                  <section className="rounded-[var(--radius-md)] border border-[rgba(215,170,70,0.24)] bg-[rgba(215,170,70,0.06)] p-4">
+                    <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                      <LockKeyhole className="h-3.5 w-3.5 text-[var(--text-gold)]" />
+                      Channel Ban
+                    </div>
+                    <p className="text-sm leading-6 text-[var(--text-primary)]">
+                      Banned from {describeChannelBanScopes(activeBans)}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {activeBans.map(ban => (
+                        <span
+                          key={`${ban.target_user_id}-${ban.scope}`}
+                          className="inline-flex rounded-full border border-[rgba(215,170,70,0.2)] bg-[rgba(10,11,12,0.44)] px-2.5 py-1 text-xs text-[var(--text-secondary)]"
+                        >
+                          {getChannelBanLabel(ban.scope)} - {formatChannelBanExpiry(ban.expires_at)}
+                        </span>
+                      ))}
+                    </div>
+                    {activeBanReasons.length > 0 && (
+                      <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">
+                        Reason: {activeBanReasons.join('; ')}
+                      </p>
+                    )}
+                  </section>
+                )}
+
                 {canModerate && (
                   <section className="rounded-[var(--radius-md)] border border-[rgba(215,170,70,0.24)] bg-[rgba(215,170,70,0.055)] p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -349,7 +378,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                           Admin Moderation
                         </div>
                         <p className="text-sm leading-6 text-[var(--text-secondary)]">
-                          {banLoading ? 'Loading channel bans...' : activeBanSummary}
+                          {publicBansLoading ? 'Loading channel bans...' : activeBanSummary}
                         </p>
                       </div>
                       <Button
@@ -357,7 +386,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                         variant={activeBans.length > 0 ? 'danger' : 'secondary'}
                         size="sm"
                         onClick={() => setBanMenuOpen(value => !value)}
-                        disabled={banLoading || banSaving}
+                        disabled={publicBansLoading || banSaving}
                         aria-expanded={banMenuOpen}
                       >
                         <ShieldAlert className="mr-2 h-4 w-4" />
@@ -412,6 +441,17 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                               </option>
                             ))}
                           </select>
+                        </label>
+
+                        <label className="mt-3 block text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                          Public reason
+                          <textarea
+                            value={banReason}
+                            onChange={event => setBanReason(event.target.value)}
+                            rows={3}
+                            className="mt-2 w-full resize-none rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.06)] px-3 py-2 text-sm normal-case leading-5 tracking-normal text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--border-glow)]"
+                            placeholder="Required for bans and removals"
+                          />
                         </label>
 
                         {banError && (

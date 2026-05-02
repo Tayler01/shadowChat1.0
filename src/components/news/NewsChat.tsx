@@ -11,6 +11,7 @@ import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { useAuth } from '../../hooks/useAuth'
 import { useNewsChat } from '../../hooks/useNewsChat'
 import { formatTime } from '../../lib/utils'
+import { getBlockedActionMessage } from '../../lib/moderation'
 import type { NewsChatMessage } from '../../lib/supabase'
 
 function NewsChatRow({
@@ -39,8 +40,31 @@ function NewsChatRow({
   }
 
   const saveEdit = async () => {
-    await onEdit(message.id, draft)
-    setEditing(false)
+    try {
+      await onEdit(message.id, draft)
+      setEditing(false)
+    } catch (error) {
+      const message = await getBlockedActionMessage('news_chat', error, 'Failed to update news message')
+      toast.error(message, { duration: message.startsWith('You are banned') ? 7000 : 4000 })
+    }
+  }
+
+  const reactToMessage = async (emoji: string) => {
+    try {
+      await onReact(message.id, emoji)
+    } catch (error) {
+      const notice = await getBlockedActionMessage('news_chat', error, 'Failed to update reaction')
+      toast.error(notice, { duration: notice.startsWith('You are banned') ? 7000 : 4000 })
+    }
+  }
+
+  const deleteMessage = async () => {
+    try {
+      await onDelete(message.id)
+    } catch (error) {
+      const message = await getBlockedActionMessage('news_chat', error, 'Failed to delete news message')
+      toast.error(message, { duration: message.startsWith('You are banned') ? 7000 : 4000 })
+    }
   }
 
   return (
@@ -95,7 +119,7 @@ function NewsChatRow({
         {!editing && (
           <NewsReactionSummaryStrip
             reactions={message.reactions}
-            onReact={emoji => onReact(message.id, emoji)}
+            onReact={reactToMessage}
             className="mt-1.5"
           />
         )}
@@ -125,7 +149,7 @@ function NewsChatRow({
               </button>
               <button
                 type="button"
-                onClick={() => void onDelete(message.id)}
+                onClick={() => void deleteMessage()}
                 className="inline-flex h-7 items-center gap-1 rounded-full border border-transparent px-2 text-xs text-red-200/80 transition-colors hover:border-[rgba(190,52,85,0.35)] hover:text-red-100"
               >
                 <Trash2 className="h-3.5 w-3.5" />
@@ -139,7 +163,7 @@ function NewsChatRow({
         {!editing && (
           <NewsReactionBar
             reactions={message.reactions}
-            onReact={emoji => onReact(message.id, emoji)}
+            onReact={reactToMessage}
             variant="menu"
             className="shrink-0"
           />
@@ -183,7 +207,8 @@ export function NewsChat() {
       await sendMessage(draft)
       setDraft('')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to send news message')
+      const message = await getBlockedActionMessage('news_chat', err, 'Failed to send news message')
+      toast.error(message, { duration: message.startsWith('You are banned') ? 7000 : 4000 })
     }
   }
 

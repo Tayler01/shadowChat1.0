@@ -5,19 +5,26 @@ import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { NewsFeedItem } from './NewsFeedItem'
 import { NewsFeedModal } from './NewsFeedModal'
 import { useNewsFeed } from '../../hooks/useNewsFeed'
+import { getBlockedActionMessage } from '../../lib/moderation'
 import type { NewsFeedItem as NewsFeedItemType } from '../../lib/supabase'
+import toast from 'react-hot-toast'
 
 export function NewsFeed() {
   const { items, loading, error, refresh, toggleReaction } = useNewsFeed()
   const [openItem, setOpenItem] = useState<NewsFeedItemType | null>(null)
 
   const handleReaction = async (itemId: string, emoji: string) => {
-    await toggleReaction(itemId, emoji)
-    setOpenItem(prev => {
-      if (!prev || prev.id !== itemId) return prev
-      const updated = items.find(item => item.id === itemId)
-      return updated || prev
-    })
+    try {
+      await toggleReaction(itemId, emoji)
+      setOpenItem(prev => {
+        if (!prev || prev.id !== itemId) return prev
+        const updated = items.find(item => item.id === itemId)
+        return updated || prev
+      })
+    } catch (error) {
+      const message = await getBlockedActionMessage('news_feed', error, 'Failed to update reaction')
+      toast.error(message, { duration: message.startsWith('You are banned') ? 7000 : 4000 })
+    }
   }
 
   return (
