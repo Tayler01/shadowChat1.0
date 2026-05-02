@@ -1,9 +1,22 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CalendarDays, Ghost, Palette, UserRound, X } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { CalendarDays, Clock3, Ghost, Palette, ShieldAlert, UserRound, X } from 'lucide-react'
 import type { User } from '../../lib/supabase'
+import {
+  CHANNEL_BAN_DURATIONS,
+  CHANNEL_BAN_OPTIONS,
+  getChannelBanLabel,
+  listUserChannelBans,
+  setUserChannelBans,
+  type ChannelBanDuration,
+  type ChannelBanScope,
+  type UserChannelBan,
+} from '../../lib/moderation'
+import { useAuth } from '../../hooks/useAuth'
 import { getPresenceStateLabel, usePresenceForUser } from '../../hooks/usePresence'
 import { Avatar } from '../ui/Avatar'
+import { Button } from '../ui/Button'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 
@@ -28,6 +41,21 @@ const formatJoinDate = (value?: string) => {
   })
 }
 
+const formatBanExpiry = (value?: string | null) => {
+  if (!value) return 'permanent'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'timed'
+  return `until ${date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })}`
+}
+
+const getErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback
+
 export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   user,
   open,
@@ -36,7 +64,36 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   const dialogRef = useRef<HTMLDivElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
+  const { profile: currentProfile } = useAuth()
   const livePresence = usePresenceForUser(user?.id)
+  const [banMenuOpen, setBanMenuOpen] = useState(false)
+  const [banLoading, setBanLoading] = useState(false)
+  const [banSaving, setBanSaving] = useState(false)
+  const [banError, setBanError] = useState<string | null>(null)
+  const [activeBans, setActiveBans] = useState<UserChannelBan[]>([])
+  const [selectedBanScopes, setSelectedBanScopes] = useState<ChannelBanScope[]>([])
+  const [banDuration, setBanDuration] = useState<ChannelBanDuration>('1440')
+
+  const canModerate = Boolean(
+    open &&
+    user &&
+    currentProfile &&
+    currentProfile.id !== user.id &&
+    user.admin_role !== 'admin' &&
+    (currentProfile.admin_role === 'admin' || currentProfile.admin_role === 'sub_admin')
+  )
+
+  const selectedScopeSet = useMemo(
+    () => new Set(selectedBanScopes),
+    [selectedBanScopes]
+  )
+
+  const activeBanSummary = useMemo(() => {
+    if (activeBans.length === 0) return 'No active channel bans'
+    return activeBans
+      .map(ban => `${getChannelBanLabel(ban.scope)} ${formatBanExpiry(ban.expires_at)}`)
+      .join(', ')
+  }, [activeBans])
 
   useEffect(() => {
     if (!open) return
@@ -92,6 +149,73 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
     }
   }, [open, onClose])
 
+  useEffect(() => {
+    if (!open || !user || !canModerate) {
+      setBanMenuOpen(false)
+      setBanError(null)
+      setActiveBans([])
+      setSelectedBanScopes([])
+      return
+    }
+
+    let cancelled = false
+    setBanLoading(true)
+    setBanError(null)
+
+    listUserChannelBans(user.id)
+      .then(bans => {
+        if (cancelled) return
+        setActiveBans(bans)
+        setSelectedBanScopes(bans.map(ban => ban.scope))
+        const firstTimedBan = bans.find(ban => ban.expires_at)
+        setBanDuration(bans.length > 0 && !firstTimedBan ? 'permanent' : '1440')
+      })
+      .catch(error => {
+        if (cancelled) return
+        setBanError(getErrorMessage(error, 'Unable to load channel bans'))
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setBanLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [canModerate, open, user])
+
+  const toggleBanScope = (scope: ChannelBanScope) => {
+    setSelectedBanScopes(prev => (
+      prev.includes(scope)
+        ? prev.filter(item => item !== scope)
+        : [...prev, scope]
+    ))
+  }
+
+  const saveChannelBans = async () => {
+    if (!user || !canModerate) return
+
+    setBanSaving(true)
+    setBanError(null)
+
+    try {
+      const durationMinutes =
+        banDuration === 'permanent' ? null : Number.parseInt(banDuration, 10)
+      const nextBans = await setUserChannelBans(user.id, selectedBanScopes, durationMinutes)
+      setActiveBans(nextBans)
+      setSelectedBanScopes(nextBans.map(ban => ban.scope))
+      setBanMenuOpen(false)
+      toast.success(nextBans.length > 0 ? 'Channel bans updated' : 'Channel bans cleared')
+    } catch (error) {
+      const message = getErrorMessage(error, 'Unable to update channel bans')
+      setBanError(message)
+      toast.error(message)
+    } finally {
+      setBanSaving(false)
+    }
+  }
+
   if (!user) return null
 
   const statusMessage = user.status_message?.trim()
@@ -123,9 +247,9 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 18, scale: 0.98 }}
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="popup-surface relative max-h-[min(86vh,760px)] w-full max-w-lg overflow-hidden rounded-[var(--radius-xl)]"
+            className="popup-surface relative flex max-h-[min(86vh,760px)] w-full max-w-lg flex-col overflow-hidden rounded-[var(--radius-xl)]"
           >
-            <div className="relative h-36 overflow-hidden border-b border-[var(--border-panel)]">
+            <div className="relative h-36 shrink-0 overflow-hidden border-b border-[var(--border-panel)]">
               {user.banner_url ? (
                 <img
                   src={user.banner_url}
@@ -147,7 +271,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
               </button>
             </div>
 
-            <div className="relative px-5 pb-5 sm:px-6 sm:pb-6">
+            <div className="relative overflow-y-auto px-5 pb-5 sm:px-6 sm:pb-6">
               <div className="-mt-12 flex items-end gap-4">
                 <Avatar
                   src={user.avatar_url}
@@ -215,6 +339,114 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                     </div>
                   </dl>
                 </section>
+
+                {canModerate && (
+                  <section className="rounded-[var(--radius-md)] border border-[rgba(215,170,70,0.24)] bg-[rgba(215,170,70,0.055)] p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                          <ShieldAlert className="h-3.5 w-3.5 text-[var(--text-gold)]" />
+                          Admin Moderation
+                        </div>
+                        <p className="text-sm leading-6 text-[var(--text-secondary)]">
+                          {banLoading ? 'Loading channel bans...' : activeBanSummary}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant={activeBans.length > 0 ? 'danger' : 'secondary'}
+                        size="sm"
+                        onClick={() => setBanMenuOpen(value => !value)}
+                        disabled={banLoading || banSaving}
+                        aria-expanded={banMenuOpen}
+                      >
+                        <ShieldAlert className="mr-2 h-4 w-4" />
+                        Channel bans
+                      </Button>
+                    </div>
+
+                    {banMenuOpen && (
+                      <div
+                        role="menu"
+                        aria-label="Channel ban options"
+                        className="mt-4 rounded-[var(--radius-md)] border border-[var(--border-panel)] bg-[rgba(10,10,10,0.82)] p-3 shadow-[var(--shadow-panel-strong)]"
+                      >
+                        <div className="space-y-2">
+                          {CHANNEL_BAN_OPTIONS.map(option => (
+                            <label
+                              key={option.scope}
+                              className="flex cursor-pointer items-start gap-3 rounded-[var(--radius-sm)] border border-transparent p-2 transition-colors hover:border-[rgba(215,170,70,0.18)] hover:bg-[rgba(255,255,255,0.04)]"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedScopeSet.has(option.scope)}
+                                onChange={() => toggleBanScope(option.scope)}
+                                className="mt-1 h-4 w-4 accent-[var(--text-gold)]"
+                              />
+                              <span>
+                                <span className="block text-sm font-semibold text-[var(--text-primary)]">
+                                  {option.label}
+                                </span>
+                                <span className="block text-xs leading-5 text-[var(--text-muted)]">
+                                  {option.description}
+                                </span>
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+
+                        <label className="mt-3 block text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                          <span className="mb-2 flex items-center gap-2">
+                            <Clock3 className="h-3.5 w-3.5" />
+                            Ban length
+                          </span>
+                          <select
+                            value={banDuration}
+                            onChange={event => setBanDuration(event.target.value as ChannelBanDuration)}
+                            disabled={selectedBanScopes.length === 0}
+                            className="w-full rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.06)] px-3 py-2 text-sm normal-case tracking-normal text-[var(--text-primary)] outline-none transition-colors focus:border-[var(--border-glow)] disabled:opacity-50"
+                          >
+                            {CHANNEL_BAN_DURATIONS.map(duration => (
+                              <option key={duration.value} value={duration.value}>
+                                {duration.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+
+                        {banError && (
+                          <p className="mt-3 rounded-[var(--radius-sm)] border border-[rgba(190,52,85,0.4)] bg-[rgba(190,52,85,0.12)] px-3 py-2 text-xs text-[rgb(255,190,204)]">
+                            {banError}
+                          </p>
+                        )}
+
+                        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedBanScopes([])
+                              setBanDuration('permanent')
+                            }}
+                            disabled={banSaving || selectedBanScopes.length === 0}
+                          >
+                            Clear selections
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="primary"
+                            size="sm"
+                            loading={banSaving}
+                            onClick={saveChannelBans}
+                          >
+                            Save bans
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+                )}
               </div>
             </div>
           </motion.div>

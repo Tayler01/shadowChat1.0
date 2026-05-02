@@ -23,13 +23,14 @@ The project is already wired for hosted Supabase and Netlify deployment. It is d
 - Realtime group chat with active-user count and per-user weather in the header
 - Realtime direct messages
 - Unread tracking and in-app DM notifications
-- User profiles with avatar, banner, status, role badges, presence visibility, and theme color
+- User profiles with avatar, banner, status, role badges, presence visibility, theme color, and admin moderation controls
 - File, image, and voice-message uploads
 - Message reactions, pinning, editing, and deletion
 - Slash commands and reply/thread affordances
 - AI reply and summary hooks through a secured Supabase Edge Function
 - News tab with a today-only tracked-source feed and a separate News Chat channel
 - App-wide admin/sub-admin access controls with role badges and operator-only tools
+- Operator-managed channel bans for General Chat, News Chat, and News Feed participation
 - Admin-managed X/Truth Social source tracking from Settings
 - Admin feedback review for submitted bugs, suggestions, and private attachments
 - Server-side link previews for chat and News Chat URLs
@@ -64,6 +65,7 @@ Backend lives under [`supabase`](C:/repos/chat2.0/supabase).
 - News data lives in isolated `news_*` tables and RPCs from [`supabase/migrations/20260430041621_news_tab_foundation.sql`](C:/repos/chat2.0/supabase/migrations/20260430041621_news_tab_foundation.sql:1).
 - Feedback submissions use `public.feedback_submissions` plus the private `feedback-attachments` Storage bucket.
 - Admin roles use `public.user_roles`, `public.admin_role_audit`, `public.admin_role_notifications`, and the synced public `users.admin_role` badge field.
+- Channel bans use `public.user_channel_bans` plus RLS/RPC enforcement for General Chat, News Chat, and News Feed participation.
 - Weather locations use private `public.user_weather_preferences` rows scoped by RLS to the owning user.
 
 Always-on background services live under [`services`](C:/repos/chat2.0/services).

@@ -32,7 +32,9 @@ message history.
 News source management lives in Settings > Admin > News Sources. It is shown
 only to app operators with the `admin` or `sub_admin` role. Operators can add,
 pause, re-enable, and delete tracked accounts from the scraper list. Full admins
-manage the sub-admin list from Settings > Admin > Admin Access.
+manage the sub-admin list from Settings > Admin > Admin Access. App operators
+can also channel-ban users from News Chat and News Feed reactions from the
+user's public profile popup.
 
 ## Backend Map
 
@@ -49,6 +51,8 @@ Main tables:
 - `news_chat_messages`: News Chat messages.
 - `news_chat_reactions`: per-user News Chat reactions, aggregated back onto messages.
 - `news_user_state`: per-user seen timestamps for feed/chat badge counts.
+- `user_channel_bans`: app-wide moderation records that can block News Chat
+  participation or News Feed reactions.
 
 Main RPCs:
 
@@ -61,6 +65,8 @@ Main RPCs:
 - `mark_news_seen`
 - `count_news_badge_items`
 - `clear_expired_news_feed_items`
+- `list_user_channel_bans`
+- `set_user_channel_bans`
 
 Realtime publication includes `news_feed_items`, `news_chat_messages`,
 `news_sources`, and `news_user_state`. The reaction detail tables are not

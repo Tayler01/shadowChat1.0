@@ -915,6 +915,7 @@ export const toggleReaction = async (messageId: string, emoji: string, isDM = fa
     emoji: emoji,
     is_dm: isDM
   })
+  if (error) throw error
 }
 
 export const fetchDMConversations = async () => {

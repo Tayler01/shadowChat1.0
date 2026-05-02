@@ -33,6 +33,8 @@ Admin settings are split into subpages under Settings > Admin:
   X/Truth Social accounts.
 - Feedback Review: operator review and deletion for submitted bugs and
   suggestions.
+- Channel Bans: operator controls shown in another user's public profile popup
+  for General Chat, News Chat, and News Feed participation limits.
 
 ## Backend Surface
 
@@ -42,6 +44,7 @@ Main tables:
 - `public.admin_role_audit`: role grant/revoke/change history.
 - `public.admin_role_notifications`: one-time user notices for role grants.
 - `public.users.admin_role`: synced public role badge field.
+- `public.user_channel_bans`: active and historical channel-ban records.
 
 Main RPCs:
 
@@ -52,10 +55,16 @@ Main RPCs:
 - `mark_admin_role_notification_seen`
 - `is_app_admin`
 - `is_app_operator`
+- `list_user_channel_bans`
+- `set_user_channel_bans`
+- `is_user_channel_banned`
 
 Only full admins can call the role-management RPCs that list users or grant and
 revoke sub-admin access. App operators can use admin-class product tools guarded
 by `is_app_operator`.
+
+For the channel-ban model and enforcement map, see
+[docs/CHANNEL_BANS.md](C:/repos/chat2.0/docs/CHANNEL_BANS.md:1).
 
 ## Realtime
 
