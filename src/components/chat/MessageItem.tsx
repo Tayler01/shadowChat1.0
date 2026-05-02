@@ -18,6 +18,7 @@ import { FileAttachment } from './FileAttachment'
 import { VideoAttachment } from './VideoAttachment'
 import { MessageRichText } from './MessageRichText'
 import { PublicProfileDialog } from '../profile/PublicProfileDialog'
+import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { formatTime, shouldGroupMessage, cn, getReadableTextColor } from '../../lib/utils'
 import type { Message, User } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -278,8 +279,9 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         <div className="flex-1 min-w-0">
           {!isGrouped && (
             <div className="mb-1 flex min-h-8 items-end space-x-2 pl-11">
-              <span className="font-semibold text-[var(--text-primary)]">
-                {message.user?.display_name}
+              <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-[var(--text-primary)]">
+                <span className="truncate">{message.user?.display_name}</span>
+                <UserRoleBadge role={message.user?.admin_role} />
               </span>
               <span className="text-xs text-[var(--text-muted)]">
                 {formatTime(message.created_at)}
@@ -328,7 +330,9 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     className="mb-1 text-left text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text-gold)] hover:underline"
                     aria-label="View parent message"
                   >
-                    Replying to {parentMessage.user?.display_name || 'Unknown'}:
+                    Replying to {parentMessage.user?.display_name || 'Unknown'}
+                    <UserRoleBadge role={parentMessage.user?.admin_role} className="ml-1" />
+                    :
                     {' '}
                     {parentMessage.content.slice(0, 30)}
                     {parentMessage.content.length > 30 ? '...' : ''}

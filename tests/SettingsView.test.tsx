@@ -5,6 +5,7 @@ import { SettingsView } from '../src/components/settings/SettingsView'
 const mockUpsertSource = jest.fn()
 const mockSetSourceEnabled = jest.fn()
 const mockRefreshNewsAdmin = jest.fn()
+const mockUpdateSubAdmin = jest.fn()
 const mockUseNewsAdmin = jest.fn(() => ({
   isAdmin: true,
   sources: [
@@ -89,11 +90,59 @@ jest.mock('../src/hooks/usePwaInstallPrompt', () => ({
 }))
 
 jest.mock('../src/hooks/useAuth', () => ({
-  useAuth: () => ({ signOut: jest.fn() }),
+  useAuth: () => ({
+    signOut: jest.fn(),
+    user: { id: 'admin-1', username: 'caleb', display_name: 'Caleb', admin_role: 'admin' },
+  }),
 }))
 
 jest.mock('../src/hooks/useNewsAdmin', () => ({
   useNewsAdmin: () => mockUseNewsAdmin(),
+}))
+
+jest.mock('../src/hooks/useAdminAccess', () => ({
+  useAdminAccess: () => ({
+    role: 'admin',
+    isAdmin: true,
+    isOperator: true,
+    users: [
+      {
+        id: 'admin-1',
+        email: 'caleb@example.com',
+        username: 'caleb',
+        display_name: 'Caleb',
+        avatar_url: null,
+        banner_url: null,
+        status: 'online',
+        status_message: '',
+        color: '#d7aa46',
+        admin_role: 'admin',
+        last_active: '2026-04-30T00:00:00.000Z',
+        created_at: '2026-04-30T00:00:00.000Z',
+        updated_at: '2026-04-30T00:00:00.000Z',
+      },
+      {
+        id: 'user-2',
+        email: 'shadow@example.com',
+        username: 'shadow',
+        display_name: 'Shadow',
+        avatar_url: null,
+        banner_url: null,
+        status: 'online',
+        status_message: '',
+        color: '#d7aa46',
+        admin_role: null,
+        last_active: '2026-04-30T00:00:00.000Z',
+        created_at: '2026-04-30T00:00:00.000Z',
+        updated_at: '2026-04-30T00:00:00.000Z',
+      },
+    ],
+    loading: false,
+    savingUserId: null,
+    error: null,
+    refresh: jest.fn(),
+    updateSubAdmin: mockUpdateSubAdmin,
+  }),
 }))
 
 jest.mock('../src/lib/bridge', () => ({
@@ -146,6 +195,8 @@ test('settings admin panel manages news sources', () => {
 
   fireEvent.click(screen.getByRole('button', { name: /admin/i }))
 
+  expect(screen.getByRole('heading', { name: 'Admin Access' })).toBeInTheDocument()
+  expect(screen.getByText('shadow@example.com')).toBeInTheDocument()
   expect(screen.getByRole('heading', { name: 'News Sources' })).toBeInTheDocument()
   expect(screen.getByText('@openai')).toBeInTheDocument()
 

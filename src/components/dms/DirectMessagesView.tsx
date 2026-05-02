@@ -19,6 +19,7 @@ import { FileAttachment } from '../chat/FileAttachment'
 import { VideoAttachment } from '../chat/VideoAttachment'
 import { MessageRichText } from '../chat/MessageRichText'
 import { PublicProfileDialog } from '../profile/PublicProfileDialog'
+import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { useFailedMessages } from '../../hooks/useFailedMessages'
 import { formatTime, shouldGroupMessage, getReadableTextColor } from '../../lib/utils'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
@@ -262,6 +263,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
       avatar_url: user.avatar_url,
       color: user.color,
       status: user.status,
+      admin_role: user.admin_role,
     }]
   })
 
@@ -421,8 +423,9 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
-                        <span className="truncate font-medium text-[var(--text-primary)]">
-                          {conversation.other_user?.display_name}
+                        <span className="inline-flex min-w-0 items-center gap-1.5 font-medium text-[var(--text-primary)]">
+                          <span className="truncate">{conversation.other_user?.display_name}</span>
+                          <UserRoleBadge role={conversation.other_user?.admin_role} />
                         </span>
                       </div>
 
@@ -485,8 +488,9 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 />
 
                 <div className="min-w-0">
-                  <h2 className="truncate font-semibold text-[var(--text-primary)]">
-                    {currentConv.other_user?.display_name}
+                  <h2 className="inline-flex max-w-full items-center gap-1.5 font-semibold text-[var(--text-primary)]">
+                    <span className="truncate">{currentConv.other_user?.display_name}</span>
+                    <UserRoleBadge role={currentConv.other_user?.admin_role} />
                   </h2>
                   <p className="truncate text-xs sm:text-sm text-[var(--text-muted)]">
                     @{currentConv.other_user?.username} {'\u2022'} {currentConv.other_user?.status}
@@ -515,7 +519,10 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
               {messages.length === 0 && !loadingMore && (
                 <div className="glass-panel rounded-[var(--radius-xl)] px-8 py-8 text-center text-[var(--text-muted)]">
                   <MessageSquare className="mx-auto mb-4 h-12 w-12 opacity-50" />
-                  <h3 className="mb-2 text-lg font-medium text-[var(--text-primary)]">Say hello to {currentConv.other_user?.display_name}</h3>
+                  <h3 className="mb-2 inline-flex max-w-full items-center justify-center gap-1.5 text-lg font-medium text-[var(--text-primary)]">
+                    <span className="truncate">Say hello to {currentConv.other_user?.display_name}</span>
+                    <UserRoleBadge role={currentConv.other_user?.admin_role} />
+                  </h3>
                   <p className="text-sm">This thread is ready. Send the first message and the conversation will show up here immediately.</p>
                 </div>
               )}
@@ -585,8 +592,15 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                         )
                       )}
 
+                      {showIncomingAvatar && message.sender && (
+                        <div className="mb-1 ml-8 inline-flex max-w-full items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)]">
+                          <span className="truncate">{message.sender.display_name}</span>
+                          <UserRoleBadge role={message.sender.admin_role} />
+                        </div>
+                      )}
+
                       <div
-                        className={`rounded-2xl px-4 py-2 ${showIncomingAvatar ? 'mt-7' : ''} ${
+                        className={`rounded-2xl px-4 py-2 ${showIncomingAvatar ? 'ml-8' : ''} ${
                           bubbleStyle
                             ? ''
                             : isOwn
@@ -652,9 +666,17 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                       <div className="h-2 w-2 animate-bounce rounded-full bg-[var(--gold-3)]" style={{ animationDelay: '0.1s' }} />
                       <div className="h-2 w-2 animate-bounce rounded-full bg-[var(--gold-3)]" style={{ animationDelay: '0.2s' }} />
                     </div>
-                    <span>
-                      {typingUsers.map(u => u.display_name).join(', ')}
-                      {typingUsers.length === 1 ? ' is' : ' are'} typing...
+                    <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                      {typingUsers.map((typingUser, index) => (
+                        <React.Fragment key={typingUser.id}>
+                          {index > 0 && <span>,</span>}
+                          <span className="inline-flex items-center gap-1">
+                            {typingUser.display_name}
+                            <UserRoleBadge role={typingUser.admin_role} />
+                          </span>
+                        </React.Fragment>
+                      ))}
+                      <span>{typingUsers.length === 1 ? 'is' : 'are'} typing...</span>
                     </span>
                   </motion.div>
                 )}

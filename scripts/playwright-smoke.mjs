@@ -638,6 +638,7 @@ async function scenarioSettings(state, _sessionA, sessionB) {
   await sessionB.page.reload({ waitUntil: 'domcontentloaded' })
   await waitForChatView(sessionB.page)
   await goToSettings(sessionB.page)
+  await openSettingsSection(sessionB.page, 'Notifications & Audio')
 
   await assertSwitchGeometry(sessionB.page, 'Toggle Push Notifications', 'Toggle Sound Effects')
   await capture(sessionB.page, state.artifactDir, 'settings-desktop-before-modal')
@@ -753,6 +754,7 @@ async function scenarioMobileDmBack(state, sessionA, sessionB, mobileSession) {
 async function scenarioMobileSettingsVisual(state, mobileSession) {
   await waitForChatView(mobileSession.page)
   await goToSettings(mobileSession.page)
+  await openSettingsSection(mobileSession.page, 'Notifications & Audio')
   await assertSwitchGeometry(mobileSession.page, 'Toggle Push Notifications', 'Toggle Sound Effects')
   await capture(mobileSession.page, state.artifactDir, 'settings-mobile')
 }
@@ -778,6 +780,11 @@ async function goToChat(page) {
 async function goToSettings(page) {
   await page.getByRole('button', { name: /^Settings$/ }).click()
   await waitForSettingsView(page)
+}
+
+async function openSettingsSection(page, sectionName) {
+  await page.getByRole('button', { name: sectionName }).click()
+  await page.getByRole('button', { name: 'Back to settings' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
 async function goToProfile(page) {
@@ -808,7 +815,7 @@ async function waitForDmView(page) {
 
 async function waitForSettingsView(page) {
   await page.getByRole('heading', { name: 'Settings' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-  await page.getByRole('button', { name: 'Notification Setup' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByRole('button', { name: 'Notifications & Audio' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
 async function waitForProfileView(page) {

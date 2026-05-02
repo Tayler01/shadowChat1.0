@@ -72,7 +72,7 @@ export function useMessageNotifications(onOpenConversation: (id: string) => void
           const { data } = await working
             .from('dm_messages')
             .select(
-              `id, content, conversation_id, sender:users!sender_id(id, display_name, avatar_url, color)`
+              `id, content, conversation_id, sender:users!sender_id(id, display_name, avatar_url, color, admin_role)`
             )
             .eq('id', payload.new.id)
             .single()
@@ -85,6 +85,7 @@ export function useMessageNotifications(onOpenConversation: (id: string) => void
               display_name?: string
               avatar_url?: string
               color?: string
+              admin_role?: 'admin' | 'sub_admin' | null
             }
           } | null
 

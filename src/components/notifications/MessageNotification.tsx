@@ -1,6 +1,8 @@
 import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Avatar } from '../ui/Avatar'
+import { UserRoleBadge } from '../ui/UserRoleBadge'
+import type { AdminRole } from '../../lib/supabase'
 import type { Toast } from 'react-hot-toast'
 
 interface MessageNotificationProps {
@@ -10,6 +12,7 @@ interface MessageNotificationProps {
     display_name?: string
     avatar_url?: string
     color?: string
+    admin_role?: AdminRole | null
   }
   onClick: () => void
   desktop: boolean
@@ -32,8 +35,9 @@ export const MessageNotification: React.FC<MessageNotificationProps> = ({ t, con
         >
           <Avatar src={sender.avatar_url} alt={sender.display_name || 'User'} size="sm" color={sender.color} />
           <div className="flex-1 min-w-0">
-            <p className="truncate text-sm font-medium text-[var(--text-primary)]">
-              {sender.display_name}
+            <p className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">
+              <span className="truncate">{sender.display_name}</span>
+              <UserRoleBadge role={sender.admin_role} />
             </p>
             <p className="truncate text-sm text-[var(--text-secondary)]">
               {content}

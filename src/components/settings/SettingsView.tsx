@@ -17,6 +17,7 @@ import {
   Plus,
   Power,
   RefreshCw,
+  Search,
   Shield,
   Smartphone,
   Trash2,
@@ -37,6 +38,8 @@ import { PhoneInstallGuide } from '../onboarding/PhoneInstallGuide'
 import { FeedbackSubmissionModal } from './FeedbackSubmissionModal'
 import { ProfileView } from '../profile/ProfileView'
 import { useNewsAdmin } from '../../hooks/useNewsAdmin'
+import { useAdminAccess } from '../../hooks/useAdminAccess'
+import { UserRoleBadge } from '../ui/UserRoleBadge'
 
 interface SettingsViewProps {
   onToggleSidebar: () => void
@@ -222,11 +225,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
   const [newsHandle, setNewsHandle] = useState('')
   const [newsDisplayName, setNewsDisplayName] = useState('')
   const [newsProfileUrl, setNewsProfileUrl] = useState('')
+  const [adminUserSearch, setAdminUserSearch] = useState('')
   const { scheme, setScheme } = useTheme()
   const isDesktop = useIsDesktop()
-  const { signOut } = useAuth()
+  const { signOut, user: currentUser } = useAuth()
   const {
-    isAdmin: isNewsAdmin,
+    role: adminRole,
+    isAdmin: isFullAdmin,
+    isOperator: isAdminOperator,
+    users: adminAccessUsers,
+    loading: adminAccessLoading,
+    savingUserId: adminSavingUserId,
+    error: adminAccessError,
+    refresh: refreshAdminAccess,
+    updateSubAdmin,
+  } = useAdminAccess()
+  const {
+    isAdmin: canManageNewsSources,
     sources: newsSources,
     loading: newsAdminLoading,
     saving: newsAdminSaving,
@@ -256,7 +271,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
   } = usePushNotifications()
 
   const devicePushEnabled = subscribed
+  const visibleSections = useMemo(
+    () => sections.filter(section => section.id !== 'admin' || isAdminOperator),
+    [isAdminOperator]
+  )
   const activeSectionConfig = sections.find(section => section.id === activeSection) ?? null
+  const adminFilteredUsers = useMemo(() => {
+    const normalizedSearch = adminUserSearch.trim().toLowerCase()
+    if (!normalizedSearch) return adminAccessUsers
+
+    return adminAccessUsers.filter(adminUser => (
+      adminUser.display_name?.toLowerCase().includes(normalizedSearch) ||
+      adminUser.username?.toLowerCase().includes(normalizedSearch) ||
+      adminUser.email?.toLowerCase().includes(normalizedSearch)
+    ))
+  }, [adminAccessUsers, adminUserSearch])
   const notificationPreferenceSettings = useMemo(
     () => (
       preferences
@@ -419,6 +448,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
     }
   }
 
+  const handleSubAdminToggle = async (targetUserId: string, enabled: boolean) => {
+    try {
+      await updateSubAdmin(targetUserId, enabled)
+      toast.success(enabled ? 'Sub-admin access granted' : 'Sub-admin access removed')
+    } catch (err) {
+      console.error(err)
+      toast.error(err instanceof Error ? err.message : 'Failed to update admin access')
+    }
+  }
+
   const renderHub = () => (
     <>
       <div className="mb-6 sm:mb-8">
@@ -450,7 +489,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {sections.map(section => (
+        {visibleSections.map(section => (
           <button
             key={section.id}
             type="button"
@@ -623,8 +662,131 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
     </div>
   )
 
-  const renderAdmin = () => (
-    <div className="space-y-5">
+  const renderAdminAccessPanel = () => {
+    if (!isFullAdmin) return null
+
+    return (
+      <div className="glass-panel rounded-[var(--radius-lg)] p-5">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-start gap-3">
+            <Shield className="mt-0.5 h-5 w-5 text-[var(--text-muted)]" />
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Admin Access</h2>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">
+                Manage sub-admin access from the complete user list.
+              </p>
+            </div>
+          </div>
+          <Button type="button" variant="ghost" size="sm" onClick={() => void refreshAdminAccess()} aria-label="Refresh admin users">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <div className="mb-4 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium text-[var(--text-primary)]">Find user</span>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+              <input
+                value={adminUserSearch}
+                onChange={event => setAdminUserSearch(event.target.value)}
+                placeholder="Search name, username, or email"
+                className="obsidian-input w-full rounded-[var(--radius-md)] py-3 pl-9 pr-3.5 text-sm"
+              />
+            </div>
+          </label>
+          <div className="mt-3 flex flex-wrap gap-2 text-[11px] uppercase tracking-[0.14em]">
+            <span className="rounded-full border border-[rgba(215,170,70,0.18)] bg-[rgba(215,170,70,0.08)] px-3 py-1 text-[var(--text-gold)]">
+              Role: {adminRole === 'admin' ? 'Full admin' : 'Sub-admin'}
+            </span>
+            <span className="rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-1 text-[var(--text-muted)]">
+              Users: {adminFilteredUsers.length}
+            </span>
+          </div>
+        </div>
+
+        {adminAccessLoading ? (
+          <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 text-sm text-[var(--text-muted)]">
+            Loading admin access.
+          </div>
+        ) : adminAccessError ? (
+          <div className="rounded-[var(--radius-md)] border border-[rgba(190,52,85,0.35)] bg-[rgba(87,14,28,0.18)] p-4 text-sm text-red-100">
+            {adminAccessError}
+          </div>
+        ) : (
+          <div className="max-h-[36rem] space-y-2 overflow-y-auto pr-1">
+            {adminFilteredUsers.map(adminUser => {
+              const isCurrentFullAdmin = adminUser.admin_role === 'admin'
+              const isSubAdmin = adminUser.admin_role === 'sub_admin'
+              const isCurrentUser = adminUser.id === currentUser?.id
+              const saving = adminSavingUserId === adminUser.id
+
+              return (
+                <div
+                  key={adminUser.id}
+                  className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-center"
+                >
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <span className="truncate font-medium text-[var(--text-primary)]">{adminUser.display_name}</span>
+                      <UserRoleBadge role={adminUser.admin_role} />
+                      <span className="truncate text-sm text-[var(--text-muted)]">@{adminUser.username}</span>
+                    </div>
+                    <p className="mt-1 truncate text-sm text-[var(--text-muted)]">{adminUser.email}</p>
+                    <p className="mt-1 text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      Joined {new Date(adminUser.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+
+                  <span className={`w-fit rounded-full border px-3 py-1 text-xs uppercase tracking-[0.12em] ${
+                    isCurrentFullAdmin
+                      ? 'border-[rgba(215,170,70,0.28)] bg-[rgba(215,170,70,0.1)] text-[var(--text-gold)]'
+                      : isSubAdmin
+                        ? 'border-zinc-400/30 bg-zinc-300/10 text-zinc-200'
+                        : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] text-[var(--text-muted)]'
+                  }`}>
+                    {isCurrentFullAdmin ? 'Full admin' : isSubAdmin ? 'Sub-admin' : 'Member'}
+                  </span>
+
+                  {isCurrentFullAdmin ? (
+                    <Button type="button" variant="ghost" size="sm" disabled className="w-full justify-center lg:w-auto">
+                      Locked
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant={isSubAdmin ? 'danger' : 'secondary'}
+                      size="sm"
+                      onClick={() => void handleSubAdminToggle(adminUser.id, !isSubAdmin)}
+                      disabled={isCurrentUser}
+                      loading={saving}
+                      className="w-full justify-center lg:w-auto"
+                    >
+                      {isSubAdmin ? 'Remove' : 'Grant'}
+                    </Button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const renderAdmin = () => {
+    if (!adminAccessLoading && !isAdminOperator) {
+      return (
+        <div className="glass-panel rounded-[var(--radius-lg)] p-5 text-sm leading-6 text-[var(--text-muted)]">
+          Admin tools are limited to admin-class accounts.
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-5">
+        {renderAdminAccessPanel()}
+
       <div className="glass-panel rounded-[var(--radius-lg)] p-5">
         <div className="mb-4 flex items-center gap-3">
           <KeyRound className="h-5 w-5 text-[var(--text-muted)]" />
@@ -682,9 +844,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
           <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 text-sm text-[var(--text-muted)]">
             Loading source controls.
           </div>
-        ) : !isNewsAdmin ? (
+        ) : !canManageNewsSources ? (
           <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 text-sm leading-6 text-[var(--text-muted)]">
-            News source management is limited to accounts with the <span className="font-mono text-[var(--text-gold)]">news_admin</span> role.
+            News source management is limited to admin-class accounts.
           </div>
         ) : (
           <div className="space-y-4">
@@ -803,7 +965,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
         )}
       </div>
     </div>
-  )
+    )
+  }
 
   const renderColorLayout = () => (
     <div className="glass-panel rounded-[var(--radius-lg)] p-5">

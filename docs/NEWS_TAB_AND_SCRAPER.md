@@ -30,7 +30,7 @@ message history.
 - [src/hooks/useNewsAdmin.ts](C:/repos/chat2.0/src/hooks/useNewsAdmin.ts:1): admin source management.
 
 News source management lives in Settings under `News Sources`. It is shown only
-to users with the `news_admin` role.
+to app operators with the `admin` or `sub_admin` role.
 
 ## Backend Map
 
@@ -40,7 +40,7 @@ with follow-up migrations for admin bootstrap and normalized source handles.
 
 Main tables:
 
-- `user_roles`: currently used for the `news_admin` role.
+- `user_roles`: app-wide admin role table for `admin` and `sub_admin`.
 - `news_sources`: tracked X/Truth accounts, cursors, health, and admin state.
 - `news_feed_items`: normalized post snapshots for the today board.
 - `news_feed_reactions`: per-user feed reactions, aggregated back onto items.
@@ -50,7 +50,7 @@ Main tables:
 
 Main RPCs:
 
-- `is_news_admin`
+- `is_app_operator`
 - `upsert_news_source`
 - `set_news_source_enabled`
 - `hide_news_feed_item`

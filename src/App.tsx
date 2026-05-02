@@ -14,6 +14,7 @@ import { LoadingSpinner } from './components/ui/LoadingSpinner'
 import { AppBadgeSync } from './components/notifications/AppBadgeSync'
 import { PhoneInstallOnboarding } from './components/onboarding/PhoneInstallOnboarding'
 import { useSessionResumeRecovery } from './hooks/useSessionResumeRecovery'
+import { useAdminRoleNotifications } from './hooks/useAdminRoleNotifications'
 
 const DirectMessagesView = lazy(() =>
   import('./components/dms/DirectMessagesView').then(module => ({
@@ -81,6 +82,7 @@ function ViewLoadingState() {
 
 function App() {
   useSessionResumeRecovery()
+  useAdminRoleNotifications()
   const [currentView, setCurrentView] = useState<View>(() => getInitialLocationState().view)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const isDesktop = useIsDesktop()

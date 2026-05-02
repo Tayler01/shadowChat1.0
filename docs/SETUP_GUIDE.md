@@ -177,8 +177,8 @@ secrets are `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; optional source
 credentials are `X_USERNAME`, `X_EMAIL`, `X_PASSWORD`, `TRUTH_USERNAME`,
 `TRUTH_EMAIL`, and `TRUTH_PASSWORD`.
 
-News admins manage tracked sources from Settings > News Sources. The admin role
-is stored in `public.user_roles` as `news_admin`.
+Admins and sub-admins manage tracked sources from Settings > News Sources. The
+admin class is stored in `public.user_roles` as `admin` or `sub_admin`.
 
 Full runbook: [docs/NEWS_TAB_AND_SCRAPER.md](C:/repos/chat2.0/docs/NEWS_TAB_AND_SCRAPER.md:1).
 
@@ -195,7 +195,7 @@ After setup, verify:
 7. New-account phone setup opens after signup or first sign-in from the same browser
 8. News tab loads
 9. News Chat sends and receives a message
-10. A `news_admin` user can add/pause a News source in Settings
+10. An `admin` or `sub_admin` user can add/pause a News source in Settings
 11. If the scraper is configured, `news_sources.last_checked_at` updates after a worker cycle
 
 ## 9. Optional Preview Mode

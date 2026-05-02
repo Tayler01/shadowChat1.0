@@ -1,5 +1,6 @@
 import React from 'react'
 import { Avatar } from '../ui/Avatar'
+import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { formatTime } from '../../lib/utils'
 import type { Message } from '../../lib/supabase'
 
@@ -27,8 +28,9 @@ export const ThreadReplyLink: React.FC<ThreadReplyLinkProps> = ({
       />
       <div className="min-w-0 flex-1">
         <div className="mb-1 flex items-baseline gap-2">
-          <span className="truncate font-semibold text-[var(--text-primary)]">
-            {message.user?.display_name}
+          <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-[var(--text-primary)]">
+            <span className="truncate">{message.user?.display_name}</span>
+            <UserRoleBadge role={message.user?.admin_role} />
           </span>
           <span className="text-xs text-[var(--text-muted)]">
             {formatTime(message.created_at)}
@@ -43,7 +45,9 @@ export const ThreadReplyLink: React.FC<ThreadReplyLinkProps> = ({
           onClick={() => onJumpToMessage(parent.id)}
           className="mt-2 inline-flex max-w-full items-center rounded-full border border-[rgba(215,170,70,0.16)] bg-[rgba(215,170,70,0.08)] px-2.5 py-1 text-[11px] text-[var(--text-gold)] transition-colors hover:bg-[rgba(215,170,70,0.14)]"
         >
-          In reply to {parent.user?.display_name || 'Unknown'}: {parent.content.slice(0, 40)}
+          In reply to {parent.user?.display_name || 'Unknown'}
+          <UserRoleBadge role={parent.user?.admin_role} className="ml-1" />
+          : {parent.content.slice(0, 40)}
           {parent.content.length > 40 ? '...' : ''}
         </button>
       </div>

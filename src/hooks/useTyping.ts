@@ -4,11 +4,13 @@ import { runRealtimeRecovery } from '../lib/realtimeRecovery'
 import { useAuth } from './useAuth'
 import { useRealtimeRecovery } from './useRealtimeRecovery'
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
+import type { AdminRole } from '../lib/supabase'
 
-interface TypingUser {
+export interface TypingUser {
   id: string
   username: string
   display_name: string
+  admin_role?: AdminRole | null
 }
 
 export const useTyping = (channelName: string = 'general') => {
@@ -114,7 +116,8 @@ export const useTyping = (channelName: string = 'general') => {
           user: {
             id: user.id,
             username: user.username,
-            display_name: user.display_name
+            display_name: user.display_name,
+            admin_role: user.admin_role,
           },
           typing: false
         }
@@ -142,7 +145,8 @@ export const useTyping = (channelName: string = 'general') => {
           user: {
             id: user.id,
             username: user.username,
-            display_name: user.display_name
+            display_name: user.display_name,
+            admin_role: user.admin_role,
           },
           typing: true
         }

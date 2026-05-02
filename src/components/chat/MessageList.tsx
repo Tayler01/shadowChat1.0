@@ -12,6 +12,7 @@ import toast from 'react-hot-toast'
 import type { Message } from '../../lib/supabase'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { useAuth } from '../../hooks/useAuth'
+import { UserRoleBadge } from '../ui/UserRoleBadge'
 
 interface MessageListProps {
   onReply?: (messageId: string, content: string) => void
@@ -467,9 +468,17 @@ export const MessageList: React.FC<MessageListProps> = ({
                 style={{ animationDelay: '0.2s' }}
               />
             </div>
-            <span>
-              {typingUsers.map(u => u.display_name).join(', ')}
-              {typingUsers.length === 1 ? ' is' : ' are'} typing...
+            <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+              {typingUsers.map((typingUser, index) => (
+                <React.Fragment key={typingUser.id}>
+                  {index > 0 && <span>,</span>}
+                  <span className="inline-flex items-center gap-1">
+                    {typingUser.display_name}
+                    <UserRoleBadge role={typingUser.admin_role} />
+                  </span>
+                </React.Fragment>
+              ))}
+              <span>{typingUsers.length === 1 ? 'is' : 'are'} typing...</span>
             </span>
           </motion.div>
         )}

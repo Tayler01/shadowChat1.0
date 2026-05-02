@@ -191,7 +191,7 @@ After deploy, verify:
 9. Settings feedback can submit a bug or feature report with an image attachment after feedback schema changes
 10. News tab loads, switches between News Feed and News Chat, and badges clear after viewing
 11. News Chat sends, edits, deletes, reacts, and renders link previews
-12. Settings > News Sources shows source health for a `news_admin` account
+12. Settings > News Sources shows source health for an `admin` or `sub_admin` account
 13. Render worker has checked enabled sources since deploy and today's feed rows match current Eastern-day posts
 
 Recommended production smoke for local post-deploy validation:

@@ -29,7 +29,7 @@ export function useNewsAdmin() {
     try {
       const workingClient = await getWorkingClient()
       const [adminResult, sourcesResult] = await Promise.all([
-        workingClient.rpc('is_news_admin', { target_user_id: user.id }),
+        workingClient.rpc('is_app_operator', { target_user_id: user.id }),
         workingClient
           .from('news_sources')
           .select('*')
@@ -43,7 +43,7 @@ export function useNewsAdmin() {
       setSources((sourcesResult.data ?? []) as unknown as NewsSource[])
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load news admin state')
+      setError(err instanceof Error ? err.message : 'Unable to load news operator state')
     } finally {
       setLoading(false)
     }

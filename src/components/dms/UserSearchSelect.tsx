@@ -2,6 +2,7 @@ import React from 'react'
 import { MessageSquare, Search } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
 import { Input } from '../ui/Input'
+import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { useUserSearch } from '../../hooks/useUserSearch'
 import { useAllUsers } from '../../hooks/useAllUsers'
 import type { BasicUser } from '../../lib/supabase'
@@ -128,7 +129,10 @@ export const UserSearchSelect: React.FC<UserSearchSelectProps> = ({
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium text-[var(--text-primary)]">
-                        {u.display_name}
+                        <span className="inline-flex max-w-full items-center gap-1.5">
+                          <span className="truncate">{u.display_name}</span>
+                          <UserRoleBadge role={u.admin_role} />
+                        </span>
                       </div>
                       <div className="truncate text-xs text-[var(--text-muted)]">
                         @{u.username}

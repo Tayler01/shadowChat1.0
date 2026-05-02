@@ -6,6 +6,7 @@ import { Button } from '../ui/Button'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { MessageRichText } from '../chat/MessageRichText'
 import { NewsReactionBar, NewsReactionSummaryStrip } from './NewsReactionBar'
+import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { useAuth } from '../../hooks/useAuth'
 import { useNewsChat } from '../../hooks/useNewsChat'
 import { formatTime } from '../../lib/utils'
@@ -60,8 +61,9 @@ function NewsChatRow({
         )}
 
         <div className="mb-1 flex flex-wrap items-baseline gap-2">
-          <span className="font-semibold text-[var(--text-primary)]">
-            {message.user?.display_name || message.user?.username || 'Unknown'}
+          <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-[var(--text-primary)]">
+            <span className="truncate">{message.user?.display_name || message.user?.username || 'Unknown'}</span>
+            <UserRoleBadge role={message.user?.admin_role} />
           </span>
           <span className="text-xs text-[var(--text-muted)]">{formatTime(message.created_at)}</span>
           {message.edited_at && <span className="text-xs text-[var(--text-muted)]">(edited)</span>}

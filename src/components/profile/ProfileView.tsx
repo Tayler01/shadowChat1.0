@@ -8,6 +8,7 @@ import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
+import { UserRoleBadge } from '../ui/UserRoleBadge'
 import toast from 'react-hot-toast'
 import type { UserStatus } from '../../types'
 import { getPresenceOption, presenceOptions } from '../../lib/presence'
@@ -306,8 +307,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
             ) : (
               <div className="space-y-4">
                 <div>
-                  <h1 className="text-2xl font-bold text-[var(--text-primary)]">
-                    {profile.display_name}
+                  <h1 className="flex min-w-0 items-center gap-2 text-2xl font-bold text-[var(--text-primary)]">
+                    <span className="truncate">{profile.display_name}</span>
+                    <UserRoleBadge role={profile.admin_role} className="mt-1" />
                   </h1>
                   <p className="text-[var(--text-muted)]">
                     @{profile.username}
@@ -391,7 +393,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
                 <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">Display name</div>
-                <div className="mt-2 text-base font-medium text-[var(--text-primary)]">{profile.display_name}</div>
+                <div className="mt-2 flex items-center gap-1.5 text-base font-medium text-[var(--text-primary)]">
+                  <span className="truncate">{profile.display_name}</span>
+                  <UserRoleBadge role={profile.admin_role} />
+                </div>
               </div>
               <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
                 <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">Username</div>

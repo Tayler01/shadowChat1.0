@@ -1,6 +1,7 @@
 import React from 'react'
 import { PinnedMessageItem } from './PinnedMessageItem'
 import type { Message } from '../../lib/supabase'
+import { UserRoleBadge } from '../ui/UserRoleBadge'
 
 interface PinnedMessagesBarProps {
   messages: Message[]
@@ -37,10 +38,18 @@ export function PinnedMessagesBar({
           className="group relative max-w-xs cursor-help truncate rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-sm text-[var(--text-secondary)]"
           title={`${messages[0].user?.display_name}: ${messages[0].content}`}
         >
-          <strong>{messages[0].user?.display_name}:</strong> {messages[0].content}
+          <strong className="inline-flex items-center gap-1">
+            {messages[0].user?.display_name}
+            <UserRoleBadge role={messages[0].user?.admin_role} />
+          </strong>
+          : {messages[0].content}
 
           <div className="glass-panel-strong pointer-events-none absolute bottom-full left-0 z-50 mb-2 max-w-sm whitespace-nowrap rounded-[var(--radius-sm)] px-3 py-2 text-xs text-[var(--text-primary)] opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-            <strong>{messages[0].user?.display_name}:</strong> {messages[0].content}
+            <strong className="inline-flex items-center gap-1">
+              {messages[0].user?.display_name}
+              <UserRoleBadge role={messages[0].user?.admin_role} />
+            </strong>
+            : {messages[0].content}
           </div>
         </div>
         {messages.length > 1 && (

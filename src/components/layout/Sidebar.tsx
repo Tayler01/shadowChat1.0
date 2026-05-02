@@ -1,6 +1,7 @@
 import React from 'react';
 import { MessageSquare, Users, Newspaper, Settings, Moon, Sun, X } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
+import { UserRoleBadge } from '../ui/UserRoleBadge';
 import { useAuth } from '../../hooks/useAuth';
 import { useDirectMessages } from '../../hooks/useDirectMessages';
 import { useNewsBadges } from '../../hooks/useNewsBadges';
@@ -138,8 +139,9 @@ export function Sidebar({
               showStatus
             />
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-[var(--text-primary)]">
-                {user?.display_name}
+              <p className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">
+                <span className="truncate">{user?.display_name}</span>
+                <UserRoleBadge role={user?.admin_role} />
               </p>
               <p className="truncate text-xs text-[var(--text-muted)]">
                 @{user?.username}

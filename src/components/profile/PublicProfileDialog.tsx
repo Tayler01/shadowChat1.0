@@ -4,6 +4,7 @@ import { CalendarDays, Palette, UserRound, X } from 'lucide-react'
 import type { User } from '../../lib/supabase'
 import { getPresenceOption } from '../../lib/presence'
 import { Avatar } from '../ui/Avatar'
+import { UserRoleBadge } from '../ui/UserRoleBadge'
 
 interface PublicProfileDialogProps {
   user: User | null
@@ -153,8 +154,9 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                   className="rounded-full border-4 border-[var(--bg-panel-strong)] shadow-[var(--shadow-panel-strong)]"
                 />
                 <div className="min-w-0 pb-2">
-                  <h2 id="public-profile-title" className="truncate text-2xl font-bold text-[var(--text-primary)]">
-                    {user.display_name || user.username || 'Unknown User'}
+                  <h2 id="public-profile-title" className="flex min-w-0 items-center gap-2 text-2xl font-bold text-[var(--text-primary)]">
+                    <span className="truncate">{user.display_name || user.username || 'Unknown User'}</span>
+                    <UserRoleBadge role={user.admin_role} className="mt-1" />
                   </h2>
                   <p className="truncate text-sm text-[var(--text-muted)]">@{user.username || 'unknown'}</p>
                 </div>

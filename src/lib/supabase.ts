@@ -659,6 +659,8 @@ export const uploadChatFile = async (file: File) => {
 // Database types matching the actual schema
 import type { UserStatus } from '../types'
 
+export type AdminRole = 'admin' | 'sub_admin'
+
 export interface User {
   id: string
   email: string
@@ -669,6 +671,7 @@ export interface User {
   status: UserStatus
   status_message: string
   color: string
+  admin_role?: AdminRole | null
   last_active: string
   created_at: string
   updated_at: string
@@ -797,8 +800,20 @@ export interface DMMessage {
 export interface BasicUser
   extends Pick<
     User,
-    'id' | 'username' | 'display_name' | 'avatar_url' | 'color' | 'status'
+    'id' | 'username' | 'display_name' | 'avatar_url' | 'color' | 'status' | 'admin_role'
   > {}
+
+export interface AdminAccessUser extends User {
+  role_created_at?: string | null
+  role_created_by?: string | null
+}
+
+export interface AdminRoleNotification {
+  id: string
+  role: AdminRole
+  message: string
+  created_at: string
+}
 
 export type ChatMessage = Message | DMMessage
 
@@ -849,7 +864,7 @@ export const fetchDMConversations = async () => {
   if (missingIds.length) {
     const { data: usersData, error: userErr } = await workingClient
       .from('users')
-      .select('id, username, display_name, avatar_url, color, status')
+      .select('id, username, display_name, avatar_url, color, status, admin_role')
       .in('id', missingIds)
     if (userErr) {
     } else {
@@ -931,7 +946,7 @@ export const fetchAllUsers = async (options?: { signal?: AbortSignal }) => {
   const workingClient = await getWorkingClient()
   let query = workingClient
     .from('users')
-    .select('id, username, display_name, avatar_url, color, status')
+    .select('id, username, display_name, avatar_url, color, status, admin_role')
   if (options?.signal && typeof query.abortSignal === 'function') {
     query = query.abortSignal(options.signal)
   }
@@ -940,6 +955,44 @@ export const fetchAllUsers = async (options?: { signal?: AbortSignal }) => {
     return [] as BasicUser[]
   }
   return (data ?? []) as BasicUser[]
+}
+
+export const getMyAdminRole = async () => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_my_admin_role')
+  if (error) throw error
+  return (data ?? null) as AdminRole | null
+}
+
+export const fetchAdminAccessUsers = async () => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('list_admin_access_users')
+  if (error) throw error
+  return (data ?? []) as AdminAccessUser[]
+}
+
+export const setSubAdminStatus = async (targetUserId: string, enabled: boolean) => {
+  const workingClient = await getWorkingClient()
+  const { error } = await workingClient.rpc('set_sub_admin_status', {
+    target_user_id: targetUserId,
+    enabled,
+  })
+  if (error) throw error
+}
+
+export const fetchPendingAdminRoleNotifications = async () => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_pending_admin_role_notifications')
+  if (error) throw error
+  return (data ?? []) as AdminRoleNotification[]
+}
+
+export const markAdminRoleNotificationSeen = async (notificationId: string) => {
+  const workingClient = await getWorkingClient()
+  const { error } = await workingClient.rpc('mark_admin_role_notification_seen', {
+    notification_id: notificationId,
+  })
+  if (error) throw error
 }
 
 // Helper function to ensure valid session before database operations

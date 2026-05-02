@@ -7,6 +7,7 @@ import type { EmojiClickData } from '../../types'
 import { MessageReactions } from './MessageItem'
 import { VideoAttachment } from './VideoAttachment'
 import { cn } from '../../lib/utils'
+import { UserRoleBadge } from '../ui/UserRoleBadge'
 
 const QUICK_REACTIONS = ['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F389}', '\u{1F64F}']
 
@@ -70,7 +71,11 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
           className="text-[0.65rem]"
         />
         <div className="break-words text-sm text-[var(--text-primary)]">
-          <strong>{message.user?.display_name}:</strong>{' '}
+          <strong className="inline-flex items-center gap-1">
+            {message.user?.display_name}
+            <UserRoleBadge role={message.user?.admin_role} />
+          </strong>
+          :{' '}
           {message.message_type === 'audio' ? (
             <audio controls src={message.audio_url} className="mt-1 max-w-full" />
           ) : message.message_type === 'video' && message.file_url ? (
