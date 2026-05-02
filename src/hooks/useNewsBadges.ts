@@ -87,6 +87,16 @@ export function useNewsBadges() {
           { event: '*', schema: 'public', table: 'news_chat_messages' },
           () => void refresh()
         )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'news_user_state',
+            filter: `user_id=eq.${user.id}`,
+          },
+          () => void refresh()
+        )
         .subscribe((status: string) => {
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             void runRealtimeRecovery('channel-error')

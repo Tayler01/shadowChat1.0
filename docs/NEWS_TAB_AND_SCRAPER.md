@@ -60,8 +60,10 @@ Main RPCs:
 - `count_news_badge_items`
 - `clear_expired_news_feed_items`
 
-Realtime publication includes `news_feed_items`, `news_chat_messages`, and
-`news_sources`.
+Realtime publication includes `news_feed_items`, `news_chat_messages`,
+`news_sources`, and `news_user_state`. The reaction detail tables are not
+published because their RPCs aggregate reaction state back onto the published
+parent rows.
 
 ## Feed Lifecycle
 
