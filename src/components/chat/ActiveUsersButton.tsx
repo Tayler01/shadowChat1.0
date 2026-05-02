@@ -42,13 +42,13 @@ export function ActiveUsersButton({ resetStatus }: ActiveUsersButtonProps) {
       <button
         type="button"
         onClick={() => setOpen(value => !value)}
-        className="inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5 text-sm text-[var(--text-muted)] transition-colors hover:border-[rgba(215,170,70,0.28)] hover:bg-[rgba(215,170,70,0.08)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.28)]"
+        className="inline-flex min-h-7 items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-2 py-0.5 text-[11px] text-[var(--text-muted)] transition-colors hover:border-[rgba(215,170,70,0.28)] hover:bg-[rgba(215,170,70,0.08)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.28)] sm:min-h-8 sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-xs"
         aria-label={`${activeUsers.length} active users`}
         aria-haspopup="dialog"
         aria-expanded={open}
       >
         <Users className="h-4 w-4" />
-        <span className="min-w-[1.1rem] rounded-full border border-[rgba(215,170,70,0.24)] bg-[rgba(215,170,70,0.1)] px-1.5 text-center text-[10px] font-semibold leading-5 text-[var(--text-gold)]">
+        <span className="min-w-[1rem] rounded-full border border-[rgba(215,170,70,0.24)] bg-[rgba(215,170,70,0.1)] px-1.5 text-center text-[10px] font-semibold leading-4 text-[var(--text-gold)]">
           {activeUsers.length}
         </span>
         <ClientResetIndicator status={resetStatus} />

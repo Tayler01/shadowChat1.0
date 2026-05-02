@@ -127,7 +127,7 @@ export function WeatherWidget({ onOpenSettings }: WeatherWidgetProps) {
       <button
         type="button"
         onClick={() => setOpen(value => !value)}
-        className="inline-flex min-h-9 items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5 text-sm text-[var(--text-muted)] transition-colors hover:border-[rgba(215,170,70,0.28)] hover:bg-[rgba(215,170,70,0.08)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.28)]"
+        className="inline-flex min-h-7 items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-2 py-0.5 text-[11px] text-[var(--text-muted)] transition-colors hover:border-[rgba(215,170,70,0.28)] hover:bg-[rgba(215,170,70,0.08)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.28)] sm:min-h-8 sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-xs"
         aria-label={current ? `${formatTemperature(current.temperature)} and ${current.condition.label}` : 'Weather settings'}
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -139,7 +139,7 @@ export function WeatherWidget({ onOpenSettings }: WeatherWidgetProps) {
             <MapPin className="h-4 w-4" />
           )}
         </span>
-        <span className="min-w-[2rem] text-center text-xs font-semibold text-[var(--text-primary)]">
+        <span className="min-w-[1.8rem] text-center text-xs font-semibold text-[var(--text-primary)]">
           {current ? formatTemperature(current.temperature) : loading ? '--' : 'Set'}
         </span>
       </button>

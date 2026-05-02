@@ -76,22 +76,20 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
       className="flex h-full min-h-0 flex-col bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.05),transparent_26%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] text-sm"
     >
       {/* Header */}
-      <div className="glass-panel-strong relative z-30 flex-shrink-0 border-b border-[var(--border-panel)] px-6 py-5">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4">
-          <div className="flex items-center space-x-3">
+      <div className="glass-panel-strong relative z-30 flex-shrink-0 border-b border-[var(--border-panel)] px-4 py-1.5 md:px-6">
+        <div className="mx-auto flex min-h-9 w-full max-w-6xl items-center justify-between gap-2.5">
+          <div className="flex min-w-0 items-center">
             {/* Menu button removed on mobile */}
             {/* Header title */}
-            <div className="relative flex min-h-10 items-center gap-3 md:gap-4">
+            <div className="relative flex min-w-0 items-center gap-2 md:gap-4">
               <img
                 src="/icons/header-logo.png"
                 alt="SHADO"
-                className="absolute -left-12 top-1/2 h-[5.75rem] w-44 -translate-y-1/2 object-contain object-left sm:-left-14 sm:w-48 md:hidden"
+                className="h-8 w-16 flex-shrink-0 object-contain object-left sm:h-10 sm:w-20 md:hidden"
               />
-              <div className="pl-28 sm:pl-32 md:pl-0">
-                <h1 className="text-lg font-semibold text-[var(--text-primary)] md:text-xl">
-                  General Chat
-                </h1>
-                <p className="text-[10px] uppercase tracking-[0.16em] text-[var(--text-muted)] md:text-xs md:tracking-[0.18em]">
+              <div className="min-w-0">
+                <h1 className="sr-only">General Chat</h1>
+                <p className="truncate text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)] sm:tracking-[0.18em] md:text-xs">
                   Lounge Channel
                 </p>
               </div>
@@ -106,7 +104,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-shrink-0 items-center gap-1 sm:gap-2">
             <WeatherWidget onOpenSettings={() => onViewChange('settings')} />
             <ActiveUsersButton resetStatus={resetStatus} />
           </div>
