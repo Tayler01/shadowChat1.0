@@ -247,7 +247,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 18, scale: 0.98 }}
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="popup-surface relative flex max-h-[min(86vh,760px)] w-full max-w-lg flex-col overflow-hidden rounded-[var(--radius-xl)]"
+            className="popup-surface relative max-h-[min(86vh,760px)] w-full max-w-lg overflow-y-auto overflow-x-hidden rounded-[var(--radius-xl)]"
           >
             <div className="relative h-36 shrink-0 overflow-hidden border-b border-[var(--border-panel)]">
               {user.banner_url ? (
@@ -271,7 +271,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
               </button>
             </div>
 
-            <div className="relative overflow-y-auto px-5 pb-5 sm:px-6 sm:pb-6">
+            <div className="relative px-5 pb-5 sm:px-6 sm:pb-6">
               <div className="-mt-12 flex items-end gap-4">
                 <Avatar
                   src={user.avatar_url}
