@@ -180,9 +180,11 @@ credentials are `X_USERNAME`, `X_EMAIL`, `X_PASSWORD`, `TRUTH_USERNAME`,
 Admins and sub-admins manage tracked sources from Settings > Admin > News
 Sources. The admin class is stored in `public.user_roles` as `admin` or
 `sub_admin`; full admins can manage sub-admin access from Settings > Admin >
-Admin Access.
+Admin Access. Operators can also open another user's public profile popup to
+manage channel bans for General Chat, News Chat, and News Feed participation.
 
 Full runbook: [docs/NEWS_TAB_AND_SCRAPER.md](C:/repos/chat2.0/docs/NEWS_TAB_AND_SCRAPER.md:1).
+Moderation runbook: [docs/CHANNEL_BANS.md](C:/repos/chat2.0/docs/CHANNEL_BANS.md:1).
 
 ## 8. Optional Weather Widget Setup
 
@@ -212,6 +214,8 @@ After setup, verify:
 12. A full `admin` user can grant or remove sub-admin access from Settings > Admin > Admin Access
 13. Settings > Account & Profile can save and clear a weather location
 14. General Chat shows the weather widget and active-user count without overlapping on mobile
+15. An `admin` or `sub_admin` can open another user's profile popup and update channel-ban scopes
+16. A banned user cannot post/react in the selected channel or board, and can still use DMs
 
 ## 10. Optional Preview Mode
 
@@ -266,6 +270,12 @@ For implementation and QA details, see [docs/PHONE_INSTALL_ONBOARDING.md](C:/rep
 - migrations were not pushed
 - wrong Supabase project linked
 - stale session or auth issue
+
+### Channel Ban Controls Are Missing
+
+- confirm the signed-in account has `admin` or `sub_admin`
+- confirm the target profile is not the single full admin account
+- confirm migrations include `user_channel_bans`
 
 ### Weather Location Does Not Save
 

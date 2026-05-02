@@ -54,7 +54,7 @@ Do browser validation when changing:
 - theme and visual polish
 - push notification setup
 - News Feed layout, reaction menus, badges, and source-health admin UI
-- admin access, admin subpages, or role badges
+- admin access, admin subpages, role badges, or channel-ban moderation
 - active-user indicators or presence visibility
 - General Chat weather widget or Account & Profile weather location settings
 
@@ -180,6 +180,7 @@ Admin/weather focused Jest coverage currently lives in:
 
 - [tests/SettingsView.test.tsx](C:/repos/chat2.0/tests/SettingsView.test.tsx:1)
 - [tests/AdminFeedbackReview.test.tsx](C:/repos/chat2.0/tests/AdminFeedbackReview.test.tsx:1)
+- [tests/PublicProfileDialog.test.tsx](C:/repos/chat2.0/tests/PublicProfileDialog.test.tsx:1)
 - [tests/WeatherWidget.test.tsx](C:/repos/chat2.0/tests/WeatherWidget.test.tsx:1)
 - [tests/WeatherLocationSettings.test.tsx](C:/repos/chat2.0/tests/WeatherLocationSettings.test.tsx:1)
 - [tests/weather.test.ts](C:/repos/chat2.0/tests/weather.test.ts:1)
@@ -237,6 +238,13 @@ For Admin Access changes, verify a full `admin` can open Settings > Admin >
 Admin Access, search the complete user list, grant/revoke sub-admin access, and
 cannot remove the single full admin from that UI. Verify sub-admin users can see
 operator tools but cannot see Admin Access.
+
+For channel-ban moderation changes, verify an `admin` or `sub_admin` can open
+another user's profile popup from an avatar, open Channel bans, save timed and
+permanent scopes, clear all scopes, and cannot moderate the single full admin
+account. Then verify the target user is blocked from General Chat, News Chat,
+and/or News Feed reactions according to the selected scopes while DMs remain
+usable.
 
 For weather changes, verify General Chat header on desktop and mobile, the
 forecast popup, and Settings > Account & Profile > Weather Location. Weather
@@ -327,6 +335,7 @@ Examples:
 - profile edit
 - settings and push setup
 - admin subpages and feedback review
+- channel-ban controls in public profile popups
 - weather widget and weather settings
 - mobile nav and composer spacing
 

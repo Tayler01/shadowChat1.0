@@ -85,6 +85,9 @@ tables or buckets. For example, Settings feedback submissions require
 bucket before the production UI can submit reports, and the weather widget
 requires `public.user_weather_preferences` before users can save weather
 locations.
+Channel bans require `public.user_channel_bans` plus the updated channel and
+reaction policies before the production moderation UI can reliably block
+participation.
 
 Recent app-surface migrations to confirm in fresh projects:
 
@@ -93,6 +96,7 @@ Recent app-surface migrations to confirm in fresh projects:
 - `20260502034206_feedback_admin_review_access.sql`: operator feedback review access.
 - `20260502034941_feedback_review_read_policy_consolidation.sql`: consolidated feedback read policies.
 - `20260502042003_user_weather_preferences.sql`: private per-user weather location preferences.
+- `20260502070543_channel_bans_moderation.sql`: profile-popup moderation controls and channel-ban enforcement.
 
 ### Edge Functions
 
@@ -213,6 +217,8 @@ After deploy, verify:
 14. General Chat header shows active-user count, active-user popup, and weather widget without mobile overlap
 15. Settings > Account & Profile can save or clear a weather location
 16. Settings > Admin > Feedback Review lists submitted feedback for an app operator
+17. An app operator can open another user's profile popup and see Channel bans
+18. A channel-banned user is blocked from the selected channel or board while DMs still work
 
 Recommended production smoke for local post-deploy validation:
 
@@ -259,6 +265,14 @@ setup if the signed-in user has no saved weather location. If location save
 fails, confirm `20260502042003_user_weather_preferences.sql` has been applied
 and that the signed-in user has an authenticated session. Open-Meteo does not
 require a project secret for the current browser-side integration.
+
+### Channel Bans Do Not Apply
+
+The frontend deploy can show moderation controls while enforcement still fails
+if the target Supabase project is missing
+`20260502070543_channel_bans_moderation.sql`. Confirm `supabase migration list`
+shows the migration on both local and remote, then retest General Chat, News
+Chat, News Feed reactions, and DMs.
 
 ### News Feed Is Stale
 

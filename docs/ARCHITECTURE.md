@@ -56,6 +56,7 @@ React UI
 - [`push.ts`](C:/repos/chat2.0/src/lib/push.ts:1): browser push storage and dispatch wiring
 - [`ai.ts`](C:/repos/chat2.0/src/lib/ai.ts:1): authenticated AI function calls
 - [`weather.ts`](C:/repos/chat2.0/src/lib/weather.ts:1): Open-Meteo geocoding/forecast mapping and private weather preference helpers
+- [`moderation.ts`](C:/repos/chat2.0/src/lib/moderation.ts:1): channel-ban scopes, durations, and moderation RPC wrappers
 - [`utils.ts`](C:/repos/chat2.0/src/lib/utils.ts:1): shared formatting and UI helpers
 
 ## Backend Layers
@@ -74,6 +75,7 @@ Important domains:
 - uploads and storage policies
 - user feedback submissions and private feedback attachments
 - app-wide admin/sub-admin roles, audit rows, and role-change notifications
+- channel bans for General Chat, News Chat, and News Feed participation
 - foreground presence visibility and active-user state
 - private per-user weather preferences
 - push subscriptions and notification preferences
@@ -117,7 +119,13 @@ Role badges are intentionally public identity metadata. Full admins render with
 a gold shield and sub-admins render with a silver shield in chat/profile
 surfaces.
 
+Channel bans are an admin moderation subdomain exposed from another user's
+public profile popup. Operators can block General Chat, News Chat, and News
+Feed participation for timed or permanent durations. DMs are deliberately not
+part of channel-ban enforcement.
+
 Full runbook: [docs/ADMIN_ACCESS.md](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1).
+Moderation runbook: [docs/CHANNEL_BANS.md](C:/repos/chat2.0/docs/CHANNEL_BANS.md:1).
 
 ### Weather
 
@@ -183,6 +191,15 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 3. `useNewsChat` receives realtime inserts/updates/deletes
 4. Link text is tokenized client-side and metadata is fetched through `link-preview`
 5. Reactions are toggled through `toggle_news_chat_reaction`
+
+### Channel Ban Enforcement
+
+1. An app operator opens a user's public profile popup
+2. The profile popup loads active bans through `list_user_channel_bans`
+3. Operator saves scopes and duration through `set_user_channel_bans`
+4. RLS blocks banned inserts/updates in `messages` or `news_chat_messages`
+5. Reaction RPCs block banned group, News Chat, or News Feed reactions
+6. Existing user deletes remain allowed so old content can still be cleaned up
 
 ### Active Presence
 

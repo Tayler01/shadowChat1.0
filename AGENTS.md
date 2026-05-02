@@ -21,9 +21,10 @@ with service-role credentials; never expose scraper credentials or provider
 tokens in browser-visible `VITE_*` variables.
 
 Admin access is now app-wide. Before changing admin behavior, read
-[docs/ADMIN_ACCESS.md](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1). Keep exactly
+[docs/ADMIN_ACCESS.md](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1) and
+[docs/CHANNEL_BANS.md](C:/repos/chat2.0/docs/CHANNEL_BANS.md:1). Keep exactly
 one full `admin`; `sub_admin` users can use operator tools but cannot manage
-roles.
+roles. Channel bans are enforced by RLS/RPCs and must keep DMs untouched.
 
 The General Chat weather widget stores location preferences privately in
 `user_weather_preferences`. Before changing weather behavior, read
@@ -112,6 +113,7 @@ npx jest --runInBand
 - [`src/lib/push.ts`](C:/repos/chat2.0/src/lib/push.ts:1): push subscription persistence and function calls
 - [`src/lib/ai.ts`](C:/repos/chat2.0/src/lib/ai.ts:1): AI function calls
 - [`src/lib/weather.ts`](C:/repos/chat2.0/src/lib/weather.ts:1): weather provider mapping and private preference helpers
+- [`src/lib/moderation.ts`](C:/repos/chat2.0/src/lib/moderation.ts:1): channel-ban scope and RPC helpers
 
 ### Views
 
@@ -137,6 +139,7 @@ npx jest --runInBand
 - [`supabase/functions/bridge-pairing-revoke/index.ts`](C:/repos/chat2.0/supabase/functions/bridge-pairing-revoke/index.ts:1): remote revoke and device wipe
 - [`supabase/functions/bridge-heartbeat/index.ts`](C:/repos/chat2.0/supabase/functions/bridge-heartbeat/index.ts:1): bridge health ping
 - Admin roles live in `public.user_roles`, `public.admin_role_audit`, and `public.admin_role_notifications`; visible badges sync to `public.users.admin_role`.
+- Channel bans live in `public.user_channel_bans`; General Chat, News Chat, and News Feed restrictions are enforced by RLS and reaction RPCs.
 - Presence visibility and the General Chat active-user list use `public.user_presence`, `users.presence_visibility`, and the `update_user_last_active`, `list_presence_states`, and `get_active_users` RPCs.
 - Weather preferences live in private `public.user_weather_preferences` rows and should not be added to public user profile data.
 
@@ -155,6 +158,7 @@ Any change touching:
 
 - auth
 - chat message inserts
+- channel-ban or moderation enforcement
 - DM unread counts
 - admin role access
 - active presence or visibility

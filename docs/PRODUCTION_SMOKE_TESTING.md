@@ -117,7 +117,10 @@ Common failure meanings:
 7. Open General Chat and confirm active-user count plus weather widget render without header overlap.
 8. Open Settings > Account & Profile and confirm Weather Location renders.
 9. If the deploy touched admin tools, verify Settings > Admin subpages with an operator account.
-10. Keep the latest passing artifact path with the deploy notes.
+10. If the deploy touched moderation, verify an operator can open another
+    user's profile popup and see Channel bans without using a personal admin
+    account for routine smoke traffic.
+11. Keep the latest passing artifact path with the deploy notes.
 
 ## Latest Feedback Release Checks
 
@@ -134,3 +137,12 @@ May 2, 2026 local post-build checks:
 - Production build passed: `npm run build`
 - Headed weather widget preview passed with artifacts under `output/playwright/weather-widget/`
 - Netlify Production Deploy workflow passed for commit `601c3c9`
+
+## Latest Channel Ban Moderation Checks
+
+May 2, 2026 channel-ban moderation release:
+
+- Local gates passed: `npm run lint`, `npx tsc --noEmit -p tsconfig.app.json`, `npm run build`
+- Focused Jest passed: `npx jest --runInBand tests/PublicProfileDialog.test.tsx tests/MessageItem.test.tsx tests/useMessages.test.tsx tests/NewsChat.test.tsx`
+- Supabase migration `20260502070543_channel_bans_moderation.sql` applied and migration history aligned
+- Netlify Production Deploy workflow passed for commit `f868bce`

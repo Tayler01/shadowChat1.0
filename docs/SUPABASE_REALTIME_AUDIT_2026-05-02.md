@@ -43,5 +43,6 @@ security-sensitive or high-churn operational data.
 | `notification_preferences` | Per-user push notification settings. | Do not publish. Settings are user-driven and refreshed on demand. |
 | `notification_sounds` | Static notification sound catalog. | Do not publish. Static lookup table. |
 | `push_subscriptions` | Browser push endpoints and keys. | Do not publish. Sensitive endpoint material. |
+| `user_channel_bans` | Active and historical moderation bans for General Chat, News Chat, and News Feed. | Do not publish. Operators read/write on demand from profile popups; enforcement is RLS/RPC-based. |
 | `user_weather_preferences` | Private per-user weather location and temperature-unit preference. | Do not publish. Personal setting refreshed on demand by the owning user only. |
 | `user_sessions` | App session tracking table. | Do not publish. Session lifecycle is auth-sensitive and not used for live UI. |
