@@ -101,8 +101,8 @@ export const MessageRichText: React.FC<MessageRichTextProps> = ({
   }, [firstUrl, showPreview])
 
   return (
-    <div className={cn('whitespace-pre-wrap break-words', className)}>
-      <span>
+    <div className={cn('min-w-0 max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere]', className)}>
+      <span className="break-words [overflow-wrap:anywhere]">
         {parts.map((part, index) => {
           if (part.type === 'text') {
             return <React.Fragment key={`${index}-text`}>{part.text}</React.Fragment>
@@ -114,7 +114,7 @@ export const MessageRichText: React.FC<MessageRichTextProps> = ({
               href={part.href}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-medium text-[var(--text-gold)] underline decoration-[rgba(241,211,138,0.42)] underline-offset-2 transition-colors hover:text-[var(--gold-5)]"
+              className="break-words font-medium text-[var(--text-gold)] underline decoration-[rgba(241,211,138,0.42)] underline-offset-2 transition-colors [overflow-wrap:anywhere] hover:text-[var(--gold-5)]"
             >
               {part.text}
             </a>

@@ -6,26 +6,27 @@ const mockSendMessage = jest.fn()
 const mockEditMessage = jest.fn()
 const mockDeleteMessage = jest.fn()
 const mockToggleReaction = jest.fn()
-const mockUseNewsChat = jest.fn(() => ({
-  messages: [
-    {
-      id: 'message-1',
-      user_id: 'user-1',
-      content: 'Breaking link https://example.com/story',
-      reactions: { '\u{1F525}': { count: 2, users: ['user-2'] } },
-      created_at: '2026-04-30T00:00:00.000Z',
-      updated_at: '2026-04-30T00:00:00.000Z',
-      edited_at: null,
-      deleted_at: null,
-      user: {
-        id: 'user-1',
-        username: 'reporter',
-        display_name: 'Reporter',
-        avatar_url: null,
-        color: '#d7aa46',
-      },
-    },
-  ],
+
+const baseMessage = {
+  id: 'message-1',
+  user_id: 'user-1',
+  content: 'Breaking link https://example.com/story',
+  reactions: { '\u{1F525}': { count: 2, users: ['user-2'] } },
+  created_at: '2026-04-30T00:00:00.000Z',
+  updated_at: '2026-04-30T00:00:00.000Z',
+  edited_at: null,
+  deleted_at: null,
+  user: {
+    id: 'user-1',
+    username: 'reporter',
+    display_name: 'Reporter',
+    avatar_url: null,
+    color: '#d7aa46',
+  },
+}
+
+const buildNewsChatState = (messages = [baseMessage]) => ({
+  messages,
   loading: false,
   sending: false,
   error: null,
@@ -35,7 +36,8 @@ const mockUseNewsChat = jest.fn(() => ({
   deleteMessage: mockDeleteMessage,
   toggleReaction: mockToggleReaction,
   markSeen: jest.fn(),
-}))
+})
+const mockUseNewsChat = jest.fn(() => buildNewsChatState())
 
 jest.mock('../src/hooks/useNewsChat', () => ({
   useNewsChat: () => mockUseNewsChat(),
@@ -110,4 +112,16 @@ test('news chat supports owner edits, deletes, and reactions', async () => {
   fireEvent.click(screen.getByRole('button', { name: /news reactions menu/i }))
   fireEvent.click(screen.getByRole('menuitem', { name: /\u{1F525}\s*2/u }))
   expect(mockToggleReaction).toHaveBeenCalledWith('message-1', '\u{1F525}')
+})
+
+test('news chat leaves long comments readable and keeps reaction menu in its own column', () => {
+  const longComment = `Long comment ${'shadowchat'.repeat(32)} https://example.com/${'story'.repeat(24)}`
+  mockUseNewsChat.mockReturnValueOnce(buildNewsChatState([{ ...baseMessage, content: longComment }]))
+
+  render(<NewsChat />)
+
+  expect(screen.getByText(longComment)).toBeInTheDocument()
+  expect(screen.getByTestId('news-chat-message-bubble')).toHaveClass('min-w-0')
+  expect(screen.getByTestId('news-chat-message-bubble')).toHaveClass('max-w-full')
+  expect(screen.getByRole('button', { name: /news reactions menu/i }).parentElement).toHaveClass('shrink-0')
 })

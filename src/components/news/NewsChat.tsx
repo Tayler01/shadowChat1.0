@@ -44,7 +44,7 @@ function NewsChatRow({
   }
 
   return (
-    <div className="group grid grid-cols-[auto_minmax(0,1fr)] gap-3 px-4 py-3 md:px-5">
+    <div className="group grid max-w-full grid-cols-[auto_minmax(0,1fr)_2rem] gap-3 px-4 py-3 md:px-5">
       <Avatar
         src={message.user?.avatar_url}
         alt={message.user?.display_name || 'News user'}
@@ -54,16 +54,7 @@ function NewsChatRow({
         presenceVisibility={message.user?.presence_visibility}
         showStatus
       />
-      <div className="relative min-w-0 pr-10">
-        {!editing && (
-          <NewsReactionBar
-            reactions={message.reactions}
-            onReact={emoji => onReact(message.id, emoji)}
-            variant="menu"
-            className="absolute right-0 top-0"
-          />
-        )}
-
+      <div className="min-w-0">
         <div className="mb-1 flex flex-wrap items-baseline gap-2">
           <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-[var(--text-primary)]">
             <span className="truncate">{message.user?.display_name || message.user?.username || 'Unknown'}</span>
@@ -93,7 +84,10 @@ function NewsChatRow({
             </div>
           </div>
         ) : (
-          <div className="inline-block max-w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] px-3 py-2 text-sm text-[var(--text-primary)] shadow-[var(--shadow-panel)]">
+          <div
+            data-testid="news-chat-message-bubble"
+            className="block w-fit min-w-0 max-w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] px-3 py-2 text-sm text-[var(--text-primary)] shadow-[var(--shadow-panel)]"
+          >
             <MessageRichText content={message.content} />
           </div>
         )}
@@ -140,6 +134,16 @@ function NewsChatRow({
             </>
           )}
         </div>
+      </div>
+      <div className="relative flex h-8 w-8 justify-end">
+        {!editing && (
+          <NewsReactionBar
+            reactions={message.reactions}
+            onReact={emoji => onReact(message.id, emoji)}
+            variant="menu"
+            className="shrink-0"
+          />
+        )}
       </div>
     </div>
   )

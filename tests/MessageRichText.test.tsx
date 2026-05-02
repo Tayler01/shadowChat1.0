@@ -62,3 +62,12 @@ test('does not request metadata when preview rendering is disabled', () => {
   expect(screen.getByRole('link', { name: 'https://example.com' })).toBeInTheDocument()
   expect(mockedFetchPreview).not.toHaveBeenCalled()
 })
+
+test('allows long text and links to wrap instead of clipping', () => {
+  const longWord = 'shadow'.repeat(40)
+  const { container } = render(<MessageRichText content={`read ${longWord} https://example.com/${longWord}`} showPreview={false} />)
+
+  expect(container.firstElementChild).toHaveClass('max-w-full')
+  expect(container.firstElementChild).toHaveClass('[overflow-wrap:anywhere]')
+  expect(screen.getByRole('link', { name: `https://example.com/${longWord}` })).toHaveClass('[overflow-wrap:anywhere]')
+})
