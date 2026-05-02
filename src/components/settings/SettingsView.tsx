@@ -16,7 +16,6 @@ import {
   Palette,
   Plus,
   Power,
-  RefreshCw,
   Search,
   Shield,
   Smartphone,
@@ -303,7 +302,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
     loading: adminAccessLoading,
     savingUserId: adminSavingUserId,
     error: adminAccessError,
-    refresh: refreshAdminAccess,
     updateSubAdmin,
   } = useAdminAccess()
   const {
@@ -312,7 +310,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
     loading: newsAdminLoading,
     saving: newsAdminSaving,
     error: newsAdminError,
-    refresh: refreshNewsAdmin,
     upsertSource,
     setSourceEnabled,
     deleteSource,
@@ -334,7 +331,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
     enablePush,
     disablePush,
     updatePreference,
-    refreshState,
   } = usePushNotifications()
 
   const devicePushEnabled = subscribed
@@ -465,11 +461,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
       console.error(err)
       toast.error(err instanceof Error ? err.message : 'Failed to enable push notifications')
     }
-  }
-
-  const handleRefreshNotificationStatus = async () => {
-    await refreshState()
-    toast.success('Notification status refreshed')
   }
 
   const handleInstallApp = async (): Promise<'accepted' | 'dismissed' | null> => {
@@ -638,12 +629,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
                 <p className="mt-2 text-[var(--gold-4)]">{supportReason}</p>
               )}
               {pushError && <p className="mt-2 text-red-200/90">{pushError}</p>}
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="mt-4">
                 <Button onClick={() => setShowNotificationSetup(true)} variant="secondary" size="sm" className="justify-center">
                   Notification Setup
-                </Button>
-                <Button onClick={() => void refreshState()} variant="secondary" size="sm" className="justify-center">
-                  Refresh Status
                 </Button>
               </div>
             </div>
@@ -781,9 +769,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
               </p>
             </div>
           </div>
-          <Button type="button" variant="ghost" size="sm" onClick={() => void refreshAdminAccess()} aria-label="Refresh admin users">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
         </div>
 
         <div className="mb-4 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
@@ -1009,9 +994,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
               <p className="mt-1 text-sm text-[var(--text-muted)]">Tracked X and Truth accounts for the Today Board.</p>
             </div>
           </div>
-          <Button type="button" variant="ghost" size="sm" onClick={() => void refreshNewsAdmin()} aria-label="Refresh news sources">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
         </div>
 
         {newsAdminLoading ? (
@@ -1329,7 +1311,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
         canInstall={canInstall}
         onClose={() => setShowNotificationSetup(false)}
         onEnable={handleEnableFromModal}
-        onRefresh={handleRefreshNotificationStatus}
         onInstall={async () => {
           await handleInstallApp()
         }}

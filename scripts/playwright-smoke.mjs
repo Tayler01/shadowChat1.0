@@ -672,7 +672,6 @@ async function scenarioSettings(state, _sessionA, sessionB) {
   }
 
   if (pushEnabled) {
-    await sessionB.page.getByRole('button', { name: 'Refresh Status' }).first().click()
     await expectVisibleText(sessionB.page, 'Enabled on this device', 30_000)
     await expectSwitchState(sessionB.page, pushSwitchLabel, true)
   } else {

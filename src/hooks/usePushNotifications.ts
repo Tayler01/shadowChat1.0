@@ -63,6 +63,25 @@ export function usePushNotifications() {
     refreshState()
   }, [refreshState])
 
+  useEffect(() => {
+    if (!user) return
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'hidden') return
+      void refreshState()
+    }
+
+    window.addEventListener('focus', refreshWhenVisible)
+    window.addEventListener('pageshow', refreshWhenVisible)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+
+    return () => {
+      window.removeEventListener('focus', refreshWhenVisible)
+      window.removeEventListener('pageshow', refreshWhenVisible)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
+  }, [refreshState, user])
+
   const updatePreference = useCallback(
     async (key: keyof Omit<NotificationPreferences, 'user_id'>, value: NotificationPreferences[typeof key]) => {
       if (!user) return

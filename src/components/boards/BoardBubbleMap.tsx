@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpen, Brush, Coins, GraduationCap, MessageSquareText, Newspaper } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { BOARD_DEFINITIONS, type BoardDefinition } from '../../lib/boards'
@@ -15,6 +15,11 @@ interface BubblePosition {
   radius: number
 }
 
+interface BubbleVelocity {
+  vx: number
+  vy: number
+}
+
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   'news-feed': Newspaper,
   'news-chat': MessageSquareText,
@@ -25,6 +30,152 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 }
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(value, max))
+const EDGE_PADDING_X = 12
+const EDGE_PADDING_TOP = 20
+const EDGE_PADDING_BOTTOM = 16
+const COLLISION_SPACING = 0.92
+const COLLISION_RESTITUTION = 0.72
+const COLLISION_TRANSFER = 0.44
+const MOTION_FRICTION = 0.992
+const MOTION_STOP_SPEED = 0.045
+const MAX_THROW_SPEED = 28
+
+const clonePositions = (positions: Record<string, BubblePosition>) => (
+  Object.fromEntries(
+    Object.entries(positions).map(([slug, position]) => [slug, { ...position }])
+  ) as Record<string, BubblePosition>
+)
+
+const createZeroVelocities = (positions: Record<string, BubblePosition>) => (
+  Object.fromEntries(
+    Object.keys(positions).map(slug => [slug, { vx: 0, vy: 0 }])
+  ) as Record<string, BubbleVelocity>
+)
+
+const clampSpeed = (value: number) => clamp(value, -MAX_THROW_SPEED, MAX_THROW_SPEED)
+
+const clampBubbleToBounds = (
+  position: BubblePosition,
+  width: number,
+  height: number,
+  velocity?: BubbleVelocity
+) => {
+  const minX = position.radius + EDGE_PADDING_X
+  const maxX = width - position.radius - EDGE_PADDING_X
+  const minY = position.radius + EDGE_PADDING_TOP
+  const maxY = height - position.radius - EDGE_PADDING_BOTTOM
+
+  if (position.x < minX) {
+    position.x = minX
+    if (velocity && velocity.vx < 0) velocity.vx *= -0.58
+  } else if (position.x > maxX) {
+    position.x = maxX
+    if (velocity && velocity.vx > 0) velocity.vx *= -0.58
+  }
+
+  if (position.y < minY) {
+    position.y = minY
+    if (velocity && velocity.vy < 0) velocity.vy *= -0.58
+  } else if (position.y > maxY) {
+    position.y = maxY
+    if (velocity && velocity.vy > 0) velocity.vy *= -0.58
+  }
+}
+
+const resolveBubbleCollisions = (
+  positions: Record<string, BubblePosition>,
+  velocities: Record<string, BubbleVelocity>,
+  width: number,
+  height: number,
+  pinnedSlug: string | null = null
+) => {
+  const slugs = Object.keys(positions)
+
+  for (let pass = 0; pass < 4; pass += 1) {
+    for (let i = 0; i < slugs.length; i += 1) {
+      for (let j = i + 1; j < slugs.length; j += 1) {
+        const aSlug = slugs[i]
+        const bSlug = slugs[j]
+        const a = positions[aSlug]
+        const b = positions[bSlug]
+        if (!a || !b) continue
+
+        let dx = b.x - a.x
+        let dy = b.y - a.y
+        let distance = Math.hypot(dx, dy)
+        if (distance < 0.001) {
+          dx = 1
+          dy = 0
+          distance = 1
+        }
+
+        const minDistance = (a.radius + b.radius) * COLLISION_SPACING
+        if (distance >= minDistance) continue
+
+        const nx = dx / distance
+        const ny = dy / distance
+        const overlap = minDistance - distance
+        const aPinned = aSlug === pinnedSlug
+        const bPinned = bSlug === pinnedSlug
+
+        if (aPinned && !bPinned) {
+          b.x += nx * overlap
+          b.y += ny * overlap
+        } else if (bPinned && !aPinned) {
+          a.x -= nx * overlap
+          a.y -= ny * overlap
+        } else {
+          const halfOverlap = overlap * 0.5
+          a.x -= nx * halfOverlap
+          a.y -= ny * halfOverlap
+          b.x += nx * halfOverlap
+          b.y += ny * halfOverlap
+        }
+
+        const aVelocity = velocities[aSlug] ?? { vx: 0, vy: 0 }
+        const bVelocity = velocities[bSlug] ?? { vx: 0, vy: 0 }
+        velocities[aSlug] = aVelocity
+        velocities[bSlug] = bVelocity
+
+        const inverseMassA = aPinned ? 0 : 1
+        const inverseMassB = bPinned ? 0 : 1
+        const inverseMassTotal = inverseMassA + inverseMassB
+        const relativeVelocityX = bVelocity.vx - aVelocity.vx
+        const relativeVelocityY = bVelocity.vy - aVelocity.vy
+        const relativeNormalVelocity = relativeVelocityX * nx + relativeVelocityY * ny
+
+        if (inverseMassTotal > 0 && relativeNormalVelocity < 0) {
+          const impulse = (-(1 + COLLISION_RESTITUTION) * relativeNormalVelocity) / inverseMassTotal
+          if (!aPinned) {
+            aVelocity.vx -= impulse * nx * inverseMassA
+            aVelocity.vy -= impulse * ny * inverseMassA
+          }
+          if (!bPinned) {
+            bVelocity.vx += impulse * nx * inverseMassB
+            bVelocity.vy += impulse * ny * inverseMassB
+          }
+        }
+
+        if (aPinned && !bPinned) {
+          const hitSpeed = aVelocity.vx * nx + aVelocity.vy * ny
+          if (hitSpeed > 0) {
+            bVelocity.vx += nx * hitSpeed * COLLISION_TRANSFER
+            bVelocity.vy += ny * hitSpeed * COLLISION_TRANSFER
+          }
+        } else if (bPinned && !aPinned) {
+          const hitSpeed = -(bVelocity.vx * nx + bVelocity.vy * ny)
+          if (hitSpeed > 0) {
+            aVelocity.vx -= nx * hitSpeed * COLLISION_TRANSFER
+            aVelocity.vy -= ny * hitSpeed * COLLISION_TRANSFER
+          }
+        }
+
+        clampBubbleToBounds(a, width, height, aPinned ? undefined : aVelocity)
+        clampBubbleToBounds(b, width, height, bPinned ? undefined : bVelocity)
+      }
+    }
+  }
+}
 
 const getInitialPositions = (width: number, height: number) => {
   const mobileScale = width < 640 ? 0.72 : width < 920 ? 0.86 : 1
@@ -35,53 +186,102 @@ const getInitialPositions = (width: number, height: number) => {
     const radius = board.defaultPosition.radius * mobileScale
     positions[board.slug] = {
       radius,
-      x: clamp((board.defaultPosition.x / 100) * width, radius + 12, width - radius - 12),
-      y: clamp((board.defaultPosition.y / 100) * height, radius + verticalPadding, height - radius - 16),
+      x: clamp((board.defaultPosition.x / 100) * width, radius + EDGE_PADDING_X, width - radius - EDGE_PADDING_X),
+      y: clamp((board.defaultPosition.y / 100) * height, radius + verticalPadding, height - radius - EDGE_PADDING_BOTTOM),
     }
   })
 
   return positions
 }
 
-const resolveActiveCollision = (
-  positions: Record<string, BubblePosition>,
-  activeSlug: string,
-  width: number,
-  height: number
-) => {
-  const next = Object.fromEntries(
-    Object.entries(positions).map(([slug, position]) => [slug, { ...position }])
-  ) as Record<string, BubblePosition>
-  const active = next[activeSlug]
-  if (!active) return next
-
-  Object.entries(next).forEach(([slug, position]) => {
-    if (slug === activeSlug) return
-    const dx = position.x - active.x
-    const dy = position.y - active.y
-    const distance = Math.max(Math.hypot(dx, dy), 0.001)
-    const minDistance = (position.radius + active.radius) * 0.82
-    if (distance >= minDistance) return
-
-    const push = (minDistance - distance) * 0.92
-    const ux = dx / distance
-    const uy = dy / distance
-    position.x = clamp(position.x + ux * push, position.radius + 12, width - position.radius - 12)
-    position.y = clamp(position.y + uy * push, position.radius + 20, height - position.radius - 16)
-  })
-
-  return next
-}
-
 export function BoardBubbleMap({ countsByBoard, onSelect }: BoardBubbleMapProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const activePointerRef = useRef<number | null>(null)
   const activeSlugRef = useRef<string | null>(null)
+  const animationFrameRef = useRef<number | null>(null)
   const dragOffsetRef = useRef({ x: 0, y: 0 })
   const dragStartRef = useRef({ x: 0, y: 0 })
+  const lastPointerRef = useRef({ x: 0, y: 0, time: 0 })
   const dragMovedRef = useRef(false)
+  const lastFrameTimeRef = useRef<number | null>(null)
+  const positionsRef = useRef<Record<string, BubblePosition>>({})
+  const velocitiesRef = useRef<Record<string, BubbleVelocity>>({})
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [positions, setPositions] = useState<Record<string, BubblePosition>>({})
+
+  const setBubblePositions = (updater: (previous: Record<string, BubblePosition>) => Record<string, BubblePosition>) => {
+    setPositions(previous => {
+      const next = updater(previous)
+      positionsRef.current = next
+      return next
+    })
+  }
+
+  const stopPhysicsLoop = useCallback(() => {
+    if (animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current)
+      animationFrameRef.current = null
+    }
+    lastFrameTimeRef.current = null
+  }, [])
+
+  const startPhysicsLoop = useCallback(() => {
+    if (animationFrameRef.current !== null || !size.width || !size.height) return
+
+    const step = (time: number) => {
+      const previousTime = lastFrameTimeRef.current ?? time
+      const deltaFrames = clamp((time - previousTime) / 16.67, 0.5, 2.5)
+      const friction = Math.pow(MOTION_FRICTION, deltaFrames)
+      const pinnedSlug = activeSlugRef.current
+      lastFrameTimeRef.current = time
+
+      const next = clonePositions(positionsRef.current)
+      const velocities = velocitiesRef.current
+
+      Object.entries(next).forEach(([slug, position]) => {
+        const velocity = velocities[slug] ?? { vx: 0, vy: 0 }
+        velocities[slug] = velocity
+
+        if (slug !== pinnedSlug) {
+          position.x += velocity.vx * deltaFrames
+          position.y += velocity.vy * deltaFrames
+          velocity.vx *= friction
+          velocity.vy *= friction
+          clampBubbleToBounds(position, size.width, size.height, velocity)
+        }
+      })
+
+      resolveBubbleCollisions(next, velocities, size.width, size.height, pinnedSlug)
+
+      let hasMotion = false
+      Object.entries(velocities).forEach(([slug, velocity]) => {
+        if (slug === pinnedSlug) return
+
+        velocity.vx = clampSpeed(velocity.vx)
+        velocity.vy = clampSpeed(velocity.vy)
+
+        if (Math.hypot(velocity.vx, velocity.vy) <= MOTION_STOP_SPEED) {
+          velocity.vx = 0
+          velocity.vy = 0
+        } else {
+          hasMotion = true
+        }
+      })
+
+      positionsRef.current = next
+      setPositions(next)
+
+      if (hasMotion || activePointerRef.current !== null) {
+        animationFrameRef.current = window.requestAnimationFrame(step)
+        return
+      }
+
+      animationFrameRef.current = null
+      lastFrameTimeRef.current = null
+    }
+
+    animationFrameRef.current = window.requestAnimationFrame(step)
+  }, [size.height, size.width])
 
   useEffect(() => {
     const element = containerRef.current
@@ -108,8 +308,14 @@ export function BoardBubbleMap({ countsByBoard, onSelect }: BoardBubbleMapProps)
 
   useEffect(() => {
     if (!size.width || !size.height) return
-    setPositions(getInitialPositions(size.width, size.height))
-  }, [size.width, size.height])
+    stopPhysicsLoop()
+    const initialPositions = getInitialPositions(size.width, size.height)
+    positionsRef.current = initialPositions
+    velocitiesRef.current = createZeroVelocities(initialPositions)
+    setPositions(initialPositions)
+  }, [size.width, size.height, stopPhysicsLoop])
+
+  useEffect(() => () => stopPhysicsLoop(), [stopPhysicsLoop])
 
   const boards = useMemo(() => [...BOARD_DEFINITIONS].sort((a, b) => a.defaultPosition.y - b.defaultPosition.y), [])
 
@@ -121,10 +327,12 @@ export function BoardBubbleMap({ countsByBoard, onSelect }: BoardBubbleMapProps)
     activeSlugRef.current = board.slug
     dragMovedRef.current = false
     dragStartRef.current = { x: event.clientX, y: event.clientY }
+    lastPointerRef.current = { x: event.clientX, y: event.clientY, time: event.timeStamp }
     dragOffsetRef.current = {
       x: event.clientX - position.x,
       y: event.clientY - position.y,
     }
+    velocitiesRef.current[board.slug] = { vx: 0, vy: 0 }
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
@@ -141,16 +349,27 @@ export function BoardBubbleMap({ countsByBoard, onSelect }: BoardBubbleMapProps)
     if (dragDistance < 4) return
 
     dragMovedRef.current = true
+    const lastPointer = lastPointerRef.current
+    const deltaFrames = clamp((event.timeStamp - lastPointer.time) / 16.67, 0.5, 3)
+    const activeVelocity = velocitiesRef.current[activeSlug] ?? { vx: 0, vy: 0 }
+    activeVelocity.vx = clampSpeed((event.clientX - lastPointer.x) / deltaFrames)
+    activeVelocity.vy = clampSpeed((event.clientY - lastPointer.y) / deltaFrames)
+    velocitiesRef.current[activeSlug] = activeVelocity
+    lastPointerRef.current = { x: event.clientX, y: event.clientY, time: event.timeStamp }
+
     const nextActive = {
       ...active,
-      x: clamp(event.clientX - dragOffsetRef.current.x, active.radius + 12, size.width - active.radius - 12),
-      y: clamp(event.clientY - dragOffsetRef.current.y, active.radius + 20, size.height - active.radius - 16),
+      x: clamp(event.clientX - dragOffsetRef.current.x, active.radius + EDGE_PADDING_X, size.width - active.radius - EDGE_PADDING_X),
+      y: clamp(event.clientY - dragOffsetRef.current.y, active.radius + EDGE_PADDING_TOP, size.height - active.radius - EDGE_PADDING_BOTTOM),
     }
 
-    setPositions(prev => resolveActiveCollision({
-      ...prev,
-      [activeSlug]: nextActive,
-    }, activeSlug, size.width, size.height))
+    setBubblePositions(previous => {
+      const next = clonePositions(previous)
+      next[activeSlug] = nextActive
+      resolveBubbleCollisions(next, velocitiesRef.current, size.width, size.height, activeSlug)
+      return next
+    })
+    startPhysicsLoop()
   }
 
   const handlePointerUp = (event: React.PointerEvent<HTMLButtonElement>, board: BoardDefinition) => {
@@ -166,6 +385,8 @@ export function BoardBubbleMap({ countsByBoard, onSelect }: BoardBubbleMapProps)
 
     if (!dragMovedRef.current) {
       onSelect(board)
+    } else {
+      startPhysicsLoop()
     }
     dragMovedRef.current = false
   }
@@ -202,7 +423,12 @@ export function BoardBubbleMap({ countsByBoard, onSelect }: BoardBubbleMapProps)
               x: position ? position.x - diameter / 2 : 0,
               y: position ? position.y - diameter / 2 : 0,
             }}
-            transition={{ type: 'spring', stiffness: 420, damping: 34, mass: 0.7 }}
+            transition={{
+              opacity: { duration: 0.16 },
+              scale: { type: 'spring', stiffness: 360, damping: 28, mass: 0.7 },
+              x: { duration: 0.012, ease: 'linear' },
+              y: { duration: 0.012, ease: 'linear' },
+            }}
             className={cn(
               'absolute left-0 top-0 isolate flex cursor-grab select-none flex-col items-center justify-center rounded-full border px-4 text-center shadow-[0_18px_52px_rgba(0,0,0,0.34)] outline-none transition-colors active:cursor-grabbing',
               board.kind === 'feed'

@@ -6,7 +6,6 @@ import {
   Image as ImageIcon,
   Lightbulb,
   MessageSquarePlus,
-  RefreshCw,
   Search,
   X,
 } from 'lucide-react'
@@ -252,7 +251,7 @@ function FeedbackDetailModal({
 }
 
 export function AdminFeedbackReview() {
-  const { submissions, loading, error, deletingId, refresh, deleteSubmission } = useAdminFeedback()
+  const { submissions, loading, error, deletingId, deleteSubmission } = useAdminFeedback()
   const [selectedSubmission, setSelectedSubmission] = useState<AdminFeedbackSubmission | null>(null)
   const [filter, setFilter] = useState<FeedbackFilter>('all')
   const [searchTerm, setSearchTerm] = useState('')
@@ -297,9 +296,6 @@ export function AdminFeedbackReview() {
             </p>
           </div>
         </div>
-        <Button type="button" variant="ghost" size="sm" onClick={() => void refresh()} aria-label="Refresh feedback submissions">
-          <RefreshCw className="h-4 w-4" />
-        </Button>
       </div>
 
       <div className="mb-4 grid gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 lg:grid-cols-[1fr_auto] lg:items-center">

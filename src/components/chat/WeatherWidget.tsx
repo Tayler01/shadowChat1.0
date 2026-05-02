@@ -9,7 +9,6 @@ import {
   CloudSun,
   MapPin,
   Moon,
-  RefreshCw,
   Sun,
 } from 'lucide-react'
 import { useWeatherForecast } from '../../hooks/useWeatherForecast'
@@ -86,7 +85,7 @@ function ForecastRow({
 }
 
 export function WeatherWidget({ onOpenSettings }: WeatherWidgetProps) {
-  const { preference, forecast, loading, error, refresh } = useWeatherForecast()
+  const { preference, forecast, loading, error } = useWeatherForecast()
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const current = forecast?.current
@@ -150,7 +149,7 @@ export function WeatherWidget({ onOpenSettings }: WeatherWidgetProps) {
           aria-label="Weather forecast"
           className="popup-surface absolute right-0 top-full z-[80] mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-panel)] shadow-[var(--shadow-panel-strong)]"
         >
-          <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-3">
+          <div className="border-b border-[var(--border-subtle)] px-4 py-3">
             <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
                 Weather
@@ -159,14 +158,6 @@ export function WeatherWidget({ onOpenSettings }: WeatherWidgetProps) {
                 {preference?.location_name || 'No location selected'}
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => void refresh()}
-              className="rounded-[var(--radius-sm)] p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[rgba(255,255,255,0.04)] hover:text-[var(--text-primary)]"
-              aria-label="Refresh weather"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </button>
           </div>
 
           {!preference ? (

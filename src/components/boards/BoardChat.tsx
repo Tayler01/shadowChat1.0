@@ -256,11 +256,6 @@ export function BoardChat({ board }: { board: ChatBoardDefinition }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="border-b border-[var(--border-panel)] px-4 py-3 md:px-5">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--text-primary)]">{board.title}</h2>
-        <p className="mt-1 text-xs text-[var(--text-muted)]">Text and links only.</p>
-      </div>
-
       <div className="relative min-h-0 flex-1">
         <div ref={scrollRef} onScroll={handleUnreadScroll} className="h-full overflow-y-auto">
           {loading ? (

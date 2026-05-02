@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
-import { RefreshCw, Satellite } from 'lucide-react'
-import { Button } from '../ui/Button'
+import { Satellite } from 'lucide-react'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { NewsFeedItem } from './NewsFeedItem'
 import { NewsFeedModal } from './NewsFeedModal'
@@ -10,7 +9,7 @@ import { showActionErrorToast } from '../../lib/toastNotifications'
 import type { NewsFeedItem as NewsFeedItemType } from '../../lib/supabase'
 
 export function NewsFeed() {
-  const { items, loading, error, refresh, toggleReaction } = useNewsFeed()
+  const { items, loading, error, toggleReaction } = useNewsFeed()
   const [openItem, setOpenItem] = useState<NewsFeedItemType | null>(null)
 
   const handleReaction = async (itemId: string, emoji: string) => {
@@ -29,18 +28,6 @@ export function NewsFeed() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--border-panel)] px-4 py-3 md:px-5">
-        <div className="min-w-0">
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[var(--text-primary)]">Today Board</h2>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
-            Clears at 00:00 Eastern.
-          </p>
-        </div>
-        <Button type="button" variant="ghost" size="sm" onClick={() => void refresh()} aria-label="Refresh news feed">
-          <RefreshCw className="h-4 w-4" />
-        </Button>
-      </div>
-
       <div className="min-h-0 flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex h-full items-center justify-center p-8">

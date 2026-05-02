@@ -105,12 +105,10 @@ test('filters submissions and opens the full detail modal with image attachments
   expect(within(dialog).getByText('Test Browser')).toBeInTheDocument()
 })
 
-test('refreshes feedback submissions on command', () => {
+test('does not show a manual refresh command in the feedback header', () => {
   render(<AdminFeedbackReview />)
 
-  fireEvent.click(screen.getByRole('button', { name: /refresh feedback submissions/i }))
-
-  expect(mockRefresh).toHaveBeenCalledTimes(1)
+  expect(screen.queryByRole('button', { name: /refresh feedback submissions/i })).not.toBeInTheDocument()
 })
 
 test('deletes a feedback submission after confirmation', async () => {

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Bell, Copy, ExternalLink, Info, RefreshCw, Smartphone } from 'lucide-react'
+import { Bell, Copy, ExternalLink, Info, Smartphone } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Button } from '../ui/Button'
 import type { NotificationGuidance } from '../../lib/push'
@@ -12,7 +12,6 @@ interface NotificationSetupModalProps {
   canInstall: boolean
   onClose: () => void
   onEnable: () => Promise<void>
-  onRefresh: () => Promise<void>
   onInstall: () => Promise<void>
 }
 
@@ -24,7 +23,6 @@ export const NotificationSetupModal: React.FC<NotificationSetupModalProps> = ({
   canInstall,
   onClose,
   onEnable,
-  onRefresh,
   onInstall,
 }) => {
   if (!open) return null
@@ -94,11 +92,6 @@ export const NotificationSetupModal: React.FC<NotificationSetupModalProps> = ({
             </Button>
           )}
 
-          <Button onClick={() => void onRefresh()} variant="secondary" loading={saving}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh Status
-          </Button>
-
           <Button onClick={() => void handleCopy()} variant="ghost">
             <Copy className="mr-2 h-4 w-4" />
             Copy Steps
@@ -107,7 +100,7 @@ export const NotificationSetupModal: React.FC<NotificationSetupModalProps> = ({
 
         <p className="mt-4 flex items-start gap-2 text-xs text-[var(--text-muted)]">
           <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          Browsers do not allow websites to deep-link straight into OS notification settings, so Shadow Chat shows the exact platform steps and refreshes permission when you come back.
+          Browsers do not allow websites to deep-link straight into OS notification settings, so Shadow Chat shows the exact platform steps and checks permission when you come back.
         </p>
       </div>
     </div>

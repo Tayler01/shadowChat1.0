@@ -263,11 +263,11 @@ export const getNotificationGuidance = (
     if (platform.os === 'android') {
       return {
         title: 'Notifications Are Enabled',
-        summary: 'This Android device is subscribed. If alerts still do not appear, refresh the subscription so Chrome or the installed app gets a fresh push endpoint.',
+        summary: 'This Android device is subscribed. If alerts still do not appear, turn Push Notifications off and back on so Chrome or the installed app gets a fresh push endpoint.',
         steps: [
           'Keep notifications allowed for Shadow Chat in browser site settings.',
           getSystemSettingsStep(platform),
-          'Tap Refresh Status, then turn Push Notifications off and back on if this device still does not receive alerts.',
+          'Turn Push Notifications off and back on if this device still does not receive alerts.',
         ],
         canRequestNow: false,
         requiresInstall: false,
@@ -293,7 +293,7 @@ export const getNotificationGuidance = (
       steps: [
         getSiteSettingsStep(platform),
         getSystemSettingsStep(platform),
-        'Return to Shadow Chat and tap Refresh Status after changing the settings.',
+        'Return to Shadow Chat after changing the settings; the app checks permission again when it is visible.',
       ],
       canRequestNow: false,
       requiresInstall: false,
