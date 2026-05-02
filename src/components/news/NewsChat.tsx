@@ -44,7 +44,7 @@ function NewsChatRow({
   }
 
   return (
-    <div className="group grid max-w-full grid-cols-[auto_minmax(0,1fr)_2rem] gap-3 px-4 py-3 md:px-5">
+    <div className="group grid max-w-full grid-cols-[auto_minmax(0,1fr)_2rem] items-start gap-3 px-4 py-3 md:px-5">
       <Avatar
         src={message.user?.avatar_url}
         alt={message.user?.display_name || 'News user'}
