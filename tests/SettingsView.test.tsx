@@ -167,6 +167,10 @@ jest.mock('../src/components/settings/AdminFeedbackReview', () => ({
   AdminFeedbackReview: () => <div data-testid="admin-feedback-review">Feedback review panel</div>,
 }))
 
+jest.mock('../src/components/settings/WeatherLocationSettings', () => ({
+  WeatherLocationSettings: () => <div data-testid="weather-location-settings">Weather location settings</div>,
+}))
+
 jest.mock('../src/components/onboarding/PhoneInstallGuide', () => ({
   PhoneInstallGuide: () => null,
 }))
@@ -176,6 +180,10 @@ jest.mock('react-hot-toast', () => {
   toastFn.error = jest.fn()
   toastFn.success = jest.fn()
   return { __esModule: true, default: toastFn }
+})
+
+beforeEach(() => {
+  window.sessionStorage.clear()
 })
 
 test('settings renders section hub and opens account profile detail', () => {
@@ -192,6 +200,16 @@ test('settings renders section hub and opens account profile detail', () => {
 
   fireEvent.click(screen.getByRole('button', { name: /settings/i }))
   expect(screen.getByRole('button', { name: /notifications & audio/i })).toBeInTheDocument()
+})
+
+test('settings opens account profile from requested weather settings section', () => {
+  window.sessionStorage.setItem('shadowchat:settings-section', 'account-profile')
+
+  render(<SettingsView onToggleSidebar={jest.fn()} />)
+
+  expect(screen.getByRole('heading', { name: 'Account & Profile' })).toBeInTheDocument()
+  expect(screen.getByTestId('weather-location-settings')).toBeInTheDocument()
+  expect(window.sessionStorage.getItem('shadowchat:settings-section')).toBeNull()
 })
 
 test('settings admin panel manages news sources', () => {

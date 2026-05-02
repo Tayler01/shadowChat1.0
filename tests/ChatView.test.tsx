@@ -38,6 +38,10 @@ jest.mock('../src/components/chat/PinnedMessagesBar', () => ({
   ),
 }))
 
+jest.mock('../src/components/chat/WeatherWidget', () => ({
+  WeatherWidget: () => <div data-testid="weather-widget" />,
+}))
+
 jest.mock('../src/components/layout/MobileChatFooter', () => ({
   MobileChatFooter: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="mobile-chat-footer">{children}</div>

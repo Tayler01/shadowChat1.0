@@ -37,6 +37,7 @@ import { NotificationSetupModal } from './NotificationSetupModal'
 import { PhoneInstallGuide } from '../onboarding/PhoneInstallGuide'
 import { FeedbackSubmissionModal } from './FeedbackSubmissionModal'
 import { AdminFeedbackReview } from './AdminFeedbackReview'
+import { WeatherLocationSettings } from './WeatherLocationSettings'
 import { ProfileView } from '../profile/ProfileView'
 import { useNewsAdmin } from '../../hooks/useNewsAdmin'
 import { useAdminAccess } from '../../hooks/useAdminAccess'
@@ -124,6 +125,29 @@ const sections: SettingsSection[] = [
     icon: Shield,
   },
 ]
+
+const SETTINGS_SECTION_STORAGE_KEY = 'shadowchat:settings-section'
+
+const isSettingsSectionId = (value: string | null): value is SettingsSectionId => (
+  sections.some(section => section.id === value)
+)
+
+const getInitialSettingsSection = (): SettingsSectionId | null => {
+  if (typeof window === 'undefined') return null
+
+  const urlSection = new URL(window.location.href).searchParams.get('settingsSection')
+  if (isSettingsSectionId(urlSection)) {
+    return urlSection
+  }
+
+  const requestedSection = window.sessionStorage.getItem(SETTINGS_SECTION_STORAGE_KEY)
+  if (isSettingsSectionId(requestedSection)) {
+    window.sessionStorage.removeItem(SETTINGS_SECTION_STORAGE_KEY)
+    return requestedSection
+  }
+
+  return null
+}
 
 const adminSections: AdminSection[] = [
   {
@@ -254,7 +278,7 @@ function SectionHeader({
 export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) => {
   const { enabled: sounds, setEnabled: setSounds } = useSoundEffects()
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
-  const [activeSection, setActiveSection] = useState<SettingsSectionId | null>(null)
+  const [activeSection, setActiveSection] = useState<SettingsSectionId | null>(() => getInitialSettingsSection())
   const [activeAdminSection, setActiveAdminSection] = useState<AdminSectionId | null>(null)
   const [showDangerZone, setShowDangerZone] = useState(false)
   const [showNotificationSetup, setShowNotificationSetup] = useState(false)
@@ -1221,6 +1245,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
   const renderAccountProfile = () => (
     <div className="space-y-5">
       <ProfileView onToggleSidebar={onToggleSidebar} embedded />
+      <WeatherLocationSettings />
       <div className="glass-panel rounded-[var(--radius-lg)] p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>

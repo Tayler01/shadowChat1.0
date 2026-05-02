@@ -1,0 +1,246 @@
+import React, { useEffect, useRef, useState } from 'react'
+import {
+  Cloud,
+  CloudDrizzle,
+  CloudFog,
+  CloudLightning,
+  CloudRain,
+  CloudSnow,
+  CloudSun,
+  MapPin,
+  Moon,
+  RefreshCw,
+  Sun,
+} from 'lucide-react'
+import { useWeatherForecast } from '../../hooks/useWeatherForecast'
+import {
+  formatTemperature,
+  getTemperatureUnitLabel,
+  type WeatherConditionKind,
+  type WeatherDailyForecast,
+} from '../../lib/weather'
+
+interface WeatherWidgetProps {
+  onOpenSettings?: () => void
+}
+
+const SETTINGS_SECTION_STORAGE_KEY = 'shadowchat:settings-section'
+const WEATHER_SETTINGS_SECTION = 'account-profile'
+const iconClass = 'h-4 w-4'
+
+function WeatherIcon({
+  kind,
+  isDay = true,
+  className = iconClass,
+}: {
+  kind: WeatherConditionKind
+  isDay?: boolean
+  className?: string
+}) {
+  if (kind === 'clear') {
+    return isDay ? <Sun className={className} /> : <Moon className={className} />
+  }
+
+  if (kind === 'partly-cloudy') return <CloudSun className={className} />
+  if (kind === 'fog') return <CloudFog className={className} />
+  if (kind === 'drizzle') return <CloudDrizzle className={className} />
+  if (kind === 'rain') return <CloudRain className={className} />
+  if (kind === 'snow') return <CloudSnow className={className} />
+  if (kind === 'thunderstorm') return <CloudLightning className={className} />
+  return <Cloud className={className} />
+}
+
+const formatDay = (value: string) =>
+  new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {
+    weekday: 'short',
+  })
+
+const formatUpdated = (value?: string) => {
+  if (!value) return 'Updated now'
+
+  return `Updated ${new Date(value).toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  })}`
+}
+
+function ForecastRow({
+  day,
+}: {
+  day: WeatherDailyForecast
+}) {
+  return (
+    <div className="grid grid-cols-[3rem_auto_1fr_auto] items-center gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-2">
+      <span className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--text-muted)]">
+        {formatDay(day.date)}
+      </span>
+      <span className="text-[var(--text-gold)]">
+        <WeatherIcon kind={day.condition.kind} className="h-4 w-4" />
+      </span>
+      <span className="truncate text-sm text-[var(--text-secondary)]">{day.condition.label}</span>
+      <span className="text-sm font-medium text-[var(--text-primary)]">
+        {formatTemperature(day.temperatureMax)} / {formatTemperature(day.temperatureMin)}
+      </span>
+    </div>
+  )
+}
+
+export function WeatherWidget({ onOpenSettings }: WeatherWidgetProps) {
+  const { preference, forecast, loading, error, refresh } = useWeatherForecast()
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const current = forecast?.current
+
+  useEffect(() => {
+    if (!open) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [open])
+
+  const handleSettings = () => {
+    setOpen(false)
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.setItem(SETTINGS_SECTION_STORAGE_KEY, WEATHER_SETTINGS_SECTION)
+    }
+    onOpenSettings?.()
+  }
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(value => !value)}
+        className="inline-flex min-h-9 items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5 text-sm text-[var(--text-muted)] transition-colors hover:border-[rgba(215,170,70,0.28)] hover:bg-[rgba(215,170,70,0.08)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.28)]"
+        aria-label={current ? `${formatTemperature(current.temperature)} and ${current.condition.label}` : 'Weather settings'}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+      >
+        <span className="text-[var(--text-gold)]">
+          {current ? (
+            <WeatherIcon kind={current.condition.kind} isDay={current.isDay} />
+          ) : (
+            <MapPin className="h-4 w-4" />
+          )}
+        </span>
+        <span className="min-w-[2rem] text-center text-xs font-semibold text-[var(--text-primary)]">
+          {current ? formatTemperature(current.temperature) : loading ? '--' : 'Set'}
+        </span>
+      </button>
+
+      {open && (
+        <div
+          role="dialog"
+          aria-label="Weather forecast"
+          className="popup-surface absolute right-0 top-full z-[80] mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-panel)] shadow-[var(--shadow-panel-strong)]"
+        >
+          <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                Weather
+              </p>
+              <p className="mt-1 truncate text-sm font-medium text-[var(--text-primary)]">
+                {preference?.location_name || 'No location selected'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              className="rounded-[var(--radius-sm)] p-1.5 text-[var(--text-muted)] transition-colors hover:bg-[rgba(255,255,255,0.04)] hover:text-[var(--text-primary)]"
+              aria-label="Refresh weather"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </button>
+          </div>
+
+          {!preference ? (
+            <div className="px-4 py-5">
+              <p className="text-sm leading-6 text-[var(--text-muted)]">
+                Pick a city in Settings so General Chat can show your local weather here.
+              </p>
+              <button
+                type="button"
+                onClick={handleSettings}
+                className="mt-4 w-full rounded-[var(--radius-sm)] border border-[var(--border-panel)] bg-[var(--bg-panel)] px-3 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-glow)] hover:text-[var(--text-gold)]"
+              >
+                Open Weather Settings
+              </button>
+            </div>
+          ) : error ? (
+            <div className="px-4 py-5 text-sm leading-6 text-red-100">
+              {error}
+            </div>
+          ) : !current ? (
+            <div className="px-4 py-5 text-sm text-[var(--text-muted)]">
+              Loading weather.
+            </div>
+          ) : (
+            <div className="space-y-4 p-4">
+              <div className="rounded-[var(--radius-md)] border border-[rgba(215,170,70,0.18)] bg-[rgba(215,170,70,0.06)] p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-4xl font-semibold leading-none text-[var(--text-primary)]">
+                      {formatTemperature(current.temperature)}
+                    </div>
+                    <div className="mt-1 text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                      {'\u00b0'}{getTemperatureUnitLabel(forecast.temperatureUnit)}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[rgba(215,170,70,0.2)] bg-[rgba(255,255,255,0.04)] text-[var(--text-gold)]">
+                      <WeatherIcon kind={current.condition.kind} isDay={current.isDay} className="h-6 w-6" />
+                    </span>
+                    <p className="mt-2 text-sm font-medium text-[var(--text-primary)]">{current.condition.label}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+                  <div className="rounded-[var(--radius-sm)] bg-[rgba(0,0,0,0.18)] p-2">
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Feels</p>
+                    <p className="mt-1 font-medium text-[var(--text-primary)]">{formatTemperature(current.apparentTemperature)}</p>
+                  </div>
+                  <div className="rounded-[var(--radius-sm)] bg-[rgba(0,0,0,0.18)] p-2">
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Humidity</p>
+                    <p className="mt-1 font-medium text-[var(--text-primary)]">{Math.round(current.relativeHumidity)}%</p>
+                  </div>
+                  <div className="rounded-[var(--radius-sm)] bg-[rgba(0,0,0,0.18)] p-2">
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Wind</p>
+                    <p className="mt-1 font-medium text-[var(--text-primary)]">{Math.round(current.windSpeed)} mph</p>
+                  </div>
+                  <div className="rounded-[var(--radius-sm)] bg-[rgba(0,0,0,0.18)] p-2">
+                    <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Rain</p>
+                    <p className="mt-1 font-medium text-[var(--text-primary)]">{current.precipitation.toFixed(2)} in</p>
+                  </div>
+                </div>
+
+                <p className="mt-3 text-xs text-[var(--text-muted)]">{formatUpdated(current.time)}</p>
+              </div>
+
+              <div className="space-y-2">
+                {forecast.daily.map(day => (
+                  <ForecastRow key={day.date} day={day} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}

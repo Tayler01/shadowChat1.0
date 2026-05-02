@@ -9,6 +9,7 @@ import { MobileChatFooter } from '../layout/MobileChatFooter'
 import toast from 'react-hot-toast'
 import { useClientReset } from '../../hooks/ClientResetContext'
 import { ActiveUsersButton } from './ActiveUsersButton'
+import { WeatherWidget } from './WeatherWidget'
 import { clearGroupNotifications } from '../../lib/appBadge'
 import {
   SESSION_RECOVERY_EVENT,
@@ -105,7 +106,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-2">
+            <WeatherWidget onOpenSettings={() => onViewChange('settings')} />
             <ActiveUsersButton resetStatus={resetStatus} />
           </div>
         </div>
