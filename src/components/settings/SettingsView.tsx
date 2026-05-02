@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   ArrowLeft,
@@ -63,6 +63,16 @@ type SettingsSection = {
   icon: React.ComponentType<{ className?: string }>
 }
 
+type AdminSectionId = 'access' | 'bridge-pairing' | 'news-sources'
+
+type AdminSection = {
+  id: AdminSectionId
+  title: string
+  description: string
+  icon: React.ComponentType<{ className?: string }>
+  fullAdminOnly?: boolean
+}
+
 const sections: SettingsSection[] = [
   {
     id: 'notifications-audio',
@@ -111,6 +121,28 @@ const sections: SettingsSection[] = [
     title: 'Account & Profile',
     description: 'Profile editor, public identity, presence, and session.',
     icon: Shield,
+  },
+]
+
+const adminSections: AdminSection[] = [
+  {
+    id: 'access',
+    title: 'Admin Access',
+    description: 'Grant or remove sub-admin access from the complete user list.',
+    icon: Shield,
+    fullAdminOnly: true,
+  },
+  {
+    id: 'bridge-pairing',
+    title: 'ESP Bridge Pairing',
+    description: 'Approve bridge pairing codes for operator-owned devices.',
+    icon: KeyRound,
+  },
+  {
+    id: 'news-sources',
+    title: 'News Sources',
+    description: 'Manage tracked X and Truth accounts for the Today Board.',
+    icon: Newspaper,
   },
 ]
 
@@ -214,7 +246,9 @@ function SectionHeader({
 
 export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) => {
   const { enabled: sounds, setEnabled: setSounds } = useSoundEffects()
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const [activeSection, setActiveSection] = useState<SettingsSectionId | null>(null)
+  const [activeAdminSection, setActiveAdminSection] = useState<AdminSectionId | null>(null)
   const [showDangerZone, setShowDangerZone] = useState(false)
   const [showNotificationSetup, setShowNotificationSetup] = useState(false)
   const [showPhoneInstallGuide, setShowPhoneInstallGuide] = useState(false)
@@ -276,7 +310,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
     () => sections.filter(section => section.id !== 'admin' || isAdminOperator),
     [isAdminOperator]
   )
+  const visibleAdminSections = useMemo(
+    () => adminSections.filter(section => !section.fullAdminOnly || isFullAdmin),
+    [isFullAdmin]
+  )
   const activeSectionConfig = sections.find(section => section.id === activeSection) ?? null
+  const activeAdminSectionConfig =
+    visibleAdminSections.find(section => section.id === activeAdminSection) ?? null
   const adminFilteredUsers = useMemo(() => {
     const normalizedSearch = adminUserSearch.trim().toLowerCase()
     if (!normalizedSearch) return adminAccessUsers
@@ -326,6 +366,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
     ),
     [preferences, updatePreference]
   )
+
+  useEffect(() => {
+    if (activeSection !== 'admin') {
+      setActiveAdminSection(null)
+    }
+  }, [activeSection])
+
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current
+    if (!scrollContainer) return
+
+    if (typeof scrollContainer.scrollTo === 'function') {
+      scrollContainer.scrollTo({ top: 0 })
+      return
+    }
+
+    scrollContainer.scrollTop = 0
+  }, [activeAdminSection, activeSection])
 
   const handleExportData = () => {
     toast.success('Data export started - you will receive an email when ready')
@@ -776,8 +834,32 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
     )
   }
 
-  const renderAdmin = () => {
-    if (!adminAccessLoading && !isAdminOperator) {
+  const getAdminSectionMeta = (sectionId: AdminSectionId) => {
+    if (sectionId === 'access') {
+      return adminAccessLoading ? 'Loading users' : `${adminAccessUsers.length} users`
+    }
+
+    if (sectionId === 'bridge-pairing') {
+      return lastBridgeDeviceId ? 'Recently approved' : 'Pair device'
+    }
+
+    if (newsAdminLoading) {
+      return 'Loading sources'
+    }
+
+    return `${newsSources.length} sources`
+  }
+
+  const renderAdminHub = () => {
+    if (adminAccessLoading && !isAdminOperator) {
+      return (
+        <div className="glass-panel rounded-[var(--radius-lg)] p-5 text-sm leading-6 text-[var(--text-muted)]">
+          Loading admin tools.
+        </div>
+      )
+    }
+
+    if (!isAdminOperator) {
       return (
         <div className="glass-panel rounded-[var(--radius-lg)] p-5 text-sm leading-6 text-[var(--text-muted)]">
           Admin tools are limited to admin-class accounts.
@@ -787,8 +869,47 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
 
     return (
       <div className="space-y-5">
-        {renderAdminAccessPanel()}
+        <div className="glass-panel rounded-[var(--radius-lg)] p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Admin Sections</h2>
+              <p className="mt-1 text-sm leading-6 text-[var(--text-muted)]">
+                Open one operator tool at a time for a cleaner workspace.
+              </p>
+            </div>
+            <span className="w-fit rounded-full border border-[rgba(215,170,70,0.18)] bg-[rgba(215,170,70,0.08)] px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--text-gold)]">
+              Role: {adminRole === 'admin' ? 'Full admin' : 'Sub-admin'}
+            </span>
+          </div>
 
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            {visibleAdminSections.map(adminSection => (
+              <button
+                key={adminSection.id}
+                type="button"
+                onClick={() => setActiveAdminSection(adminSection.id)}
+                className="group relative grid min-h-32 grid-cols-[auto_1fr_auto] items-center gap-4 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 text-left transition-all hover:-translate-y-0.5 hover:border-[var(--border-glow)] hover:bg-[rgba(255,255,255,0.05)] md:grid-cols-1 md:items-stretch"
+              >
+                <span className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)] p-2.5 text-[var(--text-gold)] md:w-fit md:rounded-[var(--radius-md)] md:p-3">
+                  <adminSection.icon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 md:mt-auto">
+                  <span className="block text-base font-semibold text-[var(--text-primary)]">{adminSection.title}</span>
+                  <span className="mt-1 block text-sm leading-5 text-[var(--text-muted)]">{adminSection.description}</span>
+                  <span className="mt-3 inline-flex rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                    {getAdminSectionMeta(adminSection.id)}
+                  </span>
+                </span>
+                <ChevronRight className="h-4 w-4 text-[var(--text-muted)] transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--text-gold)] md:absolute md:right-5 md:top-5" />
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const renderBridgePairingPanel = () => (
       <div className="glass-panel rounded-[var(--radius-lg)] p-5">
         <div className="mb-4 flex items-center gap-3">
           <KeyRound className="h-5 w-5 text-[var(--text-muted)]" />
@@ -827,7 +948,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
           )}
         </div>
       </div>
+  )
 
+  const renderNewsSourcesPanel = () => (
       <div className="glass-panel rounded-[var(--radius-lg)] p-5">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
@@ -966,7 +1089,36 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
           </div>
         )}
       </div>
-    </div>
+  )
+
+  const renderAdmin = () => {
+    if (!activeAdminSection) {
+      return renderAdminHub()
+    }
+
+    if (!activeAdminSectionConfig) {
+      return renderAdminHub()
+    }
+
+    const content = {
+      access: renderAdminAccessPanel,
+      'bridge-pairing': renderBridgePairingPanel,
+      'news-sources': renderNewsSourcesPanel,
+    }[activeAdminSection]()
+
+    return (
+      <div className="space-y-4">
+        <button
+          type="button"
+          onClick={() => setActiveAdminSection(null)}
+          className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:border-[var(--border-glow)] hover:text-[var(--text-gold)]"
+          aria-label="Back to admin sections"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Admin
+        </button>
+        {content}
+      </div>
     )
   }
 
@@ -1091,6 +1243,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
 
   return (
     <motion.div
+      ref={scrollContainerRef}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.08),transparent_26%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] pb-[calc(env(safe-area-inset-bottom)_+_8rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_4rem)]"

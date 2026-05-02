@@ -195,8 +195,20 @@ test('settings admin panel manages news sources', () => {
 
   fireEvent.click(screen.getByRole('button', { name: /admin/i }))
 
+  expect(screen.getByRole('heading', { name: 'Admin Sections' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /admin access/i })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /esp bridge pairing/i })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /news sources/i })).toBeInTheDocument()
+  expect(screen.queryByText('shadow@example.com')).not.toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('button', { name: /admin access/i }))
+
   expect(screen.getByRole('heading', { name: 'Admin Access' })).toBeInTheDocument()
   expect(screen.getByText('shadow@example.com')).toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('button', { name: /back to admin sections/i }))
+  fireEvent.click(screen.getByRole('button', { name: /news sources/i }))
+
   expect(screen.getByRole('heading', { name: 'News Sources' })).toBeInTheDocument()
   expect(screen.getByText('@openai')).toBeInTheDocument()
 
