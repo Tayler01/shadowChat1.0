@@ -1,6 +1,7 @@
 import React from 'react'
 import { Avatar } from '../ui/Avatar'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
+import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { formatTime } from '../../lib/utils'
 import type { Message } from '../../lib/supabase'
 
@@ -25,12 +26,16 @@ export const ThreadReplyLink: React.FC<ThreadReplyLinkProps> = ({
         alt={message.user?.display_name || 'Unknown User'}
         size="sm"
         color={message.user?.color}
+        userId={message.user?.id}
+        presenceVisibility={message.user?.presence_visibility}
+        showStatus
       />
       <div className="min-w-0 flex-1">
         <div className="mb-1 flex items-baseline gap-2">
           <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-[var(--text-primary)]">
             <span className="truncate">{message.user?.display_name}</span>
             <UserRoleBadge role={message.user?.admin_role} />
+            <UserPresenceBadge userId={message.user?.id} presenceVisibility={message.user?.presence_visibility} />
           </span>
           <span className="text-xs text-[var(--text-muted)]">
             {formatTime(message.created_at)}
@@ -47,6 +52,7 @@ export const ThreadReplyLink: React.FC<ThreadReplyLinkProps> = ({
         >
           In reply to {parent.user?.display_name || 'Unknown'}
           <UserRoleBadge role={parent.user?.admin_role} className="ml-1" />
+          <UserPresenceBadge userId={parent.user?.id} presenceVisibility={parent.user?.presence_visibility} className="ml-1" />
           : {parent.content.slice(0, 40)}
           {parent.content.length > 40 ? '...' : ''}
         </button>

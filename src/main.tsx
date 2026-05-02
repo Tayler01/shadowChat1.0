@@ -5,16 +5,19 @@ import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 import { AuthProvider } from './hooks/useAuth';
 import { ThemeProvider } from './hooks/useTheme';
+import { PresenceRoot } from './PresenceRoot';
 import { registerPushServiceWorker } from './lib/push';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
-      <ThemeProvider>
-        <ErrorBoundary>
-          <App />
-        </ErrorBoundary>
-      </ThemeProvider>
+      <PresenceRoot>
+        <ThemeProvider>
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
+        </ThemeProvider>
+      </PresenceRoot>
     </AuthProvider>
   </StrictMode>
 );

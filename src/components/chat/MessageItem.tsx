@@ -19,6 +19,7 @@ import { VideoAttachment } from './VideoAttachment'
 import { MessageRichText } from './MessageRichText'
 import { PublicProfileDialog } from '../profile/PublicProfileDialog'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
+import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { formatTime, shouldGroupMessage, cn, getReadableTextColor } from '../../lib/utils'
 import type { Message, User } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -261,7 +262,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   alt={message.user?.display_name || 'Unknown User'}
                   size="md"
                   color={message.user?.color}
-                  status={message.user?.status}
+                  userId={message.user?.id}
+                  presenceVisibility={message.user?.presence_visibility}
                   showStatus
                 />
               </button>
@@ -282,6 +284,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
               <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-[var(--text-primary)]">
                 <span className="truncate">{message.user?.display_name}</span>
                 <UserRoleBadge role={message.user?.admin_role} />
+                <UserPresenceBadge userId={message.user?.id} presenceVisibility={message.user?.presence_visibility} />
               </span>
               <span className="text-xs text-[var(--text-muted)]">
                 {formatTime(message.created_at)}
@@ -332,6 +335,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   >
                     Replying to {parentMessage.user?.display_name || 'Unknown'}
                     <UserRoleBadge role={parentMessage.user?.admin_role} className="ml-1" />
+                    <UserPresenceBadge userId={parentMessage.user?.id} presenceVisibility={parentMessage.user?.presence_visibility} className="ml-1" />
                     :
                     {' '}
                     {parentMessage.content.slice(0, 30)}

@@ -2,9 +2,11 @@ import React from 'react';
 import { MessageSquare, Users, Newspaper, Settings, Moon, Sun, X } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
 import { UserRoleBadge } from '../ui/UserRoleBadge';
+import { UserPresenceBadge } from '../ui/UserPresenceBadge';
 import { useAuth } from '../../hooks/useAuth';
 import { useDirectMessages } from '../../hooks/useDirectMessages';
 import { useNewsBadges } from '../../hooks/useNewsBadges';
+import { getPresenceStateLabel, usePresenceForUser } from '../../hooks/usePresence';
 
 interface SidebarProps {
   currentView: 'chat' | 'dms' | 'news' | 'settings';
@@ -26,8 +28,12 @@ export function Sidebar({
   onClose,
 }: SidebarProps) {
   const { user } = useAuth();
+  const myPresence = usePresenceForUser(user?.id);
   const { conversations } = useDirectMessages();
   const { count: newsBadgeCount } = useNewsBadges();
+  const myPresenceState =
+    myPresence?.presence_state ||
+    (user?.presence_visibility === 'invisible' ? 'invisible' : 'offline');
 
   const totalUnread = conversations.reduce((sum, conv) => sum + (conv.unread_count || 0), 0);
 
@@ -135,19 +141,21 @@ export function Sidebar({
               alt={user?.display_name || 'You'}
               size="md"
               color={user?.color}
-              status={user?.status}
+              userId={user?.id}
+              presenceVisibility={user?.presence_visibility}
               showStatus
             />
             <div className="min-w-0 flex-1">
               <p className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">
                 <span className="truncate">{user?.display_name}</span>
                 <UserRoleBadge role={user?.admin_role} />
+                <UserPresenceBadge userId={user?.id} presenceVisibility={user?.presence_visibility} />
               </p>
               <p className="truncate text-xs text-[var(--text-muted)]">
                 @{user?.username}
               </p>
               <p className="mt-1 truncate text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                {user?.status || 'offline'}
+                {getPresenceStateLabel(myPresenceState)}
               </p>
             </div>
           </div>

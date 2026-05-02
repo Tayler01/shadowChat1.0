@@ -399,30 +399,55 @@ function useProvideAuth() {
     };
   }, []);
 
-  // Update presence periodically
+  // Heartbeat only while the app is actually foregrounded. If the tab is hidden
+  // or the app is closed, the database active window expires after two minutes.
   useEffect(() => {
     if (!user) return;
 
-    const updatePresence = () => updateUserPresence();
-    
-    // Update immediately
-    updatePresence();
-    
-    // Update at configured interval
-    const interval = setInterval(updatePresence, PRESENCE_INTERVAL_MS);
-    
-    // Update on page visibility change
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        updatePresence();
+    let interval: number | null = null;
+
+    const updatePresence = () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return;
+      }
+      void updateUserPresence();
+    };
+
+    const stopHeartbeat = () => {
+      if (interval !== null) {
+        window.clearInterval(interval);
+        interval = null;
       }
     };
-    
+
+    const startHeartbeat = () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        stopHeartbeat();
+        return;
+      }
+
+      updatePresence();
+      if (interval === null) {
+        interval = window.setInterval(updatePresence, PRESENCE_INTERVAL_MS);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        startHeartbeat();
+      } else {
+        stopHeartbeat();
+      }
+    };
+
+    startHeartbeat();
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', startHeartbeat);
     
     return () => {
-      clearInterval(interval);
+      stopHeartbeat();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', startHeartbeat);
     };
   }, [user]);
 

@@ -40,6 +40,7 @@ import { ProfileView } from '../profile/ProfileView'
 import { useNewsAdmin } from '../../hooks/useNewsAdmin'
 import { useAdminAccess } from '../../hooks/useAdminAccess'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
+import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 
 interface SettingsViewProps {
   onToggleSidebar: () => void
@@ -730,6 +731,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <span className="truncate font-medium text-[var(--text-primary)]">{adminUser.display_name}</span>
                       <UserRoleBadge role={adminUser.admin_role} />
+                      <UserPresenceBadge userId={adminUser.id} presenceVisibility={adminUser.presence_visibility} />
                       <span className="truncate text-sm text-[var(--text-muted)]">@{adminUser.username}</span>
                     </div>
                     <p className="mt-1 truncate text-sm text-[var(--text-muted)]">{adminUser.email}</p>

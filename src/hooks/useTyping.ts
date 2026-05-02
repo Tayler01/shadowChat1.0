@@ -5,12 +5,14 @@ import { useAuth } from './useAuth'
 import { useRealtimeRecovery } from './useRealtimeRecovery'
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
 import type { AdminRole } from '../lib/supabase'
+import type { PresenceVisibility } from '../types'
 
 export interface TypingUser {
   id: string
   username: string
   display_name: string
   admin_role?: AdminRole | null
+  presence_visibility?: PresenceVisibility | null
 }
 
 export const useTyping = (channelName: string = 'general') => {
@@ -118,6 +120,7 @@ export const useTyping = (channelName: string = 'general') => {
             username: user.username,
             display_name: user.display_name,
             admin_role: user.admin_role,
+            presence_visibility: user.presence_visibility,
           },
           typing: false
         }
@@ -147,6 +150,7 @@ export const useTyping = (channelName: string = 'general') => {
             username: user.username,
             display_name: user.display_name,
             admin_role: user.admin_role,
+            presence_visibility: user.presence_visibility,
           },
           typing: true
         }

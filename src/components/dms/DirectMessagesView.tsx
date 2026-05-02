@@ -20,11 +20,13 @@ import { VideoAttachment } from '../chat/VideoAttachment'
 import { MessageRichText } from '../chat/MessageRichText'
 import { PublicProfileDialog } from '../profile/PublicProfileDialog'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
+import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { useFailedMessages } from '../../hooks/useFailedMessages'
 import { formatTime, shouldGroupMessage, getReadableTextColor } from '../../lib/utils'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { useTyping } from '../../hooks/useTyping'
+import { getPresenceStateLabel, usePresenceForUser } from '../../hooks/usePresence'
 import toast from 'react-hot-toast'
 import type { BasicUser, ChatMessageType, User } from '../../lib/supabase'
 
@@ -249,6 +251,10 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   }, [initialMessageId, messages])
 
   const currentConv = conversations.find(c => c.id === currentConversation)
+  const currentPeerPresence = usePresenceForUser(currentConv?.other_user?.id)
+  const currentPeerPresenceState =
+    currentPeerPresence?.presence_state ||
+    (currentConv?.other_user?.presence_visibility === 'invisible' ? 'invisible' : 'offline')
   const showConversationList = isDesktop || !currentConversation
   const searchableUsers: BasicUser[] = conversations.flatMap(conversation => {
     const user = conversation.other_user
@@ -264,6 +270,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
       color: user.color,
       status: user.status,
       admin_role: user.admin_role,
+      presence_visibility: user.presence_visibility,
     }]
   })
 
@@ -417,7 +424,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                       alt={conversation.other_user?.display_name || 'Unknown User'}
                       size="md"
                       color={conversation.other_user?.color}
-                      status={conversation.other_user?.status}
+                      userId={conversation.other_user?.id}
+                      presenceVisibility={conversation.other_user?.presence_visibility}
                       showStatus
                     />
 
@@ -426,6 +434,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                         <span className="inline-flex min-w-0 items-center gap-1.5 font-medium text-[var(--text-primary)]">
                           <span className="truncate">{conversation.other_user?.display_name}</span>
                           <UserRoleBadge role={conversation.other_user?.admin_role} />
+                          <UserPresenceBadge userId={conversation.other_user?.id} presenceVisibility={conversation.other_user?.presence_visibility} />
                         </span>
                       </div>
 
@@ -483,7 +492,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   alt={currentConv.other_user?.display_name || 'Unknown User'}
                   size="md"
                   color={currentConv.other_user?.color}
-                  status={currentConv.other_user?.status}
+                  userId={currentConv.other_user?.id}
+                  presenceVisibility={currentConv.other_user?.presence_visibility}
                   showStatus
                 />
 
@@ -491,9 +501,10 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   <h2 className="inline-flex max-w-full items-center gap-1.5 font-semibold text-[var(--text-primary)]">
                     <span className="truncate">{currentConv.other_user?.display_name}</span>
                     <UserRoleBadge role={currentConv.other_user?.admin_role} />
+                    <UserPresenceBadge userId={currentConv.other_user?.id} presenceVisibility={currentConv.other_user?.presence_visibility} />
                   </h2>
                   <p className="truncate text-xs sm:text-sm text-[var(--text-muted)]">
-                    @{currentConv.other_user?.username} {'\u2022'} {currentConv.other_user?.status}
+                    @{currentConv.other_user?.username} {'\u2022'} {getPresenceStateLabel(currentPeerPresenceState)}
                   </p>
                 </div>
                 <img
@@ -522,6 +533,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   <h3 className="mb-2 inline-flex max-w-full items-center justify-center gap-1.5 text-lg font-medium text-[var(--text-primary)]">
                     <span className="truncate">Say hello to {currentConv.other_user?.display_name}</span>
                     <UserRoleBadge role={currentConv.other_user?.admin_role} />
+                    <UserPresenceBadge userId={currentConv.other_user?.id} presenceVisibility={currentConv.other_user?.presence_visibility} />
                   </h3>
                   <p className="text-sm">This thread is ready. Send the first message and the conversation will show up here immediately.</p>
                 </div>
@@ -579,7 +591,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                               alt={message.sender?.display_name || 'Unknown User'}
                               size="sm"
                               color={message.sender?.color}
-                              status={message.sender?.status}
+                              userId={message.sender?.id}
+                              presenceVisibility={message.sender?.presence_visibility}
                               showStatus
                             />
                           </button>
@@ -596,6 +609,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                         <div className="mb-1 ml-8 inline-flex max-w-full items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)]">
                           <span className="truncate">{message.sender.display_name}</span>
                           <UserRoleBadge role={message.sender.admin_role} />
+                          <UserPresenceBadge userId={message.sender.id} presenceVisibility={message.sender.presence_visibility} />
                         </div>
                       )}
 
@@ -673,6 +687,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                           <span className="inline-flex items-center gap-1">
                             {typingUser.display_name}
                             <UserRoleBadge role={typingUser.admin_role} />
+                            <UserPresenceBadge userId={typingUser.id} presenceVisibility={typingUser.presence_visibility} />
                           </span>
                         </React.Fragment>
                       ))}

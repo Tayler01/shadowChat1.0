@@ -8,6 +8,7 @@ import { MessageReactions } from './MessageItem'
 import { VideoAttachment } from './VideoAttachment'
 import { cn } from '../../lib/utils'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
+import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 
 const QUICK_REACTIONS = ['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F389}', '\u{1F64F}']
 
@@ -74,6 +75,7 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
           <strong className="inline-flex items-center gap-1">
             {message.user?.display_name}
             <UserRoleBadge role={message.user?.admin_role} />
+            <UserPresenceBadge userId={message.user?.id} presenceVisibility={message.user?.presence_visibility} />
           </strong>
           :{' '}
           {message.message_type === 'audio' ? (

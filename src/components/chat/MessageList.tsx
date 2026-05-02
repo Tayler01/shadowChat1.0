@@ -13,6 +13,7 @@ import type { Message } from '../../lib/supabase'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { useAuth } from '../../hooks/useAuth'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
+import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 
 interface MessageListProps {
   onReply?: (messageId: string, content: string) => void
@@ -475,6 +476,7 @@ export const MessageList: React.FC<MessageListProps> = ({
                   <span className="inline-flex items-center gap-1">
                     {typingUser.display_name}
                     <UserRoleBadge role={typingUser.admin_role} />
+                    <UserPresenceBadge userId={typingUser.id} presenceVisibility={typingUser.presence_visibility} />
                   </span>
                 </React.Fragment>
               ))}

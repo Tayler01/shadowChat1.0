@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Users } from 'lucide-react'
 import { useMessages } from '../../hooks/useMessages'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
@@ -8,8 +7,8 @@ import { PinnedMessagesBar } from './PinnedMessagesBar'
 import { useFailedMessages } from '../../hooks/useFailedMessages'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import toast from 'react-hot-toast'
-import { ClientResetIndicator } from '../ui/ClientResetIndicator'
 import { useClientReset } from '../../hooks/ClientResetContext'
+import { ActiveUsersButton } from './ActiveUsersButton'
 import { clearGroupNotifications } from '../../lib/appBadge'
 import {
   SESSION_RECOVERY_EVENT,
@@ -76,7 +75,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
       className="flex h-full min-h-0 flex-col bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.05),transparent_26%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] text-sm"
     >
       {/* Header */}
-      <div className="glass-panel-strong flex-shrink-0 border-b border-[var(--border-panel)] px-6 py-5">
+      <div className="glass-panel-strong relative z-30 flex-shrink-0 border-b border-[var(--border-panel)] px-6 py-5">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4">
           <div className="flex items-center space-x-3">
             {/* Menu button removed on mobile */}
@@ -107,11 +106,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
           </div>
 
           <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2 rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5 text-sm text-[var(--text-muted)]">
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Live now</span>
-              <ClientResetIndicator status={resetStatus} />
-            </div>
+            <ActiveUsersButton resetStatus={resetStatus} />
           </div>
         </div>
       </div>

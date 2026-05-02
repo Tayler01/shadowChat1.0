@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Camera, Edit3, Save, X, Menu } from 'lucide-react'
+import { Camera, Edit3, Eye, Ghost, Save, X, Menu } from 'lucide-react'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useAuth } from '../../hooks/useAuth'
 import { fetchUserStats } from '../../lib/supabase'
+import { getPresenceStateLabel, usePresenceForUser } from '../../hooks/usePresence'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
+import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import toast from 'react-hot-toast'
-import type { UserStatus } from '../../types'
-import { getPresenceOption, presenceOptions } from '../../lib/presence'
+import type { PresenceVisibility } from '../../types'
 
 const colorOptions = [
   '#d7aa46', '#c99642', '#b88646', '#9f7340', '#8f6a37',
@@ -26,12 +27,13 @@ interface ProfileViewProps {
 interface ProfileFormData {
   display_name: string
   status_message: string
-  status: UserStatus
+  presence_visibility: PresenceVisibility
   color: string
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embedded = false }) => {
   const { profile, updateProfile, uploadAvatar, uploadBanner } = useAuth()
+  const myPresence = usePresenceForUser(profile?.id)
   const isDesktop = useIsDesktop()
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -43,7 +45,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
   const [formData, setFormData] = useState<ProfileFormData>({
     display_name: profile?.display_name || '',
     status_message: profile?.status_message || '',
-    status: profile?.status || 'online',
+    presence_visibility: profile?.presence_visibility || 'tracked',
     color: profile?.color || '#d7aa46'
   })
 
@@ -62,6 +64,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
     load()
     return () => { active = false }
   }, [profile])
+
+  useEffect(() => {
+    if (!profile || isEditing) return
+
+    setFormData({
+      display_name: profile.display_name || '',
+      status_message: profile.status_message || '',
+      presence_visibility: profile.presence_visibility || 'tracked',
+      color: profile.color || '#d7aa46',
+    })
+  }, [isEditing, profile])
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -115,7 +128,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
     setFormData({
       display_name: profile?.display_name || '',
       status_message: profile?.status_message || '',
-      status: profile?.status || 'online',
+      presence_visibility: profile?.presence_visibility || 'tracked',
       color: profile?.color || '#d7aa46'
     })
     setIsEditing(false)
@@ -128,6 +141,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
       </div>
     )
   }
+
+  const presenceState =
+    myPresence?.presence_state ||
+    (profile.presence_visibility === 'invisible' ? 'invisible' : 'offline')
+  const presenceLabel = getPresenceStateLabel(presenceState)
 
   const content = (
     <div className="mx-auto max-w-5xl p-4 sm:p-6">
@@ -174,6 +192,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
                 alt={profile.display_name}
                 size="xl"
                 color={profile.color}
+                userId={profile.id}
+                presenceVisibility={profile.presence_visibility}
+                showStatus
                 className="border-4 border-[var(--bg-panel-strong)] shadow-[0_12px_28px_rgba(0,0,0,0.34)]"
               />
               <button
@@ -242,27 +263,41 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
 
                 <div>
                   <label className="mb-2 block text-sm font-medium text-[var(--text-secondary)]">
-                    Status
+                    Presence
                   </label>
                   <div className="grid grid-cols-2 gap-2">
-                    {presenceOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={() => setFormData(prev => ({ ...prev, status: option.value }))}
-                        className={`rounded-[var(--radius-md)] border p-3 transition-colors ${
-                          formData.status === option.value
-                            ? option.selectedClass
-                            : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] hover:border-[var(--border-panel)] hover:bg-[rgba(255,255,255,0.05)]'
-                        }`}
-                      >
-                        <div className="flex items-center space-x-2">
-                          <div className={`w-3 h-3 rounded-full ${option.dotClass}`} />
-                          <span className="text-sm font-medium text-[var(--text-primary)]">
-                            {option.label}
-                          </span>
-                        </div>
-                      </button>
-                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, presence_visibility: 'tracked' }))}
+                      className={`rounded-[var(--radius-md)] border p-3 text-left transition-colors ${
+                        formData.presence_visibility === 'tracked'
+                          ? 'border-[#22c55e]/70 bg-[#22c55e]/10 shadow-[0_0_0_1px_rgba(34,197,94,0.22),0_8px_24px_rgba(34,197,94,0.14)]'
+                          : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] hover:border-[var(--border-panel)] hover:bg-[rgba(255,255,255,0.05)]'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <span className="h-3 w-3 rounded-full bg-[#22c55e] shadow-[0_0_12px_rgba(34,197,94,0.55)]" />
+                        <span className="text-sm font-medium text-[var(--text-primary)]">
+                          Track active
+                        </span>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, presence_visibility: 'invisible' }))}
+                      className={`rounded-[var(--radius-md)] border p-3 text-left transition-colors ${
+                        formData.presence_visibility === 'invisible'
+                          ? 'border-[rgba(213,220,232,0.58)] bg-[rgba(255,255,255,0.08)] shadow-[0_0_0_1px_rgba(213,220,232,0.18),0_8px_24px_rgba(255,255,255,0.08)]'
+                          : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] hover:border-[var(--border-panel)] hover:bg-[rgba(255,255,255,0.05)]'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Ghost className="h-3.5 w-3.5 text-[rgb(213,220,232)]" />
+                        <span className="text-sm font-medium text-[var(--text-primary)]">
+                          Invisible
+                        </span>
+                      </div>
+                    </button>
                   </div>
                 </div>
 
@@ -310,6 +345,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
                   <h1 className="flex min-w-0 items-center gap-2 text-2xl font-bold text-[var(--text-primary)]">
                     <span className="truncate">{profile.display_name}</span>
                     <UserRoleBadge role={profile.admin_role} className="mt-1" />
+                    <UserPresenceBadge userId={profile.id} presenceVisibility={profile.presence_visibility} />
                   </h1>
                   <p className="text-[var(--text-muted)]">
                     @{profile.username}
@@ -326,9 +362,13 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
 
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center space-x-2">
-                    <div className={`w-3 h-3 rounded-full ${getPresenceOption(profile.status).dotClass}`} />
+                    {presenceState === 'invisible' ? (
+                      <Ghost className="h-3.5 w-3.5 text-[rgb(213,220,232)]" />
+                    ) : (
+                      <div className={`h-3 w-3 rounded-full ${presenceState === 'online' ? 'bg-[#22c55e] shadow-[0_0_12px_rgba(34,197,94,0.55)]' : 'bg-[#64748b] shadow-[0_0_10px_rgba(100,116,139,0.36)]'}`} />
+                    )}
                     <span className="text-sm text-[var(--text-secondary)]">
-                      {getPresenceOption(profile.status).label}
+                      {presenceLabel}
                     </span>
                   </div>
 
@@ -396,6 +436,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
                 <div className="mt-2 flex items-center gap-1.5 text-base font-medium text-[var(--text-primary)]">
                   <span className="truncate">{profile.display_name}</span>
                   <UserRoleBadge role={profile.admin_role} />
+                  <UserPresenceBadge userId={profile.id} presenceVisibility={profile.presence_visibility} />
                 </div>
               </div>
               <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
@@ -419,10 +460,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
 
             <div className="space-y-3">
               <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">Current status</div>
+                <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">Current presence</div>
                 <div className="mt-2 flex items-center gap-2 text-sm text-[var(--text-primary)]">
-                  <div className={`h-3 w-3 rounded-full ${getPresenceOption(profile.status).dotClass}`} />
-                  <span>{getPresenceOption(profile.status).label}</span>
+                  {presenceState === 'invisible' ? (
+                    <Ghost className="h-3.5 w-3.5 text-[rgb(213,220,232)]" />
+                  ) : presenceState === 'online' ? (
+                    <div className="h-3 w-3 rounded-full bg-[#22c55e] shadow-[0_0_12px_rgba(34,197,94,0.55)]" />
+                  ) : (
+                    <Eye className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                  )}
+                  <span>{presenceLabel}</span>
                 </div>
               </div>
 

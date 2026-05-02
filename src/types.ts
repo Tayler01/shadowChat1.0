@@ -1,4 +1,6 @@
 export type UserStatus = 'online' | 'away' | 'busy' | 'offline';
+export type PresenceVisibility = 'tracked' | 'invisible';
+export type PresenceState = 'online' | 'offline' | 'invisible';
 
 /**
  * Minimal representation of the emoji data returned by the

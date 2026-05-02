@@ -2,6 +2,7 @@ import React from 'react'
 import { PinnedMessageItem } from './PinnedMessageItem'
 import type { Message } from '../../lib/supabase'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
+import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 
 interface PinnedMessagesBarProps {
   messages: Message[]
@@ -41,6 +42,7 @@ export function PinnedMessagesBar({
           <strong className="inline-flex items-center gap-1">
             {messages[0].user?.display_name}
             <UserRoleBadge role={messages[0].user?.admin_role} />
+            <UserPresenceBadge userId={messages[0].user?.id} presenceVisibility={messages[0].user?.presence_visibility} />
           </strong>
           : {messages[0].content}
 
@@ -48,6 +50,7 @@ export function PinnedMessagesBar({
             <strong className="inline-flex items-center gap-1">
               {messages[0].user?.display_name}
               <UserRoleBadge role={messages[0].user?.admin_role} />
+              <UserPresenceBadge userId={messages[0].user?.id} presenceVisibility={messages[0].user?.presence_visibility} />
             </strong>
             : {messages[0].content}
           </div>

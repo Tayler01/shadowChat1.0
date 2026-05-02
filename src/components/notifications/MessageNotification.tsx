@@ -2,17 +2,21 @@ import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Avatar } from '../ui/Avatar'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
+import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import type { AdminRole } from '../../lib/supabase'
+import type { PresenceVisibility } from '../../types'
 import type { Toast } from 'react-hot-toast'
 
 interface MessageNotificationProps {
   t: Toast
   content: string
   sender: {
+    id?: string
     display_name?: string
     avatar_url?: string
     color?: string
     admin_role?: AdminRole | null
+    presence_visibility?: PresenceVisibility | null
   }
   onClick: () => void
   desktop: boolean
@@ -33,11 +37,20 @@ export const MessageNotification: React.FC<MessageNotificationProps> = ({ t, con
               : 'mx-auto w-[min(calc(100vw-2rem),24rem)]'
           }`}
         >
-          <Avatar src={sender.avatar_url} alt={sender.display_name || 'User'} size="sm" color={sender.color} />
+          <Avatar
+            src={sender.avatar_url}
+            alt={sender.display_name || 'User'}
+            size="sm"
+            color={sender.color}
+            userId={sender.id}
+            presenceVisibility={sender.presence_visibility}
+            showStatus
+          />
           <div className="flex-1 min-w-0">
             <p className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">
               <span className="truncate">{sender.display_name}</span>
               <UserRoleBadge role={sender.admin_role} />
+              <UserPresenceBadge userId={sender.id} presenceVisibility={sender.presence_visibility} />
             </p>
             <p className="truncate text-sm text-[var(--text-secondary)]">
               {content}

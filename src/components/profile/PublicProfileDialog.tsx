@@ -1,10 +1,11 @@
 import React, { useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CalendarDays, Palette, UserRound, X } from 'lucide-react'
+import { CalendarDays, Ghost, Palette, UserRound, X } from 'lucide-react'
 import type { User } from '../../lib/supabase'
-import { getPresenceOption } from '../../lib/presence'
+import { getPresenceStateLabel, usePresenceForUser } from '../../hooks/usePresence'
 import { Avatar } from '../ui/Avatar'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
+import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 
 interface PublicProfileDialogProps {
   user: User | null
@@ -35,7 +36,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   const dialogRef = useRef<HTMLDivElement>(null)
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
-  const presence = getPresenceOption(user?.status)
+  const livePresence = usePresenceForUser(user?.id)
 
   useEffect(() => {
     if (!open) return
@@ -94,6 +95,10 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   if (!user) return null
 
   const statusMessage = user.status_message?.trim()
+  const presenceState =
+    livePresence?.presence_state ||
+    (user.presence_visibility === 'invisible' ? 'invisible' : 'offline')
+  const presenceLabel = getPresenceStateLabel(presenceState)
 
   return (
     <AnimatePresence>
@@ -149,7 +154,8 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                   alt={user.display_name || user.username || 'User'}
                   size="xl"
                   color={user.color}
-                  status={user.status}
+                  userId={user.id}
+                  presenceVisibility={user.presence_visibility}
                   showStatus
                   className="rounded-full border-4 border-[var(--bg-panel-strong)] shadow-[var(--shadow-panel-strong)]"
                 />
@@ -157,6 +163,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                   <h2 id="public-profile-title" className="flex min-w-0 items-center gap-2 text-2xl font-bold text-[var(--text-primary)]">
                     <span className="truncate">{user.display_name || user.username || 'Unknown User'}</span>
                     <UserRoleBadge role={user.admin_role} className="mt-1" />
+                    <UserPresenceBadge userId={user.id} presenceVisibility={user.presence_visibility} />
                   </h2>
                   <p className="truncate text-sm text-[var(--text-muted)]">@{user.username || 'unknown'}</p>
                 </div>
@@ -164,8 +171,12 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
 
               <div className="mt-5 flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
-                  <span className={`h-2.5 w-2.5 rounded-full ${presence.dotClass}`} />
-                  {presence.label}
+                  {presenceState === 'invisible' ? (
+                    <Ghost className="h-3.5 w-3.5 text-[rgb(213,220,232)]" />
+                  ) : (
+                    <span className={`h-2.5 w-2.5 rounded-full ${presenceState === 'online' ? 'bg-[#22c55e] shadow-[0_0_12px_rgba(34,197,94,0.55)]' : 'bg-[#64748b] shadow-[0_0_10px_rgba(100,116,139,0.36)]'}`} />
+                  )}
+                  {presenceLabel}
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]">
                   <Palette className="h-3.5 w-3.5 text-[var(--text-gold)]" />

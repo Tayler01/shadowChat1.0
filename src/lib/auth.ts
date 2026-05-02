@@ -145,10 +145,11 @@ export const signIn = async ({ email, password }: SignInData) => {
   if (error) throw error
 
   if (data.user) {
-    await supabase
-      .from('users')
-      .update({ status: 'online', last_active: new Date().toISOString() })
-      .eq('id', data.user.id)
+    try {
+      await supabase.rpc('update_user_last_active')
+    } catch {
+      // The foreground heartbeat will retry; sign-in should not fail on presence.
+    }
   }
 
   return data
@@ -159,9 +160,15 @@ export const signOut = async () => {
 
   if (user) {
     await supabase
-      .from('users')
-      .update({ status: 'offline' })
-      .eq('id', user.id)
+      .from('user_presence')
+      .update({
+        status: 'offline',
+        last_seen: null,
+        current_channel: null,
+        typing_in: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', user.id)
   }
 
   const { error } = await supabase.auth.signOut()
@@ -213,6 +220,7 @@ export const updateUserProfile = async (updates: Partial<{
   status_message: string;
   color: string;
   status: 'online' | 'away' | 'busy' | 'offline';
+  presence_visibility: 'tracked' | 'invisible';
   avatar_url: string;
   banner_url: string;
 }>): Promise<AppUser> => {

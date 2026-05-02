@@ -657,7 +657,7 @@ export const uploadChatFile = async (file: File) => {
 }
 
 // Database types matching the actual schema
-import type { UserStatus } from '../types'
+import type { PresenceState, PresenceVisibility, UserStatus } from '../types'
 
 export type AdminRole = 'admin' | 'sub_admin'
 
@@ -670,6 +670,7 @@ export interface User {
   banner_url?: string
   status: UserStatus
   status_message: string
+  presence_visibility?: PresenceVisibility
   color: string
   admin_role?: AdminRole | null
   last_active: string
@@ -800,8 +801,29 @@ export interface DMMessage {
 export interface BasicUser
   extends Pick<
     User,
-    'id' | 'username' | 'display_name' | 'avatar_url' | 'color' | 'status' | 'admin_role'
+    'id' | 'username' | 'display_name' | 'avatar_url' | 'color' | 'status' | 'admin_role' | 'presence_visibility'
   > {}
+
+export interface PresenceSnapshot {
+  user_id: string
+  username?: string | null
+  display_name?: string | null
+  avatar_url?: string | null
+  color?: string | null
+  presence_visibility: PresenceVisibility
+  presence_state: PresenceState
+  is_active: boolean
+  last_seen?: string | null
+}
+
+export interface ActiveUserSnapshot {
+  user_id: string
+  username?: string | null
+  display_name?: string | null
+  avatar_url?: string | null
+  color?: string | null
+  last_seen?: string | null
+}
 
 export interface AdminAccessUser extends User {
   role_created_at?: string | null
@@ -838,6 +860,54 @@ export const updateUserPresence = async () => {
   }
 }
 
+export const setUserPresenceVisibility = async (visibility: PresenceVisibility) => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('set_presence_visibility', {
+    next_visibility: visibility,
+  })
+  if (error) throw error
+  return (data ?? visibility) as PresenceVisibility
+}
+
+export const markUserOffline = async () => {
+  try {
+    const workingClient = await getWorkingClient()
+    const { data: { user } } = await workingClient.auth.getUser()
+    if (!user) return
+
+    await workingClient
+      .from('user_presence')
+      .update({
+        status: 'offline',
+        last_seen: null,
+        current_channel: null,
+        typing_in: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', user.id)
+  } catch {
+    // Best-effort only; stale heartbeats expire after the active window.
+  }
+}
+
+export const fetchPresenceStates = async () => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('list_presence_states')
+  if (error) {
+    return [] as PresenceSnapshot[]
+  }
+  return (data ?? []) as PresenceSnapshot[]
+}
+
+export const fetchActiveUsers = async () => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_active_users')
+  if (error) {
+    return [] as ActiveUserSnapshot[]
+  }
+  return (data ?? []) as ActiveUserSnapshot[]
+}
+
 export const toggleReaction = async (messageId: string, emoji: string, isDM = false) => {
   const workingClient = await getWorkingClient()
   const { error } = await workingClient.rpc('toggle_message_reaction', {
@@ -864,7 +934,7 @@ export const fetchDMConversations = async () => {
   if (missingIds.length) {
     const { data: usersData, error: userErr } = await workingClient
       .from('users')
-      .select('id, username, display_name, avatar_url, color, status, admin_role')
+      .select('id, username, display_name, avatar_url, color, status, admin_role, presence_visibility')
       .in('id', missingIds)
     if (userErr) {
     } else {
@@ -946,7 +1016,7 @@ export const fetchAllUsers = async (options?: { signal?: AbortSignal }) => {
   const workingClient = await getWorkingClient()
   let query = workingClient
     .from('users')
-    .select('id, username, display_name, avatar_url, color, status, admin_role')
+    .select('id, username, display_name, avatar_url, color, status, admin_role, presence_visibility')
   if (options?.signal && typeof query.abortSignal === 'function') {
     query = query.abortSignal(options.signal)
   }
