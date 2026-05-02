@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { Check, Copy, Edit3, Send, Trash2, X } from 'lucide-react'
+import React, { useCallback, useRef, useState } from 'react'
+import { ArrowDown, Check, Copy, Edit3, Send, Trash2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
@@ -10,10 +10,13 @@ import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { useAuth } from '../../hooks/useAuth'
 import { useNewsChat } from '../../hooks/useNewsChat'
+import { useReadCursor } from '../../hooks/useReadCursor'
+import { useUnreadScroll } from '../../hooks/useUnreadScroll'
 import { formatTime } from '../../lib/utils'
 import { getBlockedActionMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
 import type { NewsChatMessage } from '../../lib/supabase'
+import { UnreadDivider } from '../chat/UnreadDivider'
 
 function NewsChatRow({
   message,
@@ -69,7 +72,10 @@ function NewsChatRow({
   }
 
   return (
-    <div className="group grid max-w-full grid-cols-[auto_minmax(0,1fr)_2rem] items-start gap-3 px-4 py-3 md:px-5">
+    <div
+      id={`news-chat-message-${message.id}`}
+      className="group grid max-w-full grid-cols-[auto_minmax(0,1fr)_2rem] items-start gap-3 px-4 py-3 md:px-5"
+    >
       <Avatar
         src={message.user?.avatar_url}
         alt={message.user?.display_name || 'News user'}
@@ -175,6 +181,7 @@ function NewsChatRow({
 }
 
 export function NewsChat() {
+  const { profile } = useAuth()
   const {
     messages,
     loading,
@@ -184,21 +191,44 @@ export function NewsChat() {
     editMessage,
     deleteMessage,
     toggleReaction,
+    markSeen,
   } = useNewsChat()
   const [draft, setDraft] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
+  const {
+    cursor,
+    loading: cursorLoading,
+    markRead,
+  } = useReadCursor('news_chat', 'main', Boolean(profile?.id))
 
-  useEffect(() => {
-    const container = scrollRef.current
-    if (!container) return
+  const markNewsChatRead = useCallback(
+    async (message: NewsChatMessage) => {
+      await Promise.all([
+        markRead(message.id, message.created_at),
+        markSeen(),
+      ])
+    },
+    [markRead, markSeen]
+  )
 
-    if (typeof container.scrollTo === 'function') {
-      container.scrollTo({ top: container.scrollHeight })
-      return
-    }
-
-    container.scrollTop = container.scrollHeight
-  }, [messages.length])
+  const {
+    autoScroll,
+    firstUnreadMessageId,
+    handleUnreadScroll,
+    scrollToBottom,
+  } = useUnreadScroll<NewsChatMessage>({
+    containerRef: scrollRef,
+    messages,
+    loading,
+    cursor,
+    cursorLoading,
+    enabled: Boolean(profile?.id),
+    surfaceKey: 'news_chat:main',
+    getMessageId: message => message.id,
+    getMessageCreatedAt: message => message.created_at,
+    getElementId: id => `news-chat-message-${id}`,
+    onMarkReadToLatest: markNewsChatRead,
+  })
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -220,31 +250,48 @@ export function NewsChat() {
         <p className="mt-1 text-xs text-[var(--text-muted)]">Text and links only.</p>
       </div>
 
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex h-full items-center justify-center p-8">
-            <LoadingSpinner size="lg" className="text-[var(--text-gold)]" />
-          </div>
-        ) : error ? (
-          <div className="m-4 rounded-[var(--radius-md)] border border-[rgba(190,52,85,0.35)] bg-[rgba(87,14,28,0.18)] p-4 text-sm text-red-100">
-            {error}
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="flex h-full items-center justify-center p-6 text-center text-sm text-[var(--text-muted)]">
-            No news chat messages yet.
-          </div>
-        ) : (
-          <div className="py-2">
-            {messages.map(message => (
-              <NewsChatRow
-                key={message.id}
-                message={message}
-                onEdit={editMessage}
-                onDelete={deleteMessage}
-                onReact={toggleReaction}
-              />
-            ))}
-          </div>
+      <div className="relative min-h-0 flex-1">
+        <div ref={scrollRef} onScroll={handleUnreadScroll} className="h-full overflow-y-auto">
+          {loading ? (
+            <div className="flex h-full items-center justify-center p-8">
+              <LoadingSpinner size="lg" className="text-[var(--text-gold)]" />
+            </div>
+          ) : error ? (
+            <div className="m-4 rounded-[var(--radius-md)] border border-[rgba(190,52,85,0.35)] bg-[rgba(87,14,28,0.18)] p-4 text-sm text-red-100">
+              {error}
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="flex h-full items-center justify-center p-6 text-center text-sm text-[var(--text-muted)]">
+              No news chat messages yet.
+            </div>
+          ) : (
+            <div className="py-2">
+              {messages.map(message => (
+                <React.Fragment key={message.id}>
+                  {firstUnreadMessageId === message.id && (
+                    <UnreadDivider className="mx-4 md:mx-5" />
+                  )}
+                  <NewsChatRow
+                    message={message}
+                    onEdit={editMessage}
+                    onDelete={deleteMessage}
+                    onReact={toggleReaction}
+                  />
+                </React.Fragment>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {!autoScroll && (
+          <button
+            type="button"
+            onClick={() => scrollToBottom()}
+            aria-label="Jump to latest"
+            className="absolute bottom-4 right-4 z-20 rounded-full border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] p-2 text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)] transition-transform hover:-translate-y-0.5"
+          >
+            <ArrowDown className="h-5 w-5" />
+          </button>
         )}
       </div>
 

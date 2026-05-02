@@ -18,8 +18,12 @@ export function NewsView() {
   const { markSeen } = useNewsBadges()
 
   useEffect(() => {
+    if (activeTab !== 'feed') {
+      return
+    }
+
     const handle = window.setTimeout(() => {
-      void markSeen(activeTab)
+      void markSeen('feed')
     }, 500)
 
     return () => window.clearTimeout(handle)

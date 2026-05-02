@@ -27,7 +27,7 @@ afterEach(() => {
   mockMarkSeen.mockReset()
 })
 
-test('news view switches between feed and chat and marks active section seen', () => {
+test('news view switches between feed and chat and leaves chat read tracking to the chat surface', () => {
   render(<NewsView />)
 
   expect(screen.getByText('feed board')).toBeInTheDocument()
@@ -43,5 +43,5 @@ test('news view switches between feed and chat and marks active section seen', (
   act(() => {
     jest.advanceTimersByTime(600)
   })
-  expect(mockMarkSeen).toHaveBeenCalledWith('chat')
+  expect(mockMarkSeen).not.toHaveBeenCalledWith('chat')
 })

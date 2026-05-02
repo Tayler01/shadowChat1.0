@@ -26,9 +26,12 @@ import { formatTime, shouldGroupMessage, getReadableTextColor } from '../../lib/
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { useTyping } from '../../hooks/useTyping'
+import { useReadCursor } from '../../hooks/useReadCursor'
+import { useUnreadScroll } from '../../hooks/useUnreadScroll'
 import { getPresenceStateLabel, usePresenceForUser } from '../../hooks/usePresence'
 import toast from 'react-hot-toast'
-import type { BasicUser, ChatMessageType, User } from '../../lib/supabase'
+import type { BasicUser, ChatMessageType, DMMessage, User } from '../../lib/supabase'
+import { UnreadDivider } from '../chat/UnreadDivider'
 
 interface DirectMessagesViewProps {
   onToggleSidebar: () => void
@@ -36,11 +39,6 @@ interface DirectMessagesViewProps {
   onViewChange: (view: 'chat' | 'dms' | 'news' | 'settings') => void
   initialConversation?: string
   initialMessageId?: string
-}
-
-type PendingUnreadJump = {
-  conversationId: string
-  unreadCount: number
 }
 
 export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
@@ -60,6 +58,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     startConversation,
     sendMessage,
     markAsRead,
+    messagesLoading,
     sending,
     loadOlderMessages,
     loadingMore,
@@ -71,14 +70,15 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const [searchUsername, setSearchUsername] = useState('')
   const [startingUsername, setStartingUsername] = useState<string | null>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
-  const pendingUnreadJumpRef = useRef<PendingUnreadJump | null>(null)
   const initialTargetJumpDoneRef = useRef<string | null>(null)
-  const [autoScroll, setAutoScroll] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [profileUser, setProfileUser] = useState<User | null>(null)
-  const [unreadJumpToken, setUnreadJumpToken] = useState(0)
-  const [firstUnreadDMMessageId, setFirstUnreadDMMessageId] = useState<string | null>(null)
   const { typingUsers } = useTyping(currentConversation ? `dm-${currentConversation}` : 'none')
+  const {
+    cursor,
+    loading: cursorLoading,
+    markRead,
+  } = useReadCursor('dm', currentConversation, Boolean(profile?.id && currentConversation))
 
   useEffect(() => {
     if (initialConversation && currentConversation !== initialConversation) {
@@ -93,21 +93,6 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
 
     setCurrentConversation(conversations[0].id)
   }, [conversations, currentConversation, initialConversation, isDesktop, setCurrentConversation])
-
-  useEffect(() => {
-    if (!currentConversation) return
-    const conv = conversations.find(c => c.id === currentConversation)
-    if (conv && (conv.unread_count || 0) > 0) {
-      pendingUnreadJumpRef.current = {
-        conversationId: currentConversation,
-        unreadCount: conv.unread_count || 0,
-      }
-      setUnreadJumpToken(token => token + 1)
-      void markAsRead(currentConversation).catch(() => {
-        pendingUnreadJumpRef.current = null
-      })
-    }
-  }, [currentConversation, conversations, markAsRead])
 
   const handleUserSelect = async (user: { username: string }) => {
     const normalizedUsername = user.username.trim().toLowerCase()
@@ -158,67 +143,73 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     setCurrentConversation(conversationId)
   }
 
+  const getUnreadDMMessages = useCallback(
+    (items: DMMessage[]) => {
+      if (!profile?.id) return []
+      return items.filter(
+        message =>
+          message.sender_id !== profile.id &&
+          !(message.read_by ?? []).includes(profile.id)
+      )
+    },
+    [profile?.id]
+  )
+
+  const markDMReadToLatest = useCallback(
+    async (message: DMMessage) => {
+      if (!currentConversation) return
+      await Promise.all([
+        markRead(message.id, message.created_at),
+        markAsRead(currentConversation),
+      ])
+    },
+    [currentConversation, markAsRead, markRead]
+  )
+
+  const {
+    autoScroll,
+    firstUnreadMessageId: firstUnreadDMMessageId,
+    setAutoScroll,
+    setFirstUnreadMessageId,
+    handleUnreadScroll,
+    scrollToBottom,
+    markLatestRead,
+  } = useUnreadScroll<DMMessage>({
+    containerRef: messagesRef,
+    messages,
+    loading: messagesLoading,
+    cursor,
+    cursorLoading,
+    enabled: Boolean(profile?.id && currentConversation),
+    surfaceKey: `dm:${currentConversation || 'none'}`,
+    initialMessageId,
+    getMessageId: message => message.id,
+    getMessageCreatedAt: message => message.created_at,
+    getElementId: id => `dm-message-${id}`,
+    getUnreadMessages: getUnreadDMMessages,
+    onMarkReadToLatest: markDMReadToLatest,
+  })
+
   const handleScroll = useCallback(() => {
     const el = messagesRef.current
     if (!el) return
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 20
-    setAutoScroll(atBottom)
+
+    handleUnreadScroll()
+
     if (el.scrollTop < 100 && hasMore && !loadingMore) {
       loadOlderMessages()
     }
-  }, [hasMore, loadingMore, loadOlderMessages])
-
-  const scrollToBottom = useCallback(() => {
-    if (messagesRef.current) {
-      messagesRef.current.scrollTo({
-        top: messagesRef.current.scrollHeight,
-        behavior: 'smooth',
-      })
-      setAutoScroll(true)
-    }
-  }, [])
+  }, [handleUnreadScroll, hasMore, loadingMore, loadOlderMessages])
 
   useEffect(() => {
-    setAutoScroll(true)
-    setFirstUnreadDMMessageId(null)
     initialTargetJumpDoneRef.current = null
   }, [currentConversation])
 
   useEffect(() => {
-    if (autoScroll && messagesRef.current) {
-      messagesRef.current.scrollTop = messagesRef.current.scrollHeight
+    if (autoScroll && typingUsers.length > 0) {
+      scrollToBottom('auto')
     }
-  }, [messages, currentConversation, autoScroll])
-
-  useEffect(() => {
-    const pending = pendingUnreadJumpRef.current
-    if (
-      initialMessageId ||
-      !pending ||
-      pending.conversationId !== currentConversation ||
-      pending.unreadCount <= 0 ||
-      messages.length === 0
-    ) {
-      return
-    }
-
-    const firstUnreadIndex = Math.max(messages.length - pending.unreadCount, 0)
-    const anchorIndex = Math.max(firstUnreadIndex - 1, 0)
-    const anchorMessage = messages[anchorIndex]
-    const firstUnreadMessage = messages[firstUnreadIndex] ?? messages[0]
-    if (!anchorMessage) {
-      return
-    }
-
-    setFirstUnreadDMMessageId(firstUnreadMessage?.id ?? null)
-    setAutoScroll(false)
-    pendingUnreadJumpRef.current = null
-
-    requestAnimationFrame(() => {
-      const el = document.getElementById(`dm-message-${anchorMessage.id}`)
-      el?.scrollIntoView({ block: 'start' })
-    })
-  }, [currentConversation, initialMessageId, messages, unreadJumpToken])
+  }, [autoScroll, scrollToBottom, typingUsers.length])
 
   useEffect(() => {
     if (
@@ -235,8 +226,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     }
 
     initialTargetJumpDoneRef.current = initialMessageId
-    pendingUnreadJumpRef.current = null
-    setFirstUnreadDMMessageId(null)
+    setFirstUnreadMessageId(null)
     setAutoScroll(false)
 
     requestAnimationFrame(() => {
@@ -244,11 +234,12 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
       if (!el) return
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
       el.classList.add('ring-2', 'ring-[rgba(34,197,94,0.55)]')
+      void markLatestRead(false)
       window.setTimeout(() => {
         el.classList.remove('ring-2', 'ring-[rgba(34,197,94,0.55)]')
       }, 2200)
     })
-  }, [initialMessageId, messages])
+  }, [initialMessageId, markLatestRead, messages, setAutoScroll, setFirstUnreadMessageId])
 
   const currentConv = conversations.find(c => c.id === currentConversation)
   const currentPeerPresence = usePresenceForUser(currentConv?.other_user?.id)
@@ -553,13 +544,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 return (
                   <React.Fragment key={message.id}>
                   {firstUnreadDMMessageId === message.id && (
-                    <div className="my-3 flex items-center gap-3">
-                      <hr className="flex-grow border-t border-[rgba(34,197,94,0.24)]" />
-                      <span className="rounded-full border border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.08)] px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-[#86efac]">
-                        Unread
-                      </span>
-                      <hr className="flex-grow border-t border-[rgba(34,197,94,0.24)]" />
-                    </div>
+                    <UnreadDivider />
                   )}
                   <motion.div
                     key={message.id}
@@ -700,7 +685,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
               {!autoScroll && (
                 <button
                   type="button"
-                  onClick={scrollToBottom}
+                  onClick={() => scrollToBottom()}
                   aria-label="Jump to latest"
                   className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)_+_9.25rem)] z-50 rounded-full border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] p-2 text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)] transition-transform hover:-translate-y-0.5 md:bottom-32"
                 >

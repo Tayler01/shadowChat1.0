@@ -6,6 +6,7 @@ const mockSendMessage = jest.fn()
 const mockEditMessage = jest.fn()
 const mockDeleteMessage = jest.fn()
 const mockToggleReaction = jest.fn()
+const mockMarkRead = jest.fn()
 
 const baseMessage = {
   id: 'message-1',
@@ -53,6 +54,15 @@ jest.mock('../src/hooks/useAuth', () => ({
   }),
 }))
 
+jest.mock('../src/hooks/useReadCursor', () => ({
+  useReadCursor: () => ({
+    cursor: null,
+    loading: false,
+    refresh: jest.fn(),
+    markRead: mockMarkRead,
+  }),
+}))
+
 jest.mock('../src/lib/linkPreview', () => ({
   extractFirstMessageUrl: () => null,
   fetchLinkPreview: jest.fn(),
@@ -71,6 +81,7 @@ beforeEach(() => {
   mockEditMessage.mockResolvedValue(undefined)
   mockDeleteMessage.mockResolvedValue(undefined)
   mockToggleReaction.mockResolvedValue(undefined)
+  mockMarkRead.mockResolvedValue(null)
 })
 
 afterEach(() => {

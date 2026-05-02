@@ -35,6 +35,7 @@ interface DirectMessagesContextValue {
   currentConversation: string | null;
   setCurrentConversation: React.Dispatch<React.SetStateAction<string | null>>;
   messages: DMMessage[];
+  messagesLoading: boolean;
   sending: boolean;
   loadingMore: boolean;
   hasMore: boolean;
@@ -57,13 +58,8 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
   const [currentConversation, setCurrentConversation] = useState<string | null>(null);
   const { user } = useAuth();
   const { playMessage } = useSoundEffects();
-  const currentConversationRef = useRef<string | null>(null);
   const conversationsChannelRef = useRef<RealtimeChannel | null>(null);
   const conversationsSubscribeRef = useRef<(() => Promise<RealtimeChannel>) | null>(null);
-
-  useEffect(() => {
-    currentConversationRef.current = currentConversation;
-  }, [currentConversation]);
 
   const refreshConversations = useCallback(async () => {
     try {
@@ -148,11 +144,9 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
               const convIndex = prev.findIndex(c => c.id === payload.new.conversation_id);
               if (convIndex >= 0) {
                 const updated = [...prev];
-                const isCurrent =
-                  payload.new.conversation_id === currentConversationRef.current;
                 let unread = updated[convIndex].unread_count;
                 if (payload.new.sender_id !== user.id) {
-                  unread = isCurrent ? 0 : (unread || 0) + 1;
+                  unread = (unread || 0) + 1;
                 }
 
                 updated[convIndex] = {
@@ -299,6 +293,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
 
   const {
     messages,
+    loading: messagesLoading,
     sending,
     sendMessage: sendConversationMessage,
     loadingMore,
@@ -368,6 +363,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     currentConversation,
     setCurrentConversation,
     messages,
+    messagesLoading,
     sending,
     loadingMore,
     hasMore,
@@ -432,57 +428,6 @@ export function useConversationMessages(conversationId: string | null) {
     []
   );
 
-  const markVisibleMessagesRead = useCallback(
-    async (pendingMessages: DMMessage[]) => {
-      if (!conversationId || !user) return
-
-      const unreadIds = pendingMessages
-        .filter(
-          message =>
-            message.sender_id !== user.id &&
-            !(message.read_by ?? []).includes(user.id)
-        )
-        .map(message => message.id)
-
-      if (unreadIds.length === 0) {
-        return
-      }
-
-      const readAt = new Date().toISOString()
-      const unreadIdSet = new Set(unreadIds)
-
-      await markDMMessagesRead(conversationId)
-      void clearDMNotifications(conversationId)
-
-      if (activeConversationIdRef.current !== conversationId) {
-        return
-      }
-
-      setMessages(prev =>
-        prev.map(message => {
-          if (!unreadIdSet.has(message.id)) {
-            return message
-          }
-
-          const readBy = message.read_by ?? []
-          if (readBy.includes(user.id)) {
-            return {
-              ...message,
-              read_at: message.read_at ?? readAt,
-            }
-          }
-
-          return {
-            ...message,
-            read_at: message.read_at ?? readAt,
-            read_by: [...readBy, user.id],
-          }
-        })
-      )
-    },
-    [conversationId, user]
-  )
-
   const handleVisible = useCallback(() => {
     if (clientResetRef.current) {
       void clientResetRef.current();
@@ -533,7 +478,6 @@ export function useConversationMessages(conversationId: string | null) {
           const fetchedMessages = ((data || []) as unknown as DMMessage[]).reverse()
           setHasMore((data?.length || 0) === MESSAGE_FETCH_LIMIT);
           setMessages(fetchedMessages);
-          await markVisibleMessagesRead(fetchedMessages).catch(() => undefined)
         }
       } catch {
         if (!disposed && requestId === fetchRequestIdRef.current) {
@@ -591,7 +535,7 @@ export function useConversationMessages(conversationId: string | null) {
         clientResetRef.current = undefined;
       }
     };
-  }, [conversationId, markVisibleMessagesRead, user]);
+  }, [conversationId, user]);
 
   const loadOlderMessages = useCallback(async () => {
     if (loadingMore || !hasMore || !conversationId) return;
@@ -675,10 +619,8 @@ export function useConversationMessages(conversationId: string | null) {
                 return prev.some(m => m.id === message.id) ? prev : [...prev, message];
               });
 
-              // Mark as read if not sent by current user
               if (user && message.sender_id !== user.id) {
                 playMessage();
-                await markVisibleMessagesRead([message])
               }
             }
           }
@@ -767,7 +709,7 @@ export function useConversationMessages(conversationId: string | null) {
       }
       channelRef.current = null;
     };
-  }, [conversationId, markVisibleMessagesRead, user, playMessage]);
+  }, [conversationId, user, playMessage]);
 
   const sendMessage = useCallback(
     async (

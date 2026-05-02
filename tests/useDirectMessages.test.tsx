@@ -237,7 +237,7 @@ test('startConversation throws when user not found', async () => {
   await expect(result.current.startConversation('missing')).rejects.toThrow('User not found');
 });
 
-test('marks visible unread messages as read through the RPC helper', async () => {
+test('defers unread message marking until the view records the read position', async () => {
   const unreadMessage = {
     id: 'm1',
     conversation_id: 'conv1',
@@ -265,6 +265,15 @@ test('marks visible unread messages as read through the RPC helper', async () =>
 
   await act(async () => {
     result.current.setCurrentConversation('conv1');
+  });
+
+  await waitFor(() => {
+    expect(result.current.messages).toHaveLength(1);
+  });
+  expect(markDMMessagesRead).not.toHaveBeenCalled();
+
+  await act(async () => {
+    await result.current.markAsRead('conv1');
   });
 
   await waitFor(() => {

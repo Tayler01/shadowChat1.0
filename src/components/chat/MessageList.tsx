@@ -16,6 +16,9 @@ import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { getBlockedActionMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
+import { useReadCursor } from '../../hooks/useReadCursor'
+import { useUnreadScroll } from '../../hooks/useUnreadScroll'
+import { UnreadDivider } from './UnreadDivider'
 
 interface MessageListProps {
   onReply?: (messageId: string, content: string) => void
@@ -50,15 +53,8 @@ export const MessageList: React.FC<MessageListProps> = ({
   const containerRef = useRef<HTMLDivElement>(null)
   const prevHeightRef = useRef(0)
   const prevScrollTopRef = useRef(0)
-  const initialUnreadJumpDoneRef = useRef(false)
   const initialTargetJumpDoneRef = useRef<string | null>(null)
-  const lastSeenMessageIdRef = useRef<string | null>(null)
-  const [autoScroll, setAutoScroll] = useState(true)
-  const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(null)
-  const lastSeenStorageKey = useMemo(
-    () => (profile?.id ? `shadowchat:general:last-seen:${profile.id}` : null),
-    [profile?.id]
-  )
+  const { cursor, loading: cursorLoading, markRead } = useReadCursor('general_chat', 'main', Boolean(profile?.id))
 
   const { messageMap, childrenMap, rootMessages } = useMemo(() => {
     const msgMap = new Map<string, Message>()
@@ -119,6 +115,24 @@ export const MessageList: React.FC<MessageListProps> = ({
     })
   }
 
+  const expandMessageAncestors = useCallback(
+    (message: Message) => {
+      setCollapsed(prev => {
+        const newSet = new Set(prev)
+        let current: Message | undefined = messageMap.get(message.id) || message
+
+        while (current?.reply_to) {
+          newSet.delete(current.reply_to)
+          current = messageMap.get(current.reply_to)
+        }
+
+        newSet.delete(message.id)
+        return newSet
+      })
+    },
+    [messageMap]
+  )
+
   const jumpToMessage = useCallback(
     (id: string) => {
       setCollapsed(prev => {
@@ -148,29 +162,6 @@ export const MessageList: React.FC<MessageListProps> = ({
     [messageMap]
   )
 
-  const handleScroll = useCallback(() => {
-    const el = containerRef.current
-    if (!el) return
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 20
-    setAutoScroll(atBottom)
-
-    if (el.scrollTop < 100 && hasMore && !loadingMore) {
-      prevHeightRef.current = el.scrollHeight
-      prevScrollTopRef.current = el.scrollTop
-      loadOlderMessages()
-    }
-  }, [hasMore, loadingMore, loadOlderMessages])
-
-  const scrollToBottom = useCallback(() => {
-    if (containerRef.current) {
-      containerRef.current.scrollTo({
-        top: containerRef.current.scrollHeight,
-        behavior: 'smooth'
-      })
-      setAutoScroll(true)
-    }
-  }, [])
-
   const replyLinkMessages = useMemo(() => {
     return messages
       .filter(m => m.reply_to && messageMap.get(m.reply_to))
@@ -191,21 +182,53 @@ export const MessageList: React.FC<MessageListProps> = ({
     [combinedMessages]
   )
 
-  useEffect(() => {
-    initialUnreadJumpDoneRef.current = false
-    initialTargetJumpDoneRef.current = null
-    setFirstUnreadMessageId(null)
-    if (!lastSeenStorageKey || typeof localStorage === 'undefined') {
-      lastSeenMessageIdRef.current = null
-      return
-    }
+  const markGeneralChatRead = useCallback(
+    async (message: Message) => {
+      await markRead(message.id, message.created_at)
+    },
+    [markRead]
+  )
 
-    try {
-      lastSeenMessageIdRef.current = localStorage.getItem(lastSeenStorageKey)
-    } catch {
-      lastSeenMessageIdRef.current = null
+  const {
+    autoScroll,
+    firstUnreadMessageId,
+    setAutoScroll,
+    setFirstUnreadMessageId,
+    handleUnreadScroll,
+    scrollToBottom,
+    markLatestRead,
+  } = useUnreadScroll<Message>({
+    containerRef,
+    messages: combinedMessages as Message[],
+    loading,
+    cursor,
+    cursorLoading,
+    enabled: Boolean(profile?.id),
+    surfaceKey: 'general_chat:main',
+    initialMessageId,
+    getMessageId: message => message.id,
+    getMessageCreatedAt: message => message.created_at,
+    getElementId: id => `message-${id}`,
+    onBeforeInitialJump: expandMessageAncestors,
+    onMarkReadToLatest: markGeneralChatRead,
+  })
+
+  const handleScroll = useCallback(() => {
+    const el = containerRef.current
+    if (!el) return
+
+    handleUnreadScroll()
+
+    if (el.scrollTop < 100 && hasMore && !loadingMore) {
+      prevHeightRef.current = el.scrollHeight
+      prevScrollTopRef.current = el.scrollTop
+      loadOlderMessages()
     }
-  }, [lastSeenStorageKey])
+  }, [handleUnreadScroll, hasMore, loadingMore, loadOlderMessages])
+
+  useEffect(() => {
+    initialTargetJumpDoneRef.current = null
+  }, [profile?.id])
 
   // Maintain scroll position when older messages are prepended
   useEffect(() => {
@@ -223,44 +246,11 @@ export const MessageList: React.FC<MessageListProps> = ({
     }
   }, [loadingMore, messages])
 
-  // Scroll to bottom when messages or typing users change
   useEffect(() => {
-    if (autoScroll && containerRef.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight
+    if (autoScroll && typingUsers.length > 0) {
+      scrollToBottom('auto')
     }
-  }, [messages, typingUsers, autoScroll])
-
-  useEffect(() => {
-    if (
-      loading ||
-      initialMessageId ||
-      initialUnreadJumpDoneRef.current ||
-      combinedMessages.length === 0
-    ) {
-      return
-    }
-
-    initialUnreadJumpDoneRef.current = true
-
-    const lastSeenId = lastSeenMessageIdRef.current
-    const lastSeenIndex = lastSeenId
-      ? combinedMessages.findIndex(message => message.id === lastSeenId)
-      : -1
-
-    if (lastSeenIndex >= 0 && lastSeenIndex < combinedMessages.length - 1) {
-      const firstUnread = combinedMessages[lastSeenIndex + 1]
-      setFirstUnreadMessageId(firstUnread.id)
-      setAutoScroll(false)
-
-      requestAnimationFrame(() => {
-        const el = document.getElementById(`message-${lastSeenId}`)
-        el?.scrollIntoView({ block: 'start' })
-      })
-      return
-    }
-
-    setFirstUnreadMessageId(null)
-  }, [combinedMessages, initialMessageId, loading])
+  }, [autoScroll, scrollToBottom, typingUsers.length])
 
   useEffect(() => {
     if (
@@ -286,30 +276,12 @@ export const MessageList: React.FC<MessageListProps> = ({
       if (!el) return
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
       el.classList.add('ring-2', 'ring-[rgba(34,197,94,0.55)]')
+      void markLatestRead(false)
       window.setTimeout(() => {
         el.classList.remove('ring-2', 'ring-[rgba(34,197,94,0.55)]')
       }, 2200)
     })
-  }, [combinedMessages, initialMessageId, loading])
-
-  useEffect(() => {
-    if (
-      !lastSeenStorageKey ||
-      loading ||
-      !autoScroll ||
-      !initialUnreadJumpDoneRef.current ||
-      combinedMessages.length === 0 ||
-      (typeof document !== 'undefined' && document.visibilityState !== 'visible')
-    ) {
-      return
-    }
-
-    try {
-      localStorage.setItem(lastSeenStorageKey, combinedMessages[combinedMessages.length - 1].id)
-    } catch {
-      // Ignore storage failures; the feed will still behave like normal chat.
-    }
-  }, [autoScroll, combinedMessages, lastSeenStorageKey, loading])
+  }, [combinedMessages, initialMessageId, loading, markLatestRead, setAutoScroll, setFirstUnreadMessageId])
 
   const handleEdit = async (messageId: string, content: string) => {
     try {
@@ -418,13 +390,7 @@ export const MessageList: React.FC<MessageListProps> = ({
             return (
               <React.Fragment key={message.id}>
                 {firstUnreadMessageId === message.id && (
-                  <div className="my-3 flex items-center gap-3">
-                    <hr className="flex-grow border-t border-[rgba(34,197,94,0.24)]" />
-                    <span className="rounded-full border border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.08)] px-3 py-1 text-[11px] uppercase tracking-[0.16em] text-[#86efac]">
-                      Unread
-                    </span>
-                    <hr className="flex-grow border-t border-[rgba(34,197,94,0.24)]" />
-                  </div>
+                  <UnreadDivider />
                 )}
                 <div className={cn(isGrouped ? 'pt-1 pb-1' : 'pt-4 pb-1')}>
                   {message.isReplyLink ? (
@@ -493,7 +459,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       {!autoScroll && (
         <button
           type="button"
-          onClick={scrollToBottom}
+          onClick={() => scrollToBottom()}
           aria-label="Jump to latest"
           className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)_+_9.25rem)] z-50 rounded-full border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] p-2 text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)] transition-transform hover:-translate-y-0.5 md:bottom-32"
         >
