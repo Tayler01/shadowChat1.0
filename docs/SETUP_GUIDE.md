@@ -177,12 +177,24 @@ secrets are `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; optional source
 credentials are `X_USERNAME`, `X_EMAIL`, `X_PASSWORD`, `TRUTH_USERNAME`,
 `TRUTH_EMAIL`, and `TRUTH_PASSWORD`.
 
-Admins and sub-admins manage tracked sources from Settings > News Sources. The
-admin class is stored in `public.user_roles` as `admin` or `sub_admin`.
+Admins and sub-admins manage tracked sources from Settings > Admin > News
+Sources. The admin class is stored in `public.user_roles` as `admin` or
+`sub_admin`; full admins can manage sub-admin access from Settings > Admin >
+Admin Access.
 
 Full runbook: [docs/NEWS_TAB_AND_SCRAPER.md](C:/repos/chat2.0/docs/NEWS_TAB_AND_SCRAPER.md:1).
 
-## 8. Verify Core Flows
+## 8. Optional Weather Widget Setup
+
+The General Chat weather widget works without any provider secret. Users choose
+their own location from Settings > Account & Profile > Weather Location. The
+browser calls Open-Meteo for geocoding and forecasts.
+
+Fresh Supabase projects must include
+[`20260502042003_user_weather_preferences.sql`](C:/repos/chat2.0/supabase/migrations/20260502042003_user_weather_preferences.sql:1)
+so the private per-user preference table and RLS policies exist.
+
+## 9. Verify Core Flows
 
 After setup, verify:
 
@@ -195,10 +207,13 @@ After setup, verify:
 7. New-account phone setup opens after signup or first sign-in from the same browser
 8. News tab loads
 9. News Chat sends and receives a message
-10. An `admin` or `sub_admin` user can add/pause a News source in Settings
+10. An `admin` or `sub_admin` user can add/pause a News source in Settings > Admin > News Sources
 11. If the scraper is configured, `news_sources.last_checked_at` updates after a worker cycle
+12. A full `admin` user can grant or remove sub-admin access from Settings > Admin > Admin Access
+13. Settings > Account & Profile can save and clear a weather location
+14. General Chat shows the weather widget and active-user count without overlapping on mobile
 
-## 9. Optional Preview Mode
+## 10. Optional Preview Mode
 
 For production-style local QA:
 
@@ -207,14 +222,14 @@ npm run build
 npx vite preview --host 127.0.0.1 --port 4174
 ```
 
-## 10. End-User Phone Setup
+## 11. End-User Phone Setup
 
 New accounts get a guided Home Screen setup modal. The guide is intentionally simple:
 
 - iPhone: open in Safari, tap Share, tap `Add to Home Screen`, tap `Add`
 - Android: tap `Install Now` when Chrome exposes the native prompt, or use the Chrome menu and choose `Install app` / `Add to Home screen`
 
-Users can reopen the guide from Settings under `Phone App Setup`.
+Users can reopen the guide from Settings under `App Setup & User Guide`.
 
 For implementation and QA details, see [docs/PHONE_INSTALL_ONBOARDING.md](C:/repos/chat2.0/docs/PHONE_INSTALL_ONBOARDING.md:1).
 
@@ -251,6 +266,13 @@ For implementation and QA details, see [docs/PHONE_INSTALL_ONBOARDING.md](C:/rep
 - migrations were not pushed
 - wrong Supabase project linked
 - stale session or auth issue
+
+### Weather Location Does Not Save
+
+- confirm migrations include `user_weather_preferences`
+- confirm the user is signed in
+- confirm browser requests to `geocoding-api.open-meteo.com` and
+  `api.open-meteo.com` are not blocked by local network policy
 
 When debugging realtime, inspect:
 

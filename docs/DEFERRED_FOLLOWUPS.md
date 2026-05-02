@@ -32,3 +32,5 @@ Near-future priorities from the full codebase audit, after the P0 fixes:
 16. Add update channels for stable, beta, local bundle, and rollback metadata.
 17. Implement per-conversation notification preferences shared across web, push, and bridge clients.
 18. Revisit the paused mood emoji / tone indicator feature with better UX, user control, and accuracy before exposing it again in Settings.
+19. Add an explicit Fahrenheit/Celsius toggle for the weather widget if users need unit control beyond the stored `temperature_unit` field.
+20. Update the Netlify GitHub Actions workflow away from Node 20 actions before GitHub's Node 20 runner deprecation window ends.

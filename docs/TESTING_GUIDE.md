@@ -17,13 +17,13 @@ npm run build
 Run the suite:
 
 ```powershell
-npm test -- --runInBand
+npx jest --runInBand
 ```
 
 Run a specific test file:
 
 ```powershell
-npm test -- --runInBand tests/useDirectMessages.test.tsx
+npx jest --runInBand tests/useDirectMessages.test.tsx
 ```
 
 Current coverage is strongest around:
@@ -37,6 +37,8 @@ Current coverage is strongest around:
 - session refresh and realtime reset helpers
 - theme and user search hooks
 - News tab segmentation and News Chat rendering
+- admin feedback review
+- weather widget and location settings
 
 ## When To Add Manual Browser QA
 
@@ -52,6 +54,9 @@ Do browser validation when changing:
 - theme and visual polish
 - push notification setup
 - News Feed layout, reaction menus, badges, and source-health admin UI
+- admin access, admin subpages, or role badges
+- active-user indicators or presence visibility
+- General Chat weather widget or Account & Profile weather location settings
 
 ## Recommended Local Browser Loop
 
@@ -171,6 +176,21 @@ News-specific Jest coverage currently lives in:
 - [tests/NewsChat.test.tsx](C:/repos/chat2.0/tests/NewsChat.test.tsx:1)
 - [tests/linkPreview.test.ts](C:/repos/chat2.0/tests/linkPreview.test.ts:1)
 
+Admin/weather focused Jest coverage currently lives in:
+
+- [tests/SettingsView.test.tsx](C:/repos/chat2.0/tests/SettingsView.test.tsx:1)
+- [tests/AdminFeedbackReview.test.tsx](C:/repos/chat2.0/tests/AdminFeedbackReview.test.tsx:1)
+- [tests/WeatherWidget.test.tsx](C:/repos/chat2.0/tests/WeatherWidget.test.tsx:1)
+- [tests/WeatherLocationSettings.test.tsx](C:/repos/chat2.0/tests/WeatherLocationSettings.test.tsx:1)
+- [tests/weather.test.ts](C:/repos/chat2.0/tests/weather.test.ts:1)
+
+Latest focused release smoke recorded for the weather widget release:
+
+- Date: May 2, 2026
+- Local gates: `npm run lint`, `npx tsc --noEmit -p tsconfig.app.json`, `npx jest --runInBand`, `npm run build`
+- Browser check: headed Chromium against `npx vite preview --host 127.0.0.1 --port 4184 --strictPort`
+- Artifacts: `output/playwright/weather-widget/final-desktop-weather-popup.png`, `output/playwright/weather-widget/final-mobile-chat-header.png`, and `output/playwright/weather-widget/final-weather-settings-card.png`
+
 Latest full release smoke recorded for the feedback submission release:
 
 - Date: April 28, 2026
@@ -207,6 +227,21 @@ The source should update `last_checked_at`; successful sources should update
 Eastern-day posts should appear on the board.
 
 For Settings feedback changes, verify the wizard from Settings, submit at least one bug or feature report with an image attachment, then query `public.feedback_submissions` as the same user and download the stored object from `feedback-attachments`. This confirms both table RLS and private Storage policy behavior.
+
+For Feedback Review changes, verify Settings > Admin > Feedback Review as an
+`admin` or `sub_admin`. The list should show submitted bugs and suggestions,
+and the full popup should show title, description, submitter metadata, and
+signed image attachments. Admin review is read-only for now.
+
+For Admin Access changes, verify a full `admin` can open Settings > Admin >
+Admin Access, search the complete user list, grant/revoke sub-admin access, and
+cannot remove the single full admin from that UI. Verify sub-admin users can see
+operator tools but cannot see Admin Access.
+
+For weather changes, verify General Chat header on desktop and mobile, the
+forecast popup, and Settings > Account & Profile > Weather Location. Weather
+preferences should be scoped to the signed-in user and should not appear on
+public profile data.
 
 Disposable accounts are the most deterministic option. Reused env-backed accounts can carry old threads and unread state from earlier runs.
 
@@ -250,7 +285,7 @@ Checks to cover:
 - verify the guide opens after first authenticated load
 - verify the iPhone tab shows Safari, Share, `Add to Home Screen`, and `Add`
 - verify the Android tab shows either the native `Install Now` path or Chrome menu fallback
-- verify Settings exposes `Phone App Setup` and can reopen the same guide
+- verify Settings exposes `App Setup & User Guide` and can reopen the same guide
 
 The stable `PLAYWRIGHT_ACCOUNT_*` users should stay out of this test so routine smoke runs are not blocked by onboarding. See [docs/PHONE_INSTALL_ONBOARDING.md](C:/repos/chat2.0/docs/PHONE_INSTALL_ONBOARDING.md:1).
 
@@ -291,6 +326,8 @@ Examples:
 - DM send/receive in two browser contexts
 - profile edit
 - settings and push setup
+- admin subpages and feedback review
+- weather widget and weather settings
 - mobile nav and composer spacing
 
 ## Realtime Validation Checklist

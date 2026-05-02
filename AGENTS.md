@@ -20,6 +20,16 @@ DM tables for News Feed or News Chat behavior. The News scraper runs on Render
 with service-role credentials; never expose scraper credentials or provider
 tokens in browser-visible `VITE_*` variables.
 
+Admin access is now app-wide. Before changing admin behavior, read
+[docs/ADMIN_ACCESS.md](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1). Keep exactly
+one full `admin`; `sub_admin` users can use operator tools but cannot manage
+roles.
+
+The General Chat weather widget stores location preferences privately in
+`user_weather_preferences`. Before changing weather behavior, read
+[docs/WEATHER_WIDGET.md](C:/repos/chat2.0/docs/WEATHER_WIDGET.md:1). Do not
+put weather location data on public profile rows.
+
 The current major planning and upcoming implementation track is the `ESP bridge` feature for an airgapped Windows PC.
 
 High-level direction:
@@ -68,7 +78,7 @@ npm run build
 Run targeted Jest when touching behavior that already has tests:
 
 ```powershell
-npm test -- --runInBand
+npx jest --runInBand
 ```
 
 ## Repo Map
@@ -88,6 +98,9 @@ npm test -- --runInBand
 - [`src/hooks/useNewsChat.tsx`](C:/repos/chat2.0/src/hooks/useNewsChat.tsx:1): News Chat fetch, realtime, send/edit/delete, reactions, and seen state
 - [`src/hooks/useNewsBadges.ts`](C:/repos/chat2.0/src/hooks/useNewsBadges.ts:1): News Sidebar/MobileNav badge counts
 - [`src/hooks/useNewsAdmin.ts`](C:/repos/chat2.0/src/hooks/useNewsAdmin.ts:1): Settings admin source controls
+- [`src/hooks/useAdminAccess.ts`](C:/repos/chat2.0/src/hooks/useAdminAccess.ts:1): full-admin and sub-admin access controls
+- [`src/hooks/useWeatherPreference.ts`](C:/repos/chat2.0/src/hooks/useWeatherPreference.ts:1): private weather location preference state
+- [`src/hooks/useWeatherForecast.ts`](C:/repos/chat2.0/src/hooks/useWeatherForecast.ts:1): weather forecast loading and refresh
 - [`src/hooks/usePushNotifications.ts`](C:/repos/chat2.0/src/hooks/usePushNotifications.ts:1): browser push setup and preference state
 - [`src/hooks/useTheme.tsx`](C:/repos/chat2.0/src/hooks/useTheme.tsx:1): product theme selection and persistence
 - [`src/hooks/useTyping.ts`](C:/repos/chat2.0/src/hooks/useTyping.ts:1): typing indicators
@@ -98,14 +111,15 @@ npm test -- --runInBand
 - [`src/lib/auth.ts`](C:/repos/chat2.0/src/lib/auth.ts:1): auth workflows and profile bootstrap
 - [`src/lib/push.ts`](C:/repos/chat2.0/src/lib/push.ts:1): push subscription persistence and function calls
 - [`src/lib/ai.ts`](C:/repos/chat2.0/src/lib/ai.ts:1): AI function calls
+- [`src/lib/weather.ts`](C:/repos/chat2.0/src/lib/weather.ts:1): weather provider mapping and private preference helpers
 
 ### Views
 
-- [`src/components/chat`](C:/repos/chat2.0/src/components/chat): group chat UI
+- [`src/components/chat`](C:/repos/chat2.0/src/components/chat): group chat UI, active users, and weather widget
 - [`src/components/dms`](C:/repos/chat2.0/src/components/dms): inbox and DM thread UI
 - [`src/components/news`](C:/repos/chat2.0/src/components/news): News Feed, News Chat, feed modal, and News reactions
 - [`src/components/profile`](C:/repos/chat2.0/src/components/profile): profile editing and presentation
-- [`src/components/settings`](C:/repos/chat2.0/src/components/settings): feature toggles, push setup, theme settings
+- [`src/components/settings`](C:/repos/chat2.0/src/components/settings): sectioned settings, admin tools, feedback, weather location, push setup, theme settings
 - [`src/components/layout`](C:/repos/chat2.0/src/components/layout): sidebar, mobile nav, shell controls
 
 ### Backend Schema And Functions
@@ -122,6 +136,9 @@ npm test -- --runInBand
 - [`supabase/functions/bridge-session-refresh/index.ts`](C:/repos/chat2.0/supabase/functions/bridge-session-refresh/index.ts:1): bridge control-plane session rotation
 - [`supabase/functions/bridge-pairing-revoke/index.ts`](C:/repos/chat2.0/supabase/functions/bridge-pairing-revoke/index.ts:1): remote revoke and device wipe
 - [`supabase/functions/bridge-heartbeat/index.ts`](C:/repos/chat2.0/supabase/functions/bridge-heartbeat/index.ts:1): bridge health ping
+- Admin roles live in `public.user_roles`, `public.admin_role_audit`, and `public.admin_role_notifications`; visible badges sync to `public.users.admin_role`.
+- Presence visibility and the General Chat active-user list use `public.user_presence`, `users.presence_visibility`, and the `update_user_last_active`, `list_presence_states`, and `get_active_users` RPCs.
+- Weather preferences live in private `public.user_weather_preferences` rows and should not be added to public user profile data.
 
 ### ESP Bridge Firmware
 
@@ -139,6 +156,9 @@ Any change touching:
 - auth
 - chat message inserts
 - DM unread counts
+- admin role access
+- active presence or visibility
+- weather preference storage
 - visibility refresh
 - session refresh
 - websocket reconnects
@@ -196,13 +216,13 @@ npm run build
 Run the whole suite:
 
 ```powershell
-npm test -- --runInBand
+npx jest --runInBand
 ```
 
 Run a single file:
 
 ```powershell
-npm test -- --runInBand tests/useDirectMessages.test.tsx
+npx jest --runInBand tests/useDirectMessages.test.tsx
 ```
 
 Use `--runInBand` on Windows to reduce flakiness and keep output easier to read.

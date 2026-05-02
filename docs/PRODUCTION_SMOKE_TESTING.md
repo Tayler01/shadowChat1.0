@@ -114,7 +114,10 @@ Common failure meanings:
 4. Use `npm run qa:smoke:prod:headless` only for unattended environments where headless Chromium is stable.
 5. Open the News tab with a stable account and confirm News Feed/News Chat render.
 6. If the deploy touched News, verify Render worker health in `news_sources` and send one News Chat link to confirm previews.
-7. Keep the latest passing artifact path with the deploy notes.
+7. Open General Chat and confirm active-user count plus weather widget render without header overlap.
+8. Open Settings > Account & Profile and confirm Weather Location renders.
+9. If the deploy touched admin tools, verify Settings > Admin subpages with an operator account.
+10. Keep the latest passing artifact path with the deploy notes.
 
 ## Latest Feedback Release Checks
 
@@ -122,3 +125,12 @@ April 28, 2026 post-deploy checks:
 
 - Production Settings smoke passed: `output/playwright/prod-feedback-settings-postdeploy/summary.json`
 - Production feedback E2E passed with a real submission row and private attachment download: `output/playwright/feedback-prod-e2e-1777419359750/summary.json`
+
+## Latest Weather/Admin Local Release Checks
+
+May 2, 2026 local post-build checks:
+
+- Full Jest suite passed: `npx jest --runInBand`
+- Production build passed: `npm run build`
+- Headed weather widget preview passed with artifacts under `output/playwright/weather-widget/`
+- Netlify Production Deploy workflow passed for commit `601c3c9`

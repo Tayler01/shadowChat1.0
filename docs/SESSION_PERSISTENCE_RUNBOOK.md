@@ -73,7 +73,7 @@ For any auth, session, or realtime-adjacent edit:
 npm run lint
 npx tsc --noEmit -p tsconfig.app.json
 npm run build
-npm test -- --runInBand
+npx jest --runInBand
 ```
 
 Minimum headed browser smoke:

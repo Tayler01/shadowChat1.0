@@ -8,7 +8,7 @@ Shadow Chat is a PWA. New accounts should be guided into adding it to their phon
 - After the new user has an active session, `PhoneInstallOnboarding` opens the guided setup modal unless the app is already running in standalone mode.
 - The first display records the guide as seen for that user, so it does not return on later logins even if the user refreshes or leaves before closing it.
 - Closing the modal or tapping `I Added It` only dismisses the current modal instance.
-- Settings keeps a `Phone App Setup` section so anyone can reopen the guide later.
+- Settings keeps the guide under `App Setup & User Guide` so anyone can reopen it later.
 
 The onboarding marker is local to the browser that created the account. This avoids interrupting existing users and the stable Playwright smoke accounts.
 
@@ -41,7 +41,7 @@ Recommended checks:
 2. Open a fresh Playwright context.
 3. Set the local storage key through the app by signing up, or seed the pending marker for the temp email before sign-in.
 4. Sign in and verify the phone setup modal opens.
-5. Check the iPhone tab text, Android tab text, and Settings `Phone App Setup` reopen path.
+5. Check the iPhone tab text, Android tab text, and Settings `App Setup & User Guide` reopen path.
 6. Delete the temporary auth user and confirm its `public.users` row is gone.
 
 Useful references:

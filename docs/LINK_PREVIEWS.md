@@ -26,8 +26,11 @@ Deploy the function before deploying the frontend that calls it:
 ```powershell
 supabase functions deploy link-preview --no-verify-jwt
 npm run build
-npx netlify deploy --prod
+git push origin main
 ```
+
+The push to `main` starts the GitHub Actions Netlify production deploy. Use
+`npx netlify deploy --prod` only as a manual fallback.
 
 ## Validation
 

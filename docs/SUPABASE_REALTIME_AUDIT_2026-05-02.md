@@ -21,6 +21,7 @@ security-sensitive or high-churn operational data.
 | `news_sources` | Admin-managed tracked News accounts and scraper health. | Keep published. Needed for admin source controls and scraper visibility. |
 | `news_user_state` | Per-user News feed/chat seen timestamps. | Publish now. Needed for accurate News unread counts across tabs/devices. |
 | `user_roles` | App-wide admin/sub-admin roles. | Keep published. Role visibility is intentional app-wide. |
+| `user_presence` | Foreground heartbeat rows for tracked/invisible presence and active-user state. | Keep published. Needed for app-wide status dots and the General Chat active-user popup. |
 | `users` | Public user profiles, presence-ish profile fields, and visible admin badges. | Keep published. Supports profile/identity freshness. |
 
 ## Not Published
@@ -34,7 +35,7 @@ security-sensitive or high-churn operational data.
 | `bridge_pairing_codes` | Short-lived bridge pairing codes. | Do not publish. Sensitive short-lived data, polled by bridge status function. |
 | `bridge_pairings` | Device-to-user bridge pairing records. | Do not publish yet. Pairing lifecycle is handled by functions. |
 | `bridge_update_manifests` | Firmware/tools release metadata. | Do not publish. Firmware checks are request/response, not live UI. |
-| `feedback_submissions` | User feedback and attachments metadata. | Do not publish. User submits/read-own flow only. |
+| `feedback_submissions` | User feedback and attachments metadata. | Do not publish. User submit/read-own and operator review are on-demand, not live. |
 | `message_reactions` | Normalized group-message reaction rows. | Do not publish. RPCs aggregate reactions back onto `messages`, which is published. |
 | `news_chat_reactions` | Normalized News Chat reaction rows. | Do not publish. RPCs aggregate reactions back onto `news_chat_messages`, which is published. |
 | `news_feed_reactions` | Normalized News Feed reaction rows. | Do not publish. RPCs aggregate reactions back onto `news_feed_items`, which is published. |
@@ -42,5 +43,5 @@ security-sensitive or high-churn operational data.
 | `notification_preferences` | Per-user push notification settings. | Do not publish. Settings are user-driven and refreshed on demand. |
 | `notification_sounds` | Static notification sound catalog. | Do not publish. Static lookup table. |
 | `push_subscriptions` | Browser push endpoints and keys. | Do not publish. Sensitive endpoint material. |
-| `user_presence` | Database presence fields from an earlier presence model. | Do not publish. Active typing/presence uses realtime channels/broadcasts; this table can be high churn. |
+| `user_weather_preferences` | Private per-user weather location and temperature-unit preference. | Do not publish. Personal setting refreshed on demand by the owning user only. |
 | `user_sessions` | App session tracking table. | Do not publish. Session lifecycle is auth-sensitive and not used for live UI. |

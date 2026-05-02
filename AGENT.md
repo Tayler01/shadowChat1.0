@@ -16,17 +16,23 @@ npm run build
 - [`src/hooks/useAuth.tsx`](C:/repos/chat2.0/src/hooks/useAuth.tsx:1)
 - [`src/hooks/useMessages.tsx`](C:/repos/chat2.0/src/hooks/useMessages.tsx:1)
 - [`src/hooks/useDirectMessages.tsx`](C:/repos/chat2.0/src/hooks/useDirectMessages.tsx:1)
+- [`src/hooks/useAdminAccess.ts`](C:/repos/chat2.0/src/hooks/useAdminAccess.ts:1)
+- [`src/hooks/useWeatherPreference.ts`](C:/repos/chat2.0/src/hooks/useWeatherPreference.ts:1)
+- [`src/hooks/useWeatherForecast.ts`](C:/repos/chat2.0/src/hooks/useWeatherForecast.ts:1)
 - [`src/lib/supabase.ts`](C:/repos/chat2.0/src/lib/supabase.ts:1)
 - [`src/lib/push.ts`](C:/repos/chat2.0/src/lib/push.ts:1)
+- [`src/lib/weather.ts`](C:/repos/chat2.0/src/lib/weather.ts:1)
 - [`supabase/functions/openai-chat/index.ts`](C:/repos/chat2.0/supabase/functions/openai-chat/index.ts:1)
 - [`supabase/functions/send-push/index.ts`](C:/repos/chat2.0/supabase/functions/send-push/index.ts:1)
+- [`docs/ADMIN_ACCESS.md`](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1)
+- [`docs/WEATHER_WIDGET.md`](C:/repos/chat2.0/docs/WEATHER_WIDGET.md:1)
 
 ## Testing
 
 Run targeted unit coverage when possible:
 
 ```powershell
-npm test -- --runInBand
+npx jest --runInBand
 ```
 
 For stable UI debugging, prefer preview mode:
@@ -42,7 +48,7 @@ Use headed Playwright or inline Node scripts with the installed `playwright` pac
 
 - Keep the obsidian-and-gold design system consistent.
 - Avoid off-theme bright default accents.
-- Re-check mobile layouts after shell, DM, chat, or settings changes.
+- Re-check mobile layouts after shell, DM, chat, settings, active-user, or weather changes.
 
 ## Read Before Editing
 

@@ -29,8 +29,9 @@ message history.
 - [src/hooks/useNewsBadges.ts](C:/repos/chat2.0/src/hooks/useNewsBadges.ts:1): Sidebar/MobileNav badge count.
 - [src/hooks/useNewsAdmin.ts](C:/repos/chat2.0/src/hooks/useNewsAdmin.ts:1): admin source management.
 
-News source management lives in Settings under `News Sources`. It is shown only
-to app operators with the `admin` or `sub_admin` role.
+News source management lives in Settings > Admin > News Sources. It is shown
+only to app operators with the `admin` or `sub_admin` role. Full admins manage
+the sub-admin list from Settings > Admin > Admin Access.
 
 ## Backend Map
 
@@ -64,6 +65,9 @@ Realtime publication includes `news_feed_items`, `news_chat_messages`,
 `news_sources`, and `news_user_state`. The reaction detail tables are not
 published because their RPCs aggregate reaction state back onto the published
 parent rows.
+
+For the app-wide role model, see
+[docs/ADMIN_ACCESS.md](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1).
 
 ## Feed Lifecycle
 

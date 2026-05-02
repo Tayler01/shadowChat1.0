@@ -2,13 +2,15 @@
 
 ## Current Documentation Track
 
-Status: active on April 30, 2026
+Status: refreshed on May 2, 2026
 
 Deliverables:
 
 - refresh README and repo docs for the shipped News tab
 - document the Render News scraper deployment and troubleshooting path
 - document News setup, testing, production smoke, and link-preview secrets
+- document app-wide admin/sub-admin access, role badges, and admin subpages
+- document feedback review, active-user presence, and weather widget behavior
 - keep the ESP bridge plan intact as the bridge-specific source of truth
 
 Acceptance:
@@ -17,6 +19,9 @@ Acceptance:
   commands, and known Truth Social blocking risk from the repo docs
 - production handoff clearly separates Netlify, Supabase, and Render deployment
   responsibilities
+- GitHub Actions Netlify production deploy is treated as the default `main`
+  deployment path
+- private user settings such as weather location stay out of public profile rows
 
 ## Milestone 1: Manifest Foundation
 

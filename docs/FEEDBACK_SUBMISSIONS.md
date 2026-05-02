@@ -38,12 +38,13 @@ supabase db push --yes
 npm run lint
 npx tsc --noEmit -p tsconfig.app.json
 npm run build
-npx netlify deploy --prod
+git push origin main
 ```
 
-The Netlify deploy must happen after the Supabase migration so the production
-Settings UI can upload to the `feedback-attachments` bucket and insert
-`feedback_submissions` rows.
+The GitHub Actions Netlify production deploy runs on pushes to `main`. The
+Supabase migration must be applied before that production UI can upload to the
+`feedback-attachments` bucket, insert `feedback_submissions` rows, or let app
+operators review submitted attachments.
 
 ## End-To-End Validation
 

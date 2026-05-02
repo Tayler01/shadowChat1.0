@@ -30,7 +30,7 @@ React UI
 - [`src/components/dms`](C:/repos/chat2.0/src/components/dms): inbox and DM thread
 - [`src/components/news`](C:/repos/chat2.0/src/components/news): News Feed, News Chat, feed modal, and News reactions
 - [`src/components/profile`](C:/repos/chat2.0/src/components/profile): user profile experience
-- [`src/components/settings`](C:/repos/chat2.0/src/components/settings): settings and notification setup
+- [`src/components/settings`](C:/repos/chat2.0/src/components/settings): sectioned settings, notification setup, feedback, admin tools, and weather location
 - [`src/components/layout`](C:/repos/chat2.0/src/components/layout): shell, nav, and responsive structure
 
 ### Hooks
@@ -42,6 +42,9 @@ React UI
 - [`useNewsChat`](C:/repos/chat2.0/src/hooks/useNewsChat.tsx:1): News Chat fetch, realtime, send/edit/delete, reactions, and seen state
 - [`useNewsBadges`](C:/repos/chat2.0/src/hooks/useNewsBadges.ts:1): News unread/new-item badge counts
 - [`useNewsAdmin`](C:/repos/chat2.0/src/hooks/useNewsAdmin.ts:1): News source admin state and source upsert/toggle RPCs
+- [`useAdminAccess`](C:/repos/chat2.0/src/hooks/useAdminAccess.ts:1): full-admin/sub-admin access state and role updates
+- [`useWeatherPreference`](C:/repos/chat2.0/src/hooks/useWeatherPreference.ts:1): private per-user weather location load/save/clear
+- [`useWeatherForecast`](C:/repos/chat2.0/src/hooks/useWeatherForecast.ts:1): Open-Meteo forecast refresh for the header widget
 - [`usePushNotifications`](C:/repos/chat2.0/src/hooks/usePushNotifications.ts:1): push subscription UX
 - [`useTyping`](C:/repos/chat2.0/src/hooks/useTyping.ts:1): typing indicators
 - [`useTheme`](C:/repos/chat2.0/src/hooks/useTheme.tsx:1): design-system theme selection
@@ -52,6 +55,7 @@ React UI
 - [`auth.ts`](C:/repos/chat2.0/src/lib/auth.ts:1): auth API wrappers and profile bootstrap
 - [`push.ts`](C:/repos/chat2.0/src/lib/push.ts:1): browser push storage and dispatch wiring
 - [`ai.ts`](C:/repos/chat2.0/src/lib/ai.ts:1): authenticated AI function calls
+- [`weather.ts`](C:/repos/chat2.0/src/lib/weather.ts:1): Open-Meteo geocoding/forecast mapping and private weather preference helpers
 - [`utils.ts`](C:/repos/chat2.0/src/lib/utils.ts:1): shared formatting and UI helpers
 
 ## Backend Layers
@@ -69,6 +73,9 @@ Important domains:
 - isolated News sources, feed items, News Chat messages, News reactions, and News seen state
 - uploads and storage policies
 - user feedback submissions and private feedback attachments
+- app-wide admin/sub-admin roles, audit rows, and role-change notifications
+- foreground presence visibility and active-user state
+- private per-user weather preferences
 - push subscriptions and notification preferences
 - ESP bridge control-plane and update-manifest tables
 
@@ -99,6 +106,31 @@ connect the worker to a trusted remote browser through `PINCHTAB_CDP_URL` or
 
 Full runbook: [docs/NEWS_TAB_AND_SCRAPER.md](C:/repos/chat2.0/docs/NEWS_TAB_AND_SCRAPER.md:1).
 
+### Admin Access
+
+Admin access is an app-wide role domain. The single full `admin` can grant or
+revoke `sub_admin` access from Settings > Admin > Admin Access. Sub-admins can
+use operator tools, including News Sources and Feedback Review, but cannot
+manage roles.
+
+Role badges are intentionally public identity metadata. Full admins render with
+a gold shield and sub-admins render with a silver shield in chat/profile
+surfaces.
+
+Full runbook: [docs/ADMIN_ACCESS.md](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1).
+
+### Weather
+
+Weather is a client-side product surface backed by private Supabase preference
+rows. Users choose a location in Account & Profile settings; the General Chat
+header calls Open-Meteo directly for current conditions and forecast data.
+
+Weather preferences are not public profile data and are not in Supabase
+Realtime. The widget refreshes on preference changes and periodic forecast
+polling.
+
+Full runbook: [docs/WEATHER_WIDGET.md](C:/repos/chat2.0/docs/WEATHER_WIDGET.md:1).
+
 ### ESP Bridge
 
 The ESP bridge track supports an airgapped Windows PC through an ESP32-S3 data
@@ -125,6 +157,7 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 3. Local state updates optimistically
 4. Realtime subscription reconciles inserts and updates across clients
 5. Optional push fan-out can be triggered for group notifications
+6. Profile/role/presence decorations are joined or resolved from public user and presence state
 
 ### Direct Message
 
@@ -136,7 +169,7 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 
 ### News Feed
 
-1. News admin adds or enables a source in Settings
+1. App operator adds or enables a source in Settings > Admin > News Sources
 2. Render worker reads enabled `news_sources`
 3. Worker extracts normalized post snapshots and updates source health/cursor fields
 4. Current Eastern-day snapshots are inserted into `news_feed_items`
@@ -150,6 +183,23 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 3. `useNewsChat` receives realtime inserts/updates/deletes
 4. Link text is tokenized client-side and metadata is fetched through `link-preview`
 5. Reactions are toggled through `toggle_news_chat_reaction`
+
+### Active Presence
+
+1. Authenticated foreground clients call `update_user_last_active`
+2. `user_presence` stores a recent heartbeat for tracked users
+3. `users.presence_visibility = invisible` clears active presence and renders
+   invisible identity indicators
+4. `list_presence_states` and `get_active_users` feed app-wide dots and the
+   General Chat active-user popup
+
+### Weather Widget
+
+1. User saves a city/postal-code result from Account & Profile settings
+2. The selected row is upserted into `user_weather_preferences`
+3. General Chat loads the preference for the signed-in user
+4. The widget calls Open-Meteo forecast for current conditions and a short forecast
+5. The popup displays current temp, condition, humidity, wind, rain, and daily highs/lows
 
 ### Push Notification
 

@@ -2,12 +2,23 @@
 
 ## Current Repository Note
 
-- April 30, 2026 documentation refresh is in progress for the shipped News tab,
-  Render News scraper, link previews, production deployment, setup, and testing
-  runbooks.
+- May 2, 2026 documentation refresh is in progress for the shipped News tab,
+  Render News scraper, link previews, production deployment, setup, testing,
+  admin access, feedback review, realtime presence, and weather widget runbooks.
 - News is live as an isolated backend domain with `news_sources`,
   `news_feed_items`, `news_chat_messages`, News reactions, badge state, and
-  Settings-based `news_admin` source controls.
+  Settings > Admin > News Sources operator controls.
+- Admin access is app-wide: exactly one full `admin`, many `sub_admin`
+  operators, visible gold/silver role badges, audit rows, and one-time role
+  notices.
+- Presence is app-wide with tracked/invisible settings, `user_presence`
+  foreground heartbeats, status dots, and the General Chat active-user popup.
+- General Chat has a private per-user Open-Meteo weather widget backed by
+  `user_weather_preferences`.
+- Settings > Admin > Feedback Review gives app operators read-only access to
+  submitted bugs/suggestions and signed private attachment URLs.
+- Netlify production now deploys automatically from GitHub Actions on pushes to
+  `main`.
 - X scraping is running through the Render worker with per-source browser
   isolation. Truth Social remains a known hosted-worker blocking risk; use a
   trusted remote browser path such as PinchTab if Render remains blocked.
@@ -522,7 +533,7 @@ Milestone 9 validation passed:
 ```powershell
 npm run bridge:bundle:pack
 npm run bridge:bundle:pack
-npm test -- --runInBand tests/AppBadgeSync.test.tsx
+npx jest --runInBand tests/AppBadgeSync.test.tsx
 npm run bridge:tui:test
 npm run lint
 npx tsc --noEmit -p tsconfig.app.json

@@ -51,9 +51,15 @@ git commit -m "Describe the change"
 git push origin main
 ```
 
+Pushing `main` automatically starts the GitHub Actions workflow in
+[.github/workflows/netlify-production.yml](C:/repos/chat2.0/.github/workflows/netlify-production.yml:1).
+That workflow runs install, lint, typecheck, Netlify build, and Netlify
+production deploy.
+
 ## Netlify Production Deploy
 
-From the repo root:
+Manual CLI deploy is now a fallback path, not the normal production path. From
+the repo root:
 
 ```powershell
 npx netlify deploy --prod
@@ -63,6 +69,7 @@ This project already includes:
 
 - linked Netlify metadata under [`.netlify`](C:/repos/chat2.0/.netlify/state.json:1)
 - a production build command in [netlify.toml](C:/repos/chat2.0/netlify.toml:1)
+- GitHub Actions production deployment on every push to `main`
 
 ## Supabase Deployment Steps
 
@@ -75,7 +82,17 @@ supabase db push --yes
 Run schema deployment before publishing frontend changes that depend on new
 tables or buckets. For example, Settings feedback submissions require
 `public.feedback_submissions` and the private `feedback-attachments` Storage
-bucket before the production UI can submit reports.
+bucket before the production UI can submit reports, and the weather widget
+requires `public.user_weather_preferences` before users can save weather
+locations.
+
+Recent app-surface migrations to confirm in fresh projects:
+
+- `20260501233924_admin_roles_foundation.sql`: app-wide admin/sub-admin model.
+- `20260502020855_presence_visibility_active_users.sql`: tracked/invisible presence and active users.
+- `20260502034206_feedback_admin_review_access.sql`: operator feedback review access.
+- `20260502034941_feedback_review_read_policy_consolidation.sql`: consolidated feedback read policies.
+- `20260502042003_user_weather_preferences.sql`: private per-user weather location preferences.
 
 ### Edge Functions
 
@@ -191,8 +208,11 @@ After deploy, verify:
 9. Settings feedback can submit a bug or feature report with an image attachment after feedback schema changes
 10. News tab loads, switches between News Feed and News Chat, and badges clear after viewing
 11. News Chat sends, edits, deletes, reacts, and renders link previews
-12. Settings > News Sources shows source health for an `admin` or `sub_admin` account
+12. Settings > Admin > News Sources shows source health for an `admin` or `sub_admin` account
 13. Render worker has checked enabled sources since deploy and today's feed rows match current Eastern-day posts
+14. General Chat header shows active-user count, active-user popup, and weather widget without mobile overlap
+15. Settings > Account & Profile can save or clear a weather location
+16. Settings > Admin > Feedback Review lists submitted feedback for an app operator
 
 Recommended production smoke for local post-deploy validation:
 
@@ -231,6 +251,14 @@ The frontend deploy can be healthy while push still fails if:
 ### Realtime Looks Stale
 
 The frontend deploy can be healthy while realtime still fails if the target Supabase project is not on the latest migrations.
+
+### Weather Widget Is Empty
+
+The frontend deploy can be healthy while the weather widget still prompts for
+setup if the signed-in user has no saved weather location. If location save
+fails, confirm `20260502042003_user_weather_preferences.sql` has been applied
+and that the signed-in user has an authenticated session. Open-Meteo does not
+require a project secret for the current browser-side integration.
 
 ### News Feed Is Stale
 
