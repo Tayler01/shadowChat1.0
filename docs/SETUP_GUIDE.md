@@ -207,7 +207,7 @@ After setup, verify:
 7. New-account phone setup opens after signup or first sign-in from the same browser
 8. News tab loads
 9. News Chat sends and receives a message
-10. An `admin` or `sub_admin` user can add/pause a News source in Settings > Admin > News Sources
+10. An `admin` or `sub_admin` user can add, pause, enable, and delete a News source in Settings > Admin > News Sources
 11. If the scraper is configured, `news_sources.last_checked_at` updates after a worker cycle
 12. A full `admin` user can grant or remove sub-admin access from Settings > Admin > Admin Access
 13. Settings > Account & Profile can save and clear a weather location

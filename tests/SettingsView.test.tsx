@@ -4,6 +4,7 @@ import { SettingsView } from '../src/components/settings/SettingsView'
 
 const mockUpsertSource = jest.fn()
 const mockSetSourceEnabled = jest.fn()
+const mockDeleteSource = jest.fn()
 const mockRefreshNewsAdmin = jest.fn()
 const mockUpdateSubAdmin = jest.fn()
 const mockUseNewsAdmin = jest.fn(() => ({
@@ -34,6 +35,7 @@ const mockUseNewsAdmin = jest.fn(() => ({
   refresh: mockRefreshNewsAdmin,
   upsertSource: mockUpsertSource,
   setSourceEnabled: mockSetSourceEnabled,
+  deleteSource: mockDeleteSource,
 }))
 
 jest.mock('../src/hooks/useIsDesktop', () => ({
@@ -183,7 +185,12 @@ jest.mock('react-hot-toast', () => {
 })
 
 beforeEach(() => {
+  jest.clearAllMocks()
   window.sessionStorage.clear()
+})
+
+afterEach(() => {
+  jest.restoreAllMocks()
 })
 
 test('settings renders section hub and opens account profile detail', () => {
@@ -212,7 +219,7 @@ test('settings opens account profile from requested weather settings section', (
   expect(window.sessionStorage.getItem('shadowchat:settings-section')).toBeNull()
 })
 
-test('settings admin panel manages news sources', () => {
+test('settings admin panel manages news sources', async () => {
   render(<SettingsView onToggleSidebar={jest.fn()} />)
 
   fireEvent.click(screen.getByRole('button', { name: /admin/i }))
@@ -238,13 +245,29 @@ test('settings admin panel manages news sources', () => {
   fireEvent.change(screen.getByLabelText(/handle/i), { target: { value: 'ShadoNews' } })
   fireEvent.click(screen.getByRole('button', { name: /save/i }))
 
-  return waitFor(() => {
+  await waitFor(() => {
     expect(mockUpsertSource).toHaveBeenCalledWith({
       platform: 'x',
       handle: 'ShadoNews',
       displayName: undefined,
       profileUrl: undefined,
     })
+  })
+})
+
+test('settings admin panel deletes news tracker accounts after confirmation', async () => {
+  jest.spyOn(window, 'confirm').mockReturnValueOnce(true)
+  mockDeleteSource.mockResolvedValueOnce(undefined)
+
+  render(<SettingsView onToggleSidebar={jest.fn()} />)
+
+  fireEvent.click(screen.getByRole('button', { name: /admin/i }))
+  fireEvent.click(screen.getByRole('button', { name: /news sources/i }))
+  fireEvent.click(screen.getByRole('button', { name: /delete openai from news tracker/i }))
+
+  expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Delete OpenAI from the news tracker'))
+  await waitFor(() => {
+    expect(mockDeleteSource).toHaveBeenCalledWith('source-1')
   })
 })
 

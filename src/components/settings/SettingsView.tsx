@@ -315,6 +315,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
     refresh: refreshNewsAdmin,
     upsertSource,
     setSourceEnabled,
+    deleteSource,
   } = useNewsAdmin()
   const { canInstall, promptInstall } = usePwaInstallPrompt()
   const { enabled: suggestionsEnabled, setEnabled: setSuggestionsEnabled } = useSuggestionsEnabled()
@@ -535,6 +536,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
     } catch (err) {
       console.error(err)
       toast.error(err instanceof Error ? err.message : 'Failed to update news source')
+    }
+  }
+
+  const handleDeleteNewsSource = async (sourceId: string, label: string) => {
+    const confirmed = window.confirm(`Delete ${label} from the news tracker? Existing feed items will stay, but this account will no longer be tracked.`)
+    if (!confirmed) return
+
+    try {
+      await deleteSource(sourceId)
+      toast.success('News source deleted')
+    } catch (err) {
+      console.error(err)
+      toast.error(err instanceof Error ? err.message : 'Failed to delete news source')
     }
   }
 
@@ -1077,7 +1091,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
                 newsSources.map(source => (
                   <div
                     key={source.id}
-                    className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 lg:grid-cols-[1fr_auto_auto] lg:items-center"
+                    className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 lg:grid-cols-[1fr_auto_auto_auto] lg:items-center"
                   >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
@@ -1116,6 +1130,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
                     >
                       <Power className="mr-2 h-4 w-4" />
                       {source.enabled ? 'Pause' : 'Enable'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      onClick={() => void handleDeleteNewsSource(
+                        source.id,
+                        source.display_name || `@${source.normalized_handle || source.handle}`
+                      )}
+                      disabled={newsAdminSaving}
+                      className="w-full justify-center lg:w-auto"
+                      aria-label={`Delete ${source.display_name || source.handle} from news tracker`}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Delete
                     </Button>
                   </div>
                 ))

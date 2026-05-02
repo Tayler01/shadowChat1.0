@@ -30,8 +30,9 @@ message history.
 - [src/hooks/useNewsAdmin.ts](C:/repos/chat2.0/src/hooks/useNewsAdmin.ts:1): admin source management.
 
 News source management lives in Settings > Admin > News Sources. It is shown
-only to app operators with the `admin` or `sub_admin` role. Full admins manage
-the sub-admin list from Settings > Admin > Admin Access.
+only to app operators with the `admin` or `sub_admin` role. Operators can add,
+pause, re-enable, and delete tracked accounts from the scraper list. Full admins
+manage the sub-admin list from Settings > Admin > Admin Access.
 
 ## Backend Map
 

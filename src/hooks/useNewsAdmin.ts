@@ -86,6 +86,26 @@ export function useNewsAdmin() {
     }
   }, [fetchAdminState])
 
+  const deleteSource = useCallback(async (sourceId: string) => {
+    setSaving(true)
+    try {
+      const workingClient = await getWorkingClient()
+      const { error: deleteError } = await workingClient
+        .from('news_sources')
+        .delete()
+        .eq('id', sourceId)
+
+      if (deleteError) throw deleteError
+      setSources(current => current.filter(source => source.id !== sourceId))
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to delete news source')
+      throw err
+    } finally {
+      setSaving(false)
+    }
+  }, [])
+
   return {
     isAdmin,
     sources,
@@ -95,5 +115,6 @@ export function useNewsAdmin() {
     refresh: fetchAdminState,
     upsertSource,
     setSourceEnabled,
+    deleteSource,
   }
 }
