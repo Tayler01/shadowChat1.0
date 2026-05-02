@@ -163,6 +163,10 @@ jest.mock('../src/components/settings/FeedbackSubmissionModal', () => ({
   FeedbackSubmissionModal: () => null,
 }))
 
+jest.mock('../src/components/settings/AdminFeedbackReview', () => ({
+  AdminFeedbackReview: () => <div data-testid="admin-feedback-review">Feedback review panel</div>,
+}))
+
 jest.mock('../src/components/onboarding/PhoneInstallGuide', () => ({
   PhoneInstallGuide: () => null,
 }))
@@ -199,6 +203,7 @@ test('settings admin panel manages news sources', () => {
   expect(screen.getByRole('button', { name: /admin access/i })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /esp bridge pairing/i })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /news sources/i })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /feedback review/i })).toBeInTheDocument()
   expect(screen.queryByText('shadow@example.com')).not.toBeInTheDocument()
 
   fireEvent.click(screen.getByRole('button', { name: /admin access/i }))
@@ -223,4 +228,13 @@ test('settings admin panel manages news sources', () => {
       profileUrl: undefined,
     })
   })
+})
+
+test('settings admin panel opens feedback review', () => {
+  render(<SettingsView onToggleSidebar={jest.fn()} />)
+
+  fireEvent.click(screen.getByRole('button', { name: /admin/i }))
+  fireEvent.click(screen.getByRole('button', { name: /feedback review/i }))
+
+  expect(screen.getByTestId('admin-feedback-review')).toBeInTheDocument()
 })

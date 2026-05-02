@@ -21,8 +21,13 @@ ShadowChat users can submit bug reports and feature ideas from Settings.
 - Attachment limit: 5 images per submission, 10 MB per image
 
 Rows are scoped to the submitting user with Row Level Security. Users can insert
-and read their own submissions. Admin review, admin notifications, and cross-user
-review access are intentionally deferred until the admin tooling is built.
+and read their own submissions. App operators can now read all submissions from
+**Settings > Admin > Feedback Review**. The attachment bucket stays private;
+operators receive short-lived signed URLs after the storage `SELECT` policy
+confirms their admin-class access.
+
+Admin review is currently read-only. Status editing, assignment, notifications,
+and moderation workflows are intentionally deferred.
 
 ## Deployment
 
@@ -50,7 +55,9 @@ For any change to this flow, verify all of the following:
 4. Query `public.feedback_submissions` as the same user and confirm the title,
    type, description, and attachment metadata.
 5. Download the attachment from `feedback-attachments` as the same user.
-6. Run the Settings smoke scenario or the full smoke suite.
+6. Open **Settings > Admin > Feedback Review** as an app operator and confirm the
+   row appears with its signed image attachment.
+7. Run the Settings smoke scenario or the full smoke suite.
 
 The April 28, 2026 release was verified with:
 

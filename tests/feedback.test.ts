@@ -1,14 +1,22 @@
 import {
+  FEEDBACK_ATTACHMENT_SIGNED_URL_SECONDS,
   FEEDBACK_ATTACHMENTS_BUCKET,
+  fetchAdminFeedbackSubmissions,
   submitFeedback,
   validateFeedbackSubmission,
 } from '../src/lib/feedback'
 
 const upload = jest.fn()
 const remove = jest.fn()
+const createSignedUrls = jest.fn()
 const insert = jest.fn()
 const select = jest.fn()
 const single = jest.fn()
+const selectFeedback = jest.fn()
+const orderFeedback = jest.fn()
+const limitFeedback = jest.fn()
+const selectUsers = jest.fn()
+const inUsers = jest.fn()
 const getUser = jest.fn()
 
 jest.mock('../src/lib/supabase', () => ({
@@ -20,11 +28,21 @@ jest.mock('../src/lib/supabase', () => ({
       from: jest.fn(() => ({
         upload,
         remove,
+        createSignedUrls,
       })),
     },
-    from: jest.fn(() => ({
-      insert,
-    })),
+    from: jest.fn((table: string) => {
+      if (table === 'users') {
+        return {
+          select: selectUsers,
+        }
+      }
+
+      return {
+        insert,
+        select: selectFeedback,
+      }
+    }),
   })),
 }))
 
@@ -35,6 +53,12 @@ beforeEach(() => {
   single.mockResolvedValue({ data: { id: 'feedback-id' }, error: null })
   select.mockReturnValue({ single })
   insert.mockReturnValue({ select })
+  limitFeedback.mockResolvedValue({ data: [], error: null })
+  orderFeedback.mockReturnValue({ limit: limitFeedback })
+  selectFeedback.mockReturnValue({ order: orderFeedback })
+  inUsers.mockResolvedValue({ data: [], error: null })
+  selectUsers.mockReturnValue({ in: inUsers })
+  createSignedUrls.mockResolvedValue({ data: [], error: null })
   getUser.mockResolvedValue({ data: { user: { id: 'user-id' } }, error: null })
 })
 
@@ -107,4 +131,75 @@ test('cleans up uploaded images when the database insert fails', async () => {
   ).rejects.toThrow('insert failed')
 
   expect(remove).toHaveBeenCalledWith([expect.stringMatching(/^user-id\/.+\/1-.+-broken\.png$/)])
+})
+
+test('loads admin feedback submissions with signed private attachment URLs', async () => {
+  limitFeedback.mockResolvedValueOnce({
+    data: [
+      {
+        id: 'feedback-1',
+        user_id: 'user-id',
+        submission_type: 'bug',
+        title: 'Broken image upload',
+        description: 'Image uploads sometimes fail on mobile.',
+        attachments: [
+          {
+            bucket: FEEDBACK_ATTACHMENTS_BUCKET,
+            path: 'user-id/feedback-1/1-upload.png',
+            name: 'upload.png',
+            size: 1200,
+            type: 'image/png',
+          },
+        ],
+        status: 'new',
+        user_agent: 'Test Browser',
+        created_at: '2026-05-01T12:00:00.000Z',
+        updated_at: '2026-05-01T12:00:00.000Z',
+      },
+    ],
+    error: null,
+  })
+  inUsers.mockResolvedValueOnce({
+    data: [
+      {
+        id: 'user-id',
+        username: 'caleb',
+        display_name: 'Caleb',
+        avatar_url: null,
+        color: '#d7aa46',
+        status: 'online',
+        admin_role: 'admin',
+        presence_visibility: 'tracked',
+      },
+    ],
+    error: null,
+  })
+  createSignedUrls.mockResolvedValueOnce({
+    data: [
+      {
+        path: 'user-id/feedback-1/1-upload.png',
+        signedUrl: 'https://example.test/signed-upload.png',
+      },
+    ],
+    error: null,
+  })
+
+  const submissions = await fetchAdminFeedbackSubmissions()
+
+  expect(limitFeedback).toHaveBeenCalledWith(100)
+  expect(inUsers).toHaveBeenCalledWith('id', ['user-id'])
+  expect(createSignedUrls).toHaveBeenCalledWith(
+    ['user-id/feedback-1/1-upload.png'],
+    FEEDBACK_ATTACHMENT_SIGNED_URL_SECONDS
+  )
+  expect(submissions[0]).toEqual(expect.objectContaining({
+    title: 'Broken image upload',
+    user: expect.objectContaining({ username: 'caleb' }),
+    attachments: [
+      expect.objectContaining({
+        name: 'upload.png',
+        signedUrl: 'https://example.test/signed-upload.png',
+      }),
+    ],
+  }))
 })

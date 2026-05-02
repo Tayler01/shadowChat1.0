@@ -36,6 +36,7 @@ import { approveBridgePairing } from '../../lib/bridge'
 import { NotificationSetupModal } from './NotificationSetupModal'
 import { PhoneInstallGuide } from '../onboarding/PhoneInstallGuide'
 import { FeedbackSubmissionModal } from './FeedbackSubmissionModal'
+import { AdminFeedbackReview } from './AdminFeedbackReview'
 import { ProfileView } from '../profile/ProfileView'
 import { useNewsAdmin } from '../../hooks/useNewsAdmin'
 import { useAdminAccess } from '../../hooks/useAdminAccess'
@@ -63,7 +64,7 @@ type SettingsSection = {
   icon: React.ComponentType<{ className?: string }>
 }
 
-type AdminSectionId = 'access' | 'bridge-pairing' | 'news-sources'
+type AdminSectionId = 'access' | 'bridge-pairing' | 'news-sources' | 'feedback-review'
 
 type AdminSection = {
   id: AdminSectionId
@@ -143,6 +144,12 @@ const adminSections: AdminSection[] = [
     title: 'News Sources',
     description: 'Manage tracked X and Truth accounts for the Today Board.',
     icon: Newspaper,
+  },
+  {
+    id: 'feedback-review',
+    title: 'Feedback Review',
+    description: 'View submitted bugs, suggestions, descriptions, and images.',
+    icon: MessageSquarePlus,
   },
 ]
 
@@ -843,6 +850,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
       return lastBridgeDeviceId ? 'Recently approved' : 'Pair device'
     }
 
+    if (sectionId === 'feedback-review') {
+      return 'Bugs & ideas'
+    }
+
     if (newsAdminLoading) {
       return 'Loading sources'
     }
@@ -882,7 +893,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
             </span>
           </div>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {visibleAdminSections.map(adminSection => (
               <button
                 key={adminSection.id}
@@ -1091,6 +1102,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
       </div>
   )
 
+  const renderFeedbackReviewPanel = () => (
+    <AdminFeedbackReview />
+  )
+
   const renderAdmin = () => {
     if (!activeAdminSection) {
       return renderAdminHub()
@@ -1104,6 +1119,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
       access: renderAdminAccessPanel,
       'bridge-pairing': renderBridgePairingPanel,
       'news-sources': renderNewsSourcesPanel,
+      'feedback-review': renderFeedbackReviewPanel,
     }[activeAdminSection]()
 
     return (

@@ -1,10 +1,12 @@
-import { getWorkingClient } from './supabase'
+import { getWorkingClient, type User } from './supabase'
 
 export const FEEDBACK_ATTACHMENTS_BUCKET = 'feedback-attachments'
 export const MAX_FEEDBACK_ATTACHMENTS = 5
 export const MAX_FEEDBACK_ATTACHMENT_BYTES = 10 * 1024 * 1024
+export const FEEDBACK_ATTACHMENT_SIGNED_URL_SECONDS = 30 * 60
 
 export type FeedbackSubmissionType = 'bug' | 'feature'
+export type FeedbackSubmissionStatus = 'new' | 'reviewing' | 'planned' | 'closed'
 
 export interface FeedbackAttachmentRecord {
   bucket: typeof FEEDBACK_ATTACHMENTS_BUCKET
@@ -24,6 +26,41 @@ export interface FeedbackSubmissionInput {
 export interface FeedbackSubmissionResult {
   id: string
   attachments: FeedbackAttachmentRecord[]
+}
+
+export interface AdminFeedbackAttachmentRecord extends FeedbackAttachmentRecord {
+  signedUrl?: string
+  signedUrlError?: string
+}
+
+export type FeedbackSubmitter = Pick<
+  User,
+  | 'id'
+  | 'username'
+  | 'display_name'
+  | 'avatar_url'
+  | 'color'
+  | 'status'
+  | 'admin_role'
+  | 'presence_visibility'
+>
+
+export interface AdminFeedbackSubmission {
+  id: string
+  user_id: string
+  submission_type: FeedbackSubmissionType
+  title: string
+  description: string
+  attachments: AdminFeedbackAttachmentRecord[]
+  status: FeedbackSubmissionStatus
+  user_agent?: string | null
+  created_at: string
+  updated_at: string
+  user?: FeedbackSubmitter | null
+}
+
+type FeedbackSubmissionRow = Omit<AdminFeedbackSubmission, 'attachments' | 'user'> & {
+  attachments: unknown
 }
 
 const titleMinLength = 3
@@ -54,6 +91,100 @@ const sanitizeFileName = (name: string) => {
     .slice(0, 80)
 
   return safeName || 'attachment'
+}
+
+const isFeedbackAttachmentRecord = (value: unknown): value is FeedbackAttachmentRecord => {
+  if (!value || typeof value !== 'object') return false
+
+  const attachment = value as Partial<FeedbackAttachmentRecord>
+  return (
+    attachment.bucket === FEEDBACK_ATTACHMENTS_BUCKET &&
+    typeof attachment.path === 'string' &&
+    attachment.path.length > 0 &&
+    typeof attachment.name === 'string' &&
+    typeof attachment.size === 'number' &&
+    typeof attachment.type === 'string'
+  )
+}
+
+const normalizeFeedbackAttachments = (attachments: unknown): FeedbackAttachmentRecord[] => {
+  if (!Array.isArray(attachments)) return []
+
+  return attachments.filter(isFeedbackAttachmentRecord)
+}
+
+const signFeedbackAttachments = async (
+  workingClient: Awaited<ReturnType<typeof getWorkingClient>>,
+  attachments: FeedbackAttachmentRecord[]
+): Promise<AdminFeedbackAttachmentRecord[]> => {
+  if (attachments.length === 0) return []
+
+  const paths = attachments.map(attachment => attachment.path)
+  const signedUrlResult = await workingClient.storage
+    .from(FEEDBACK_ATTACHMENTS_BUCKET)
+    .createSignedUrls(paths, FEEDBACK_ATTACHMENT_SIGNED_URL_SECONDS)
+
+  if (signedUrlResult.error) {
+    return attachments.map(attachment => ({
+      ...attachment,
+      signedUrlError: signedUrlResult.error.message,
+    }))
+  }
+
+  const signedUrlsByPath = new Map<string, string>()
+  ;(signedUrlResult.data ?? []).forEach((signedUrlRecord: any) => {
+    const path = signedUrlRecord.path || signedUrlRecord.name
+    const signedUrl = signedUrlRecord.signedUrl || signedUrlRecord.signedURL
+    if (path && signedUrl) {
+      signedUrlsByPath.set(path, signedUrl)
+    }
+  })
+
+  return attachments.map(attachment => ({
+    ...attachment,
+    signedUrl: signedUrlsByPath.get(attachment.path),
+  }))
+}
+
+export const fetchAdminFeedbackSubmissions = async (): Promise<AdminFeedbackSubmission[]> => {
+  const workingClient = await getWorkingClient()
+  const { data: feedbackRows, error: feedbackError } = await workingClient
+    .from('feedback_submissions')
+    .select('id, user_id, submission_type, title, description, attachments, status, user_agent, created_at, updated_at')
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  if (feedbackError) {
+    throw feedbackError
+  }
+
+  const rows = (feedbackRows ?? []) as FeedbackSubmissionRow[]
+  const submitterIds = Array.from(new Set(rows.map(row => row.user_id).filter(Boolean)))
+  const submittersById = new Map<string, FeedbackSubmitter>()
+
+  if (submitterIds.length > 0) {
+    const { data: submitters, error: submittersError } = await workingClient
+      .from('users')
+      .select('id, username, display_name, avatar_url, color, status, admin_role, presence_visibility')
+      .in('id', submitterIds)
+
+    if (submittersError) {
+      throw submittersError
+    }
+
+    ;((submitters ?? []) as FeedbackSubmitter[]).forEach(submitter => {
+      submittersById.set(submitter.id, submitter)
+    })
+  }
+
+  return Promise.all(rows.map(async row => ({
+    ...row,
+    attachments: await signFeedbackAttachments(
+      workingClient,
+      normalizeFeedbackAttachments(row.attachments)
+    ),
+    user: submittersById.get(row.user_id) ?? null,
+  })))
 }
 
 export const buildFeedbackAttachmentPath = (
