@@ -86,7 +86,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
                 <img
                   src="/icons/header-logo.png"
                   alt="SHADO"
-                  className="h-full w-full origin-left scale-[1.3] object-contain object-left"
+                  className="h-full w-full origin-left -translate-x-1 scale-[1.6] object-contain object-left"
                 />
               </span>
               <div className="min-w-0">
