@@ -2,7 +2,6 @@ import React from 'react'
 import { Copy, ExternalLink, Play, Share2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Button } from '../ui/Button'
-import { NewsReactionBar } from './NewsReactionBar'
 import { formatTime } from '../../lib/utils'
 import type { NewsFeedItem } from '../../lib/supabase'
 
@@ -12,11 +11,9 @@ const getSourceLabel = (item: NewsFeedItem) =>
 export function NewsFeedModal({
   item,
   onClose,
-  onReact,
 }: {
   item: NewsFeedItem | null
   onClose: () => void
-  onReact: (itemId: string, emoji: string) => void | Promise<void>
 }) {
   if (!item) return null
 
@@ -100,12 +97,6 @@ export function NewsFeedModal({
                   {item.body_text}
                 </p>
               )}
-              <div className="mt-6">
-                <NewsReactionBar
-                  reactions={item.reactions}
-                  onReact={emoji => onReact(item.id, emoji)}
-                />
-              </div>
             </article>
 
             <aside className="min-w-0 space-y-4">

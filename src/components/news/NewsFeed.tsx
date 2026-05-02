@@ -72,7 +72,6 @@ export function NewsFeed() {
       <NewsFeedModal
         item={openItem}
         onClose={() => setOpenItem(null)}
-        onReact={handleReaction}
       />
     </div>
   )
