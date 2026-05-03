@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
 import type { UserReadCursor } from '../lib/readCursors'
 
 const READ_SETTLE_MS = 220
@@ -53,12 +53,18 @@ export function useUnreadScroll<TMessage>({
   onBeforeInitialJump,
   onMarkReadToLatest,
 }: UseUnreadScrollOptions<TMessage>) {
-  const [autoScroll, setAutoScroll] = useState(true)
+  const [autoScroll, setAutoScrollState] = useState(true)
   const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(null)
+  const autoScrollRef = useRef(true)
   const initialUnreadJumpDoneRef = useRef(false)
   const lastMarkedKeyRef = useRef<string | null>(null)
   const readInFlightKeyRef = useRef<string | null>(null)
   const markTimerRef = useRef<number | null>(null)
+
+  const setAutoScroll = useCallback((value: boolean) => {
+    autoScrollRef.current = value
+    setAutoScrollState(value)
+  }, [])
 
   const findFirstUnreadMessage = useCallback(() => {
     const explicitUnread = getUnreadMessages?.(messages)
@@ -133,7 +139,7 @@ export function useUnreadScroll<TMessage>({
     setAutoScroll(true)
     setFirstUnreadMessageId(null)
     scheduleMarkLatestRead(true)
-  }, [containerRef, scheduleMarkLatestRead])
+  }, [containerRef, scheduleMarkLatestRead, setAutoScroll])
 
   const handleScroll = useCallback(() => {
     const container = containerRef.current
@@ -148,7 +154,7 @@ export function useUnreadScroll<TMessage>({
     }
 
     return atBottom
-  }, [containerRef, scheduleMarkLatestRead])
+  }, [containerRef, scheduleMarkLatestRead, setAutoScroll])
 
   useEffect(() => {
     initialUnreadJumpDoneRef.current = false
@@ -156,9 +162,9 @@ export function useUnreadScroll<TMessage>({
     readInFlightKeyRef.current = null
     setFirstUnreadMessageId(null)
     setAutoScroll(true)
-  }, [surfaceKey])
+  }, [setAutoScroll, surfaceKey])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     return () => {
       if (markTimerRef.current) {
         window.clearTimeout(markTimerRef.current)
@@ -167,6 +173,47 @@ export function useUnreadScroll<TMessage>({
   }, [])
 
   useEffect(() => {
+    const container = containerRef.current
+    if (
+      !enabled ||
+      loading ||
+      !container ||
+      typeof ResizeObserver === 'undefined'
+    ) {
+      return
+    }
+
+    let frameId: number | null = null
+    const followLatest = () => {
+      if (!autoScrollRef.current) return
+
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId)
+      }
+
+      frameId = requestAnimationFrame(() => {
+        frameId = null
+        if (autoScrollRef.current) {
+          scrollToBottom('auto')
+        }
+      })
+    }
+
+    const observer = new ResizeObserver(followLatest)
+    observer.observe(container)
+    if (container.firstElementChild instanceof Element) {
+      observer.observe(container.firstElementChild)
+    }
+
+    return () => {
+      observer.disconnect()
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId)
+      }
+    }
+  }, [containerRef, enabled, loading, messages.length, scrollToBottom])
+
+  useLayoutEffect(() => {
     if (
       !enabled ||
       loading ||
@@ -233,9 +280,10 @@ export function useUnreadScroll<TMessage>({
     onBeforeInitialJump,
     scheduleMarkLatestRead,
     scrollToBottom,
+    setAutoScroll,
   ])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (
       !enabled ||
       loading ||
@@ -247,9 +295,7 @@ export function useUnreadScroll<TMessage>({
     }
 
     if (autoScroll) {
-      requestAnimationFrame(() => {
-        scrollToBottom('auto')
-      })
+      scrollToBottom('auto')
       return
     }
 
