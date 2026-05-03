@@ -24,12 +24,16 @@ describe('BoardBubbleMap', () => {
     const chat = screen.getByRole('button', { name: /open news chat/i })
 
     expect(feed).toHaveClass('rounded-full')
+    expect(feed).toHaveAttribute('data-board-shape', 'pill')
+    expect(feed).toHaveClass('overflow-hidden')
     expect(Number.parseFloat(feed.style.width)).toBeGreaterThan(Number.parseFloat(feed.style.height))
 
     expect(staticBoard).toHaveClass('rounded-[var(--radius-sm)]')
+    expect(staticBoard).toHaveAttribute('data-board-shape', 'square')
     expect(Number.parseFloat(staticBoard.style.width)).toBe(Number.parseFloat(staticBoard.style.height))
 
     expect(chat).toHaveClass('rounded-full')
+    expect(chat).toHaveAttribute('data-board-shape', 'circle')
     expect(Number.parseFloat(chat.style.width)).toBe(Number.parseFloat(chat.style.height))
   })
 })
