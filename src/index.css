@@ -211,7 +211,7 @@ html, body, #root {
 
 @media (max-width: 767px) {
   .app-viewport {
-    height: var(--shadowchat-visual-viewport-height, 100dvh);
+    height: var(--shadowchat-app-height, var(--shadowchat-visual-viewport-height, 100dvh));
   }
 }
 

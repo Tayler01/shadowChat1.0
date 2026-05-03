@@ -534,7 +534,7 @@ describe('DirectMessagesView user search', () => {
     );
 
     expect(screen.getByTestId('dm-message-scroll')).toHaveClass(
-      'pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_0.75rem)]'
+      'pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.75rem)]'
     );
     expect(screen.getByTestId('dm-message-stack')).toHaveClass('min-h-full', 'justify-end');
     expect(screen.getByText('hello from a sparse thread')).toBeInTheDocument();

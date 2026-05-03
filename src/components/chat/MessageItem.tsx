@@ -284,7 +284,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
               <textarea
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
-                className="obsidian-input w-full resize-none rounded-[var(--radius-md)] p-3"
+                className="obsidian-input w-full resize-none rounded-[var(--radius-md)] p-3 text-base md:text-sm"
                 rows={2}
               />
               <div className="flex space-x-2">

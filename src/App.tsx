@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react'
+import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { AuthGuard } from './components/auth/AuthGuard'
 import { Sidebar } from './components/layout/Sidebar'
@@ -16,6 +16,7 @@ import { PhoneInstallOnboarding } from './components/onboarding/PhoneInstallOnbo
 import { useSessionResumeRecovery } from './hooks/useSessionResumeRecovery'
 import { useAdminRoleNotifications } from './hooks/useAdminRoleNotifications'
 import { useChannelBanExpirySweep } from './hooks/useChannelBanExpirySweep'
+import { computeMobileViewportState } from './lib/mobileViewport'
 
 const DirectMessagesView = lazy(() =>
   import('./components/dms/DirectMessagesView').then(module => ({
@@ -95,6 +96,7 @@ function App() {
   const [boardsResetKey, setBoardsResetKey] = useState(0)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const isDesktop = useIsDesktop()
+  const mobileAppHeightRef = useRef<number | null>(null)
   const [dmTarget, setDmTarget] = useState<string | null>(() => getInitialLocationState().conversation)
   const [messageTarget, setMessageTarget] = useState<string | null>(() => getInitialLocationState().message)
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -122,32 +124,88 @@ function App() {
     if (typeof window === 'undefined' || isDesktop) return
 
     const root = document.documentElement
+    const nav = window.navigator as Navigator & { standalone?: boolean }
+    const isIOS =
+      /iPad|iPhone|iPod/.test(nav.userAgent) ||
+      (nav.platform === 'MacIntel' && nav.maxTouchPoints > 1)
+    let frameId: number | null = null
+    let settleTimerIds: number[] = []
 
-    const updateToastViewport = () => {
-      const viewport = window.visualViewport
-      const viewportHeight = viewport?.height ?? window.innerHeight
-      const viewportOffsetTop = viewport?.offsetTop ?? 0
-      const keyboardInset = Math.max(0, window.innerHeight - viewportHeight - viewportOffsetTop)
-      const keyboardOpen = viewportHeight < window.innerHeight - 120
-      const topRem = keyboardOpen ? 0.75 : 4.5
-      const topSpacePx = viewportOffsetTop + topRem * 16
-
-      root.style.setProperty('--shadowchat-visual-viewport-height', `${viewportHeight}px`)
-      root.style.setProperty('--shadowchat-keyboard-inset', `${keyboardInset}px`)
-      root.style.setProperty('--shadowchat-toast-top', `calc(${viewportOffsetTop}px + env(safe-area-inset-top) + ${topRem}rem)`)
-      root.style.setProperty('--shadowchat-toast-top-space', `${topSpacePx}px`)
+    const isEditableFocused = () => {
+      const activeElement = document.activeElement
+      return (
+        activeElement instanceof HTMLInputElement ||
+        activeElement instanceof HTMLTextAreaElement ||
+        (activeElement instanceof HTMLElement && activeElement.isContentEditable)
+      )
     }
 
-    updateToastViewport()
-    window.visualViewport?.addEventListener('resize', updateToastViewport)
-    window.visualViewport?.addEventListener('scroll', updateToastViewport)
-    window.addEventListener('resize', updateToastViewport)
+    const updateMobileViewport = () => {
+      const viewport = window.visualViewport
+      const layoutHeight = window.innerHeight
+      const viewportHeight = viewport?.height ?? window.innerHeight
+      const viewportOffsetTop = viewport?.offsetTop ?? 0
+      const viewportState = computeMobileViewportState({
+        layoutHeight,
+        visualViewportHeight: viewportHeight,
+        visualViewportOffsetTop: viewportOffsetTop,
+        isIOS,
+        editableFocused: isEditableFocused(),
+        previousStableAppHeight: mobileAppHeightRef.current,
+      })
+      mobileAppHeightRef.current = viewportState.stableAppHeight
+
+      root.style.setProperty('--shadowchat-app-height', `${viewportState.appHeight}px`)
+      root.style.setProperty('--shadowchat-visual-viewport-height', `${viewportState.visualViewportHeight}px`)
+      root.style.setProperty('--shadowchat-keyboard-inset', `${viewportState.keyboardInset}px`)
+      root.style.setProperty('--shadowchat-toast-top', `calc(${viewportOffsetTop}px + env(safe-area-inset-top) + ${viewportState.toastTopRem}rem)`)
+      root.style.setProperty('--shadowchat-toast-top-space', `${viewportState.toastTopSpacePx}px`)
+    }
+
+    const scheduleMobileViewportUpdate = () => {
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId)
+      }
+      settleTimerIds.forEach(timerId => window.clearTimeout(timerId))
+      settleTimerIds = []
+
+      frameId = requestAnimationFrame(() => {
+        frameId = null
+        updateMobileViewport()
+        settleTimerIds = [80, 180, 320].map(delay =>
+          window.setTimeout(updateMobileViewport, delay)
+        )
+      })
+    }
+
+    scheduleMobileViewportUpdate()
+    const handleOrientationChange = () => {
+      mobileAppHeightRef.current = null
+      scheduleMobileViewportUpdate()
+    }
+
+    window.visualViewport?.addEventListener('resize', scheduleMobileViewportUpdate)
+    window.visualViewport?.addEventListener('scroll', scheduleMobileViewportUpdate)
+    window.addEventListener('resize', scheduleMobileViewportUpdate)
+    window.addEventListener('orientationchange', handleOrientationChange)
+    window.addEventListener('focusin', scheduleMobileViewportUpdate)
+    window.addEventListener('focusout', scheduleMobileViewportUpdate)
+    window.addEventListener('pageshow', scheduleMobileViewportUpdate)
 
     return () => {
-      window.visualViewport?.removeEventListener('resize', updateToastViewport)
-      window.visualViewport?.removeEventListener('scroll', updateToastViewport)
-      window.removeEventListener('resize', updateToastViewport)
+      window.visualViewport?.removeEventListener('resize', scheduleMobileViewportUpdate)
+      window.visualViewport?.removeEventListener('scroll', scheduleMobileViewportUpdate)
+      window.removeEventListener('resize', scheduleMobileViewportUpdate)
+      window.removeEventListener('orientationchange', handleOrientationChange)
+      window.removeEventListener('focusin', scheduleMobileViewportUpdate)
+      window.removeEventListener('focusout', scheduleMobileViewportUpdate)
+      window.removeEventListener('pageshow', scheduleMobileViewportUpdate)
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId)
+      }
+      settleTimerIds.forEach(timerId => window.clearTimeout(timerId))
       root.style.removeProperty('--shadowchat-visual-viewport-height')
+      root.style.removeProperty('--shadowchat-app-height')
       root.style.removeProperty('--shadowchat-keyboard-inset')
       root.style.removeProperty('--shadowchat-toast-top')
       root.style.removeProperty('--shadowchat-toast-top-space')

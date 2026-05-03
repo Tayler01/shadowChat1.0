@@ -102,6 +102,12 @@ test('restores meaningful composer drafts', () => {
   expect(screen.getByRole('textbox')).toHaveValue('partial message')
 })
 
+test('uses a 16px mobile textarea to avoid iOS focus zoom', () => {
+  render(<MessageInput onSendMessage={() => {}} />)
+
+  expect(screen.getByRole('textbox')).toHaveClass('text-base', 'md:text-sm')
+})
+
 test('shows an error and keeps reply state when uploaded image send resolves to null', async () => {
   uploadChatFile.mockResolvedValueOnce('https://example.com/file.png')
   const onSendMessage = jest.fn().mockResolvedValue(null)

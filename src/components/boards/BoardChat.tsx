@@ -188,7 +188,7 @@ function BoardChatRow({
             <textarea
               value={draft}
               onChange={event => setDraft(event.target.value)}
-              className="obsidian-input min-h-20 w-full resize-none rounded-[var(--radius-md)] p-3 text-sm"
+              className="obsidian-input min-h-20 w-full resize-none rounded-[var(--radius-md)] p-3 text-base md:text-sm"
             />
             <div className="flex gap-2">
               <Button type="button" size="sm" onClick={() => void saveEdit()} disabled={!draft.trim()}>
@@ -388,7 +388,7 @@ export function BoardChat({ board }: { board: ChatBoardDefinition }) {
             }}
             placeholder={`Drop a link or note in ${board.title}`}
             rows={1}
-            className="obsidian-input max-h-28 min-h-11 flex-1 resize-none rounded-[var(--radius-md)] px-3.5 py-3 text-sm text-[var(--text-primary)]"
+            className="obsidian-input max-h-28 min-h-11 flex-1 resize-none rounded-[var(--radius-md)] px-3.5 py-3 text-base text-[var(--text-primary)] md:text-sm"
           />
           <Button
             type="submit"

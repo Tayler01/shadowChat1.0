@@ -253,7 +253,7 @@ function DirectMessageBubble({
               <textarea
                 value={draft}
                 onChange={event => setDraft(event.target.value)}
-                className="obsidian-input min-h-20 w-full resize-none rounded-[var(--radius-md)] p-3 text-sm"
+                className="obsidian-input min-h-20 w-full resize-none rounded-[var(--radius-md)] p-3 text-base md:text-sm"
               />
               <div className="flex gap-2">
                 <Button type="button" size="sm" onClick={() => void saveEdit()} disabled={!draft.trim()}>
@@ -821,7 +821,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
               ref={messagesRef}
               onScroll={handleScroll}
               data-testid="dm-message-scroll"
-              className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_0.75rem)] pt-4 md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
+              className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.75rem)] pt-4 md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
             >
               <div data-testid="dm-message-stack" className="mx-auto flex min-h-full w-full max-w-4xl flex-col justify-end space-y-3">
               {loadingMore && (
@@ -912,7 +912,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   type="button"
                   onClick={() => scrollToBottom()}
                   aria-label="Jump to latest"
-                  className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)_+_9.25rem)] z-50 rounded-full border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] p-2 text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)] transition-transform hover:-translate-y-0.5 md:bottom-32"
+                  className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.5rem)] z-50 rounded-full border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] p-2 text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)] transition-transform hover:-translate-y-0.5 md:bottom-32"
                 >
                   <ArrowDown className="w-5 h-5" />
                 </button>

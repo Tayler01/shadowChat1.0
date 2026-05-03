@@ -625,7 +625,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             autoCapitalize="sentences"
             name={`message-composer-${cacheKey}`}
             rows={1}
-            className="obsidian-input no-scrollbar max-h-32 w-full resize-none rounded-[var(--radius-md)] px-3.5 py-3 text-[var(--text-primary)] md:px-3 md:py-2"
+            className="obsidian-input no-scrollbar max-h-32 w-full resize-none rounded-[var(--radius-md)] px-3.5 py-3 text-base text-[var(--text-primary)] md:px-3 md:py-2 md:text-sm"
           />
         </div>
 

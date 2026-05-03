@@ -254,6 +254,8 @@ export const MessageList: React.FC<MessageListProps> = ({
 
   useEffect(() => {
     let frameId: number | null = null
+    let settleFrameId: number | null = null
+    let settleTimerId: number | null = null
 
     const keepLatestVisible = () => {
       if (!autoScroll) return
@@ -261,10 +263,24 @@ export const MessageList: React.FC<MessageListProps> = ({
       if (frameId !== null) {
         cancelAnimationFrame(frameId)
       }
+      if (settleFrameId !== null) {
+        cancelAnimationFrame(settleFrameId)
+      }
+      if (settleTimerId !== null) {
+        window.clearTimeout(settleTimerId)
+      }
 
       frameId = requestAnimationFrame(() => {
         frameId = null
         scrollToBottom('auto')
+        settleFrameId = requestAnimationFrame(() => {
+          settleFrameId = null
+          scrollToBottom('auto')
+        })
+        settleTimerId = window.setTimeout(() => {
+          settleTimerId = null
+          scrollToBottom('auto')
+        }, 140)
       })
     }
 
@@ -281,6 +297,12 @@ export const MessageList: React.FC<MessageListProps> = ({
       window.removeEventListener('focusin', keepLatestVisible)
       if (frameId !== null) {
         cancelAnimationFrame(frameId)
+      }
+      if (settleFrameId !== null) {
+        cancelAnimationFrame(settleFrameId)
+      }
+      if (settleTimerId !== null) {
+        window.clearTimeout(settleTimerId)
       }
     }
   }, [autoScroll, combinedMessages.length, scrollToBottom])
@@ -400,7 +422,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       ref={containerRef}
       onScroll={handleScroll}
       data-testid="message-scroll"
-      className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_0.75rem)] pt-4 md:px-3 md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
+      className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.75rem)] pt-4 md:px-3 md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
     >
       <div data-testid="message-stack" className="mx-auto flex min-h-full w-full max-w-6xl flex-col justify-end">
 
@@ -495,7 +517,7 @@ export const MessageList: React.FC<MessageListProps> = ({
           type="button"
           onClick={() => scrollToBottom()}
           aria-label="Jump to latest"
-          className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_0.5rem)] z-50 rounded-full border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] p-2 text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)] transition-transform hover:-translate-y-0.5 md:bottom-32"
+          className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.5rem)] z-50 rounded-full border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] p-2 text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)] transition-transform hover:-translate-y-0.5 md:bottom-32"
         >
           <ArrowDown className="w-5 h-5" />
         </button>
