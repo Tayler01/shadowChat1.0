@@ -20,6 +20,8 @@ interface BubbleVelocity {
   vy: number
 }
 
+type BoardShape = 'circle' | 'pill' | 'square'
+
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   'news-feed': Newspaper,
   'news-chat': MessageSquareText,
@@ -195,6 +197,30 @@ const getInitialPositions = (width: number, height: number) => {
   })
 
   return positions
+}
+
+const getBoardShape = (board: BoardDefinition): BoardShape => {
+  if (board.kind === 'feed') return 'pill'
+  if (board.kind === 'static') return 'square'
+  return 'circle'
+}
+
+const getBoardVisualSize = (board: BoardDefinition, diameter: number) => {
+  const shape = getBoardShape(board)
+
+  if (shape === 'pill') {
+    return {
+      shape,
+      width: diameter,
+      height: diameter * 0.64,
+    }
+  }
+
+  return {
+    shape,
+    width: diameter,
+    height: diameter,
+  }
 }
 
 export function BoardBubbleMap({ countsByBoard, onSelect }: BoardBubbleMapProps) {
@@ -406,6 +432,7 @@ export function BoardBubbleMap({ countsByBoard, onSelect }: BoardBubbleMapProps)
         const Icon = iconMap[board.slug] || MessageSquareText
         const unreadCount = countsByBoard[board.slug] || 0
         const diameter = position ? position.radius * 2 : board.defaultPosition.radius * 2
+        const visual = getBoardVisualSize(board, diameter)
 
         return (
           <motion.button
@@ -423,8 +450,8 @@ export function BoardBubbleMap({ countsByBoard, onSelect }: BoardBubbleMapProps)
             animate={{
               opacity: 1,
               scale: 1,
-              x: position ? position.x - diameter / 2 : 0,
-              y: position ? position.y - diameter / 2 : 0,
+              x: position ? position.x - visual.width / 2 : 0,
+              y: position ? position.y - visual.height / 2 : 0,
             }}
             transition={{
               opacity: { duration: 0.16 },
@@ -433,7 +460,12 @@ export function BoardBubbleMap({ countsByBoard, onSelect }: BoardBubbleMapProps)
               y: { duration: 0.012, ease: 'linear' },
             }}
             className={cn(
-              'absolute left-0 top-0 isolate flex cursor-grab select-none flex-col items-center justify-center rounded-full border px-4 text-center shadow-[0_18px_52px_rgba(0,0,0,0.34)] outline-none transition-colors active:cursor-grabbing',
+              'absolute left-0 top-0 isolate flex cursor-grab select-none flex-col items-center justify-center border px-4 text-center shadow-[0_18px_52px_rgba(0,0,0,0.34)] outline-none transition-colors active:cursor-grabbing',
+              visual.shape === 'pill'
+                ? 'rounded-full'
+                : visual.shape === 'square'
+                  ? 'rounded-[var(--radius-sm)]'
+                  : 'rounded-full',
               board.kind === 'feed'
                 ? 'border-[rgba(215,170,70,0.36)] bg-[radial-gradient(circle_at_30%_18%,rgba(255,240,184,0.24),rgba(215,170,70,0.08)_38%,rgba(15,16,17,0.94)_100%)]'
                 : board.kind === 'static'
@@ -442,23 +474,32 @@ export function BoardBubbleMap({ countsByBoard, onSelect }: BoardBubbleMapProps)
               'hover:border-[rgba(215,170,70,0.42)] focus-visible:ring-2 focus-visible:ring-[rgba(215,170,70,0.34)]'
             )}
             style={{
-              width: diameter,
-              height: diameter,
+              width: visual.width,
+              height: visual.height,
               color: board.accent,
             }}
             aria-label={`Open ${board.title}`}
           >
-            <span className="absolute inset-0 -z-10 rounded-full opacity-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]" />
+            <span
+              className={cn(
+                'absolute inset-0 -z-10 opacity-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]',
+                visual.shape === 'square' ? 'rounded-[var(--radius-sm)]' : 'rounded-full'
+              )}
+            />
             {unreadCount > 0 && (
               <span className="absolute right-3 top-3 min-w-6 rounded-full border border-[rgba(215,170,70,0.45)] bg-[rgba(215,170,70,0.16)] px-1.5 py-1 text-xs font-semibold leading-none text-[var(--text-gold)]">
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
-            <span className="mb-2 inline-flex h-9 w-9 items-center justify-center rounded-full border border-current/20 bg-current/10 text-current">
+            <span className={cn('inline-flex h-9 w-9 items-center justify-center rounded-full border border-current/20 bg-current/10 text-current', visual.shape === 'pill' ? 'mb-1.5' : 'mb-2')}>
               <Icon className="h-[1.125rem] w-[1.125rem]" />
             </span>
-            <span className="text-base font-semibold leading-tight text-[var(--text-primary)]">{board.title}</span>
-            <span className="mt-1 max-w-[9rem] text-[11px] leading-4 text-[var(--text-muted)]">{board.description}</span>
+            <span className={cn('font-semibold leading-tight text-[var(--text-primary)]', visual.shape === 'pill' ? 'text-sm' : 'text-base')}>
+              {board.title}
+            </span>
+            <span className={cn('mt-1 max-w-[9rem] text-[11px] leading-4 text-[var(--text-muted)]', visual.shape === 'pill' ? 'hidden sm:block' : '')}>
+              {board.description}
+            </span>
           </motion.button>
         )
       })}
