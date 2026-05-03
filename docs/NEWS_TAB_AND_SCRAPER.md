@@ -19,9 +19,10 @@ Current boards are:
   Social accounts. Users can open a nearly full-screen post modal, react, copy
   links, and share original links. Users cannot post messages in this feed.
 - `News Chat`, `Investing Chat`, `Learning Chat`, and `Crypto Chat`: public
-  chat boards backed by the shared `board_chat_messages` table. They support
-  text, link previews, edits, deletes, read cursors, unread dividers, and emoji
-  reactions.
+  chat boards backed by the shared `board_chat_messages` table. They open with
+  the latest 50 messages, lazy-load older history from the top of the scroller,
+  and support text, link previews, edits, deletes, read cursors, unread
+  dividers, and emoji reactions.
 - `Art Board`: a static placeholder that currently renders `Coming soon`.
 
 Opened boards use the primary Boards header with a clear back button. The feed

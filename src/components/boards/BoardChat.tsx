@@ -196,8 +196,11 @@ export function BoardChat({ board }: { board: ChatBoardDefinition }) {
   const {
     messages,
     loading,
+    loadingMore,
+    hasMore,
     sending,
     error,
+    loadOlderMessages,
     sendMessage,
     editMessage,
     deleteMessage,
@@ -237,6 +240,17 @@ export function BoardChat({ board }: { board: ChatBoardDefinition }) {
     onMarkReadToLatest: markBoardRead,
   })
 
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+
+    handleUnreadScroll()
+
+    if (el.scrollTop < 100 && hasMore && !loadingMore) {
+      void loadOlderMessages()
+    }
+  }, [handleUnreadScroll, hasMore, loadingMore, loadOlderMessages])
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!draft.trim() || sending) return
@@ -257,7 +271,7 @@ export function BoardChat({ board }: { board: ChatBoardDefinition }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="relative min-h-0 flex-1">
-        <div ref={scrollRef} onScroll={handleUnreadScroll} className="h-full overflow-y-auto">
+        <div ref={scrollRef} onScroll={handleScroll} className="h-full overflow-y-auto">
           {loading ? (
             <div className="flex h-full items-center justify-center p-8">
               <LoadingSpinner size="lg" className="text-[var(--text-gold)]" />
@@ -272,6 +286,11 @@ export function BoardChat({ board }: { board: ChatBoardDefinition }) {
             </div>
           ) : (
             <div className="py-2">
+              {loadingMore && (
+                <div className="flex justify-center py-2 text-sm text-[var(--text-muted)]">
+                  <LoadingSpinner size="sm" /> Loading more...
+                </div>
+              )}
               {messages.map(message => (
                 <React.Fragment key={message.id}>
                   {firstUnreadMessageId === message.id && (

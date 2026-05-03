@@ -34,6 +34,9 @@ test('refreshes the saved session after the app resumes', async () => {
   renderHook(() => useSessionResumeRecovery(true, 25))
 
   act(() => {
+    setDocumentHidden(true)
+    document.dispatchEvent(new Event('visibilitychange'))
+    setDocumentHidden(false)
     document.dispatchEvent(new Event('visibilitychange'))
   })
 
@@ -81,6 +84,7 @@ test('passes focus and online reasons to central recovery', async () => {
   renderHook(() => useSessionResumeRecovery(true, 25))
 
   act(() => {
+    window.dispatchEvent(new Event('blur'))
     window.dispatchEvent(new Event('focus'))
   })
 
@@ -99,4 +103,19 @@ test('passes focus and online reasons to central recovery', async () => {
   })
 
   expect(runSessionRecovery).toHaveBeenLastCalledWith('online')
+})
+
+test('ignores initial focus and pageshow events after launch', async () => {
+  renderHook(() => useSessionResumeRecovery(true, 25))
+
+  act(() => {
+    window.dispatchEvent(new Event('focus'))
+    window.dispatchEvent(new Event('pageshow'))
+  })
+
+  await act(async () => {
+    await jest.advanceTimersByTimeAsync(25)
+  })
+
+  expect(runSessionRecovery).not.toHaveBeenCalled()
 })

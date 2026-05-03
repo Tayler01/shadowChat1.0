@@ -13,6 +13,10 @@ import { useRealtimeRecovery } from './useRealtimeRecovery'
 
 const normalizeScopeId = (scopeId?: string | null) => scopeId?.trim() || 'main'
 
+type RefreshOptions = {
+  silent?: boolean
+}
+
 export function useReadCursor(
   surface: ReadSurface,
   scopeId?: string | null,
@@ -24,15 +28,21 @@ export function useReadCursor(
   const [loading, setLoading] = useState(true)
   const channelRef = useRef<RealtimeChannel | null>(null)
   const subscribeRef = useRef<(() => Promise<RealtimeChannel | null>) | null>(null)
+  const hasLoadedRef = useRef(false)
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (options: RefreshOptions = {}) => {
     if (!enabled || !user) {
       setCursor(null)
+      hasLoadedRef.current = true
       setLoading(false)
       return null
     }
 
-    setLoading(true)
+    const showLoading = !options.silent || !hasLoadedRef.current
+    if (showLoading) {
+      setLoading(true)
+    }
+
     try {
       const nextCursor = await fetchUserReadCursor(surface, normalizedScopeId)
       setCursor(nextCursor)
@@ -41,6 +51,7 @@ export function useReadCursor(
       setCursor(null)
       return null
     } finally {
+      hasLoadedRef.current = true
       setLoading(false)
     }
   }, [enabled, normalizedScopeId, surface, user])
@@ -50,7 +61,7 @@ export function useReadCursor(
   }, [refresh])
 
   const resetCursorChannel = useCallback(async () => {
-    await refresh()
+    await refresh({ silent: true })
 
     const activeChannel = channelRef.current
     const realtimeClient = getRealtimeClient()

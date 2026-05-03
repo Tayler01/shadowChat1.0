@@ -37,10 +37,10 @@ React UI
 ### Hooks
 
 - [`useAuth`](C:/repos/chat2.0/src/hooks/useAuth.tsx:1): session + profile state
-- [`useMessages`](C:/repos/chat2.0/src/hooks/useMessages.tsx:1): group chat state and realtime
-- [`useDirectMessages`](C:/repos/chat2.0/src/hooks/useDirectMessages.tsx:1): DM state and realtime
+- [`useMessages`](C:/repos/chat2.0/src/hooks/useMessages.tsx:1): group chat state, 50-message initial windows, older-message lazy loading, and realtime
+- [`useDirectMessages`](C:/repos/chat2.0/src/hooks/useDirectMessages.tsx:1): DM state, 50-message thread windows, older-message lazy loading, and realtime
 - [`useNewsFeed`](C:/repos/chat2.0/src/hooks/useNewsFeed.tsx:1): News Feed fetch, realtime, reactions, modal data, and seen state
-- [`useBoardChat`](C:/repos/chat2.0/src/hooks/useBoardChat.tsx:1): shared board-chat fetch, realtime, send/edit/delete, and reactions
+- [`useBoardChat`](C:/repos/chat2.0/src/hooks/useBoardChat.tsx:1): shared board-chat 50-message fetch windows, older-message lazy loading, realtime, send/edit/delete, and reactions
 - [`useBoardBadges`](C:/repos/chat2.0/src/hooks/useBoardBadges.ts:1): per-board unread counts and combined Boards nav badge
 - [`useNewsBadges`](C:/repos/chat2.0/src/hooks/useNewsBadges.ts:1): compatibility wrapper over board badges
 - [`useNewsAdmin`](C:/repos/chat2.0/src/hooks/useNewsAdmin.ts:1): News source admin state and source upsert/toggle RPCs

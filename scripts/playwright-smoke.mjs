@@ -475,11 +475,13 @@ async function createDesktopSession(browserInstance, state, account, folderName,
       headless: state.config.headless,
       slowMo: state.config.slowMo,
       viewport: { width: 1440, height: 960 },
+      serviceWorkers: 'block',
       ignoreHTTPSErrors: true,
     })
   } else {
     context = await browserInstance.newContext({
       viewport: { width: 1440, height: 960 },
+      serviceWorkers: 'block',
       ignoreHTTPSErrors: true,
     })
   }
@@ -509,6 +511,7 @@ async function refreshMobileSession(browserInstance, state, account, existingSes
   const context = await browserInstance.newContext({
     ...devices['iPhone 13'],
     storageState: storageStatePath,
+    serviceWorkers: 'block',
     ignoreHTTPSErrors: true,
   })
   await installBrowserMocks(context)
@@ -528,6 +531,7 @@ async function refreshMobileSession(browserInstance, state, account, existingSes
 async function writeStorageState(browserInstance, state, account, storageStatePath) {
   const scratchContext = await browserInstance.newContext({
     viewport: { width: 1440, height: 960 },
+    serviceWorkers: 'block',
     ignoreHTTPSErrors: true,
   })
   await installBrowserMocks(scratchContext)
@@ -804,7 +808,7 @@ async function waitForBootSurface(page) {
 }
 
 async function waitForChatView(page) {
-  await page.getByRole('heading', { name: 'General Chat' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByText('Lounge Channel', { exact: true }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
   await page.locator('textarea:visible').first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
@@ -823,7 +827,7 @@ async function waitForProfileView(page) {
 }
 
 async function isChatVisible(page) {
-  return page.getByRole('heading', { name: 'General Chat' }).isVisible().catch(() => false)
+  return page.getByText('Lounge Channel', { exact: true }).isVisible().catch(() => false)
 }
 
 async function ensureSignupView(page) {

@@ -24,7 +24,6 @@ import { useAuth } from './useAuth';
 import { useRealtimeRecovery } from './useRealtimeRecovery';
 import { useSoundEffects } from './useSoundEffects';
 
-const STORED_MESSAGE_LIMIT = 200;
 const SEND_OPERATION_TIMEOUT_MS = 12000;
 
 const dedupeMessagesById = (items: Message[]) => {
@@ -33,6 +32,32 @@ const dedupeMessagesById = (items: Message[]) => {
     map.set(item.id, item)
   })
   return Array.from(map.values())
+}
+
+const sortMessagesByCreatedAt = (items: Message[]) =>
+  [...items].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+
+const trimMessageWindow = (items: Message[]) => {
+  const deduped = dedupeMessagesById(items)
+  const pinned = deduped.filter(message => message.pinned)
+  const regular = deduped.filter(message => !message.pinned)
+
+  return sortMessagesByCreatedAt([
+    ...pinned,
+    ...sortMessagesByCreatedAt(regular).slice(-MESSAGE_FETCH_LIMIT),
+  ])
+}
+
+const cacheMessages = (items: Message[]) => {
+  if (typeof localStorage === 'undefined') {
+    return
+  }
+
+  try {
+    localStorage.setItem('chatHistory', JSON.stringify(trimMessageWindow(items)))
+  } catch {
+    // ignore storage errors
+  }
 }
 
 // --- Helper functions extracted from sendMessage workflow ---
@@ -142,7 +167,7 @@ function useProvideMessages(): MessagesContextValue {
       try {
         const stored = localStorage.getItem('chatHistory');
         if (stored) {
-          return (JSON.parse(stored) as Message[]).slice(-STORED_MESSAGE_LIMIT);
+          return trimMessageWindow(JSON.parse(stored) as Message[]);
         }
       } catch {
         // ignore parse errors
@@ -161,6 +186,9 @@ function useProvideMessages(): MessagesContextValue {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const subscribeRef = useRef<() => Promise<RealtimeChannel>>();
   const clientResetRef = useRef<() => Promise<void>>();
+  const resetInFlightRef = useRef<Promise<void> | null>(null);
+  const fetchRequestIdRef = useRef(0);
+  const loadedOlderRef = useRef(false);
 
   const addNewMessage = useCallback(
     (msg: Message) => {
@@ -169,7 +197,8 @@ function useProvideMessages(): MessagesContextValue {
         const exists = prev.some(m => m.id === msg.id);
         if (exists) return prev;
         added = true;
-        return [...prev, msg];
+        const nextMessages = dedupeMessagesById([...prev, msg]);
+        return loadedOlderRef.current ? sortMessagesByCreatedAt(nextMessages) : trimMessageWindow(nextMessages);
       });
       if (added && user && msg.user_id !== user.id) {
         playMessage();
@@ -179,6 +208,9 @@ function useProvideMessages(): MessagesContextValue {
   );
 
   const fetchMessages = useCallback(async () => {
+    const requestId = fetchRequestIdRef.current + 1;
+    fetchRequestIdRef.current = requestId;
+
     try {
       const workingClient = await getWorkingClient();
       const [pinnedRes, messagesRes] = await Promise.all([
@@ -206,9 +238,14 @@ function useProvideMessages(): MessagesContextValue {
 
       const pinnedMessages = (pinnedRes.data || []) as unknown as Message[];
       const fetchedMessages = ((messagesRes.data || []) as unknown as Message[]).reverse();
-      setHasMore((messagesRes.data?.length || 0) === MESSAGE_FETCH_LIMIT);
       const data = dedupeMessagesById([...pinnedMessages, ...fetchedMessages]);
       const error = pinnedRes.error || messagesRes.error;
+
+      if (requestId !== fetchRequestIdRef.current) {
+        return;
+      }
+
+      setHasMore((messagesRes.data?.length || 0) === MESSAGE_FETCH_LIMIT);
 
       if (error) {
         throw error;
@@ -216,18 +253,10 @@ function useProvideMessages(): MessagesContextValue {
         const pinnedIds = new Set(pinnedMessages.map(m => m.id));
 
         setMessages(prev => {
-          if (prev.length === 0) {
-            if (typeof localStorage !== 'undefined') {
-              try {
-                localStorage.setItem(
-                  'chatHistory',
-                  JSON.stringify(data.slice(-STORED_MESSAGE_LIMIT))
-                );
-              } catch {
-                // ignore storage errors
-              }
-            }
-            return data as unknown as Message[];
+          if (prev.length === 0 || !loadedOlderRef.current) {
+            const nextMessages = trimMessageWindow(data as unknown as Message[]);
+            cacheMessages(nextMessages);
+            return nextMessages;
           }
 
           const mergedMap = new Map<string, Message>();
@@ -254,19 +283,9 @@ function useProvideMessages(): MessagesContextValue {
           });
 
           const merged = Array.from(mergedMap.values());
-
-          if (typeof localStorage !== 'undefined') {
-            try {
-              localStorage.setItem(
-                'chatHistory',
-                JSON.stringify(merged.slice(-STORED_MESSAGE_LIMIT))
-              );
-            } catch {
-              // ignore storage errors
-            }
-          }
-
-          return merged;
+          const nextMessages = sortMessagesByCreatedAt(merged);
+          cacheMessages(nextMessages);
+          return nextMessages;
         });
       } else {
         setMessages([]);
@@ -282,7 +301,9 @@ function useProvideMessages(): MessagesContextValue {
     } catch (error) {
       throw error;
     } finally {
-      setLoading(false);
+      if (requestId === fetchRequestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -309,10 +330,11 @@ function useProvideMessages(): MessagesContextValue {
 
       if (data && data.length > 0) {
         const newMessages = (data as unknown as Message[]).reverse();
+        loadedOlderRef.current = true;
         setMessages(prev => {
           const pinned = prev.filter(m => m.pinned);
           const rest = prev.filter(m => !m.pinned);
-          return dedupeMessagesById([...pinned, ...newMessages, ...rest]);
+          return sortMessagesByCreatedAt(dedupeMessagesById([...pinned, ...newMessages, ...rest]));
         });
         setHasMore(data.length === MESSAGE_FETCH_LIMIT);
       } else {
@@ -325,52 +347,55 @@ function useProvideMessages(): MessagesContextValue {
 
   // Reset function to reinitialize everything with fresh client
   const resetWithFreshClient = useCallback(async () => {
-    try {
-      // Clean up old channel
-      if (channelRef.current) {
-        try {
-          const workingClient = await getWorkingClient();
-          if (workingClient && workingClient.removeChannel && typeof workingClient.removeChannel === 'function') {
-            await workingClient.removeChannel(channelRef.current);
-          }
-        } catch (error) {
-          throw error;
-        }
-        channelRef.current = null;
-      }
-      
-      // Refetch messages with new client
-      await fetchMessages();
-      
-      // Resubscribe to realtime with new client
-      if (subscribeRef.current) {
-        try {
-          const newChannel = await subscribeRef.current();
-          channelRef.current = newChannel;
-        } catch (subscribeError) {
-          throw subscribeError;
-        }
-      }
-      
-    } catch (error) {
-      throw error;
+    if (resetInFlightRef.current) {
+      return resetInFlightRef.current;
     }
+
+    resetInFlightRef.current = (async () => {
+      try {
+        // Clean up old channel
+        if (channelRef.current) {
+          try {
+            const workingClient = await getWorkingClient();
+            if (workingClient && workingClient.removeChannel && typeof workingClient.removeChannel === 'function') {
+              await workingClient.removeChannel(channelRef.current);
+            }
+          } catch (error) {
+            throw error;
+          }
+          channelRef.current = null;
+        }
+
+        // Refetch messages with new client
+        await fetchMessages();
+
+        // Resubscribe to realtime with new client
+        if (subscribeRef.current) {
+          try {
+            const newChannel = await subscribeRef.current();
+            channelRef.current = newChannel;
+          } catch (subscribeError) {
+            throw subscribeError;
+          }
+        }
+
+      } catch (error) {
+        throw error;
+      } finally {
+        resetInFlightRef.current = null;
+      }
+    })();
+
+    return resetInFlightRef.current;
   }, [fetchMessages]);
 
   const handleVisible = useCallback(() => {
     const channel = channelRef.current;
-    if (channel && channel.state !== 'joined') {
-      // Channel cleanup will be handled by the useEffect cleanup
-      if (subscribeRef.current) {
-        subscribeRef.current().then(newChannel => {
-          if (newChannel) {
-            channelRef.current = newChannel;
-          }
-        }).catch(() => {});
-      }
+    if (channel && channel.state === 'joined') {
+      fetchMessages();
+      return;
     }
-    
-    // Use the reset function instead of just fetchMessages
+
     if (clientResetRef.current) {
       clientResetRef.current();
     } else {
@@ -391,16 +416,7 @@ function useProvideMessages(): MessagesContextValue {
 
   // Persist messages to localStorage whenever they change
   useEffect(() => {
-    if (typeof localStorage !== 'undefined') {
-      try {
-        localStorage.setItem(
-          'chatHistory',
-          JSON.stringify(messages.slice(-STORED_MESSAGE_LIMIT))
-        );
-      } catch {
-        // ignore storage errors
-      }
-    }
+    cacheMessages(messages);
   }, [messages]);
 
   // Subscribe to real-time updates

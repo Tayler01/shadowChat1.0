@@ -52,6 +52,10 @@ interface DirectMessagesContextValue {
 const DirectMessagesContext = createContext<DirectMessagesContextValue | undefined>(undefined);
 const SEND_OPERATION_TIMEOUT_MS = 12000;
 
+type FetchConversationMessagesOptions = {
+  silent?: boolean;
+}
+
 function useProvideDirectMessages(): DirectMessagesContextValue {
   const [conversations, setConversations] = useState<DMConversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -449,10 +453,12 @@ export function useConversationMessages(conversationId: string | null) {
 
     let disposed = false;
 
-    const fetchMessages = async () => {
+    const fetchMessages = async (options: FetchConversationMessagesOptions = {}) => {
       const requestId = fetchRequestIdRef.current + 1;
       fetchRequestIdRef.current = requestId;
-      setLoading(true);
+      if (!options.silent) {
+        setLoading(true);
+      }
 
       try {
         const workingClient = await getWorkingClient();
@@ -472,8 +478,10 @@ export function useConversationMessages(conversationId: string | null) {
         }
 
         if (error) {
-          setMessages([]);
-          setHasMore(false);
+          if (!options.silent) {
+            setMessages([]);
+            setHasMore(false);
+          }
         } else {
           const fetchedMessages = ((data || []) as unknown as DMMessage[]).reverse()
           setHasMore((data?.length || 0) === MESSAGE_FETCH_LIMIT);
@@ -481,8 +489,10 @@ export function useConversationMessages(conversationId: string | null) {
         }
       } catch {
         if (!disposed && requestId === fetchRequestIdRef.current) {
-          setMessages([]);
-          setHasMore(false);
+          if (!options.silent) {
+            setMessages([]);
+            setHasMore(false);
+          }
         }
       } finally {
         if (!disposed && requestId === fetchRequestIdRef.current) {
@@ -519,7 +529,7 @@ export function useConversationMessages(conversationId: string | null) {
         // ignore resubscribe failures; the fetch still repairs visible state
       }
 
-      await fetchMessages();
+      await fetchMessages({ silent: true });
     };
 
     clientResetRef.current = resetWithFreshClient;

@@ -7,10 +7,13 @@ import {
   type BoardChatMessage,
 } from '../lib/supabase'
 import { runRealtimeRecovery } from '../lib/realtimeRecovery'
+import { MESSAGE_FETCH_LIMIT } from '../config'
 import { useAuth } from './useAuth'
 import { useRealtimeRecovery } from './useRealtimeRecovery'
 
-const CHAT_LIMIT = 120
+type FetchMessagesOptions = {
+  silent?: boolean
+}
 
 const sortChatMessages = (items: BoardChatMessage[]) =>
   [...items].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
@@ -25,13 +28,23 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
   const { user } = useAuth()
   const [messages, setMessages] = useState<BoardChatMessage[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const channelRef = useRef<RealtimeChannel | null>(null)
   const subscribeRef = useRef<(() => Promise<RealtimeChannel | null>) | null>(null)
+  const fetchRequestIdRef = useRef(0)
+  const loadedOlderRef = useRef(false)
 
-  const fetchMessages = useCallback(async () => {
-    setLoading(true)
+  const fetchMessages = useCallback(async (options: FetchMessagesOptions = {}) => {
+    const requestId = fetchRequestIdRef.current + 1
+    fetchRequestIdRef.current = requestId
+    const showLoading = !options.silent
+    if (showLoading) {
+      setLoading(true)
+    }
+
     try {
       const workingClient = await getWorkingClient()
       const { data, error: fetchError } = await workingClient
@@ -42,15 +55,37 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
         `)
         .eq('board_slug', boardSlug)
         .order('created_at', { ascending: false })
-        .limit(CHAT_LIMIT)
+        .limit(MESSAGE_FETCH_LIMIT)
 
       if (fetchError) throw fetchError
-      setMessages(sortChatMessages((data ?? []) as unknown as BoardChatMessage[]))
+
+      if (requestId !== fetchRequestIdRef.current) {
+        return
+      }
+
+      const fetchedMessages = sortChatMessages((data ?? []) as unknown as BoardChatMessage[])
+      setHasMore((data?.length || 0) === MESSAGE_FETCH_LIMIT)
+      setMessages(prev => {
+        if (!loadedOlderRef.current || prev.length === 0) {
+          return fetchedMessages
+        }
+        return dedupeChatMessages([...prev, ...fetchedMessages])
+      })
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Unable to load ${boardTitle}`)
+      if (requestId !== fetchRequestIdRef.current) {
+        return
+      }
+
+      if (!options.silent) {
+        setMessages([])
+        setHasMore(false)
+        setError(err instanceof Error ? err.message : `Unable to load ${boardTitle}`)
+      }
     } finally {
-      setLoading(false)
+      if (requestId === fetchRequestIdRef.current) {
+        setLoading(false)
+      }
     }
   }, [boardSlug, boardTitle])
 
@@ -71,12 +106,17 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
   }, [boardSlug])
 
   useEffect(() => {
+    loadedOlderRef.current = false
+    fetchRequestIdRef.current += 1
     setMessages([])
+    setHasMore(true)
+    setError(null)
+    setLoading(true)
     void fetchMessages()
   }, [fetchMessages])
 
   const resetChatChannel = useCallback(async () => {
-    await fetchMessages()
+    await fetchMessages({ silent: true })
 
     const activeChannel = channelRef.current
     const realtimeClient = getRealtimeClient()
@@ -117,7 +157,10 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
           async (payload: any) => {
             const message = await fetchMessage(payload.new.id)
             if (!message) return
-            setMessages(prev => dedupeChatMessages([...prev, message]).slice(-CHAT_LIMIT))
+            setMessages(prev => {
+              const nextMessages = dedupeChatMessages([...prev, message])
+              return loadedOlderRef.current ? nextMessages : nextMessages.slice(-MESSAGE_FETCH_LIMIT)
+            })
           }
         )
         .on(
@@ -185,7 +228,10 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
 
       if (insertError) throw insertError
       const message = data as unknown as BoardChatMessage
-      setMessages(prev => dedupeChatMessages([...prev, message]).slice(-CHAT_LIMIT))
+      setMessages(prev => {
+        const nextMessages = dedupeChatMessages([...prev, message])
+        return loadedOlderRef.current ? nextMessages : nextMessages.slice(-MESSAGE_FETCH_LIMIT)
+      })
       return message
     } finally {
       setSending(false)
@@ -238,12 +284,49 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
     }
   }, [fetchMessage, user])
 
+  const loadOlderMessages = useCallback(async () => {
+    if (loadingMore || !hasMore) return
+    const oldest = messages[0]?.created_at
+    if (!oldest) return
+
+    setLoadingMore(true)
+    try {
+      const workingClient = await getWorkingClient()
+      const { data, error: fetchError } = await workingClient
+        .from('board_chat_messages')
+        .select(`
+          *,
+          user:users!user_id(*)
+        `)
+        .eq('board_slug', boardSlug)
+        .lt('created_at', oldest)
+        .order('created_at', { ascending: false })
+        .limit(MESSAGE_FETCH_LIMIT)
+
+      if (fetchError) throw fetchError
+
+      if (data && data.length > 0) {
+        const olderMessages = sortChatMessages(data as unknown as BoardChatMessage[])
+        loadedOlderRef.current = true
+        setMessages(prev => dedupeChatMessages([...olderMessages, ...prev]))
+        setHasMore(data.length === MESSAGE_FETCH_LIMIT)
+      } else {
+        setHasMore(false)
+      }
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [boardSlug, hasMore, loadingMore, messages])
+
   return {
     messages,
     loading,
+    loadingMore,
+    hasMore,
     sending,
     error,
     refresh: fetchMessages,
+    loadOlderMessages,
     sendMessage,
     editMessage,
     deleteMessage,

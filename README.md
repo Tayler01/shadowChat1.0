@@ -108,7 +108,7 @@ Required:
 Common optional values:
 
 - `VITE_PRESENCE_INTERVAL_MS`
-- `VITE_MESSAGE_FETCH_LIMIT`
+- `VITE_MESSAGE_FETCH_LIMIT` (defaults to `50` for chat and DM windows)
 - `VITE_DEBUG_LOGS`
 - `VITE_WEB_PUSH_PUBLIC_KEY`
 
