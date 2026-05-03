@@ -258,13 +258,18 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
   const deleteMessage = useCallback(async (messageId: string) => {
     if (!user) return
     const workingClient = await getWorkingClient()
-    const { error: deleteError } = await workingClient
+    const { data, error: deleteError } = await workingClient
       .from('board_chat_messages')
       .delete()
       .eq('id', messageId)
       .eq('board_slug', boardSlug)
+      .select('id')
+      .maybeSingle()
 
     if (deleteError) throw deleteError
+    if (!data) {
+      throw new Error('Message delete was not confirmed by the server.')
+    }
     setMessages(prev => prev.filter(message => message.id !== messageId))
   }, [boardSlug, user])
 

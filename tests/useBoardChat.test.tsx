@@ -120,7 +120,7 @@ test('realtime recovery refreshes board chat without showing the full loading st
 
 test('deletes board chat messages without client-side owner filtering', async () => {
   const initialQuery = createQuery([createMessage('m1', 1)])
-  const deleteQuery = createQuery([])
+  const deleteQuery = createQuery([{ id: 'm1' }])
   workingClient.from
     .mockReturnValueOnce(initialQuery)
     .mockReturnValueOnce(deleteQuery)
@@ -137,4 +137,24 @@ test('deletes board chat messages without client-side owner filtering', async ()
   expect(deleteQuery.eq).toHaveBeenNthCalledWith(1, 'id', 'm1')
   expect(deleteQuery.eq).toHaveBeenNthCalledWith(2, 'board_slug', 'news-chat')
   expect(deleteQuery.eq).toHaveBeenCalledTimes(2)
+  expect(deleteQuery.select).toHaveBeenCalledWith('id')
+  expect(deleteQuery.maybeSingle).toHaveBeenCalled()
+})
+
+test('does not treat zero-row board chat deletes as successful', async () => {
+  const initialQuery = createQuery([createMessage('m1', 1)])
+  const deleteQuery = createQuery([])
+  workingClient.from
+    .mockReturnValueOnce(initialQuery)
+    .mockReturnValueOnce(deleteQuery)
+
+  const { result } = renderHook(() => useBoardChat('news-chat', 'News Chat'))
+
+  await waitFor(() => expect(result.current.loading).toBe(false))
+
+  await expect(
+    act(async () => {
+      await result.current.deleteMessage('m1')
+    })
+  ).rejects.toThrow('Message delete was not confirmed by the server.')
 })

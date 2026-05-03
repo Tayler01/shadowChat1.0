@@ -72,6 +72,7 @@ const createQuery = (overrides: Record<string, unknown> = {}) => {
     update: jest.fn(() => query),
     delete: jest.fn(() => query),
     eq: jest.fn(() => query),
+    maybeSingle: jest.fn().mockResolvedValue({ data: { id: 'm1' }, error: null }),
     rpc: jest.fn(() => query),
   };
 
@@ -326,6 +327,29 @@ describe('message actions', () => {
     expect(deleteFn).toHaveBeenCalled();
     expect(eqFn).toHaveBeenNthCalledWith(1, 'id', 'm1');
     expect(eqFn).toHaveBeenCalledTimes(1);
+    expect(query.select).toHaveBeenCalledWith('id');
+    expect(query.maybeSingle).toHaveBeenCalled();
+  });
+
+  it('does not treat zero-row message deletes as successful', async () => {
+    const query = createQuery({
+      maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+    });
+
+    const { result } = renderHook(() => useMessages(), { wrapper: MessagesProvider });
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    workingClient.from.mockClear();
+    workingClient.from.mockReturnValueOnce(query as any);
+
+    await expect(
+      act(async () => {
+        await result.current.deleteMessage('m1');
+      })
+    ).rejects.toThrow('Message delete was not confirmed by the server.');
   });
 
   it('toggles reaction', async () => {

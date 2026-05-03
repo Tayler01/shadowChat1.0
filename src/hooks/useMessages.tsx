@@ -771,13 +771,19 @@ function useProvideMessages(): MessagesContextValue {
     try {
       const workingClient = await getWorkingClient();
       
-      const { error } = await workingClient
+      const { data, error } = await workingClient
         .from('messages')
         .delete()
-        .eq('id', messageId);
+        .eq('id', messageId)
+        .select('id')
+        .maybeSingle();
 
       if (error) {
         throw error;
+      }
+
+      if (!data) {
+        throw new Error('Message delete was not confirmed by the server.');
       }
 
       // Optimistically remove from local state
