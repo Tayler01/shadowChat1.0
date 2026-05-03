@@ -209,6 +209,12 @@ html, body, #root {
   }
 }
 
+@media (max-width: 767px) {
+  .app-viewport {
+    height: var(--shadowchat-visual-viewport-height, 100dvh);
+  }
+}
+
 @layer components {
   .glass-panel {
     background: var(--bg-panel);

@@ -489,6 +489,40 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   }, [autoScroll, scrollToBottom, typingUsers.length])
 
   useEffect(() => {
+    if (isDesktop || !currentConversation) return
+
+    let frameId: number | null = null
+    const keepLatestVisible = () => {
+      if (!autoScroll) return
+
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId)
+      }
+
+      frameId = requestAnimationFrame(() => {
+        frameId = null
+        scrollToBottom('auto')
+      })
+    }
+
+    keepLatestVisible()
+    window.visualViewport?.addEventListener('resize', keepLatestVisible)
+    window.visualViewport?.addEventListener('scroll', keepLatestVisible)
+    window.addEventListener('resize', keepLatestVisible)
+    window.addEventListener('focusin', keepLatestVisible)
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', keepLatestVisible)
+      window.visualViewport?.removeEventListener('scroll', keepLatestVisible)
+      window.removeEventListener('resize', keepLatestVisible)
+      window.removeEventListener('focusin', keepLatestVisible)
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId)
+      }
+    }
+  }, [autoScroll, currentConversation, isDesktop, messages.length, scrollToBottom])
+
+  useEffect(() => {
     if (
       !initialMessageId ||
       initialTargetJumpDoneRef.current === initialMessageId ||
@@ -786,9 +820,10 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
             <div
               ref={messagesRef}
               onScroll={handleScroll}
-              className="relative flex-1 min-h-0 w-full space-y-3 overflow-y-auto overflow-x-hidden px-4 pb-[calc(env(safe-area-inset-bottom)_+_9.5rem)] pt-4 md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
+              data-testid="dm-message-scroll"
+              className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_0.75rem)] pt-4 md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
             >
-              <div className="mx-auto w-full max-w-4xl space-y-3">
+              <div data-testid="dm-message-stack" className="mx-auto flex min-h-full w-full max-w-4xl flex-col justify-end space-y-3">
               {loadingMore && (
                 <div className="flex justify-center py-2 text-sm text-[var(--text-muted)]">
                   <LoadingSpinner size="sm" /> Loading more...

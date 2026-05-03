@@ -28,6 +28,9 @@ jest.mock('../src/hooks/useSoundEffects', () => ({
 jest.mock('../src/hooks/useTyping', () => ({
   useTyping: () => ({ typingUsers: [], startTyping: jest.fn(), stopTyping: jest.fn() }),
 }));
+jest.mock('../src/hooks/useReadCursor', () => ({
+  useReadCursor: () => ({ cursor: null, loading: false, markRead: jest.fn() }),
+}));
 jest.mock('../src/hooks/useIsDesktop', () => ({
   useIsDesktop: jest.fn(() => true),
 }));
@@ -466,5 +469,74 @@ describe('DirectMessagesView user search', () => {
     fireEvent.click(screen.getByRole('button', { name: /^back$/i }));
 
     expect(onViewChange).toHaveBeenCalledWith('chat');
+  });
+
+  test('mobile thread keeps sparse messages bottom-aligned above the chat footer', () => {
+    const { useIsDesktop } = jest.requireMock('../src/hooks/useIsDesktop') as {
+      useIsDesktop: jest.Mock
+    };
+    useIsDesktop.mockReturnValue(false);
+
+    const conversation = {
+      id: 'c1',
+      other_user: {
+        id: 'u2',
+        username: 'bob',
+        display_name: 'Bob',
+        avatar_url: '',
+        color: 'red',
+        status: 'online',
+      },
+      last_message: null,
+      unread_count: 0,
+    };
+
+    dmSpy.mockReturnValue({
+      conversations: [conversation],
+      currentConversation: 'c1',
+      messages: [{
+        id: 'm1',
+        conversation_id: 'c1',
+        sender_id: 'u1',
+        recipient_id: 'u2',
+        content: 'hello from a sparse thread',
+        message_type: 'text',
+        file_url: null,
+        audio_url: null,
+        reactions: {},
+        read_by: ['u1'],
+        created_at: '2026-05-03T12:00:00.000Z',
+        updated_at: '2026-05-03T12:00:00.000Z',
+        sender: { id: 'u1', username: 'me', display_name: 'Me' },
+      }],
+      loading: false,
+      messagesLoading: false,
+      loadingMore: false,
+      hasMore: false,
+      sending: false,
+      uploading: false,
+      setCurrentConversation: setCurrentConversationMock,
+      startConversation: startConversationMock,
+      sendMessage: jest.fn(),
+      editMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      toggleReaction: jest.fn(),
+      markAsRead: jest.fn(),
+      loadOlderMessages: jest.fn(),
+    } as any);
+
+    render(
+      <DirectMessagesView
+        onToggleSidebar={() => {}}
+        currentView="dms"
+        onViewChange={() => {}}
+      />
+    );
+
+    expect(screen.getByTestId('dm-message-scroll')).toHaveClass(
+      'pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_0.75rem)]'
+    );
+    expect(screen.getByTestId('dm-message-stack')).toHaveClass('min-h-full', 'justify-end');
+    expect(screen.getByText('hello from a sparse thread')).toBeInTheDocument();
   });
 });

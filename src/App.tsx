@@ -127,11 +127,13 @@ function App() {
       const viewport = window.visualViewport
       const viewportHeight = viewport?.height ?? window.innerHeight
       const viewportOffsetTop = viewport?.offsetTop ?? 0
+      const keyboardInset = Math.max(0, window.innerHeight - viewportHeight - viewportOffsetTop)
       const keyboardOpen = viewportHeight < window.innerHeight - 120
       const topRem = keyboardOpen ? 0.75 : 4.5
       const topSpacePx = viewportOffsetTop + topRem * 16
 
       root.style.setProperty('--shadowchat-visual-viewport-height', `${viewportHeight}px`)
+      root.style.setProperty('--shadowchat-keyboard-inset', `${keyboardInset}px`)
       root.style.setProperty('--shadowchat-toast-top', `calc(${viewportOffsetTop}px + env(safe-area-inset-top) + ${topRem}rem)`)
       root.style.setProperty('--shadowchat-toast-top-space', `${topSpacePx}px`)
     }
@@ -146,6 +148,7 @@ function App() {
       window.visualViewport?.removeEventListener('scroll', updateToastViewport)
       window.removeEventListener('resize', updateToastViewport)
       root.style.removeProperty('--shadowchat-visual-viewport-height')
+      root.style.removeProperty('--shadowchat-keyboard-inset')
       root.style.removeProperty('--shadowchat-toast-top')
       root.style.removeProperty('--shadowchat-toast-top-space')
     }
