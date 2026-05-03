@@ -7,6 +7,12 @@ const mockEditMessage = jest.fn()
 const mockDeleteMessage = jest.fn()
 const mockToggleReaction = jest.fn()
 const mockMarkRead = jest.fn()
+let mockProfile = {
+  id: 'user-1',
+  username: 'reporter',
+  display_name: 'Reporter',
+  admin_role: null as 'admin' | 'sub_admin' | null,
+}
 
 const baseMessage = {
   id: 'message-1',
@@ -23,6 +29,7 @@ const baseMessage = {
     display_name: 'Reporter',
     avatar_url: null,
     color: '#d7aa46',
+    admin_role: null as 'admin' | 'sub_admin' | null,
   },
 }
 
@@ -45,11 +52,7 @@ jest.mock('../src/hooks/useBoardChat', () => ({
 
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => ({
-    profile: {
-      id: 'user-1',
-      username: 'reporter',
-      display_name: 'Reporter',
-    },
+    profile: mockProfile,
   }),
 }))
 
@@ -76,6 +79,12 @@ jest.mock('react-hot-toast', () => {
 })
 
 beforeEach(() => {
+  mockProfile = {
+    id: 'user-1',
+    username: 'reporter',
+    display_name: 'Reporter',
+    admin_role: null,
+  }
   mockSendMessage.mockResolvedValue(null)
   mockEditMessage.mockResolvedValue(undefined)
   mockDeleteMessage.mockResolvedValue(undefined)
@@ -123,6 +132,55 @@ test('news chat supports owner edits, deletes, and reactions', async () => {
 
   fireEvent.click(screen.getByRole('button', { name: /reaction \u{1F525} count 2/iu }))
   expect(mockToggleReaction).toHaveBeenCalledWith('message-1', '\u{1F525}')
+})
+
+test('news chat lets operators delete normal user messages', async () => {
+  mockProfile = {
+    id: 'admin-1',
+    username: 'mod',
+    display_name: 'Mod',
+    admin_role: 'sub_admin',
+  }
+  mockUseNewsChat.mockReturnValueOnce(buildNewsChatState([{
+    ...baseMessage,
+    user_id: 'user-2',
+    user: {
+      ...baseMessage.user,
+      id: 'user-2',
+      admin_role: null,
+    },
+  }]))
+
+  render(<NewsChat />)
+
+  fireEvent.click(screen.getByRole('button', { name: /news chat message actions/i }))
+  fireEvent.click(screen.getByRole('menuitem', { name: /^delete$/i }))
+
+  expect(mockDeleteMessage).toHaveBeenCalledWith('message-1')
+})
+
+test('news chat hides operator delete for another operator message', () => {
+  mockProfile = {
+    id: 'admin-1',
+    username: 'mod',
+    display_name: 'Mod',
+    admin_role: 'sub_admin',
+  }
+  mockUseNewsChat.mockReturnValueOnce(buildNewsChatState([{
+    ...baseMessage,
+    user_id: 'user-2',
+    user: {
+      ...baseMessage.user,
+      id: 'user-2',
+      admin_role: 'admin',
+    },
+  }]))
+
+  render(<NewsChat />)
+
+  fireEvent.click(screen.getByRole('button', { name: /news chat message actions/i }))
+
+  expect(screen.queryByRole('menuitem', { name: /^delete$/i })).not.toBeInTheDocument()
 })
 
 test('news chat leaves long comments readable and keeps reaction menu in its own column', () => {

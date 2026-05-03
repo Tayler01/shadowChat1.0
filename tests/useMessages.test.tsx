@@ -325,7 +325,7 @@ describe('message actions', () => {
 
     expect(deleteFn).toHaveBeenCalled();
     expect(eqFn).toHaveBeenNthCalledWith(1, 'id', 'm1');
-    expect(eqFn).toHaveBeenNthCalledWith(2, 'user_id', user.id);
+    expect(eqFn).toHaveBeenCalledTimes(1);
   });
 
   it('toggles reaction', async () => {

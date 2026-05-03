@@ -117,3 +117,24 @@ test('realtime recovery refreshes board chat without showing the full loading st
   await waitFor(() => expect(refreshQuery.limit).toHaveBeenCalledWith(50))
   expect(result.current.loading).toBe(false)
 })
+
+test('deletes board chat messages without client-side owner filtering', async () => {
+  const initialQuery = createQuery([createMessage('m1', 1)])
+  const deleteQuery = createQuery([])
+  workingClient.from
+    .mockReturnValueOnce(initialQuery)
+    .mockReturnValueOnce(deleteQuery)
+
+  const { result } = renderHook(() => useBoardChat('news-chat', 'News Chat'))
+
+  await waitFor(() => expect(result.current.loading).toBe(false))
+
+  await act(async () => {
+    await result.current.deleteMessage('m1')
+  })
+
+  expect(deleteQuery.delete).toHaveBeenCalled()
+  expect(deleteQuery.eq).toHaveBeenNthCalledWith(1, 'id', 'm1')
+  expect(deleteQuery.eq).toHaveBeenNthCalledWith(2, 'board_slug', 'news-chat')
+  expect(deleteQuery.eq).toHaveBeenCalledTimes(2)
+})

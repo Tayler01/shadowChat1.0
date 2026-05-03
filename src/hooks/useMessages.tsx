@@ -774,8 +774,7 @@ function useProvideMessages(): MessagesContextValue {
       const { error } = await workingClient
         .from('messages')
         .delete()
-        .eq('id', messageId)
-        .eq('user_id', user.id);
+        .eq('id', messageId);
 
       if (error) {
         throw error;

@@ -9,6 +9,11 @@ Admins and sub-admins can open another user's public profile popup from an
 avatar and use the Admin Moderation section to manage channel bans. Full admins
 can also grant or remove sub-admin access from the same profile popup.
 
+Admins and sub-admins can also delete normal-user messages from General Chat and
+board chats through the message action menu. Messages authored by admins or
+sub-admins are protected from other operators; DMs are not part of operator
+message deletion.
+
 Available scopes:
 
 - `general_chat`: blocks General Chat messages, edits, and reactions.
@@ -65,6 +70,9 @@ Ban enforcement happens at the database boundary:
   `general_chat` for group chat while leaving DM reactions alone.
 - `board_chat_messages` insert/update/delete policies check the board's
   moderation scope and `all_interaction`.
+- `messages` and `board_chat_messages` delete policies also allow app operators
+  to remove normal-user messages while protecting admin/sub-admin-authored
+  messages.
 - `board_chat_reactions` insert/delete policies and `toggle_board_chat_reaction`
   check the board's moderation scope and `all_interaction`.
 - `news_feed_reactions` insert policy and `toggle_news_feed_reaction` check

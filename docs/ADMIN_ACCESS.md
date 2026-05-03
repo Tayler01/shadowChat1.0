@@ -39,6 +39,9 @@ Admin settings are split into subpages under Settings > Admin:
 - Channel Bans: operator controls shown in another user's public profile popup
   for General Chat, individual chat boards, and all-interaction participation
   limits.
+- Message Moderation: operators can delete normal-user messages in General Chat
+  and board chats from the message action menu. Admin/sub-admin-authored
+  messages and all DMs are excluded.
 
 ## Backend Surface
 

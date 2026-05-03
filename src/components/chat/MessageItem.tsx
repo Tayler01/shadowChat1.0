@@ -91,6 +91,9 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
 
     const isGrouped = shouldGroupMessage(message, previousMessage)
     const isOwner = profile?.id === message.user_id
+    const isOperator = profile?.admin_role === 'admin' || profile?.admin_role === 'sub_admin'
+    const isAuthorOperator = message.user?.admin_role === 'admin' || message.user?.admin_role === 'sub_admin'
+    const canDelete = isOwner || (isOperator && Boolean(message.user) && !isAuthorOperator)
     const isShadoAI = message.user?.username === 'shado_ai'
     const isAIMessage = isShadoAI || message.message_type === 'command'
     const avatarSrc = isShadoAI
@@ -207,7 +210,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         label: 'Delete',
         icon: Trash2,
         tone: 'danger',
-        hidden: !isOwner,
+        hidden: !canDelete,
         onSelect: () => void onDelete(message.id),
       },
       {

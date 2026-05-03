@@ -102,6 +102,7 @@ Recent app-surface migrations to confirm in fresh projects:
 - `20260502070543_channel_bans_moderation.sql`: profile-popup moderation controls and channel-ban enforcement.
 - `20260502193604_boards_domain.sql`: Boards catalog, reusable board-chat stream, per-board unread counts, and Boards moderation scopes.
 - `20260503191500_add_new_chat_boards.sql`: Vibe Coding, AI News, and Projects Chat catalog rows plus their board moderation scopes.
+- `20260503191532_admin_delete_non_admin_chat_messages.sql`: operator deletion of normal-user General Chat and board-chat messages.
 
 ### Edge Functions
 

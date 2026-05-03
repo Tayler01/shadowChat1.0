@@ -5,13 +5,18 @@ import { MessageItem } from '../src/components/chat/MessageItem'
 import type { Message } from '../src/lib/supabase'
 import { useToneAnalysisEnabled } from '../src/hooks/useToneAnalysisEnabled'
 
+let mockAuthState = {
+  user: { id: 'u1' },
+  profile: { id: 'u1', admin_role: null as 'admin' | 'sub_admin' | null },
+}
+
 jest.mock('../src/config', () => ({
   PRESENCE_INTERVAL_MS: 30000,
   MESSAGE_FETCH_LIMIT: 40,
 }))
 
 jest.mock('../src/hooks/useAuth', () => ({
-  useAuth: () => ({ user: { id: 'u1' } }),
+  useAuth: () => mockAuthState,
 }))
 
 jest.mock('../src/hooks/useToneAnalysisEnabled')
@@ -48,6 +53,10 @@ const baseMessage = {
 } as unknown as Message
 
 beforeEach(() => {
+  mockAuthState = {
+    user: { id: 'u1' },
+    profile: { id: 'u1', admin_role: null },
+  }
   mockedToneEnabled.mockReturnValue({ enabled: true, setEnabled: jest.fn() })
 })
 
@@ -141,6 +150,76 @@ test('renders file message', () => {
 
   const link = screen.getByRole('link', { name: /doc.txt/i })
   expect(link).toHaveAttribute('href', fileMessage.file_url)
+})
+
+test('lets an app operator delete a normal user group message', async () => {
+  mockAuthState = {
+    user: { id: 'admin-1' },
+    profile: { id: 'admin-1', admin_role: 'sub_admin' },
+  }
+  const onDelete = jest.fn()
+  const normalUserMessage = {
+    ...baseMessage,
+    user_id: 'u2',
+    message_type: 'text',
+    content: 'needs moderation',
+    user: {
+      ...baseMessage.user,
+      id: 'u2',
+      admin_role: null,
+    },
+  } as Message
+
+  render(
+    <MessageItem
+      message={normalUserMessage}
+      onEdit={async () => {}}
+      onDelete={onDelete}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+      onJumpToMessage={() => {}}
+      containerRef={React.createRef()}
+    />
+  )
+
+  await userEvent.click(screen.getByRole('button', { name: /message actions/i }))
+  await userEvent.click(screen.getByRole('menuitem', { name: /^delete$/i }))
+
+  expect(onDelete).toHaveBeenCalledWith('m1')
+})
+
+test('does not let an operator delete another operator group message', async () => {
+  mockAuthState = {
+    user: { id: 'admin-1' },
+    profile: { id: 'admin-1', admin_role: 'sub_admin' },
+  }
+  const operatorMessage = {
+    ...baseMessage,
+    user_id: 'u2',
+    message_type: 'text',
+    content: 'operator message',
+    user: {
+      ...baseMessage.user,
+      id: 'u2',
+      admin_role: 'sub_admin',
+    },
+  } as Message
+
+  render(
+    <MessageItem
+      message={operatorMessage}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+      onJumpToMessage={() => {}}
+      containerRef={React.createRef()}
+    />
+  )
+
+  await userEvent.click(screen.getByRole('button', { name: /message actions/i }))
+
+  expect(screen.queryByRole('menuitem', { name: /^delete$/i })).not.toBeInTheDocument()
 })
 
 test('renders audio file preview', () => {

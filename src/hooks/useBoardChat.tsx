@@ -263,7 +263,6 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
       .delete()
       .eq('id', messageId)
       .eq('board_slug', boardSlug)
-      .eq('user_id', user.id)
 
     if (deleteError) throw deleteError
     setMessages(prev => prev.filter(message => message.id !== messageId))

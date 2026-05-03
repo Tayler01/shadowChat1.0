@@ -58,6 +58,9 @@ function BoardChatRow({
   const EmojiPicker = useEmojiPicker(showReactionPicker)
   const pickerDimensions = getEmojiPickerDimensions()
   const isOwner = profile?.id === message.user_id
+  const isOperator = profile?.admin_role === 'admin' || profile?.admin_role === 'sub_admin'
+  const isAuthorOperator = message.user?.admin_role === 'admin' || message.user?.admin_role === 'sub_admin'
+  const canDelete = isOwner || (isOperator && Boolean(message.user) && !isAuthorOperator)
 
   const copyMessage = async () => {
     try {
@@ -150,7 +153,7 @@ function BoardChatRow({
       label: 'Delete',
       icon: Trash2,
       tone: 'danger',
-      hidden: !isOwner,
+      hidden: !canDelete,
       onSelect: deleteMessage,
     },
   ]
