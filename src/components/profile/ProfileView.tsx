@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Camera, Edit3, Eye, Ghost, Save, X, Menu } from 'lucide-react'
+import { Camera, Edit3, Eye, Ghost, Minus, Plus, RotateCcw, Save, X, Menu } from 'lucide-react'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useAuth } from '../../hooks/useAuth'
 import { fetchUserStats } from '../../lib/supabase'
@@ -31,6 +31,274 @@ interface ProfileFormData {
   color: string
 }
 
+interface AvatarEditorState {
+  file: File
+  url: string
+}
+
+interface AvatarCropDialogProps {
+  state: AvatarEditorState
+  saving: boolean
+  onCancel: () => void
+  onSave: (file: File) => Promise<void>
+}
+
+const AVATAR_OUTPUT_SIZE = 512
+const AVATAR_PREVIEW_SIZE = 224
+const MIN_AVATAR_ZOOM = 1
+const MAX_AVATAR_ZOOM = 3
+
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(value, max))
+
+const getCoverBaseScale = (imageSize: { width: number; height: number }, outputSize: number) => {
+  if (!imageSize.width || !imageSize.height) return 1
+  return Math.max(outputSize / imageSize.width, outputSize / imageSize.height)
+}
+
+const getOffsetBounds = (imageSize: { width: number; height: number }, zoom: number) => {
+  const baseScale = getCoverBaseScale(imageSize, AVATAR_OUTPUT_SIZE)
+  const drawWidth = imageSize.width * baseScale * zoom
+  const drawHeight = imageSize.height * baseScale * zoom
+
+  return {
+    x: Math.max(0, (drawWidth - AVATAR_OUTPUT_SIZE) / 2),
+    y: Math.max(0, (drawHeight - AVATAR_OUTPUT_SIZE) / 2),
+  }
+}
+
+const createAdjustedAvatarFile = async (
+  sourceUrl: string,
+  originalFile: File,
+  imageSize: { width: number; height: number },
+  zoom: number,
+  offset: { x: number; y: number }
+) => {
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = () => reject(new Error('Failed to load avatar image'))
+    img.src = sourceUrl
+  })
+
+  const canvas = document.createElement('canvas')
+  canvas.width = AVATAR_OUTPUT_SIZE
+  canvas.height = AVATAR_OUTPUT_SIZE
+  const context = canvas.getContext('2d')
+  if (!context) {
+    throw new Error('Avatar editor is unavailable in this browser')
+  }
+
+  const type = ['image/png', 'image/webp', 'image/jpeg'].includes(originalFile.type)
+    ? originalFile.type
+    : 'image/jpeg'
+
+  if (type === 'image/jpeg') {
+    context.fillStyle = '#0d0f10'
+    context.fillRect(0, 0, AVATAR_OUTPUT_SIZE, AVATAR_OUTPUT_SIZE)
+  }
+
+  const baseScale = getCoverBaseScale(imageSize, AVATAR_OUTPUT_SIZE)
+  const drawWidth = imageSize.width * baseScale * zoom
+  const drawHeight = imageSize.height * baseScale * zoom
+  const drawX = (AVATAR_OUTPUT_SIZE - drawWidth) / 2 + offset.x
+  const drawY = (AVATAR_OUTPUT_SIZE - drawHeight) / 2 + offset.y
+
+  context.drawImage(image, drawX, drawY, drawWidth, drawHeight)
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(result => {
+      if (result) {
+        resolve(result)
+      } else {
+        reject(new Error('Failed to prepare avatar image'))
+      }
+    }, type, 0.92)
+  })
+
+  const extension = type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg'
+  return new File([blob], `avatar-${Date.now()}.${extension}`, { type })
+}
+
+function AvatarCropDialog({ state, saving, onCancel, onSave }: AvatarCropDialogProps) {
+  const [imageSize, setImageSize] = useState({ width: 0, height: 0 })
+  const [zoom, setZoom] = useState(1.18)
+  const [offset, setOffset] = useState({ x: 0, y: 0 })
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>())
+  const lastPinchDistanceRef = useRef<number | null>(null)
+  const lastDragPointRef = useRef<{ x: number; y: number } | null>(null)
+
+  const clampOffset = useCallback((nextOffset: { x: number; y: number }, nextZoom = zoom) => {
+    const bounds = getOffsetBounds(imageSize, nextZoom)
+    return {
+      x: clamp(nextOffset.x, -bounds.x, bounds.x),
+      y: clamp(nextOffset.y, -bounds.y, bounds.y),
+    }
+  }, [imageSize, zoom])
+
+  const updateZoom = useCallback((nextZoom: number) => {
+    const clampedZoom = clamp(nextZoom, MIN_AVATAR_ZOOM, MAX_AVATAR_ZOOM)
+    setZoom(clampedZoom)
+    setOffset(current => clampOffset(current, clampedZoom))
+  }, [clampOffset])
+
+  const resetCrop = () => {
+    setZoom(1.18)
+    setOffset({ x: 0, y: 0 })
+  }
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId)
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    lastDragPointRef.current = { x: event.clientX, y: event.clientY }
+
+    if (pointersRef.current.size === 2) {
+      const points = Array.from(pointersRef.current.values())
+      lastPinchDistanceRef.current = Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y)
+    }
+  }
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!pointersRef.current.has(event.pointerId)) return
+
+    pointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+
+    if (pointersRef.current.size >= 2) {
+      const points = Array.from(pointersRef.current.values())
+      const nextDistance = Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y)
+      const previousDistance = lastPinchDistanceRef.current ?? nextDistance
+      if (previousDistance > 0) {
+        updateZoom(zoom * (nextDistance / previousDistance))
+      }
+      lastPinchDistanceRef.current = nextDistance
+      return
+    }
+
+    const lastPoint = lastDragPointRef.current
+    if (!lastPoint) return
+
+    const scale = AVATAR_OUTPUT_SIZE / AVATAR_PREVIEW_SIZE
+    const delta = {
+      x: (event.clientX - lastPoint.x) * scale,
+      y: (event.clientY - lastPoint.y) * scale,
+    }
+    setOffset(current => clampOffset({ x: current.x + delta.x, y: current.y + delta.y }))
+    lastDragPointRef.current = { x: event.clientX, y: event.clientY }
+  }
+
+  const clearPointer = (event: React.PointerEvent<HTMLDivElement>) => {
+    pointersRef.current.delete(event.pointerId)
+    lastPinchDistanceRef.current = null
+    lastDragPointRef.current = pointersRef.current.size === 1
+      ? Array.from(pointersRef.current.values())[0]
+      : null
+  }
+
+  const previewBaseScale = getCoverBaseScale(imageSize, AVATAR_PREVIEW_SIZE)
+  const previewWidth = imageSize.width * previewBaseScale * zoom
+  const previewHeight = imageSize.height * previewBaseScale * zoom
+  const previewOffset = {
+    x: (offset.x / AVATAR_OUTPUT_SIZE) * AVATAR_PREVIEW_SIZE,
+    y: (offset.y / AVATAR_OUTPUT_SIZE) * AVATAR_PREVIEW_SIZE,
+  }
+
+  const handleSave = async () => {
+    try {
+      const adjusted = await createAdjustedAvatarFile(state.url, state.file, imageSize, zoom, clampOffset(offset))
+      await onSave(adjusted)
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to prepare avatar')
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[rgba(4,5,6,0.76)] p-4 backdrop-blur-sm">
+      <div className="popup-surface w-full max-w-md overflow-hidden rounded-[var(--radius-lg)]">
+        <div className="flex items-center justify-between border-b border-[var(--border-panel)] px-4 py-3">
+          <div>
+            <h2 className="text-base font-semibold text-[var(--text-primary)]">Adjust Avatar</h2>
+            <p className="text-xs text-[var(--text-muted)]">Drag to position. Pinch or use size to zoom.</p>
+          </div>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="popup-close inline-flex h-9 w-9 items-center justify-center rounded-full"
+            aria-label="Cancel avatar adjustment"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-5 p-5">
+          <div className="flex justify-center">
+            <div
+              role="application"
+              aria-label="Avatar crop preview"
+              className="relative h-56 w-56 touch-none overflow-hidden rounded-full border-4 border-[rgba(255,240,184,0.2)] bg-[rgba(255,255,255,0.04)] shadow-[var(--shadow-panel-strong)]"
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={clearPointer}
+              onPointerCancel={clearPointer}
+            >
+              <img
+                src={state.url}
+                alt="Avatar preview"
+                draggable={false}
+                onLoad={event => {
+                  const img = event.currentTarget
+                  setImageSize({ width: img.naturalWidth, height: img.naturalHeight })
+                  setOffset(current => clampOffset(current))
+                }}
+                className="absolute left-1/2 top-1/2 max-w-none select-none"
+                style={{
+                  width: previewWidth || 'auto',
+                  height: previewHeight || 'auto',
+                  transform: `translate(-50%, -50%) translate(${previewOffset.x}px, ${previewOffset.y}px)`,
+                }}
+              />
+              <div className="pointer-events-none absolute inset-0 rounded-full ring-1 ring-inset ring-white/10" />
+            </div>
+          </div>
+
+          <label className="block space-y-2">
+            <div className="flex items-center justify-between text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
+              <span>Size</span>
+              <span>{Math.round(zoom * 100)}%</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Minus className="h-4 w-4 text-[var(--text-muted)]" />
+              <input
+                type="range"
+                min={MIN_AVATAR_ZOOM}
+                max={MAX_AVATAR_ZOOM}
+                step={0.01}
+                value={zoom}
+                onChange={event => updateZoom(Number(event.target.value))}
+                className="w-full accent-[var(--gold-accent)]"
+                aria-label="Avatar size"
+              />
+              <Plus className="h-4 w-4 text-[var(--text-muted)]" />
+            </div>
+          </label>
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button type="button" variant="ghost" onClick={resetCrop} className="flex-1">
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Reset
+            </Button>
+            <Button type="button" variant="ghost" onClick={onCancel} className="flex-1">
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => void handleSave()} loading={saving || !imageSize.width} className="flex-1">
+              Save Avatar
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embedded = false }) => {
   const { profile, updateProfile, uploadAvatar, uploadBanner } = useAuth()
   const myPresence = usePresenceForUser(profile?.id)
@@ -42,6 +310,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
   const [stats, setStats] = useState({ messages: 0, reactions: 0, friends: 0 })
   const avatarInputRef = React.useRef<HTMLInputElement>(null)
   const bannerInputRef = React.useRef<HTMLInputElement>(null)
+  const [avatarEditor, setAvatarEditor] = useState<AvatarEditorState | null>(null)
   const [formData, setFormData] = useState<ProfileFormData>({
     display_name: profile?.display_name || '',
     status_message: profile?.status_message || '',
@@ -76,19 +345,40 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
     })
   }, [isEditing, profile])
 
+  useEffect(() => {
+    return () => {
+      if (avatarEditor) {
+        URL.revokeObjectURL(avatarEditor.url)
+      }
+    }
+  }, [avatarEditor])
+
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    const url = URL.createObjectURL(file)
+    setAvatarEditor({ file, url })
+    e.target.value = ''
+  }
+
+  const closeAvatarEditor = () => {
+    if (avatarEditor) {
+      URL.revokeObjectURL(avatarEditor.url)
+    }
+    setAvatarEditor(null)
+  }
+
+  const saveAdjustedAvatar = async (file: File) => {
     setUploadingAvatar(true)
     try {
       await uploadAvatar(file)
       toast.success('Avatar updated!')
+      closeAvatarEditor()
     } catch (err) {
       console.error(err)
       toast.error('Failed to upload avatar')
     } finally {
       setUploadingAvatar(false)
-      e.target.value = ''
     }
   }
 
@@ -497,6 +787,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
             </div>
           </div>
         </div>
+      )}
+      {avatarEditor && (
+        <AvatarCropDialog
+          state={avatarEditor}
+          saving={uploadingAvatar}
+          onCancel={closeAvatarEditor}
+          onSave={saveAdjustedAvatar}
+        />
       )}
     </div>
   )

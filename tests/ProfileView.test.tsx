@@ -34,6 +34,10 @@ jest.mock('../src/hooks/useAuth', () => ({
   }),
 }))
 
+jest.mock('../src/hooks/useUserChannelBans', () => ({
+  useUserChannelBans: () => ({ hasActiveBan: false }),
+}))
+
 jest.mock('../src/lib/supabase', () => ({
   fetchUserStats: jest.fn(() => new Promise(() => {})),
 }))
@@ -47,6 +51,8 @@ jest.mock('react-hot-toast', () => {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  URL.createObjectURL = jest.fn(() => 'blob:avatar-preview')
+  URL.revokeObjectURL = jest.fn()
 })
 
 test('edits bio through the profile form', async () => {
@@ -71,4 +77,18 @@ test('keeps profile image controls visually anchored and visible', () => {
   expect(screen.getByRole('button', { name: /change avatar/i })).toHaveClass('-bottom-2')
   expect(screen.getByRole('button', { name: /change avatar/i })).toHaveClass('right-1')
   expect(screen.getByRole('button', { name: /change banner image/i }).className).toContain('rgba(255,240,184,0.46)')
+})
+
+test('opens avatar adjustment before uploading a selected profile image', () => {
+  render(<ProfileView onToggleSidebar={jest.fn()} />)
+
+  const inputs = document.querySelectorAll('input[type="file"][accept="image/*"]')
+  const input = inputs[1] as HTMLInputElement
+  const file = new File(['avatar'], 'avatar.png', { type: 'image/png' })
+
+  fireEvent.change(input, { target: { files: [file] } })
+
+  expect(screen.getByRole('heading', { name: /adjust avatar/i })).toBeInTheDocument()
+  expect(screen.getByRole('application', { name: /avatar crop preview/i })).toBeInTheDocument()
+  expect(uploadAvatar).not.toHaveBeenCalled()
 })
