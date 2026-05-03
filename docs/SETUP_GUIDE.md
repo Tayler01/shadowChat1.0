@@ -67,6 +67,8 @@ supabase db push
 ```
 
 That applies the migrations under [supabase/migrations](C:/repos/chat2.0/supabase/migrations).
+For hosted projects, use `supabase migration list --linked` after the push to
+confirm the remote project includes the latest app-surface migrations.
 
 ## 4. Configure Supabase Secrets
 
@@ -208,7 +210,7 @@ After setup, verify:
 5. Profile updates persist
 6. Push settings screen renders
 7. New-account phone setup opens after signup or first sign-in from the same browser
-8. Boards tab loads the low-friction bubble map and bubbles reset when Boards is reopened
+8. Boards tab loads the low-friction map, feed pills/chat circles/static squares render correctly, and the map resets when Boards is reopened
 9. News Chat, Investing Chat, Learning Chat, Crypto Chat, Vibe Coding, AI News, and Projects Chat send and receive messages without duplicate subheaders
 10. An `admin` or `sub_admin` user can add, pause, enable, and delete a News source in Settings > Admin > News Sources
 11. If the scraper is configured, `news_sources.last_checked_at` updates after a worker cycle
@@ -217,6 +219,9 @@ After setup, verify:
 14. General Chat shows the weather widget and active-user count without overlapping on mobile
 15. An `admin` or `sub_admin` can open another user's profile popup and update channel-ban scopes
 16. A banned user cannot post/react in the selected channel, board, or all-interaction scope, and can still read content and use DMs
+17. An `admin` or `sub_admin` can delete a normal-user General Chat or board-chat message and the delete propagates to another signed-in client
+18. Avatar upload allows crop/zoom/position adjustment and the saved avatar renders correctly in chat and profile surfaces
+19. A sparse DM thread keeps messages visible when the mobile keyboard opens
 
 ## 10. Optional Preview Mode
 
@@ -277,6 +282,13 @@ For implementation and QA details, see [docs/PHONE_INSTALL_ONBOARDING.md](C:/rep
 - confirm the signed-in account has `admin` or `sub_admin`
 - confirm the target profile is not the single full admin account
 - confirm migrations include `user_channel_bans`
+
+### Operator Message Delete Fails
+
+- confirm the signed-in account has `admin` or `sub_admin`
+- confirm the target message was not authored by an admin or sub-admin
+- confirm migrations include `20260503191532_admin_delete_non_admin_chat_messages.sql`
+- confirm you are testing General Chat or a board chat, not DMs
 
 ### Weather Location Does Not Save
 

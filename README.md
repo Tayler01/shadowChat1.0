@@ -23,14 +23,15 @@ The project is already wired for hosted Supabase and Netlify deployment. It is d
 - Realtime group chat with active-user count and per-user weather in the header
 - Realtime direct messages
 - Unread tracking and in-app DM notifications
-- User profiles with avatar, banner, status, role badges, presence visibility, theme color, and admin moderation controls
+- User profiles with adjustable avatar crop/zoom, banner, status, role badges, presence visibility, theme color, and admin moderation controls
 - File, image, and voice-message uploads
 - Message reactions, pinning, editing, and deletion
 - Slash commands and reply/thread affordances
 - AI reply and summary hooks through a secured Supabase Edge Function
-- Boards tab with a low-friction draggable bubble map, the existing News Feed, News Chat, Investing Chat, Learning Chat, Crypto Chat, and a coming-soon Art Board
+- Boards tab with a low-friction draggable board map, feed pills, chat circles, static board squares, the existing News Feed, News Chat, Investing Chat, Learning Chat, Crypto Chat, and a coming-soon Art Board
 - App-wide admin/sub-admin access controls with role badges and operator-only tools
 - Operator-managed bans for General Chat, individual chat boards, and all app interaction
+- Server-confirmed operator message deletion for normal-user General Chat and board-chat messages
 - Admin-managed X/Truth Social source tracking from Settings
 - Admin feedback review for submitted bugs, suggestions, and private attachments
 - Server-side link previews for chat, DMs, and board chat URLs
@@ -167,6 +168,7 @@ node scripts/playwright-smoke.mjs --scenario=full --run-name=full-smoke-release 
 - News Feed realtime depends on the isolated News migrations, the `shado-news-scraper` Render worker, and the source health/cursor fields in `news_sources`.
 - Board chat realtime depends on `board_chat_messages`, `board_chat_reactions`, `user_read_cursors`, and `get_board_badge_counts`.
 - Board and feed detail views share the primary Boards header/back control and intentionally avoid redundant secondary headers or manual refresh buttons.
+- Operator message deletes in General Chat and board chats depend on the moderation delete policies returning a deleted row before the client removes it locally.
 - Weather preferences are private, and forecasts refresh automatically after preference changes and on a periodic timer. `user_weather_preferences` is not published to Supabase Realtime.
 - iPhone web push requires the app to be installed to the Home Screen. Android and Windows work through supported browsers/PWAs.
 - iPhone Home Screen resume behavior now depends on the session/realtime hardening in [`src/lib/supabase.ts`](C:/repos/chat2.0/src/lib/supabase.ts:1) and the deferred auth callback flow in [`src/hooks/useAuth.tsx`](C:/repos/chat2.0/src/hooks/useAuth.tsx:1). Avoid reintroducing async Supabase calls directly inside `onAuthStateChange`.

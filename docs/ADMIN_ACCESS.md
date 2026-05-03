@@ -41,7 +41,8 @@ Admin settings are split into subpages under Settings > Admin:
   limits.
 - Message Moderation: operators can delete normal-user messages in General Chat
   and board chats from the message action menu. Admin/sub-admin-authored
-  messages and all DMs are excluded.
+  messages and all DMs are excluded. The delete hooks require Supabase to
+  return the deleted row before the UI removes it locally.
 
 ## Backend Surface
 
@@ -52,6 +53,8 @@ Main tables:
 - `public.admin_role_notifications`: one-time user notices for role grants.
 - `public.users.admin_role`: synced public role badge field.
 - `public.user_channel_bans`: active and historical channel-ban records.
+- `messages` and `board_chat_messages`: protected by operator delete policies
+  for normal-user message moderation.
 
 Main RPCs:
 

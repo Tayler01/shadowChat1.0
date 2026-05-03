@@ -54,6 +54,7 @@ Do browser validation when changing:
 - theme and visual polish
 - push notification setup
 - Boards map layout, per-board badges, News Feed layout, reaction menus, and source-health admin UI
+- profile avatar crop, zoom, and positioning
 - admin access, admin subpages, role badges, or channel-ban moderation
 - active-user indicators or presence visibility
 - General Chat weather widget or Account & Profile weather location settings
@@ -212,8 +213,9 @@ For link preview changes, verify a local preview build with a signed-in account 
 For Boards changes, verify both desktop and mobile:
 
 - Boards nav label opens the bubble map, and old `view=news` URLs route to Boards
-- board bubbles show per-board unread counts and reset to the default layout when Boards is opened
-- dragging a bubble gives it low-friction motion and can push nearby bubbles into a diminishing chain reaction
+- feed boards render as pills, chat boards render as circles, and static boards render as squares
+- board objects show per-board unread counts and reset to the default layout when Boards is opened
+- dragging a board object gives it low-friction motion and can push nearby objects into a diminishing chain reaction
 - News Feed and all chat boards open from their bubbles, have a clear back button, and do not show duplicate secondary headers or manual refresh rows
 - feed tile media placement, no empty image placeholders, and scrollable modal media
 - feed and chat reaction menus stay inside the viewport
@@ -243,7 +245,8 @@ For Settings feedback changes, verify the wizard from Settings, submit at least 
 For Feedback Review changes, verify Settings > Admin > Feedback Review as an
 `admin` or `sub_admin`. The list should show submitted bugs and suggestions,
 and the full popup should show title, description, submitter metadata, and
-signed image attachments. Admin review is read-only for now.
+signed image attachments. The delete action should remove the submission from
+the operator list and prevent it from reopening.
 
 For Admin Access changes, verify a full `admin` can open Settings > Admin >
 Admin Access, search the complete user list, grant/revoke sub-admin access, and
@@ -257,6 +260,12 @@ account. Then verify the target user is blocked from General Chat, the selected
 chat boards, and/or all interaction according to the selected scopes while DMs
 remain usable and read access remains open.
 
+For operator message deletion changes, verify with two accounts that an
+`admin` or `sub_admin` can delete a normal-user message from General Chat and a
+chat board, and that the message disappears for both users through realtime.
+Also verify admin/sub-admin-authored messages and DMs do not expose operator
+delete behavior.
+
 For profile admin-access changes, verify the full admin can grant/remove
 sub-admin access from a user's profile popup, and sub-admin users cannot see or
 use that role-management control.
@@ -265,6 +274,10 @@ For weather changes, verify General Chat header on desktop and mobile, the
 forecast popup, and Settings > Account & Profile > Weather Location. Weather
 preferences should be scoped to the signed-in user and should not appear on
 public profile data. The forecast popup should not show a manual refresh button.
+
+For profile avatar changes, upload a new avatar, drag/reposition it, adjust
+zoom by slider and touch gesture where available, save, and verify the cropped
+result appears in chat, DMs, board chats, and the public profile popup.
 
 Disposable accounts are the most deterministic option. Reused env-backed accounts can carry old threads and unread state from earlier runs.
 
@@ -378,6 +391,7 @@ Examples:
 - login screen spacing
 - sidebar and bottom nav tap targets
 - DM composer overlap
+- empty or sparse DM threads keep the visible message history above the keyboard
 - settings scroll and action button layout
 - profile cards and stats layout
 - toast placement above nav/composer

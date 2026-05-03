@@ -91,6 +91,23 @@ participation.
 Boards require `public.board_catalog`, `public.board_chat_messages`,
 `public.board_chat_reactions`, and `get_board_badge_counts` before the
 production Boards UI can load chat boards or unread counts.
+Operator message deletion requires the latest message-delete policies before
+the production UI can delete normal-user General Chat or board-chat messages
+for everyone.
+
+Before marking a release complete, compare local and linked migration state:
+
+```powershell
+supabase migration list --linked
+supabase db push --linked --dry-run
+```
+
+If the dry run lists pending migrations, apply them before or with the frontend
+deploy:
+
+```powershell
+supabase db push --linked --yes
+```
 
 Recent app-surface migrations to confirm in fresh projects:
 
@@ -225,6 +242,7 @@ After deploy, verify:
 16. Settings > Admin > Feedback Review lists submitted feedback for an app operator
 17. An app operator can open another user's profile popup and see Channel bans
 18. A channel-banned user is blocked from the selected channel, board, or all interaction while DMs and read access still work
+19. An app operator can delete a normal-user General Chat message and board-chat message, and both disappear for other signed-in users without refresh
 
 Recommended production smoke for local post-deploy validation:
 
@@ -263,6 +281,14 @@ The frontend deploy can be healthy while push still fails if:
 ### Realtime Looks Stale
 
 The frontend deploy can be healthy while realtime still fails if the target Supabase project is not on the latest migrations.
+
+### Operator Delete Only Changes One Screen
+
+The frontend deploy can be healthy while admin/sub-admin message deletion fails
+server-side if the target Supabase project is missing
+`20260503191532_admin_delete_non_admin_chat_messages.sql`. The current client
+expects Supabase to return the deleted row; if no row is returned, it keeps the
+message visible and reports the failure instead of pretending the delete worked.
 
 ### Weather Widget Is Empty
 

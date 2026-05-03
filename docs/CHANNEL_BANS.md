@@ -12,7 +12,9 @@ can also grant or remove sub-admin access from the same profile popup.
 Admins and sub-admins can also delete normal-user messages from General Chat and
 board chats through the message action menu. Messages authored by admins or
 sub-admins are protected from other operators; DMs are not part of operator
-message deletion.
+message deletion. These deletes are server-confirmed deletes, not local hides:
+the client asks Supabase to return the deleted row and leaves the message in
+place if RLS or migration drift prevents the database delete.
 
 Available scopes:
 
@@ -50,6 +52,9 @@ The canonical schema lives in
 [`20260502070543_channel_bans_moderation.sql`](C:/repos/chat2.0/supabase/migrations/20260502070543_channel_bans_moderation.sql:1).
 Boards-era scopes and shared board-chat enforcement live in
 [`20260502193604_boards_domain.sql`](C:/repos/chat2.0/supabase/migrations/20260502193604_boards_domain.sql:1).
+Operator deletion of normal-user General Chat and board-chat messages is
+enabled by
+[`20260503191532_admin_delete_non_admin_chat_messages.sql`](C:/repos/chat2.0/supabase/migrations/20260503191532_admin_delete_non_admin_chat_messages.sql:1).
 
 Main table:
 
@@ -81,3 +86,16 @@ Ban enforcement happens at the database boundary:
 Every ban change inserts a public General Chat moderation notice from the Shado
 account with the target user, scope, reason, and duration. Expired timed bans
 are swept by `expire_user_channel_bans()` and announced the same way.
+
+## Deployment Check
+
+Before trusting moderation deletes in production, confirm the linked Supabase
+project includes `20260503191532_admin_delete_non_admin_chat_messages.sql`:
+
+```powershell
+supabase migration list --linked
+```
+
+If that migration is missing, admins may see delete failures. The current
+client deliberately does not remove the message locally unless Supabase returns
+the deleted row.

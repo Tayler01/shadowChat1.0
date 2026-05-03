@@ -8,10 +8,12 @@ the Render-hosted scraper that keeps the feed current.
 The old `News` tab has been rebuilt as `Boards`. Opening `view=news` still
 routes to Boards for compatibility, but the app now writes `view=boards`.
 
-The Boards landing surface is a low-friction draggable bubble map. Bubbles keep
-motion after a drag, bounce gently against bounds, and pass diminishing force to
-other bubbles on collision. The layout resets to the default arrangement each
-time users open Boards from navigation.
+The Boards landing surface is a low-friction draggable board map. Board objects
+keep motion after a drag, bounce gently against bounds, and pass diminishing
+force to other objects on collision. Visual shape communicates board type:
+feeds render as pills, chat boards render as circles, and static/non-chat boards
+render as squares. The layout resets to the default arrangement each time users
+open Boards from navigation.
 
 Current boards are:
 

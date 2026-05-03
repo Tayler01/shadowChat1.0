@@ -28,9 +28,9 @@ React UI
 
 - [`src/components/chat`](C:/repos/chat2.0/src/components/chat): group chat
 - [`src/components/dms`](C:/repos/chat2.0/src/components/dms): inbox and DM thread
-- [`src/components/boards`](C:/repos/chat2.0/src/components/boards): Boards map, board routing, and reusable chat boards
+- [`src/components/boards`](C:/repos/chat2.0/src/components/boards): draggable Boards map, board routing, and reusable chat boards
 - [`src/components/news`](C:/repos/chat2.0/src/components/news): News Feed, feed modal, reactions, and compatibility wrappers
-- [`src/components/profile`](C:/repos/chat2.0/src/components/profile): user profile experience
+- [`src/components/profile`](C:/repos/chat2.0/src/components/profile): user profile experience, including avatar crop/zoom/position editing before upload
 - [`src/components/settings`](C:/repos/chat2.0/src/components/settings): sectioned settings, notification setup, feedback, admin tools, and weather location
 - [`src/components/layout`](C:/repos/chat2.0/src/components/layout): shell, nav, and responsive structure
 
@@ -127,6 +127,11 @@ public profile popup. Operators can block General Chat, individual chat boards,
 or all app interaction for timed or permanent durations. DMs are deliberately
 not part of channel-ban enforcement.
 
+Operator message deletion is part of the same moderation surface for General
+Chat and board chats. The client only removes a message locally after Supabase
+returns the deleted row, which keeps RLS or migration drift from becoming a
+false local-only delete.
+
 Full runbook: [docs/ADMIN_ACCESS.md](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1).
 Moderation runbook: [docs/CHANNEL_BANS.md](C:/repos/chat2.0/docs/CHANNEL_BANS.md:1).
 
@@ -196,6 +201,14 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 5. Reactions are toggled through `toggle_board_chat_reaction`
 6. `user_read_cursors` tracks last read by `surface = 'board_chat'` and board slug
 7. The board content renders directly under the primary Boards header/back control with no duplicate subheader or manual refresh row
+
+### Boards Landing
+
+1. User opens Boards from the main navigation
+2. `BoardBubbleMap` lays out feed boards as pills, chat boards as circles, and static boards as squares
+3. Dragging a board object applies low-friction motion and collision transfer
+4. Selecting a board routes into its feed, chat, or static placeholder view
+5. Reopening Boards restores the default layout instead of persisting an old ad-hoc arrangement
 
 ### Channel Ban Enforcement
 
