@@ -10,17 +10,20 @@ import { NewsReactionSummaryStrip } from '../news/NewsReactionBar'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { UnreadDivider } from '../chat/UnreadDivider'
+import { MobileChatFooter } from '../layout/MobileChatFooter'
 import { useAuth } from '../../hooks/useAuth'
 import { useBoardChat } from '../../hooks/useBoardChat'
 import { useReadCursor } from '../../hooks/useReadCursor'
 import { useUnreadScroll } from '../../hooks/useUnreadScroll'
-import { formatTime } from '../../lib/utils'
+import { cn, formatTime } from '../../lib/utils'
 import { getBlockedActionMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
 import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import type { EmojiClickData } from '../../types'
 import type { BoardChatMessage } from '../../lib/supabase'
 import type { ChatBoardDefinition } from '../../lib/boards'
+
+type AppView = 'chat' | 'dms' | 'boards' | 'settings'
 
 const getEmojiPickerDimensions = () => {
   if (typeof window === 'undefined') return { width: 300, height: 360 }
@@ -245,7 +248,66 @@ function BoardChatRow({
   )
 }
 
-export function BoardChat({ board }: { board: ChatBoardDefinition }) {
+function BoardChatComposer({
+  board,
+  draft,
+  sending,
+  onDraftChange,
+  onSubmit,
+  className,
+}: {
+  board: ChatBoardDefinition
+  draft: string
+  sending: boolean
+  onDraftChange: (value: string) => void
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void
+  className?: string
+}) {
+  return (
+    <form
+      onSubmit={onSubmit}
+      className={cn(
+        'border-t border-[var(--border-panel)] bg-[linear-gradient(180deg,rgba(16,18,19,0.94),rgba(10,11,12,0.98))] p-3',
+        className
+      )}
+    >
+      <div className="flex items-end gap-2">
+        <textarea
+          value={draft}
+          onChange={event => onDraftChange(event.target.value)}
+          onKeyDown={event => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault()
+              event.currentTarget.form?.requestSubmit()
+            }
+          }}
+          placeholder={`Drop a link or note in ${board.title}`}
+          rows={1}
+          className="obsidian-input max-h-28 min-h-11 flex-1 resize-none rounded-[var(--radius-md)] px-3.5 py-3 text-base text-[var(--text-primary)] md:text-sm"
+        />
+        <Button
+          type="submit"
+          disabled={!draft.trim() || sending}
+          loading={sending}
+          className="h-11 w-11 rounded-xl p-0"
+          aria-label={`Send ${board.title} message`}
+        >
+          <Send className="h-5 w-5" />
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+export function BoardChat({
+  board,
+  currentView = 'boards',
+  onViewChange = () => {},
+}: {
+  board: ChatBoardDefinition
+  currentView?: AppView
+  onViewChange?: (view: AppView) => void
+}) {
   const { profile } = useAuth()
   const {
     messages,
@@ -305,6 +367,61 @@ export function BoardChat({ board }: { board: ChatBoardDefinition }) {
     }
   }, [handleUnreadScroll, hasMore, loadingMore, loadOlderMessages])
 
+  useEffect(() => {
+    let frameId: number | null = null
+    let settleFrameId: number | null = null
+    let settleTimerId: number | null = null
+
+    const keepLatestVisible = () => {
+      if (!autoScroll) return
+
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId)
+      }
+      if (settleFrameId !== null) {
+        cancelAnimationFrame(settleFrameId)
+      }
+      if (settleTimerId !== null) {
+        window.clearTimeout(settleTimerId)
+      }
+
+      frameId = requestAnimationFrame(() => {
+        frameId = null
+        scrollToBottom('auto')
+        settleFrameId = requestAnimationFrame(() => {
+          settleFrameId = null
+          scrollToBottom('auto')
+        })
+        settleTimerId = window.setTimeout(() => {
+          settleTimerId = null
+          scrollToBottom('auto')
+        }, 140)
+      })
+    }
+
+    keepLatestVisible()
+    window.visualViewport?.addEventListener('resize', keepLatestVisible)
+    window.visualViewport?.addEventListener('scroll', keepLatestVisible)
+    window.addEventListener('resize', keepLatestVisible)
+    window.addEventListener('focusin', keepLatestVisible)
+
+    return () => {
+      window.visualViewport?.removeEventListener('resize', keepLatestVisible)
+      window.visualViewport?.removeEventListener('scroll', keepLatestVisible)
+      window.removeEventListener('resize', keepLatestVisible)
+      window.removeEventListener('focusin', keepLatestVisible)
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId)
+      }
+      if (settleFrameId !== null) {
+        cancelAnimationFrame(settleFrameId)
+      }
+      if (settleTimerId !== null) {
+        window.clearTimeout(settleTimerId)
+      }
+    }
+  }, [autoScroll, messages.length, scrollToBottom])
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!draft.trim() || sending) return
@@ -325,7 +442,12 @@ export function BoardChat({ board }: { board: ChatBoardDefinition }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="relative min-h-0 flex-1">
-        <div ref={scrollRef} onScroll={handleScroll} className="h-full overflow-y-auto">
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          data-testid="board-chat-message-scroll"
+          className="h-full overflow-y-auto pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.75rem)] md:pb-0"
+        >
           {loading ? (
             <div className="flex h-full items-center justify-center p-8">
               <LoadingSpinner size="lg" className="text-[var(--text-gold)]" />
@@ -368,39 +490,32 @@ export function BoardChat({ board }: { board: ChatBoardDefinition }) {
             type="button"
             onClick={() => scrollToBottom()}
             aria-label="Jump to latest"
-            className="absolute bottom-4 right-4 z-20 rounded-full border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] p-2 text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)] transition-transform hover:-translate-y-0.5"
+            className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.5rem)] z-50 rounded-full border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] p-2 text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)] transition-transform hover:-translate-y-0.5 md:absolute md:bottom-4 md:right-4 md:z-20"
           >
             <ArrowDown className="h-5 w-5" />
           </button>
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="border-t border-[var(--border-panel)] bg-[linear-gradient(180deg,rgba(16,18,19,0.94),rgba(10,11,12,0.98))] p-3">
-        <div className="flex items-end gap-2">
-          <textarea
-            value={draft}
-            onChange={event => setDraft(event.target.value)}
-            onKeyDown={event => {
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault()
-                event.currentTarget.form?.requestSubmit()
-              }
-            }}
-            placeholder={`Drop a link or note in ${board.title}`}
-            rows={1}
-            className="obsidian-input max-h-28 min-h-11 flex-1 resize-none rounded-[var(--radius-md)] px-3.5 py-3 text-base text-[var(--text-primary)] md:text-sm"
-          />
-          <Button
-            type="submit"
-            disabled={!draft.trim() || sending}
-            loading={sending}
-            className="h-11 w-11 rounded-xl p-0"
-            aria-label={`Send ${board.title} message`}
-          >
-            <Send className="h-5 w-5" />
-          </Button>
-        </div>
-      </form>
+      <div className="hidden md:block">
+        <BoardChatComposer
+          board={board}
+          draft={draft}
+          sending={sending}
+          onDraftChange={setDraft}
+          onSubmit={handleSubmit}
+        />
+      </div>
+
+      <MobileChatFooter currentView={currentView} onViewChange={onViewChange}>
+        <BoardChatComposer
+          board={board}
+          draft={draft}
+          sending={sending}
+          onDraftChange={setDraft}
+          onSubmit={handleSubmit}
+        />
+      </MobileChatFooter>
     </div>
   )
 }

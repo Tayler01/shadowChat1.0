@@ -65,6 +65,14 @@ jest.mock('../src/hooks/useReadCursor', () => ({
   }),
 }))
 
+jest.mock('../src/hooks/useDirectMessages', () => ({
+  useDirectMessages: () => ({ conversations: [] }),
+}))
+
+jest.mock('../src/hooks/useBoardBadges', () => ({
+  useBoardBadges: () => ({ count: 0, refresh: jest.fn(), markFeedSeen: jest.fn(), countsByBoard: {} }),
+}))
+
 jest.mock('../src/lib/linkPreview', () => ({
   extractFirstMessageUrl: () => null,
   fetchLinkPreview: jest.fn(),
@@ -102,14 +110,23 @@ test('news chat renders messages and sends text links', async () => {
   expect(screen.getByText('Reporter')).toBeInTheDocument()
   expect(screen.getByText('Breaking link https://example.com/story')).toBeInTheDocument()
 
-  fireEvent.change(screen.getByPlaceholderText(/drop a link or note in news chat/i), {
+  fireEvent.change(screen.getAllByPlaceholderText(/drop a link or note in news chat/i)[0], {
     target: { value: 'new story https://example.com/new' },
   })
-  fireEvent.click(screen.getByRole('button', { name: /send news chat message/i }))
+  fireEvent.click(screen.getAllByRole('button', { name: /send news chat message/i })[0])
 
   await waitFor(() => {
     expect(mockSendMessage).toHaveBeenCalledWith('new story https://example.com/new')
   })
+})
+
+test('news chat reserves mobile footer and keyboard space in the message scroller', () => {
+  render(<NewsChat />)
+
+  expect(screen.getByTestId('board-chat-message-scroll')).toHaveClass(
+    'pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.75rem)]'
+  )
+  expect(screen.getAllByPlaceholderText(/drop a link or note in news chat/i)[0]).toHaveClass('text-base', 'md:text-sm')
 })
 
 test('news chat supports owner edits, deletes, and reactions', async () => {

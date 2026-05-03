@@ -492,16 +492,33 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     if (isDesktop || !currentConversation) return
 
     let frameId: number | null = null
+    let settleFrameId: number | null = null
+    let settleTimerId: number | null = null
+
     const keepLatestVisible = () => {
       if (!autoScroll) return
 
       if (frameId !== null) {
         cancelAnimationFrame(frameId)
       }
+      if (settleFrameId !== null) {
+        cancelAnimationFrame(settleFrameId)
+      }
+      if (settleTimerId !== null) {
+        window.clearTimeout(settleTimerId)
+      }
 
       frameId = requestAnimationFrame(() => {
         frameId = null
         scrollToBottom('auto')
+        settleFrameId = requestAnimationFrame(() => {
+          settleFrameId = null
+          scrollToBottom('auto')
+        })
+        settleTimerId = window.setTimeout(() => {
+          settleTimerId = null
+          scrollToBottom('auto')
+        }, 140)
       })
     }
 
@@ -518,6 +535,12 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
       window.removeEventListener('focusin', keepLatestVisible)
       if (frameId !== null) {
         cancelAnimationFrame(frameId)
+      }
+      if (settleFrameId !== null) {
+        cancelAnimationFrame(settleFrameId)
+      }
+      if (settleTimerId !== null) {
+        window.clearTimeout(settleTimerId)
       }
     }
   }, [autoScroll, currentConversation, isDesktop, messages.length, scrollToBottom])

@@ -94,6 +94,7 @@ function App() {
   useChannelBanExpirySweep()
   const [currentView, setCurrentView] = useState<View>(() => getInitialLocationState().view)
   const [boardsResetKey, setBoardsResetKey] = useState(0)
+  const [boardsChatFooterActive, setBoardsChatFooterActive] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const isDesktop = useIsDesktop()
   const mobileAppHeightRef = useRef<number | null>(null)
@@ -316,6 +317,12 @@ function App() {
     window.history.replaceState({}, '', url)
   }, [currentView, dmTarget, messageTarget])
 
+  useEffect(() => {
+    if (currentView !== 'boards') {
+      setBoardsChatFooterActive(false)
+    }
+  }, [currentView])
+
   const renderCurrentView = () => {
     switch (currentView) {
       case 'chat':
@@ -337,7 +344,14 @@ function App() {
           />
         )
       case 'boards':
-        return <BoardsView resetKey={boardsResetKey} />
+        return (
+          <BoardsView
+            resetKey={boardsResetKey}
+            currentView={currentView}
+            onViewChange={handleViewChange}
+            onMobileChatActiveChange={setBoardsChatFooterActive}
+          />
+        )
       case 'settings':
         return <SettingsView onToggleSidebar={toggleSidebar} />
       default:
@@ -385,7 +399,7 @@ function App() {
           </main>
 
           {/* Mobile bottom navigation */}
-          {currentView !== 'chat' && currentView !== 'dms' && (
+          {currentView !== 'chat' && currentView !== 'dms' && !(currentView === 'boards' && boardsChatFooterActive) && (
             <MobileNav currentView={currentView} onViewChange={handleViewChange} />
           )}
 

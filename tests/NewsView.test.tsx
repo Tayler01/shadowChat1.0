@@ -80,10 +80,12 @@ test('boards view opens feed boards and marks feed unread as seen immediately', 
 })
 
 test('boards view opens chat boards without clearing feed unread', () => {
-  render(<BoardsView />)
+  const onMobileChatActiveChange = jest.fn()
+  render(<BoardsView onMobileChatActiveChange={onMobileChatActiveChange} />)
 
   fireEvent.click(screen.getByRole('button', { name: 'News Chat' }))
 
   expect(screen.getByText('chat board')).toBeInTheDocument()
   expect(mockMarkFeedSeen).not.toHaveBeenCalled()
+  expect(onMobileChatActiveChange).toHaveBeenLastCalledWith(true)
 })

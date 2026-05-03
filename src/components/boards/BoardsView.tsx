@@ -5,17 +5,29 @@ import { BoardBubbleMap } from './BoardBubbleMap'
 import { BoardChat } from './BoardChat'
 import { NewsFeed } from '../news/NewsFeed'
 import { Button } from '../ui/Button'
+import { cn } from '../../lib/utils'
 import type { BoardDefinition } from '../../lib/boards'
 import { useBoardBadges } from '../../hooks/useBoardBadges'
 
+type AppView = 'chat' | 'dms' | 'boards' | 'settings'
+
 interface BoardsViewProps {
   resetKey?: number
+  currentView?: AppView
+  onViewChange?: (view: AppView) => void
+  onMobileChatActiveChange?: (active: boolean) => void
 }
 
-export function BoardsView({ resetKey = 0 }: BoardsViewProps) {
+export function BoardsView({
+  resetKey = 0,
+  currentView = 'boards',
+  onViewChange = () => {},
+  onMobileChatActiveChange,
+}: BoardsViewProps) {
   const [activeBoard, setActiveBoard] = useState<BoardDefinition | null>(null)
   const [mapKey, setMapKey] = useState(0)
   const { countsByBoard, markFeedSeen } = useBoardBadges()
+  const hasActiveChatBoard = activeBoard?.kind === 'chat'
 
   useEffect(() => {
     setActiveBoard(null)
@@ -28,11 +40,18 @@ export function BoardsView({ resetKey = 0 }: BoardsViewProps) {
     }
   }, [activeBoard?.slug, markFeedSeen])
 
+  useEffect(() => {
+    onMobileChatActiveChange?.(hasActiveChatBoard)
+    return () => onMobileChatActiveChange?.(false)
+  }, [hasActiveChatBoard, onMobileChatActiveChange])
+
   const openBoard = (board: BoardDefinition) => {
+    onMobileChatActiveChange?.(board.kind === 'chat')
     setActiveBoard(board)
   }
 
   const closeBoard = () => {
+    onMobileChatActiveChange?.(false)
     setActiveBoard(null)
     setMapKey(value => value + 1)
   }
@@ -41,7 +60,13 @@ export function BoardsView({ resetKey = 0 }: BoardsViewProps) {
     if (!activeBoard) return null
 
     if (activeBoard.kind === 'chat') {
-      return <BoardChat board={activeBoard} />
+      return (
+        <BoardChat
+          board={activeBoard}
+          currentView={currentView}
+          onViewChange={onViewChange}
+        />
+      )
     }
 
     if (activeBoard.kind === 'feed') {
@@ -59,7 +84,10 @@ export function BoardsView({ resetKey = 0 }: BoardsViewProps) {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex h-full min-h-0 flex-col bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.06),transparent_28%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] pb-[calc(env(safe-area-inset-bottom)_+_4.2rem)] text-sm md:pb-0"
+      className={cn(
+        'flex h-full min-h-0 flex-col bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.06),transparent_28%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] text-sm',
+        hasActiveChatBoard ? 'pb-0' : 'pb-[calc(env(safe-area-inset-bottom)_+_4.2rem)] md:pb-0'
+      )}
     >
       <header className="glass-panel-strong flex-shrink-0 border-b border-[var(--border-panel)] px-4 py-3 md:px-6">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">
