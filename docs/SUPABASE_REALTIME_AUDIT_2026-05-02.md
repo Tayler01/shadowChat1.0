@@ -14,7 +14,7 @@ security-sensitive or high-churn operational data.
 | --- | --- | --- |
 | `admin_role_notifications` | One-time user notices when admin access changes. | Keep published. Useful for admin-access notice delivery. |
 | `board_catalog` | Visible Boards metadata and moderation-scope mapping. | Keep published. Lets board badges/layout refresh if board metadata changes. |
-| `board_chat_messages` | Shared chat stream for News, Investing, Learning, and Crypto boards. | Keep published. Needed for live board chats and board unread counts. |
+| `board_chat_messages` | Shared chat stream for all chat boards. | Keep published. Needed for live board chats and board unread counts. |
 | `dm_conversations` | DM conversation records and participant membership. | Keep published. Needed for DM inbox/unread refresh. |
 | `dm_messages` | Direct message rows, read state, reactions, and attachments. | Keep published. Needed for live DMs and unread counts. |
 | `messages` | General group chat messages. | Keep published. Needed for live group chat. |

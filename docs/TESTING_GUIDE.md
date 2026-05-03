@@ -218,7 +218,7 @@ For Boards changes, verify both desktop and mobile:
 - feed tile media placement, no empty image placeholders, and scrollable modal media
 - feed and chat reaction menus stay inside the viewport
 - selected reactions render as compact counts
-- News Chat, Investing Chat, Learning Chat, and Crypto Chat send/edit/delete/reaction realtime between two signed-in users
+- News Chat, Investing Chat, Learning Chat, Crypto Chat, Vibe Coding, AI News, and Projects Chat send/edit/delete/reaction realtime between two signed-in users
 - Board bubbles show their own unread counts, the Boards nav badge combines chat-board counts only, and News Feed clears immediately after opening
 
 For News scraper changes, start with proof mode:

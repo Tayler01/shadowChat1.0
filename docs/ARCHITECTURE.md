@@ -189,7 +189,7 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 
 ### Board Chat
 
-1. Signed-in user opens News Chat, Investing Chat, Learning Chat, or Crypto Chat from the low-friction Boards bubble map
+1. Signed-in user opens a chat board such as News Chat, Investing Chat, Learning Chat, Crypto Chat, Vibe Coding, AI News, or Projects Chat from the low-friction Boards bubble map
 2. Insert hits `board_chat_messages` with the selected `board_slug`
 3. `useBoardChat` receives realtime inserts/updates/deletes for that board
 4. Link text is tokenized client-side and metadata is fetched through `link-preview`

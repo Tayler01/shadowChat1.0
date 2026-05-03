@@ -101,6 +101,7 @@ Recent app-surface migrations to confirm in fresh projects:
 - `20260502042003_user_weather_preferences.sql`: private per-user weather location preferences.
 - `20260502070543_channel_bans_moderation.sql`: profile-popup moderation controls and channel-ban enforcement.
 - `20260502193604_boards_domain.sql`: Boards catalog, reusable board-chat stream, per-board unread counts, and Boards moderation scopes.
+- `20260503191500_add_new_chat_boards.sql`: Vibe Coding, AI News, and Projects Chat catalog rows plus their board moderation scopes.
 
 ### Edge Functions
 
@@ -215,7 +216,7 @@ After deploy, verify:
 8. A message containing an `https://` or `www.` link renders as a clickable link and loads a compact preview card
 9. Settings feedback can submit a bug or feature report with an image attachment after feedback schema changes
 10. Boards tab loads the low-friction bubble map and opens News Feed plus each chat board
-11. News Chat, Investing Chat, Learning Chat, and Crypto Chat send, edit, delete, react, render link previews, and avoid duplicate subheaders/manual refresh rows
+11. News Chat, Investing Chat, Learning Chat, Crypto Chat, Vibe Coding, AI News, and Projects Chat send, edit, delete, react, render link previews, and avoid duplicate subheaders/manual refresh rows
 12. Settings > Admin > News Sources shows source health for an `admin` or `sub_admin` account
 13. Render worker has checked enabled sources since deploy and today's feed rows match current Eastern-day posts
 14. General Chat header shows active-user count, active-user popup, and weather widget without mobile overlap

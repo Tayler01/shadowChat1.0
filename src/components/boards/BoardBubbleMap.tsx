@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { BookOpen, Brush, Coins, GraduationCap, MessageSquareText, Newspaper } from 'lucide-react'
+import { Bot, BookOpen, Brush, Code2, Coins, FolderKanban, GraduationCap, MessageSquareText, Newspaper } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { BOARD_DEFINITIONS, type BoardDefinition } from '../../lib/boards'
 import { cn } from '../../lib/utils'
@@ -26,6 +26,9 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   'investing-chat': Coins,
   'learning-chat': GraduationCap,
   'crypto-chat': BookOpen,
+  'vibe-coding': Code2,
+  'ai-news': Bot,
+  'projects-chat': FolderKanban,
   'art-board': Brush,
 }
 

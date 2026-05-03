@@ -18,11 +18,11 @@ Current boards are:
 - `News Feed`: a shared today-only feed board populated by tracked X and Truth
   Social accounts. Users can open a nearly full-screen post modal, react, copy
   links, and share original links. Users cannot post messages in this feed.
-- `News Chat`, `Investing Chat`, `Learning Chat`, and `Crypto Chat`: public
-  chat boards backed by the shared `board_chat_messages` table. They open with
-  the latest 50 messages, lazy-load older history from the top of the scroller,
-  and support text, link previews, edits, deletes, read cursors, unread
-  dividers, and emoji reactions.
+- `News Chat`, `Investing Chat`, `Learning Chat`, `Crypto Chat`, `Vibe Coding`,
+  `AI News`, and `Projects Chat`: public chat boards backed by the shared
+  `board_chat_messages` table. They open with the latest 50 messages, lazy-load
+  older history from the top of the scroller, and support text, link previews,
+  edits, deletes, read cursors, unread dividers, and emoji reactions.
 - `Art Board`: a static placeholder that currently renders `Coming soon`.
 
 Opened boards use the primary Boards header with a clear back button. The feed
@@ -67,8 +67,7 @@ with follow-up migrations for admin bootstrap and normalized source handles.
 Main tables:
 
 - `board_catalog`: visible board metadata and moderation scope mapping.
-- `board_chat_messages`: shared message stream for News, Investing, Learning,
-  and Crypto chat boards.
+- `board_chat_messages`: shared message stream for all chat boards.
 - `board_chat_reactions`: per-user board-chat reactions, aggregated back onto
   `board_chat_messages`.
 - `user_roles`: app-wide admin role table for `admin` and `sub_admin`.

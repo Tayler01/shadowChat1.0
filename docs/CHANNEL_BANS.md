@@ -19,6 +19,11 @@ Available scopes:
   reactions.
 - `board_crypto_chat`: blocks Crypto Chat messages, edits, deletes, and
   reactions.
+- `board_vibe_coding`: blocks Vibe Coding messages, edits, deletes, and
+  reactions.
+- `board_ai_news`: blocks AI News messages, edits, deletes, and reactions.
+- `board_projects_chat`: blocks Projects Chat messages, edits, deletes, and
+  reactions.
 - `all_interaction`: blocks posting, editing, deleting, and emoji reactions
   app-wide, including News Feed reactions.
 

@@ -6,6 +6,9 @@ export type ChannelBanScope =
   | 'board_investing_chat'
   | 'board_learning_chat'
   | 'board_crypto_chat'
+  | 'board_vibe_coding'
+  | 'board_ai_news'
+  | 'board_projects_chat'
   | 'all_interaction'
 
 export interface UserChannelBan {
@@ -61,6 +64,21 @@ export const CHANNEL_BAN_OPTIONS: Array<{ scope: ChannelBanScope; label: string;
     scope: 'board_crypto_chat',
     label: 'Crypto Chat',
     description: 'Blocks Crypto Chat messages, edits, deletes, and reactions.',
+  },
+  {
+    scope: 'board_vibe_coding',
+    label: 'Vibe Coding',
+    description: 'Blocks Vibe Coding messages, edits, deletes, and reactions.',
+  },
+  {
+    scope: 'board_ai_news',
+    label: 'AI News',
+    description: 'Blocks AI News messages, edits, deletes, and reactions.',
+  },
+  {
+    scope: 'board_projects_chat',
+    label: 'Projects Chat',
+    description: 'Blocks Projects Chat messages, edits, deletes, and reactions.',
   },
 ]
 
