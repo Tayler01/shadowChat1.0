@@ -774,7 +774,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
         </div>
       </motion.div>
 
-      <div className="relative flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col">
         {currentConversation && currentConv ? (
           <>
             <div className="glass-panel-strong flex-shrink-0 border-b border-[var(--border-panel)] px-6 py-4">
