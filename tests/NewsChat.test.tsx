@@ -106,7 +106,8 @@ test('news chat renders messages and sends text links', async () => {
 test('news chat supports owner edits, deletes, and reactions', async () => {
   render(<NewsChat />)
 
-  fireEvent.click(screen.getByRole('button', { name: /^edit$/i }))
+  fireEvent.click(screen.getByRole('button', { name: /news chat message actions/i }))
+  fireEvent.click(screen.getByRole('menuitem', { name: /^edit$/i }))
   fireEvent.change(screen.getByDisplayValue('Breaking link https://example.com/story'), {
     target: { value: 'updated news note' },
   })
@@ -116,11 +117,11 @@ test('news chat supports owner edits, deletes, and reactions', async () => {
     expect(mockEditMessage).toHaveBeenCalledWith('message-1', 'updated news note')
   })
 
-  fireEvent.click(screen.getByRole('button', { name: /^delete$/i }))
+  fireEvent.click(screen.getByRole('button', { name: /news chat message actions/i }))
+  fireEvent.click(screen.getByRole('menuitem', { name: /^delete$/i }))
   expect(mockDeleteMessage).toHaveBeenCalledWith('message-1')
 
-  fireEvent.click(screen.getByRole('button', { name: /news reactions menu/i }))
-  fireEvent.click(screen.getByRole('menuitem', { name: /\u{1F525}\s*2/u }))
+  fireEvent.click(screen.getByRole('button', { name: /reaction \u{1F525} count 2/iu }))
   expect(mockToggleReaction).toHaveBeenCalledWith('message-1', '\u{1F525}')
 })
 
@@ -133,5 +134,5 @@ test('news chat leaves long comments readable and keeps reaction menu in its own
   expect(screen.getByText(longComment)).toBeInTheDocument()
   expect(screen.getByTestId('board-chat-message-bubble')).toHaveClass('min-w-0')
   expect(screen.getByTestId('board-chat-message-bubble')).toHaveClass('max-w-full')
-  expect(screen.getByRole('button', { name: /news reactions menu/i }).parentElement).toHaveClass('shrink-0')
+  expect(screen.getByRole('button', { name: /news chat message actions/i }).parentElement).toHaveClass('shrink-0')
 })

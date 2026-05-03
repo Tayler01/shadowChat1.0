@@ -1,11 +1,12 @@
-import React, { useCallback, useRef, useState } from 'react'
-import { ArrowDown, Check, Copy, Edit3, Send, Trash2, X } from 'lucide-react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { ArrowDown, Check, Copy, Edit3, Plus, Send, Trash2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { MessageRichText } from '../chat/MessageRichText'
-import { NewsReactionBar, NewsReactionSummaryStrip } from '../news/NewsReactionBar'
+import { ChatMessageActionsMenu, type ChatMessageAction } from '../chat/ChatMessageActionsMenu'
+import { NewsReactionSummaryStrip } from '../news/NewsReactionBar'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { UnreadDivider } from '../chat/UnreadDivider'
@@ -16,8 +17,25 @@ import { useUnreadScroll } from '../../hooks/useUnreadScroll'
 import { formatTime } from '../../lib/utils'
 import { getBlockedActionMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
+import { useEmojiPicker } from '../../hooks/useEmojiPicker'
+import type { EmojiClickData } from '../../types'
 import type { BoardChatMessage } from '../../lib/supabase'
 import type { ChatBoardDefinition } from '../../lib/boards'
+
+const getEmojiPickerDimensions = () => {
+  if (typeof window === 'undefined') return { width: 300, height: 360 }
+
+  if (window.innerWidth < 480) {
+    return { width: 280, height: Math.max(260, Math.min(320, window.innerHeight - 120)) }
+  }
+
+  return { width: 300, height: 360 }
+}
+
+const getEmojiPickerTheme = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+    ? 'dark'
+    : 'light'
 
 function BoardChatRow({
   board,
@@ -35,6 +53,10 @@ function BoardChatRow({
   const { profile } = useAuth()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(message.content)
+  const [showReactionPicker, setShowReactionPicker] = useState(false)
+  const pickerRef = useRef<HTMLDivElement>(null)
+  const EmojiPicker = useEmojiPicker(showReactionPicker)
+  const pickerDimensions = getEmojiPickerDimensions()
   const isOwner = profile?.id === message.user_id
 
   const copyMessage = async () => {
@@ -69,6 +91,11 @@ function BoardChatRow({
     }
   }
 
+  const handleReactionSelect = (emojiData: EmojiClickData) => {
+    void reactToMessage(emojiData.emoji)
+    setShowReactionPicker(false)
+  }
+
   const deleteMessage = async () => {
     try {
       await onDelete(message.id)
@@ -81,6 +108,52 @@ function BoardChatRow({
       showActionErrorToast(notice)
     }
   }
+
+  useEffect(() => {
+    if (!showReactionPicker) return
+
+    const handleClick = (event: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+        setShowReactionPicker(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showReactionPicker])
+
+  const actions: ChatMessageAction[] = [
+    {
+      id: 'copy',
+      label: 'Copy',
+      icon: Copy,
+      onSelect: copyMessage,
+    },
+    {
+      id: 'reaction',
+      label: 'Add Reaction',
+      icon: Plus,
+      onSelect: () => setShowReactionPicker(true),
+    },
+    {
+      id: 'edit',
+      label: 'Edit',
+      icon: Edit3,
+      hidden: !isOwner,
+      onSelect: () => {
+        setDraft(message.content)
+        setEditing(true)
+      },
+    },
+    {
+      id: 'delete',
+      label: 'Delete',
+      icon: Trash2,
+      tone: 'danger',
+      hidden: !isOwner,
+      onSelect: deleteMessage,
+    },
+  ]
 
   return (
     <div
@@ -142,49 +215,27 @@ function BoardChatRow({
           />
         )}
 
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => void copyMessage()}
-            className="inline-flex h-7 items-center gap-1 rounded-full border border-transparent px-2 text-xs text-[var(--text-muted)] transition-colors hover:border-[var(--border-subtle)] hover:text-[var(--text-primary)]"
-            aria-label={`Copy ${board.title} message`}
-          >
-            <Copy className="h-3.5 w-3.5" />
-            Copy
-          </button>
-          {isOwner && (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setDraft(message.content)
-                  setEditing(true)
-                }}
-                className="inline-flex h-7 items-center gap-1 rounded-full border border-transparent px-2 text-xs text-[var(--text-muted)] transition-colors hover:border-[var(--border-subtle)] hover:text-[var(--text-primary)]"
-              >
-                <Edit3 className="h-3.5 w-3.5" />
-                Edit
-              </button>
-              <button
-                type="button"
-                onClick={() => void deleteMessage()}
-                className="inline-flex h-7 items-center gap-1 rounded-full border border-transparent px-2 text-xs text-red-200/80 transition-colors hover:border-[rgba(190,52,85,0.35)] hover:text-red-100"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                Delete
-              </button>
-            </>
-          )}
-        </div>
       </div>
       <div className="relative flex h-8 w-8 justify-end">
         {!editing && (
-          <NewsReactionBar
-            reactions={message.reactions}
-            onReact={reactToMessage}
-            variant="menu"
+          <ChatMessageActionsMenu
+            actions={actions}
             className="shrink-0"
+            buttonLabel={`${board.title} message actions`}
           />
+        )}
+        {showReactionPicker && EmojiPicker && (
+          <div
+            ref={pickerRef}
+            className="fixed left-1/2 top-16 z-[90] max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] sm:absolute sm:bottom-full sm:left-auto sm:right-0 sm:top-auto sm:mb-2 sm:translate-x-0"
+          >
+            <EmojiPicker
+              onEmojiClick={handleReactionSelect}
+              width={pickerDimensions.width}
+              height={pickerDimensions.height}
+              theme={getEmojiPickerTheme()}
+            />
+          </div>
         )}
       </div>
     </div>

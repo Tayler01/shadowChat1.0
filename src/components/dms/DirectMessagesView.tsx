@@ -6,6 +6,10 @@ import {
   ArrowLeft,
   ArrowDown,
   X,
+  Check,
+  Copy,
+  Edit3,
+  Trash2,
 } from 'lucide-react'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
 import { useAuth } from '../../hooks/useAuth'
@@ -18,9 +22,11 @@ import { FailedMessageItem } from '../chat/FailedMessageItem'
 import { FileAttachment } from '../chat/FileAttachment'
 import { VideoAttachment } from '../chat/VideoAttachment'
 import { MessageRichText } from '../chat/MessageRichText'
+import { ChatMessageActionsMenu, type ChatMessageAction } from '../chat/ChatMessageActionsMenu'
 import { PublicProfileDialog } from '../profile/PublicProfileDialog'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
+import { NewsReactionSummaryStrip } from '../news/NewsReactionBar'
 import { useFailedMessages } from '../../hooks/useFailedMessages'
 import { formatTime, shouldGroupMessage, getReadableTextColor } from '../../lib/utils'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
@@ -32,6 +38,8 @@ import { getPresenceStateLabel, usePresenceForUser } from '../../hooks/usePresen
 import toast from 'react-hot-toast'
 import type { BasicUser, ChatMessageType, DMMessage, User } from '../../lib/supabase'
 import { UnreadDivider } from '../chat/UnreadDivider'
+import { useEmojiPicker } from '../../hooks/useEmojiPicker'
+import type { EmojiClickData } from '../../types'
 
 interface DirectMessagesViewProps {
   onToggleSidebar: () => void
@@ -39,6 +47,272 @@ interface DirectMessagesViewProps {
   onViewChange: (view: 'chat' | 'dms' | 'boards' | 'settings') => void
   initialConversation?: string
   initialMessageId?: string
+}
+
+const getEmojiPickerDimensions = () => {
+  if (typeof window === 'undefined') return { width: 300, height: 360 }
+
+  if (window.innerWidth < 480) {
+    return { width: 280, height: Math.max(260, Math.min(320, window.innerHeight - 120)) }
+  }
+
+  return { width: 300, height: 360 }
+}
+
+const getEmojiPickerTheme = () =>
+  typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+    ? 'dark'
+    : 'light'
+
+function DirectMessageBubble({
+  message,
+  previousMessage,
+  profile,
+  onEdit,
+  onDelete,
+  onReact,
+  onOpenProfile,
+}: {
+  message: DMMessage
+  previousMessage?: DMMessage
+  profile: User | null
+  onEdit: (id: string, content: string) => Promise<void>
+  onDelete: (id: string) => Promise<void>
+  onReact: (id: string, emoji: string) => Promise<void>
+  onOpenProfile: (user: User | null) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(message.content)
+  const [showReactionPicker, setShowReactionPicker] = useState(false)
+  const pickerRef = useRef<HTMLDivElement>(null)
+  const EmojiPicker = useEmojiPicker(showReactionPicker)
+  const pickerDimensions = getEmojiPickerDimensions()
+  const isGrouped = shouldGroupMessage(message, previousMessage)
+  const isOwn = message.sender_id === profile?.id
+  const isIncoming = !isOwn
+  const showIncomingAvatar = !isGrouped && !isOwn
+  const bubbleColor = undefined
+  const bubbleStyle = bubbleColor
+    ? { backgroundColor: bubbleColor, color: getReadableTextColor(bubbleColor) }
+    : undefined
+
+  const copyMessage = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content)
+      toast.success('Message copied')
+    } catch {
+      toast.error('Failed to copy message')
+    }
+  }
+
+  const saveEdit = async () => {
+    try {
+      await onEdit(message.id, draft)
+      setEditing(false)
+    } catch {
+      toast.error('Failed to edit message')
+    }
+  }
+
+  const deleteMessage = async () => {
+    try {
+      await onDelete(message.id)
+    } catch {
+      toast.error('Failed to delete message')
+    }
+  }
+
+  const reactToMessage = async (emoji: string) => {
+    try {
+      await onReact(message.id, emoji)
+    } catch {
+      toast.error('Failed to update reaction')
+    }
+  }
+
+  const handleReactionSelect = (emojiData: EmojiClickData) => {
+    void reactToMessage(emojiData.emoji)
+    setShowReactionPicker(false)
+  }
+
+  useEffect(() => {
+    if (!showReactionPicker) return
+
+    const handleClick = (event: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+        setShowReactionPicker(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showReactionPicker])
+
+  const actions: ChatMessageAction[] = [
+    {
+      id: 'copy',
+      label: 'Copy',
+      icon: Copy,
+      onSelect: copyMessage,
+    },
+    {
+      id: 'reaction',
+      label: 'Add Reaction',
+      icon: Plus,
+      onSelect: () => setShowReactionPicker(true),
+    },
+    {
+      id: 'edit',
+      label: 'Edit',
+      icon: Edit3,
+      hidden: !isOwn,
+      onSelect: () => {
+        setDraft(message.content)
+        setEditing(true)
+      },
+    },
+    {
+      id: 'delete',
+      label: 'Delete',
+      icon: Trash2,
+      tone: 'danger',
+      hidden: !isOwn,
+      onSelect: deleteMessage,
+    },
+  ]
+
+  return (
+    <motion.div
+      id={`dm-message-${message.id}`}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`group flex ${isOwn ? 'justify-end' : 'justify-start'} ${isGrouped ? 'mt-1' : 'mt-4'}`}
+    >
+      <div
+        className={`relative ${
+          isIncoming
+            ? 'ml-4 max-w-[calc(85%_-_1rem)] sm:max-w-[calc(20rem_-_1rem)] lg:max-w-[calc(28rem_-_1rem)]'
+            : 'max-w-[85%] sm:max-w-xs lg:max-w-md'
+        }`}
+      >
+        {showIncomingAvatar && (
+          message.sender ? (
+            <button
+              type="button"
+              onClick={() => onOpenProfile(message.sender ?? null)}
+              className="absolute left-0 top-0 z-10 rounded-full focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.32)]"
+              aria-label={`Open ${message.sender.display_name || message.sender.username}'s profile`}
+              aria-haspopup="dialog"
+            >
+              <Avatar
+                src={message.sender?.avatar_url}
+                alt={message.sender?.display_name || 'Unknown User'}
+                size="sm"
+                color={message.sender?.color}
+                userId={message.sender?.id}
+                presenceVisibility={message.sender?.presence_visibility}
+                showStatus
+              />
+            </button>
+          ) : (
+            <Avatar
+              alt="Unknown User"
+              size="sm"
+              className="absolute left-0 top-0 z-10"
+            />
+          )
+        )}
+
+        {showIncomingAvatar && message.sender && (
+          <div className="mb-1 ml-8 inline-flex max-w-full items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)]">
+            <span className="truncate">{message.sender.display_name}</span>
+            <UserRoleBadge role={message.sender.admin_role} />
+            <UserPresenceBadge userId={message.sender.id} presenceVisibility={message.sender.presence_visibility} />
+          </div>
+        )}
+
+        <div
+          className={`relative rounded-2xl px-4 py-2 ${showIncomingAvatar ? 'ml-8' : ''} ${
+            bubbleStyle
+              ? ''
+              : isOwn
+                ? 'border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.16),rgba(215,170,70,0.1)_34%,rgba(122,89,24,0.45)_100%)] text-[var(--text-primary)] shadow-[var(--shadow-gold-soft)]'
+                : 'border border-[var(--border-subtle)] bg-[var(--bg-panel)] text-[var(--text-primary)] shadow-[var(--shadow-panel)]'
+          }`}
+          style={bubbleStyle}
+        >
+          {!editing && (
+            <ChatMessageActionsMenu
+              actions={actions}
+              className={`absolute top-0 ${isOwn ? '-left-10' : '-right-10'} opacity-80 md:opacity-0 md:group-hover:opacity-80`}
+            />
+          )}
+
+          {editing ? (
+            <div className="space-y-2">
+              <textarea
+                value={draft}
+                onChange={event => setDraft(event.target.value)}
+                className="obsidian-input min-h-20 w-full resize-none rounded-[var(--radius-md)] p-3 text-sm"
+              />
+              <div className="flex gap-2">
+                <Button type="button" size="sm" onClick={() => void saveEdit()} disabled={!draft.trim()}>
+                  <Check className="mr-2 h-4 w-4" />
+                  Save
+                </Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
+                  <X className="mr-2 h-4 w-4" />
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : message.message_type === 'audio' ? (
+            <audio controls src={message.audio_url} className="mt-1 max-w-full" />
+          ) : message.message_type === 'image' && message.file_url ? (
+            <img
+              src={message.file_url}
+              alt="uploaded"
+              className="mt-1 max-w-xs rounded-[var(--radius-md)] border border-[var(--border-subtle)]"
+            />
+          ) : message.message_type === 'video' && message.file_url ? (
+            <VideoAttachment url={message.file_url} meta={message.content} />
+          ) : message.message_type === 'file' && message.file_url ? (
+            <FileAttachment url={message.file_url} meta={message.content} />
+          ) : (
+            <MessageRichText content={message.content} className="text-sm" />
+          )}
+
+          {!editing && (
+            <>
+              <NewsReactionSummaryStrip
+                reactions={message.reactions}
+                onReact={reactToMessage}
+                className="mt-1.5"
+              />
+              <p className={`mt-1 text-xs ${isOwn ? 'text-[var(--text-gold)]/85' : 'text-[var(--text-muted)]'}`}>
+                {formatTime(message.created_at)}
+                {message.edited_at && ' (edited)'}
+              </p>
+            </>
+          )}
+        </div>
+
+        {showReactionPicker && EmojiPicker && (
+          <div
+            ref={pickerRef}
+            className="fixed left-1/2 top-16 z-[90] max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] sm:absolute sm:bottom-full sm:left-1/2 sm:top-auto sm:mb-2"
+          >
+            <EmojiPicker
+              onEmojiClick={handleReactionSelect}
+              width={pickerDimensions.width}
+              height={pickerDimensions.height}
+              theme={getEmojiPickerTheme()}
+            />
+          </div>
+        )}
+      </div>
+    </motion.div>
+  )
 }
 
 export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
@@ -57,6 +331,9 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     setCurrentConversation,
     startConversation,
     sendMessage,
+    editMessage,
+    deleteMessage,
+    toggleReaction,
     markAsRead,
     messagesLoading,
     sending,
@@ -530,109 +807,22 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 </div>
               )}
 
-              {messages.map((message, index) => {
-                const previousMessage = messages[index - 1]
-                const isGrouped = shouldGroupMessage(message, previousMessage)
-                const isOwn = message.sender_id === profile?.id
-                const isIncoming = !isOwn
-                const showIncomingAvatar = !isGrouped && !isOwn
-                const bubbleColor = undefined
-                const bubbleStyle = bubbleColor
-                  ? { backgroundColor: bubbleColor, color: getReadableTextColor(bubbleColor) }
-                  : undefined
-
-                return (
-                  <React.Fragment key={message.id}>
+              {messages.map((message, index) => (
+                <React.Fragment key={message.id}>
                   {firstUnreadDMMessageId === message.id && (
                     <UnreadDivider />
                   )}
-                  <motion.div
-                    key={message.id}
-                    id={`dm-message-${message.id}`}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${
-                      isGrouped ? 'mt-1' : 'mt-4'
-                    }`}
-                  >
-                    <div
-                      className={`relative ${
-                        isIncoming
-                          ? 'ml-4 max-w-[calc(85%_-_1rem)] sm:max-w-[calc(20rem_-_1rem)] lg:max-w-[calc(28rem_-_1rem)]'
-                          : 'max-w-[85%] sm:max-w-xs lg:max-w-md'
-                      }`}
-                    >
-                      {showIncomingAvatar && (
-                        message.sender ? (
-                          <button
-                            type="button"
-                            onClick={() => setProfileUser(message.sender ?? null)}
-                            className="absolute left-0 top-0 z-10 rounded-full focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.32)]"
-                            aria-label={`Open ${message.sender.display_name || message.sender.username}'s profile`}
-                            aria-haspopup="dialog"
-                          >
-                            <Avatar
-                              src={message.sender?.avatar_url}
-                              alt={message.sender?.display_name || 'Unknown User'}
-                              size="sm"
-                              color={message.sender?.color}
-                              userId={message.sender?.id}
-                              presenceVisibility={message.sender?.presence_visibility}
-                              showStatus
-                            />
-                          </button>
-                        ) : (
-                          <Avatar
-                            alt="Unknown User"
-                            size="sm"
-                            className="absolute left-0 top-0 z-10"
-                          />
-                        )
-                      )}
-
-                      {showIncomingAvatar && message.sender && (
-                        <div className="mb-1 ml-8 inline-flex max-w-full items-center gap-1.5 text-xs font-medium text-[var(--text-secondary)]">
-                          <span className="truncate">{message.sender.display_name}</span>
-                          <UserRoleBadge role={message.sender.admin_role} />
-                          <UserPresenceBadge userId={message.sender.id} presenceVisibility={message.sender.presence_visibility} />
-                        </div>
-                      )}
-
-                      <div
-                        className={`rounded-2xl px-4 py-2 ${showIncomingAvatar ? 'ml-8' : ''} ${
-                          bubbleStyle
-                            ? ''
-                            : isOwn
-                              ? 'border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.16),rgba(215,170,70,0.1)_34%,rgba(122,89,24,0.45)_100%)] text-[var(--text-primary)] shadow-[var(--shadow-gold-soft)]'
-                              : 'border border-[var(--border-subtle)] bg-[var(--bg-panel)] text-[var(--text-primary)] shadow-[var(--shadow-panel)]'
-                        }`}
-                        style={bubbleStyle}
-                      >
-                        {message.message_type === 'audio' ? (
-                          <audio controls src={message.audio_url} className="mt-1 max-w-full" />
-                        ) : message.message_type === 'image' && message.file_url ? (
-                          <img
-                            src={message.file_url}
-                            alt="uploaded"
-                            className="mt-1 max-w-xs rounded-[var(--radius-md)] border border-[var(--border-subtle)]"
-                          />
-                        ) : message.message_type === 'video' && message.file_url ? (
-                          <VideoAttachment url={message.file_url} meta={message.content} />
-                        ) : message.message_type === 'file' && message.file_url ? (
-                          <FileAttachment url={message.file_url} meta={message.content} />
-                        ) : (
-                          <MessageRichText content={message.content} className="text-sm" />
-                        )}
-                        <p className={`mt-1 text-xs ${isOwn ? 'text-[var(--text-gold)]/85' : 'text-[var(--text-muted)]'}`}>
-                          {formatTime(message.created_at)}
-                          {message.edited_at && ' (edited)'}
-                        </p>
-                      </div>
-                    </div>
-                  </motion.div>
-                  </React.Fragment>
-                )
-              })}
+                  <DirectMessageBubble
+                    message={message}
+                    previousMessage={messages[index - 1]}
+                    profile={profile}
+                    onEdit={editMessage}
+                    onDelete={deleteMessage}
+                    onReact={toggleReaction}
+                    onOpenProfile={setProfileUser}
+                  />
+                </React.Fragment>
+              ))}
 
               {failedMessages.map(msg => (
                 <FailedMessageItem

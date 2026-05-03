@@ -45,6 +45,9 @@ interface DirectMessagesContextValue {
     messageType?: ChatMessageType,
     fileUrl?: string
   ) => Promise<DMMessage | null>;
+  editMessage: (messageId: string, content: string) => Promise<void>;
+  deleteMessage: (messageId: string) => Promise<void>;
+  toggleReaction: (messageId: string, emoji: string) => Promise<void>;
   markAsRead: (conversationId: string) => Promise<void>;
   loadOlderMessages: () => Promise<void>;
 }
@@ -300,6 +303,9 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     loading: messagesLoading,
     sending,
     sendMessage: sendConversationMessage,
+    editMessage,
+    deleteMessage,
+    toggleReaction,
     loadingMore,
     hasMore,
     loadOlderMessages,
@@ -373,6 +379,9 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     hasMore,
     startConversation,
     sendMessage,
+    editMessage,
+    deleteMessage,
+    toggleReaction,
     markAsRead,
     loadOlderMessages,
   };
@@ -431,6 +440,24 @@ export function useConversationMessages(conversationId: string | null) {
     },
     []
   );
+
+  const fetchConversationMessage = useCallback(async (messageId: string) => {
+    if (!conversationId) return null;
+
+    const workingClient = await getWorkingClient();
+    const { data, error } = await workingClient
+      .from('dm_messages')
+      .select(`
+        *,
+        sender:users!sender_id(*)
+      `)
+      .eq('id', messageId)
+      .eq('conversation_id', conversationId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return data as unknown as DMMessage;
+  }, [conversationId]);
 
   const handleVisible = useCallback(() => {
     if (clientResetRef.current) {
@@ -797,6 +824,61 @@ export function useConversationMessages(conversationId: string | null) {
       }
     }, [user, conversationId, insertConversationMessage]);
 
+  const editMessage = useCallback(async (messageId: string, content: string) => {
+    if (!user || !conversationId || !content.trim()) return;
+
+    const workingClient = await getWorkingClient();
+    const editedAt = new Date().toISOString();
+    const { error } = await workingClient
+      .from('dm_messages')
+      .update({ content: content.trim(), edited_at: editedAt })
+      .eq('id', messageId)
+      .eq('conversation_id', conversationId)
+      .eq('sender_id', user.id);
+
+    if (error) throw error;
+
+    setMessages(prev => prev.map(message => (
+      message.id === messageId
+        ? { ...message, content: content.trim(), edited_at: editedAt }
+        : message
+    )));
+  }, [conversationId, user]);
+
+  const deleteMessage = useCallback(async (messageId: string) => {
+    if (!user || !conversationId) return;
+
+    const workingClient = await getWorkingClient();
+    const { error } = await workingClient
+      .from('dm_messages')
+      .delete()
+      .eq('id', messageId)
+      .eq('conversation_id', conversationId)
+      .eq('sender_id', user.id);
+
+    if (error) throw error;
+
+    setMessages(prev => prev.filter(message => message.id !== messageId));
+  }, [conversationId, user]);
+
+  const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
+    if (!user || !conversationId) return;
+
+    const workingClient = await getWorkingClient();
+    const { error } = await workingClient.rpc('toggle_message_reaction', {
+      message_id: messageId,
+      emoji,
+      is_dm: true,
+    });
+
+    if (error) throw error;
+
+    const message = await fetchConversationMessage(messageId);
+    if (message && activeConversationIdRef.current === conversationId) {
+      setMessages(prev => prev.map(existing => existing.id === message.id ? message : existing));
+    }
+  }, [conversationId, fetchConversationMessage, user]);
+
   return {
     messages,
     loading,
@@ -804,6 +886,9 @@ export function useConversationMessages(conversationId: string | null) {
     loadingMore,
     hasMore,
     sendMessage,
+    editMessage,
+    deleteMessage,
+    toggleReaction,
     loadOlderMessages,
   };
 }
