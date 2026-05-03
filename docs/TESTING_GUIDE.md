@@ -194,6 +194,14 @@ Latest focused release smoke recorded for the Boards header and bubble-motion ad
 - Coverage: desktop/mobile Boards map, low-friction bubble collision, News Chat and News Feed without duplicate subheaders, and removed visible refresh controls
 - Artifacts: `output/playwright/header-bubbles-adjustment/`
 
+Latest focused release smoke recorded for the Boards map polish:
+
+- Date: May 3, 2026
+- Local gates: `npx jest --runInBand tests/BoardBubbleMap.test.tsx`, `npm run lint`, `npx tsc --noEmit -p tsconfig.app.json`, `npm run build`
+- Browser check: headed Chromium against preview builds on desktop and mobile viewports
+- Coverage: board text containment, no visual overlap after drag collisions, shape metadata, collision sparkle feedback, sound-effects-aware collision tap, and pill corner-spin settling
+- Artifacts: `output/playwright/boards-map-polish/`
+
 Latest focused release smoke recorded for the weather widget release:
 
 - Date: May 2, 2026
@@ -216,6 +224,9 @@ For Boards changes, verify both desktop and mobile:
 - feed boards render as pills, chat boards render as circles, and static boards render as squares
 - board objects show per-board unread counts and reset to the default layout when Boards is opened
 - dragging a board object gives it low-friction motion and can push nearby objects into a diminishing chain reaction
+- board labels stay contained inside their shape and objects do not visually overlap after collision settling
+- collision feedback shows a subtle sparkle burst and plays a short tap only when sound effects are enabled
+- feed pill boards can spin briefly after corner hits and should settle back into a readable upright position
 - News Feed and all chat boards open from their bubbles, have a clear back button, and do not show duplicate secondary headers or manual refresh rows
 - feed tile media placement, no empty image placeholders, and scrollable modal media
 - feed and chat reaction menus stay inside the viewport

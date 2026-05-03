@@ -210,7 +210,7 @@ After setup, verify:
 5. Profile updates persist
 6. Push settings screen renders
 7. New-account phone setup opens after signup or first sign-in from the same browser
-8. Boards tab loads the low-friction map, feed pills/chat circles/static squares render correctly, and the map resets when Boards is reopened
+8. Boards tab loads the low-friction map, feed pills/chat circles/static squares render correctly, labels stay contained, collision feedback works, and the map resets when Boards is reopened
 9. News Chat, Investing Chat, Learning Chat, Crypto Chat, Vibe Coding, AI News, and Projects Chat send and receive messages without duplicate subheaders
 10. An `admin` or `sub_admin` user can add, pause, enable, and delete a News source in Settings > Admin > News Sources
 11. If the scraper is configured, `news_sources.last_checked_at` updates after a worker cycle

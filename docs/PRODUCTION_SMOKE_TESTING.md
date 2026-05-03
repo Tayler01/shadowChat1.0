@@ -112,7 +112,7 @@ Common failure meanings:
 2. Confirm local `.env.testing.local` or CI has both stable smoke accounts.
 3. Run `npm run qa:smoke:prod`.
 4. Use `npm run qa:smoke:prod:headless` only for unattended environments where headless Chromium is stable.
-5. Open the Boards tab with a stable account and confirm the low-friction board map, News Feed, and chat boards render.
+5. Open the Boards tab with a stable account and confirm the low-friction board map, contained labels, non-overlapping objects, News Feed, and chat boards render.
 6. If the deploy touched News or Boards, verify Render worker health in `news_sources`, send one board-chat link to confirm previews, and confirm opened boards do not show duplicate secondary headers or manual refresh controls.
 7. Open General Chat and confirm active-user count plus weather widget render without header overlap.
 8. Open Settings > Account & Profile and confirm Weather Location renders.
@@ -155,3 +155,10 @@ May 2, 2026 Boards header and bubble-motion adjustment:
 - Headed preview check passed against `npx vite preview --host 127.0.0.1 --port 4175 --strictPort`
 - Verified desktop/mobile Boards map, collision motion, News Chat/News Feed without duplicate subheaders, and removed visible refresh controls
 - Artifacts: `output/playwright/header-bubbles-adjustment/`
+
+May 3, 2026 Boards map polish:
+
+- Local gates passed: `npx jest --runInBand tests/BoardBubbleMap.test.tsx`, `npm run lint`, `npx tsc --noEmit -p tsconfig.app.json`, `npm run build`
+- Headed desktop and mobile preview checks passed against local Vite preview
+- Verified contained labels, no visual overlap after drag collisions, collision sparkle feedback, sound-effects-aware collision tap, and readable pill spin settling
+- Artifacts: `output/playwright/boards-map-polish/`

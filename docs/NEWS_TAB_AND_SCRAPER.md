@@ -12,8 +12,11 @@ The Boards landing surface is a low-friction draggable board map. Board objects
 keep motion after a drag, bounce gently against bounds, and pass diminishing
 force to other objects on collision. Visual shape communicates board type:
 feeds render as pills, chat boards render as circles, and static/non-chat boards
-render as squares. The layout resets to the default arrangement each time users
-open Boards from navigation.
+render as squares. Labels are clipped or wrapped inside their board object so
+text cannot spill out on mobile. Collisions show a small sparkle burst and a
+short Web Audio tap when sound effects are enabled; pill feed boards can pick
+up a brief corner-hit spin before settling upright again. The layout resets to
+the default arrangement each time users open Boards from navigation.
 
 Current boards are:
 
@@ -38,7 +41,7 @@ bridge behavior, push, or message history.
 ## Frontend Map
 
 - [src/components/boards/BoardsView.tsx](C:/repos/chat2.0/src/components/boards/BoardsView.tsx:1): top-level Boards experience.
-- [src/components/boards/BoardBubbleMap.tsx](C:/repos/chat2.0/src/components/boards/BoardBubbleMap.tsx:1): low-friction draggable board bubble map with collision transfer.
+- [src/components/boards/BoardBubbleMap.tsx](C:/repos/chat2.0/src/components/boards/BoardBubbleMap.tsx:1): low-friction draggable board map with collision transfer, no-overlap spacing, sparkle/audio feedback, and pill spin handling.
 - [src/components/boards/BoardChat.tsx](C:/repos/chat2.0/src/components/boards/BoardChat.tsx:1): reusable board-chat surface.
 - [src/components/news/NewsFeed.tsx](C:/repos/chat2.0/src/components/news/NewsFeed.tsx:1): today board rendering and refresh.
 - [src/components/news/NewsFeedItem.tsx](C:/repos/chat2.0/src/components/news/NewsFeedItem.tsx:1): compact feed tile.

@@ -206,9 +206,11 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 
 1. User opens Boards from the main navigation
 2. `BoardBubbleMap` lays out feed boards as pills, chat boards as circles, and static boards as squares
-3. Dragging a board object applies low-friction motion and collision transfer
-4. Selecting a board routes into its feed, chat, or static placeholder view
-5. Reopening Boards restores the default layout instead of persisting an old ad-hoc arrangement
+3. Board labels are constrained inside each object so mobile text cannot spill out of the visual shape
+4. Dragging a board object applies low-friction motion, no-overlap collision spacing, and collision transfer
+5. Collisions can emit a small sparkle burst and a short sound-effects-aware tap; feed pills can spin briefly from corner hits and then settle upright
+6. Selecting a board routes into its feed, chat, or static placeholder view
+7. Reopening Boards restores the default layout instead of persisting an old ad-hoc arrangement
 
 ### Channel Ban Enforcement
 

@@ -28,7 +28,7 @@ The project is already wired for hosted Supabase and Netlify deployment. It is d
 - Message reactions, pinning, editing, and deletion
 - Slash commands and reply/thread affordances
 - AI reply and summary hooks through a secured Supabase Edge Function
-- Boards tab with a low-friction draggable board map, feed pills, chat circles, static board squares, the existing News Feed, News Chat, Investing Chat, Learning Chat, Crypto Chat, and a coming-soon Art Board
+- Boards tab with a low-friction draggable board map, feed pills, chat circles, static board squares, collision sparkle/sound feedback, the existing News Feed, News Chat, Investing Chat, Learning Chat, Crypto Chat, and a coming-soon Art Board
 - App-wide admin/sub-admin access controls with role badges and operator-only tools
 - Operator-managed bans for General Chat, individual chat boards, and all app interaction
 - Server-confirmed operator message deletion for normal-user General Chat and board-chat messages
