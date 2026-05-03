@@ -307,6 +307,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
               <div
                 className="relative inline-block max-w-[calc(100%-3rem)] group/message md:max-w-full"
                 data-testid="message-bubble-shell"
+                onMouseEnter={handleMouseEnterReactions}
+                onMouseLeave={handleMouseLeaveReactions}
               >
                 {parentMessage && (
                   <button

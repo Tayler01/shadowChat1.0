@@ -433,6 +433,26 @@ test('prevents the message actions button from stealing composer focus', () => {
   expect(fireEvent.mouseDown(actionsButton)).toBe(false)
 })
 
+test('shows quick reactions when hovering a group message bubble', async () => {
+  render(
+    <MessageItem
+      message={{ ...baseMessage, message_type: 'text', content: 'reaction hover' } as Message}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+      onJumpToMessage={() => {}}
+      containerRef={React.createRef()}
+    />
+  )
+
+  act(() => {
+    fireEvent.mouseEnter(screen.getByTestId('message-bubble-shell'))
+  })
+
+  expect(screen.getByRole('button', { name: `React with ${String.fromCodePoint(0x1F44D)}` })).toBeInTheDocument()
+})
+
 test('clicking reply preview triggers jump callback', async () => {
   const parent = { ...baseMessage, id: 'p1', content: 'parent', message_type: 'text' } as Message
   const reply = { ...baseMessage, id: 'c1', content: 'child', message_type: 'text', reply_to: 'p1' } as Message
@@ -452,7 +472,9 @@ test('clicking reply preview triggers jump callback', async () => {
   )
 
   const btn = screen.getByRole('button', { name: /view parent message/i })
-  await userEvent.click(btn)
+  await act(async () => {
+    await userEvent.click(btn)
+  })
   expect(cb).toHaveBeenCalledWith('p1')
 })
 

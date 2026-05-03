@@ -959,10 +959,6 @@ async function reactToMessage(page, messageText, emoji) {
   const wrapper = getMessageWrapperByText(page, messageText)
   await wrapper.hover()
   await wrapper.getByRole('button', { name: 'Message actions' }).click()
-  if (emoji === '\u{1F44D}') {
-    await page.getByRole('button', { name: 'React with thumbs up' }).last().click()
-    return
-  }
   await page.getByRole('button', { name: `React with ${emoji}` }).last().click()
 }
 
