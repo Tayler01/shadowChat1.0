@@ -124,7 +124,7 @@ test('news chat reserves mobile footer and keyboard space in the message scrolle
   render(<NewsChat />)
 
   expect(screen.getByTestId('board-chat-message-scroll')).toHaveClass(
-    'pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)]'
+    'pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.75rem)]'
   )
   expect(screen.getAllByPlaceholderText(/drop a link or note in news chat/i)[0]).toHaveClass('text-base', 'md:text-sm')
 })

@@ -3,11 +3,6 @@ import type { UserReadCursor } from '../lib/readCursors'
 
 const READ_SETTLE_MS = 220
 const SHORT_UNREAD_VIEWPORT_RATIO = 0.72
-const getTimestamp = () => (
-  typeof performance !== 'undefined' && typeof performance.now === 'function'
-    ? performance.now()
-    : Date.now()
-)
 
 interface UseUnreadScrollOptions<TMessage> {
   containerRef: RefObject<HTMLElement>
@@ -65,9 +60,6 @@ export function useUnreadScroll<TMessage>({
   const lastMarkedKeyRef = useRef<string | null>(null)
   const readInFlightKeyRef = useRef<string | null>(null)
   const markTimerRef = useRef<number | null>(null)
-  const viewportAdjustingUntilRef = useRef(0)
-  const viewportFrameRef = useRef<number | null>(null)
-  const viewportTimerRefs = useRef<number[]>([])
 
   const setAutoScroll = useCallback((value: boolean) => {
     autoScrollRef.current = value
@@ -149,43 +141,11 @@ export function useUnreadScroll<TMessage>({
     scheduleMarkLatestRead(true)
   }, [containerRef, scheduleMarkLatestRead, setAutoScroll])
 
-  const scheduleViewportBottomLock = useCallback(() => {
-    if (!enabled || loading || !autoScrollRef.current) return
-
-    viewportAdjustingUntilRef.current = getTimestamp() + 700
-
-    if (viewportFrameRef.current !== null) {
-      cancelAnimationFrame(viewportFrameRef.current)
-    }
-    viewportTimerRefs.current.forEach(timerId => window.clearTimeout(timerId))
-    viewportTimerRefs.current = []
-
-    const keepPinned = () => {
-      if (autoScrollRef.current) {
-        scrollToBottom('auto')
-      }
-    }
-
-    viewportFrameRef.current = requestAnimationFrame(() => {
-      viewportFrameRef.current = null
-      keepPinned()
-      viewportTimerRefs.current = [90, 220, 420].map(delay =>
-        window.setTimeout(keepPinned, delay)
-      )
-    })
-  }, [enabled, loading, scrollToBottom])
-
   const handleScroll = useCallback(() => {
     const container = containerRef.current
     if (!container) return false
 
     const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= 28
-
-    if (!atBottom && autoScrollRef.current && viewportAdjustingUntilRef.current > getTimestamp()) {
-      scrollToBottom('auto')
-      return true
-    }
-
     setAutoScroll(atBottom)
 
     if (atBottom) {
@@ -194,7 +154,7 @@ export function useUnreadScroll<TMessage>({
     }
 
     return atBottom
-  }, [containerRef, scheduleMarkLatestRead, scrollToBottom, setAutoScroll])
+  }, [containerRef, scheduleMarkLatestRead, setAutoScroll])
 
   useEffect(() => {
     initialUnreadJumpDoneRef.current = false
@@ -209,35 +169,8 @@ export function useUnreadScroll<TMessage>({
       if (markTimerRef.current) {
         window.clearTimeout(markTimerRef.current)
       }
-      if (viewportFrameRef.current !== null) {
-        cancelAnimationFrame(viewportFrameRef.current)
-      }
-      viewportTimerRefs.current.forEach(timerId => window.clearTimeout(timerId))
-      viewportTimerRefs.current = []
     }
   }, [])
-
-  useEffect(() => {
-    if (!enabled || loading) return
-
-    window.visualViewport?.addEventListener('resize', scheduleViewportBottomLock)
-    window.visualViewport?.addEventListener('scroll', scheduleViewportBottomLock)
-    window.addEventListener('resize', scheduleViewportBottomLock)
-    window.addEventListener('focusin', scheduleViewportBottomLock)
-
-    return () => {
-      window.visualViewport?.removeEventListener('resize', scheduleViewportBottomLock)
-      window.visualViewport?.removeEventListener('scroll', scheduleViewportBottomLock)
-      window.removeEventListener('resize', scheduleViewportBottomLock)
-      window.removeEventListener('focusin', scheduleViewportBottomLock)
-      if (viewportFrameRef.current !== null) {
-        cancelAnimationFrame(viewportFrameRef.current)
-        viewportFrameRef.current = null
-      }
-      viewportTimerRefs.current.forEach(timerId => window.clearTimeout(timerId))
-      viewportTimerRefs.current = []
-    }
-  }, [enabled, loading, scheduleViewportBottomLock])
 
   useEffect(() => {
     const container = containerRef.current

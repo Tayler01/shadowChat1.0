@@ -161,7 +161,6 @@ function App() {
       root.style.setProperty('--shadowchat-app-height', `${viewportState.appHeight}px`)
       root.style.setProperty('--shadowchat-visual-viewport-height', `${viewportState.visualViewportHeight}px`)
       root.style.setProperty('--shadowchat-keyboard-inset', `${viewportState.keyboardInset}px`)
-      root.style.setProperty('--shadowchat-mobile-scroll-keyboard-inset', `${viewportState.scrollKeyboardInset}px`)
       root.style.setProperty('--shadowchat-toast-top', `calc(${viewportOffsetTop}px + env(safe-area-inset-top) + ${viewportState.toastTopRem}rem)`)
       root.style.setProperty('--shadowchat-toast-top-space', `${viewportState.toastTopSpacePx}px`)
     }
@@ -211,7 +210,6 @@ function App() {
       root.style.removeProperty('--shadowchat-visual-viewport-height')
       root.style.removeProperty('--shadowchat-app-height')
       root.style.removeProperty('--shadowchat-keyboard-inset')
-      root.style.removeProperty('--shadowchat-mobile-scroll-keyboard-inset')
       root.style.removeProperty('--shadowchat-toast-top')
       root.style.removeProperty('--shadowchat-toast-top-space')
     }
