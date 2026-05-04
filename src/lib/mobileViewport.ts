@@ -36,17 +36,32 @@ export function computeMobileViewportState({
     0,
     stableBaselineHeight - visualViewportHeight - visualViewportOffsetTop
   )
-  const rawKeyboardInset = isIOS
-    ? Math.max(viewportInsetFromLayout, viewportInsetFromStableFrame)
-    : viewportInsetFromLayout
+
+  if (!isIOS) {
+    const viewportCompressed =
+      viewportInsetFromLayout > KEYBOARD_VIEWPORT_THRESHOLD_PX ||
+      visualViewportHeight < layoutHeight - KEYBOARD_VIEWPORT_THRESHOLD_PX
+    const keyboardOpen = editableFocused && viewportCompressed
+    const toastTopRem = keyboardOpen ? 0.75 : 4.5
+
+    return {
+      appHeight: visualViewportHeight,
+      stableAppHeight: layoutHeight,
+      visualViewportHeight,
+      keyboardInset: 0,
+      keyboardOpen,
+      toastTopRem,
+      toastTopSpacePx: visualViewportOffsetTop + toastTopRem * 16,
+    }
+  }
+
+  const rawKeyboardInset = Math.max(viewportInsetFromLayout, viewportInsetFromStableFrame)
   const viewportCompressed =
     rawKeyboardInset > KEYBOARD_VIEWPORT_THRESHOLD_PX ||
-    visualViewportHeight < (
-      isIOS ? stableBaselineHeight : layoutHeight
-    ) - KEYBOARD_VIEWPORT_THRESHOLD_PX
+    visualViewportHeight < stableBaselineHeight - KEYBOARD_VIEWPORT_THRESHOLD_PX
   const keyboardOpen = editableFocused && viewportCompressed
   const keyboardInset = keyboardOpen ? rawKeyboardInset : 0
-  const stableAppHeight = !previousStableAppHeight || !isIOS || !viewportCompressed
+  const stableAppHeight = !previousStableAppHeight || !viewportCompressed
     ? layoutHeight
     : previousStableAppHeight
   const appHeight = isIOS && viewportCompressed ? stableAppHeight : visualViewportHeight

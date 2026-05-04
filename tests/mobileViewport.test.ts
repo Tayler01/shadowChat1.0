@@ -31,6 +31,21 @@ describe('computeMobileViewportState', () => {
     expect(state.keyboardOpen).toBe(false)
   })
 
+  it('does not add a keyboard inset on Android-style visual viewport compression', () => {
+    const state = computeMobileViewportState({
+      layoutHeight: 852,
+      visualViewportHeight: 512,
+      visualViewportOffsetTop: 0,
+      isIOS: false,
+      editableFocused: true,
+      previousStableAppHeight: 852,
+    })
+
+    expect(state.appHeight).toBe(512)
+    expect(state.keyboardInset).toBe(0)
+    expect(state.keyboardOpen).toBe(true)
+  })
+
   it('keeps the iOS frame stable when innerHeight also shrinks with the keyboard', () => {
     const state = computeMobileViewportState({
       layoutHeight: 512,
