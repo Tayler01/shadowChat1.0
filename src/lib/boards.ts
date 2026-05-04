@@ -114,7 +114,7 @@ export const BOARD_DEFINITIONS: readonly BoardDefinition[] = [
     slug: 'art-board',
     title: 'Art Board',
     kind: 'static',
-    description: 'Coming soon',
+    description: 'Shared mood canvas',
     navUnread: false,
     accent: '#d88fb8',
     defaultPosition: { x: 58, y: 76, radius: 82 },

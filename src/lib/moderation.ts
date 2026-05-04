@@ -9,6 +9,7 @@ export type ChannelBanScope =
   | 'board_vibe_coding'
   | 'board_ai_news'
   | 'board_projects_chat'
+  | 'art_board'
   | 'all_interaction'
 
 export interface UserChannelBan {
@@ -79,6 +80,11 @@ export const CHANNEL_BAN_OPTIONS: Array<{ scope: ChannelBanScope; label: string;
     scope: 'board_projects_chat',
     label: 'Projects Chat',
     description: 'Blocks Projects Chat messages, edits, deletes, and reactions.',
+  },
+  {
+    scope: 'art_board',
+    label: 'Art Board',
+    description: 'Blocks adding, editing, deleting, linking, and reactions on the Art Board while leaving browsing open.',
   },
 ]
 

@@ -91,6 +91,10 @@ participation.
 Boards require `public.board_catalog`, `public.board_chat_messages`,
 `public.board_chat_reactions`, and `get_board_badge_counts` before the
 production Boards UI can load chat boards or unread counts.
+Art Board requires `public.art_board_items`, `public.art_board_links`,
+`public.art_board_reactions`, the public `art-board` Storage bucket policies,
+and the deployed `art-board-import-image` Edge Function before image URL imports
+and shared canvas updates work.
 Operator message deletion requires the latest message-delete policies before
 the production UI can delete normal-user General Chat or board-chat messages
 for everyone.
@@ -120,6 +124,8 @@ Recent app-surface migrations to confirm in fresh projects:
 - `20260502193604_boards_domain.sql`: Boards catalog, reusable board-chat stream, per-board unread counts, and Boards moderation scopes.
 - `20260503191500_add_new_chat_boards.sql`: Vibe Coding, AI News, and Projects Chat catalog rows plus their board moderation scopes.
 - `20260503191532_admin_delete_non_admin_chat_messages.sql`: operator deletion of normal-user General Chat and board-chat messages.
+- `20260504012117_art_board_domain.sql`: Art Board tables, RLS, realtime publication, public Storage bucket, and moderation scope.
+- `20260504021602_art_board_z_index_bigint.sql`: widens Art Board ordering values for timestamp-based layering.
 
 ### Edge Functions
 
@@ -142,6 +148,7 @@ supabase functions deploy bridge-update-check --no-verify-jwt
 supabase functions deploy bridge-user-profile --no-verify-jwt
 supabase functions deploy bridge-user-search --no-verify-jwt
 supabase functions deploy link-preview --no-verify-jwt
+supabase functions deploy art-board-import-image
 ```
 
 The bridge functions keep JWT verification disabled at the Supabase function gateway because the firmware bootstrap calls do not carry a browser user token. User-sensitive bridge operations validate the caller's Supabase session inside the function, while device-sensitive operations validate pairing codes or bridge control-plane tokens.
@@ -234,15 +241,16 @@ After deploy, verify:
 8. A message containing an `https://` or `www.` link renders as a clickable link and loads a compact preview card
 9. Settings feedback can submit a bug or feature report with an image attachment after feedback schema changes
 10. Boards tab loads the low-friction board map, keeps labels inside board objects, avoids visual overlap after collisions, and opens News Feed plus each chat board
-11. News Chat, Investing Chat, Learning Chat, Crypto Chat, Vibe Coding, AI News, and Projects Chat send, edit, delete, react, render link previews, and avoid duplicate subheaders/manual refresh rows
-12. Settings > Admin > News Sources shows source health for an `admin` or `sub_admin` account
-13. Render worker has checked enabled sources since deploy and today's feed rows match current Eastern-day posts
-14. General Chat header shows active-user count, active-user popup, and weather widget without mobile overlap
-15. Settings > Account & Profile can save or clear a weather location
-16. Settings > Admin > Feedback Review lists submitted feedback for an app operator
-17. An app operator can open another user's profile popup and see Channel bans
-18. A channel-banned user is blocked from the selected channel, board, or all interaction while DMs and read access still work
-19. An app operator can delete a normal-user General Chat message and board-chat message, and both disappear for other signed-in users without refresh
+11. Art Board opens from Boards, settles without a stuck loader, exposes Home/zoom/About/Add/Recently Added controls, and the Add menu opens on mobile
+12. News Chat, Investing Chat, Learning Chat, Crypto Chat, Vibe Coding, AI News, and Projects Chat send, edit, delete, react, render link previews, and avoid duplicate subheaders/manual refresh rows
+13. Settings > Admin > News Sources shows source health for an `admin` or `sub_admin` account
+14. Render worker has checked enabled sources since deploy and today's feed rows match current Eastern-day posts
+15. General Chat header shows active-user count, active-user popup, and weather widget without mobile overlap
+16. Settings > Account & Profile can save or clear a weather location
+17. Settings > Admin > Feedback Review lists submitted feedback for an app operator
+18. An app operator can open another user's profile popup and see Channel bans
+19. A channel-banned user is blocked from the selected channel, board, Art Board, or all interaction while DMs and read access still work
+20. An app operator can delete a normal-user General Chat message and board-chat message, and both disappear for other signed-in users without refresh
 
 Recommended production smoke for local post-deploy validation:
 

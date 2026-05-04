@@ -16,6 +16,7 @@ import { PhoneInstallOnboarding } from './components/onboarding/PhoneInstallOnbo
 import { useSessionResumeRecovery } from './hooks/useSessionResumeRecovery'
 import { useAdminRoleNotifications } from './hooks/useAdminRoleNotifications'
 import { useChannelBanExpirySweep } from './hooks/useChannelBanExpirySweep'
+import { useArtBoardReactionNotifications } from './hooks/useArtBoardReactionNotifications'
 import { computeMobileViewportState } from './lib/mobileViewport'
 
 const DirectMessagesView = lazy(() =>
@@ -92,6 +93,7 @@ function App() {
   useSessionResumeRecovery()
   useAdminRoleNotifications()
   useChannelBanExpirySweep()
+  useArtBoardReactionNotifications()
   const [currentView, setCurrentView] = useState<View>(() => getInitialLocationState().view)
   const [boardsResetKey, setBoardsResetKey] = useState(0)
   const [boardsChatFooterActive, setBoardsChatFooterActive] = useState(false)

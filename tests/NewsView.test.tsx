@@ -46,6 +46,20 @@ jest.mock('../src/components/boards/BoardBubbleMap', () => ({
       >
         News Chat
       </button>
+      <button
+        type="button"
+        onClick={() => onSelect({
+          slug: 'art-board',
+          title: 'Art Board',
+          kind: 'static',
+          description: 'Shared mood canvas',
+          navUnread: false,
+          accent: '#d88fb8',
+          defaultPosition: { x: 0, y: 0, radius: 80 },
+        })}
+      >
+        Art Board
+      </button>
     </div>
   ),
 }))
@@ -56,6 +70,10 @@ jest.mock('../src/components/news/NewsFeed', () => ({
 
 jest.mock('../src/components/boards/BoardChat', () => ({
   BoardChat: () => <div>chat board</div>,
+}))
+
+jest.mock('../src/components/art/ArtBoard', () => ({
+  ArtBoard: () => <div>art board canvas</div>,
 }))
 
 beforeEach(() => {
@@ -88,4 +106,15 @@ test('boards view opens chat boards without clearing feed unread', () => {
   expect(screen.getByText('chat board')).toBeInTheDocument()
   expect(mockMarkFeedSeen).not.toHaveBeenCalled()
   expect(onMobileChatActiveChange).toHaveBeenLastCalledWith(true)
+})
+
+test('boards view opens the art board canvas from a static board', () => {
+  const onMobileChatActiveChange = jest.fn()
+  render(<BoardsView onMobileChatActiveChange={onMobileChatActiveChange} />)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Art Board' }))
+
+  expect(screen.getByText('art board canvas')).toBeInTheDocument()
+  expect(screen.queryByText('Coming soon')).not.toBeInTheDocument()
+  expect(onMobileChatActiveChange).toHaveBeenLastCalledWith(false)
 })

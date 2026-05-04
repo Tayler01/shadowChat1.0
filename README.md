@@ -28,7 +28,7 @@ The project is already wired for hosted Supabase and Netlify deployment. It is d
 - Message reactions, pinning, editing, and deletion
 - Slash commands and reply/thread affordances
 - AI reply and summary hooks through a secured Supabase Edge Function
-- Boards tab with a low-friction draggable board map, feed pills, chat circles, static board squares, collision sparkle/sound feedback, the existing News Feed, News Chat, Investing Chat, Learning Chat, Crypto Chat, and a coming-soon Art Board
+- Boards tab with a low-friction draggable board map, feed pills, chat circles, static board squares, collision sparkle/sound feedback, the existing News Feed, News Chat, Investing Chat, Learning Chat, Crypto Chat, and a shared Art Board mood canvas
 - App-wide admin/sub-admin access controls with role badges and operator-only tools
 - Operator-managed bans for General Chat, individual chat boards, and all app interaction
 - Server-confirmed operator message deletion for normal-user General Chat and board-chat messages
@@ -51,6 +51,7 @@ Frontend lives under [`src`](C:/repos/chat2.0/src).
 - [`src/hooks`](C:/repos/chat2.0/src/hooks) contains most stateful app behavior.
 - [`src/lib`](C:/repos/chat2.0/src/lib) contains Supabase, auth, push, AI, env, and utility layers.
 - [`src/components/boards`](C:/repos/chat2.0/src/components/boards) contains the Boards map, board routing, and reusable board-chat UI.
+- [`src/components/art`](C:/repos/chat2.0/src/components/art) contains the Art Board canvas, add flows, item controls, linking, and detail popup.
 - [`src/components/news`](C:/repos/chat2.0/src/components/news) contains the News Feed, feed item, reaction, modal UI, and compatibility wrappers for older imports.
 - [`src/components/chat/WeatherWidget.tsx`](C:/repos/chat2.0/src/components/chat/WeatherWidget.tsx:1) contains the General Chat weather pill and forecast popup.
 - [`src/components/settings/WeatherLocationSettings.tsx`](C:/repos/chat2.0/src/components/settings/WeatherLocationSettings.tsx:1) contains the per-user weather location picker.
@@ -66,6 +67,7 @@ Backend lives under [`supabase`](C:/repos/chat2.0/supabase).
 - [`supabase/functions/link-preview`](C:/repos/chat2.0/supabase/functions/link-preview/index.ts) fetches server-side metadata for chat, DM, and board-chat link cards.
 - News data lives in isolated `news_*` tables and RPCs from [`supabase/migrations/20260430041621_news_tab_foundation.sql`](C:/repos/chat2.0/supabase/migrations/20260430041621_news_tab_foundation.sql:1).
 - Boards use `public.board_catalog`, `public.board_chat_messages`, `public.board_chat_reactions`, and per-board `user_read_cursors`.
+- Art Board uses `public.art_board_items`, `public.art_board_links`, `public.art_board_reactions`, the public `art-board` Storage bucket, and the `art-board-import-image` Edge Function.
 - Feedback submissions use `public.feedback_submissions` plus the private `feedback-attachments` Storage bucket.
 - Admin roles use `public.user_roles`, `public.admin_role_audit`, `public.admin_role_notifications`, and the synced public `users.admin_role` badge field.
 - Channel bans use `public.user_channel_bans` plus RLS/RPC enforcement for General Chat, individual board chats, and all interaction.
@@ -167,6 +169,7 @@ node scripts/playwright-smoke.mjs --scenario=full --run-name=full-smoke-release 
 - Active-user dots and the General Chat user-count popup depend on `user_presence`, `users.presence_visibility`, and the `update_user_last_active`, `list_presence_states`, and `get_active_users` RPCs.
 - News Feed realtime depends on the isolated News migrations, the `shado-news-scraper` Render worker, and the source health/cursor fields in `news_sources`.
 - Board chat realtime depends on `board_chat_messages`, `board_chat_reactions`, `user_read_cursors`, and `get_board_badge_counts`.
+- Art Board realtime depends on `art_board_items`, `art_board_links`, and `art_board_reactions`; item movement autosaves after edits instead of streaming live drag state.
 - Board and feed detail views share the primary Boards header/back control and intentionally avoid redundant secondary headers or manual refresh buttons.
 - Operator message deletes in General Chat and board chats depend on the moderation delete policies returning a deleted row before the client removes it locally.
 - Weather preferences are private, and forecasts refresh automatically after preference changes and on a periodic timer. `user_weather_preferences` is not published to Supabase Realtime.
@@ -212,6 +215,7 @@ Production is hosted on Netlify, the backend is hosted on Supabase, and the News
 - [docs/ARCHITECTURE.md](C:/repos/chat2.0/docs/ARCHITECTURE.md:1): codebase map and key data flows
 - [docs/ADMIN_ACCESS.md](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1): app-wide admin/sub-admin roles, badges, settings, and RPCs
 - [docs/CHANNEL_BANS.md](C:/repos/chat2.0/docs/CHANNEL_BANS.md:1): profile-popup moderation controls and database-enforced channel bans
+- [docs/ART_BOARD.md](C:/repos/chat2.0/docs/ART_BOARD.md:1): shared Art Board canvas, schema, storage, moderation, and validation
 - [docs/WEATHER_WIDGET.md](C:/repos/chat2.0/docs/WEATHER_WIDGET.md:1): General Chat weather widget, private location preferences, and validation
 - [docs/NEWS_TAB_AND_SCRAPER.md](C:/repos/chat2.0/docs/NEWS_TAB_AND_SCRAPER.md:1): Boards-era News Feed backend, scraper lifecycle, Render setup, and troubleshooting
 - [services/news-scraper/README.md](C:/repos/chat2.0/services/news-scraper/README.md:1): worker-local command and environment reference

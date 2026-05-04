@@ -632,6 +632,7 @@ export const resetRealtimeConnection = async () => {
 
 export const VOICE_BUCKET = 'message-media'
 export const UPLOADS_BUCKET = 'chat-uploads'
+export const ART_BOARD_BUCKET = 'art-board'
 
 export const uploadVoiceMessage = async (blob: Blob, mimeType = 'audio/webm') => {
   const workingClient = await getWorkingClient()
@@ -654,6 +655,18 @@ export const uploadChatFile = async (file: File) => {
   if (error) throw error
   const { data } = workingClient.storage.from(UPLOADS_BUCKET).getPublicUrl(filePath)
   return data.publicUrl
+}
+
+export const uploadArtBoardImage = async (file: File) => {
+  const workingClient = await getWorkingClient()
+  const { data: { user } } = await workingClient.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '-').slice(-120) || 'art-image'
+  const filePath = `${user.id}/uploads/${Date.now()}_${safeName}`
+  const { error } = await workingClient.storage.from(ART_BOARD_BUCKET).upload(filePath, file)
+  if (error) throw error
+  const { data } = workingClient.storage.from(ART_BOARD_BUCKET).getPublicUrl(filePath)
+  return { path: filePath, publicUrl: data.publicUrl }
 }
 
 // Database types matching the actual schema
@@ -780,6 +793,51 @@ export interface BoardChatMessage {
   created_at: string
   updated_at: string
   user?: User
+}
+
+export type ArtBoardItemType = 'image' | 'note'
+export type ArtBoardFrameStyle = 'clean' | 'print' | 'polaroid' | 'pinned'
+export type ArtBoardNoteColor = 'butter' | 'rose' | 'sage' | 'sky' | 'lavender' | 'peach'
+export type ArtBoardReaction = 'heart' | 'spark' | 'fire' | 'idea'
+export type ArtBoardLinkLabel = 'inspired by' | 'reference' | 'related' | 'part of' | 'contrast'
+
+export interface ArtBoardItem {
+  id: string
+  user_id: string
+  item_type: ArtBoardItemType
+  title?: string | null
+  caption?: string | null
+  tags: string[]
+  image_url?: string | null
+  image_path?: string | null
+  alt_text?: string | null
+  note_text?: string | null
+  note_color: ArtBoardNoteColor
+  frame_style: ArtBoardFrameStyle
+  position_x: number
+  position_y: number
+  width: number
+  height: number
+  rotation: number
+  z_index: number
+  chunk_x: number
+  chunk_y: number
+  reactions: Record<string, { count: number; users: string[] }>
+  deleted_at?: string | null
+  deleted_by?: string | null
+  created_at: string
+  updated_at: string
+  user?: User
+}
+
+export interface ArtBoardLink {
+  id: string
+  item_a_id: string
+  item_b_id: string
+  created_by: string
+  label: ArtBoardLinkLabel
+  created_at: string
+  updated_at: string
 }
 
 export interface DMConversation {

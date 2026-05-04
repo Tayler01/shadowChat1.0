@@ -3,6 +3,7 @@ import { ArrowLeft } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { BoardBubbleMap } from './BoardBubbleMap'
 import { BoardChat } from './BoardChat'
+import { ArtBoard } from '../art/ArtBoard'
 import { NewsFeed } from '../news/NewsFeed'
 import { Button } from '../ui/Button'
 import { cn } from '../../lib/utils'
@@ -71,6 +72,10 @@ export function BoardsView({
 
     if (activeBoard.kind === 'feed') {
       return <NewsFeed />
+    }
+
+    if (activeBoard.slug === 'art-board') {
+      return <ArtBoard />
     }
 
     return (

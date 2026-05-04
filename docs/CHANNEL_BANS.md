@@ -31,8 +31,10 @@ Available scopes:
 - `board_ai_news`: blocks AI News messages, edits, deletes, and reactions.
 - `board_projects_chat`: blocks Projects Chat messages, edits, deletes, and
   reactions.
+- `art_board`: blocks Art Board adds, edits, deletes, links, and reactions
+  while leaving browsing open.
 - `all_interaction`: blocks posting, editing, deleting, and emoji reactions
-  app-wide, including News Feed reactions.
+  app-wide, including News Feed and Art Board reactions.
 
 Available durations:
 
@@ -55,6 +57,8 @@ Boards-era scopes and shared board-chat enforcement live in
 Operator deletion of normal-user General Chat and board-chat messages is
 enabled by
 [`20260503191532_admin_delete_non_admin_chat_messages.sql`](C:/repos/chat2.0/supabase/migrations/20260503191532_admin_delete_non_admin_chat_messages.sql:1).
+Art Board scope, item policies, and soft-delete RPCs live in
+[`20260504012117_art_board_domain.sql`](C:/repos/chat2.0/supabase/migrations/20260504012117_art_board_domain.sql:1).
 
 Main table:
 
@@ -67,6 +71,8 @@ Main RPCs:
 - `is_user_channel_banned`
 - `is_board_interaction_banned`
 - `toggle_board_chat_reaction`
+- `delete_art_board_item`
+- `toggle_art_board_reaction`
 
 Ban enforcement happens at the database boundary:
 
@@ -82,6 +88,8 @@ Ban enforcement happens at the database boundary:
   check the board's moderation scope and `all_interaction`.
 - `news_feed_reactions` insert policy and `toggle_news_feed_reaction` check
   `all_interaction`.
+- `art_board_items`, `art_board_links`, and Art Board RPCs check `art_board`
+  and `all_interaction`; banned users can still browse the board.
 
 Every ban change inserts a public General Chat moderation notice from the Shado
 account with the target user, scope, reason, and duration. Expired timed bans

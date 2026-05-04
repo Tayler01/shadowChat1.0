@@ -29,6 +29,7 @@ React UI
 - [`src/components/chat`](C:/repos/chat2.0/src/components/chat): group chat
 - [`src/components/dms`](C:/repos/chat2.0/src/components/dms): inbox and DM thread
 - [`src/components/boards`](C:/repos/chat2.0/src/components/boards): draggable Boards map, board routing, and reusable chat boards
+- [`src/components/art`](C:/repos/chat2.0/src/components/art): shared Art Board canvas, add/edit flows, links, reactions, and detail popup
 - [`src/components/news`](C:/repos/chat2.0/src/components/news): News Feed, feed modal, reactions, and compatibility wrappers
 - [`src/components/profile`](C:/repos/chat2.0/src/components/profile): user profile experience, including avatar crop/zoom/position editing before upload
 - [`src/components/settings`](C:/repos/chat2.0/src/components/settings): sectioned settings, notification setup, feedback, admin tools, and weather location
@@ -74,7 +75,7 @@ Important domains:
 - DM conversations and DM messages
 - reactions and pinning helpers
 - isolated News sources, feed items, feed reactions, and News seen state
-- Boards catalog, shared board-chat messages/reactions, and per-board read cursors
+- Boards catalog, shared board-chat messages/reactions, per-board read cursors, and separate Art Board item/link/reaction tables
 - uploads and storage policies
 - user feedback submissions and private feedback attachments
 - app-wide admin/sub-admin roles, audit rows, and role-change notifications
@@ -211,6 +212,16 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 5. Collisions can emit a small sparkle burst and a short sound-effects-aware tap; feed pills can spin briefly from corner hits and then settle upright
 6. Selecting a board routes into its feed, chat, or static placeholder view
 7. Reopening Boards restores the default layout instead of persisting an old ad-hoc arrangement
+
+### Art Board
+
+1. User opens the square Art Board tile from Boards
+2. The client lazy-loads `art_board_items` by generated chunk coordinates and fetches related `art_board_links`
+3. Users add uploaded/imported images or sticky notes, then placement autosaves after movement stops
+4. `art-board-import-image` copies public URL imports into the public `art-board` Storage bucket before item creation
+5. Links are non-directional rows in `art_board_links`; reactions toggle through `toggle_art_board_reaction`
+6. `art_board_items`, `art_board_links`, and `art_board_reactions` publish low-frequency realtime updates, but live drag state is not streamed
+7. `art_board` and `all_interaction` bans block writes while preserving read/browse access
 
 ### Channel Ban Enforcement
 

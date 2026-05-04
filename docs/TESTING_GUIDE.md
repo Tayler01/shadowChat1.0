@@ -36,7 +36,7 @@ Current coverage is strongest around:
 - thread reply and pinned message UI
 - session refresh and realtime reset helpers
 - theme and user search hooks
-- Boards map routing and board-chat rendering
+- Boards map routing, Art Board routing, and board-chat rendering
 - admin feedback review
 - weather widget and location settings
 
@@ -53,7 +53,7 @@ Do browser validation when changing:
 - mobile navigation or composer layout
 - theme and visual polish
 - push notification setup
-- Boards map layout, per-board badges, News Feed layout, reaction menus, and source-health admin UI
+- Boards map layout, per-board badges, Art Board canvas controls, News Feed layout, reaction menus, and source-health admin UI
 - profile avatar crop, zoom, and positioning
 - admin access, admin subpages, role badges, or channel-ban moderation
 - active-user indicators or presence visibility
@@ -174,6 +174,7 @@ Current smoke scenarios:
 Boards/News-specific Jest coverage currently lives in:
 
 - [tests/NewsView.test.tsx](C:/repos/chat2.0/tests/NewsView.test.tsx:1)
+- [tests/ArtBoard.test.tsx](C:/repos/chat2.0/tests/ArtBoard.test.tsx:1)
 - [tests/NewsChat.test.tsx](C:/repos/chat2.0/tests/NewsChat.test.tsx:1)
 - [tests/linkPreview.test.ts](C:/repos/chat2.0/tests/linkPreview.test.ts:1)
 
@@ -221,6 +222,7 @@ For link preview changes, verify a local preview build with a signed-in account 
 For Boards changes, verify both desktop and mobile:
 
 - Boards nav label opens the bubble map, and old `view=news` URLs route to Boards
+- Art Board opens from its square board tile, the `+` menu is clickable, sticky-note formatting works, and canvas overlay controls are not swallowed by pan/drag pointer capture
 - feed boards render as pills, chat boards render as circles, and static boards render as squares
 - board objects show per-board unread counts and reset to the default layout when Boards is opened
 - dragging a board object gives it low-friction motion and can push nearby objects into a diminishing chain reaction
