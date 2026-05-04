@@ -5,8 +5,10 @@ separate backend domain from News Feed, board chats, DMs, and General Chat.
 
 ## User Experience
 
-- The Boards map opens `Art Board` as a free-panning canvas with Home, zoom,
-  About, Add, and Recently Added controls.
+- The Boards map opens `Art Board` as a free-panning canvas with Home,
+  button-based zoom, pinch zoom on mobile, About, and Add controls. The
+  Recently Added tray is intentionally hidden while the mobile canvas UX is
+  refined.
 - Users can add images or pastel sticky notes.
 - Image adds support local upload or URL import. URL import copies the image
   into Supabase Storage before it becomes an Art Board item.
@@ -77,6 +79,7 @@ Recommended browser pass:
 2. Sign in with a smoke account.
 3. Open Boards, then Art Board.
 4. Confirm the empty canvas settles, `+` opens, Sticky Note opens, formatting
-   buttons work, and no console/page errors appear.
+   buttons work, pinch zoom changes the board scale, and no console/page
+   errors appear.
 5. Create a temporary sticky note through normal RLS, toggle a reaction, then
    soft-delete it through `delete_art_board_item`.

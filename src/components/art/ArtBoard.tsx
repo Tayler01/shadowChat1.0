@@ -13,7 +13,6 @@ import {
   Lightbulb,
   Link2,
   List,
-  MoreHorizontal,
   Move,
   Pencil,
   Plus,
@@ -74,6 +73,13 @@ interface CanvasSize {
   height: number
 }
 
+interface PinchGesture {
+  pointerIds: [number, number]
+  startDistance: number
+  startZoom: number
+  worldAtMidpoint: CanvasPoint
+}
+
 interface DraftItem extends Omit<ArtBoardItem, 'id' | 'created_at' | 'updated_at' | 'chunk_x' | 'chunk_y'> {
   id: 'draft'
   created_at: string
@@ -106,6 +112,26 @@ const getItemCenter = (item: ArtBoardItem | DraftItem) => ({
   x: item.position_x + item.width / 2,
   y: item.position_y + item.height / 2,
 })
+
+const getPointDistance = (a: CanvasPoint, b: CanvasPoint) =>
+  Math.hypot(a.x - b.x, a.y - b.y)
+
+const getPointMidpoint = (a: CanvasPoint, b: CanvasPoint) => ({
+  x: (a.x + b.x) / 2,
+  y: (a.y + b.y) / 2,
+})
+
+const isPrimaryPointerButton = (event: React.PointerEvent) =>
+  event.pointerType === 'touch' || event.button === 0 || event.buttons === 1
+
+const capturePointerSafely = (target: Element, pointerId: number) => {
+  const pointerTarget = target as Element & { setPointerCapture?: (id: number) => void }
+  try {
+    pointerTarget.setPointerCapture?.(pointerId)
+  } catch {
+    // Synthetic test events and some interrupted mobile gestures can lose capture eligibility.
+  }
+}
 
 const formatTags = (tags: string[]) => tags.map(tag => `#${tag}`).join(' ')
 
@@ -188,15 +214,23 @@ const applyTextFormat = (
   const end = element?.selectionEnd ?? value.length
   const selected = value.slice(start, end)
   let replacement = ''
+  let selectionStart = start
+  let selectionEnd = start
 
   if (format === 'bold') {
-    replacement = `**${selected || 'bold'}**`
+    replacement = selected ? `**${selected}**` : '****'
+    selectionStart = selected ? start + replacement.length : start + 2
+    selectionEnd = selectionStart
   } else if (format === 'italic') {
-    replacement = `_${selected || 'italic'}_`
+    replacement = selected ? `_${selected}_` : '__'
+    selectionStart = selected ? start + replacement.length : start + 1
+    selectionEnd = selectionStart
   } else {
     replacement = selected
       ? selected.split('\n').map(line => `- ${line.replace(/^\s*[-*]\s+/, '')}`).join('\n')
-      : '- item'
+      : '- '
+    selectionStart = start + replacement.length
+    selectionEnd = selectionStart
   }
 
   const nextValue = `${value.slice(0, start)}${replacement}${value.slice(end)}`
@@ -204,8 +238,7 @@ const applyTextFormat = (
 
   window.requestAnimationFrame(() => {
     element?.focus()
-    const cursor = start + replacement.length
-    element?.setSelectionRange(cursor, cursor)
+    element?.setSelectionRange(selectionStart, selectionEnd)
   })
 }
 
@@ -263,6 +296,7 @@ function ArtReactionButtons({
 
 function ArtBoardItemCard({
   item,
+  stackIndex,
   selected,
   editing,
   canEdit,
@@ -270,9 +304,11 @@ function ArtBoardItemCard({
   onPointerDown,
   onResizePointerDown,
   onSelectAction,
+  onDoneEditing,
   onReact,
 }: {
   item: ArtBoardItem | DraftItem
+  stackIndex: number
   selected: boolean
   editing: boolean
   canEdit: boolean
@@ -280,6 +316,7 @@ function ArtBoardItemCard({
   onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void
   onResizePointerDown: (event: React.PointerEvent<HTMLButtonElement>) => void
   onSelectAction: (action: 'edit' | 'foreground' | 'background' | 'link' | 'delete') => void
+  onDoneEditing: () => void
   onReact: (reaction: ArtBoardReaction) => void
 }) {
   const actions: ChatMessageAction[] = [
@@ -334,7 +371,7 @@ function ArtBoardItemCard({
         width: item.width,
         height: item.height,
         transform: `rotate(${item.rotation}deg)`,
-        zIndex: editing ? 900 : selected ? 800 : item.z_index,
+        zIndex: editing ? 10002 : selected ? 10001 : stackIndex,
       }}
       onPointerDown={onPointerDown}
     >
@@ -405,7 +442,7 @@ function ArtBoardItemCard({
             <button type="button" onClick={() => onSelectAction('foreground')} className="rounded-full p-1 hover:bg-white/10" aria-label="Bring forward">
               <ArrowUpToLine className="h-3.5 w-3.5" />
             </button>
-            <button type="button" onClick={() => onSelectAction('edit')} className="rounded-full p-1 hover:bg-white/10" aria-label="Done editing">
+            <button type="button" onClick={onDoneEditing} className="rounded-full p-1 hover:bg-white/10" aria-label="Done editing">
               <Check className="h-3.5 w-3.5" />
             </button>
           </div>
@@ -844,7 +881,6 @@ export function ArtBoard() {
   const { profile } = useAuth()
   const {
     items,
-    recentItems,
     links,
     loading,
     error,
@@ -866,6 +902,8 @@ export function ArtBoard() {
     itemId?: string
     startItem?: ArtBoardItem | DraftItem
   } | null>(null)
+  const activePointersRef = useRef<Map<number, CanvasPoint>>(new Map())
+  const pinchRef = useRef<PinchGesture | null>(null)
   const longPressTimerRef = useRef<number | null>(null)
   const draftSaveTimerRef = useRef<number | null>(null)
   const [viewportSize, setViewportSize] = useState<CanvasSize>({ width: 1, height: 1 })
@@ -877,7 +915,6 @@ export function ArtBoard() {
   const [addMode, setAddMode] = useState<AddMode>(null)
   const [addChooserOpen, setAddChooserOpen] = useState(false)
   const [aboutOpen, setAboutOpen] = useState(false)
-  const [recentOpen, setRecentOpen] = useState(true)
   const [draftItem, setDraftItem] = useState<DraftItem | null>(null)
   const [linkSourceId, setLinkSourceId] = useState<string | null>(null)
   const [pendingLinkTargetId, setPendingLinkTargetId] = useState<string | null>(null)
@@ -900,9 +937,6 @@ export function ArtBoard() {
       ? allItems.find(item => item.id === selectedId) ?? null
       : null
   const openDetailItem = openDetailId ? itemsById.get(openDetailId) ?? null : null
-  const selectedLinks = selectedId
-    ? links.filter(link => link.item_a_id === selectedId || link.item_b_id === selectedId)
-    : []
 
   const canvasCenter = useCallback(() => ({
     x: (viewportSize.width / 2 - pan.x) / zoom,
@@ -976,6 +1010,51 @@ export function ArtBoard() {
     }
   }
 
+  const clearDraftSaveTimer = useCallback(() => {
+    if (draftSaveTimerRef.current !== null) {
+      window.clearTimeout(draftSaveTimerRef.current)
+      draftSaveTimerRef.current = null
+    }
+  }, [])
+
+  const trackTouchPointer = (event: React.PointerEvent) => {
+    if (event.pointerType !== 'touch') return
+    activePointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+  }
+
+  const releaseTouchPointer = (event: React.PointerEvent) => {
+    if (event.pointerType !== 'touch') return
+    activePointersRef.current.delete(event.pointerId)
+  }
+
+  const startPinchIfReady = () => {
+    const entries = Array.from(activePointersRef.current.entries())
+    const rect = containerRef.current?.getBoundingClientRect()
+    if (entries.length < 2 || !rect) return false
+
+    const [first, second] = entries.slice(-2)
+    const midpoint = getPointMidpoint(first[1], second[1])
+    const localMidpoint = {
+      x: midpoint.x - rect.left,
+      y: midpoint.y - rect.top,
+    }
+    const distance = Math.max(getPointDistance(first[1], second[1]), 1)
+
+    clearLongPress()
+    pointerRef.current = null
+    pinchRef.current = {
+      pointerIds: [first[0], second[0]],
+      startDistance: distance,
+      startZoom: zoom,
+      worldAtMidpoint: {
+        x: (localMidpoint.x - pan.x) / zoom,
+        y: (localMidpoint.y - pan.y) / zoom,
+      },
+    }
+
+    return true
+  }
+
   const canEditItem = (item: ArtBoardItem | DraftItem | null | undefined) =>
     Boolean(item && profile?.id && item.user_id === profile.id)
 
@@ -991,9 +1070,7 @@ export function ArtBoard() {
   }
 
   const scheduleDraftSave = useCallback((item: DraftItem) => {
-    if (draftSaveTimerRef.current !== null) {
-      window.clearTimeout(draftSaveTimerRef.current)
-    }
+    clearDraftSaveTimer()
 
     draftSaveTimerRef.current = window.setTimeout(async () => {
       try {
@@ -1006,9 +1083,11 @@ export function ArtBoard() {
         }
       } catch (error) {
         showActionErrorToast(await normalizeError(error))
+      } finally {
+        draftSaveTimerRef.current = null
       }
     }, DRAFT_SAVE_DELAY_MS)
-  }, [createItem])
+  }, [clearDraftSaveTimer, createItem])
 
   const commitItemUpdate = useCallback(async (item: ArtBoardItem, updates: UpdateArtBoardItemInput, rollback: ArtBoardItem) => {
     try {
@@ -1060,6 +1139,7 @@ export function ArtBoard() {
       const confirmed = window.confirm('Remove this Art Board item?')
       if (!confirmed) return
       if (item.id === 'draft') {
+        clearDraftSaveTimer()
         setDraftItem(null)
         setSelectedId(null)
         return
@@ -1082,7 +1162,13 @@ export function ArtBoard() {
   }
 
   const handleCanvasPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return
+    trackTouchPointer(event)
+    if (event.pointerType === 'touch') {
+      capturePointerSafely(event.currentTarget, event.pointerId)
+      if (startPinchIfReady()) return
+    }
+
+    if (!isPrimaryPointerButton(event)) return
     clearLongPress()
     pointerRef.current = {
       mode: 'pan',
@@ -1090,12 +1176,18 @@ export function ArtBoard() {
       startClient: { x: event.clientX, y: event.clientY },
       startPan: pan,
     }
-    event.currentTarget.setPointerCapture(event.pointerId)
+    capturePointerSafely(event.currentTarget, event.pointerId)
   }
 
   const handleItemPointerDown = (item: ArtBoardItem | DraftItem, event: React.PointerEvent<HTMLDivElement>) => {
     event.stopPropagation()
-    if (event.button !== 0) return
+    trackTouchPointer(event)
+    if (event.pointerType === 'touch') {
+      capturePointerSafely(event.currentTarget, event.pointerId)
+      if (startPinchIfReady()) return
+    }
+
+    if (!isPrimaryPointerButton(event)) return
 
     if (linkSourceId && item.id !== linkSourceId && item.id !== 'draft') {
       setPendingLinkTargetId(item.id)
@@ -1111,7 +1203,7 @@ export function ArtBoard() {
       itemId: item.id,
       startItem,
     }
-    event.currentTarget.setPointerCapture(event.pointerId)
+    capturePointerSafely(event.currentTarget, event.pointerId)
 
     clearLongPress()
     longPressTimerRef.current = window.setTimeout(() => {
@@ -1138,10 +1230,33 @@ export function ArtBoard() {
       itemId: item.id,
       startItem: { ...item },
     }
-    event.currentTarget.setPointerCapture(event.pointerId)
+    capturePointerSafely(event.currentTarget, event.pointerId)
   }
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType === 'touch' && activePointersRef.current.has(event.pointerId)) {
+      activePointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    }
+
+    const pinch = pinchRef.current
+    if (pinch) {
+      const first = activePointersRef.current.get(pinch.pointerIds[0])
+      const second = activePointersRef.current.get(pinch.pointerIds[1])
+      const rect = containerRef.current?.getBoundingClientRect()
+      if (!first || !second || !rect) return
+
+      event.preventDefault()
+      const distance = Math.max(getPointDistance(first, second), 1)
+      const midpoint = getPointMidpoint(first, second)
+      const nextZoom = clampZoom(pinch.startZoom * (distance / pinch.startDistance))
+      setZoom(nextZoom)
+      setPan({
+        x: midpoint.x - rect.left - pinch.worldAtMidpoint.x * nextZoom,
+        y: midpoint.y - rect.top - pinch.worldAtMidpoint.y * nextZoom,
+      })
+      return
+    }
+
     const active = pointerRef.current
     if (!active || active.pointerId !== event.pointerId) return
     const dx = event.clientX - active.startClient.x
@@ -1180,6 +1295,15 @@ export function ArtBoard() {
   }
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    const pinch = pinchRef.current
+    releaseTouchPointer(event)
+    if (pinch?.pointerIds.includes(event.pointerId)) {
+      clearLongPress()
+      pinchRef.current = null
+      pointerRef.current = null
+      return
+    }
+
     const active = pointerRef.current
     clearLongPress()
     if (!active || active.pointerId !== event.pointerId) return
@@ -1321,6 +1445,7 @@ export function ArtBoard() {
     <div className="relative flex min-h-0 flex-1 overflow-hidden bg-[#17130f]">
       <div
         ref={containerRef}
+        data-testid="art-board-canvas"
         className="relative min-h-0 flex-1 touch-none overflow-hidden bg-[radial-gradient(circle_at_center,rgba(215,170,70,0.10),transparent_30%),linear-gradient(135deg,rgba(55,42,27,0.45),rgba(10,9,8,0.92))]"
         onPointerDown={handleCanvasPointerDown}
         onPointerMove={handlePointerMove}
@@ -1330,6 +1455,7 @@ export function ArtBoard() {
       >
         <div className="pointer-events-none absolute inset-0 opacity-[0.13] [background-image:radial-gradient(circle_at_1px_1px,rgba(255,240,184,0.72)_1px,transparent_0)] [background-size:18px_18px]" />
         <div
+          data-testid="art-board-stage"
           className="absolute left-0 top-0 origin-top-left"
           style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
         >
@@ -1352,10 +1478,11 @@ export function ArtBoard() {
             </div>
           ))}
 
-          {allItems.map(item => (
+          {allItems.map((item, index) => (
             <ArtBoardItemCard
               key={item.id}
               item={item}
+              stackIndex={index + 1}
               selected={selectedId === item.id}
               editing={editingId === item.id}
               canEdit={canEditItem(item)}
@@ -1363,6 +1490,7 @@ export function ArtBoard() {
               onPointerDown={event => handleItemPointerDown(item, event)}
               onResizePointerDown={event => handleResizePointerDown(item, event)}
               onSelectAction={action => void handleItemAction(item, action)}
+              onDoneEditing={() => setEditingId(null)}
               onReact={reaction => void reactToItem(item.id, reaction)}
             />
           ))}
@@ -1420,18 +1548,28 @@ export function ArtBoard() {
             onPointerDown={event => event.stopPropagation()}
             onClick={event => event.stopPropagation()}
           >
-            <button type="button" onClick={() => startItemEdit(selectedItem)} className="rounded-full p-2 text-[var(--text-primary)] hover:bg-white/5" aria-label="Move item">
+            <button
+              type="button"
+              onClick={() => startItemEdit(selectedItem)}
+              className={cn(
+                'rounded-full p-2 text-[var(--text-primary)] hover:bg-white/5',
+                editingId === selectedItem.id && 'bg-white/5 text-[rgb(143,216,189)]'
+              )}
+              aria-label="Move item"
+            >
               <Move className="h-4 w-4" />
             </button>
-        <button type="button" onClick={() => void rotateSelected(-2)} className="rounded-full p-2 text-[var(--text-primary)] hover:bg-white/5" aria-label="Rotate left">
+            <button type="button" onClick={() => void rotateSelected(-2)} className="rounded-full p-2 text-[var(--text-primary)] hover:bg-white/5" aria-label="Rotate left">
               <RotateCcw className="h-4 w-4" />
             </button>
             <button type="button" onClick={() => void rotateSelected(2)} className="rounded-full p-2 text-[var(--text-primary)] hover:bg-white/5" aria-label="Rotate right">
               <RotateCw className="h-4 w-4" />
             </button>
-            <button type="button" onClick={() => setEditingId(null)} className="rounded-full p-2 text-[var(--text-gold)] hover:bg-white/5" aria-label="Done">
-              <Check className="h-4 w-4" />
-            </button>
+            {editingId === selectedItem.id && (
+              <button type="button" onClick={() => setEditingId(null)} className="rounded-full p-2 text-[var(--text-gold)] hover:bg-white/5" aria-label="Done">
+                <Check className="h-4 w-4" />
+              </button>
+            )}
           </div>
         )}
 
@@ -1462,28 +1600,6 @@ export function ArtBoard() {
             {error}
           </div>
         )}
-
-        <div
-          className={cn('absolute bottom-[calc(env(safe-area-inset-bottom)+4.55rem)] left-3 z-30 w-[min(22rem,calc(100vw-1.5rem))] rounded-[var(--radius-md)] border border-[var(--border-panel)] bg-[rgba(12,11,10,0.84)] shadow-[var(--shadow-panel-strong)] backdrop-blur-xl transition-transform md:bottom-3', !recentOpen && 'translate-y-[calc(100%-2.75rem)]')}
-          onPointerDown={event => event.stopPropagation()}
-          onClick={event => event.stopPropagation()}
-        >
-          <button type="button" onClick={() => setRecentOpen(value => !value)} className="flex w-full items-center justify-between px-3 py-2 text-left text-sm font-semibold text-[var(--text-primary)]">
-            Recently added
-            <MoreHorizontal className="h-4 w-4 text-[var(--text-muted)]" />
-          </button>
-          <div className="flex gap-2 overflow-x-auto px-3 pb-3">
-            {recentItems.map(item => (
-              <button key={item.id} type="button" onClick={() => jumpToItem(item)} className="h-16 w-16 shrink-0 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-black/30">
-                {item.item_type === 'image' ? (
-                  <img src={item.image_url || ''} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <span className={cn('block h-full w-full p-1 text-left text-[10px] leading-3', noteColorClass(item.note_color))}>{item.note_text}</span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
 
       <AddArtDialog mode={addMode} onClose={() => setAddMode(null)} onCreateDraft={createDraft} />

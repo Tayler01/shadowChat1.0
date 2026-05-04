@@ -3,6 +3,7 @@ import React from 'react'
 import { ArtBoard } from '../src/components/art/ArtBoard'
 
 const mockCreateItem = jest.fn()
+const mockItems: never[] = []
 const emptyItems: never[] = []
 const emptyLinks: never[] = []
 const mockLoadViewport = jest.fn()
@@ -21,7 +22,7 @@ jest.mock('../src/hooks/useAuth', () => ({
 
 jest.mock('../src/hooks/useArtBoard', () => ({
   useArtBoard: () => ({
-    items: emptyItems,
+    items: mockItems,
     recentItems: emptyItems,
     links: emptyLinks,
     loading: false,
@@ -73,6 +74,33 @@ describe('ArtBoard', () => {
 
     expect(textarea.value).toBe('**hello**')
     expect(screen.getByRole('button', { name: 'Place on board' })).toBeInTheDocument()
+
+    fireEvent.change(textarea, { target: { value: 'hello' } })
+    textarea.setSelectionRange(5, 5)
+    fireEvent.click(screen.getByLabelText('Italic'))
+
+    expect(textarea.value).toBe('hello__')
+    expect(textarea.value).not.toContain('italic')
+
+    expect(screen.queryByText('Recently added')).not.toBeInTheDocument()
+
+    unmount()
+  })
+
+  it('exits item move mode from the inline done control', () => {
+    const { unmount } = render(<ArtBoard />)
+
+    fireEvent.click(screen.getByLabelText('Add to Art Board'))
+    fireEvent.click(screen.getByRole('button', { name: 'Sticky note' }))
+    fireEvent.change(screen.getByPlaceholderText('Write the note...'), { target: { value: 'hello' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Place on board' }))
+
+    expect(screen.getByLabelText('Done editing')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByLabelText('Done editing'))
+
+    expect(screen.queryByLabelText('Done editing')).not.toBeInTheDocument()
+    expect(screen.queryByText('Edit item')).not.toBeInTheDocument()
 
     unmount()
   })
