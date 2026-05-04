@@ -143,4 +143,54 @@ describe('useUnreadScroll', () => {
 
     document.body.removeChild(container)
   })
+
+  it('keeps bottom lock active through mobile viewport scroll events', async () => {
+    const container = document.createElement('div')
+    const content = document.createElement('div')
+    container.appendChild(content)
+    document.body.appendChild(container)
+    setScrollMetrics(container, 1000, 600)
+
+    Object.defineProperty(container, 'scrollTo', {
+      configurable: true,
+      value: jest.fn((options?: ScrollToOptions | number) => {
+        const top = typeof options === 'number' ? options : options?.top
+        container.scrollTop = Number(top)
+      }),
+    })
+
+    const { result } = renderHook(() =>
+      useUnreadScroll<TestMessage>({
+        containerRef: { current: container },
+        messages: [makeMessage('m1', 1)],
+        loading: false,
+        cursor: null,
+        cursorLoading: false,
+        enabled: true,
+        surfaceKey: 'general_chat:main',
+        getMessageId: message => message.id,
+        getMessageCreatedAt: message => message.created_at,
+        getElementId: id => `message-${id}`,
+        onMarkReadToLatest: jest.fn(),
+      })
+    )
+
+    await waitFor(() => expect(container.scrollTop).toBe(400))
+
+    act(() => {
+      window.dispatchEvent(new Event('focusin'))
+    })
+
+    setScrollMetrics(container, 1250, 520)
+    container.scrollTop = 400
+
+    act(() => {
+      result.current.handleUnreadScroll()
+    })
+
+    expect(result.current.autoScroll).toBe(true)
+    expect(container.scrollTop).toBe(730)
+
+    document.body.removeChild(container)
+  })
 })
