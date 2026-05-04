@@ -14,6 +14,7 @@ export interface MobileViewportState {
   stableAppHeight: number
   visualViewportHeight: number
   keyboardInset: number
+  scrollKeyboardInset: number
   keyboardOpen: boolean
   toastTopRem: number
   toastTopSpacePx: number
@@ -46,6 +47,7 @@ export function computeMobileViewportState({
     ) - KEYBOARD_VIEWPORT_THRESHOLD_PX
   const keyboardOpen = editableFocused && viewportCompressed
   const keyboardInset = keyboardOpen ? rawKeyboardInset : 0
+  const scrollKeyboardInset = isIOS ? keyboardInset : 0
   const stableAppHeight = !previousStableAppHeight || !isIOS || !viewportCompressed
     ? layoutHeight
     : previousStableAppHeight
@@ -57,6 +59,7 @@ export function computeMobileViewportState({
     stableAppHeight,
     visualViewportHeight,
     keyboardInset,
+    scrollKeyboardInset,
     keyboardOpen,
     toastTopRem,
     toastTopSpacePx: visualViewportOffsetTop + toastTopRem * 16,

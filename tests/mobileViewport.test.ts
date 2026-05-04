@@ -13,6 +13,7 @@ describe('computeMobileViewportState', () => {
 
     expect(state.appHeight).toBe(852)
     expect(state.keyboardInset).toBe(340)
+    expect(state.scrollKeyboardInset).toBe(340)
     expect(state.keyboardOpen).toBe(true)
   })
 
@@ -28,7 +29,24 @@ describe('computeMobileViewportState', () => {
 
     expect(state.appHeight).toBe(520)
     expect(state.keyboardInset).toBe(0)
+    expect(state.scrollKeyboardInset).toBe(0)
     expect(state.keyboardOpen).toBe(false)
+  })
+
+  it('does not add Android keyboard height to chat scroller padding', () => {
+    const state = computeMobileViewportState({
+      layoutHeight: 852,
+      visualViewportHeight: 512,
+      visualViewportOffsetTop: 0,
+      isIOS: false,
+      editableFocused: true,
+      previousStableAppHeight: 852,
+    })
+
+    expect(state.appHeight).toBe(512)
+    expect(state.keyboardInset).toBe(340)
+    expect(state.scrollKeyboardInset).toBe(0)
+    expect(state.keyboardOpen).toBe(true)
   })
 
   it('keeps the iOS frame stable when innerHeight also shrinks with the keyboard', () => {
@@ -43,6 +61,7 @@ describe('computeMobileViewportState', () => {
 
     expect(state.appHeight).toBe(852)
     expect(state.keyboardInset).toBe(340)
+    expect(state.scrollKeyboardInset).toBe(340)
     expect(state.keyboardOpen).toBe(true)
   })
 
@@ -58,6 +77,7 @@ describe('computeMobileViewportState', () => {
 
     expect(state.appHeight).toBe(852)
     expect(state.keyboardInset).toBe(0)
+    expect(state.scrollKeyboardInset).toBe(0)
     expect(state.keyboardOpen).toBe(false)
   })
 })

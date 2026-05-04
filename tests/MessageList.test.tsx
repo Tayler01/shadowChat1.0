@@ -151,7 +151,7 @@ describe('MessageList mobile keyboard layout', () => {
     render(<MessageList />)
 
     expect(screen.getByTestId('message-scroll')).toHaveClass(
-      'pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.75rem)]'
+      'pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)]'
     )
     expect(screen.getByTestId('message-stack')).toHaveClass(
       'flex',

@@ -446,7 +446,7 @@ export function BoardChat({
           ref={scrollRef}
           onScroll={handleScroll}
           data-testid="board-chat-message-scroll"
-          className="h-full overflow-y-auto pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.75rem)] md:pb-0"
+          className="h-full overflow-y-auto pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] md:pb-0"
         >
           {loading ? (
             <div className="flex h-full items-center justify-center p-8">
