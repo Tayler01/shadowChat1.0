@@ -14,6 +14,7 @@ export interface MobileViewportState {
   stableAppHeight: number
   visualViewportHeight: number
   keyboardInset: number
+  scrollKeyboardInset: number
   keyboardOpen: boolean
   toastTopRem: number
   toastTopSpacePx: number
@@ -49,6 +50,7 @@ export function computeMobileViewportState({
       stableAppHeight: layoutHeight,
       visualViewportHeight,
       keyboardInset: 0,
+      scrollKeyboardInset: 0,
       keyboardOpen,
       toastTopRem,
       toastTopSpacePx: visualViewportOffsetTop + toastTopRem * 16,
@@ -72,6 +74,7 @@ export function computeMobileViewportState({
     stableAppHeight,
     visualViewportHeight,
     keyboardInset,
+    scrollKeyboardInset: keyboardInset,
     keyboardOpen,
     toastTopRem,
     toastTopSpacePx: visualViewportOffsetTop + toastTopRem * 16,

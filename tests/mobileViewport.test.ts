@@ -13,6 +13,7 @@ describe('computeMobileViewportState', () => {
 
     expect(state.appHeight).toBe(852)
     expect(state.keyboardInset).toBe(340)
+    expect(state.scrollKeyboardInset).toBe(340)
     expect(state.keyboardOpen).toBe(true)
   })
 
@@ -28,6 +29,7 @@ describe('computeMobileViewportState', () => {
 
     expect(state.appHeight).toBe(520)
     expect(state.keyboardInset).toBe(0)
+    expect(state.scrollKeyboardInset).toBe(0)
     expect(state.keyboardOpen).toBe(false)
   })
 
@@ -43,6 +45,7 @@ describe('computeMobileViewportState', () => {
 
     expect(state.appHeight).toBe(512)
     expect(state.keyboardInset).toBe(0)
+    expect(state.scrollKeyboardInset).toBe(0)
     expect(state.keyboardOpen).toBe(true)
   })
 
@@ -58,6 +61,7 @@ describe('computeMobileViewportState', () => {
 
     expect(state.appHeight).toBe(852)
     expect(state.keyboardInset).toBe(340)
+    expect(state.scrollKeyboardInset).toBe(340)
     expect(state.keyboardOpen).toBe(true)
   })
 
@@ -73,6 +77,7 @@ describe('computeMobileViewportState', () => {
 
     expect(state.appHeight).toBe(852)
     expect(state.keyboardInset).toBe(0)
+    expect(state.scrollKeyboardInset).toBe(0)
     expect(state.keyboardOpen).toBe(false)
   })
 })
