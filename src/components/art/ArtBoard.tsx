@@ -6,9 +6,7 @@ import {
   Check,
   Flame,
   Heart,
-  Home,
   Image as ImageIcon,
-  Info,
   Italic,
   Lightbulb,
   Link2,
@@ -23,8 +21,6 @@ import {
   Trash2,
   Upload,
   X,
-  ZoomIn,
-  ZoomOut,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Avatar } from '../ui/Avatar'
@@ -61,7 +57,7 @@ const LONG_PRESS_MS = 430
 const DRAFT_SAVE_DELAY_MS = 900
 
 type AddMode = 'image' | 'note' | null
-type PointerMode = 'pan' | 'move' | 'resize'
+type PointerMode = 'pan' | 'move'
 
 interface CanvasPoint {
   x: number
@@ -266,30 +262,49 @@ function StickyFormatToolbar({
   )
 }
 
-function ArtReactionButtons({
-  onReact,
-  compact = false,
+const getReactionActions = (onReact: (reaction: ArtBoardReaction) => void): ChatMessageAction[] =>
+  ART_BOARD_REACTIONS.map(reaction => ({
+    id: `reaction-${reaction.id}`,
+    label: reaction.label,
+    icon: reactionIcons[reaction.id],
+    onSelect: () => onReact(reaction.id),
+  }))
+
+function ArtReactionBadges({
+  reactions,
+  className,
 }: {
-  onReact: (reaction: ArtBoardReaction) => void
-  compact?: boolean
+  reactions?: ArtBoardItem['reactions']
+  className?: string
 }) {
+  const entries = ART_BOARD_REACTIONS
+    .map(reaction => ({
+      ...reaction,
+      count: reactions?.[reaction.id]?.count ?? 0,
+      Icon: reactionIcons[reaction.id],
+    }))
+    .filter(reaction => reaction.count > 0)
+
+  if (!entries.length) return null
+
   return (
-    <div className={cn('flex items-center gap-1', compact && 'rounded-full border border-[var(--border-subtle)] bg-[rgba(9,10,11,0.72)] p-1')}>
-      {ART_BOARD_REACTIONS.map(reaction => {
-        const Icon = reactionIcons[reaction.id]
-        return (
-          <button
-            key={reaction.id}
-            type="button"
-            onClick={() => onReact(reaction.id)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.07)] hover:text-[var(--text-gold)]"
-            aria-label={reaction.label}
-            title={reaction.label}
-          >
-            <Icon className="h-4 w-4" />
-          </button>
-        )
-      })}
+    <div
+      className={cn(
+        'pointer-events-none absolute bottom-2 right-2 z-20 flex max-w-[78%] flex-wrap justify-end gap-1',
+        className
+      )}
+      aria-label="Art item reactions"
+    >
+      {entries.map(({ id, label, count, Icon }) => (
+        <span
+          key={id}
+          className="inline-flex min-h-6 items-center gap-1 rounded-full border border-[rgba(215,170,70,0.25)] bg-[rgba(8,9,10,0.76)] px-2 py-0.5 text-[11px] font-semibold text-[var(--text-gold)] shadow-[0_6px_16px_rgba(0,0,0,0.3)] backdrop-blur"
+          title={`${label}: ${count}`}
+        >
+          <Icon className="h-3 w-3" />
+          {count}
+        </span>
+      ))}
     </div>
   )
 }
@@ -302,7 +317,6 @@ function ArtBoardItemCard({
   canEdit,
   canDelete,
   onPointerDown,
-  onResizePointerDown,
   onSelectAction,
   onDoneEditing,
   onReact,
@@ -314,12 +328,12 @@ function ArtBoardItemCard({
   canEdit: boolean
   canDelete: boolean
   onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void
-  onResizePointerDown: (event: React.PointerEvent<HTMLButtonElement>) => void
   onSelectAction: (action: 'edit' | 'foreground' | 'background' | 'link' | 'delete') => void
   onDoneEditing: () => void
   onReact: (reaction: ArtBoardReaction) => void
 }) {
   const actions: ChatMessageAction[] = [
+    ...getReactionActions(onReact),
     {
       id: 'edit',
       label: 'Edit',
@@ -418,7 +432,6 @@ function ArtBoardItemCard({
             onPointerDown={event => event.stopPropagation()}
             onClick={event => event.stopPropagation()}
           >
-            <ArtReactionButtons onReact={onReact} compact />
             <ChatMessageActionsMenu
               actions={actions}
               buttonLabel="Art item actions"
@@ -426,6 +439,7 @@ function ArtBoardItemCard({
             />
           </div>
         )}
+        <ArtReactionBadges reactions={item.reactions} />
       </div>
 
       {editing && canEdit && (
@@ -448,11 +462,15 @@ function ArtBoardItemCard({
           </div>
           <button
             type="button"
-            onPointerDown={onResizePointerDown}
+            onPointerDown={event => event.stopPropagation()}
+            onClick={event => {
+              event.stopPropagation()
+              onDoneEditing()
+            }}
             className="absolute -bottom-3 -right-3 h-7 w-7 rounded-full border border-[rgba(143,216,189,0.5)] bg-[rgba(7,9,9,0.92)] text-[rgb(143,216,189)] shadow-[var(--shadow-panel)]"
-            aria-label="Resize art item"
+            aria-label="Exit item move mode"
           >
-            <Plus className="mx-auto h-4 w-4 rotate-45" />
+            <Check className="mx-auto h-4 w-4" />
           </button>
         </>
       )}
@@ -677,6 +695,7 @@ function DetailDialog({
   onDeleteLink: (link: ArtBoardLink) => void
 }) {
   const actions: ChatMessageAction[] = [
+    ...getReactionActions(onReact),
     { id: 'edit', label: 'Edit', icon: Pencil, hidden: !canEdit, onSelect: () => onAction('edit') },
     { id: 'foreground', label: 'Bring forward', icon: ArrowUpToLine, hidden: !canEdit, onSelect: () => onAction('foreground') },
     { id: 'background', label: 'Send back', icon: ArrowDownToLine, hidden: !canEdit, onSelect: () => onAction('background') },
@@ -685,8 +704,8 @@ function DetailDialog({
   ]
 
   return (
-    <div className="fixed inset-0 z-[95] flex items-end justify-center bg-black/70 px-3 pb-3 pt-10 backdrop-blur-sm sm:items-center">
-      <div className="popup-surface max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[var(--radius-lg)]">
+    <div className="absolute inset-0 z-[95] flex items-stretch justify-center bg-black/70 p-2 backdrop-blur-sm md:fixed md:inset-0 md:items-center md:p-4">
+      <div className="popup-surface flex h-full max-h-full w-full max-w-none flex-col overflow-hidden rounded-[var(--radius-lg)] md:h-auto md:max-h-[90vh] md:max-w-4xl">
         <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[var(--border-panel)] bg-[rgba(12,13,13,0.92)] px-4 py-3 backdrop-blur-xl">
           <div className="min-w-0">
             <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-muted)]">Art Board</p>
@@ -700,13 +719,17 @@ function DetailDialog({
           </div>
         </div>
 
-        <div className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-4 md:grid-cols-[minmax(0,1fr)_18rem]">
           <div className="min-w-0">
             {item.item_type === 'image' ? (
-              <img src={item.image_url || ''} alt={item.alt_text || item.title || item.caption || 'Art board image'} className="max-h-[62vh] w-full rounded-[var(--radius-md)] object-contain" />
+              <div className="relative">
+                <img src={item.image_url || ''} alt={item.alt_text || item.title || item.caption || 'Art board image'} className="max-h-[62vh] w-full rounded-[var(--radius-md)] object-contain" />
+                <ArtReactionBadges reactions={item.reactions} />
+              </div>
             ) : (
-              <div className={cn('min-h-48 rounded-[var(--radius-md)] p-5 shadow-[var(--shadow-panel)]', noteColorClass(item.note_color))}>
+              <div className={cn('relative min-h-48 rounded-[var(--radius-md)] p-5 shadow-[var(--shadow-panel)]', noteColorClass(item.note_color))}>
                 <StickyRichText content={item.note_text || ''} className="text-base leading-7" />
+                <ArtReactionBadges reactions={item.reactions} />
               </div>
             )}
             {item.caption && <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{item.caption}</p>}
@@ -727,23 +750,6 @@ function DetailDialog({
                 <p className="text-xs text-[var(--text-muted)]">{formatTime(item.created_at)}</p>
               </div>
             </div>
-
-            <section className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white/[0.035] p-3">
-              <p className="mb-2 text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">Reactions</p>
-              <ArtReactionButtons onReact={onReact} />
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[var(--text-secondary)]">
-                {ART_BOARD_REACTIONS.map(reaction => {
-                  const Icon = reactionIcons[reaction.id]
-                  const count = item.reactions?.[reaction.id]?.count ?? 0
-                  return (
-                    <div key={reaction.id} className="flex items-center gap-2 rounded-[var(--radius-sm)] bg-black/18 px-2 py-1.5">
-                      <Icon className="h-3.5 w-3.5 text-[var(--text-gold)]" />
-                      {count}
-                    </div>
-                  )
-                })}
-              </div>
-            </section>
 
             {item.tags.length > 0 && (
               <section className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-white/[0.035] p-3">
@@ -877,6 +883,26 @@ function EditPanel({
   )
 }
 
+export function ArtBoardAboutDialog({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[96] flex items-center justify-center bg-black/62 px-4 backdrop-blur-sm">
+      <div className="popup-surface w-full max-w-md rounded-[var(--radius-lg)] p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Art Board</h2>
+          <button type="button" onClick={onClose} className="rounded-full p-1 text-[var(--text-muted)] hover:bg-white/5" aria-label="Close Art Board about">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="space-y-3 text-sm leading-6 text-[var(--text-secondary)]">
+          <p>Browse the shared studio board, add images or sticky notes, and connect related pieces with labeled links.</p>
+          <p>Tap once to select. Tap selected art again to open details. Long-press your own item to move it. Changes autosave after you stop adjusting.</p>
+          <p>Admins can remove items from the context menu. Art Board bans block adding, editing, linking, and reactions while browsing stays open.</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ArtBoard() {
   const { profile } = useAuth()
   const {
@@ -914,7 +940,6 @@ export function ArtBoard() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [addMode, setAddMode] = useState<AddMode>(null)
   const [addChooserOpen, setAddChooserOpen] = useState(false)
-  const [aboutOpen, setAboutOpen] = useState(false)
   const [draftItem, setDraftItem] = useState<DraftItem | null>(null)
   const [linkSourceId, setLinkSourceId] = useState<string | null>(null)
   const [pendingLinkTargetId, setPendingLinkTargetId] = useState<string | null>(null)
@@ -958,11 +983,6 @@ export function ArtBoard() {
       y: viewportSize.height / 2 - point.y * nextZoom,
     })
   }, [viewportSize.height, viewportSize.width, zoom])
-
-  const goHome = useCallback(() => {
-    setZoom(0.9)
-    setPan({ x: viewportSize.width / 2, y: viewportSize.height / 2 })
-  }, [viewportSize.height, viewportSize.width])
 
   useEffect(() => {
     const node = containerRef.current
@@ -1016,6 +1036,14 @@ export function ArtBoard() {
       draftSaveTimerRef.current = null
     }
   }, [])
+
+  const finishItemEditing = () => {
+    clearLongPress()
+    pointerRef.current = null
+    pinchRef.current = null
+    activePointersRef.current.clear()
+    setEditingId(null)
+  }
 
   const trackTouchPointer = (event: React.PointerEvent) => {
     if (event.pointerType !== 'touch') return
@@ -1219,20 +1247,6 @@ export function ArtBoard() {
     }, LONG_PRESS_MS)
   }
 
-  const handleResizePointerDown = (item: ArtBoardItem | DraftItem, event: React.PointerEvent<HTMLButtonElement>) => {
-    event.stopPropagation()
-    clearLongPress()
-    pointerRef.current = {
-      mode: 'resize',
-      pointerId: event.pointerId,
-      startClient: { x: event.clientX, y: event.clientY },
-      startPan: pan,
-      itemId: item.id,
-      startItem: { ...item },
-    }
-    capturePointerSafely(event.currentTarget, event.pointerId)
-  }
-
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'touch' && activePointersRef.current.has(event.pointerId)) {
       activePointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
@@ -1282,16 +1296,6 @@ export function ArtBoard() {
       return
     }
 
-    if (active.mode === 'resize') {
-      updateLocalItem(active.itemId, item => {
-        const next = clampArtBoardItem({
-          width: active.startItem!.width + dx / zoom,
-          height: active.startItem!.height + dy / zoom,
-          rotation: item.rotation,
-        })
-        return { ...item, width: next.width, height: next.height }
-      })
-    }
   }
 
   const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -1312,7 +1316,7 @@ export function ArtBoard() {
     const itemId = active.itemId
     pointerRef.current = null
 
-    if (itemId && (active.mode === 'move' || active.mode === 'resize')) {
+    if (itemId && active.mode === 'move') {
       const item = itemId === 'draft'
         ? draftItem
         : allItems.find(existing => existing.id === itemId)
@@ -1325,8 +1329,6 @@ export function ArtBoard() {
         void commitItemUpdate(item as ArtBoardItem, {
           position_x: item.position_x,
           position_y: item.position_y,
-          width: item.width,
-          height: item.height,
         }, rollback)
       }
       return
@@ -1352,13 +1354,6 @@ export function ArtBoard() {
       x: event.clientX - rect.left - world.x * nextZoom,
       y: event.clientY - rect.top - world.y * nextZoom,
     })
-  }
-
-  const zoomBy = (factor: number) => {
-    const center = canvasCenter()
-    const nextZoom = clampZoom(zoom * factor)
-    setZoom(nextZoom)
-    centerOn(center, nextZoom)
   }
 
   const createDraft = (input: Omit<CreateArtBoardItemInput, 'position_x' | 'position_y' | 'z_index'>) => {
@@ -1488,31 +1483,11 @@ export function ArtBoard() {
               canEdit={canEditItem(item)}
               canDelete={canDeleteItem(item)}
               onPointerDown={event => handleItemPointerDown(item, event)}
-              onResizePointerDown={event => handleResizePointerDown(item, event)}
               onSelectAction={action => void handleItemAction(item, action)}
-              onDoneEditing={() => setEditingId(null)}
+              onDoneEditing={finishItemEditing}
               onReact={reaction => void reactToItem(item.id, reaction)}
             />
           ))}
-        </div>
-
-        <div
-          className="absolute left-3 top-3 z-30 flex flex-wrap items-center gap-2"
-          onPointerDown={event => event.stopPropagation()}
-          onClick={event => event.stopPropagation()}
-        >
-          <button type="button" onClick={goHome} className="glass-panel-strong rounded-full p-2 text-[var(--text-gold)]" aria-label="Home">
-            <Home className="h-4 w-4" />
-          </button>
-          <button type="button" onClick={() => zoomBy(1.12)} className="glass-panel-strong rounded-full p-2 text-[var(--text-primary)]" aria-label="Zoom in">
-            <ZoomIn className="h-4 w-4" />
-          </button>
-          <button type="button" onClick={() => zoomBy(0.88)} className="glass-panel-strong rounded-full p-2 text-[var(--text-primary)]" aria-label="Zoom out">
-            <ZoomOut className="h-4 w-4" />
-          </button>
-          <button type="button" onClick={() => setAboutOpen(true)} className="glass-panel-strong rounded-full p-2 text-[var(--text-primary)]" aria-label="About Art Board">
-            <Info className="h-4 w-4" />
-          </button>
         </div>
 
         <div
@@ -1566,8 +1541,13 @@ export function ArtBoard() {
               <RotateCw className="h-4 w-4" />
             </button>
             {editingId === selectedItem.id && (
-              <button type="button" onClick={() => setEditingId(null)} className="rounded-full p-2 text-[var(--text-gold)] hover:bg-white/5" aria-label="Done">
+              <button type="button" onClick={finishItemEditing} className="rounded-full p-2 text-[var(--text-gold)] hover:bg-white/5" aria-label="Done">
                 <Check className="h-4 w-4" />
+              </button>
+            )}
+            {editingId === selectedItem.id && (
+              <button type="button" onClick={finishItemEditing} className="rounded-full p-2 text-[var(--text-muted)] hover:bg-white/5 hover:text-[var(--text-primary)]" aria-label="Exit edit mode">
+                <X className="h-4 w-4" />
               </button>
             )}
           </div>
@@ -1669,23 +1649,6 @@ export function ArtBoard() {
         />
       )}
 
-      {aboutOpen && (
-        <div className="fixed inset-0 z-[96] flex items-center justify-center bg-black/62 px-4 backdrop-blur-sm">
-          <div className="popup-surface w-full max-w-md rounded-[var(--radius-lg)] p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Art Board</h2>
-              <button type="button" onClick={() => setAboutOpen(false)} className="rounded-full p-1 text-[var(--text-muted)] hover:bg-white/5" aria-label="Close Art Board about">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="space-y-3 text-sm leading-6 text-[var(--text-secondary)]">
-              <p>Browse the shared studio board, add images or sticky notes, and connect related pieces with labeled links.</p>
-              <p>Tap once to select. Tap selected art again to open details. Long-press your own item to move and resize it. Changes autosave after you stop adjusting.</p>
-              <p>Admins can remove items from the context menu. Art Board bans block adding, editing, linking, and reactions while browsing stays open.</p>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

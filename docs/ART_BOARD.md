@@ -5,23 +5,25 @@ separate backend domain from News Feed, board chats, DMs, and General Chat.
 
 ## User Experience
 
-- The Boards map opens `Art Board` as a free-panning canvas with Home,
-  button-based zoom, pinch zoom on mobile, About, and Add controls. The
+- The Boards map opens `Art Board` as a free-panning canvas with pinch zoom on
+  mobile, an About button in the Boards header, and a floating Add control. The
   Recently Added tray is intentionally hidden while the mobile canvas UX is
   refined.
 - Users can add images or pastel sticky notes.
 - Image adds support local upload or URL import. URL import copies the image
   into Supabase Storage before it becomes an Art Board item.
 - Sticky notes support simple bold, italic, bullet, link, title, caption, tag,
-  color, resize, rotation, and layer adjustments.
-- Items can overlap. Creators can move, resize, rotate, edit metadata, link,
-  and delete their own items.
+  color, rotation, and layer adjustments.
+- Items can overlap. Creators can move, rotate, edit metadata, link, and delete
+  their own items.
 - Admins and sub-admins can remove Art Board items from the item action menu,
   but they do not edit another user's art.
 - Item links are non-directional and use preset labels such as `related`,
   `inspired by`, `reference`, `part of`, and `contrast`.
 - Reactions are intentionally small and art-specific: `heart`, `spark`, `fire`,
-  and `idea`. Counts live in the detail popup.
+  and `idea`. Reaction choices live in each item's three-dot menu; nonzero
+  counts render as compact badges on the lower-right of the canvas item and in
+  the same lower-right spot on the detail preview.
 
 ## Backend
 
@@ -49,8 +51,8 @@ Realtime:
 
 - `art_board_items`, `art_board_links`, and `art_board_reactions` are published
   to Supabase Realtime.
-- The app does not stream live drag state. Placement changes autosave after the
-  user stops moving/resizing/rotating.
+- The app does not stream live drag state. Placement and rotation changes
+  autosave after the user stops adjusting an item.
 
 ## Moderation
 
@@ -78,8 +80,9 @@ Recommended browser pass:
 1. Open a production-style preview build on mobile viewport.
 2. Sign in with a smoke account.
 3. Open Boards, then Art Board.
-4. Confirm the empty canvas settles, `+` opens, Sticky Note opens, formatting
-   buttons work, pinch zoom changes the board scale, and no console/page
-   errors appear.
-5. Create a temporary sticky note through normal RLS, toggle a reaction, then
-   soft-delete it through `delete_art_board_item`.
+4. Confirm the empty canvas settles, the header About button opens above the
+   mobile header, `+` opens, Sticky Note opens, formatting buttons work, pinch
+   zoom changes the board scale, and no console/page errors appear.
+5. Create a temporary sticky note through normal RLS, toggle a reaction from
+   the item three-dot menu, confirm its compact badge appears, then soft-delete
+   it through `delete_art_board_item`.

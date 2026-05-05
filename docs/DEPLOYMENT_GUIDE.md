@@ -241,7 +241,7 @@ After deploy, verify:
 8. A message containing an `https://` or `www.` link renders as a clickable link and loads a compact preview card
 9. Settings feedback can submit a bug or feature report with an image attachment after feedback schema changes
 10. Boards tab loads the low-friction board map, keeps labels inside board objects, avoids visual overlap after collisions, and opens News Feed plus each chat board
-11. Art Board opens from Boards, settles without a stuck loader, exposes Home/zoom/About/Add/Recently Added controls, and the Add menu opens on mobile
+11. Art Board opens from Boards, settles without a stuck loader, exposes header About and floating Add controls, supports pinch zoom on mobile, and keeps item reactions in the three-dot menu with compact count badges
 12. News Chat, Investing Chat, Learning Chat, Crypto Chat, Vibe Coding, AI News, and Projects Chat send, edit, delete, react, render link previews, and avoid duplicate subheaders/manual refresh rows
 13. Settings > Admin > News Sources shows source health for an `admin` or `sub_admin` account
 14. Render worker has checked enabled sources since deploy and today's feed rows match current Eastern-day posts

@@ -681,7 +681,7 @@ export function BoardBubbleMap({ countsByBoard, onSelect }: BoardBubbleMapProps)
               )}
             />
             {unreadCount > 0 && (
-              <span className="absolute right-2 top-2 min-w-6 rounded-full border border-[rgba(215,170,70,0.45)] bg-[rgba(215,170,70,0.16)] px-1.5 py-1 text-xs font-semibold leading-none text-[var(--text-gold)]">
+              <span className="absolute right-3 top-3 z-20 min-w-6 rounded-full border border-[rgba(215,170,70,0.45)] bg-[rgba(215,170,70,0.16)] px-1.5 py-1 text-xs font-semibold leading-none text-[var(--text-gold)]">
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}

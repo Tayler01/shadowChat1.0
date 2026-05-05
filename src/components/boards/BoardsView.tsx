@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Info } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { BoardBubbleMap } from './BoardBubbleMap'
 import { BoardChat } from './BoardChat'
-import { ArtBoard } from '../art/ArtBoard'
+import { ArtBoard, ArtBoardAboutDialog } from '../art/ArtBoard'
 import { NewsFeed } from '../news/NewsFeed'
 import { Button } from '../ui/Button'
 import { cn } from '../../lib/utils'
@@ -27,6 +27,7 @@ export function BoardsView({
 }: BoardsViewProps) {
   const [activeBoard, setActiveBoard] = useState<BoardDefinition | null>(null)
   const [mapKey, setMapKey] = useState(0)
+  const [artAboutOpen, setArtAboutOpen] = useState(false)
   const { countsByBoard, markFeedSeen } = useBoardBadges()
   const hasActiveChatBoard = activeBoard?.kind === 'chat'
 
@@ -48,11 +49,13 @@ export function BoardsView({
 
   const openBoard = (board: BoardDefinition) => {
     onMobileChatActiveChange?.(board.kind === 'chat')
+    setArtAboutOpen(false)
     setActiveBoard(board)
   }
 
   const closeBoard = () => {
     onMobileChatActiveChange?.(false)
+    setArtAboutOpen(false)
     setActiveBoard(null)
     setMapKey(value => value + 1)
   }
@@ -121,6 +124,18 @@ export function BoardsView({
               </>
             )}
           </div>
+          {activeBoard?.slug === 'art-board' && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setArtAboutOpen(true)}
+              className="h-9 w-9 shrink-0 p-0"
+              aria-label="About Art Board"
+            >
+              <Info className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </header>
 
@@ -133,6 +148,8 @@ export function BoardsView({
           <BoardBubbleMap key={mapKey} countsByBoard={countsByBoard} onSelect={openBoard} />
         )}
       </main>
+
+      {artAboutOpen && <ArtBoardAboutDialog onClose={() => setArtAboutOpen(false)} />}
     </motion.div>
   )
 }
