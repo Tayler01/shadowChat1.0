@@ -14,6 +14,15 @@
     --bg-input: rgba(255, 255, 255, 0.04);
     --bg-input-focus: rgba(255, 255, 255, 0.06);
     --bg-overlay: rgba(5, 6, 7, 0.72);
+    --bg-page-radial: rgba(215, 170, 70, 0.08);
+    --bg-page-start: #0c0d0e;
+    --bg-page-end: #080909;
+    --bg-app-radial: rgba(215, 170, 70, 0.08);
+    --mobile-footer-bg: linear-gradient(180deg, rgba(18, 20, 21, 0.88), rgba(9, 10, 11, 0.98));
+    --mobile-footer-shadow: 0 -14px 36px rgba(0, 0, 0, 0.32);
+    --nav-active-bg: rgba(255, 255, 255, 0.04);
+    --nav-hover-bg: rgba(255, 255, 255, 0.03);
+    --nav-icon-bg: rgba(255, 255, 255, 0.03);
 
     --gold-1: #6f5318;
     --gold-2: #9a7421;
@@ -75,16 +84,20 @@
     color-scheme: dark;
   }
 
+  .light {
+    color-scheme: light;
+  }
+
   html {
     background:
-      radial-gradient(circle at top, rgba(215, 170, 70, 0.08), transparent 30%),
-      linear-gradient(180deg, #0c0d0e 0%, #080909 100%);
+      radial-gradient(circle at top, var(--bg-page-radial), transparent 30%),
+      linear-gradient(180deg, var(--bg-page-start) 0%, var(--bg-page-end) 100%);
   }
 
   body {
     background:
-      radial-gradient(circle at top, rgba(215, 170, 70, 0.08), transparent 30%),
-      linear-gradient(180deg, #0c0d0e 0%, #080909 100%);
+      radial-gradient(circle at top, var(--bg-page-radial), transparent 30%),
+      linear-gradient(180deg, var(--bg-page-start) 0%, var(--bg-page-end) 100%);
     color: var(--text-primary);
   }
 
@@ -180,6 +193,68 @@
   --color-primary-end: var(--gold-2);
   --color-accent: var(--gold-accent);
   --color-accent-light: rgba(200, 176, 138, 0.13);
+}
+
+:root[data-scheme='moonstone-light'] {
+  color-scheme: light;
+  --bg-app: #f7f2e6;
+  --bg-shell: #fffaf0;
+  --bg-panel: rgba(255, 252, 244, 0.88);
+  --bg-panel-strong: rgba(255, 250, 239, 0.96);
+  --bg-panel-soft: rgba(74, 58, 37, 0.045);
+  --bg-elevated: #fff6e6;
+  --bg-input: rgba(255, 255, 255, 0.74);
+  --bg-input-focus: rgba(255, 255, 255, 0.92);
+  --bg-overlay: rgba(58, 45, 28, 0.32);
+  --bg-page-radial: rgba(215, 170, 70, 0.22);
+  --bg-page-start: #fffaf0;
+  --bg-page-end: #efe5d2;
+  --bg-app-radial: rgba(215, 170, 70, 0.18);
+  --mobile-footer-bg: linear-gradient(180deg, rgba(255, 252, 244, 0.9), rgba(245, 236, 219, 0.98));
+  --mobile-footer-shadow: 0 -12px 32px rgba(80, 59, 28, 0.16);
+  --nav-active-bg: rgba(215, 170, 70, 0.14);
+  --nav-hover-bg: rgba(80, 59, 28, 0.055);
+  --nav-icon-bg: rgba(80, 59, 28, 0.06);
+
+  --gold-2: #9f6f16;
+  --gold-3: #b9851f;
+  --gold-4: #d7aa46;
+  --gold-5: #fff2c7;
+  --gold-accent: #b9851f;
+  --gold-accent-strong: #8b5e12;
+  --gold-text: #7b5516;
+
+  --border-subtle: rgba(75, 58, 37, 0.14);
+  --border-panel: rgba(75, 58, 37, 0.18);
+  --border-glow: rgba(185, 133, 31, 0.34);
+  --border-strong: rgba(75, 58, 37, 0.24);
+
+  --text-primary: #282014;
+  --text-secondary: #5c4b33;
+  --text-muted: #806f55;
+  --text-inverse: #fffaf0;
+  --text-gold: #7d5718;
+
+  --state-success: #8b6f25;
+  --state-success-soft: rgba(139, 111, 37, 0.13);
+  --state-warning: #a96f25;
+  --state-warning-soft: rgba(169, 111, 37, 0.13);
+  --state-danger: #a64d58;
+  --state-danger-soft: rgba(166, 77, 88, 0.13);
+  --state-muted: #806f55;
+
+  --shadow-panel: 0 12px 32px rgba(80, 59, 28, 0.12);
+  --shadow-panel-strong: 0 18px 50px rgba(80, 59, 28, 0.18);
+  --shadow-gold-soft: 0 0 0 1px rgba(185, 133, 31, 0.24), 0 8px 22px rgba(185, 133, 31, 0.16);
+  --shadow-gold-cta:
+    0 0 0 1px rgba(139, 94, 18, 0.18),
+    0 10px 24px rgba(185, 133, 31, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+
+  --color-primary-start: var(--gold-5);
+  --color-primary-end: var(--gold-2);
+  --color-accent: var(--gold-accent);
+  --color-accent-light: rgba(185, 133, 31, 0.14);
 }
 
 .no-scrollbar::-webkit-scrollbar {

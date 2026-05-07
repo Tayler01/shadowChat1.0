@@ -53,8 +53,9 @@ jest.mock('../src/hooks/useSuggestedReplies', () => ({
 jest.mock('../src/hooks/useTheme', () => ({
   useTheme: () => ({ scheme: 'obsidian-gold', setScheme: jest.fn() }),
   colorSchemes: {
-    'obsidian-gold': { label: 'Obsidian Gold', start: '#111111', end: '#d7aa46' },
-    'carbon-ivory': { label: 'Carbon Ivory', start: '#111111', end: '#c8b08a' },
+    'obsidian-gold': { label: 'Obsidian Gold', start: '#111111', end: '#d7aa46', mode: 'dark' },
+    'carbon-ivory': { label: 'Carbon Ivory', start: '#111111', end: '#c8b08a', mode: 'dark' },
+    'moonstone-light': { label: 'Moonstone Light', start: '#fff8e8', end: '#d7aa46', mode: 'light' },
   },
 }))
 
