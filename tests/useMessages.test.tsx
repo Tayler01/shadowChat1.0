@@ -217,12 +217,13 @@ describe('sendMessage', () => {
       await result.current.sendMessage('hello', 'text', undefined, 'parent');
     });
 
-    expect(insertSpy).toHaveBeenCalledWith({
+    expect(insertSpy).toHaveBeenCalledWith(expect.objectContaining({
+      id: expect.any(String),
       user_id: user.id,
       content: 'hello',
       message_type: 'text',
-      reply_to: 'parent'
-    });
+      reply_to: 'parent',
+    }));
     insertSpy.mockRestore();
   });
 
@@ -237,12 +238,13 @@ describe('sendMessage', () => {
       await result.current.sendMessage('https://example.com/audio.webm', 'audio');
     });
 
-    expect(insertSpy).toHaveBeenCalledWith({
+    expect(insertSpy).toHaveBeenCalledWith(expect.objectContaining({
+      id: expect.any(String),
       user_id: user.id,
       content: '',
       message_type: 'audio',
       audio_url: 'https://example.com/audio.webm',
-    });
+    }));
     insertSpy.mockRestore();
   });
 

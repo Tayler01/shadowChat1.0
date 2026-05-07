@@ -63,6 +63,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 }) => {
   const { draft, setDraft, clear } = useDraft(cacheKey)
   const [message, setMessage] = useState(draft)
+  const [submitting, setSubmitting] = useState(false)
+  const submittingRef = useRef(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const EmojiPicker = useEmojiPicker(showEmojiPicker)
   const [showSlashCommands, setShowSlashCommands] = useState(false)
@@ -83,6 +85,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const { enabled: suggestionsEnabled } = useSuggestionsEnabled()
   const { suggestions } = useSuggestedReplies(messages, suggestionsEnabled)
   const pickerDimensions = getEmojiPickerDimensions()
+  const inputDisabled = disabled || submitting
 
   const setComposerMessage = useCallback((value: string) => {
     const nextMessage = normalizeComposerValue(value)
@@ -204,12 +207,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const handleSubmit = async (
     e: React.FormEvent<HTMLFormElement> | React.KeyboardEvent<HTMLTextAreaElement>
   ) => {
-    
+     
     e.preventDefault()
-    
-    if (!message.trim() || disabled) {
+     
+    if (!message.trim() || inputDisabled || submittingRef.current) {
       return
     }
+
+    submittingRef.current = true
+    setSubmitting(true)
 
     // Process slash commands
     const processedMessage = await processSlashCommand(message.trim(), messages)
@@ -246,6 +252,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           ? err.message
           : 'Failed to send message'
       toast.error(message)
+    } finally {
+      submittingRef.current = false
+      setSubmitting(false)
     }
     // Keep focus on the textarea so the mobile keyboard stays open
     textareaRef.current?.focus()
@@ -291,21 +300,25 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }
 
   const openImageUpload = () => {
+    if (inputDisabled) return
     imageInputRef.current?.click()
     setShowAttachmentMenu(false)
   }
 
   const openFileUpload = () => {
+    if (inputDisabled) return
     fileInputRef.current?.click()
     setShowAttachmentMenu(false)
   }
 
   const openVideoUpload = () => {
+    if (inputDisabled) return
     videoInputRef.current?.click()
     setShowAttachmentMenu(false)
   }
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (inputDisabled || submittingRef.current) return
     const file = e.target.files?.[0]
     e.target.value = ''
     if (file) {
@@ -330,6 +343,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }
 
   const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (inputDisabled || submittingRef.current) return
     const file = e.target.files?.[0]
     e.target.value = ''
     if (file) {
@@ -355,6 +369,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (inputDisabled || submittingRef.current) return
     const file = e.target.files?.[0]
     e.target.value = ''
     if (file) {
@@ -435,6 +450,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }
 
   const handleRecordClick = async () => {
+    if (inputDisabled) return
     if (recording) {
       stopRecording()
     } else {
@@ -536,7 +552,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             type="button"
             variant="ghost"
             size="sm"
-            onClick={() => setShowAttachmentMenu(prev => !prev)}
+            onClick={() => {
+              if (inputDisabled) return
+              setShowAttachmentMenu(prev => !prev)
+            }}
+            disabled={inputDisabled}
             className="h-11 w-11 rounded-xl p-0 md:h-12 md:w-12"
             aria-label="Add attachment"
           >
@@ -619,7 +639,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
-            disabled={disabled}
+            disabled={inputDisabled}
             autoComplete="off"
             autoCorrect="on"
             autoCapitalize="sentences"
@@ -634,6 +654,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           variant="ghost"
           size="sm"
           onClick={handleRecordClick}
+          disabled={inputDisabled}
           className="hidden h-12 w-12 rounded-xl p-0 md:inline-flex"
           aria-label="Record audio"
         >
@@ -644,7 +665,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+          onClick={() => {
+            if (inputDisabled) return
+            setShowEmojiPicker(!showEmojiPicker)
+          }}
+          disabled={inputDisabled}
           className="hidden h-12 w-12 rounded-xl p-0 text-[var(--text-gold)] md:inline-flex"
           aria-label="Insert emoji"
         >
@@ -653,7 +678,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
         <Button
           type="submit"
-          disabled={!message.trim() || disabled}
+          disabled={!message.trim() || inputDisabled}
           className="h-11 w-11 rounded-xl p-0 md:h-12 md:w-12"
           aria-label="Send message"
           onMouseDown={e => e.preventDefault()}

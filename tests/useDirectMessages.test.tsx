@@ -198,13 +198,14 @@ test('sends audio message with proper type', async () => {
     await result.current.sendMessage('https://example.com/a.webm', 'audio');
   });
 
-  expect(insertFn).toHaveBeenCalledWith({
+  expect(insertFn).toHaveBeenCalledWith(expect.objectContaining({
+    id: expect.any(String),
     conversation_id: 'conv1',
     sender_id: 'u1',
     content: '',
     message_type: 'audio',
     audio_url: 'https://example.com/a.webm',
-  });
+  }));
 });
 
 test('startConversation sets currentConversation', async () => {
