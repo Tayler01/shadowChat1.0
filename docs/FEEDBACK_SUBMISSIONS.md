@@ -96,6 +96,13 @@ marked Included or Excluded, and the stage-by-stage Codex notes. If the PR
 exists but the Netlify preview URL is missing, the run should still be Ready for
 Testing with a warning instead of Failed.
 
+Feedback Builds should get their preview URLs from the GitHub Actions
+`Netlify Preview Deploy` workflow. That workflow runs on PRs against `main`,
+deploys the PR build to Netlify with the alias `pr-<pull-request-number>`, and
+posts a sticky PR comment containing the preview URL. If that workflow is
+temporarily unavailable, the processor can fall back to a manual Netlify draft
+deploy and store that returned URL on `feedback_build_runs.preview_url`.
+
 After a full admin approves a run to merge, the processor reruns the gates,
 squash-merges to `main`, records the merge summary and commit SHA, closes the
 original feedback submission, deletes the remote feature branch, and logs the

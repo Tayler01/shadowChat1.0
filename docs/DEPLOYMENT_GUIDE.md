@@ -56,6 +56,31 @@ Pushing `main` automatically starts the GitHub Actions workflow in
 That workflow runs install, lint, typecheck, Netlify build, and Netlify
 production deploy.
 
+Opening or updating a pull request against `main` starts the GitHub Actions
+workflow in
+[.github/workflows/netlify-preview.yml](C:/repos/chat2.0/.github/workflows/netlify-preview.yml:1).
+That workflow runs install, lint, typecheck, a Netlify deploy-preview build, and
+then publishes an alias preview at `pr-<pull-request-number>`. It also writes a
+sticky PR comment containing the preview URL so Feedback Builds and human review
+have a stable place to find the test build before merge.
+
+## Netlify PR Preview Deploys
+
+PR previews require the same GitHub Actions repository secrets as production:
+
+- `NETLIFY_AUTH_TOKEN`
+- `NETLIFY_SITE_ID`
+
+The preview workflow intentionally does not deploy to production. It publishes
+the built `dist` directory with:
+
+```powershell
+npx netlify deploy --context deploy-preview --dir=dist --alias="pr-<number>"
+```
+
+Use the sticky PR comment or the Netlify check output as the source of truth for
+the preview URL during admin verification.
+
 ## Netlify Production Deploy
 
 Manual CLI deploy is now a fallback path, not the normal production path. From
