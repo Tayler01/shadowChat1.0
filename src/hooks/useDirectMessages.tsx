@@ -391,6 +391,7 @@ export function useConversationMessages(conversationId: string | null) {
   const [messages, setMessages] = useState<DMMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const { user } = useAuth();
@@ -408,6 +409,7 @@ export function useConversationMessages(conversationId: string | null) {
   const insertConversationMessage = useCallback(
     async (
       payload: {
+        id?: string;
         conversation_id: string;
         sender_id: string;
         content: string;
@@ -759,7 +761,27 @@ export function useConversationMessages(conversationId: string | null) {
       const requiresContent = messageType !== 'audio' && messageType !== 'image' && messageType !== 'video' && messageType !== 'file';
       if (!user || !conversationId || (requiresContent && !trimmedContent)) return null;
 
+      if (sendingRef.current) return null;
+
+      const timestamp = new Date().toISOString();
+      const clientMessageId = crypto.randomUUID();
+      const optimistic = {
+        id: clientMessageId,
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content: messageType === 'audio' ? '' : trimmedContent,
+        message_type: messageType,
+        file_url: fileUrl,
+        ...(messageType === 'audio' ? { audio_url: trimmedContent } : {}),
+        reactions: {},
+        created_at: timestamp,
+        updated_at: timestamp,
+        sender: user,
+      } as DMMessage;
+
+      sendingRef.current = true;
       setSending(true);
+      setMessages(prev => (prev.some(m => m.id === clientMessageId) ? prev : [...prev, optimistic]));
       try {
         return await withTimeout(
           (async () => {
@@ -769,6 +791,7 @@ export function useConversationMessages(conversationId: string | null) {
             }
 
             const insertPayload = {
+              id: clientMessageId,
               conversation_id: conversationId,
               sender_id: user.id,
               content: messageType === 'audio' ? '' : trimmedContent,
@@ -802,8 +825,11 @@ export function useConversationMessages(conversationId: string | null) {
 
             if (finalData) {
               const message = finalData as DMMessage;
-              // Optimistically add the sent message
-              setMessages(prev => [...prev, message]);
+              setMessages(prev =>
+                prev.some(existing => existing.id === message.id)
+                  ? prev.map(existing => (existing.id === message.id ? message : existing))
+                  : [...prev, message]
+              );
               if (message.id) {
                 triggerDMPushNotification(message.id).catch(() => {
                   // Push delivery should not block the DM send path.
@@ -817,9 +843,11 @@ export function useConversationMessages(conversationId: string | null) {
           'Message send timed out while reconnecting. Please try again.'
         );
       } catch (error) {
+        setMessages(prev => prev.filter(message => message.id !== clientMessageId));
         await runRealtimeRecovery('send-error').catch(() => undefined);
         throw error;
       } finally {
+        sendingRef.current = false;
         setSending(false);
       }
     }, [user, conversationId, insertConversationMessage]);
