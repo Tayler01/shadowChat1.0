@@ -7,6 +7,7 @@ const mockUseAuth = jest.fn()
 const mockUseUserChannelBans = jest.fn()
 const mockSetUserChannelBans = jest.fn()
 const mockSetSubAdminStatus = jest.fn()
+const mockGetOrCreateDMConversation = jest.fn()
 const mockNotifyChannelBansChanged = jest.fn()
 const mockToastSuccess = jest.fn()
 const mockToastError = jest.fn()
@@ -20,6 +21,7 @@ jest.mock('../src/hooks/useUserChannelBans', () => ({
 }))
 
 jest.mock('../src/lib/supabase', () => ({
+  getOrCreateDMConversation: (...args: unknown[]) => mockGetOrCreateDMConversation(...args),
   setSubAdminStatus: (...args: unknown[]) => mockSetSubAdminStatus(...args),
 }))
 
@@ -97,6 +99,7 @@ beforeEach(() => {
   mockUseUserChannelBans.mockReturnValue({ bans: [], loading: false, refresh: jest.fn() })
   mockSetUserChannelBans.mockResolvedValue([])
   mockSetSubAdminStatus.mockResolvedValue(undefined)
+  mockGetOrCreateDMConversation.mockResolvedValue(null)
 })
 
 test('renders public profile details in a dialog', () => {
@@ -171,4 +174,23 @@ test('lets the full admin grant sub-admin access from the profile dialog', async
     expect(mockSetSubAdminStatus).toHaveBeenCalledWith(user.id, true)
   })
   expect(mockToastSuccess).toHaveBeenCalledWith('Sub-admin access granted')
+})
+
+test('offers a Message CTA that jumps into a DM thread', async () => {
+  const browserUser = userEvent.setup()
+  const onClose = jest.fn()
+  mockUseAuth.mockReturnValue({ profile: { ...adminUser, id: 'viewer-1', admin_role: null } })
+  mockGetOrCreateDMConversation.mockResolvedValue('conv-1')
+
+  window.history.replaceState({}, '', 'http://localhost/?view=chat')
+  render(<PublicProfileDialog user={user} open onClose={onClose} />)
+  await act(async () => {
+    await browserUser.click(screen.getByRole('button', { name: /message/i }))
+  })
+  await waitFor(() => {
+    expect(mockGetOrCreateDMConversation).toHaveBeenCalledWith(user.id)
+  })
+  expect(onClose).toHaveBeenCalled()
+  expect(window.location.search).toContain('view=dms')
+  expect(window.location.search).toContain('conversation=conv-1')
 })
