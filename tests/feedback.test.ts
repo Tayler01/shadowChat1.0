@@ -1,8 +1,14 @@
 import {
   FEEDBACK_ATTACHMENT_SIGNED_URL_SECONDS,
   FEEDBACK_ATTACHMENTS_BUCKET,
+  approveFeedbackBuildMerge,
+  archiveFeedbackBuildRun,
+  createFeedbackBuildRun,
   deleteAdminFeedbackSubmission,
   fetchAdminFeedbackSubmissions,
+  fetchFeedbackBuildRunLogs,
+  fetchFeedbackBuildRuns,
+  retryFeedbackBuildRun,
   submitFeedback,
   validateFeedbackSubmission,
 } from '../src/lib/feedback'
@@ -20,6 +26,13 @@ const orderFeedback = jest.fn()
 const limitFeedback = jest.fn()
 const selectUsers = jest.fn()
 const inUsers = jest.fn()
+const selectBuildRuns = jest.fn()
+const orderBuildRuns = jest.fn()
+const limitBuildRuns = jest.fn()
+const selectBuildLogs = jest.fn()
+const inBuildLogs = jest.fn()
+const orderBuildLogs = jest.fn()
+const rpc = jest.fn()
 const getUser = jest.fn()
 
 jest.mock('../src/lib/supabase', () => ({
@@ -41,12 +54,25 @@ jest.mock('../src/lib/supabase', () => ({
         }
       }
 
+      if (table === 'feedback_build_runs') {
+        return {
+          select: selectBuildRuns,
+        }
+      }
+
+      if (table === 'feedback_build_run_logs') {
+        return {
+          select: selectBuildLogs,
+        }
+      }
+
       return {
         insert,
         delete: deleteFeedback,
         select: selectFeedback,
       }
     }),
+    rpc,
   })),
 }))
 
@@ -64,6 +90,13 @@ beforeEach(() => {
   selectFeedback.mockReturnValue({ order: orderFeedback })
   inUsers.mockResolvedValue({ data: [], error: null })
   selectUsers.mockReturnValue({ in: inUsers })
+  limitBuildRuns.mockResolvedValue({ data: [], error: null })
+  orderBuildRuns.mockReturnValue({ limit: limitBuildRuns })
+  selectBuildRuns.mockReturnValue({ order: orderBuildRuns })
+  orderBuildLogs.mockResolvedValue({ data: [], error: null })
+  inBuildLogs.mockReturnValue({ order: orderBuildLogs })
+  selectBuildLogs.mockReturnValue({ in: inBuildLogs })
+  rpc.mockResolvedValue({ data: null, error: null })
   createSignedUrls.mockResolvedValue({ data: [], error: null })
   getUser.mockResolvedValue({ data: { user: { id: 'user-id' } }, error: null })
 })
@@ -227,4 +260,137 @@ test('deletes admin feedback submissions and attached images', async () => {
   expect(remove).toHaveBeenCalledWith(['user-id/feedback-1/1-upload.png'])
   expect(deleteFeedback).toHaveBeenCalled()
   expect(eqFeedback).toHaveBeenCalledWith('id', 'feedback-1')
+})
+
+test('loads feedback build runs and stage logs', async () => {
+  limitBuildRuns.mockResolvedValueOnce({
+    data: [
+      {
+        id: 'run-1',
+        feedback_submission_id: 'feedback-1',
+        created_by: 'admin-1',
+        companion_prompt: 'Please fix the upload flow with care.',
+        generated_prompt: 'Generated prompt',
+        included_attachments: [
+          {
+            bucket: FEEDBACK_ATTACHMENTS_BUCKET,
+            path: 'user-id/feedback-1/1-upload.png',
+            name: 'upload.png',
+            size: 1200,
+            type: 'image/png',
+          },
+        ],
+        recognition_enabled: true,
+        status: 'pending',
+        current_stage: 'queued',
+        branch_name: null,
+        pr_url: null,
+        preview_url: null,
+        preview_warning: null,
+        summary: null,
+        merge_commit_sha: null,
+        failure_message: null,
+        approved_merge_at: null,
+        approved_merge_by: null,
+        archived_at: null,
+        archived_by: null,
+        started_at: null,
+        completed_at: null,
+        created_at: '2026-05-07T01:00:00.000Z',
+        updated_at: '2026-05-07T01:00:00.000Z',
+      },
+    ],
+    error: null,
+  })
+  orderBuildLogs.mockResolvedValueOnce({
+    data: [
+      {
+        id: 'log-1',
+        run_id: 'run-1',
+        stage: 'queued',
+        message: 'Queued for Codex.',
+        metadata: { source: 'test' },
+        created_at: '2026-05-07T01:00:00.000Z',
+      },
+    ],
+    error: null,
+  })
+
+  const runs = await fetchFeedbackBuildRuns()
+  const logs = await fetchFeedbackBuildRunLogs(['run-1'])
+
+  expect(limitBuildRuns).toHaveBeenCalledWith(100)
+  expect(inBuildLogs).toHaveBeenCalledWith('run_id', ['run-1'])
+  expect(runs[0]).toEqual(expect.objectContaining({
+    id: 'run-1',
+    included_attachments: [
+      expect.objectContaining({
+        name: 'upload.png',
+      }),
+    ],
+  }))
+  expect(logs[0]).toEqual(expect.objectContaining({
+    stage: 'queued',
+    metadata: { source: 'test' },
+  }))
+})
+
+test('calls feedback build run RPCs with sanitized attachment metadata', async () => {
+  const runRow = {
+    id: 'run-1',
+    feedback_submission_id: 'feedback-1',
+    created_by: 'admin-1',
+    companion_prompt: 'Please fix the upload flow with care.',
+    generated_prompt: 'Generated prompt',
+    included_attachments: [],
+    recognition_enabled: true,
+    status: 'pending',
+    current_stage: 'queued',
+    created_at: '2026-05-07T01:00:00.000Z',
+    updated_at: '2026-05-07T01:00:00.000Z',
+  }
+  rpc.mockResolvedValue({ data: runRow, error: null })
+
+  await createFeedbackBuildRun({
+    feedbackSubmissionId: 'feedback-1',
+    companionPrompt: 'Please fix the upload flow with care.',
+    includedAttachments: [
+      {
+        bucket: FEEDBACK_ATTACHMENTS_BUCKET,
+        path: 'user-id/feedback-1/1-upload.png',
+        name: 'upload.png',
+        size: 1200,
+        type: 'image/png',
+        signedUrl: 'https://example.test/private-url.png',
+      },
+    ],
+    recognitionEnabled: false,
+  })
+  await retryFeedbackBuildRun({
+    previousRunId: 'run-1',
+    companionPrompt: 'Try again with the smaller implementation plan.',
+    includedAttachments: [],
+    recognitionEnabled: true,
+  })
+  await approveFeedbackBuildMerge('run-1')
+  await archiveFeedbackBuildRun('run-1')
+
+  expect(rpc).toHaveBeenNthCalledWith(1, 'create_feedback_build_run', expect.objectContaining({
+    p_feedback_submission_id: 'feedback-1',
+    p_recognition_enabled: false,
+    p_included_attachments: [
+      {
+        bucket: FEEDBACK_ATTACHMENTS_BUCKET,
+        path: 'user-id/feedback-1/1-upload.png',
+        name: 'upload.png',
+        size: 1200,
+        type: 'image/png',
+      },
+    ],
+  }))
+  expect(rpc).toHaveBeenNthCalledWith(2, 'retry_feedback_build_run', expect.objectContaining({
+    p_previous_run_id: 'run-1',
+  }))
+  expect(rpc).toHaveBeenNthCalledWith(3, 'approve_feedback_build_merge', { p_run_id: 'run-1' })
+  expect(rpc).toHaveBeenNthCalledWith(4, 'archive_feedback_build_run', { p_run_id: 'run-1' })
 })

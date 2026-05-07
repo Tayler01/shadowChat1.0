@@ -31,6 +31,88 @@ Deleting removes the `feedback_submissions` row first, then cleans up attached
 private images best-effort. Status editing, assignment, notifications, and
 moderation workflows are intentionally deferred.
 
+## Feedback Builds
+
+Full admins get an additional **Feedback Builds** lane inside Feedback Review.
+Sub-admin operators can continue reviewing submissions, but they cannot see or
+start Codex build runs.
+
+The build workflow uses two additional tables:
+
+- `public.feedback_build_runs`
+- `public.feedback_build_run_logs`
+
+Admins do not write directly to those tables from the browser. The UI calls
+these RPCs instead:
+
+- `create_feedback_build_run`
+- `retry_feedback_build_run`
+- `approve_feedback_build_merge`
+- `archive_feedback_build_run`
+
+Starting or retrying a build requires a companion prompt with at least 20
+characters. Attached screenshots are included by default, and a full admin can
+exclude any image before queueing the run. The generated prompt is stored on the
+run for review. Stage notes are append-only logs created as Codex finishes each
+step.
+
+Run statuses shown in the admin UI:
+
+1. Pending
+2. Running
+3. Ready for Testing
+4. Failed
+5. Archived
+
+The backend also stores merge-oriented states used by the processor:
+`approved_to_merge`, `merging`, and `merged`.
+
+The Codex processor should handle one repo operation globally at a time. It
+processes merge-approved runs first, then pending runs. The required stage log
+sequence is:
+
+1. `queued`
+2. `classifying`
+3. `reviewing_affected_code`
+4. `debugging_existing_behavior`
+5. `researching_solution`
+6. `planning`
+7. `reviewing_plan_against_code`
+8. `implementing`
+9. `testing`
+10. `branch_pushed`
+11. `ready_for_testing`
+12. `approved_to_merge`
+13. `merging`
+14. `documenting_cleanup`
+15. `merged`
+
+Failures can be retried from the admin run detail. Retries create a new pending
+run and restart from classification. Runs are archived, not deleted.
+
+When a run reaches Ready for Testing, the detail view shows the draft PR link,
+Netlify preview URL when available, branch name, generated prompt, screenshots
+marked Included or Excluded, and the stage-by-stage Codex notes. If the PR
+exists but the Netlify preview URL is missing, the run should still be Ready for
+Testing with a warning instead of Failed.
+
+After a full admin approves a run to merge, the processor reruns the gates,
+squash-merges to `main`, records the merge summary and commit SHA, closes the
+original feedback submission, deletes the remote feature branch, and logs the
+cleanup step.
+
+## Evening Report Recognition
+
+The daily Shado update should include public-safe credit for submitters whose
+feedback builds merged that day when `recognition_enabled = true`. Mention the
+display name or username only. Do not include screenshots, private companion
+prompt text, or sensitive bug details in the chat announcement.
+
+The evening report runs daily at 8:00 PM Eastern. It should include merged
+Feedback Builds and normal `main` commits from the day. If there were no app
+updates, it should still post a short, energetic good-evening message from
+Shado.
+
 ## Deployment
 
 Run the normal schema deployment before shipping the frontend:
