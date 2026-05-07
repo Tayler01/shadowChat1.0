@@ -17,6 +17,7 @@ import { useSessionResumeRecovery } from './hooks/useSessionResumeRecovery'
 import { useAdminRoleNotifications } from './hooks/useAdminRoleNotifications'
 import { useChannelBanExpirySweep } from './hooks/useChannelBanExpirySweep'
 import { useArtBoardReactionNotifications } from './hooks/useArtBoardReactionNotifications'
+import { useTheme } from './hooks/useTheme'
 import { computeMobileViewportState } from './lib/mobileViewport'
 
 const DirectMessagesView = lazy(() =>
@@ -78,7 +79,7 @@ const getInitialLocationState = (): LocationState => {
 
 function ViewLoadingState() {
   return (
-    <div className="flex flex-1 items-center justify-center bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.06),transparent_28%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))]">
+    <div className="flex flex-1 items-center justify-center bg-[radial-gradient(circle_at_top,var(--bg-app-radial),transparent_28%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))]">
       <div className="glass-panel rounded-[var(--radius-xl)] px-8 py-7 text-center text-[var(--text-muted)]">
         <div className="mb-3 flex justify-center">
           <LoadingSpinner size="lg" className="text-[var(--text-gold)]" />
@@ -94,6 +95,7 @@ function App() {
   useAdminRoleNotifications()
   useChannelBanExpirySweep()
   useArtBoardReactionNotifications()
+  const { scheme, setScheme, mode } = useTheme()
   const [currentView, setCurrentView] = useState<View>(() => getInitialLocationState().view)
   const [boardsResetKey, setBoardsResetKey] = useState(0)
   const [boardsChatFooterActive, setBoardsChatFooterActive] = useState(false)
@@ -102,26 +104,7 @@ function App() {
   const mobileAppHeightRef = useRef<number | null>(null)
   const [dmTarget, setDmTarget] = useState<string | null>(() => getInitialLocationState().conversation)
   const [messageTarget, setMessageTarget] = useState<string | null>(() => getInitialLocationState().message)
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('darkMode')
-      if (stored) {
-        return stored === 'true'
-      }
-      return true
-    }
-    return true
-  })
-
-  // Apply dark mode class
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
-    localStorage.setItem('darkMode', isDarkMode.toString())
-  }, [isDarkMode])
+  const isDarkMode = mode === 'dark'
 
   useEffect(() => {
     if (typeof window === 'undefined' || isDesktop) return
@@ -219,7 +202,7 @@ function App() {
 
 
   const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode)
+    setScheme(scheme === 'moonstone-light' ? 'obsidian-gold' : 'moonstone-light')
   }
 
   const toggleSidebar = () => {
@@ -377,7 +360,7 @@ function App() {
           <DirectMessagesProvider>
           <AppBadgeSync />
           <PhoneInstallOnboarding />
-          <div className="app-viewport flex flex-col overflow-hidden bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.08),transparent_28%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] md:flex-row">
+          <div className="app-viewport flex flex-col overflow-hidden bg-[radial-gradient(circle_at_top,var(--bg-app-radial),transparent_28%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] md:flex-row">
           {isDesktop && (
             <Sidebar
               currentView={currentView}

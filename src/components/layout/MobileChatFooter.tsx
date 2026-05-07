@@ -43,7 +43,7 @@ export function MobileChatFooter({ currentView, onViewChange, children }: Mobile
   return (
     <div
       ref={footerRef}
-      className="fixed inset-x-0 bottom-[var(--shadowchat-keyboard-inset,0px)] z-50 flex flex-col border-t border-[var(--border-panel)] bg-[linear-gradient(180deg,rgba(18,20,21,0.88),rgba(9,10,11,0.98))] pb-[env(safe-area-inset-bottom)] shadow-[0_-14px_36px_rgba(0,0,0,0.32)] backdrop-blur-xl md:hidden"
+      className="fixed inset-x-0 bottom-[var(--shadowchat-keyboard-inset,0px)] z-50 flex flex-col border-t border-[var(--border-panel)] [background:var(--mobile-footer-bg)] pb-[env(safe-area-inset-bottom)] shadow-[var(--mobile-footer-shadow)] backdrop-blur-xl md:hidden"
       data-mobile-chat-footer="true"
     >
       {children}

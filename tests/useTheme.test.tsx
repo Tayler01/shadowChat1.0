@@ -34,6 +34,28 @@ test('supports additional color schemes', () => {
   expect(document.documentElement.classList.contains('carbon-ivory')).toBe(true);
 });
 
+test('supports a light theme mode', () => {
+  const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
+
+  act(() => {
+    result.current.setScheme('moonstone-light');
+  });
+
+  expect(result.current.mode).toBe('light');
+  expect(document.documentElement.dataset.themeMode).toBe('light');
+  expect(document.documentElement.classList.contains('moonstone-light')).toBe(true);
+  expect(document.documentElement.classList.contains('light')).toBe(true);
+  expect(document.documentElement.classList.contains('dark')).toBe(false);
+});
+
+test('dark themes publish dark mode metadata', () => {
+  const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
+
+  expect(result.current.mode).toBe('dark');
+  expect(document.documentElement.dataset.themeMode).toBe('dark');
+  expect(document.documentElement.classList.contains('dark')).toBe(true);
+});
+
 test('maps legacy saved schemes to the new palette', () => {
   localStorage.setItem('colorScheme', 'teal');
 

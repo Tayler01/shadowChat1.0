@@ -6,6 +6,7 @@ import {
   BookOpen,
   Brain,
   ChevronRight,
+  Check,
   Database,
   Download,
   KeyRound,
@@ -1179,11 +1180,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
         <LayoutGrid className="h-5 w-5 text-[var(--text-muted)]" />
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">Color Scheme</h2>
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 lg:grid-cols-5">
         {(Object.keys(colorSchemes) as ColorScheme[]).map(key => (
           <button
             key={key}
+            type="button"
             onClick={() => setScheme(key)}
+            aria-pressed={scheme === key}
             className={`rounded-[var(--radius-md)] border p-3 text-left transition-all ${
               scheme === key
                 ? 'border-[var(--border-glow)] bg-[rgba(255,255,255,0.06)] shadow-[var(--shadow-gold-soft)]'
@@ -1192,10 +1195,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
             aria-label={`Select ${key} color scheme`}
           >
             <span
-              className="mb-2 block h-10 rounded-[var(--radius-sm)] border border-[rgba(255,255,255,0.08)]"
+              className="relative mb-2 block h-12 rounded-[var(--radius-sm)] border border-[var(--border-subtle)]"
               style={{ background: `linear-gradient(135deg, ${colorSchemes[key].start}, ${colorSchemes[key].end})` }}
-            />
-            <span className="block text-sm font-medium text-[var(--text-primary)]">{colorSchemes[key].label}</span>
+            >
+              {scheme === key && (
+                <span className="absolute right-2 top-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-[var(--border-glow)] bg-[var(--bg-panel-strong)] text-[var(--text-gold)] shadow-[var(--shadow-panel)]">
+                  <Check className="h-3.5 w-3.5" />
+                </span>
+              )}
+            </span>
+            <span className="flex items-center justify-between gap-2 text-sm font-medium text-[var(--text-primary)]">
+              {colorSchemes[key].label}
+              <span className="rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                {colorSchemes[key].mode}
+              </span>
+            </span>
           </button>
         ))}
       </div>

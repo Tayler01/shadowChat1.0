@@ -47,11 +47,11 @@ export function MobileNav({ currentView, onViewChange, className }: MobileNavPro
               onClick={() => onViewChange(item.id)}
               className={`flex h-full w-full flex-col items-center justify-center rounded-[var(--radius-md)] px-1 py-1.5 text-[10px] focus:outline-none transition-all ${
                 currentView === item.id
-                  ? 'bg-[rgba(255,255,255,0.04)] text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)]'
-                  : 'text-[var(--text-muted)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[var(--text-primary)]'
+                  ? 'bg-[var(--nav-active-bg)] text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)]'
+                  : 'text-[var(--text-muted)] hover:bg-[var(--nav-hover-bg)] hover:text-[var(--text-primary)]'
               }`}
             >
-              <span className="relative mb-1 flex h-8 w-8 items-center justify-center rounded-full">
+              <span className="relative mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--nav-icon-bg)]">
                 <item.icon className="w-[1.15rem] h-[1.15rem]" />
                 {item.badge && (
                   <span className="absolute -right-1 -top-1 rounded-full border border-[rgba(215,170,70,0.3)] bg-[rgba(215,170,70,0.14)] px-1 text-[10px] leading-none text-[var(--text-gold)]">
