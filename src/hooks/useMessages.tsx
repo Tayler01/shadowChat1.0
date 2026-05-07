@@ -66,10 +66,8 @@ export const prepareMessageData = (
   content: string,
   messageType: ChatMessageType,
   fileUrl?: string,
-  replyTo?: string,
-  id?: string
+  replyTo?: string
 ) => ({
-  ...(id ? { id } : {}),
   user_id: userId,
   content: messageType === 'audio' ? '' : content.trim(),
   message_type: messageType,
@@ -79,7 +77,6 @@ export const prepareMessageData = (
 });
 
 export const insertMessage = async (messageData: {
-  id?: string;
   user_id: string;
   content: string;
   message_type: ChatMessageType;
@@ -113,7 +110,6 @@ export const insertMessage = async (messageData: {
 };
 
 export const refreshSessionAndRetry = async (messageData: {
-  id?: string;
   user_id: string;
   content: string;
   message_type: ChatMessageType;
@@ -183,7 +179,6 @@ function useProvideMessages(): MessagesContextValue {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [loading, setLoading] = useState(initialMessages.length === 0);
   const [sending, setSending] = useState(false);
-  const sendingRef = useRef(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const { user } = useAuth();
@@ -211,19 +206,6 @@ function useProvideMessages(): MessagesContextValue {
     },
     [playMessage, user]
   );
-
-  const upsertMessageById = useCallback((msg: Message) => {
-    setMessages(prev => {
-      const exists = prev.some(m => m.id === msg.id);
-      const nextMessages = exists ? prev.map(m => (m.id === msg.id ? msg : m)) : [...prev, msg];
-      const deduped = dedupeMessagesById(nextMessages);
-      return loadedOlderRef.current ? sortMessagesByCreatedAt(deduped) : trimMessageWindow(deduped);
-    });
-  }, []);
-
-  const removeMessageById = useCallback((id: string) => {
-    setMessages(prev => prev.filter(m => m.id !== id));
-  }, []);
 
   const fetchMessages = useCallback(async () => {
     const requestId = fetchRequestIdRef.current + 1;
@@ -664,28 +646,6 @@ function useProvideMessages(): MessagesContextValue {
       return null;
     }
 
-    if (sendingRef.current) {
-      return null;
-    }
-
-    const clientMessageId = crypto.randomUUID();
-    const trimmed = content.trim();
-    const optimistic = {
-      id: clientMessageId,
-      user_id: user.id,
-      content: messageType === 'audio' ? '' : trimmed,
-      message_type: messageType,
-      file_url: fileUrl,
-      ...(replyTo ? { reply_to: replyTo } : {}),
-      ...(messageType === 'audio' ? { audio_url: trimmed } : {}),
-      reactions: {},
-      pinned: false,
-      created_at: timestamp,
-      updated_at: timestamp,
-      user,
-    } as Message;
-
-    sendingRef.current = true;
     setSending(true);
     let inserted: Message | null = null;
 
@@ -701,8 +661,7 @@ function useProvideMessages(): MessagesContextValue {
         content,
         messageType,
         fileUrl,
-        replyTo,
-        clientMessageId
+        replyTo
       );
 
       const attemptSend = async () => {
@@ -718,10 +677,10 @@ function useProvideMessages(): MessagesContextValue {
           throw error;
         }
 
-          if (data) {
-            inserted = data as unknown as Message;
+        if (data) {
+          inserted = data as unknown as Message;
 
-            upsertMessageById(data as unknown as Message);
+          addNewMessage(data as unknown as Message);
 
           if (data.id) {
             triggerGroupPushNotification(data.id).catch(() => {
@@ -761,22 +720,19 @@ function useProvideMessages(): MessagesContextValue {
     };
 
     try {
-      addNewMessage(optimistic);
       await withTimeout(
         executeSend(),
         SEND_OPERATION_TIMEOUT_MS,
         'Message send timed out while reconnecting. Please try again.'
       );
     } catch (error) {
-      removeMessageById(clientMessageId);
       await runRealtimeRecovery('send-error').catch(() => undefined);
       throw error;
     } finally {
-      sendingRef.current = false;
       setSending(false);
     }
     return inserted;
-  }, [addNewMessage, fetchMessages, removeMessageById, upsertMessageById, user]);
+  }, [addNewMessage, fetchMessages, user]);
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
     if (!user) return;

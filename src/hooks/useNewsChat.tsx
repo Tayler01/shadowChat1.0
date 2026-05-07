@@ -26,7 +26,6 @@ export function useNewsChat() {
   const [messages, setMessages] = useState<NewsChatMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
-  const sendingRef = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const channelRef = useRef<RealtimeChannel | null>(null)
   const subscribeRef = useRef<(() => Promise<RealtimeChannel | null>) | null>(null)
@@ -159,32 +158,17 @@ export function useNewsChat() {
 
   const sendMessage = useCallback(async (content: string) => {
     if (!user || !content.trim()) return null
-    if (sendingRef.current) return null
-    const timestamp = new Date().toISOString()
-    const clientMessageId = crypto.randomUUID()
-    const optimistic = {
-      id: clientMessageId,
-      user_id: user.id,
-      content: content.trim(),
-      reactions: {},
-      created_at: timestamp,
-      updated_at: timestamp,
-      user,
-    } as NewsChatMessage
+    const sessionValid = await ensureSession()
+    if (!sessionValid) {
+      throw new Error('Authentication session is invalid or expired.')
+    }
 
-    sendingRef.current = true
     setSending(true)
     try {
       const workingClient = await getWorkingClient()
-      setMessages(prev => dedupeChatMessages([...prev, optimistic]).slice(-CHAT_LIMIT))
-      const sessionValid = await ensureSession()
-      if (!sessionValid) {
-        throw new Error('Authentication session is invalid or expired.')
-      }
       const { data, error: insertError } = await workingClient
         .from('news_chat_messages')
         .insert({
-          id: clientMessageId,
           user_id: user.id,
           content: content.trim(),
         })
@@ -198,11 +182,7 @@ export function useNewsChat() {
       const message = data as unknown as NewsChatMessage
       setMessages(prev => dedupeChatMessages([...prev, message]).slice(-CHAT_LIMIT))
       return message
-    } catch (error) {
-      setMessages(prev => prev.filter(message => message.id !== clientMessageId))
-      throw error
     } finally {
-      sendingRef.current = false
       setSending(false)
     }
   }, [user])

@@ -263,19 +263,9 @@ function BoardChatComposer({
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void
   className?: string
 }) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const retainFocusOnBlurRef = useRef(false)
-
-  const armFocusRetention = () => {
-    retainFocusOnBlurRef.current = true
-  }
-
   return (
     <form
-      onSubmit={event => {
-        retainFocusOnBlurRef.current = false
-        onSubmit(event)
-      }}
+      onSubmit={onSubmit}
       className={cn(
         'border-t border-[var(--border-panel)] bg-[linear-gradient(180deg,rgba(16,18,19,0.94),rgba(10,11,12,0.98))] p-3',
         className
@@ -283,14 +273,8 @@ function BoardChatComposer({
     >
       <div className="flex items-end gap-2">
         <textarea
-          ref={textareaRef}
           value={draft}
           onChange={event => onDraftChange(event.target.value)}
-          onBlur={() => {
-            if (!retainFocusOnBlurRef.current) return
-            retainFocusOnBlurRef.current = false
-            textareaRef.current?.focus()
-          }}
           onKeyDown={event => {
             if (event.key === 'Enter' && !event.shiftKey) {
               event.preventDefault()
@@ -307,13 +291,6 @@ function BoardChatComposer({
           loading={sending}
           className="h-11 w-11 rounded-xl p-0"
           aria-label={`Send ${board.title} message`}
-          onMouseDown={event => {
-            armFocusRetention()
-            event.preventDefault()
-          }}
-          onTouchStart={() => {
-            armFocusRetention()
-          }}
         >
           <Send className="h-5 w-5" />
         </Button>

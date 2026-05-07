@@ -31,7 +31,6 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [sending, setSending] = useState(false)
-  const sendingRef = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const channelRef = useRef<RealtimeChannel | null>(null)
   const subscribeRef = useRef<(() => Promise<RealtimeChannel | null>) | null>(null)
@@ -206,36 +205,17 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
 
   const sendMessage = useCallback(async (content: string) => {
     if (!user || !content.trim()) return null
-    if (sendingRef.current) return null
-    const timestamp = new Date().toISOString()
-    const clientMessageId = crypto.randomUUID()
-    const optimistic = {
-      id: clientMessageId,
-      board_slug: boardSlug,
-      user_id: user.id,
-      content: content.trim(),
-      reactions: {},
-      created_at: timestamp,
-      updated_at: timestamp,
-      user,
-    } as BoardChatMessage
+    const sessionValid = await ensureSession()
+    if (!sessionValid) {
+      throw new Error('Authentication session is invalid or expired.')
+    }
 
-    sendingRef.current = true
     setSending(true)
     try {
-      setMessages(prev => {
-        const nextMessages = dedupeChatMessages([...prev, optimistic])
-        return loadedOlderRef.current ? nextMessages : nextMessages.slice(-MESSAGE_FETCH_LIMIT)
-      })
-      const sessionValid = await ensureSession()
-      if (!sessionValid) {
-        throw new Error('Authentication session is invalid or expired.')
-      }
       const workingClient = await getWorkingClient()
       const { data, error: insertError } = await workingClient
         .from('board_chat_messages')
         .insert({
-          id: clientMessageId,
           board_slug: boardSlug,
           user_id: user.id,
           content: content.trim(),
@@ -253,11 +233,7 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
         return loadedOlderRef.current ? nextMessages : nextMessages.slice(-MESSAGE_FETCH_LIMIT)
       })
       return message
-    } catch (error) {
-      setMessages(prev => prev.filter(message => message.id !== clientMessageId))
-      throw error
     } finally {
-      sendingRef.current = false
       setSending(false)
     }
   }, [boardSlug, user])
