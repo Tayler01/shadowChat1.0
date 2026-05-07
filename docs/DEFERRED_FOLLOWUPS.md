@@ -33,4 +33,4 @@ Near-future priorities from the full codebase audit, after the P0 fixes:
 17. Implement per-conversation notification preferences shared across web, push, and bridge clients.
 18. Revisit the paused mood emoji / tone indicator feature with better UX, user control, and accuracy before exposing it again in Settings.
 19. Add an explicit Fahrenheit/Celsius toggle for the weather widget if users need unit control beyond the stored `temperature_unit` field.
-20. Update the Netlify GitHub Actions workflow away from Node 20 actions before GitHub's Node 20 runner deprecation window ends.
+20. Completed 2026-05-07: Netlify GitHub Actions now opt JS actions into the Node 24 runner runtime. The app build still uses Node 20 until dependency upgrades are intentionally staged.
