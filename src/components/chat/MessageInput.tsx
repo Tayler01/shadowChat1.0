@@ -74,6 +74,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const { startTyping, stopTyping } = useTyping(typingChannel)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const retainFocusOnBlurRef = useRef(false)
   const emojiPickerRef = useRef<HTMLDivElement>(null)
   const attachmentMenuRef = useRef<HTMLDivElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
@@ -209,6 +210,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   ) => {
      
     e.preventDefault()
+    retainFocusOnBlurRef.current = false
      
     if (!message.trim() || inputDisabled || submittingRef.current) {
       return
@@ -638,6 +640,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             value={message}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
+            onBlur={() => {
+              if (!retainFocusOnBlurRef.current) return
+              retainFocusOnBlurRef.current = false
+              textareaRef.current?.focus()
+            }}
             placeholder={placeholder}
             disabled={inputDisabled}
             autoComplete="off"
@@ -681,7 +688,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           disabled={!message.trim() || inputDisabled}
           className="h-11 w-11 rounded-xl p-0 md:h-12 md:w-12"
           aria-label="Send message"
-          onMouseDown={e => e.preventDefault()}
+          onMouseDown={event => {
+            retainFocusOnBlurRef.current = true
+            event.preventDefault()
+          }}
+          onTouchStart={() => {
+            retainFocusOnBlurRef.current = true
+          }}
         >
           <Send className="w-5 h-5" />
         </Button>
