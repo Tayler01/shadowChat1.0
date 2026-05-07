@@ -7,6 +7,34 @@ export const FEEDBACK_ATTACHMENT_SIGNED_URL_SECONDS = 30 * 60
 
 export type FeedbackSubmissionType = 'bug' | 'feature'
 export type FeedbackSubmissionStatus = 'new' | 'reviewing' | 'planned' | 'closed'
+export type FeedbackBuildRunStatus =
+  | 'pending'
+  | 'running'
+  | 'ready_for_testing'
+  | 'failed'
+  | 'approved_to_merge'
+  | 'merging'
+  | 'merged'
+  | 'archived'
+
+export type FeedbackBuildRunStage =
+  | 'queued'
+  | 'classifying'
+  | 'reviewing_affected_code'
+  | 'debugging_existing_behavior'
+  | 'researching_solution'
+  | 'planning'
+  | 'reviewing_plan_against_code'
+  | 'implementing'
+  | 'testing'
+  | 'branch_pushed'
+  | 'ready_for_testing'
+  | 'approved_to_merge'
+  | 'merging'
+  | 'documenting_cleanup'
+  | 'merged'
+  | 'failed'
+  | 'archived'
 
 export interface FeedbackAttachmentRecord {
   bucket: typeof FEEDBACK_ATTACHMENTS_BUCKET
@@ -59,8 +87,66 @@ export interface AdminFeedbackSubmission {
   user?: FeedbackSubmitter | null
 }
 
+export interface FeedbackBuildRun {
+  id: string
+  feedback_submission_id: string
+  created_by: string
+  companion_prompt: string
+  generated_prompt: string
+  included_attachments: AdminFeedbackAttachmentRecord[]
+  recognition_enabled: boolean
+  status: FeedbackBuildRunStatus
+  current_stage: FeedbackBuildRunStage
+  branch_name?: string | null
+  pr_url?: string | null
+  preview_url?: string | null
+  preview_warning?: string | null
+  summary?: string | null
+  merge_commit_sha?: string | null
+  failure_message?: string | null
+  approved_merge_at?: string | null
+  approved_merge_by?: string | null
+  archived_at?: string | null
+  archived_by?: string | null
+  started_at?: string | null
+  completed_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface FeedbackBuildRunLog {
+  id: string
+  run_id: string
+  stage: FeedbackBuildRunStage
+  message: string
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface FeedbackBuildRunInput {
+  feedbackSubmissionId: string
+  companionPrompt: string
+  includedAttachments: AdminFeedbackAttachmentRecord[]
+  recognitionEnabled: boolean
+}
+
+export interface FeedbackBuildRetryInput {
+  previousRunId: string
+  companionPrompt: string
+  includedAttachments: AdminFeedbackAttachmentRecord[]
+  recognitionEnabled: boolean
+}
+
 type FeedbackSubmissionRow = Omit<AdminFeedbackSubmission, 'attachments' | 'user'> & {
   attachments: unknown
+}
+
+type FeedbackBuildRunRow = Omit<FeedbackBuildRun, 'included_attachments'> & {
+  included_attachments: unknown
+}
+
+type FeedbackBuildRunLogRow = Omit<FeedbackBuildRunLog, 'metadata'> & {
+  metadata: unknown
 }
 
 const titleMinLength = 3
@@ -112,6 +198,33 @@ const normalizeFeedbackAttachments = (attachments: unknown): FeedbackAttachmentR
 
   return attachments.filter(isFeedbackAttachmentRecord)
 }
+
+const normalizeAdminFeedbackAttachments = (attachments: unknown): AdminFeedbackAttachmentRecord[] => {
+  if (!Array.isArray(attachments)) return []
+
+  return attachments.filter(isFeedbackAttachmentRecord).map(attachment => attachment as AdminFeedbackAttachmentRecord)
+}
+
+const normalizeBuildRun = (row: FeedbackBuildRunRow): FeedbackBuildRun => ({
+  ...row,
+  included_attachments: normalizeAdminFeedbackAttachments(row.included_attachments),
+})
+
+const normalizeBuildRunLog = (row: FeedbackBuildRunLogRow): FeedbackBuildRunLog => ({
+  ...row,
+  metadata: row.metadata && typeof row.metadata === 'object' && !Array.isArray(row.metadata)
+    ? row.metadata as Record<string, unknown>
+    : {},
+})
+
+const serializeBuildAttachments = (attachments: AdminFeedbackAttachmentRecord[]) =>
+  attachments.map(({ bucket, path, name, size, type }) => ({
+    bucket,
+    path,
+    name,
+    size,
+    type,
+  }))
 
 const signFeedbackAttachments = async (
   workingClient: Awaited<ReturnType<typeof getWorkingClient>>,
@@ -213,6 +326,96 @@ export const deleteAdminFeedbackSubmission = async (
       // The submission is already removed; orphan cleanup can be retried later.
     }
   }
+}
+
+export const fetchFeedbackBuildRuns = async (): Promise<FeedbackBuildRun[]> => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient
+    .from('feedback_build_runs')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  if (error) {
+    throw error
+  }
+
+  return ((data ?? []) as FeedbackBuildRunRow[]).map(normalizeBuildRun)
+}
+
+export const fetchFeedbackBuildRunLogs = async (runIds: string[]): Promise<FeedbackBuildRunLog[]> => {
+  if (runIds.length === 0) return []
+
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient
+    .from('feedback_build_run_logs')
+    .select('*')
+    .in('run_id', runIds)
+    .order('created_at', { ascending: true })
+
+  if (error) {
+    throw error
+  }
+
+  return ((data ?? []) as FeedbackBuildRunLogRow[]).map(normalizeBuildRunLog)
+}
+
+export const createFeedbackBuildRun = async (input: FeedbackBuildRunInput): Promise<FeedbackBuildRun> => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('create_feedback_build_run', {
+    p_feedback_submission_id: input.feedbackSubmissionId,
+    p_companion_prompt: input.companionPrompt,
+    p_included_attachments: serializeBuildAttachments(input.includedAttachments),
+    p_recognition_enabled: input.recognitionEnabled,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return normalizeBuildRun(data as FeedbackBuildRunRow)
+}
+
+export const retryFeedbackBuildRun = async (input: FeedbackBuildRetryInput): Promise<FeedbackBuildRun> => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('retry_feedback_build_run', {
+    p_previous_run_id: input.previousRunId,
+    p_companion_prompt: input.companionPrompt,
+    p_included_attachments: serializeBuildAttachments(input.includedAttachments),
+    p_recognition_enabled: input.recognitionEnabled,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return normalizeBuildRun(data as FeedbackBuildRunRow)
+}
+
+export const approveFeedbackBuildMerge = async (runId: string): Promise<FeedbackBuildRun> => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('approve_feedback_build_merge', {
+    p_run_id: runId,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return normalizeBuildRun(data as FeedbackBuildRunRow)
+}
+
+export const archiveFeedbackBuildRun = async (runId: string): Promise<FeedbackBuildRun> => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('archive_feedback_build_run', {
+    p_run_id: runId,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return normalizeBuildRun(data as FeedbackBuildRunRow)
 }
 
 export const buildFeedbackAttachmentPath = (
