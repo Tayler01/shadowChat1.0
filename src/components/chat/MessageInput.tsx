@@ -695,7 +695,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         </Button>
 
         <Button
-          type="submit"
+          type="button"
           disabled={!message.trim() || inputDisabled}
           className="h-11 w-11 rounded-xl p-0 md:h-12 md:w-12"
           aria-label="Send message"
@@ -706,6 +706,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           onTouchStart={event => {
             retainFocusOnBlurRef.current = true
             event.preventDefault()
+            void handleSubmit(event)
+          }}
+          onClick={event => {
             void handleSubmit(event)
           }}
         >
