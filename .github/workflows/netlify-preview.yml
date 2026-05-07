@@ -1,0 +1,120 @@
+name: Netlify Preview Deploy
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: netlify-preview-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and deploy preview
+    runs-on: ubuntu-latest
+    env:
+      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+      NETLIFY_CLI_VERSION: 26.0.0
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify Netlify secrets
+        run: |
+          test -n "$NETLIFY_AUTH_TOKEN" || { echo "NETLIFY_AUTH_TOKEN is not configured."; exit 1; }
+          test -n "$NETLIFY_SITE_ID" || { echo "NETLIFY_SITE_ID is not configured."; exit 1; }
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit -p tsconfig.app.json
+
+      - name: Build with Netlify preview environment
+        run: npx --yes netlify@$NETLIFY_CLI_VERSION build --context deploy-preview
+
+      - name: Deploy Netlify preview
+        run: |
+          npx --yes netlify@$NETLIFY_CLI_VERSION deploy \
+            --context deploy-preview \
+            --dir=dist \
+            --alias="pr-${{ github.event.pull_request.number }}" \
+            --message="GitHub Actions preview deploy PR #${{ github.event.pull_request.number }} ${{ github.sha }}" \
+            --json > netlify-preview.json
+
+      - name: Capture preview URL
+        id: preview
+        run: |
+          node <<'NODE'
+          const fs = require('fs')
+          const data = JSON.parse(fs.readFileSync('netlify-preview.json', 'utf8'))
+          const url = data.deploy_url || data.deployUrl || data.ssl_url || data.url
+          if (!url) {
+            console.error('Netlify deploy output did not include a deploy URL.')
+            console.error(JSON.stringify(data, null, 2))
+            process.exit(1)
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `url=${url}\n`)
+          NODE
+
+      - name: Comment preview URL
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- shadowchat-netlify-preview -->'
+            const body = [
+              marker,
+              'Netlify preview is ready:',
+              process.env.PREVIEW_URL,
+              '',
+              `This preview was built from \`${context.sha.slice(0, 7)}\`.`,
+            ].join('\n')
+
+            const { owner, repo } = context.repo
+            const issue_number = context.payload.pull_request.number
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            })
+            const existing = comments.find(comment => comment.body?.includes(marker))
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              })
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              })
+            }
+        env:
+          PREVIEW_URL: ${{ steps.preview.outputs.url }}
