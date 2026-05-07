@@ -205,14 +205,22 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
   }, [message])
 
-  const handleSubmit = async (
-    e: React.FormEvent<HTMLFormElement> | React.KeyboardEvent<HTMLTextAreaElement>
-  ) => {
-     
-    e.preventDefault()
-    retainFocusOnBlurRef.current = false
-     
+  type SubmitEvent =
+    | React.FormEvent<HTMLFormElement>
+    | React.KeyboardEvent<HTMLTextAreaElement>
+    | React.MouseEvent<HTMLButtonElement>
+    | React.TouchEvent<HTMLButtonElement>
+
+  const handleSubmit = async (e?: SubmitEvent) => {
+    e?.preventDefault()
+
+    // iOS Safari won't reliably reopen the keyboard after async work, so we must
+    // avoid losing focus in the first place when the user taps Send.
+    retainFocusOnBlurRef.current = true
+    textareaRef.current?.focus()
+
     if (!message.trim() || inputDisabled || submittingRef.current) {
+      retainFocusOnBlurRef.current = false
       return
     }
 
@@ -258,6 +266,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       submittingRef.current = false
       setSubmitting(false)
     }
+
+    retainFocusOnBlurRef.current = false
+
     // Keep focus on the textarea so the mobile keyboard stays open
     textareaRef.current?.focus()
 
@@ -692,8 +703,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             retainFocusOnBlurRef.current = true
             event.preventDefault()
           }}
-          onTouchStart={() => {
+          onTouchStart={event => {
             retainFocusOnBlurRef.current = true
+            event.preventDefault()
+            void handleSubmit(event)
           }}
         >
           <Send className="w-5 h-5" />
