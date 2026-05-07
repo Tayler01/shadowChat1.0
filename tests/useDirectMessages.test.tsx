@@ -211,8 +211,7 @@ test('startConversation sets currentConversation', async () => {
   const maybeSingle = jest.fn().mockResolvedValue({ data: { id: 'u2' }, error: null });
   workingClient.from.mockImplementationOnce(() => createQuery({ maybeSingle }) as any);
 
-  const conversation = { id: 'c1' } as any;
-  (getOrCreateDMConversation as jest.Mock).mockResolvedValue(conversation);
+  (getOrCreateDMConversation as jest.Mock).mockResolvedValue('c1');
   (fetchDMConversations as jest.Mock).mockResolvedValue([{ id: 'c1' }]);
 
   const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider });

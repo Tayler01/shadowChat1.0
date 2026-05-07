@@ -1053,7 +1053,15 @@ export const getOrCreateDMConversation = async (otherUserId: string) => {
   if (error) {
     return null
   }
-  return data
+  if (typeof data === 'string') {
+    return data
+  }
+
+  if (data && typeof data === 'object' && 'id' in data && typeof (data as { id?: unknown }).id === 'string') {
+    return (data as { id: string }).id
+  }
+
+  return null
 }
 
 export const markDMMessagesRead = async (conversationId: string) => {

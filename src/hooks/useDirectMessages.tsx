@@ -346,12 +346,12 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
       throw new Error('User not found');
     }
 
-    const conversation = await getOrCreateDMConversation(match.id);
-    if (conversation) {
+    const conversationId = await getOrCreateDMConversation(match.id);
+    if (conversationId) {
       const convs = await fetchDMConversations();
       setConversations(convs);
-      setCurrentConversation(conversation.id);
-      return conversation.id as string;
+      setCurrentConversation(conversationId);
+      return conversationId;
     }
     return null;
   }, [user]);

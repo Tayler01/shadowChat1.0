@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { CalendarDays, Clock3, Ghost, LockKeyhole, Palette, ShieldAlert, ShieldCheck, UserRound, X } from 'lucide-react'
+import { CalendarDays, Clock3, Ghost, LockKeyhole, MessageCircle, Palette, ShieldAlert, ShieldCheck, UserRound, X } from 'lucide-react'
 import type { User } from '../../lib/supabase'
-import { setSubAdminStatus } from '../../lib/supabase'
+import { getOrCreateDMConversation, setSubAdminStatus } from '../../lib/supabase'
 import {
   CHANNEL_BAN_DURATIONS,
   CHANNEL_BAN_OPTIONS,
@@ -75,6 +75,14 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   const [banReason, setBanReason] = useState('')
   const [localAdminRole, setLocalAdminRole] = useState(user?.admin_role ?? null)
   const [adminRoleSaving, setAdminRoleSaving] = useState(false)
+  const [dmStarting, setDmStarting] = useState(false)
+
+  const canStartDM = Boolean(
+    open &&
+    user &&
+    currentProfile &&
+    currentProfile.id !== user.id
+  )
 
   const canModerate = Boolean(
     open &&
@@ -252,6 +260,34 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
     }
   }
 
+  const startDirectMessage = async () => {
+    if (!user || !canStartDM || dmStarting) return
+    if (typeof window === 'undefined') return
+
+    setDmStarting(true)
+
+    try {
+      const conversationId = await getOrCreateDMConversation(user.id)
+
+      if (!conversationId) {
+        throw new Error('Unable to start conversation')
+      }
+
+      const url = new URL(window.location.href)
+      url.searchParams.set('view', 'dms')
+      url.searchParams.set('conversation', conversationId)
+      url.searchParams.delete('message')
+      window.history.replaceState({}, '', url)
+      window.dispatchEvent(new PopStateEvent('popstate'))
+
+      onClose()
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Unable to start conversation'))
+    } finally {
+      setDmStarting(false)
+    }
+  }
+
   if (!user) return null
 
   const statusMessage = user.status_message?.trim()
@@ -347,6 +383,22 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                   />
                 </span>
               </div>
+
+              {canStartDM && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    loading={dmStarting}
+                    onClick={() => void startDirectMessage()}
+                    className="w-full sm:w-auto"
+                  >
+                    <MessageCircle className="mr-2 h-4 w-4" />
+                    Message
+                  </Button>
+                </div>
+              )}
 
               <div className="mt-5 space-y-3">
                 <section className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.035)] p-4">
