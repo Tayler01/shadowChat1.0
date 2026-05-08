@@ -93,6 +93,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const isOwner = profile?.id === message.user_id
     const isOperator = profile?.admin_role === 'admin' || profile?.admin_role === 'sub_admin'
     const isAuthorOperator = message.user?.admin_role === 'admin' || message.user?.admin_role === 'sub_admin'
+    const isLocalDelivery = message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
     const canDelete = isOwner || (isOperator && Boolean(message.user) && !isAuthorOperator)
     const isShadoAI = message.user?.username === 'shado_ai'
     const isAIMessage = isShadoAI || message.message_type === 'command'
@@ -186,20 +187,21 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         id: 'reaction',
         label: 'Add Reaction',
         icon: Plus,
+        hidden: isLocalDelivery,
         onSelect: () => setShowReactionPicker(true),
       },
       {
         id: 'reply',
         label: 'Reply',
         icon: Reply,
-        hidden: !onReply,
+        hidden: !onReply || isLocalDelivery,
         onSelect: () => onReply?.(message.id, message.content),
       },
       {
         id: 'edit',
         label: 'Edit',
         icon: Edit3,
-        hidden: !isOwner,
+        hidden: !isOwner || isLocalDelivery,
         onSelect: () => {
           setIsEditing(true)
           setEditContent(message.content)
@@ -210,13 +212,14 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         label: 'Delete',
         icon: Trash2,
         tone: 'danger',
-        hidden: !canDelete,
+        hidden: !canDelete || isLocalDelivery,
         onSelect: () => void onDelete(message.id),
       },
       {
         id: 'pin',
         label: message.pinned ? 'Unpin' : 'Pin',
         icon: message.pinned ? PinOff : Pin,
+        hidden: isLocalDelivery,
         onSelect: handlePinToggle,
       },
     ]
@@ -274,6 +277,14 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
               {message.edited_at && (
                 <span className="text-xs text-[var(--text-muted)]/80">
                   (edited)
+                </span>
+              )}
+              {isOwner && message.delivery_status && message.delivery_status !== 'sent' && (
+                <span className={cn(
+                  'text-xs',
+                  message.delivery_status === 'failed' ? 'text-red-300' : 'text-[var(--text-muted)]/80'
+                )}>
+                  {message.delivery_status === 'failed' ? 'Failed to send' : 'Sending...'}
                 </span>
               )}
             </div>

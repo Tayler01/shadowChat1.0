@@ -201,6 +201,7 @@ test('sends audio message with proper type', async () => {
   expect(insertFn).toHaveBeenCalledWith({
     conversation_id: 'conv1',
     sender_id: 'u1',
+    client_message_id: expect.any(String),
     content: '',
     message_type: 'audio',
     audio_url: 'https://example.com/a.webm',

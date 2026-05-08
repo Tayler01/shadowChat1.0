@@ -695,6 +695,7 @@ export type ChatMessageType = 'text' | 'command' | 'audio' | 'image' | 'video' |
 
 export interface Message {
   id: string
+  client_message_id?: string | null
   user_id: string
   content: string
   message_type: ChatMessageType
@@ -710,6 +711,8 @@ export interface Message {
   created_at: string
   updated_at: string
   user?: User
+  optimistic?: boolean
+  delivery_status?: 'sending' | 'sent' | 'failed'
 }
 
 export type NewsPlatform = 'x' | 'truth'
@@ -852,6 +855,7 @@ export interface DMConversation {
 
 export interface DMMessage {
   id: string
+  client_message_id?: string | null
   conversation_id: string
   sender_id: string
   content: string
@@ -866,6 +870,8 @@ export interface DMMessage {
   created_at: string
   updated_at: string
   sender?: User
+  optimistic?: boolean
+  delivery_status?: 'sending' | 'sent' | 'failed'
 }
 
 export interface BasicUser

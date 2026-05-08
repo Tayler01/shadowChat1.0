@@ -108,6 +108,41 @@ test('uses a 16px mobile textarea to avoid iOS focus zoom', () => {
   expect(screen.getByRole('textbox')).toHaveClass('text-base', 'md:text-sm')
 })
 
+test('clears immediately and blocks repeated send taps while pending', async () => {
+  let resolveSend!: () => void
+  const pendingSend = new Promise<void>(resolve => {
+    resolveSend = resolve
+  })
+  const onSendMessage = jest.fn(() => pendingSend)
+
+  render(<MessageInput onSendMessage={onSendMessage} />)
+  const textarea = screen.getByRole('textbox')
+  const sendButton = screen.getByRole('button', { name: /send message/i })
+
+  await act(async () => {
+    fireEvent.change(textarea, { target: { value: 'hello' } })
+  })
+
+  await act(async () => {
+    fireEvent.click(sendButton)
+  })
+
+  expect(onSendMessage).toHaveBeenCalledTimes(1)
+  expect(onSendMessage).toHaveBeenCalledWith('hello', 'text', undefined, undefined)
+  expect(textarea).toHaveValue('')
+
+  await act(async () => {
+    fireEvent.click(sendButton)
+  })
+
+  expect(onSendMessage).toHaveBeenCalledTimes(1)
+
+  await act(async () => {
+    resolveSend()
+    await pendingSend
+  })
+})
+
 test('shows an error and keeps reply state when uploaded image send resolves to null', async () => {
   uploadChatFile.mockResolvedValueOnce('https://example.com/file.png')
   const onSendMessage = jest.fn().mockResolvedValue(null)

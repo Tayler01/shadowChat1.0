@@ -72,7 +72,9 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
 
       const message = await getBlockedActionMessage('general_chat', error, 'Failed to send message')
       showActionErrorToast(message)
-      addFailedMessage({ id: Date.now().toString(), type: type || 'text', content: content, dataUrl: fileUrl })
+      if (!(error as { optimisticMessageId?: string })?.optimisticMessageId) {
+        addFailedMessage({ id: Date.now().toString(), type: type || 'text', content: content, dataUrl: fileUrl })
+      }
       return null
     }
   }

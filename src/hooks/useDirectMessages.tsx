@@ -23,6 +23,11 @@ import {
 } from '../lib/supabase';
 import { runRealtimeRecovery } from '../lib/realtimeRecovery';
 import { triggerDMPushNotification } from '../lib/push';
+import {
+  createClientMessageId,
+  markMessageSendFailed,
+  upsertMessageIntoState,
+} from '../lib/optimisticMessages';
 import { MESSAGE_FETCH_LIMIT } from '../config';
 import { useAuth } from './useAuth';
 import { useRealtimeRecovery } from './useRealtimeRecovery';
@@ -163,6 +168,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
                     id: payload.new.id,
                     conversation_id: payload.new.conversation_id,
                     sender_id: payload.new.sender_id,
+                    client_message_id: payload.new.client_message_id,
                     content: payload.new.content,
                     message_type: payload.new.message_type ?? 'text',
                     audio_url: payload.new.audio_url ?? undefined,
@@ -394,13 +400,14 @@ export function useConversationMessages(conversationId: string | null) {
   const [sending, setSending] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { playMessage } = useSoundEffects();
   const channelRef = useRef<RealtimeChannel | null>(null);
   const subscribeRef = useRef<() => RealtimeChannel>();
   const clientResetRef = useRef<() => Promise<void>>();
   const activeConversationIdRef = useRef<string | null>(conversationId);
   const fetchRequestIdRef = useRef(0);
+  const sendingRef = useRef(false);
 
   useEffect(() => {
     activeConversationIdRef.current = conversationId;
@@ -411,6 +418,7 @@ export function useConversationMessages(conversationId: string | null) {
       payload: {
         conversation_id: string;
         sender_id: string;
+        client_message_id?: string;
         content: string;
         message_type: ChatMessageType;
         file_url?: string;
@@ -434,10 +442,28 @@ export function useConversationMessages(conversationId: string | null) {
         )
       );
 
-      return Promise.race([insertPromise, timeoutPromise]) as Promise<{
+      let result = (await Promise.race([insertPromise, timeoutPromise])) as {
         data: DMMessage | null;
         error: any;
-      }>;
+      };
+
+      if (
+        result.error &&
+        payload.client_message_id &&
+        (result.error.code === '23505' || result.error.status === 409)
+      ) {
+        result = await workingClient
+          .from('dm_messages')
+          .select(`
+            *,
+            sender:users!sender_id(*)
+          `)
+          .eq('sender_id', payload.sender_id)
+          .eq('client_message_id', payload.client_message_id)
+          .maybeSingle();
+      }
+
+      return result;
     },
     []
   );
@@ -513,7 +539,15 @@ export function useConversationMessages(conversationId: string | null) {
         } else {
           const fetchedMessages = ((data || []) as unknown as DMMessage[]).reverse()
           setHasMore((data?.length || 0) === MESSAGE_FETCH_LIMIT);
-          setMessages(fetchedMessages);
+          setMessages(prev => {
+            const pendingLocalMessages = prev.filter(
+              message => message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
+            );
+            return fetchedMessages.reduce<DMMessage[]>(
+              (acc, message) => upsertMessageIntoState(acc, { ...message, optimistic: false, delivery_status: 'sent' }),
+              pendingLocalMessages
+            );
+          });
         }
       } catch {
         if (!disposed && requestId === fetchRequestIdRef.current) {
@@ -654,7 +688,11 @@ export function useConversationMessages(conversationId: string | null) {
 
             if (message) {
               setMessages(prev => {
-                return prev.some(m => m.id === message.id) ? prev : [...prev, message];
+                return upsertMessageIntoState(prev, {
+                  ...message,
+                  optimistic: false,
+                  delivery_status: 'sent',
+                });
               });
 
               if (user && message.sender_id !== user.id) {
@@ -688,7 +726,11 @@ export function useConversationMessages(conversationId: string | null) {
 
             if (message) {
               setMessages(prev =>
-                prev.map(m => (m.id === message.id ? message : m))
+                upsertMessageIntoState(prev, {
+                  ...message,
+                  optimistic: false,
+                  delivery_status: 'sent',
+                })
               );
             }
           }
@@ -761,7 +803,34 @@ export function useConversationMessages(conversationId: string | null) {
       const requiresContent = messageType !== 'audio' && messageType !== 'image' && messageType !== 'video' && messageType !== 'file';
       if (!user || !conversationId || (requiresContent && !trimmedContent)) return null;
 
+      if (sendingRef.current) {
+        return null;
+      }
+
+      sendingRef.current = true;
       setSending(true);
+      const clientMessageId = createClientMessageId();
+      const createdAt = new Date().toISOString();
+      const optimisticMessage = {
+        id: clientMessageId,
+        client_message_id: clientMessageId,
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content: messageType === 'audio' ? '' : trimmedContent,
+        message_type: messageType,
+        file_url: fileUrl,
+        ...(messageType === 'audio' ? { audio_url: trimmedContent } : {}),
+        read_at: undefined,
+        read_by: [user.id],
+        reactions: {},
+        created_at: createdAt,
+        updated_at: createdAt,
+        sender: profile ?? user,
+        optimistic: true,
+        delivery_status: 'sending',
+      } as DMMessage;
+      setMessages(prev => upsertMessageIntoState(prev, optimisticMessage));
+
       try {
         return await withTimeout(
           (async () => {
@@ -773,6 +842,7 @@ export function useConversationMessages(conversationId: string | null) {
             const insertPayload = {
               conversation_id: conversationId,
               sender_id: user.id,
+              client_message_id: clientMessageId,
               content: messageType === 'audio' ? '' : trimmedContent,
               message_type: messageType,
               file_url: fileUrl,
@@ -803,9 +873,12 @@ export function useConversationMessages(conversationId: string | null) {
             }
 
             if (finalData) {
-              const message = finalData as DMMessage;
-              // Optimistically add the sent message
-              setMessages(prev => [...prev, message]);
+              const message = {
+                ...(finalData as DMMessage),
+                optimistic: false,
+                delivery_status: 'sent',
+              } as DMMessage;
+              setMessages(prev => upsertMessageIntoState(prev, message));
               if (message.id) {
                 triggerDMPushNotification(message.id).catch(() => {
                   // Push delivery should not block the DM send path.
@@ -819,12 +892,20 @@ export function useConversationMessages(conversationId: string | null) {
           'Message send timed out while reconnecting. Please try again.'
         );
       } catch (error) {
+        setMessages(prev => markMessageSendFailed(prev, clientMessageId));
         await runRealtimeRecovery('send-error').catch(() => undefined);
-        throw error;
+        if (error instanceof Error) {
+          (error as Error & { optimisticMessageId?: string }).optimisticMessageId = clientMessageId;
+          throw error;
+        }
+        const wrappedError = new Error('Failed to send message') as Error & { optimisticMessageId?: string };
+        wrappedError.optimisticMessageId = clientMessageId;
+        throw wrappedError;
       } finally {
+        sendingRef.current = false;
         setSending(false);
       }
-    }, [user, conversationId, insertConversationMessage]);
+    }, [user, conversationId, insertConversationMessage, profile]);
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
     if (!user || !conversationId || !content.trim()) return;

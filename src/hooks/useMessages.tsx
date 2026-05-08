@@ -18,6 +18,12 @@ import {
 } from '../lib/supabase';
 import { runRealtimeRecovery } from '../lib/realtimeRecovery';
 import { triggerGroupPushNotification } from '../lib/push';
+import {
+  createClientMessageId,
+  findMatchingMessageIndex,
+  markMessageSendFailed,
+  upsertMessageIntoState,
+} from '../lib/optimisticMessages';
 import { MESSAGE_FETCH_LIMIT } from '../config';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useAuth } from './useAuth';
@@ -26,13 +32,8 @@ import { useSoundEffects } from './useSoundEffects';
 
 const SEND_OPERATION_TIMEOUT_MS = 12000;
 
-const dedupeMessagesById = (items: Message[]) => {
-  const map = new Map<string, Message>()
-  items.forEach(item => {
-    map.set(item.id, item)
-  })
-  return Array.from(map.values())
-}
+const dedupeMessagesById = (items: Message[]) =>
+  items.reduce<Message[]>((acc, item) => upsertMessageIntoState(acc, item), [])
 
 const sortMessagesByCreatedAt = (items: Message[]) =>
   [...items].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
@@ -54,7 +55,10 @@ const cacheMessages = (items: Message[]) => {
   }
 
   try {
-    localStorage.setItem('chatHistory', JSON.stringify(trimMessageWindow(items)))
+    const cacheableMessages = items.filter(
+      message => !message.optimistic && message.delivery_status !== 'sending' && message.delivery_status !== 'failed'
+    )
+    localStorage.setItem('chatHistory', JSON.stringify(trimMessageWindow(cacheableMessages)))
   } catch {
     // ignore storage errors
   }
@@ -66,9 +70,11 @@ export const prepareMessageData = (
   content: string,
   messageType: ChatMessageType,
   fileUrl?: string,
-  replyTo?: string
+  replyTo?: string,
+  clientMessageId?: string
 ) => ({
   user_id: userId,
+  ...(clientMessageId ? { client_message_id: clientMessageId } : {}),
   content: messageType === 'audio' ? '' : content.trim(),
   message_type: messageType,
   file_url: fileUrl,
@@ -80,6 +86,7 @@ export const insertMessage = async (messageData: {
   user_id: string;
   content: string;
   message_type: ChatMessageType;
+  client_message_id?: string;
   file_url?: string;
   audio_url?: string;
   reply_to?: string;
@@ -102,7 +109,23 @@ export const insertMessage = async (messageData: {
     )
   );
 
-  const result = (await Promise.race([insertPromise, timeout])) as any;
+  let result = (await Promise.race([insertPromise, timeout])) as any;
+
+  if (
+    result.error &&
+    messageData.client_message_id &&
+    (result.error.code === '23505' || result.error.status === 409)
+  ) {
+    result = await workingClient
+      .from('messages')
+      .select(`
+        *,
+        user:users!user_id(*)
+      `)
+      .eq('user_id', messageData.user_id)
+      .eq('client_message_id', messageData.client_message_id)
+      .maybeSingle();
+  }
 
   const duration = performance.now() - start;
 
@@ -113,6 +136,7 @@ export const refreshSessionAndRetry = async (messageData: {
   user_id: string;
   content: string;
   message_type: ChatMessageType;
+  client_message_id?: string;
   file_url?: string;
   audio_url?: string;
   reply_to?: string;
@@ -181,7 +205,7 @@ function useProvideMessages(): MessagesContextValue {
   const [sending, setSending] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { playMessage, playReaction } = useSoundEffects();
   const channelRef = useRef<RealtimeChannel | null>(null);
   const subscribeRef = useRef<() => Promise<RealtimeChannel>>();
@@ -189,15 +213,20 @@ function useProvideMessages(): MessagesContextValue {
   const resetInFlightRef = useRef<Promise<void> | null>(null);
   const fetchRequestIdRef = useRef(0);
   const loadedOlderRef = useRef(false);
+  const sendingRef = useRef(false);
 
   const addNewMessage = useCallback(
     (msg: Message) => {
       let added = false;
       setMessages(prev => {
-        const exists = prev.some(m => m.id === msg.id);
-        if (exists) return prev;
-        added = true;
-        const nextMessages = dedupeMessagesById([...prev, msg]);
+        const exists = findMatchingMessageIndex(prev, msg) >= 0;
+        const nextMessages = upsertMessageIntoState(prev, {
+          ...msg,
+          optimistic: false,
+          delivery_status: 'sent',
+        });
+        if (nextMessages === prev) return prev;
+        added = !exists;
         return loadedOlderRef.current ? sortMessagesByCreatedAt(nextMessages) : trimMessageWindow(nextMessages);
       });
       if (added && user && msg.user_id !== user.id) {
@@ -254,7 +283,14 @@ function useProvideMessages(): MessagesContextValue {
 
         setMessages(prev => {
           if (prev.length === 0 || !loadedOlderRef.current) {
-            const nextMessages = trimMessageWindow(data as unknown as Message[]);
+            const pendingLocalMessages = prev.filter(
+              message => message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
+            );
+            const mergedMessages = [...data as unknown as Message[]].reduce<Message[]>(
+              (acc, message) => upsertMessageIntoState(acc, { ...message, optimistic: false, delivery_status: 'sent' }),
+              pendingLocalMessages
+            );
+            const nextMessages = trimMessageWindow(mergedMessages);
             cacheMessages(nextMessages);
             return nextMessages;
           }
@@ -277,9 +313,14 @@ function useProvideMessages(): MessagesContextValue {
 
           // Add new messages
           data.forEach(d => {
-            if (!mergedMap.has(d.id)) {
-              mergedMap.set(d.id, d as unknown as Message);
-            }
+            const currentMessages = Array.from(mergedMap.values());
+            const upserted = upsertMessageIntoState(currentMessages, {
+              ...(d as unknown as Message),
+              optimistic: false,
+              delivery_status: 'sent',
+            });
+            mergedMap.clear();
+            upserted.forEach(message => mergedMap.set(message.id, message));
           });
 
           const merged = Array.from(mergedMap.values());
@@ -646,8 +687,40 @@ function useProvideMessages(): MessagesContextValue {
       return null;
     }
 
+    if (sendingRef.current) {
+      return null;
+    }
+
+    sendingRef.current = true;
     setSending(true);
     let inserted: Message | null = null;
+    const clientMessageId = createClientMessageId();
+    const createdAt = new Date().toISOString();
+    const optimisticPayload = prepareMessageData(
+      user.id,
+      content,
+      messageType,
+      fileUrl,
+      replyTo,
+      clientMessageId
+    );
+
+    setMessages(prev => {
+      const nextMessages = upsertMessageIntoState(prev, {
+        id: clientMessageId,
+        ...optimisticPayload,
+        reactions: {},
+        pinned: false,
+        pinned_by: null,
+        pinned_at: null,
+        created_at: createdAt,
+        updated_at: createdAt,
+        user: profile ?? user,
+        optimistic: true,
+        delivery_status: 'sending',
+      } as Message);
+      return loadedOlderRef.current ? sortMessagesByCreatedAt(nextMessages) : trimMessageWindow(nextMessages);
+    });
 
     const executeSend = async () => {
       // Ensure we have a valid session before attempting database operations
@@ -661,7 +734,8 @@ function useProvideMessages(): MessagesContextValue {
         content,
         messageType,
         fileUrl,
-        replyTo
+        replyTo,
+        clientMessageId
       );
 
       const attemptSend = async () => {
@@ -678,9 +752,13 @@ function useProvideMessages(): MessagesContextValue {
         }
 
         if (data) {
-          inserted = data as unknown as Message;
+          inserted = {
+            ...(data as unknown as Message),
+            optimistic: false,
+            delivery_status: 'sent',
+          };
 
-          addNewMessage(data as unknown as Message);
+          addNewMessage(inserted);
 
           if (data.id) {
             triggerGroupPushNotification(data.id).catch(() => {
@@ -726,13 +804,21 @@ function useProvideMessages(): MessagesContextValue {
         'Message send timed out while reconnecting. Please try again.'
       );
     } catch (error) {
+      setMessages(prev => markMessageSendFailed(prev, clientMessageId));
       await runRealtimeRecovery('send-error').catch(() => undefined);
-      throw error;
+      if (error instanceof Error) {
+        (error as Error & { optimisticMessageId?: string }).optimisticMessageId = clientMessageId;
+        throw error;
+      }
+      const wrappedError = new Error('Failed to send message') as Error & { optimisticMessageId?: string };
+      wrappedError.optimisticMessageId = clientMessageId;
+      throw wrappedError;
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
     return inserted;
-  }, [addNewMessage, fetchMessages, user]);
+  }, [addNewMessage, fetchMessages, profile, user]);
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
     if (!user) return;

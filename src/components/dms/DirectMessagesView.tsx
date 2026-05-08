@@ -90,6 +90,7 @@ function DirectMessageBubble({
   const isGrouped = shouldGroupMessage(message, previousMessage)
   const isOwn = message.sender_id === profile?.id
   const isIncoming = !isOwn
+  const isLocalDelivery = message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
   const showIncomingAvatar = !isGrouped && !isOwn
   const bubbleColor = undefined
   const bubbleStyle = bubbleColor
@@ -159,13 +160,14 @@ function DirectMessageBubble({
       id: 'reaction',
       label: 'Add Reaction',
       icon: Plus,
+      hidden: isLocalDelivery,
       onSelect: () => setShowReactionPicker(true),
     },
     {
       id: 'edit',
       label: 'Edit',
       icon: Edit3,
-      hidden: !isOwn,
+      hidden: !isOwn || isLocalDelivery,
       onSelect: () => {
         setDraft(message.content)
         setEditing(true)
@@ -176,7 +178,7 @@ function DirectMessageBubble({
       label: 'Delete',
       icon: Trash2,
       tone: 'danger',
-      hidden: !isOwn,
+      hidden: !isOwn || isLocalDelivery,
       onSelect: deleteMessage,
     },
   ]
@@ -292,6 +294,11 @@ function DirectMessageBubble({
               <p className={`mt-1 text-xs ${isOwn ? 'text-[var(--text-gold)]/85' : 'text-[var(--text-muted)]'}`}>
                 {formatTime(message.created_at)}
                 {message.edited_at && ' (edited)'}
+                {isOwn && message.delivery_status && message.delivery_status !== 'sent' && (
+                  <span className={message.delivery_status === 'failed' ? 'ml-2 text-red-300' : 'ml-2'}>
+                    {message.delivery_status === 'failed' ? 'Failed to send' : 'Sending...'}
+                  </span>
+                )}
               </p>
             </>
           )}
@@ -412,7 +419,9 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     } catch (error) {
       console.error(error)
       toast.error('Failed to send message')
-      addFailedMessage({ id: Date.now().toString(), type: type || 'text', content, dataUrl: fileUrl })
+      if (!(error as { optimisticMessageId?: string })?.optimisticMessageId) {
+        addFailedMessage({ id: Date.now().toString(), type: type || 'text', content, dataUrl: fileUrl })
+      }
     }
   }
 

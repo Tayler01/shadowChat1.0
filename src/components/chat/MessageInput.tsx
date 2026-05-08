@@ -80,6 +80,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
+  const submittingRef = useRef(false)
   const { enabled: suggestionsEnabled } = useSuggestionsEnabled()
   const { suggestions } = useSuggestedReplies(messages, suggestionsEnabled)
   const pickerDimensions = getEmojiPickerDimensions()
@@ -201,36 +202,52 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
   }, [message])
 
-  const handleSubmit = async (
-    e: React.FormEvent<HTMLFormElement> | React.KeyboardEvent<HTMLTextAreaElement>
-  ) => {
-    
-    e.preventDefault()
-    
-    if (!message.trim() || disabled) {
+  const restoreComposerFocus = useCallback(() => {
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus()
+    })
+    window.setTimeout(() => {
+      textareaRef.current?.focus()
+    }, 0)
+  }, [])
+
+  const sendCurrentMessage = async () => {
+    const currentMessage = message.trim()
+
+    if (!currentMessage || disabled || submittingRef.current) {
       return
     }
 
-    // Process slash commands
-    const processedMessage = await processSlashCommand(message.trim(), messages)
-    const finalMessage = processedMessage || message.trim()
-
-    const aiMatch = !processedMessage && message.trim().toLowerCase().startsWith('@ai')
-      ? message.trim().slice(3).trim()
-      : null
+    submittingRef.current = true
 
     try {
-      await onSendMessage(
+      // Process slash commands
+      const processedMessage = await processSlashCommand(currentMessage, messages)
+      const finalMessage = processedMessage || currentMessage
+
+      const aiMatch = !processedMessage && currentMessage.toLowerCase().startsWith('@ai')
+        ? currentMessage.slice(3).trim()
+        : null
+
+      clear()
+      setMessage('')
+      stopTyping()
+      setShowSlashCommands(false)
+      restoreComposerFocus()
+
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto'
+      }
+
+      const sent = await onSendMessage(
         finalMessage,
         'text',
         undefined,
         replyingTo?.id
       )
-      clear()
-      setMessage('')
-      stopTyping()
-      setShowSlashCommands(false)
-      onCancelReply?.()
+      if (sent !== null) {
+        onCancelReply?.()
+      }
 
       if (aiMatch) {
         try {
@@ -246,15 +263,17 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           ? err.message
           : 'Failed to send message'
       toast.error(message)
+    } finally {
+      submittingRef.current = false
+      restoreComposerFocus()
     }
-    // Keep focus on the textarea so the mobile keyboard stays open
-    textareaRef.current?.focus()
+  }
 
-    // Reset textarea height
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
-    }
-    
+  const handleSubmit = (
+    e: React.FormEvent<HTMLFormElement> | React.KeyboardEvent<HTMLTextAreaElement>
+  ) => {
+    e.preventDefault()
+    void sendCurrentMessage()
   }
 
 
@@ -652,11 +671,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         </Button>
 
         <Button
-          type="submit"
+          type="button"
           disabled={!message.trim() || disabled}
           className="h-11 w-11 rounded-xl p-0 md:h-12 md:w-12"
           aria-label="Send message"
           onMouseDown={e => e.preventDefault()}
+          onClick={() => void sendCurrentMessage()}
         >
           <Send className="w-5 h-5" />
         </Button>
