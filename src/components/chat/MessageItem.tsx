@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Pin,
@@ -17,7 +17,6 @@ import { FileAttachment } from './FileAttachment'
 import { VideoAttachment } from './VideoAttachment'
 import { MessageRichText } from './MessageRichText'
 import { ChatMessageActionsMenu, type ChatMessageAction } from './ChatMessageActionsMenu'
-import { PublicProfileDialog } from '../profile/PublicProfileDialog'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { formatTime, shouldGroupMessage, cn, getReadableTextColor } from '../../lib/utils'
@@ -43,6 +42,12 @@ interface MessageItemProps {
   onJumpToMessage?: (messageId: string) => void
   containerRef?: React.RefObject<HTMLDivElement>
 }
+
+const PublicProfileDialog = lazy(() =>
+  import('../profile/PublicProfileDialog').then(module => ({
+    default: module.PublicProfileDialog,
+  }))
+)
 
 const getToneEmoji = (tone: string) => {
   if (tone === 'positive') return '\u{1F60A}'
@@ -452,11 +457,15 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
           alt="uploaded image"
           onClose={() => setShowImageModal(false)}
         />
-        <PublicProfileDialog
-          user={profileUser}
-          open={Boolean(profileUser)}
-          onClose={() => setProfileUser(null)}
-        />
+        {profileUser && (
+          <Suspense fallback={null}>
+            <PublicProfileDialog
+              user={profileUser}
+              open
+              onClose={() => setProfileUser(null)}
+            />
+          </Suspense>
+        )}
       </>
     )
   }

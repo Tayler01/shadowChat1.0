@@ -23,7 +23,6 @@ import { FileAttachment } from '../chat/FileAttachment'
 import { VideoAttachment } from '../chat/VideoAttachment'
 import { MessageRichText } from '../chat/MessageRichText'
 import { ChatMessageActionsMenu, type ChatMessageAction } from '../chat/ChatMessageActionsMenu'
-import { PublicProfileDialog } from '../profile/PublicProfileDialog'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { NewsReactionSummaryStrip } from '../news/NewsReactionBar'
@@ -48,6 +47,12 @@ interface DirectMessagesViewProps {
   initialConversation?: string
   initialMessageId?: string
 }
+
+const PublicProfileDialog = React.lazy(() =>
+  import('../profile/PublicProfileDialog').then(module => ({
+    default: module.PublicProfileDialog,
+  }))
+)
 
 const getEmojiPickerDimensions = () => {
   if (typeof window === 'undefined') return { width: 300, height: 360 }
@@ -1015,11 +1020,15 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
           </div>
         )}
       </div>
-      <PublicProfileDialog
-        user={profileUser}
-        open={Boolean(profileUser)}
-        onClose={() => setProfileUser(null)}
-      />
+      {profileUser && (
+        <React.Suspense fallback={null}>
+          <PublicProfileDialog
+            user={profileUser}
+            open
+            onClose={() => setProfileUser(null)}
+          />
+        </React.Suspense>
+      )}
     </div>
   )
 }
