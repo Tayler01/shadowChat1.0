@@ -153,6 +153,49 @@ describe('helper functions', () => {
     expect(error).toBeNull();
   });
 
+  it('insertMessage falls back when production schema is missing client_message_id', async () => {
+    const missingColumnInsert = jest.fn(() => ({
+      select: () => ({
+        single: () => Promise.resolve({
+          data: null,
+          error: {
+            code: 'PGRST204',
+            message: "Could not find the 'client_message_id' column of 'messages' in the schema cache",
+          },
+        }),
+      }),
+    }));
+    const legacyInsert = jest.fn(() => ({
+      select: () => ({
+        single: () => Promise.resolve({ data: { id: '1' } as any, error: null }),
+      }),
+    }));
+    workingClient.from
+      .mockReturnValueOnce(createQuery({ insert: missingColumnInsert }) as any)
+      .mockReturnValueOnce(createQuery({ insert: legacyInsert }) as any);
+
+    const { data, error } = await insertMessage({
+      user_id: 'u1',
+      client_message_id: 'client-1',
+      content: 'hi',
+      message_type: 'text',
+    });
+
+    expect(missingColumnInsert).toHaveBeenCalledWith({
+      user_id: 'u1',
+      client_message_id: 'client-1',
+      content: 'hi',
+      message_type: 'text',
+    });
+    expect(legacyInsert).toHaveBeenCalledWith({
+      user_id: 'u1',
+      content: 'hi',
+      message_type: 'text',
+    });
+    expect(data).toEqual({ id: '1' });
+    expect(error).toBeNull();
+  });
+
   it('refreshSessionAndRetry refreshes and retries insert', async () => {
     const insertSpy = jest.spyOn(messagesModule, 'insertMessage').mockResolvedValueOnce({ data: { id: '1' } as any, error: null });
 

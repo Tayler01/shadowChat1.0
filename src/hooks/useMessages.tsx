@@ -21,6 +21,7 @@ import { triggerGroupPushNotification } from '../lib/push';
 import {
   createClientMessageId,
   findMatchingMessageIndex,
+  isClientMessageIdSchemaError,
   markMessageSendFailed,
   upsertMessageIntoState,
 } from '../lib/optimisticMessages';
@@ -110,6 +111,20 @@ export const insertMessage = async (messageData: {
   );
 
   let result = (await Promise.race([insertPromise, timeout])) as any;
+
+  if (result.error && messageData.client_message_id && isClientMessageIdSchemaError(result.error)) {
+    const { client_message_id: _clientMessageId, ...legacyMessageData } = messageData;
+    const legacyInsertPromise = workingClient
+      .from('messages')
+      .insert(legacyMessageData)
+      .select(`
+        *,
+        user:users!user_id(*)
+      `)
+      .single();
+
+    result = (await Promise.race([legacyInsertPromise, timeout])) as any;
+  }
 
   if (
     result.error &&

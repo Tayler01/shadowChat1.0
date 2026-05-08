@@ -25,6 +25,7 @@ import { runRealtimeRecovery } from '../lib/realtimeRecovery';
 import { triggerDMPushNotification } from '../lib/push';
 import {
   createClientMessageId,
+  isClientMessageIdSchemaError,
   markMessageSendFailed,
   upsertMessageIntoState,
 } from '../lib/optimisticMessages';
@@ -446,6 +447,23 @@ export function useConversationMessages(conversationId: string | null) {
         data: DMMessage | null;
         error: any;
       };
+
+      if (result.error && payload.client_message_id && isClientMessageIdSchemaError(result.error)) {
+        const { client_message_id: _clientMessageId, ...legacyPayload } = payload;
+        const legacyInsertPromise = workingClient
+          .from('dm_messages')
+          .insert(legacyPayload)
+          .select(`
+            *,
+            sender:users!sender_id(*)
+          `)
+          .single();
+
+        result = (await Promise.race([legacyInsertPromise, timeoutPromise])) as {
+          data: DMMessage | null;
+          error: any;
+        };
+      }
 
       if (
         result.error &&

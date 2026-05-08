@@ -36,6 +36,17 @@ export function createClientMessageId() {
   return createUuidFallback()
 }
 
+export function isClientMessageIdSchemaError(error: any) {
+  const message = String(error?.message ?? error?.details ?? '')
+  return (
+    error?.code === 'PGRST204' &&
+    message.includes('client_message_id')
+  ) || (
+    /client_message_id/i.test(message) &&
+    /schema cache|column|could not find/i.test(message)
+  )
+}
+
 const getAuthorId = (message: OptimisticMessageFields) => message.user_id ?? message.sender_id ?? null
 
 const timestampsAreClose = (a: string, b: string) => {
