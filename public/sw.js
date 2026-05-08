@@ -6,6 +6,47 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim())
 })
 
+const STATIC_ASSET_CACHE = 'shadowchat-static-assets-v1'
+
+const isCacheableStaticAssetRequest = (request) => {
+  if (!request || request.method !== 'GET') {
+    return false
+  }
+
+  try {
+    const url = new URL(request.url)
+    return url.origin === self.location.origin && url.pathname.startsWith('/assets/')
+  } catch {
+    return false
+  }
+}
+
+self.addEventListener('fetch', (event) => {
+  if (
+    !event.respondWith ||
+    typeof caches === 'undefined' ||
+    typeof fetch === 'undefined' ||
+    !isCacheableStaticAssetRequest(event.request)
+  ) {
+    return
+  }
+
+  event.respondWith(
+    caches.open(STATIC_ASSET_CACHE).then(async (cache) => {
+      const cached = await cache.match(event.request)
+      if (cached) {
+        return cached
+      }
+
+      const response = await fetch(event.request)
+      if (response && response.ok) {
+        await cache.put(event.request, response.clone())
+      }
+      return response
+    })
+  )
+})
+
 const normalizeBadgeCount = (value) => {
   const numeric = Number(value)
   if (!Number.isFinite(numeric) || numeric <= 0) {

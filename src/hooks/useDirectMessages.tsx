@@ -73,6 +73,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
   const { playMessage } = useSoundEffects();
   const conversationsChannelRef = useRef<RealtimeChannel | null>(null);
   const conversationsSubscribeRef = useRef<(() => Promise<RealtimeChannel>) | null>(null);
+  const refreshConversationsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refreshConversations = useCallback(async () => {
     try {
@@ -83,6 +84,25 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  const refreshConversationsDebounced = useCallback((delay = 250) => {
+    if (refreshConversationsTimerRef.current) {
+      clearTimeout(refreshConversationsTimerRef.current);
+    }
+
+    refreshConversationsTimerRef.current = setTimeout(() => {
+      refreshConversationsTimerRef.current = null;
+      void refreshConversations();
+    }, delay);
+  }, [refreshConversations]);
+
+  useEffect(() => {
+    return () => {
+      if (refreshConversationsTimerRef.current) {
+        clearTimeout(refreshConversationsTimerRef.current);
+      }
+    };
   }, []);
 
   const resetWithFreshClient = useCallback(async () => {
@@ -190,14 +210,14 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
               return prev;
             });
 
-            void refreshConversations();
+            if (missing) {
+              void refreshConversations();
+            } else {
+              refreshConversationsDebounced();
+            }
 
             if (payload.new.sender_id !== user.id) {
               playMessage();
-            }
-
-            if (missing) {
-              void refreshConversations();
             }
           }
         )
@@ -304,7 +324,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
       }
       conversationsChannelRef.current = null;
     };
-  }, [playMessage, refreshConversations, user]);
+  }, [playMessage, refreshConversations, refreshConversationsDebounced, user]);
 
   const {
     messages,
@@ -327,11 +347,11 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     ) => {
       const message = await sendConversationMessage(content, messageType, fileUrl);
       if (message) {
-        void refreshConversations();
+        refreshConversationsDebounced();
       }
       return message;
     },
-    [refreshConversations, sendConversationMessage]
+    [refreshConversationsDebounced, sendConversationMessage]
   );
 
   const startConversation = useCallback(async (username: string) => {
@@ -372,8 +392,8 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
         c.id === conversationId ? { ...c, unread_count: 0 } : c
       )
     );
-    void refreshConversations();
-  }, [refreshConversations]);
+    refreshConversationsDebounced();
+  }, [refreshConversationsDebounced]);
 
   return {
     conversations,

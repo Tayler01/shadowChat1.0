@@ -20,6 +20,7 @@ export const useTyping = (channelName: string = 'general') => {
   const userId = user?.id
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([])
   const [isTyping, setIsTyping] = useState(false)
+  const isTypingRef = useRef(false)
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
   const channelRef = useRef<RealtimeChannel | null>(null)
   const clientRef = useRef<SupabaseClient | null>(null)
@@ -105,9 +106,10 @@ export const useTyping = (channelName: string = 'general') => {
   }, [channelName, userId])
 
   const stopTyping = useCallback(async () => {
-    if (!isTyping || !user) return
+    if (!isTypingRef.current || !user) return
 
     try {
+      isTypingRef.current = false
       setIsTyping(false)
 
       // Broadcast typing stop using current user info
@@ -129,15 +131,29 @@ export const useTyping = (channelName: string = 'general') => {
       // Clear timeout
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current)
+        typingTimeoutRef.current = undefined
       }
     } catch (err) {
     }
-  }, [isTyping, user])
+  }, [user])
 
   const startTyping = useCallback(async () => {
-    if (isTyping || !user) return
+    if (!user) return
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current)
+    }
+
+    // Auto-stop typing after 2 seconds of inactivity. Refresh this on each keystroke
+    // without rebroadcasting "typing: true" while the user is already typing.
+    typingTimeoutRef.current = setTimeout(() => {
+      void stopTyping()
+    }, 2000)
+
+    if (isTypingRef.current) return
 
     try {
+      isTypingRef.current = true
       setIsTyping(true)
 
       // Broadcast typing start using current user info
@@ -156,18 +172,9 @@ export const useTyping = (channelName: string = 'general') => {
         }
       })
 
-      // Clear any existing timeout
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current)
-      }
-
-      // Auto-stop typing after 2 seconds of inactivity
-      typingTimeoutRef.current = setTimeout(() => {
-        stopTyping()
-      }, 2000)
     } catch (err) {
     }
-  }, [isTyping, user, stopTyping])
+  }, [user, stopTyping])
 
   // Clean up timeout on unmount
   useEffect(() => {
@@ -175,6 +182,7 @@ export const useTyping = (channelName: string = 'general') => {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current)
       }
+      isTypingRef.current = false
     }
   }, [])
 

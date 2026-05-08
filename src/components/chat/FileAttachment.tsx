@@ -30,6 +30,7 @@ export const FileAttachment: React.FC<FileAttachmentProps> = ({ url, meta }) => 
         <iframe
           src={url}
           title={name}
+          loading="lazy"
           className="mb-2 h-48 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.02)]"
         />
       )}

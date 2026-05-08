@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   MessageSquare,
@@ -64,7 +64,7 @@ const getEmojiPickerTheme = () =>
     ? 'dark'
     : 'light'
 
-function DirectMessageBubble({
+const DirectMessageBubble = React.memo(function DirectMessageBubble({
   message,
   previousMessage,
   profile,
@@ -274,7 +274,9 @@ function DirectMessageBubble({
             <img
               src={message.file_url}
               alt="uploaded"
-              className="mt-1 max-w-xs rounded-[var(--radius-md)] border border-[var(--border-subtle)]"
+              loading="lazy"
+              decoding="async"
+              className="mt-1 aspect-[4/3] max-h-[70vh] w-[min(20rem,100%)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] object-contain"
             />
           ) : message.message_type === 'video' && message.file_url ? (
             <VideoAttachment url={message.file_url} meta={message.content} />
@@ -320,7 +322,7 @@ function DirectMessageBubble({
       </div>
     </motion.div>
   )
-}
+})
 
 export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   onToggleSidebar: _onToggleSidebar,
@@ -378,7 +380,11 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     setCurrentConversation(conversations[0].id)
   }, [conversations, currentConversation, initialConversation, isDesktop, setCurrentConversation])
 
-  const handleUserSelect = async (user: { username: string }) => {
+  const handleConversationSelect = useCallback((conversationId: string) => {
+    setCurrentConversation(conversationId)
+  }, [setCurrentConversation])
+
+  const handleUserSelect = useCallback(async (user: { username: string }) => {
     const normalizedUsername = user.username.trim().toLowerCase()
     const existingConversation = conversations.find(
       conversation => conversation.other_user?.username?.toLowerCase() === normalizedUsername
@@ -407,9 +413,9 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     } finally {
       setStartingUsername(null)
     }
-  }
+  }, [conversations, handleConversationSelect, setCurrentConversation, startConversation])
 
-  const handleSendMessage = async (
+  const handleSendMessage = useCallback(async (
     content: string,
     type?: ChatMessageType,
     fileUrl?: string
@@ -423,11 +429,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
         addFailedMessage({ id: Date.now().toString(), type: type || 'text', content, dataUrl: fileUrl })
       }
     }
-  }
-
-  const handleConversationSelect = (conversationId: string) => {
-    setCurrentConversation(conversationId)
-  }
+  }, [addFailedMessage, sendMessage])
 
   const getUnreadDMMessages = useCallback(
     (items: DMMessage[]) => {
@@ -590,7 +592,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     currentPeerPresence?.presence_state ||
     (currentConv?.other_user?.presence_visibility === 'invisible' ? 'invisible' : 'offline')
   const showConversationList = isDesktop || !currentConversation
-  const searchableUsers: BasicUser[] = conversations.flatMap(conversation => {
+  const searchableUsers: BasicUser[] = useMemo(() => conversations.flatMap(conversation => {
     const user = conversation.other_user
     if (!user) {
       return []
@@ -606,7 +608,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
       admin_role: user.admin_role,
       presence_visibility: user.presence_visibility,
     }]
-  })
+  }), [conversations])
 
   return (
     <div className="flex h-full min-h-0 bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.05),transparent_28%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))]">
@@ -746,7 +748,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   animate={{ opacity: 1, x: 0 }}
                   type="button"
                   onClick={() => handleConversationSelect(conversation.id)}
-                  className={`w-full rounded-[var(--radius-md)] border p-3 text-left transition-all ${
+                  className={`w-full rounded-[var(--radius-md)] border p-3 text-left transition-colors duration-[var(--dur-med)] ${
                     currentConversation === conversation.id
                       ? 'border-[var(--border-glow)] bg-[rgba(255,255,255,0.05)] shadow-[var(--shadow-gold-soft)]'
                       : 'border-transparent hover:border-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.03)]'

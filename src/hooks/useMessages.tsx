@@ -92,7 +92,6 @@ export const insertMessage = async (messageData: {
   audio_url?: string;
   reply_to?: string;
 }) => {
-  const start = performance.now();
   const workingClient = await getWorkingClient();
   const insertPromise = workingClient
     .from('messages')
@@ -141,8 +140,6 @@ export const insertMessage = async (messageData: {
       .eq('client_message_id', messageData.client_message_id)
       .maybeSingle();
   }
-
-  const duration = performance.now() - start;
 
   return result as { data: Message | null; error: any };
 };
@@ -310,15 +307,16 @@ function useProvideMessages(): MessagesContextValue {
             return nextMessages;
           }
 
+          const fetchedById = new Map(data.map(message => [message.id, message as unknown as Message]));
           const mergedMap = new Map<string, Message>();
 
           // Replace or update existing messages
           prev.forEach(m => {
-            const fetched = data.find(d => d.id === m.id);
+            const fetched = fetchedById.get(m.id);
             let updated = m;
 
             if (fetched) {
-              updated = fetched as unknown as Message;
+              updated = fetched;
             } else if (m.pinned && !pinnedIds.has(m.id)) {
               updated = { ...m, pinned: false, pinned_by: null, pinned_at: null } as Message;
             }
@@ -327,19 +325,16 @@ function useProvideMessages(): MessagesContextValue {
           });
 
           // Add new messages
-          data.forEach(d => {
-            const currentMessages = Array.from(mergedMap.values());
-            const upserted = upsertMessageIntoState(currentMessages, {
+          const mergedMessages = data.reduce<Message[]>(
+            (acc, d) => upsertMessageIntoState(acc, {
               ...(d as unknown as Message),
               optimistic: false,
               delivery_status: 'sent',
-            });
-            mergedMap.clear();
-            upserted.forEach(message => mergedMap.set(message.id, message));
-          });
+            }),
+            Array.from(mergedMap.values())
+          );
 
-          const merged = Array.from(mergedMap.values());
-          const nextMessages = sortMessagesByCreatedAt(merged);
+          const nextMessages = sortMessagesByCreatedAt(mergedMessages);
           cacheMessages(nextMessages);
           return nextMessages;
         });
@@ -527,10 +522,6 @@ function useProvideMessages(): MessagesContextValue {
             }
 
             if (newMessage) {
-              // Log received message with clear indication if it's from another user
-              const isFromCurrentUser = newMessage.user_id === user.id;
-              const logPrefix = isFromCurrentUser ? '📨 [REALTIME-SELF]' : '📨 [REALTIME-OTHER]';
-
               addNewMessage(newMessage as unknown as Message)
             }
           } catch {
@@ -539,11 +530,7 @@ function useProvideMessages(): MessagesContextValue {
         })
         .on('broadcast', { event: 'new_message' }, (payload: any) => {
           const newMessage = payload.payload as Message;
-          
-          // Log broadcast message with clear indication if it's from another user
-          const isFromCurrentUser = newMessage.user_id === user.id;
-          const logPrefix = isFromCurrentUser ? '📡 [BROADCAST-SELF]' : '📡 [BROADCAST-OTHER]';
-          
+
           addNewMessage(newMessage as Message)
         })
         .on(
@@ -694,9 +681,6 @@ function useProvideMessages(): MessagesContextValue {
     fileUrl?: string,
     replyTo?: string
   ): Promise<Message | null> => {
-    const timestamp = new Date().toISOString();
-    const logPrefix = `🚀 [MESSAGES] [${timestamp}] sendMessage`;
-
     // Text messages require content, but image/audio messages may provide just a file URL
     if (!user || (!content.trim() && !fileUrl)) {
       return null;
@@ -788,8 +772,6 @@ function useProvideMessages(): MessagesContextValue {
               payload: data,
             });
           }
-
-          fetchMessages();
         }
       };
 
@@ -833,7 +815,7 @@ function useProvideMessages(): MessagesContextValue {
       setSending(false);
     }
     return inserted;
-  }, [addNewMessage, fetchMessages, profile, user]);
+  }, [addNewMessage, profile, user]);
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
     if (!user) return;

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useMessages } from '../../hooks/useMessages'
 import { MessageList } from './MessageList'
@@ -26,7 +26,7 @@ interface ChatViewProps {
 
 export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, initialMessageId }) => {
   const { messages, sendMessage, sending, togglePin, toggleReaction } = useMessages()
-  const pinnedMessages = messages.filter(m => m.pinned)
+  const pinnedMessages = useMemo(() => messages.filter(m => m.pinned), [messages])
   const { status: resetStatus } = useClientReset()
   const { failedMessages, addFailedMessage, removeFailedMessage } = useFailedMessages('general')
 

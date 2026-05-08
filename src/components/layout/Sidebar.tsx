@@ -96,7 +96,7 @@ export function Sidebar({
             onClick={() => onViewChange(item.id)}
             className={`
               flex w-full items-center space-x-3 rounded-[var(--radius-md)] px-3 py-3
-              border transition-all duration-[var(--dur-med)]
+              border transition-[background-color,border-color,box-shadow,color] duration-[var(--dur-med)]
               ${currentView === item.id
                 ? 'border-[var(--border-glow)] bg-[rgba(255,255,255,0.05)] text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)]'
                 : 'border-transparent text-[var(--text-secondary)] hover:border-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[var(--text-primary)]'

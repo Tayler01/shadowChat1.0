@@ -538,7 +538,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                 setComposerMessage(cleanText)
                 textareaRef.current?.focus()
               }}
-              className="rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-sm text-[var(--text-secondary)] transition-all hover:border-[var(--border-glow)] hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--text-gold)]"
+              className="rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-sm text-[var(--text-secondary)] transition-colors hover:border-[var(--border-glow)] hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--text-gold)]"
             >
               {/* Display the original suggestion but insert cleaned version */}
               {s.replace(/^[\d.)-\s]*["']?|["']?$/g, '').trim()}

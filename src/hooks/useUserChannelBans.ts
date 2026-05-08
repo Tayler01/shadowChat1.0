@@ -36,7 +36,12 @@ const fetchUserBans = async (userId: string, force = false) => {
   return request
 }
 
-export function useUserChannelBans(userId?: string | null) {
+type UseUserChannelBansOptions = {
+  subscribe?: boolean
+}
+
+export function useUserChannelBans(userId?: string | null, options: UseUserChannelBansOptions = {}) {
+  const { subscribe: shouldSubscribe = true } = options
   const [bans, setBans] = useState<PublicUserChannelBan[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -99,7 +104,7 @@ export function useUserChannelBans(userId?: string | null) {
   }, [refresh, userId])
 
   useEffect(() => {
-    if (!userId) return
+    if (!userId || !shouldSubscribe) return
 
     let channel: RealtimeChannel | null = null
     let currentClient: any = null
@@ -135,7 +140,7 @@ export function useUserChannelBans(userId?: string | null) {
         getRealtimeClient()?.removeChannel(channel)
       }
     }
-  }, [refresh, userId])
+  }, [refresh, shouldSubscribe, userId])
 
   return useMemo(() => ({
     bans,

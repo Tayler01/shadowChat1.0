@@ -69,6 +69,9 @@ export const MessageList: React.FC<MessageListProps> = ({
         roots.push(m)
       }
     })
+    childMap.forEach(children => {
+      children.sort((a, b) => a.created_at.localeCompare(b.created_at))
+    })
     return { messageMap: msgMap, childrenMap: childMap, rootMessages: roots }
   }, [messages])
 
@@ -101,9 +104,9 @@ export const MessageList: React.FC<MessageListProps> = ({
       })
       return newCollapsed
     })
-  }, [messages, childrenMap, rootMessages])
+  }, [childrenMap, rootMessages])
 
-  const toggleThread = (id: string) => {
+  const toggleThread = useCallback((id: string) => {
     setCollapsed(prev => {
       const newSet = new Set(prev)
       if (newSet.has(id)) {
@@ -113,7 +116,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       }
       return newSet
     })
-  }
+  }, [])
 
   const expandMessageAncestors = useCallback(
     (message: Message) => {
@@ -338,7 +341,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     })
   }, [combinedMessages, initialMessageId, loading, markLatestRead, setAutoScroll, setFirstUnreadMessageId])
 
-  const handleEdit = async (messageId: string, content: string) => {
+  const handleEdit = useCallback(async (messageId: string, content: string) => {
     try {
       await editMessage(messageId, content)
       toast.success('Message updated')
@@ -346,9 +349,9 @@ export const MessageList: React.FC<MessageListProps> = ({
       const message = await getBlockedActionMessage('general_chat', error, 'Failed to update message')
       showActionErrorToast(message)
     }
-  }
+  }, [editMessage])
 
-  const handleDelete = async (messageId: string) => {
+  const handleDelete = useCallback(async (messageId: string) => {
     try {
       await deleteMessage(messageId)
       toast.success('Message deleted')
@@ -356,16 +359,14 @@ export const MessageList: React.FC<MessageListProps> = ({
       const message = await getBlockedActionMessage('general_chat', error, 'Failed to delete message')
       showActionErrorToast(message)
     }
-  }
+  }, [deleteMessage])
 
-  const renderThread = (
+  const renderThread = useCallback((
     message: Message,
     depth = 0,
     prev?: Message
   ): React.ReactNode => {
-    const replies = (childrenMap.get(message.id) || []).sort((a, b) =>
-      a.created_at.localeCompare(b.created_at)
-    )
+    const replies = childrenMap.get(message.id) || []
     const isCollapsed = collapsed.has(message.id)
 
     return (
@@ -404,7 +405,18 @@ export const MessageList: React.FC<MessageListProps> = ({
         )}
       </div>
     )
-  }
+  }, [
+    childrenMap,
+    collapsed,
+    handleDelete,
+    handleEdit,
+    jumpToMessage,
+    messageMap,
+    onReply,
+    togglePin,
+    toggleReaction,
+    toggleThread,
+  ])
 
   if (loading) {
     return (

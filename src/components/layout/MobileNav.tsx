@@ -7,9 +7,10 @@ interface MobileNavProps {
   currentView: 'chat' | 'dms' | 'boards' | 'settings'
   onViewChange: (view: 'chat' | 'dms' | 'boards' | 'settings') => void
   className?: string
+  embedded?: boolean
 }
 
-export function MobileNav({ currentView, onViewChange, className }: MobileNavProps) {
+export function MobileNav({ currentView, onViewChange, className, embedded = false }: MobileNavProps) {
   const { conversations } = useDirectMessages()
   const { count: boardsBadgeCount } = useBoardBadges()
   const totalUnread = conversations.reduce(
@@ -36,7 +37,7 @@ export function MobileNav({ currentView, onViewChange, className }: MobileNavPro
 
   return (
     <nav
-      className={`glass-panel-strong h-[4.15rem] border-t border-[var(--border-panel)] backdrop-blur-xl md:hidden ${
+      className={`${embedded ? 'h-[4.15rem] border-t border-[var(--border-panel)] bg-transparent' : 'glass-panel-strong h-[4.15rem] border-t border-[var(--border-panel)] backdrop-blur-xl'} md:hidden ${
         className || 'fixed bottom-0 inset-x-0 z-50'
       }`}
     >
@@ -45,7 +46,7 @@ export function MobileNav({ currentView, onViewChange, className }: MobileNavPro
           <li key={item.id} className="relative flex-1">
             <button
               onClick={() => onViewChange(item.id)}
-              className={`flex h-full w-full flex-col items-center justify-center rounded-[var(--radius-md)] px-1 py-1.5 text-[10px] focus:outline-none transition-all ${
+              className={`flex h-full w-full flex-col items-center justify-center rounded-[var(--radius-md)] px-1 py-1.5 text-[10px] transition-[background-color,box-shadow,color] duration-[var(--dur-med)] focus:outline-none ${
                 currentView === item.id
                   ? 'bg-[var(--nav-active-bg)] text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)]'
                   : 'text-[var(--text-muted)] hover:bg-[var(--nav-hover-bg)] hover:text-[var(--text-primary)]'

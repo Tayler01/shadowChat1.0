@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ExternalLink, Play } from 'lucide-react'
 import {
   extractFirstMessageUrl,
@@ -41,6 +41,7 @@ const LinkPreviewCard: React.FC<{ preview: LinkPreview }> = ({ preview }) => {
             src={preview.image}
             alt={preview.title ? `${preview.title} preview image` : `${host} preview image`}
             loading="lazy"
+            decoding="async"
             className="h-full w-full object-cover"
           />
           {preview.mediaType === 'video' && (
@@ -79,13 +80,50 @@ export const MessageRichText: React.FC<MessageRichTextProps> = ({
 }) => {
   const parts = useMemo(() => tokenizeMessageText(content), [content])
   const firstUrl = useMemo(() => extractFirstMessageUrl(content), [content])
+  const containerRef = useRef<HTMLDivElement>(null)
   const [preview, setPreview] = useState<LinkPreview | null>(null)
+  const [shouldFetchPreview, setShouldFetchPreview] = useState(false)
+
+  useEffect(() => {
+    setPreview(null)
+    setShouldFetchPreview(false)
+
+    if (!showPreview || !firstUrl) {
+      return
+    }
+
+    if (typeof IntersectionObserver === 'undefined') {
+      setShouldFetchPreview(true)
+      return
+    }
+
+    const element = containerRef.current
+    if (!element) {
+      setShouldFetchPreview(true)
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(entry => entry.isIntersecting)) {
+          setShouldFetchPreview(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '600px 0px' }
+    )
+
+    observer.observe(element)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [firstUrl, showPreview])
 
   useEffect(() => {
     let cancelled = false
-    setPreview(null)
 
-    if (!showPreview || !firstUrl) {
+    if (!showPreview || !firstUrl || !shouldFetchPreview) {
       return
     }
 
@@ -98,10 +136,10 @@ export const MessageRichText: React.FC<MessageRichTextProps> = ({
     return () => {
       cancelled = true
     }
-  }, [firstUrl, showPreview])
+  }, [firstUrl, shouldFetchPreview, showPreview])
 
   return (
-    <div className={cn('min-w-0 max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere]', className)}>
+    <div ref={containerRef} className={cn('min-w-0 max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere]', className)}>
       <span className="break-words [overflow-wrap:anywhere]">
         {parts.map((part, index) => {
           if (part.type === 'text') {

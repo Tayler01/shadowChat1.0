@@ -51,6 +51,7 @@ export function MobileChatFooter({ currentView, onViewChange, children }: Mobile
         currentView={currentView}
         onViewChange={onViewChange}
         className="static"
+        embedded
       />
     </div>
   )

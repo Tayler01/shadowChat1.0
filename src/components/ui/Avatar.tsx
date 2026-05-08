@@ -42,7 +42,7 @@ export function Avatar({
   const [imageError, setImageError] = useState(false);
   const initials = fallback || alt.split(' ').map(n => n[0]).join('').toUpperCase();
   const livePresence = usePresenceForUser(userId);
-  const { hasActiveBan } = useUserChannelBans(userId);
+  const { hasActiveBan } = useUserChannelBans(userId, { subscribe: false });
   const resolvedPresenceState =
     presenceState ||
     livePresence?.presence_state ||
@@ -64,7 +64,7 @@ export function Avatar({
         flex items-center justify-center
         text-[var(--text-gold)] font-medium
         ring-2 ring-[rgba(255,255,255,0.08)]
-        transition-all duration-200 hover:scale-105
+        transition-[filter,opacity,transform] duration-200 hover:scale-105
         ${hasActiveBan ? 'opacity-60 grayscale' : ''}
       `}
         style={color ? { backgroundColor: color } : undefined}

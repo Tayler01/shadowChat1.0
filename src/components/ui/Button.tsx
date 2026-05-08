@@ -65,7 +65,7 @@ export function Button({
       className={`
         group relative inline-flex items-center justify-center overflow-hidden
         font-medium rounded-[var(--radius-sm)]
-        transition-all duration-[var(--dur-med)] ease-[var(--ease-premium)]
+        transition-[background-color,border-color,box-shadow,color,opacity,transform] duration-[var(--dur-med)] ease-[var(--ease-premium)]
         disabled:opacity-50 disabled:cursor-not-allowed
         focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.22)] focus:ring-offset-0
         ${variants[variant]}
@@ -87,7 +87,7 @@ export function Button({
           />
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute -left-1/3 top-0 h-full w-1/3 -skew-x-12 bg-[linear-gradient(90deg,transparent,rgba(255,240,184,0.24),transparent)] opacity-0 transition-all duration-500 ease-[var(--ease-premium)] group-hover:translate-x-[230%] group-hover:opacity-100"
+            className="pointer-events-none absolute -left-1/3 top-0 h-full w-1/3 -skew-x-12 bg-[linear-gradient(90deg,transparent,rgba(255,240,184,0.24),transparent)] opacity-0 transition-[opacity,transform] duration-500 ease-[var(--ease-premium)] group-hover:translate-x-[230%] group-hover:opacity-100"
           />
         </>
       )}

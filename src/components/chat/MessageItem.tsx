@@ -85,8 +85,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const [showQuickReactions, setShowQuickReactions] = useState(false)
     const [profileUser, setProfileUser] = useState<User | null>(null)
     const reactionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-    const analyzeTone = useToneAnalysis()
     const { enabled: toneEnabled } = useToneAnalysisEnabled()
+    const analyzeTone = useToneAnalysis(toneEnabled)
     const pickerDimensions = getEmojiPickerDimensions()
 
     const isGrouped = shouldGroupMessage(message, previousMessage)
@@ -359,7 +359,9 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     <img
                       src={message.file_url}
                       alt="uploaded image"
-                      className="mt-1 max-w-full cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-subtle)] sm:max-w-xs"
+                      loading="lazy"
+                      decoding="async"
+                      className="mt-1 aspect-[4/3] max-h-[70vh] w-[min(20rem,100%)] cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-subtle)] object-contain sm:max-w-xs"
                       onClick={() => setShowImageModal(true)}
                     />
                   ) : message.message_type === 'video' && message.file_url ? (
@@ -399,7 +401,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     <button
                       key={e}
                       onClick={() => handleReaction(e)}
-                      className="text-base hover:scale-110 transition-transform"
+                      className="text-base transition-transform hover:scale-110"
                       type="button"
                       aria-label={`React with ${normalizeEmojiValue(e)}`}
                     >
@@ -408,7 +410,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   ))}
                   <button
                     onClick={() => setShowReactionPicker(!showReactionPicker)}
-                    className="text-base hover:scale-110 transition-transform"
+                    className="text-base transition-transform hover:scale-110"
                     type="button"
                     aria-label="Add reaction"
                   >
