@@ -67,7 +67,7 @@ const getEmojiPickerTheme = () =>
 const DirectMessageBubble = React.memo(function DirectMessageBubble({
   message,
   previousMessage,
-  profile,
+  currentUserId,
   onEdit,
   onDelete,
   onReact,
@@ -75,7 +75,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
 }: {
   message: DMMessage
   previousMessage?: DMMessage
-  profile: User | null
+  currentUserId: string | null
   onEdit: (id: string, content: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
   onReact: (id: string, emoji: string) => Promise<void>
@@ -88,7 +88,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
   const EmojiPicker = useEmojiPicker(showReactionPicker)
   const pickerDimensions = getEmojiPickerDimensions()
   const isGrouped = shouldGroupMessage(message, previousMessage)
-  const isOwn = message.sender_id === profile?.id
+  const isOwn = message.sender_id === currentUserId
   const isIncoming = !isOwn
   const isLocalDelivery = message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
   const showIncomingAvatar = !isGrouped && !isOwn
@@ -356,6 +356,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const [searchUsername, setSearchUsername] = useState('')
   const [startingUsername, setStartingUsername] = useState<string | null>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
+  const prevHeightRef = useRef(0)
+  const prevScrollTopRef = useRef(0)
   const initialTargetJumpDoneRef = useRef<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [profileUser, setProfileUser] = useState<User | null>(null)
@@ -453,6 +455,9 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     },
     [currentConversation, markAsRead, markRead]
   )
+  const getDMMessageId = useCallback((message: DMMessage) => message.id, [])
+  const getDMMessageCreatedAt = useCallback((message: DMMessage) => message.created_at, [])
+  const getDMMessageElementId = useCallback((id: string) => `dm-message-${id}`, [])
 
   const {
     autoScroll,
@@ -471,9 +476,9 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     enabled: Boolean(profile?.id && currentConversation),
     surfaceKey: `dm:${currentConversation || 'none'}`,
     initialMessageId,
-    getMessageId: message => message.id,
-    getMessageCreatedAt: message => message.created_at,
-    getElementId: id => `dm-message-${id}`,
+    getMessageId: getDMMessageId,
+    getMessageCreatedAt: getDMMessageCreatedAt,
+    getElementId: getDMMessageElementId,
     getUnreadMessages: getUnreadDMMessages,
     onMarkReadToLatest: markDMReadToLatest,
   })
@@ -485,13 +490,28 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     handleUnreadScroll()
 
     if (el.scrollTop < 100 && hasMore && !loadingMore) {
-      loadOlderMessages()
+      prevHeightRef.current = el.scrollHeight
+      prevScrollTopRef.current = el.scrollTop
+      void loadOlderMessages()
     }
   }, [handleUnreadScroll, hasMore, loadingMore, loadOlderMessages])
 
   useEffect(() => {
     initialTargetJumpDoneRef.current = null
   }, [currentConversation])
+
+  useEffect(() => {
+    const el = messagesRef.current
+    if (!el) return
+    if (!loadingMore && prevHeightRef.current) {
+      const diff = el.scrollHeight - prevHeightRef.current
+      el.scrollTop = prevScrollTopRef.current <= 0
+        ? diff
+        : prevScrollTopRef.current + diff
+      prevHeightRef.current = 0
+      prevScrollTopRef.current = 0
+    }
+  }, [loadingMore, messages.length])
 
   useEffect(() => {
     if (autoScroll && typingUsers.length > 0) {
@@ -884,7 +904,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   <DirectMessageBubble
                     message={message}
                     previousMessage={messages[index - 1]}
-                    profile={profile}
+                    currentUserId={profile?.id ?? null}
                     onEdit={editMessage}
                     onDelete={deleteMessage}
                     onReact={toggleReaction}

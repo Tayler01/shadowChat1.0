@@ -191,6 +191,9 @@ export const MessageList: React.FC<MessageListProps> = ({
     },
     [markRead]
   )
+  const getMessageId = useCallback((message: Message) => message.id, [])
+  const getMessageCreatedAt = useCallback((message: Message) => message.created_at, [])
+  const getMessageElementId = useCallback((id: string) => `message-${id}`, [])
 
   const {
     autoScroll,
@@ -209,9 +212,9 @@ export const MessageList: React.FC<MessageListProps> = ({
     enabled: Boolean(profile?.id),
     surfaceKey: 'general_chat:main',
     initialMessageId,
-    getMessageId: message => message.id,
-    getMessageCreatedAt: message => message.created_at,
-    getElementId: id => `message-${id}`,
+    getMessageId,
+    getMessageCreatedAt,
+    getElementId: getMessageElementId,
     onBeforeInitialJump: expandMessageAncestors,
     onMarkReadToLatest: markGeneralChatRead,
   })
@@ -247,7 +250,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       prevHeightRef.current = 0
       prevScrollTopRef.current = 0
     }
-  }, [loadingMore, messages])
+  }, [loadingMore, messages.length])
 
   useEffect(() => {
     if (autoScroll && typingUsers.length > 0) {

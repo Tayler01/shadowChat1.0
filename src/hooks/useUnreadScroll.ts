@@ -60,6 +60,13 @@ export function useUnreadScroll<TMessage>({
   const lastMarkedKeyRef = useRef<string | null>(null)
   const readInFlightKeyRef = useRef<string | null>(null)
   const markTimerRef = useRef<number | null>(null)
+  const messagesRef = useRef(messages)
+  messagesRef.current = messages
+  const messageCount = messages.length
+  const latestMessage = messages[messageCount - 1]
+  const latestMessageKey = latestMessage
+    ? `${surfaceKey}:${getMessageId(latestMessage)}:${getMessageCreatedAt(latestMessage)}`
+    : `${surfaceKey}:empty`
 
   const setAutoScroll = useCallback((value: boolean) => {
     autoScrollRef.current = value
@@ -89,13 +96,14 @@ export function useUnreadScroll<TMessage>({
   }, [cursor, getMessageCreatedAt, getMessageId, getUnreadMessages, messages])
 
   const markLatestRead = useCallback(async (clearDivider = false) => {
-    if (!enabled || messages.length === 0) return
+    const currentMessages = messagesRef.current
+    if (!enabled || currentMessages.length === 0) return
 
-    const latestMessage = messages[messages.length - 1]
-    if (!latestMessage) return
+    const currentLatestMessage = currentMessages[currentMessages.length - 1]
+    if (!currentLatestMessage) return
 
-    const latestId = getMessageId(latestMessage)
-    const latestCreatedAt = getMessageCreatedAt(latestMessage)
+    const latestId = getMessageId(currentLatestMessage)
+    const latestCreatedAt = getMessageCreatedAt(currentLatestMessage)
     const markKey = `${surfaceKey}:${latestId}:${latestCreatedAt}`
     if (lastMarkedKeyRef.current === markKey || readInFlightKeyRef.current === markKey) {
       return
@@ -103,7 +111,7 @@ export function useUnreadScroll<TMessage>({
 
     readInFlightKeyRef.current = markKey
     try {
-      await onMarkReadToLatest(latestMessage)
+      await onMarkReadToLatest(currentLatestMessage)
       lastMarkedKeyRef.current = markKey
       if (clearDivider) {
         setFirstUnreadMessageId(null)
@@ -113,7 +121,7 @@ export function useUnreadScroll<TMessage>({
         readInFlightKeyRef.current = null
       }
     }
-  }, [enabled, getMessageCreatedAt, getMessageId, messages, onMarkReadToLatest, surfaceKey])
+  }, [enabled, getMessageCreatedAt, getMessageId, onMarkReadToLatest, surfaceKey])
 
   const scheduleMarkLatestRead = useCallback((clearDivider = false) => {
     if (markTimerRef.current) {
@@ -211,7 +219,7 @@ export function useUnreadScroll<TMessage>({
         cancelAnimationFrame(frameId)
       }
     }
-  }, [containerRef, enabled, loading, messages.length, scrollToBottom])
+  }, [containerRef, enabled, latestMessageKey, loading, scrollToBottom])
 
   useLayoutEffect(() => {
     if (
@@ -289,7 +297,7 @@ export function useUnreadScroll<TMessage>({
       loading ||
       cursorLoading ||
       !initialUnreadJumpDoneRef.current ||
-      messages.length === 0
+      messageCount === 0
     ) {
       return
     }
@@ -312,8 +320,9 @@ export function useUnreadScroll<TMessage>({
     findFirstUnreadMessage,
     firstUnreadMessageId,
     getMessageId,
+    latestMessageKey,
     loading,
-    messages,
+    messageCount,
     scrollToBottom,
   ])
 

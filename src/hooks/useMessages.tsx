@@ -948,9 +948,6 @@ function useProvideMessages(): MessagesContextValue {
   const togglePin = useCallback(async (messageId: string) => {
     if (!user) return;
 
-    const current = messages.find(m => m.id === messageId);
-    const isPinned = current?.pinned;
-
     try {
       const workingClient = await getWorkingClient();
       
@@ -962,8 +959,11 @@ function useProvideMessages(): MessagesContextValue {
         throw error;
       }
 
-      setMessages(prev =>
-        prev.map(m => {
+      setMessages(prev => {
+        const current = prev.find(m => m.id === messageId);
+        const isPinned = current?.pinned;
+
+        return prev.map(m => {
           if (m.id === messageId) {
             return {
               ...m,
@@ -975,15 +975,15 @@ function useProvideMessages(): MessagesContextValue {
           return !isPinned
             ? { ...m, pinned: false, pinned_by: null, pinned_at: null }
             : m;
-        })
-      );
+        });
+      });
       
     } catch (error) {
       // Re-sync with database to revert optimistic updates
       fetchMessages();
       throw error;
     }
-  }, [fetchMessages, messages, user]);
+  }, [fetchMessages, user]);
 
   return {
     messages,
