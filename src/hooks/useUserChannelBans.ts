@@ -37,12 +37,16 @@ const fetchUserBans = async (userId: string, force = false) => {
 }
 
 type UseUserChannelBansOptions = {
+  fetch?: boolean
   subscribe?: boolean
 }
 
 export function useUserChannelBans(userId?: string | null, options: UseUserChannelBansOptions = {}) {
+  const { fetch: shouldFetch = true } = options
   const { subscribe: shouldSubscribe = true } = options
-  const [bans, setBans] = useState<PublicUserChannelBan[]>([])
+  const [bans, setBans] = useState<PublicUserChannelBan[]>(() => (
+    userId ? banCache.get(userId)?.bans ?? [] : []
+  ))
   const [loading, setLoading] = useState(false)
 
   const refresh = useCallback(async (force = true) => {
@@ -70,6 +74,12 @@ export function useUserChannelBans(userId?: string | null, options: UseUserChann
       return
     }
 
+    if (!shouldFetch) {
+      setBans(banCache.get(userId)?.bans ?? [])
+      setLoading(false)
+      return
+    }
+
     let cancelled = false
     setLoading(true)
 
@@ -87,10 +97,10 @@ export function useUserChannelBans(userId?: string | null, options: UseUserChann
     return () => {
       cancelled = true
     }
-  }, [userId])
+  }, [shouldFetch, userId])
 
   useEffect(() => {
-    if (!userId || typeof window === 'undefined') return
+    if (!shouldFetch || !userId || typeof window === 'undefined') return
 
     const handleChange = (event: Event) => {
       const detail = (event as CustomEvent<{ targetUserId?: string }>).detail
@@ -101,10 +111,10 @@ export function useUserChannelBans(userId?: string | null, options: UseUserChann
 
     window.addEventListener(CHANNEL_BANS_CHANGED_EVENT, handleChange)
     return () => window.removeEventListener(CHANNEL_BANS_CHANGED_EVENT, handleChange)
-  }, [refresh, userId])
+  }, [refresh, shouldFetch, userId])
 
   useEffect(() => {
-    if (!userId || !shouldSubscribe) return
+    if (!shouldFetch || !userId || !shouldSubscribe) return
 
     let channel: RealtimeChannel | null = null
     let currentClient: any = null
@@ -140,7 +150,7 @@ export function useUserChannelBans(userId?: string | null, options: UseUserChann
         getRealtimeClient()?.removeChannel(channel)
       }
     }
-  }, [refresh, shouldSubscribe, userId])
+  }, [refresh, shouldFetch, shouldSubscribe, userId])
 
   return useMemo(() => ({
     bans,

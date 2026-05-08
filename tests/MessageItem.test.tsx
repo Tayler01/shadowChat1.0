@@ -23,7 +23,7 @@ jest.mock('../src/hooks/useToneAnalysisEnabled')
 jest.mock('../src/lib/linkPreview', () => ({
   tokenizeMessageText: jest.requireActual('../src/lib/linkPreview').tokenizeMessageText,
   extractFirstMessageUrl: jest.requireActual('../src/lib/linkPreview').extractFirstMessageUrl,
-  fetchLinkPreview: jest.fn(() => Promise.resolve(null)),
+  fetchLinkPreview: jest.fn(() => new Promise(() => {})),
 }))
 
 const mockedToneEnabled = useToneAnalysisEnabled as jest.MockedFunction<typeof useToneAnalysisEnabled>
@@ -182,8 +182,12 @@ test('lets an app operator delete a normal user group message', async () => {
     />
   )
 
-  await userEvent.click(screen.getByRole('button', { name: /message actions/i }))
-  await userEvent.click(screen.getByRole('menuitem', { name: /^delete$/i }))
+  await act(async () => {
+    await userEvent.click(screen.getByRole('button', { name: /message actions/i }))
+  })
+  await act(async () => {
+    await userEvent.click(screen.getByRole('menuitem', { name: /^delete$/i }))
+  })
 
   expect(onDelete).toHaveBeenCalledWith('m1')
 })
@@ -217,7 +221,9 @@ test('does not let an operator delete another operator group message', async () 
     />
   )
 
-  await userEvent.click(screen.getByRole('button', { name: /message actions/i }))
+  await act(async () => {
+    await userEvent.click(screen.getByRole('button', { name: /message actions/i }))
+  })
 
   expect(screen.queryByRole('menuitem', { name: /^delete$/i })).not.toBeInTheDocument()
 })

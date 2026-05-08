@@ -42,7 +42,7 @@ export function Avatar({
   const [imageError, setImageError] = useState(false);
   const initials = fallback || alt.split(' ').map(n => n[0]).join('').toUpperCase();
   const livePresence = usePresenceForUser(userId);
-  const { hasActiveBan } = useUserChannelBans(userId, { subscribe: false });
+  const { hasActiveBan } = useUserChannelBans(userId, { fetch: false, subscribe: false });
   const resolvedPresenceState =
     presenceState ||
     livePresence?.presence_state ||
