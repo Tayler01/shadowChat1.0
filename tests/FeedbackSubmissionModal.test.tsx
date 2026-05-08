@@ -15,6 +15,10 @@ jest.mock('../src/lib/feedback', () => ({
   submitFeedback: jest.fn(),
 }))
 
+beforeEach(() => {
+  jest.clearAllMocks()
+})
+
 test('walks a user through a feature idea submission with an image', async () => {
   const onSubmitted = jest.fn()
   ;(submitFeedback as jest.Mock).mockResolvedValue({ id: 'feedback-123', attachments: [] })
@@ -69,4 +73,36 @@ test('keeps the details step gated until enough detail is present', async () => 
   })
 
   expect(continueButton).toBeDisabled()
+})
+
+test('debounces rapid send feedback taps', async () => {
+  let submitCalls = 0
+  ;(submitFeedback as jest.Mock).mockImplementation(() => {
+    submitCalls += 1
+    return new Promise<{ id: string; attachments: any[] }>(resolve => {
+      setTimeout(() => resolve({ id: `feedback-${submitCalls}`, attachments: [] }), 0)
+    })
+  })
+
+  render(<FeedbackSubmissionModal open onClose={jest.fn()} />)
+
+  fireEvent.click(screen.getByRole('button', { name: /continue/i }))
+
+  fireEvent.change(screen.getByLabelText(/brief description/i), {
+    target: { value: 'Ship debounce' },
+  })
+  fireEvent.change(screen.getByLabelText(/details/i), {
+    target: { value: 'Ensure rapid taps do not submit duplicate feedback entries.' },
+  })
+  fireEvent.click(screen.getByRole('button', { name: /continue/i }))
+
+  const sendButton = screen.getByRole('button', { name: /send feedback/i })
+  fireEvent.click(sendButton)
+  fireEvent.click(sendButton)
+
+  expect(submitFeedback).toHaveBeenCalledTimes(1)
+
+  await waitFor(() => {
+    expect(screen.getByRole('heading', { name: /feedback sent/i })).toBeInTheDocument()
+  })
 })

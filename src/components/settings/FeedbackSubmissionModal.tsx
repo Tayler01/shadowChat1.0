@@ -66,6 +66,7 @@ export const FeedbackSubmissionModal: React.FC<FeedbackSubmissionModalProps> = (
   const [description, setDescription] = useState('')
   const [attachments, setAttachments] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
+  const submittingRef = useRef(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const remainingSlots = MAX_FEEDBACK_ATTACHMENTS - attachments.length
@@ -76,7 +77,7 @@ export const FeedbackSubmissionModal: React.FC<FeedbackSubmissionModalProps> = (
   )
 
   const resetAndClose = () => {
-    if (submitting) return
+    if (submitting || submittingRef.current) return
     setStep(0)
     setType('bug')
     setTitle('')
@@ -124,6 +125,8 @@ export const FeedbackSubmissionModal: React.FC<FeedbackSubmissionModalProps> = (
   }
 
   const handleSubmit = async () => {
+    if (submittingRef.current || submitting) return
+    submittingRef.current = true
     try {
       setSubmitting(true)
       const result = await submitFeedback({
@@ -140,6 +143,7 @@ export const FeedbackSubmissionModal: React.FC<FeedbackSubmissionModalProps> = (
       console.error(error)
       toast.error(error instanceof Error ? error.message : 'Could not send feedback')
     } finally {
+      submittingRef.current = false
       setSubmitting(false)
     }
   }
@@ -398,6 +402,7 @@ export const FeedbackSubmissionModal: React.FC<FeedbackSubmissionModalProps> = (
                         type="button"
                         onClick={() => void handleSubmit()}
                         loading={submitting}
+                        disabled={submitting || submittingRef.current}
                         className="w-full justify-center sm:w-auto"
                       >
                         <Send className="mr-2 h-4 w-4" />
