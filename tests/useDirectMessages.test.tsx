@@ -31,6 +31,15 @@ jest.mock('../src/hooks/useTyping', () => ({
 jest.mock('../src/hooks/useReadCursor', () => ({
   useReadCursor: () => ({ cursor: null, loading: false, markRead: jest.fn() }),
 }));
+jest.mock('../src/hooks/useBoardBadges', () => ({
+  useBoardBadges: () => ({
+    count: 0,
+    navCount: 0,
+    countsByBoard: {},
+    refresh: jest.fn(),
+    markFeedSeen: jest.fn(),
+  }),
+}));
 jest.mock('../src/hooks/useIsDesktop', () => ({
   useIsDesktop: jest.fn(() => true),
 }));

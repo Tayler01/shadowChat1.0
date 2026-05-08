@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, createElement, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { getRealtimeClient, getWorkingClient } from '../lib/supabase'
 import { BOARD_DEFINITIONS } from '../lib/boards'
@@ -12,7 +12,16 @@ interface BoardBadgeRow {
   contributes_to_nav: boolean
 }
 
+type BoardBadgesValue = {
+  count: number
+  navCount: number
+  countsByBoard: Record<string, number>
+  refresh: () => Promise<Record<string, number>>
+  markFeedSeen: () => Promise<void>
+}
+
 const BADGE_REALTIME_DEBOUNCE_MS = 350
+const BoardBadgesContext = createContext<BoardBadgesValue | null>(null)
 
 const normalizeCount = (value: unknown) => {
   const count = Number(value ?? 0)
@@ -23,7 +32,7 @@ const emptyCounts = () => (
   Object.fromEntries(BOARD_DEFINITIONS.map(board => [board.slug, 0])) as Record<string, number>
 )
 
-export function useBoardBadges() {
+function useProvideBoardBadges(): BoardBadgesValue {
   const { user } = useAuth()
   const [countsByBoard, setCountsByBoard] = useState<Record<string, number>>(() => emptyCounts())
   const [navCount, setNavCount] = useState(0)
@@ -210,4 +219,18 @@ export function useBoardBadges() {
     refresh,
     markFeedSeen,
   }), [countsByBoard, markFeedSeen, navCount, refresh])
+}
+
+export function BoardBadgesProvider({ children }: { children: ReactNode }) {
+  const value = useProvideBoardBadges()
+  return createElement(BoardBadgesContext.Provider, { value }, children)
+}
+
+export function useBoardBadges() {
+  const context = useContext(BoardBadgesContext)
+  if (!context) {
+    throw new Error('useBoardBadges must be used within BoardBadgesProvider')
+  }
+
+  return context
 }

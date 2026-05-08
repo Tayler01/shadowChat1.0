@@ -18,6 +18,7 @@ import { useAdminRoleNotifications } from './hooks/useAdminRoleNotifications'
 import { useChannelBanExpirySweep } from './hooks/useChannelBanExpirySweep'
 import { useArtBoardReactionNotifications } from './hooks/useArtBoardReactionNotifications'
 import { useTheme } from './hooks/useTheme'
+import { BoardBadgesProvider } from './hooks/useBoardBadges'
 import { computeMobileViewportState } from './lib/mobileViewport'
 
 const DirectMessagesView = lazy(() =>
@@ -354,49 +355,50 @@ function App() {
 
   return (
     <>
-    <AuthGuard>
-      <ClientResetProvider>
-        <SoundEffectsProvider>
-        <MessagesProvider>
-          <DirectMessagesProvider>
-          <AppBadgeSync />
-          <PhoneInstallOnboarding />
-          <div className="app-viewport flex flex-col overflow-hidden bg-[radial-gradient(circle_at_top,var(--bg-app-radial),transparent_28%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] md:flex-row">
-          {isDesktop && (
-            <Sidebar
-              currentView={currentView}
-              onViewChange={handleViewChange}
-              isDarkMode={isDarkMode}
-              onToggleDarkMode={toggleDarkMode}
-              isOpen={sidebarOpen}
-              onClose={closeSidebar}
-            />
-          )}
+      <AuthGuard>
+        <ClientResetProvider>
+          <SoundEffectsProvider>
+            <MessagesProvider>
+              <DirectMessagesProvider>
+                <BoardBadgesProvider>
+                  <AppBadgeSync />
+                  <PhoneInstallOnboarding />
+                  <div className="app-viewport flex flex-col overflow-hidden bg-[radial-gradient(circle_at_top,var(--bg-app-radial),transparent_28%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] md:flex-row">
+                    {isDesktop && (
+                      <Sidebar
+                        currentView={currentView}
+                        onViewChange={handleViewChange}
+                        isDarkMode={isDarkMode}
+                        onToggleDarkMode={toggleDarkMode}
+                        isOpen={sidebarOpen}
+                        onClose={closeSidebar}
+                      />
+                    )}
 
-          {isDesktop && sidebarOpen && (
-            <div
-              className="fixed inset-0 bg-black/40 md:hidden"
-              onClick={closeSidebar}
-            />
-          )}
+                    {isDesktop && sidebarOpen && (
+                      <div
+                        className="fixed inset-0 bg-black/40 md:hidden"
+                        onClick={closeSidebar}
+                      />
+                    )}
 
-          <main className="flex-1 flex min-h-0 flex-col min-w-0 overflow-hidden">
-            <Suspense fallback={<ViewLoadingState />}>
-              {renderCurrentView()}
-            </Suspense>
-          </main>
+                    <main className="flex-1 flex min-h-0 flex-col min-w-0 overflow-hidden">
+                      <Suspense fallback={<ViewLoadingState />}>
+                        {renderCurrentView()}
+                      </Suspense>
+                    </main>
 
-          {/* Mobile bottom navigation */}
-          {currentView !== 'chat' && currentView !== 'dms' && !(currentView === 'boards' && boardsChatFooterActive) && (
-            <MobileNav currentView={currentView} onViewChange={handleViewChange} />
-          )}
-
-        </div>
-        </DirectMessagesProvider>
-      </MessagesProvider>
-      </SoundEffectsProvider>
-      </ClientResetProvider>
-    </AuthGuard>
+                    {/* Mobile bottom navigation */}
+                    {currentView !== 'chat' && currentView !== 'dms' && !(currentView === 'boards' && boardsChatFooterActive) && (
+                      <MobileNav currentView={currentView} onViewChange={handleViewChange} />
+                    )}
+                  </div>
+                </BoardBadgesProvider>
+              </DirectMessagesProvider>
+            </MessagesProvider>
+          </SoundEffectsProvider>
+        </ClientResetProvider>
+      </AuthGuard>
     <Toaster
       position={isDesktop ? 'top-right' : 'top-center'}
       containerStyle={
