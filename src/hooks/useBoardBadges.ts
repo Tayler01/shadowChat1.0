@@ -12,6 +12,8 @@ interface BoardBadgeRow {
   contributes_to_nav: boolean
 }
 
+const BADGE_REALTIME_DEBOUNCE_MS = 350
+
 const normalizeCount = (value: unknown) => {
   const count = Number(value ?? 0)
   return Number.isFinite(count) && count > 0 ? Math.floor(count) : 0
@@ -27,6 +29,8 @@ export function useBoardBadges() {
   const [navCount, setNavCount] = useState(0)
   const channelRef = useRef<RealtimeChannel | null>(null)
   const subscribeRef = useRef<(() => Promise<RealtimeChannel | null>) | null>(null)
+  const refreshInFlightRef = useRef<Promise<Record<string, number>> | null>(null)
+  const refreshTimerRef = useRef<number | null>(null)
 
   const refresh = useCallback(async () => {
     if (!user) {
@@ -36,35 +40,56 @@ export function useBoardBadges() {
       return counts
     }
 
-    try {
-      const workingClient = await getWorkingClient()
-      const { data, error } = await workingClient.rpc('get_board_badge_counts', {
-        target_user_id: user.id,
-      })
-      if (error) throw error
-
-      const rows = (data ?? []) as BoardBadgeRow[]
-      const nextCounts = emptyCounts()
-      let nextNavCount = 0
-
-      rows.forEach(row => {
-        const unreadCount = normalizeCount(row.unread_count)
-        nextCounts[row.board_slug] = unreadCount
-        if (row.contributes_to_nav) {
-          nextNavCount += unreadCount
-        }
-      })
-
-      setCountsByBoard(nextCounts)
-      setNavCount(nextNavCount)
-      return nextCounts
-    } catch {
-      const counts = emptyCounts()
-      setCountsByBoard(counts)
-      setNavCount(0)
-      return counts
+    if (refreshInFlightRef.current) {
+      return refreshInFlightRef.current
     }
+
+    refreshInFlightRef.current = (async () => {
+      try {
+        const workingClient = await getWorkingClient()
+        const { data, error } = await workingClient.rpc('get_board_badge_counts', {
+          target_user_id: user.id,
+        })
+        if (error) throw error
+
+        const rows = (data ?? []) as BoardBadgeRow[]
+        const nextCounts = emptyCounts()
+        let nextNavCount = 0
+
+        rows.forEach(row => {
+          const unreadCount = normalizeCount(row.unread_count)
+          nextCounts[row.board_slug] = unreadCount
+          if (row.contributes_to_nav) {
+            nextNavCount += unreadCount
+          }
+        })
+
+        setCountsByBoard(nextCounts)
+        setNavCount(nextNavCount)
+        return nextCounts
+      } catch {
+        const counts = emptyCounts()
+        setCountsByBoard(counts)
+        setNavCount(0)
+        return counts
+      } finally {
+        refreshInFlightRef.current = null
+      }
+    })()
+
+    return refreshInFlightRef.current
   }, [user])
+
+  const refreshSoon = useCallback(() => {
+    if (refreshTimerRef.current !== null) {
+      window.clearTimeout(refreshTimerRef.current)
+    }
+
+    refreshTimerRef.current = window.setTimeout(() => {
+      refreshTimerRef.current = null
+      void refresh()
+    }, BADGE_REALTIME_DEBOUNCE_MS)
+  }, [refresh])
 
   useEffect(() => {
     void refresh()
@@ -109,17 +134,17 @@ export function useBoardBadges() {
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'board_chat_messages' },
-          () => void refresh()
+          () => refreshSoon()
         )
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'board_catalog' },
-          () => void refresh()
+          () => refreshSoon()
         )
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'news_feed_items' },
-          () => void refresh()
+          () => refreshSoon()
         )
         .on(
           'postgres_changes',
@@ -129,7 +154,7 @@ export function useBoardBadges() {
             table: 'news_user_state',
             filter: `user_id=eq.${user.id}`,
           },
-          () => void refresh()
+          () => refreshSoon()
         )
         .on(
           'postgres_changes',
@@ -142,7 +167,7 @@ export function useBoardBadges() {
           (payload: any) => {
             const row = (payload.new || payload.old) as { surface?: string } | undefined
             if (row?.surface === 'board_chat') {
-              void refresh()
+              refreshSoon()
             }
           }
         )
@@ -161,12 +186,16 @@ export function useBoardBadges() {
 
     return () => {
       subscribeRef.current = null
+      if (refreshTimerRef.current !== null) {
+        window.clearTimeout(refreshTimerRef.current)
+        refreshTimerRef.current = null
+      }
       if (channel && currentClient?.removeChannel) {
         currentClient.removeChannel(channel)
       }
       channelRef.current = null
     }
-  }, [refresh, user])
+  }, [refreshSoon, user])
 
   const markFeedSeen = useCallback(async () => {
     const workingClient = await getWorkingClient()

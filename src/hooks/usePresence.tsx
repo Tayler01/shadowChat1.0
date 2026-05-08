@@ -9,6 +9,7 @@ import {
 } from '../lib/supabase'
 
 const PRESENCE_REFRESH_MS = 30000
+const PRESENCE_REALTIME_DEBOUNCE_MS = 350
 
 type PresenceContextValue = {
   presenceByUserId: Record<string, PresenceSnapshot>
@@ -35,6 +36,7 @@ export function PresenceProvider({
   const [presenceByUserId, setPresenceByUserId] = useState<Record<string, PresenceSnapshot>>({})
   const aliveRef = useRef(true)
   const refreshInFlightRef = useRef<Promise<void> | null>(null)
+  const refreshTimerRef = useRef<number | null>(null)
 
   const refresh = useCallback(async () => {
     if (!userId) {
@@ -60,10 +62,25 @@ export function PresenceProvider({
     return refreshInFlightRef.current
   }, [userId])
 
+  const refreshSoon = useCallback(() => {
+    if (refreshTimerRef.current !== null) {
+      window.clearTimeout(refreshTimerRef.current)
+    }
+
+    refreshTimerRef.current = window.setTimeout(() => {
+      refreshTimerRef.current = null
+      void refresh()
+    }, PRESENCE_REALTIME_DEBOUNCE_MS)
+  }, [refresh])
+
   useEffect(() => {
     aliveRef.current = true
     return () => {
       aliveRef.current = false
+      if (refreshTimerRef.current !== null) {
+        window.clearTimeout(refreshTimerRef.current)
+        refreshTimerRef.current = null
+      }
     }
   }, [])
 
@@ -104,14 +121,14 @@ export function PresenceProvider({
           'postgres_changes',
           { event: '*', schema: 'public', table: 'user_presence' },
           () => {
-            void refresh()
+            refreshSoon()
           }
         )
         .on(
           'postgres_changes',
           { event: 'UPDATE', schema: 'public', table: 'users' },
           () => {
-            void refresh()
+            refreshSoon()
           }
         )
         .subscribe((status: string) => {
@@ -140,6 +157,10 @@ export function PresenceProvider({
     return () => {
       disposed = true
       clearReconnect()
+      if (refreshTimerRef.current !== null) {
+        window.clearTimeout(refreshTimerRef.current)
+        refreshTimerRef.current = null
+      }
       window.clearInterval(poll)
       if (channel && currentClient?.removeChannel) {
         currentClient.removeChannel(channel)
@@ -147,7 +168,7 @@ export function PresenceProvider({
         getRealtimeClient()?.removeChannel(channel)
       }
     }
-  }, [refresh, userId])
+  }, [refresh, refreshSoon, userId])
 
   const activeUsers = useMemo(
     () =>

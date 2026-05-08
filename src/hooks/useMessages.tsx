@@ -226,6 +226,8 @@ function useProvideMessages(): MessagesContextValue {
   const fetchRequestIdRef = useRef(0);
   const loadedOlderRef = useRef(false);
   const sendingRef = useRef(false);
+  const latestMessagesRef = useRef<Message[]>(initialMessages);
+  const hydrationFetchesRef = useRef<Map<string, Promise<Message | null>>>(new Map());
 
   const addNewMessage = useCallback(
     (msg: Message) => {
@@ -358,6 +360,31 @@ function useProvideMessages(): MessagesContextValue {
     }
   }, []);
 
+  const hydrateMessage = useCallback((messageId: string) => {
+    const existing = hydrationFetchesRef.current.get(messageId);
+    if (existing) return existing;
+
+    const request = getWorkingClient()
+      .then(workingClient =>
+        workingClient
+          .from('messages')
+          .select(`
+            *,
+            user:users!user_id(*)
+          `)
+          .eq('id', messageId)
+          .maybeSingle()
+      )
+      .then(({ data, error }) => (error || !data ? null : data as unknown as Message))
+      .catch(() => null)
+      .finally(() => {
+        hydrationFetchesRef.current.delete(messageId);
+      });
+
+    hydrationFetchesRef.current.set(messageId, request);
+    return request;
+  }, []);
+
   const loadOlderMessages = useCallback(async () => {
     if (loadingMore || !hasMore) return;
     const oldest = messages.find(m => !m.pinned)?.created_at;
@@ -467,6 +494,7 @@ function useProvideMessages(): MessagesContextValue {
 
   // Persist messages to localStorage whenever they change
   useEffect(() => {
+    latestMessagesRef.current = messages;
     cacheMessages(messages);
   }, [messages]);
 
@@ -481,6 +509,7 @@ function useProvideMessages(): MessagesContextValue {
 
     let channel: RealtimeChannel | null = null;
     let currentClient: any = null;
+    let disposed = false;
 
     const subscribeToChannel = async (): Promise<RealtimeChannel> => {
       currentClient = await getWorkingClient().catch(() => getRealtimeClient());
@@ -506,20 +535,15 @@ function useProvideMessages(): MessagesContextValue {
         },
         async (payload: any) => {
           try {
-            // Fetch the complete message with user data
-            const workingClient = await getWorkingClient();
-            const { data: newMessage, error } = await workingClient
-              .from('messages')
-              .select(`
-                *,
-                user:users!user_id(*)
-              `)
-              .eq('id', payload.new.id)
-              .single();
-
-            if (error) {
+            const alreadyHydrated = latestMessagesRef.current.some(message =>
+              message.id === payload.new.id && !message.optimistic && Boolean(message.user)
+            );
+            if (alreadyHydrated) {
               return;
             }
+
+            const newMessage = await hydrateMessage(payload.new.id);
+            if (disposed) return;
 
             if (newMessage) {
               addNewMessage(newMessage as unknown as Message)
@@ -542,20 +566,8 @@ function useProvideMessages(): MessagesContextValue {
           },
           async (payload: any) => {
             try {
-              // Fetch the updated message with user data
-              const workingClient = await getWorkingClient();
-              const { data: updatedMessage, error } = await workingClient
-                .from('messages')
-                .select(`
-                  *,
-                  user:users!user_id(*)
-                `)
-                .eq('id', payload.new.id)
-                .single();
-
-              if (error) {
-                return;
-              }
+              const updatedMessage = await hydrateMessage(payload.new.id);
+              if (disposed) return;
 
               if (updatedMessage) {
                 setMessages(prev => {
@@ -666,6 +678,7 @@ function useProvideMessages(): MessagesContextValue {
     subscribeRef.current = subscribeToChannel;
 
     return () => {
+      disposed = true;
       if (channel && currentClient && currentClient.removeChannel && typeof currentClient.removeChannel === 'function') {
         currentClient.removeChannel(channel);
       } else if (channel && getRealtimeClient()?.removeChannel) {
@@ -673,7 +686,7 @@ function useProvideMessages(): MessagesContextValue {
       }
       channelRef.current = null;
     };
-  }, [addNewMessage, playReaction, user]);
+  }, [addNewMessage, hydrateMessage, playReaction, user]);
 
   const sendMessage = useCallback(async (
     content: string,

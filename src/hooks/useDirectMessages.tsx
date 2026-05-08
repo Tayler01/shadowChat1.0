@@ -429,10 +429,17 @@ export function useConversationMessages(conversationId: string | null) {
   const activeConversationIdRef = useRef<string | null>(conversationId);
   const fetchRequestIdRef = useRef(0);
   const sendingRef = useRef(false);
+  const latestMessagesRef = useRef<DMMessage[]>([]);
+  const hydrationFetchesRef = useRef<Map<string, Promise<DMMessage | null>>>(new Map());
 
   useEffect(() => {
     activeConversationIdRef.current = conversationId;
+    hydrationFetchesRef.current.clear();
   }, [conversationId]);
+
+  useEffect(() => {
+    latestMessagesRef.current = messages;
+  }, [messages]);
 
   const insertConversationMessage = useCallback(
     async (
@@ -522,6 +529,34 @@ export function useConversationMessages(conversationId: string | null) {
 
     if (error || !data) return null;
     return data as unknown as DMMessage;
+  }, [conversationId]);
+
+  const hydrateConversationMessage = useCallback((messageId: string) => {
+    if (!conversationId) return Promise.resolve(null);
+
+    const existing = hydrationFetchesRef.current.get(messageId);
+    if (existing) return existing;
+
+    const request = getWorkingClient()
+      .then(workingClient =>
+        workingClient
+          .from('dm_messages')
+          .select(`
+            *,
+            sender:users!sender_id(*)
+          `)
+          .eq('id', messageId)
+          .eq('conversation_id', conversationId)
+          .maybeSingle()
+      )
+      .then(({ data, error }) => (error || !data ? null : data as unknown as DMMessage))
+      .catch(() => null)
+      .finally(() => {
+        hydrationFetchesRef.current.delete(messageId);
+      });
+
+    hydrationFetchesRef.current.set(messageId, request);
+    return request;
   }, [conversationId]);
 
   const handleVisible = useCallback(() => {
@@ -709,18 +744,12 @@ export function useConversationMessages(conversationId: string | null) {
             filter: `conversation_id=eq.${conversationId}`,
           },
           async (payload: any) => {
-            // Fetch the complete message with sender data
-            const workingClient = await getWorkingClient();
-            const { data } = await workingClient
-              .from('dm_messages')
-              .select(`
-                *,
-                sender:users!sender_id(*)
-              `)
-              .eq('id', payload.new.id)
-              .single();
+            const alreadyHydrated = latestMessagesRef.current.some(message =>
+              message.id === payload.new.id && !message.optimistic && Boolean(message.sender)
+            );
+            if (alreadyHydrated) return;
 
-            const message = data as unknown as DMMessage | null;
+            const message = await hydrateConversationMessage(payload.new.id);
 
             if (disposed) return;
 
@@ -748,17 +777,7 @@ export function useConversationMessages(conversationId: string | null) {
             filter: `conversation_id=eq.${conversationId}`,
           },
           async (payload: any) => {
-            const workingClient = await getWorkingClient();
-            const { data } = await workingClient
-              .from('dm_messages')
-              .select(`
-                *,
-                sender:users!sender_id(*)
-              `)
-              .eq('id', payload.new.id)
-              .single();
-
-            const message = data as unknown as DMMessage | null;
+            const message = await hydrateConversationMessage(payload.new.id);
 
             if (disposed) return;
 
@@ -828,7 +847,7 @@ export function useConversationMessages(conversationId: string | null) {
       }
       channelRef.current = null;
     };
-  }, [conversationId, user, playMessage]);
+  }, [conversationId, hydrateConversationMessage, user, playMessage]);
 
   const sendMessage = useCallback(
     async (
