@@ -124,6 +124,7 @@ export function useMessageNotifications(onOpenConversation: (id: string) => void
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
           const activeChannel = channelRef.current
           if (
+            status !== 'CLOSED' &&
             activeChannel &&
             realtimeClient.removeChannel &&
             typeof realtimeClient.removeChannel === 'function'

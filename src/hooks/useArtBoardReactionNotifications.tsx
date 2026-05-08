@@ -136,7 +136,7 @@ export function useArtBoardReactionNotifications() {
 
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             const activeChannel = channelRef.current
-            if (activeChannel && realtimeClient.removeChannel) {
+            if (status !== 'CLOSED' && activeChannel && realtimeClient.removeChannel) {
               try {
                 realtimeClient.removeChannel(activeChannel)
               } catch {

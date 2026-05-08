@@ -237,6 +237,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             const activeChannel = conversationsChannelRef.current;
             if (
+              status !== 'CLOSED' &&
               activeChannel &&
               realtimeClient.removeChannel &&
               typeof realtimeClient.removeChannel === 'function'
@@ -706,6 +707,7 @@ export function useConversationMessages(conversationId: string | null) {
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             const activeChannel = channelRef.current;
             if (
+              status !== 'CLOSED' &&
               activeChannel &&
               realtimeClient.removeChannel &&
               typeof realtimeClient.removeChannel === 'function'

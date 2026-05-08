@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 export function LoginForm() {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -15,11 +16,27 @@ export function LoginForm() {
     username: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const { signIn, signUp, loading } = useAuth();
+  const { signIn, signUp, loading, error: authError } = useAuth();
+
+  const getAuthErrorMessage = (error: unknown) => {
+    const fallback = 'Sign in failed. Please try again.';
+    const message = error instanceof Error
+      ? error.message
+      : typeof error === 'object' && error && 'message' in error && typeof error.message === 'string'
+        ? error.message
+        : '';
+
+    if (/exceed_(cached_)?egress_quota|project is restricted|status\s*402|payment required/i.test(message)) {
+      return 'ShadowChat is temporarily blocked by the backend usage quota. An admin needs to restore Supabase service, then login will work again.';
+    }
+
+    return message || fallback;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
+    setSubmitError(null);
 
     try {
       if (isLogin) {
@@ -49,8 +66,9 @@ export function LoginForm() {
         }
       }
     } catch (error: unknown) {
-      const err = error as Error | { message?: string };
-      toast.error(err.message || 'An error occurred');
+      const message = getAuthErrorMessage(error);
+      setSubmitError(message);
+      toast.error(message, { duration: 7000 });
     }
   };
 
@@ -60,7 +78,12 @@ export function LoginForm() {
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
+    if (submitError) {
+      setSubmitError(null);
+    }
   };
+
+  const visibleError = submitError || (authError ? getAuthErrorMessage(new Error(authError)) : null);
 
   return (
     <div className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(215,170,70,0.08),transparent_24%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] px-4">
@@ -135,6 +158,12 @@ export function LoginForm() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
+            {visibleError && (
+              <div className="rounded-[var(--radius-md)] border border-[rgba(180,90,99,0.34)] bg-[rgba(180,90,99,0.12)] px-4 py-3 text-sm leading-6 text-[var(--text-primary)]">
+                {visibleError}
+              </div>
+            )}
+
             {!isLogin && (
               <>
                 <Input

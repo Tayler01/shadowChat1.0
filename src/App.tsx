@@ -353,6 +353,7 @@ function App() {
   }
 
   return (
+    <>
     <AuthGuard>
       <ClientResetProvider>
         <SoundEffectsProvider>
@@ -390,66 +391,67 @@ function App() {
             <MobileNav currentView={currentView} onViewChange={handleViewChange} />
           )}
 
-          <Toaster
-            position={isDesktop ? 'top-right' : 'top-center'}
-            containerStyle={
-              isDesktop
-                ? undefined
-                : {
-                    top: 'var(--shadowchat-toast-top, calc(env(safe-area-inset-top) + 4.5rem))',
-                    left: '1rem',
-                    right: '1rem',
-                    maxHeight: 'calc(var(--shadowchat-visual-viewport-height, 100vh) - var(--shadowchat-toast-top-space, 5rem) - 1rem)',
-                  }
-            }
-            toastOptions={{
-              duration: 4000,
-              style: {
-                background: isDarkMode ? 'rgba(18, 20, 22, 0.96)' : '#ffffff',
-                color: isDarkMode ? '#f6f2e8' : '#111827',
-                border: isDarkMode ? '1px solid rgba(255,240,184,0.12)' : '1px solid #e5e7eb',
-                boxShadow: isDarkMode ? '0 20px 56px rgba(0,0,0,0.44), 0 0 0 1px rgba(255,240,184,0.03)' : undefined,
-                backdropFilter: isDarkMode ? 'blur(18px)' : undefined,
-                borderRadius: '18px',
-              },
-              success: {
-                iconTheme: {
-                  primary: 'var(--state-success)',
-                  secondary: 'var(--bg-shell)',
-                },
-                style: {
-                  border: '1px solid rgba(215,170,70,0.18)',
-                },
-              },
-              error: {
-                iconTheme: {
-                  primary: 'var(--state-danger)',
-                  secondary: 'var(--bg-shell)',
-                },
-                style: {
-                  border: '1px solid rgba(180,90,99,0.18)',
-                },
-              },
-              loading: {
-                iconTheme: {
-                  primary: 'var(--gold-accent)',
-                  secondary: 'var(--bg-shell)',
-                },
-              },
-              blank: {
-                iconTheme: {
-                  primary: 'var(--gold-accent)',
-                  secondary: 'var(--bg-shell)',
-                },
-              },
-            }}
-          />
         </div>
         </DirectMessagesProvider>
       </MessagesProvider>
       </SoundEffectsProvider>
       </ClientResetProvider>
     </AuthGuard>
+    <Toaster
+      position={isDesktop ? 'top-right' : 'top-center'}
+      containerStyle={
+        isDesktop
+          ? undefined
+          : {
+              top: 'var(--shadowchat-toast-top, calc(env(safe-area-inset-top) + 4.5rem))',
+              left: '1rem',
+              right: '1rem',
+              maxHeight: 'calc(var(--shadowchat-visual-viewport-height, 100vh) - var(--shadowchat-toast-top-space, 5rem) - 1rem)',
+            }
+      }
+      toastOptions={{
+        duration: 4000,
+        style: {
+          background: isDarkMode ? 'rgba(18, 20, 22, 0.96)' : '#ffffff',
+          color: isDarkMode ? '#f6f2e8' : '#111827',
+          border: isDarkMode ? '1px solid rgba(255,240,184,0.12)' : '1px solid #e5e7eb',
+          boxShadow: isDarkMode ? '0 20px 56px rgba(0,0,0,0.44), 0 0 0 1px rgba(255,240,184,0.03)' : undefined,
+          backdropFilter: isDarkMode ? 'blur(18px)' : undefined,
+          borderRadius: '18px',
+        },
+        success: {
+          iconTheme: {
+            primary: 'var(--state-success)',
+            secondary: 'var(--bg-shell)',
+          },
+          style: {
+            border: '1px solid rgba(215,170,70,0.18)',
+          },
+        },
+        error: {
+          iconTheme: {
+            primary: 'var(--state-danger)',
+            secondary: 'var(--bg-shell)',
+          },
+          style: {
+            border: '1px solid rgba(180,90,99,0.18)',
+          },
+        },
+        loading: {
+          iconTheme: {
+            primary: 'var(--gold-accent)',
+            secondary: 'var(--bg-shell)',
+          },
+        },
+        blank: {
+          iconTheme: {
+            primary: 'var(--gold-accent)',
+            secondary: 'var(--bg-shell)',
+          },
+        },
+      }}
+    />
+    </>
   )
 }
 

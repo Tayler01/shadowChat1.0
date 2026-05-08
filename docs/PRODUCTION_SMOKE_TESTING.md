@@ -104,6 +104,7 @@ Common failure meanings:
 
 - `Signup ... completed without an active session`: production is running in disposable signup mode or the `PLAYWRIGHT_ACCOUNT_*` variables are missing.
 - `Missing Playwright account ... credentials`: `--account-mode=env` was requested but one of the required email/password variables is absent.
+- Auth requests returning HTTP `402` with `exceed_cached_egress_quota` or `exceed_egress_quota`: Supabase has restricted the project for usage quota. This is not a password or app-code failure. Restore Supabase service from the dashboard or contact Supabase support, then rerun the production smoke. The login screen should show a backend-quota message while the restriction is active.
 - Timeout or browser crash after sign-in: rerun `npm run qa:smoke:prod` or `npm run qa:smoke:prod:headed` to observe the visible browser. On Windows, headed mode is the preferred debug path for local Chromium instability.
 
 ## Post-Deploy Checklist
