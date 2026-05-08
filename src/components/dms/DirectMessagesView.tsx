@@ -274,8 +274,11 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
             <img
               src={message.file_url}
               alt="uploaded"
+              width={320}
+              height={240}
               loading="lazy"
               decoding="async"
+              draggable={false}
               className="mt-1 aspect-[4/3] max-h-[70vh] w-[min(20rem,100%)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] object-contain"
             />
           ) : message.message_type === 'video' && message.file_url ? (

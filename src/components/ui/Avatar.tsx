@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Ghost, LockKeyhole } from 'lucide-react';
 import { getPresenceOption } from '../../lib/presence';
 import { usePresenceForUser } from '../../hooks/usePresence';
@@ -26,7 +26,14 @@ const sizeClasses = {
   xl: 'w-16 h-16 text-xl',
 };
 
-export function Avatar({
+const sizePixels = {
+  sm: 24,
+  md: 32,
+  lg: 48,
+  xl: 64,
+};
+
+export const Avatar = React.memo(function Avatar({
   src,
   alt,
   size = 'md',
@@ -41,6 +48,7 @@ export function Avatar({
 }: AvatarProps) {
   const [imageError, setImageError] = useState(false);
   const initials = fallback || alt.split(' ').map(n => n[0]).join('').toUpperCase();
+  const pixelSize = sizePixels[size];
   const livePresence = usePresenceForUser(userId);
   const { hasActiveBan } = useUserChannelBans(userId, { fetch: false, subscribe: false });
   const resolvedPresenceState =
@@ -52,6 +60,10 @@ export function Avatar({
   const showLiveOnline = showStatus && resolvedPresenceState === 'online';
   const showLegacyStatus = showStatus && !resolvedPresenceState && status;
   const statusPosition = hasActiveBan ? '-top-1 -right-1' : '-bottom-0.5 -right-0.5';
+
+  useEffect(() => {
+    setImageError(false);
+  }, [src]);
   
   return (
     <div className={`relative inline-block ${className}`}>
@@ -73,6 +85,11 @@ export function Avatar({
           <img
             src={src}
             alt={alt}
+            width={pixelSize}
+            height={pixelSize}
+            loading="lazy"
+            decoding="async"
+            draggable={false}
             className="w-full h-full object-cover"
             onError={() => setImageError(true)}
           />
@@ -123,4 +140,4 @@ export function Avatar({
       )}
     </div>
   );
-}
+})

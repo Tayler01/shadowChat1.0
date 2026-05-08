@@ -19,7 +19,12 @@ export const FailedMessageItem: React.FC<Props> = ({ message, onResend }) => {
           <img
             src={message.dataUrl}
             alt={message.fileName}
-            className="max-w-xs rounded cursor-pointer"
+            width={320}
+            height={240}
+            loading="lazy"
+            decoding="async"
+            draggable={false}
+            className="aspect-[4/3] w-[min(20rem,100%)] max-w-xs cursor-pointer rounded object-contain"
             onClick={() => setShowImageModal(true)}
           />
         )}

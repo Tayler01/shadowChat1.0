@@ -359,8 +359,11 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     <img
                       src={message.file_url}
                       alt="uploaded image"
+                      width={320}
+                      height={240}
                       loading="lazy"
                       decoding="async"
+                      draggable={false}
                       className="mt-1 aspect-[4/3] max-h-[70vh] w-[min(20rem,100%)] cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-subtle)] object-contain sm:max-w-xs"
                       onClick={() => setShowImageModal(true)}
                     />
