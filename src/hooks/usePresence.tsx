@@ -7,9 +7,11 @@ import {
   getWorkingClient,
   type PresenceSnapshot,
 } from '../lib/supabase'
+import type { PresenceState } from '../types'
 
 const PRESENCE_REFRESH_MS = 30000
 const PRESENCE_REALTIME_DEBOUNCE_MS = 350
+const PRESENCE_ACTIVE_WINDOW_MS = 2 * 60 * 1000
 
 type PresenceContextValue = {
   presenceByUserId: Record<string, PresenceSnapshot>
@@ -26,6 +28,35 @@ const PresenceContext = createContext<PresenceContextValue>({
 const normalizePresence = (rows: PresenceSnapshot[]) =>
   Object.fromEntries(rows.map(row => [row.user_id, row]))
 
+type UserPresenceRealtimeRow = {
+  user_id?: string | null
+  status?: string | null
+  last_seen?: string | null
+}
+
+const resolvePresenceFromHeartbeat = (
+  existing: PresenceSnapshot,
+  row: UserPresenceRealtimeRow,
+  now = Date.now()
+) => {
+  const lastSeen = row.last_seen ?? existing.last_seen ?? null
+  const lastSeenMs = lastSeen ? new Date(lastSeen).getTime() : 0
+  const fresh = Boolean(lastSeenMs && now - lastSeenMs < PRESENCE_ACTIVE_WINDOW_MS)
+  const online = row.status === 'online' && fresh
+  const presenceState: PresenceState = existing.presence_visibility === 'invisible'
+    ? 'invisible'
+    : online
+      ? 'online'
+      : 'offline'
+
+  return {
+    ...existing,
+    last_seen: lastSeen,
+    presence_state: presenceState,
+    is_active: existing.presence_visibility === 'tracked' && online,
+  }
+}
+
 export function PresenceProvider({
   children,
   userId,
@@ -37,6 +68,11 @@ export function PresenceProvider({
   const aliveRef = useRef(true)
   const refreshInFlightRef = useRef<Promise<void> | null>(null)
   const refreshTimerRef = useRef<number | null>(null)
+  const presenceByUserIdRef = useRef<Record<string, PresenceSnapshot>>({})
+
+  useEffect(() => {
+    presenceByUserIdRef.current = presenceByUserId
+  }, [presenceByUserId])
 
   const refresh = useCallback(async () => {
     if (!userId) {
@@ -72,6 +108,32 @@ export function PresenceProvider({
       void refresh()
     }, PRESENCE_REALTIME_DEBOUNCE_MS)
   }, [refresh])
+
+  const applyPresenceRealtimePayload = useCallback((payload: any) => {
+    const row = (payload.new || payload.old) as UserPresenceRealtimeRow | undefined
+    const targetUserId = row?.user_id
+    if (!targetUserId) {
+      refreshSoon()
+      return
+    }
+
+    const existing = presenceByUserIdRef.current[targetUserId]
+    if (!existing) {
+      refreshSoon()
+      return
+    }
+
+    const nextRow = payload.eventType === 'DELETE'
+      ? { ...row, status: 'offline', last_seen: null }
+      : row
+    const nextPresence = resolvePresenceFromHeartbeat(existing, nextRow)
+
+    presenceByUserIdRef.current = {
+      ...presenceByUserIdRef.current,
+      [targetUserId]: nextPresence,
+    }
+    setPresenceByUserId(presenceByUserIdRef.current)
+  }, [refreshSoon])
 
   useEffect(() => {
     aliveRef.current = true
@@ -120,8 +182,8 @@ export function PresenceProvider({
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'user_presence' },
-          () => {
-            refreshSoon()
+          (payload: any) => {
+            applyPresenceRealtimePayload(payload)
           }
         )
         .on(
@@ -168,7 +230,7 @@ export function PresenceProvider({
         getRealtimeClient()?.removeChannel(channel)
       }
     }
-  }, [refresh, refreshSoon, userId])
+  }, [applyPresenceRealtimePayload, refresh, refreshSoon, userId])
 
   const activeUsers = useMemo(
     () =>
