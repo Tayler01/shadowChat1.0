@@ -3,6 +3,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import { getRealtimeClient, getWorkingClient } from '../lib/supabase'
 import { BOARD_DEFINITIONS } from '../lib/boards'
 import { runRealtimeRecovery } from '../lib/realtimeRecovery'
+import { shouldRefreshBadgesForNewsFeedPayload } from '../lib/newsFeedVisibility'
 import { useAuth } from './useAuth'
 import { useRealtimeRecovery } from './useRealtimeRecovery'
 
@@ -142,7 +143,16 @@ function useProvideBoardBadges(): BoardBadgesValue {
         .channel('public:board_badges')
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'board_chat_messages' },
+          { event: 'INSERT', schema: 'public', table: 'board_chat_messages' },
+          (payload: any) => {
+            if (payload.new?.user_id !== user.id) {
+              refreshSoon()
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'board_chat_messages' },
           () => refreshSoon()
         )
         .on(
@@ -153,7 +163,11 @@ function useProvideBoardBadges(): BoardBadgesValue {
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'news_feed_items' },
-          () => refreshSoon()
+          (payload: any) => {
+            if (shouldRefreshBadgesForNewsFeedPayload(payload)) {
+              refreshSoon()
+            }
+          }
         )
         .on(
           'postgres_changes',

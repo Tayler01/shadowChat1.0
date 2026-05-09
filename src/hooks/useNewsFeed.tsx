@@ -6,18 +6,15 @@ import {
   type NewsFeedItem,
 } from '../lib/supabase'
 import { runRealtimeRecovery } from '../lib/realtimeRecovery'
+import {
+  getEasternVisibleDay,
+  isCurrentVisibleNewsFeedRow,
+  isKnownHiddenOrOtherDayNewsFeedRow,
+} from '../lib/newsFeedVisibility'
 import { useAuth } from './useAuth'
 import { useRealtimeRecovery } from './useRealtimeRecovery'
 
 const FEED_LIMIT = 80
-
-const getEasternVisibleDay = () =>
-  new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'America/New_York',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date())
 
 const sortFeedItems = (items: NewsFeedItem[]) =>
   [...items].sort((a, b) => (
@@ -63,10 +60,6 @@ export function useNewsFeed() {
       setLoading(false)
     }
   }, [])
-
-  const isCurrentVisibleItem = useCallback((item: NewsFeedItem | null): item is NewsFeedItem => (
-    Boolean(item && !item.hidden && item.visible_day === getEasternVisibleDay())
-  ), [])
 
   const fetchFeedItem = useCallback(async (id: string) => {
     const workingClient = await getWorkingClient()
@@ -127,8 +120,10 @@ export function useNewsFeed() {
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'news_feed_items' },
           async (payload: any) => {
+            if (isKnownHiddenOrOtherDayNewsFeedRow(payload.new)) return
+
             const item = await fetchFeedItem(payload.new.id)
-            if (!isCurrentVisibleItem(item)) return
+            if (!isCurrentVisibleNewsFeedRow(item)) return
             setItems(prev => dedupeFeedItems([item, ...prev]).slice(0, FEED_LIMIT))
           }
         )
@@ -136,12 +131,17 @@ export function useNewsFeed() {
           'postgres_changes',
           { event: 'UPDATE', schema: 'public', table: 'news_feed_items' },
           async (payload: any) => {
+            if (isKnownHiddenOrOtherDayNewsFeedRow(payload.new)) {
+              setItems(prev => prev.filter(existing => existing.id !== payload.new.id))
+              return
+            }
+
             const item = await fetchFeedItem(payload.new.id)
             setItems(prev => {
               if (!item || item.hidden) {
                 return prev.filter(existing => existing.id !== payload.new.id)
               }
-              if (!isCurrentVisibleItem(item)) {
+              if (!isCurrentVisibleNewsFeedRow(item)) {
                 return prev.filter(existing => existing.id !== payload.new.id)
               }
               return dedupeFeedItems(prev.map(existing => existing.id === item.id ? item : existing))
@@ -175,7 +175,7 @@ export function useNewsFeed() {
       }
       channelRef.current = null
     }
-  }, [fetchFeedItem, isCurrentVisibleItem, user])
+  }, [fetchFeedItem, user])
 
   const toggleReaction = useCallback(async (feedItemId: string, emoji: string) => {
     if (!user) return
