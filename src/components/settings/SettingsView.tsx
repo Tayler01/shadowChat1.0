@@ -228,7 +228,7 @@ function ToggleRow({
         role="switch"
         aria-checked={enabled}
         aria-label={`Toggle ${label}`}
-        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full border transition-all ${
+        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full border transition-[background-color,border-color,box-shadow,opacity] ${
           enabled
             ? 'border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] shadow-[var(--shadow-gold-soft)]'
             : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.05)]'
@@ -590,7 +590,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
             key={section.id}
             type="button"
             onClick={() => setActiveSection(section.id)}
-            className="group relative grid grid-cols-[auto_1fr_auto] items-center gap-4 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 text-left shadow-[var(--shadow-panel)] transition-all hover:-translate-y-0.5 hover:border-[var(--border-glow)] hover:bg-[rgba(255,255,255,0.05)] sm:min-h-36 sm:grid-cols-1 sm:items-stretch sm:rounded-[var(--radius-lg)] sm:p-5"
+            className="group relative grid grid-cols-[auto_1fr_auto] items-center gap-4 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 text-left shadow-[var(--shadow-panel)] transition-[background-color,border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-[var(--border-glow)] hover:bg-[rgba(255,255,255,0.05)] sm:min-h-36 sm:grid-cols-1 sm:items-stretch sm:rounded-[var(--radius-lg)] sm:p-5"
           >
             <span className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)] p-2.5 text-[var(--text-gold)] sm:w-fit sm:rounded-[var(--radius-md)] sm:p-3">
               <section.icon className="h-5 w-5" />
@@ -923,7 +923,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
                 key={adminSection.id}
                 type="button"
                 onClick={() => setActiveAdminSection(adminSection.id)}
-                className="group relative grid min-h-32 grid-cols-[auto_1fr_auto] items-center gap-4 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 text-left transition-all hover:-translate-y-0.5 hover:border-[var(--border-glow)] hover:bg-[rgba(255,255,255,0.05)] md:grid-cols-1 md:items-stretch"
+                className="group relative grid min-h-32 grid-cols-[auto_1fr_auto] items-center gap-4 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 text-left transition-[background-color,border-color,transform] hover:-translate-y-0.5 hover:border-[var(--border-glow)] hover:bg-[rgba(255,255,255,0.05)] md:grid-cols-1 md:items-stretch"
               >
                 <span className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)] p-2.5 text-[var(--text-gold)] md:w-fit md:rounded-[var(--radius-md)] md:p-3">
                   <adminSection.icon className="h-5 w-5" />
@@ -1187,7 +1187,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
             type="button"
             onClick={() => setScheme(key)}
             aria-pressed={scheme === key}
-            className={`rounded-[var(--radius-md)] border p-3 text-left transition-all ${
+            className={`rounded-[var(--radius-md)] border p-3 text-left transition-[background-color,border-color,box-shadow] ${
               scheme === key
                 ? 'border-[var(--border-glow)] bg-[rgba(255,255,255,0.06)] shadow-[var(--shadow-gold-soft)]'
                 : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] hover:border-[var(--border-panel)] hover:bg-[rgba(255,255,255,0.05)]'

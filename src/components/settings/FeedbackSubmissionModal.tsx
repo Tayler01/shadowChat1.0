@@ -231,7 +231,7 @@ export const FeedbackSubmissionModal: React.FC<FeedbackSubmissionModalProps> = (
                         type="button"
                         onClick={() => setType(option.value)}
                         aria-pressed={selected}
-                        className={`rounded-[var(--radius-md)] border p-4 text-left transition-all ${
+                        className={`rounded-[var(--radius-md)] border p-4 text-left transition-[background-color,border-color,box-shadow] ${
                           selected
                             ? 'border-[var(--border-glow)] bg-[rgba(215,170,70,0.12)] shadow-[var(--shadow-gold-soft)]'
                             : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] hover:border-[var(--border-panel)] hover:bg-[rgba(255,255,255,0.05)]'

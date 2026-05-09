@@ -458,7 +458,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
             <div className="h-full w-full bg-[radial-gradient(circle_at_top_left,rgba(255,240,184,0.18),transparent_26%),linear-gradient(135deg,#17191c,#0f1112_58%,#34250c)]" />
           )}
           <button
-            className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-sm)] border border-[rgba(255,240,184,0.46)] bg-[linear-gradient(180deg,rgba(255,240,184,0.24),rgba(215,170,70,0.18)_42%,rgba(43,30,8,0.78)_100%)] p-0 text-[var(--text-gold)] shadow-[0_10px_24px_rgba(0,0,0,0.38),0_0_0_1px_rgba(215,170,70,0.1)] transition-all hover:-translate-y-0.5 hover:border-[rgba(255,240,184,0.72)] hover:text-[rgb(255,240,184)]"
+            className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-[var(--radius-sm)] border border-[rgba(255,240,184,0.46)] bg-[linear-gradient(180deg,rgba(255,240,184,0.24),rgba(215,170,70,0.18)_42%,rgba(43,30,8,0.78)_100%)] p-0 text-[var(--text-gold)] shadow-[0_10px_24px_rgba(0,0,0,0.38),0_0_0_1px_rgba(215,170,70,0.1)] transition-[border-color,color,transform] hover:-translate-y-0.5 hover:border-[rgba(255,240,184,0.72)] hover:text-[rgb(255,240,184)]"
             aria-label="Change banner image"
             onClick={() => bannerInputRef.current?.click()}
           >
@@ -488,7 +488,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
                 className="border-4 border-[var(--bg-panel-strong)] shadow-[0_12px_28px_rgba(0,0,0,0.34)]"
               />
               <button
-                className="absolute -bottom-2 right-1 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(255,240,184,0.58)] bg-[linear-gradient(180deg,rgba(255,240,184,0.28),rgba(215,170,70,0.2)_42%,rgba(80,55,13,0.88)_100%)] p-0 text-[rgb(255,240,184)] shadow-[0_10px_22px_rgba(0,0,0,0.42),var(--shadow-gold-soft)] transition-all hover:-translate-y-0.5 hover:border-[rgba(255,248,220,0.82)]"
+                className="absolute -bottom-2 right-1 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(255,240,184,0.58)] bg-[linear-gradient(180deg,rgba(255,240,184,0.28),rgba(215,170,70,0.2)_42%,rgba(80,55,13,0.88)_100%)] p-0 text-[rgb(255,240,184)] shadow-[0_10px_22px_rgba(0,0,0,0.42),var(--shadow-gold-soft)] transition-[border-color,transform] hover:-translate-y-0.5 hover:border-[rgba(255,248,220,0.82)]"
                 aria-label="Change avatar"
                 onClick={() => avatarInputRef.current?.click()}
               >
