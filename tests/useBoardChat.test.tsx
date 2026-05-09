@@ -52,12 +52,30 @@ const createQuery = (data: unknown[], error: unknown = null) => {
   return query
 }
 
-const createChannel = () => ({
-  state: 'joined',
-  on: jest.fn().mockReturnThis(),
-  subscribe: jest.fn().mockReturnThis(),
-  send: jest.fn(),
-})
+type RealtimeHandlers = Record<string, (payload: any) => Promise<void> | void>
+
+type TestChannel = {
+  state: string
+  on: jest.Mock<TestChannel, [string, { event: string }, RealtimeHandlers[string]]>
+  subscribe: jest.Mock<TestChannel, []>
+  send: jest.Mock
+}
+
+const createChannel = (handlers: RealtimeHandlers): TestChannel => {
+  const channel: TestChannel = {
+    state: 'joined',
+    on: jest.fn((_: string, config: { event: string }, handler: RealtimeHandlers[string]) => {
+      handlers[config.event] = handler
+      return channel
+    }),
+    subscribe: jest.fn(() => channel),
+    send: jest.fn(),
+  }
+
+  return channel
+}
+
+let realtimeHandlers: RealtimeHandlers
 
 let workingClient: {
   from: jest.Mock
@@ -70,10 +88,11 @@ beforeEach(() => {
   jest.resetAllMocks()
   ;(useAuth as jest.Mock).mockReturnValue({ user: { id: 'u1' } })
   ;(ensureSession as jest.Mock).mockResolvedValue(true)
+  realtimeHandlers = {}
 
   workingClient = {
     from: jest.fn(),
-    channel: jest.fn(() => createChannel()),
+    channel: jest.fn(() => createChannel(realtimeHandlers)),
     removeChannel: jest.fn(),
     rpc: jest.fn().mockResolvedValue({ data: null, error: null }),
   }
@@ -116,6 +135,80 @@ test('realtime recovery refreshes board chat without showing the full loading st
   expect(result.current.loading).toBe(false)
   await waitFor(() => expect(refreshQuery.limit).toHaveBeenCalledWith(50))
   expect(result.current.loading).toBe(false)
+})
+
+test('skips realtime update detail fetches for unloaded board chat messages', async () => {
+  const initialQuery = createQuery([createMessage('m1', 1)])
+  workingClient.from.mockReturnValue(initialQuery)
+
+  const { result } = renderHook(() => useBoardChat('news-chat', 'News Chat'))
+
+  await waitFor(() => expect(result.current.loading).toBe(false))
+  await waitFor(() => expect(realtimeHandlers.UPDATE).toBeDefined())
+  expect(workingClient.from).toHaveBeenCalledTimes(1)
+
+  act(() => {
+    realtimeHandlers.UPDATE?.({
+      new: {
+        id: 'offscreen-message',
+        content: 'offscreen edit',
+        updated_at: '2026-05-02T13:00:00.000Z',
+      },
+    })
+  })
+
+  expect(workingClient.from).toHaveBeenCalledTimes(1)
+  expect(result.current.messages.map(message => message.id)).toEqual(['m1'])
+})
+
+test('merges realtime board chat updates for loaded messages without refetching', async () => {
+  const initialQuery = createQuery([createMessage('m1', 1)])
+  workingClient.from.mockReturnValue(initialQuery)
+
+  const { result } = renderHook(() => useBoardChat('news-chat', 'News Chat'))
+
+  await waitFor(() => expect(result.current.loading).toBe(false))
+  await waitFor(() => expect(realtimeHandlers.UPDATE).toBeDefined())
+  expect(workingClient.from).toHaveBeenCalledTimes(1)
+
+  act(() => {
+    realtimeHandlers.UPDATE?.({
+      new: {
+        id: 'm1',
+        content: 'edited locally',
+        reactions: { gold: ['u2'] },
+        updated_at: '2026-05-02T13:00:00.000Z',
+      },
+    })
+  })
+
+  expect(workingClient.from).toHaveBeenCalledTimes(1)
+  expect(result.current.messages[0].content).toBe('edited locally')
+  expect(result.current.messages[0].reactions).toEqual({ gold: ['u2'] })
+  expect(result.current.messages[0].user).toEqual({ id: 'u1', username: 'user', display_name: 'User' })
+})
+
+test('ignores stale realtime board chat updates for loaded messages', async () => {
+  const initialQuery = createQuery([createMessage('m1', 5)])
+  workingClient.from.mockReturnValue(initialQuery)
+
+  const { result } = renderHook(() => useBoardChat('news-chat', 'News Chat'))
+
+  await waitFor(() => expect(result.current.loading).toBe(false))
+  await waitFor(() => expect(realtimeHandlers.UPDATE).toBeDefined())
+
+  act(() => {
+    realtimeHandlers.UPDATE?.({
+      new: {
+        id: 'm1',
+        content: 'stale edit',
+        updated_at: '2026-05-02T12:04:00.000Z',
+      },
+    })
+  })
+
+  expect(workingClient.from).toHaveBeenCalledTimes(1)
+  expect(result.current.messages[0].content).toBe('m1')
 })
 
 test('deletes board chat messages without client-side owner filtering', async () => {

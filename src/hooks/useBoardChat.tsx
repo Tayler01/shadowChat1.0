@@ -24,6 +24,11 @@ const dedupeChatMessages = (items: BoardChatMessage[]) => {
   return sortChatMessages(Array.from(map.values()))
 }
 
+const isIncomingUpdateCurrent = (existing: BoardChatMessage, incoming: Partial<BoardChatMessage>) => {
+  if (!incoming.updated_at || !existing.updated_at) return true
+  return new Date(incoming.updated_at).getTime() >= new Date(existing.updated_at).getTime()
+}
+
 export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
   const { user } = useAuth()
   const [messages, setMessages] = useState<BoardChatMessage[]>([])
@@ -36,6 +41,11 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
   const subscribeRef = useRef<(() => Promise<RealtimeChannel | null>) | null>(null)
   const fetchRequestIdRef = useRef(0)
   const loadedOlderRef = useRef(false)
+  const messagesRef = useRef<BoardChatMessage[]>([])
+
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
 
   const fetchMessages = useCallback(async (options: FetchMessagesOptions = {}) => {
     const requestId = fetchRequestIdRef.current + 1
@@ -166,11 +176,14 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
         .on(
           'postgres_changes',
           { event: 'UPDATE', schema: 'public', table: 'board_chat_messages', filter: `board_slug=eq.${boardSlug}` },
-          async (payload: any) => {
-            const message = await fetchMessage(payload.new.id)
-            if (!message) return
+          (payload: any) => {
+            const messageId = payload.new?.id
+            if (!messageId || !messagesRef.current.some(message => message.id === messageId)) return
+
             setMessages(prev => dedupeChatMessages(prev.map(existing => (
-              existing.id === message.id ? message : existing
+              existing.id === messageId && isIncomingUpdateCurrent(existing, payload.new)
+                ? { ...existing, ...payload.new, user: existing.user }
+                : existing
             ))))
           }
         )
