@@ -13,24 +13,26 @@ const normalizeBadgeCount = (count: number) => {
   return Math.floor(count)
 }
 
-const postBadgeCountToServiceWorker = async (count: number) => {
+const postMessageToServiceWorker = async (message: Record<string, unknown>) => {
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
     return
-  }
-
-  const message = {
-    type: 'SHADOWCHAT_BADGE_UPDATE',
-    count,
   }
 
   navigator.serviceWorker.controller?.postMessage(message)
 
   try {
-    const registration = await navigator.serviceWorker.ready
-    registration.active?.postMessage(message)
+    const registration = await navigator.serviceWorker.getRegistration?.()
+    registration?.active?.postMessage(message)
   } catch {
-    // Badge support is best-effort and should never block chat.
+    // Service worker messaging is best-effort and should never block chat.
   }
+}
+
+const postBadgeCountToServiceWorker = async (count: number) => {
+  await postMessageToServiceWorker({
+    type: 'SHADOWCHAT_BADGE_UPDATE',
+    count,
+  })
 }
 
 const postServiceWorkerMessage = async (message: Record<string, unknown>) => {
@@ -42,14 +44,7 @@ const postServiceWorkerMessage = async (message: Record<string, unknown>) => {
     return
   }
 
-  navigator.serviceWorker.controller?.postMessage(message)
-
-  try {
-    const registration = await navigator.serviceWorker.ready
-    registration.active?.postMessage(message)
-  } catch {
-    // Service worker messaging is best-effort and should never block chat.
-  }
+  await postMessageToServiceWorker(message)
 }
 
 export const updateAppBadge = async (count: number) => {

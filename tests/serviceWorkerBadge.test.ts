@@ -8,7 +8,7 @@ const flushPromises = async () => {
   await Promise.resolve()
 }
 
-const loadServiceWorker = () => {
+const loadServiceWorker = (options: { caches?: unknown } = {}) => {
   const listeners: ListenerMap = {}
   const setAppBadge = jest.fn().mockResolvedValue(undefined)
   const clearAppBadge = jest.fn().mockResolvedValue(undefined)
@@ -42,6 +42,7 @@ const loadServiceWorker = () => {
   }
 
   const context = vm.createContext({
+    caches: options.caches,
     clearTimeout,
     navigator: selfMock.navigator,
     Promise,
@@ -246,5 +247,27 @@ describe('service worker app badge handling', () => {
     expect(closeBridgeGroup).toHaveBeenCalledTimes(1)
     expect(closeDM).not.toHaveBeenCalled()
     expect(closeUnknown).not.toHaveBeenCalled()
+  })
+
+  it('cleans up old static asset caches on activation', async () => {
+    const caches = {
+      delete: jest.fn().mockResolvedValue(true),
+      keys: jest.fn().mockResolvedValue([
+        'shadowchat-static-assets-v0',
+        'shadowchat-static-assets-v1',
+        'other-cache',
+      ]),
+    }
+    const { listeners } = loadServiceWorker({ caches })
+    const pending: Promise<unknown>[] = []
+
+    listeners.activate({
+      waitUntil: (task: Promise<unknown>) => pending.push(task),
+    })
+
+    await Promise.allSettled(pending)
+
+    expect(caches.delete).toHaveBeenCalledTimes(1)
+    expect(caches.delete).toHaveBeenCalledWith('shadowchat-static-assets-v0')
   })
 })

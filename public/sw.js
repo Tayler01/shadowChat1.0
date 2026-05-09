@@ -1,12 +1,32 @@
+const STATIC_ASSET_CACHE = 'shadowchat-static-assets-v1'
+const STATIC_ASSET_CACHE_PREFIX = 'shadowchat-static-assets-'
+
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting())
 })
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim())
-})
+const cleanupOldStaticAssetCaches = async () => {
+  if (typeof caches === 'undefined' || !caches.keys || !caches.delete) {
+    return
+  }
 
-const STATIC_ASSET_CACHE = 'shadowchat-static-assets-v1'
+  const cacheNames = await caches.keys()
+  await Promise.all(
+    cacheNames
+      .filter((cacheName) => (
+        cacheName.startsWith(STATIC_ASSET_CACHE_PREFIX) &&
+        cacheName !== STATIC_ASSET_CACHE
+      ))
+      .map((cacheName) => caches.delete(cacheName))
+  )
+}
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(Promise.all([
+    self.clients.claim(),
+    cleanupOldStaticAssetCaches(),
+  ]))
+})
 
 const isCacheableStaticAssetRequest = (request) => {
   if (!request || request.method !== 'GET') {

@@ -46,6 +46,7 @@ const DEFAULT_PREFERENCES = {
 }
 
 const SW_PATH = '/sw.js'
+let serviceWorkerRegistrationPromise: Promise<ServiceWorkerRegistration | null> | null = null
 
 export const getDefaultNotificationPreferences = (
   userId: string
@@ -111,8 +112,16 @@ export const registerPushServiceWorker = async () => {
   const support = getPushSupportStatus()
   if (!support.supported) return null
 
-  const registration = await navigator.serviceWorker.register(SW_PATH, { scope: '/' })
-  return registration
+  if (!serviceWorkerRegistrationPromise) {
+    serviceWorkerRegistrationPromise = navigator.serviceWorker
+      .register(SW_PATH, { scope: '/' })
+      .catch(error => {
+        serviceWorkerRegistrationPromise = null
+        throw error
+      })
+  }
+
+  return serviceWorkerRegistrationPromise
 }
 
 const urlBase64ToUint8Array = (base64String: string) => {

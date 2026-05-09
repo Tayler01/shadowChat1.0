@@ -27,6 +27,10 @@ export function AppBadgeSync() {
 
   useEffect(() => {
     const syncBadge = () => {
+      if (document.visibilityState === 'hidden') {
+        return
+      }
+
       if (totalUnread === 0 && Date.now() < trustLocalClearUntilRef.current) {
         void updateAppBadge(0)
         return

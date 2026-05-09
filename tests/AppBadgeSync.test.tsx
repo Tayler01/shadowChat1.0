@@ -34,6 +34,10 @@ describe('AppBadgeSync', () => {
   beforeEach(() => {
     conversations = []
     jest.clearAllMocks()
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'visible',
+    })
   })
 
   it('trusts a local clear briefly so Android does not repaint a stale launcher badge', async () => {
@@ -65,5 +69,21 @@ describe('AppBadgeSync', () => {
     window.dispatchEvent(new Event('focus'))
 
     await waitFor(() => expect(mockedRefreshAppBadge).toHaveBeenCalledWith(1))
+  })
+
+  it('does not refresh from the server while the app is being hidden', async () => {
+    conversations = [{ unread_count: 1 }]
+    renderBadgeSync()
+
+    await waitFor(() => expect(mockedRefreshAppBadge).toHaveBeenCalledWith(1))
+    mockedRefreshAppBadge.mockClear()
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'hidden',
+    })
+    document.dispatchEvent(new Event('visibilitychange'))
+
+    expect(mockedRefreshAppBadge).not.toHaveBeenCalled()
   })
 })
