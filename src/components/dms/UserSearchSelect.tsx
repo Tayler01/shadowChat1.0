@@ -65,7 +65,7 @@ export const UserSearchSelect: React.FC<UserSearchSelectProps> = ({
     ? (error || 'User not found')
     : null
   const panelClasses = inlineResults
-    ? 'mt-3 max-h-[min(55vh,24rem)] w-full overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(7,8,9,0.84)] shadow-[var(--shadow-panel)] backdrop-blur-xl'
+    ? 'mt-3 max-h-[min(55vh,24rem)] w-full overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(7,8,9,0.96)] shadow-[var(--shadow-panel)]'
     : 'glass-panel absolute z-10 mt-2 max-h-60 w-full overflow-y-auto rounded-[var(--radius-md)] border border-[var(--border-panel)] shadow-[var(--shadow-panel)]'
 
   return (

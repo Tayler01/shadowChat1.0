@@ -702,7 +702,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 12 }}
-              className="absolute inset-0 z-20 flex flex-col bg-[linear-gradient(180deg,rgba(7,8,9,0.94),rgba(10,11,12,0.98))] backdrop-blur-xl"
+              className="absolute inset-0 z-20 flex flex-col bg-[linear-gradient(180deg,rgba(7,8,9,0.97),rgba(10,11,12,0.99))]"
             >
               <div className="border-b border-[var(--border-panel)] px-4 py-4">
                 <div className="mb-3 flex items-center justify-between gap-3">

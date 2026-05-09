@@ -37,7 +37,7 @@ export function MobileNav({ currentView, onViewChange, className, embedded = fal
 
   return (
     <nav
-      className={`${embedded ? 'h-[4.15rem] border-t border-[var(--border-panel)] bg-transparent' : 'glass-panel-strong h-[4.15rem] border-t border-[var(--border-panel)] backdrop-blur-xl'} md:hidden ${
+      className={`${embedded ? 'h-[4.15rem] border-t border-[var(--border-panel)] bg-transparent' : 'glass-panel-strong h-[4.15rem] border-t border-[var(--border-panel)]'} md:hidden ${
         className || 'fixed bottom-0 inset-x-0 z-50'
       }`}
     >
