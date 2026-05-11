@@ -507,7 +507,7 @@ export function BoardChat({
         />
       </div>
 
-      <MobileChatFooter currentView={currentView} onViewChange={onViewChange}>
+      <MobileChatFooter currentView={currentView} onViewChange={onViewChange} avoidAndroidKeyboardLift>
         <BoardChatComposer
           board={board}
           draft={draft}

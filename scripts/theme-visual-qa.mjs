@@ -159,7 +159,9 @@ async function runThemeProfile(profile, theme, accountA, accountB) {
     await page.getByRole('button', { name: 'Open News Chat' }).click()
     await page.locator('textarea:visible').first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
     await auditPage(page, profile, theme, '06-board-chat', { composer: true })
-    await focusAndAuditComposer(page, profile, theme, '07-board-chat-composer')
+    await focusAndAuditComposer(page, profile, theme, '07-board-chat-composer', {
+      simulateAndroidKeyboardInset: profile.browserName === 'chromium',
+    })
 
     await goToSettings(page)
     await auditPage(page, profile, theme, '08-settings', { header: false })
@@ -270,6 +272,9 @@ async function auditPage(page, profile, theme, flow, options = {}) {
   if (metrics.footer && (metrics.footer.top < 0 || metrics.footer.bottom > metrics.viewportHeight + 2)) {
     failures.push(`mobile footer outside viewport ${JSON.stringify(metrics.footer)}`)
   }
+  if (options.footerAtViewportBottom && metrics.footer && Math.abs(metrics.footer.bottom - metrics.viewportHeight) > 2) {
+    failures.push(`mobile footer detached from viewport bottom ${JSON.stringify(metrics.footer)}`)
+  }
 
   const check = {
     profile: profile.id,
@@ -288,7 +293,7 @@ async function auditPage(page, profile, theme, flow, options = {}) {
   }
 }
 
-async function focusAndAuditComposer(page, profile, theme, flow) {
+async function focusAndAuditComposer(page, profile, theme, flow, options = {}) {
   const original = profile.viewport
   const composer = page.locator('textarea:visible').last()
   await composer.click()
@@ -298,10 +303,26 @@ async function focusAndAuditComposer(page, profile, theme, flow) {
   const compressedHeight = Math.max(560, original.height - 280)
   await page.setViewportSize({ width: original.width, height: compressedHeight })
   await delay(250)
-  await auditPage(page, { ...profile, viewport: { width: original.width, height: compressedHeight } }, theme, `${flow}-compressed`, { composer: true })
+  if (options.simulateAndroidKeyboardInset) {
+    await page.evaluate(() => {
+      document.documentElement.style.setProperty('--shadowchat-keyboard-inset', '280px')
+    })
+  }
+  await auditPage(
+    page,
+    { ...profile, viewport: { width: original.width, height: compressedHeight } },
+    theme,
+    `${flow}-compressed`,
+    { composer: true, footerAtViewportBottom: Boolean(options.simulateAndroidKeyboardInset) }
+  )
 
   await page.setViewportSize(original)
   await delay(250)
+  if (options.simulateAndroidKeyboardInset) {
+    await page.evaluate(() => {
+      document.documentElement.style.removeProperty('--shadowchat-keyboard-inset')
+    })
+  }
   await composer.fill('')
 }
 
