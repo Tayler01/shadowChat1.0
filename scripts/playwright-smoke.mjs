@@ -653,10 +653,12 @@ async function scenarioSettings(state, _sessionA, sessionB) {
   await sessionB.page.getByRole('button', { name: 'Close' }).click()
   await sessionB.page.getByText('Setup Steps').waitFor({ state: 'hidden', timeout: DEFAULT_TIMEOUT_MS })
 
-  await toggleSwitch(sessionB.page, 'Toggle Reactions')
-  await expectSwitchState(sessionB.page, 'Toggle Reactions', true)
-  await toggleSwitch(sessionB.page, 'Toggle Reactions')
-  await expectSwitchState(sessionB.page, 'Toggle Reactions', false)
+  const reactionsSwitchLabel = 'Toggle Reactions'
+  const reactionsInitiallyEnabled = await isSwitchChecked(sessionB.page, reactionsSwitchLabel)
+  await toggleSwitch(sessionB.page, reactionsSwitchLabel)
+  await expectSwitchState(sessionB.page, reactionsSwitchLabel, !reactionsInitiallyEnabled)
+  await toggleSwitch(sessionB.page, reactionsSwitchLabel)
+  await expectSwitchState(sessionB.page, reactionsSwitchLabel, reactionsInitiallyEnabled)
 
   const pushSwitchLabel = 'Toggle Push Notifications'
   if (!(await isSwitchChecked(sessionB.page, pushSwitchLabel))) {
@@ -675,7 +677,14 @@ async function scenarioSettings(state, _sessionA, sessionB) {
     await sessionB.page.getByText('Setup Steps').waitFor({ state: 'hidden', timeout: DEFAULT_TIMEOUT_MS }).catch(() => {})
   }
 
-  if (pushEnabled) {
+  const pushActuallyEnabled = pushEnabled && await waitForEither(
+    [
+      async () => isSwitchChecked(sessionB.page, pushSwitchLabel),
+    ],
+    5_000
+  )
+
+  if (pushActuallyEnabled) {
     await expectVisibleText(sessionB.page, 'Enabled on this device', 30_000)
     await expectSwitchState(sessionB.page, pushSwitchLabel, true)
   } else {
@@ -791,7 +800,8 @@ async function openSettingsSection(page, sectionName) {
 }
 
 async function goToProfile(page) {
-  await page.getByRole('button', { name: /^Profile$/ }).click()
+  await goToSettings(page)
+  await openSettingsSection(page, 'Account & Profile')
   await waitForProfileView(page)
 }
 
@@ -823,7 +833,7 @@ async function waitForSettingsView(page) {
 
 async function waitForProfileView(page) {
   await page.getByRole('button', { name: /Edit Profile|Cancel/i }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-  await page.getByText('Identity').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByRole('heading', { name: 'Identity' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
 async function isChatVisible(page) {
@@ -1019,16 +1029,14 @@ async function isSwitchChecked(page, label) {
 }
 
 async function expectSwitchState(page, label, expected) {
-  await page.waitForFunction(
-    ({ switchLabel, expectedState }) => {
-      const element = Array.from(document.querySelectorAll('[role="switch"]')).find(node =>
-        (node.getAttribute('aria-label') || '') === switchLabel
-      )
-      return element?.getAttribute('aria-checked') === String(expectedState)
-    },
-    { switchLabel: label, expectedState: expected },
-    { timeout: DEFAULT_TIMEOUT_MS }
-  )
+  const deadline = Date.now() + DEFAULT_TIMEOUT_MS
+  while (Date.now() < deadline) {
+    if (await isSwitchChecked(page, label) === expected) {
+      return
+    }
+    await page.waitForTimeout(250)
+  }
+  throw new Error(`Switch "${label}" did not reach aria-checked=${expected}`)
 }
 
 async function assertSwitchGeometry(page, primaryLabel, referenceLabel) {

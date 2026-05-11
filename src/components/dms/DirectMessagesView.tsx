@@ -641,15 +641,14 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   return (
     <div className="flex h-full min-h-0 bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.05),transparent_28%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))]">
       <motion.div
-        initial={{ x: -320 }}
-        animate={{ x: 0 }}
+        initial={false}
         className={`glass-panel-strong relative flex-shrink-0 w-full border-r border-[var(--border-panel)] lg:w-[22rem] ${
           showConversationList ? 'flex' : 'hidden lg:flex'
         } flex-col`}
       >
         <div className="border-b border-[var(--border-panel)] p-4">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center">
+          <div className="mb-4 flex items-center justify-between gap-2 overflow-hidden">
+            <div className="flex min-w-0 flex-1 items-center">
               {!isDesktop && (
                 <Button
                   variant="ghost"
@@ -665,10 +664,10 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 <img
                   src="/icons/header-logo.png"
                   alt="SHADO"
-                  className="absolute -left-12 top-1/2 h-[5.75rem] w-44 -translate-y-1/2 object-contain object-left sm:-left-14 sm:w-48 md:hidden"
+                  className="absolute -left-10 top-1/2 h-[5.25rem] w-36 -translate-y-1/2 object-contain object-left min-[380px]:-left-12 min-[380px]:h-[5.75rem] min-[380px]:w-44 sm:-left-14 sm:w-48 md:hidden"
                 />
-                <div className="min-w-0 pl-28 sm:pl-32 md:pl-0">
-                  <h2 className="text-base font-semibold text-[var(--text-primary)] md:text-lg">
+                <div className="min-w-0 pl-24 min-[380px]:pl-28 sm:pl-32 md:pl-0">
+                  <h2 className="truncate text-base font-semibold text-[var(--text-primary)] md:text-lg">
                     Direct Messages
                   </h2>
                   {!isDesktop && (
@@ -682,7 +681,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
             <Button
               size="sm"
               onClick={() => setShowNewConversation(true)}
-              className="gap-2 p-2 sm:px-3"
+              className="shrink-0 gap-2 p-2 sm:px-3"
               aria-label="Start new conversation"
             >
               <Plus className="w-4 h-4" />

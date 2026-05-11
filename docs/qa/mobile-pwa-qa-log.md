@@ -1,0 +1,30 @@
+# Mobile PWA QA Log
+
+Last updated: 2026-05-10
+
+## Summary
+
+Mobile PWA visual QA now runs through `npm run qa:mobile-pwa`, which uses `scripts/mobile-pwa-visual-qa.mjs` against a production-style Vite preview on `127.0.0.1:4174`.
+
+Latest focused pass: `npm run qa:mobile-pwa -- --run-name=mobile-pwa-final --no-reuse-server`.
+
+- Result: passed.
+- Profiles: Mobile Safari/WebKit iPhone small, Mobile Safari/WebKit iPhone large, Mobile Chrome Android medium, Mobile Chrome Android small.
+- Checks: 83 passed, 0 failed, 1 non-blocking not-tested note.
+- Artifacts: `output/playwright/mobile-pwa-final/`.
+- Prior complete public-profile coverage artifact: `output/playwright/mobile-pwa-audit-10/` with 84 passed, 0 failed, 0 not tested.
+
+## Issue Log
+
+| Issue ID | Status | Device profile | Route/screen | Reproduction steps | Screenshot path | Root cause | Files changed | Verification command | Notes/remaining risk |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| MPWA-001 | fixed | local QA environment | Playwright mobile browsers | Run `npm run qa:mobile-pwa -- --run-name=mobile-pwa-initial --no-reuse-server`. | n/a | Playwright was installed but the local browser binaries were missing. | none | `npx playwright install chromium webkit` | Environment dependency installed locally. |
+| MPWA-002 | verified | all mobile profiles | core mobile PWA flows | Run the new mobile visual QA harness. | `output/playwright/mobile-pwa-final/summary.json` | The repo had mobile smoke coverage but no focused reusable PWA visual audit harness. | `package.json`; `scripts/mobile-pwa-visual-qa.mjs` | `npm run qa:mobile-pwa -- --run-name=mobile-pwa-final --no-reuse-server` | Harness covers launch/session restore, chat, DMs, boards, settings, feedback, profile, message actions, composer focus/compression, and refocus simulation. |
+| MPWA-003 | fixed | iPhone small WebKit, 390x844 | DM list | Navigate to DMs during the mobile PWA audit and navigate back to the DM list from a thread. | `output/playwright/mobile-pwa-audit-5/iphone-small-webkit-07-dm-list.png`; `output/playwright/mobile-pwa-final/summary.json` | The DM list panel used horizontal entrance motion that could be sampled mid-transition and clip controls on route entry or return-to-list. | `src/components/dms/DirectMessagesView.tsx` | `npm run qa:mobile-pwa -- --run-name=mobile-pwa-final --no-reuse-server` | Removed the full-panel horizontal slide so the viewport-width DM list no longer creates transient mobile clipping. |
+| MPWA-004 | fixed | Android small Chromium, 360x800 | DM list header | Navigate to DMs on the small Android profile. | `output/playwright/mobile-pwa-audit-7/android-small-chromium-07-dm-list.png` | The DM masthead did not leave enough shrink room for the new conversation button at the narrowest tested width. | `src/components/dms/DirectMessagesView.tsx` | `npm run qa:mobile-pwa -- --run-name=mobile-pwa-audit-8 --no-reuse-server` | Header now has constrained flex behavior, a smaller logo/offset below 380px, truncated title text, and a non-shrinking plus button. |
+| MPWA-005 | documented | all mobile profiles | dense secondary controls | Run the mobile PWA audit and review warnings in `summary.json`. | `output/playwright/mobile-pwa-final/summary.json` | Some reaction chips, reply links, weather/action buttons, and board reaction chips are visually small secondary controls. | docs only | `npm run qa:mobile-pwa -- --run-name=mobile-pwa-final --no-reuse-server` | Automated audit records them as warnings, not blockers. Validate comfort on real installed iPhone and Android before deciding whether to enlarge dense secondary controls. |
+| MPWA-006 | documented | iPhone small WebKit, 390x844 | public profile modal | Run `mobile-pwa-final` and open a public profile from the currently loaded chat content. | `output/playwright/mobile-pwa-final/summary.json`; `output/playwright/mobile-pwa-audit-10/summary.json` | In the final run, one visible opener did not produce a dialog on the iPhone-small profile. The same flow passed in the prior complete run and other final profiles. | `scripts/mobile-pwa-visual-qa.mjs`; docs only | `npm run qa:mobile-pwa -- --run-name=mobile-pwa-final --no-reuse-server` | Marked as non-blocking testability variance. Real-device validation should still tap public profiles from chat and DM content. |
+
+## Final Summary
+
+The automated mobile PWA visual loop passed across the core installed-home-screen simulations. Final required checks also passed: lint, typecheck, build, Jest, existing mobile smoke, full smoke, and the focused mobile PWA harness. Remaining mobile-specific risk is limited to real-device behavior that Playwright cannot fully reproduce: native keyboard animation, iOS standalone status bar behavior, home indicator safe-area behavior on physical devices, and touch comfort for dense secondary controls.
