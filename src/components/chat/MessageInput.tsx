@@ -463,7 +463,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   return (
     <div
-      className={`relative border-t border-[var(--border-panel)] bg-[linear-gradient(180deg,rgba(16,18,19,0.94),rgba(10,11,12,0.98))] px-3 pb-3 pt-2.5 md:p-3 ${className}`}
+      className={`theme-composer-surface relative border-t border-[var(--border-panel)] px-3 pb-3 pt-2.5 md:p-3 ${className}`}
     >
       {replyingTo && (
         <div className="mb-2 flex items-center justify-between rounded-[var(--radius-xs)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] shadow-[var(--shadow-panel)]">
@@ -538,7 +538,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                 setComposerMessage(cleanText)
                 textareaRef.current?.focus()
               }}
-              className="rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)] px-3 py-1 text-sm text-[var(--text-secondary)] transition-colors hover:border-[var(--border-glow)] hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--text-gold)]"
+              className="rounded-full border border-[var(--border-subtle)] bg-[var(--bg-panel-soft)] px-3 py-1 text-sm text-[var(--text-secondary)] transition-colors hover:border-[var(--border-glow)] hover:bg-[var(--theme-surface-hover)] hover:text-[var(--theme-accent-readable)]"
             >
               {/* Display the original suggestion but insert cleaned version */}
               {s.replace(/^[\d.)-\s]*["']?|["']?$/g, '').trim()}
@@ -664,7 +664,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           variant="ghost"
           size="sm"
           onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-          className="hidden h-12 w-12 rounded-xl p-0 text-[var(--text-gold)] md:inline-flex"
+          className="hidden h-12 w-12 rounded-xl p-0 text-[var(--theme-accent-readable)] md:inline-flex"
           aria-label="Insert emoji"
         >
           <Smile className="w-4 h-4" />

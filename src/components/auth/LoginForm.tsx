@@ -86,7 +86,7 @@ export function LoginForm() {
   const visibleError = submitError || (authError ? getAuthErrorMessage(new Error(authError)) : null);
 
   return (
-    <div className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.12),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(215,170,70,0.08),transparent_24%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] px-4">
+    <div className="theme-page-surface relative flex min-h-[100dvh] items-center justify-center overflow-hidden px-4">
       <div className="pointer-events-none absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] [background-size:32px_32px]" />
       <div className="relative mx-4 grid w-full max-w-5xl gap-6 lg:grid-cols-[1fr_26rem]">
         <div className="hidden items-end lg:flex">
@@ -95,9 +95,9 @@ export function LoginForm() {
               <img
                 src="/icons/header-logo.png"
                 alt="SHADO"
-                className="h-28 w-80 object-contain object-left"
+                className="theme-logo h-28 w-80 object-contain object-left"
               />
-              <span className="inline-flex rounded-full border border-[rgba(215,170,70,0.16)] bg-[rgba(215,170,70,0.08)] px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--text-gold)]">
+              <span className="theme-accent-chip inline-flex rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.14em]">
                 Real-time private chat
               </span>
               <h2 className="text-4xl font-semibold leading-tight text-[var(--text-primary)]">
@@ -134,7 +134,7 @@ export function LoginForm() {
               <img
                 src="/icons/header-logo.png"
                 alt="SHADO"
-                className="h-20 w-56 object-contain"
+                className="theme-logo h-20 w-56 object-contain"
               />
             </div>
             <h1 className="text-2xl font-bold text-[var(--text-primary)]">
@@ -150,7 +150,7 @@ export function LoginForm() {
               <span className="rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">
                 Realtime
               </span>
-              <span className="rounded-full border border-[rgba(215,170,70,0.16)] bg-[rgba(215,170,70,0.08)] px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--text-gold)]">
+              <span className="theme-accent-chip rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.14em]">
                 Private chat
               </span>
             </div>
@@ -239,7 +239,7 @@ export function LoginForm() {
             <button
               type="button"
               onClick={() => setIsLogin(!isLogin)}
-              className="text-sm font-medium text-[var(--text-gold)] transition-colors hover:text-[var(--gold-accent-strong)]"
+              className="text-sm font-medium text-[var(--theme-accent-readable)] transition-colors hover:text-[var(--theme-accent-strong)]"
             >
               {isLogin 
                 ? "Don't have an account? Sign up" 

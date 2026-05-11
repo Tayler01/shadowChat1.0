@@ -207,7 +207,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
             <button
               type="button"
               onClick={() => onOpenProfile(message.sender ?? null)}
-              className="absolute left-0 top-0 z-10 rounded-full focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.32)]"
+              className="absolute left-0 top-0 z-10 rounded-full focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]"
               aria-label={`Open ${message.sender.display_name || message.sender.username}'s profile`}
               aria-haspopup="dialog"
             >
@@ -243,7 +243,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
             bubbleStyle
               ? ''
               : isOwn
-                ? 'border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.16),rgba(215,170,70,0.1)_34%,rgba(122,89,24,0.45)_100%)] text-[var(--text-primary)] shadow-[var(--shadow-gold-soft)]'
+                ? 'theme-sent-bubble'
                 : 'border border-[var(--border-subtle)] bg-[var(--bg-panel)] text-[var(--text-primary)] shadow-[var(--shadow-panel)]'
           }`}
           style={bubbleStyle}
@@ -301,7 +301,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
                 onReact={reactToMessage}
                 className="mt-1.5"
               />
-              <p className={`mt-1 text-xs ${isOwn ? 'text-[var(--text-gold)]/85' : 'text-[var(--text-muted)]'}`}>
+              <p className={`mt-1 text-xs ${isOwn ? 'text-[var(--theme-accent-readable)]/85' : 'text-[var(--text-muted)]'}`}>
                 {formatTime(message.created_at)}
                 {message.edited_at && ' (edited)'}
                 {isOwn && message.delivery_status && message.delivery_status !== 'sent' && (
@@ -639,7 +639,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   }), [conversations])
 
   return (
-    <div className="flex h-full min-h-0 bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.05),transparent_28%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))]">
+    <div className="theme-app-surface flex h-full min-h-0">
       <motion.div
         initial={false}
         className={`glass-panel-strong relative flex-shrink-0 w-full border-r border-[var(--border-panel)] lg:w-[22rem] ${
@@ -664,7 +664,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 <img
                   src="/icons/header-logo.png"
                   alt="SHADO"
-                  className="absolute -left-10 top-1/2 h-[5.25rem] w-36 -translate-y-1/2 object-contain object-left min-[380px]:-left-12 min-[380px]:h-[5.75rem] min-[380px]:w-44 sm:-left-14 sm:w-48 md:hidden"
+                  className="theme-logo absolute -left-10 top-1/2 h-[5.25rem] w-36 -translate-y-1/2 object-contain object-left min-[380px]:-left-12 min-[380px]:h-[5.75rem] min-[380px]:w-44 sm:-left-14 sm:w-48 md:hidden"
                 />
                 <div className="min-w-0 pl-24 min-[380px]:pl-28 sm:pl-32 md:pl-0">
                   <h2 className="truncate text-base font-semibold text-[var(--text-primary)] md:text-lg">
@@ -701,7 +701,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 12 }}
-              className="absolute inset-0 z-20 flex flex-col bg-[linear-gradient(180deg,rgba(7,8,9,0.97),rgba(10,11,12,0.99))]"
+              className="theme-panel-cover absolute inset-0 z-20 flex flex-col"
             >
               <div className="border-b border-[var(--border-panel)] px-4 py-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
@@ -777,7 +777,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   onClick={() => handleConversationSelect(conversation.id)}
                   className={`w-full rounded-[var(--radius-md)] border p-3 text-left transition-colors duration-[var(--dur-med)] ${
                     currentConversation === conversation.id
-                      ? 'border-[var(--border-glow)] bg-[rgba(255,255,255,0.05)] shadow-[var(--shadow-gold-soft)]'
+                      ? 'theme-selected-row'
                       : 'border-transparent hover:border-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.03)]'
                   }`}
                 >
@@ -821,7 +821,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                         </span>
                       )}
                       {unreadCount > 0 && (
-                        <span className="inline-flex min-w-[1.75rem] items-center justify-center rounded-full border border-[rgba(215,170,70,0.3)] bg-[rgba(215,170,70,0.14)] px-2 py-0.5 text-xs font-medium text-[var(--text-gold)]">
+                        <span className="theme-unread-badge inline-flex min-w-[1.75rem] items-center justify-center rounded-full px-2 py-0.5 text-xs font-medium">
                           {unreadCount > 99 ? '99+' : unreadCount}
                         </span>
                       )}
@@ -835,11 +835,11 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
         </div>
       </motion.div>
 
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         {currentConversation && currentConv ? (
           <>
-            <div className="glass-panel-strong flex-shrink-0 border-b border-[var(--border-panel)] px-6 py-4">
-              <div className="mx-auto flex w-full max-w-4xl items-center gap-3">
+            <div className="glass-panel-strong w-full max-w-full flex-shrink-0 border-b border-[var(--border-panel)] px-4 py-4 sm:px-6">
+              <div className="mx-auto flex min-w-0 max-w-full items-center gap-3 sm:w-full sm:max-w-4xl">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -860,7 +860,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   showStatus
                 />
 
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <h2 className="inline-flex max-w-full items-center gap-1.5 font-semibold text-[var(--text-primary)]">
                     <span className="truncate">{currentConv.other_user?.display_name}</span>
                     <UserRoleBadge role={currentConv.other_user?.admin_role} />
@@ -873,7 +873,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 <img
                   src="/icons/header-logo.png"
                   alt="SHADO"
-                  className="ml-auto h-8 w-20 shrink-0 object-contain object-right md:hidden"
+                  className="theme-logo ml-auto h-8 w-16 shrink-0 object-contain object-right min-[380px]:w-20 md:hidden"
                 />
               </div>
             </div>
@@ -947,9 +947,9 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                     className="mt-2 flex items-center space-x-2 text-sm text-[var(--text-muted)]"
                   >
                     <div className="flex space-x-1">
-                      <div className="h-2 w-2 animate-bounce rounded-full bg-[var(--gold-3)]" />
-                      <div className="h-2 w-2 animate-bounce rounded-full bg-[var(--gold-3)]" style={{ animationDelay: '0.1s' }} />
-                      <div className="h-2 w-2 animate-bounce rounded-full bg-[var(--gold-3)]" style={{ animationDelay: '0.2s' }} />
+                      <div className="h-2 w-2 animate-bounce rounded-full bg-[var(--theme-accent)]" />
+                      <div className="h-2 w-2 animate-bounce rounded-full bg-[var(--theme-accent)]" style={{ animationDelay: '0.1s' }} />
+                      <div className="h-2 w-2 animate-bounce rounded-full bg-[var(--theme-accent)]" style={{ animationDelay: '0.2s' }} />
                     </div>
                     <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
                       {typingUsers.map((typingUser, index) => (
@@ -973,7 +973,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   type="button"
                   onClick={() => scrollToBottom()}
                   aria-label="Jump to latest"
-                  className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.5rem)] z-50 rounded-full border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] p-2 text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)] transition-transform hover:-translate-y-0.5 md:bottom-32"
+                  className="theme-floating-action fixed right-4 bottom-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.5rem)] z-50 rounded-full p-2 transition-transform hover:-translate-y-0.5 md:bottom-32"
                 >
                   <ArrowDown className="w-5 h-5" />
                 </button>

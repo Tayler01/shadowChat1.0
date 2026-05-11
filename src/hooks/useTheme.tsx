@@ -3,9 +3,9 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 
 export type ColorScheme =
   | 'obsidian-gold'
-  | 'obsidian-champagne'
-  | 'graphite-amber'
-  | 'carbon-ivory'
+  | 'aurora-veil'
+  | 'ember-slate'
+  | 'neon-circuit'
   | 'moonstone-light'
 
 export type ThemeMode = 'dark' | 'light'
@@ -20,52 +20,85 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined)
 
 export const colorSchemes: Record<
   ColorScheme,
-  { label: string; start: string; end: string; accent: string; mode: ThemeMode }
+  {
+    label: string
+    description: string
+    start: string
+    end: string
+    accent: string
+    mode: ThemeMode
+    preview: string
+    backdrop: string
+    texture: string
+  }
 > = {
   'obsidian-gold': {
     label: 'Obsidian Gold',
+    description: 'Black glass, liquid metal, and restrained gold.',
     start: '#fff0b8',
     end: '#9a7421',
     accent: '#d7aa46',
     mode: 'dark',
+    preview: '/themes/obsidian-gold/preview.webp',
+    backdrop: '/themes/obsidian-gold/backdrop.webp',
+    texture: '/themes/obsidian-gold/texture.webp',
   },
-  'obsidian-champagne': {
-    label: 'Noir Champagne',
-    start: '#f3ddb0',
-    end: '#8f6a37',
-    accent: '#d2ac69',
+  'aurora-veil': {
+    label: 'Aurora Veil',
+    description: 'Charcoal glass with teal, violet, and blue aurora light.',
+    start: '#5de3df',
+    end: '#8e5cff',
+    accent: '#58d7d5',
     mode: 'dark',
+    preview: '/themes/aurora-veil/preview.webp',
+    backdrop: '/themes/aurora-veil/backdrop.webp',
+    texture: '/themes/aurora-veil/texture.webp',
   },
-  'graphite-amber': {
-    label: 'Blackened Brass',
-    start: '#e6bf7d',
-    end: '#7a5628',
-    accent: '#b88646',
+  'ember-slate': {
+    label: 'Ember Slate',
+    description: 'Smoky slate, copper heat, and warm ember edges.',
+    start: '#ffb36b',
+    end: '#6f2918',
+    accent: '#df7a3a',
     mode: 'dark',
+    preview: '/themes/ember-slate/preview.webp',
+    backdrop: '/themes/ember-slate/backdrop.webp',
+    texture: '/themes/ember-slate/texture.webp',
   },
-  'carbon-ivory': {
-    label: 'Smoked Ivory',
-    start: '#e4d5b6',
-    end: '#7b694b',
-    accent: '#c8b08a',
+  'neon-circuit': {
+    label: 'Neon Circuit',
+    description: 'Dark acrylic, cyan circuitry, and magenta edge glow.',
+    start: '#25e8ff',
+    end: '#ff4fd8',
+    accent: '#22d8ff',
     mode: 'dark',
+    preview: '/themes/neon-circuit/preview.webp',
+    backdrop: '/themes/neon-circuit/backdrop.webp',
+    texture: '/themes/neon-circuit/texture.webp',
   },
   'moonstone-light': {
     label: 'Moonstone Light',
-    start: '#fff8e8',
-    end: '#d7aa46',
-    accent: '#b9851f',
+    description: 'Pearlescent daylight surfaces with soft blue prism accents.',
+    start: '#fafdff',
+    end: '#b9d8f3',
+    accent: '#5c82c8',
     mode: 'light',
+    preview: '/themes/moonstone-light/preview.webp',
+    backdrop: '/themes/moonstone-light/backdrop.webp',
+    texture: '/themes/moonstone-light/texture.webp',
   },
 }
 
 const legacySchemeMap: Record<string, ColorScheme> = {
   indigo: 'obsidian-gold',
-  teal: 'obsidian-champagne',
-  rose: 'graphite-amber',
-  violet: 'obsidian-gold',
-  orange: 'graphite-amber',
-  contrast: 'carbon-ivory',
+  teal: 'aurora-veil',
+  rose: 'ember-slate',
+  violet: 'aurora-veil',
+  orange: 'ember-slate',
+  contrast: 'moonstone-light',
+  'obsidian-champagne': 'aurora-veil',
+  'graphite-amber': 'ember-slate',
+  'carbon-ivory': 'neon-circuit',
 }
 
 function normalizeScheme(value: string | null): ColorScheme {
@@ -94,6 +127,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     document.documentElement.dataset.themeMode = mode
     document.documentElement.classList.remove(
       ...(Object.keys(colorSchemes) as ColorScheme[]),
+      'obsidian-champagne',
+      'graphite-amber',
+      'carbon-ivory',
       'dark',
       'light'
     )

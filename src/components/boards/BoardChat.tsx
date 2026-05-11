@@ -267,7 +267,7 @@ function BoardChatComposer({
     <form
       onSubmit={onSubmit}
       className={cn(
-        'border-t border-[var(--border-panel)] bg-[linear-gradient(180deg,rgba(16,18,19,0.94),rgba(10,11,12,0.98))] p-3',
+        'theme-composer-surface border-t border-[var(--border-panel)] p-3',
         className
       )}
     >
@@ -490,7 +490,7 @@ export function BoardChat({
             type="button"
             onClick={() => scrollToBottom()}
             aria-label="Jump to latest"
-            className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.5rem)] z-50 rounded-full border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] p-2 text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)] transition-transform hover:-translate-y-0.5 md:absolute md:bottom-4 md:right-4 md:z-20"
+            className="theme-floating-action fixed right-4 bottom-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.5rem)] z-50 rounded-full p-2 transition-transform hover:-translate-y-0.5 md:absolute md:bottom-4 md:right-4 md:z-20"
           >
             <ArrowDown className="h-5 w-5" />
           </button>

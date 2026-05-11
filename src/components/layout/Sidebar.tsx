@@ -98,17 +98,17 @@ export function Sidebar({
               flex w-full items-center space-x-3 rounded-[var(--radius-md)] px-3 py-3
               border transition-[background-color,border-color,box-shadow,color] duration-[var(--dur-med)]
               ${currentView === item.id
-                ? 'border-[var(--border-glow)] bg-[rgba(255,255,255,0.05)] text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)]'
+                ? 'theme-selected-row text-[var(--theme-accent-readable)]'
                 : 'border-transparent text-[var(--text-secondary)] hover:border-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[var(--text-primary)]'
               }
             `}
           >
-            <span className={`rounded-[var(--radius-sm)] p-2 ${currentView === item.id ? 'bg-[rgba(215,170,70,0.12)]' : 'bg-[rgba(255,255,255,0.03)]'}`}>
+            <span className={`rounded-[var(--radius-sm)] p-2 ${currentView === item.id ? 'bg-[var(--theme-accent-soft)]' : 'bg-[rgba(255,255,255,0.03)]'}`}>
               <item.icon className="h-4 w-4" />
             </span>
             <span className="font-medium">{item.label}</span>
             {item.badge && (
-              <span className="ml-auto min-w-[20px] rounded-full border border-[rgba(215,170,70,0.3)] bg-[rgba(215,170,70,0.14)] px-2 py-1 text-center text-xs text-[var(--text-gold)]">
+              <span className="theme-unread-badge ml-auto min-w-[20px] rounded-full px-2 py-1 text-center text-xs">
                 {item.badge}
               </span>
             )}
@@ -125,7 +125,7 @@ export function Sidebar({
             <span className="text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Signed in</span>
             <button
               onClick={onToggleDarkMode}
-              className="rounded-[var(--radius-sm)] p-2 text-[var(--text-muted)] transition-colors hover:bg-[rgba(255,255,255,0.04)] hover:text-[var(--text-gold)]"
+              className="rounded-[var(--radius-sm)] p-2 text-[var(--text-muted)] transition-colors hover:bg-[var(--theme-surface-hover)] hover:text-[var(--theme-accent-readable)]"
               aria-label="Toggle dark mode"
             >
               {isDarkMode ? (

@@ -185,7 +185,7 @@ const normalizeNewsHandleInput = (value: string) =>
 
 const getNewsSourceHealthClass = (status: string) => {
   if (status === 'ok') {
-    return 'border-[rgba(215,170,70,0.22)] bg-[rgba(215,170,70,0.08)] text-[var(--text-gold)]'
+    return 'theme-accent-chip border'
   }
 
   if (status === 'blocked') {
@@ -230,13 +230,13 @@ function ToggleRow({
         aria-label={`Toggle ${label}`}
         className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full border transition-[background-color,border-color,box-shadow,opacity] ${
           enabled
-            ? 'border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] shadow-[var(--shadow-gold-soft)]'
+            ? 'theme-floating-action'
             : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.05)]'
         } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
       >
         <span
           className={`inline-block h-4 w-4 transform rounded-full transition-transform ${
-            enabled ? 'translate-x-6 bg-[var(--gold-5)]' : 'translate-x-1 bg-[var(--text-secondary)]'
+            enabled ? 'translate-x-6 bg-[var(--theme-accent-strong)]' : 'translate-x-1 bg-[var(--text-secondary)]'
           }`}
         />
       </button>
@@ -1181,37 +1181,46 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">Color Scheme</h2>
       </div>
       <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 lg:grid-cols-5">
-        {(Object.keys(colorSchemes) as ColorScheme[]).map(key => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setScheme(key)}
-            aria-pressed={scheme === key}
-            className={`rounded-[var(--radius-md)] border p-3 text-left transition-[background-color,border-color,box-shadow] ${
-              scheme === key
-                ? 'border-[var(--border-glow)] bg-[rgba(255,255,255,0.06)] shadow-[var(--shadow-gold-soft)]'
-                : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] hover:border-[var(--border-panel)] hover:bg-[rgba(255,255,255,0.05)]'
-            }`}
-            aria-label={`Select ${key} color scheme`}
-          >
-            <span
-              className="relative mb-2 block h-12 rounded-[var(--radius-sm)] border border-[var(--border-subtle)]"
-              style={{ background: `linear-gradient(135deg, ${colorSchemes[key].start}, ${colorSchemes[key].end})` }}
+        {(Object.keys(colorSchemes) as ColorScheme[]).map(key => {
+          const option = colorSchemes[key]
+
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setScheme(key)}
+              aria-pressed={scheme === key}
+              className={`rounded-[var(--radius-md)] border p-3 text-left transition-[background-color,border-color,box-shadow,transform] hover:-translate-y-0.5 ${
+                scheme === key
+                  ? 'border-[var(--border-glow)] bg-[var(--theme-accent-soft)] shadow-[var(--shadow-accent-soft)]'
+                  : 'border-[var(--border-subtle)] bg-[var(--bg-panel-soft)] hover:border-[var(--border-panel)] hover:bg-[var(--theme-surface-hover)]'
+              }`}
+              aria-label={`Select ${option.label} color scheme`}
             >
-              {scheme === key && (
-                <span className="absolute right-2 top-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-[var(--border-glow)] bg-[var(--bg-panel-strong)] text-[var(--text-gold)] shadow-[var(--shadow-panel)]">
-                  <Check className="h-3.5 w-3.5" />
-                </span>
-              )}
-            </span>
-            <span className="flex items-center justify-between gap-2 text-sm font-medium text-[var(--text-primary)]">
-              {colorSchemes[key].label}
-              <span className="rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[var(--text-muted)]">
-                {colorSchemes[key].mode}
+              <span
+                className="relative mb-3 block h-16 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-cover bg-center"
+                style={{
+                  backgroundImage: `linear-gradient(135deg, rgba(0,0,0,0.08), rgba(0,0,0,0.34)), url(${option.preview}), linear-gradient(135deg, ${option.start}, ${option.end})`,
+                }}
+              >
+                {scheme === key && (
+                  <span className="absolute right-2 top-2 inline-flex h-6 w-6 items-center justify-center rounded-full border border-[var(--border-glow)] bg-[var(--bg-panel-strong)] text-[var(--theme-accent-readable)] shadow-[var(--shadow-panel)]">
+                    <Check className="h-3.5 w-3.5" />
+                  </span>
+                )}
               </span>
-            </span>
-          </button>
-        ))}
+              <span className="flex items-center justify-between gap-2 text-sm font-medium text-[var(--text-primary)]">
+                {option.label}
+                <span className="rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  {option.mode}
+                </span>
+              </span>
+              <span className="mt-2 block text-xs leading-5 text-[var(--text-muted)]">
+                {option.description}
+              </span>
+            </button>
+          )
+        })}
       </div>
     </div>
   )
@@ -1312,7 +1321,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
       ref={scrollContainerRef}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.08),transparent_26%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] pb-[calc(env(safe-area-inset-bottom)_+_8rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_4rem)]"
+      className="theme-app-surface flex-1 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)_+_8rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_4rem)]"
     >
       <div className="mx-auto max-w-6xl p-4 sm:p-6">
         {renderSection()}

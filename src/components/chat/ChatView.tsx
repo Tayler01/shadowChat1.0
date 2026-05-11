@@ -83,7 +83,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex h-full min-h-0 flex-col bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.05),transparent_26%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] text-sm"
+      className="theme-app-surface flex h-full min-h-0 flex-col text-sm"
     >
       {/* Header */}
       <div className="glass-panel-strong relative z-30 flex-shrink-0 border-b border-[var(--border-panel)] px-4 py-1.5 md:px-6">
@@ -96,7 +96,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
                 <img
                   src="/icons/header-logo.png"
                   alt="SHADO"
-                  className="absolute left-0 top-1/2 h-12 w-28 origin-left -translate-y-1/2 scale-[1.3] object-contain object-left sm:h-14 sm:w-32"
+                  className="theme-logo absolute left-0 top-1/2 h-12 w-28 origin-left -translate-y-1/2 scale-[1.3] object-contain object-left sm:h-14 sm:w-32"
                 />
               </span>
               <div className="min-w-0">
@@ -109,7 +109,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
                 <span className="rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">
                   Live feed
                 </span>
-                <span className="rounded-full border border-[rgba(215,170,70,0.16)] bg-[rgba(215,170,70,0.08)] px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--text-gold)]">
+                <span className="theme-accent-chip rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.14em]">
                   {messages.length} messages loaded
                 </span>
               </div>

@@ -80,7 +80,7 @@ const getInitialLocationState = (): LocationState => {
 
 function ViewLoadingState() {
   return (
-    <div className="flex flex-1 items-center justify-center bg-[radial-gradient(circle_at_top,var(--bg-app-radial),transparent_28%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))]">
+    <div className="theme-app-surface flex flex-1 items-center justify-center">
       <div className="glass-panel rounded-[var(--radius-xl)] px-8 py-7 text-center text-[var(--text-muted)]">
         <div className="mb-3 flex justify-center">
           <LoadingSpinner size="lg" className="text-[var(--text-gold)]" />
@@ -363,7 +363,7 @@ function App() {
                 <BoardBadgesProvider>
                   <AppBadgeSync />
                   <PhoneInstallOnboarding />
-                  <div className="app-viewport flex flex-col overflow-hidden bg-[radial-gradient(circle_at_top,var(--bg-app-radial),transparent_28%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] md:flex-row">
+                  <div className="app-viewport flex flex-col overflow-hidden md:flex-row">
                     {isDesktop && (
                       <Sidebar
                         currentView={currentView}
@@ -377,7 +377,7 @@ function App() {
 
                     {isDesktop && sidebarOpen && (
                       <div
-                        className="fixed inset-0 bg-black/40 md:hidden"
+                        className="fixed inset-0 bg-[var(--bg-overlay)] md:hidden"
                         onClick={closeSidebar}
                       />
                     )}
@@ -414,11 +414,11 @@ function App() {
       toastOptions={{
         duration: 4000,
         style: {
-          background: isDarkMode ? 'rgba(18, 20, 22, 0.96)' : '#ffffff',
-          color: isDarkMode ? '#f6f2e8' : '#111827',
-          border: isDarkMode ? '1px solid rgba(255,240,184,0.12)' : '1px solid #e5e7eb',
-          boxShadow: isDarkMode ? '0 20px 56px rgba(0,0,0,0.44), 0 0 0 1px rgba(255,240,184,0.03)' : undefined,
-          backdropFilter: isDarkMode ? 'blur(18px)' : undefined,
+          background: 'var(--bg-panel-strong)',
+          color: 'var(--text-primary)',
+          border: '1px solid var(--border-panel)',
+          boxShadow: 'var(--shadow-panel-strong)',
+          backdropFilter: 'blur(18px)',
           borderRadius: '18px',
         },
         success: {
@@ -427,7 +427,7 @@ function App() {
             secondary: 'var(--bg-shell)',
           },
           style: {
-            border: '1px solid rgba(215,170,70,0.18)',
+            border: '1px solid var(--theme-accent-border-soft)',
           },
         },
         error: {
@@ -441,13 +441,13 @@ function App() {
         },
         loading: {
           iconTheme: {
-            primary: 'var(--gold-accent)',
+            primary: 'var(--theme-accent)',
             secondary: 'var(--bg-shell)',
           },
         },
         blank: {
           iconTheme: {
-            primary: 'var(--gold-accent)',
+            primary: 'var(--theme-accent)',
             secondary: 'var(--bg-shell)',
           },
         },

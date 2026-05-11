@@ -500,13 +500,13 @@ export const MessageList: React.FC<MessageListProps> = ({
             className="mt-2 flex items-center space-x-2 text-sm text-[var(--text-muted)]"
           >
             <div className="flex space-x-1">
-              <div className="h-2 w-2 animate-bounce rounded-full bg-[var(--gold-3)]" />
+              <div className="h-2 w-2 animate-bounce rounded-full bg-[var(--theme-accent)]" />
               <div
-                className="h-2 w-2 animate-bounce rounded-full bg-[var(--gold-3)]"
+                className="h-2 w-2 animate-bounce rounded-full bg-[var(--theme-accent)]"
                 style={{ animationDelay: '0.1s' }}
               />
               <div
-                className="h-2 w-2 animate-bounce rounded-full bg-[var(--gold-3)]"
+                className="h-2 w-2 animate-bounce rounded-full bg-[var(--theme-accent)]"
                 style={{ animationDelay: '0.2s' }}
               />
             </div>
@@ -532,7 +532,7 @@ export const MessageList: React.FC<MessageListProps> = ({
           type="button"
           onClick={() => scrollToBottom()}
           aria-label="Jump to latest"
-          className="fixed right-4 bottom-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.5rem)] z-50 rounded-full border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_36%,rgba(122,89,24,0.5)_100%)] p-2 text-[var(--text-gold)] shadow-[var(--shadow-gold-soft)] transition-transform hover:-translate-y-0.5 md:bottom-32"
+          className="theme-floating-action fixed right-4 bottom-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.5rem)] z-50 rounded-full p-2 transition-transform hover:-translate-y-0.5 md:bottom-32"
         >
           <ArrowDown className="w-5 h-5" />
         </button>

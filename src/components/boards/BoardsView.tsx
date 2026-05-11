@@ -93,7 +93,7 @@ export function BoardsView({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className={cn(
-        'flex h-full min-h-0 flex-col bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.06),transparent_28%),linear-gradient(180deg,var(--bg-shell),var(--bg-app))] text-sm',
+        'theme-app-surface flex h-full min-h-0 flex-col text-sm',
         hasActiveChatBoard ? 'pb-0' : 'pb-[calc(env(safe-area-inset-bottom)_+_4.2rem)] md:pb-0'
       )}
     >

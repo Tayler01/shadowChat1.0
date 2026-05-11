@@ -330,7 +330,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   <button
                     type="button"
                     onClick={() => onJumpToMessage?.(parentMessage.id)}
-                    className="mb-1 text-left text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text-gold)] hover:underline"
+                    className="mb-1 text-left text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--theme-accent-readable)] hover:underline"
                     aria-label="View parent message"
                   >
                     Replying to {parentMessage.user?.display_name || 'Unknown'}
@@ -346,7 +346,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   className={cn(
                     'relative peer space-y-1 break-words rounded-[var(--radius-md)] px-3 py-2 shadow-[var(--shadow-panel)]',
                     isAIMessage
-                      ? 'border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(255,240,184,0.08),rgba(255,255,255,0.03)_24%,rgba(13,15,16,0.98)_100%)] text-[var(--text-primary)]'
+                      ? 'border border-[var(--border-glow)] bg-[var(--theme-accent-softer)] text-[var(--text-primary)]'
                       : bubbleStyle
                       ? ''
                       : 'border border-[var(--border-subtle)] bg-[var(--bg-panel)] text-[var(--text-primary)]'
@@ -498,7 +498,7 @@ export const MessageReactions: React.FC<{
             onClick={() => onReact(emoji)}
             className={`inline-flex items-center space-x-1 rounded-full border px-1.5 py-0.5 text-xs transition-colors ${
               isReacted
-                ? 'border-[var(--border-glow)] bg-[rgba(215,170,70,0.14)] text-[var(--text-gold)]'
+                ? 'theme-accent-chip'
                 : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)] text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.08)]'
             }`}
             aria-label={`Reaction ${normalizeEmojiValue(emoji)} count ${data.count}`}

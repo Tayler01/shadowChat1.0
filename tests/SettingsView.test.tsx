@@ -53,9 +53,10 @@ jest.mock('../src/hooks/useSuggestedReplies', () => ({
 jest.mock('../src/hooks/useTheme', () => ({
   useTheme: () => ({ scheme: 'obsidian-gold', setScheme: jest.fn() }),
   colorSchemes: {
-    'obsidian-gold': { label: 'Obsidian Gold', start: '#111111', end: '#d7aa46', mode: 'dark' },
-    'carbon-ivory': { label: 'Carbon Ivory', start: '#111111', end: '#c8b08a', mode: 'dark' },
-    'moonstone-light': { label: 'Moonstone Light', start: '#fff8e8', end: '#d7aa46', mode: 'light' },
+    'obsidian-gold': { label: 'Obsidian Gold', description: 'Gold glass', start: '#111111', end: '#d7aa46', mode: 'dark', preview: '/themes/obsidian-gold/preview.webp' },
+    'aurora-veil': { label: 'Aurora Veil', description: 'Aurora glass', start: '#112233', end: '#58d7d5', mode: 'dark', preview: '/themes/aurora-veil/preview.webp' },
+    'neon-circuit': { label: 'Neon Circuit', description: 'Neon glass', start: '#071020', end: '#ff4fd8', mode: 'dark', preview: '/themes/neon-circuit/preview.webp' },
+    'moonstone-light': { label: 'Moonstone Light', description: 'Pearl daylight', start: '#fff8e8', end: '#5c82c8', mode: 'light', preview: '/themes/moonstone-light/preview.webp' },
   },
 }))
 

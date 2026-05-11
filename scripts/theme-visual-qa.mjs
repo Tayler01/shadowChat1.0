@@ -12,36 +12,29 @@ const DEFAULT_TIMEOUT_MS = 20_000
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx'
 const taskKillCommand = process.platform === 'win32' ? 'taskkill' : null
-const windowsCommandShell = process.env.ComSpec || 'cmd.exe'
+
+const themes = [
+  'obsidian-gold',
+  'aurora-veil',
+  'ember-slate',
+  'neon-circuit',
+  'moonstone-light',
+]
 
 const deviceProfiles = [
   {
     id: 'iphone-small-webkit',
-    label: 'Mobile Safari WebKit iPhone small PWA',
+    label: 'iPhone small WebKit',
     browserName: 'webkit',
     device: devices['iPhone 13'],
     viewport: { width: 390, height: 844 },
   },
   {
-    id: 'iphone-large-webkit',
-    label: 'Mobile Safari WebKit iPhone large PWA',
-    browserName: 'webkit',
-    device: devices['iPhone 14 Pro Max'] ?? devices['iPhone 13'],
-    viewport: { width: 430, height: 932 },
-  },
-  {
     id: 'android-medium-chromium',
-    label: 'Mobile Chrome Android medium PWA',
+    label: 'Android medium Chromium',
     browserName: 'chromium',
     device: devices['Pixel 7'] ?? devices['Pixel 5'],
     viewport: { width: 412, height: 915 },
-  },
-  {
-    id: 'android-small-chromium',
-    label: 'Mobile Chrome Android small PWA',
-    browserName: 'chromium',
-    device: devices['Pixel 5'],
-    viewport: { width: 360, height: 800 },
   },
 ]
 
@@ -63,7 +56,8 @@ const summary = {
   startedAt: new Date().toISOString(),
   baseUrl: config.baseUrl,
   artifactDir,
-  deviceProfiles: deviceProfiles.map(({ id, label, browserName, viewport }) => ({
+  themes: config.themes,
+  deviceProfiles: config.profiles.map(({ id, label, browserName, viewport }) => ({
     id,
     label,
     browserName,
@@ -84,8 +78,10 @@ try {
   const accountA = buildEnvAccount(1)
   const accountB = buildEnvAccount(2)
 
-  for (const profile of deviceProfiles) {
-    await runProfile(profile, accountA, accountB)
+  for (const profile of config.profiles) {
+    for (const theme of config.themes) {
+      await runThemeProfile(profile, theme, accountA, accountB)
+    }
   }
 
   summary.finishedAt = new Date().toISOString()
@@ -93,18 +89,18 @@ try {
   await writeJson(resultPath, summary)
 
   if (summary.status === 'failed') {
-    throw new Error(`Mobile PWA QA found ${summary.checks.filter(check => check.status === 'failed').length} failing checks`)
+    throw new Error(`Theme visual QA found ${summary.checks.filter(check => check.status === 'failed').length} failing checks`)
   }
 
   console.log('')
-  console.log(`Mobile PWA visual QA passed. Summary: ${resultPath}`)
+  console.log(`Theme visual QA passed. Summary: ${resultPath}`)
 } catch (error) {
   summary.finishedAt = new Date().toISOString()
   summary.status = 'failed'
   summary.error = serializeError(error)
   await writeJson(resultPath, summary)
   console.error('')
-  console.error(`Mobile PWA visual QA failed. Summary: ${resultPath}`)
+  console.error(`Theme visual QA failed. Summary: ${resultPath}`)
   console.error(error instanceof Error ? error.stack || error.message : String(error))
   process.exitCode = 1
 } finally {
@@ -116,8 +112,8 @@ try {
   }
 }
 
-async function runProfile(profile, accountA, accountB) {
-  logLine(`Starting ${profile.label}`)
+async function runThemeProfile(profile, theme, accountA, accountB) {
+  logLine(`Starting ${profile.label} / ${theme}`)
   const browserType = profile.browserName === 'webkit' ? webkit : chromium
   const browser = await browserType.launch({
     headless: config.headless,
@@ -135,85 +131,60 @@ async function runProfile(profile, accountA, accountB) {
     serviceWorkers: 'block',
     ignoreHTTPSErrors: true,
   })
-  await context.addInitScript(() => {
+  await context.addInitScript(selectedTheme => {
     Object.defineProperty(navigator, 'standalone', {
       configurable: true,
       get: () => true,
     })
-  })
+    window.localStorage.setItem('colorScheme', selectedTheme)
+  }, theme)
   await installBrowserMocks(context)
 
   const page = await context.newPage()
-  attachDiagnostics(page, path.join(logsDir, `${profile.id}.log`), profile.id)
+  attachDiagnostics(page, path.join(logsDir, `${profile.id}-${theme}.log`), `${profile.id}-${theme}`)
 
   try {
     await page.goto(config.baseUrl, { waitUntil: 'domcontentloaded' })
     await waitForChatView(page)
-    await auditPage(page, profile, '01-chat-launch', { composer: true })
-
-    await focusAndAuditComposer(page, profile, '02-chat-composer')
-    const chatMessage = `Mobile PWA chat ${timestampToken()}`
-    await sendVisibleMessage(page, chatMessage)
-    await expectVisibleText(page, chatMessage, DEFAULT_TIMEOUT_MS)
-    await auditPage(page, profile, '03-chat-after-send', { composer: true })
-    await openMessageActionsIfAvailable(page, profile, '04-chat-message-actions')
-    await openProfileIfAvailable(page, profile, '05-public-profile')
-    await simulateBackgroundRefocus(page)
-    await auditPage(page, profile, '06-chat-refocus', { composer: true })
+    await expectTheme(page, theme)
+    await auditPage(page, profile, theme, '01-chat', { composer: true })
+    await focusAndAuditComposer(page, profile, theme, '02-chat-composer')
 
     await goToDirectMessages(page)
-    await auditPage(page, profile, '07-dm-list', { header: false })
-    await openConversationWithUser(page, accountB)
-    await auditPage(page, profile, '08-dm-thread', { composer: true })
-    await focusAndAuditComposer(page, profile, '09-dm-composer')
-    await page.getByRole('button', { name: 'Back' }).first().click()
-    await expectVisibleText(page, 'Direct Messages', DEFAULT_TIMEOUT_MS)
-    await auditPage(page, profile, '10-dm-list-after-back', { header: false })
-    await page.getByRole('button', { name: 'Back' }).click()
-    await waitForChatView(page)
+    await auditPage(page, profile, theme, '03-dm-list', { header: false })
+    await openConversationWithUser(page, profile, theme, accountB)
 
     await goToBoards(page)
-    await auditPage(page, profile, '11-boards-map')
+    await auditPage(page, profile, theme, '05-boards')
     await page.getByRole('button', { name: 'Open News Chat' }).click()
     await page.locator('textarea:visible').first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-    await auditPage(page, profile, '12-board-chat', { composer: true })
-    await focusAndAuditComposer(page, profile, '13-board-chat-composer')
-    await page.getByRole('button', { name: 'Back to boards' }).click()
-    await auditPage(page, profile, '14-boards-back')
+    await auditPage(page, profile, theme, '06-board-chat', { composer: true })
+    await focusAndAuditComposer(page, profile, theme, '07-board-chat-composer')
 
     await goToSettings(page)
-    await auditPage(page, profile, '15-settings-hub', { header: false })
-    await openSettingsSection(page, 'Feedback')
-    await auditPage(page, profile, '16-settings-feedback', { header: false })
-    await page.getByRole('button', { name: 'Send Feedback' }).click()
-    await page.getByRole('dialog', { name: /Send a bug report or feature idea/i }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-    await auditPage(page, profile, '17-feedback-modal', { header: false })
-    await page.getByRole('button', { name: 'Close feedback' }).click()
-    await page.getByRole('dialog', { name: /Send a bug report or feature idea/i }).waitFor({ state: 'hidden', timeout: DEFAULT_TIMEOUT_MS })
-    await page.getByRole('button', { name: 'Back to settings' }).click()
-    await openSettingsSection(page, 'Account & Profile')
-    await auditPage(page, profile, '18-account-profile', { header: false })
+    await auditPage(page, profile, theme, '08-settings', { header: false })
+    await openSettingsSection(page, 'Color & Layout')
+    await auditPage(page, profile, theme, '09-theme-picker', { header: false })
 
-    logLine(`Passed ${profile.label}`)
+    logLine(`Passed ${profile.label} / ${theme}`)
   } finally {
     await context.close().catch(() => {})
   }
 }
 
-async function auditPage(page, profile, flow, options = {}) {
+async function auditPage(page, profile, theme, flow, options = {}) {
   await page.waitForLoadState('domcontentloaded')
   await delay(150)
 
-  const screenshotPath = path.join(artifactDir, `${profile.id}-${flow}.png`)
+  const screenshotPath = path.join(artifactDir, `${profile.id}-${theme}-${flow}.png`)
   await page.screenshot({ path: screenshotPath, fullPage: false })
 
-  const metrics = await page.evaluate(({ expectComposer, expectHeader }) => {
+  const metrics = await page.evaluate(({ expectComposer, expectHeader, selectedTheme }) => {
     const viewportWidth = window.innerWidth
     const viewportHeight = window.innerHeight
     const doc = document.documentElement
     const body = document.body
     const horizontalOverflow = Math.max(doc.scrollWidth, body?.scrollWidth ?? 0) - doc.clientWidth
-
     const isVisible = (element) => {
       const style = window.getComputedStyle(element)
       const rect = element.getBoundingClientRect()
@@ -225,231 +196,120 @@ async function auditPage(page, profile, flow, options = {}) {
         rect.height > 0
       )
     }
-
+    const rectFor = (element) => {
+      if (!element) return null
+      const rect = element.getBoundingClientRect()
+      return {
+        top: Math.round(rect.top),
+        bottom: Math.round(rect.bottom),
+        left: Math.round(rect.left),
+        right: Math.round(rect.right),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+      }
+    }
+    const composer = Array.from(document.querySelectorAll('textarea')).filter(isVisible).at(-1) ?? null
+    const footer = document.querySelector('[data-mobile-chat-footer="true"]')
+    const header = Array.from(document.querySelectorAll('header, .glass-panel-strong'))
+      .filter(isVisible)
+      .map(element => ({ element, rect: element.getBoundingClientRect() }))
+      .filter(({ rect }) => rect.top < Math.min(180, viewportHeight / 2) && rect.bottom > 0 && rect.height < 200)
+      .sort((a, b) => a.rect.top - b.rect.top)[0]?.element ?? null
     const overflowOffenders = Array.from(document.querySelectorAll('body *'))
       .filter(isVisible)
       .map((element) => {
         const rect = element.getBoundingClientRect()
         return {
           tag: element.tagName.toLowerCase(),
-          id: element.id || '',
           className: typeof element.className === 'string' ? element.className.slice(0, 140) : '',
           text: (element.textContent || '').replace(/\s+/gu, ' ').trim().slice(0, 80),
           left: Math.round(rect.left),
           right: Math.round(rect.right),
-          top: Math.round(rect.top),
-          bottom: Math.round(rect.bottom),
           width: Math.round(rect.width),
-          height: Math.round(rect.height),
         }
       })
       .filter(item => item.right > viewportWidth + 2 || item.left < -2)
       .slice(0, 12)
-
-    const textareas = Array.from(document.querySelectorAll('textarea')).filter(isVisible)
-    const composer = textareas[textareas.length - 1] ?? null
-    const composerRect = composer?.getBoundingClientRect()
-    const footer = document.querySelector('[data-mobile-chat-footer="true"]')
-    const footerRect = footer?.getBoundingClientRect()
-    const header = Array.from(document.querySelectorAll('header, .glass-panel-strong'))
-      .filter(isVisible)
-      .map((element) => ({ element, rect: element.getBoundingClientRect() }))
-      .filter(({ rect }) => rect.top < Math.min(180, viewportHeight / 2) && rect.bottom > 0 && rect.height < 200)
-      .sort((a, b) => a.rect.top - b.rect.top)[0]
-    const headerRect = header?.rect
-
-    const clippedPrimaryActions = Array.from(document.querySelectorAll('button, [role="button"], a[href], input, textarea, select'))
-      .filter(isVisible)
-      .map((element) => {
-        const rect = element.getBoundingClientRect()
-        return {
-          label: element.getAttribute('aria-label') || element.textContent?.replace(/\s+/gu, ' ').trim().slice(0, 60) || element.tagName.toLowerCase(),
-          left: Math.round(rect.left),
-          right: Math.round(rect.right),
-          top: Math.round(rect.top),
-          bottom: Math.round(rect.bottom),
-          width: Math.round(rect.width),
-          height: Math.round(rect.height),
-        }
-      })
-      .filter(item => item.left < -2 || item.right > viewportWidth + 2)
-      .slice(0, 12)
-
-    const smallTapTargets = Array.from(document.querySelectorAll('button, [role="button"], a[href], input, textarea, select'))
-      .filter(isVisible)
-      .map((element) => {
-        const rect = element.getBoundingClientRect()
-        return {
-          label: element.getAttribute('aria-label') || element.textContent?.replace(/\s+/gu, ' ').trim().slice(0, 60) || element.tagName.toLowerCase(),
-          width: Math.round(rect.width),
-          height: Math.round(rect.height),
-        }
-      })
-      .filter(item => item.width < 32 || item.height < 32)
-      .slice(0, 12)
+    const css = getComputedStyle(doc)
 
     return {
+      selectedTheme,
+      actualTheme: doc.dataset.scheme,
+      themeMode: doc.dataset.themeMode,
       viewportWidth,
       viewportHeight,
-      devicePixelRatio: window.devicePixelRatio,
       horizontalOverflow,
       overflowOffenders,
-      clippedPrimaryActions,
-      smallTapTargets,
+      composer: rectFor(composer),
+      footer: rectFor(footer),
+      header: rectFor(header),
       expectComposer,
       expectHeader,
-      composer: composerRect
-        ? {
-            top: Math.round(composerRect.top),
-            bottom: Math.round(composerRect.bottom),
-            left: Math.round(composerRect.left),
-            right: Math.round(composerRect.right),
-            width: Math.round(composerRect.width),
-            height: Math.round(composerRect.height),
-          }
-        : null,
-      footer: footerRect
-        ? {
-            top: Math.round(footerRect.top),
-            bottom: Math.round(footerRect.bottom),
-            height: Math.round(footerRect.height),
-          }
-        : null,
-      header: headerRect
-        ? {
-            top: Math.round(headerRect.top),
-            bottom: Math.round(headerRect.bottom),
-            left: Math.round(headerRect.left),
-            right: Math.round(headerRect.right),
-            width: Math.round(headerRect.width),
-            height: Math.round(headerRect.height),
-          }
-        : null,
       cssVars: {
-        appHeight: getComputedStyle(doc).getPropertyValue('--shadowchat-app-height').trim(),
-        visualViewportHeight: getComputedStyle(doc).getPropertyValue('--shadowchat-visual-viewport-height').trim(),
-        keyboardInset: getComputedStyle(doc).getPropertyValue('--shadowchat-keyboard-inset').trim(),
-        mobileFooterHeight: getComputedStyle(doc).getPropertyValue('--shadowchat-mobile-chat-footer-height').trim(),
+        accent: css.getPropertyValue('--theme-accent').trim(),
+        accentReadable: css.getPropertyValue('--theme-accent-readable').trim(),
+        backdrop: css.getPropertyValue('--theme-backdrop-image').trim(),
+        texture: css.getPropertyValue('--theme-texture-image').trim(),
+        appHeight: css.getPropertyValue('--shadowchat-app-height').trim(),
+        keyboardInset: css.getPropertyValue('--shadowchat-keyboard-inset').trim(),
       },
     }
-  }, { expectComposer: Boolean(options.composer), expectHeader: options.header !== false })
+  }, { expectComposer: Boolean(options.composer), expectHeader: options.header !== false, selectedTheme: theme })
 
   const failures = []
-  if (metrics.horizontalOverflow > 2) {
-    failures.push(`horizontal overflow ${metrics.horizontalOverflow}px`)
-  }
-  if (metrics.clippedPrimaryActions.length > 0) {
-    failures.push(`clipped visible controls: ${metrics.clippedPrimaryActions.map(item => item.label).join(', ')}`)
-  }
-  if (options.composer && !metrics.composer) {
-    failures.push('expected visible composer textarea')
-  }
-  if (options.header !== false && !metrics.header) {
-    failures.push('expected visible header near top of viewport')
-  }
-  if (metrics.header && (
-    metrics.header.top < -2 ||
-    metrics.header.bottom < 28 ||
-    metrics.header.left < -2 ||
-    metrics.header.right > metrics.viewportWidth + 2
-  )) {
+  if (metrics.actualTheme !== theme) failures.push(`expected theme ${theme}, saw ${metrics.actualTheme}`)
+  if (metrics.horizontalOverflow > 2) failures.push(`horizontal overflow ${metrics.horizontalOverflow}px`)
+  if (options.header !== false && !metrics.header) failures.push('expected visible header near top of viewport')
+  if (metrics.header && (metrics.header.top < -2 || metrics.header.bottom < 28 || metrics.header.right > metrics.viewportWidth + 2)) {
     failures.push(`header outside viewport ${JSON.stringify(metrics.header)}`)
   }
-  if (metrics.composer && (
-    metrics.composer.left < -1 ||
-    metrics.composer.right > metrics.viewportWidth + 1 ||
-    metrics.composer.bottom > metrics.viewportHeight + 1
-  )) {
+  if (options.composer && !metrics.composer) failures.push('expected visible composer textarea')
+  if (metrics.composer && (metrics.composer.left < -1 || metrics.composer.right > metrics.viewportWidth + 1 || metrics.composer.bottom > metrics.viewportHeight + 1)) {
     failures.push(`composer outside viewport ${JSON.stringify(metrics.composer)}`)
   }
-  if (metrics.footer && (
-    metrics.footer.top < 0 ||
-    metrics.footer.bottom > metrics.viewportHeight + 2
-  )) {
+  if (metrics.footer && (metrics.footer.top < 0 || metrics.footer.bottom > metrics.viewportHeight + 2)) {
     failures.push(`mobile footer outside viewport ${JSON.stringify(metrics.footer)}`)
   }
 
   const check = {
     profile: profile.id,
+    theme,
     flow,
     status: failures.length > 0 ? 'failed' : 'passed',
     screenshotPath,
     failures,
-    warnings: metrics.smallTapTargets.length
-      ? [`small tap target candidates: ${metrics.smallTapTargets.map(item => `${item.label} ${item.width}x${item.height}`).join('; ')}`]
-      : [],
     metrics,
   }
   summary.checks.push(check)
   await appendFile(runLogPath, `${JSON.stringify(check)}\n`)
 
   if (failures.length > 0) {
-    throw new Error(`${profile.id} ${flow}: ${failures.join('; ')}`)
+    throw new Error(`${profile.id} ${theme} ${flow}: ${failures.join('; ')}`)
   }
-
-  return check
 }
 
-async function focusAndAuditComposer(page, profile, flow) {
+async function focusAndAuditComposer(page, profile, theme, flow) {
   const original = profile.viewport
   const composer = page.locator('textarea:visible').last()
   await composer.click()
-  await composer.fill(`Draft ${timestampToken()}`)
-  await auditPage(page, profile, `${flow}-focused`, { composer: true })
+  await composer.fill(`Theme QA ${theme}`)
+  await auditPage(page, profile, theme, `${flow}-focused`, { composer: true })
 
   const compressedHeight = Math.max(560, original.height - 280)
   await page.setViewportSize({ width: original.width, height: compressedHeight })
   await delay(250)
-  await auditPage(page, { ...profile, viewport: { width: original.width, height: compressedHeight } }, `${flow}-compressed`, { composer: true })
+  await auditPage(page, { ...profile, viewport: { width: original.width, height: compressedHeight } }, theme, `${flow}-compressed`, { composer: true })
 
   await page.setViewportSize(original)
   await delay(250)
   await composer.fill('')
 }
 
-async function openMessageActionsIfAvailable(page, profile, flow) {
-  const actions = page.getByRole('button', { name: /Message actions|message actions/i }).last()
-  if (!(await actions.isVisible().catch(() => false))) {
-    summary.notTested.push({ profile: profile.id, flow, reason: 'No visible message action button in current viewport.' })
-    return
-  }
-
-  await actions.click()
-  await page.getByTestId('message-actions-menu').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-  await auditPage(page, profile, flow)
-  await page.keyboard.press('Escape')
-}
-
-async function openProfileIfAvailable(page, profile, flow) {
-  const opener = page.locator('button[aria-label^="Open"][aria-label$="profile"]').first()
-  if (!(await opener.isVisible().catch(() => false))) {
-    summary.notTested.push({ profile: profile.id, flow, reason: 'No visible profile opener in currently loaded messages.' })
-    return
-  }
-
-  await opener.click()
-  const dialogOpened = await page.getByRole('dialog').waitFor({ timeout: 5000 }).then(() => true).catch(() => false)
-  if (!dialogOpened) {
-    summary.notTested.push({ profile: profile.id, flow, reason: 'A visible profile opener did not open a dialog in this run.' })
-    return
-  }
-  await auditPage(page, profile, flow)
-  const closeButton = page.getByRole('button', { name: 'Close profile' })
-  if (await closeButton.isVisible().catch(() => false)) {
-    await closeButton.click()
-  } else {
-    await page.keyboard.press('Escape')
-  }
-  await page.getByRole('dialog').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
-}
-
 async function authenticateAccount(page, account) {
   await page.goto(config.baseUrl, { waitUntil: 'domcontentloaded' })
   await waitForBootSurface(page)
 
-  if (await isChatVisible(page)) {
-    return
-  }
+  if (await isChatVisible(page)) return
 
   if (!(await page.getByRole('button', { name: 'Sign In' }).isVisible().catch(() => false))) {
     await page.getByRole('button', { name: /Sign in/i }).click()
@@ -511,13 +371,6 @@ async function goToDirectMessages(page) {
 }
 
 async function goToBoards(page) {
-  if (!(await page.getByRole('button', { name: /^Boards$/ }).isVisible().catch(() => false))) {
-    const back = page.getByRole('button', { name: 'Back' }).first()
-    if (await back.isVisible().catch(() => false)) {
-      await back.click()
-      await waitForChatView(page).catch(() => {})
-    }
-  }
   if (await page.getByRole('button', { name: /^Boards$/ }).isVisible().catch(() => false)) {
     await page.getByRole('button', { name: /^Boards$/ }).click()
   } else {
@@ -527,13 +380,6 @@ async function goToBoards(page) {
 }
 
 async function goToSettings(page) {
-  if (!(await page.getByRole('button', { name: /^Settings$/ }).isVisible().catch(() => false))) {
-    const back = page.getByRole('button', { name: 'Back' }).first()
-    if (await back.isVisible().catch(() => false)) {
-      await back.click()
-      await waitForChatView(page).catch(() => {})
-    }
-  }
   if (await page.getByRole('button', { name: /^Settings$/ }).isVisible().catch(() => false)) {
     await page.getByRole('button', { name: /^Settings$/ }).click()
   } else {
@@ -558,63 +404,30 @@ async function openSettingsSection(page, sectionName) {
   await page.getByRole('button', { name: 'Back to settings' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
-async function openConversationWithUser(page, account) {
+async function openConversationWithUser(page, profile, theme, account) {
   const row = page.getByRole('button', { name: new RegExp(`@${escapeRegExp(account.username)}`, 'i') }).first()
-  if (await row.isVisible().catch(() => false)) {
+  if (!(await row.isVisible().catch(() => false))) {
+    await page.getByRole('button', { name: 'Start new conversation' }).click()
+    await page.getByPlaceholder('Search by username').fill(account.username)
+    const searchRow = page.getByRole('button', { name: new RegExp(`@${escapeRegExp(account.username)}`, 'i') }).first()
+    const found = await searchRow.waitFor({ timeout: 8000 }).then(() => true).catch(() => false)
+    if (!found) {
+      summary.notTested.push({ profile: profile.id, theme, flow: '04-dm-thread', reason: `Could not find @${account.username} for DM visual QA.` })
+      await page.getByRole('button', { name: 'Close new conversation' }).click().catch(() => {})
+      return
+    }
+    await searchRow.click()
+  } else {
     await row.click()
-    await waitForEitherThreadOrList(page, account)
-    return
   }
 
-  await page.getByRole('button', { name: 'Start new conversation' }).click()
-  await page.getByPlaceholder('Search by username').fill(account.username)
-  const searchRow = page.getByRole('button', { name: new RegExp(`@${escapeRegExp(account.username)}`, 'i') }).first()
-  await searchRow.waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-  await searchRow.click()
-  await waitForEitherThreadOrList(page, account)
+  await page.locator('textarea:visible').first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await auditPage(page, profile, theme, '04-dm-thread', { composer: true })
+  await focusAndAuditComposer(page, profile, theme, '04-dm-composer')
 }
 
-async function waitForEitherThreadOrList(page, account) {
-  await page.waitForFunction(expectedUsername => {
-    const text = document.body?.innerText || ''
-    return text.includes(`@${expectedUsername}`) || text.includes('Select a conversation')
-  }, account.username, { timeout: DEFAULT_TIMEOUT_MS })
-}
-
-async function sendVisibleMessage(page, messageText) {
-  const composer = page.locator('textarea:visible').last()
-  await composer.click()
-  await composer.fill(messageText)
-  await page.locator('button[aria-label="Send message"]:visible').last().click()
-}
-
-async function expectVisibleText(page, text, timeoutMs) {
-  await page.getByText(text, { exact: false }).first().waitFor({ timeout: timeoutMs })
-}
-
-async function simulateBackgroundRefocus(page) {
-  await page.evaluate(async () => {
-    const originalHidden = Object.getOwnPropertyDescriptor(document, 'hidden')
-    const originalVisibilityState = Object.getOwnPropertyDescriptor(document, 'visibilityState')
-    let hidden = true
-
-    Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden })
-    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (hidden ? 'hidden' : 'visible') })
-
-    document.dispatchEvent(new Event('visibilitychange'))
-    await new Promise(resolve => setTimeout(resolve, 250))
-    hidden = false
-    document.dispatchEvent(new Event('visibilitychange'))
-    window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))
-    await new Promise(resolve => setTimeout(resolve, 800))
-
-    if (originalHidden) {
-      Object.defineProperty(document, 'hidden', originalHidden)
-    }
-    if (originalVisibilityState) {
-      Object.defineProperty(document, 'visibilityState', originalVisibilityState)
-    }
-  })
+async function expectTheme(page, theme) {
+  await page.waitForFunction(expectedTheme => document.documentElement.dataset.scheme === expectedTheme, theme, { timeout: DEFAULT_TIMEOUT_MS })
 }
 
 async function isChatVisible(page) {
@@ -661,20 +474,21 @@ async function ensurePreviewServer() {
       command: npmCommand,
       args: ['run', 'build'],
       logPath: path.join(logsDir, 'build.log'),
-      label: 'vite build',
     })
   }
 
   const previewLogPath = path.join(logsDir, 'preview.log')
-  const child = spawnCli(npxCommand, [
+  const child = spawn(npxCommand, [
     'vite',
     'preview',
     '--host',
     config.host,
     '--port',
     String(config.port),
+    '--strictPort',
   ], {
     cwd: repoRoot,
+    shell: process.platform === 'win32',
     stdio: ['ignore', 'pipe', 'pipe'],
   })
 
@@ -695,8 +509,9 @@ async function runLoggedCommand({ command, args, logPath }) {
   await appendFile(logPath, `> ${command} ${args.join(' ')}\n`)
 
   await new Promise((resolve, reject) => {
-    const child = spawnCli(command, args, {
+    const child = spawn(command, args, {
       cwd: repoRoot,
+      shell: process.platform === 'win32',
       stdio: ['ignore', 'pipe', 'pipe'],
     })
 
@@ -704,11 +519,8 @@ async function runLoggedCommand({ command, args, logPath }) {
     child.stderr.on('data', chunk => void appendFile(logPath, chunk))
     child.on('error', reject)
     child.on('exit', code => {
-      if (code === 0) {
-        resolve()
-      } else {
-        reject(new Error(`${command} ${args.join(' ')} exited with ${code}`))
-      }
+      if (code === 0) resolve()
+      else reject(new Error(`${command} ${args.join(' ')} exited with ${code}`))
     })
   })
 }
@@ -744,25 +556,6 @@ async function stopChildProcess(child) {
   child.kill('SIGTERM')
 }
 
-function spawnCli(command, args, options) {
-  if (process.platform === 'win32' && /\.cmd$/i.test(command)) {
-    return spawn(windowsCommandShell, ['/d', '/s', '/c', [command, ...args].map(quoteCmdArg).join(' ')], {
-      ...options,
-      shell: false,
-    })
-  }
-
-  return spawn(command, args, options)
-}
-
-function quoteCmdArg(value) {
-  const text = String(value)
-  if (/^[A-Za-z0-9_./:=+-]+$/.test(text)) {
-    return text
-  }
-  return `"${text.replace(/"/g, '""')}"`
-}
-
 function parseArgs(argv) {
   const parsed = {
     headed: false,
@@ -771,6 +564,8 @@ function parseArgs(argv) {
     reuseServer: true,
     skipBuild: false,
     runName: null,
+    themes: null,
+    profiles: null,
   }
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -784,6 +579,10 @@ function parseArgs(argv) {
     else if (current === '--base-url' && argv[index + 1]) parsed.baseUrl = argv[++index]
     else if (current.startsWith('--run-name=')) parsed.runName = current.slice('--run-name='.length)
     else if (current === '--run-name' && argv[index + 1]) parsed.runName = argv[++index]
+    else if (current.startsWith('--themes=')) parsed.themes = current.slice('--themes='.length)
+    else if (current === '--themes' && argv[index + 1]) parsed.themes = argv[++index]
+    else if (current.startsWith('--profiles=')) parsed.profiles = current.slice('--profiles='.length)
+    else if (current === '--profiles' && argv[index + 1]) parsed.profiles = argv[++index]
     else if (current.startsWith('--slow-mo=')) parsed.slowMo = Number(current.slice('--slow-mo='.length)) || 0
     else if (current === '--slow-mo' && argv[index + 1]) parsed.slowMo = Number(argv[++index]) || 0
   }
@@ -794,6 +593,8 @@ function parseArgs(argv) {
 function buildConfig(parsedArgs, values) {
   const baseUrl = parsedArgs.baseUrl || values.PLAYWRIGHT_BASE_URL || `http://${DEFAULT_HOST}:${DEFAULT_PORT}`
   const base = new URL(baseUrl)
+  const selectedThemes = selectByIds(themes, parsedArgs.themes)
+  const selectedProfiles = selectProfiles(parsedArgs.profiles)
 
   return {
     baseUrl: base.toString().replace(/\/$/, ''),
@@ -803,9 +604,23 @@ function buildConfig(parsedArgs, values) {
     slowMo: parsedArgs.slowMo,
     reuseServer: parsedArgs.reuseServer,
     skipBuild: parsedArgs.skipBuild,
-    artifactDir: path.join('output', 'playwright', slugify(parsedArgs.runName || `mobile-pwa-${timestampToken()}`)),
+    themes: selectedThemes,
+    profiles: selectedProfiles,
+    artifactDir: path.join('output', 'playwright', slugify(parsedArgs.runName || `theme-visual-${timestampToken()}`)),
     envValues: values,
   }
+}
+
+function selectByIds(available, rawIds) {
+  if (!rawIds || rawIds === 'all') return available
+  const requested = rawIds.split(',').map(value => value.trim()).filter(Boolean)
+  return requested.filter(value => available.includes(value))
+}
+
+function selectProfiles(rawIds) {
+  if (!rawIds || rawIds === 'all') return deviceProfiles
+  const requested = rawIds.split(',').map(value => value.trim()).filter(Boolean)
+  return deviceProfiles.filter(profile => requested.includes(profile.id))
 }
 
 async function loadDotEnv(filePath) {
@@ -859,8 +674,11 @@ function buildEnvAccount(index) {
     email,
     password,
     username,
-    displayName: getEnvValue(prefix.map(value => `${value}DISPLAY_NAME`)),
   }
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
 }
 
 function timestampToken() {
@@ -873,10 +691,6 @@ function slugify(value) {
     .replace(/[^a-z0-9-]+/gu, '-')
     .replace(/^-+|-+$/gu, '')
     .slice(0, 80) || 'run'
-}
-
-function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
 }
 
 function logLine(message) {

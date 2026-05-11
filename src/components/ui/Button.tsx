@@ -11,11 +11,11 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 const variants = {
   primary: `
     border border-[var(--border-glow)]
-    bg-[linear-gradient(180deg,rgba(255,240,184,0.18),rgba(215,170,70,0.12)_34%,rgba(122,89,24,0.52)_100%)]
-    text-[var(--text-gold)]
-    shadow-[var(--shadow-gold-cta)]
+    bg-[var(--button-primary-bg)]
+    text-[var(--theme-accent-text)]
+    shadow-[var(--shadow-cta)]
     hover:-translate-y-0.5 hover:scale-[1.01]
-    hover:shadow-[0_0_0_1px_rgba(255,240,184,0.24),0_14px_32px_rgba(201,151,47,0.34),inset_0_1px_0_rgba(255,255,255,0.22)]
+    hover:shadow-[var(--button-primary-hover-shadow)]
     active:translate-y-[1px] active:scale-[0.99]
   `,
   secondary: `
@@ -24,15 +24,15 @@ const variants = {
     text-[var(--text-primary)]
     shadow-[var(--shadow-panel)]
     hover:border-[var(--border-glow)]
-    hover:bg-[rgba(255,255,255,0.06)]
-    hover:text-[var(--text-gold)]
+    hover:bg-[var(--theme-surface-hover)]
+    hover:text-[var(--theme-accent-readable)]
   `,
   ghost: `
     border border-transparent
     bg-transparent
     text-[var(--text-secondary)]
-    hover:border-[rgba(215,170,70,0.16)]
-    hover:bg-[rgba(255,255,255,0.04)]
+    hover:border-[var(--theme-accent-border-soft)]
+    hover:bg-[var(--theme-accent-soft)]
     hover:text-[var(--text-primary)]
   `,
   danger: `
@@ -67,7 +67,7 @@ export function Button({
         font-medium rounded-[var(--radius-sm)]
         transition-[background-color,border-color,box-shadow,color,opacity,transform] duration-[var(--dur-med)] ease-[var(--ease-premium)]
         disabled:opacity-50 disabled:cursor-not-allowed
-        focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.22)] focus:ring-offset-0
+        focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)] focus:ring-offset-0
         ${variants[variant]}
         ${sizes[size]}
         ${className}
@@ -79,15 +79,15 @@ export function Button({
         <>
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute inset-[1px] rounded-[calc(var(--radius-sm)-1px)] bg-[radial-gradient(circle_at_50%_0%,rgba(255,240,184,0.18),transparent_42%),linear-gradient(180deg,rgba(27,24,18,0.98),rgba(13,13,13,0.98))]"
+            className="pointer-events-none absolute inset-[1px] rounded-[calc(var(--radius-sm)-1px)] bg-[var(--button-primary-inner-bg)]"
           />
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute inset-x-[18%] top-[1px] h-[42%] rounded-full bg-[linear-gradient(180deg,rgba(255,248,225,0.32),rgba(255,248,225,0))] blur-sm"
+            className="pointer-events-none absolute inset-x-[18%] top-[1px] h-[42%] rounded-full bg-[var(--button-primary-highlight)] blur-sm"
           />
           <span
             aria-hidden="true"
-            className="pointer-events-none absolute -left-1/3 top-0 h-full w-1/3 -skew-x-12 bg-[linear-gradient(90deg,transparent,rgba(255,240,184,0.24),transparent)] opacity-0 transition-[opacity,transform] duration-500 ease-[var(--ease-premium)] group-hover:translate-x-[230%] group-hover:opacity-100"
+            className="pointer-events-none absolute -left-1/3 top-0 h-full w-1/3 -skew-x-12 bg-[var(--button-primary-sheen)] opacity-0 transition-[opacity,transform] duration-500 ease-[var(--ease-premium)] group-hover:translate-x-[230%] group-hover:opacity-100"
           />
         </>
       )}
