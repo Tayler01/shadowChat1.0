@@ -309,6 +309,28 @@ For DM or group-chat regressions, use two browser contexts with different accoun
 - thread selection
 - mobile and desktop layout
 
+## Goal Mode
+
+Use `/goal` for durable multi-step outcomes, not vague cleanup buckets. Start by
+reading this file, checking `git status --short`, and converting the requested
+work into focused checkpoints.
+
+Goal playbooks live in [docs/GOAL_PLAYBOOKS.md](C:/repos/chat2.0/docs/GOAL_PLAYBOOKS.md:1).
+
+For longer feature work, keep progress in
+[docs/features/feature-progress-log.md](C:/repos/chat2.0/docs/features/feature-progress-log.md:1).
+
+For mobile/PWA goals, update the existing QA docs instead of creating a parallel
+system:
+
+- [docs/qa/mobile-pwa-qa-log.md](C:/repos/chat2.0/docs/qa/mobile-pwa-qa-log.md:1)
+- [docs/qa/mobile-viewport-audit.md](C:/repos/chat2.0/docs/qa/mobile-viewport-audit.md:1)
+- [docs/qa/real-device-mobile-validation.md](C:/repos/chat2.0/docs/qa/real-device-mobile-validation.md:1)
+
+Do not treat a goal as complete until the stopping condition is externally
+verified with commands, smoke output, screenshots, logs, or a documented reason
+that a check requires real-device validation.
+
 ## Common Risk Areas
 
 ### DM Realtime
