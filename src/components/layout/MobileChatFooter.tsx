@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from 'react'
 import { MobileNav } from './MobileNav'
+import type { AppView } from '../../types/navigation'
 
 interface MobileChatFooterProps {
-  currentView: 'chat' | 'dms' | 'boards' | 'settings'
-  onViewChange: (view: 'chat' | 'dms' | 'boards' | 'settings') => void
+  currentView: AppView
+  onViewChange: (view: AppView) => void
   children: React.ReactNode
   avoidAndroidKeyboardLift?: boolean
 }

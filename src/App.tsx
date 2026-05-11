@@ -20,6 +20,7 @@ import { useArtBoardReactionNotifications } from './hooks/useArtBoardReactionNot
 import { useTheme } from './hooks/useTheme'
 import { BoardBadgesProvider } from './hooks/useBoardBadges'
 import { computeMobileViewportState } from './lib/mobileViewport'
+import type { AppView as View } from './types/navigation'
 
 const DirectMessagesView = lazy(() =>
   import('./components/dms/DirectMessagesView').then(module => ({
@@ -39,7 +40,12 @@ const BoardsView = lazy(() =>
   }))
 )
 
-type View = 'chat' | 'dms' | 'boards' | 'settings'
+const GamesHome = lazy(() =>
+  import('./features/games/GamesHome').then(module => ({
+    default: module.GamesHome,
+  }))
+)
+
 type LocationState = {
   view: View
   conversation: string | null
@@ -47,7 +53,7 @@ type LocationState = {
 }
 
 const isView = (value: string | null): value is View => (
-  value === 'chat' || value === 'dms' || value === 'boards' || value === 'settings'
+  value === 'chat' || value === 'dms' || value === 'boards' || value === 'games' || value === 'settings'
 )
 
 const normalizeViewParam = (value: string | null): View | null => {
@@ -340,6 +346,8 @@ function App() {
             onMobileChatActiveChange={setBoardsChatFooterActive}
           />
         )
+      case 'games':
+        return <GamesHome />
       case 'settings':
         return <SettingsView onToggleSidebar={toggleSidebar} />
       default:

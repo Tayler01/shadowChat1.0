@@ -1,11 +1,12 @@
 import React from 'react'
-import { MessageSquare, Newspaper, Settings, Users } from 'lucide-react'
+import { Gamepad2, MessageSquare, Newspaper, Settings, Users } from 'lucide-react'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
 import { useBoardBadges } from '../../hooks/useBoardBadges'
+import type { AppView } from '../../types/navigation'
 
 interface MobileNavProps {
-  currentView: 'chat' | 'dms' | 'boards' | 'settings'
-  onViewChange: (view: 'chat' | 'dms' | 'boards' | 'settings') => void
+  currentView: AppView
+  onViewChange: (view: AppView) => void
   className?: string
   embedded?: boolean
 }
@@ -32,6 +33,7 @@ export function MobileNav({ currentView, onViewChange, className, embedded = fal
       label: 'Boards',
       badge: boardsBadgeCount > 0 ? boardsBadgeCount : null,
     },
+    { id: 'games' as const, icon: Gamepad2, label: 'Games', badge: null },
     { id: 'settings' as const, icon: Settings, label: 'Settings', badge: null },
   ]
 
@@ -41,12 +43,12 @@ export function MobileNav({ currentView, onViewChange, className, embedded = fal
         className || 'fixed bottom-0 inset-x-0 z-50'
       }`}
     >
-      <ul className="flex h-full justify-around px-1.5">
+      <ul className="flex h-full justify-around px-1">
         {navItems.map(item => (
           <li key={item.id} className="relative flex-1">
             <button
               onClick={() => onViewChange(item.id)}
-              className={`flex h-full w-full flex-col items-center justify-center rounded-[var(--radius-md)] px-1 py-1.5 text-[10px] transition-[background-color,box-shadow,color] duration-[var(--dur-med)] focus:outline-none ${
+              className={`flex h-full w-full flex-col items-center justify-center rounded-[var(--radius-md)] px-0.5 py-1.5 text-[10px] transition-[background-color,box-shadow,color] duration-[var(--dur-med)] focus:outline-none ${
                 currentView === item.id
                   ? 'bg-[var(--nav-active-bg)] text-[var(--theme-accent-readable)] shadow-[var(--shadow-accent-soft)]'
                   : 'text-[var(--text-muted)] hover:bg-[var(--nav-hover-bg)] hover:text-[var(--text-primary)]'

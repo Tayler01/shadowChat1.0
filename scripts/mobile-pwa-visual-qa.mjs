@@ -183,18 +183,21 @@ async function runProfile(profile, accountA, accountB) {
     await page.getByRole('button', { name: 'Back to boards' }).click()
     await auditPage(page, profile, '14-boards-back')
 
+    await goToGames(page)
+    await auditPage(page, profile, '15-games-home')
+
     await goToSettings(page)
-    await auditPage(page, profile, '15-settings-hub', { header: false })
+    await auditPage(page, profile, '16-settings-hub', { header: false })
     await openSettingsSection(page, 'Feedback')
-    await auditPage(page, profile, '16-settings-feedback', { header: false })
+    await auditPage(page, profile, '17-settings-feedback', { header: false })
     await page.getByRole('button', { name: 'Send Feedback' }).click()
     await page.getByRole('dialog', { name: /Send a bug report or feature idea/i }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-    await auditPage(page, profile, '17-feedback-modal', { header: false })
+    await auditPage(page, profile, '18-feedback-modal', { header: false })
     await page.getByRole('button', { name: 'Close feedback' }).click()
     await page.getByRole('dialog', { name: /Send a bug report or feature idea/i }).waitFor({ state: 'hidden', timeout: DEFAULT_TIMEOUT_MS })
     await page.getByRole('button', { name: 'Back to settings' }).click()
     await openSettingsSection(page, 'Account & Profile')
-    await auditPage(page, profile, '18-account-profile', { header: false })
+    await auditPage(page, profile, '19-account-profile', { header: false })
 
     logLine(`Passed ${profile.label}`)
   } finally {
@@ -525,6 +528,11 @@ async function waitForSettingsView(page) {
   await page.getByRole('heading', { name: 'Settings' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
+async function waitForGamesView(page) {
+  await page.getByRole('heading', { name: 'Games' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByRole('heading', { name: 'Shadow War' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+}
+
 async function goToDirectMessages(page) {
   await page.getByRole('button', { name: /Direct Messages|DMs/i }).click()
   await waitForDmView(page)
@@ -544,6 +552,22 @@ async function goToBoards(page) {
     await navigateByViewParam(page, 'boards')
   }
   await page.getByRole('heading', { name: 'Boards' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+}
+
+async function goToGames(page) {
+  if (!(await page.getByRole('button', { name: /^Games$/ }).isVisible().catch(() => false))) {
+    const back = page.getByRole('button', { name: 'Back' }).first()
+    if (await back.isVisible().catch(() => false)) {
+      await back.click()
+      await waitForChatView(page).catch(() => {})
+    }
+  }
+  if (await page.getByRole('button', { name: /^Games$/ }).isVisible().catch(() => false)) {
+    await page.getByRole('button', { name: /^Games$/ }).click()
+  } else {
+    await navigateByViewParam(page, 'games')
+  }
+  await waitForGamesView(page)
 }
 
 async function goToSettings(page) {

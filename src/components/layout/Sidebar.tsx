@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageSquare, Users, Newspaper, Settings, Moon, Sun, X } from 'lucide-react';
+import { Gamepad2, MessageSquare, Users, Newspaper, Settings, Moon, Sun, X } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
 import { UserRoleBadge } from '../ui/UserRoleBadge';
 import { UserPresenceBadge } from '../ui/UserPresenceBadge';
@@ -7,10 +7,11 @@ import { useAuth } from '../../hooks/useAuth';
 import { useDirectMessages } from '../../hooks/useDirectMessages';
 import { useBoardBadges } from '../../hooks/useBoardBadges';
 import { getPresenceStateLabel, usePresenceForUser } from '../../hooks/usePresence';
+import type { AppView } from '../../types/navigation';
 
 interface SidebarProps {
-  currentView: 'chat' | 'dms' | 'boards' | 'settings';
-  onViewChange: (view: 'chat' | 'dms' | 'boards' | 'settings') => void;
+  currentView: AppView;
+  onViewChange: (view: AppView) => void;
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
   onNewDM?: () => void;
@@ -55,6 +56,12 @@ export function Sidebar({
       label: 'Boards',
       icon: Newspaper,
       badge: boardsBadgeCount > 0 ? boardsBadgeCount : null,
+    },
+    {
+      id: 'games' as const,
+      label: 'Games',
+      icon: Gamepad2,
+      badge: null,
     },
     {
       id: 'settings' as const,

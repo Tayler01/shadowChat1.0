@@ -9,8 +9,7 @@ import { Button } from '../ui/Button'
 import { cn } from '../../lib/utils'
 import type { BoardDefinition } from '../../lib/boards'
 import { useBoardBadges } from '../../hooks/useBoardBadges'
-
-type AppView = 'chat' | 'dms' | 'boards' | 'settings'
+import type { AppView } from '../../types/navigation'
 
 interface BoardsViewProps {
   resetKey?: number

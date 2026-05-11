@@ -120,7 +120,6 @@ export function createFreshSupabaseClient() {
 export let supabase: AnySupabaseClient
 
 declare global {
-  // eslint-disable-next-line no-var
   var __supabaseClient: AnySupabaseClient | undefined
 }
 
@@ -796,6 +795,75 @@ export interface BoardChatMessage {
   created_at: string
   updated_at: string
   user?: User
+}
+
+export type GameSessionStatus = 'waiting' | 'active' | 'completed' | 'cancelled'
+export type ShadowWarMatchStatus = 'setup' | 'active' | 'completed' | 'cancelled'
+export type ShadowWarPhase = 'placement' | 'reveal' | 'sudden_war' | 'complete'
+export type ShadowWarPlayerSlot = 'player_one' | 'player_two'
+
+export interface GameSession {
+  id: string
+  game_type: 'shadow_war'
+  status: GameSessionStatus
+  created_by: string
+  player_one_id: string
+  player_two_id?: string | null
+  winner_id?: string | null
+  loser_id?: string | null
+  current_match_id?: string | null
+  created_at: string
+  updated_at: string
+  completed_at?: string | null
+  player_one?: BasicUser | null
+  player_two?: BasicUser | null
+  winner?: BasicUser | null
+}
+
+export interface ShadowWarMatch {
+  id: string
+  session_id: string
+  status: ShadowWarMatchStatus
+  round_number: number
+  target_score: number
+  player_one_score: number
+  player_two_score: number
+  current_phase: ShadowWarPhase
+  state: Record<string, unknown>
+  created_at: string
+  updated_at: string
+  completed_at?: string | null
+}
+
+export interface ShadowWarPlayerStateRow {
+  match_id: string
+  user_id: string
+  player_slot: ShadowWarPlayerSlot
+  state: Record<string, unknown>
+  updated_at: string
+}
+
+export interface ShadowWarMove {
+  id: string
+  match_id: string
+  user_id: string
+  player_slot: ShadowWarPlayerSlot
+  round_number: number
+  move_type: 'placement' | 'sudden_war'
+  payload: Record<string, unknown>
+  revealed_at?: string | null
+  created_at: string
+}
+
+export interface GameSessionQueueEntry {
+  id: string
+  session_id: string
+  user_id: string
+  position: number
+  status: 'queued' | 'invited' | 'joined' | 'skipped' | 'left'
+  created_at: string
+  updated_at: string
+  user?: BasicUser | null
 }
 
 export type ArtBoardItemType = 'image' | 'note'

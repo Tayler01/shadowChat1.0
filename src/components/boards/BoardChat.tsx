@@ -22,8 +22,7 @@ import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import type { EmojiClickData } from '../../types'
 import type { BoardChatMessage } from '../../lib/supabase'
 import type { ChatBoardDefinition } from '../../lib/boards'
-
-type AppView = 'chat' | 'dms' | 'boards' | 'settings'
+import type { AppView } from '../../types/navigation'
 
 const getEmojiPickerDimensions = () => {
   if (typeof window === 'undefined') return { width: 300, height: 360 }

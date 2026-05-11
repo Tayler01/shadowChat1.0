@@ -17,10 +17,11 @@ import {
   type SessionRecoveryResult,
 } from '../../lib/sessionRecovery'
 import type { ChatMessageType } from '../../lib/supabase'
+import type { AppView } from '../../types/navigation'
 
 interface ChatViewProps {
-  currentView: 'chat' | 'dms' | 'boards' | 'settings'
-  onViewChange: (view: 'chat' | 'dms' | 'boards' | 'settings') => void
+  currentView: AppView
+  onViewChange: (view: AppView) => void
   initialMessageId?: string
 }
 

@@ -39,11 +39,12 @@ import type { BasicUser, ChatMessageType, DMMessage, User } from '../../lib/supa
 import { UnreadDivider } from '../chat/UnreadDivider'
 import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import type { EmojiClickData } from '../../types'
+import type { AppView } from '../../types/navigation'
 
 interface DirectMessagesViewProps {
   onToggleSidebar: () => void
-  currentView: 'chat' | 'dms' | 'boards' | 'settings'
-  onViewChange: (view: 'chat' | 'dms' | 'boards' | 'settings') => void
+  currentView: AppView
+  onViewChange: (view: AppView) => void
   initialConversation?: string
   initialMessageId?: string
 }
