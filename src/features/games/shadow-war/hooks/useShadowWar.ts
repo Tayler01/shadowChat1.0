@@ -96,6 +96,30 @@ export function useShadowWar() {
     void resetChannel()
   })
 
+  const activeMatchId = snapshot.match?.id ?? null
+  const activeMatchPhase = snapshot.match?.current_phase ?? null
+  const activeMatchStatus = snapshot.match?.status ?? null
+
+  useEffect(() => {
+    if (!selectedSessionId || !activeMatchId || activeMatchStatus !== 'active') return
+    if (activeMatchPhase !== 'reveal' && activeMatchPhase !== 'sudden_war') return
+
+    let cancelled = false
+    const refreshTransientState = () => {
+      if (cancelled || document.visibilityState !== 'visible') return
+      void refresh(selectedSessionId).catch(() => {})
+    }
+
+    const timeoutId = window.setTimeout(refreshTransientState, 900)
+    const intervalId = window.setInterval(refreshTransientState, 2_000)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeoutId)
+      window.clearInterval(intervalId)
+    }
+  }, [activeMatchId, activeMatchPhase, activeMatchStatus, refresh, selectedSessionId])
+
   useEffect(() => {
     if (!user) return
 

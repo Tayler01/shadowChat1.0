@@ -1,5 +1,5 @@
 import React from 'react'
-import { ArrowLeft, ChevronRight, HelpCircle, Loader2, Music, Plus, Shield, Swords, Users, Volume2, VolumeX, X } from 'lucide-react'
+import { ArrowLeft, HelpCircle, Loader2, Music, Plus, Shield, Swords, Users, Volume2, VolumeX, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner'
 import { useAuth } from '../../../hooks/useAuth'
@@ -166,40 +166,48 @@ export function ShadowWarScreen({
 
   const renderSessionActions = (session: GameSession) => {
     const isPlayer = isUserInSession(session, user?.id)
+    const canContinue = isPlayer && Boolean(session.current_match_id) && session.status !== 'completed'
+    const canOpenWaitingTable = isPlayer && session.status === 'waiting'
     const sessionIsQueued = activeSession?.id === session.id
       ? isQueuedForSelected
       : false
     const canJoin = session.status === 'waiting' && !isPlayer
     const canQueue = session.status === 'active' && !isPlayer && !sessionIsQueued
+    const hasActions = canContinue || canOpenWaitingTable || canJoin || canQueue || sessionIsQueued
+
+    if (!hasActions) {
+      return null
+    }
 
     return (
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        {isPlayer && session.current_match_id && session.status !== 'completed' ? (
-          <WarButton className="col-span-2" onClick={() => actions.selectSession(session.id)}>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        {canContinue ? (
+          <WarButton className="sm:col-span-2" onClick={() => actions.selectSession(session.id)}>
             <Swords className="mr-2 h-4 w-4" />
             Continue Duel
           </WarButton>
-        ) : (
-          <WarButton className="col-span-2" variant="secondary" onClick={() => actions.selectSession(session.id)}>
-            Inspect Duel
-            <ChevronRight className="ml-2 h-4 w-4" />
+        ) : null}
+
+        {canOpenWaitingTable ? (
+          <WarButton className="sm:col-span-2" variant="secondary" onClick={() => actions.selectSession(session.id)}>
+            Open Table
           </WarButton>
-        )}
+        ) : null}
 
         {canJoin && (
-          <WarButton loading={busy === 'join'} onClick={() => void guarded(() => actions.join(session.id), 'Joined duel')}>
+          <WarButton className="sm:col-span-2" loading={busy === 'join'} onClick={() => void guarded(() => actions.join(session.id), 'Joined duel')}>
             <Users className="mr-2 h-4 w-4" />
             Join Duel
           </WarButton>
         )}
         {canQueue && (
-          <WarButton variant="secondary" loading={busy === 'queue'} onClick={() => void guarded(() => actions.queue(session.id), 'Joined queue')}>
+          <WarButton className="sm:col-span-2" variant="secondary" loading={busy === 'queue'} onClick={() => void guarded(() => actions.queue(session.id), 'Joined queue')}>
             <Shield className="mr-2 h-4 w-4" />
             Queue
           </WarButton>
         )}
         {sessionIsQueued && (
-          <WarButton variant="ghost" loading={busy === 'leaveQueue'} onClick={() => void guarded(() => actions.leaveQueue(session.id), 'Left queue')}>
+          <WarButton className="sm:col-span-2" variant="ghost" loading={busy === 'leaveQueue'} onClick={() => void guarded(() => actions.leaveQueue(session.id), 'Left queue')}>
             Leave Queue
           </WarButton>
         )}

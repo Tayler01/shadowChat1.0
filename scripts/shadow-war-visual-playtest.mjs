@@ -113,8 +113,8 @@ try {
     if (await isSuddenWar(pageOne) || await isSuddenWar(pageTwo)) {
       await playSuddenWar(pageOne)
       await playSuddenWar(pageTwo)
-      await waitForAutoResolveState(pageOne)
-      await waitForAutoResolveState(pageTwo)
+      await waitForPostSuddenWarState(pageOne)
+      await waitForPostSuddenWarState(pageTwo)
     }
 
     record('ui round completed', { round })
@@ -387,6 +387,18 @@ async function waitForAutoResolveState(page) {
     const text = document.body?.innerText || ''
     if (text.includes('Duel complete') || text.includes('Victory held')) return true
     if (text.includes('Sudden war')) return true
+    if (text.includes('Waiting for opponent') || text.includes('Battle resolving')) return false
+    if (document.querySelector('[data-testid="shadow-war-hand"] [data-testid="shadow-war-card"]:not([disabled])')) return true
+    const lock = document.querySelector('[data-testid="shadow-war-lock"]')
+    return Boolean(lock && !lock.disabled)
+  }, null, { timeout: DEFAULT_TIMEOUT_MS })
+}
+
+async function waitForPostSuddenWarState(page) {
+  await page.waitForFunction(() => {
+    const text = document.body?.innerText || ''
+    if (text.includes('Duel complete') || text.includes('Victory held')) return true
+    if (text.includes('Sudden war')) return false
     if (text.includes('Waiting for opponent') || text.includes('Battle resolving')) return false
     if (document.querySelector('[data-testid="shadow-war-hand"] [data-testid="shadow-war-card"]:not([disabled])')) return true
     const lock = document.querySelector('[data-testid="shadow-war-lock"]')

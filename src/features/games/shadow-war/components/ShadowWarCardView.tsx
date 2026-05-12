@@ -82,8 +82,10 @@ export function ShadowWarCardView({
       <div className="absolute inset-x-1.5 bottom-2 px-1 text-center">
         <p
           className={cn(
-            'overflow-hidden text-ellipsis whitespace-nowrap font-serif font-semibold uppercase text-[#f6e0a2] [text-shadow:0_2px_4px_rgba(0,0,0,0.95),0_0_10px_rgba(0,0,0,0.9)]',
-            compact ? 'text-[10px] leading-3' : 'text-xs'
+            'overflow-hidden font-serif font-semibold uppercase text-[#f6e0a2] [text-shadow:0_2px_4px_rgba(0,0,0,0.95),0_0_10px_rgba(0,0,0,0.9)]',
+            compact
+              ? 'whitespace-nowrap text-[6px] leading-[0.65rem] tracking-0 sm:text-[8px] sm:leading-[0.72rem]'
+              : 'line-clamp-2 break-words text-xs tracking-[0.02em] [overflow-wrap:anywhere]'
           )}
         >
           {card.name}

@@ -222,13 +222,13 @@
 @keyframes shadow-war-cinematic-enter {
   0% {
     opacity: 0;
-    transform: scale(1.025);
+    transform: scale(1.018);
     filter: brightness(0.72);
   }
-  16% {
+  8% {
     opacity: 1;
   }
-  68% {
+  86% {
     opacity: 1;
     transform: scale(1);
     filter: brightness(1.06);
@@ -242,74 +242,145 @@
 
 @keyframes shadow-war-cinematic-lane {
   0% {
-    transform: translateY(14px) scale(0.98);
+    transform: translateY(10px) scale(0.985);
     opacity: 0;
     filter: brightness(0.7);
   }
-  24% {
+  20% {
     opacity: 1;
-  }
-  48% {
-    transform: translateY(0) scale(1.015);
-    filter: brightness(1.45);
   }
   100% {
     transform: translateY(0) scale(1);
-    opacity: 0.92;
-    filter: brightness(0.9);
+    opacity: 1;
+    filter: brightness(1);
   }
 }
 
-@keyframes shadow-war-cinematic-card-opponent {
+@keyframes shadow-war-cinematic-card-ready-opponent {
   0% {
-    transform: translate(-50%, -44px) rotate(-7deg) scale(0.94);
+    transform: translate(-50%, -26px) rotate(-5deg) scale(0.96);
     opacity: 0;
-  }
-  34% {
-    opacity: 1;
-  }
-  54% {
-    transform: translate(-50%, 42px) rotate(3deg) scale(1.02);
   }
   100% {
-    transform: translate(-50%, 8px) rotate(0deg) scale(1);
-    opacity: 0.78;
+    transform: translate(-50%, 0) rotate(0deg) scale(1);
+    opacity: 1;
   }
 }
 
-@keyframes shadow-war-cinematic-card-player {
+@keyframes shadow-war-cinematic-card-ready-player {
   0% {
-    transform: translate(-50%, 44px) rotate(7deg) scale(0.94);
+    transform: translate(-50%, 26px) rotate(5deg) scale(0.96);
     opacity: 0;
-  }
-  34% {
-    opacity: 1;
-  }
-  54% {
-    transform: translate(-50%, -42px) rotate(-3deg) scale(1.02);
   }
   100% {
-    transform: translate(-50%, -8px) rotate(0deg) scale(1);
-    opacity: 0.78;
+    transform: translate(-50%, 0) rotate(0deg) scale(1);
+    opacity: 1;
   }
 }
 
-@keyframes shadow-war-cinematic-strike {
+@keyframes shadow-war-cinematic-card-hit-opponent {
+  0% {
+    transform: translate(-50%, 0) rotate(0deg) scale(1);
+    filter: brightness(1);
+  }
+  42% {
+    transform: translate(-50%, 22px) rotate(2deg) scale(1.035);
+    filter: brightness(1.45);
+  }
+  70% {
+    transform: translate(-50%, -7px) rotate(-1deg) scale(0.99);
+    filter: brightness(0.92);
+  }
+  100% {
+    transform: translate(-50%, 0) rotate(0deg) scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes shadow-war-cinematic-card-hit-player {
+  0% {
+    transform: translate(-50%, 0) rotate(0deg) scale(1);
+    filter: brightness(1);
+  }
+  42% {
+    transform: translate(-50%, -22px) rotate(-2deg) scale(1.035);
+    filter: brightness(1.45);
+  }
+  70% {
+    transform: translate(-50%, 7px) rotate(1deg) scale(0.99);
+    filter: brightness(0.92);
+  }
+  100% {
+    transform: translate(-50%, 0) rotate(0deg) scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes shadow-war-cinematic-ray {
   0% {
     opacity: 0;
-    transform: translate(-50%, -50%) scaleX(0.16) rotate(-18deg);
+    transform: translate(-50%, -50%) scaleX(0.08) rotate(-17deg);
   }
-  48% {
-    opacity: 0;
-  }
-  58% {
+  42% {
     opacity: 1;
-    transform: translate(-50%, -50%) scaleX(1.16) rotate(-12deg);
+    transform: translate(-50%, -50%) scaleX(1.16) rotate(-10deg);
     filter: brightness(2);
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -50%) scaleX(1.42) rotate(-8deg);
+    transform: translate(-50%, -50%) scaleX(1.42) rotate(-5deg);
+  }
+}
+
+@keyframes shadow-war-cinematic-impact {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.42) rotate(-18deg);
+  }
+  36% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.08) rotate(7deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.58) rotate(28deg);
+  }
+}
+
+@keyframes shadow-war-cinematic-effect {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.82);
+    filter: brightness(0.8);
+  }
+  22% {
+    opacity: 1;
+    transform: translateY(0) scale(1.05);
+    filter: brightness(1.55);
+  }
+  68% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-15px) scale(1.08);
+    filter: brightness(1);
+  }
+}
+
+@keyframes shadow-war-cinematic-outcome {
+  0% {
+    opacity: 0;
+    transform: translateY(9px) scale(0.88);
+  }
+  42% {
+    opacity: 1;
+    transform: translateY(0) scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -321,7 +392,7 @@
   44% {
     opacity: 0;
   }
-  56% {
+  58% {
     opacity: 1;
     transform: translateY(0) scale(1.15);
   }
@@ -340,7 +411,7 @@
     opacity: 0.72;
   }
   100% {
-    opacity: 0;
+    opacity: 0.12;
     transform: translateY(-28px) scaleX(1.1);
   }
 }
@@ -363,13 +434,13 @@
 @keyframes shadow-war-cinematic-title {
   0% {
     opacity: 0;
-    transform: translateY(18px) scale(0.96);
-  }
-  48% {
-    opacity: 0;
     transform: translateY(12px) scale(0.98);
   }
-  66% {
+  34% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  78% {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
@@ -380,39 +451,60 @@
 }
 
 .shadow-war-cinematic {
-  animation: shadow-war-cinematic-enter 1850ms cubic-bezier(0.2, 0.82, 0.22, 1) forwards;
+  animation: shadow-war-cinematic-enter 5800ms cubic-bezier(0.2, 0.82, 0.22, 1) forwards;
 }
 
 .shadow-war-cinematic-lane {
-  animation: shadow-war-cinematic-lane 1700ms cubic-bezier(0.2, 0.82, 0.22, 1) forwards;
+  animation: shadow-war-cinematic-lane 650ms cubic-bezier(0.2, 0.82, 0.22, 1) forwards;
 }
 
 .shadow-war-cinematic-card-opponent {
-  animation: shadow-war-cinematic-card-opponent 1550ms cubic-bezier(0.2, 0.82, 0.22, 1) forwards;
+  animation:
+    shadow-war-cinematic-card-ready-opponent 620ms cubic-bezier(0.2, 0.82, 0.22, 1) forwards,
+    shadow-war-cinematic-card-hit-opponent 860ms cubic-bezier(0.2, 0.82, 0.22, 1) var(--lane-delay) forwards;
 }
 
 .shadow-war-cinematic-card-player {
-  animation: shadow-war-cinematic-card-player 1550ms cubic-bezier(0.2, 0.82, 0.22, 1) forwards;
+  animation:
+    shadow-war-cinematic-card-ready-player 620ms cubic-bezier(0.2, 0.82, 0.22, 1) forwards,
+    shadow-war-cinematic-card-hit-player 860ms cubic-bezier(0.2, 0.82, 0.22, 1) var(--lane-delay) forwards;
 }
 
-.shadow-war-cinematic-strike {
-  animation: shadow-war-cinematic-strike 1550ms cubic-bezier(0.2, 0.82, 0.22, 1) forwards;
+.shadow-war-cinematic-ray {
+  opacity: 0;
+  animation: shadow-war-cinematic-ray 760ms cubic-bezier(0.2, 0.82, 0.22, 1) var(--lane-delay) forwards;
+}
+
+.shadow-war-cinematic-impact {
+  opacity: 0;
+  animation: shadow-war-cinematic-impact 840ms cubic-bezier(0.2, 0.82, 0.22, 1) var(--lane-delay) forwards;
+}
+
+.shadow-war-cinematic-effect {
+  opacity: 0;
+  animation: shadow-war-cinematic-effect 1450ms cubic-bezier(0.2, 0.82, 0.22, 1) var(--effect-delay) forwards;
+}
+
+.shadow-war-cinematic-outcome {
+  opacity: 0;
+  animation: shadow-war-cinematic-outcome 760ms cubic-bezier(0.2, 0.82, 0.22, 1) calc(var(--lane-delay) + 620ms) forwards;
 }
 
 .shadow-war-cinematic-spark {
-  animation: shadow-war-cinematic-spark 1400ms ease-out forwards;
+  animation: shadow-war-cinematic-spark 5200ms ease-out forwards;
 }
 
 .shadow-war-cinematic-smoke {
-  animation: shadow-war-cinematic-smoke 1850ms ease-out forwards;
+  animation: shadow-war-cinematic-smoke 5800ms ease-out forwards;
 }
 
 .shadow-war-cinematic-sigil {
-  animation: shadow-war-cinematic-sigil 1750ms ease-out forwards;
+  animation: shadow-war-cinematic-sigil 5200ms ease-out forwards;
 }
 
 .shadow-war-cinematic-title {
-  animation: shadow-war-cinematic-title 1850ms cubic-bezier(0.2, 0.82, 0.22, 1) forwards;
+  opacity: 0;
+  animation: shadow-war-cinematic-title 1250ms cubic-bezier(0.2, 0.82, 0.22, 1) 4560ms forwards;
 }
 
 :root[data-scheme='obsidian-gold'] {

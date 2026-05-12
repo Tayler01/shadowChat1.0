@@ -20,21 +20,21 @@ const round = (): ShadowWarRoundHistoryEntry => ({
   laneResults: [
     {
       lane: 'left',
-      playerOneCard: card('archer', 1),
-      playerTwoCard: card('spy', 2),
-      playerOneStrength: 4,
-      playerTwoStrength: 2,
+      playerOneCard: card('champion', 1),
+      playerTwoCard: card('warlord', 2),
+      playerOneStrength: 10,
+      playerTwoStrength: 9,
       winner: 'player_one',
       notes: [],
     },
     {
       lane: 'center',
-      playerOneCard: card('knight', 3),
+      playerOneCard: card('spy', 3),
       playerTwoCard: card('sovereign', 4),
-      playerOneStrength: 6,
-      playerTwoStrength: 10,
+      playerOneStrength: 2,
+      playerTwoStrength: 7,
       winner: 'player_two',
-      notes: [],
+      notes: undefined as unknown as string[],
     },
     {
       lane: 'right',
@@ -59,6 +59,10 @@ describe('ShadowWarBattleCinematic', () => {
     expect(screen.getByText('Right')).toBeInTheDocument()
     expect(screen.getByText('Won')).toBeInTheDocument()
     expect(screen.getByText('Lost')).toBeInTheDocument()
-    expect(screen.getByText('Contested')).toBeInTheDocument()
+    expect(screen.getByText('Champion')).toBeInTheDocument()
+    expect(screen.getByText('Sovereign')).toBeInTheDocument()
+    expect(screen.getAllByText('Tie').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('+2').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('-3').length).toBeGreaterThan(0)
   })
 })

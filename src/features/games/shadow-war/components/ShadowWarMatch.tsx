@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Crown, Flag, Hourglass, Loader2, Lock, Sparkles } from 'lucide-react'
+import { Crown, Flag, Loader2, Lock } from 'lucide-react'
 import { cn } from '../../../../lib/utils'
 import { useAuth } from '../../../../hooks/useAuth'
 import type { GameSession, GameSessionQueueEntry, ShadowWarMatch as ShadowWarMatchRow, ShadowWarMove, ShadowWarPlayerStateRow } from '../../../../lib/supabase'
@@ -244,7 +244,7 @@ export function ShadowWarMatch({
     setCinematicRound(latestRound)
     const timeout = window.setTimeout(() => {
       setCinematicRound(currentRound => currentRound?.resolvedAt === latestRound.resolvedAt ? null : currentRound)
-    }, 1900)
+    }, 5900)
 
     return () => window.clearTimeout(timeout)
   }, [latestRound, match.id])
@@ -267,6 +267,7 @@ export function ShadowWarMatch({
           mySlot={mySlot}
         />
       )}
+      <p className="sr-only" aria-live="polite">{statusLabel}</p>
       <section className="shrink-0 border-b border-[#b9934c]/35 bg-black/58 px-3 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-sm">
         <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-2">
           <div className="flex min-w-0 items-center gap-2">
@@ -301,15 +302,8 @@ export function ShadowWarMatch({
         </div>
       </section>
 
-      <div className="shrink-0 border-b border-[#b9934c]/30 bg-black/60 px-3 py-2">
-        <div className="mx-auto flex max-w-6xl items-center justify-center gap-2 rounded-[0.75rem] border border-[#b9934c]/35 bg-black/54 px-3 py-2 text-center text-sm font-semibold text-[#f0d381]">
-          {isLocked && !canResolve ? <Hourglass className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
-          {statusLabel}
-        </div>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3 md:px-4">
-        <div className="mx-auto grid max-w-6xl grid-cols-3 gap-2 md:gap-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2 md:px-4 md:py-3">
+        <div className="mx-auto grid max-w-6xl grid-cols-3 gap-1.5 sm:gap-2 md:gap-4">
           {SHADOW_WAR_LANES.map(lane => {
             const laneResult = displayedRound?.laneResults?.find((result: any) => result.lane === lane)
             const winner = laneResult?.winner
@@ -322,7 +316,7 @@ export function ShadowWarMatch({
                 onClick={() => placeSelectedCard(lane)}
                 disabled={!selectedCardId || isLocked || isSuddenWar}
                 className={cn(
-                  'relative flex min-h-[21rem] flex-col overflow-hidden rounded-[0.8rem] border p-2 text-left shadow-[inset_0_0_28px_rgba(0,0,0,0.45),0_18px_40px_rgba(0,0,0,0.35)] transition-[border-color,box-shadow,transform] duration-200 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/50 disabled:cursor-default md:min-h-[30rem] md:p-3',
+                  'relative flex min-h-[18.5rem] flex-col overflow-hidden rounded-[0.8rem] border p-1.5 text-left shadow-[inset_0_0_28px_rgba(0,0,0,0.45),0_18px_40px_rgba(0,0,0,0.35)] transition-[border-color,box-shadow,transform] duration-200 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/50 disabled:cursor-default sm:min-h-[21rem] sm:p-2 md:min-h-[30rem] md:p-3',
                   laneStyles[lane],
                   winner && 'after:pointer-events-none after:absolute after:inset-x-2 after:top-1/2 after:h-px after:origin-center after:animate-[shadow-war-clash_900ms_ease-out_1] after:bg-gradient-to-r after:from-transparent after:via-[#f0d381] after:to-transparent after:shadow-[0_0_28px_rgba(240,211,129,0.7)]',
                   winner === mySlot && 'ring-1 ring-[#f0d381]/34',
@@ -341,7 +335,7 @@ export function ShadowWarMatch({
                   )}
                 </div>
 
-                <div className="mx-auto w-full max-w-[6.4rem] md:max-w-[8.2rem]">
+                <div className="mx-auto w-full max-w-[5.8rem] sm:max-w-[6.4rem] md:max-w-[8.2rem]">
                   <ShadowWarCardView
                     card={getMoveCard(opponentMove, lane)}
                     hidden={!opponentMove?.revealed_at}
@@ -355,7 +349,7 @@ export function ShadowWarMatch({
                   <span className="h-px w-full bg-gradient-to-r from-transparent via-[#d7aa46]/40 to-transparent" />
                 </div>
 
-                <div className="mx-auto w-full max-w-[6.4rem] md:max-w-[8.2rem]">
+                <div className="mx-auto w-full max-w-[5.8rem] sm:max-w-[6.4rem] md:max-w-[8.2rem]">
                   <ShadowWarCardView
                     card={myMove ? getMoveCard(myMove, lane) : placedCard(lane)}
                     hidden={false}
@@ -478,16 +472,21 @@ export function ShadowWarMatch({
           </div>
         ) : (
           isSuddenWar ? (
-            <GameButton
-              data-testid="shadow-war-lock"
-              className="mx-auto flex w-full max-w-6xl"
-              disabled={!selectedCardId || submitting}
-              loading={busy === 'submitSuddenWarCard'}
-              onClick={() => void submitSuddenWar()}
-            >
-              <Lock className="mr-2 h-4 w-4" />
-              Battle Reserve
-            </GameButton>
+            <div className="mx-auto w-full max-w-6xl">
+              <p className="mb-2 text-center text-[10px] font-semibold uppercase tracking-[0.18em] text-[#f0d381]">
+                Sudden war
+              </p>
+              <GameButton
+                data-testid="shadow-war-lock"
+                className="flex w-full"
+                disabled={!selectedCardId || submitting}
+                loading={busy === 'submitSuddenWarCard'}
+                onClick={() => void submitSuddenWar()}
+              >
+                <Lock className="mr-2 h-4 w-4" />
+                Battle Reserve
+              </GameButton>
+            </div>
           ) : (
             <GameButton
               data-testid="shadow-war-lock"
