@@ -10,12 +10,13 @@ import {
   Copy,
   Edit3,
   Trash2,
+  Search,
 } from 'lucide-react'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
 import { useAuth } from '../../hooks/useAuth'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
-import { UserSearchSelect } from './UserSearchSelect'
+import { Input } from '../ui/Input'
 import { MessageInput } from '../chat/MessageInput'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import { FailedMessageItem } from '../chat/FailedMessageItem'
@@ -34,6 +35,7 @@ import { useTyping } from '../../hooks/useTyping'
 import { useReadCursor } from '../../hooks/useReadCursor'
 import { useUnreadScroll } from '../../hooks/useUnreadScroll'
 import { getPresenceStateLabel, usePresenceForUser } from '../../hooks/usePresence'
+import { useAllUsers } from '../../hooks/useAllUsers'
 import toast from 'react-hot-toast'
 import type { BasicUser, ChatMessageType, DMMessage, User } from '../../lib/supabase'
 import { UnreadDivider } from '../chat/UnreadDivider'
@@ -333,6 +335,138 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
   )
 })
 
+function NewDirectMessagePicker({
+  users,
+  loading,
+  query,
+  pendingUsername,
+  onQueryChange,
+  onSelect,
+  onCancel,
+}: {
+  users: BasicUser[]
+  loading: boolean
+  query: string
+  pendingUsername: string | null
+  onQueryChange: (value: string) => void
+  onSelect: (user: BasicUser) => void | Promise<void>
+  onCancel: () => void
+}) {
+  const normalizedQuery = query.trim().toLowerCase()
+  const filteredUsers = normalizedQuery
+    ? users.filter(user =>
+        user.username.toLowerCase().includes(normalizedQuery) ||
+        user.display_name.toLowerCase().includes(normalizedQuery)
+      )
+    : users
+
+  return (
+    <div className="theme-image-surface flex h-full min-h-0 flex-col">
+      <div className="border-b border-[var(--border-panel)] px-4 pb-4 pt-[calc(env(safe-area-inset-top)_+_1rem)] sm:px-5">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-muted)]">
+              Direct Messages
+            </p>
+            <h2 className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">
+              New Message
+            </h2>
+            <p className="mt-1 max-w-sm text-sm text-[var(--text-muted)]">
+              Pick someone you do not already have a thread with.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-11 w-11 shrink-0 rounded-2xl p-0"
+            onClick={onCancel}
+            aria-label="Close new conversation"
+          >
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
+
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+          <Input
+            value={query}
+            onChange={event => onQueryChange(event.target.value)}
+            placeholder="Search people"
+            autoFocus
+            className="h-12 rounded-2xl pl-10 text-base"
+          />
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5">
+        {loading ? (
+          <div className="flex h-full items-center justify-center gap-2 text-sm text-[var(--text-muted)]">
+            <LoadingSpinner size="sm" />
+            Loading people...
+          </div>
+        ) : filteredUsers.length === 0 ? (
+          <div className="glass-panel mt-4 rounded-[var(--radius-xl)] px-5 py-7 text-center text-[var(--text-muted)]">
+            <MessageSquare className="mx-auto mb-3 h-9 w-9 opacity-50" />
+            <p className="font-medium text-[var(--text-primary)]">
+              {normalizedQuery ? 'No matching people' : 'No new people to message'}
+            </p>
+            <p className="mt-1 text-sm">
+              {normalizedQuery
+                ? 'Try another name or username.'
+                : 'You already have conversations with everyone available.'}
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2 pb-[calc(env(safe-area-inset-bottom)_+_1rem)]">
+            <div className="px-1 pb-1 text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">
+              {filteredUsers.length} available
+            </div>
+            {filteredUsers.map(user => {
+              const isPending = pendingUsername === user.username
+
+              return (
+                <button
+                  key={user.id}
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => void onSelect(user)}
+                  className="glass-panel flex w-full items-center gap-3 rounded-[var(--radius-lg)] px-3.5 py-3 text-left transition-[border-color,background-color,transform] duration-[var(--dur-fast)] hover:border-[var(--border-glow)] hover:bg-[var(--theme-surface-hover)] disabled:cursor-wait disabled:opacity-70"
+                >
+                  <Avatar
+                    src={user.avatar_url}
+                    alt={user.display_name}
+                    size="md"
+                    color={user.color}
+                    userId={user.id}
+                    presenceVisibility={user.presence_visibility}
+                    showStatus
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate font-semibold text-[var(--text-primary)]">
+                        {user.display_name}
+                      </span>
+                      <UserRoleBadge role={user.admin_role} />
+                      <UserPresenceBadge userId={user.id} presenceVisibility={user.presence_visibility} />
+                    </div>
+                    <p className="truncate text-sm text-[var(--text-muted)]">
+                      @{user.username}
+                    </p>
+                  </div>
+                  <span className="theme-accent-chip shrink-0 rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.12em]">
+                    {isPending ? 'Opening' : 'Message'}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   onToggleSidebar: _onToggleSidebar,
   currentView,
@@ -360,6 +494,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     hasMore,
   } = useDirectMessages()
   const { failedMessages, addFailedMessage, removeFailedMessage } = useFailedMessages(currentConversation || 'none')
+  const { users: allUsers, loading: allUsersLoading } = useAllUsers()
 
   const [showNewConversation, setShowNewConversation] = useState(false)
   const [searchUsername, setSearchUsername] = useState('')
@@ -621,219 +756,174 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     currentPeerPresence?.presence_state ||
     (currentConv?.other_user?.presence_visibility === 'invisible' ? 'invisible' : 'offline')
   const showConversationList = isDesktop || !currentConversation
-  const searchableUsers: BasicUser[] = useMemo(() => conversations.flatMap(conversation => {
-    const user = conversation.other_user
-    if (!user) {
-      return []
-    }
-
-    return [{
-      id: user.id,
-      username: user.username,
-      display_name: user.display_name,
-      avatar_url: user.avatar_url,
-      color: user.color,
-      status: user.status,
-      admin_role: user.admin_role,
-      presence_visibility: user.presence_visibility,
-    }]
-  }), [conversations])
+  const existingConversationUserIds = useMemo(
+    () => new Set(conversations.map(conversation => conversation.other_user?.id).filter(Boolean) as string[]),
+    [conversations]
+  )
+  const availableDmUsers = useMemo(
+    () => allUsers
+      .filter(user =>
+        user.id !== profile?.id &&
+        user.dm_discoverable !== false &&
+        !existingConversationUserIds.has(user.id)
+      )
+      .sort((left, right) =>
+        (left.display_name || left.username).localeCompare(right.display_name || right.username)
+      ),
+    [allUsers, existingConversationUserIds, profile?.id]
+  )
 
   return (
-    <div className="theme-app-surface flex h-full min-h-0">
+    <div className="theme-image-surface flex h-full min-h-0">
       <motion.div
         initial={false}
-        className={`glass-panel-strong relative flex-shrink-0 w-full border-r border-[var(--border-panel)] lg:w-[22rem] ${
+        className={`theme-image-surface relative flex-shrink-0 w-full border-r border-[var(--border-panel)] lg:w-[22rem] ${
           showConversationList ? 'flex' : 'hidden lg:flex'
         } flex-col`}
       >
-        <div className="border-b border-[var(--border-panel)] p-4">
-          <div className="mb-4 flex items-center justify-between gap-2 overflow-visible">
-            <div className="flex min-w-0 flex-1 items-center">
-              {!isDesktop && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onViewChange('chat')}
-                  className="mr-2"
-                  aria-label="Back"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                </Button>
-              )}
-              <div className="relative flex min-h-10 min-w-0 items-center gap-3">
-                <img
-                  src="/icons/header-logo.png"
-                  alt="SHADO"
-                  className="theme-logo absolute -left-10 top-1/2 h-[5.25rem] w-36 -translate-y-1/2 object-contain object-left min-[380px]:-left-12 min-[380px]:h-[5.75rem] min-[380px]:w-44 sm:-left-14 sm:w-48 md:hidden"
-                />
-                <div className="min-w-0 pl-24 min-[380px]:pl-28 sm:pl-32 md:pl-0">
-                  <h2 className="truncate text-base font-semibold text-[var(--text-primary)] md:text-lg">
-                    Direct Messages
-                  </h2>
+        {showNewConversation ? (
+          <NewDirectMessagePicker
+            users={availableDmUsers}
+            loading={allUsersLoading}
+            query={searchUsername}
+            pendingUsername={startingUsername}
+            onQueryChange={setSearchUsername}
+            onSelect={handleUserSelect}
+            onCancel={() => {
+              setShowNewConversation(false)
+              setSearchUsername('')
+            }}
+          />
+        ) : (
+          <>
+            <div className="border-b border-[var(--border-panel)] p-4">
+              <div className="mb-4 flex items-center justify-between gap-2 overflow-visible">
+                <div className="flex min-w-0 flex-1 items-center">
                   {!isDesktop && (
-                    <p className="truncate text-[11px] text-[var(--text-muted)]">
-                      Open a thread or jump back in.
-                    </p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onViewChange('chat')}
+                      className="mr-2"
+                      aria-label="Back"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                    </Button>
                   )}
-                </div>
-              </div>
-            </div>
-            <Button
-              size="sm"
-              onClick={() => setShowNewConversation(true)}
-              className="shrink-0 gap-2 p-2 sm:px-3"
-              aria-label="Start new conversation"
-            >
-              <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">New</span>
-            </Button>
-          </div>
-
-          <div className="mb-3 flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
-            <span>{conversations.length} thread{conversations.length === 1 ? '' : 's'}</span>
-            <span>{conversations.reduce((sum, conversation) => sum + (conversation.unread_count || 0), 0)} unread</span>
-          </div>
-        </div>
-
-        <AnimatePresence>
-          {showNewConversation && (
-            <motion.div
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 12 }}
-              className="theme-image-panel-surface absolute inset-0 z-20 flex flex-col"
-            >
-              <div className="border-b border-[var(--border-panel)] px-4 py-4">
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div>
-                    <h3 className="text-base font-semibold text-[var(--text-primary)]">
-                      Start a new DM
-                    </h3>
-                    <p className="text-sm text-[var(--text-muted)]">
-                      Tap a person once and we'll drop you straight into the thread.
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-10 w-10 rounded-xl p-0"
-                    onClick={() => {
-                      setShowNewConversation(false)
-                      setSearchUsername('')
-                    }}
-                    aria-label="Close new conversation"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-                <UserSearchSelect
-                  value={searchUsername}
-                  onChange={setSearchUsername}
-                  onSelect={handleUserSelect}
-                  users={searchableUsers}
-                  autoFocus
-                  inlineResults
-                  pendingUsername={startingUsername}
-                  title={!isDesktop ? 'Find someone to message' : undefined}
-                  description={!isDesktop ? 'Search by username or pick from the people already in your network.' : undefined}
-                />
-                <div className="mt-3 flex justify-end">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setShowNewConversation(false)
-                      setSearchUsername('')
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {conversations.length === 0 ? (
-            <div className="p-6 text-center text-[var(--text-muted)]">
-              <MessageSquare className="mx-auto mb-2 h-8 w-8 opacity-50" />
-              <p className="text-sm text-[var(--text-primary)]">No conversations yet</p>
-              <p className="mt-1 text-xs">Start a private chat to build your inbox.</p>
-            </div>
-          ) : (
-            <div className="space-y-1 p-2">
-              {conversations.map(conversation => {
-                const unreadCount = conversation.unread_count || 0
-
-                return (
-                <motion.button
-                  key={conversation.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  type="button"
-                  onClick={() => handleConversationSelect(conversation.id)}
-                  className={`w-full rounded-[var(--radius-md)] border p-3 text-left transition-colors duration-[var(--dur-med)] ${
-                    currentConversation === conversation.id
-                      ? 'theme-selected-row'
-                      : 'border-transparent hover:border-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.03)]'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <Avatar
-                      src={conversation.other_user?.avatar_url}
-                      alt={conversation.other_user?.display_name || 'Unknown User'}
-                      size="md"
-                      color={conversation.other_user?.color}
-                      userId={conversation.other_user?.id}
-                      presenceVisibility={conversation.other_user?.presence_visibility}
-                      showStatus
+                  <div className="relative flex min-h-10 min-w-0 items-center gap-3">
+                    <img
+                      src="/icons/header-logo.png"
+                      alt="SHADO"
+                      className="theme-logo absolute -left-10 top-1/2 h-[5.25rem] w-36 -translate-y-1/2 object-contain object-left min-[380px]:-left-12 min-[380px]:h-[5.75rem] min-[380px]:w-44 sm:-left-14 sm:w-48 md:hidden"
                     />
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between">
-                        <span className="inline-flex min-w-0 items-center gap-1.5 font-medium text-[var(--text-primary)]">
-                          <span className="truncate">{conversation.other_user?.display_name}</span>
-                          <UserRoleBadge role={conversation.other_user?.admin_role} />
-                          <UserPresenceBadge userId={conversation.other_user?.id} presenceVisibility={conversation.other_user?.presence_visibility} />
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="truncate text-xs text-[var(--text-muted)]">
-                          @{conversation.other_user?.username}
-                        </span>
-                      </div>
-
-                      {conversation.last_message && (
-                        <p className="mt-1 truncate text-sm text-[var(--text-secondary)]">
-                          {conversation.last_message.content}
+                    <div className="min-w-0 pl-24 min-[380px]:pl-28 sm:pl-32 md:pl-0">
+                      <h2 className="truncate text-base font-semibold text-[var(--text-primary)] md:text-lg">
+                        Direct Messages
+                      </h2>
+                      {!isDesktop && (
+                        <p className="truncate text-[11px] text-[var(--text-muted)]">
+                          Open a thread or jump back in.
                         </p>
                       )}
                     </div>
-
-                    <div className="ml-auto flex min-w-[3.5rem] shrink-0 flex-col items-end gap-2 text-right">
-                      {conversation.last_message && (
-                        <span className="text-xs text-[var(--text-muted)]">
-                          {formatTime(conversation.last_message.created_at)}
-                        </span>
-                      )}
-                      {unreadCount > 0 && (
-                        <span className="theme-unread-badge inline-flex min-w-[1.75rem] items-center justify-center rounded-full px-2 py-0.5 text-xs font-medium">
-                          {unreadCount > 99 ? '99+' : unreadCount}
-                        </span>
-                      )}
-                    </div>
                   </div>
-                </motion.button>
-                )
-              })}
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => setShowNewConversation(true)}
+                  className="shrink-0 gap-2 p-2 sm:px-3"
+                  aria-label="Start new conversation"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span className="hidden sm:inline">New</span>
+                </Button>
+              </div>
+
+              <div className="mb-3 flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                <span>{conversations.length} thread{conversations.length === 1 ? '' : 's'}</span>
+                <span>{conversations.reduce((sum, conversation) => sum + (conversation.unread_count || 0), 0)} unread</span>
+              </div>
             </div>
-          )}
-        </div>
+
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {conversations.length === 0 ? (
+                <div className="p-6 text-center text-[var(--text-muted)]">
+                  <MessageSquare className="mx-auto mb-2 h-8 w-8 opacity-50" />
+                  <p className="text-sm text-[var(--text-primary)]">No conversations yet</p>
+                  <p className="mt-1 text-xs">Start a private chat to build your inbox.</p>
+                </div>
+              ) : (
+                <div className="space-y-1 p-2">
+                  {conversations.map(conversation => {
+                    const unreadCount = conversation.unread_count || 0
+
+                    return (
+                    <motion.button
+                      key={conversation.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      type="button"
+                      onClick={() => handleConversationSelect(conversation.id)}
+                      className={`w-full rounded-[var(--radius-md)] border p-3 text-left transition-colors duration-[var(--dur-med)] ${
+                        currentConversation === conversation.id
+                          ? 'theme-selected-row'
+                          : 'border-transparent hover:border-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.03)]'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <Avatar
+                          src={conversation.other_user?.avatar_url}
+                          alt={conversation.other_user?.display_name || 'Unknown User'}
+                          size="md"
+                          color={conversation.other_user?.color}
+                          userId={conversation.other_user?.id}
+                          presenceVisibility={conversation.other_user?.presence_visibility}
+                          showStatus
+                        />
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className="inline-flex min-w-0 items-center gap-1.5 font-medium text-[var(--text-primary)]">
+                              <span className="truncate">{conversation.other_user?.display_name}</span>
+                              <UserRoleBadge role={conversation.other_user?.admin_role} />
+                              <UserPresenceBadge userId={conversation.other_user?.id} presenceVisibility={conversation.other_user?.presence_visibility} />
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between">
+                            <span className="truncate text-xs text-[var(--text-muted)]">
+                              @{conversation.other_user?.username}
+                            </span>
+                          </div>
+
+                          {conversation.last_message && (
+                            <p className="mt-1 truncate text-sm text-[var(--text-secondary)]">
+                              {conversation.last_message.content}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="ml-auto flex min-w-[3.5rem] shrink-0 flex-col items-end gap-2 text-right">
+                          {conversation.last_message && (
+                            <span className="text-xs text-[var(--text-muted)]">
+                              {formatTime(conversation.last_message.created_at)}
+                            </span>
+                          )}
+                          {unreadCount > 0 && (
+                            <span className="theme-unread-badge inline-flex min-w-[1.75rem] items-center justify-center rounded-full px-2 py-0.5 text-xs font-medium">
+                              {unreadCount > 99 ? '99+' : unreadCount}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </motion.button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </motion.div>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">

@@ -408,7 +408,7 @@ describe('DirectMessagesView user search', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /start new conversation/i }));
-    fireEvent.change(screen.getByPlaceholderText(/search by username/i), { target: { value: 'bob' } });
+    fireEvent.change(screen.getByPlaceholderText(/search people/i), { target: { value: 'bob' } });
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /bob/i }));
@@ -418,7 +418,7 @@ describe('DirectMessagesView user search', () => {
     await waitFor(() => expect(setCurrentConversationMock).toHaveBeenCalledWith('c1'));
   });
 
-  test('shows user not found error', async () => {
+  test('shows no matching people when search has no available users', async () => {
     searchSpy.mockReturnValue({ results: [], loading: false, error: 'User not found' });
     allSpy.mockReturnValue({ users: [], loading: false, error: null });
 
@@ -431,20 +431,20 @@ describe('DirectMessagesView user search', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /start new conversation/i }));
-    fireEvent.change(screen.getByPlaceholderText(/search by username/i), { target: { value: 'alice' } });
+    fireEvent.change(screen.getByPlaceholderText(/search people/i), { target: { value: 'alice' } });
 
-    expect(await screen.findByText(/user not found/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no matching people/i)).toBeInTheDocument();
     expect(startConversationMock).not.toHaveBeenCalled();
     expect(setCurrentConversationMock).not.toHaveBeenCalled();
   });
 
   test('displays all users when search empty', () => {
-    allSpy.mockReturnValueOnce({
+    allSpy.mockReturnValue({
       users: [user, { ...user, id: 'u3', username: 'alice', display_name: 'Alice' }],
       loading: false,
       error: null,
     });
-    searchSpy.mockReturnValueOnce({ results: [], loading: false, error: null });
+    searchSpy.mockReturnValue({ results: [], loading: false, error: null });
 
     render(
       <DirectMessagesView
@@ -458,6 +458,48 @@ describe('DirectMessagesView user search', () => {
 
     expect(screen.getByRole('button', { name: /bob/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /alice/i })).toBeInTheDocument();
+  });
+
+  test('new message picker excludes existing conversations and hidden users', () => {
+    allSpy.mockReturnValue({
+      users: [
+        user,
+        { ...user, id: 'u3', username: 'alice', display_name: 'Alice' },
+        { ...user, id: 'u4', username: 'shado_ai', display_name: 'Shado', dm_discoverable: false },
+      ],
+      loading: false,
+      error: null,
+    });
+    searchSpy.mockReturnValue({ results: [], loading: false, error: null });
+    dmSpy.mockReturnValue({
+      conversations: [{
+        id: 'existing',
+        other_user: user,
+        last_message: null,
+        unread_count: 0,
+      }],
+      currentConversation: null,
+      messages: [],
+      loading: false,
+      setCurrentConversation: setCurrentConversationMock,
+      startConversation: startConversationMock,
+      sendMessage: jest.fn(),
+      markAsRead: jest.fn(),
+    } as any);
+
+    render(
+      <DirectMessagesView
+        onToggleSidebar={() => {}}
+        currentView="dms"
+        onViewChange={() => {}}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /start new conversation/i }));
+
+    expect(screen.queryByRole('button', { name: /bob/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /alice/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /shado/i })).not.toBeInTheDocument();
   });
 
   test('mobile inbox back button returns to chat', async () => {

@@ -685,6 +685,7 @@ export interface User {
   presence_visibility?: PresenceVisibility
   color: string
   admin_role?: AdminRole | null
+  dm_discoverable?: boolean
   last_active: string
   created_at: string
   updated_at: string
@@ -953,7 +954,7 @@ export interface DMMessage {
 export interface BasicUser
   extends Pick<
     User,
-    'id' | 'username' | 'display_name' | 'avatar_url' | 'color' | 'status' | 'admin_role' | 'presence_visibility'
+    'id' | 'username' | 'display_name' | 'avatar_url' | 'color' | 'status' | 'admin_role' | 'presence_visibility' | 'dm_discoverable'
   > {}
 
 export interface PresenceSnapshot {
@@ -1177,7 +1178,9 @@ export const fetchAllUsers = async (options?: { signal?: AbortSignal }) => {
   const workingClient = await getWorkingClient()
   let query = workingClient
     .from('users')
-    .select('id, username, display_name, avatar_url, color, status, admin_role, presence_visibility')
+    .select('id, username, display_name, avatar_url, color, status, admin_role, presence_visibility, dm_discoverable')
+    .eq('dm_discoverable', true)
+    .order('display_name', { ascending: true })
   if (options?.signal && typeof query.abortSignal === 'function') {
     query = query.abortSignal(options.signal)
   }
