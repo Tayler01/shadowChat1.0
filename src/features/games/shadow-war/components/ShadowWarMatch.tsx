@@ -4,9 +4,10 @@ import { cn } from '../../../../lib/utils'
 import { useAuth } from '../../../../hooks/useAuth'
 import type { GameSession, GameSessionQueueEntry, ShadowWarMatch as ShadowWarMatchRow, ShadowWarMove, ShadowWarPlayerStateRow } from '../../../../lib/supabase'
 import { SHADOW_WAR_LANES, validatePlacement } from '../engine/resolver'
-import type { ShadowWarCard, ShadowWarLane, ShadowWarPlacementInput, ShadowWarPlayerState } from '../engine/types'
+import type { ShadowWarCard, ShadowWarLane, ShadowWarPlacementInput, ShadowWarPlayerState, ShadowWarRoundHistoryEntry } from '../engine/types'
 import { ShadowWarCardView } from './ShadowWarCardView'
 import { getShadowWarAvatar, getShadowWarFaction, type ShadowWarIdentity } from '../identity'
+import { ShadowWarBattleCinematic } from './ShadowWarBattleCinematic'
 
 const laneLabels: Record<ShadowWarLane, string> = {
   left: 'Left',
@@ -110,6 +111,7 @@ export function ShadowWarMatch({
   const playerState = asPlayerState(playerStateRow)
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const [placement, setPlacement] = useState<Partial<ShadowWarPlacementInput>>({})
+  const [cinematicRound, setCinematicRound] = useState<ShadowWarRoundHistoryEntry | null>(null)
   const mySlot = playerStateRow?.player_slot
   const opponentSlot = mySlot === 'player_one' ? 'player_two' : 'player_one'
   const myMove = mySlot ? getMoveForSlot(moves, mySlot, 'placement') : null
@@ -123,7 +125,7 @@ export function ShadowWarMatch({
   const bothLocked = isSuddenWar ? suddenWarMoves.length >= 2 : placementMoves.length >= 2
   const canResolve = bothLocked && (match.current_phase === 'reveal' || match.current_phase === 'sudden_war') && match.status === 'active'
   const latestRound = Array.isArray(match.state?.rounds)
-    ? (match.state.rounds as any[]).slice(-1)[0]
+    ? ((match.state.rounds as ShadowWarRoundHistoryEntry[]).slice(-1)[0] ?? null)
     : null
   const pendingSuddenWar = match.state?.pendingSuddenWar as any | undefined
   const displayedRound = pendingSuddenWar ?? latestRound
@@ -138,6 +140,7 @@ export function ShadowWarMatch({
   const autoResolveKey = `${match.id}:${match.round_number}:${match.current_phase}:${moves.length}`
   const autoResolveRef = useRef<string | null>(null)
   const clashSoundRef = useRef<string | null>(null)
+  const cinematicRef = useRef<string | null>(null)
 
   const availableHand = useMemo(() => {
     const used = new Set([
@@ -228,6 +231,24 @@ export function ShadowWarMatch({
     }
   }, [displayedRound, match.id, match.round_number])
 
+  useEffect(() => {
+    if (!latestRound?.resolvedAt) return
+
+    const cinematicKey = `${match.id}:${latestRound.roundNumber}:${latestRound.resolvedAt}`
+    if (cinematicRef.current === cinematicKey) return
+    cinematicRef.current = cinematicKey
+
+    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (prefersReducedMotion) return
+
+    setCinematicRound(latestRound)
+    const timeout = window.setTimeout(() => {
+      setCinematicRound(currentRound => currentRound?.resolvedAt === latestRound.resolvedAt ? null : currentRound)
+    }, 1900)
+
+    return () => window.clearTimeout(timeout)
+  }, [latestRound, match.id])
+
   const statusLabel = match.status === 'completed'
     ? 'Duel complete'
     : isSuddenWar
@@ -240,6 +261,12 @@ export function ShadowWarMatch({
 
   return (
     <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden">
+      {cinematicRound && (
+        <ShadowWarBattleCinematic
+          round={cinematicRound}
+          mySlot={mySlot}
+        />
+      )}
       <section className="shrink-0 border-b border-[#b9934c]/35 bg-black/58 px-3 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-sm">
         <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-2">
           <div className="flex min-w-0 items-center gap-2">

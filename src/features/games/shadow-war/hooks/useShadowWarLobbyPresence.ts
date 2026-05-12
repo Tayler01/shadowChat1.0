@@ -12,14 +12,30 @@ export interface ShadowWarLobbyUser {
 
 type PresenceState = Record<string, ShadowWarLobbyUser[]>
 
+const dedupeLobbyUsers = (users: ShadowWarLobbyUser[]) => {
+  const usersById = new Map<string, ShadowWarLobbyUser>()
+
+  users.forEach(nextUser => {
+    const existingUser = usersById.get(nextUser.id)
+    if (!existingUser || nextUser.joinedAt >= existingUser.joinedAt) {
+      usersById.set(nextUser.id, nextUser)
+    }
+  })
+
+  return Array.from(usersById.values()).sort((a, b) => a.joinedAt - b.joinedAt)
+}
+
 export function useShadowWarLobbyPresence(active: boolean = true) {
   const { user } = useAuth()
+  const userId = user?.id
+  const userName = user?.display_name || user?.username || 'Shadow player'
+  const userAvatarUrl = user?.avatar_url
   const [users, setUsers] = useState<ShadowWarLobbyUser[]>([])
   const channelRef = useRef<RealtimeChannel | null>(null)
   const clientRef = useRef<any>(null)
 
   useEffect(() => {
-    if (!active || !user) {
+    if (!active || !userId) {
       setUsers([])
       return
     }
@@ -32,16 +48,15 @@ export function useShadowWarLobbyPresence(active: boolean = true) {
 
       clientRef.current = client
       const channel = client.channel('shadow-war:lobby-presence', {
-        config: { presence: { key: user.id } },
+        config: { presence: { key: userId } },
       })
       channelRef.current = channel
 
       const syncUsers = () => {
         const state = channel.presenceState() as PresenceState
-        const nextUsers = Object.values(state)
+        const nextUsers = dedupeLobbyUsers(Object.values(state)
           .flat()
-          .filter(Boolean)
-          .sort((a, b) => a.joinedAt - b.joinedAt)
+          .filter(Boolean))
         setUsers(nextUsers)
       }
 
@@ -50,9 +65,9 @@ export function useShadowWarLobbyPresence(active: boolean = true) {
         .subscribe((status: string) => {
           if (status !== 'SUBSCRIBED') return
           void channel.track({
-            id: user.id,
-            name: user.display_name || user.username || 'Shadow player',
-            avatarUrl: user.avatar_url,
+            id: userId,
+            name: userName,
+            avatarUrl: userAvatarUrl,
             joinedAt: Date.now(),
           })
         })
@@ -70,8 +85,7 @@ export function useShadowWarLobbyPresence(active: boolean = true) {
       channelRef.current = null
       setUsers([])
     }
-  }, [active, user])
+  }, [active, userAvatarUrl, userId, userName])
 
   return useMemo(() => ({ users }), [users])
 }
-
