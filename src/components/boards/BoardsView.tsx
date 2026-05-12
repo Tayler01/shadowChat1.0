@@ -92,7 +92,7 @@ export function BoardsView({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className={cn(
-        'theme-app-surface flex h-full min-h-0 flex-col text-sm',
+        'theme-image-surface flex h-full min-h-0 flex-col text-sm',
         hasActiveChatBoard ? 'pb-0' : 'pb-[calc(env(safe-area-inset-bottom)_+_4.2rem)] md:pb-0'
       )}
     >
@@ -140,7 +140,7 @@ export function BoardsView({
 
       <main className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col overflow-hidden md:p-4">
         {activeBoard ? (
-          <section className="glass-panel-strong flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-x-0 border-y-0 border-[var(--border-panel)] md:rounded-[var(--radius-lg)] md:border">
+          <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-x-0 border-y-0 border-[var(--border-panel)] bg-transparent md:rounded-[var(--radius-lg)] md:border">
             {renderActiveBoard()}
           </section>
         ) : (
