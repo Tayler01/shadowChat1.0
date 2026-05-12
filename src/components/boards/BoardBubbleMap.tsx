@@ -58,6 +58,30 @@ const EDGE_PADDING_X = 12
 const EDGE_PADDING_TOP = 20
 const EDGE_PADDING_BOTTOM = 16
 const COLLISION_SPACING = 1.06
+
+const hexToRgb = (hex: string) => {
+  const normalized = hex.replace('#', '').trim()
+  if (!/^[0-9a-f]{6}$/iu.test(normalized)) return null
+  return {
+    r: Number.parseInt(normalized.slice(0, 2), 16),
+    g: Number.parseInt(normalized.slice(2, 4), 16),
+    b: Number.parseInt(normalized.slice(4, 6), 16),
+  }
+}
+
+const getBoardBubbleBackground = (board: BoardDefinition) => {
+  const rgb = hexToRgb(board.accent) ?? { r: 215, g: 170, b: 70 }
+  const accent = `${rgb.r}, ${rgb.g}, ${rgb.b}`
+  const borderAlpha = board.kind === 'feed' ? 0.42 : board.kind === 'static' ? 0.36 : 0.28
+
+  return {
+    background: [
+      `radial-gradient(circle at 30% 18%, rgba(${accent}, 0.28), rgba(${accent}, 0.11) 42%, transparent 76%)`,
+      'var(--theme-panel-cover-bg)',
+    ].join(', '),
+    borderColor: `rgba(${accent}, ${borderAlpha})`,
+  }
+}
 const COLLISION_RESTITUTION = 0.62
 const COLLISION_TRANSFER = 0.5
 const COLLISION_PASSES = 6
@@ -626,6 +650,7 @@ export function BoardBubbleMap({ countsByBoard, onSelect }: BoardBubbleMapProps)
         const showDescription = !compact && visual.shape !== 'pill'
         const rotation = visual.shape === 'pill' ? position?.angle ?? 0 : 0
         const labelMaxWidth = Math.max(visual.width - 28, 68)
+        const bubbleSurface = getBoardBubbleBackground(board)
 
         return (
           <motion.button
@@ -649,20 +674,16 @@ export function BoardBubbleMap({ countsByBoard, onSelect }: BoardBubbleMapProps)
               opacity: { duration: 0.16 },
             }}
             className={cn(
-              'absolute left-0 top-0 isolate flex cursor-grab select-none flex-col items-center justify-center overflow-hidden border px-3 text-center shadow-[0_18px_52px_rgba(0,0,0,0.34)] outline-none transition-colors active:cursor-grabbing',
+              'absolute left-0 top-0 isolate flex cursor-grab select-none flex-col items-center justify-center overflow-visible border px-3 text-center shadow-[0_18px_52px_rgba(0,0,0,0.34)] outline-none transition-colors active:cursor-grabbing',
               visual.shape === 'pill'
                 ? 'rounded-full'
                 : visual.shape === 'square'
                   ? 'rounded-[var(--radius-sm)]'
                   : 'rounded-full',
-              board.kind === 'feed'
-                ? 'border-[rgba(215,170,70,0.36)] bg-[radial-gradient(circle_at_30%_18%,rgba(255,240,184,0.24),rgba(215,170,70,0.08)_38%,rgba(15,16,17,0.94)_100%)]'
-                : board.kind === 'static'
-                  ? 'border-[rgba(216,143,184,0.34)] bg-[radial-gradient(circle_at_30%_18%,rgba(216,143,184,0.2),rgba(255,255,255,0.04)_42%,rgba(15,16,17,0.94)_100%)]'
-                  : 'border-[rgba(255,255,255,0.11)] bg-[radial-gradient(circle_at_28%_18%,rgba(255,255,255,0.15),rgba(255,255,255,0.05)_42%,rgba(15,16,17,0.95)_100%)]',
-              'hover:border-[rgba(215,170,70,0.42)] focus-visible:ring-2 focus-visible:ring-[rgba(215,170,70,0.34)]'
+              'bg-transparent hover:border-[var(--border-glow)] focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)]'
             )}
             style={{
+              ...bubbleSurface,
               width: visual.width,
               height: visual.height,
               color: board.accent,
@@ -681,7 +702,7 @@ export function BoardBubbleMap({ countsByBoard, onSelect }: BoardBubbleMapProps)
               )}
             />
             {unreadCount > 0 && (
-              <span className="absolute right-3 top-3 z-20 min-w-6 rounded-full border border-[rgba(215,170,70,0.45)] bg-[rgba(215,170,70,0.16)] px-1.5 py-1 text-xs font-semibold leading-none text-[var(--text-gold)]">
+              <span className="theme-unread-badge absolute right-1.5 top-1.5 z-20 min-w-6 rounded-full px-1.5 py-1 text-xs font-semibold leading-none shadow-[0_8px_18px_rgba(0,0,0,0.28)]">
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}

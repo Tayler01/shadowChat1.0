@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { BoardBubbleMap } from '../src/components/boards/BoardBubbleMap'
 
 describe('BoardBubbleMap', () => {
@@ -25,7 +25,7 @@ describe('BoardBubbleMap', () => {
 
     expect(feed).toHaveClass('rounded-full')
     expect(feed).toHaveAttribute('data-board-shape', 'pill')
-    expect(feed).toHaveClass('overflow-hidden')
+    expect(feed).toHaveClass('overflow-visible')
     expect(Number.parseFloat(feed.style.width)).toBeGreaterThan(Number.parseFloat(feed.style.height))
 
     expect(staticBoard).toHaveClass('rounded-[var(--radius-sm)]')
@@ -35,5 +35,15 @@ describe('BoardBubbleMap', () => {
     expect(chat).toHaveClass('rounded-full')
     expect(chat).toHaveAttribute('data-board-shape', 'circle')
     expect(Number.parseFloat(chat.style.width)).toBe(Number.parseFloat(chat.style.height))
+  })
+
+  it('renders unread badges on top of bubbles without relying on clipping', () => {
+    render(<BoardBubbleMap countsByBoard={{ 'news-chat': 12 }} onSelect={jest.fn()} />)
+
+    const chat = screen.getByRole('button', { name: /open news chat/i })
+    const badge = within(chat).getByText('12')
+
+    expect(chat).toHaveClass('overflow-visible')
+    expect(badge).toHaveClass('theme-unread-badge')
   })
 })

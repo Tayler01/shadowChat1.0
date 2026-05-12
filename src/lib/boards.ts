@@ -38,7 +38,7 @@ export const BOARD_DEFINITIONS: readonly BoardDefinition[] = [
     description: 'Tracked source feed',
     navUnread: false,
     accent: '#d7aa46',
-    defaultPosition: { x: 31, y: 31, radius: 88 },
+    defaultPosition: { x: 28, y: 24, radius: 84 },
   },
   {
     slug: 'news-chat',
@@ -48,7 +48,7 @@ export const BOARD_DEFINITIONS: readonly BoardDefinition[] = [
     navUnread: true,
     moderationScope: 'board_news_chat',
     accent: '#f0c96d',
-    defaultPosition: { x: 57, y: 28, radius: 86 },
+    defaultPosition: { x: 66, y: 24, radius: 82 },
   },
   {
     slug: 'investing-chat',
@@ -58,7 +58,7 @@ export const BOARD_DEFINITIONS: readonly BoardDefinition[] = [
     navUnread: true,
     moderationScope: 'board_investing_chat',
     accent: '#8fd8bd',
-    defaultPosition: { x: 43, y: 52, radius: 88 },
+    defaultPosition: { x: 42, y: 43, radius: 84 },
   },
   {
     slug: 'learning-chat',
@@ -68,7 +68,7 @@ export const BOARD_DEFINITIONS: readonly BoardDefinition[] = [
     navUnread: true,
     moderationScope: 'board_learning_chat',
     accent: '#b7b9ff',
-    defaultPosition: { x: 67, y: 55, radius: 88 },
+    defaultPosition: { x: 76, y: 47, radius: 82 },
   },
   {
     slug: 'crypto-chat',
@@ -78,7 +78,7 @@ export const BOARD_DEFINITIONS: readonly BoardDefinition[] = [
     navUnread: true,
     moderationScope: 'board_crypto_chat',
     accent: '#77c8ff',
-    defaultPosition: { x: 25, y: 66, radius: 82 },
+    defaultPosition: { x: 23, y: 60, radius: 78 },
   },
   {
     slug: 'vibe-coding',
@@ -88,7 +88,7 @@ export const BOARD_DEFINITIONS: readonly BoardDefinition[] = [
     navUnread: true,
     moderationScope: 'board_vibe_coding',
     accent: '#9ee7ff',
-    defaultPosition: { x: 74, y: 70, radius: 84 },
+    defaultPosition: { x: 57, y: 64, radius: 80 },
   },
   {
     slug: 'ai-news',
@@ -98,7 +98,7 @@ export const BOARD_DEFINITIONS: readonly BoardDefinition[] = [
     navUnread: true,
     moderationScope: 'board_ai_news',
     accent: '#c8a7ff',
-    defaultPosition: { x: 38, y: 82, radius: 80 },
+    defaultPosition: { x: 33, y: 78, radius: 78 },
   },
   {
     slug: 'projects-chat',
@@ -108,7 +108,7 @@ export const BOARD_DEFINITIONS: readonly BoardDefinition[] = [
     navUnread: true,
     moderationScope: 'board_projects_chat',
     accent: '#ffcf8a',
-    defaultPosition: { x: 75, y: 88, radius: 84 },
+    defaultPosition: { x: 72, y: 78, radius: 80 },
   },
   {
     slug: 'art-board',
@@ -117,7 +117,7 @@ export const BOARD_DEFINITIONS: readonly BoardDefinition[] = [
     description: 'Shared mood canvas',
     navUnread: false,
     accent: '#d88fb8',
-    defaultPosition: { x: 58, y: 76, radius: 82 },
+    defaultPosition: { x: 52, y: 89, radius: 78 },
   },
 ] as const
 

@@ -46,10 +46,16 @@
     --theme-modal-background:
       radial-gradient(circle at top, rgba(var(--theme-accent-strong-rgb), 0.09), transparent 32%),
       linear-gradient(180deg, rgba(24, 26, 29, 0.96), rgba(13, 15, 16, 0.98));
-    --theme-sent-bubble-bg: linear-gradient(180deg, rgba(var(--theme-accent-strong-rgb), 0.16), rgba(var(--theme-accent-rgb), 0.1) 34%, rgba(var(--theme-accent-rgb), 0.45) 100%);
+    --theme-sent-bubble-bg:
+      radial-gradient(circle at 18% 0%, rgb(var(--theme-accent-strong-rgb) / 0.18), transparent 42%),
+      linear-gradient(180deg, rgba(15, 18, 20, 0.84), rgba(8, 10, 12, 0.8));
     --theme-floating-action-bg: linear-gradient(180deg, rgba(var(--theme-accent-strong-rgb), 0.18), rgba(var(--theme-accent-rgb), 0.12) 36%, rgba(var(--theme-accent-rgb), 0.5) 100%);
     --theme-composer-bg: linear-gradient(180deg, rgba(16, 18, 19, 0.94), rgba(10, 11, 12, 0.98));
     --theme-panel-cover-bg: linear-gradient(180deg, rgba(7, 8, 9, 0.97), rgba(10, 11, 12, 0.99));
+    --theme-popup-surface-bg:
+      radial-gradient(circle at 18% 0%, rgb(var(--theme-accent-strong-rgb) / 0.14), transparent 34%),
+      linear-gradient(180deg, rgb(var(--theme-accent-rgb) / 0.08), rgb(var(--theme-accent-rgb) / 0.035)),
+      var(--theme-panel-cover-bg);
 
     --bg-app: var(--theme-page-end);
     --bg-shell: var(--theme-shell);
@@ -675,10 +681,16 @@
   --theme-modal-background:
     radial-gradient(circle at top, rgba(143, 178, 227, 0.28), transparent 34%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(239, 246, 253, 0.98));
-  --theme-sent-bubble-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(143, 178, 227, 0.18) 34%, rgba(92, 130, 200, 0.22) 100%);
+  --theme-sent-bubble-bg:
+    radial-gradient(circle at 18% 0%, rgba(92, 130, 200, 0.18), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(232, 241, 252, 0.84));
   --theme-floating-action-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(143, 178, 227, 0.32) 36%, rgba(92, 130, 200, 0.36) 100%);
   --theme-composer-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(235, 244, 253, 0.98));
   --theme-panel-cover-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(239, 246, 253, 0.99));
+  --theme-popup-surface-bg:
+    radial-gradient(circle at 18% 0%, rgba(92, 130, 200, 0.18), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(236, 244, 255, 0.52)),
+    var(--theme-panel-cover-bg);
   --mobile-footer-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(238, 246, 253, 0.98));
   --mobile-footer-shadow: 0 -12px 32px rgba(55, 86, 125, 0.13);
   --nav-active-bg: rgba(92, 130, 200, 0.13);
@@ -789,10 +801,15 @@ html, body, #root {
   }
 
   .theme-sent-bubble {
-    border: 1px solid var(--border-glow);
-    background: var(--theme-sent-bubble-bg);
+    border: 1px solid rgb(var(--theme-accent-rgb) / 0.44);
+    background: var(--theme-sent-bubble-bg), var(--theme-panel-cover-bg);
     color: var(--text-primary);
-    box-shadow: var(--shadow-accent-soft);
+    box-shadow:
+      var(--shadow-accent-soft),
+      0 10px 26px rgba(0, 0, 0, 0.22),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px) saturate(1.05);
+    -webkit-backdrop-filter: blur(12px) saturate(1.05);
   }
 
   .theme-floating-action {
@@ -831,12 +848,14 @@ html, body, #root {
   }
 
   .popup-surface {
-    background: var(--theme-modal-background);
+    background: var(--theme-popup-surface-bg, var(--theme-modal-background));
     border: 1px solid var(--border-strong);
     box-shadow:
-      0 24px 70px rgba(0, 0, 0, 0.48),
-      0 0 0 1px rgba(var(--theme-accent-strong-rgb), 0.04);
-    backdrop-filter: blur(22px);
+      0 24px 70px rgba(0, 0, 0, 0.54),
+      0 0 0 1px rgb(var(--theme-accent-strong-rgb) / 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    backdrop-filter: blur(24px) saturate(1.12);
+    -webkit-backdrop-filter: blur(24px) saturate(1.12);
   }
 
   .popup-close {

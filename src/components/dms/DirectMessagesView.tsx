@@ -240,7 +240,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
         )}
 
         <div
-          className={`relative rounded-2xl px-4 py-2 ${showIncomingAvatar ? 'ml-8' : ''} ${
+          className={`relative w-fit max-w-full rounded-2xl px-4 py-2 ${showIncomingAvatar ? 'ml-8' : ''} ${
             bubbleStyle
               ? ''
               : isOwn
@@ -986,7 +986,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
               <div className="mx-auto w-full max-w-4xl">
                 <MessageInput
                   onSendMessage={handleSendMessage}
-                  placeholder={`Message @${currentConv.other_user?.username}...`}
+                  placeholder="Message..."
                   cacheKey={`dm-${currentConversation}`}
                   onUploadStatusChange={setUploading}
                   messages={messages}
@@ -1001,7 +1001,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
             >
               <MessageInput
                 onSendMessage={handleSendMessage}
-                placeholder={`Message @${currentConv.other_user?.username}...`}
+                placeholder="Message..."
                 className="border-t border-[var(--border-panel)]"
                 cacheKey={`dm-${currentConversation}`}
                 onUploadStatusChange={setUploading}
