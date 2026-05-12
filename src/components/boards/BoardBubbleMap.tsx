@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Bot, BookOpen, Brush, Code2, Coins, FolderKanban, GraduationCap, MessageSquareText, Newspaper } from 'lucide-react'
+import { Bot, BookOpen, Brush, Code2, Coins, FolderKanban, GraduationCap, MessageSquareText, Newspaper, Pin } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { BOARD_DEFINITIONS, type BoardDefinition } from '../../lib/boards'
 import { cn } from '../../lib/utils'
@@ -22,7 +22,7 @@ interface BubbleVelocity {
   angular: number
 }
 
-type BoardShape = 'circle' | 'pill' | 'square'
+type BoardShape = 'circle' | 'pill' | 'square' | 'octagon'
 
 interface CollisionFeedbackEvent {
   key: string
@@ -51,6 +51,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   'ai-news': Bot,
   'projects-chat': FolderKanban,
   'art-board': Brush,
+  'shadow-pin': Pin,
 }
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(value, max))
@@ -96,6 +97,7 @@ const ANGULAR_STOP_SPEED = 0.025
 const MAX_ANGULAR_SPEED = 2.65
 
 const getBoardShape = (board: BoardDefinition): BoardShape => {
+  if (board.slug === 'shadow-pin') return 'octagon'
   if (board.kind === 'feed') return 'pill'
   if (board.kind === 'static') return 'square'
   return 'circle'
@@ -679,7 +681,9 @@ export function BoardBubbleMap({ countsByBoard, onSelect }: BoardBubbleMapProps)
                 ? 'rounded-full'
                 : visual.shape === 'square'
                   ? 'rounded-[var(--radius-sm)]'
-                  : 'rounded-full',
+                  : visual.shape === 'octagon'
+                    ? 'rounded-none'
+                    : 'rounded-full',
               'bg-transparent hover:border-[var(--border-glow)] focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)]'
             )}
             style={{
@@ -692,13 +696,16 @@ export function BoardBubbleMap({ countsByBoard, onSelect }: BoardBubbleMapProps)
                 : undefined,
               transformOrigin: '50% 50%',
               willChange: 'transform',
+              clipPath: visual.shape === 'octagon'
+                ? 'polygon(29% 0, 71% 0, 100% 29%, 100% 71%, 71% 100%, 29% 100%, 0 71%, 0 29%)'
+                : undefined,
             }}
             aria-label={`Open ${board.title}`}
           >
             <span
               className={cn(
                 'absolute inset-0 -z-10 opacity-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]',
-                visual.shape === 'square' ? 'rounded-[var(--radius-sm)]' : 'rounded-full'
+                visual.shape === 'square' ? 'rounded-[var(--radius-sm)]' : visual.shape === 'octagon' ? 'rounded-none' : 'rounded-full'
               )}
             />
             {unreadCount > 0 && (

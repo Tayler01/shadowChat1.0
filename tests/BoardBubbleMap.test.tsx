@@ -16,11 +16,12 @@ describe('BoardBubbleMap', () => {
     global.ResizeObserver = originalResizeObserver
   })
 
-  it('renders feeds as pills, static boards as squares, and chats as circles', () => {
+  it('renders feeds as pills, static boards as squares, Shadow Pin as an octagon, and chats as circles', () => {
     render(<BoardBubbleMap countsByBoard={{}} onSelect={jest.fn()} />)
 
     const feed = screen.getByRole('button', { name: /open news feed/i })
     const staticBoard = screen.getByRole('button', { name: /open art board/i })
+    const shadowPin = screen.getByRole('button', { name: /open shadow pin/i })
     const chat = screen.getByRole('button', { name: /open news chat/i })
 
     expect(feed).toHaveClass('rounded-full')
@@ -31,6 +32,10 @@ describe('BoardBubbleMap', () => {
     expect(staticBoard).toHaveClass('rounded-[var(--radius-sm)]')
     expect(staticBoard).toHaveAttribute('data-board-shape', 'square')
     expect(Number.parseFloat(staticBoard.style.width)).toBe(Number.parseFloat(staticBoard.style.height))
+
+    expect(shadowPin).toHaveAttribute('data-board-shape', 'octagon')
+    expect(shadowPin.style.clipPath).toContain('polygon')
+    expect(Number.parseFloat(shadowPin.style.width)).toBe(Number.parseFloat(shadowPin.style.height))
 
     expect(chat).toHaveClass('rounded-full')
     expect(chat).toHaveAttribute('data-board-shape', 'circle')

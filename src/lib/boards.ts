@@ -119,6 +119,15 @@ export const BOARD_DEFINITIONS: readonly BoardDefinition[] = [
     accent: '#d88fb8',
     defaultPosition: { x: 52, y: 89, radius: 78 },
   },
+  {
+    slug: 'shadow-pin',
+    title: 'Shadow Pin',
+    kind: 'static',
+    description: 'Public image categories',
+    navUnread: false,
+    accent: '#d7aa46',
+    defaultPosition: { x: 82, y: 88, radius: 72 },
+  },
 ] as const
 
 export type BoardSlug = typeof BOARD_DEFINITIONS[number]['slug']

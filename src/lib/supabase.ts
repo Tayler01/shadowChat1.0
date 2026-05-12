@@ -632,6 +632,7 @@ export const resetRealtimeConnection = async () => {
 export const VOICE_BUCKET = 'message-media'
 export const UPLOADS_BUCKET = 'chat-uploads'
 export const ART_BOARD_BUCKET = 'art-board'
+export const SHADOW_PIN_BUCKET = 'shadow-pin'
 
 export const uploadVoiceMessage = async (blob: Blob, mimeType = 'audio/webm') => {
   const workingClient = await getWorkingClient()
@@ -665,6 +666,25 @@ export const uploadArtBoardImage = async (file: File) => {
   const { error } = await workingClient.storage.from(ART_BOARD_BUCKET).upload(filePath, file)
   if (error) throw error
   const { data } = workingClient.storage.from(ART_BOARD_BUCKET).getPublicUrl(filePath)
+  return { path: filePath, publicUrl: data.publicUrl }
+}
+
+export const uploadShadowPinImage = async (
+  file: File,
+  target: 'category' | 'image',
+  scopeId?: string
+) => {
+  const workingClient = await getWorkingClient()
+  const { data: { user } } = await workingClient.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '-').slice(-120) || 'shadow-pin-image'
+  const folder = target === 'category'
+    ? `${user.id}/categories/${scopeId || Date.now()}/cover`
+    : `${user.id}/categories/${scopeId || 'uncategorized'}/pins`
+  const filePath = `${folder}/${Date.now()}_${safeName}`
+  const { error } = await workingClient.storage.from(SHADOW_PIN_BUCKET).upload(filePath, file)
+  if (error) throw error
+  const { data } = workingClient.storage.from(SHADOW_PIN_BUCKET).getPublicUrl(filePath)
   return { path: filePath, publicUrl: data.publicUrl }
 }
 

@@ -68,3 +68,9 @@ entrypoint = "./functions/art-board-import-image/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/art-board-import-image/*.html" ]
+
+[functions.shadow-pin-import-image]
+enabled = true
+verify_jwt = true
+import_map = "./functions/shadow-pin-import-image/deno.json"
+entrypoint = "./functions/shadow-pin-import-image/index.ts"
