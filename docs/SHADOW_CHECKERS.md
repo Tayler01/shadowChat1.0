@@ -49,6 +49,16 @@ Key files:
 The board is a mobile-first cinematic 2.5D implementation. It is intentionally
 dependency-free for v1 to avoid adding a heavy 3D runtime to the main app bundle.
 
+The current polish pass uses generated WebP assets under
+`public/games/shadow-checkers/` for the game logo, picker/lobby background,
+character portraits, the turn banner, and victory/defeat result overlays.
+The old move-history panel is intentionally hidden from the match surface; the
+board instead offers a last-opponent-move highlight toggle.
+
+Mandatory jumps are shown with helper highlights. If a player attempts another
+destination while a capture is required, the UI blocks the move, shows a toast,
+and keeps the capture options highlighted.
+
 ## QA
 
 Run:

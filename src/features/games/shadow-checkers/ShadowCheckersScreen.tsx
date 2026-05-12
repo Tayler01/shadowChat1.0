@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner'
 import { useAuth } from '../../../hooks/useAuth'
 import { cn } from '../../../lib/utils'
-import type { GameSession, ShadowCheckersMatch } from '../../../lib/supabase'
+import type { ShadowCheckersMatch } from '../../../lib/supabase'
 import { SHADOW_CHECKERS_ASSETS, SHADOW_CHECKERS_CHARACTERS, getShadowCheckersCharacter } from './assets/manifest'
 import { ShadowCheckersBoard } from './components/ShadowCheckersBoard'
 import { CheckersCrownBadge } from './components/CheckersCrownBadge'
@@ -62,14 +62,23 @@ function playerSlot(match: ShadowCheckersMatch | null, userId?: string | null): 
   return 'spectator'
 }
 
+function formatWinReason(reason?: string | null) {
+  if (reason === 'all_pieces_captured') return 'All pieces captured'
+  if (reason === 'no_legal_moves') return 'No legal moves'
+  if (reason === 'resignation') return 'Resignation'
+  return 'Match complete'
+}
+
 export function ShadowCheckersScreen({ onExit }: ShadowCheckersScreenProps) {
   const { user } = useAuth()
   const [selectedCharacter, setSelectedCharacter] = React.useState(SHADOW_CHECKERS_CHARACTERS[0].key)
   const [selectedPieceId, setSelectedPieceId] = React.useState<string | null>(null)
   const [showHints, setShowHints] = React.useState(true)
+  const [showLastMove, setShowLastMove] = React.useState(true)
   const [helperMoves, setHelperMoves] = React.useState<CheckersMove[]>([])
   const [rulesOpen, setRulesOpen] = React.useState(false)
   const [chatDraft, setChatDraft] = React.useState('')
+  const [dismissedResultMatchId, setDismissedResultMatchId] = React.useState<string | null>(null)
   const {
     sessions,
     matches,
@@ -96,8 +105,18 @@ export function ShadowCheckersScreen({ onExit }: ShadowCheckersScreenProps) {
     if (!state || !myTurn || !selectedPieceId) return []
     return getLegalMoves(state, viewerSlot as CheckersPlayer, selectedPieceId)
   }, [myTurn, selectedPieceId, state, viewerSlot])
-  const selectedMatchSession = sessions.find(session => session.id === activeMatch?.session_id) ?? null
-
+  const mandatoryMoves = React.useMemo(() => {
+    if (!state || !myTurn || viewerSlot === 'spectator' || !hasMandatoryCapture(state, viewerSlot)) return []
+    return getLegalMoves(state, viewerSlot).filter(move => move.captures.length > 0)
+  }, [myTurn, state, viewerSlot])
+  const highlightedLastMove = React.useMemo(() => {
+    if (!showLastMove) return null
+    const visibleMoves = viewerSlot === 'spectator'
+      ? moves
+      : moves.filter(move => move.player_slot !== viewerSlot)
+    const move = visibleMoves[visibleMoves.length - 1]
+    return move ? { path: move.path, captures: move.captures } : null
+  }, [moves, showLastMove, viewerSlot])
   const openMatches = React.useMemo(() => matches.filter(match => match.status === 'waiting'), [matches])
   const activeMatches = React.useMemo(() => matches.filter(match => match.status === 'active'), [matches])
   const myMatch = React.useMemo(() => matches.find(match => isPlayer(match, user?.id)) ?? null, [matches, user?.id])
@@ -106,6 +125,14 @@ export function ShadowCheckersScreen({ onExit }: ShadowCheckersScreenProps) {
     setSelectedPieceId(null)
     setHelperMoves([])
   }, [activeMatch?.id, activeMatch?.move_count])
+
+  React.useEffect(() => {
+    setDismissedResultMatchId(null)
+  }, [activeMatch?.id])
+
+  React.useEffect(() => {
+    setHelperMoves(mandatoryMoves)
+  }, [mandatoryMoves])
 
   const guarded = async (action: () => Promise<unknown>, success: string) => {
     try {
@@ -128,13 +155,26 @@ export function ShadowCheckersScreen({ onExit }: ShadowCheckersScreenProps) {
       if (hasMandatoryCapture(state, viewerSlot)) {
         const captureMoves = getLegalMoves(state, viewerSlot).filter(move => move.captures.length > 0)
         setHelperMoves(captureMoves)
-        toast.error('Capture required')
+        toast.error('Mandatory jump available')
+      } else {
+        toast.error('That piece has no legal moves')
       }
       return
     }
 
     setSelectedPieceId(piece.id)
-    setHelperMoves([])
+    setHelperMoves(mandatoryMoves)
+  }
+
+  const handleInvalidDestination = () => {
+    if (!state || !myTurn || viewerSlot === 'spectator') return
+    const captureMoves = getLegalMoves(state, viewerSlot).filter(move => move.captures.length > 0)
+    if (captureMoves.length > 0) {
+      setHelperMoves(captureMoves)
+      toast.error('Mandatory jump available. You have to take the jump.')
+      return
+    }
+    toast.error('That move is not legal')
   }
 
   const handleSelectMove = (move: CheckersMove) => {
@@ -154,11 +194,11 @@ export function ShadowCheckersScreen({ onExit }: ShadowCheckersScreenProps) {
   const renderRulesDialog = () => {
     if (!rulesOpen) return null
     return (
-      <div className="fixed inset-0 z-[90] flex items-end justify-center bg-black/74 px-3 pb-[calc(env(safe-area-inset-bottom)_+_0.85rem)] pt-[calc(env(safe-area-inset-top)_+_0.85rem)] backdrop-blur-sm sm:items-center" onMouseDown={() => setRulesOpen(false)}>
+      <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/74 px-3 py-[calc(env(safe-area-inset-top)_+_0.85rem)] backdrop-blur-sm" onMouseDown={() => setRulesOpen(false)}>
         <section
           role="dialog"
           aria-modal="true"
-          className="max-h-full w-full max-w-lg overflow-y-auto rounded-[1.1rem] border border-[#d7aa46]/35 bg-[linear-gradient(180deg,rgba(20,18,14,0.98),rgba(5,6,7,0.98))] p-4 text-[#f6e0a2] shadow-[0_26px_90px_rgba(0,0,0,0.72)]"
+          className="max-h-[min(88vh,42rem)] w-full max-w-lg overflow-y-auto rounded-[1.1rem] border border-[#d7aa46]/35 bg-[linear-gradient(180deg,rgba(20,18,14,0.98),rgba(5,6,7,0.98))] p-4 text-[#f6e0a2] shadow-[0_26px_90px_rgba(0,0,0,0.72)]"
           onMouseDown={event => event.stopPropagation()}
         >
           <div className="flex items-start justify-between gap-3">
@@ -280,7 +320,13 @@ export function ShadowCheckersScreen({ onExit }: ShadowCheckersScreenProps) {
         <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#b9a16f]">Multiplayer checkers</p>
-            <h2 className="mt-1 text-2xl font-semibold text-[#f6e0a2] md:text-3xl">Public Duel Lobby</h2>
+            <img
+              src={SHADOW_CHECKERS_ASSETS.logo}
+              alt="Shadow Checkers"
+              className="mt-2 h-auto w-full max-w-[26rem] object-contain drop-shadow-[0_12px_30px_rgba(0,0,0,0.72)]"
+              loading="eager"
+            />
+            <h2 className="mt-3 text-2xl font-semibold text-[#f6e0a2] md:text-3xl">Public Duel Lobby</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[#d9c79f]">
               Create a public match, join an open table, or spectate a live board. Unfinished matches persist until a player wins, resigns, or the creator cancels.
             </p>
@@ -339,41 +385,26 @@ export function ShadowCheckersScreen({ onExit }: ShadowCheckersScreenProps) {
 
   const renderMatch = () => {
     if (!activeMatch || !state) return null
-    const topAsset = state.winner
-      ? state.winner === viewerSlot ? SHADOW_CHECKERS_ASSETS.victory : viewerSlot === 'spectator' ? SHADOW_CHECKERS_ASSETS.pickerArt : SHADOW_CHECKERS_ASSETS.defeat
-      : null
     const playerOnePieces = state.pieces.filter(piece => piece.owner === 'player_one').length
     const playerTwoPieces = state.pieces.filter(piece => piece.owner === 'player_two').length
     const selectedPiece = state.pieces.find(piece => piece.id === selectedPieceId)
+    const winnerName = state.winner === 'player_one'
+      ? displayName(activeMatch.player_one)
+      : displayName(activeMatch.player_two)
+    const resultTitle = state.winner === viewerSlot
+      ? 'Victory'
+      : viewerSlot === 'spectator'
+        ? 'Match Concluded'
+        : 'Defeat'
+    const resultAsset = state.winner === viewerSlot || viewerSlot === 'spectator'
+      ? SHADOW_CHECKERS_ASSETS.victory
+      : SHADOW_CHECKERS_ASSETS.defeat
+    const showResultOverlay = Boolean(state.winner && dismissedResultMatchId !== activeMatch.id)
+    const totalCaptures = state.stats.player_one.captures + state.stats.player_two.captures
+    const totalCrowns = state.stats.player_one.kings + state.stats.player_two.kings
 
     return (
       <main className="relative z-10 min-h-0 flex-1 overflow-y-auto px-3 py-3 pb-[calc(env(safe-area-inset-bottom)_+_1rem)] md:px-6">
-        {topAsset && (
-          <section className="mb-3 overflow-hidden rounded-[1rem] border border-[#b9934c]/35 bg-black/72">
-            <img src={topAsset} alt="" className="h-32 w-full object-cover opacity-85" />
-            <div className="p-3 text-center">
-              <h2 className="text-xl font-semibold text-[#f6e0a2]">{state.winner === viewerSlot ? 'Victory' : viewerSlot === 'spectator' ? 'Match Concluded' : 'Defeat'}</h2>
-              <p className="mt-1 text-sm text-[#d9c79f]">
-                Winner: {state.winner === 'player_one' ? displayName(activeMatch.player_one) : displayName(activeMatch.player_two)}
-              </p>
-              {activePlayer && (
-                <div className="mt-3 flex flex-wrap justify-center gap-2">
-                  {state.winner === viewerSlot && queue.length > 0 ? (
-                    <CheckersButton loading={busy === 'nextChallenger'} onClick={() => void guarded(() => actions.nextChallenger(activeMatch.id), 'Next challenger seated')}>
-                      <Users className="mr-2 h-4 w-4" />
-                      Next Challenger
-                    </CheckersButton>
-                  ) : (
-                    <CheckersButton variant="secondary" loading={busy === 'rematch'} onClick={() => void guarded(() => actions.rematch(activeMatch.id), 'Rematch started')}>
-                      <Swords className="mr-2 h-4 w-4" />
-                      Rematch
-                    </CheckersButton>
-                  )}
-                </div>
-              )}
-            </div>
-          </section>
-        )}
         <section className="mb-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-[1rem] border border-[#b9934c]/28 bg-black/58 p-3">
           <PlayerChip name={displayName(activeMatch.player_one, 'Player one')} characterKey={activeMatch.player_one_character_key} crown={activeMatch.player_one?.checkers_crown} detail={`${playerOnePieces} pieces`} />
           <div className="rounded-[0.8rem] border border-[#d7aa46]/35 bg-[#d7aa46]/10 px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.12em] text-[#f0d381]">
@@ -383,18 +414,57 @@ export function ShadowCheckersScreen({ onExit }: ShadowCheckersScreenProps) {
         </section>
 
         <div className="grid gap-3 xl:grid-cols-[1fr_22rem]">
-          <section className="rounded-[1.25rem] border border-[#b9934c]/28 bg-[radial-gradient(circle_at_50%_0%,rgba(215,170,70,0.11),rgba(0,0,0,0.66)_42%,rgba(0,0,0,0.82))] p-3 shadow-[0_24px_70px_rgba(0,0,0,0.54)]">
-            <ShadowCheckersBoard
-              state={state}
-              viewerSlot={viewerSlot}
-              selectedPieceId={selectedPieceId}
-              legalMoves={legalMoves}
-              helperMoves={helperMoves}
-              onSelectPiece={handleSelectPiece}
-              onSelectMove={handleSelectMove}
-              disabled={!myTurn || Boolean(state.winner) || busy === 'move'}
-              showHints={showHints}
-            />
+          <section className="relative overflow-hidden rounded-[1.25rem] border border-[#b9934c]/28 bg-[radial-gradient(circle_at_50%_0%,rgba(215,170,70,0.11),rgba(0,0,0,0.66)_42%,rgba(0,0,0,0.82))] p-3 shadow-[0_24px_70px_rgba(0,0,0,0.54)]">
+            <div className="relative">
+              <ShadowCheckersBoard
+                state={state}
+                viewerSlot={viewerSlot}
+                selectedPieceId={selectedPieceId}
+                legalMoves={legalMoves}
+                helperMoves={helperMoves}
+                highlightedMove={highlightedLastMove}
+                onSelectPiece={handleSelectPiece}
+                onSelectMove={handleSelectMove}
+                onInvalidDestination={handleInvalidDestination}
+                disabled={!myTurn || Boolean(state.winner) || busy === 'move'}
+                showHints={showHints}
+              />
+              {myTurn && !state.winner && (
+                <div className="pointer-events-none absolute inset-x-4 top-[44%] z-20 -translate-y-1/2">
+                  <img
+                    src={SHADOW_CHECKERS_ASSETS.yourTurn}
+                    alt=""
+                    className="mx-auto max-h-28 w-full max-w-[32rem] object-contain opacity-95 drop-shadow-[0_18px_34px_rgba(0,0,0,0.75)]"
+                    loading="eager"
+                  />
+                </div>
+              )}
+              {showResultOverlay && (
+                <button
+                  type="button"
+                  aria-label="Dismiss match result"
+                  onClick={() => setDismissedResultMatchId(activeMatch.id)}
+                  className="absolute inset-0 z-30 flex items-center justify-center bg-black/68 p-3 text-left backdrop-blur-[2px]"
+                >
+                  <div className="w-full max-w-[31rem] overflow-hidden rounded-[1.1rem] border border-[#f0d381]/35 bg-black/82 shadow-[0_28px_80px_rgba(0,0,0,0.78)]">
+                    <img src={resultAsset} alt="" className="h-40 w-full object-cover sm:h-52" loading="eager" />
+                    <div className="space-y-3 p-4 text-center">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b9a16f]">Tap anywhere to dismiss</p>
+                        <h2 className="mt-1 text-2xl font-semibold text-[#f6e0a2]">{resultTitle}</h2>
+                        <p className="mt-1 text-sm text-[#d9c79f]">Winner: {winnerName}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs text-[#d9c79f]">
+                        <span className="rounded-[0.65rem] border border-[#b9934c]/20 bg-white/[0.04] px-2 py-2">Reason: {formatWinReason(state.winReason ?? activeMatch.win_reason)}</span>
+                        <span className="rounded-[0.65rem] border border-[#b9934c]/20 bg-white/[0.04] px-2 py-2">Moves: {activeMatch.move_count}</span>
+                        <span className="rounded-[0.65rem] border border-[#b9934c]/20 bg-white/[0.04] px-2 py-2">Captures: {totalCaptures}</span>
+                        <span className="rounded-[0.65rem] border border-[#b9934c]/20 bg-white/[0.04] px-2 py-2">Crowns: {totalCrowns}</span>
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              )}
+            </div>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs text-[#b9a16f]">
                 {selectedPiece ? `Selected ${selectedPiece.king ? 'crowned ' : ''}${selectedPiece.owner === 'player_one' ? 'gold' : 'shadow'} piece` : activePlayer ? 'Tap a piece, then tap a highlighted destination.' : 'Spectators can watch the board update live.'}
@@ -405,6 +475,9 @@ export function ShadowCheckersScreen({ onExit }: ShadowCheckersScreenProps) {
                     {showHints ? 'Hide Hints' : 'Show Hints'}
                   </CheckersButton>
                 )}
+                <CheckersButton variant="secondary" onClick={() => setShowLastMove(value => !value)}>
+                  {showLastMove ? 'Hide Last Move' : 'Show Last Move'}
+                </CheckersButton>
                 <CheckersButton variant="ghost" onClick={() => setRulesOpen(true)}>
                   <HelpCircle className="mr-2 h-4 w-4" />
                   Rules
@@ -418,23 +491,24 @@ export function ShadowCheckersScreen({ onExit }: ShadowCheckersScreenProps) {
                     Resign
                   </CheckersButton>
                 )}
+                {state.winner && activePlayer && (
+                  state.winner === viewerSlot && queue.length > 0 ? (
+                    <CheckersButton loading={busy === 'nextChallenger'} onClick={() => void guarded(() => actions.nextChallenger(activeMatch.id), 'Next challenger seated')}>
+                      <Users className="mr-2 h-4 w-4" />
+                      Next Challenger
+                    </CheckersButton>
+                  ) : (
+                    <CheckersButton variant="secondary" loading={busy === 'rematch'} onClick={() => void guarded(() => actions.rematch(activeMatch.id), 'Rematch started')}>
+                      <Swords className="mr-2 h-4 w-4" />
+                      Rematch
+                    </CheckersButton>
+                  )
+                )}
               </div>
             </div>
           </section>
 
           <aside className="space-y-3">
-            <section className="rounded-[1rem] border border-[#b9934c]/25 bg-black/58 p-3">
-              <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0d381]">Last 5 Moves</h3>
-              <div className="mt-2 space-y-2">
-                {moves.length === 0 ? (
-                  <p className="text-sm text-[#b9a16f]">No moves yet.</p>
-                ) : moves.map(move => (
-                  <div key={move.id} className="rounded-[0.7rem] border border-white/8 bg-white/[0.035] px-3 py-2 text-xs text-[#d9c79f]">
-                    <span className="font-semibold text-[#f6e0a2]">{move.player_slot === 'player_one' ? 'Gold' : 'Shadow'}:</span> {move.notation}
-                  </div>
-                ))}
-              </div>
-            </section>
             <section className="rounded-[1rem] border border-[#b9934c]/25 bg-black/58 p-3">
               <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0d381]">Match Chat</h3>
               <div className="mt-2 min-h-20 space-y-2">
@@ -472,14 +546,14 @@ export function ShadowCheckersScreen({ onExit }: ShadowCheckersScreenProps) {
 
   return (
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[#030405] text-[#f6e0a2]">
-      <img src={SHADOW_CHECKERS_ASSETS.pickerArt} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-[0.48]" />
+      <img src={SHADOW_CHECKERS_ASSETS.background} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-[0.56]" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(215,170,70,0.18),transparent_30%),linear-gradient(180deg,rgba(0,0,0,0.58),rgba(0,0,0,0.20)_42%,rgba(0,0,0,0.84))]" />
       <header className="relative z-20 shrink-0 border-b border-[#b9934c]/35 bg-black/86 shadow-[0_16px_40px_rgba(0,0,0,0.58)]">
         <div className="flex min-h-[calc(env(safe-area-inset-top)_+_5.5rem)] items-center gap-3 px-3 pb-3 pt-[calc(env(safe-area-inset-top)_+_0.65rem)]">
           <button type="button" aria-label={selectedMatchId ? 'Back to Shadow Checkers lobby' : 'Back to games'} onClick={() => selectedMatchId ? actions.selectMatch(null) : onExit?.()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-transparent bg-black/5 text-[#f0d381] hover:bg-white/10">
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <img src={SHADOW_CHECKERS_ASSETS.logo} alt="Shadow Checkers" className="min-w-0 flex-1 object-contain" />
+          <img src={SHADOW_CHECKERS_ASSETS.logo} alt="Shadow Checkers" className="h-16 min-w-0 flex-1 object-contain drop-shadow-[0_12px_28px_rgba(0,0,0,0.72)]" />
           <button type="button" aria-label="Open Shadow Checkers rules" onClick={() => setRulesOpen(true)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-transparent bg-black/5 text-[#f0d381] hover:bg-white/10">
             <HelpCircle className="h-5 w-5" />
           </button>

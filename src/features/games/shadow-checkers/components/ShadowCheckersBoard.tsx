@@ -8,8 +8,13 @@ interface ShadowCheckersBoardProps {
   selectedPieceId?: string | null
   legalMoves: CheckersMove[]
   helperMoves?: CheckersMove[]
+  highlightedMove?: {
+    path: CheckersPosition[]
+    captures: CheckersPosition[]
+  } | null
   onSelectPiece?: (piece: CheckersPiece) => void
   onSelectMove?: (move: CheckersMove) => void
+  onInvalidDestination?: (position: CheckersPosition) => void
   disabled?: boolean
   showHints?: boolean
 }
@@ -20,8 +25,10 @@ export function ShadowCheckersBoard({
   selectedPieceId,
   legalMoves,
   helperMoves = [],
+  highlightedMove,
   onSelectPiece,
   onSelectMove,
+  onInvalidDestination,
   disabled = false,
   showHints = true,
 }: ShadowCheckersBoardProps) {
@@ -43,7 +50,10 @@ export function ShadowCheckersBoard({
   helperMoves.forEach(move => {
     helperSquares.add(squareKey(move.path[0]))
     helperSquares.add(squareKey(move.path[move.path.length - 1]))
+    move.captures.forEach(position => helperSquares.add(squareKey(position)))
   })
+  const lastPathSquares = new Set((highlightedMove?.path ?? []).map(squareKey))
+  const lastCaptureSquares = new Set((highlightedMove?.captures ?? []).map(squareKey))
 
   return (
     <div className="relative mx-auto w-full max-w-[min(94vw,42rem)] [perspective:1100px]">
@@ -55,18 +65,28 @@ export function ShadowCheckersBoard({
             const legalMove = legalByDestination.get(squareKey(square))
             const selected = piece?.id === selectedPieceId
             const helper = helperSquares.has(squareKey(square))
+            const lastPath = lastPathSquares.has(squareKey(square))
+            const lastCapture = lastCaptureSquares.has(squareKey(square))
+            const canClickInvalidDestination = Boolean(
+              selectedPieceId &&
+              square.playable &&
+              !piece &&
+              !legalMove &&
+              !disabled
+            )
 
             return (
               <button
                 key={`${square.row}-${square.col}`}
                 type="button"
-                disabled={disabled || (!piece && !legalMove)}
+                disabled={disabled || (!piece && !legalMove && !canClickInvalidDestination)}
                 onClick={() => {
                   if (legalMove) {
                     onSelectMove?.(legalMove)
                     return
                   }
                   if (piece) onSelectPiece?.(piece)
+                  else if (canClickInvalidDestination) onInvalidDestination?.({ row: square.row, col: square.col })
                 }}
                 className={cn(
                   'relative min-h-0 touch-manipulation overflow-visible focus:outline-none focus:ring-2 focus:ring-[#f0d381]/70',
@@ -74,7 +94,9 @@ export function ShadowCheckersBoard({
                     ? 'bg-[radial-gradient(circle_at_50%_35%,rgba(80,65,38,0.92),rgba(24,18,12,0.98))]'
                     : 'bg-[linear-gradient(135deg,#06080b,#12151a)]',
                   legalMove && showHints && 'after:absolute after:left-1/2 after:top-1/2 after:h-5 after:w-5 after:-translate-x-1/2 after:-translate-y-1/2 after:rounded-full after:border after:border-[#f6e0a2]/70 after:bg-[#d7aa46]/40 after:shadow-[0_0_24px_rgba(215,170,70,0.75)]',
-                  helper && 'shadow-[inset_0_0_0_3px_rgba(229,83,83,0.65)]'
+                  lastPath && 'shadow-[inset_0_0_0_3px_rgba(111,183,255,0.72),0_0_22px_rgba(111,183,255,0.28)]',
+                  lastCapture && 'shadow-[inset_0_0_0_3px_rgba(229,83,83,0.72),0_0_22px_rgba(229,83,83,0.28)]',
+                  helper && 'shadow-[inset_0_0_0_3px_rgba(240,211,129,0.85),0_0_24px_rgba(240,211,129,0.32)]'
                 )}
                 aria-label={piece ? `${piece.owner} piece` : legalMove ? 'Move here' : 'Board square'}
               >
