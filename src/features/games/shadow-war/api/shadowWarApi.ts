@@ -30,12 +30,30 @@ export const fetchShadowWarSessions = async () => {
       winner:users!game_sessions_winner_id_fkey(${USER_SELECT})
     `)
     .eq('game_type', 'shadow_war')
-    .in('status', ['waiting', 'active', 'completed'])
+    .in('status', ['waiting', 'active'])
     .order('updated_at', { ascending: false })
     .limit(12)
 
   if (error) throw error
   return (data ?? []) as unknown as GameSession[]
+}
+
+export const fetchShadowWarSession = async (sessionId: string) => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient
+    .from('game_sessions')
+    .select(`
+      *,
+      player_one:users!game_sessions_player_one_id_fkey(${USER_SELECT}),
+      player_two:users!game_sessions_player_two_id_fkey(${USER_SELECT}),
+      winner:users!game_sessions_winner_id_fkey(${USER_SELECT})
+    `)
+    .eq('game_type', 'shadow_war')
+    .eq('id', sessionId)
+    .maybeSingle()
+
+  if (error) throw error
+  return (data ?? null) as unknown as GameSession | null
 }
 
 export const fetchShadowWarQueue = async (sessionId: string) => {

@@ -8,6 +8,14 @@ import type { GameSession } from '../../../lib/supabase'
 import { useShadowWar } from './hooks/useShadowWar'
 import { ShadowWarMatch } from './components/ShadowWarMatch'
 import { SHADOW_WAR_ASSETS } from './assets/manifest'
+import { useShadowWarIdentity } from './hooks/useShadowWarIdentity'
+import { useShadowWarLobbyPresence } from './hooks/useShadowWarLobbyPresence'
+import {
+  getShadowWarAvatar,
+  getShadowWarFaction,
+  SHADOW_WAR_AVATARS,
+  SHADOW_WAR_FACTIONS,
+} from './identity'
 
 interface ShadowWarScreenProps {
   onExit?: () => void
@@ -71,6 +79,7 @@ export function ShadowWarScreen({
   onToggleMusic,
 }: ShadowWarScreenProps) {
   const { user } = useAuth()
+  const { identity, setIdentity } = useShadowWarIdentity()
   const {
     sessions,
     selectedSessionId,
@@ -84,11 +93,14 @@ export function ShadowWarScreen({
     error,
     actions,
   } = useShadowWar()
+  const { users: lobbyUsers } = useShadowWarLobbyPresence(!selectedSessionId)
 
   const selectedIsPlayer = Boolean(activeSession && isUserInSession(activeSession, user?.id))
   const selectedHasPlayableMatch = Boolean(activeSession && match && selectedIsPlayer)
   const isQueuedForSelected = Boolean(queue.some(entry => entry.user_id === user?.id && entry.status === 'queued'))
   const myOpenSession = sessions.find(session => isUserInSession(session, user?.id) && session.status !== 'completed') ?? null
+  const selectedAvatar = getShadowWarAvatar(identity.avatarId)
+  const selectedFaction = getShadowWarFaction(identity.factionId)
 
   const guarded = async (action: () => Promise<unknown>, success: string) => {
     try {
@@ -164,8 +176,81 @@ export function ShadowWarScreen({
             </div>
           </div>
           <p className="max-w-2xl text-sm leading-6 text-[#d9c79f]">
-            Create a fresh duel, join an open seat, or inspect an active table before queueing. Shadow War no longer drops you into a match until you choose one.
+            Create a fresh duel, join an open seat, or queue behind an active battle.
           </p>
+          <div className="mt-5 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-[1rem] border border-[#b9934c]/24 bg-black/42 p-3">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#f0d381]">War persona</p>
+                  <p className="mt-0.5 text-xs text-[#b9a16f]">{selectedAvatar.name} of {selectedFaction.name}</p>
+                </div>
+                <div className={cn('h-12 w-12 shrink-0 overflow-hidden rounded-full border bg-black/70', selectedAvatar.accentClass)}>
+                  <img src={selectedAvatar.imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                </div>
+              </div>
+              <div className="grid grid-cols-6 gap-2">
+                {SHADOW_WAR_AVATARS.map(avatar => (
+                  <button
+                    key={avatar.id}
+                    type="button"
+                    aria-label={`Select ${avatar.name}`}
+                    onClick={() => setIdentity(current => ({ ...current, avatarId: avatar.id }))}
+                    className={cn(
+                      'aspect-square overflow-hidden rounded-full border bg-black/72 transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/50',
+                      avatar.accentClass,
+                      identity.avatarId === avatar.id ? 'ring-2 ring-[#f0d381]/70' : 'opacity-72 hover:opacity-100'
+                    )}
+                  >
+                    <img src={avatar.imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  </button>
+                ))}
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {SHADOW_WAR_FACTIONS.map(faction => (
+                  <button
+                    key={faction.id}
+                    type="button"
+                    onClick={() => setIdentity(current => ({ ...current, factionId: faction.id }))}
+                    className={cn(
+                      'min-h-11 rounded-[0.65rem] border bg-black/46 px-2 py-2 text-left transition-[border-color,background,transform] duration-200 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/50',
+                      faction.accentClass,
+                      identity.factionId === faction.id ? 'bg-[#d7aa46]/12' : ''
+                    )}
+                  >
+                    <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] opacity-80">{faction.crest}</span>
+                    <span className="block truncate text-xs font-semibold text-[#f6e0a2]">{faction.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[1rem] border border-[#b9934c]/24 bg-black/42 p-3">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#f0d381]">Lobby</p>
+                <span className="rounded-full border border-[#d7aa46]/28 bg-[#d7aa46]/10 px-2 py-0.5 text-[10px] font-semibold text-[#f0d381]">
+                  {lobbyUsers.length || 1} active
+                </span>
+              </div>
+              <div className="space-y-2">
+                {(lobbyUsers.length > 0 ? lobbyUsers : [{ id: user?.id ?? 'you', name: user?.display_name || user?.username || 'You', avatarUrl: user?.avatar_url ?? null, joinedAt: Date.now() }]).slice(0, 5).map(lobbyUser => (
+                  <div key={lobbyUser.id} className="flex items-center gap-2 rounded-[0.7rem] border border-white/8 bg-white/[0.035] px-2 py-2">
+                    <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full border border-[#d7aa46]/28 bg-black/60">
+                      {lobbyUser.avatarUrl ? (
+                        <img src={lobbyUser.avatarUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                      ) : (
+                        <img src={selectedAvatar.imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-semibold text-[#f6e0a2]">{lobbyUser.id === user?.id ? 'You' : lobbyUser.name}</p>
+                      <p className="truncate text-[10px] text-[#b9a16f]">Browsing Shadow War</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
           <div className="mt-5 grid gap-2 sm:grid-cols-2">
             <WarButton loading={busy === 'create'} onClick={() => void guarded(actions.create, 'Duel created')}>
               <Plus className="mr-2 h-4 w-4" />
@@ -275,7 +360,7 @@ export function ShadowWarScreen({
             type="button"
             aria-label={selectedSessionId ? 'Back to Shadow War lobbies' : 'Back to games'}
             onClick={goBack}
-            className="absolute left-3 top-[calc(env(safe-area-inset-top)_+_0.8rem)] flex h-11 w-11 shrink-0 items-center justify-center rounded-[0.65rem] border border-[#b9934c]/45 bg-black/64 text-[#f0d381] shadow-[0_12px_28px_rgba(0,0,0,0.45)] backdrop-blur-sm transition-colors hover:bg-[#d7aa46]/10 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/50"
+            className="absolute left-1 top-[calc(env(safe-area-inset-top)_+_0.35rem)] flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-transparent bg-black/5 text-[#f0d381] drop-shadow-[0_4px_10px_rgba(0,0,0,0.9)] transition-colors hover:bg-black/18 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/50"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -285,10 +370,10 @@ export function ShadowWarScreen({
               aria-label={musicPlaying ? 'Pause Shadow War music' : 'Play Shadow War music'}
               onClick={onToggleMusic}
               className={cn(
-                'absolute right-3 top-[calc(env(safe-area-inset-top)_+_0.8rem)] flex h-11 w-11 shrink-0 items-center justify-center rounded-[0.65rem] border text-[#f0d381] shadow-[0_12px_28px_rgba(0,0,0,0.45)] backdrop-blur-sm transition-colors focus:outline-none focus:ring-2 focus:ring-[#f0d381]/50',
+                'absolute right-1 top-[calc(env(safe-area-inset-top)_+_0.35rem)] flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-transparent text-[#f0d381] drop-shadow-[0_4px_10px_rgba(0,0,0,0.9)] transition-colors focus:outline-none focus:ring-2 focus:ring-[#f0d381]/50',
                 audioBlocked
-                  ? 'border-[#f0d381]/55 bg-[#d7aa46]/20'
-                  : 'border-[#b9934c]/45 bg-black/64 hover:bg-[#d7aa46]/10'
+                  ? 'bg-[#d7aa46]/16'
+                  : 'bg-black/5 hover:bg-black/18'
               )}
             >
               {audioBlocked ? <Music className="h-5 w-5" /> : musicPlaying ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
@@ -315,6 +400,7 @@ export function ShadowWarScreen({
           onResolveRound={actions.resolveRound}
           onRematch={actions.rematch}
           onNextChallenger={actions.nextChallenger}
+          playerIdentity={identity}
         />
       ) : (
         renderLobby()

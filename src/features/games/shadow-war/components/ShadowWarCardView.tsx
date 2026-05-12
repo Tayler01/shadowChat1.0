@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Shield, Sparkles } from 'lucide-react'
+import { Shield } from 'lucide-react'
 import { cn } from '../../../../lib/utils'
 import type { ShadowWarCard } from '../engine/types'
 import { SHADOW_WAR_ASSETS } from '../assets/manifest'
@@ -79,18 +79,17 @@ export function ShadowWarCardView({
       )}
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.02)_0%,rgba(0,0,0,0.0)_44%,rgba(0,0,0,0.44)_100%)]" />
       <div className="absolute inset-[5px] rounded-[calc(var(--radius-md)-5px)] border border-[rgba(215,170,70,0.24)]" />
-      <div className="absolute left-2 top-2 flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(239,202,114,0.45)] bg-[rgba(7,8,9,0.72)] text-lg font-bold text-[var(--theme-accent-readable)]">
-        {card.rank}
-      </div>
-      <div className="absolute inset-x-2 bottom-2 rounded-[var(--radius-sm)] border border-[rgba(255,255,255,0.1)] bg-[rgba(5,6,7,0.72)] px-2 py-1.5 backdrop-blur-sm">
-        <div className="flex items-center gap-1.5">
-          <Sparkles className="h-3 w-3 text-[var(--theme-accent-readable)]" />
-          <p className={cn('truncate font-semibold text-[var(--text-primary)]', compact ? 'text-[10px]' : 'text-xs')}>
-            {card.name}
-          </p>
-        </div>
+      <div className="absolute inset-x-1.5 bottom-2 px-1 text-center">
+        <p
+          className={cn(
+            'overflow-hidden text-ellipsis whitespace-nowrap font-serif font-semibold uppercase text-[#f6e0a2] [text-shadow:0_2px_4px_rgba(0,0,0,0.95),0_0_10px_rgba(0,0,0,0.9)]',
+            compact ? 'text-[10px] leading-3' : 'text-xs'
+          )}
+        >
+          {card.name}
+        </p>
         {!compact && (
-          <p className="mt-0.5 line-clamp-2 text-[10px] leading-3 text-[var(--text-muted)]">
+          <p className="mt-0.5 line-clamp-2 text-[10px] leading-3 text-[#d9c79f] [text-shadow:0_1px_3px_rgba(0,0,0,0.95)]">
             {card.description}
           </p>
         )}

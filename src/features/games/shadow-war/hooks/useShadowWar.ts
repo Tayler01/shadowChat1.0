@@ -10,6 +10,7 @@ import {
   fetchShadowWarMoves,
   fetchShadowWarPlayerState,
   fetchShadowWarQueue,
+  fetchShadowWarSession,
   fetchShadowWarSessions,
   joinShadowWarSession,
   leaveShadowWarQueue,
@@ -44,7 +45,7 @@ export function useShadowWar() {
     try {
       const sessions = await fetchShadowWarSessions()
       const selected = nextSelectedSessionId
-        ? sessions.find(session => session.id === nextSelectedSessionId) ?? null
+        ? sessions.find(session => session.id === nextSelectedSessionId) ?? await fetchShadowWarSession(nextSelectedSessionId)
         : null
       const activeSession = selected
 
@@ -159,9 +160,21 @@ export function useShadowWar() {
     join: (sessionId: string) => runAction('join', () => joinShadowWarSession(sessionId), joined => joined.sessionId),
     leaveQueue: (sessionId: string) => runAction('leaveQueue', () => leaveShadowWarQueue(sessionId)),
     submitPlacement: (matchId: string, placement: { left: string; center: string; right: string }) =>
-      runAction('submitPlacement', () => submitShadowWarPlacement(matchId, placement)),
+      runAction('submitPlacement', async () => {
+        const result = await submitShadowWarPlacement(matchId, placement)
+        if (result.revealed) {
+          await resolveShadowWarRound(matchId)
+        }
+        return result
+      }),
     submitSuddenWarCard: (matchId: string, cardId: string) =>
-      runAction('submitSuddenWarCard', () => submitShadowWarSuddenWarCard(matchId, cardId)),
+      runAction('submitSuddenWarCard', async () => {
+        const result = await submitShadowWarSuddenWarCard(matchId, cardId)
+        if (result.revealed) {
+          await resolveShadowWarRound(matchId)
+        }
+        return result
+      }),
     resolveRound: (matchId: string) => runAction('resolveRound', () => resolveShadowWarRound(matchId)),
     rematch: (sessionId: string) => runAction('rematch', () => rematchShadowWarSession(sessionId), next => next.sessionId),
     nextChallenger: (sessionId: string) => runAction('nextChallenger', () => startShadowWarNextChallenger(sessionId), next => next.sessionId),

@@ -105,18 +105,16 @@ try {
   for (let round = 1; round <= 12; round += 1) {
     if (await isMatchComplete(pageOne)) break
 
-    await playPlacement(pageOne)
-    await playPlacement(pageTwo)
-    await resolveIfReady(pageOne, pageTwo)
-    await waitForPostResolveState(pageOne)
-    await waitForPostResolveState(pageTwo)
+    await playPlacement(pageOne, 'high')
+    await playPlacement(pageTwo, 'low')
+    await waitForAutoResolveState(pageOne)
+    await waitForAutoResolveState(pageTwo)
 
     if (await isSuddenWar(pageOne) || await isSuddenWar(pageTwo)) {
       await playSuddenWar(pageOne)
       await playSuddenWar(pageTwo)
-      await resolveIfReady(pageOne, pageTwo)
-      await waitForPostResolveState(pageOne)
-      await waitForPostResolveState(pageTwo)
+      await waitForAutoResolveState(pageOne)
+      await waitForAutoResolveState(pageTwo)
     }
 
     record('ui round completed', { round })
@@ -279,6 +277,21 @@ async function waitForMatch(page) {
   await page.getByTestId('shadow-war-lock').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
+async function continueActiveDuel(page) {
+  const currentDuel = page.getByRole('button', { name: 'Continue Current Duel' })
+  if (await currentDuel.isVisible().catch(() => false)) {
+    await currentDuel.click()
+    await waitForMatch(page)
+    return
+  }
+
+  const continueDuel = page.getByRole('button', { name: 'Continue Duel' }).first()
+  if (await continueDuel.isVisible().catch(() => false)) {
+    await continueDuel.click()
+    await waitForMatch(page)
+  }
+}
+
 async function waitForLobbyState(page, expectedTexts) {
   await page.waitForFunction(texts => {
     const bodyText = document.body?.innerText || ''
@@ -286,22 +299,49 @@ async function waitForLobbyState(page, expectedTexts) {
   }, expectedTexts, { timeout: DEFAULT_TIMEOUT_MS })
 }
 
-async function playPlacement(page) {
+async function playPlacement(page, strengthMode = 'first') {
   await waitForPlayerDecision(page)
   if (await isMatchComplete(page)) return
   if (await isSuddenWar(page)) return
 
   const lock = page.getByTestId('shadow-war-lock')
   if (!(await lock.isVisible().catch(() => false)) || !(await lock.isEnabled().catch(() => false))) {
-    const handCards = page.locator('[data-testid="shadow-war-card"]:not([disabled])')
+    const handCards = page.getByTestId('shadow-war-hand').locator('[data-testid="shadow-war-card"]:not([disabled])')
     await handCards.first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-    for (const lane of ['left', 'center', 'right']) {
-      await page.locator('[data-testid="shadow-war-card"]:not([disabled])').first().click()
+    const cards = await collectHandCards(page)
+    const orderedCards = cards
+      .sort((a, b) => strengthMode === 'low' ? a.rank - b.rank : b.rank - a.rank)
+      .slice(0, 3)
+
+    for (const [index, lane] of ['left', 'center', 'right'].entries()) {
+      const card = orderedCards[index]
+      const cardLocator = card
+        ? page.getByTestId('shadow-war-hand').locator(`[data-shadow-war-card-id="${card.id}"]`)
+        : page.getByTestId('shadow-war-hand').locator('[data-testid="shadow-war-card"]:not([disabled])').first()
+      await cardLocator.click()
+      await delay(120)
       await page.locator(`[data-shadow-war-lane="${lane}"]`).click()
+      await delay(120)
     }
   }
 
+  await page.waitForFunction(() => {
+    const lockButton = document.querySelector('[data-testid="shadow-war-lock"]')
+    return Boolean(lockButton && !lockButton.disabled)
+  }, null, { timeout: DEFAULT_TIMEOUT_MS })
   await page.getByTestId('shadow-war-lock').click()
+}
+
+async function collectHandCards(page) {
+  const cards = await page.getByTestId('shadow-war-hand').locator('[data-testid="shadow-war-card"]:not([disabled])').all()
+  const results = []
+  for (const card of cards) {
+    const id = await card.getAttribute('data-shadow-war-card-id')
+    const label = await card.getAttribute('aria-label')
+    const rank = Number(label?.match(/strength (\d+)/)?.[1] ?? 0)
+    if (id && rank > 0) results.push({ id, rank })
+  }
+  return results
 }
 
 async function playSuddenWar(page) {
@@ -310,28 +350,25 @@ async function playSuddenWar(page) {
   await page.getByText('Sudden war').first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
   const lock = page.getByTestId('shadow-war-lock')
   if (!(await lock.isEnabled().catch(() => false))) {
-    await page.locator('[data-testid="shadow-war-card"]:not([disabled])').first().click()
+    await page.getByTestId('shadow-war-hand').locator('[data-testid="shadow-war-card"]:not([disabled])').first().click()
+    await delay(120)
   }
-  await lock.click()
-}
-
-async function resolveIfReady(...pages) {
-  const deadline = Date.now() + DEFAULT_TIMEOUT_MS
-  while (Date.now() < deadline) {
-    for (const page of pages) {
-      const resolve = page.getByTestId('shadow-war-resolve')
-      if (
-        await resolve.isVisible().catch(() => false) &&
-        await resolve.isEnabled().catch(() => false)
-      ) {
-        await resolve.click()
-        await delay(700)
-        return
-      }
-    }
-    await delay(250)
+  const enabled = await page.waitForFunction(() => {
+    const lockButton = document.querySelector('[data-testid="shadow-war-lock"]')
+    return Boolean(lockButton && !lockButton.disabled)
+  }, null, { timeout: 5_000 }).then(() => true).catch(() => false)
+  if (!enabled) {
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await openShadowWar(page)
+    await continueActiveDuel(page)
+    if (await isMatchComplete(page) || !(await isSuddenWar(page))) return
+    await page.getByTestId('shadow-war-hand').locator('[data-testid="shadow-war-card"]:not([disabled])').first().click()
+    await page.waitForFunction(() => {
+      const lockButton = document.querySelector('[data-testid="shadow-war-lock"]')
+      return Boolean(lockButton && !lockButton.disabled)
+    }, null, { timeout: DEFAULT_TIMEOUT_MS })
   }
-  throw new Error('Reveal control did not become available')
+  await page.getByTestId('shadow-war-lock').click()
 }
 
 async function waitForPlayerDecision(page) {
@@ -339,22 +376,22 @@ async function waitForPlayerDecision(page) {
     const text = document.body?.innerText || ''
     if (text.includes('Duel complete') || text.includes('Victory held')) return true
     if (text.includes('Sudden war')) return true
-    if (document.querySelector('[data-testid="shadow-war-card"]:not([disabled])')) return true
+    if (text.includes('Choose your formation')) return true
     const lock = document.querySelector('[data-testid="shadow-war-lock"]')
     return Boolean(lock && !lock.disabled)
   }, null, { timeout: DEFAULT_TIMEOUT_MS })
 }
 
-async function waitForPostResolveState(page) {
+async function waitForAutoResolveState(page) {
   await page.waitForFunction(() => {
     const text = document.body?.innerText || ''
     if (text.includes('Duel complete') || text.includes('Victory held')) return true
     if (text.includes('Sudden war')) return true
-    const resolve = document.querySelector('[data-testid="shadow-war-resolve"]')
-    if (resolve && !resolve.disabled) return false
+    if (text.includes('Waiting for opponent') || text.includes('Battle resolving')) return false
+    if (document.querySelector('[data-testid="shadow-war-hand"] [data-testid="shadow-war-card"]:not([disabled])')) return true
     const lock = document.querySelector('[data-testid="shadow-war-lock"]')
     return Boolean(lock && !lock.disabled)
-  }, null, { timeout: DEFAULT_TIMEOUT_MS }).catch(() => {})
+  }, null, { timeout: DEFAULT_TIMEOUT_MS })
 }
 
 async function isSuddenWar(page) {

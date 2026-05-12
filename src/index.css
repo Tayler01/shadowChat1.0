@@ -201,6 +201,24 @@
   }
 }
 
+@keyframes shadow-war-clash {
+  0% {
+    opacity: 0;
+    transform: scaleX(0.18) rotate(-4deg);
+    filter: brightness(0.8);
+  }
+  35% {
+    opacity: 1;
+    transform: scaleX(1.04) rotate(2deg);
+    filter: brightness(1.7);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(1.28) rotate(0deg);
+    filter: brightness(1);
+  }
+}
+
 :root[data-scheme='obsidian-gold'] {
   --theme-accent-rgb: 215 170 70;
   --theme-accent-strong-rgb: 239 202 114;

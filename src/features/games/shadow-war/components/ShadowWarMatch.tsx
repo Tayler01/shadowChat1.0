@@ -1,11 +1,12 @@
-import React, { useMemo, useState } from 'react'
-import { Check, Crown, Flag, Hourglass, Loader2, Lock, Shield, Sparkles, Swords } from 'lucide-react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { Crown, Flag, Hourglass, Loader2, Lock, Sparkles } from 'lucide-react'
 import { cn } from '../../../../lib/utils'
 import { useAuth } from '../../../../hooks/useAuth'
 import type { GameSession, GameSessionQueueEntry, ShadowWarMatch as ShadowWarMatchRow, ShadowWarMove, ShadowWarPlayerStateRow } from '../../../../lib/supabase'
 import { SHADOW_WAR_LANES, validatePlacement } from '../engine/resolver'
 import type { ShadowWarCard, ShadowWarLane, ShadowWarPlacementInput, ShadowWarPlayerState } from '../engine/types'
 import { ShadowWarCardView } from './ShadowWarCardView'
+import { getShadowWarAvatar, getShadowWarFaction, type ShadowWarIdentity } from '../identity'
 
 const laneLabels: Record<ShadowWarLane, string> = {
   left: 'Left',
@@ -90,6 +91,7 @@ export function ShadowWarMatch({
   onResolveRound,
   onRematch,
   onNextChallenger,
+  playerIdentity,
 }: {
   session: GameSession
   match: ShadowWarMatchRow
@@ -102,6 +104,7 @@ export function ShadowWarMatch({
   onResolveRound: (matchId: string) => Promise<unknown>
   onRematch: (sessionId: string) => Promise<unknown>
   onNextChallenger: (sessionId: string) => Promise<unknown>
+  playerIdentity?: ShadowWarIdentity
 }) {
   const { user } = useAuth()
   const playerState = asPlayerState(playerStateRow)
@@ -128,6 +131,13 @@ export function ShadowWarMatch({
   const myScore = mySlot === 'player_two' ? match.player_two_score : match.player_one_score
   const opponentScore = mySlot === 'player_two' ? match.player_one_score : match.player_two_score
   const opponentName = playerName(session, opponentSlot)
+  const myAvatar = getShadowWarAvatar(playerIdentity?.avatarId)
+  const myFaction = getShadowWarFaction(playerIdentity?.factionId)
+  const opponentAvatar = getShadowWarAvatar(opponentSlot === 'player_one' ? 'field-captain' : 'night-spy')
+  const opponentFaction = getShadowWarFaction(opponentSlot === 'player_one' ? 'storm-guard' : 'blood-oath')
+  const autoResolveKey = `${match.id}:${match.round_number}:${match.current_phase}:${moves.length}`
+  const autoResolveRef = useRef<string | null>(null)
+  const clashSoundRef = useRef<string | null>(null)
 
   const availableHand = useMemo(() => {
     const used = new Set([
@@ -169,12 +179,61 @@ export function ShadowWarMatch({
     setSelectedCardId(null)
   }
 
+  useEffect(() => {
+    if (!canResolve || busy === 'resolveRound' || autoResolveRef.current === autoResolveKey) return
+    autoResolveRef.current = autoResolveKey
+    const timeout = window.setTimeout(() => {
+      void onResolveRound(match.id).catch(() => {
+        autoResolveRef.current = null
+      })
+    }, 520)
+    return () => window.clearTimeout(timeout)
+  }, [autoResolveKey, busy, canResolve, match.id, onResolveRound])
+
+  useEffect(() => {
+    if (!displayedRound) return
+    const soundKey = `${match.id}:${match.round_number}:${displayedRound.roundWinner ?? 'pending'}`
+    if (clashSoundRef.current === soundKey) return
+    clashSoundRef.current = soundKey
+
+    try {
+      const AudioContextConstructor = window.AudioContext || (window as any).webkitAudioContext
+      if (!AudioContextConstructor) return
+      const context = new AudioContextConstructor()
+      const gain = context.createGain()
+      gain.gain.setValueAtTime(0.0001, context.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.12, context.currentTime + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.34)
+      gain.connect(context.destination)
+
+      const first = context.createOscillator()
+      first.type = 'triangle'
+      first.frequency.setValueAtTime(132, context.currentTime)
+      first.frequency.exponentialRampToValueAtTime(72, context.currentTime + 0.28)
+      first.connect(gain)
+      first.start()
+      first.stop(context.currentTime + 0.36)
+
+      const second = context.createOscillator()
+      second.type = 'square'
+      second.frequency.setValueAtTime(220, context.currentTime + 0.06)
+      second.frequency.exponentialRampToValueAtTime(98, context.currentTime + 0.22)
+      second.connect(gain)
+      second.start(context.currentTime + 0.06)
+      second.stop(context.currentTime + 0.28)
+
+      window.setTimeout(() => void context.close().catch(() => {}), 520)
+    } catch {
+      // Browser audio policies can still block synthesized feedback; gameplay should continue.
+    }
+  }, [displayedRound, match.id, match.round_number])
+
   const statusLabel = match.status === 'completed'
     ? 'Duel complete'
     : isSuddenWar
       ? 'Sudden war'
       : canResolve
-        ? 'Ready to reveal'
+        ? 'Battle resolving'
         : isLocked
           ? 'Waiting for opponent'
           : 'Choose your formation'
@@ -185,11 +244,11 @@ export function ShadowWarMatch({
         <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#d7aa46]/45 bg-black/60 text-[#f0d381] shadow-[0_0_28px_rgba(215,170,70,0.18)]">
-              <Shield className="h-5 w-5" />
+              <img src={myAvatar.imageUrl} alt="" className="h-full w-full rounded-full object-cover" loading="lazy" />
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-[#f6e0a2]">You</p>
-              <p className="truncate text-xs text-[#b9a16f]">Iron Vanguard</p>
+              <p className="truncate text-xs text-[#b9a16f]">{myFaction.name}</p>
             </div>
           </div>
 
@@ -206,10 +265,10 @@ export function ShadowWarMatch({
           <div className="flex min-w-0 items-center justify-end gap-2 text-right">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-[#f6e0a2]">{opponentName}</p>
-              <p className="truncate text-xs text-[#b9a16f]">Blood Oath</p>
+              <p className="truncate text-xs text-[#b9a16f]">{opponentFaction.name}</p>
             </div>
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#8f2f26]/55 bg-black/60 text-[#f18468] shadow-[0_0_28px_rgba(165,74,56,0.18)]">
-              <Swords className="h-5 w-5" />
+              <img src={opponentAvatar.imageUrl} alt="" className="h-full w-full rounded-full object-cover" loading="lazy" />
             </div>
           </div>
         </div>
@@ -238,6 +297,9 @@ export function ShadowWarMatch({
                 className={cn(
                   'relative flex min-h-[21rem] flex-col overflow-hidden rounded-[0.8rem] border p-2 text-left shadow-[inset_0_0_28px_rgba(0,0,0,0.45),0_18px_40px_rgba(0,0,0,0.35)] transition-[border-color,box-shadow,transform] duration-200 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/50 disabled:cursor-default md:min-h-[30rem] md:p-3',
                   laneStyles[lane],
+                  winner && 'after:pointer-events-none after:absolute after:inset-x-2 after:top-1/2 after:h-px after:origin-center after:animate-[shadow-war-clash_900ms_ease-out_1] after:bg-gradient-to-r after:from-transparent after:via-[#f0d381] after:to-transparent after:shadow-[0_0_28px_rgba(240,211,129,0.7)]',
+                  winner === mySlot && 'ring-1 ring-[#f0d381]/34',
+                  winner && winner !== mySlot && winner !== 'contested' && 'opacity-88',
                   selectedCardId && !isLocked && !isSuddenWar && 'border-[#f0d381]/75 shadow-[0_0_0_1px_rgba(240,211,129,0.28),0_18px_45px_rgba(215,170,70,0.12)]'
                 )}
               >
@@ -278,7 +340,10 @@ export function ShadowWarMatch({
           })}
         </div>
 
-        <section className="mx-auto mt-3 max-w-6xl rounded-[0.95rem] border border-[#b9934c]/30 bg-black/64 p-2 shadow-[0_18px_45px_rgba(0,0,0,0.38)] backdrop-blur-sm md:p-3">
+        <section
+          data-testid="shadow-war-hand"
+          className="mx-auto mt-3 max-w-6xl rounded-[0.95rem] border border-[#b9934c]/30 bg-black/64 p-2 shadow-[0_18px_45px_rgba(0,0,0,0.38)] backdrop-blur-sm md:p-3"
+        >
           <div className="mb-2 flex items-center justify-between gap-2 px-1">
             <div className="flex items-center gap-2 text-sm font-semibold text-[#f6e0a2]">
               <Flag className="h-4 w-4 text-[#f0d381]" />
@@ -375,10 +440,10 @@ export function ShadowWarMatch({
             </div>
           </div>
         ) : canResolve ? (
-          <GameButton data-testid="shadow-war-resolve" className="mx-auto flex w-full max-w-6xl" onClick={() => onResolveRound(match.id)} loading={busy === 'resolveRound'}>
-            <Check className="mr-2 h-4 w-4" />
-            {isSuddenWar ? 'Reveal Sudden War' : 'Reveal Round'}
-          </GameButton>
+          <div className="flex items-center justify-center gap-2 py-3 text-sm font-semibold text-[#f0d381]">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Battle resolving...
+          </div>
         ) : isLocked ? (
           <div className="flex items-center justify-center gap-2 py-3 text-sm text-[#d9c79f]">
             <Loader2 className="h-4 w-4 animate-spin text-[#f0d381]" />
@@ -394,7 +459,7 @@ export function ShadowWarMatch({
               onClick={() => void submitSuddenWar()}
             >
               <Lock className="mr-2 h-4 w-4" />
-              Lock Sudden War Card
+              Battle Reserve
             </GameButton>
           ) : (
             <GameButton
@@ -405,7 +470,7 @@ export function ShadowWarMatch({
               onClick={() => void submit()}
             >
               <Lock className="mr-2 h-4 w-4" />
-              Lock Formation
+              Battle
             </GameButton>
           )
         )}
