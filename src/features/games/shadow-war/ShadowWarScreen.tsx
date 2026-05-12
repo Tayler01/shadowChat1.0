@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner'
 import { useAuth } from '../../../hooks/useAuth'
 import { cn } from '../../../lib/utils'
-import type { GameSession } from '../../../lib/supabase'
+import type { GameSession, GameSessionPresence } from '../../../lib/supabase'
 import { useShadowWar } from './hooks/useShadowWar'
 import { ShadowWarMatch } from './components/ShadowWarMatch'
 import { SHADOW_WAR_ASSETS } from './assets/manifest'
@@ -68,6 +68,10 @@ function displayPlayerName(session: GameSession, slot: 'one' | 'two') {
   return user?.display_name || user?.username || (slot === 'one' ? 'Player one' : 'Open seat')
 }
 
+function displayPresenceName(presence: GameSessionPresence) {
+  return presence.user?.display_name || presence.user?.username || 'Shadow player'
+}
+
 function isUserInSession(session: GameSession, userId?: string | null) {
   return Boolean(userId && (session.player_one_id === userId || session.player_two_id === userId))
 }
@@ -88,6 +92,7 @@ export function ShadowWarScreen({
     playerState,
     queue,
     moves,
+    presence,
     loading,
     busy,
     error,
@@ -98,7 +103,19 @@ export function ShadowWarScreen({
   const selectedIsPlayer = Boolean(activeSession && isUserInSession(activeSession, user?.id))
   const selectedHasPlayableMatch = Boolean(activeSession && match && selectedIsPlayer)
   const isQueuedForSelected = Boolean(queue.some(entry => entry.user_id === user?.id && entry.status === 'queued'))
-  const myOpenSession = sessions.find(session => isUserInSession(session, user?.id) && session.status !== 'completed') ?? null
+  const presenceBySessionId = React.useMemo(() => {
+    const next = new Map<string, GameSessionPresence[]>()
+    presence.forEach(entry => {
+      const sessionPresence = next.get(entry.session_id) ?? []
+      sessionPresence.push(entry)
+      next.set(entry.session_id, sessionPresence)
+    })
+    return next
+  }, [presence])
+  const visibleSessions = React.useMemo(() => (
+    sessions.filter(session => (presenceBySessionId.get(session.id)?.length ?? 0) > 0 || session.id === selectedSessionId)
+  ), [presenceBySessionId, selectedSessionId, sessions])
+  const myOpenSession = visibleSessions.find(session => isUserInSession(session, user?.id) && session.status !== 'completed') ?? null
   const selectedAvatar = getShadowWarAvatar(identity.avatarId)
   const selectedFaction = getShadowWarFaction(identity.factionId)
 
@@ -162,6 +179,32 @@ export function ShadowWarScreen({
     )
   }
 
+  const renderSessionPresence = (session: GameSession) => {
+    const sessionPresence = presenceBySessionId.get(session.id) ?? []
+
+    if (sessionPresence.length === 0) {
+      return (
+        <p className="mt-3 rounded-[0.7rem] border border-[#b9934c]/20 bg-white/[0.035] px-3 py-2 text-xs text-[#b9a16f]">
+          No player is currently at this table.
+        </p>
+      )
+    }
+
+    return (
+      <div className="mt-3 flex flex-wrap gap-2">
+        {sessionPresence.map(entry => (
+          <span
+            key={`${entry.session_id}-${entry.user_id}`}
+            className="inline-flex min-h-8 items-center gap-2 rounded-full border border-[#d7aa46]/28 bg-[#d7aa46]/10 px-2.5 py-1 text-xs font-semibold text-[#f6e0a2]"
+          >
+            <span className="h-2 w-2 rounded-full bg-[#75f0a4] shadow-[0_0_12px_rgba(117,240,164,0.75)]" />
+            {entry.user_id === user?.id ? 'You' : displayPresenceName(entry)}
+          </span>
+        ))}
+      </div>
+    )
+  }
+
   const renderLobby = () => (
     <main className="relative z-10 min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-[calc(env(safe-area-inset-bottom)_+_1rem)] md:px-6">
       {!selectedSessionId && (
@@ -176,7 +219,7 @@ export function ShadowWarScreen({
             </div>
           </div>
           <p className="max-w-2xl text-sm leading-6 text-[#d9c79f]">
-            Create a fresh duel, join an open seat, or queue behind an active battle.
+            Create a fresh duel or join a table where a player is actively waiting.
           </p>
           <div className="mt-5 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="rounded-[1rem] border border-[#b9934c]/24 bg-black/42 p-3">
@@ -275,6 +318,7 @@ export function ShadowWarScreen({
               <p className="mt-1 text-sm text-[#d9c79f]">
                 {displayPlayerName(activeSession, 'one')} vs {displayPlayerName(activeSession, 'two')}
               </p>
+              {renderSessionPresence(activeSession)}
             </div>
             <span className="rounded-full border border-[#d7aa46]/35 bg-[#d7aa46]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#f0d381]">
               {activeSession.status}
@@ -305,12 +349,12 @@ export function ShadowWarScreen({
         </div>
       ) : (
         <section className="space-y-3">
-          {sessions.length === 0 && (
+          {visibleSessions.length === 0 && (
             <div className="rounded-[1rem] border border-[#b9934c]/25 bg-black/50 p-5 text-center text-sm text-[#b9a16f]">
-              No duels yet. Create the first table.
+              No active tables with players present. Create the first table.
             </div>
           )}
-          {sessions.map(session => (
+          {visibleSessions.map(session => (
             <article
               key={session.id}
               className={cn(
@@ -331,6 +375,7 @@ export function ShadowWarScreen({
                   {session.status}
                 </span>
               </div>
+              {renderSessionPresence(session)}
               {renderSessionActions(session)}
             </article>
           ))}

@@ -6,20 +6,24 @@ import { useAuth } from '../../../../hooks/useAuth'
 import { useRealtimeRecovery } from '../../../../hooks/useRealtimeRecovery'
 import {
   createShadowWarSession,
+  cleanupShadowWarEmptySessions,
   fetchShadowWarMatch,
   fetchShadowWarMoves,
   fetchShadowWarPlayerState,
   fetchShadowWarQueue,
   fetchShadowWarSession,
+  fetchShadowWarSessionPresence,
   fetchShadowWarSessions,
   joinShadowWarSession,
   leaveShadowWarQueue,
+  leaveShadowWarSessionPresence,
   queueShadowWarSession,
   rematchShadowWarSession,
   resolveShadowWarRound,
   startShadowWarNextChallenger,
   submitShadowWarPlacement,
   submitShadowWarSuddenWarCard,
+  touchShadowWarSessionPresence,
   type ShadowWarSnapshot,
 } from '../api/shadowWarApi'
 
@@ -30,6 +34,7 @@ const emptySnapshot: ShadowWarSnapshot = {
   playerState: null,
   queue: [],
   moves: [],
+  presence: [],
 }
 
 export function useShadowWar() {
@@ -49,13 +54,18 @@ export function useShadowWar() {
         : null
       const activeSession = selected
 
+      const sessionIds = Array.from(new Set([
+        ...sessions.map(session => session.id),
+        ...(activeSession ? [activeSession.id] : []),
+      ]))
       const match = activeSession?.current_match_id
         ? await fetchShadowWarMatch(activeSession.current_match_id)
         : null
       const playerState = match ? await fetchShadowWarPlayerState(match.id) : null
       const queue = activeSession ? await fetchShadowWarQueue(activeSession.id) : []
       const moves = match ? await fetchShadowWarMoves(match.id, match.round_number) : []
-      const next = { sessions, activeSession, match, playerState, queue, moves }
+      const presence = await fetchShadowWarSessionPresence(sessionIds)
+      const next = { sessions, activeSession, match, playerState, queue, moves, presence }
       setSnapshot(next)
       setError(null)
       return next
@@ -107,6 +117,7 @@ export function useShadowWar() {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'shadow_war_matches' }, refreshSoon)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'shadow_war_moves' }, refreshSoon)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'game_session_queue' }, refreshSoon)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'game_session_presence' }, refreshSoon)
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'shadow_war_player_states', filter: `user_id=eq.${user.id}` },
@@ -128,6 +139,60 @@ export function useShadowWar() {
         currentClient.removeChannel(channel)
       }
       channelRef.current = null
+    }
+  }, [refresh, user])
+
+  const presenceSessionId = snapshot.activeSession?.id ?? null
+  const presenceSessionStatus = snapshot.activeSession?.status ?? null
+  const presencePlayerOneId = snapshot.activeSession?.player_one_id ?? null
+  const presencePlayerTwoId = snapshot.activeSession?.player_two_id ?? null
+
+  useEffect(() => {
+    if (!user || !presenceSessionId || !selectedSessionId) return
+    const isPlayer = user.id === presencePlayerOneId || user.id === presencePlayerTwoId
+    if (!isPlayer || !['waiting', 'active'].includes(presenceSessionStatus ?? '')) return
+
+    let cancelled = false
+
+    const touchPresence = () => {
+      void touchShadowWarSessionPresence(presenceSessionId).catch(() => {})
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') touchPresence()
+    }
+
+    touchPresence()
+    const intervalId = window.setInterval(() => {
+      if (!cancelled && document.visibilityState === 'visible') touchPresence()
+    }, 25_000)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      void leaveShadowWarSessionPresence(presenceSessionId).catch(() => {})
+    }
+  }, [presencePlayerOneId, presencePlayerTwoId, presenceSessionId, presenceSessionStatus, selectedSessionId, user])
+
+  useEffect(() => {
+    if (!user) return
+
+    let cancelled = false
+    const runCleanup = async () => {
+      const result = await cleanupShadowWarEmptySessions().catch(() => null)
+      if (!cancelled && result?.cancelledCount) {
+        await refresh().catch(() => emptySnapshot)
+      }
+    }
+
+    void runCleanup()
+    const intervalId = window.setInterval(() => void runCleanup(), 60_000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
     }
   }, [refresh, user])
 

@@ -866,6 +866,14 @@ export interface GameSessionQueueEntry {
   user?: BasicUser | null
 }
 
+export interface GameSessionPresence {
+  session_id: string
+  user_id: string
+  last_seen_at: string
+  created_at: string
+  user?: BasicUser | null
+}
+
 export type ArtBoardItemType = 'image' | 'note'
 export type ArtBoardFrameStyle = 'clean' | 'print' | 'polaroid' | 'pinned'
 export type ArtBoardNoteColor = 'butter' | 'rose' | 'sage' | 'sky' | 'lavender' | 'peach'

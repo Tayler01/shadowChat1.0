@@ -2,6 +2,7 @@ import {
   ensureSession,
   getWorkingClient,
   type GameSession,
+  type GameSessionPresence,
   type GameSessionQueueEntry,
   type ShadowWarMatch,
   type ShadowWarMove,
@@ -17,6 +18,7 @@ export interface ShadowWarSnapshot {
   playerState: ShadowWarPlayerStateRow | null
   queue: GameSessionQueueEntry[]
   moves: ShadowWarMove[]
+  presence: GameSessionPresence[]
 }
 
 export const fetchShadowWarSessions = async () => {
@@ -67,6 +69,22 @@ export const fetchShadowWarQueue = async (sessionId: string) => {
 
   if (error) throw error
   return (data ?? []) as unknown as GameSessionQueueEntry[]
+}
+
+export const fetchShadowWarSessionPresence = async (sessionIds: string[]) => {
+  if (sessionIds.length === 0) return [] as GameSessionPresence[]
+
+  const workingClient = await getWorkingClient()
+  const recentCutoff = new Date(Date.now() - 2 * 60 * 1000).toISOString()
+  const { data, error } = await workingClient
+    .from('game_session_presence')
+    .select(`*, user:users!game_session_presence_user_id_fkey(${USER_SELECT})`)
+    .in('session_id', sessionIds)
+    .gt('last_seen_at', recentCutoff)
+    .order('last_seen_at', { ascending: false })
+
+  if (error) throw error
+  return (data ?? []) as unknown as GameSessionPresence[]
 }
 
 export const fetchShadowWarMatch = async (matchId: string) => {
@@ -145,6 +163,33 @@ export const leaveShadowWarQueue = async (sessionId: string) => {
     target_session_id: sessionId,
   })
   if (error) throw error
+}
+
+export const touchShadowWarSessionPresence = async (sessionId: string) => {
+  if (!await ensureSession()) throw new Error('Authentication session is invalid or expired.')
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('touch_shadow_war_session_presence', {
+    target_session_id: sessionId,
+  })
+  if (error) throw error
+  return data as GameSessionPresence
+}
+
+export const leaveShadowWarSessionPresence = async (sessionId: string) => {
+  if (!await ensureSession()) return
+  const workingClient = await getWorkingClient()
+  const { error } = await workingClient.rpc('leave_shadow_war_session_presence', {
+    target_session_id: sessionId,
+  })
+  if (error) throw error
+}
+
+export const cleanupShadowWarEmptySessions = async () => {
+  if (!await ensureSession()) return { cancelledCount: 0, cancelledSessionIds: [] as string[] }
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('cleanup_shadow_war_empty_sessions')
+  if (error) throw error
+  return data as { cancelledCount: number; cancelledSessionIds: string[] }
 }
 
 export const submitShadowWarPlacement = async (
