@@ -16,6 +16,7 @@ import {
   SHADOW_WAR_AVATARS,
   SHADOW_WAR_FACTIONS,
 } from './identity'
+import { SHADOW_WAR_CARD_DEFINITIONS } from './engine/cards'
 
 interface ShadowWarScreenProps {
   onExit?: () => void
@@ -25,6 +26,19 @@ interface ShadowWarScreenProps {
 }
 
 type WarButtonVariant = 'primary' | 'secondary' | 'ghost'
+
+const SHADOW_WAR_CARD_MATCHUP_NOTES: Record<string, string> = {
+  scout: 'Weak in combat, but useful bait. If it loses, the extra draw can help you recover and set up a stronger next round.',
+  spy: 'Best into Champion, Warlord, or Sovereign. It can drag huge cards down by 3 strength and make an expensive enemy commitment beatable.',
+  squire: 'Wins by supporting the lane beside it. Place it next to a weaker friendly card when a small +1 can flip that lane.',
+  archer: 'Strong when you want pressure across lanes. Its +1 can help the lane to the right, or Center when Archer is played Right.',
+  shieldbearer: 'Stops narrow losses. It can turn a 1 or 2 point defeat into a contested lane, denying your opponent the lane win.',
+  knight: 'No trick, just dependable strength. It cleanly beats lower raw ranks when abilities do not interfere.',
+  captain: 'Stabilizes your weakest lane. It is strongest when your formation has one lane that only needs a small push.',
+  champion: 'A counterpunch card. It gains +2 against a higher-rank enemy, making it dangerous into Warlord or Sovereign unless Spy changes the math.',
+  warlord: 'A power card that can also help an adjacent lane when it has raw advantage. Watch out for Spy sabotage.',
+  sovereign: 'The strongest raw card and the cleanest lane claim, but Spy can cut it down. Best when you think the opponent cannot counter it.',
+}
 
 function WarButton({
   variant = 'primary',
@@ -283,10 +297,38 @@ export function ShadowWarScreen({
             </div>
 
             <div className="rounded-[0.85rem] border border-[#b9934c]/24 bg-black/38 p-3">
-              <h3 className="text-sm font-semibold text-[#f0d381]">Card Abilities</h3>
+              <h3 className="text-sm font-semibold text-[#f0d381]">Card Strength And Abilities</h3>
               <p className="mt-2">
-                Scout, Spy, Shieldbearer, Captain, Champion, and Warlord can shift lane strength. Read the card text and watch where your opponent might commit power.
+                Higher strength usually wins the lane, but abilities can swing matchups. Use this guide to decide when to commit power and when to counter it.
               </p>
+              <div className="mt-3 space-y-2.5">
+                {SHADOW_WAR_CARD_DEFINITIONS.map(card => (
+                  <article
+                    key={card.cardId}
+                    className="rounded-[0.75rem] border border-white/8 bg-white/[0.035] p-3"
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.55rem] border border-[#d7aa46]/32 bg-[#d7aa46]/12 text-base font-bold text-[#f6e0a2]">
+                        {card.rank}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                          <h4 className="text-sm font-semibold text-[#f6e0a2]">{card.name}</h4>
+                          <span className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[#b9a16f]">
+                            {card.archetype}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-[#d9c79f]">
+                          <span className="font-semibold text-[#f0d381]">Power:</span> {card.description}
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-[#b9a16f]">
+                          <span className="font-semibold text-[#f0d381]">Can beat:</span> {SHADOW_WAR_CARD_MATCHUP_NOTES[card.cardId]}
+                        </p>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
             </div>
           </div>
         </section>
