@@ -35,6 +35,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify Netlify secrets
+        run: |
+          test -n "$NETLIFY_AUTH_TOKEN" || { echo "NETLIFY_AUTH_TOKEN is not configured."; exit 1; }
+          test -n "$NETLIFY_SITE_ID" || { echo "NETLIFY_SITE_ID is not configured."; exit 1; }
+
       - name: Lint
         run: npm run lint
 
@@ -45,4 +50,10 @@ jobs:
         run: npx --yes netlify@$NETLIFY_CLI_VERSION build
 
       - name: Deploy to Netlify production
-        run: npx --yes netlify@$NETLIFY_CLI_VERSION deploy --prod --dir=dist --message "GitHub Actions production deploy ${{ github.sha }}"
+        run: |
+          npx --yes netlify@$NETLIFY_CLI_VERSION deploy \
+            --auth "$NETLIFY_AUTH_TOKEN" \
+            --site "$NETLIFY_SITE_ID" \
+            --prod \
+            --dir=dist \
+            --message "GitHub Actions production deploy ${{ github.sha }}"
