@@ -3,12 +3,14 @@ import { Gamepad2, Volume2, VolumeX } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { ShadowWarScreen } from './shadow-war/ShadowWarScreen'
 import { SHADOW_WAR_ASSETS } from './shadow-war/assets/manifest'
+import { ShadowCheckersScreen } from './shadow-checkers/ShadowCheckersScreen'
+import { SHADOW_CHECKERS_ASSETS } from './shadow-checkers/assets/manifest'
 
 interface GamesHomeProps {
   onImmersiveChange?: (immersive: boolean) => void
 }
 
-type SelectedGame = 'shadow-war' | null
+type SelectedGame = 'shadow-war' | 'shadow-checkers' | null
 
 export function GamesHome({ onImmersiveChange }: GamesHomeProps) {
   const [selectedGame, setSelectedGame] = useState<SelectedGame>(null)
@@ -54,6 +56,18 @@ export function GamesHome({ onImmersiveChange }: GamesHomeProps) {
     onImmersiveChange?.(false)
   }
 
+  const enterShadowCheckers = () => {
+    pauseMusic()
+    setAudioBlocked(false)
+    setSelectedGame('shadow-checkers')
+    onImmersiveChange?.(true)
+  }
+
+  const exitShadowCheckers = () => {
+    setSelectedGame(null)
+    onImmersiveChange?.(false)
+  }
+
   const toggleMusic = () => {
     if (musicPlaying) {
       pauseMusic()
@@ -93,6 +107,10 @@ export function GamesHome({ onImmersiveChange }: GamesHomeProps) {
           audioBlocked={audioBlocked}
           onToggleMusic={toggleMusic}
         />
+        </div>
+      ) : selectedGame === 'shadow-checkers' ? (
+        <div className="h-full min-h-0 overflow-hidden bg-black">
+          <ShadowCheckersScreen onExit={exitShadowCheckers} />
         </div>
       ) : (
         <motion.div
@@ -142,6 +160,39 @@ export function GamesHome({ onImmersiveChange }: GamesHomeProps) {
             </div>
             <div className="hidden rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.04)] p-3 text-[#f0d381] md:block">
               {musicPlaying ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
+            </div>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          aria-label="Open Shadow Checkers"
+          onClick={enterShadowCheckers}
+          className="group relative min-h-[9.75rem] w-full overflow-hidden rounded-[2rem] border border-[rgba(215,170,70,0.42)] bg-[#050403] text-left shadow-[0_24px_60px_rgba(0,0,0,0.48)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[rgba(239,202,114,0.68)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,202,114,0.55)] md:min-h-[12rem]"
+        >
+          <img
+            src={SHADOW_CHECKERS_ASSETS.pickerArt}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover opacity-[0.86]"
+            loading="eager"
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.94),rgba(0,0,0,0.56)_52%,rgba(0,0,0,0.24)),radial-gradient(circle_at_78%_28%,rgba(215,170,70,0.24),transparent_34%)]" />
+          <div className="absolute inset-x-6 top-4 h-px bg-gradient-to-r from-transparent via-[#f0d381]/55 to-transparent" />
+          <div className="absolute inset-x-6 bottom-4 h-px bg-gradient-to-r from-transparent via-[#8a6328]/60 to-transparent" />
+          <div className="relative flex h-full min-h-[9.75rem] items-center gap-4 px-5 py-5 md:min-h-[12rem] md:px-8">
+            <div className="min-w-0 flex-1">
+              <img
+                src={SHADOW_CHECKERS_ASSETS.logo}
+                alt="Shadow Checkers"
+                className="mx-auto mb-3 h-auto w-full max-w-[30rem] object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.85)] md:mx-0"
+                loading="eager"
+              />
+              <p className="mx-auto max-w-xl text-center text-sm leading-6 text-[#d9c79f] md:mx-0 md:text-left md:text-base">
+                A cinematic multiplayer checkers duel with public tables, spectators, and Hall of Fame crowns.
+              </p>
+            </div>
+            <div className="hidden rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.04)] p-3 text-[#f0d381] md:block">
+              <Gamepad2 className="h-5 w-5" />
             </div>
           </div>
         </button>

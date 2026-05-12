@@ -705,6 +705,7 @@ export interface User {
   presence_visibility?: PresenceVisibility
   color: string
   admin_role?: AdminRole | null
+  checkers_crown?: boolean
   dm_discoverable?: boolean
   last_active: string
   created_at: string
@@ -818,14 +819,18 @@ export interface BoardChatMessage {
   user?: User
 }
 
+export type GameType = 'shadow_war' | 'shadow_checkers'
 export type GameSessionStatus = 'waiting' | 'active' | 'completed' | 'cancelled'
 export type ShadowWarMatchStatus = 'setup' | 'active' | 'completed' | 'cancelled'
 export type ShadowWarPhase = 'placement' | 'reveal' | 'sudden_war' | 'complete'
 export type ShadowWarPlayerSlot = 'player_one' | 'player_two'
+export type ShadowCheckersPlayerSlot = 'player_one' | 'player_two'
+export type ShadowCheckersMatchStatus = 'waiting' | 'active' | 'completed' | 'cancelled'
+export type ShadowCheckersWinReason = 'all_pieces_captured' | 'no_legal_moves' | 'resignation'
 
 export interface GameSession {
   id: string
-  game_type: 'shadow_war'
+  game_type: GameType
   status: GameSessionStatus
   created_by: string
   player_one_id: string
@@ -882,6 +887,7 @@ export interface GameSessionQueueEntry {
   user_id: string
   position: number
   status: 'queued' | 'invited' | 'joined' | 'skipped' | 'left'
+  metadata?: Record<string, unknown>
   created_at: string
   updated_at: string
   user?: BasicUser | null
@@ -892,6 +898,66 @@ export interface GameSessionPresence {
   user_id: string
   last_seen_at: string
   created_at: string
+  user?: BasicUser | null
+}
+
+export interface ShadowCheckersMatch {
+  id: string
+  session_id: string
+  status: ShadowCheckersMatchStatus
+  player_one_id: string
+  player_two_id?: string | null
+  player_one_character_key: string
+  player_two_character_key?: string | null
+  current_turn_user_id?: string | null
+  board_state: Record<string, unknown>
+  move_count: number
+  winner_id?: string | null
+  loser_id?: string | null
+  win_reason?: ShadowCheckersWinReason | null
+  created_at: string
+  updated_at: string
+  completed_at?: string | null
+  cancelled_at?: string | null
+  player_one?: BasicUser | null
+  player_two?: BasicUser | null
+  winner?: BasicUser | null
+  loser?: BasicUser | null
+}
+
+export interface ShadowCheckersMove {
+  id: string
+  match_id: string
+  user_id: string
+  player_slot: ShadowCheckersPlayerSlot
+  move_number: number
+  piece_id: string
+  path: Array<{ row: number; col: number }>
+  captures: Array<{ row: number; col: number }>
+  crowned: boolean
+  notation: string
+  created_at: string
+  user?: BasicUser | null
+}
+
+export interface ShadowCheckersChatMessage {
+  id: string
+  match_id: string
+  user_id: string
+  body: string
+  created_at: string
+  user?: BasicUser | null
+}
+
+export interface ShadowCheckersStats {
+  user_id: string
+  wins: number
+  losses: number
+  total_games: number
+  captures_made: number
+  kings_crowned: number
+  last_win_at?: string | null
+  updated_at: string
   user?: BasicUser | null
 }
 
@@ -974,7 +1040,7 @@ export interface DMMessage {
 export interface BasicUser
   extends Pick<
     User,
-    'id' | 'username' | 'display_name' | 'avatar_url' | 'color' | 'status' | 'admin_role' | 'presence_visibility' | 'dm_discoverable'
+    'id' | 'username' | 'display_name' | 'avatar_url' | 'color' | 'status' | 'admin_role' | 'checkers_crown' | 'presence_visibility' | 'dm_discoverable'
   > {}
 
 export interface PresenceSnapshot {
@@ -1108,7 +1174,7 @@ export const fetchDMConversations = async () => {
   if (missingIds.length) {
     const { data: usersData, error: userErr } = await workingClient
       .from('users')
-      .select('id, username, display_name, avatar_url, color, status, admin_role, presence_visibility')
+      .select('id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, presence_visibility')
       .in('id', missingIds)
     if (userErr) {
     } else {
@@ -1198,7 +1264,7 @@ export const fetchAllUsers = async (options?: { signal?: AbortSignal }) => {
   const workingClient = await getWorkingClient()
   let query = workingClient
     .from('users')
-    .select('id, username, display_name, avatar_url, color, status, admin_role, presence_visibility, dm_discoverable')
+    .select('id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, presence_visibility, dm_discoverable')
     .eq('dm_discoverable', true)
     .order('display_name', { ascending: true })
   if (options?.signal && typeof query.abortSignal === 'function') {

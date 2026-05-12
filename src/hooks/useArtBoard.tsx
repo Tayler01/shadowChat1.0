@@ -19,7 +19,7 @@ import { useRealtimeRecovery } from './useRealtimeRecovery'
 
 const ART_BOARD_ITEM_SELECT = `
   *,
-  user:users!user_id(id, username, display_name, avatar_url, color, status, admin_role, presence_visibility, created_at, updated_at)
+  user:users!user_id(id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, presence_visibility, created_at, updated_at)
 `
 
 export interface ArtBoardViewportState {

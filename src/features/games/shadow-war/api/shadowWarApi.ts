@@ -9,7 +9,7 @@ import {
   type ShadowWarPlayerStateRow,
 } from '../../../../lib/supabase'
 
-const USER_SELECT = 'id, username, display_name, avatar_url, color, status, admin_role, presence_visibility'
+const USER_SELECT = 'id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, presence_visibility'
 
 export interface ShadowWarSnapshot {
   sessions: GameSession[]

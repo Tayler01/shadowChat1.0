@@ -19,6 +19,7 @@ import { MessageRichText } from './MessageRichText'
 import { ChatMessageActionsMenu, type ChatMessageAction } from './ChatMessageActionsMenu'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
+import { CheckersCrownBadge } from '../../features/games/shadow-checkers/components/CheckersCrownBadge'
 import { formatTime, shouldGroupMessage, cn, getReadableTextColor } from '../../lib/utils'
 import type { Message, User } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -274,6 +275,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
               <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-[var(--text-primary)]">
                 <span className="truncate">{message.user?.display_name}</span>
                 <UserRoleBadge role={message.user?.admin_role} />
+                <CheckersCrownBadge active={message.user?.checkers_crown} />
                 <UserPresenceBadge userId={message.user?.id} presenceVisibility={message.user?.presence_visibility} />
               </span>
               <span className="text-xs text-[var(--text-muted)]">
