@@ -22,6 +22,7 @@
     "qa:smoke:full": "node scripts/playwright-smoke.mjs --scenario=full",
     "qa:shadow-war": "node scripts/shadow-war-db-smoke.mjs",
     "qa:shadow-war:core": "node scripts/shadow-war-db-smoke.mjs --skip-queue",
+    "qa:shadow-war:visual": "node scripts/shadow-war-visual-playtest.mjs",
     "news:scrape:proof": "node services/news-scraper/src/index.mjs --proof",
     "news:scraper": "node services/news-scraper/src/index.mjs",
     "bridge:tui": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1",

@@ -1,6 +1,10 @@
 # Shadow War
 
-Shadow War is the first game in the Shadow Chat games area. It lives behind the top-level `Games` navigation item and is structured so future games can share the same lobby/session foundation without becoming part of chat or Boards.
+Shadow War is the first game in the Shadow Chat games area. The top-level
+`Games` navigation item opens a selector page; choosing Shadow War enters a
+full-screen immersive game shell that hides Shadow Chat sidebars, mobile
+navigation, and chat chrome while the duel is active. The selector structure is
+ready for future games without nesting games inside Boards.
 
 ## Game Rules
 
@@ -69,12 +73,21 @@ Initial generated art sheet:
 - `public/games/shadow-war/cards/*.webp`
 - `public/games/shadow-war/card-back.webp`
 - `public/games/shadow-war/shadow-war-banner.webp`
+- `public/games/shadow-war/shadow-war-logo.webp`
+- `public/games/shadow-war/battlefield-table.webp`
+- `public/games/shadow-war/audio/chronicles-of-a-hero.mp3`
 
 Manifest:
 
 - `src/features/games/shadow-war/assets/manifest.ts`
 
-The current UI uses the asset sheet as a cinematic landing visual anchor and optimized WebP card faces during match play. Code-native labels remain layered over the art for accessibility and reliable small-screen readability.
+The current UI uses the generated banner as the immersive header itself,
+optimized WebP card faces during match play, a dark generated battlefield
+backdrop, and the provided `Chronicles of a Hero` MP3 as the in-game soundtrack.
+The game selector click is the user gesture that starts audio when the browser
+allows it; if playback is blocked, the in-game music button retries playback.
+Code-native labels remain layered over the art for accessibility and reliable
+small-screen readability.
 
 ## Local Testing
 
@@ -120,6 +133,17 @@ For a two-account core pass before the third queue account exists:
 ```powershell
 npm run qa:shadow-war:core
 ```
+
+For a foreground two-account browser playthrough of the immersive UI:
+
+```powershell
+node scripts/shadow-war-visual-playtest.mjs --headed --slow-mo=80 --no-reuse-server --run-name=shadow-war-immersive-visual
+```
+
+The visual playtest cleans up stale active Shadow War sessions for the two test
+accounts, opens the Games selector, enters Shadow War, verifies the soundtrack
+asset is mounted, creates and joins a duel, plays a full match through the UI,
+and saves screenshots under `output/playwright/<run-name>/`.
 
 ## Known Follow-Ups
 

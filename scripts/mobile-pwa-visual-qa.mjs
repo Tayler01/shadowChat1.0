@@ -530,7 +530,7 @@ async function waitForSettingsView(page) {
 
 async function waitForGamesView(page) {
   await page.getByRole('heading', { name: 'Games' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-  await page.getByRole('heading', { name: 'Shadow War' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByRole('button', { name: 'Open Shadow War' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
 async function goToDirectMessages(page) {

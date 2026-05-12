@@ -106,6 +106,7 @@ function App() {
   const [currentView, setCurrentView] = useState<View>(() => getInitialLocationState().view)
   const [boardsResetKey, setBoardsResetKey] = useState(0)
   const [boardsChatFooterActive, setBoardsChatFooterActive] = useState(false)
+  const [gameImmersive, setGameImmersive] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const isDesktop = useIsDesktop()
   const mobileAppHeightRef = useRef<number | null>(null)
@@ -271,6 +272,9 @@ function App() {
     if (view === 'boards') {
       setBoardsResetKey(value => value + 1)
     }
+    if (view !== 'games') {
+      setGameImmersive(false)
+    }
     setCurrentView(view)
     if (view !== 'dms') {
       setDmTarget(null)
@@ -317,6 +321,14 @@ function App() {
     }
   }, [currentView])
 
+  useEffect(() => {
+    if (currentView !== 'games') {
+      setGameImmersive(false)
+    }
+  }, [currentView])
+
+  const hideAppChrome = currentView === 'games' && gameImmersive
+
   const renderCurrentView = () => {
     switch (currentView) {
       case 'chat':
@@ -347,7 +359,7 @@ function App() {
           />
         )
       case 'games':
-        return <GamesHome />
+        return <GamesHome onImmersiveChange={setGameImmersive} />
       case 'settings':
         return <SettingsView onToggleSidebar={toggleSidebar} />
       default:
@@ -371,8 +383,8 @@ function App() {
                 <BoardBadgesProvider>
                   <AppBadgeSync />
                   <PhoneInstallOnboarding />
-                  <div className="app-viewport flex flex-col overflow-hidden md:flex-row">
-                    {isDesktop && (
+                  <div className={`app-viewport flex flex-col overflow-hidden md:flex-row ${hideAppChrome ? 'bg-black' : ''}`}>
+                    {isDesktop && !hideAppChrome && (
                       <Sidebar
                         currentView={currentView}
                         onViewChange={handleViewChange}
@@ -383,7 +395,7 @@ function App() {
                       />
                     )}
 
-                    {isDesktop && sidebarOpen && (
+                    {isDesktop && !hideAppChrome && sidebarOpen && (
                       <div
                         className="fixed inset-0 bg-[var(--bg-overlay)] md:hidden"
                         onClick={closeSidebar}
@@ -397,7 +409,7 @@ function App() {
                     </main>
 
                     {/* Mobile bottom navigation */}
-                    {currentView !== 'chat' && currentView !== 'dms' && !(currentView === 'boards' && boardsChatFooterActive) && (
+                    {!hideAppChrome && currentView !== 'chat' && currentView !== 'dms' && !(currentView === 'boards' && boardsChatFooterActive) && (
                       <MobileNav currentView={currentView} onViewChange={handleViewChange} />
                     )}
                   </div>

@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { Check, Crown, Loader2, Lock, Swords } from 'lucide-react'
-import { Button } from '../../../../components/ui/Button'
+import { Check, Crown, Flag, Hourglass, Loader2, Lock, Shield, Sparkles, Swords } from 'lucide-react'
 import { cn } from '../../../../lib/utils'
 import { useAuth } from '../../../../hooks/useAuth'
 import type { GameSession, GameSessionQueueEntry, ShadowWarMatch as ShadowWarMatchRow, ShadowWarMove, ShadowWarPlayerStateRow } from '../../../../lib/supabase'
@@ -12,6 +11,48 @@ const laneLabels: Record<ShadowWarLane, string> = {
   left: 'Left',
   center: 'Center',
   right: 'Right',
+}
+
+const laneStyles: Record<ShadowWarLane, string> = {
+  left: 'border-[#4f8dba]/45 bg-[linear-gradient(180deg,rgba(18,43,63,0.66),rgba(5,7,9,0.78))]',
+  center: 'border-[#d7aa46]/45 bg-[linear-gradient(180deg,rgba(72,53,19,0.58),rgba(5,7,9,0.78))]',
+  right: 'border-[#a54a38]/48 bg-[linear-gradient(180deg,rgba(78,22,17,0.58),rgba(5,7,9,0.78))]',
+}
+
+const laneTextStyles: Record<ShadowWarLane, string> = {
+  left: 'text-[#9fd3ff]',
+  center: 'text-[#f1d58d]',
+  right: 'text-[#f18468]',
+}
+
+function GameButton({
+  variant = 'primary',
+  loading = false,
+  className,
+  children,
+  disabled,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: 'primary' | 'secondary' | 'ghost'
+  loading?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        'inline-flex min-h-12 items-center justify-center rounded-[0.65rem] border px-4 py-2 text-sm font-semibold transition-[border-color,background,box-shadow,color,opacity,transform] duration-200 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/50 disabled:cursor-not-allowed disabled:opacity-50',
+        variant === 'primary' && 'border-[#f0d381]/70 bg-[linear-gradient(180deg,#e3bd61,#7c5821)] text-[#140d07] shadow-[0_18px_42px_rgba(215,170,70,0.3)] hover:-translate-y-0.5',
+        variant === 'secondary' && 'border-[#b9934c]/42 bg-black/55 text-[#f1d58d] hover:border-[#f0d381]/60 hover:bg-[#2b2114]/78',
+        variant === 'ghost' && 'border-transparent bg-transparent text-[#d9c79f] hover:border-[#b9934c]/35 hover:bg-white/5',
+        className
+      )}
+      disabled={disabled || loading}
+      {...props}
+    >
+      {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+      {children}
+    </button>
+  )
 }
 
 const asPlayerState = (row: ShadowWarPlayerStateRow | null): ShadowWarPlayerState | null => {
@@ -30,6 +71,11 @@ const getMoveCard = (move: ShadowWarMove | null, lane: ShadowWarLane) => {
 const getSuddenWarCard = (move: ShadowWarMove | null) => {
   const payload = move?.payload as { card?: ShadowWarCard } | undefined
   return payload?.card ?? null
+}
+
+function playerName(session: GameSession, slot: 'player_one' | 'player_two') {
+  const player = slot === 'player_one' ? session.player_one : session.player_two
+  return player?.display_name || player?.username || (slot === 'player_one' ? 'Iron Vanguard' : 'Ravenblade')
 }
 
 export function ShadowWarMatch({
@@ -79,6 +125,9 @@ export function ShadowWarMatch({
   const pendingSuddenWar = match.state?.pendingSuddenWar as any | undefined
   const displayedRound = pendingSuddenWar ?? latestRound
   const hasQueuedChallenger = queue.some(entry => entry.status === 'queued')
+  const myScore = mySlot === 'player_two' ? match.player_two_score : match.player_one_score
+  const opponentScore = mySlot === 'player_two' ? match.player_one_score : match.player_two_score
+  const opponentName = playerName(session, opponentSlot)
 
   const availableHand = useMemo(() => {
     const used = new Set([
@@ -120,33 +169,61 @@ export function ShadowWarMatch({
     setSelectedCardId(null)
   }
 
+  const statusLabel = match.status === 'completed'
+    ? 'Duel complete'
+    : isSuddenWar
+      ? 'Sudden war'
+      : canResolve
+        ? 'Ready to reveal'
+        : isLocked
+          ? 'Waiting for opponent'
+          : 'Choose your formation'
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-[radial-gradient(circle_at_50%_0%,rgba(215,170,70,0.1),transparent_28%),linear-gradient(180deg,rgba(13,14,16,0.98),rgba(6,7,9,0.98))]">
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--border-panel)] px-4 py-3">
-        <div className="min-w-0">
-          <p className="text-[11px] uppercase tracking-[0.16em] text-[var(--text-muted)]">Round {match.round_number}</p>
-          <h2 className="truncate text-lg font-semibold text-[var(--text-primary)]">Shadow War</h2>
+    <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden">
+      <section className="shrink-0 border-b border-[#b9934c]/35 bg-black/58 px-3 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-sm">
+        <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#d7aa46]/45 bg-black/60 text-[#f0d381] shadow-[0_0_28px_rgba(215,170,70,0.18)]">
+              <Shield className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-[#f6e0a2]">You</p>
+              <p className="truncate text-xs text-[#b9a16f]">Iron Vanguard</p>
+            </div>
+          </div>
+
+          <div className="rounded-[0.75rem] border border-[#d7aa46]/40 bg-black/72 px-4 py-2 text-center shadow-[0_12px_35px_rgba(0,0,0,0.46)]">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#b9a16f]">Round {match.round_number}</p>
+            <p className="text-2xl font-bold leading-none text-[#f0d381]">
+              <span className="text-[#8fc7ff]">{myScore}</span>
+              <span className="px-2 text-[#d9c79f]">-</span>
+              <span className="text-[#f18468]">{opponentScore}</span>
+            </p>
+            <p className="mt-1 text-[10px] uppercase tracking-[0.16em] text-[#d9c79f]">First to {match.target_score}</p>
+          </div>
+
+          <div className="flex min-w-0 items-center justify-end gap-2 text-right">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-[#f6e0a2]">{opponentName}</p>
+              <p className="truncate text-xs text-[#b9a16f]">Blood Oath</p>
+            </div>
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#8f2f26]/55 bg-black/60 text-[#f18468] shadow-[0_0_28px_rgba(165,74,56,0.18)]">
+              <Swords className="h-5 w-5" />
+            </div>
+          </div>
         </div>
-        <div className="rounded-[var(--radius-md)] border border-[rgba(215,170,70,0.26)] bg-[rgba(215,170,70,0.1)] px-3 py-1.5 text-center">
-          <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">First to {match.target_score}</p>
-          <p className="text-lg font-bold text-[var(--theme-accent-readable)]">{match.player_one_score} - {match.player_two_score}</p>
+      </section>
+
+      <div className="shrink-0 border-b border-[#b9934c]/30 bg-black/60 px-3 py-2">
+        <div className="mx-auto flex max-w-6xl items-center justify-center gap-2 rounded-[0.75rem] border border-[#b9934c]/35 bg-black/54 px-3 py-2 text-center text-sm font-semibold text-[#f0d381]">
+          {isLocked && !canResolve ? <Hourglass className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+          {statusLabel}
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
-        <div className="mb-3 grid grid-cols-3 gap-2">
-          {SHADOW_WAR_LANES.map(lane => (
-            <div key={`enemy-${lane}`} className="min-w-0">
-              <ShadowWarCardView
-                card={getMoveCard(opponentMove, lane)}
-                hidden={!opponentMove?.revealed_at}
-                compact
-              />
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-3 gap-2">
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-3 md:px-4">
+        <div className="mx-auto grid max-w-6xl grid-cols-3 gap-2 md:gap-4">
           {SHADOW_WAR_LANES.map(lane => {
             const laneResult = displayedRound?.laneResults?.find((result: any) => result.lane === lane)
             const winner = laneResult?.winner
@@ -154,58 +231,87 @@ export function ShadowWarMatch({
               <button
                 key={lane}
                 type="button"
+                data-testid="shadow-war-lane"
+                data-shadow-war-lane={lane}
                 onClick={() => placeSelectedCard(lane)}
+                disabled={!selectedCardId || isLocked || isSuddenWar}
                 className={cn(
-                  'min-h-40 rounded-[var(--radius-md)] border bg-[linear-gradient(180deg,rgba(255,255,255,0.035),rgba(255,255,255,0.015))] p-2 text-left transition-colors',
-                  selectedCardId && !isLocked && !isSuddenWar ? 'border-[rgba(239,202,114,0.54)]' : 'border-[rgba(255,255,255,0.1)]'
+                  'relative flex min-h-[21rem] flex-col overflow-hidden rounded-[0.8rem] border p-2 text-left shadow-[inset_0_0_28px_rgba(0,0,0,0.45),0_18px_40px_rgba(0,0,0,0.35)] transition-[border-color,box-shadow,transform] duration-200 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/50 disabled:cursor-default md:min-h-[30rem] md:p-3',
+                  laneStyles[lane],
+                  selectedCardId && !isLocked && !isSuddenWar && 'border-[#f0d381]/75 shadow-[0_0_0_1px_rgba(240,211,129,0.28),0_18px_45px_rgba(215,170,70,0.12)]'
                 )}
               >
                 <div className="mb-2 flex items-center justify-between gap-1">
-                  <span className="text-xs font-semibold text-[var(--text-primary)]">{laneLabels[lane]}</span>
+                  <span className={cn('font-serif text-base font-semibold md:text-xl', laneTextStyles[lane])}>
+                    {laneLabels[lane]}
+                  </span>
                   {winner && (
-                    <span className="rounded-full bg-[rgba(215,170,70,0.12)] px-1.5 py-0.5 text-[9px] uppercase text-[var(--theme-accent-readable)]">
+                    <span className="rounded-full border border-[#d7aa46]/30 bg-black/55 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.08em] text-[#f0d381]">
                       {winner === 'contested' ? 'Tie' : winner === mySlot ? 'Won' : 'Lost'}
                     </span>
                   )}
                 </div>
-                <ShadowWarCardView
-                  card={myMove ? getMoveCard(myMove, lane) : placedCard(lane)}
-                  hidden={false}
-                  compact
-                />
+
+                <div className="mx-auto w-full max-w-[6.4rem] md:max-w-[8.2rem]">
+                  <ShadowWarCardView
+                    card={getMoveCard(opponentMove, lane)}
+                    hidden={!opponentMove?.revealed_at}
+                    compact
+                  />
+                </div>
+
+                <div className="my-3 flex flex-1 items-center justify-center">
+                  <span className="h-px w-full bg-gradient-to-r from-transparent via-[#d7aa46]/40 to-transparent" />
+                  <span className="mx-2 h-3 w-3 rotate-45 border border-[#d7aa46]/45 bg-black" />
+                  <span className="h-px w-full bg-gradient-to-r from-transparent via-[#d7aa46]/40 to-transparent" />
+                </div>
+
+                <div className="mx-auto w-full max-w-[6.4rem] md:max-w-[8.2rem]">
+                  <ShadowWarCardView
+                    card={myMove ? getMoveCard(myMove, lane) : placedCard(lane)}
+                    hidden={false}
+                    compact
+                  />
+                </div>
               </button>
             )
           })}
         </div>
 
-        <div className="mt-4 rounded-[var(--radius-md)] border border-[rgba(255,255,255,0.1)] bg-[rgba(0,0,0,0.22)] p-3">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
-              <Swords className="h-4 w-4 text-[var(--theme-accent-readable)]" />
+        <section className="mx-auto mt-3 max-w-6xl rounded-[0.95rem] border border-[#b9934c]/30 bg-black/64 p-2 shadow-[0_18px_45px_rgba(0,0,0,0.38)] backdrop-blur-sm md:p-3">
+          <div className="mb-2 flex items-center justify-between gap-2 px-1">
+            <div className="flex items-center gap-2 text-sm font-semibold text-[#f6e0a2]">
+              <Flag className="h-4 w-4 text-[#f0d381]" />
               Warband hand
             </div>
             {isLocked && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[rgba(215,170,70,0.12)] px-2 py-1 text-xs text-[var(--theme-accent-readable)]">
+              <span className="inline-flex items-center gap-1 rounded-full border border-[#d7aa46]/30 bg-[#d7aa46]/10 px-2 py-1 text-xs text-[#f0d381]">
                 <Lock className="h-3 w-3" />
                 Locked
               </span>
             )}
           </div>
-          <div className="grid grid-cols-5 gap-2">
-            {isSuddenWar && (
-              <div className="col-span-5 mb-1 rounded-[var(--radius-md)] border border-[rgba(215,170,70,0.24)] bg-[rgba(215,170,70,0.08)] p-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--theme-accent-readable)]">
-                  Sudden war
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  The lanes tied. Lock one unplayed reserve card; higher strength takes the round.
-                </p>
-                <div className="mt-2 grid grid-cols-2 gap-2">
+
+          {isSuddenWar && (
+            <div className="mb-2 rounded-[0.75rem] border border-[#d7aa46]/30 bg-[#d7aa46]/10 p-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#f0d381]">
+                Sudden war
+              </p>
+              <p className="mt-1 text-xs text-[#d9c79f]">
+                The lanes tied. Lock one reserve card; higher strength takes the round.
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="mx-auto w-full max-w-[5.8rem]">
                   <ShadowWarCardView card={getSuddenWarCard(mySuddenWarMove)} compact hidden={false} />
+                </div>
+                <div className="mx-auto w-full max-w-[5.8rem]">
                   <ShadowWarCardView card={getSuddenWarCard(opponentSuddenWarMove)} compact hidden={!opponentSuddenWarMove?.revealed_at} />
                 </div>
               </div>
-            )}
+            </div>
+          )}
+
+          <div className="grid grid-cols-5 gap-1.5 md:gap-2">
             {(isLocked ? [] : availableHand).map(card => (
               <ShadowWarCardView
                 key={card.instanceId}
@@ -216,83 +322,97 @@ export function ShadowWarMatch({
               />
             ))}
             {!playerState && (
-              <div className="col-span-5 py-6 text-center text-sm text-[var(--text-muted)]">
+              <div className="col-span-5 py-6 text-center text-sm text-[#b9a16f]">
                 Loading your hand...
               </div>
             )}
+            {playerState && isLocked && (
+              <div className="col-span-5 py-4 text-center text-sm text-[#b9a16f]">
+                Formation locked. Waiting for the reveal window.
+              </div>
+            )}
+            {playerState && !isLocked && availableHand.length === 0 && (
+              <div className="col-span-5 py-4 text-center text-sm text-[#b9a16f]">
+                No reserve cards available.
+              </div>
+            )}
           </div>
-        </div>
+        </section>
       </div>
 
-      <div className="shrink-0 border-t border-[var(--border-panel)] bg-[var(--theme-composer-bg)] p-3 pb-[calc(env(safe-area-inset-bottom)_+_0.75rem)] md:pb-3">
+      <footer className="shrink-0 border-t border-[#b9934c]/35 bg-black/84 p-3 pb-[calc(env(safe-area-inset-bottom)_+_0.75rem)] shadow-[0_-18px_42px_rgba(0,0,0,0.56)] backdrop-blur-md md:pb-3">
         {match.status === 'completed' ? (
-          <div className="space-y-3">
+          <div className="mx-auto max-w-6xl space-y-3">
             <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-[var(--text-primary)]">
-                {session.winner_id === user?.id ? 'Victory held' : 'Duel complete'}
-              </p>
-              <p className="text-xs text-[var(--text-muted)]">
-                {hasQueuedChallenger
-                  ? 'Winner is recorded. A queued challenger is waiting.'
-                  : 'Winner is recorded. Run it back or wait for the next challenger.'}
-              </p>
-            </div>
-            <Crown className="h-6 w-6 text-[var(--theme-accent-readable)]" />
+              <div>
+                <p className="text-sm font-semibold text-[#f6e0a2]">
+                  {session.winner_id === user?.id ? 'Victory held' : 'Duel complete'}
+                </p>
+                <p className="text-xs text-[#b9a16f]">
+                  {hasQueuedChallenger
+                    ? 'Winner is recorded. A queued challenger is waiting.'
+                    : 'Winner is recorded. Run it back or wait for the next challenger.'}
+                </p>
+              </div>
+              <Crown className="h-6 w-6 text-[#f0d381]" />
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <Button
-                type="button"
+              <GameButton
                 variant="secondary"
                 onClick={() => onRematch(session.id)}
                 loading={busy === 'rematch'}
                 disabled={hasQueuedChallenger}
               >
                 Rematch
-              </Button>
-              <Button
-                type="button"
+              </GameButton>
+              <GameButton
                 onClick={() => onNextChallenger(session.id)}
                 disabled={session.winner_id !== user?.id || !hasQueuedChallenger}
                 loading={busy === 'nextChallenger'}
               >
                 Next
-              </Button>
+              </GameButton>
             </div>
           </div>
         ) : canResolve ? (
-          <Button type="button" className="w-full" onClick={() => onResolveRound(match.id)} loading={busy === 'resolveRound'}>
+          <GameButton data-testid="shadow-war-resolve" className="mx-auto flex w-full max-w-6xl" onClick={() => onResolveRound(match.id)} loading={busy === 'resolveRound'}>
             <Check className="mr-2 h-4 w-4" />
             {isSuddenWar ? 'Reveal Sudden War' : 'Reveal Round'}
-          </Button>
+          </GameButton>
         ) : isLocked ? (
-          <div className="flex items-center justify-center gap-2 py-3 text-sm text-[var(--text-secondary)]">
-            <Loader2 className="h-4 w-4 animate-spin text-[var(--theme-accent-readable)]" />
+          <div className="flex items-center justify-center gap-2 py-3 text-sm text-[#d9c79f]">
+            <Loader2 className="h-4 w-4 animate-spin text-[#f0d381]" />
             Waiting for opponent...
           </div>
         ) : (
           isSuddenWar ? (
-            <Button
-              type="button"
-              className="w-full"
+            <GameButton
+              data-testid="shadow-war-lock"
+              className="mx-auto flex w-full max-w-6xl"
               disabled={!selectedCardId || submitting}
               loading={busy === 'submitSuddenWarCard'}
               onClick={() => void submitSuddenWar()}
             >
               <Lock className="mr-2 h-4 w-4" />
               Lock Sudden War Card
-            </Button>
+            </GameButton>
           ) : (
-            <Button type="button" className="w-full" disabled={!validation.valid || submitting} loading={submitting} onClick={() => void submit()}>
+            <GameButton
+              data-testid="shadow-war-lock"
+              className="mx-auto flex w-full max-w-6xl"
+              disabled={!validation.valid || submitting}
+              loading={submitting}
+              onClick={() => void submit()}
+            >
               <Lock className="mr-2 h-4 w-4" />
               Lock Formation
-            </Button>
+            </GameButton>
           )
         )}
         {!validation.valid && !isLocked && !isSuddenWar && (
-          <p className="mt-2 text-center text-xs text-[var(--text-muted)]">{validation.message}</p>
+          <p className="mt-2 text-center text-xs text-[#b9a16f]">{validation.message}</p>
         )}
-      </div>
+      </footer>
     </div>
   )
 }

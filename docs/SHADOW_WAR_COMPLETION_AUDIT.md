@@ -1,6 +1,6 @@
 # Shadow War Completion Audit
 
-Last updated: 2026-05-11
+Last updated: 2026-05-12
 
 This audit maps the Shadow War goal to concrete evidence. It is intentionally
 strict: a green build or visual sweep is not treated as proof of multiplayer
@@ -34,6 +34,8 @@ direction.
 | Mobile-first game UI | `ShadowWarScreen.tsx`, `ShadowWarMatch.tsx`, `ShadowWarCardView.tsx` | Implemented |
 | Generated original assets | `public/games/shadow-war/shadow-war-asset-sheet.png`, `src/features/games/shadow-war/assets/manifest.ts` | Generated asset sheet wired in |
 | Optimized individual card assets | `public/games/shadow-war/cards/*.webp`, `public/games/shadow-war/card-back.webp`, `public/games/shadow-war/shadow-war-banner.webp` | Implemented |
+| Immersive game shell | `src/features/games/GamesHome.tsx`, `src/App.tsx`, `src/features/games/shadow-war/ShadowWarScreen.tsx` | Selector-first flow, hidden chat chrome, full-header banner, and game soundtrack implemented |
+| Foreground two-account UI playthrough | `scripts/shadow-war-visual-playtest.mjs` | Passed with artifact `output/playwright/shadow-war-immersive-visual-9/summary.json` |
 | Documentation | `docs/SHADOW_WAR.md`, this audit | Implemented |
 | Navigation/mobile visual QA | `npm run qa:mobile-pwa`, artifact `output/playwright/mobile-pwa-20260511220642/summary.json`; latest direct sweep `output/playwright/shadow-war-games-local-final/summary.json` with `15-games-home` screenshots for iPhone/Android | Passed |
 | Standard verification | lint, typecheck, build, full Jest, targeted Shadow War tests, mobile QA, DB smoke | Passed |
@@ -114,6 +116,17 @@ direction.
   - `iphone-large-webkit`
   - `android-medium-chromium`
   - `android-small-chromium`
+- `node scripts/shadow-war-visual-playtest.mjs --headed --slow-mo=60 --no-reuse-server --run-name=shadow-war-immersive-visual-9`:
+  passed. The run cleaned stale active test sessions, opened the selector,
+  entered immersive Shadow War, mounted the soundtrack asset, created/joined a
+  two-account duel, played a full match through the UI, and captured screenshots.
+  Artifact: `output/playwright/shadow-war-immersive-visual-9/summary.json`.
+- `npm run qa:mobile-pwa`: passed on 2026-05-12 after the immersive selector
+  update across iPhone small, iPhone large, Android medium, and Android small
+  profiles. Artifact: `output/playwright/mobile-pwa-20260512004727/summary.json`.
+- `npm run qa:shadow-war:core`: passed on 2026-05-12 after the immersive
+  selection refresh fix. Artifact:
+  `output/shadow-war/shadow-war-db-20260512004727/summary.json`.
 - Latest `npm run lint`: passed.
 - `npm run lint`: passed with no warnings after removing an unused
   `no-var` eslint-disable directive in `src/lib/supabase.ts`.

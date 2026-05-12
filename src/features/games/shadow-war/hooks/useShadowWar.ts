@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
-import { getRealtimeClient, getWorkingClient, type GameSession } from '../../../../lib/supabase'
+import { getRealtimeClient, getWorkingClient } from '../../../../lib/supabase'
 import { runRealtimeRecovery } from '../../../../lib/realtimeRecovery'
 import { useAuth } from '../../../../hooks/useAuth'
 import { useRealtimeRecovery } from '../../../../hooks/useRealtimeRecovery'
@@ -31,9 +31,6 @@ const emptySnapshot: ShadowWarSnapshot = {
   moves: [],
 }
 
-const isUserInSession = (session: GameSession, userId?: string | null) =>
-  Boolean(userId && (session.player_one_id === userId || session.player_two_id === userId))
-
 export function useShadowWar() {
   const { user } = useAuth()
   const [snapshot, setSnapshot] = useState<ShadowWarSnapshot>(emptySnapshot)
@@ -42,45 +39,33 @@ export function useShadowWar() {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const channelRef = useRef<RealtimeChannel | null>(null)
-  const refreshInFlightRef = useRef<Promise<ShadowWarSnapshot> | null>(null)
 
-  const refresh = useCallback(async () => {
-    if (refreshInFlightRef.current) return refreshInFlightRef.current
+  const refresh = useCallback(async (nextSelectedSessionId = selectedSessionId) => {
+    try {
+      const sessions = await fetchShadowWarSessions()
+      const selected = nextSelectedSessionId
+        ? sessions.find(session => session.id === nextSelectedSessionId) ?? null
+        : null
+      const activeSession = selected
 
-    refreshInFlightRef.current = (async () => {
-      try {
-        const sessions = await fetchShadowWarSessions()
-        const selected = selectedSessionId
-          ? sessions.find(session => session.id === selectedSessionId) ?? null
-          : null
-        const activeSession = selected
-          ?? sessions.find(session => isUserInSession(session, user?.id) && session.status !== 'completed')
-          ?? sessions.find(session => session.status === 'waiting')
-          ?? sessions[0]
-          ?? null
-
-        const match = activeSession?.current_match_id
-          ? await fetchShadowWarMatch(activeSession.current_match_id)
-          : null
-        const playerState = match ? await fetchShadowWarPlayerState(match.id) : null
-        const queue = activeSession ? await fetchShadowWarQueue(activeSession.id) : []
-        const moves = match ? await fetchShadowWarMoves(match.id, match.round_number) : []
-        const next = { sessions, activeSession, match, playerState, queue, moves }
-        setSnapshot(next)
-        setError(null)
-        return next
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Unable to load games'
-        setError(message)
-        throw err
-      } finally {
-        setLoading(false)
-        refreshInFlightRef.current = null
-      }
-    })()
-
-    return refreshInFlightRef.current
-  }, [selectedSessionId, user?.id])
+      const match = activeSession?.current_match_id
+        ? await fetchShadowWarMatch(activeSession.current_match_id)
+        : null
+      const playerState = match ? await fetchShadowWarPlayerState(match.id) : null
+      const queue = activeSession ? await fetchShadowWarQueue(activeSession.id) : []
+      const moves = match ? await fetchShadowWarMoves(match.id, match.round_number) : []
+      const next = { sessions, activeSession, match, playerState, queue, moves }
+      setSnapshot(next)
+      setError(null)
+      return next
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to load games'
+      setError(message)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [selectedSessionId])
 
   useEffect(() => {
     void refresh().catch(() => {})
@@ -145,12 +130,20 @@ export function useShadowWar() {
     }
   }, [refresh, user])
 
-  const runAction = useCallback(async <T,>(label: string, action: () => Promise<T>) => {
+  const runAction = useCallback(async <T,>(
+    label: string,
+    action: () => Promise<T>,
+    getSelectedSessionId?: (result: T) => string | null | undefined
+  ) => {
     setBusy(label)
     setError(null)
     try {
       const result = await action()
-      await refresh().catch(() => emptySnapshot)
+      const nextSelectedSessionId = getSelectedSessionId?.(result)
+      if (nextSelectedSessionId !== undefined) {
+        setSelectedSessionId(nextSelectedSessionId)
+      }
+      await refresh(nextSelectedSessionId).catch(() => emptySnapshot)
       return result
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Game action failed'
@@ -162,38 +155,30 @@ export function useShadowWar() {
   }, [refresh])
 
   const actions = useMemo(() => ({
-    create: () => runAction('create', async () => {
-      const sessionId = await createShadowWarSession()
-      setSelectedSessionId(sessionId)
-      return sessionId
-    }),
-    join: (sessionId: string) => runAction('join', async () => {
-      const joined = await joinShadowWarSession(sessionId)
-      setSelectedSessionId(joined.sessionId)
-      return joined
-    }),
-    queue: (sessionId: string) => runAction('queue', () => queueShadowWarSession(sessionId)),
+    create: () => runAction('create', createShadowWarSession, sessionId => sessionId),
+    join: (sessionId: string) => runAction('join', () => joinShadowWarSession(sessionId), joined => joined.sessionId),
     leaveQueue: (sessionId: string) => runAction('leaveQueue', () => leaveShadowWarQueue(sessionId)),
     submitPlacement: (matchId: string, placement: { left: string; center: string; right: string }) =>
       runAction('submitPlacement', () => submitShadowWarPlacement(matchId, placement)),
     submitSuddenWarCard: (matchId: string, cardId: string) =>
       runAction('submitSuddenWarCard', () => submitShadowWarSuddenWarCard(matchId, cardId)),
     resolveRound: (matchId: string) => runAction('resolveRound', () => resolveShadowWarRound(matchId)),
-    rematch: (sessionId: string) => runAction('rematch', async () => {
-      const next = await rematchShadowWarSession(sessionId)
-      setSelectedSessionId(next.sessionId)
-      return next
-    }),
-    nextChallenger: (sessionId: string) => runAction('nextChallenger', async () => {
-      const next = await startShadowWarNextChallenger(sessionId)
-      setSelectedSessionId(next.sessionId)
-      return next
-    }),
-    selectSession: (sessionId: string) => setSelectedSessionId(sessionId),
-  }), [runAction])
+    rematch: (sessionId: string) => runAction('rematch', () => rematchShadowWarSession(sessionId), next => next.sessionId),
+    nextChallenger: (sessionId: string) => runAction('nextChallenger', () => startShadowWarNextChallenger(sessionId), next => next.sessionId),
+    queue: (sessionId: string) => runAction('queue', () => queueShadowWarSession(sessionId), () => sessionId),
+    selectSession: (sessionId: string | null) => {
+      setSelectedSessionId(sessionId)
+      void refresh(sessionId).catch(() => {})
+    },
+    clearSession: () => {
+      setSelectedSessionId(null)
+      void refresh(null).catch(() => {})
+    },
+  }), [refresh, runAction])
 
   return {
     ...snapshot,
+    selectedSessionId,
     loading,
     busy,
     error,
