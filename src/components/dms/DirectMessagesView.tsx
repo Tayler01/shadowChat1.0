@@ -648,7 +648,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
         } flex-col`}
       >
         <div className="border-b border-[var(--border-panel)] p-4">
-          <div className="mb-4 flex items-center justify-between gap-2 overflow-hidden">
+          <div className="mb-4 flex items-center justify-between gap-2 overflow-visible">
             <div className="flex min-w-0 flex-1 items-center">
               {!isDesktop && (
                 <Button
@@ -702,7 +702,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 12 }}
-              className="theme-panel-cover absolute inset-0 z-20 flex flex-col"
+              className="theme-image-panel-surface absolute inset-0 z-20 flex flex-col"
             >
               <div className="border-b border-[var(--border-panel)] px-4 py-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
@@ -711,7 +711,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                       Start a new DM
                     </h3>
                     <p className="text-sm text-[var(--text-muted)]">
-                      Tap a person once and we’ll drop you straight into the thread.
+                      Tap a person once and we'll drop you straight into the thread.
                     </p>
                   </div>
                   <Button
@@ -874,7 +874,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 <img
                   src="/icons/header-logo.png"
                   alt="SHADO"
-                  className="theme-logo ml-auto h-8 w-16 shrink-0 object-contain object-right min-[380px]:w-20 md:hidden"
+                  className="theme-logo ml-auto h-12 w-28 shrink-0 object-contain object-right min-[380px]:h-14 min-[380px]:w-32 md:hidden"
                 />
               </div>
             </div>

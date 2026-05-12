@@ -44,6 +44,7 @@
       radial-gradient(circle at 50% 0%, rgba(var(--theme-accent-rgb), 0.08), transparent 28%),
       linear-gradient(180deg, var(--theme-shell), var(--theme-page-end));
     --theme-image-surface-overlay: linear-gradient(180deg, rgba(6, 8, 10, 0.06), rgba(6, 8, 10, 0.2));
+    --theme-image-panel-overlay: linear-gradient(180deg, rgba(7, 8, 9, 0.97), rgba(8, 9, 10, 0.985));
     --theme-modal-background:
       radial-gradient(circle at top, rgba(var(--theme-accent-strong-rgb), 0.09), transparent 32%),
       linear-gradient(180deg, rgba(24, 26, 29, 0.96), rgba(13, 15, 16, 0.98));
@@ -680,6 +681,7 @@
     radial-gradient(circle at 50% 0%, rgba(143, 178, 227, 0.2), transparent 30%),
     linear-gradient(180deg, var(--theme-shell), var(--theme-page-end));
   --theme-image-surface-overlay: linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(237, 244, 251, 0.72));
+  --theme-image-panel-overlay: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(239, 246, 253, 0.985));
   --theme-modal-background:
     radial-gradient(circle at top, rgba(143, 178, 227, 0.28), transparent 34%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(239, 246, 253, 0.98));
@@ -789,6 +791,17 @@ html, body, #root {
   .theme-image-surface {
     background:
       var(--theme-image-surface-overlay),
+      var(--theme-texture-image),
+      var(--theme-backdrop-image),
+      var(--theme-app-background);
+    background-position: center, center top, center, center;
+    background-repeat: no-repeat, repeat, no-repeat, no-repeat;
+    background-size: auto, 720px 720px, cover, auto;
+  }
+
+  .theme-image-panel-surface {
+    background:
+      var(--theme-image-panel-overlay),
       var(--theme-texture-image),
       var(--theme-backdrop-image),
       var(--theme-app-background);
