@@ -1,5 +1,5 @@
 import React from 'react'
-import { ArrowLeft, ChevronRight, Loader2, Music, Plus, Shield, Swords, Users, Volume2, VolumeX } from 'lucide-react'
+import { ArrowLeft, ChevronRight, HelpCircle, Loader2, Music, Plus, Shield, Swords, Users, Volume2, VolumeX, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner'
 import { useAuth } from '../../../hooks/useAuth'
@@ -83,6 +83,7 @@ export function ShadowWarScreen({
   onToggleMusic,
 }: ShadowWarScreenProps) {
   const { user } = useAuth()
+  const [instructionsOpen, setInstructionsOpen] = React.useState(false)
   const { identity, setIdentity } = useShadowWarIdentity()
   const {
     sessions,
@@ -118,6 +119,19 @@ export function ShadowWarScreen({
   const myOpenSession = visibleSessions.find(session => isUserInSession(session, user?.id) && session.status !== 'completed') ?? null
   const selectedAvatar = getShadowWarAvatar(identity.avatarId)
   const selectedFaction = getShadowWarFaction(identity.factionId)
+
+  React.useEffect(() => {
+    if (!instructionsOpen) return
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setInstructionsOpen(false)
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [instructionsOpen])
 
   const guarded = async (action: () => Promise<unknown>, success: string) => {
     try {
@@ -201,6 +215,81 @@ export function ShadowWarScreen({
             {entry.user_id === user?.id ? 'You' : displayPresenceName(entry)}
           </span>
         ))}
+      </div>
+    )
+  }
+
+  const renderInstructionsDialog = () => {
+    if (!instructionsOpen) return null
+
+    return (
+      <div
+        className="fixed inset-0 z-[90] flex items-end justify-center bg-black/72 px-3 pb-[calc(env(safe-area-inset-bottom)_+_0.85rem)] pt-[calc(env(safe-area-inset-top)_+_0.85rem)] backdrop-blur-sm sm:items-center"
+        role="presentation"
+        onMouseDown={() => setInstructionsOpen(false)}
+      >
+        <section
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="shadow-war-instructions-title"
+          className="max-h-full w-full max-w-lg overflow-y-auto rounded-[1.1rem] border border-[#d7aa46]/35 bg-[linear-gradient(180deg,rgba(24,20,14,0.98),rgba(5,6,7,0.98))] p-4 text-[#f6e0a2] shadow-[0_26px_90px_rgba(0,0,0,0.72)]"
+          onMouseDown={event => event.stopPropagation()}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b9a16f]">How to play</p>
+              <h2 id="shadow-war-instructions-title" className="mt-1 text-2xl font-semibold text-[#f6e0a2]">
+                Shadow War
+              </h2>
+            </div>
+            <button
+              type="button"
+              aria-label="Close Shadow War instructions"
+              onClick={() => setInstructionsOpen(false)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-transparent bg-black/10 text-[#f0d381] transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/50"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="mt-4 space-y-4 text-sm leading-6 text-[#d9c79f]">
+            <p>
+              Shadow War is a 1v1 tactical card duel. Each round, both players secretly place three units into Left, Center, and Right lanes, then lock formation.
+            </p>
+
+            <div className="rounded-[0.85rem] border border-[#b9934c]/24 bg-black/38 p-3">
+              <h3 className="text-sm font-semibold text-[#f0d381]">Round Flow</h3>
+              <ol className="mt-2 list-decimal space-y-1.5 pl-4">
+                <li>Pick one card for each lane.</li>
+                <li>Tap Battle to lock your formation.</li>
+                <li>When both players lock, lanes reveal and resolve automatically.</li>
+                <li>Win two lanes to take the round. First to 5 rounds wins the match.</li>
+              </ol>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-[0.85rem] border border-[#b9934c]/24 bg-black/38 p-3">
+                <h3 className="text-sm font-semibold text-[#f0d381]">Strategy</h3>
+                <p className="mt-2">
+                  Strong cards can dominate a lane, but low cards have tricks. Sacrifice one lane when it helps you win the other two.
+                </p>
+              </div>
+              <div className="rounded-[0.85rem] border border-[#b9934c]/24 bg-black/38 p-3">
+                <h3 className="text-sm font-semibold text-[#f0d381]">Tables</h3>
+                <p className="mt-2">
+                  Create a duel to wait for a challenger, join an open table, or queue behind an active fight.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-[0.85rem] border border-[#b9934c]/24 bg-black/38 p-3">
+              <h3 className="text-sm font-semibold text-[#f0d381]">Card Abilities</h3>
+              <p className="mt-2">
+                Scout, Spy, Shieldbearer, Captain, Champion, and Warlord can shift lane strength. Read the card text and watch where your opponent might commit power.
+              </p>
+            </div>
+          </div>
+        </section>
       </div>
     )
   }
@@ -424,6 +513,14 @@ export function ShadowWarScreen({
               {audioBlocked ? <Music className="h-5 w-5" /> : musicPlaying ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
             </button>
           )}
+          <button
+            type="button"
+            aria-label="Open Shadow War instructions"
+            onClick={() => setInstructionsOpen(true)}
+            className="absolute right-2 top-[calc(env(safe-area-inset-top)_+_3.35rem)] flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-transparent bg-black/5 text-[#f0d381] drop-shadow-[0_4px_10px_rgba(0,0,0,0.9)] transition-colors hover:bg-black/18 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/50"
+          >
+            <HelpCircle className="h-5 w-5" />
+          </button>
         </div>
         {audioBlocked && (
           <p className="bg-black/82 px-4 py-2 text-xs text-[#f0d381]">
@@ -462,6 +559,7 @@ export function ShadowWarScreen({
           {error}
         </div>
       )}
+      {renderInstructionsDialog()}
     </div>
   )
 }
