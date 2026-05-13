@@ -7,6 +7,12 @@ directory = "netlify/functions"
 node_bundler = "esbuild"
 
 [[redirects]]
+from = "/api/shadow-pin/media"
+to = "/.netlify/functions/shadow-pin-media"
+status = 200
+force = true
+
+[[redirects]]
 from = "/*"
 to = "/index.html"
 status = 200

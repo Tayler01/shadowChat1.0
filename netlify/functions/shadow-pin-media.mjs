@@ -1,33 +1,36 @@
 import {
+  authenticateAuthorization,
   cleanText,
   createAdminClient,
   createImportedShadowPinItem,
-  authenticateRequest,
   processShadowPinRow,
 } from './_shared/shadow-pin-media.mjs'
 
-const json = (body, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      'content-type': 'application/json',
-      'cache-control': 'no-store',
-    },
-  })
+const json = (body, statusCode = 200) => ({
+  statusCode,
+  headers: {
+    'content-type': 'application/json',
+    'cache-control': 'no-store',
+  },
+  body: JSON.stringify(body),
+})
 
-export default async function handler(request) {
-  if (request.method !== 'POST') {
+export async function handler(event) {
+  if (event.httpMethod !== 'POST') {
     return json({ error: 'Method not allowed.' }, 405)
   }
 
   try {
     const admin = createAdminClient()
-    const user = await authenticateRequest(request, admin)
+    const user = await authenticateAuthorization(
+      event.headers?.authorization || event.headers?.Authorization || '',
+      admin
+    )
     if (!user) {
       return json({ error: 'Authentication required.' }, 401)
     }
 
-    const body = await request.json()
+    const body = JSON.parse(event.body || '{}')
     const action = body?.action
 
     if (action === 'process-existing') {
@@ -69,8 +72,4 @@ export default async function handler(request) {
     const message = error instanceof Error ? error.message : 'ShadowPin media processing failed.'
     return json({ error: message }, 400)
   }
-}
-
-export const config = {
-  path: '/api/shadow-pin/media',
 }

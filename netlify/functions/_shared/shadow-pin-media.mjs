@@ -45,14 +45,17 @@ export function createAdminClient() {
   })
 }
 
-export async function authenticateRequest(request, admin) {
-  const authorization = request.headers.get('authorization') || ''
+export async function authenticateAuthorization(authorization, admin) {
   const token = authorization.replace(/^Bearer\s+/i, '').trim()
   if (!token) return null
 
   const { data, error } = await admin.auth.getUser(token)
   if (error || !data?.user?.id) return null
   return { id: data.user.id }
+}
+
+export async function authenticateRequest(request, admin) {
+  return authenticateAuthorization(request.headers.get('authorization') || '', admin)
 }
 
 export function cleanText(value, maxLength, label, required) {
