@@ -1,11 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import React, { useEffect, useMemo, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowDown } from 'lucide-react'
 import { useMessages } from '../../hooks/useMessages'
 import { useTyping } from '../../hooks/useTyping'
 import { groupMessagesByDate, cn, shouldGroupMessage } from '../../lib/utils'
 import { MessageItem } from './MessageItem'
-import { ThreadReplyLink } from './ThreadReplyLink'
 import type { FailedMessage } from '../../hooks/useFailedMessages'
 import { FailedMessageItem } from './FailedMessageItem'
 import toast from 'react-hot-toast'
@@ -56,101 +55,16 @@ export const MessageList: React.FC<MessageListProps> = ({
   const initialTargetJumpDoneRef = useRef<string | null>(null)
   const { cursor, loading: cursorLoading, markRead } = useReadCursor('general_chat', 'main', Boolean(profile?.id))
 
-  const { messageMap, childrenMap, rootMessages } = useMemo(() => {
+  const messageMap = useMemo(() => {
     const msgMap = new Map<string, Message>()
-    const childMap = new Map<string, Message[]>()
-    const roots: Message[] = []
     messages.forEach(m => {
       msgMap.set(m.id, m)
-      if (m.reply_to) {
-        if (!childMap.has(m.reply_to)) childMap.set(m.reply_to, [])
-        childMap.get(m.reply_to)!.push(m)
-      } else {
-        roots.push(m)
-      }
     })
-    childMap.forEach(children => {
-      children.sort((a, b) => a.created_at.localeCompare(b.created_at))
-    })
-    return { messageMap: msgMap, childrenMap: childMap, rootMessages: roots }
+    return msgMap
   }, [messages])
-
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
-    const initialCollapsed = new Set<string>()
-    rootMessages.forEach(m => {
-      const replies = childrenMap.get(m.id) || []
-      if (replies.length > 0) {
-        const allAI = replies.every(r => r.message_type === 'command')
-        if (!allAI) {
-          initialCollapsed.add(m.id)
-        }
-      }
-    })
-    return initialCollapsed
-  })
-
-  // Update collapsed state when messages change to include new threads
-  useEffect(() => {
-    setCollapsed(prev => {
-      const newCollapsed = new Set(prev)
-      rootMessages.forEach(m => {
-        const replies = childrenMap.get(m.id) || []
-        if (replies.length > 0 && !prev.has(m.id)) {
-          const allAI = replies.every(r => r.message_type === 'command')
-          if (!allAI) {
-            newCollapsed.add(m.id)
-          }
-        }
-      })
-      return newCollapsed
-    })
-  }, [childrenMap, rootMessages])
-
-  const toggleThread = useCallback((id: string) => {
-    setCollapsed(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(id)) {
-        newSet.delete(id)
-      } else {
-        newSet.add(id)
-      }
-      return newSet
-    })
-  }, [])
-
-  const expandMessageAncestors = useCallback(
-    (message: Message) => {
-      setCollapsed(prev => {
-        const newSet = new Set(prev)
-        let current: Message | undefined = messageMap.get(message.id) || message
-
-        while (current?.reply_to) {
-          newSet.delete(current.reply_to)
-          current = messageMap.get(current.reply_to)
-        }
-
-        newSet.delete(message.id)
-        return newSet
-      })
-    },
-    [messageMap]
-  )
 
   const jumpToMessage = useCallback(
     (id: string) => {
-      setCollapsed(prev => {
-        const newSet = new Set(prev)
-        let current = messageMap.get(id)
-        // Expand all ancestor threads so the message is visible
-        while (current && current.reply_to) {
-          newSet.delete(current.reply_to)
-          current = messageMap.get(current.reply_to)
-        }
-        newSet.delete(id)
-        return newSet
-      })
-
-      // Wait for the DOM to update before scrolling
       requestAnimationFrame(() => {
         const el = document.getElementById(`message-${id}`)
         if (el) {
@@ -162,23 +76,12 @@ export const MessageList: React.FC<MessageListProps> = ({
         }
       })
     },
-    [messageMap]
+    []
   )
 
-  const replyLinkMessages = useMemo(() => {
-    return messages
-      .filter(m => m.reply_to && messageMap.get(m.reply_to))
-      .map(m => ({
-        ...m,
-        parent: messageMap.get(m.reply_to!)!,
-        isReplyLink: true,
-      })) as Array<Message & { parent: Message; isReplyLink: boolean }>
-  }, [messages, messageMap])
-
   const combinedMessages = useMemo(() => {
-    const all = [...rootMessages, ...replyLinkMessages]
-    return all.sort((a, b) => a.created_at.localeCompare(b.created_at))
-  }, [rootMessages, replyLinkMessages])
+    return [...messages].sort((a, b) => a.created_at.localeCompare(b.created_at))
+  }, [messages])
 
   const groupedMessages = useMemo(
     () => groupMessagesByDate(combinedMessages as any[]),
@@ -215,7 +118,6 @@ export const MessageList: React.FC<MessageListProps> = ({
     getMessageId,
     getMessageCreatedAt,
     getElementId: getMessageElementId,
-    onBeforeInitialJump: expandMessageAncestors,
     onMarkReadToLatest: markGeneralChatRead,
   })
 
@@ -364,63 +266,6 @@ export const MessageList: React.FC<MessageListProps> = ({
     }
   }, [deleteMessage])
 
-  const renderThread = useCallback((
-    message: Message,
-    depth = 0,
-    prev?: Message
-  ): React.ReactNode => {
-    const replies = childrenMap.get(message.id) || []
-    const isCollapsed = collapsed.has(message.id)
-
-    return (
-      <div key={message.id} className={cn(depth > 0 ? 'ml-6 border-l border-[var(--border-subtle)] pl-3' : '')}>
-        <MessageItem
-          message={message}
-          previousMessage={prev}
-          parentMessage={messageMap.get(message.reply_to ?? '')}
-          onReply={onReply}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onTogglePin={togglePin}
-          onToggleReaction={toggleReaction}
-          onJumpToMessage={jumpToMessage}
-          containerRef={containerRef}
-        />
-        {replies.length > 0 && (
-          <div className="mt-1">
-            <button
-              type="button"
-              onClick={() => toggleThread(message.id)}
-              className="text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text-gold)]"
-            >
-              {isCollapsed
-                ? `Show ${replies.length} repl${replies.length > 1 ? 'ies' : 'y'}`
-                : 'Hide replies'}
-            </button>
-            {!isCollapsed && (
-              <div className="mt-1 space-y-1">
-                {replies.map((m, idx) =>
-                  renderThread(m, depth + 1, replies[idx - 1])
-                )}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    )
-  }, [
-    childrenMap,
-    collapsed,
-    handleDelete,
-    handleEdit,
-    jumpToMessage,
-    messageMap,
-    onReply,
-    togglePin,
-    toggleReaction,
-    toggleThread,
-  ])
-
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -455,8 +300,9 @@ export const MessageList: React.FC<MessageListProps> = ({
             <span className="mx-2 whitespace-nowrap rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-1 text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">{group.date}</span>
             <hr className="flex-grow border-t border-[var(--border-panel)]" />
           </div>
-          {group.messages.map((message: any, idx) => {
-            const prev = group.messages[idx - 1] as any
+          {group.messages.map((groupMessage, idx) => {
+            const message = groupMessage as Message
+            const prev = group.messages[idx - 1] as Message | undefined
             const isGrouped = shouldGroupMessage(message, prev)
             return (
               <React.Fragment key={message.id}>
@@ -464,15 +310,18 @@ export const MessageList: React.FC<MessageListProps> = ({
                   <UnreadDivider />
                 )}
                 <div className={cn(isGrouped ? 'pt-1 pb-1' : 'pt-4 pb-1')}>
-                  {message.isReplyLink ? (
-                    <ThreadReplyLink
-                      message={message}
-                      parent={message.parent}
-                      onJumpToMessage={jumpToMessage}
-                    />
-                  ) : (
-                    renderThread(message, 0, prev)
-                  )}
+                  <MessageItem
+                    message={message}
+                    previousMessage={prev}
+                    parentMessage={messageMap.get(message.reply_to ?? '')}
+                    onReply={onReply}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onTogglePin={togglePin}
+                    onToggleReaction={toggleReaction}
+                    onJumpToMessage={jumpToMessage}
+                    containerRef={containerRef}
+                  />
                 </div>
               </React.Fragment>
             )

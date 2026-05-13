@@ -23,6 +23,7 @@ interface BubbleVelocity {
 }
 
 type BoardShape = 'circle' | 'pill' | 'square' | 'octagon'
+const OCTAGON_CLIP_PATH = 'polygon(29% 0, 71% 0, 100% 29%, 100% 71%, 71% 100%, 29% 100%, 0 71%, 0 29%)'
 
 interface CollisionFeedbackEvent {
   key: string
@@ -687,7 +688,9 @@ export function BoardBubbleMap({ countsByBoard, onSelect }: BoardBubbleMapProps)
               'bg-transparent hover:border-[var(--border-glow)] focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)]'
             )}
             style={{
-              ...bubbleSurface,
+              ...(visual.shape === 'octagon'
+                ? { background: 'transparent', borderColor: 'transparent' }
+                : bubbleSurface),
               width: visual.width,
               height: visual.height,
               color: board.accent,
@@ -696,18 +699,37 @@ export function BoardBubbleMap({ countsByBoard, onSelect }: BoardBubbleMapProps)
                 : undefined,
               transformOrigin: '50% 50%',
               willChange: 'transform',
-              clipPath: visual.shape === 'octagon'
-                ? 'polygon(29% 0, 71% 0, 100% 29%, 100% 71%, 71% 100%, 29% 100%, 0 71%, 0 29%)'
-                : undefined,
             }}
             aria-label={`Open ${board.title}`}
           >
-            <span
-              className={cn(
-                'absolute inset-0 -z-10 opacity-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]',
-                visual.shape === 'square' ? 'rounded-[var(--radius-sm)]' : visual.shape === 'octagon' ? 'rounded-none' : 'rounded-full'
-              )}
-            />
+            {visual.shape === 'octagon' ? (
+              <>
+                <span
+                  className="absolute inset-0 -z-20 shadow-[0_18px_52px_rgba(0,0,0,0.34)]"
+                  style={{
+                    background: bubbleSurface.borderColor,
+                    clipPath: OCTAGON_CLIP_PATH,
+                  }}
+                  aria-hidden="true"
+                />
+                <span
+                  className="absolute inset-[2px] -z-10 opacity-95 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
+                  style={{
+                    background: bubbleSurface.background,
+                    clipPath: OCTAGON_CLIP_PATH,
+                  }}
+                  aria-hidden="true"
+                />
+              </>
+            ) : (
+              <span
+                className={cn(
+                  'absolute inset-0 -z-10 opacity-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]',
+                  visual.shape === 'square' ? 'rounded-[var(--radius-sm)]' : 'rounded-full'
+                )}
+                aria-hidden="true"
+              />
+            )}
             {unreadCount > 0 && (
               <span className="theme-unread-badge absolute right-1.5 top-1.5 z-20 min-w-6 rounded-full px-1.5 py-1 text-xs font-semibold leading-none shadow-[0_8px_18px_rgba(0,0,0,0.28)]">
                 {unreadCount > 99 ? '99+' : unreadCount}

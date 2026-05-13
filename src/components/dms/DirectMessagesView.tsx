@@ -19,6 +19,7 @@ import { Button } from '../ui/Button'
 import { Input } from '../ui/Input'
 import { MessageInput } from '../chat/MessageInput'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
+import { MobileNav } from '../layout/MobileNav'
 import { FailedMessageItem } from '../chat/FailedMessageItem'
 import { FileAttachment } from '../chat/FileAttachment'
 import { VideoAttachment } from '../chat/VideoAttachment'
@@ -81,6 +82,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
   onDelete,
   onReact,
   onOpenProfile,
+  containerRef,
 }: {
   message: DMMessage
   previousMessage?: DMMessage
@@ -89,6 +91,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
   onDelete: (id: string) => Promise<void>
   onReact: (id: string, emoji: string) => Promise<void>
   onOpenProfile: (user: User | null) => void
+  containerRef?: React.RefObject<HTMLDivElement>
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(message.content)
@@ -99,6 +102,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
   const isGrouped = shouldGroupMessage(message, previousMessage)
   const isOwn = message.sender_id === currentUserId
   const isIncoming = !isOwn
+  const isImageMessage = message.message_type === 'image' && Boolean(message.file_url)
   const isLocalDelivery = message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
   const showIncomingAvatar = !isGrouped && !isOwn
   const bubbleColor = undefined
@@ -244,10 +248,14 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
         )}
 
         <div
-          className={`relative w-fit max-w-full rounded-2xl px-4 py-2 ${showIncomingAvatar ? 'ml-8' : ''} ${
+          className={`relative w-fit max-w-full rounded-2xl ${showIncomingAvatar ? 'ml-8' : ''} ${
+            isImageMessage ? 'bg-transparent px-0 py-0 shadow-none' : 'px-4 py-2'
+          } ${
             bubbleStyle
               ? ''
-              : isOwn
+              : isImageMessage
+                ? ''
+                : isOwn
                 ? 'theme-sent-bubble'
                 : 'border border-[var(--border-subtle)] bg-[var(--bg-panel)] text-[var(--text-primary)] shadow-[var(--shadow-panel)]'
           }`}
@@ -256,6 +264,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
           {!editing && (
             <ChatMessageActionsMenu
               actions={actions}
+              containerRef={containerRef}
               className={`absolute top-0 ${isOwn ? '-left-10' : '-right-10'} opacity-80 md:opacity-0 md:group-hover:opacity-80`}
             />
           )}
@@ -280,7 +289,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
             </div>
           ) : message.message_type === 'audio' ? (
             <audio controls src={message.audio_url} className="mt-1 max-w-full" />
-          ) : message.message_type === 'image' && message.file_url ? (
+          ) : isImageMessage ? (
             <img
               src={message.file_url}
               alt="uploaded"
@@ -289,7 +298,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
               loading="lazy"
               decoding="async"
               draggable={false}
-              className="mt-1 aspect-[4/3] max-h-[70vh] w-[min(20rem,100%)] rounded-[var(--radius-md)] border border-[var(--border-subtle)] object-contain"
+              className="mt-1 aspect-[4/3] max-h-[70vh] w-[min(20rem,100%)] rounded-[var(--radius-md)] object-contain shadow-[0_12px_34px_rgba(0,0,0,0.24)]"
             />
           ) : message.message_type === 'video' && message.file_url ? (
             <VideoAttachment url={message.file_url} meta={message.content} />
@@ -401,7 +410,7 @@ function NewDirectMessagePicker({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 pb-[calc(env(safe-area-inset-bottom)_+_5rem)] sm:px-5 md:pb-3">
         {loading ? (
           <div className="flex h-full items-center justify-center gap-2 text-sm text-[var(--text-muted)]">
             <LoadingSpinner size="sm" />
@@ -847,7 +856,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)_+_5rem)] md:pb-0">
               {conversations.length === 0 ? (
                 <div className="p-6 text-center text-[var(--text-muted)]">
                   <MessageSquare className="mx-auto mb-2 h-8 w-8 opacity-50" />
@@ -1011,6 +1020,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                     onDelete={deleteMessage}
                     onReact={toggleReaction}
                     onOpenProfile={setProfileUser}
+                    containerRef={messagesRef}
                   />
                 </React.Fragment>
               ))}
@@ -1122,6 +1132,9 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
             onClose={() => setProfileUser(null)}
           />
         </React.Suspense>
+      )}
+      {!isDesktop && !currentConversation && (
+        <MobileNav currentView={currentView} onViewChange={onViewChange} />
       )}
     </div>
   )

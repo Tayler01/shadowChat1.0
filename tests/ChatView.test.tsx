@@ -32,9 +32,11 @@ jest.mock('../src/components/chat/MessageInput', () => ({
   MessageInput: () => <div data-testid="message-input" />,
 }))
 
-jest.mock('../src/components/chat/PinnedMessagesBar', () => ({
-  PinnedMessagesBar: ({ compact }: { compact?: boolean }) => (
-    <div data-testid="pinned-messages-bar" data-compact={compact ? 'true' : 'false'} />
+jest.mock('../src/components/chat/PinnedMessagesButton', () => ({
+  PinnedMessagesButton: ({ messages }: { messages: unknown[] }) => (
+    <button type="button" data-testid="pinned-messages-button">
+      {messages.length}
+    </button>
   ),
 }))
 
@@ -68,11 +70,9 @@ jest.mock('../src/lib/sessionRecovery', () => ({
   SESSION_RECOVERY_EVENT: 'shadowchat:session-recovery',
 }))
 
-test('renders pinned messages only in the chat feed area', () => {
+test('renders pinned messages as a header button instead of a feed bar', () => {
   render(<ChatView currentView="chat" onViewChange={() => {}} />)
 
-  const pinnedBars = screen.getAllByTestId('pinned-messages-bar')
-  expect(pinnedBars).toHaveLength(1)
-  expect(pinnedBars[0]).toHaveAttribute('data-compact', 'false')
+  expect(screen.getByTestId('pinned-messages-button')).toHaveTextContent('1')
   expect(screen.getByTestId('message-list')).toBeInTheDocument()
 })

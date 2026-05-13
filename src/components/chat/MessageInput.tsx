@@ -556,7 +556,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             variant="ghost"
             size="sm"
             onClick={() => setShowAttachmentMenu(prev => !prev)}
-            className="h-11 w-11 rounded-xl p-0 md:h-12 md:w-12"
+            className="h-12 w-12 rounded-xl p-0"
             aria-label="Add attachment"
           >
             <Plus className="w-4 h-4" />
@@ -644,7 +644,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             autoCapitalize="sentences"
             name={`message-composer-${cacheKey}`}
             rows={1}
-            className="obsidian-input no-scrollbar max-h-32 w-full resize-none rounded-[var(--radius-md)] px-3.5 py-3 text-base text-[var(--text-primary)] md:px-3 md:py-2 md:text-sm"
+            className="obsidian-input no-scrollbar max-h-32 min-h-12 w-full resize-none rounded-[var(--radius-md)] px-3.5 py-3 text-base leading-6 text-[var(--text-primary)] md:px-3 md:py-2 md:text-sm"
           />
         </div>
 
@@ -673,7 +673,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         <Button
           type="button"
           disabled={!message.trim() || disabled}
-          className="h-11 w-11 rounded-xl p-0 md:h-12 md:w-12"
+          className="h-12 w-12 rounded-xl p-0"
           aria-label="Send message"
           onMouseDown={e => e.preventDefault()}
           onClick={() => void sendCurrentMessage()}

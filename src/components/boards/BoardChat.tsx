@@ -46,12 +46,14 @@ function BoardChatRow({
   onEdit,
   onDelete,
   onReact,
+  containerRef,
 }: {
   board: ChatBoardDefinition
   message: BoardChatMessage
   onEdit: (id: string, content: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
   onReact: (id: string, emoji: string) => Promise<void>
+  containerRef?: React.RefObject<HTMLDivElement>
 }) {
   const { profile } = useAuth()
   const [editing, setEditing] = useState(false)
@@ -227,6 +229,7 @@ function BoardChatRow({
         {!editing && (
           <ChatMessageActionsMenu
             actions={actions}
+            containerRef={containerRef}
             className="shrink-0"
             buttonLabel={`${board.title} message actions`}
           />
@@ -272,7 +275,7 @@ function BoardChatComposer({
         className
       )}
     >
-      <div className="flex items-end gap-2">
+      <div className="flex items-end gap-2.5">
         <textarea
           value={draft}
           onChange={event => onDraftChange(event.target.value)}
@@ -284,13 +287,13 @@ function BoardChatComposer({
           }}
           placeholder={`Drop a link or note in ${board.title}`}
           rows={1}
-          className="obsidian-input max-h-28 min-h-11 flex-1 resize-none rounded-[var(--radius-md)] px-3.5 py-3 text-base text-[var(--text-primary)] md:text-sm"
+          className="obsidian-input max-h-28 min-h-12 flex-1 resize-none rounded-[var(--radius-md)] px-3.5 py-3 text-base leading-6 text-[var(--text-primary)] md:text-sm"
         />
         <Button
           type="submit"
           disabled={!draft.trim() || sending}
           loading={sending}
-          className="h-11 w-11 rounded-xl p-0"
+          className="h-12 w-12 rounded-xl p-0"
           aria-label={`Send ${board.title} message`}
         >
           <Send className="h-5 w-5" />
@@ -479,6 +482,7 @@ export function BoardChat({
                     onEdit={editMessage}
                     onDelete={deleteMessage}
                     onReact={toggleReaction}
+                    containerRef={scrollRef}
                   />
                 </React.Fragment>
               ))}

@@ -34,7 +34,11 @@ describe('BoardBubbleMap', () => {
     expect(Number.parseFloat(staticBoard.style.width)).toBe(Number.parseFloat(staticBoard.style.height))
 
     expect(shadowPin).toHaveAttribute('data-board-shape', 'octagon')
-    expect(shadowPin.style.clipPath).toContain('polygon')
+    expect(
+      Array.from(shadowPin.querySelectorAll('span[aria-hidden="true"]')).some(
+        element => (element as HTMLElement).style.clipPath.includes('polygon')
+      )
+    ).toBe(true)
     expect(Number.parseFloat(shadowPin.style.width)).toBe(Number.parseFloat(shadowPin.style.height))
 
     expect(chat).toHaveClass('rounded-full')

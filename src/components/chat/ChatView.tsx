@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { useMessages } from '../../hooks/useMessages'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
-import { PinnedMessagesBar } from './PinnedMessagesBar'
+import { PinnedMessagesButton } from './PinnedMessagesButton'
 import { useFailedMessages } from '../../hooks/useFailedMessages'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import { useClientReset } from '../../hooks/ClientResetContext'
@@ -119,23 +119,15 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
 
           <div className="flex flex-shrink-0 items-center gap-1 sm:gap-2">
             <WeatherWidget onOpenSettings={() => onViewChange('settings')} />
+            <PinnedMessagesButton
+              messages={pinnedMessages}
+              onUnpin={togglePin}
+              onToggleReaction={toggleReaction}
+            />
             <ActiveUsersButton resetStatus={resetStatus} />
           </div>
         </div>
       </div>
-
-      {/* Pinned messages */}
-      {pinnedMessages.length > 0 && (
-        <div className="px-4 pt-4 md:px-3">
-          <div className="mx-auto w-full max-w-6xl">
-          <PinnedMessagesBar
-            messages={pinnedMessages}
-            onUnpin={togglePin}
-            onToggleReaction={toggleReaction}
-          />
-          </div>
-        </div>
-      )}
 
       {/* Messages */}
       <MessageList

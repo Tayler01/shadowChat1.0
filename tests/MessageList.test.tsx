@@ -58,12 +58,6 @@ jest.mock('../src/components/chat/MessageItem', () => ({
   ),
 }))
 
-jest.mock('../src/components/chat/ThreadReplyLink', () => ({
-  ThreadReplyLink: ({ message }: { message: Message }) => (
-    <div data-testid={`reply-link-${message.id}`}>{message.content}</div>
-  ),
-}))
-
 jest.mock('../src/components/chat/FailedMessageItem', () => ({
   FailedMessageItem: () => <div data-testid="failed-message" />,
 }))

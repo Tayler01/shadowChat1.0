@@ -197,10 +197,6 @@ export function GamesHome({ onImmersiveChange }: GamesHomeProps) {
           </div>
         </button>
 
-        <section className="relative overflow-hidden rounded-[1.35rem] border border-[#b9934c]/28 bg-[linear-gradient(135deg,rgba(7,6,5,0.92),rgba(31,22,12,0.78))] px-4 py-4 text-sm font-semibold uppercase tracking-[0.14em] text-[#d9c79f] shadow-[0_18px_45px_rgba(0,0,0,0.28)]">
-          <span className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-[#f0d381] via-[#8a6328] to-transparent" />
-          More games coming soon
-        </section>
       </main>
         </motion.div>
       )}

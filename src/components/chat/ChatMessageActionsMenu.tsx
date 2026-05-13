@@ -23,6 +23,14 @@ type ChatMessageActionsMenuProps = {
   onOpenChange?: (open: boolean) => void
 }
 
+const getRootPixelValue = (name: string) => {
+  if (typeof window === 'undefined') return 0
+  const value = Number.parseFloat(
+    window.getComputedStyle(document.documentElement).getPropertyValue(name)
+  )
+  return Number.isFinite(value) ? value : 0
+}
+
 export function ChatMessageActionsMenu({
   actions,
   containerRef,
@@ -81,12 +89,20 @@ export function ChatMessageActionsMenu({
     const mobileFooterRect = window.innerWidth < 768
       ? document.querySelector('[data-mobile-chat-footer="true"]')?.getBoundingClientRect()
       : undefined
+    const keyboardAwareFooterTop = (() => {
+      if (window.innerWidth >= 768) return undefined
+      const keyboardInset = getRootPixelValue('--shadowchat-keyboard-inset')
+      const footerHeight = getRootPixelValue('--shadowchat-mobile-chat-footer-height')
+      if (keyboardInset <= 0 || footerHeight <= 0) return undefined
+      return window.innerHeight - keyboardInset - footerHeight
+    })()
     const safeGap = 12
     const visibleTop = Math.max(viewportTop, containerRect?.top ?? viewportTop)
     const visibleBottom = Math.min(
       viewportBottom,
       containerRect?.bottom ?? viewportBottom,
-      mobileFooterRect?.top ?? viewportBottom
+      mobileFooterRect?.top ?? viewportBottom,
+      keyboardAwareFooterTop ?? viewportBottom
     )
     const menuHeight = menuRef.current.scrollHeight
     const menuWidth = menuRef.current.offsetWidth

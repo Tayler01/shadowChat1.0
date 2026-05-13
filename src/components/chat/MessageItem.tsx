@@ -103,6 +103,10 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const canDelete = isOwner || (isOperator && Boolean(message.user) && !isAuthorOperator)
     const isShadoAI = message.user?.username === 'shado_ai'
     const isAIMessage = isShadoAI || message.message_type === 'command'
+    const isImageMessage = message.message_type === 'image' && Boolean(message.file_url)
+    const parentPreview = parentMessage
+      ? parentMessage.content?.trim() || (parentMessage.message_type === 'image' ? 'Image' : parentMessage.message_type)
+      : ''
     const avatarSrc = isShadoAI
       ? message.user?.avatar_url || '/icons/app-icon-192.png'
       : message.user?.avatar_url
@@ -329,25 +333,36 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 onMouseLeave={handleMouseLeaveReactions}
               >
                 {parentMessage && (
-                  <button
-                    type="button"
-                    onClick={() => onJumpToMessage?.(parentMessage.id)}
-                    className="mb-1 text-left text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--theme-accent-readable)] hover:underline"
-                    aria-label="View parent message"
-                  >
-                    Replying to {parentMessage.user?.display_name || 'Unknown'}
-                    <UserRoleBadge role={parentMessage.user?.admin_role} className="ml-1" />
-                    <UserPresenceBadge userId={parentMessage.user?.id} presenceVisibility={parentMessage.user?.presence_visibility} className="ml-1" />
-                    :
-                    {' '}
-                    {parentMessage.content.slice(0, 30)}
-                    {parentMessage.content.length > 30 ? '...' : ''}
-                  </button>
+                  <div className="mb-1 flex min-w-0 items-end gap-2 pl-1 text-xs text-[var(--text-muted)]">
+                    <span
+                      aria-hidden="true"
+                      className="h-4 w-4 shrink-0 rounded-bl-[0.45rem] border-b border-l border-[var(--theme-accent-border-soft)]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => onJumpToMessage?.(parentMessage.id)}
+                      className="min-w-0 truncate text-left transition-colors hover:text-[var(--theme-accent-readable)] hover:underline"
+                      aria-label="View parent message"
+                    >
+                      Replying to {parentMessage.user?.display_name || 'Unknown'}
+                      <UserRoleBadge role={parentMessage.user?.admin_role} className="ml-1" />
+                      <UserPresenceBadge userId={parentMessage.user?.id} presenceVisibility={parentMessage.user?.presence_visibility} className="ml-1" />
+                      :
+                      {' '}
+                      {parentPreview.slice(0, 36)}
+                      {parentPreview.length > 36 ? '...' : ''}
+                    </button>
+                  </div>
                 )}
                 <div
                   className={cn(
-                    'relative peer space-y-1 break-words rounded-[var(--radius-md)] px-3 py-2 shadow-[var(--shadow-panel)]',
-                    isAIMessage
+                    'relative peer space-y-1 break-words rounded-[var(--radius-md)]',
+                    isImageMessage
+                      ? 'bg-transparent px-0 py-0 text-[var(--text-primary)] shadow-none'
+                      : 'px-3 py-2 shadow-[var(--shadow-panel)]',
+                    isImageMessage
+                      ? ''
+                      : isAIMessage
                       ? 'border border-[var(--border-glow)] bg-[var(--theme-accent-softer)] text-[var(--text-primary)]'
                       : bubbleStyle
                       ? ''
@@ -362,7 +377,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   />
                   {message.message_type === 'audio' ? (
                     <audio controls src={message.audio_url} className="mt-1 max-w-full" />
-                  ) : message.message_type === 'image' && message.file_url ? (
+                  ) : isImageMessage ? (
                     <img
                       src={message.file_url}
                       alt="uploaded image"
@@ -371,7 +386,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                       loading="lazy"
                       decoding="async"
                       draggable={false}
-                      className="mt-1 aspect-[4/3] max-h-[70vh] w-[min(20rem,100%)] cursor-pointer rounded-[var(--radius-md)] border border-[var(--border-subtle)] object-contain sm:max-w-xs"
+                      className="mt-1 aspect-[4/3] max-h-[70vh] w-[min(20rem,100%)] cursor-pointer rounded-[var(--radius-md)] object-contain shadow-[0_12px_34px_rgba(0,0,0,0.24)] sm:max-w-xs"
                       onClick={() => setShowImageModal(true)}
                     />
                   ) : message.message_type === 'video' && message.file_url ? (
