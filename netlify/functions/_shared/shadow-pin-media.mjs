@@ -30,13 +30,12 @@ export function getRuntimeEnv(name) {
 export function getSupabaseEnv() {
   const supabaseUrl = getRuntimeEnv('SUPABASE_URL') || getRuntimeEnv('VITE_SUPABASE_URL')
   const serviceRoleKey = getRuntimeEnv('SUPABASE_SERVICE_ROLE_KEY')
-  const anonKey = getRuntimeEnv('SUPABASE_ANON_KEY') || getRuntimeEnv('VITE_SUPABASE_ANON_KEY')
 
-  if (!supabaseUrl || !serviceRoleKey || !anonKey) {
+  if (!supabaseUrl || !serviceRoleKey) {
     throw new Error('Supabase media processing environment is not configured.')
   }
 
-  return { supabaseUrl, serviceRoleKey, anonKey }
+  return { supabaseUrl, serviceRoleKey }
 }
 
 export function createAdminClient() {
