@@ -23,10 +23,10 @@ interface ShadowCheckersBoardProps {
 }
 
 const CINEMATIC_BOARD_GRID_FRAME = {
-  left: '15.1%',
-  top: '12.6%',
-  width: '70%',
-  height: '70%',
+  left: '13.6%',
+  top: '11.9%',
+  width: '73.2%',
+  height: '73.3%',
 } satisfies CSSProperties
 
 export function ShadowCheckersBoard({
@@ -124,9 +124,9 @@ export function ShadowCheckersBoard({
                 className={cn(
                   'absolute left-1/2 top-1/2 h-[84%] w-[84%] -translate-x-1/2 -translate-y-1/2 object-contain drop-shadow-[0_10px_12px_rgba(0,0,0,0.76)] transition-transform duration-200',
                   isCinematic && 'top-[54%]',
-                  selected && 'scale-110',
-                  disabled && 'opacity-70'
+                  selected && 'scale-110'
                 )}
+                style={{ filter: getPieceFilter(piece) }}
                 loading="eager"
                 draggable={false}
               />
@@ -139,8 +139,7 @@ export function ShadowCheckersBoard({
                   piece.owner === 'player_one'
                     ? 'border-[#fff0b7]/80 bg-[radial-gradient(circle_at_35%_24%,#fff0b7,#d2a042_42%,#6e4212_100%)] text-[#120c05]'
                     : 'border-[#9fb1c6]/65 bg-[radial-gradient(circle_at_35%_24%,#44505e,#11151b_55%,#030405_100%)] text-[#f2f5f9]',
-                  selected && 'scale-110 ring-4 ring-[#f0d381]/55',
-                  disabled && 'opacity-70'
+                  selected && 'scale-110 ring-4 ring-[#f0d381]/55'
                 )}
               >
                 <span className="absolute inset-[16%] rounded-full border border-black/35" />
@@ -188,4 +187,12 @@ function getPieceAsset(piece: CheckersPiece) {
     return piece.king ? SHADOW_CHECKERS_ASSETS.pieces.amberKing : SHADOW_CHECKERS_ASSETS.pieces.amber
   }
   return piece.king ? SHADOW_CHECKERS_ASSETS.pieces.obsidianKing : SHADOW_CHECKERS_ASSETS.pieces.obsidian
+}
+
+function getPieceFilter(piece: CheckersPiece) {
+  if (piece.owner === 'player_one') {
+    return 'brightness(0.74) contrast(1.28) saturate(0.9) drop-shadow(0 10px 12px rgba(0,0,0,0.84))'
+  }
+
+  return 'brightness(0.82) contrast(1.34) saturate(0.9) drop-shadow(0 10px 12px rgba(0,0,0,0.88))'
 }
