@@ -18,9 +18,15 @@ export function GamesHome({ onImmersiveChange }: GamesHomeProps) {
   const [audioBlocked, setAudioBlocked] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  const playMusic = useCallback(async () => {
+  const playMusic = useCallback(async (source?: string) => {
     const audio = audioRef.current
     if (!audio) return
+
+    if (source && audio.getAttribute('src') !== source) {
+      audio.pause()
+      audio.setAttribute('src', source)
+      audio.load()
+    }
 
     audio.volume = 0.42
     audio.loop = true
@@ -44,7 +50,7 @@ export function GamesHome({ onImmersiveChange }: GamesHomeProps) {
   }, [])
 
   const enterShadowWar = () => {
-    void playMusic()
+    void playMusic(SHADOW_WAR_ASSETS.music)
     setSelectedGame('shadow-war')
     onImmersiveChange?.(true)
   }
@@ -57,13 +63,15 @@ export function GamesHome({ onImmersiveChange }: GamesHomeProps) {
   }
 
   const enterShadowCheckers = () => {
-    pauseMusic()
+    void playMusic(SHADOW_CHECKERS_ASSETS.music)
     setAudioBlocked(false)
     setSelectedGame('shadow-checkers')
     onImmersiveChange?.(true)
   }
 
   const exitShadowCheckers = () => {
+    pauseMusic()
+    setAudioBlocked(false)
     setSelectedGame(null)
     onImmersiveChange?.(false)
   }
@@ -73,7 +81,8 @@ export function GamesHome({ onImmersiveChange }: GamesHomeProps) {
       pauseMusic()
       return
     }
-    void playMusic()
+    const source = selectedGame === 'shadow-checkers' ? SHADOW_CHECKERS_ASSETS.music : SHADOW_WAR_ASSETS.music
+    void playMusic(source)
   }
 
   useEffect(() => {
@@ -90,7 +99,6 @@ export function GamesHome({ onImmersiveChange }: GamesHomeProps) {
   const audio = (
     <audio
       ref={audioRef}
-      src={SHADOW_WAR_ASSETS.music}
       preload="auto"
       aria-hidden="true"
     />
@@ -110,7 +118,12 @@ export function GamesHome({ onImmersiveChange }: GamesHomeProps) {
         </div>
       ) : selectedGame === 'shadow-checkers' ? (
         <div className="h-full min-h-0 overflow-hidden bg-black">
-          <ShadowCheckersScreen onExit={exitShadowCheckers} />
+          <ShadowCheckersScreen
+            onExit={exitShadowCheckers}
+            musicPlaying={musicPlaying}
+            audioBlocked={audioBlocked}
+            onToggleMusic={toggleMusic}
+          />
         </div>
       ) : (
         <motion.div

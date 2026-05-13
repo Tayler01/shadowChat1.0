@@ -19,7 +19,48 @@ export const SHADOW_CHECKERS_ASSETS = {
   victory: `${ASSET_ROOT}/victory-banner.webp`,
   defeat: `${ASSET_ROOT}/defeat-banner.webp`,
   yourTurn: `${ASSET_ROOT}/your-turn-banner.webp`,
+  music: `${ASSET_ROOT}/audio/heart-of-courage.mp3`,
+  boardCinematic: `${ASSET_ROOT}/boards/cinematic-board.webp`,
+  pieces: {
+    amber: `${ASSET_ROOT}/pieces/amber-piece.webp`,
+    amberKing: `${ASSET_ROOT}/pieces/amber-king-piece.webp`,
+    obsidian: `${ASSET_ROOT}/pieces/obsidian-piece.webp`,
+    obsidianKing: `${ASSET_ROOT}/pieces/obsidian-king-piece.webp`,
+  },
 }
+
+export const SHADOW_CHECKERS_IMAGE2_PROMPTS = [
+  {
+    id: 'shadow-checkers-cinematic-board',
+    output: `${ASSET_ROOT}/boards/cinematic-board.webp`,
+    prompt:
+      'Cinematic dark medieval Shadow Checkers board asset for a premium mobile game, square 8x8 checkers board viewed from a subtle top-down tactical angle, obsidian stone and aged amber-gold playable squares, engraved metal border, faint battlefield table texture, dramatic rim lighting, high contrast, crisp readable squares, no coordinate labels, no chess pieces, no playing cards, no tarot, no logos, no watermark, no text.',
+  },
+  {
+    id: 'shadow-checkers-amber-piece',
+    output: `${ASSET_ROOT}/pieces/amber-piece.webp`,
+    prompt:
+      'Single regular checkers piece asset, amber gold faction, cinematic dark medieval mobile game style, round stacked war token with engraved shield motif, polished metal and worn enamel, top-down three-quarter view, transparent-safe centered composition, crisp silhouette, no chess symbols, no letters, no logos, no watermark, consistent with obsidian and gold Shadow Checkers art direction.',
+  },
+  {
+    id: 'shadow-checkers-amber-king-piece',
+    output: `${ASSET_ROOT}/pieces/amber-king-piece.webp`,
+    prompt:
+      'Single crowned king checkers piece asset, amber gold faction, cinematic dark medieval mobile game style, round war token upgraded with small crown crest and subtle golden glow, polished engraved metal, top-down three-quarter view, transparent-safe centered composition, crisp silhouette, no chess symbols, no letters, no logos, no watermark, consistent with obsidian and gold Shadow Checkers art direction.',
+  },
+  {
+    id: 'shadow-checkers-obsidian-piece',
+    output: `${ASSET_ROOT}/pieces/obsidian-piece.webp`,
+    prompt:
+      'Single regular checkers piece asset, obsidian shadow faction, cinematic dark medieval mobile game style, round stacked war token with engraved shield motif, blackened steel and smoky blue-gray highlights, top-down three-quarter view, transparent-safe centered composition, crisp silhouette, no chess symbols, no letters, no logos, no watermark, consistent with obsidian and gold Shadow Checkers art direction.',
+  },
+  {
+    id: 'shadow-checkers-obsidian-king-piece',
+    output: `${ASSET_ROOT}/pieces/obsidian-king-piece.webp`,
+    prompt:
+      'Single crowned king checkers piece asset, obsidian shadow faction, cinematic dark medieval mobile game style, round war token upgraded with small crown crest and cold silver-blue glow, blackened engraved metal, top-down three-quarter view, transparent-safe centered composition, crisp silhouette, no chess symbols, no letters, no logos, no watermark, consistent with obsidian and gold Shadow Checkers art direction.',
+  },
+]
 
 export const SHADOW_CHECKERS_CHARACTERS: ShadowCheckersCharacter[] = [
   {

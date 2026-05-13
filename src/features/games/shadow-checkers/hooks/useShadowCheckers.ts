@@ -36,6 +36,14 @@ const emptySnapshot: ShadowCheckersSnapshot = {
   leaderboard: [],
 }
 
+function formatShadowCheckersHookError(label: string, error: unknown) {
+  const message = error instanceof Error ? error.message : 'Game action failed'
+  if (label === 'move' && /capture required|multi-jump|required jump|mandatory jump|move banned|not permitted|row-level security|violates row-level/i.test(message)) {
+    return 'Mandatory jump available. You have to take the jump.'
+  }
+  return message
+}
+
 export function useShadowCheckers() {
   const { user } = useAuth()
   const [snapshot, setSnapshot] = useState<ShadowCheckersSnapshot>(emptySnapshot)
@@ -44,6 +52,7 @@ export function useShadowCheckers() {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const channelRef = useRef<RealtimeChannel | null>(null)
+  const refreshTimerRef = useRef<number | null>(null)
 
   const refresh = useCallback(async (nextSelectedMatchId = selectedMatchId) => {
     try {
@@ -107,7 +116,13 @@ export function useShadowCheckers() {
       if (!currentClient?.channel) return
 
       const refreshSoon = () => {
-        window.setTimeout(() => void refresh().catch(() => {}), 120)
+        if (refreshTimerRef.current !== null) {
+          window.clearTimeout(refreshTimerRef.current)
+        }
+        refreshTimerRef.current = window.setTimeout(() => {
+          refreshTimerRef.current = null
+          void refresh().catch(() => {})
+        }, 80)
       }
 
       channel = currentClient
@@ -133,6 +148,10 @@ export function useShadowCheckers() {
       if (channel && currentClient?.removeChannel) {
         currentClient.removeChannel(channel)
       }
+      if (refreshTimerRef.current !== null) {
+        window.clearTimeout(refreshTimerRef.current)
+        refreshTimerRef.current = null
+      }
       channelRef.current = null
     }
   }, [refresh, user])
@@ -153,7 +172,7 @@ export function useShadowCheckers() {
       await refresh(nextSelectedMatchId).catch(() => emptySnapshot)
       return result
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Game action failed'
+      const message = formatShadowCheckersHookError(label, err)
       setError(message)
       throw err
     } finally {
