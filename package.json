@@ -33,7 +33,8 @@
     "bridge:tui:test": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-bridge-tui-layout.ps1",
     "qa:smoke:full:headed": "node scripts/playwright-smoke.mjs --scenario=full --headed",
     "qa:mobile-pwa": "node scripts/mobile-pwa-visual-qa.mjs",
-    "qa:themes": "node scripts/theme-visual-qa.mjs"
+    "qa:themes": "node scripts/theme-visual-qa.mjs",
+    "shadow-pin:backfill-media": "node scripts/shadow-pin-backfill-media.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
@@ -45,6 +46,7 @@
     "react-dom": "^18.3.1",
     "react-hot-toast": "^2.4.1",
     "sentiment": "^5.0.2",
+    "sharp": "^0.34.5",
     "tailwind-merge": "^2.2.0"
   },
   "devDependencies": {

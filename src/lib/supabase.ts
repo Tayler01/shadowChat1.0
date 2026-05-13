@@ -682,7 +682,10 @@ export const uploadShadowPinImage = async (
     ? `${user.id}/categories/${scopeId || Date.now()}/cover`
     : `${user.id}/categories/${scopeId || 'uncategorized'}/pins`
   const filePath = `${folder}/${Date.now()}_${safeName}`
-  const { error } = await workingClient.storage.from(SHADOW_PIN_BUCKET).upload(filePath, file)
+  const { error } = await workingClient.storage.from(SHADOW_PIN_BUCKET).upload(filePath, file, {
+    cacheControl: '31536000',
+    contentType: file.type,
+  })
   if (error) throw error
   const { data } = workingClient.storage.from(SHADOW_PIN_BUCKET).getPublicUrl(filePath)
   return { path: filePath, publicUrl: data.publicUrl }

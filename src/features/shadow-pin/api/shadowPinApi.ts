@@ -161,9 +161,38 @@ export async function fetchShadowPinImages(categoryId: string, page = 0) {
 async function getSessionAccessToken() {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session?.access_token) {
-    throw new Error('Sign in to import images.')
+    throw new Error('Sign in to save images.')
   }
   return session.access_token
+}
+
+async function callShadowPinMediaFunction<T>(payload: Record<string, unknown>): Promise<T> {
+  const accessToken = await getSessionAccessToken()
+  const response = await fetch('/api/shadow-pin/media', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify(payload),
+  })
+  const data = await response.json().catch(() => null)
+  if (!response.ok || data?.error) {
+    throw new Error(data?.error || 'ShadowPin image processing failed.')
+  }
+  return data as T
+}
+
+async function processShadowPinMedia<T extends ShadowPinCategory | ShadowPinImage>(
+  targetType: 'category' | 'image',
+  id: string
+) {
+  const data = await callShadowPinMediaFunction<{ item: T }>({
+    action: 'process-existing',
+    targetType,
+    id,
+  })
+  return data.item
 }
 
 async function importShadowPinUrl(payload: {
@@ -173,15 +202,19 @@ async function importShadowPinUrl(payload: {
   url: string
   categoryId?: string
 }) {
-  const accessToken = await getSessionAccessToken()
-  const { data, error } = await supabase.functions.invoke('shadow-pin-import-image', {
-    body: payload,
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+  const action = payload.targetType === 'category'
+    ? 'create-category-from-url'
+    : 'create-image-from-url'
+  const data = await callShadowPinMediaFunction<{
+    category?: ShadowPinCategory
+    image?: ShadowPinImage
+  }>({
+    action,
+    title: payload.title,
+    description: payload.description,
+    url: payload.url,
+    categoryId: payload.categoryId,
   })
-  if (error) throw error
-  if (data?.error) throw new Error(data.error)
   return data
 }
 
@@ -219,12 +252,14 @@ export async function createShadowPinCategory(values: ShadowPinCategoryFormValue
       image_path: path,
       image_content_type: file.type,
       image_size_bytes: file.size,
+      processing_status: 'processing',
+      processing_error: null,
     })
     .select(CATEGORY_SELECT)
     .single()
 
   if (error) throw error
-  return data as unknown as ShadowPinCategory
+  return processShadowPinMedia<ShadowPinCategory>('category', (data as { id: string }).id)
 }
 
 export async function updateShadowPinCategory(
@@ -247,6 +282,15 @@ export async function updateShadowPinCategory(
     update.image_path = path
     update.image_content_type = values.file.type
     update.image_size_bytes = values.file.size
+    update.thumbnail_url = null
+    update.thumbnail_path = null
+    update.medium_url = null
+    update.medium_path = null
+    update.image_width = null
+    update.image_height = null
+    update.processing_status = 'processing'
+    update.processing_error = null
+    update.processed_at = null
   }
 
   const { data, error } = await client
@@ -257,7 +301,11 @@ export async function updateShadowPinCategory(
     .single()
 
   if (error) throw error
-  return data as unknown as ShadowPinCategory
+  const category = data as unknown as ShadowPinCategory
+  if (values.file) {
+    return processShadowPinMedia<ShadowPinCategory>('category', category.id)
+  }
+  return category
 }
 
 export async function createShadowPinImage(categoryId: string, values: ShadowPinImageFormValues) {
@@ -296,12 +344,14 @@ export async function createShadowPinImage(categoryId: string, values: ShadowPin
       image_path: path,
       image_content_type: file.type,
       image_size_bytes: file.size,
+      processing_status: 'processing',
+      processing_error: null,
     })
     .select(IMAGE_SELECT)
     .single()
 
   if (error) throw error
-  return data as unknown as ShadowPinImage
+  return processShadowPinMedia<ShadowPinImage>('image', (data as { id: string }).id)
 }
 
 export async function updateShadowPinImage(imageId: string, values: Pick<ShadowPinImageFormValues, 'title' | 'description'>) {

@@ -52,6 +52,27 @@ const canManage = (
   adminRole?: string | null
 ) => Boolean(userId && (item.creator_id === userId || adminRole === 'admin' || adminRole === 'sub_admin'))
 
+const getCategoryImageUrl = (category: ShadowPinCategory, size: 'thumb' | 'medium' | 'full' = 'thumb') => {
+  if (size === 'thumb') return category.thumbnail_url || category.medium_url || category.image_url
+  if (size === 'medium') return category.medium_url || category.thumbnail_url || category.image_url
+  return category.image_url
+}
+
+const getPinImageUrl = (image: ShadowPinImage, size: 'thumb' | 'medium' | 'full' = 'thumb') => {
+  if (size === 'thumb') return image.thumbnail_url || image.medium_url || image.image_url
+  if (size === 'medium') {
+    return image.image_content_type === 'image/gif'
+      ? image.image_url
+      : image.medium_url || image.thumbnail_url || image.image_url
+  }
+  return image.image_url
+}
+
+const getImageAspectRatio = (item: { image_width?: number | null; image_height?: number | null }) =>
+  item.image_width && item.image_height ? `${item.image_width} / ${item.image_height}` : undefined
+
+const isProcessingMedia = (status?: string | null) => status === 'pending' || status === 'processing'
+
 function ShadowPinHeader({
   title,
   subtitle,
@@ -188,12 +209,23 @@ function CategoryCard({
       </div>
       <div className="relative aspect-[4/3] overflow-hidden bg-[rgba(255,255,255,0.05)]">
         <img
-          src={category.image_url}
+          src={getCategoryImageUrl(category)}
           alt={category.title}
           loading="lazy"
           decoding="async"
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
         />
+        {isProcessingMedia(category.processing_status) && (
+          <div className="absolute inset-x-2 bottom-2 inline-flex items-center justify-center gap-2 rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(4,5,6,0.78)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] backdrop-blur-md">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--theme-accent-readable)]" />
+            Processing cover
+          </div>
+        )}
+        {category.processing_status === 'failed' && (
+          <div className="absolute inset-x-2 bottom-2 rounded-full border border-amber-300/30 bg-amber-500/15 px-3 py-2 text-center text-xs font-semibold text-amber-100 backdrop-blur-md">
+            Using original image
+          </div>
+        )}
         {canManageCategory && (
           <button
             type="button"
@@ -358,7 +390,7 @@ function CategoryFormModal({
             )}
             <div className="flex flex-1 gap-2 sm:justify-end">
               <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
-              <Button type="submit" loading={saving}>{mode === 'create' ? 'Create' : 'Save'}</Button>
+              <Button type="submit" loading={saving}>{saving ? 'Processing image...' : mode === 'create' ? 'Create' : 'Save'}</Button>
             </div>
           </div>
         </div>
@@ -443,7 +475,7 @@ function ImageFormModal({
             )}
             <div className="flex flex-1 gap-2 sm:justify-end">
               <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
-              <Button type="submit" loading={saving}>{mode === 'create' ? 'Add' : 'Save'}</Button>
+              <Button type="submit" loading={saving}>{saving ? 'Processing image...' : mode === 'create' ? 'Add' : 'Save'}</Button>
             </div>
           </div>
         </div>
@@ -464,7 +496,7 @@ function CategoryDetailsModal({
   return (
     <div className="fixed inset-0 z-[95] flex items-end justify-center bg-black/68 p-3 backdrop-blur-sm sm:items-center">
       <div className="popup-surface max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-[var(--radius-lg)]">
-        <img src={category.image_url} alt={category.title} className="aspect-[4/3] w-full object-cover" />
+        <img src={getCategoryImageUrl(category, 'medium')} alt={category.title} className="aspect-[4/3] w-full object-cover" />
         <div className="space-y-4 p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -528,7 +560,25 @@ function ImageCard({
       {...longPress}
     >
       <div className="relative">
-        <img src={image.image_url} alt={image.title} loading="lazy" decoding="async" className="w-full object-cover" />
+        <img
+          src={getPinImageUrl(image)}
+          alt={image.title}
+          loading="lazy"
+          decoding="async"
+          style={{ aspectRatio: getImageAspectRatio(image) }}
+          className="w-full object-cover"
+        />
+        {isProcessingMedia(image.processing_status) && (
+          <div className="absolute inset-x-2 bottom-2 inline-flex items-center justify-center gap-2 rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(4,5,6,0.78)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] backdrop-blur-md">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--theme-accent-readable)]" />
+            Processing image
+          </div>
+        )}
+        {image.processing_status === 'failed' && (
+          <div className="absolute inset-x-2 bottom-2 rounded-full border border-amber-300/30 bg-amber-500/15 px-3 py-2 text-center text-xs font-semibold text-amber-100 backdrop-blur-md">
+            Using original
+          </div>
+        )}
         <HeartButton active={image.viewer_has_hearted} count={image.heart_count} onClick={onHeart} className="absolute right-2 top-2" />
         {overlayOpen && (
           <div className="absolute inset-x-0 bottom-0 space-y-2 bg-[linear-gradient(180deg,rgba(4,5,6,0),rgba(4,5,6,0.9)_20%,rgba(4,5,6,0.96))] p-3 text-[var(--text-primary)]">
@@ -576,7 +626,7 @@ function ImageViewerModal({
         <HeartButton active={image.viewer_has_hearted} count={image.heart_count} onClick={onHeart} />
       </div>
       <div className="min-h-0 flex-1 overflow-hidden rounded-[var(--radius-lg)] bg-black/40">
-        <img src={image.image_url} alt={image.title} className="h-full w-full object-contain" />
+        <img src={getPinImageUrl(image, 'medium')} alt={image.title} className="h-full w-full object-contain" />
       </div>
       <div className="mt-3 rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(5,6,8,0.72)] p-3">
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">{image.title}</h2>
