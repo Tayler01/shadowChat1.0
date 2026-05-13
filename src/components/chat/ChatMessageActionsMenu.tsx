@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { MoreHorizontal } from 'lucide-react'
 import { Button } from '../ui/Button'
@@ -21,6 +22,12 @@ type ChatMessageActionsMenuProps = {
   menuLabel?: string
   buttonLabel?: string
   onOpenChange?: (open: boolean) => void
+}
+
+type MenuPlacement = {
+  top: number
+  left: number
+  maxHeight: number
 }
 
 const getRootPixelValue = (name: string) => {
@@ -47,6 +54,22 @@ const getVisibleSurfaceTop = (selector: string) => {
   return tops.length ? Math.min(...tops) : undefined
 }
 
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(value, max))
+
+const toDocumentRect = (rect: DOMRect, viewport: VisualViewport | null) => {
+  const offsetTop = viewport?.offsetTop ?? 0
+  const offsetLeft = viewport?.offsetLeft ?? 0
+
+  return {
+    top: rect.top + offsetTop,
+    bottom: rect.bottom + offsetTop,
+    left: rect.left + offsetLeft,
+    right: rect.right + offsetLeft,
+    width: rect.width,
+    height: rect.height,
+  }
+}
+
 export function ChatMessageActionsMenu({
   actions,
   containerRef,
@@ -58,10 +81,7 @@ export function ChatMessageActionsMenu({
 }: ChatMessageActionsMenuProps) {
   const visibleActions = actions.filter(action => !action.hidden)
   const [open, setOpen] = useState(false)
-  const [openAbove, setOpenAbove] = useState(false)
-  const [openRight, setOpenRight] = useState(false)
-  const [placementReady, setPlacementReady] = useState(false)
-  const [menuMaxHeight, setMenuMaxHeight] = useState<number | undefined>(undefined)
+  const [placement, setPlacement] = useState<MenuPlacement | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -78,7 +98,9 @@ export function ChatMessageActionsMenu({
 
     const handleClick = (event: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
-        setMenuOpen(false)
+        if (!menuRef.current || !menuRef.current.contains(event.target as Node)) {
+          setMenuOpen(false)
+        }
       }
     }
 
@@ -86,24 +108,26 @@ export function ChatMessageActionsMenu({
     return () => document.removeEventListener('mousedown', handleClick)
   }, [open, setMenuOpen])
 
-  useLayoutEffect(() => {
-    if (!open) {
-      setPlacementReady(false)
-      return
-    }
+  const updatePlacement = useCallback(() => {
+    if (!open) return
 
     const btnRect = rootRef.current?.getBoundingClientRect()
     const containerRect = containerRef?.current?.getBoundingClientRect()
 
-    if (!btnRect || !menuRef.current) return
+    if (!btnRect || !menuRef.current || typeof window === 'undefined') return
 
-    const viewport = window.visualViewport
+    const viewport = window.visualViewport ?? null
     const viewportTop = viewport?.offsetTop ?? 0
     const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight)
     const viewportLeft = viewport?.offsetLeft ?? 0
     const viewportRight = viewportLeft + (viewport?.width ?? window.innerWidth)
+    const buttonBox = toDocumentRect(btnRect, viewport)
+    const containerBox = containerRect ? toDocumentRect(containerRect, viewport) : undefined
     const mobileFooterRect = window.innerWidth < 768
       ? document.querySelector('[data-mobile-chat-footer="true"]')?.getBoundingClientRect()
+      : undefined
+    const mobileFooterTop = mobileFooterRect
+      ? toDocumentRect(mobileFooterRect, viewport).top
       : undefined
     const composerTop = window.innerWidth < 768
       ? getVisibleSurfaceTop('[data-message-composer-surface="true"]')
@@ -116,38 +140,86 @@ export function ChatMessageActionsMenu({
       return window.innerHeight - keyboardInset - footerHeight
     })()
     const safeGap = 12
-    const visibleTop = Math.max(viewportTop, containerRect?.top ?? viewportTop)
+    const visibleTop = Math.max(viewportTop, containerBox?.top ?? viewportTop)
     const visibleBottom = Math.min(
       viewportBottom,
-      containerRect?.bottom ?? viewportBottom,
-      mobileFooterRect?.top ?? viewportBottom,
+      containerBox?.bottom ?? viewportBottom,
+      mobileFooterTop ?? viewportBottom,
       composerTop ?? viewportBottom,
       keyboardAwareFooterTop ?? viewportBottom
     )
-    const menuHeight = menuRef.current.scrollHeight
-    const menuWidth = menuRef.current.offsetWidth
+    const menuHeight = menuRef.current.scrollHeight || Math.max(96, visibleActions.length * 42 + 16)
+    const menuWidth = menuRef.current.offsetWidth || 180
+    const availableViewportHeight = Math.max(96, visibleBottom - visibleTop - safeGap * 2)
 
-    const spaceBelow = Math.max(0, visibleBottom - btnRect.bottom - safeGap)
-    const spaceAbove = Math.max(0, btnRect.top - visibleTop - safeGap)
-    const wouldOverlapComposer =
-      composerTop !== undefined &&
-      btnRect.bottom + menuHeight + safeGap > composerTop
+    const spaceBelow = Math.max(0, visibleBottom - buttonBox.bottom - safeGap)
+    const spaceAbove = Math.max(0, buttonBox.top - visibleTop - safeGap)
+    const wouldOverlapBottomBoundary = buttonBox.bottom + menuHeight + safeGap > visibleBottom
     const shouldOpenUp =
-      (spaceBelow < menuHeight || wouldOverlapComposer) &&
+      (spaceBelow < menuHeight || wouldOverlapBottomBoundary) &&
       spaceAbove >= Math.min(menuHeight, 96)
-    const availableSpace = shouldOpenUp ? spaceAbove : spaceBelow
+    const maxHeight = Math.floor(Math.min(360, Math.max(96, shouldOpenUp ? spaceAbove : spaceBelow, availableViewportHeight)))
+    const desiredTop = shouldOpenUp
+      ? buttonBox.top - menuHeight - safeGap
+      : buttonBox.bottom + safeGap
+    const top = clamp(
+      desiredTop,
+      visibleTop + safeGap,
+      Math.max(visibleTop + safeGap, visibleBottom - Math.min(menuHeight, maxHeight) - safeGap)
+    )
 
-    setOpenAbove(shouldOpenUp)
-    setMenuMaxHeight(Math.floor(Math.min(360, Math.max(96, availableSpace))))
+    const left = clamp(
+      buttonBox.right - menuWidth,
+      viewportLeft + safeGap,
+      Math.max(viewportLeft + safeGap, viewportRight - menuWidth - safeGap)
+    )
 
-    const desktopSidebarWidth = window.innerWidth >= 768 ? 256 : 0
-    const safeLeft = Math.max(viewportLeft + safeGap, desktopSidebarWidth)
-    const rightAlignedLeft = btnRect.right - menuWidth
-    const canOpenRight = btnRect.right + menuWidth + safeGap <= viewportRight
+    setPlacement({ top, left, maxHeight })
+  }, [containerRef, open, visibleActions.length])
 
-    setOpenRight(rightAlignedLeft < safeLeft && canOpenRight)
-    setPlacementReady(true)
-  }, [containerRef, open])
+  useLayoutEffect(() => {
+    if (!open) {
+      setPlacement(null)
+      return
+    }
+
+    updatePlacement()
+  }, [open, updatePlacement])
+
+  useEffect(() => {
+    if (!open) return
+
+    let frameId: number | null = null
+    const schedulePlacement = () => {
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId)
+      }
+      frameId = requestAnimationFrame(updatePlacement)
+    }
+
+    const settleTimers = [80, 180, 320].map(delay => window.setTimeout(schedulePlacement, delay))
+    const scrollContainer = containerRef?.current
+
+    window.addEventListener('resize', schedulePlacement)
+    window.addEventListener('scroll', schedulePlacement, true)
+    window.addEventListener('focusin', schedulePlacement)
+    window.visualViewport?.addEventListener?.('resize', schedulePlacement)
+    window.visualViewport?.addEventListener?.('scroll', schedulePlacement)
+    scrollContainer?.addEventListener('scroll', schedulePlacement)
+
+    return () => {
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId)
+      }
+      settleTimers.forEach(timer => window.clearTimeout(timer))
+      window.removeEventListener('resize', schedulePlacement)
+      window.removeEventListener('scroll', schedulePlacement, true)
+      window.removeEventListener('focusin', schedulePlacement)
+      window.visualViewport?.removeEventListener?.('resize', schedulePlacement)
+      window.visualViewport?.removeEventListener?.('scroll', schedulePlacement)
+      scrollContainer?.removeEventListener('scroll', schedulePlacement)
+    }
+  }, [containerRef, open, updatePlacement])
 
   if (!visibleActions.length) return null
 
@@ -171,54 +243,59 @@ export function ChatMessageActionsMenu({
         <MoreHorizontal className="h-4 w-4" />
       </Button>
 
-      <AnimatePresence>
-        {open && (
-          <div
-            className={cn(
-              'absolute z-50 -m-2 p-2',
-              openAbove ? 'bottom-full mb-1' : 'top-full mt-1',
-              openRight ? 'left-full ml-2' : 'right-0',
-              !placementReady && 'invisible pointer-events-none'
-            )}
-            ref={menuRef}
-            role="menu"
-            aria-label={menuLabel}
-            data-testid="message-actions-menu"
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="glass-panel-strong z-50 min-w-[160px] overflow-y-auto overscroll-contain rounded-[var(--radius-md)] py-1"
-              style={{ maxHeight: menuMaxHeight }}
+      {typeof document !== 'undefined' && createPortal(
+        <AnimatePresence>
+          {open && (
+            <div
+              className={cn(
+                'fixed z-[90] p-2',
+                !placement && 'pointer-events-none invisible'
+              )}
+              ref={menuRef}
+              role="menu"
+              aria-label={menuLabel}
+              data-testid="message-actions-menu"
+              style={{
+                top: placement?.top ?? 0,
+                left: placement?.left ?? 0,
+              }}
             >
-              {visibleActions.map(action => {
-                const Icon = action.icon
-                return (
-                  <button
-                    key={action.id}
-                    onClick={() => {
-                      void action.onSelect()
-                      setMenuOpen(false)
-                    }}
-                    className={cn(
-                      'flex w-full items-center space-x-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[rgba(255,255,255,0.05)]',
-                      action.tone === 'danger'
-                        ? 'text-red-300 hover:text-red-100'
-                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                    )}
-                    type="button"
-                    role="menuitem"
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span>{action.label}</span>
-                  </button>
-                )
-              })}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="glass-panel-strong z-50 min-w-[160px] overflow-y-auto overscroll-contain rounded-[var(--radius-md)] py-1"
+                style={{ maxHeight: placement?.maxHeight }}
+              >
+                {visibleActions.map(action => {
+                  const Icon = action.icon
+                  return (
+                    <button
+                      key={action.id}
+                      onClick={() => {
+                        void action.onSelect()
+                        setMenuOpen(false)
+                      }}
+                      className={cn(
+                        'flex w-full items-center space-x-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[rgba(255,255,255,0.05)]',
+                        action.tone === 'danger'
+                          ? 'text-red-300 hover:text-red-100'
+                          : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                      )}
+                      type="button"
+                      role="menuitem"
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span>{action.label}</span>
+                    </button>
+                  )
+                })}
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   )
 }

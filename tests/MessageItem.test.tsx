@@ -573,9 +573,10 @@ test('opens the message actions menu upward near the mobile viewport bottom', as
 
     await waitFor(() => {
       const menu = screen.getByRole('menu', { name: /message options/i })
-      expect(menu).toHaveClass('bottom-full')
-      expect(menu).not.toHaveClass('top-full')
-      expect(menu).not.toHaveClass('left-full')
+      expect(menu).toHaveClass('fixed')
+      expect(Number.parseFloat(menu.style.top)).toBeCloseTo(250, 0)
+      expect(Number.parseFloat(menu.style.top)).toBeLessThan(522)
+      expect(Number.parseFloat(menu.style.left)).toBeCloseTo(180, 0)
     })
   } finally {
     rectSpy.mockRestore()
@@ -700,8 +701,10 @@ test('keeps the mobile message actions menu above the fixed composer footer', as
 
     await waitFor(() => {
       const menu = screen.getByRole('menu', { name: /message options/i })
-      expect(menu).toHaveClass('bottom-full')
-      expect(menu).not.toHaveClass('top-full')
+      expect(menu).toHaveClass('fixed')
+      expect(Number.parseFloat(menu.style.top)).toBeCloseTo(296, 0)
+      expect(Number.parseFloat(menu.style.top)).toBeLessThan(568)
+      expect(Number.parseFloat(menu.style.left)).toBeCloseTo(180, 0)
     })
   } finally {
     footer.remove()
