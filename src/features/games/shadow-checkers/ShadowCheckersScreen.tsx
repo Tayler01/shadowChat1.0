@@ -79,6 +79,7 @@ export function ShadowCheckersScreen({ onExit }: ShadowCheckersScreenProps) {
   const [rulesOpen, setRulesOpen] = React.useState(false)
   const [chatDraft, setChatDraft] = React.useState('')
   const [dismissedResultMatchId, setDismissedResultMatchId] = React.useState<string | null>(null)
+  const [showYourTurnBanner, setShowYourTurnBanner] = React.useState(false)
   const {
     sessions,
     matches,
@@ -133,6 +134,18 @@ export function ShadowCheckersScreen({ onExit }: ShadowCheckersScreenProps) {
   React.useEffect(() => {
     setHelperMoves(mandatoryMoves)
   }, [mandatoryMoves])
+
+  React.useEffect(() => {
+    if (!myTurn || state?.winner) {
+      setShowYourTurnBanner(false)
+      return
+    }
+
+    setShowYourTurnBanner(true)
+    const timeout = window.setTimeout(() => setShowYourTurnBanner(false), 2000)
+
+    return () => window.clearTimeout(timeout)
+  }, [activeMatch?.id, activeMatch?.current_turn_user_id, myTurn, state?.winner])
 
   const guarded = async (action: () => Promise<unknown>, success: string) => {
     try {
@@ -429,7 +442,7 @@ export function ShadowCheckersScreen({ onExit }: ShadowCheckersScreenProps) {
                 disabled={!myTurn || Boolean(state.winner) || busy === 'move'}
                 showHints={showHints}
               />
-              {myTurn && !state.winner && (
+              {showYourTurnBanner && myTurn && !state.winner && (
                 <div className="pointer-events-none absolute inset-x-4 top-[44%] z-20 -translate-y-1/2">
                   <img
                     src={SHADOW_CHECKERS_ASSETS.yourTurn}
