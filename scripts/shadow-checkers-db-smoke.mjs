@@ -35,9 +35,16 @@ try {
   const playerOne = await signInClient(supabaseUrl, supabaseAnonKey, readAccount(1))
   const playerTwo = await signInClient(supabaseUrl, supabaseAnonKey, readAccount(2))
 
-  const created = await rpc(playerOne.client, 'create_shadow_checkers_match', { character_key: 'obsidian-sentinel' })
+  const created = await rpc(playerOne.client, 'create_shadow_checkers_match', {
+    character_key: 'obsidian-sentinel',
+    selected_board_skin: 'cinematic',
+  })
   assert(created?.sessionId && created?.matchId, 'create_shadow_checkers_match did not return ids')
   record('create public match', created)
+
+  const opened = await fetchMatch(playerOne.client, created.matchId)
+  assert(opened.board_skin === 'cinematic', 'created match did not preserve selected board skin')
+  record('created match stores selected board skin')
 
   await expectRpcFailure(
     playerTwo.client,

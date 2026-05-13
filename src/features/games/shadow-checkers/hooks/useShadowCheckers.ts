@@ -181,8 +181,8 @@ export function useShadowCheckers() {
   }, [refresh])
 
   const actions = useMemo(() => ({
-    create: (characterKey: string) =>
-      runAction('create', () => createShadowCheckersMatch(characterKey), result => result.matchId),
+    create: (characterKey: string, boardSkin: 'classic' | 'cinematic' = 'classic') =>
+      runAction('create', () => createShadowCheckersMatch(characterKey, boardSkin), result => result.matchId),
     join: (sessionId: string, characterKey: string) =>
       runAction('join', () => joinShadowCheckersMatch(sessionId, characterKey), result => result.matchId),
     submitMove: (matchId: string, pieceId: string, path: CheckersPosition[]) =>

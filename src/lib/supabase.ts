@@ -829,6 +829,7 @@ export type ShadowWarPhase = 'placement' | 'reveal' | 'sudden_war' | 'complete'
 export type ShadowWarPlayerSlot = 'player_one' | 'player_two'
 export type ShadowCheckersPlayerSlot = 'player_one' | 'player_two'
 export type ShadowCheckersMatchStatus = 'waiting' | 'active' | 'completed' | 'cancelled'
+export type ShadowCheckersBoardSkin = 'classic' | 'cinematic'
 export type ShadowCheckersWinReason = 'all_pieces_captured' | 'no_legal_moves' | 'resignation'
 
 export interface GameSession {
@@ -912,6 +913,7 @@ export interface ShadowCheckersMatch {
   player_two_id?: string | null
   player_one_character_key: string
   player_two_character_key?: string | null
+  board_skin?: ShadowCheckersBoardSkin
   current_turn_user_id?: string | null
   board_state: Record<string, unknown>
   move_count: number
