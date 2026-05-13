@@ -60,6 +60,8 @@ jobs:
           npx --yes netlify@$NETLIFY_CLI_VERSION deploy \
             --context deploy-preview \
             --dir=dist \
+            --functions=.netlify/functions \
+            --skip-functions-cache \
             --alias="pr-${{ github.event.pull_request.number }}" \
             --message="GitHub Actions preview deploy PR #${{ github.event.pull_request.number }} ${{ github.sha }}" \
             --json > netlify-preview.json

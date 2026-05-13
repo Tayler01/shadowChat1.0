@@ -56,4 +56,6 @@ jobs:
             --site "$NETLIFY_SITE_ID" \
             --prod \
             --dir=dist \
+            --functions=.netlify/functions \
+            --skip-functions-cache \
             --message "GitHub Actions production deploy ${{ github.sha }}"
