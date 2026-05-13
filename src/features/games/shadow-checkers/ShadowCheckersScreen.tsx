@@ -503,7 +503,12 @@ export function ShadowCheckersScreen({
     const isCreator = match.player_one_id === user?.id
 
     return (
-      <article key={match.id} className="rounded-[1rem] border border-[#b9934c]/25 bg-black/58 p-4 shadow-[0_18px_45px_rgba(0,0,0,0.35)]">
+      <article
+        key={match.id}
+        data-checkers-match-id={match.id}
+        data-checkers-session-id={session?.id}
+        className="rounded-[1rem] border border-[#b9934c]/25 bg-black/58 p-4 shadow-[0_18px_45px_rgba(0,0,0,0.35)]"
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-semibold text-[#f6e0a2]">
