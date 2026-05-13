@@ -270,6 +270,7 @@ function BoardChatComposer({
   return (
     <form
       onSubmit={onSubmit}
+      data-message-composer-surface="true"
       className={cn(
         'theme-composer-surface border-t border-[var(--border-panel)] p-3',
         className

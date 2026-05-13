@@ -31,6 +31,22 @@ const getRootPixelValue = (name: string) => {
   return Number.isFinite(value) ? value : 0
 }
 
+const getVisibleSurfaceTop = (selector: string) => {
+  if (typeof document === 'undefined') return undefined
+
+  const tops = Array.from(document.querySelectorAll<HTMLElement>(selector))
+    .map(element => element.getBoundingClientRect())
+    .filter(rect =>
+      rect.width > 0 &&
+      rect.height > 0 &&
+      rect.bottom > 0 &&
+      rect.top < window.innerHeight
+    )
+    .map(rect => rect.top)
+
+  return tops.length ? Math.min(...tops) : undefined
+}
+
 export function ChatMessageActionsMenu({
   actions,
   containerRef,
@@ -89,6 +105,9 @@ export function ChatMessageActionsMenu({
     const mobileFooterRect = window.innerWidth < 768
       ? document.querySelector('[data-mobile-chat-footer="true"]')?.getBoundingClientRect()
       : undefined
+    const composerTop = window.innerWidth < 768
+      ? getVisibleSurfaceTop('[data-message-composer-surface="true"]')
+      : undefined
     const keyboardAwareFooterTop = (() => {
       if (window.innerWidth >= 768) return undefined
       const keyboardInset = getRootPixelValue('--shadowchat-keyboard-inset')
@@ -102,6 +121,7 @@ export function ChatMessageActionsMenu({
       viewportBottom,
       containerRect?.bottom ?? viewportBottom,
       mobileFooterRect?.top ?? viewportBottom,
+      composerTop ?? viewportBottom,
       keyboardAwareFooterTop ?? viewportBottom
     )
     const menuHeight = menuRef.current.scrollHeight
@@ -109,7 +129,12 @@ export function ChatMessageActionsMenu({
 
     const spaceBelow = Math.max(0, visibleBottom - btnRect.bottom - safeGap)
     const spaceAbove = Math.max(0, btnRect.top - visibleTop - safeGap)
-    const shouldOpenUp = spaceBelow < menuHeight && spaceAbove > spaceBelow
+    const wouldOverlapComposer =
+      composerTop !== undefined &&
+      btnRect.bottom + menuHeight + safeGap > composerTop
+    const shouldOpenUp =
+      (spaceBelow < menuHeight || wouldOverlapComposer) &&
+      spaceAbove >= Math.min(menuHeight, 96)
     const availableSpace = shouldOpenUp ? spaceAbove : spaceBelow
 
     setOpenAbove(shouldOpenUp)

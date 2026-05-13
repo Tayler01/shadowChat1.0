@@ -119,12 +119,12 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
 
           <div className="flex flex-shrink-0 items-center gap-1 sm:gap-2">
             <WeatherWidget onOpenSettings={() => onViewChange('settings')} />
+            <ActiveUsersButton resetStatus={resetStatus} />
             <PinnedMessagesButton
               messages={pinnedMessages}
               onUnpin={togglePin}
               onToggleReaction={toggleReaction}
             />
-            <ActiveUsersButton resetStatus={resetStatus} />
           </div>
         </div>
       </div>

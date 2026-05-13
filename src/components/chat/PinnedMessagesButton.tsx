@@ -53,7 +53,7 @@ export function PinnedMessagesButton({
 
       {open && (
         <div
-          className="glass-panel-strong absolute right-0 top-full z-[80] mt-2 w-[min(24rem,calc(100vw-1rem))] overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-panel)] shadow-[var(--shadow-panel-strong)]"
+          className="glass-panel-strong fixed left-1/2 top-[calc(env(safe-area-inset-top)_+_4.35rem)] z-[80] w-[min(24rem,calc(100vw-1.5rem))] -translate-x-1/2 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-panel)] shadow-[var(--shadow-panel-strong)] md:absolute md:left-auto md:right-0 md:top-full md:mt-2 md:w-[min(24rem,calc(100vw-1rem))] md:translate-x-0"
           role="dialog"
           aria-label="Pinned messages"
         >

@@ -463,6 +463,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   return (
     <div
+      data-message-composer-surface="true"
       className={`theme-composer-surface relative border-t border-[var(--border-panel)] px-3 pb-3 pt-2.5 md:p-3 ${className}`}
     >
       {replyingTo && (
