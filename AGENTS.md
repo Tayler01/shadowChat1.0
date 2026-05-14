@@ -391,6 +391,11 @@ For a clean working environment, see:
 - [docs/DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1)
 - bridge planning and implementation docs listed in `Current Feature Focus`
 
+Before using `npx` in Codex desktop shells, confirm `Get-Command node,npm,npx`
+resolves all three commands. This workstation uses shims in
+`C:\Users\tayle\AppData\Local\pnpm` that forward to the FNM Node install; if
+`npx` is missing, repair that setup instead of switching QA into reuse mode.
+
 ## Before Shipping
 
 Before push/deploy:

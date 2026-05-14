@@ -45,6 +45,7 @@ import { UnreadDivider } from '../chat/UnreadDivider'
 import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import type { EmojiClickData } from '../../types'
 import type { AppView } from '../../types/navigation'
+import { getSupabaseImageTransformUrl } from '../../lib/storageImageTransforms'
 
 interface DirectMessagesViewProps {
   onToggleSidebar: () => void
@@ -84,6 +85,8 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
   onReact,
   onOpenProfile,
   containerRef,
+  avatarLoading = 'lazy',
+  avatarFetchPriority,
 }: {
   message: DMMessage
   previousMessage?: DMMessage
@@ -93,6 +96,8 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
   onReact: (id: string, emoji: string) => Promise<void>
   onOpenProfile: (user: User | null) => void
   containerRef?: React.RefObject<HTMLDivElement>
+  avatarLoading?: 'eager' | 'lazy'
+  avatarFetchPriority?: 'high' | 'low' | 'auto'
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(message.content)
@@ -104,6 +109,12 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
   const isOwn = message.sender_id === currentUserId
   const isIncoming = !isOwn
   const isImageMessage = message.message_type === 'image' && Boolean(message.file_url)
+  const imageMessageSrc = getSupabaseImageTransformUrl(message.file_url, {
+    width: 960,
+    height: 960,
+    resize: 'contain',
+    quality: 82,
+  })
   const isLocalDelivery = message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
   const showIncomingAvatar = !isGrouped && !isOwn
   const bubbleColor = undefined
@@ -202,7 +213,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
       id={`dm-message-${message.id}`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`group flex ${isOwn ? 'justify-end' : 'justify-start'} ${isGrouped ? 'mt-1' : 'mt-4'}`}
+      className={`group flex [content-visibility:auto] [contain-intrinsic-size:0_88px] ${isOwn ? 'justify-end' : 'justify-start'} ${isGrouped ? 'mt-1' : 'mt-4'}`}
     >
       <div
         className={`relative ${
@@ -228,6 +239,8 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
                 userId={message.sender?.id}
                 presenceVisibility={message.sender?.presence_visibility}
                 showStatus
+                loading={avatarLoading}
+                fetchPriority={avatarFetchPriority}
               />
             </button>
           ) : (
@@ -293,7 +306,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
             <audio controls src={message.audio_url} className="mt-1 max-w-full" />
           ) : isImageMessage ? (
             <img
-              src={message.file_url}
+              src={imageMessageSrc}
               alt="uploaded"
               width={320}
               height={240}
@@ -768,6 +781,9 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const currentPeerPresenceState =
     currentPeerPresence?.presence_state ||
     (currentConv?.other_user?.presence_visibility === 'invisible' ? 'invisible' : 'offline')
+  const eagerDMAvatarMessageIds = useMemo(() => (
+    new Set(messages.slice(-12).map(message => message.id))
+  ), [messages])
   const showConversationList = isDesktop || !currentConversation
   const existingConversationUserIds = useMemo(
     () => new Set(conversations.map(conversation => conversation.other_user?.id).filter(Boolean) as string[]),
@@ -867,8 +883,9 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 </div>
               ) : (
                 <div className="space-y-1 p-2">
-                  {conversations.map(conversation => {
+                  {conversations.map((conversation, index) => {
                     const unreadCount = conversation.unread_count || 0
+                    const eagerConversationAvatar = index < 12
 
                     return (
                     <motion.button
@@ -892,6 +909,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                           userId={conversation.other_user?.id}
                           presenceVisibility={conversation.other_user?.presence_visibility}
                           showStatus
+                          loading={eagerConversationAvatar ? 'eager' : 'lazy'}
+                          fetchPriority={eagerConversationAvatar ? 'high' : undefined}
                         />
 
                         <div className="min-w-0 flex-1">
@@ -964,6 +983,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   userId={currentConv.other_user?.id}
                   presenceVisibility={currentConv.other_user?.presence_visibility}
                   showStatus
+                  loading="eager"
+                  fetchPriority="high"
                 />
 
                 <div className="min-w-0 flex-1">
@@ -1025,6 +1046,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                     onReact={toggleReaction}
                     onOpenProfile={setProfileUser}
                     containerRef={messagesRef}
+                    avatarLoading={eagerDMAvatarMessageIds.has(message.id) ? 'eager' : 'lazy'}
+                    avatarFetchPriority={eagerDMAvatarMessageIds.has(message.id) ? 'high' : undefined}
                   />
                 </React.Fragment>
               ))}

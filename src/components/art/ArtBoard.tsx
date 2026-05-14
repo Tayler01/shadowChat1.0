@@ -40,6 +40,7 @@ import {
   uploadArtBoardImageFile,
 } from '../../lib/artBoard'
 import { getBlockedActionMessage } from '../../lib/moderation'
+import { getSupabaseImageTransformUrl } from '../../lib/storageImageTransforms'
 import { showActionErrorToast } from '../../lib/toastNotifications'
 import { cn, formatTime } from '../../lib/utils'
 import type {
@@ -55,6 +56,29 @@ const MIN_ZOOM = 0.35
 const MAX_ZOOM = 1.8
 const LONG_PRESS_MS = 430
 const DRAFT_SAVE_DELAY_MS = 900
+const getArtBoardCanvasImageUrl = (item: ArtBoardItem) =>
+  getSupabaseImageTransformUrl(item.image_url, {
+    width: Math.max(320, Math.min(1600, item.width * 3)),
+    height: Math.max(320, Math.min(1600, item.height * 3)),
+    resize: 'cover',
+    quality: 78,
+  })
+
+const getArtBoardDetailImageUrl = (url?: string | null) =>
+  getSupabaseImageTransformUrl(url, {
+    width: 1600,
+    height: 1600,
+    resize: 'contain',
+    quality: 82,
+  })
+
+const getArtBoardThumbnailUrl = (url?: string | null) =>
+  getSupabaseImageTransformUrl(url, {
+    width: 160,
+    height: 160,
+    resize: 'cover',
+    quality: 76,
+  })
 
 type AddMode = 'image' | 'note' | null
 type PointerMode = 'pan' | 'move'
@@ -408,7 +432,7 @@ function ArtBoardItemCard({
               <span className="absolute left-1/2 top-1 z-10 h-3 w-3 -translate-x-1/2 rounded-full border border-black/20 bg-[var(--text-gold)] shadow-[0_2px_8px_rgba(0,0,0,0.45)]" />
             )}
             <img
-              src={item.image_url || ''}
+              src={getArtBoardCanvasImageUrl(item)}
               alt={item.alt_text || item.title || item.caption || 'Art board image'}
               draggable={false}
               loading="lazy"
@@ -726,7 +750,7 @@ function DetailDialog({
             {item.item_type === 'image' ? (
               <div className="relative">
                 <img
-                  src={item.image_url || ''}
+                  src={getArtBoardDetailImageUrl(item.image_url)}
                   alt={item.alt_text || item.title || item.caption || 'Art board image'}
                   loading="eager"
                   decoding="async"
@@ -780,7 +804,7 @@ function DetailDialog({
                         <button type="button" onClick={() => onJumpToItem(other)} className="flex w-full items-center gap-2 text-left">
                           <span className="h-10 w-10 overflow-hidden rounded-[var(--radius-sm)] bg-black/30">
                             {other.item_type === 'image' ? (
-                              <img src={other.image_url || ''} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                              <img src={getArtBoardThumbnailUrl(other.image_url)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                             ) : (
                               <span className={cn('block h-full w-full', noteColorClass(other.note_color))} />
                             )}

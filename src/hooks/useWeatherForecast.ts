@@ -1,11 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useWeatherPreference } from './useWeatherPreference'
 import {
   fetchWeatherForecast,
   type WeatherForecast,
+  type WeatherPreference,
 } from '../lib/weather'
 
 const WEATHER_REFRESH_MS = 10 * 60 * 1000
+const getVisibleDocument = () =>
+  typeof document === 'undefined' || document.visibilityState !== 'hidden'
 
 export function useWeatherForecast() {
   const {
@@ -17,9 +20,13 @@ export function useWeatherForecast() {
   const [forecast, setForecast] = useState<WeatherForecast | null>(null)
   const [loadingForecast, setLoadingForecast] = useState(false)
   const [forecastError, setForecastError] = useState<string | null>(null)
+  const forecastRequestIdRef = useRef(0)
 
-  const refreshForecast = useCallback(async () => {
-    if (!preference) {
+  const refreshForecast = useCallback(async (nextPreference: WeatherPreference | null = preference) => {
+    const requestId = forecastRequestIdRef.current + 1
+    forecastRequestIdRef.current = requestId
+
+    if (!nextPreference) {
       setForecast(null)
       setForecastError(null)
       return
@@ -27,12 +34,19 @@ export function useWeatherForecast() {
 
     setLoadingForecast(true)
     try {
-      setForecast(await fetchWeatherForecast(preference))
-      setForecastError(null)
+      const nextForecast = await fetchWeatherForecast(nextPreference)
+      if (requestId === forecastRequestIdRef.current) {
+        setForecast(nextForecast)
+        setForecastError(null)
+      }
     } catch (err) {
-      setForecastError(err instanceof Error ? err.message : 'Unable to load weather')
+      if (requestId === forecastRequestIdRef.current) {
+        setForecastError(err instanceof Error ? err.message : 'Unable to load weather')
+      }
     } finally {
-      setLoadingForecast(false)
+      if (requestId === forecastRequestIdRef.current) {
+        setLoadingForecast(false)
+      }
     }
   }, [preference])
 
@@ -43,16 +57,26 @@ export function useWeatherForecast() {
   useEffect(() => {
     if (!preference) return
 
-    const interval = window.setInterval(() => {
-      void refreshForecast()
-    }, WEATHER_REFRESH_MS)
+    const refreshWhenVisible = () => {
+      if (getVisibleDocument()) {
+        void refreshForecast()
+      }
+    }
 
-    return () => window.clearInterval(interval)
+    const interval = window.setInterval(refreshWhenVisible, WEATHER_REFRESH_MS)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    window.addEventListener('focus', refreshWhenVisible)
+
+    return () => {
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+      window.removeEventListener('focus', refreshWhenVisible)
+    }
   }, [preference, refreshForecast])
 
   const refresh = useCallback(async () => {
-    await refreshPreference()
-    await refreshForecast()
+    const nextPreference = await refreshPreference()
+    await refreshForecast(nextPreference ?? null)
   }, [refreshForecast, refreshPreference])
 
   return useMemo(() => ({

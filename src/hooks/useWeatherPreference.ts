@@ -23,15 +23,18 @@ export function useWeatherPreference() {
       setPreference(null)
       setLoading(false)
       setError(null)
-      return
+      return null
     }
 
     setLoading(true)
     try {
-      setPreference(await fetchWeatherPreference(user.id))
+      const nextPreference = await fetchWeatherPreference(user.id)
+      setPreference(nextPreference)
       setError(null)
+      return nextPreference
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load weather location')
+      return null
     } finally {
       setLoading(false)
     }

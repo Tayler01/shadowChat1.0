@@ -47,8 +47,20 @@ performance pass across iPhone/WebKit and Android/Chromium flows.
 6. Tooling and import guardrails
    - Keep mobile QA scripts on repo-local Vite binaries so they do not depend
      on a global `npx` being present.
-   - Cap backend Art Board URL imports at 2 MB; larger images should be saved
-     and uploaded through the phone app so the browser optimizer runs first.
+   - Keep Art Board URL imports at the bucket-level 10 MB limit and rely on
+     backend delivery transformations instead of asking users to resize images.
+
+7. Avatar and realtime render containment
+   - Treat avatars as phone-first UI, with only the newest visible chat/DM
+     avatars eager-loaded and older/offscreen avatars left lazy.
+   - Serve avatars, chat image attachments, and Art Board canvas/detail images
+     through Supabase backend transformation URLs so phones receive
+     display-sized images even when the stored object is larger.
+   - Keep presence updates scoped to the user row that changed so one heartbeat
+     does not force every avatar and presence badge in long chat lists to
+     repaint.
+   - Pause periodic presence and weather refreshes while the PWA is hidden, then
+     refresh when it becomes visible again.
 
 ## Findings And Resolution
 
@@ -56,12 +68,19 @@ performance pass across iPhone/WebKit and Android/Chromium flows.
 | --- | --- |
 | Chat avatars, profile photos, banners, Art Board images, and image attachments were loading row-backed originals that could be much larger than phone displays need. | Added shared browser-side image optimization before avatar, banner, chat image, Art Board image, and Shadow Pin uploads. GIF and SVG are preserved. |
 | Existing profile, chat, DM, and Art Board media still pointed at older large objects. | Added `npm run media:backfill-mobile` and ran the backend backfill on May 14, 2026. It optimized 89 of 110 row-backed media URLs, reducing those rows from 281,326,346 bytes to 12,878,620 bytes while preserving originals in storage. |
-| Future uploads needed a protection path, not just a one-time cleanup. | New in-app uploads are optimized before storage, row-backed media can be reprocessed by the idempotent backfill script, and Art Board URL imports now reject remote images over 2 MB so they do not bypass the optimizer. |
+| Future uploads needed a protection path, not just a one-time cleanup. | New in-app uploads are optimized before storage where practical, row-backed media can be reprocessed by the idempotent backfill script, and render paths now request backend-transformed delivery URLs so users do not need to manually resize normal images. |
+| Shadow Pin already had the better backend media model: originals plus generated thumbnail/medium derivatives from the Netlify Sharp processor. | Left Shadow Pin on that path and used it as the pattern for other surfaces instead of reworking it again. |
+| Art Board URL imports were capped at 2 MB, which made users think about image size. | Raised the import guardrail to the bucket's 10 MB limit and switched Art Board image delivery to Supabase backend transformation URLs for canvas/detail thumbnails. |
+| Avatar and chat image rows can still point at older originals or future externally written objects. | Added a shared Supabase Storage transform URL helper and routed Avatar, General Chat image, DM image, and Art Board image rendering through backend resizing/optimization where the source is a Supabase public storage URL. GIF/SVG sources bypass transformation. |
 | Art Board, News, and profile images could compete with first paint or decode on the main thread. | Added explicit `loading` and `decoding` hints so lists and trays lazy-load while opened detail/profile media remains eager. |
 | Chat and DM realtime UPDATE events could hydrate full rows just to patch already-visible messages. | Added local realtime update merge logic that preserves joined user/sender data, ignores stale updates, and skips unloaded rows. |
 | Supabase performance advisor reported duplicate indexes. | Dropped duplicate message, DM conversation, and username indexes while keeping equivalent coverage. Broader RLS policy advisor warnings remain a separate security-sensitive cleanup. |
 | Mobile QA was being forced into preview reuse mode when `npx` was missing. | Fixed the Windows user PATH for `npm`/`npx`, documented the setup check, and changed the QA scripts to start Vite through the repo-local `node_modules/vite/bin/vite.js` entrypoint. |
 | The production build emitted a circular manual-chunk warning. | Tightened Vite manual chunk package detection so packages are grouped by exact package name instead of substring matches such as `react`. |
+| Linked Supabase storage still contains old original objects, but current app rows are much lighter after backfill: `users.avatar_url` references 523 kB total across 12 avatar rows, `art_board_items.image_url` references 2,986 kB across 11 rows, and only one current chat attachment remains over 1 MB. | Keep originals for rollback, but focus the next avatar work on render churn and viewport prioritization rather than another avatar migration. Videos remain a separate attachment delivery track. |
+| Every avatar and invisible-status badge subscribed through the full presence context, so any heartbeat could invalidate all consumers in chat, DMs, sidebars, and profile surfaces. | Presence now uses per-user `useSyncExternalStore` snapshots. Consumers whose user row did not change keep the same snapshot and avoid unnecessary rerenders. |
+| Long General Chat and DM threads are capped initially but still render every loaded message once older pages are fetched. | Added CSS containment for chat/DM rows and eager loading only for the newest 12 avatar rows. True windowing remains the next bigger list-rendering step if threads routinely exceed a few hundred loaded rows. |
+| Weather and presence refresh timers kept running while the app was hidden. | Presence polling and weather forecast refreshes now skip hidden tabs and refresh on visibility/focus. Manual weather refresh also uses the freshly fetched preference instead of a stale closure. |
 
 ## Residual Mobile QA Notes
 

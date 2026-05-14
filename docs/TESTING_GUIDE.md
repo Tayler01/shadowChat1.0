@@ -90,6 +90,12 @@ Do not use preview reuse mode to hide a missing `npm` or `npx` dependency.
 Fix the toolchain first, then rerun the normal fresh-preview check. The setup
 guide documents the expected `node`, `npm`, and `npx` checks.
 
+For this workstation, fresh Codex shell commands should resolve `node`, `npm`,
+and `npx` through user-level shims in `C:\Users\tayle\AppData\Local\pnpm`.
+Those shims forward to the FNM Node install documented in the setup guide. If a
+check fails with `npx` not found, repair that shim/PATH setup before treating a
+QA script as reusable-server only.
+
 The repo smoke and mobile QA scripts start Vite through the repo-local
 `node_modules/vite/bin/vite.js` entrypoint when it exists. That keeps browser
 QA independent from a global `npx` path while still requiring a working Node

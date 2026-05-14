@@ -31,6 +31,7 @@ import { useToneAnalysis } from '../../hooks/useToneAnalysis'
 import { useToneAnalysisEnabled } from '../../hooks/useToneAnalysisEnabled'
 import { getBlockedActionMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
+import { getSupabaseImageTransformUrl } from '../../lib/storageImageTransforms'
 
 interface MessageItemProps {
   message: Message
@@ -43,6 +44,8 @@ interface MessageItemProps {
   onToggleReaction: (messageId: string, emoji: string) => Promise<void>
   onJumpToMessage?: (messageId: string) => void
   containerRef?: React.RefObject<HTMLDivElement>
+  avatarLoading?: 'eager' | 'lazy'
+  avatarFetchPriority?: 'high' | 'low' | 'auto'
 }
 
 const PublicProfileDialog = lazy(() =>
@@ -81,7 +84,20 @@ const getEmojiPickerTheme = () =>
     : 'light'
 
 export const MessageItem: React.FC<MessageItemProps> = React.memo(
-  ({ message, previousMessage, parentMessage, onReply, onEdit, onDelete, onTogglePin, onToggleReaction, onJumpToMessage, containerRef }) => {
+  ({
+    message,
+    previousMessage,
+    parentMessage,
+    onReply,
+    onEdit,
+    onDelete,
+    onTogglePin,
+    onToggleReaction,
+    onJumpToMessage,
+    containerRef,
+    avatarLoading = 'lazy',
+    avatarFetchPriority,
+  }) => {
     const { profile } = useAuth()
     const [isEditing, setIsEditing] = useState(false)
     const [editContent, setEditContent] = useState(message.content)
@@ -105,6 +121,12 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const isShadoAI = message.user?.username === 'shado_ai'
     const isAIMessage = isShadoAI || message.message_type === 'command'
     const isImageMessage = message.message_type === 'image' && Boolean(message.file_url)
+    const imageMessageSrc = getSupabaseImageTransformUrl(message.file_url, {
+      width: 960,
+      height: 960,
+      resize: 'contain',
+      quality: 82,
+    })
     const parentPreview = parentMessage
       ? parentMessage.content?.trim() || (parentMessage.message_type === 'image' ? 'Image' : parentMessage.message_type)
       : ''
@@ -261,6 +283,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   userId={message.user?.id}
                   presenceVisibility={message.user?.presence_visibility}
                   showStatus
+                  loading={avatarLoading}
+                  fetchPriority={avatarFetchPriority}
                 />
               </button>
             ) : (
@@ -381,7 +405,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     <audio controls src={message.audio_url} className="mt-1 max-w-full" />
                   ) : isImageMessage ? (
                     <img
-                      src={message.file_url}
+                      src={imageMessageSrc}
                       alt="uploaded image"
                       width={320}
                       height={240}
@@ -492,11 +516,15 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
 
 MessageItem.displayName = 'MessageItem'
 
-export const MessageReactions: React.FC<{
+export const MessageReactions = React.memo(function MessageReactions({
+  message,
+  onReact,
+  className = '',
+}: {
   message: Message
   onReact: (emoji: string) => void
   className?: string
-}> = ({ message, onReact, className = '' }) => {
+}) {
   const { profile } = useAuth()
   const reactions: Record<string, { count: number; users: string[] }> = message.reactions || {}
   const hasReactions = Object.keys(reactions).length > 0
@@ -510,7 +538,7 @@ export const MessageReactions: React.FC<{
         return (
           <motion.button
             key={emoji}
-            initial={{ scale: 0 }}
+            initial={false}
             animate={{ scale: 1 }}
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.9 }}
@@ -529,4 +557,4 @@ export const MessageReactions: React.FC<{
       })}
     </div>
   )
-}
+})

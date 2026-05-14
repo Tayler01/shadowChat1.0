@@ -23,8 +23,20 @@ supabase --version
 On Windows, especially from the Codex desktop shell, verify that `npm` and
 `npx` resolve from PATH before running QA. If `node --version` works but
 `npm`/`npx` do not, fix the machine/user PATH or install a normal Node LTS
-toolchain rather than working around it in test commands. On this workstation,
-the Visual Studio Node runtime path is a valid fallback:
+toolchain rather than working around it in test commands.
+
+On this workstation, Codex shells inherit `C:\Users\tayle\AppData\Local\pnpm`
+but may not inherit the full Windows user PATH. That directory now contains
+small `node.CMD`, `npm.CMD`, and `npx.CMD` shims that forward to the FNM Node
+install at:
+
+```powershell
+C:\Users\tayle\AppData\Roaming\fnm\node-versions\v24.15.0\installation
+```
+
+If `npx` disappears again, first verify those shims still exist and point at an
+installed FNM Node version. The Visual Studio Node runtime path is a fallback,
+but prefer the FNM install because it includes the normal npm/npx toolchain:
 
 ```powershell
 C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VisualStudio\NodeJs
@@ -137,8 +149,9 @@ supabase functions deploy art-board-import-image
 ```
 
 `art-board-import-image` is required for Art Board URL imports. It rejects
-private/local URLs and oversized remote images so imported media cannot bypass
-the mobile upload optimizer with a very large row-backed asset.
+private/local URLs and remote images above the `art-board` bucket's 10 MB
+limit. Runtime Art Board delivery uses backend image transformations so users
+do not need to resize normal imported images by hand.
 
 Deploy bridge functions too when working on the ESP bridge or when a fresh
 Supabase project needs full feature parity:

@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import {
   fetchPresenceStates,
@@ -7,31 +7,97 @@ import {
   getWorkingClient,
   type PresenceSnapshot,
 } from '../lib/supabase'
-import type { PresenceState } from '../types'
+import type { PresenceState, PresenceVisibility } from '../types'
 
 const PRESENCE_REFRESH_MS = 30000
 const PRESENCE_REALTIME_DEBOUNCE_MS = 350
 const PRESENCE_ACTIVE_WINDOW_MS = 2 * 60 * 1000
 
 type PresenceContextValue = {
-  presenceByUserId: Record<string, PresenceSnapshot>
-  activeUsers: PresenceSnapshot[]
+  store: PresenceStore
   refresh: () => Promise<void>
 }
 
-const PresenceContext = createContext<PresenceContextValue>({
-  presenceByUserId: {},
-  activeUsers: [],
-  refresh: async () => undefined,
-})
-
 const normalizePresence = (rows: PresenceSnapshot[]) =>
   Object.fromEntries(rows.map(row => [row.user_id, row]))
+
+const getVisibleDocument = () =>
+  typeof document === 'undefined' || document.visibilityState !== 'hidden'
+
+const getActiveUsersSnapshot = (presenceByUserId: Record<string, PresenceSnapshot>) =>
+  Object.values(presenceByUserId)
+    .filter(row => row.is_active)
+    .sort((left, right) =>
+      (left.display_name || left.username || '').localeCompare(
+        right.display_name || right.username || ''
+      )
+    )
+
+const activeUsersEqual = (left: PresenceSnapshot[], right: PresenceSnapshot[]) =>
+  left.length === right.length && left.every((item, index) => item === right[index])
+
+type PresenceStore = {
+  subscribe: (listener: () => void) => () => void
+  getPresenceByUserId: () => Record<string, PresenceSnapshot>
+  getPresenceForUser: (userId?: string | null) => PresenceSnapshot | null
+  getActiveUsers: () => PresenceSnapshot[]
+  setPresenceByUserId: (nextPresenceByUserId: Record<string, PresenceSnapshot>) => void
+}
+
+const createPresenceStore = (): PresenceStore => {
+  let presenceByUserId: Record<string, PresenceSnapshot> = {}
+  let activeUsers: PresenceSnapshot[] = []
+  const listeners = new Set<() => void>()
+
+  const emit = () => {
+    listeners.forEach(listener => listener())
+  }
+
+  const setPresenceByUserId = (nextPresenceByUserId: Record<string, PresenceSnapshot>) => {
+    const nextActiveUsers = getActiveUsersSnapshot(nextPresenceByUserId)
+    presenceByUserId = nextPresenceByUserId
+    activeUsers = activeUsersEqual(activeUsers, nextActiveUsers) ? activeUsers : nextActiveUsers
+    emit()
+  }
+
+  return {
+    subscribe(listener) {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    getPresenceByUserId() {
+      return presenceByUserId
+    },
+    getPresenceForUser(userId) {
+      return userId ? presenceByUserId[userId] ?? null : null
+    },
+    getActiveUsers() {
+      return activeUsers
+    },
+    setPresenceByUserId,
+  }
+}
+
+const fallbackPresenceStore = createPresenceStore()
+
+const PresenceContext = createContext<PresenceContextValue>({
+  store: fallbackPresenceStore,
+  refresh: async () => undefined,
+})
 
 type UserPresenceRealtimeRow = {
   user_id?: string | null
   status?: string | null
   last_seen?: string | null
+}
+
+type UserProfileRealtimeRow = {
+  id?: string | null
+  username?: string | null
+  display_name?: string | null
+  avatar_url?: string | null
+  color?: string | null
+  presence_visibility?: PresenceVisibility | null
 }
 
 const resolvePresenceFromHeartbeat = (
@@ -64,19 +130,18 @@ export function PresenceProvider({
   children: React.ReactNode
   userId?: string | null
 }) {
-  const [presenceByUserId, setPresenceByUserId] = useState<Record<string, PresenceSnapshot>>({})
+  const storeRef = useRef<PresenceStore | null>(null)
+  if (!storeRef.current) {
+    storeRef.current = createPresenceStore()
+  }
+  const store = storeRef.current
   const aliveRef = useRef(true)
   const refreshInFlightRef = useRef<Promise<void> | null>(null)
   const refreshTimerRef = useRef<number | null>(null)
-  const presenceByUserIdRef = useRef<Record<string, PresenceSnapshot>>({})
-
-  useEffect(() => {
-    presenceByUserIdRef.current = presenceByUserId
-  }, [presenceByUserId])
 
   const refresh = useCallback(async () => {
     if (!userId) {
-      setPresenceByUserId({})
+      store.setPresenceByUserId({})
       return
     }
 
@@ -87,7 +152,7 @@ export function PresenceProvider({
     refreshInFlightRef.current = fetchPresenceStates()
       .then(rows => {
         if (aliveRef.current) {
-          setPresenceByUserId(normalizePresence(rows))
+          store.setPresenceByUserId(normalizePresence(rows))
         }
       })
       .catch(() => undefined)
@@ -96,9 +161,13 @@ export function PresenceProvider({
       })
 
     return refreshInFlightRef.current
-  }, [userId])
+  }, [store, userId])
 
   const refreshSoon = useCallback(() => {
+    if (!getVisibleDocument()) {
+      return
+    }
+
     if (refreshTimerRef.current !== null) {
       window.clearTimeout(refreshTimerRef.current)
     }
@@ -117,7 +186,7 @@ export function PresenceProvider({
       return
     }
 
-    const existing = presenceByUserIdRef.current[targetUserId]
+    const existing = store.getPresenceForUser(targetUserId)
     if (!existing) {
       refreshSoon()
       return
@@ -128,12 +197,44 @@ export function PresenceProvider({
       : row
     const nextPresence = resolvePresenceFromHeartbeat(existing, nextRow)
 
-    presenceByUserIdRef.current = {
-      ...presenceByUserIdRef.current,
+    store.setPresenceByUserId({
+      ...store.getPresenceByUserId(),
       [targetUserId]: nextPresence,
+    })
+  }, [refreshSoon, store])
+
+  const applyUserRealtimePayload = useCallback((payload: any) => {
+    const row = payload.new as UserProfileRealtimeRow | undefined
+    const targetUserId = row?.id
+    if (!targetUserId) {
+      refreshSoon()
+      return
     }
-    setPresenceByUserId(presenceByUserIdRef.current)
-  }, [refreshSoon])
+
+    const existing = store.getPresenceForUser(targetUserId)
+    if (!existing) {
+      refreshSoon()
+      return
+    }
+
+    const nextBase: PresenceSnapshot = {
+      ...existing,
+      username: row.username ?? existing.username,
+      display_name: row.display_name ?? existing.display_name,
+      avatar_url: row.avatar_url ?? existing.avatar_url,
+      color: row.color ?? existing.color,
+      presence_visibility: row.presence_visibility ?? existing.presence_visibility,
+    }
+    const nextPresence = resolvePresenceFromHeartbeat(nextBase, {
+      status: existing.presence_state === 'online' ? 'online' : 'offline',
+      last_seen: existing.last_seen,
+    })
+
+    store.setPresenceByUserId({
+      ...store.getPresenceByUserId(),
+      [targetUserId]: nextPresence,
+    })
+  }, [refreshSoon, store])
 
   useEffect(() => {
     aliveRef.current = true
@@ -148,7 +249,7 @@ export function PresenceProvider({
 
   useEffect(() => {
     if (!userId) {
-      setPresenceByUserId({})
+      store.setPresenceByUserId({})
       return
     }
 
@@ -189,8 +290,8 @@ export function PresenceProvider({
         .on(
           'postgres_changes',
           { event: 'UPDATE', schema: 'public', table: 'users' },
-          () => {
-            refreshSoon()
+          (payload: any) => {
+            applyUserRealtimePayload(payload)
           }
         )
         .subscribe((status: string) => {
@@ -213,8 +314,19 @@ export function PresenceProvider({
     void refresh()
     void subscribe()
     const poll = window.setInterval(() => {
-      void refresh()
+      if (getVisibleDocument()) {
+        void refresh()
+      }
     }, PRESENCE_REFRESH_MS)
+
+    const refreshWhenVisible = () => {
+      if (getVisibleDocument()) {
+        void refresh()
+      }
+    }
+
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    window.addEventListener('focus', refreshWhenVisible)
 
     return () => {
       disposed = true
@@ -224,33 +336,22 @@ export function PresenceProvider({
         refreshTimerRef.current = null
       }
       window.clearInterval(poll)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+      window.removeEventListener('focus', refreshWhenVisible)
       if (channel && currentClient?.removeChannel) {
         currentClient.removeChannel(channel)
       } else if (channel && getRealtimeClient()?.removeChannel) {
         getRealtimeClient()?.removeChannel(channel)
       }
     }
-  }, [applyPresenceRealtimePayload, refresh, refreshSoon, userId])
-
-  const activeUsers = useMemo(
-    () =>
-      Object.values(presenceByUserId)
-        .filter(row => row.is_active)
-        .sort((left, right) =>
-          (left.display_name || left.username || '').localeCompare(
-            right.display_name || right.username || ''
-          )
-        ),
-    [presenceByUserId]
-  )
+  }, [applyPresenceRealtimePayload, applyUserRealtimePayload, refresh, store, userId])
 
   const value = useMemo(
     () => ({
-      presenceByUserId,
-      activeUsers,
+      store,
       refresh,
     }),
-    [activeUsers, presenceByUserId, refresh]
+    [refresh, store]
   )
 
   return (
@@ -261,16 +362,41 @@ export function PresenceProvider({
 }
 
 export function usePresence() {
-  return useContext(PresenceContext)
+  const { store, refresh } = useContext(PresenceContext)
+  const presenceByUserId = useSyncExternalStore(
+    store.subscribe,
+    store.getPresenceByUserId,
+    fallbackPresenceStore.getPresenceByUserId
+  )
+  const activeUsers = useSyncExternalStore(
+    store.subscribe,
+    store.getActiveUsers,
+    fallbackPresenceStore.getActiveUsers
+  )
+
+  return useMemo(() => ({
+    presenceByUserId,
+    activeUsers,
+    refresh,
+  }), [activeUsers, presenceByUserId, refresh])
 }
 
 export function usePresenceForUser(userId?: string | null) {
-  const { presenceByUserId } = usePresence()
-  return userId ? presenceByUserId[userId] ?? null : null
+  const { store } = useContext(PresenceContext)
+  return useSyncExternalStore(
+    store.subscribe,
+    () => store.getPresenceForUser(userId),
+    () => fallbackPresenceStore.getPresenceForUser(userId)
+  )
 }
 
 export function useActiveUsers() {
-  return usePresence().activeUsers
+  const { store } = useContext(PresenceContext)
+  return useSyncExternalStore(
+    store.subscribe,
+    store.getActiveUsers,
+    fallbackPresenceStore.getActiveUsers
+  )
 }
 
 export const getPresenceStateLabel = (state?: string | null) => {

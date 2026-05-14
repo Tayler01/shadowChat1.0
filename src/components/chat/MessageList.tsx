@@ -83,6 +83,10 @@ export const MessageList: React.FC<MessageListProps> = ({
     return [...messages].sort((a, b) => a.created_at.localeCompare(b.created_at))
   }, [messages])
 
+  const eagerAvatarMessageIds = useMemo(() => (
+    new Set(combinedMessages.slice(-12).map(message => message.id))
+  ), [combinedMessages])
+
   const groupedMessages = useMemo(
     () => groupMessagesByDate(combinedMessages as any[]),
     [combinedMessages]
@@ -309,7 +313,7 @@ export const MessageList: React.FC<MessageListProps> = ({
                 {firstUnreadMessageId === message.id && (
                   <UnreadDivider />
                 )}
-                <div className={cn(isGrouped ? 'pt-1 pb-1' : 'pt-4 pb-1')}>
+                <div className={cn(isGrouped ? 'pt-1 pb-1' : 'pt-4 pb-1', '[content-visibility:auto] [contain-intrinsic-size:0_88px]')}>
                   <MessageItem
                     message={message}
                     previousMessage={prev}
@@ -321,6 +325,8 @@ export const MessageList: React.FC<MessageListProps> = ({
                     onToggleReaction={toggleReaction}
                     onJumpToMessage={jumpToMessage}
                     containerRef={containerRef}
+                    avatarLoading={eagerAvatarMessageIds.has(message.id) ? 'eager' : 'lazy'}
+                    avatarFetchPriority={eagerAvatarMessageIds.has(message.id) ? 'high' : undefined}
                   />
                 </div>
               </React.Fragment>

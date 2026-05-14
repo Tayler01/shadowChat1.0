@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Ghost, LockKeyhole } from 'lucide-react';
 import { getPresenceOption } from '../../lib/presence';
+import { getSupabaseImageTransformUrl } from '../../lib/storageImageTransforms';
 import { usePresenceForUser } from '../../hooks/usePresence';
 import { useUserChannelBans } from '../../hooks/useUserChannelBans';
 import type { PresenceState, PresenceVisibility } from '../../types';
@@ -17,6 +18,8 @@ interface AvatarProps {
   presenceVisibility?: PresenceVisibility | null;
   color?: string;
   showStatus?: boolean;
+  loading?: 'eager' | 'lazy';
+  fetchPriority?: 'high' | 'low' | 'auto';
 }
 
 const sizeClasses = {
@@ -45,6 +48,8 @@ export const Avatar = React.memo(function Avatar({
   presenceVisibility,
   color,
   showStatus,
+  loading = 'lazy',
+  fetchPriority,
 }: AvatarProps) {
   const [imageError, setImageError] = useState(false);
   const initials = fallback || alt.split(' ').map(n => n[0]).join('').toUpperCase();
@@ -60,6 +65,17 @@ export const Avatar = React.memo(function Avatar({
   const showLiveOnline = showStatus && resolvedPresenceState === 'online';
   const showLegacyStatus = showStatus && !resolvedPresenceState && status;
   const statusPosition = hasActiveBan ? '-top-1 -right-1' : '-bottom-0.5 -right-0.5';
+  const optimizedSrc = getSupabaseImageTransformUrl(src, {
+    width: pixelSize * 3,
+    height: pixelSize * 3,
+    resize: 'cover',
+    quality: 80,
+  });
+  const imagePriorityProps = fetchPriority
+    ? ({ fetchpriority: fetchPriority } as React.ImgHTMLAttributes<HTMLImageElement> & {
+        fetchpriority: AvatarProps['fetchPriority'];
+      })
+    : {};
 
   useEffect(() => {
     setImageError(false);
@@ -83,11 +99,12 @@ export const Avatar = React.memo(function Avatar({
       >
         {src && !imageError ? (
           <img
-            src={src}
+            src={optimizedSrc}
             alt={alt}
             width={pixelSize}
             height={pixelSize}
-            loading="lazy"
+            loading={loading}
+            {...imagePriorityProps}
             decoding="async"
             draggable={false}
             className="w-full h-full object-cover"
