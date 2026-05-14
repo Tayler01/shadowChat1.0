@@ -9,6 +9,14 @@ type GifPickerProps = {
   onClose: () => void
 }
 
+const shouldAutoFocusSearch = () => {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false
+  }
+
+  return window.innerWidth >= 768 && window.matchMedia('(hover: hover) and (pointer: fine)').matches
+}
+
 export const GifPicker: React.FC<GifPickerProps> = ({ onSelect, onClose }) => {
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -31,7 +39,9 @@ export const GifPicker: React.FC<GifPickerProps> = ({ onSelect, onClose }) => {
   }, [query])
 
   useEffect(() => {
-    inputRef.current?.focus()
+    if (shouldAutoFocusSearch()) {
+      inputRef.current?.focus()
+    }
   }, [])
 
   useEffect(() => {
@@ -67,11 +77,11 @@ export const GifPicker: React.FC<GifPickerProps> = ({ onSelect, onClose }) => {
 
   return (
     <div
-      className="glass-panel-strong absolute bottom-full left-2 right-2 z-[92] mb-2 max-h-[min(28rem,calc(100vh-8rem))] overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-panel)] shadow-[var(--shadow-panel-strong)] md:left-0 md:right-auto md:w-[24rem]"
+      className="glass-panel-strong fixed inset-x-2 bottom-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.5rem)] z-[92] max-h-[min(32rem,calc(100dvh-8rem))] overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-panel)] shadow-[var(--shadow-panel-strong)] md:absolute md:bottom-full md:left-0 md:right-auto md:mb-2 md:w-[24rem] md:max-h-[min(28rem,calc(100vh-8rem))]"
       role="dialog"
       aria-label="GIF picker"
     >
-      <div className="border-b border-[var(--border-panel)] p-2.5">
+      <div className="border-b border-[var(--border-panel)] p-2.5 pb-2">
         <div className="flex items-center gap-2">
           <label className="relative min-w-0 flex-1">
             <span className="sr-only">Search KLIPY</span>
@@ -81,14 +91,14 @@ export const GifPicker: React.FC<GifPickerProps> = ({ onSelect, onClose }) => {
               value={query}
               onChange={event => setQuery(event.target.value)}
               placeholder="Search KLIPY"
-              className="obsidian-input h-10 w-full rounded-[var(--radius-sm)] py-2 pl-9 pr-3 text-sm"
+              className="obsidian-input h-11 w-full rounded-[var(--radius-sm)] py-2 pl-9 pr-3 text-base md:h-10 md:text-sm"
             />
           </label>
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="h-10 w-10 rounded-[var(--radius-sm)] p-0"
+            className="h-11 w-11 rounded-[var(--radius-sm)] p-0 md:h-10 md:w-10"
             onClick={onClose}
             aria-label="Close GIF picker"
           >
@@ -101,7 +111,7 @@ export const GifPicker: React.FC<GifPickerProps> = ({ onSelect, onClose }) => {
         </div>
       </div>
 
-      <div className="h-[min(20rem,calc(100vh-14rem))] overflow-y-auto p-2">
+      <div className="h-[min(22rem,calc(100dvh-14rem))] overflow-y-auto overscroll-contain p-2 pb-3 md:h-[min(20rem,calc(100vh-14rem))] md:pb-2">
         {loading ? (
           <div className="flex h-full items-center justify-center gap-2 text-sm text-[var(--text-muted)]">
             <LoadingSpinner size="sm" />
@@ -116,13 +126,13 @@ export const GifPicker: React.FC<GifPickerProps> = ({ onSelect, onClose }) => {
             No GIFs found.
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-2" aria-label={label}>
+          <div className="grid grid-cols-3 gap-2.5 md:gap-2" aria-label={label}>
             {gifs.map(gif => (
               <button
                 key={gif.id}
                 type="button"
                 onClick={() => handleSelect(gif)}
-                className="group relative aspect-square overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] transition hover:border-[var(--border-glow)] focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.35)]"
+                className="group relative aspect-square min-h-[5.75rem] overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] transition hover:border-[var(--border-glow)] focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.35)] md:min-h-0"
                 aria-label={`Send GIF ${gif.title}`}
               >
                 <img

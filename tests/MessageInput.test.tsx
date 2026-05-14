@@ -283,3 +283,40 @@ test('sends a selected GIF as an image attachment when enabled', async () => {
     undefined
   )
 })
+
+test('does not autofocus GIF search on touch-sized mobile inputs', async () => {
+  const originalMatchMedia = window.matchMedia
+  const originalInnerWidth = window.innerWidth
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    value: jest.fn().mockReturnValue({ matches: false }),
+  })
+  Object.defineProperty(window, 'innerWidth', {
+    configurable: true,
+    value: 390,
+  })
+
+  try {
+    const user = userEvent.setup()
+    render(<MessageInput onSendMessage={() => {}} enableGifPicker />)
+
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /add attachment/i }))
+    })
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /^gif$/i }))
+    })
+
+    const search = await screen.findByPlaceholderText('Search KLIPY')
+    expect(document.activeElement).not.toBe(search)
+  } finally {
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: originalMatchMedia,
+    })
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: originalInnerWidth,
+    })
+  }
+})
