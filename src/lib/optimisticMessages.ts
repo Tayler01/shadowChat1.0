@@ -100,6 +100,37 @@ export function upsertMessageIntoState<TMessage extends OptimisticMessageFields>
   return next
 }
 
+const isIncomingUpdateCurrent = (
+  existing: { updated_at?: string },
+  incoming: { updated_at?: string }
+) => {
+  if (!incoming.updated_at || !existing.updated_at) return true
+  const incomingTime = Date.parse(incoming.updated_at)
+  const existingTime = Date.parse(existing.updated_at)
+  if (!Number.isFinite(incomingTime) || !Number.isFinite(existingTime)) return true
+  return incomingTime >= existingTime
+}
+
+export function mergeRealtimeMessageUpdate<
+  TMessage extends OptimisticMessageFields & { updated_at?: string }
+>(
+  existing: TMessage,
+  incoming: Partial<TMessage>,
+  preservedFields: Partial<TMessage> = {}
+): TMessage | null {
+  if (!isIncomingUpdateCurrent(existing, incoming)) {
+    return null
+  }
+
+  return {
+    ...existing,
+    ...incoming,
+    ...preservedFields,
+    optimistic: false,
+    delivery_status: 'sent',
+  }
+}
+
 export function markMessageSendFailed<TMessage extends OptimisticMessageFields>(
   messages: TMessage[],
   clientMessageId: string

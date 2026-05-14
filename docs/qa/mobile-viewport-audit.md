@@ -2,6 +2,10 @@
 
 Last updated: 2026-05-10
 
+ShadowChat defaults to phone-first design and testing. Unless a task explicitly
+states otherwise, viewport decisions should be judged against iPhone/WebKit and
+Android/Chromium phone profiles before desktop convenience.
+
 ## Viewport Meta Status
 
 - `index.html` sets `width=device-width, initial-scale=1.0, user-scalable=no`.

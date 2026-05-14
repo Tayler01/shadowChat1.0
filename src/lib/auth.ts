@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import type { User as SupabaseAuthUser } from '@supabase/supabase-js'
 import type { User as AppUser } from './supabase'
+import { optimizeImageFile } from './imageOptimization'
 
 const AVATAR_BUCKET = 'avatars'
 const BANNER_BUCKET = 'banners'
@@ -242,8 +243,19 @@ export const uploadUserAvatar = async (file: File) => {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  const filePath = `${user.id}/${Date.now()}_${file.name}`
-  const { error } = await supabase.storage.from(AVATAR_BUCKET).upload(filePath, file, { upsert: true })
+  const uploadFile = await optimizeImageFile(file, {
+    maxWidth: 512,
+    maxHeight: 512,
+    minBytes: 80 * 1024,
+    quality: 0.84,
+    fileNamePrefix: 'avatar',
+  })
+  const filePath = `${user.id}/${Date.now()}_${uploadFile.name}`
+  const { error } = await supabase.storage.from(AVATAR_BUCKET).upload(filePath, uploadFile, {
+    upsert: true,
+    contentType: uploadFile.type,
+    cacheControl: '31536000',
+  })
   if (error) throw error
 
   const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(filePath)
@@ -255,8 +267,18 @@ export const uploadUserBanner = async (file: File) => {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  const filePath = `${user.id}/${Date.now()}_${file.name}`
-  const { error } = await supabase.storage.from(BANNER_BUCKET).upload(filePath, file, { upsert: true })
+  const uploadFile = await optimizeImageFile(file, {
+    maxWidth: 1600,
+    maxHeight: 900,
+    quality: 0.82,
+    fileNamePrefix: 'banner',
+  })
+  const filePath = `${user.id}/${Date.now()}_${uploadFile.name}`
+  const { error } = await supabase.storage.from(BANNER_BUCKET).upload(filePath, uploadFile, {
+    upsert: true,
+    contentType: uploadFile.type,
+    cacheControl: '31536000',
+  })
   if (error) throw error
 
   const { data } = supabase.storage.from(BANNER_BUCKET).getPublicUrl(filePath)

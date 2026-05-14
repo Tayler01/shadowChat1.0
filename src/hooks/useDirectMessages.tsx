@@ -27,6 +27,7 @@ import {
   createClientMessageId,
   isClientMessageIdSchemaError,
   markMessageSendFailed,
+  mergeRealtimeMessageUpdate,
   upsertMessageIntoState,
 } from '../lib/optimisticMessages';
 import { MESSAGE_FETCH_LIMIT } from '../config';
@@ -776,20 +777,19 @@ export function useConversationMessages(conversationId: string | null) {
             table: 'dm_messages',
             filter: `conversation_id=eq.${conversationId}`,
           },
-          async (payload: any) => {
-            const message = await hydrateConversationMessage(payload.new.id);
+          (payload: any) => {
+            const incoming = payload.new as Partial<DMMessage>
+            if (!incoming?.id || disposed) return
 
-            if (disposed) return;
+            setMessages(prev => {
+              const existing = prev.find(message => message.id === incoming.id)
+              if (!existing) return prev
 
-            if (message) {
-              setMessages(prev =>
-                upsertMessageIntoState(prev, {
-                  ...message,
-                  optimistic: false,
-                  delivery_status: 'sent',
-                })
-              );
-            }
+              const merged = mergeRealtimeMessageUpdate(existing, incoming, { sender: existing.sender })
+              if (!merged) return prev
+
+              return upsertMessageIntoState(prev, merged)
+            });
           }
         )
         .subscribe(async (status: string) => {

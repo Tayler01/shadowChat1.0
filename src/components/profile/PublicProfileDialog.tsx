@@ -326,6 +326,8 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                 <img
                   src={user.banner_url}
                   alt=""
+                  loading="eager"
+                  decoding="async"
                   className="h-full w-full object-cover"
                 />
               ) : (

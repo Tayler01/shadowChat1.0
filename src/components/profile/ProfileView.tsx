@@ -88,15 +88,6 @@ const createAdjustedAvatarFile = async (
     throw new Error('Avatar editor is unavailable in this browser')
   }
 
-  const type = ['image/png', 'image/webp', 'image/jpeg'].includes(originalFile.type)
-    ? originalFile.type
-    : 'image/jpeg'
-
-  if (type === 'image/jpeg') {
-    context.fillStyle = '#0d0f10'
-    context.fillRect(0, 0, AVATAR_OUTPUT_SIZE, AVATAR_OUTPUT_SIZE)
-  }
-
   const baseScale = getCoverBaseScale(imageSize, AVATAR_OUTPUT_SIZE)
   const drawWidth = imageSize.width * baseScale * zoom
   const drawHeight = imageSize.height * baseScale * zoom
@@ -105,17 +96,18 @@ const createAdjustedAvatarFile = async (
 
   context.drawImage(image, drawX, drawY, drawWidth, drawHeight)
 
-  const blob = await new Promise<Blob>((resolve, reject) => {
+  const createBlob = (type: 'image/webp' | 'image/jpeg', quality: number) => new Promise<Blob | null>(resolve => {
     canvas.toBlob(result => {
-      if (result) {
-        resolve(result)
-      } else {
-        reject(new Error('Failed to prepare avatar image'))
-      }
-    }, type, 0.92)
+      resolve(result)
+    }, type, quality)
   })
+  const blob = await createBlob('image/webp', 0.84) || await createBlob('image/jpeg', 0.86)
+  if (!blob) {
+    throw new Error('Failed to prepare avatar image')
+  }
 
-  const extension = type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg'
+  const type = blob.type || 'image/jpeg'
+  const extension = type === 'image/webp' ? 'webp' : 'jpg'
   return new File([blob], `avatar-${Date.now()}.${extension}`, { type })
 }
 
@@ -453,7 +445,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
         {/* Banner */}
         <div className="h-32 relative">
           {profile.banner_url ? (
-            <img src={profile.banner_url} alt="Banner" className="w-full h-full object-cover" />
+            <img src={profile.banner_url} alt="Banner" loading="eager" decoding="async" className="w-full h-full object-cover" />
           ) : (
             <div className="h-full w-full bg-[radial-gradient(circle_at_top_left,rgba(255,240,184,0.18),transparent_26%),linear-gradient(135deg,#17191c,#0f1112_58%,#34250c)]" />
           )}

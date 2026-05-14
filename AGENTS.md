@@ -6,6 +6,20 @@ This file is the working handbook for agentic contributors operating inside this
 
 Ship product-quality improvements to ShadowChat without breaking realtime chat, DMs, auth, uploads, push notifications, or the premium dark UI language.
 
+## Mobile-First Product Default
+
+Unless a task explicitly says otherwise, treat ShadowChat work as mobile-first
+and phone-first. The primary product targets are iPhone and Android phone
+experiences, especially installed PWA/Home Screen flows. Desktop behavior should
+remain functional, but design decisions, performance budgets, interaction
+comfort, and visual QA should default to mobile constraints before desktop
+polish.
+
+For user-facing work, verify the closest practical iPhone/WebKit and
+Android/Chromium paths. Pay special attention to touch targets, safe-area
+insets, browser chrome, keyboard compression, fixed headers/footers, scroll
+containers, media loading, and realtime UI smoothness on phone-sized viewports.
+
 ## Current Feature Focus
 
 The shipped News tab and Render News scraper are now a live production surface.
@@ -171,7 +185,9 @@ should be treated as a realtime-sensitive change. Re-test the affected flow in a
 
 ### 2. Respect The Design System
 
-The app uses a premium obsidian-and-gold visual system. Avoid introducing:
+The app uses a premium obsidian-and-gold visual system. Design the phone
+experience first unless the task explicitly targets another surface. Avoid
+introducing:
 
 - default bright blues and greens
 - plain browser-looking controls
@@ -301,13 +317,14 @@ const { chromium } = require('playwright');
 '@ | node
 ```
 
-For DM or group-chat regressions, use two browser contexts with different accounts and verify:
+For DM or group-chat regressions, use two browser contexts with different accounts and verify the phone-first flow:
 
 - send path
 - recipient live update
 - unread count changes
 - thread selection
-- mobile and desktop layout
+- iPhone/WebKit and Android/Chromium mobile layout
+- desktop layout only when the change affects desktop or the task asks for it
 
 ## Goal Mode
 
@@ -381,5 +398,5 @@ Before push/deploy:
 1. Confirm the change is intentionally scoped.
 2. Run lint, typecheck, and build.
 3. Run targeted Jest if existing tests cover the area.
-4. Run a headed browser check for UI/realtime changes.
-5. Review the final screens for visual consistency, especially on mobile.
+4. Run iPhone/WebKit and Android/Chromium browser checks for UI/realtime changes.
+5. Review the final phone screens for visual consistency, touch comfort, safe-area behavior, keyboard behavior, and media-loading smoothness.

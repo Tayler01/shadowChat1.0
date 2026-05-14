@@ -106,6 +106,8 @@ export function NewsFeedModal({
                     <img
                       src={primaryMedia.thumbnail_url || primaryMedia.url}
                       alt={primaryMedia.alt || item.headline}
+                      loading="eager"
+                      decoding="async"
                       className="max-h-[68vh] max-w-full object-contain"
                     />
                     {primaryMedia.type === 'video' && (
@@ -132,7 +134,7 @@ export function NewsFeedModal({
                       rel="noopener noreferrer"
                       className="aspect-square overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)]"
                     >
-                      <img src={media.thumbnail_url || media.url} alt="" className="h-full w-full object-cover" />
+                      <img src={media.thumbnail_url || media.url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                     </a>
                   ))}
                 </div>

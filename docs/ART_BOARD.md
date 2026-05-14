@@ -12,6 +12,10 @@ separate backend domain from News Feed, board chats, DMs, and General Chat.
 - Users can add images or pastel sticky notes.
 - Image adds support local upload or URL import. URL import copies the image
   into Supabase Storage before it becomes an Art Board item.
+- Local image uploads are optimized for mobile before storage. URL imports are
+  capped at 2 MB because they run on the backend and cannot use the browser
+  canvas optimizer; larger remote images should be saved and uploaded from the
+  phone so the app can create a mobile-safe version first.
 - Sticky notes support simple bold, italic, bullet, link, title, caption, tag,
   color, rotation, and layer adjustments.
 - Items can overlap. Creators can move, rotate, edit metadata, link, and delete
@@ -45,7 +49,9 @@ Storage:
 - `art-board`: public image bucket for uploaded and imported images.
 - Users can write only inside their own first-level folder.
 - Imported URLs are fetched through `art-board-import-image` so private/local
-  URLs are rejected and copied into Storage.
+  URLs are rejected and copied into Storage. The function rejects imports over
+  2 MB to prevent new oversized row-backed media from bypassing the mobile
+  upload optimizer.
 
 Realtime:
 

@@ -3,6 +3,7 @@ import {
   VITE_SUPABASE_ANON_KEY,
   VITE_SUPABASE_URL,
 } from './env'
+import { optimizeImageFile } from './imageOptimization'
 
 type AnySupabaseClient = any
 type SessionResponse = {
@@ -650,8 +651,19 @@ export const uploadChatFile = async (file: File) => {
   const workingClient = await getWorkingClient()
   const { data: { user } } = await workingClient.auth.getUser()
   if (!user) throw new Error('Not authenticated')
-  const filePath = `${user.id}/${Date.now()}_${file.name}`
-  const { error } = await workingClient.storage.from(UPLOADS_BUCKET).upload(filePath, file)
+  const uploadFile = file.type.startsWith('image/')
+    ? await optimizeImageFile(file, {
+      maxWidth: 1600,
+      maxHeight: 1600,
+      quality: 0.82,
+      fileNamePrefix: 'chat-image',
+    })
+    : file
+  const filePath = `${user.id}/${Date.now()}_${uploadFile.name}`
+  const { error } = await workingClient.storage.from(UPLOADS_BUCKET).upload(filePath, uploadFile, {
+    contentType: uploadFile.type,
+    cacheControl: '31536000',
+  })
   if (error) throw error
   const { data } = workingClient.storage.from(UPLOADS_BUCKET).getPublicUrl(filePath)
   return data.publicUrl
@@ -661,9 +673,18 @@ export const uploadArtBoardImage = async (file: File) => {
   const workingClient = await getWorkingClient()
   const { data: { user } } = await workingClient.auth.getUser()
   if (!user) throw new Error('Not authenticated')
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '-').slice(-120) || 'art-image'
+  const uploadFile = await optimizeImageFile(file, {
+    maxWidth: 1600,
+    maxHeight: 1600,
+    quality: 0.82,
+    fileNamePrefix: 'art-image',
+  })
+  const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]+/g, '-').slice(-120) || 'art-image'
   const filePath = `${user.id}/uploads/${Date.now()}_${safeName}`
-  const { error } = await workingClient.storage.from(ART_BOARD_BUCKET).upload(filePath, file)
+  const { error } = await workingClient.storage.from(ART_BOARD_BUCKET).upload(filePath, uploadFile, {
+    contentType: uploadFile.type,
+    cacheControl: '31536000',
+  })
   if (error) throw error
   const { data } = workingClient.storage.from(ART_BOARD_BUCKET).getPublicUrl(filePath)
   return { path: filePath, publicUrl: data.publicUrl }
@@ -677,14 +698,20 @@ export const uploadShadowPinImage = async (
   const workingClient = await getWorkingClient()
   const { data: { user } } = await workingClient.auth.getUser()
   if (!user) throw new Error('Not authenticated')
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '-').slice(-120) || 'shadow-pin-image'
+  const uploadFile = await optimizeImageFile(file, {
+    maxWidth: 2400,
+    maxHeight: 2400,
+    quality: 0.86,
+    fileNamePrefix: 'shadow-pin',
+  })
+  const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]+/g, '-').slice(-120) || 'shadow-pin-image'
   const folder = target === 'category'
     ? `${user.id}/categories/${scopeId || Date.now()}/cover`
     : `${user.id}/categories/${scopeId || 'uncategorized'}/pins`
   const filePath = `${folder}/${Date.now()}_${safeName}`
-  const { error } = await workingClient.storage.from(SHADOW_PIN_BUCKET).upload(filePath, file, {
+  const { error } = await workingClient.storage.from(SHADOW_PIN_BUCKET).upload(filePath, uploadFile, {
     cacheControl: '31536000',
-    contentType: file.type,
+    contentType: uploadFile.type,
   })
   if (error) throw error
   const { data } = workingClient.storage.from(SHADOW_PIN_BUCKET).getPublicUrl(filePath)

@@ -6,6 +6,10 @@ flow regressions, but real installed PWAs still differ around browser chrome,
 keyboard animation, safe areas, status bars, lock/reopen behavior, and touch
 comfort.
 
+ShadowChat is phone-first by default. Unless a task explicitly states another
+target, real-device validation should cover both an iPhone path and an Android
+phone path before a user-facing change is considered fully proven.
+
 Related docs:
 
 - `docs/qa/mobile-pwa-qa-log.md`

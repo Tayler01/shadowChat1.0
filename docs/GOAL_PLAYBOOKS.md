@@ -10,6 +10,8 @@ Before starting any goal:
 3. Inspect the touched docs, scripts, tests, and app code before editing.
 4. Prefer repo scripts over generic commands.
 5. Keep changes small and update the relevant progress or QA doc as work lands.
+6. Unless the prompt explicitly says otherwise, treat the product target as
+   iPhone and Android phone usage first.
 
 Core local verification commands:
 
@@ -19,8 +21,9 @@ npx tsc --noEmit -p tsconfig.app.json
 npm run build
 ```
 
-Behavior changes should also run targeted Jest. Browser, realtime, and mobile
-changes should run the closest smoke or visual QA script.
+Behavior changes should also run targeted Jest. Browser, realtime, and
+user-facing changes should run the closest iPhone/WebKit and Android/Chromium
+smoke or visual QA script unless the task is explicitly desktop-only.
 
 ## Mobile PWA QA Loop
 
@@ -31,7 +34,7 @@ composer, modal, or installed-PWA visual bugs.
 /goal Complete a focused mobile PWA QA and patch loop for ShadowChat without stopping until the core mobile PWA flows are verified with the repo's mobile QA harness, all major reproducible issues found during the loop are fixed or documented, and the required verification commands pass.
 
 Context:
-ShadowChat is a mobile-first PWA chat app used from iOS and Android home screens. Mobile smoothness, safe-area spacing, keyboard behavior, composer visibility, scroll stability, and realtime message UI correctness matter more than desktop polish for this goal.
+ShadowChat is a mobile-first PWA chat app used from iPhone and Android home screens. Mobile smoothness, safe-area spacing, keyboard behavior, composer visibility, scroll stability, touch comfort, media-loading speed, and realtime message UI correctness matter more than desktop polish for this goal.
 
 Before changing code:
 - Read AGENTS.md.

@@ -16,8 +16,22 @@ Useful checks:
 ```powershell
 node --version
 npm --version
+npx --version
 supabase --version
 ```
+
+On Windows, especially from the Codex desktop shell, verify that `npm` and
+`npx` resolve from PATH before running QA. If `node --version` works but
+`npm`/`npx` do not, fix the machine/user PATH or install a normal Node LTS
+toolchain rather than working around it in test commands. On this workstation,
+the Visual Studio Node runtime path is a valid fallback:
+
+```powershell
+C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\VisualStudio\NodeJs
+```
+
+After updating PATH, restart the terminal or Codex process so new shells inherit
+it, then rerun the checks above.
 
 ## 1. Install Dependencies
 
@@ -119,7 +133,12 @@ supabase secrets set WEB_PUSH_SUBJECT=https://your-app.example.com
 supabase functions deploy openai-chat --no-verify-jwt
 supabase functions deploy send-push --no-verify-jwt
 supabase functions deploy link-preview --no-verify-jwt
+supabase functions deploy art-board-import-image
 ```
+
+`art-board-import-image` is required for Art Board URL imports. It rejects
+private/local URLs and oversized remote images so imported media cannot bypass
+the mobile upload optimizer with a very large row-backed asset.
 
 Deploy bridge functions too when working on the ESP bridge or when a fresh
 Supabase project needs full feature parity:

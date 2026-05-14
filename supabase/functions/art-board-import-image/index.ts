@@ -2,7 +2,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4'
 
 const ART_BOARD_BUCKET = 'art-board'
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024
 const ALLOWED_CONTENT_TYPES = new Map([
   ['image/jpeg', 'jpg'],
   ['image/png', 'png'],
@@ -197,13 +197,13 @@ serve(async req => {
 
     const contentLength = Number(response.headers.get('content-length') ?? '0')
     if (contentLength > MAX_IMAGE_BYTES) {
-      throw new Error('Image is larger than 10MB.')
+      throw new Error('Image is larger than 2MB. Save it and upload it from your phone so ShadowChat can optimize it for mobile.')
     }
 
     const { contentType, extension } = resolveImageType(response.headers.get('content-type'))
     const bytes = await response.arrayBuffer()
     if (bytes.byteLength > MAX_IMAGE_BYTES) {
-      throw new Error('Image is larger than 10MB.')
+      throw new Error('Image is larger than 2MB. Save it and upload it from your phone so ShadowChat can optimize it for mobile.')
     }
 
     const path = `${user.id}/imports/${Date.now()}-${crypto.randomUUID()}.${extension}`

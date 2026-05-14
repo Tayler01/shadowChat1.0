@@ -411,6 +411,8 @@ function ArtBoardItemCard({
               src={item.image_url || ''}
               alt={item.alt_text || item.title || item.caption || 'Art board image'}
               draggable={false}
+              loading="lazy"
+              decoding="async"
               className="h-full w-full rounded-[calc(var(--radius-sm)-2px)] object-cover"
             />
             {item.frame_style === 'polaroid' && (
@@ -723,7 +725,13 @@ function DetailDialog({
           <div className="min-w-0">
             {item.item_type === 'image' ? (
               <div className="relative">
-                <img src={item.image_url || ''} alt={item.alt_text || item.title || item.caption || 'Art board image'} className="max-h-[62vh] w-full rounded-[var(--radius-md)] object-contain" />
+                <img
+                  src={item.image_url || ''}
+                  alt={item.alt_text || item.title || item.caption || 'Art board image'}
+                  loading="eager"
+                  decoding="async"
+                  className="max-h-[62vh] w-full rounded-[var(--radius-md)] object-contain"
+                />
                 <ArtReactionBadges reactions={item.reactions} />
               </div>
             ) : (
@@ -772,7 +780,7 @@ function DetailDialog({
                         <button type="button" onClick={() => onJumpToItem(other)} className="flex w-full items-center gap-2 text-left">
                           <span className="h-10 w-10 overflow-hidden rounded-[var(--radius-sm)] bg-black/30">
                             {other.item_type === 'image' ? (
-                              <img src={other.image_url || ''} alt="" className="h-full w-full object-cover" />
+                              <img src={other.image_url || ''} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                             ) : (
                               <span className={cn('block h-full w-full', noteColorClass(other.note_color))} />
                             )}

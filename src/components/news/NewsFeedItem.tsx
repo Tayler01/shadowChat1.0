@@ -59,6 +59,8 @@ export function NewsFeedItem({
             <img
               src={media.thumbnail_url || media.url}
               alt={media.alt || item.headline}
+              loading="lazy"
+              decoding="async"
               className="h-full w-full rounded-[var(--radius-sm)] object-cover"
             />
             {media.type === 'video' && (

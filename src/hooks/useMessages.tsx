@@ -23,6 +23,7 @@ import {
   findMatchingMessageIndex,
   isClientMessageIdSchemaError,
   markMessageSendFailed,
+  mergeRealtimeMessageUpdate,
   upsertMessageIntoState,
 } from '../lib/optimisticMessages';
 import { MESSAGE_FETCH_LIMIT } from '../config';
@@ -564,43 +565,39 @@ function useProvideMessages(): MessagesContextValue {
             schema: 'public',
             table: 'messages'
           },
-          async (payload: any) => {
-            try {
-              const updatedMessage = await hydrateMessage(payload.new.id);
-              if (disposed) return;
+          (payload: any) => {
+            const incoming = payload.new as Partial<Message>
+            if (!incoming?.id || disposed) return
 
-              if (updatedMessage) {
-                setMessages(prev => {
-                  const index = prev.findIndex(msg => msg.id === updatedMessage.id)
-                  if (index !== -1) {
-                    const prevMessage = prev[index]
-                    const changed =
-                      JSON.stringify(prevMessage.reactions) !== JSON.stringify(updatedMessage.reactions)
-                    const newList = prev.map(msg =>
-                      msg.id === updatedMessage.id ? (updatedMessage as unknown as Message) : msg
-                    )
-                    if (changed) {
-                      const prevUsers = (prevMessage.reactions || {}) as Record<string, { users?: string[] }>
-                      const currUsers = (updatedMessage.reactions || {}) as Record<string, { users?: string[] }>
-                      const changedByCurrent = Object.keys({ ...prevUsers, ...currUsers }).some(e => {
-                        const before = prevUsers[e]?.users || []
-                        const after = currUsers[e]?.users || []
-                        const beforeHas = before.includes(user.id)
-                        const afterHas = after.includes(user.id)
-                        return beforeHas !== afterHas
-                      })
-                      if (!changedByCurrent) {
-                        playReaction()
-                      }
-                    }
-                    return newList
-                  }
-                  return [...prev, updatedMessage as unknown as Message]
+            setMessages(prev => {
+              const index = prev.findIndex(msg => msg.id === incoming.id)
+              if (index === -1) return prev
+
+              const prevMessage = prev[index]
+              const merged = mergeRealtimeMessageUpdate(prevMessage, incoming, { user: prevMessage.user })
+              if (!merged) return prev
+
+              const changed =
+                JSON.stringify(prevMessage.reactions) !== JSON.stringify(merged.reactions)
+              const newList = prev.map(msg =>
+                msg.id === merged.id ? (merged as unknown as Message) : msg
+              )
+              if (changed) {
+                const prevUsers = (prevMessage.reactions || {}) as Record<string, { users?: string[] }>
+                const currUsers = (merged.reactions || {}) as Record<string, { users?: string[] }>
+                const changedByCurrent = Object.keys({ ...prevUsers, ...currUsers }).some(e => {
+                  const before = prevUsers[e]?.users || []
+                  const after = currUsers[e]?.users || []
+                  const beforeHas = before.includes(user.id)
+                  const afterHas = after.includes(user.id)
+                  return beforeHas !== afterHas
                 })
+                if (!changedByCurrent) {
+                  playReaction()
+                }
               }
-            } catch {
-              // ignore realtime update fetch errors and wait for the next refresh
-            }
+              return newList
+            })
           }
         )
         .on(

@@ -2,6 +2,18 @@
 
 This project uses a mix of static checks, Jest coverage, and real browser validation.
 
+## Mobile-First Testing Default
+
+Unless a task explicitly says otherwise, test and design ShadowChat changes for
+phone usage first. The primary validation targets are iPhone/WebKit and
+Android/Chromium mobile experiences, including installed PWA/Home Screen
+behavior when the touched area can be affected by browser chrome, safe areas,
+keyboard movement, push setup, media loading, or realtime reconnects.
+
+Desktop checks are still useful when a change affects desktop layout or shared
+logic, but they are secondary to phone-sized interaction, touch comfort,
+keyboard/composer behavior, scroll stability, and smooth media loading.
+
 ## Baseline Checks
 
 Run these for almost every change:
@@ -59,6 +71,10 @@ Do browser validation when changing:
 - active-user indicators or presence visibility
 - General Chat weather widget or Account & Profile weather location settings
 
+For user-facing changes, the default browser validation should include at least
+one iPhone/WebKit profile and one Android/Chromium profile through the closest
+repo QA harness or a focused headed check.
+
 ## Recommended Local Browser Loop
 
 Use a preview build for stable QA:
@@ -67,6 +83,17 @@ Use a preview build for stable QA:
 npm run build
 npx vite preview --host 127.0.0.1 --port 4174
 ```
+
+## Windows Toolchain Notes
+
+Do not use preview reuse mode to hide a missing `npm` or `npx` dependency.
+Fix the toolchain first, then rerun the normal fresh-preview check. The setup
+guide documents the expected `node`, `npm`, and `npx` checks.
+
+The repo smoke and mobile QA scripts start Vite through the repo-local
+`node_modules/vite/bin/vite.js` entrypoint when it exists. That keeps browser
+QA independent from a global `npx` path while still requiring a working Node
+runtime and installed project dependencies.
 
 ## Playwright Usage
 
@@ -384,16 +411,16 @@ Examples:
 
 ### Group Chat
 
-1. Sign into two accounts
-2. Open chat on both
+1. Sign into two accounts on phone-sized profiles
+2. Open chat on both, covering iPhone/WebKit and Android/Chromium when practical
 3. Send a message from account A
 4. Confirm it appears on account B without refresh
 5. Confirm reactions, edits, and deletes propagate correctly
 
 ### DMs
 
-1. Sign into two accounts
-2. Open DMs on both
+1. Sign into two accounts on phone-sized profiles
+2. Open DMs on both, covering iPhone/WebKit and Android/Chromium when practical
 3. Keep account B on a different thread or inbox view
 4. Send a DM from account A to account B
 5. Confirm the thread moves to the top and unread count updates live on account B
@@ -401,6 +428,8 @@ Examples:
 
 ## Mobile QA Checklist
 
+- iPhone small/large WebKit profile
+- Android small/medium Chromium profile
 - login screen spacing
 - sidebar and bottom nav tap targets
 - DM composer overlap

@@ -16,9 +16,13 @@ const scenarioSets = {
   full: ['auth', 'group-chat', 'settings', 'dm', 'resume-send', 'profile-visual', 'mobile-dm-back', 'mobile-settings-visual'],
 }
 
-const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
-const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx'
 const taskKillCommand = process.platform === 'win32' ? 'taskkill' : null
+
+const platformCommand = name => process.platform === 'win32' ? `${name}.cmd` : name
+const viteScriptPath = path.join(process.cwd(), 'node_modules', 'vite', 'bin', 'vite.js')
+const hasLocalViteScript = existsSync(viteScriptPath)
+const viteCommand = hasLocalViteScript ? process.execPath : platformCommand('vite')
+const viteBaseArgs = hasLocalViteScript ? [viteScriptPath] : []
 
 const args = parseArgs(process.argv.slice(2))
 const repoRoot = process.cwd()
@@ -423,8 +427,8 @@ async function ensurePreviewServer(state) {
 
   if (!state.config.skipBuild) {
     await runLoggedCommand({
-      command: npmCommand,
-      args: ['run', 'build'],
+      command: viteCommand,
+      args: [...viteBaseArgs, 'build'],
       cwd: state.repoRoot,
       logPath: path.join(state.logsDir, 'build.log'),
       label: 'vite build',
@@ -432,8 +436,8 @@ async function ensurePreviewServer(state) {
   }
 
   const previewLogPath = path.join(state.logsDir, 'preview.log')
-  const child = spawn(npxCommand, [
-    'vite',
+  const child = spawn(viteCommand, [
+    ...viteBaseArgs,
     'preview',
     '--host',
     state.config.host,
@@ -442,7 +446,7 @@ async function ensurePreviewServer(state) {
     '--strictPort',
   ], {
     cwd: state.repoRoot,
-    shell: process.platform === 'win32',
+    shell: process.platform === 'win32' && /\.cmd$/i.test(viteCommand),
     stdio: ['ignore', 'pipe', 'pipe'],
   })
 
@@ -1141,7 +1145,7 @@ async function runLoggedCommand({ command, args, cwd, logPath, label }) {
   await new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd,
-      shell: process.platform === 'win32',
+      shell: process.platform === 'win32' && /\.cmd$/i.test(command),
       stdio: ['ignore', 'pipe', 'pipe'],
     })
 
