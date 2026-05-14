@@ -46,9 +46,6 @@ export function PinnedMessagesButton({
         aria-haspopup="dialog"
       >
         <Pin className="h-4 w-4" />
-        <span className="theme-unread-badge absolute -right-0.5 -top-0.5 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full px-1 text-[0.62rem] font-semibold leading-none">
-          {messages.length > 9 ? '9+' : messages.length}
-        </span>
       </Button>
 
       {open && (

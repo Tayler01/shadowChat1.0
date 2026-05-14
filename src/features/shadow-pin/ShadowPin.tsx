@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useRef, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
   Edit3,
@@ -68,6 +68,19 @@ const getPinImageUrl = (image: ShadowPinImage, size: 'thumb' | 'medium' | 'full'
   return image.image_url
 }
 
+const uniqueImageSources = (...sources: Array<string | null | undefined>) =>
+  sources.filter((source, index, all): source is string => Boolean(source && all.indexOf(source) === index))
+
+const getPinImageSources = (image: ShadowPinImage, size: 'thumb' | 'medium' | 'full' = 'thumb') => {
+  if (size === 'thumb') return uniqueImageSources(image.thumbnail_url, image.medium_url, image.image_url)
+  if (size === 'medium') {
+    return image.image_content_type === 'image/gif'
+      ? uniqueImageSources(image.image_url, image.medium_url, image.thumbnail_url)
+      : uniqueImageSources(image.medium_url, image.thumbnail_url, image.image_url)
+  }
+  return uniqueImageSources(image.image_url, image.medium_url, image.thumbnail_url)
+}
+
 const getImageAspectRatio = (item: { image_width?: number | null; image_height?: number | null }) =>
   item.image_width && item.image_height ? `${item.image_width} / ${item.image_height}` : undefined
 
@@ -122,11 +135,15 @@ function HeartButton({
   count,
   onClick,
   className,
+  variant = 'pill',
+  showCount = true,
 }: {
   active?: boolean
   count: number
   onClick: () => void
   className?: string
+  variant?: 'pill' | 'bare'
+  showCount?: boolean
 }) {
   return (
     <button
@@ -136,14 +153,16 @@ function HeartButton({
         onClick()
       }}
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,255,255,0.14)] bg-[rgba(4,5,6,0.72)] px-2.5 py-1.5 text-xs font-semibold text-[var(--text-primary)] shadow-[0_8px_20px_rgba(0,0,0,0.22)] backdrop-blur-md',
-        active && 'border-[rgba(244,114,182,0.55)] text-pink-200',
+        'inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]',
+        variant === 'pill' && 'rounded-full border border-[rgba(255,255,255,0.14)] bg-[rgba(4,5,6,0.72)] px-2.5 py-1.5 shadow-[0_8px_20px_rgba(0,0,0,0.22)] backdrop-blur-md',
+        variant === 'bare' && 'h-9 w-9 rounded-full bg-transparent p-0 drop-shadow-[0_2px_5px_rgba(0,0,0,0.9)]',
+        active && (variant === 'pill' ? 'border-[rgba(244,114,182,0.55)] text-pink-200' : 'text-pink-200'),
         className
       )}
       aria-pressed={Boolean(active)}
     >
-      <Heart className={cn('h-4 w-4', active && 'fill-current')} />
-      {formatCount(count)}
+      <Heart className={cn(variant === 'bare' ? 'h-5 w-5 stroke-[2.4]' : 'h-4 w-4', active && 'fill-current')} />
+      {showCount && formatCount(count)}
     </button>
   )
 }
@@ -537,6 +556,14 @@ function ImageCard({
 }) {
   const clickTimer = useRef<number | null>(null)
   const longPress = useLongPress(canManageImage ? onEdit : onViewer)
+  const imageSources = useMemo(() => getPinImageSources(image, 'thumb'), [image])
+  const [sourceIndex, setSourceIndex] = useState(0)
+  const imageSrc = imageSources[sourceIndex] || image.image_url
+  const aspectRatio = getImageAspectRatio(image) || '4 / 5'
+
+  useEffect(() => {
+    setSourceIndex(0)
+  }, [image.id, image.thumbnail_url, image.medium_url, image.image_url])
 
   const handleClick = () => {
     if (longPress.didLongPress()) return
@@ -554,19 +581,21 @@ function ImageCard({
 
   return (
     <article
-      className="break-inside-avoid overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(5,6,8,0.62)] shadow-[var(--shadow-panel)]"
+      className="inline-block w-full break-inside-avoid-column overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(5,6,8,0.62)] shadow-[var(--shadow-panel)]"
       onClick={handleClick}
       onContextMenu={event => event.preventDefault()}
       {...longPress}
     >
-      <div className="relative">
+      <div className="relative overflow-hidden" style={{ aspectRatio }}>
         <img
-          src={getPinImageUrl(image)}
+          src={imageSrc}
           alt={image.title}
           loading="lazy"
           decoding="async"
-          style={{ aspectRatio: getImageAspectRatio(image) }}
-          className="w-full object-cover"
+          onError={() => {
+            setSourceIndex(index => Math.min(index + 1, imageSources.length - 1))
+          }}
+          className="block h-full w-full object-cover"
         />
         {isProcessingMedia(image.processing_status) && (
           <div className="absolute inset-x-2 bottom-2 inline-flex items-center justify-center gap-2 rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(4,5,6,0.78)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] backdrop-blur-md">
@@ -579,7 +608,14 @@ function ImageCard({
             Using original
           </div>
         )}
-        <HeartButton active={image.viewer_has_hearted} count={image.heart_count} onClick={onHeart} className="absolute right-2 top-2" />
+        <HeartButton
+          active={image.viewer_has_hearted}
+          count={image.heart_count}
+          onClick={onHeart}
+          className="absolute right-2 top-2"
+          variant="bare"
+          showCount={false}
+        />
         {overlayOpen && (
           <div className="absolute inset-x-0 bottom-0 space-y-2 bg-[linear-gradient(180deg,rgba(4,5,6,0),rgba(4,5,6,0.9)_20%,rgba(4,5,6,0.96))] p-3 text-[var(--text-primary)]">
             <h3 className="text-sm font-semibold leading-tight">{image.title}</h3>
@@ -590,7 +626,7 @@ function ImageCard({
             </div>
           </div>
         )}
-        {canManageImage && (
+        {overlayOpen && canManageImage && (
           <button
             type="button"
             onClick={event => {
@@ -790,11 +826,11 @@ function ShadowPinCategoryScreen({
           </div>
         ) : (
           <>
-            <div className="columns-2 gap-3 sm:columns-3 lg:columns-4 [column-fill:_balance]">
+            <div className="columns-2 gap-3 sm:columns-3 lg:columns-4 [column-fill:_auto]">
               {masonry.map(image => {
                 const manage = canManage(image, user?.id, adminRole)
                 return (
-                  <div key={image.id} className="mb-3">
+                  <div key={image.id} className="mb-3 break-inside-avoid-column">
                     <ImageCard
                       image={image}
                       canManageImage={manage}
