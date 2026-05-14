@@ -4,6 +4,12 @@ import { cn } from '../../../../lib/utils'
 import type { ShadowWarCard } from '../engine/types'
 import { SHADOW_WAR_ASSETS } from '../assets/manifest'
 
+const nonSelectableStyle = {
+  userSelect: 'none',
+  WebkitUserSelect: 'none',
+  WebkitTouchCallout: 'none',
+} as React.CSSProperties
+
 export function ShadowWarCardView({
   card,
   compact = false,
@@ -43,13 +49,16 @@ export function ShadowWarCardView({
   if (hidden || !card) {
     return (
       <div className={cn(
-        'relative flex aspect-[3/4] min-h-0 w-full flex-col items-center justify-center overflow-hidden rounded-[0.45rem] border border-[rgba(215,170,70,0.28)] bg-[radial-gradient(circle_at_50%_8%,rgba(215,170,70,0.2),rgba(18,19,21,0.96)_52%,rgba(6,7,8,0.98))] text-[#f3d58a] shadow-[0_14px_32px_rgba(0,0,0,0.5)]',
+        'relative flex aspect-[3/4] min-h-0 w-full select-none flex-col items-center justify-center overflow-hidden rounded-[0.45rem] border border-[rgba(215,170,70,0.28)] bg-[radial-gradient(circle_at_50%_8%,rgba(215,170,70,0.2),rgba(18,19,21,0.96)_52%,rgba(6,7,8,0.98))] text-[#f3d58a] shadow-[0_14px_32px_rgba(0,0,0,0.5)]',
         compact ? 'max-w-[6.2rem]' : ''
-      )}>
+      )}
+      style={nonSelectableStyle}
+      >
         <img
           src={SHADOW_WAR_ASSETS.cardBack}
           alt=""
           className="absolute inset-0 h-full w-full object-cover opacity-75"
+          draggable={false}
           loading="lazy"
         />
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.08),rgba(0,0,0,0.42))]" />
@@ -93,8 +102,9 @@ export function ShadowWarCardView({
       data-testid="shadow-war-card"
       data-shadow-war-card-id={card.instanceId}
       aria-label={`${card.name} strength ${card.rank}`}
+      style={nonSelectableStyle}
       className={cn(
-        'group relative aspect-[3/4] min-h-0 w-full overflow-hidden rounded-[0.45rem] border text-left shadow-[0_14px_32px_rgba(0,0,0,0.5)] transition-[border-color,box-shadow,transform] duration-[var(--dur-med)]',
+        'group relative aspect-[3/4] min-h-0 w-full select-none overflow-hidden rounded-[0.45rem] border text-left shadow-[0_14px_32px_rgba(0,0,0,0.5)] transition-[border-color,box-shadow,transform] duration-[var(--dur-med)]',
         selected
           ? 'border-[rgba(239,202,114,0.72)] shadow-[0_0_0_1px_rgba(239,202,114,0.2),0_18px_42px_rgba(215,170,70,0.18)]'
           : 'border-[rgba(255,255,255,0.12)]',
@@ -108,6 +118,7 @@ export function ShadowWarCardView({
           src={card.imageUrl}
           alt=""
           className="absolute inset-0 h-full w-full object-cover"
+          draggable={false}
           loading="lazy"
           onError={() => setImageFailed(true)}
         />

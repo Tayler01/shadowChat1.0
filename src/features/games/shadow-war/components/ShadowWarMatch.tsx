@@ -269,7 +269,7 @@ export function ShadowWarMatch({
 
     return (
       <div
-        className="fixed inset-0 z-[94] flex items-end justify-center bg-black/76 px-3 pb-[calc(env(safe-area-inset-bottom)_+_0.85rem)] pt-[calc(env(safe-area-inset-top)_+_0.85rem)] backdrop-blur-sm sm:items-center"
+        className="fixed inset-0 z-[94] flex select-none items-end justify-center bg-black/76 px-3 pb-[calc(env(safe-area-inset-bottom)_+_0.85rem)] pt-[calc(env(safe-area-inset-top)_+_0.85rem)] backdrop-blur-sm sm:items-center"
         role="presentation"
         onMouseDown={() => setDetailCard(null)}
       >
@@ -277,7 +277,8 @@ export function ShadowWarMatch({
           role="dialog"
           aria-modal="true"
           aria-labelledby="shadow-war-card-detail-title"
-          className="max-h-full w-full max-w-lg overflow-y-auto rounded-[1.1rem] border border-[#d7aa46]/35 bg-[linear-gradient(180deg,rgba(24,20,14,0.98),rgba(5,6,7,0.98))] p-4 text-[#f6e0a2] shadow-[0_26px_90px_rgba(0,0,0,0.72)]"
+          className="max-h-full w-full max-w-lg select-none overflow-y-auto rounded-[1.1rem] border border-[#d7aa46]/35 bg-[linear-gradient(180deg,rgba(24,20,14,0.98),rgba(5,6,7,0.98))] p-4 text-[#f6e0a2] shadow-[0_26px_90px_rgba(0,0,0,0.72)]"
+          style={{ userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' } as React.CSSProperties}
           onMouseDown={event => event.stopPropagation()}
         >
           <div className="mb-4 flex items-start justify-between gap-3">

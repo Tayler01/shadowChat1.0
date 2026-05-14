@@ -161,7 +161,14 @@ function HeartButton({
       )}
       aria-pressed={Boolean(active)}
     >
-      <Heart className={cn(variant === 'bare' ? 'h-5 w-5 stroke-[2.4]' : 'h-4 w-4', active && 'fill-current')} />
+      {variant === 'bare' ? (
+        <span className="relative inline-flex h-5 w-5 items-center justify-center">
+          <Heart className="absolute h-5 w-5 fill-black text-black opacity-95 [stroke-width:5]" aria-hidden="true" />
+          <Heart className={cn('relative h-5 w-5 stroke-[2.4]', active && 'fill-current')} />
+        </span>
+      ) : (
+        <Heart className={cn('h-4 w-4', active && 'fill-current')} />
+      )}
       {showCount && formatCount(count)}
     </button>
   )
@@ -244,19 +251,6 @@ function CategoryCard({
           <div className="absolute inset-x-2 bottom-2 rounded-full border border-amber-300/30 bg-amber-500/15 px-3 py-2 text-center text-xs font-semibold text-amber-100 backdrop-blur-md">
             Using original image
           </div>
-        )}
-        {canManageCategory && (
-          <button
-            type="button"
-            onClick={event => {
-              event.stopPropagation()
-              onEdit()
-            }}
-            className="absolute right-2 top-2 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(4,5,6,0.68)] text-[var(--text-primary)] backdrop-blur-md"
-            aria-label="Edit category"
-          >
-            <Edit3 className="h-4 w-4" />
-          </button>
         )}
       </div>
     </article>
