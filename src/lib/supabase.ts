@@ -709,6 +709,7 @@ export interface User {
   color: string
   admin_role?: AdminRole | null
   checkers_crown?: boolean
+  war_sword?: boolean
   dm_discoverable?: boolean
   last_active: string
   created_at: string
@@ -885,6 +886,18 @@ export interface ShadowWarMove {
   created_at: string
 }
 
+export interface ShadowWarStats {
+  user_id: string
+  wins: number
+  losses: number
+  total_games: number
+  rounds_won: number
+  rounds_lost: number
+  last_win_at?: string | null
+  updated_at: string
+  user?: BasicUser | null
+}
+
 export interface GameSessionQueueEntry {
   id: string
   session_id: string
@@ -1045,7 +1058,7 @@ export interface DMMessage {
 export interface BasicUser
   extends Pick<
     User,
-    'id' | 'username' | 'display_name' | 'avatar_url' | 'color' | 'status' | 'admin_role' | 'checkers_crown' | 'presence_visibility' | 'dm_discoverable'
+    'id' | 'username' | 'display_name' | 'avatar_url' | 'color' | 'status' | 'admin_role' | 'checkers_crown' | 'war_sword' | 'presence_visibility' | 'dm_discoverable'
   > {}
 
 export interface PresenceSnapshot {
@@ -1179,7 +1192,7 @@ export const fetchDMConversations = async () => {
   if (missingIds.length) {
     const { data: usersData, error: userErr } = await workingClient
       .from('users')
-      .select('id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, presence_visibility')
+      .select('id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, presence_visibility')
       .in('id', missingIds)
     if (userErr) {
     } else {
@@ -1269,7 +1282,7 @@ export const fetchAllUsers = async (options?: { signal?: AbortSignal }) => {
   const workingClient = await getWorkingClient()
   let query = workingClient
     .from('users')
-    .select('id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, presence_visibility, dm_discoverable')
+    .select('id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, presence_visibility, dm_discoverable')
     .eq('dm_discoverable', true)
     .order('display_name', { ascending: true })
   if (options?.signal && typeof query.abortSignal === 'function') {

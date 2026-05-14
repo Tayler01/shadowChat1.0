@@ -1,3 +1,7 @@
+function svgDataUrl(svg: string) {
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+}
+
 export const SHADOW_WAR_ASSETS = {
   assetSheet: '/games/shadow-war/shadow-war-asset-sheet.png',
   battlefield: '/games/shadow-war/battlefield-table.webp',
@@ -18,6 +22,27 @@ export const SHADOW_WAR_ASSETS = {
     sovereign: '/games/shadow-war/cards/sovereign.webp',
   },
 } as const
+
+export const SHADOW_WAR_SWORD_BADGE = svgDataUrl(`
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <defs>
+      <linearGradient id="gold" x1="10" y1="8" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#fff4bf"/>
+        <stop offset="0.52" stop-color="#d4a141"/>
+        <stop offset="1" stop-color="#8b5a16"/>
+      </linearGradient>
+      <linearGradient id="steel" x1="24" y1="8" x2="42" y2="48" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#f8fbff"/>
+        <stop offset="0.45" stop-color="#aab4c2"/>
+        <stop offset="1" stop-color="#45505e"/>
+      </linearGradient>
+    </defs>
+    <circle cx="32" cy="32" r="29" fill="#090806" stroke="url(#gold)" stroke-width="4"/>
+    <path d="M35 8l7 7-21 26-5 7-5-5 7-5z" fill="url(#steel)" stroke="#fff0b4" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M31 12l7 7" stroke="#1b1b1b" stroke-width="2" stroke-linecap="round"/>
+    <path d="M19 40l5 5-8 9-6-6z" fill="url(#gold)" stroke="#fff0b4" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M16 37l11 11" stroke="#d9a94d" stroke-width="5" stroke-linecap="round"/>
+  </svg>`)
 
 export const SHADOW_WAR_ASSET_PROMPTS = [
   {

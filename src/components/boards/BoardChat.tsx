@@ -10,6 +10,7 @@ import { NewsReactionSummaryStrip } from '../news/NewsReactionBar'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { CheckersCrownBadge } from '../../features/games/shadow-checkers/components/CheckersCrownBadge'
+import { ShadowWarSwordBadge } from '../../features/games/shadow-war/components/ShadowWarSwordBadge'
 import { UnreadDivider } from '../chat/UnreadDivider'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import { useAuth } from '../../hooks/useAuth'
@@ -183,6 +184,7 @@ function BoardChatRow({
             <span className="truncate">{message.user?.display_name || message.user?.username || 'Unknown'}</span>
             <UserRoleBadge role={message.user?.admin_role} />
             <CheckersCrownBadge active={message.user?.checkers_crown} />
+            <ShadowWarSwordBadge active={message.user?.war_sword} />
             <UserPresenceBadge userId={message.user?.id} presenceVisibility={message.user?.presence_visibility} />
           </span>
           <span className="text-xs text-[var(--text-muted)]">{formatTime(message.created_at)}</span>

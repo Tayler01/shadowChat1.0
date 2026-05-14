@@ -12,7 +12,7 @@ describe('ShadowWarCardView', () => {
 
     const images = screen.getAllByRole('img', { hidden: true })
     expect(images.some(image => image.getAttribute('src') === '/games/shadow-war/cards/scout.webp')).toBe(true)
-    expect(screen.getByText('Scout')).toBeInTheDocument()
+    expect(screen.queryByText('Scout')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Scout strength 1' })).toBeInTheDocument()
   })
 

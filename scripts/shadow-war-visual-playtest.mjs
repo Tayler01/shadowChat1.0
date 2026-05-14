@@ -82,6 +82,7 @@ try {
   await capture(pageOne, '01-selector-entered-player-one.png')
 
   await pageOne.getByRole('button', { name: 'Create Duel' }).click()
+  await confirmShadowWarPersona(pageOne, 'Start Table')
   await waitForLobbyState(pageOne, ['Waiting for challenger', 'Your war table is open'])
   await capture(pageOne, '02-player-one-waiting-table.png')
   record('player one created duel')
@@ -89,6 +90,7 @@ try {
   await pageTwo.reload({ waitUntil: 'domcontentloaded' })
   await openShadowWar(pageTwo)
   await pageTwo.getByRole('button', { name: 'Join Duel' }).first().click()
+  await confirmShadowWarPersona(pageTwo, 'Join Duel')
   await waitForMatch(pageOne)
   await waitForMatch(pageTwo)
   await capture(pageOne, '03-player-one-match-start.png')
@@ -275,6 +277,12 @@ async function openShadowWar(page) {
 async function waitForMatch(page) {
   await page.getByTestId('shadow-war-lane').first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
   await page.getByTestId('shadow-war-lock').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+}
+
+async function confirmShadowWarPersona(page, actionName) {
+  const dialog = page.getByRole('dialog').filter({ hasText: 'Shadow War' })
+  await dialog.waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await dialog.getByRole('button', { name: actionName }).click()
 }
 
 async function continueActiveDuel(page) {

@@ -1,10 +1,10 @@
 import React from 'react'
-import { ArrowLeft, HelpCircle, Loader2, Music, Plus, Shield, Swords, Users, Volume2, VolumeX, X } from 'lucide-react'
+import { ArrowLeft, HelpCircle, Loader2, Music, Plus, Shield, Swords, Trophy, Users, Volume2, VolumeX, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner'
 import { useAuth } from '../../../hooks/useAuth'
 import { cn } from '../../../lib/utils'
-import type { GameSession, GameSessionPresence } from '../../../lib/supabase'
+import type { GameSession, GameSessionPresence, ShadowWarStats } from '../../../lib/supabase'
 import { useShadowWar } from './hooks/useShadowWar'
 import { ShadowWarMatch } from './components/ShadowWarMatch'
 import { SHADOW_WAR_ASSETS } from './assets/manifest'
@@ -17,6 +17,8 @@ import {
   SHADOW_WAR_FACTIONS,
 } from './identity'
 import { SHADOW_WAR_CARD_DEFINITIONS } from './engine/cards'
+import { SHADOW_WAR_CARD_MATCHUP_NOTES } from './engine/cardGuide'
+import { ShadowWarSwordBadge } from './components/ShadowWarSwordBadge'
 
 interface ShadowWarScreenProps {
   onExit?: () => void
@@ -26,19 +28,10 @@ interface ShadowWarScreenProps {
 }
 
 type WarButtonVariant = 'primary' | 'secondary' | 'ghost'
-
-const SHADOW_WAR_CARD_MATCHUP_NOTES: Record<string, string> = {
-  scout: 'Weak in combat, but useful bait. If it loses, the extra draw can help you recover and set up a stronger next round.',
-  spy: 'Best into Champion, Warlord, or Sovereign. It can drag huge cards down by 3 strength and make an expensive enemy commitment beatable.',
-  squire: 'Wins by supporting the lane beside it. Place it next to a weaker friendly card when a small +1 can flip that lane.',
-  archer: 'Strong when you want pressure across lanes. Its +1 can help the lane to the right, or Center when Archer is played Right.',
-  shieldbearer: 'Stops narrow losses. It can turn a 1 or 2 point defeat into a contested lane, denying your opponent the lane win.',
-  knight: 'No trick, just dependable strength. It cleanly beats lower raw ranks when abilities do not interfere.',
-  captain: 'Stabilizes your weakest lane. It is strongest when your formation has one lane that only needs a small push.',
-  champion: 'A counterpunch card. It gains +2 against a higher-rank enemy, making it dangerous into Warlord or Sovereign unless Spy changes the math.',
-  warlord: 'A power card that can also help an adjacent lane when it has raw advantage. Watch out for Spy sabotage.',
-  sovereign: 'The strongest raw card and the cleanest lane claim, but Spy can cut it down. Best when you think the opponent cannot counter it.',
-}
+type IdentityDialogState =
+  | { mode: 'create' }
+  | { mode: 'join'; sessionId: string }
+  | { mode: 'queue'; sessionId: string }
 
 function WarButton({
   variant = 'primary',
@@ -90,6 +83,10 @@ function isUserInSession(session: GameSession, userId?: string | null) {
   return Boolean(userId && (session.player_one_id === userId || session.player_two_id === userId))
 }
 
+function winRate(stats: ShadowWarStats) {
+  return stats.total_games > 0 ? Math.round((stats.wins / stats.total_games) * 100) : 0
+}
+
 export function ShadowWarScreen({
   onExit,
   musicPlaying = false,
@@ -98,6 +95,7 @@ export function ShadowWarScreen({
 }: ShadowWarScreenProps) {
   const { user } = useAuth()
   const [instructionsOpen, setInstructionsOpen] = React.useState(false)
+  const [identityDialog, setIdentityDialog] = React.useState<IdentityDialogState | null>(null)
   const { identity, setIdentity } = useShadowWarIdentity()
   const {
     sessions,
@@ -108,6 +106,7 @@ export function ShadowWarScreen({
     queue,
     moves,
     presence,
+    leaderboard,
     loading,
     busy,
     error,
@@ -135,25 +134,42 @@ export function ShadowWarScreen({
   const selectedFaction = getShadowWarFaction(identity.factionId)
 
   React.useEffect(() => {
-    if (!instructionsOpen) return
+    if (!instructionsOpen && !identityDialog) return
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setInstructionsOpen(false)
+        setIdentityDialog(null)
       }
     }
 
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [instructionsOpen])
+  }, [identityDialog, instructionsOpen])
 
   const guarded = async (action: () => Promise<unknown>, success: string) => {
     try {
       await action()
       toast.success(success)
+      return true
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Game action failed')
+      return false
     }
+  }
+
+  const confirmIdentityDialog = async () => {
+    if (!identityDialog) return
+
+    if (identityDialog.mode === 'create') {
+      if (!await guarded(actions.create, 'Duel created')) return
+    } else if (identityDialog.mode === 'join') {
+      if (!await guarded(() => actions.join(identityDialog.sessionId), 'Joined duel')) return
+    } else {
+      if (!await guarded(() => actions.queue(identityDialog.sessionId), 'Joined queue')) return
+    }
+
+    setIdentityDialog(null)
   }
 
   const goBack = () => {
@@ -195,13 +211,13 @@ export function ShadowWarScreen({
         ) : null}
 
         {canJoin && (
-          <WarButton className="sm:col-span-2" loading={busy === 'join'} onClick={() => void guarded(() => actions.join(session.id), 'Joined duel')}>
+          <WarButton className="sm:col-span-2" loading={busy === 'join'} onClick={() => setIdentityDialog({ mode: 'join', sessionId: session.id })}>
             <Users className="mr-2 h-4 w-4" />
             Join Duel
           </WarButton>
         )}
         {canQueue && (
-          <WarButton className="sm:col-span-2" variant="secondary" loading={busy === 'queue'} onClick={() => void guarded(() => actions.queue(session.id), 'Joined queue')}>
+          <WarButton className="sm:col-span-2" variant="secondary" loading={busy === 'queue'} onClick={() => setIdentityDialog({ mode: 'queue', sessionId: session.id })}>
             <Shield className="mr-2 h-4 w-4" />
             Queue
           </WarButton>
@@ -237,6 +253,162 @@ export function ShadowWarScreen({
             {entry.user_id === user?.id ? 'You' : displayPresenceName(entry)}
           </span>
         ))}
+      </div>
+    )
+  }
+
+  const renderLeaderboard = () => (
+    <aside className="rounded-[1rem] border border-[#b9934c]/25 bg-black/58 p-4 shadow-[0_18px_45px_rgba(0,0,0,0.35)] backdrop-blur-sm">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#b9a16f]">Hall of blades</p>
+          <h3 className="mt-1 text-lg font-semibold text-[#f6e0a2]">Shadow War Leaderboard</h3>
+        </div>
+        <Trophy className="h-5 w-5 shrink-0 text-[#f0d381]" />
+      </div>
+
+      {leaderboard.length === 0 ? (
+        <p className="rounded-[0.75rem] border border-[#b9934c]/18 bg-white/[0.035] px-3 py-3 text-sm text-[#b9a16f]">
+          Finish a duel to claim the first sword.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {leaderboard.slice(0, 8).map((entry, index) => {
+            const name = entry.user?.display_name || entry.user?.username || 'Shadow duelist'
+            return (
+              <div
+                key={entry.user_id}
+                className={cn(
+                  'grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-[0.8rem] border px-3 py-2',
+                  index === 0
+                    ? 'border-[#f0d381]/48 bg-[#d7aa46]/14 shadow-[0_0_28px_rgba(215,170,70,0.12)]'
+                    : 'border-white/8 bg-white/[0.035]'
+                )}
+              >
+                <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[#d7aa46]/35 bg-black/62 text-xs font-bold text-[#f0d381]">
+                  {index + 1}
+                </span>
+                <div className="min-w-0">
+                  <p className="inline-flex max-w-full items-center gap-1.5 text-sm font-semibold text-[#f6e0a2]">
+                    <span className="truncate">{name}</span>
+                    <ShadowWarSwordBadge active={index === 0} />
+                  </p>
+                  <p className="truncate text-[11px] text-[#b9a16f]">
+                    {entry.wins}W / {entry.losses}L · {winRate(entry)}% · {entry.rounds_won}-{entry.rounds_lost} rounds
+                  </p>
+                </div>
+                <span className="rounded-full border border-[#d7aa46]/28 bg-[#d7aa46]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#f0d381]">
+                  {entry.total_games}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </aside>
+  )
+
+  const renderIdentityDialog = () => {
+    if (!identityDialog) return null
+
+    const title = identityDialog.mode === 'create'
+      ? 'Choose Your War Persona'
+      : identityDialog.mode === 'join'
+        ? 'Choose Persona To Join'
+        : 'Choose Persona To Queue'
+    const actionLabel = identityDialog.mode === 'create'
+      ? 'Start Table'
+      : identityDialog.mode === 'join'
+        ? 'Join Duel'
+        : 'Join Queue'
+
+    return (
+      <div
+        className="fixed inset-0 z-[92] flex items-end justify-center bg-black/72 px-3 pb-[calc(env(safe-area-inset-bottom)_+_0.85rem)] pt-[calc(env(safe-area-inset-top)_+_0.85rem)] backdrop-blur-sm sm:items-center"
+        role="presentation"
+        onMouseDown={() => setIdentityDialog(null)}
+      >
+        <section
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="shadow-war-persona-title"
+          className="max-h-full w-full max-w-lg overflow-y-auto rounded-[1.1rem] border border-[#d7aa46]/35 bg-[linear-gradient(180deg,rgba(24,20,14,0.98),rgba(5,6,7,0.98))] p-4 text-[#f6e0a2] shadow-[0_26px_90px_rgba(0,0,0,0.72)]"
+          onMouseDown={event => event.stopPropagation()}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b9a16f]">Shadow War</p>
+              <h2 id="shadow-war-persona-title" className="mt-1 text-2xl font-semibold text-[#f6e0a2]">
+                {title}
+              </h2>
+              <p className="mt-1 text-sm text-[#b9a16f]">{selectedAvatar.name} of {selectedFaction.name}</p>
+            </div>
+            <button
+              type="button"
+              aria-label="Close persona picker"
+              onClick={() => setIdentityDialog(null)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-transparent bg-black/10 text-[#f0d381] transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/50"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="mt-4 rounded-[1rem] border border-[#b9934c]/24 bg-black/42 p-3">
+            <div className="mb-3 flex items-center gap-3">
+              <div className={cn('h-14 w-14 shrink-0 overflow-hidden rounded-full border bg-black/70', selectedAvatar.accentClass)}>
+                <img src={selectedAvatar.imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-base font-semibold text-[#f6e0a2]">{selectedAvatar.name}</p>
+                <p className="truncate text-sm text-[#b9a16f]">{selectedFaction.crest} {selectedFaction.name}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-6 gap-2">
+              {SHADOW_WAR_AVATARS.map(avatar => (
+                <button
+                  key={avatar.id}
+                  type="button"
+                  aria-label={`Select ${avatar.name}`}
+                  onClick={() => setIdentity(current => ({ ...current, avatarId: avatar.id }))}
+                  className={cn(
+                    'aspect-square overflow-hidden rounded-full border bg-black/72 transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/50',
+                    avatar.accentClass,
+                    identity.avatarId === avatar.id ? 'ring-2 ring-[#f0d381]/70' : 'opacity-72 hover:opacity-100'
+                  )}
+                >
+                  <img src={avatar.imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                </button>
+              ))}
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {SHADOW_WAR_FACTIONS.map(faction => (
+                <button
+                  key={faction.id}
+                  type="button"
+                  onClick={() => setIdentity(current => ({ ...current, factionId: faction.id }))}
+                  className={cn(
+                    'min-h-11 rounded-[0.65rem] border bg-black/46 px-2 py-2 text-left transition-[border-color,background,transform] duration-200 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/50',
+                    faction.accentClass,
+                    identity.factionId === faction.id ? 'bg-[#d7aa46]/12' : ''
+                  )}
+                >
+                  <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] opacity-80">{faction.crest}</span>
+                  <span className="block truncate text-xs font-semibold text-[#f6e0a2]">{faction.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <WarButton variant="ghost" onClick={() => setIdentityDialog(null)}>
+              Cancel
+            </WarButton>
+            <WarButton loading={busy === identityDialog.mode || (identityDialog.mode === 'create' && busy === 'create')} onClick={() => void confirmIdentityDialog()}>
+              {actionLabel}
+            </WarButton>
+          </div>
+        </section>
       </div>
     )
   }
@@ -360,81 +532,33 @@ export function ShadowWarScreen({
           <p className="max-w-2xl text-sm leading-6 text-[#d9c79f]">
             Create a fresh duel or join a table where a player is actively waiting.
           </p>
-          <div className="mt-5 grid gap-3 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-[1rem] border border-[#b9934c]/24 bg-black/42 p-3">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#f0d381]">War persona</p>
-                  <p className="mt-0.5 text-xs text-[#b9a16f]">{selectedAvatar.name} of {selectedFaction.name}</p>
-                </div>
-                <div className={cn('h-12 w-12 shrink-0 overflow-hidden rounded-full border bg-black/70', selectedAvatar.accentClass)}>
-                  <img src={selectedAvatar.imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
-                </div>
-              </div>
-              <div className="grid grid-cols-6 gap-2">
-                {SHADOW_WAR_AVATARS.map(avatar => (
-                  <button
-                    key={avatar.id}
-                    type="button"
-                    aria-label={`Select ${avatar.name}`}
-                    onClick={() => setIdentity(current => ({ ...current, avatarId: avatar.id }))}
-                    className={cn(
-                      'aspect-square overflow-hidden rounded-full border bg-black/72 transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/50',
-                      avatar.accentClass,
-                      identity.avatarId === avatar.id ? 'ring-2 ring-[#f0d381]/70' : 'opacity-72 hover:opacity-100'
-                    )}
-                  >
-                    <img src={avatar.imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
-                  </button>
-                ))}
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {SHADOW_WAR_FACTIONS.map(faction => (
-                  <button
-                    key={faction.id}
-                    type="button"
-                    onClick={() => setIdentity(current => ({ ...current, factionId: faction.id }))}
-                    className={cn(
-                      'min-h-11 rounded-[0.65rem] border bg-black/46 px-2 py-2 text-left transition-[border-color,background,transform] duration-200 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/50',
-                      faction.accentClass,
-                      identity.factionId === faction.id ? 'bg-[#d7aa46]/12' : ''
-                    )}
-                  >
-                    <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] opacity-80">{faction.crest}</span>
-                    <span className="block truncate text-xs font-semibold text-[#f6e0a2]">{faction.name}</span>
-                  </button>
-                ))}
-              </div>
+          <div className="mt-5 rounded-[1rem] border border-[#b9934c]/24 bg-black/42 p-3">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#f0d381]">Lobby</p>
+              <span className="rounded-full border border-[#d7aa46]/28 bg-[#d7aa46]/10 px-2 py-0.5 text-[10px] font-semibold text-[#f0d381]">
+                {lobbyUsers.length || 1} active
+              </span>
             </div>
-
-            <div className="rounded-[1rem] border border-[#b9934c]/24 bg-black/42 p-3">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#f0d381]">Lobby</p>
-                <span className="rounded-full border border-[#d7aa46]/28 bg-[#d7aa46]/10 px-2 py-0.5 text-[10px] font-semibold text-[#f0d381]">
-                  {lobbyUsers.length || 1} active
-                </span>
-              </div>
-              <div className="space-y-2">
-                {(lobbyUsers.length > 0 ? lobbyUsers : [{ id: user?.id ?? 'you', name: user?.display_name || user?.username || 'You', avatarUrl: user?.avatar_url ?? null, joinedAt: Date.now() }]).slice(0, 5).map(lobbyUser => (
-                  <div key={lobbyUser.id} className="flex items-center gap-2 rounded-[0.7rem] border border-white/8 bg-white/[0.035] px-2 py-2">
-                    <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full border border-[#d7aa46]/28 bg-black/60">
-                      {lobbyUser.avatarUrl ? (
-                        <img src={lobbyUser.avatarUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
-                      ) : (
-                        <img src={selectedAvatar.imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-xs font-semibold text-[#f6e0a2]">{lobbyUser.id === user?.id ? 'You' : lobbyUser.name}</p>
-                      <p className="truncate text-[10px] text-[#b9a16f]">Browsing Shadow War</p>
-                    </div>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {(lobbyUsers.length > 0 ? lobbyUsers : [{ id: user?.id ?? 'you', name: user?.display_name || user?.username || 'You', avatarUrl: user?.avatar_url ?? null, joinedAt: Date.now() }]).slice(0, 8).map(lobbyUser => (
+                <div key={lobbyUser.id} className="flex min-w-[10rem] items-center gap-2 rounded-[0.7rem] border border-white/8 bg-white/[0.035] px-2 py-2">
+                  <div className="h-8 w-8 shrink-0 overflow-hidden rounded-full border border-[#d7aa46]/28 bg-black/60">
+                    {lobbyUser.avatarUrl ? (
+                      <img src={lobbyUser.avatarUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                    ) : (
+                      <img src={selectedAvatar.imageUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+                    )}
                   </div>
-                ))}
-              </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-semibold text-[#f6e0a2]">{lobbyUser.id === user?.id ? 'You' : lobbyUser.name}</p>
+                    <p className="truncate text-[10px] text-[#b9a16f]">Browsing Shadow War</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
           <div className="mt-5 grid gap-2 sm:grid-cols-2">
-            <WarButton loading={busy === 'create'} onClick={() => void guarded(actions.create, 'Duel created')}>
+            <WarButton loading={busy === 'create'} onClick={() => setIdentityDialog({ mode: 'create' })}>
               <Plus className="mr-2 h-4 w-4" />
               Create Duel
             </WarButton>
@@ -487,38 +611,41 @@ export function ShadowWarScreen({
           <LoadingSpinner size="lg" className="text-[#f0d381]" />
         </div>
       ) : (
-        <section className="space-y-3">
-          {visibleSessions.length === 0 && (
-            <div className="rounded-[1rem] border border-[#b9934c]/25 bg-black/50 p-5 text-center text-sm text-[#b9a16f]">
-              No active tables with players present. Create the first table.
-            </div>
-          )}
-          {visibleSessions.map(session => (
-            <article
-              key={session.id}
-              className={cn(
-                'rounded-[1rem] border bg-black/58 p-4 shadow-[0_18px_45px_rgba(0,0,0,0.35)] backdrop-blur-sm',
-                activeSession?.id === session.id
-                  ? 'border-[#f0d381]/45'
-                  : 'border-[#b9934c]/22'
-              )}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[#f6e0a2]">{sessionTitle(session)}</p>
-                  <p className="mt-1 truncate text-xs text-[#b9a16f]">
-                    {displayPlayerName(session, 'one')} vs {displayPlayerName(session, 'two')}
-                  </p>
-                </div>
-                <span className="rounded-full border border-[#d7aa46]/30 bg-[#d7aa46]/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#f0d381]">
-                  {session.status}
-                </span>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
+          <section className="space-y-3">
+            {visibleSessions.length === 0 && (
+              <div className="rounded-[1rem] border border-[#b9934c]/25 bg-black/50 p-5 text-center text-sm text-[#b9a16f]">
+                No active tables with players present. Create the first table.
               </div>
-              {renderSessionPresence(session)}
-              {renderSessionActions(session)}
-            </article>
-          ))}
-        </section>
+            )}
+            {visibleSessions.map(session => (
+              <article
+                key={session.id}
+                className={cn(
+                  'rounded-[1rem] border bg-black/58 p-4 shadow-[0_18px_45px_rgba(0,0,0,0.35)] backdrop-blur-sm',
+                  activeSession?.id === session.id
+                    ? 'border-[#f0d381]/45'
+                    : 'border-[#b9934c]/22'
+                )}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#f6e0a2]">{sessionTitle(session)}</p>
+                    <p className="mt-1 truncate text-xs text-[#b9a16f]">
+                      {displayPlayerName(session, 'one')} vs {displayPlayerName(session, 'two')}
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-[#d7aa46]/30 bg-[#d7aa46]/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#f0d381]">
+                    {session.status}
+                  </span>
+                </div>
+                {renderSessionPresence(session)}
+                {renderSessionActions(session)}
+              </article>
+            ))}
+          </section>
+          {renderLeaderboard()}
+        </div>
       )}
     </main>
   )
@@ -610,6 +737,7 @@ export function ShadowWarScreen({
         </div>
       )}
       {renderInstructionsDialog()}
+      {renderIdentityDialog()}
     </div>
   )
 }

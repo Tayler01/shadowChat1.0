@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Shield } from 'lucide-react'
 import { cn } from '../../../../lib/utils'
 import type { ShadowWarCard } from '../engine/types'
@@ -10,18 +10,35 @@ export function ShadowWarCardView({
   selected = false,
   hidden = false,
   onClick,
+  onLongPress,
 }: {
   card?: ShadowWarCard | null
   compact?: boolean
   selected?: boolean
   hidden?: boolean
   onClick?: () => void
+  onLongPress?: () => void
 }) {
   const [imageFailed, setImageFailed] = useState(false)
+  const longPressTimerRef = useRef<number | null>(null)
+  const longPressTriggeredRef = useRef(false)
 
   useEffect(() => {
     setImageFailed(false)
   }, [card?.imageUrl])
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+  }
+
+  useEffect(() => () => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current)
+    }
+  }, [])
 
   if (hidden || !card) {
     return (
@@ -47,7 +64,31 @@ export function ShadowWarCardView({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onPointerDown={() => {
+        if (!onLongPress) return
+        longPressTriggeredRef.current = false
+        clearLongPressTimer()
+        longPressTimerRef.current = window.setTimeout(() => {
+          longPressTriggeredRef.current = true
+          onLongPress()
+        }, 520)
+      }}
+      onPointerUp={clearLongPressTimer}
+      onPointerCancel={clearLongPressTimer}
+      onPointerLeave={clearLongPressTimer}
+      onContextMenu={event => {
+        if (!onLongPress) return
+        event.preventDefault()
+        onLongPress()
+      }}
+      onClick={event => {
+        if (longPressTriggeredRef.current) {
+          event.preventDefault()
+          longPressTriggeredRef.current = false
+          return
+        }
+        onClick?.()
+      }}
       disabled={!onClick}
       data-testid="shadow-war-card"
       data-shadow-war-card-id={card.instanceId}
@@ -79,23 +120,6 @@ export function ShadowWarCardView({
       )}
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.02)_0%,rgba(0,0,0,0.0)_44%,rgba(0,0,0,0.44)_100%)]" />
       <div className="absolute inset-[5px] rounded-[calc(var(--radius-md)-5px)] border border-[rgba(215,170,70,0.24)]" />
-      <div className="absolute inset-x-1.5 bottom-2 px-1 text-center">
-        <p
-          className={cn(
-            'overflow-hidden font-serif font-semibold uppercase text-[#f6e0a2] [text-shadow:0_2px_4px_rgba(0,0,0,0.95),0_0_10px_rgba(0,0,0,0.9)]',
-            compact
-              ? 'whitespace-nowrap text-[6px] leading-[0.65rem] tracking-0 sm:text-[8px] sm:leading-[0.72rem]'
-              : 'line-clamp-2 break-words text-xs tracking-[0.02em] [overflow-wrap:anywhere]'
-          )}
-        >
-          {card.name}
-        </p>
-        {!compact && (
-          <p className="mt-0.5 line-clamp-2 text-[10px] leading-3 text-[#d9c79f] [text-shadow:0_1px_3px_rgba(0,0,0,0.95)]">
-            {card.description}
-          </p>
-        )}
-      </div>
     </button>
   )
 }

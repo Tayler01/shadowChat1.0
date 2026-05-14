@@ -7,9 +7,10 @@ import {
   type ShadowWarMatch,
   type ShadowWarMove,
   type ShadowWarPlayerStateRow,
+  type ShadowWarStats,
 } from '../../../../lib/supabase'
 
-const USER_SELECT = 'id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, presence_visibility'
+const USER_SELECT = 'id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, presence_visibility'
 
 export interface ShadowWarSnapshot {
   sessions: GameSession[]
@@ -19,6 +20,7 @@ export interface ShadowWarSnapshot {
   queue: GameSessionQueueEntry[]
   moves: ShadowWarMove[]
   presence: GameSessionPresence[]
+  leaderboard: ShadowWarStats[]
 }
 
 export const fetchShadowWarSessions = async () => {
@@ -85,6 +87,28 @@ export const fetchShadowWarSessionPresence = async (sessionIds: string[]) => {
 
   if (error) throw error
   return (data ?? []) as unknown as GameSessionPresence[]
+}
+
+export const fetchShadowWarLeaderboard = async () => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient
+    .from('shadow_war_stats')
+    .select(`*, user:users!user_id(${USER_SELECT})`)
+    .gt('total_games', 0)
+    .order('wins', { ascending: false })
+    .order('losses', { ascending: true })
+    .order('last_win_at', { ascending: false, nullsFirst: false })
+    .limit(50)
+
+  if (error) throw error
+  return ((data ?? []) as unknown as ShadowWarStats[]).sort((a, b) => {
+    const aRate = a.total_games > 0 ? a.wins / a.total_games : 0
+    const bRate = b.total_games > 0 ? b.wins / b.total_games : 0
+    return b.wins - a.wins
+      || a.losses - b.losses
+      || bRate - aRate
+      || Date.parse(b.last_win_at ?? '0') - Date.parse(a.last_win_at ?? '0')
+  })
 }
 
 export const fetchShadowWarMatch = async (matchId: string) => {

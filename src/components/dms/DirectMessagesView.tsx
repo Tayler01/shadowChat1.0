@@ -28,6 +28,7 @@ import { ChatMessageActionsMenu, type ChatMessageAction } from '../chat/ChatMess
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { CheckersCrownBadge } from '../../features/games/shadow-checkers/components/CheckersCrownBadge'
+import { ShadowWarSwordBadge } from '../../features/games/shadow-war/components/ShadowWarSwordBadge'
 import { NewsReactionSummaryStrip } from '../news/NewsReactionBar'
 import { useFailedMessages } from '../../hooks/useFailedMessages'
 import { formatTime, shouldGroupMessage, getReadableTextColor } from '../../lib/utils'
@@ -243,6 +244,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
             <span className="truncate">{message.sender.display_name}</span>
             <UserRoleBadge role={message.sender.admin_role} />
             <CheckersCrownBadge active={message.sender.checkers_crown} />
+            <ShadowWarSwordBadge active={message.sender.war_sword} />
             <UserPresenceBadge userId={message.sender.id} presenceVisibility={message.sender.presence_visibility} />
           </div>
         )}
@@ -898,6 +900,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                               <span className="truncate">{conversation.other_user?.display_name}</span>
                               <UserRoleBadge role={conversation.other_user?.admin_role} />
                               <CheckersCrownBadge active={conversation.other_user?.checkers_crown} />
+                              <ShadowWarSwordBadge active={conversation.other_user?.war_sword} />
                               <UserPresenceBadge userId={conversation.other_user?.id} presenceVisibility={conversation.other_user?.presence_visibility} />
                             </span>
                           </div>
@@ -968,6 +971,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                     <span className="truncate">{currentConv.other_user?.display_name}</span>
                     <UserRoleBadge role={currentConv.other_user?.admin_role} />
                     <CheckersCrownBadge active={currentConv.other_user?.checkers_crown} />
+                    <ShadowWarSwordBadge active={currentConv.other_user?.war_sword} />
                     <UserPresenceBadge userId={currentConv.other_user?.id} presenceVisibility={currentConv.other_user?.presence_visibility} />
                   </h2>
                   <p className="truncate text-xs sm:text-sm text-[var(--text-muted)]">

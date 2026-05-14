@@ -7,6 +7,7 @@ import { useRealtimeRecovery } from '../../../../hooks/useRealtimeRecovery'
 import {
   createShadowWarSession,
   cleanupShadowWarEmptySessions,
+  fetchShadowWarLeaderboard,
   fetchShadowWarMatch,
   fetchShadowWarMoves,
   fetchShadowWarPlayerState,
@@ -35,6 +36,7 @@ const emptySnapshot: ShadowWarSnapshot = {
   queue: [],
   moves: [],
   presence: [],
+  leaderboard: [],
 }
 
 export function useShadowWar() {
@@ -48,7 +50,10 @@ export function useShadowWar() {
 
   const refresh = useCallback(async (nextSelectedSessionId = selectedSessionId) => {
     try {
-      const sessions = await fetchShadowWarSessions()
+      const [sessions, leaderboard] = await Promise.all([
+        fetchShadowWarSessions(),
+        fetchShadowWarLeaderboard(),
+      ])
       const selected = nextSelectedSessionId
         ? sessions.find(session => session.id === nextSelectedSessionId) ?? await fetchShadowWarSession(nextSelectedSessionId)
         : null
@@ -65,7 +70,7 @@ export function useShadowWar() {
       const queue = activeSession ? await fetchShadowWarQueue(activeSession.id) : []
       const moves = match ? await fetchShadowWarMoves(match.id, match.round_number) : []
       const presence = await fetchShadowWarSessionPresence(sessionIds)
-      const next = { sessions, activeSession, match, playerState, queue, moves, presence }
+      const next = { sessions, activeSession, match, playerState, queue, moves, presence, leaderboard }
       setSnapshot(next)
       setError(null)
       return next
@@ -140,6 +145,7 @@ export function useShadowWar() {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'game_sessions' }, refreshSoon)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'shadow_war_matches' }, refreshSoon)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'shadow_war_moves' }, refreshSoon)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'shadow_war_stats' }, refreshSoon)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'game_session_queue' }, refreshSoon)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'game_session_presence' }, refreshSoon)
         .on(

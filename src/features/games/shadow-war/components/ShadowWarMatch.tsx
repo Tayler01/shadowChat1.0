@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { Crown, Flag, Loader2, Lock } from 'lucide-react'
+import { Crown, Flag, Loader2, Lock, X } from 'lucide-react'
 import { cn } from '../../../../lib/utils'
 import { useAuth } from '../../../../hooks/useAuth'
 import type { GameSession, GameSessionQueueEntry, ShadowWarMatch as ShadowWarMatchRow, ShadowWarMove, ShadowWarPlayerStateRow } from '../../../../lib/supabase'
@@ -8,6 +8,7 @@ import type { ShadowWarCard, ShadowWarLane, ShadowWarPlacementInput, ShadowWarPl
 import { ShadowWarCardView } from './ShadowWarCardView'
 import { getShadowWarAvatar, getShadowWarFaction, type ShadowWarIdentity } from '../identity'
 import { ShadowWarBattleCinematic } from './ShadowWarBattleCinematic'
+import { getShadowWarCardTip, getShadowWarCardWeakness } from '../engine/cardGuide'
 
 const laneLabels: Record<ShadowWarLane, string> = {
   left: 'Left',
@@ -112,6 +113,7 @@ export function ShadowWarMatch({
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
   const [placement, setPlacement] = useState<Partial<ShadowWarPlacementInput>>({})
   const [cinematicRound, setCinematicRound] = useState<ShadowWarRoundHistoryEntry | null>(null)
+  const [detailCard, setDetailCard] = useState<ShadowWarCard | null>(null)
   const mySlot = playerStateRow?.player_slot
   const opponentSlot = mySlot === 'player_one' ? 'player_two' : 'player_one'
   const myMove = mySlot ? getMoveForSlot(moves, mySlot, 'placement') : null
@@ -126,6 +128,10 @@ export function ShadowWarMatch({
   const canResolve = bothLocked && (match.current_phase === 'reveal' || match.current_phase === 'sudden_war') && match.status === 'active'
   const latestRound = Array.isArray(match.state?.rounds)
     ? ((match.state.rounds as ShadowWarRoundHistoryEntry[]).slice(-1)[0] ?? null)
+    : null
+  const roundsCount = Array.isArray(match.state?.rounds) ? (match.state.rounds as unknown[]).length : 0
+  const latestRoundKey = latestRound
+    ? `${match.id}:${roundsCount}:${latestRound.roundNumber}:${latestRound.resolvedAt ?? latestRound.roundWinner ?? 'resolved'}`
     : null
   const pendingSuddenWar = match.state?.pendingSuddenWar as any | undefined
   const displayedRound = pendingSuddenWar ?? latestRound
@@ -232,22 +238,21 @@ export function ShadowWarMatch({
   }, [displayedRound, match.id, match.round_number])
 
   useEffect(() => {
-    if (!latestRound?.resolvedAt) return
+    if (!latestRound || !latestRoundKey) return
 
-    const cinematicKey = `${match.id}:${latestRound.roundNumber}:${latestRound.resolvedAt}`
-    if (cinematicRef.current === cinematicKey) return
-    cinematicRef.current = cinematicKey
+    if (cinematicRef.current === latestRoundKey) return
+    cinematicRef.current = latestRoundKey
 
     const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     if (prefersReducedMotion) return
 
     setCinematicRound(latestRound)
     const timeout = window.setTimeout(() => {
-      setCinematicRound(currentRound => currentRound?.resolvedAt === latestRound.resolvedAt ? null : currentRound)
+      setCinematicRound(currentRound => currentRound === latestRound ? null : currentRound)
     }, 5900)
 
     return () => window.clearTimeout(timeout)
-  }, [latestRound, match.id])
+  }, [latestRound, latestRoundKey])
 
   const statusLabel = match.status === 'completed'
     ? 'Duel complete'
@@ -255,9 +260,67 @@ export function ShadowWarMatch({
       ? 'Sudden war'
       : canResolve
         ? 'Battle resolving'
-        : isLocked
-          ? 'Waiting for opponent'
-          : 'Choose your formation'
+          : isLocked
+            ? 'Waiting for opponent'
+            : 'Choose your formation'
+
+  const renderCardDetailDialog = () => {
+    if (!detailCard) return null
+
+    return (
+      <div
+        className="fixed inset-0 z-[94] flex items-end justify-center bg-black/76 px-3 pb-[calc(env(safe-area-inset-bottom)_+_0.85rem)] pt-[calc(env(safe-area-inset-top)_+_0.85rem)] backdrop-blur-sm sm:items-center"
+        role="presentation"
+        onMouseDown={() => setDetailCard(null)}
+      >
+        <section
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="shadow-war-card-detail-title"
+          className="max-h-full w-full max-w-lg overflow-y-auto rounded-[1.1rem] border border-[#d7aa46]/35 bg-[linear-gradient(180deg,rgba(24,20,14,0.98),rgba(5,6,7,0.98))] p-4 text-[#f6e0a2] shadow-[0_26px_90px_rgba(0,0,0,0.72)]"
+          onMouseDown={event => event.stopPropagation()}
+        >
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b9a16f]">Card intel</p>
+              <h2 id="shadow-war-card-detail-title" className="mt-1 text-2xl font-semibold text-[#f6e0a2]">
+                {detailCard.name}
+              </h2>
+              <p className="mt-1 text-sm text-[#b9a16f]">Strength {detailCard.rank} · {detailCard.archetype}</p>
+            </div>
+            <button
+              type="button"
+              aria-label="Close card details"
+              onClick={() => setDetailCard(null)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-transparent bg-black/10 text-[#f0d381] transition-colors hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/50"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-[11rem_minmax(0,1fr)]">
+            <div className="mx-auto w-full max-w-[12rem]">
+              <ShadowWarCardView card={detailCard} />
+            </div>
+            <div className="space-y-3 text-sm leading-6 text-[#d9c79f]">
+              <div className="rounded-[0.8rem] border border-[#b9934c]/24 bg-black/38 p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#f0d381]">Special power</p>
+                <p className="mt-1">{detailCard.description}</p>
+              </div>
+              <div className="rounded-[0.8rem] border border-[#b9934c]/24 bg-black/38 p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#f0d381]">Weakness</p>
+                <p className="mt-1">{getShadowWarCardWeakness(detailCard.cardId)}</p>
+              </div>
+              <div className="rounded-[0.8rem] border border-[#b9934c]/24 bg-black/38 p-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#f0d381]">Tip</p>
+                <p className="mt-1">{getShadowWarCardTip(detailCard.cardId)}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    )
+  }
 
   return (
     <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -267,6 +330,7 @@ export function ShadowWarMatch({
           mySlot={mySlot}
         />
       )}
+      {renderCardDetailDialog()}
       <p className="sr-only" aria-live="polite">{statusLabel}</p>
       <section className="shrink-0 border-b border-[#b9934c]/35 bg-black/58 px-3 py-3 shadow-[0_18px_40px_rgba(0,0,0,0.45)] backdrop-blur-sm">
         <div className="mx-auto grid max-w-6xl grid-cols-[1fr_auto_1fr] items-center gap-2">
@@ -405,6 +469,7 @@ export function ShadowWarMatch({
                 compact
                 selected={selectedCardId === card.instanceId}
                 onClick={() => setSelectedCardId(card.instanceId)}
+                onLongPress={() => setDetailCard(card)}
               />
             ))}
             {!playerState && (
