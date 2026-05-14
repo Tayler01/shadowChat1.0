@@ -153,6 +153,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
             messages={messages}
             replyingTo={replyTo || undefined}
             onCancelReply={() => setReplyTo(null)}
+            enableGifPicker
           />
         </div>
       </div>
@@ -171,6 +172,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
           messages={messages}
           replyingTo={replyTo || undefined}
           onCancelReply={() => setReplyTo(null)}
+          enableGifPicker
         />
       </MobileChatFooter>
     </motion.div>

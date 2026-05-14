@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Send, Smile, Command, Plus, Mic, X } from 'lucide-react'
+import { Film, Send, Smile, Command, Plus, Mic, X } from 'lucide-react'
 import { useTyping } from '../../hooks/useTyping'
 import { Button } from '../ui/Button'
 import { processSlashCommand, slashCommands } from '../../lib/utils'
@@ -11,6 +11,8 @@ import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import { RecordingIndicator } from '../ui/RecordingIndicator'
 import { useDraft } from '../../hooks/useDraft'
 import { useSuggestedReplies, useSuggestionsEnabled } from '../../hooks/useSuggestedReplies'
+import { GifPicker } from './GifPicker'
+import type { GifResult } from '../../lib/gifs'
 import toast from 'react-hot-toast'
 import { askQuestion } from '../../lib/ai'
 
@@ -47,6 +49,7 @@ interface MessageInputProps {
   replyingTo?: { id: string; content: string }
   onCancelReply?: () => void
   typingChannel?: string
+  enableGifPicker?: boolean
 }
 
 export const MessageInput: React.FC<MessageInputProps> = ({
@@ -60,10 +63,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   replyingTo,
   onCancelReply,
   typingChannel = 'general',
+  enableGifPicker = false,
 }) => {
   const { draft, setDraft, clear } = useDraft(cacheKey)
   const [message, setMessage] = useState(draft)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [showGifPicker, setShowGifPicker] = useState(false)
   const EmojiPicker = useEmojiPicker(showEmojiPicker)
   const [showSlashCommands, setShowSlashCommands] = useState(false)
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
@@ -324,6 +329,35 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     setShowAttachmentMenu(false)
   }
 
+  const openGifPicker = () => {
+    setShowGifPicker(true)
+    setShowAttachmentMenu(false)
+    setShowEmojiPicker(false)
+  }
+
+  const handleGifSelect = async (gif: GifResult) => {
+    if (disabled || submittingRef.current) {
+      return
+    }
+
+    submittingRef.current = true
+    setShowGifPicker(false)
+    try {
+      const sent = await onSendMessage('', 'image', gif.url, replyingTo?.id)
+      if (sent === null) {
+        toast.error('Failed to send GIF')
+        return
+      }
+      onCancelReply?.()
+    } catch (err) {
+      console.error(err)
+      toast.error('Failed to send GIF')
+    } finally {
+      submittingRef.current = false
+      restoreComposerFocus()
+    }
+  }
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -548,6 +582,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         </div>
       )}
 
+      {showGifPicker && enableGifPicker && (
+        <GifPicker
+          onSelect={gif => void handleGifSelect(gif)}
+          onClose={() => setShowGifPicker(false)}
+        />
+      )}
+
       {/* Input Form */}
       <form onSubmit={handleSubmit} className="flex items-end gap-2.5 md:gap-3">
         {/* Attachment Button */}
@@ -585,6 +626,16 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               >
                 File
               </button>
+              {enableGifPicker && (
+                <button
+                  type="button"
+                  onClick={openGifPicker}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.05)] hover:text-[var(--text-primary)]"
+                >
+                  <Film className="h-3.5 w-3.5" />
+                  <span>GIF</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={async () => {

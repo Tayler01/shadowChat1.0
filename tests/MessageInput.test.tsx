@@ -21,6 +21,20 @@ jest.mock('../src/hooks/useSuggestedReplies', () => ({
   useSuggestionsEnabled: () => ({ enabled: false, setEnabled: jest.fn() })
 }))
 
+jest.mock('../src/lib/gifs', () => ({
+  searchKlipyGifs: jest.fn().mockResolvedValue({
+    gifs: [
+      {
+        id: 'gif-1',
+        title: 'Celebration',
+        url: 'https://cdn.klipy.example/celebration.gif',
+        previewUrl: 'https://cdn.klipy.example/celebration-preview.gif',
+      },
+    ],
+    nextPage: null,
+  }),
+}))
+
 jest.mock('../src/lib/supabase', () => ({
   uploadVoiceMessage: jest.fn().mockResolvedValue('url'),
   uploadChatFile: jest.fn(),
@@ -31,8 +45,23 @@ const { uploadChatFile } = jest.requireMock('../src/lib/supabase') as {
   uploadChatFile: jest.Mock
 }
 
+const { searchKlipyGifs } = jest.requireMock('../src/lib/gifs') as {
+  searchKlipyGifs: jest.Mock
+}
+
 beforeEach(() => {
   jest.resetAllMocks()
+  searchKlipyGifs.mockResolvedValue({
+    gifs: [
+      {
+        id: 'gif-1',
+        title: 'Celebration',
+        url: 'https://cdn.klipy.example/celebration.gif',
+        previewUrl: 'https://cdn.klipy.example/celebration-preview.gif',
+      },
+    ],
+    nextPage: null,
+  })
   localStorage.clear()
 })
 
@@ -213,4 +242,44 @@ test('auto-detects videos from the generic file picker', async () => {
       undefined
     )
   })
+})
+
+test('hides the GIF picker menu item by default', async () => {
+  const user = userEvent.setup()
+  render(<MessageInput onSendMessage={() => {}} />)
+
+  await act(async () => {
+    await user.click(screen.getByRole('button', { name: /add attachment/i }))
+  })
+
+  expect(screen.queryByRole('button', { name: /^gif$/i })).not.toBeInTheDocument()
+})
+
+test('sends a selected GIF as an image attachment when enabled', async () => {
+  const user = userEvent.setup()
+  const onSendMessage = jest.fn().mockResolvedValue({ id: 'm1' })
+  render(<MessageInput onSendMessage={onSendMessage} enableGifPicker />)
+
+  await act(async () => {
+    await user.click(screen.getByRole('button', { name: /add attachment/i }))
+  })
+  await act(async () => {
+    await user.click(screen.getByRole('button', { name: /^gif$/i }))
+  })
+
+  expect(screen.getByRole('dialog', { name: /gif picker/i })).toBeInTheDocument()
+  await waitFor(() => {
+    expect(searchKlipyGifs).toHaveBeenCalledWith(expect.objectContaining({ query: '', limit: 24 }))
+  })
+
+  await act(async () => {
+    await user.click(await screen.findByRole('button', { name: /send gif celebration/i }))
+  })
+
+  expect(onSendMessage).toHaveBeenCalledWith(
+    '',
+    'image',
+    'https://cdn.klipy.example/celebration.gif',
+    undefined
+  )
 })
