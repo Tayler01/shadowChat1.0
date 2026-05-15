@@ -70,6 +70,8 @@ Do browser validation when changing:
 - admin access, admin subpages, role badges, or channel-ban moderation
 - active-user indicators or presence visibility
 - General Chat weather widget or Account & Profile weather location settings
+- mobile GIF/emoji pickers, quick reaction rails, image preview modals, or
+  Shadow Pin image masonry
 
 For user-facing changes, the default browser validation should include at least
 one iPhone/WebKit profile and one Android/Chromium profile through the closest

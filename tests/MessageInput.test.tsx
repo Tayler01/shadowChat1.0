@@ -284,13 +284,8 @@ test('sends a selected GIF as an image attachment when enabled', async () => {
   )
 })
 
-test('does not autofocus GIF search on touch-sized mobile inputs', async () => {
-  const originalMatchMedia = window.matchMedia
+test('autofocuses GIF search in the mobile full-screen picker', async () => {
   const originalInnerWidth = window.innerWidth
-  Object.defineProperty(window, 'matchMedia', {
-    configurable: true,
-    value: jest.fn().mockReturnValue({ matches: false }),
-  })
   Object.defineProperty(window, 'innerWidth', {
     configurable: true,
     value: 390,
@@ -308,12 +303,8 @@ test('does not autofocus GIF search on touch-sized mobile inputs', async () => {
     })
 
     const search = await screen.findByPlaceholderText('Search KLIPY')
-    expect(document.activeElement).not.toBe(search)
+    await waitFor(() => expect(document.activeElement).toBe(search))
   } finally {
-    Object.defineProperty(window, 'matchMedia', {
-      configurable: true,
-      value: originalMatchMedia,
-    })
     Object.defineProperty(window, 'innerWidth', {
       configurable: true,
       value: originalInnerWidth,
@@ -322,17 +313,29 @@ test('does not autofocus GIF search on touch-sized mobile inputs', async () => {
 })
 
 test('uses keyboard-aware mobile sizing for the GIF picker', async () => {
+  const originalInnerWidth = window.innerWidth
+  Object.defineProperty(window, 'innerWidth', {
+    configurable: true,
+    value: 390,
+  })
   const user = userEvent.setup()
-  render(<MessageInput onSendMessage={() => {}} enableGifPicker />)
+  try {
+    render(<MessageInput onSendMessage={() => {}} enableGifPicker />)
 
-  await act(async () => {
-    await user.click(screen.getByRole('button', { name: /add attachment/i }))
-  })
-  await act(async () => {
-    await user.click(screen.getByRole('button', { name: /^gif$/i }))
-  })
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /add attachment/i }))
+    })
+    await act(async () => {
+      await user.click(screen.getByRole('button', { name: /^gif$/i }))
+    })
 
-  const picker = screen.getByRole('dialog', { name: /gif picker/i })
-  expect(picker.className).toContain('--shadowchat-visual-viewport-height')
-  expect(picker.className).toContain('--shadowchat-keyboard-inset')
+    const picker = screen.getByRole('dialog', { name: /gif picker/i })
+    expect(picker).toHaveAttribute('data-mobile-fullscreen-picker', 'true')
+    expect(picker.className).toContain('--shadowchat-visual-viewport-height')
+  } finally {
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: originalInnerWidth,
+    })
+  }
 })

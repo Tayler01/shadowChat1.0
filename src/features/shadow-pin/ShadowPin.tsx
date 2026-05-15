@@ -86,6 +86,51 @@ const getImageAspectRatio = (item: { image_width?: number | null; image_height?:
 
 const isProcessingMedia = (status?: string | null) => status === 'pending' || status === 'processing'
 
+const getShadowPinMasonryColumnCount = () => {
+  if (typeof window === 'undefined') return 2
+  if (window.innerWidth >= 1024) return 4
+  if (window.innerWidth >= 640) return 3
+  return 2
+}
+
+const getMasonryHeightScore = (image: ShadowPinImage) =>
+  image.image_width && image.image_height ? image.image_height / image.image_width : 1.25
+
+const distributeMasonryColumns = (images: ShadowPinImage[], columnCount: number) => {
+  const columns = Array.from({ length: Math.max(1, columnCount) }, () => [] as ShadowPinImage[])
+  const heights = columns.map(() => 0)
+
+  images.forEach(image => {
+    const targetIndex = heights.reduce(
+      (lowestIndex, height, index) => height < heights[lowestIndex] ? index : lowestIndex,
+      0
+    )
+
+    columns[targetIndex].push(image)
+    heights[targetIndex] += getMasonryHeightScore(image) + 0.08
+  })
+
+  return columns
+}
+
+function useShadowPinMasonryColumnCount() {
+  const [columnCount, setColumnCount] = useState(getShadowPinMasonryColumnCount)
+
+  useEffect(() => {
+    const update = () => setColumnCount(getShadowPinMasonryColumnCount())
+
+    update()
+    window.addEventListener('resize', update)
+    window.visualViewport?.addEventListener?.('resize', update)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.visualViewport?.removeEventListener?.('resize', update)
+    }
+  }, [])
+
+  return columnCount
+}
+
 function ShadowPinHeader({
   title,
   subtitle,
@@ -795,7 +840,11 @@ function ShadowPinCategoryScreen({
     toast.success('Image removed')
   }
 
-  const masonry = useMemo(() => imagesState.images, [imagesState.images])
+  const masonryColumnCount = useShadowPinMasonryColumnCount()
+  const masonryColumns = useMemo(
+    () => distributeMasonryColumns(imagesState.images, masonryColumnCount),
+    [imagesState.images, masonryColumnCount]
+  )
 
   return (
     <div className="theme-image-surface flex h-full min-h-0 flex-col">
@@ -822,27 +871,32 @@ function ShadowPinCategoryScreen({
           <>
             <div
               role="list"
-              aria-label="ShadowPin image grid"
-              className="grid grid-cols-2 items-start gap-3 sm:grid-cols-3 lg:grid-cols-4"
+              aria-label="ShadowPin image masonry grid"
+              className="grid items-start gap-3"
+              style={{ gridTemplateColumns: `repeat(${masonryColumnCount}, minmax(0, 1fr))` }}
             >
-              {masonry.map(image => {
-                const manage = canManage(image, user?.id, adminRole)
-                return (
-                  <div key={image.id} role="listitem" className="min-w-0">
-                    <ImageCard
-                      image={image}
-                      canManageImage={manage}
-                      overlayOpen={overlayImageId === image.id}
-                      onToggleOverlay={() => setOverlayImageId(prev => prev === image.id ? null : image.id)}
-                      onViewer={() => setModal({ type: 'image-viewer', image })}
-                      onEdit={() => setModal({ type: 'edit-image', image })}
-                      onHeart={() => {
-                        imagesState.toggleHeart(image.id).catch(err => toast.error(err instanceof Error ? err.message : 'Heart failed'))
-                      }}
-                    />
-                  </div>
-                )
-              })}
+              {masonryColumns.map((column, columnIndex) => (
+                <div key={columnIndex} className="flex min-w-0 flex-col gap-3">
+                  {column.map(image => {
+                    const manage = canManage(image, user?.id, adminRole)
+                    return (
+                      <div key={image.id} role="listitem" className="min-w-0">
+                        <ImageCard
+                          image={image}
+                          canManageImage={manage}
+                          overlayOpen={overlayImageId === image.id}
+                          onToggleOverlay={() => setOverlayImageId(prev => prev === image.id ? null : image.id)}
+                          onViewer={() => setModal({ type: 'image-viewer', image })}
+                          onEdit={() => setModal({ type: 'edit-image', image })}
+                          onHeart={() => {
+                            imagesState.toggleHeart(image.id).catch(err => toast.error(err instanceof Error ? err.message : 'Heart failed'))
+                          }}
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
+              ))}
             </div>
             {imagesState.hasMore && (
               <div className="mt-4 flex justify-center">

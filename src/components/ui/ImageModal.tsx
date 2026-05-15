@@ -1,4 +1,5 @@
 import React from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
 interface ImageModalProps {
@@ -9,20 +10,48 @@ interface ImageModalProps {
 }
 
 export const ImageModal: React.FC<ImageModalProps> = ({ open, src, alt, onClose }) => {
+  React.useEffect(() => {
+    if (!open) return
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onClose, open])
+
   if (!open) return null
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--bg-overlay)] backdrop-blur-md">
-      <div className="popup-surface relative max-h-full max-w-full rounded-[var(--radius-xl)] p-3">
+  const modal = (
+    <div
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(0,0,0,0.84)] px-3 pb-[calc(env(safe-area-inset-bottom)_+_0.75rem)] pt-[calc(env(safe-area-inset-top)_+_0.75rem)] backdrop-blur-md"
+      role="dialog"
+      aria-modal="true"
+      aria-label={alt || 'Image preview'}
+      onMouseDown={event => {
+        if (event.target === event.currentTarget) {
+          onClose()
+        }
+      }}
+    >
+      <div className="relative flex h-full max-h-full w-full max-w-full items-center justify-center">
         <button
-          className="popup-close absolute right-3 top-3 rounded-full p-1"
+          className="popup-close absolute right-2 top-2 z-10 rounded-full p-2 shadow-[0_12px_26px_rgba(0,0,0,0.35)]"
           onClick={onClose}
           aria-label="Close image"
           type="button"
         >
           <X className="w-5 h-5" />
         </button>
-        <img src={src} alt={alt} className="max-h-[90vh] max-w-[90vw] rounded-[var(--radius-lg)]" />
+        <img
+          src={src}
+          alt={alt}
+          className="max-h-[calc(var(--shadowchat-visual-viewport-height,100dvh)_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom)_-_1.5rem)] max-w-[calc(100vw_-_1.5rem)] rounded-[var(--radius-lg)] object-contain shadow-[0_22px_70px_rgba(0,0,0,0.58)]"
+        />
       </div>
     </div>
   )
+  return typeof document === 'undefined' ? modal : createPortal(modal, document.body)
 }

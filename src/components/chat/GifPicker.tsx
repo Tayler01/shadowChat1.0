@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Search, X } from 'lucide-react'
 import { searchKlipyGifs, type GifResult } from '../../lib/gifs'
 import { Button } from '../ui/Button'
@@ -9,12 +10,25 @@ type GifPickerProps = {
   onClose: () => void
 }
 
-const shouldAutoFocusSearch = () => {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-    return false
-  }
+const isPhoneViewport = () =>
+  typeof window !== 'undefined' && window.innerWidth < 768
 
-  return window.innerWidth >= 768 && window.matchMedia('(hover: hover) and (pointer: fine)').matches
+const usePhoneViewport = () => {
+  const [phoneViewport, setPhoneViewport] = useState(isPhoneViewport)
+
+  useEffect(() => {
+    const update = () => setPhoneViewport(isPhoneViewport())
+
+    update()
+    window.addEventListener('resize', update)
+    window.visualViewport?.addEventListener?.('resize', update)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.visualViewport?.removeEventListener?.('resize', update)
+    }
+  }, [])
+
+  return phoneViewport
 }
 
 export const GifPicker: React.FC<GifPickerProps> = ({ onSelect, onClose }) => {
@@ -24,6 +38,7 @@ export const GifPicker: React.FC<GifPickerProps> = ({ onSelect, onClose }) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const phoneViewport = usePhoneViewport()
 
   const label = useMemo(
     () => (debouncedQuery ? `GIF results for ${debouncedQuery}` : 'Trending GIFs'),
@@ -39,9 +54,12 @@ export const GifPicker: React.FC<GifPickerProps> = ({ onSelect, onClose }) => {
   }, [query])
 
   useEffect(() => {
-    if (shouldAutoFocusSearch()) {
+    const frame = window.requestAnimationFrame(() => {
       inputRef.current?.focus()
-    }
+      window.setTimeout(() => inputRef.current?.focus(), 80)
+    })
+
+    return () => window.cancelAnimationFrame(frame)
   }, [])
 
   useEffect(() => {
@@ -75,12 +93,8 @@ export const GifPicker: React.FC<GifPickerProps> = ({ onSelect, onClose }) => {
     onSelect(gif)
   }, [onSelect])
 
-  return (
-    <div
-      className="glass-panel-strong fixed inset-x-2 bottom-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.5rem)] z-[92] max-h-[min(32rem,max(5rem,calc(var(--shadowchat-visual-viewport-height,100dvh)_-_env(safe-area-inset-bottom)_-_var(--shadowchat-mobile-chat-footer-height,9.5rem)_-_var(--shadowchat-keyboard-inset,0px)_-_env(safe-area-inset-top)_-_5.5rem)))] overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-panel)] shadow-[var(--shadow-panel-strong)] md:absolute md:bottom-full md:left-0 md:right-auto md:mb-2 md:w-[24rem] md:max-h-[min(28rem,calc(100vh-8rem))]"
-      role="dialog"
-      aria-label="GIF picker"
-    >
+  const pickerBody = (
+    <>
       <div className="border-b border-[var(--border-panel)] p-2.5 pb-2">
         <div className="flex items-center gap-2">
           <label className="relative min-w-0 flex-1">
@@ -111,18 +125,18 @@ export const GifPicker: React.FC<GifPickerProps> = ({ onSelect, onClose }) => {
         </div>
       </div>
 
-      <div className="h-[min(22rem,max(1.5rem,calc(var(--shadowchat-visual-viewport-height,100dvh)_-_env(safe-area-inset-bottom)_-_var(--shadowchat-mobile-chat-footer-height,9.5rem)_-_var(--shadowchat-keyboard-inset,0px)_-_env(safe-area-inset-top)_-_10.5rem)))] overflow-y-auto overscroll-contain p-2 pb-3 md:h-[min(20rem,calc(100vh-14rem))] md:pb-2">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2 pb-3 md:h-[min(20rem,calc(100vh-14rem))] md:flex-none md:pb-2">
         {loading ? (
-          <div className="flex h-full items-center justify-center gap-2 text-sm text-[var(--text-muted)]">
+          <div className="flex h-full min-h-40 items-center justify-center gap-2 text-sm text-[var(--text-muted)]">
             <LoadingSpinner size="sm" />
             <span>Loading GIFs...</span>
           </div>
         ) : error ? (
-          <div className="flex h-full items-center justify-center px-4 text-center text-sm text-red-200">
+          <div className="flex h-full min-h-40 items-center justify-center px-4 text-center text-sm text-red-200">
             {error}
           </div>
         ) : gifs.length === 0 ? (
-          <div className="flex h-full items-center justify-center px-4 text-center text-sm text-[var(--text-muted)]">
+          <div className="flex h-full min-h-40 items-center justify-center px-4 text-center text-sm text-[var(--text-muted)]">
             No GIFs found.
           </div>
         ) : (
@@ -148,6 +162,31 @@ export const GifPicker: React.FC<GifPickerProps> = ({ onSelect, onClose }) => {
           </div>
         )}
       </div>
+    </>
+  )
+
+  if (phoneViewport && typeof document !== 'undefined') {
+    return createPortal(
+      <div
+        className="fixed inset-x-0 top-0 z-[120] flex h-[var(--shadowchat-visual-viewport-height,100dvh)] flex-col bg-[linear-gradient(180deg,rgb(18,19,20),rgb(5,6,8))] pt-[calc(env(safe-area-inset-top)_+_0.65rem)] text-[var(--text-primary)]"
+        role="dialog"
+        aria-modal="true"
+        aria-label="GIF picker"
+        data-mobile-fullscreen-picker="true"
+      >
+        {pickerBody}
+      </div>,
+      document.body
+    )
+  }
+
+  return (
+    <div
+      className="glass-panel-strong absolute bottom-full left-0 right-auto z-[92] mb-2 flex max-h-[min(28rem,calc(100vh-8rem))] w-[24rem] max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-panel)] shadow-[var(--shadow-panel-strong)]"
+      role="dialog"
+      aria-label="GIF picker"
+    >
+      {pickerBody}
     </div>
   )
 }

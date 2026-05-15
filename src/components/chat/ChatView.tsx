@@ -10,8 +10,10 @@ import { useClientReset } from '../../hooks/ClientResetContext'
 import { ActiveUsersButton } from './ActiveUsersButton'
 import { WeatherWidget } from './WeatherWidget'
 import { clearGroupNotifications } from '../../lib/appBadge'
+import { uploadChatFile } from '../../lib/supabase'
 import { getBlockedActionMessage, getCurrentUserChannelBan, formatChannelBanBlockMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
+import toast from 'react-hot-toast'
 import {
   SESSION_RECOVERY_EVENT,
   type SessionRecoveryResult,
@@ -80,6 +82,22 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
     }
   }
 
+  const handleShareWeather = async (file: File) => {
+    setUploading(true)
+    try {
+      const url = await uploadChatFile(file)
+      const sent = await handleSendMessage('', 'image', url)
+      if (sent !== null) {
+        toast.success('Weather shared')
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to share weather'
+      toast.error(message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -118,7 +136,10 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
           </div>
 
           <div className="flex flex-shrink-0 items-center gap-1 sm:gap-2">
-            <WeatherWidget onOpenSettings={() => onViewChange('settings')} />
+            <WeatherWidget
+              onOpenSettings={() => onViewChange('settings')}
+              onShareWeather={handleShareWeather}
+            />
             <ActiveUsersButton resetStatus={resetStatus} />
             <PinnedMessagesButton
               messages={pinnedMessages}

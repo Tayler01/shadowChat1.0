@@ -45,7 +45,7 @@ Android/Chromium phone profiles before desktop convenience.
 - General Chat: `MessageList` owns the scroll container and pads for the mobile chat footer.
 - DMs: `DirectMessagesView` owns the thread scroll container and pads for the mobile chat footer.
 - Boards: `BoardChat` owns the board chat scroll container and pads for the mobile chat footer.
-- Shadow Pin category images use a deterministic responsive grid on mobile; avoid CSS multi-column masonry for this screen because Android Chromium can collapse it to a single visible column.
+- Shadow Pin category images use deterministic responsive masonry columns on mobile; avoid CSS multi-column masonry because Android Chromium can collapse it to one visible column, and avoid row-locked grids because mixed image heights create gaps instead of the intended packed stagger.
 - Settings/profile screens use internal vertical overflow and bottom safe-area padding.
 
 ## Composer Positioning Strategy
@@ -59,6 +59,8 @@ Android/Chromium phone profiles before desktop convenience.
 
 - Header popovers on phone-sized viewports should prefer fixed, centered placement below the safe-area/header band instead of absolute anchoring to small header pills.
 - Keyboard-adjacent bottom sheets should size from `--shadowchat-visual-viewport-height`, `--shadowchat-mobile-chat-footer-height`, `--shadowchat-keyboard-inset`, and safe-area/header clearance so focused fields do not drift into the app header.
+- GIF and full emoji pickers use body-level full-screen portals on phone-sized viewports. Keep their search fields focusable on open and keep the background opaque so compressed-keyboard states do not reveal the chat thread behind them.
+- Quick reaction rails and chat/DM image previews use body-level fixed portals with viewport-aware placement so grouped messages, scroll containers, and mobile chrome cannot paint above them.
 - Feedback and install guide modals use fixed overlays, viewport max heights, and internal overflow.
 - Public profile uses a centered fixed overlay with max height and internal scroll.
 - Feedback modal coverage passed on all automated mobile profiles.
@@ -73,8 +75,8 @@ Android/Chromium phone profiles before desktop convenience.
 
 - `scripts/mobile-pwa-visual-qa.mjs` runs production-preview mobile visual checks without adding a new Playwright framework.
 - It writes screenshots, console logs, network failures, and `summary.json` under `output/playwright/<run-name>/`.
-- Current passing artifact set: `output/playwright/mobile-pwa-phone-fixes-final/`.
-- Latest targeted regression artifacts for weather, GIF picker keyboard compression, and Android Shadow Pin grid: `output/playwright/mobile-fixes-targeted/`.
+- Current passing artifact set: `output/playwright/mobile-picker-masonry-weather-share-final/`.
+- Latest targeted regression artifacts for weather, GIF picker keyboard compression, picker portals, image modal centering, and Android Shadow Pin masonry: `output/playwright/mobile-fixes-targeted/` plus `output/playwright/mobile-picker-masonry-weather-share-final/`.
 
 ## Known Real-Device Risks
 

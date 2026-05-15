@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { toBlob } from 'html-to-image'
 import {
   Cloud,
   CloudDrizzle,
@@ -9,6 +10,7 @@ import {
   CloudSun,
   MapPin,
   Moon,
+  Share2,
   Sun,
 } from 'lucide-react'
 import { useWeatherForecast } from '../../hooks/useWeatherForecast'
@@ -21,6 +23,7 @@ import {
 
 interface WeatherWidgetProps {
   onOpenSettings?: () => void
+  onShareWeather?: (file: File) => Promise<void>
 }
 
 const SETTINGS_SECTION_STORAGE_KEY = 'shadowchat:settings-section'
@@ -84,10 +87,12 @@ function ForecastRow({
   )
 }
 
-export function WeatherWidget({ onOpenSettings }: WeatherWidgetProps) {
+export function WeatherWidget({ onOpenSettings, onShareWeather }: WeatherWidgetProps) {
   const { preference, forecast, loading, error } = useWeatherForecast()
   const [open, setOpen] = useState(false)
+  const [sharing, setSharing] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  const weatherShareRef = useRef<HTMLDivElement>(null)
   const current = forecast?.current
 
   useEffect(() => {
@@ -121,6 +126,29 @@ export function WeatherWidget({ onOpenSettings }: WeatherWidgetProps) {
     onOpenSettings?.()
   }
 
+  const handleShareWeather = async () => {
+    if (!onShareWeather || !weatherShareRef.current || !current) return
+
+    setSharing(true)
+    try {
+      const blob = await toBlob(weatherShareRef.current, {
+        cacheBust: true,
+        pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+        backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg-app').trim() || '#08090a',
+        filter: node => !(node instanceof HTMLElement && node.dataset.weatherShareExclude === 'true'),
+      })
+
+      if (!blob) {
+        throw new Error('Unable to capture weather')
+      }
+
+      await onShareWeather(new File([blob], `shado-weather-${Date.now()}.png`, { type: blob.type || 'image/png' }))
+      setOpen(false)
+    } finally {
+      setSharing(false)
+    }
+  }
+
   return (
     <div ref={rootRef} className="relative">
       <button
@@ -145,18 +173,33 @@ export function WeatherWidget({ onOpenSettings }: WeatherWidgetProps) {
 
       {open && (
         <div
+          ref={weatherShareRef}
           role="dialog"
           aria-label="Weather forecast"
           className="popup-surface fixed left-1/2 top-[calc(env(safe-area-inset-top)_+_4.75rem)] z-[80] mt-0 max-h-[calc(100dvh_-_env(safe-area-inset-top)_-_6rem)] w-[min(20rem,calc(100vw_-_1rem))] -translate-x-1/2 overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--border-panel)] shadow-[var(--shadow-panel-strong)] sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:max-h-[calc(100vh_-_8rem)] sm:w-80 sm:max-w-[calc(100vw_-_2rem)] sm:translate-x-0 sm:overflow-hidden"
         >
           <div className="border-b border-[var(--border-subtle)] px-4 py-3">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                Weather
-              </p>
-              <p className="mt-1 truncate text-sm font-medium text-[var(--text-primary)]">
-                {preference?.location_name || 'No location selected'}
-              </p>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                  Weather
+                </p>
+                <p className="mt-1 truncate text-sm font-medium text-[var(--text-primary)]">
+                  {preference?.location_name || 'No location selected'}
+                </p>
+              </div>
+              {onShareWeather && current && (
+                <button
+                  type="button"
+                  onClick={() => void handleShareWeather()}
+                  disabled={sharing}
+                  data-weather-share-exclude="true"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.035)] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-glow)] hover:text-[var(--theme-accent-readable)] disabled:cursor-wait disabled:opacity-60"
+                  aria-label="Share weather to chat"
+                >
+                  <Share2 className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
 

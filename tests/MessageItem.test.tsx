@@ -77,6 +77,28 @@ test('renders image message', () => {
   expect(img).toHaveAttribute('src', baseMessage.file_url)
 })
 
+test('opens uploaded images in a top-level mobile-safe viewer', async () => {
+  render(
+    <MessageItem
+      message={baseMessage}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+      onJumpToMessage={() => {}}
+      containerRef={React.createRef()}
+    />
+  )
+
+  await act(async () => {
+    await userEvent.click(screen.getByAltText(/uploaded image/i))
+  })
+
+  const dialog = screen.getByRole('dialog', { name: /uploaded image/i })
+  expect(dialog).toHaveClass('fixed', 'inset-0', 'z-[120]')
+  expect(screen.getByRole('button', { name: /close image/i })).toBeInTheDocument()
+})
+
 test('renders audio message', () => {
   const audioMessage = {
     ...baseMessage,
@@ -265,6 +287,10 @@ test('icon buttons have aria-labels', () => {
       containerRef={React.createRef()}
     />
   )
+
+  act(() => {
+    fireEvent.mouseEnter(screen.getByTestId('message-bubble-shell'))
+  })
 
   const addReaction = screen.getByRole('button', { name: /add reaction/i })
   expect(addReaction).toBeInTheDocument()

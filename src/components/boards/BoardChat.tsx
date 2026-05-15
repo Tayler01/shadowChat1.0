@@ -20,26 +20,11 @@ import { useUnreadScroll } from '../../hooks/useUnreadScroll'
 import { cn, formatTime } from '../../lib/utils'
 import { getBlockedActionMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
-import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import type { EmojiClickData } from '../../types'
 import type { BoardChatMessage } from '../../lib/supabase'
 import type { ChatBoardDefinition } from '../../lib/boards'
 import type { AppView } from '../../types/navigation'
-
-const getEmojiPickerDimensions = () => {
-  if (typeof window === 'undefined') return { width: 300, height: 360 }
-
-  if (window.innerWidth < 480) {
-    return { width: 280, height: Math.max(260, Math.min(320, window.innerHeight - 120)) }
-  }
-
-  return { width: 300, height: 360 }
-}
-
-const getEmojiPickerTheme = () =>
-  typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
-    ? 'dark'
-    : 'light'
+import { EmojiPickerOverlay } from '../chat/EmojiPickerOverlay'
 
 function BoardChatRow({
   board,
@@ -60,9 +45,6 @@ function BoardChatRow({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(message.content)
   const [showReactionPicker, setShowReactionPicker] = useState(false)
-  const pickerRef = useRef<HTMLDivElement>(null)
-  const EmojiPicker = useEmojiPicker(showReactionPicker)
-  const pickerDimensions = getEmojiPickerDimensions()
   const isOwner = profile?.id === message.user_id
   const isOperator = profile?.admin_role === 'admin' || profile?.admin_role === 'sub_admin'
   const isAuthorOperator = message.user?.admin_role === 'admin' || message.user?.admin_role === 'sub_admin'
@@ -117,19 +99,6 @@ function BoardChatRow({
       showActionErrorToast(notice)
     }
   }
-
-  useEffect(() => {
-    if (!showReactionPicker) return
-
-    const handleClick = (event: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
-        setShowReactionPicker(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [showReactionPicker])
 
   const actions: ChatMessageAction[] = [
     {
@@ -236,19 +205,14 @@ function BoardChatRow({
             buttonLabel={`${board.title} message actions`}
           />
         )}
-        {showReactionPicker && EmojiPicker && (
-          <div
-            ref={pickerRef}
-            className="fixed left-1/2 top-16 z-[90] max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] sm:absolute sm:bottom-full sm:left-auto sm:right-0 sm:top-auto sm:mb-2 sm:translate-x-0"
-          >
-            <EmojiPicker
-              onEmojiClick={handleReactionSelect}
-              width={pickerDimensions.width}
-              height={pickerDimensions.height}
-              theme={getEmojiPickerTheme()}
-            />
-          </div>
-        )}
+        <EmojiPickerOverlay
+          open={showReactionPicker}
+          title="Add reaction"
+          ariaLabel={`${board.title} reaction emoji picker`}
+          onClose={() => setShowReactionPicker(false)}
+          onEmojiClick={handleReactionSelect}
+          desktopClassName="fixed left-1/2 top-16 z-[90] max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] sm:absolute sm:bottom-full sm:left-auto sm:right-0 sm:top-auto sm:mb-2 sm:translate-x-0"
+        />
       </div>
     </div>
   )

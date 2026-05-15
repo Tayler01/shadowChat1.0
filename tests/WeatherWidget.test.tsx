@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import React from 'react'
+import { toBlob } from 'html-to-image'
 import { WeatherWidget } from '../src/components/chat/WeatherWidget'
 
 const mockRefresh = jest.fn()
@@ -8,6 +9,12 @@ const mockUseWeatherForecast = jest.fn()
 jest.mock('../src/hooks/useWeatherForecast', () => ({
   useWeatherForecast: () => mockUseWeatherForecast(),
 }))
+
+jest.mock('html-to-image', () => ({
+  toBlob: jest.fn(),
+}))
+
+const mockedToBlob = toBlob as jest.MockedFunction<typeof toBlob>
 
 beforeEach(() => {
   jest.clearAllMocks()
@@ -54,6 +61,7 @@ beforeEach(() => {
     error: null,
     refresh: mockRefresh,
   })
+  mockedToBlob.mockResolvedValue(new Blob(['weather'], { type: 'image/png' }))
 })
 
 test('shows compact weather and opens detailed forecast popup', () => {
@@ -88,4 +96,17 @@ test('prompts for settings when no weather location is selected', () => {
 
   expect(openSettings).toHaveBeenCalledTimes(1)
   expect(window.sessionStorage.getItem('shadowchat:settings-section')).toBe('account-profile')
+})
+
+test('captures the themed weather card for sharing to chat', async () => {
+  const shareWeather = jest.fn().mockResolvedValue(undefined)
+  render(<WeatherWidget onShareWeather={shareWeather} />)
+
+  fireEvent.click(screen.getByRole('button', { name: /72\u00b0 and partly cloudy/i }))
+  fireEvent.click(screen.getByRole('button', { name: /share weather to chat/i }))
+
+  await waitFor(() => expect(mockedToBlob).toHaveBeenCalled())
+  await waitFor(() => expect(shareWeather).toHaveBeenCalledTimes(1))
+  expect(shareWeather.mock.calls[0][0]).toBeInstanceOf(File)
+  expect(shareWeather.mock.calls[0][0].name).toMatch(/^shado-weather-/)
 })

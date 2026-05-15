@@ -88,13 +88,28 @@ beforeEach(() => {
   })
 })
 
-test('renders category pins in a deterministic mobile grid instead of CSS columns', () => {
-  render(<ShadowPin onBack={() => {}} />)
+test('renders category pins in packed mobile masonry columns', () => {
+  const originalInnerWidth = window.innerWidth
+  Object.defineProperty(window, 'innerWidth', {
+    configurable: true,
+    value: 390,
+  })
 
-  fireEvent.click(screen.getByText('Fam & Friends'))
+  try {
+    render(<ShadowPin onBack={() => {}} />)
 
-  const grid = screen.getByRole('list', { name: /shadowpin image grid/i })
-  expect(grid).toHaveClass('grid', 'grid-cols-2', 'sm:grid-cols-3', 'lg:grid-cols-4')
-  expect(grid).not.toHaveClass('columns-2')
-  expect(screen.getAllByRole('listitem')).toHaveLength(3)
+    fireEvent.click(screen.getByText('Fam & Friends'))
+
+    const grid = screen.getByRole('list', { name: /shadowpin image masonry grid/i })
+    expect(grid).toHaveClass('grid')
+    expect(grid).toHaveStyle({ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' })
+    expect(grid).not.toHaveClass('grid-cols-2')
+    expect(grid).not.toHaveClass('columns-2')
+    expect(screen.getAllByRole('listitem')).toHaveLength(3)
+  } finally {
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: originalInnerWidth,
+    })
+  }
 })

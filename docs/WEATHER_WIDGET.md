@@ -11,6 +11,9 @@ active-user count control.
   changes and every ten minutes while the widget has a saved location.
 - The popup can route users directly to Account & Profile settings when no
   location is selected.
+- In General Chat, the popup can be shared as a themed image message. The
+  capture reflects the card as the user sees it with the active theme while
+  excluding close/share controls from the image.
 - Location is personal to the signed-in user. It is not stored on public profile
   rows and is not visible to other users.
 
@@ -57,9 +60,17 @@ The browser calls Open-Meteo directly:
 No API key is required for the current non-commercial style integration, and no
 weather provider token should be added to a browser-visible `VITE_*` variable.
 
+## Weather Sharing
+
+The General Chat weather share action captures the popup with `html-to-image`,
+creates a PNG `File`, uploads it through the existing chat media upload path,
+and sends it as an image message. The browser still performs the capture, but
+users do not need to resize, compress, or prepare anything manually.
+
 ## Frontend Map
 
 - [`src/components/chat/WeatherWidget.tsx`](C:/repos/chat2.0/src/components/chat/WeatherWidget.tsx:1): compact header control and forecast popup.
+- [`src/components/chat/ChatView.tsx`](C:/repos/chat2.0/src/components/chat/ChatView.tsx:1): General Chat weather-share upload and send path.
 - [`src/components/settings/WeatherLocationSettings.tsx`](C:/repos/chat2.0/src/components/settings/WeatherLocationSettings.tsx:1): Account & Profile location picker.
 - [`src/hooks/useWeatherPreference.ts`](C:/repos/chat2.0/src/hooks/useWeatherPreference.ts:1): private preference load/save/clear hook.
 - [`src/hooks/useWeatherForecast.ts`](C:/repos/chat2.0/src/hooks/useWeatherForecast.ts:1): forecast load and periodic refresh hook.
@@ -81,3 +92,5 @@ For UI changes, run a preview build and verify:
 4. Mobile General Chat header keeps the weather and active-user pills visible.
 5. Account & Profile shows the Weather Location card.
 6. Clearing a location returns the header popup to the settings prompt.
+7. Sharing weather sends a themed PNG image message and does not include the
+   popup controls inside the captured card.

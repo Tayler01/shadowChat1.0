@@ -26,12 +26,13 @@ import type { Message, User } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
 import type { EmojiClickData } from '../../types'
-import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import { useToneAnalysis } from '../../hooks/useToneAnalysis'
 import { useToneAnalysisEnabled } from '../../hooks/useToneAnalysisEnabled'
 import { getBlockedActionMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
 import { getSupabaseImageTransformUrl } from '../../lib/storageImageTransforms'
+import { EmojiPickerOverlay } from './EmojiPickerOverlay'
+import { QuickReactionRail } from './QuickReactionRail'
 
 interface MessageItemProps {
   message: Message
@@ -68,21 +69,6 @@ const normalizeEmojiValue = (emoji: string) => {
   return value
 }
 
-const getEmojiPickerDimensions = () => {
-  if (typeof window === 'undefined') return { width: 300, height: 360 }
-
-  if (window.innerWidth < 480) {
-    return { width: 280, height: Math.max(260, Math.min(320, window.innerHeight - 120)) }
-  }
-
-  return { width: 300, height: 360 }
-}
-
-const getEmojiPickerTheme = () =>
-  typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
-    ? 'dark'
-    : 'light'
-
 export const MessageItem: React.FC<MessageItemProps> = React.memo(
   ({
     message,
@@ -103,14 +89,12 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const [editContent, setEditContent] = useState(message.content)
     const [showReactionPicker, setShowReactionPicker] = useState(false)
     const [showImageModal, setShowImageModal] = useState(false)
-    const EmojiPicker = useEmojiPicker(showReactionPicker)
-    const reactionPickerRef = useRef<HTMLDivElement>(null)
+    const bubbleShellRef = useRef<HTMLDivElement>(null)
     const [showQuickReactions, setShowQuickReactions] = useState(false)
     const [profileUser, setProfileUser] = useState<User | null>(null)
     const reactionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const { enabled: toneEnabled } = useToneAnalysisEnabled()
     const analyzeTone = useToneAnalysis(toneEnabled)
-    const pickerDimensions = getEmojiPickerDimensions()
 
     const isGrouped = shouldGroupMessage(message, previousMessage)
     const isOwner = profile?.id === message.user_id
@@ -194,20 +178,6 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const handlePinToggle = async () => {
       await onTogglePin(message.id)
     }
-
-    useEffect(() => {
-      if (!showReactionPicker) return
-      const handleClick = (e: MouseEvent) => {
-        if (
-          reactionPickerRef.current &&
-          !reactionPickerRef.current.contains(e.target as Node)
-        ) {
-          setShowReactionPicker(false)
-        }
-      }
-      document.addEventListener('mousedown', handleClick)
-      return () => document.removeEventListener('mousedown', handleClick)
-    }, [showReactionPicker])
 
     const messageActions: ChatMessageAction[] = [
       {
@@ -353,6 +323,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
           ) : (
             <>
               <div
+                ref={bubbleShellRef}
                 className="relative inline-block max-w-[calc(100%-3rem)] group/message md:max-w-full"
                 data-testid="message-bubble-shell"
                 onMouseEnter={handleMouseEnterReactions}
@@ -440,55 +411,36 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   buttonClassName="md:opacity-0 md:group-hover/message:opacity-70"
                 />
 
-                {/* Emoji picker positioned just above message bubble */}
-                <div 
-                  className={`glass-panel absolute -top-10 left-4 z-10 space-x-1 rounded-full px-2 py-1 transition-opacity duration-200 ${
-                    showQuickReactions ? 'flex opacity-100' : 'hidden opacity-0'
-                  }`}
-                  onMouseEnter={handleMouseEnterReactions}
-                  onMouseLeave={handleMouseLeaveReactions}
-                >
-                  {['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F389}', '\u{1F64F}'].map(e => (
-                    <button
-                      key={e}
-                      onClick={() => handleReaction(e)}
-                      className="text-base transition-transform hover:scale-110"
-                      type="button"
-                      aria-label={`React with ${normalizeEmojiValue(e)}`}
-                    >
-                      {e}
-                    </button>
-                  ))}
-                  <button
-                    onClick={() => setShowReactionPicker(!showReactionPicker)}
-                    className="text-base transition-transform hover:scale-110"
-                    type="button"
-                    aria-label="Add reaction"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-                
                 {/* Invisible hover area to trigger reactions */}
                 <div 
                   className="absolute -top-12 -left-2 -right-2 h-16 group-hover/message:block hidden"
                   onMouseEnter={handleMouseEnterReactions}
                   onMouseLeave={handleMouseLeaveReactions}
+                  onPointerDown={event => {
+                    if (event.pointerType !== 'mouse') {
+                      handleMouseEnterReactions()
+                    }
+                  }}
                 />
-                
-                {showReactionPicker && EmojiPicker && (
-                  <div
-                    ref={reactionPickerRef}
-                    className="fixed left-1/2 top-16 z-[90] max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] sm:absolute sm:bottom-full sm:left-1/2 sm:top-auto sm:mb-2"
-                  >
-                    <EmojiPicker
-                      onEmojiClick={handleReactionSelect}
-                      width={pickerDimensions.width}
-                      height={pickerDimensions.height}
-                      theme={getEmojiPickerTheme()}
-                    />
-                  </div>
-                )}
+                <QuickReactionRail
+                  open={showQuickReactions && !showReactionPicker}
+                  anchorRef={bubbleShellRef}
+                  reactions={['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F389}', '\u{1F64F}']}
+                  onReact={handleReaction}
+                  onAddReaction={() => setShowReactionPicker(true)}
+                  onClose={() => setShowQuickReactions(false)}
+                  onPointerEnter={handleMouseEnterReactions}
+                  onPointerLeave={handleMouseLeaveReactions}
+                  normalizeEmoji={normalizeEmojiValue}
+                />
+                <EmojiPickerOverlay
+                  open={showReactionPicker}
+                  title="Add reaction"
+                  ariaLabel="Reaction emoji picker"
+                  onClose={() => setShowReactionPicker(false)}
+                  onEmojiClick={handleReactionSelect}
+                  desktopClassName="fixed left-1/2 top-16 z-[90] max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] sm:absolute sm:bottom-full sm:left-1/2 sm:top-auto sm:mb-2"
+                />
               </div>
             </>
           )}

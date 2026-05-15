@@ -17,7 +17,9 @@ export interface EmojiClickData {
  */
 export interface EmojiPickerProps {
   onEmojiClick: (emoji: EmojiClickData, event: MouseEvent) => void;
-  width?: number;
-  height?: number;
+  width?: number | string;
+  height?: number | string;
   theme?: 'auto' | 'dark' | 'light' | string;
+  autoFocusSearch?: boolean;
+  lazyLoadEmojis?: boolean;
 }

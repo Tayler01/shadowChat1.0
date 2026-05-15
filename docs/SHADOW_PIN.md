@@ -32,6 +32,18 @@ Function: `supabase/functions/shadow-pin-import-image/index.ts`
 
 The Edge Function authenticates the caller, validates the URL, rejects local/private hosts where practical, checks image MIME and size, copies the image into `shadow-pin` Storage, then creates the category or image row. The frontend never hotlinks pasted URLs.
 
+## Image Layout
+
+Category image views use a deterministic JavaScript masonry layout instead of
+CSS multi-column layout. Phone widths render two columns, wider screens add
+columns, and images are greedily assigned by aspect ratio so mixed image
+heights keep the packed staggered flow without row gaps.
+
+Do not replace this with CSS columns without Android Chromium verification; a
+previous CSS-column version collapsed to a single visible column on Android. Do
+not replace it with a row-locked grid either, because small images beside tall
+images leave the gaps that the masonry layout is meant to avoid.
+
 ## Local Testing
 
 ```powershell

@@ -2,10 +2,10 @@ import React, { useEffect, useRef, useState } from 'react'
 import { MoreHorizontal, Plus } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../../hooks/useAuth'
-import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import type { EmojiClickData } from '../../types'
 import { cn } from '../../lib/utils'
 import type { NewsReactionSummary } from '../../lib/supabase'
+import { EmojiPickerOverlay } from '../chat/EmojiPickerOverlay'
 
 const QUICK_REACTIONS = [
   '\u{1F44D}',
@@ -16,21 +16,6 @@ const QUICK_REACTIONS = [
 ]
 
 const normalizeEmojiValue = (emoji: string) => emoji.trim()
-
-const getEmojiPickerDimensions = () => {
-  if (typeof window === 'undefined') return { width: 300, height: 360 }
-
-  if (window.innerWidth < 480) {
-    return { width: 280, height: Math.max(260, Math.min(320, window.innerHeight - 120)) }
-  }
-
-  return { width: 300, height: 360 }
-}
-
-const getEmojiPickerTheme = () =>
-  typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
-    ? 'dark'
-    : 'light'
 
 export function NewsReactionSummaryStrip({
   reactions,
@@ -84,18 +69,15 @@ export function NewsReactionBar({
   const { profile } = useAuth()
   const [showPicker, setShowPicker] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
-  const pickerRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
-  const EmojiPicker = useEmojiPicker(showPicker)
   const entries = Object.entries(reactions || {})
   const totalReactions = entries.reduce((sum, [, data]) => sum + data.count, 0)
-  const pickerDimensions = getEmojiPickerDimensions()
 
   useEffect(() => {
     if (!showPicker && !showMenu) return
     const handleClick = (event: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
-        setShowPicker(false)
+      if ((event.target as HTMLElement).closest?.('[data-emoji-picker-overlay="true"]')) {
+        return
       }
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setShowMenu(false)
@@ -186,19 +168,14 @@ export function NewsReactionBar({
                 <Plus className="h-4 w-4" />
               </button>
             </div>
-            {showPicker && EmojiPicker && (
-              <div
-                ref={pickerRef}
-                className="fixed left-1/2 top-16 z-[90] max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] sm:absolute sm:bottom-full sm:left-auto sm:right-0 sm:top-auto sm:mb-2 sm:translate-x-0"
-              >
-                <EmojiPicker
-                  onEmojiClick={handleSelect}
-                  width={pickerDimensions.width}
-                  height={pickerDimensions.height}
-                  theme={getEmojiPickerTheme()}
-                />
-              </div>
-            )}
+            <EmojiPickerOverlay
+              open={showPicker}
+              title="Add reaction"
+              ariaLabel="News reaction emoji picker"
+              onClose={() => setShowPicker(false)}
+              onEmojiClick={handleSelect}
+              desktopClassName="fixed left-1/2 top-16 z-[90] max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] sm:absolute sm:bottom-full sm:left-auto sm:right-0 sm:top-auto sm:mb-2 sm:translate-x-0"
+            />
           </div>
         )}
       </div>
@@ -250,19 +227,14 @@ export function NewsReactionBar({
       >
         <Plus className="h-3.5 w-3.5" />
       </button>
-      {showPicker && EmojiPicker && (
-        <div
-          ref={pickerRef}
-          className="fixed left-1/2 top-16 z-[90] max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] sm:absolute sm:bottom-full sm:left-0 sm:top-auto sm:mb-2 sm:translate-x-0"
-        >
-          <EmojiPicker
-            onEmojiClick={handleSelect}
-            width={pickerDimensions.width}
-            height={pickerDimensions.height}
-            theme={getEmojiPickerTheme()}
-          />
-        </div>
-      )}
+      <EmojiPickerOverlay
+        open={showPicker}
+        title="Add reaction"
+        ariaLabel="News reaction emoji picker"
+        onClose={() => setShowPicker(false)}
+        onEmojiClick={handleSelect}
+        desktopClassName="fixed left-1/2 top-16 z-[90] max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] sm:absolute sm:bottom-full sm:left-0 sm:top-auto sm:mb-2 sm:translate-x-0"
+      />
     </div>
   )
 }

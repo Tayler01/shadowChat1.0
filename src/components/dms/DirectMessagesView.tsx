@@ -42,10 +42,11 @@ import { useAllUsers } from '../../hooks/useAllUsers'
 import toast from 'react-hot-toast'
 import type { BasicUser, ChatMessageType, DMMessage, User } from '../../lib/supabase'
 import { UnreadDivider } from '../chat/UnreadDivider'
-import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import type { EmojiClickData } from '../../types'
 import type { AppView } from '../../types/navigation'
 import { getSupabaseImageTransformUrl } from '../../lib/storageImageTransforms'
+import { EmojiPickerOverlay } from '../chat/EmojiPickerOverlay'
+import { ImageModal } from '../ui/ImageModal'
 
 interface DirectMessagesViewProps {
   onToggleSidebar: () => void
@@ -60,21 +61,6 @@ const PublicProfileDialog = React.lazy(() =>
     default: module.PublicProfileDialog,
   }))
 )
-
-const getEmojiPickerDimensions = () => {
-  if (typeof window === 'undefined') return { width: 300, height: 360 }
-
-  if (window.innerWidth < 480) {
-    return { width: 280, height: Math.max(260, Math.min(320, window.innerHeight - 120)) }
-  }
-
-  return { width: 300, height: 360 }
-}
-
-const getEmojiPickerTheme = () =>
-  typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
-    ? 'dark'
-    : 'light'
 
 const DirectMessageBubble = React.memo(function DirectMessageBubble({
   message,
@@ -102,9 +88,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(message.content)
   const [showReactionPicker, setShowReactionPicker] = useState(false)
-  const pickerRef = useRef<HTMLDivElement>(null)
-  const EmojiPicker = useEmojiPicker(showReactionPicker)
-  const pickerDimensions = getEmojiPickerDimensions()
+  const [showImageModal, setShowImageModal] = useState(false)
   const isGrouped = shouldGroupMessage(message, previousMessage)
   const isOwn = message.sender_id === currentUserId
   const isIncoming = !isOwn
@@ -160,19 +144,6 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
     void reactToMessage(emojiData.emoji)
     setShowReactionPicker(false)
   }
-
-  useEffect(() => {
-    if (!showReactionPicker) return
-
-    const handleClick = (event: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
-        setShowReactionPicker(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClick)
-    return () => document.removeEventListener('mousedown', handleClick)
-  }, [showReactionPicker])
 
   const actions: ChatMessageAction[] = [
     {
@@ -313,7 +284,8 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
               loading="lazy"
               decoding="async"
               draggable={false}
-              className="mt-1 aspect-[4/3] max-h-[70vh] w-[min(20rem,100%)] rounded-[var(--radius-md)] object-contain shadow-[0_12px_34px_rgba(0,0,0,0.24)]"
+              className="mt-1 aspect-[4/3] max-h-[70vh] w-[min(20rem,100%)] cursor-pointer rounded-[var(--radius-md)] object-contain shadow-[0_12px_34px_rgba(0,0,0,0.24)]"
+              onClick={() => setShowImageModal(true)}
             />
           ) : message.message_type === 'video' && message.file_url ? (
             <VideoAttachment url={message.file_url} meta={message.content} />
@@ -343,20 +315,21 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
           )}
         </div>
 
-        {showReactionPicker && EmojiPicker && (
-          <div
-            ref={pickerRef}
-            className="fixed left-1/2 top-16 z-[90] max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] sm:absolute sm:bottom-full sm:left-1/2 sm:top-auto sm:mb-2"
-          >
-            <EmojiPicker
-              onEmojiClick={handleReactionSelect}
-              width={pickerDimensions.width}
-              height={pickerDimensions.height}
-              theme={getEmojiPickerTheme()}
-            />
-          </div>
-        )}
+        <EmojiPickerOverlay
+          open={showReactionPicker}
+          title="Add reaction"
+          ariaLabel="DM reaction emoji picker"
+          onClose={() => setShowReactionPicker(false)}
+          onEmojiClick={handleReactionSelect}
+          desktopClassName="fixed left-1/2 top-16 z-[90] max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] sm:absolute sm:bottom-full sm:left-1/2 sm:top-auto sm:mb-2"
+        />
       </div>
+      <ImageModal
+        open={showImageModal}
+        src={message.file_url || ''}
+        alt="uploaded image"
+        onClose={() => setShowImageModal(false)}
+      />
     </motion.div>
   )
 })

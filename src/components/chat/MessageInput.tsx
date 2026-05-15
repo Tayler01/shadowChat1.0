@@ -7,7 +7,6 @@ import { processSlashCommand, slashCommands } from '../../lib/utils'
 import type { ChatMessage, ChatMessageType } from '../../lib/supabase'
 import { uploadVoiceMessage, uploadChatFile } from '../../lib/supabase'
 import type { EmojiClickData } from '../../types'
-import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import { RecordingIndicator } from '../ui/RecordingIndicator'
 import { useDraft } from '../../hooks/useDraft'
 import { useSuggestedReplies, useSuggestionsEnabled } from '../../hooks/useSuggestedReplies'
@@ -15,23 +14,9 @@ import { GifPicker } from './GifPicker'
 import type { GifResult } from '../../lib/gifs'
 import toast from 'react-hot-toast'
 import { askQuestion } from '../../lib/ai'
+import { EmojiPickerOverlay } from './EmojiPickerOverlay'
 
 const normalizeComposerValue = (value: string) => (value.trim().length === 0 ? '' : value)
-
-const getEmojiPickerDimensions = () => {
-  if (typeof window === 'undefined') return { width: 300, height: 360 }
-
-  if (window.innerWidth < 480) {
-    return { width: 280, height: Math.max(260, Math.min(320, window.innerHeight - 120)) }
-  }
-
-  return { width: 300, height: 360 }
-}
-
-const getEmojiPickerTheme = () =>
-  typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
-    ? 'dark'
-    : 'light'
 
 interface MessageInputProps {
   onSendMessage: (
@@ -69,7 +54,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [message, setMessage] = useState(draft)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [showGifPicker, setShowGifPicker] = useState(false)
-  const EmojiPicker = useEmojiPicker(showEmojiPicker)
   const [showSlashCommands, setShowSlashCommands] = useState(false)
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
   const [recording, setRecording] = useState(false)
@@ -77,7 +61,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const { startTyping, stopTyping } = useTyping(typingChannel)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const emojiPickerRef = useRef<HTMLDivElement>(null)
   const attachmentMenuRef = useRef<HTMLDivElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
@@ -88,7 +71,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const submittingRef = useRef(false)
   const { enabled: suggestionsEnabled } = useSuggestionsEnabled()
   const { suggestions } = useSuggestedReplies(messages, suggestionsEnabled)
-  const pickerDimensions = getEmojiPickerDimensions()
 
   const setComposerMessage = useCallback((value: string) => {
     const nextMessage = normalizeComposerValue(value)
@@ -147,18 +129,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       stopTyping()
     }
   }, [message, startTyping, stopTyping])
-
-  // Handle clicks outside emoji picker
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
-        setShowEmojiPicker(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
 
   // Handle clicks outside attachment menu
   useEffect(() => {
@@ -547,19 +517,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       )}
 
       {/* Emoji Picker */}
-      {showEmojiPicker && EmojiPicker && (
-        <div
-          ref={emojiPickerRef}
-          className="absolute bottom-full left-1/2 z-[90] mb-2 max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] md:left-auto md:right-0 md:translate-x-0"
-        >
-          <EmojiPicker
-            onEmojiClick={insertEmoji}
-            width={pickerDimensions.width}
-            height={pickerDimensions.height}
-            theme={getEmojiPickerTheme()}
-          />
-        </div>
-      )}
+      <EmojiPickerOverlay
+        open={showEmojiPicker}
+        title="Emoji"
+        ariaLabel="Emoji picker"
+        onClose={() => setShowEmojiPicker(false)}
+        onEmojiClick={insertEmoji}
+        desktopClassName="absolute bottom-full left-1/2 z-[90] mb-2 max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] md:left-auto md:right-0 md:translate-x-0"
+      />
 
       {suggestionsEnabled && suggestions.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-2">
