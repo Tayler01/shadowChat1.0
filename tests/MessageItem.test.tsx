@@ -75,6 +75,10 @@ test('renders image message', () => {
 
   const img = screen.getByAltText(/uploaded image/i)
   expect(img).toHaveAttribute('src', baseMessage.file_url)
+  expect(img).toHaveClass('h-auto', 'max-w-[min(20rem,100%)]')
+  expect(img).not.toHaveClass('aspect-[4/3]')
+  expect(img).not.toHaveAttribute('width')
+  expect(img).not.toHaveAttribute('height')
 })
 
 test('opens uploaded images in a top-level mobile-safe viewer', async () => {

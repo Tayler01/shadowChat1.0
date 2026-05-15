@@ -129,12 +129,30 @@ export function WeatherWidget({ onOpenSettings, onShareWeather }: WeatherWidgetP
   const handleShareWeather = async () => {
     if (!onShareWeather || !weatherShareRef.current || !current) return
 
+    const captureTarget = weatherShareRef.current
+    const captureRect = captureTarget.getBoundingClientRect()
+    const captureWidth = Math.ceil(Math.max(captureTarget.scrollWidth, captureRect.width, 320))
+    const measuredCaptureHeight = Math.max(captureTarget.scrollHeight, captureRect.height)
+    const captureHeight = Math.ceil(measuredCaptureHeight || 1)
+
     setSharing(true)
     try {
-      const blob = await toBlob(weatherShareRef.current, {
+      const blob = await toBlob(captureTarget, {
         cacheBust: true,
+        width: captureWidth,
+        height: captureHeight,
         pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
         backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg-app').trim() || '#08090a',
+        style: {
+          width: `${captureWidth}px`,
+          height: `${captureHeight}px`,
+          maxHeight: 'none',
+          overflow: 'visible',
+          position: 'static',
+          left: 'auto',
+          top: 'auto',
+          transform: 'none',
+        },
         filter: node => !(node instanceof HTMLElement && node.dataset.weatherShareExclude === 'true'),
       })
 

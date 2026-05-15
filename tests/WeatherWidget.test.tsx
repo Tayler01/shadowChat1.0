@@ -106,6 +106,20 @@ test('captures the themed weather card for sharing to chat', async () => {
   fireEvent.click(screen.getByRole('button', { name: /share weather to chat/i }))
 
   await waitFor(() => expect(mockedToBlob).toHaveBeenCalled())
+  expect(mockedToBlob.mock.calls[0][1]).toEqual(expect.objectContaining({
+    width: 320,
+    height: 1,
+    style: expect.objectContaining({
+      width: '320px',
+      height: '1px',
+      maxHeight: 'none',
+      overflow: 'visible',
+      position: 'static',
+      left: 'auto',
+      top: 'auto',
+      transform: 'none',
+    }),
+  }))
   await waitFor(() => expect(shareWeather).toHaveBeenCalledTimes(1))
   expect(shareWeather.mock.calls[0][0]).toBeInstanceOf(File)
   expect(shareWeather.mock.calls[0][0].name).toMatch(/^shado-weather-/)

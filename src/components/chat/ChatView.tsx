@@ -86,7 +86,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
     setUploading(true)
     try {
       const url = await uploadChatFile(file)
-      const sent = await handleSendMessage('', 'image', url)
+      const sent = await handleSendMessage('Weather share', 'image', url)
       if (sent !== null) {
         toast.success('Weather shared')
       }
