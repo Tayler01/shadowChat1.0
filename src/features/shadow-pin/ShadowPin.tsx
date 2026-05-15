@@ -211,16 +211,16 @@ function CategoryCard({
   onEdit: () => void
   onHeart: () => void
 }) {
-  const longPress = useLongPress(canManageCategory ? onEdit : onDetails)
+  const { didLongPress, ...longPressHandlers } = useLongPress(canManageCategory ? onEdit : onDetails)
 
   return (
     <article
       className="group overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(5,6,8,0.58)] shadow-[var(--shadow-panel)] backdrop-blur-md transition-transform active:scale-[0.99]"
       onClick={() => {
-        if (!longPress.didLongPress()) onOpen()
+        if (!didLongPress()) onOpen()
       }}
       onContextMenu={event => event.preventDefault()}
-      {...longPress}
+      {...longPressHandlers}
     >
       <div className="space-y-2 p-3">
         <div className="flex items-start justify-between gap-2">
@@ -549,7 +549,7 @@ function ImageCard({
   onHeart: () => void
 }) {
   const clickTimer = useRef<number | null>(null)
-  const longPress = useLongPress(canManageImage ? onEdit : onViewer)
+  const { didLongPress, ...longPressHandlers } = useLongPress(canManageImage ? onEdit : onViewer)
   const imageSources = useMemo(() => getPinImageSources(image, 'thumb'), [image])
   const [sourceIndex, setSourceIndex] = useState(0)
   const imageSrc = imageSources[sourceIndex] || image.image_url
@@ -560,7 +560,7 @@ function ImageCard({
   }, [image.id, image.thumbnail_url, image.medium_url, image.image_url])
 
   const handleClick = () => {
-    if (longPress.didLongPress()) return
+    if (didLongPress()) return
     if (clickTimer.current) {
       window.clearTimeout(clickTimer.current)
       clickTimer.current = null
@@ -575,10 +575,10 @@ function ImageCard({
 
   return (
     <article
-      className="inline-block w-full break-inside-avoid-column overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(5,6,8,0.62)] shadow-[var(--shadow-panel)]"
+      className="block w-full overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(5,6,8,0.62)] shadow-[var(--shadow-panel)]"
       onClick={handleClick}
       onContextMenu={event => event.preventDefault()}
-      {...longPress}
+      {...longPressHandlers}
     >
       <div className="relative overflow-hidden" style={{ aspectRatio }}>
         <img
@@ -820,11 +820,15 @@ function ShadowPinCategoryScreen({
           </div>
         ) : (
           <>
-            <div className="columns-2 gap-3 sm:columns-3 lg:columns-4 [column-fill:_auto]">
+            <div
+              role="list"
+              aria-label="ShadowPin image grid"
+              className="grid grid-cols-2 items-start gap-3 sm:grid-cols-3 lg:grid-cols-4"
+            >
               {masonry.map(image => {
                 const manage = canManage(image, user?.id, adminRole)
                 return (
-                  <div key={image.id} className="mb-3 break-inside-avoid-column">
+                  <div key={image.id} role="listitem" className="min-w-0">
                     <ImageCard
                       image={image}
                       canManageImage={manage}

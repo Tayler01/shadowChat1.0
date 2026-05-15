@@ -1,6 +1,6 @@
 # Mobile Viewport Audit
 
-Last updated: 2026-05-10
+Last updated: 2026-05-15
 
 ShadowChat defaults to phone-first design and testing. Unless a task explicitly
 states otherwise, viewport decisions should be judged against iPhone/WebKit and
@@ -45,6 +45,7 @@ Android/Chromium phone profiles before desktop convenience.
 - General Chat: `MessageList` owns the scroll container and pads for the mobile chat footer.
 - DMs: `DirectMessagesView` owns the thread scroll container and pads for the mobile chat footer.
 - Boards: `BoardChat` owns the board chat scroll container and pads for the mobile chat footer.
+- Shadow Pin category images use a deterministic responsive grid on mobile; avoid CSS multi-column masonry for this screen because Android Chromium can collapse it to a single visible column.
 - Settings/profile screens use internal vertical overflow and bottom safe-area padding.
 
 ## Composer Positioning Strategy
@@ -56,6 +57,8 @@ Android/Chromium phone profiles before desktop convenience.
 
 ## Modal Positioning Strategy
 
+- Header popovers on phone-sized viewports should prefer fixed, centered placement below the safe-area/header band instead of absolute anchoring to small header pills.
+- Keyboard-adjacent bottom sheets should size from `--shadowchat-visual-viewport-height`, `--shadowchat-mobile-chat-footer-height`, `--shadowchat-keyboard-inset`, and safe-area/header clearance so focused fields do not drift into the app header.
 - Feedback and install guide modals use fixed overlays, viewport max heights, and internal overflow.
 - Public profile uses a centered fixed overlay with max height and internal scroll.
 - Feedback modal coverage passed on all automated mobile profiles.
@@ -70,7 +73,8 @@ Android/Chromium phone profiles before desktop convenience.
 
 - `scripts/mobile-pwa-visual-qa.mjs` runs production-preview mobile visual checks without adding a new Playwright framework.
 - It writes screenshots, console logs, network failures, and `summary.json` under `output/playwright/<run-name>/`.
-- Current passing artifact set: `output/playwright/mobile-pwa-final/`.
+- Current passing artifact set: `output/playwright/mobile-pwa-phone-fixes-final/`.
+- Latest targeted regression artifacts for weather, GIF picker keyboard compression, and Android Shadow Pin grid: `output/playwright/mobile-fixes-targeted/`.
 
 ## Known Real-Device Risks
 

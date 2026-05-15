@@ -320,3 +320,19 @@ test('does not autofocus GIF search on touch-sized mobile inputs', async () => {
     })
   }
 })
+
+test('uses keyboard-aware mobile sizing for the GIF picker', async () => {
+  const user = userEvent.setup()
+  render(<MessageInput onSendMessage={() => {}} enableGifPicker />)
+
+  await act(async () => {
+    await user.click(screen.getByRole('button', { name: /add attachment/i }))
+  })
+  await act(async () => {
+    await user.click(screen.getByRole('button', { name: /^gif$/i }))
+  })
+
+  const picker = screen.getByRole('dialog', { name: /gif picker/i })
+  expect(picker.className).toContain('--shadowchat-visual-viewport-height')
+  expect(picker.className).toContain('--shadowchat-keyboard-inset')
+})

@@ -1,17 +1,18 @@
 # Mobile PWA QA Log
 
-Last updated: 2026-05-10
+Last updated: 2026-05-15
 
 ## Summary
 
 Mobile PWA visual QA now runs through `npm run qa:mobile-pwa`, which uses `scripts/mobile-pwa-visual-qa.mjs` against a production-style Vite preview on `127.0.0.1:4174`.
 
-Latest focused pass: `npm run qa:mobile-pwa -- --run-name=mobile-pwa-final --no-reuse-server`.
+Latest focused pass: `npm run qa:mobile-pwa -- --run-name=mobile-pwa-phone-fixes-final --no-reuse-server`.
 
 - Result: passed.
 - Profiles: Mobile Safari/WebKit iPhone small, Mobile Safari/WebKit iPhone large, Mobile Chrome Android medium, Mobile Chrome Android small.
-- Checks: 83 passed, 0 failed, 1 non-blocking not-tested note.
-- Artifacts: `output/playwright/mobile-pwa-final/`.
+- Checks: 86 passed, 0 failed, 2 non-blocking not-tested notes.
+- Artifacts: `output/playwright/mobile-pwa-phone-fixes-final/`.
+- Targeted real-device regression artifacts: `output/playwright/mobile-fixes-targeted/`.
 - Prior complete public-profile coverage artifact: `output/playwright/mobile-pwa-audit-10/` with 84 passed, 0 failed, 0 not tested.
 
 ## Issue Log
@@ -24,6 +25,9 @@ Latest focused pass: `npm run qa:mobile-pwa -- --run-name=mobile-pwa-final --no-
 | MPWA-004 | fixed | Android small Chromium, 360x800 | DM list header | Navigate to DMs on the small Android profile. | `output/playwright/mobile-pwa-audit-7/android-small-chromium-07-dm-list.png` | The DM masthead did not leave enough shrink room for the new conversation button at the narrowest tested width. | `src/components/dms/DirectMessagesView.tsx` | `npm run qa:mobile-pwa -- --run-name=mobile-pwa-audit-8 --no-reuse-server` | Header now has constrained flex behavior, a smaller logo/offset below 380px, truncated title text, and a non-shrinking plus button. |
 | MPWA-005 | documented | all mobile profiles | dense secondary controls | Run the mobile PWA audit and review warnings in `summary.json`. | `output/playwright/mobile-pwa-final/summary.json` | Some reaction chips, reply links, weather/action buttons, and board reaction chips are visually small secondary controls. | docs only | `npm run qa:mobile-pwa -- --run-name=mobile-pwa-final --no-reuse-server` | Automated audit records them as warnings, not blockers. Validate comfort on real installed iPhone and Android before deciding whether to enlarge dense secondary controls. |
 | MPWA-006 | documented | iPhone small WebKit, 390x844 | public profile modal | Run `mobile-pwa-final` and open a public profile from the currently loaded chat content. | `output/playwright/mobile-pwa-final/summary.json`; `output/playwright/mobile-pwa-audit-10/summary.json` | In the final run, one visible opener did not produce a dialog on the iPhone-small profile. The same flow passed in the prior complete run and other final profiles. | `scripts/mobile-pwa-visual-qa.mjs`; docs only | `npm run qa:mobile-pwa -- --run-name=mobile-pwa-final --no-reuse-server` | Marked as non-blocking testability variance. Real-device validation should still tap public profiles from chat and DM content. |
+| MPWA-007 | fixed | iPhone WebKit, 390x844 | General Chat weather popup | Tap the weather pill in the mobile chat header. | `output/playwright/mobile-fixes-targeted/iphone-weather-centered.png`; `output/playwright/mobile-fixes-targeted/summary.json` | The popup was absolutely anchored to the narrow header pill, so the 320px forecast surface could hang off the viewport on iPhone. | `src/components/chat/WeatherWidget.tsx`; `tests/WeatherWidget.test.tsx` | targeted Playwright geometry check; `npm run qa:mobile-pwa -- --run-name=mobile-pwa-phone-fixes-final --no-reuse-server` | Weather popup now uses a mobile fixed center position below the safe-area/header band, with desktop keeping the anchored dropdown behavior. |
+| MPWA-008 | fixed | Android Chromium, 412x915 | Boards > Shadow Pin category images | Open Boards, open Shadow Pin, then open a populated category. | `output/playwright/mobile-fixes-targeted/android-shadow-pin-grid.png`; `output/playwright/mobile-fixes-targeted/summary.json` | Android Chromium rendered the CSS multi-column masonry as one visible column in the category image view. | `src/features/shadow-pin/ShadowPin.tsx`; `tests/ShadowPin.test.tsx` | targeted Playwright geometry check; `npm run qa:mobile-pwa -- --run-name=mobile-pwa-phone-fixes-final --no-reuse-server` | The category image list now uses an explicit responsive grid; targeted Android geometry confirmed two 188px columns at 412px width. |
+| MPWA-009 | fixed | iPhone WebKit, compressed keyboard simulation | General Chat GIF picker | Open + > GIF, then compress the viewport and set the mobile keyboard inset. | `output/playwright/mobile-fixes-targeted/iphone-gif-picker-compressed.png`; `output/playwright/mobile-fixes-targeted/summary.json` | The picker height did not reserve enough header/safe-area space when the keyboard inset lifted the sheet. | `src/components/chat/GifPicker.tsx`; `tests/MessageInput.test.tsx` | targeted Playwright geometry check; `npm run qa:mobile-pwa -- --run-name=mobile-pwa-phone-fixes-final --no-reuse-server` | The GIF picker now sizes from visual viewport, footer height, keyboard inset, and header/safe-area clearance; search stayed below the 54px header in the targeted run. |
 
 ## Final Summary
 

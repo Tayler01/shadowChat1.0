@@ -64,6 +64,7 @@ test('shows compact weather and opens detailed forecast popup', () => {
   fireEvent.click(screen.getByRole('button', { name: /72\u00b0 and partly cloudy/i }))
 
   const dialog = screen.getByRole('dialog', { name: /weather forecast/i })
+  expect(dialog).toHaveClass('fixed', 'left-1/2', '-translate-x-1/2')
   expect(within(dialog).getByText('Nashville, Tennessee, US')).toBeInTheDocument()
   expect(within(dialog).getAllByText('Partly cloudy').length).toBeGreaterThan(0)
   expect(within(dialog).getByText('Feels')).toBeInTheDocument()

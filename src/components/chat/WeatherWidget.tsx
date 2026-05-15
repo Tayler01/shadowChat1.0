@@ -147,7 +147,7 @@ export function WeatherWidget({ onOpenSettings }: WeatherWidgetProps) {
         <div
           role="dialog"
           aria-label="Weather forecast"
-          className="popup-surface absolute right-0 top-full z-[80] mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-panel)] shadow-[var(--shadow-panel-strong)]"
+          className="popup-surface fixed left-1/2 top-[calc(env(safe-area-inset-top)_+_4.75rem)] z-[80] mt-0 max-h-[calc(100dvh_-_env(safe-area-inset-top)_-_6rem)] w-[min(20rem,calc(100vw_-_1rem))] -translate-x-1/2 overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--border-panel)] shadow-[var(--shadow-panel-strong)] sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:max-h-[calc(100vh_-_8rem)] sm:w-80 sm:max-w-[calc(100vw_-_2rem)] sm:translate-x-0 sm:overflow-hidden"
         >
           <div className="border-b border-[var(--border-subtle)] px-4 py-3">
             <div className="min-w-0">

@@ -77,7 +77,7 @@ export const GifPicker: React.FC<GifPickerProps> = ({ onSelect, onClose }) => {
 
   return (
     <div
-      className="glass-panel-strong fixed inset-x-2 bottom-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.5rem)] z-[92] max-h-[min(32rem,calc(100dvh-8rem))] overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-panel)] shadow-[var(--shadow-panel-strong)] md:absolute md:bottom-full md:left-0 md:right-auto md:mb-2 md:w-[24rem] md:max-h-[min(28rem,calc(100vh-8rem))]"
+      className="glass-panel-strong fixed inset-x-2 bottom-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.5rem)] z-[92] max-h-[min(32rem,max(5rem,calc(var(--shadowchat-visual-viewport-height,100dvh)_-_env(safe-area-inset-bottom)_-_var(--shadowchat-mobile-chat-footer-height,9.5rem)_-_var(--shadowchat-keyboard-inset,0px)_-_env(safe-area-inset-top)_-_5.5rem)))] overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-panel)] shadow-[var(--shadow-panel-strong)] md:absolute md:bottom-full md:left-0 md:right-auto md:mb-2 md:w-[24rem] md:max-h-[min(28rem,calc(100vh-8rem))]"
       role="dialog"
       aria-label="GIF picker"
     >
@@ -111,7 +111,7 @@ export const GifPicker: React.FC<GifPickerProps> = ({ onSelect, onClose }) => {
         </div>
       </div>
 
-      <div className="h-[min(22rem,calc(100dvh-14rem))] overflow-y-auto overscroll-contain p-2 pb-3 md:h-[min(20rem,calc(100vh-14rem))] md:pb-2">
+      <div className="h-[min(22rem,max(1.5rem,calc(var(--shadowchat-visual-viewport-height,100dvh)_-_env(safe-area-inset-bottom)_-_var(--shadowchat-mobile-chat-footer-height,9.5rem)_-_var(--shadowchat-keyboard-inset,0px)_-_env(safe-area-inset-top)_-_10.5rem)))] overflow-y-auto overscroll-contain p-2 pb-3 md:h-[min(20rem,calc(100vh-14rem))] md:pb-2">
         {loading ? (
           <div className="flex h-full items-center justify-center gap-2 text-sm text-[var(--text-muted)]">
             <LoadingSpinner size="sm" />
