@@ -77,6 +77,11 @@ For user-facing changes, the default browser validation should include at least
 one iPhone/WebKit profile and one Android/Chromium profile through the closest
 repo QA harness or a focused headed check.
 
+When a flow requires real group chat or DM posting for end-to-end proof, create
+the smallest useful test post, verify the behavior, and delete that post
+immediately after the specific test. Do not leave QA/weather/media smoke posts
+behind for a later cleanup batch.
+
 ## Recommended Local Browser Loop
 
 Use a preview build for stable QA:
@@ -322,10 +327,22 @@ For weather changes, verify General Chat header on desktop and mobile, the
 forecast popup, and Settings > Account & Profile > Weather Location. Weather
 preferences should be scoped to the signed-in user and should not appear on
 public profile data. The forecast popup should not show a manual refresh button.
+For weather sharing, verify the chat thumbnail shows the full low-resolution
+card and the image modal opens the uncropped full share.
 
 For profile avatar changes, upload a new avatar, drag/reposition it, adjust
 zoom by slider and touch gesture where available, save, and verify the cropped
 result appears in chat, DMs, board chats, and the public profile popup.
+
+For app-wide media derivative changes, verify new group/DM static image uploads,
+weather shares, avatar/banner uploads, Art Board uploads/imports, and ShadowPin
+uploads. GIFs should remain on the existing URL path. Run the relevant backfill
+scripts after the migration is applied:
+
+```powershell
+npm run media:backfill-mobile -- --apply
+npm run shadow-pin:backfill-media -- --apply
+```
 
 Disposable accounts are the most deterministic option. Reused env-backed accounts can carry old threads and unread state from earlier runs.
 

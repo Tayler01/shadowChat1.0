@@ -57,7 +57,7 @@ const MAX_ZOOM = 1.8
 const LONG_PRESS_MS = 430
 const DRAFT_SAVE_DELAY_MS = 900
 const getArtBoardCanvasImageUrl = (item: ArtBoardItem) =>
-  getSupabaseImageTransformUrl(item.image_url, {
+  item.thumbnail_url || getSupabaseImageTransformUrl(item.image_url, {
     width: Math.max(320, Math.min(1600, item.width * 3)),
     height: Math.max(320, Math.min(1600, item.height * 3)),
     resize: 'cover',
@@ -72,8 +72,8 @@ const getArtBoardDetailImageUrl = (url?: string | null) =>
     quality: 82,
   })
 
-const getArtBoardThumbnailUrl = (url?: string | null) =>
-  getSupabaseImageTransformUrl(url, {
+const getArtBoardThumbnailUrl = (item?: Pick<ArtBoardItem, 'image_url' | 'thumbnail_url'> | null) =>
+  item?.thumbnail_url || getSupabaseImageTransformUrl(item?.image_url, {
     width: 160,
     height: 160,
     resize: 'cover',
@@ -538,10 +538,7 @@ function AddArtDialog({
             ? await uploadArtBoardImageFile(imageFile)
             : null
           : imageUrl.trim()
-            ? await importArtBoardImageUrl(imageUrl.trim()).then(result => ({
-              path: result.path,
-              publicUrl: result.publicUrl,
-            }))
+            ? await importArtBoardImageUrl(imageUrl.trim())
             : null
 
         if (!uploaded) {
@@ -555,6 +552,8 @@ function AddArtDialog({
           tags: parseArtBoardTags(tags),
           image_url: uploaded.publicUrl,
           image_path: uploaded.path,
+          thumbnail_url: uploaded.thumbnailUrl,
+          thumbnail_path: uploaded.thumbnailPath,
           alt_text: altText.trim() || null,
           frame_style: frameStyle,
           note_color: 'butter',
@@ -804,7 +803,7 @@ function DetailDialog({
                         <button type="button" onClick={() => onJumpToItem(other)} className="flex w-full items-center gap-2 text-left">
                           <span className="h-10 w-10 overflow-hidden rounded-[var(--radius-sm)] bg-black/30">
                             {other.item_type === 'image' ? (
-                              <img src={getArtBoardThumbnailUrl(other.image_url)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                              <img src={getArtBoardThumbnailUrl(other)} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                             ) : (
                               <span className={cn('block h-full w-full', noteColorClass(other.note_color))} />
                             )}
@@ -964,6 +963,7 @@ export function ArtBoard() {
   const pinchRef = useRef<PinchGesture | null>(null)
   const longPressTimerRef = useRef<number | null>(null)
   const draftSaveTimerRef = useRef<number | null>(null)
+  const initialFitRef = useRef(false)
   const [viewportSize, setViewportSize] = useState<CanvasSize>({ width: 1, height: 1 })
   const [pan, setPan] = useState<CanvasPoint>({ x: 0, y: 0 })
   const [zoom, setZoom] = useState(0.9)
@@ -1039,6 +1039,44 @@ export function ArtBoard() {
       window.removeEventListener('resize', updateSize)
     }
   }, [])
+
+  useEffect(() => {
+    if (initialFitRef.current || viewportSize.width <= 1 || viewportSize.height <= 1) return
+    const imageItems = localItems.filter(item => item.item_type === 'image')
+    if (imageItems.length === 0) return
+
+    const bounds = imageItems.reduce(
+      (acc, item) => ({
+        minX: Math.min(acc.minX, item.position_x),
+        minY: Math.min(acc.minY, item.position_y),
+        maxX: Math.max(acc.maxX, item.position_x + item.width),
+        maxY: Math.max(acc.maxY, item.position_y + item.height),
+      }),
+      {
+        minX: Number.POSITIVE_INFINITY,
+        minY: Number.POSITIVE_INFINITY,
+        maxX: Number.NEGATIVE_INFINITY,
+        maxY: Number.NEGATIVE_INFINITY,
+      }
+    )
+
+    const boundsWidth = Math.max(bounds.maxX - bounds.minX, 1)
+    const boundsHeight = Math.max(bounds.maxY - bounds.minY, 1)
+    const paddedWidth = Math.max(viewportSize.width - 48, 1)
+    const paddedHeight = Math.max(viewportSize.height - 48, 1)
+    const nextZoom = clampZoom(Math.min(0.9, paddedWidth / boundsWidth, paddedHeight / boundsHeight))
+    const center = {
+      x: bounds.minX + boundsWidth / 2,
+      y: bounds.minY + boundsHeight / 2,
+    }
+
+    setZoom(nextZoom)
+    setPan({
+      x: viewportSize.width / 2 - center.x * nextZoom,
+      y: viewportSize.height / 2 - center.y * nextZoom,
+    })
+    initialFitRef.current = true
+  }, [localItems, viewportSize.height, viewportSize.width])
 
   useEffect(() => {
     const center = canvasCenter()
@@ -1401,6 +1439,10 @@ export function ArtBoard() {
       caption: input.caption ?? null,
       image_url: input.image_url ?? null,
       image_path: input.image_path ?? null,
+      thumbnail_url: input.thumbnail_url ?? null,
+      thumbnail_path: input.thumbnail_path ?? null,
+      image_width: input.image_width ?? null,
+      image_height: input.image_height ?? null,
       alt_text: input.alt_text ?? null,
       note_text: input.note_text ?? null,
       note_color: input.note_color ?? 'butter',

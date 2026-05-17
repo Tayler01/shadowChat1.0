@@ -23,3 +23,11 @@ export function useClientReset() {
   }
   return ctx
 }
+
+export function useOptionalClientReset() {
+  return useContext(ClientResetContext) ?? {
+    status: 'idle' as ClientResetStatus,
+    lastResetTime: null,
+    manualReset: async () => {},
+  }
+}

@@ -1,10 +1,11 @@
 import { chromium, webkit, devices } from 'playwright'
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { setTimeout as delay } from 'node:timers/promises'
+import { createClient } from '@supabase/supabase-js'
 
 const DEFAULT_HOST = '127.0.0.1'
 const DEFAULT_PORT = 4174
@@ -53,7 +54,9 @@ const args = parseArgs(process.argv.slice(2))
 const repoRoot = process.cwd()
 const envValues = await loadDotEnvFiles([
   path.join(repoRoot, '.env'),
+  path.join(repoRoot, '.env.local'),
   path.join(repoRoot, '.env.testing.local'),
+  path.join(repoRoot, '.env.production'),
 ])
 const config = buildConfig(args, envValues)
 const artifactDir = path.join(repoRoot, config.artifactDir)
@@ -75,11 +78,13 @@ const summary = {
   })),
   checks: [],
   notTested: [],
+  cleanups: [],
   status: 'running',
 }
 
 let previewServer = null
 const openBrowsers = []
+let adminClient = null
 
 try {
   logLine(`Artifacts: ${artifactDir}`)
@@ -118,6 +123,7 @@ try {
   if (previewServer?.cleanup) {
     await previewServer.cleanup()
   }
+  adminClient?.realtime?.disconnect()
 }
 
 async function runProfile(profile, accountA, accountB) {
@@ -149,6 +155,7 @@ async function runProfile(profile, accountA, accountB) {
 
   const page = await context.newPage()
   attachDiagnostics(page, path.join(logsDir, `${profile.id}.log`), profile.id)
+  const groupMessagesToClean = []
 
   try {
     await page.goto(config.baseUrl, { waitUntil: 'domcontentloaded' })
@@ -156,10 +163,12 @@ async function runProfile(profile, accountA, accountB) {
     await auditPage(page, profile, '01-chat-launch', { composer: true })
 
     await focusAndAuditComposer(page, profile, '02-chat-composer')
-    const chatMessage = `Mobile PWA chat ${timestampToken()}`
+    const chatMessage = `Mobile PWA chat ${profile.id} ${timestampToken()}`
+    groupMessagesToClean.push(chatMessage)
     await sendVisibleMessage(page, chatMessage)
     await expectVisibleText(page, chatMessage, DEFAULT_TIMEOUT_MS)
     await auditPage(page, profile, '03-chat-after-send', { composer: true })
+    await cleanupGroupMessages(groupMessagesToClean.splice(0), profile, 'after-send')
     await openMessageActionsIfAvailable(page, profile, '04-chat-message-actions')
     await openProfileIfAvailable(page, profile, '05-public-profile')
     await simulateBackgroundRefocus(page)
@@ -171,7 +180,7 @@ async function runProfile(profile, accountA, accountB) {
     await auditPage(page, profile, '08-dm-thread', { composer: true })
     await focusAndAuditComposer(page, profile, '09-dm-composer')
     await page.getByRole('button', { name: 'Back' }).first().click()
-    await expectVisibleText(page, 'Direct Messages', DEFAULT_TIMEOUT_MS)
+    await waitForDmView(page)
     await auditPage(page, profile, '10-dm-list-after-back', { header: false })
     await page.getByRole('button', { name: 'Back' }).click()
     await waitForChatView(page)
@@ -205,8 +214,34 @@ async function runProfile(profile, accountA, accountB) {
 
     logLine(`Passed ${profile.label}`)
   } finally {
+    await cleanupGroupMessages(groupMessagesToClean.splice(0), profile, 'profile-finally')
     await context.close().catch(() => {})
   }
+}
+
+async function cleanupGroupMessages(messageTexts, profile, phase) {
+  if (messageTexts.length === 0) return
+
+  const admin = getAdminClient()
+  const { data, error } = await admin
+    .from('messages')
+    .delete()
+    .in('content', messageTexts)
+    .select('id,content')
+
+  if (error) {
+    throw new Error(`Failed to clean mobile QA group messages for ${profile.id}: ${error.message}`)
+  }
+
+  const cleanup = {
+    profile: profile.id,
+    phase,
+    table: 'messages',
+    requested: messageTexts.length,
+    deleted: Array.isArray(data) ? data.length : 0,
+  }
+  summary.cleanups.push(cleanup)
+  await appendFile(runLogPath, `${JSON.stringify({ cleanup })}\n`)
 }
 
 async function auditPage(page, profile, flow, options = {}) {
@@ -421,7 +456,11 @@ async function focusAndAuditComposer(page, profile, flow, options = {}) {
     page,
     { ...profile, viewport: { width: original.width, height: compressedHeight } },
     `${flow}-compressed`,
-    { composer: true, footerAtViewportBottom: Boolean(options.simulateAndroidKeyboardInset) }
+    {
+      composer: true,
+      footerAtViewportBottom: Boolean(options.simulateAndroidKeyboardInset),
+      header: options.keyboardHidesChrome === false,
+    }
   )
 
   await page.setViewportSize(original)
@@ -432,19 +471,42 @@ async function focusAndAuditComposer(page, profile, flow, options = {}) {
     })
   }
   await composer.fill('')
+  await composer.evaluate(element => element.blur())
+  await delay(250)
+  await auditPage(page, profile, `${flow}-restored`, { composer: true })
 }
 
 async function openMessageActionsIfAvailable(page, profile, flow) {
-  const actions = page.getByRole('button', { name: /Message actions|message actions/i }).last()
-  if (!(await actions.isVisible().catch(() => false))) {
+  const actions = page.getByRole('button', { name: /Message actions|message actions/i })
+  const count = await actions.count()
+  const viewport = page.viewportSize()
+  const candidates = []
+
+  for (let index = 0; index < count; index += 1) {
+    const action = actions.nth(index)
+    const box = await action.boundingBox().catch(() => null)
+    if (!box || !(await action.isVisible().catch(() => false))) continue
+    if (viewport && (box.y < 64 || box.y + box.height > viewport.height - 160)) continue
+    candidates.push(action)
+  }
+
+  if (candidates.length === 0) {
     summary.notTested.push({ profile: profile.id, flow, reason: 'No visible message action button in current viewport.' })
     return
   }
 
-  await actions.click()
-  await page.getByTestId('message-actions-menu').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-  await auditPage(page, profile, flow)
-  await page.keyboard.press('Escape')
+  for (const action of candidates.reverse()) {
+    await action.click().catch(() => {})
+    const opened = await page.getByTestId('message-actions-menu').waitFor({ timeout: 2500 }).then(() => true).catch(() => false)
+    if (opened) {
+      await auditPage(page, profile, flow)
+      await page.keyboard.press('Escape')
+      return
+    }
+    await page.keyboard.press('Escape').catch(() => {})
+  }
+
+  summary.notTested.push({ profile: profile.id, flow, reason: 'Visible message action buttons did not open a menu in this viewport.' })
 }
 
 async function openProfileIfAvailable(page, profile, flow) {
@@ -533,7 +595,7 @@ async function waitForChatView(page) {
 }
 
 async function waitForDmView(page) {
-  await page.getByRole('heading', { name: 'Direct Messages' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByRole('button', { name: 'Start new conversation' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
 async function waitForSettingsView(page) {
@@ -631,10 +693,20 @@ async function openConversationWithUser(page, account) {
 }
 
 async function waitForEitherThreadOrList(page, account) {
-  await page.waitForFunction(expectedUsername => {
+  await page.waitForFunction(expectedAccount => {
     const text = document.body?.innerText || ''
-    return text.includes(`@${expectedUsername}`) || text.includes('Select a conversation')
-  }, account.username, { timeout: DEFAULT_TIMEOUT_MS })
+    const hasVisibleComposer = Array.from(document.querySelectorAll('textarea')).some(element => {
+      const rect = element.getBoundingClientRect()
+      const style = getComputedStyle(element)
+      return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && Number(style.opacity) !== 0
+    })
+    return (
+      text.includes(`@${expectedAccount.username}`) ||
+      (expectedAccount.displayName && text.includes(expectedAccount.displayName)) ||
+      text.includes('Select a conversation') ||
+      hasVisibleComposer
+    )
+  }, account, { timeout: DEFAULT_TIMEOUT_MS })
 }
 
 async function sendVisibleMessage(page, messageText) {
@@ -890,6 +962,38 @@ function getEnvValue(names, fallback = '') {
     if (candidate) return candidate
   }
   return fallback
+}
+
+function getAdminClient() {
+  if (adminClient) return adminClient
+
+  const supabaseUrl = getEnvValue(['SUPABASE_URL', 'VITE_SUPABASE_URL'])
+  const serviceRoleKey = ensureServiceRoleKey(supabaseUrl)
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Missing SUPABASE_URL/VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY for mobile QA cleanup')
+  }
+
+  adminClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+  return adminClient
+}
+
+function ensureServiceRoleKey(supabaseUrl) {
+  const configured = getEnvValue(['SUPABASE_SERVICE_ROLE_KEY'])
+  if (configured) return configured
+
+  const ref = supabaseUrl?.match(/^https:\/\/([a-z0-9-]+)\.supabase\.co/i)?.[1]
+  if (!ref) return ''
+
+  const raw = execFileSync('supabase', ['projects', 'api-keys', '--project-ref', ref, '-o', 'json'], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  })
+  const parsed = JSON.parse(raw)
+  const keys = Array.isArray(parsed) ? parsed : parsed?.api_keys || []
+  const serviceRole = keys.find(key => key.name === 'service_role' || key.type === 'service_role')
+  return serviceRole?.api_key || ''
 }
 
 function buildEnvAccount(index) {

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Gamepad2, MessageSquare, Newspaper, Settings, Users } from 'lucide-react'
+import { Gamepad2, Images, MessageSquare, Newspaper, Users } from 'lucide-react'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
 import { useBoardBadges } from '../../hooks/useBoardBadges'
 import type { AppView } from '../../types/navigation'
@@ -34,7 +34,7 @@ export function MobileNav({ currentView, onViewChange, className, embedded = fal
       badge: boardsBadgeCount > 0 ? boardsBadgeCount : null,
     },
     { id: 'games' as const, icon: Gamepad2, label: 'Games', badge: null },
-    { id: 'settings' as const, icon: Settings, label: 'Settings', badge: null },
+    { id: 'pins' as const, icon: Images, label: 'Pins', badge: null },
   ]
 
   return (

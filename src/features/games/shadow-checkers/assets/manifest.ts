@@ -14,7 +14,8 @@ const ASSET_ROOT = '/games/shadow-checkers'
 
 export const SHADOW_CHECKERS_ASSETS = {
   logo: `${ASSET_ROOT}/shadow-checkers-logo.webp`,
-  pickerArt: `${ASSET_ROOT}/shadow-checkers-background.webp`,
+  pickerLogo: `${ASSET_ROOT}/shadow-checkers-picker-logo.webp`,
+  pickerArt: `${ASSET_ROOT}/shadow-checkers-picker-background.webp`,
   background: `${ASSET_ROOT}/shadow-checkers-background.webp`,
   victory: `${ASSET_ROOT}/victory-banner.webp`,
   defeat: `${ASSET_ROOT}/defeat-banner.webp`,

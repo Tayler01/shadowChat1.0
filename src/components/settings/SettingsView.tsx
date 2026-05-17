@@ -43,9 +43,13 @@ import { useNewsAdmin } from '../../hooks/useNewsAdmin'
 import { useAdminAccess } from '../../hooks/useAdminAccess'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
+import { MobileAppHeader } from '../layout/MobileAppHeader'
+import type { AppView } from '../../types/navigation'
 
 interface SettingsViewProps {
   onToggleSidebar: () => void
+  currentView?: AppView
+  onViewChange?: (view: AppView) => void
 }
 
 type SettingsSectionId =
@@ -127,6 +131,7 @@ const sections: SettingsSection[] = [
 ]
 
 const SETTINGS_SECTION_STORAGE_KEY = 'shadowchat:settings-section'
+const SETTINGS_MAIN_EVENT = 'shadowchat:settings-main'
 
 const isSettingsSectionId = (value: string | null): value is SettingsSectionId => (
   sections.some(section => section.id === value)
@@ -275,7 +280,11 @@ function SectionHeader({
   )
 }
 
-export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({
+  onToggleSidebar,
+  currentView = 'settings',
+  onViewChange = () => {},
+}) => {
   const { enabled: sounds, setEnabled: setSounds } = useSoundEffects()
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const [activeSection, setActiveSection] = useState<SettingsSectionId | null>(() => getInitialSettingsSection())
@@ -395,6 +404,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
     ),
     [preferences, updatePreference]
   )
+
+  useEffect(() => {
+    const handleSettingsMain = () => {
+      setActiveSection(null)
+      setActiveAdminSection(null)
+      requestAnimationFrame(() => {
+        scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+      })
+    }
+
+    window.addEventListener(SETTINGS_MAIN_EVENT, handleSettingsMain)
+    return () => window.removeEventListener(SETTINGS_MAIN_EVENT, handleSettingsMain)
+  }, [])
 
   useEffect(() => {
     if (activeSection !== 'admin') {
@@ -556,33 +578,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
 
   const renderHub = () => (
     <>
-      <div className="mb-6 sm:mb-8">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-[var(--text-primary)]">Settings</h1>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-              Choose a section to manage a specific part of ShadowChat.
-            </p>
-          </div>
-          {isDesktop && (
-            <button
-              onClick={onToggleSidebar}
-              className="rounded-[var(--radius-sm)] p-2 text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.04)] hover:text-[var(--text-primary)]"
-              aria-label="Toggle sidebar"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-          )}
+      {isDesktop && (
+        <div className="mb-4 flex justify-end">
+          <button
+            onClick={onToggleSidebar}
+            className="rounded-[var(--radius-sm)] p-2 text-[var(--text-secondary)] transition-colors hover:bg-[rgba(255,255,255,0.04)] hover:text-[var(--text-primary)]"
+            aria-label="Toggle sidebar"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
         </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <span className="rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">
-            {pushLoading ? 'Checking device' : devicePushEnabled ? 'This device subscribed' : 'This device muted'}
-          </span>
-          <span className="rounded-full border border-[rgba(215,170,70,0.16)] bg-[rgba(215,170,70,0.08)] px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--text-gold)]">
-            Theme: {scheme.replace('-', ' ')}
-          </span>
-        </div>
-      </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {visibleSections.map(section => (
@@ -1317,38 +1323,53 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onToggleSidebar }) =
   }
 
   return (
-    <motion.div
-      ref={scrollContainerRef}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="theme-app-surface flex-1 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)_+_8rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_4rem)]"
-    >
-      <div className="mx-auto max-w-6xl p-4 sm:p-6">
-        {renderSection()}
-      </div>
-      <NotificationSetupModal
-        open={showNotificationSetup}
-        guidance={guidance}
-        guidanceText={guidanceText}
-        saving={pushSaving}
-        canInstall={canInstall}
-        onClose={() => setShowNotificationSetup(false)}
-        onEnable={handleEnableFromModal}
-        onInstall={async () => {
-          await handleInstallApp()
-        }}
+    <div className="theme-app-surface flex h-full min-h-0 flex-col text-sm">
+      <MobileAppHeader
+        currentView={currentView}
+        onViewChange={onViewChange}
+        title={activeSectionConfig?.title || 'Settings'}
+        eyebrow={activeSectionConfig ? 'Settings' : undefined}
+        logo={!activeSectionConfig}
+        titleElement={activeSectionConfig ? 'p' : undefined}
+        onBack={activeSection ? () => {
+          setActiveSection(null)
+          setActiveAdminSection(null)
+        } : undefined}
+        backLabel="Back"
       />
-      <PhoneInstallGuide
-        open={showPhoneInstallGuide}
-        canInstall={canInstall}
-        onClose={() => setShowPhoneInstallGuide(false)}
-        onComplete={() => setShowPhoneInstallGuide(false)}
-        onInstall={handleInstallApp}
-      />
-      <FeedbackSubmissionModal
-        open={showFeedbackSubmission}
-        onClose={() => setShowFeedbackSubmission(false)}
-      />
-    </motion.div>
+      <motion.div
+        ref={scrollContainerRef}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="min-h-0 flex-1 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)_+_8rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_4rem)]"
+      >
+        <div className="mx-auto max-w-6xl p-4 sm:p-6">
+          {renderSection()}
+        </div>
+        <NotificationSetupModal
+          open={showNotificationSetup}
+          guidance={guidance}
+          guidanceText={guidanceText}
+          saving={pushSaving}
+          canInstall={canInstall}
+          onClose={() => setShowNotificationSetup(false)}
+          onEnable={handleEnableFromModal}
+          onInstall={async () => {
+            await handleInstallApp()
+          }}
+        />
+        <PhoneInstallGuide
+          open={showPhoneInstallGuide}
+          canInstall={canInstall}
+          onClose={() => setShowPhoneInstallGuide(false)}
+          onComplete={() => setShowPhoneInstallGuide(false)}
+          onInstall={handleInstallApp}
+        />
+        <FeedbackSubmissionModal
+          open={showFeedbackSubmission}
+          onClose={() => setShowFeedbackSubmission(false)}
+        />
+      </motion.div>
+    </div>
   )
 }

@@ -105,7 +105,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const isShadoAI = message.user?.username === 'shado_ai'
     const isAIMessage = isShadoAI || message.message_type === 'command'
     const isImageMessage = message.message_type === 'image' && Boolean(message.file_url)
-    const imageMessageSrc = getSupabaseImageTransformUrl(message.file_url, {
+    const imageMessageSrc = message.thumbnail_url || getSupabaseImageTransformUrl(message.file_url, {
       width: 960,
       height: 960,
       resize: 'contain',
@@ -115,8 +115,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
       ? parentMessage.content?.trim() || (parentMessage.message_type === 'image' ? 'Image' : parentMessage.message_type)
       : ''
     const avatarSrc = isShadoAI
-      ? message.user?.avatar_url || '/icons/app-icon-192.png'
-      : message.user?.avatar_url
+      ? message.user?.avatar_thumbnail_url || message.user?.avatar_url || '/icons/app-icon-192.png'
+      : message.user?.avatar_thumbnail_url || message.user?.avatar_url
 
     const bubbleColor = undefined
     const bubbleStyle = bubbleColor

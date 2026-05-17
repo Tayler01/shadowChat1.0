@@ -37,6 +37,10 @@ export interface CreateArtBoardItemInput {
   tags?: string[]
   image_url?: string | null
   image_path?: string | null
+  thumbnail_url?: string | null
+  thumbnail_path?: string | null
+  image_width?: number | null
+  image_height?: number | null
   alt_text?: string | null
   note_text?: string | null
   note_color?: ArtBoardNoteColor
@@ -55,6 +59,10 @@ export type UpdateArtBoardItemInput = Partial<
     | 'title'
     | 'caption'
     | 'tags'
+    | 'thumbnail_url'
+    | 'thumbnail_path'
+    | 'image_width'
+    | 'image_height'
     | 'alt_text'
     | 'note_text'
     | 'note_color'

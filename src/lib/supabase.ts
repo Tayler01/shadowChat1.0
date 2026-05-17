@@ -4,6 +4,7 @@ import {
   VITE_SUPABASE_URL,
 } from './env'
 import { optimizeImageFile } from './imageOptimization'
+import { createStoredImageAsset, type MediaThumbnailProfile } from './mediaAssets'
 
 type AnySupabaseClient = any
 type SessionResponse = {
@@ -21,6 +22,11 @@ const loggingFetch: typeof fetch = async (input, init) => {
 
 const shouldUseRealtimeWorker =
   typeof window !== 'undefined' && typeof Worker !== 'undefined'
+
+const isMissingColumnError = (error: any, column: string) => {
+  const haystack = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''} ${error?.code || ''}`
+  return haystack.includes(column)
+}
 
 export const SUPABASE_URL = VITE_SUPABASE_URL
 export const SUPABASE_ANON_KEY = VITE_SUPABASE_ANON_KEY
@@ -669,6 +675,30 @@ export const uploadChatFile = async (file: File) => {
   return data.publicUrl
 }
 
+export const uploadChatImageAsset = async (
+  file: File,
+  thumbnailProfile: MediaThumbnailProfile = 'chat'
+) => {
+  const workingClient = await getWorkingClient()
+  const { data: { user } } = await workingClient.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  const uploadFile = await optimizeImageFile(file, {
+    maxWidth: 1600,
+    maxHeight: 1600,
+    quality: 0.82,
+    fileNamePrefix: thumbnailProfile === 'weather' ? 'weather-share' : 'chat-image',
+  })
+  const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]+/g, '-').slice(-120) || 'chat-image'
+  const filePath = `${user.id}/${Date.now()}_${safeName}`
+  const { error } = await workingClient.storage.from(UPLOADS_BUCKET).upload(filePath, uploadFile, {
+    contentType: uploadFile.type,
+    cacheControl: '31536000',
+  })
+  if (error) throw error
+  const { data } = workingClient.storage.from(UPLOADS_BUCKET).getPublicUrl(filePath)
+  return createStoredImageAsset(filePath, data.publicUrl, thumbnailProfile)
+}
+
 export const uploadArtBoardImage = async (file: File) => {
   const workingClient = await getWorkingClient()
   const { data: { user } } = await workingClient.auth.getUser()
@@ -687,7 +717,7 @@ export const uploadArtBoardImage = async (file: File) => {
   })
   if (error) throw error
   const { data } = workingClient.storage.from(ART_BOARD_BUCKET).getPublicUrl(filePath)
-  return { path: filePath, publicUrl: data.publicUrl }
+  return createStoredImageAsset(filePath, data.publicUrl, 'art-board')
 }
 
 export const uploadShadowPinImage = async (
@@ -729,7 +759,11 @@ export interface User {
   username: string
   display_name: string
   avatar_url?: string
+  avatar_thumbnail_url?: string | null
+  avatar_thumbnail_path?: string | null
   banner_url?: string
+  banner_thumbnail_url?: string | null
+  banner_thumbnail_path?: string | null
   status: UserStatus
   status_message: string
   presence_visibility?: PresenceVisibility
@@ -754,6 +788,11 @@ export interface Message {
   audio_url?: string
   audio_duration?: number
   file_url?: string
+  thumbnail_url?: string | null
+  thumbnail_path?: string | null
+  media_width?: number | null
+  media_height?: number | null
+  media_processed_at?: string | null
   reactions: Record<string, { count: number; users: string[] }>
   pinned: boolean
   pinned_by?: string | null
@@ -1021,6 +1060,11 @@ export interface ArtBoardItem {
   tags: string[]
   image_url?: string | null
   image_path?: string | null
+  thumbnail_url?: string | null
+  thumbnail_path?: string | null
+  image_width?: number | null
+  image_height?: number | null
+  media_processed_at?: string | null
   alt_text?: string | null
   note_text?: string | null
   note_color: ArtBoardNoteColor
@@ -1071,6 +1115,11 @@ export interface DMMessage {
   audio_url?: string
   audio_duration?: number
   file_url?: string
+  thumbnail_url?: string | null
+  thumbnail_path?: string | null
+  media_width?: number | null
+  media_height?: number | null
+  media_processed_at?: string | null
   read_at?: string
   read_by?: string[]
   reactions: Record<string, { count: number; users: string[] }>
@@ -1085,7 +1134,7 @@ export interface DMMessage {
 export interface BasicUser
   extends Pick<
     User,
-    'id' | 'username' | 'display_name' | 'avatar_url' | 'color' | 'status' | 'admin_role' | 'checkers_crown' | 'war_sword' | 'presence_visibility' | 'dm_discoverable'
+    'id' | 'username' | 'display_name' | 'avatar_url' | 'avatar_thumbnail_url' | 'color' | 'status' | 'admin_role' | 'checkers_crown' | 'war_sword' | 'presence_visibility' | 'dm_discoverable'
   > {}
 
 export interface PresenceSnapshot {
@@ -1217,14 +1266,20 @@ export const fetchDMConversations = async () => {
 
   let usersMap: Record<string, User> = {}
   if (missingIds.length) {
-    const { data: usersData, error: userErr } = await workingClient
+    let userQuery = await workingClient
       .from('users')
-      .select('id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, presence_visibility')
+      .select('id, username, display_name, avatar_url, avatar_thumbnail_url, color, status, admin_role, checkers_crown, war_sword, presence_visibility')
       .in('id', missingIds)
-    if (userErr) {
+    if (userQuery.error && isMissingColumnError(userQuery.error, 'avatar_thumbnail_url')) {
+      userQuery = await workingClient
+        .from('users')
+        .select('id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, presence_visibility')
+        .in('id', missingIds)
+    }
+    if (userQuery.error) {
     } else {
       usersMap = Object.fromEntries(
-        (usersData ?? []).map((u: any) => [u.id, u as User])
+        (userQuery.data ?? []).map((u: any) => [u.id, u as User])
       )
     }
   }
@@ -1307,15 +1362,26 @@ export const searchUsers = async (
 
 export const fetchAllUsers = async (options?: { signal?: AbortSignal }) => {
   const workingClient = await getWorkingClient()
-  let query = workingClient
-    .from('users')
-    .select('id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, presence_visibility, dm_discoverable')
-    .eq('dm_discoverable', true)
-    .order('display_name', { ascending: true })
-  if (options?.signal && typeof query.abortSignal === 'function') {
-    query = query.abortSignal(options.signal)
+  const buildQuery = (selectColumns: string) => {
+    let query = workingClient
+      .from('users')
+      .select(selectColumns)
+      .eq('dm_discoverable', true)
+      .order('display_name', { ascending: true })
+    if (options?.signal && typeof query.abortSignal === 'function') {
+      query = query.abortSignal(options.signal)
+    }
+    return query
   }
-  const { data, error } = await query
+
+  let query = buildQuery('id, username, display_name, avatar_url, avatar_thumbnail_url, color, status, admin_role, checkers_crown, war_sword, presence_visibility, dm_discoverable')
+  let { data, error } = await query
+  if (error && isMissingColumnError(error, 'avatar_thumbnail_url')) {
+    query = buildQuery('id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, presence_visibility, dm_discoverable')
+    const fallback = await query
+    data = fallback.data
+    error = fallback.error
+  }
   if (error) {
     return [] as BasicUser[]
   }

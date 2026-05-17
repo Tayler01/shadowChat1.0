@@ -766,6 +766,47 @@ html, body, #root {
   .app-viewport {
     height: var(--shadowchat-app-height, var(--shadowchat-visual-viewport-height, 100dvh));
   }
+
+  .mobile-keyboard-chrome {
+    max-height: 4.2rem;
+    overflow: hidden;
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+      max-height var(--dur-med) var(--ease-premium),
+      opacity var(--dur-fast) var(--ease-premium),
+      transform var(--dur-med) var(--ease-premium),
+      padding var(--dur-med) var(--ease-premium),
+      border-color var(--dur-med) var(--ease-premium);
+  }
+
+  html[data-shadowchat-keyboard='open'] .mobile-keyboard-chrome {
+    max-height: 0;
+    border-color: transparent;
+    opacity: 0;
+    padding-bottom: 0;
+    padding-top: 0;
+    pointer-events: none;
+    transform: translateY(calc(-100% - env(safe-area-inset-top)));
+  }
+
+  .mobile-keyboard-nav {
+    max-height: 4.2rem;
+    overflow: hidden;
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+      max-height var(--dur-med) var(--ease-premium),
+      opacity var(--dur-fast) var(--ease-premium),
+      transform var(--dur-med) var(--ease-premium);
+  }
+
+  html[data-shadowchat-keyboard='open'] .mobile-keyboard-nav {
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(100%);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

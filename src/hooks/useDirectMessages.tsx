@@ -26,6 +26,7 @@ import { triggerDMPushNotification } from '../lib/push';
 import {
   createClientMessageId,
   isClientMessageIdSchemaError,
+  isMediaThumbnailSchemaError,
   markMessageSendFailed,
   mergeRealtimeMessageUpdate,
   upsertMessageIntoState,
@@ -50,7 +51,8 @@ interface DirectMessagesContextValue {
   sendMessage: (
     content: string,
     messageType?: ChatMessageType,
-    fileUrl?: string
+    fileUrl?: string,
+    thumbnailUrl?: string | null
   ) => Promise<DMMessage | null>;
   editMessage: (messageId: string, content: string) => Promise<void>;
   deleteMessage: (messageId: string) => Promise<void>;
@@ -195,6 +197,8 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
                     message_type: payload.new.message_type ?? 'text',
                     audio_url: payload.new.audio_url ?? undefined,
                     file_url: payload.new.file_url ?? undefined,
+                    thumbnail_url: payload.new.thumbnail_url ?? undefined,
+                    media_processed_at: payload.new.media_processed_at ?? undefined,
                     read_at: payload.new.read_at,
                     reactions: payload.new.reactions,
                     edited_at: payload.new.edited_at,
@@ -344,9 +348,10 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     async (
       content: string,
       messageType?: ChatMessageType,
-      fileUrl?: string
+      fileUrl?: string,
+      thumbnailUrl?: string | null
     ) => {
-      const message = await sendConversationMessage(content, messageType, fileUrl);
+      const message = await sendConversationMessage(content, messageType, fileUrl, thumbnailUrl);
       if (message) {
         refreshConversationsDebounced();
       }
@@ -451,6 +456,8 @@ export function useConversationMessages(conversationId: string | null) {
         content: string;
         message_type: ChatMessageType;
         file_url?: string;
+        thumbnail_url?: string;
+        media_processed_at?: string;
         audio_url?: string;
       }
     ) => {
@@ -476,8 +483,34 @@ export function useConversationMessages(conversationId: string | null) {
         error: any;
       };
 
+      if (result.error && isMediaThumbnailSchemaError(result.error)) {
+        const {
+          thumbnail_url: _thumbnailUrl,
+          media_processed_at: _mediaProcessedAt,
+          ...legacyMediaPayload
+        } = payload;
+        const legacyMediaInsertPromise = workingClient
+          .from('dm_messages')
+          .insert(legacyMediaPayload)
+          .select(`
+            *,
+            sender:users!sender_id(*)
+          `)
+          .single();
+
+        result = (await Promise.race([legacyMediaInsertPromise, timeoutPromise])) as {
+          data: DMMessage | null;
+          error: any;
+        };
+      }
+
       if (result.error && payload.client_message_id && isClientMessageIdSchemaError(result.error)) {
-        const { client_message_id: _clientMessageId, ...legacyPayload } = payload;
+        const {
+          client_message_id: _clientMessageId,
+          thumbnail_url: _thumbnailUrl,
+          media_processed_at: _mediaProcessedAt,
+          ...legacyPayload
+        } = payload;
         const legacyInsertPromise = workingClient
           .from('dm_messages')
           .insert(legacyPayload)
@@ -853,7 +886,8 @@ export function useConversationMessages(conversationId: string | null) {
     async (
       content: string,
       messageType: ChatMessageType = 'text',
-      fileUrl?: string
+      fileUrl?: string,
+      thumbnailUrl?: string | null
     ): Promise<DMMessage | null> => {
     
       const trimmedContent = content.trim();
@@ -876,6 +910,7 @@ export function useConversationMessages(conversationId: string | null) {
         content: messageType === 'audio' ? '' : trimmedContent,
         message_type: messageType,
         file_url: fileUrl,
+        ...(thumbnailUrl ? { thumbnail_url: thumbnailUrl, media_processed_at: createdAt } : {}),
         ...(messageType === 'audio' ? { audio_url: trimmedContent } : {}),
         read_at: undefined,
         read_by: [user.id],
@@ -903,6 +938,7 @@ export function useConversationMessages(conversationId: string | null) {
               content: messageType === 'audio' ? '' : trimmedContent,
               message_type: messageType,
               file_url: fileUrl,
+              ...(thumbnailUrl ? { thumbnail_url: thumbnailUrl, media_processed_at: new Date().toISOString() } : {}),
               ...(messageType === 'audio' ? { audio_url: trimmedContent } : {}),
             };
 

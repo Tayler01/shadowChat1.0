@@ -7,6 +7,7 @@ interface MobileChatFooterProps {
   onViewChange: (view: AppView) => void
   children: React.ReactNode
   avoidAndroidKeyboardLift?: boolean
+  collapseNavOnKeyboard?: boolean
 }
 
 function isIOSLikeNavigator() {
@@ -24,6 +25,7 @@ export function MobileChatFooter({
   onViewChange,
   children,
   avoidAndroidKeyboardLift = false,
+  collapseNavOnKeyboard = true,
 }: MobileChatFooterProps) {
   const footerRef = useRef<HTMLDivElement>(null)
   const disableAndroidKeyboardLift = avoidAndroidKeyboardLift && !isIOSLikeNavigator()
@@ -72,12 +74,14 @@ export function MobileChatFooter({
       style={footerStyle}
     >
       {children}
-      <MobileNav
-        currentView={currentView}
-        onViewChange={onViewChange}
-        className="static"
-        embedded
-      />
+      <div className={collapseNavOnKeyboard ? 'mobile-keyboard-nav' : undefined}>
+        <MobileNav
+          currentView={currentView}
+          onViewChange={onViewChange}
+          className="static"
+          embedded
+        />
+      </div>
     </div>
   )
 }

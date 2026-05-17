@@ -14,6 +14,10 @@ jest.mock('../src/hooks/useAuth', () => ({
   }),
 }))
 
+jest.mock('../src/components/chat/WeatherWidget', () => ({
+  WeatherWidget: () => <div data-testid="weather-widget" />,
+}))
+
 jest.mock('../src/features/shadow-pin/hooks/useShadowPinCategories', () => ({
   useShadowPinCategories: () => mockUseShadowPinCategories(),
 }))

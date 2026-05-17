@@ -75,7 +75,8 @@ Android/Chromium phone profiles before desktop convenience.
 
 - `scripts/mobile-pwa-visual-qa.mjs` runs production-preview mobile visual checks without adding a new Playwright framework.
 - It writes screenshots, console logs, network failures, and `summary.json` under `output/playwright/<run-name>/`.
-- Current passing artifact set: `output/playwright/mobile-picker-masonry-weather-share-final/`.
+- Current passing artifact set: `output/playwright/mobile-header-media-pins-headed-20260517c/` with 100 passed checks across iPhone/WebKit and Android/Chromium profiles.
+- Current headed smoke artifact set: `output/playwright/mobile-shell-headed-smoke-20260517g/` with `auth`, `dm`, and `mobile-dm-back` passed.
 - Latest targeted regression artifacts for weather, GIF picker keyboard compression, picker portals, image modal centering, and Android Shadow Pin masonry: `output/playwright/mobile-fixes-targeted/` plus `output/playwright/mobile-picker-masonry-weather-share-final/`.
 
 ## Known Real-Device Risks

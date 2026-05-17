@@ -1,6 +1,8 @@
 # ShadowPin
 
-ShadowPin is a logged-in public image board inside the existing Boards system. It adds a `Shadow Pin` static board node that opens a mobile-first category grid and per-category image masonry view.
+ShadowPin is a logged-in public image board exposed as `Pins` in the mobile
+bottom menu and desktop sidebar. Boards stays its own menu item; Pins opens the
+same ShadowPin surface directly.
 
 ## V1 Scope
 
@@ -15,12 +17,17 @@ ShadowPin is a logged-in public image board inside the existing Boards system. I
 
 Migration: `supabase/migrations/20260512203054_shadow_pin_domain.sql`
 
-- `shadow_pin_categories`: category metadata, cover asset, soft delete fields, heart count.
+- `shadow_pin_categories`: category metadata, cover asset, soft delete fields,
+  heart count, and `latest_image_created_at` for mobile category ordering.
 - `shadow_pin_images`: pin metadata, image asset, optional `category_id` for admin orphaning, soft delete fields, heart count.
 - `shadow_pin_category_hearts`: one heart per user/category.
 - `shadow_pin_image_hearts`: one heart per user/image.
 
 The migration also creates the public Supabase Storage bucket `shadow-pin` with a 15MB limit and JPEG, PNG, WebP, and GIF MIME allow-list. Storage paths are user-prefixed so authenticated users can upload only under their own folder.
+
+The mobile media derivative migration keeps `latest_image_created_at` current
+with a trigger on `shadow_pin_images`. Category lists sort by newest added image
+first, with empty categories below categories that have visible images.
 
 ## Permissions
 
@@ -58,6 +65,7 @@ For remote use, apply the migration and deploy the Edge Function:
 ```powershell
 supabase db push
 supabase functions deploy shadow-pin-import-image
+npm run shadow-pin:backfill-media -- --apply
 ```
 
 ## Known V1 Limitations

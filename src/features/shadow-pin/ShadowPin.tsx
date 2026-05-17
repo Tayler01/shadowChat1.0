@@ -1,6 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  ArrowLeft,
   Edit3,
   Heart,
   Image as ImageIcon,
@@ -17,8 +16,10 @@ import { Avatar } from '../../components/ui/Avatar'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner'
+import { MobileAppHeader } from '../../components/layout/MobileAppHeader'
 import { useAuth } from '../../hooks/useAuth'
 import { cn } from '../../lib/utils'
+import type { AppView } from '../../types/navigation'
 import { useShadowPinCategories } from './hooks/useShadowPinCategories'
 import { useShadowPinImages } from './hooks/useShadowPinImages'
 import type {
@@ -29,7 +30,9 @@ import type {
 } from './types'
 
 type ShadowPinProps = {
-  onBack: () => void
+  currentView?: AppView
+  onViewChange?: (view: AppView) => void
+  onBack?: () => void
 }
 
 type ModalMode =
@@ -129,50 +132,6 @@ function useShadowPinMasonryColumnCount() {
   }, [])
 
   return columnCount
-}
-
-function ShadowPinHeader({
-  title,
-  subtitle,
-  onBack,
-  onPlus,
-  plusLabel,
-}: {
-  title: string
-  subtitle?: string
-  onBack: () => void
-  onPlus?: () => void
-  plusLabel?: string
-}) {
-  return (
-    <header className="flex flex-shrink-0 items-center gap-3 border-b border-[var(--border-panel)] bg-[rgba(5,6,8,0.54)] px-3 py-3 backdrop-blur-md">
-      <button
-        type="button"
-        onClick={onBack}
-        className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-[var(--border-panel)] bg-[var(--theme-surface-hover)] text-[var(--text-primary)]"
-        aria-label="Back"
-      >
-        <ArrowLeft className="h-5 w-5" />
-      </button>
-      <div className="min-w-0 flex-1 text-center">
-        <div className="flex items-center justify-center gap-2 text-lg font-semibold text-[var(--text-primary)]">
-          <Pin className="h-5 w-5 text-[var(--theme-accent-readable)]" />
-          <span className="truncate">{title}</span>
-        </div>
-        {subtitle && <p className="truncate text-xs text-[var(--text-muted)]">{subtitle}</p>}
-      </div>
-      {onPlus ? (
-        <button
-          type="button"
-          onClick={onPlus}
-          className="inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-[var(--theme-accent-border)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-readable)]"
-          aria-label={plusLabel || 'Create'}
-        >
-          <Plus className="h-5 w-5" />
-        </button>
-      ) : <div className="h-11 w-11 flex-shrink-0" />}
-    </header>
-  )
 }
 
 function HeartButton({
@@ -715,7 +674,11 @@ function ImageViewerModal({
   )
 }
 
-function ShadowPinHome({ onBack, onOpenCategory }: ShadowPinProps & { onOpenCategory: (category: ShadowPinCategory) => void }) {
+function ShadowPinHome({
+  currentView,
+  onViewChange,
+  onOpenCategory,
+}: Required<Pick<ShadowPinProps, 'currentView' | 'onViewChange'>> & { onOpenCategory: (category: ShadowPinCategory) => void }) {
   const { user } = useAuth()
   const categoriesState = useShadowPinCategories()
   const [modal, setModal] = useState<ModalMode>(null)
@@ -740,9 +703,22 @@ function ShadowPinHome({ onBack, onOpenCategory }: ShadowPinProps & { onOpenCate
   }
 
   return (
-    <div className="theme-image-surface flex h-full min-h-0 flex-col">
-      <ShadowPinHeader title="ShadowPin" subtitle="Public image boards" onBack={onBack} onPlus={() => setModal({ type: 'create-category' })} plusLabel="Create category" />
-      <main className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+    <div className="theme-image-surface relative flex h-full min-h-0 flex-col">
+      <MobileAppHeader
+        currentView={currentView}
+        onViewChange={onViewChange}
+        title="Shado Pin"
+        logo
+      />
+      <button
+        type="button"
+        onClick={() => setModal({ type: 'create-category' })}
+        className="theme-floating-action absolute right-3 top-[calc(env(safe-area-inset-top)_+_3.85rem)] z-40 inline-flex h-11 w-11 items-center justify-center rounded-full md:right-4"
+        aria-label="Create category"
+      >
+        <Plus className="h-5 w-5" />
+      </button>
+      <main className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-16">
         {categoriesState.loading ? (
           <div className="flex h-full items-center justify-center"><LoadingSpinner /></div>
         ) : categoriesState.error ? (
@@ -809,9 +785,13 @@ function ShadowPinHome({ onBack, onOpenCategory }: ShadowPinProps & { onOpenCate
 }
 
 function ShadowPinCategoryScreen({
+  currentView,
+  onViewChange,
   categoryId,
   onBack,
 }: {
+  currentView: AppView
+  onViewChange: (view: AppView) => void
   categoryId: string
   onBack: () => void
 }) {
@@ -847,9 +827,24 @@ function ShadowPinCategoryScreen({
   )
 
   return (
-    <div className="theme-image-surface flex h-full min-h-0 flex-col">
-      <ShadowPinHeader title={title} subtitle="Newest pins first" onBack={onBack} onPlus={() => setModal({ type: 'add-image' })} plusLabel="Add image" />
-      <main className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
+    <div className="theme-image-surface relative flex h-full min-h-0 flex-col">
+      <MobileAppHeader
+        currentView={currentView}
+        onViewChange={onViewChange}
+        title="Shado Pin"
+        eyebrow={title}
+        onBack={onBack}
+        backLabel="Back to Shado Pin"
+      />
+      <button
+        type="button"
+        onClick={() => setModal({ type: 'add-image' })}
+        className="theme-floating-action absolute right-3 top-[calc(env(safe-area-inset-top)_+_3.85rem)] z-40 inline-flex h-11 w-11 items-center justify-center rounded-full md:right-4"
+        aria-label="Add image"
+      >
+        <Plus className="h-5 w-5" />
+      </button>
+      <main className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-16">
         {imagesState.loading && imagesState.images.length === 0 ? (
           <div className="flex h-full items-center justify-center"><LoadingSpinner /></div>
         ) : imagesState.error ? (
@@ -937,12 +932,17 @@ function ShadowPinCategoryScreen({
   )
 }
 
-export function ShadowPin({ onBack }: ShadowPinProps) {
+export function ShadowPin({
+  currentView = 'pins',
+  onViewChange = () => {},
+}: ShadowPinProps) {
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
 
   if (activeCategoryId) {
     return (
       <ShadowPinCategoryScreen
+        currentView={currentView}
+        onViewChange={onViewChange}
         categoryId={activeCategoryId}
         onBack={() => setActiveCategoryId(null)}
       />
@@ -951,7 +951,8 @@ export function ShadowPin({ onBack }: ShadowPinProps) {
 
   return (
     <ShadowPinHome
-      onBack={onBack}
+      currentView={currentView}
+      onViewChange={onViewChange}
       onOpenCategory={category => setActiveCategoryId(category.id)}
     />
   )

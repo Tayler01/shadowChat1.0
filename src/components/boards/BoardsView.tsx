@@ -1,22 +1,16 @@
-import React, { useEffect, useState } from 'react'
-import { ArrowLeft, Info } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Info } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { BoardBubbleMap } from './BoardBubbleMap'
 import { BoardChat } from './BoardChat'
 import { ArtBoard, ArtBoardAboutDialog } from '../art/ArtBoard'
 import { NewsFeed } from '../news/NewsFeed'
 import { Button } from '../ui/Button'
-import { LoadingSpinner } from '../ui/LoadingSpinner'
+import { MobileAppHeader } from '../layout/MobileAppHeader'
 import { cn } from '../../lib/utils'
 import type { BoardDefinition } from '../../lib/boards'
 import { useBoardBadges } from '../../hooks/useBoardBadges'
 import type { AppView } from '../../types/navigation'
-
-const ShadowPin = React.lazy(() =>
-  import('../../features/shadow-pin/ShadowPin').then(module => ({
-    default: module.ShadowPin,
-  }))
-)
 
 interface BoardsViewProps {
   resetKey?: number
@@ -36,8 +30,7 @@ export function BoardsView({
   const [artAboutOpen, setArtAboutOpen] = useState(false)
   const { countsByBoard, markFeedSeen } = useBoardBadges()
   const hasActiveChatBoard = activeBoard?.kind === 'chat'
-  const hasImmersiveBoard = activeBoard?.slug === 'shadow-pin'
-  const suppressMobileNav = hasActiveChatBoard || hasImmersiveBoard
+  const suppressMobileNav = hasActiveChatBoard
 
   useEffect(() => {
     setActiveBoard(null)
@@ -56,7 +49,7 @@ export function BoardsView({
   }, [onMobileChatActiveChange, suppressMobileNav])
 
   const openBoard = (board: BoardDefinition) => {
-    onMobileChatActiveChange?.(board.kind === 'chat' || board.slug === 'shadow-pin')
+    onMobileChatActiveChange?.(board.kind === 'chat')
     setArtAboutOpen(false)
     setActiveBoard(board)
   }
@@ -89,14 +82,6 @@ export function BoardsView({
       return <ArtBoard />
     }
 
-    if (activeBoard.slug === 'shadow-pin') {
-      return (
-        <React.Suspense fallback={<div className="flex h-full items-center justify-center"><LoadingSpinner /></div>}>
-          <ShadowPin onBack={closeBoard} />
-        </React.Suspense>
-      )
-    }
-
     return (
       <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-center">
         <h2 className="text-2xl font-semibold text-[var(--text-primary)]">Coming soon</h2>
@@ -109,57 +94,39 @@ export function BoardsView({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className={cn(
-        'theme-image-surface flex h-full min-h-0 flex-col text-sm',
+        'theme-image-surface relative flex h-full min-h-0 flex-col text-sm',
         suppressMobileNav ? 'pb-0' : 'pb-[calc(env(safe-area-inset-bottom)_+_4.2rem)] md:pb-0'
       )}
     >
-      {!hasImmersiveBoard && <header className="glass-panel-strong flex-shrink-0 border-b border-[var(--border-panel)] px-4 py-3 md:px-6">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3">
-          <div className="min-w-0">
-            {activeBoard ? (
-              <div className="flex min-w-0 items-center gap-3">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={closeBoard}
-                  className="h-9 w-9 shrink-0 p-0"
-                  aria-label="Back to boards"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                </Button>
-                <div className="min-w-0">
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">Boards</p>
-                  <h1 className="truncate text-lg font-semibold text-[var(--text-primary)] md:text-xl">{activeBoard.title}</h1>
-                </div>
-              </div>
-            ) : (
-              <>
-                <p className="text-[11px] uppercase tracking-[0.18em] text-[var(--text-muted)]">ShadowChat</p>
-                <h1 className="text-xl font-semibold text-[var(--text-primary)] md:text-2xl">Boards</h1>
-              </>
-            )}
-          </div>
-          {activeBoard?.slug === 'art-board' && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setArtAboutOpen(true)}
-              className="h-9 w-9 shrink-0 p-0"
-              aria-label="About Art Board"
-            >
-              <Info className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
-      </header>}
+      <MobileAppHeader
+        currentView={currentView}
+        onViewChange={onViewChange}
+        title={activeBoard?.title || 'Boards'}
+        eyebrow={activeBoard ? 'Boards' : undefined}
+        logo={!activeBoard}
+        onBack={activeBoard ? closeBoard : undefined}
+        backLabel="Back to boards"
+        collapseOnKeyboard={hasActiveChatBoard}
+      />
 
-      <main className={cn('mx-auto flex min-h-0 w-full flex-1 flex-col overflow-hidden', hasImmersiveBoard ? 'max-w-none' : 'max-w-6xl md:p-4')}>
+      {activeBoard?.slug === 'art-board' && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setArtAboutOpen(true)}
+          className="absolute left-3 top-[calc(env(safe-area-inset-top)_+_3.85rem)] z-40 h-11 w-11 rounded-full p-0 md:left-4"
+          aria-label="About Art Board"
+        >
+          <Info className="h-4 w-4" />
+        </Button>
+      )}
+
+      <main className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col overflow-hidden md:p-4">
         {activeBoard ? (
           <section className={cn(
             'flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent',
-            hasImmersiveBoard ? 'rounded-none border-0' : 'rounded-none border-x-0 border-y-0 border-[var(--border-panel)] md:rounded-[var(--radius-lg)] md:border'
+            'rounded-none border-x-0 border-y-0 border-[var(--border-panel)] md:rounded-[var(--radius-lg)] md:border'
           )}>
             {renderActiveBoard()}
           </section>

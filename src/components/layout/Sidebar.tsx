@@ -1,5 +1,5 @@
 import React from 'react';
-import { Gamepad2, MessageSquare, Users, Newspaper, Settings, Moon, Sun, X } from 'lucide-react';
+import { Gamepad2, Images, MessageSquare, Users, Newspaper, Settings, Moon, Sun, X } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
 import { UserRoleBadge } from '../ui/UserRoleBadge';
 import { UserPresenceBadge } from '../ui/UserPresenceBadge';
@@ -61,6 +61,12 @@ export function Sidebar({
       id: 'games' as const,
       label: 'Games',
       icon: Gamepad2,
+      badge: null,
+    },
+    {
+      id: 'pins' as const,
+      label: 'Pins',
+      icon: Images,
       badge: null,
     },
     {
@@ -144,7 +150,7 @@ export function Sidebar({
           </div>
           <div className="flex items-center space-x-3">
             <Avatar
-              src={user?.avatar_url}
+              src={user?.avatar_thumbnail_url || user?.avatar_url}
               alt={user?.display_name || 'You'}
               size="md"
               color={user?.color}

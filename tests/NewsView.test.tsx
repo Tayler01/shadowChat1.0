@@ -64,6 +64,10 @@ jest.mock('../src/components/boards/BoardBubbleMap', () => ({
   ),
 }))
 
+jest.mock('../src/components/chat/WeatherWidget', () => ({
+  WeatherWidget: () => <div data-testid="weather-widget" />,
+}))
+
 jest.mock('../src/components/news/NewsFeed', () => ({
   NewsFeed: () => <div>feed board</div>,
 }))

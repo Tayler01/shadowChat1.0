@@ -5,7 +5,7 @@ import { useTyping } from '../../hooks/useTyping'
 import { Button } from '../ui/Button'
 import { processSlashCommand, slashCommands } from '../../lib/utils'
 import type { ChatMessage, ChatMessageType } from '../../lib/supabase'
-import { uploadVoiceMessage, uploadChatFile } from '../../lib/supabase'
+import { uploadVoiceMessage, uploadChatFile, uploadChatImageAsset } from '../../lib/supabase'
 import type { EmojiClickData } from '../../types'
 import { RecordingIndicator } from '../ui/RecordingIndicator'
 import { useDraft } from '../../hooks/useDraft'
@@ -23,7 +23,8 @@ interface MessageInputProps {
     content: string,
     type?: ChatMessageType,
     fileUrl?: string,
-    replyTo?: string
+    replyTo?: string,
+    thumbnailUrl?: string | null
   ) => Promise<ChatMessage | null | void> | ChatMessage | null | void
   placeholder?: string
   disabled?: boolean
@@ -335,8 +336,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       onUploadStatusChange(true)
       ;(async () => {
         try {
-          const url = await uploadChatFile(file)
-          const sent = await onSendMessage('', 'image', url, replyingTo?.id)
+          const asset = await uploadChatImageAsset(file, 'chat')
+          const sent = await onSendMessage('', 'image', asset.publicUrl, replyingTo?.id, asset.thumbnailUrl)
           if (sent === null) {
             toast.error('Failed to send image')
             return
@@ -384,18 +385,22 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       onUploadStatusChange(true)
       ;(async () => {
         try {
-          const url = await uploadChatFile(file)
           const messageType: ChatMessageType = file.type.startsWith('image/')
             ? 'image'
             : file.type.startsWith('video/')
               ? 'video'
               : 'file'
           const meta = JSON.stringify({ name: file.name, size: file.size, type: file.type })
+          const asset = messageType === 'image'
+            ? await uploadChatImageAsset(file, 'chat')
+            : null
+          const url = asset?.publicUrl || await uploadChatFile(file)
           const sent = await onSendMessage(
             messageType === 'image' ? '' : meta,
             messageType,
             url,
-            replyingTo?.id
+            replyingTo?.id,
+            asset?.thumbnailUrl
           )
           if (sent === null) {
             toast.error('Failed to send attachment')

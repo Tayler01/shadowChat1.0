@@ -1,4 +1,5 @@
 import { getWorkingClient, uploadArtBoardImage } from './supabase'
+import { createStoredImageAsset } from './mediaAssets'
 import type {
   ArtBoardFrameStyle,
   ArtBoardItem,
@@ -99,5 +100,9 @@ export const importArtBoardImageUrl = async (url: string) => {
     throw new Error(data.error)
   }
 
-  return data as { ok: true; path: string; publicUrl: string; contentType: string }
+  const imported = data as { ok: true; path: string; publicUrl: string; contentType: string }
+  return {
+    ...imported,
+    ...createStoredImageAsset(imported.path, imported.publicUrl, 'art-board'),
+  }
 }

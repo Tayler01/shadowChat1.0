@@ -19,6 +19,7 @@ import {
   getTemperatureUnitLabel,
   type WeatherConditionKind,
   type WeatherDailyForecast,
+  type WeatherForecast,
 } from '../../lib/weather'
 
 interface WeatherWidgetProps {
@@ -87,6 +88,79 @@ function ForecastRow({
   )
 }
 
+function WeatherShareCaptureCard({
+  forecast,
+  locationName,
+}: {
+  forecast: WeatherForecast
+  locationName: string
+}) {
+  const current = forecast.current
+
+  return (
+    <>
+      <div className="border-b border-[var(--border-subtle)] px-4 py-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+            Weather
+          </p>
+          <p className="mt-1 text-sm font-medium text-[var(--text-primary)]">
+            {locationName}
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-4 p-4">
+        <div className="rounded-[var(--radius-md)] border border-[rgba(215,170,70,0.18)] bg-[rgba(215,170,70,0.06)] p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-4xl font-semibold leading-none text-[var(--text-primary)]">
+                {formatTemperature(current.temperature)}
+              </div>
+              <div className="mt-1 text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                {'\u00b0'}{getTemperatureUnitLabel(forecast.temperatureUnit)}
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[rgba(215,170,70,0.2)] bg-[rgba(255,255,255,0.04)] text-[var(--text-gold)]">
+                <WeatherIcon kind={current.condition.kind} isDay={current.isDay} className="h-6 w-6" />
+              </span>
+              <p className="mt-2 text-sm font-medium text-[var(--text-primary)]">{current.condition.label}</p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+            <div className="rounded-[var(--radius-sm)] bg-[rgba(0,0,0,0.18)] p-2">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Feels</p>
+              <p className="mt-1 font-medium text-[var(--text-primary)]">{formatTemperature(current.apparentTemperature)}</p>
+            </div>
+            <div className="rounded-[var(--radius-sm)] bg-[rgba(0,0,0,0.18)] p-2">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Humidity</p>
+              <p className="mt-1 font-medium text-[var(--text-primary)]">{Math.round(current.relativeHumidity)}%</p>
+            </div>
+            <div className="rounded-[var(--radius-sm)] bg-[rgba(0,0,0,0.18)] p-2">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Wind</p>
+              <p className="mt-1 font-medium text-[var(--text-primary)]">{Math.round(current.windSpeed)} mph</p>
+            </div>
+            <div className="rounded-[var(--radius-sm)] bg-[rgba(0,0,0,0.18)] p-2">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Rain</p>
+              <p className="mt-1 font-medium text-[var(--text-primary)]">{current.precipitation.toFixed(2)} in</p>
+            </div>
+          </div>
+
+          <p className="mt-3 text-xs text-[var(--text-muted)]">{formatUpdated(current.time)}</p>
+        </div>
+
+        <div className="space-y-2">
+          {forecast.daily.map(day => (
+            <ForecastRow key={day.date} day={day} />
+          ))}
+        </div>
+      </div>
+    </>
+  )
+}
+
 export function WeatherWidget({ onOpenSettings, onShareWeather }: WeatherWidgetProps) {
   const { preference, forecast, loading, error } = useWeatherForecast()
   const [open, setOpen] = useState(false)
@@ -130,8 +204,8 @@ export function WeatherWidget({ onOpenSettings, onShareWeather }: WeatherWidgetP
     if (!onShareWeather || !weatherShareRef.current || !current) return
 
     const captureTarget = weatherShareRef.current
+    const captureWidth = 320
     const captureRect = captureTarget.getBoundingClientRect()
-    const captureWidth = Math.ceil(Math.max(captureTarget.scrollWidth, captureRect.width, 320))
     const measuredCaptureHeight = Math.max(captureTarget.scrollHeight, captureRect.height)
     const captureHeight = Math.ceil(measuredCaptureHeight || 1)
 
@@ -145,6 +219,8 @@ export function WeatherWidget({ onOpenSettings, onShareWeather }: WeatherWidgetP
         backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg-app').trim() || '#08090a',
         style: {
           width: `${captureWidth}px`,
+          minWidth: `${captureWidth}px`,
+          maxWidth: `${captureWidth}px`,
           height: `${captureHeight}px`,
           maxHeight: 'none',
           overflow: 'visible',
@@ -169,11 +245,24 @@ export function WeatherWidget({ onOpenSettings, onShareWeather }: WeatherWidgetP
 
   return (
     <div ref={rootRef} className="relative">
+      {current && forecast && (
+        <div
+          ref={weatherShareRef}
+          aria-hidden="true"
+          className="popup-surface pointer-events-none fixed left-[-10000px] top-0 w-80 overflow-visible rounded-[var(--radius-lg)] border border-[var(--border-panel)] shadow-[var(--shadow-panel-strong)]"
+        >
+          <WeatherShareCaptureCard
+            forecast={forecast}
+            locationName={preference?.location_name || 'No location selected'}
+          />
+        </div>
+      )}
+
       <button
         type="button"
         onClick={() => setOpen(value => !value)}
         className="inline-flex min-h-7 items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-2 py-0.5 text-[11px] text-[var(--text-muted)] transition-colors hover:border-[rgba(215,170,70,0.28)] hover:bg-[rgba(215,170,70,0.08)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.28)] sm:min-h-8 sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-xs"
-        aria-label={current ? `${formatTemperature(current.temperature)} and ${current.condition.label}` : 'Weather settings'}
+        aria-label={current ? `${formatTemperature(current.temperature)} and ${current.condition.label}` : 'Set weather location'}
         aria-haspopup="dialog"
         aria-expanded={open}
       >
@@ -191,7 +280,6 @@ export function WeatherWidget({ onOpenSettings, onShareWeather }: WeatherWidgetP
 
       {open && (
         <div
-          ref={weatherShareRef}
           role="dialog"
           aria-label="Weather forecast"
           className="popup-surface fixed left-1/2 top-[calc(env(safe-area-inset-top)_+_4.75rem)] z-[80] mt-0 max-h-[calc(100dvh_-_env(safe-area-inset-top)_-_6rem)] w-[min(20rem,calc(100vw_-_1rem))] -translate-x-1/2 overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--border-panel)] shadow-[var(--shadow-panel-strong)] sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:max-h-[calc(100vh_-_8rem)] sm:w-80 sm:max-w-[calc(100vw_-_2rem)] sm:translate-x-0 sm:overflow-hidden"

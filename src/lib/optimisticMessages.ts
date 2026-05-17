@@ -36,15 +36,25 @@ export function createClientMessageId() {
   return createUuidFallback()
 }
 
-export function isClientMessageIdSchemaError(error: any) {
+export function isSchemaColumnError(error: any, columns: string[]) {
   const message = String(error?.message ?? error?.details ?? '')
-  return (
-    error?.code === 'PGRST204' &&
-    message.includes('client_message_id')
-  ) || (
-    /client_message_id/i.test(message) &&
-    /schema cache|column|could not find/i.test(message)
-  )
+  return columns.some(column => (
+    (
+      error?.code === 'PGRST204' &&
+      message.includes(column)
+    ) || (
+      new RegExp(column, 'i').test(message) &&
+      /schema cache|column|could not find/i.test(message)
+    )
+  ))
+}
+
+export function isClientMessageIdSchemaError(error: any) {
+  return isSchemaColumnError(error, ['client_message_id'])
+}
+
+export function isMediaThumbnailSchemaError(error: any) {
+  return isSchemaColumnError(error, ['thumbnail_url', 'thumbnail_path', 'media_processed_at'])
 }
 
 const getAuthorId = (message: OptimisticMessageFields) => message.user_id ?? message.sender_id ?? null

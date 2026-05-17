@@ -517,7 +517,7 @@ describe('DirectMessagesView user search', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /^back$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /back to chat/i }));
 
     expect(onViewChange).toHaveBeenCalledWith('chat');
   });

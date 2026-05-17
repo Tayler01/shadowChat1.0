@@ -2,7 +2,10 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Pin, X } from 'lucide-react'
 import { Button } from '../ui/Button'
 import type { Message } from '../../lib/supabase'
-import { PinnedMessageItem } from './PinnedMessageItem'
+
+const LazyPinnedMessageItem = React.lazy(() =>
+  import('./PinnedMessageItem').then(module => ({ default: module.PinnedMessageItem }))
+)
 
 interface PinnedMessagesButtonProps {
   messages: Message[]
@@ -74,16 +77,20 @@ export function PinnedMessagesButton({
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <div className="max-h-[min(60vh,24rem)] space-y-2 overflow-y-auto p-3">
-            {messages.map(message => (
-              <PinnedMessageItem
-                key={message.id}
-                message={message}
-                onUnpin={onUnpin}
-                onToggleReaction={onToggleReaction}
-              />
-            ))}
-          </div>
+          <React.Suspense
+            fallback={<div className="p-3 text-sm text-[var(--text-muted)]">Loading pinned messages...</div>}
+          >
+            <div className="max-h-[min(60vh,24rem)] space-y-2 overflow-y-auto p-3">
+              {messages.map(message => (
+                <LazyPinnedMessageItem
+                  key={message.id}
+                  message={message}
+                  onUnpin={onUnpin}
+                  onToggleReaction={onToggleReaction}
+                />
+              ))}
+            </div>
+          </React.Suspense>
         </div>
       )}
     </div>

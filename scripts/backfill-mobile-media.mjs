@@ -2,30 +2,31 @@ import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { execFileSync } from 'node:child_process'
-import sharp from 'sharp'
 import { createClient } from '@supabase/supabase-js'
 
 const repoRoot = process.cwd()
 const apply = process.argv.includes('--apply')
-const force = process.argv.includes('--force')
+const includeChatHistory = process.argv.includes('--include-chat-history')
 const limitArg = process.argv.find(arg => arg.startsWith('--limit='))
 const limit = limitArg ? Number(limitArg.slice('--limit='.length)) : Number.POSITIVE_INFINITY
 
+const OBJECT_PUBLIC_MARKER = '/storage/v1/object/public/'
+const RENDER_PUBLIC_MARKER = '/storage/v1/render/image/public/'
+const UNSAFE_TRANSFORM_EXTENSIONS = /\.(gif|svg)(?:$|[?#])/i
+
 const TARGETS = {
-  avatar: { bucket: 'avatars', maxWidth: 512, maxHeight: 512, quality: 82, minBytes: 96 * 1024 },
-  banner: { bucket: 'banners', maxWidth: 1600, maxHeight: 900, quality: 82, minBytes: 320 * 1024 },
-  art: { bucket: 'art-board', maxWidth: 1600, maxHeight: 1600, quality: 82, minBytes: 320 * 1024 },
-  chat: { bucket: 'chat-uploads', maxWidth: 1600, maxHeight: 1600, quality: 82, minBytes: 320 * 1024 },
+  avatar: { width: 240, height: 240, resize: 'cover', quality: 82 },
+  banner: { width: 960, height: 540, resize: 'cover', quality: 78 },
+  chat: { width: 720, height: 720, resize: 'contain', quality: 76 },
+  art: { width: 720, height: 720, resize: 'cover', quality: 76 },
 }
 
 const stats = {
   scanned: 0,
   candidates: 0,
-  optimized: 0,
+  updated: 0,
   skipped: 0,
   failed: 0,
-  originalBytes: 0,
-  optimizedBytes: 0,
 }
 
 function loadEnvFile(filePath) {
@@ -77,105 +78,65 @@ function createAdminClient() {
   })
 }
 
-function publicStoragePath(bucket, publicUrl) {
+function transformedImageUrl(publicUrl, target) {
   if (!publicUrl) return null
-  let url
+
   try {
-    url = new URL(publicUrl)
+    const url = new URL(publicUrl)
+    const marker = url.pathname.includes(RENDER_PUBLIC_MARKER)
+      ? RENDER_PUBLIC_MARKER
+      : OBJECT_PUBLIC_MARKER
+
+    if (!url.pathname.includes(marker) || UNSAFE_TRANSFORM_EXTENSIONS.test(url.pathname)) {
+      return null
+    }
+
+    url.pathname = url.pathname.replace(marker, RENDER_PUBLIC_MARKER)
+    url.search = ''
+    const params = new URLSearchParams()
+    params.set('width', String(target.width))
+    params.set('height', String(target.height))
+    params.set('resize', target.resize)
+    params.set('quality', String(target.quality))
+    url.search = params.toString()
+    return url.toString()
   } catch {
     return null
   }
-  const marker = `/storage/v1/object/public/${bucket}/`
-  const index = url.pathname.indexOf(marker)
-  if (index === -1) return null
-  return decodeURIComponent(url.pathname.slice(index + marker.length))
 }
 
-function buildOptimizedPath(originalPath, kind, id) {
-  const directory = originalPath.includes('/') ? originalPath.slice(0, originalPath.lastIndexOf('/')) : ''
-  const prefix = directory ? `${directory}/optimized` : 'optimized'
-  const safeId = String(id).replace(/[^a-zA-Z0-9._-]+/g, '-')
-  return `${prefix}/${kind}-${safeId}-${Date.now()}.webp`
-}
-
-async function blobToBuffer(blob) {
-  return Buffer.from(await blob.arrayBuffer())
-}
-
-async function optimizeBuffer(buffer, target) {
-  const image = sharp(buffer, { animated: false })
-  const metadata = await image.metadata()
-  if (!metadata.width || !metadata.height || (metadata.pages && metadata.pages > 1)) {
-    return null
-  }
-
-  return sharp(buffer, { animated: false })
-    .rotate()
-    .resize({
-      width: target.maxWidth,
-      height: target.maxHeight,
-      fit: 'inside',
-      withoutEnlargement: true,
-    })
-    .webp({ quality: target.quality, effort: 4 })
-    .toBuffer()
-}
-
-async function optimizePublicImage(admin, item) {
+async function updateCandidate(admin, item) {
   stats.scanned += 1
   if (stats.candidates >= limit) return 'limit'
-
-  const target = TARGETS[item.kind]
-  const sourcePath = publicStoragePath(target.bucket, item.url)
-  if (!sourcePath || sourcePath.includes('/optimized/')) {
+  if (!item.url || item.thumbnailUrl) {
     stats.skipped += 1
     return 'skipped'
   }
 
-  const { data, error } = await admin.storage.from(target.bucket).download(sourcePath)
-  if (error || !data) {
-    throw new Error(error?.message || `Unable to download ${target.bucket}/${sourcePath}`)
-  }
-
-  const original = await blobToBuffer(data)
-  if (!force && original.byteLength < target.minBytes) {
-    stats.skipped += 1
-    return 'skipped'
-  }
-
-  const optimized = await optimizeBuffer(original, target)
-  if (!optimized) {
-    stats.skipped += 1
-    return 'skipped'
-  }
-
-  if (!force && optimized.byteLength >= original.byteLength * 0.95) {
+  const thumbnailUrl = transformedImageUrl(item.url, TARGETS[item.kind])
+  if (!thumbnailUrl) {
     stats.skipped += 1
     return 'skipped'
   }
 
   stats.candidates += 1
-  stats.originalBytes += original.byteLength
-  stats.optimizedBytes += optimized.byteLength
-
   if (!apply) {
-    console.log(`dry-run ${item.kind} ${item.id}: ${original.byteLength} -> ${optimized.byteLength}`)
-    return 'optimized'
+    console.log(`dry-run ${item.kind} ${item.table} ${item.id}`)
+    return 'updated'
   }
 
-  const optimizedPath = buildOptimizedPath(sourcePath, item.kind, item.id)
-  const { error: uploadError } = await admin.storage.from(target.bucket).upload(optimizedPath, optimized, {
-    upsert: true,
-    contentType: 'image/webp',
-    cacheControl: '31536000',
-  })
-  if (uploadError) throw uploadError
+  const { error } = await admin
+    .from(item.table)
+    .update({
+      [item.thumbnailColumn]: thumbnailUrl,
+      [item.thumbnailPathColumn]: null,
+      ...(item.processedAtColumn ? { [item.processedAtColumn]: new Date().toISOString() } : {}),
+    })
+    .eq('id', item.id)
 
-  const { data: publicUrlData } = admin.storage.from(target.bucket).getPublicUrl(optimizedPath)
-  const { error: updateError } = await item.update(publicUrlData.publicUrl, optimizedPath)
-  if (updateError) throw updateError
-  console.log(`optimized ${item.kind} ${item.id}: ${original.byteLength} -> ${optimized.byteLength}`)
-  return 'optimized'
+  if (error) throw error
+  console.log(`updated ${item.kind} ${item.table} ${item.id}`)
+  return 'updated'
 }
 
 async function loadItems(admin) {
@@ -183,51 +144,55 @@ async function loadItems(admin) {
 
   const { data: users, error: usersError } = await admin
     .from('users')
-    .select('id, avatar_url, banner_url')
+    .select('id, avatar_url, avatar_thumbnail_url, banner_url, banner_thumbnail_url')
   if (usersError) throw usersError
 
   for (const user of users || []) {
-    if (user.avatar_url) {
-      items.push({
-        kind: 'avatar',
-        id: user.id,
-        url: user.avatar_url,
-        update: publicUrl => admin.from('users').update({ avatar_url: publicUrl }).eq('id', user.id),
-      })
-    }
-    if (user.banner_url) {
-      items.push({
-        kind: 'banner',
-        id: user.id,
-        url: user.banner_url,
-        update: publicUrl => admin.from('users').update({ banner_url: publicUrl }).eq('id', user.id),
-      })
-    }
+    items.push({
+      kind: 'avatar',
+      table: 'users',
+      id: user.id,
+      url: user.avatar_url,
+      thumbnailUrl: user.avatar_thumbnail_url,
+      thumbnailColumn: 'avatar_thumbnail_url',
+      thumbnailPathColumn: 'avatar_thumbnail_path',
+    })
+    items.push({
+      kind: 'banner',
+      table: 'users',
+      id: user.id,
+      url: user.banner_url,
+      thumbnailUrl: user.banner_thumbnail_url,
+      thumbnailColumn: 'banner_thumbnail_url',
+      thumbnailPathColumn: 'banner_thumbnail_path',
+    })
   }
 
   const { data: artItems, error: artError } = await admin
     .from('art_board_items')
-    .select('id, image_url, image_path, item_type, deleted_at')
+    .select('id, image_url, thumbnail_url, item_type, deleted_at')
     .eq('item_type', 'image')
     .is('deleted_at', null)
   if (artError) throw artError
 
   for (const art of artItems || []) {
-    if (!art.image_url) continue
     items.push({
       kind: 'art',
+      table: 'art_board_items',
       id: art.id,
       url: art.image_url,
-      update: (publicUrl, optimizedPath) => admin
-        .from('art_board_items')
-        .update({ image_url: publicUrl, image_path: optimizedPath })
-        .eq('id', art.id),
+      thumbnailUrl: art.thumbnail_url,
+      thumbnailColumn: 'thumbnail_url',
+      thumbnailPathColumn: 'thumbnail_path',
+      processedAtColumn: 'media_processed_at',
     })
   }
 
+  if (!includeChatHistory) return items
+
   const { data: messages, error: messageError } = await admin
     .from('messages')
-    .select('id, file_url, message_type')
+    .select('id, file_url, thumbnail_url, message_type')
     .eq('message_type', 'image')
     .not('file_url', 'is', null)
   if (messageError) throw messageError
@@ -235,15 +200,19 @@ async function loadItems(admin) {
   for (const message of messages || []) {
     items.push({
       kind: 'chat',
+      table: 'messages',
       id: message.id,
       url: message.file_url,
-      update: publicUrl => admin.from('messages').update({ file_url: publicUrl }).eq('id', message.id),
+      thumbnailUrl: message.thumbnail_url,
+      thumbnailColumn: 'thumbnail_url',
+      thumbnailPathColumn: 'thumbnail_path',
+      processedAtColumn: 'media_processed_at',
     })
   }
 
   const { data: dmMessages, error: dmError } = await admin
     .from('dm_messages')
-    .select('id, file_url, message_type')
+    .select('id, file_url, thumbnail_url, message_type')
     .eq('message_type', 'image')
     .not('file_url', 'is', null)
   if (dmError) throw dmError
@@ -251,9 +220,13 @@ async function loadItems(admin) {
   for (const message of dmMessages || []) {
     items.push({
       kind: 'chat',
+      table: 'dm_messages',
       id: message.id,
       url: message.file_url,
-      update: publicUrl => admin.from('dm_messages').update({ file_url: publicUrl }).eq('id', message.id),
+      thumbnailUrl: message.thumbnail_url,
+      thumbnailColumn: 'thumbnail_url',
+      thumbnailPathColumn: 'thumbnail_path',
+      processedAtColumn: 'media_processed_at',
     })
   }
 
@@ -263,21 +236,23 @@ async function loadItems(admin) {
 async function main() {
   const admin = createAdminClient()
   const items = await loadItems(admin)
-  console.log(`${apply ? 'apply' : 'dry-run'} mobile media backfill scanning ${items.length} row-backed URL(s).`)
+  console.log(`${apply ? 'apply' : 'dry-run'} mobile media thumbnail backfill scanning ${items.length} row-backed URL(s).`)
+  if (!includeChatHistory) {
+    console.log('chat history skipped by default; pass --include-chat-history to backfill old group/DM messages.')
+  }
 
   for (const item of items) {
     try {
-      const result = await optimizePublicImage(admin, item)
+      const result = await updateCandidate(admin, item)
       if (result === 'limit') break
-      if (result === 'optimized') stats.optimized += 1
+      if (result === 'updated') stats.updated += 1
     } catch (error) {
       stats.failed += 1
-      console.error(`failed ${item.kind} ${item.id}: ${error instanceof Error ? error.message : String(error)}`)
+      console.error(`failed ${item.kind} ${item.table} ${item.id}: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
 
-  const saved = Math.max(0, stats.originalBytes - stats.optimizedBytes)
-  console.log(`mobile media backfill complete: ${JSON.stringify({ ...stats, savedBytes: saved })}`)
+  console.log(`mobile media thumbnail backfill complete: ${JSON.stringify(stats)}`)
   if (stats.failed > 0) process.exitCode = 1
 }
 

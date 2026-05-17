@@ -24,6 +24,26 @@ jest.mock('../src/hooks/useMessages', () => ({
   }),
 }))
 
+jest.mock('../src/hooks/MessagesContext', () => ({
+  useOptionalMessages: () => ({
+    messages: [
+      {
+        id: 'pinned-1',
+        user_id: 'u1',
+        content: 'pinned text',
+        message_type: 'text',
+        pinned: true,
+        reactions: {},
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        user: { display_name: 'Alice' },
+      },
+    ],
+    togglePin: jest.fn(),
+    toggleReaction: jest.fn(),
+  }),
+}))
+
 jest.mock('../src/components/chat/MessageList', () => ({
   MessageList: () => <div data-testid="message-list" />,
 }))
@@ -60,6 +80,7 @@ jest.mock('../src/hooks/useFailedMessages', () => ({
 
 jest.mock('../src/hooks/ClientResetContext', () => ({
   useClientReset: () => ({ status: 'ok' }),
+  useOptionalClientReset: () => ({ status: 'ok' }),
 }))
 
 jest.mock('../src/lib/appBadge', () => ({

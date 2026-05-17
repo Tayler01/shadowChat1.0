@@ -322,9 +322,9 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
             className="popup-surface relative max-h-[min(86vh,760px)] w-full max-w-lg overflow-y-auto overflow-x-hidden rounded-[var(--radius-xl)]"
           >
             <div className="relative h-36 shrink-0 overflow-hidden border-b border-[var(--border-panel)]">
-              {user.banner_url ? (
+              {user.banner_thumbnail_url || user.banner_url ? (
                 <img
-                  src={user.banner_url}
+                  src={user.banner_thumbnail_url || user.banner_url}
                   alt=""
                   loading="eager"
                   decoding="async"
@@ -348,7 +348,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
             <div className="relative px-5 pb-5 sm:px-6 sm:pb-6">
               <div className="-mt-12 flex items-end gap-4">
                 <Avatar
-                  src={user.avatar_url}
+                  src={user.avatar_thumbnail_url || user.avatar_url}
                   alt={user.display_name || user.username || 'User'}
                   size="xl"
                   color={user.color}

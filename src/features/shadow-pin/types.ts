@@ -21,6 +21,7 @@ export interface ShadowPinCategory {
   processing_status?: ShadowPinProcessingStatus | null
   processing_error?: string | null
   processed_at?: string | null
+  latest_image_created_at?: string | null
   heart_count: number
   is_starter?: boolean
   deleted_at?: string | null

@@ -7,6 +7,8 @@ performance pass across iPhone/WebKit and Android/Chromium flows.
 
 - Make chat avatars, profile media, Art Board images, and chat attachments load
   quickly on phone networks.
+- Standardize the mobile header and bottom menu so phone chrome behaves
+  consistently across Chat, DMs, Boards, Games, Settings, and Pins.
 - Keep existing realtime chat and DM behavior intact.
 - Avoid schema-dependent frontend breakage during deploy.
 - Preserve original storage objects while switching row-backed URLs to optimized
@@ -19,12 +21,16 @@ performance pass across iPhone/WebKit and Android/Chromium flows.
      paths before storage upload.
    - Skip GIF and SVG so animated or vector content is not flattened.
    - Store optimized uploads with long-lived cache headers.
+   - Use the app-wide two-asset standard for new row-backed images: preserve
+     the full stored image and store a display thumbnail URL for phone lists.
 
 2. Existing media backfill
    - Use `npm run media:backfill-mobile -- --apply` to process row-backed media
-     in `avatars`, `banners`, `art-board`, and `chat-uploads`.
-   - Update database URLs to the optimized WebP object.
-   - Keep original objects in storage for rollback/manual recovery.
+     in `users` avatar/banner rows and `art_board_items`.
+   - The current backfill stores Supabase Storage transformed thumbnail URLs
+     into the new thumbnail columns. It keeps originals in place.
+   - Group/DM chat history is skipped by default; pass
+     `--include-chat-history` only for a deliberate old-message cleanup.
    - Re-run this as backend maintenance if future imported or externally
      written media ever bypasses the app upload optimizer.
 
@@ -62,6 +68,15 @@ performance pass across iPhone/WebKit and Android/Chromium flows.
    - Pause periodic presence and weather refreshes while the PWA is hidden, then
      refresh when it becomes visible again.
 
+8. Mobile shell and game-picker polish
+   - Use the shared compact mobile header on General Chat, DMs, Boards and
+     board chats, Art Board, Games, Settings, and Pins.
+   - Move Settings to the header and put Pins in the bottom menu.
+   - Collapse header and bottom menu while the phone keyboard is open on chat
+     composer surfaces, then restore them when the keyboard closes.
+   - Serve game picker cards from lightweight picker-specific WebP derivatives
+     instead of the larger in-game banner/backdrop assets.
+
 ## Findings And Resolution
 
 | Finding | Resolution |
@@ -81,6 +96,12 @@ performance pass across iPhone/WebKit and Android/Chromium flows.
 | Every avatar and invisible-status badge subscribed through the full presence context, so any heartbeat could invalidate all consumers in chat, DMs, sidebars, and profile surfaces. | Presence now uses per-user `useSyncExternalStore` snapshots. Consumers whose user row did not change keep the same snapshot and avoid unnecessary rerenders. |
 | Long General Chat and DM threads are capped initially but still render every loaded message once older pages are fetched. | Added CSS containment for chat/DM rows and eager loading only for the newest 12 avatar rows. True windowing remains the next bigger list-rendering step if threads routinely exceed a few hundred loaded rows. |
 | Weather and presence refresh timers kept running while the app was hidden. | Presence polling and weather forecast refreshes now skip hidden tabs and refresh on visibility/focus. Manual weather refresh also uses the freshly fetched preference instead of a stale closure. |
+| Weather share images could be cropped by capturing the visible popover while it was positioned for the phone header. | Weather sharing now captures a fixed-width off-screen card, uploads it through the chat image path, stores a thumbnail URL, and lets the chat modal open the full image. |
+| New chat/DM static image uploads and weather shares had no explicit thumbnail column. | Added message and DM thumbnail metadata columns plus compatibility fallbacks while the migration rolls out. GIFs keep the existing URL-only path. |
+| Art Board needed the same forward image model as chat without forcing users to resize. | Art Board uploads/imports now store thumbnail metadata and render canvas/detail media from the thumbnail path when present. A backfill covers existing Art Board images. |
+| Shadow Pin category order was still based on hearts, not recent image activity. | Added `latest_image_created_at`, trigger maintenance, and frontend ordering so categories with the newest images sort first; empty categories fall last. |
+| Game picker cards reused larger in-game assets. | Added picker-specific WebP derivatives for Shadow Checkers and Shadow War and added explicit decode/loading dimensions. |
+| Header/menu controls were implemented differently across app surfaces. | Introduced the shared mobile header/menu pattern, moved Settings into the header, moved Pins into the bottom menu, and kept the same right-side controls across mobile surfaces. |
 
 ## Residual Mobile QA Notes
 
@@ -111,4 +132,6 @@ npx tsc --noEmit -p tsconfig.app.json
 npm run build
 npx jest --runInBand
 npm run qa:mobile-pwa -- --run-name=mobile-performance-final --no-reuse-server
+npm run media:backfill-mobile -- --apply
+npm run shadow-pin:backfill-media -- --apply
 ```

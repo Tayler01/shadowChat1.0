@@ -7,8 +7,9 @@ separate backend domain from News Feed, board chats, DMs, and General Chat.
 
 - The Boards map opens `Art Board` as a free-panning canvas with pinch zoom on
   mobile, an About button in the Boards header, and a floating Add control. The
-  Recently Added tray is intentionally hidden while the mobile canvas UX is
-  refined.
+  initial canvas view fits the loaded image pins so users start zoomed out
+  enough to understand the board. The Recently Added tray is intentionally
+  hidden while the mobile canvas UX is refined.
 - Users can add images or pastel sticky notes.
 - Image adds support local upload or URL import. URL import copies the image
   into Supabase Storage before it becomes an Art Board item.
@@ -17,6 +18,10 @@ separate backend domain from News Feed, board chats, DMs, and General Chat.
   receive viewport-sized images. URL imports accept normal Art Board bucket
   images up to 10 MB and are transformed at delivery time; users should not need
   to manually resize images before adding them.
+- Art Board image rows use the same two-asset forward standard as chat media:
+  the original stored image remains the source of truth and `thumbnail_url`
+  stores the phone-sized display URL. Existing Art Board images should be
+  backfilled with `npm run media:backfill-mobile -- --apply`.
 - Sticky notes support simple bold, italic, bullet, link, title, caption, tag,
   color, rotation, and layer adjustments.
 - Items can overlap. Creators can move, rotate, edit metadata, link, and delete
@@ -53,6 +58,9 @@ Storage:
   URLs are rejected and copied into Storage. The function rejects imports over
   the bucket's 10 MB limit, and the frontend requests backend-transformed
   delivery URLs for canvas, detail, and linked-item thumbnails.
+- `thumbnail_url`, `thumbnail_path`, `image_width`, `image_height`, and
+  `media_processed_at` live on `public.art_board_items` after the mobile media
+  derivative migration.
 
 Realtime:
 

@@ -12,8 +12,8 @@ active-user count control.
 - The popup can route users directly to Account & Profile settings when no
   location is selected.
 - In General Chat, the popup can be shared as a themed image message. The
-  capture reflects the card as the user sees it with the active theme while
-  excluding close/share controls from the image.
+  capture reflects the forecast card with the active theme while excluding
+  close/share controls from the image.
 - Location is personal to the signed-in user. It is not stored on public profile
   rows and is not visible to other users.
 
@@ -62,10 +62,11 @@ weather provider token should be added to a browser-visible `VITE_*` variable.
 
 ## Weather Sharing
 
-The General Chat weather share action captures the popup with `html-to-image`,
-creates a PNG `File`, uploads it through the existing chat media upload path,
-and sends it as an image message. The browser still performs the capture, but
-users do not need to resize, compress, or prepare anything manually.
+The General Chat weather share action captures a fixed-width off-screen copy of
+the forecast card with `html-to-image`, creates a PNG `File`, uploads it through
+the chat image media path, stores a display thumbnail URL, and sends it as an
+image message. The browser still performs the capture, but users do not need to
+resize, compress, or prepare anything manually.
 
 ## Frontend Map
 
@@ -94,3 +95,5 @@ For UI changes, run a preview build and verify:
 6. Clearing a location returns the header popup to the settings prompt.
 7. Sharing weather sends a themed PNG image message and does not include the
    popup controls inside the captured card.
+8. The shared chat thumbnail shows the full card at lower resolution, and
+   tapping it opens the full weather image without side cropping.

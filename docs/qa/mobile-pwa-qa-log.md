@@ -1,17 +1,19 @@
 # Mobile PWA QA Log
 
-Last updated: 2026-05-15
+Last updated: 2026-05-17
 
 ## Summary
 
 Mobile PWA visual QA now runs through `npm run qa:mobile-pwa`, which uses `scripts/mobile-pwa-visual-qa.mjs` against a production-style Vite preview on `127.0.0.1:4174`.
 
-Latest focused pass: `node scripts/mobile-pwa-visual-qa.mjs --run-name=mobile-picker-masonry-weather-share-final --skip-build --no-reuse-server`.
+Latest focused pass: `node scripts/mobile-pwa-visual-qa.mjs --run-name=mobile-header-media-pins-headed-20260517c --no-reuse-server --headed --slow-mo=70`.
 
 - Result: passed.
 - Profiles: Mobile Safari/WebKit iPhone small, Mobile Safari/WebKit iPhone large, Mobile Chrome Android medium, Mobile Chrome Android small.
-- Checks: 88 passed, 0 failed, 0 not-tested notes.
-- Artifacts: `output/playwright/mobile-picker-masonry-weather-share-final/`.
+- Checks: 100 passed, 0 failed, 0 not-tested notes.
+- Artifacts: `output/playwright/mobile-header-media-pins-headed-20260517c/`.
+- Foreground smoke pass: `node scripts/playwright-smoke.mjs --run-name=mobile-shell-headed-smoke-20260517g --headed --slow-mo=40 --no-reuse-server` passed `auth`, `dm`, and `mobile-dm-back`.
+- QA cleanup: the mobile harness deleted its 4 group-chat posts during the run; lingering `Mobile PWA chat`, `Group smoke`, `Smoke ping`, and `Resume dm` QA rows were removed from group chat and DM tables after verification.
 - Targeted real-device regression artifacts: `output/playwright/mobile-fixes-targeted/`.
 - Prior complete public-profile coverage artifact: `output/playwright/mobile-pwa-audit-10/` with 84 passed, 0 failed, 0 not tested.
 
@@ -33,6 +35,7 @@ Latest focused pass: `node scripts/mobile-pwa-visual-qa.mjs --run-name=mobile-pi
 | MPWA-012 | fixed | iPhone WebKit, Android Chromium | Group chat and DM image preview | Tap an uploaded image in a chat or DM thread. | `output/playwright/mobile-picker-masonry-weather-share-final/summary.json` | Image previews could inherit local layout constraints and appear off-center or under app chrome. | `src/components/ui/ImageModal.tsx`; `src/components/chat/MessageItem.tsx`; `src/components/dms/DirectMessagesView.tsx` | browser 390x844 check; mobile PWA harness | Chat and DM image previews now share a body-level fixed modal that centers the image inside the safe-area viewport. Shadow Pin and Art Board previews stay on their own surfaces. |
 | MPWA-013 | implemented | iPhone WebKit, Android Chromium | General Chat weather popup | Open weather, tap Share, and send the card into chat. | `output/playwright/mobile-picker-masonry-weather-share-final/summary.json` | Weather could be discussed only as text; there was no themed image capture of the exact card the user sees. | `src/components/chat/WeatherWidget.tsx`; `src/components/chat/ChatView.tsx`; `package.json`; `package-lock.json`; `tests/WeatherWidget.test.tsx`; `docs/WEATHER_WIDGET.md` | `npx jest --runInBand tests/WeatherWidget.test.tsx`; full verification bundle | Weather share captures the themed popup with `html-to-image`, excludes controls, uploads through the existing chat media path, and sends it as an image message. |
 | MPWA-014 | fixed | iPhone WebKit, Android Chromium | Pinned message preview | Pin a message with multiline/rich content and compare it with the original bubble. | `output/playwright/mobile-picker-masonry-weather-share-final/summary.json` | Pinned previews rendered raw text, so whitespace and rich message formatting did not match the original message layout. | `src/components/chat/PinnedMessageItem.tsx`; `tests/PinnedMessageItem.test.tsx` | `npx jest --runInBand tests/PinnedMessageItem.test.tsx`; full Jest | Pinned previews now use the same rich text renderer as chat bubbles, preserving spacing and link rendering. |
+| MPWA-015 | verified | iPhone WebKit, Android Chromium | standardized header/menu, DMs, Boards, Games, Settings, Pins, keyboard-compressed chat surfaces | Run the headed mobile PWA harness after the standardized mobile shell and media-derivative work. | `output/playwright/mobile-header-media-pins-headed-20260517c/summary.json` | Header/menu controls moved to a shared mobile shell, Settings moved to the header, Pins moved into bottom nav, and keyboard focus intentionally hides chat chrome. The harness had to be updated to expect hidden keyboard chrome, display-name-only DM headers, and immediate QA post cleanup. | `src/components/layout/MobileAppHeader.tsx`; `src/components/layout/MobileNav.tsx`; `src/components/layout/MobileChatFooter.tsx`; `src/components/dms/DirectMessagesView.tsx`; `src/components/boards/BoardsView.tsx`; `src/features/shadow-pin/ShadowPin.tsx`; `src/components/settings/SettingsView.tsx`; `src/features/games/GamesHome.tsx`; `scripts/mobile-pwa-visual-qa.mjs`; `scripts/playwright-smoke.mjs`; docs | headed mobile PWA harness; headed smoke; lint; typecheck; build; Jest | 100/100 headed mobile checks passed. Smoke passed auth, DM realtime, and mobile DM back navigation. |
 
 ## Final Summary
 

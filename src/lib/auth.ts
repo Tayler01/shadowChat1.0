@@ -2,6 +2,7 @@ import { supabase } from './supabase'
 import type { User as SupabaseAuthUser } from '@supabase/supabase-js'
 import type { User as AppUser } from './supabase'
 import { optimizeImageFile } from './imageOptimization'
+import { createStoredImageAsset } from './mediaAssets'
 
 const AVATAR_BUCKET = 'avatars'
 const BANNER_BUCKET = 'banners'
@@ -223,7 +224,11 @@ export const updateUserProfile = async (updates: Partial<{
   status: 'online' | 'away' | 'busy' | 'offline';
   presence_visibility: 'tracked' | 'invisible';
   avatar_url: string;
+  avatar_thumbnail_url: string | null;
+  avatar_thumbnail_path: string | null;
   banner_url: string;
+  banner_thumbnail_url: string | null;
+  banner_thumbnail_path: string | null;
 }>): Promise<AppUser> => {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) throw new Error('Not authenticated')
@@ -259,8 +264,13 @@ export const uploadUserAvatar = async (file: File) => {
   if (error) throw error
 
   const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(filePath)
-  await updateUserProfile({ avatar_url: data.publicUrl })
-  return data.publicUrl
+  const asset = createStoredImageAsset(filePath, data.publicUrl, 'avatar')
+  await updateUserProfile({
+    avatar_url: asset.publicUrl,
+    avatar_thumbnail_url: asset.thumbnailUrl,
+    avatar_thumbnail_path: asset.thumbnailPath,
+  })
+  return asset.publicUrl
 }
 
 export const uploadUserBanner = async (file: File) => {
@@ -282,6 +292,11 @@ export const uploadUserBanner = async (file: File) => {
   if (error) throw error
 
   const { data } = supabase.storage.from(BANNER_BUCKET).getPublicUrl(filePath)
-  await updateUserProfile({ banner_url: data.publicUrl })
-  return data.publicUrl
+  const asset = createStoredImageAsset(filePath, data.publicUrl, 'banner')
+  await updateUserProfile({
+    banner_url: asset.publicUrl,
+    banner_thumbnail_url: asset.thumbnailUrl,
+    banner_thumbnail_path: asset.thumbnailPath,
+  })
+  return asset.publicUrl
 }

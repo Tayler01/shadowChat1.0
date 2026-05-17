@@ -1,7 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, {
-  createContext,
-  useContext,
   useEffect,
   useState,
   useCallback,
@@ -22,15 +20,24 @@ import {
   createClientMessageId,
   findMatchingMessageIndex,
   isClientMessageIdSchemaError,
+  isMediaThumbnailSchemaError,
   markMessageSendFailed,
   mergeRealtimeMessageUpdate,
   upsertMessageIntoState,
 } from '../lib/optimisticMessages';
 import { MESSAGE_FETCH_LIMIT } from '../config';
 import type { RealtimeChannel } from '@supabase/supabase-js';
+import {
+  MessagesContext,
+  type MessagesContextValue,
+  useMessages,
+  useOptionalMessages,
+} from './MessagesContext';
 import { useAuth } from './useAuth';
 import { useRealtimeRecovery } from './useRealtimeRecovery';
 import { useSoundEffects } from './useSoundEffects';
+
+export { useMessages, useOptionalMessages };
 
 const SEND_OPERATION_TIMEOUT_MS = 12000;
 
@@ -73,13 +80,15 @@ export const prepareMessageData = (
   messageType: ChatMessageType,
   fileUrl?: string,
   replyTo?: string,
-  clientMessageId?: string
+  clientMessageId?: string,
+  thumbnailUrl?: string | null
 ) => ({
   user_id: userId,
   ...(clientMessageId ? { client_message_id: clientMessageId } : {}),
   content: messageType === 'audio' ? '' : content.trim(),
   message_type: messageType,
   file_url: fileUrl,
+  ...(thumbnailUrl ? { thumbnail_url: thumbnailUrl, media_processed_at: new Date().toISOString() } : {}),
   ...(replyTo ? { reply_to: replyTo } : {}),
   ...(messageType === 'audio' ? { audio_url: content.trim() } : {}),
 });
@@ -90,6 +99,8 @@ export const insertMessage = async (messageData: {
   message_type: ChatMessageType;
   client_message_id?: string;
   file_url?: string;
+  thumbnail_url?: string;
+  media_processed_at?: string;
   audio_url?: string;
   reply_to?: string;
 }) => {
@@ -112,8 +123,31 @@ export const insertMessage = async (messageData: {
 
   let result = (await Promise.race([insertPromise, timeout])) as any;
 
+  if (result.error && isMediaThumbnailSchemaError(result.error)) {
+    const {
+      thumbnail_url: _thumbnailUrl,
+      media_processed_at: _mediaProcessedAt,
+      ...legacyMediaMessageData
+    } = messageData;
+    const legacyMediaInsertPromise = workingClient
+      .from('messages')
+      .insert(legacyMediaMessageData)
+      .select(`
+        *,
+        user:users!user_id(*)
+      `)
+      .single();
+
+    result = (await Promise.race([legacyMediaInsertPromise, timeout])) as any;
+  }
+
   if (result.error && messageData.client_message_id && isClientMessageIdSchemaError(result.error)) {
-    const { client_message_id: _clientMessageId, ...legacyMessageData } = messageData;
+    const {
+      client_message_id: _clientMessageId,
+      thumbnail_url: _thumbnailUrl,
+      media_processed_at: _mediaProcessedAt,
+      ...legacyMessageData
+    } = messageData;
     const legacyInsertPromise = workingClient
       .from('messages')
       .insert(legacyMessageData)
@@ -151,6 +185,8 @@ export const refreshSessionAndRetry = async (messageData: {
   message_type: ChatMessageType;
   client_message_id?: string;
   file_url?: string;
+  thumbnail_url?: string;
+  media_processed_at?: string;
   audio_url?: string;
   reply_to?: string;
 }) => {
@@ -176,27 +212,6 @@ export const refreshSessionAndRetry = async (messageData: {
     error: any;
   };
 };
-
-interface MessagesContextValue {
-  messages: Message[];
-  loading: boolean;
-  sending: boolean;
-  loadingMore: boolean;
-  hasMore: boolean;
-  sendMessage: (
-    content: string,
-    type?: ChatMessageType,
-    fileUrl?: string,
-    replyTo?: string
-  ) => Promise<Message | null>;
-  editMessage: (id: string, content: string) => Promise<void>;
-  deleteMessage: (id: string) => Promise<void>;
-  toggleReaction: (id: string, emoji: string) => Promise<void>;
-  togglePin: (id: string) => Promise<void>;
-  loadOlderMessages: () => Promise<void>;
-}
-
-const MessagesContext = createContext<MessagesContextValue | undefined>(undefined);
 
 function useProvideMessages(): MessagesContextValue {
   const initialMessages = (() => {
@@ -689,7 +704,8 @@ function useProvideMessages(): MessagesContextValue {
     content: string,
     messageType: ChatMessageType = 'text',
     fileUrl?: string,
-    replyTo?: string
+    replyTo?: string,
+    thumbnailUrl?: string | null
   ): Promise<Message | null> => {
     // Text messages require content, but image/audio messages may provide just a file URL
     if (!user || (!content.trim() && !fileUrl)) {
@@ -711,7 +727,8 @@ function useProvideMessages(): MessagesContextValue {
       messageType,
       fileUrl,
       replyTo,
-      clientMessageId
+      clientMessageId,
+      thumbnailUrl
     );
 
     setMessages(prev => {
@@ -744,7 +761,8 @@ function useProvideMessages(): MessagesContextValue {
         messageType,
         fileUrl,
         replyTo,
-        clientMessageId
+        clientMessageId,
+        thumbnailUrl
       );
 
       const attemptSend = async () => {
@@ -1002,12 +1020,4 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
   return (
     <MessagesContext.Provider value={value}>{children}</MessagesContext.Provider>
   );
-}
-
-export function useMessages() {
-  const context = useContext(MessagesContext);
-  if (!context) {
-    throw new Error('useMessages must be used within a MessagesProvider');
-  }
-  return context;
 }

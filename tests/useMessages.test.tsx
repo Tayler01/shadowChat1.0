@@ -128,6 +128,18 @@ describe('helper functions', () => {
     });
   });
 
+  it('prepareMessageData includes thumbnail metadata when provided', () => {
+    const result = prepareMessageData('u1', '', 'image', 'https://example.com/full.png', undefined, undefined, 'https://example.com/thumb.png');
+    expect(result).toMatchObject({
+      user_id: 'u1',
+      content: '',
+      message_type: 'image',
+      file_url: 'https://example.com/full.png',
+      thumbnail_url: 'https://example.com/thumb.png',
+    });
+    expect(result.media_processed_at).toEqual(expect.any(String));
+  });
+
   it('prepareMessageData stores video metadata and file url', () => {
     const result = prepareMessageData(
       'u1',

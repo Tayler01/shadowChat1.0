@@ -38,11 +38,13 @@ jest.mock('../src/lib/gifs', () => ({
 jest.mock('../src/lib/supabase', () => ({
   uploadVoiceMessage: jest.fn().mockResolvedValue('url'),
   uploadChatFile: jest.fn(),
+  uploadChatImageAsset: jest.fn(),
   DEBUG: false,
 }))
 
-const { uploadChatFile } = jest.requireMock('../src/lib/supabase') as {
+const { uploadChatFile, uploadChatImageAsset } = jest.requireMock('../src/lib/supabase') as {
   uploadChatFile: jest.Mock
+  uploadChatImageAsset: jest.Mock
 }
 
 const { searchKlipyGifs } = jest.requireMock('../src/lib/gifs') as {
@@ -173,7 +175,12 @@ test('clears immediately and blocks repeated send taps while pending', async () 
 })
 
 test('shows an error and keeps reply state when uploaded image send resolves to null', async () => {
-  uploadChatFile.mockResolvedValueOnce('https://example.com/file.png')
+  uploadChatImageAsset.mockResolvedValueOnce({
+    publicUrl: 'https://example.com/file.png',
+    thumbnailUrl: 'https://example.com/file-thumb.png',
+    path: 'file.png',
+    thumbnailPath: null,
+  })
   const onSendMessage = jest.fn().mockResolvedValue(null)
   const onCancelReply = jest.fn()
 
@@ -191,7 +198,13 @@ test('shows an error and keeps reply state when uploaded image send resolves to 
   fireEvent.change(imageInput, { target: { files: [file] } })
 
   await waitFor(() => {
-    expect(onSendMessage).toHaveBeenCalledWith('', 'image', 'https://example.com/file.png', 'parent')
+    expect(onSendMessage).toHaveBeenCalledWith(
+      '',
+      'image',
+      'https://example.com/file.png',
+      'parent',
+      'https://example.com/file-thumb.png'
+    )
   })
   expect(onCancelReply).not.toHaveBeenCalled()
   expect((toast as any).error).toHaveBeenCalledWith('Failed to send image')
@@ -239,6 +252,7 @@ test('auto-detects videos from the generic file picker', async () => {
       JSON.stringify({ name: 'movie.webm', size: file.size, type: 'video/webm' }),
       'video',
       'https://example.com/movie.webm',
+      undefined,
       undefined
     )
   })

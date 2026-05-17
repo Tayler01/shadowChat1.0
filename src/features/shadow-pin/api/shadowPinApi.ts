@@ -80,7 +80,7 @@ export async function fetchShadowPinCategories() {
     .from('shadow_pin_categories')
     .select(CATEGORY_SELECT)
     .is('deleted_at', null)
-    .order('heart_count', { ascending: false })
+    .order('latest_image_created_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false })
 
   if (error) throw error

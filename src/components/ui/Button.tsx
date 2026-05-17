@@ -60,10 +60,12 @@ export function Button({
   disabled,
   ...props
 }: ButtonProps) {
+  const hasExplicitPosition = /(^|\s)!?(absolute|fixed|sticky|static)(\s|$)/.test(className);
+
   return (
     <button
       className={`
-        group relative inline-flex items-center justify-center overflow-hidden
+        group ${hasExplicitPosition ? '' : 'relative'} inline-flex items-center justify-center overflow-hidden
         font-medium rounded-[var(--radius-sm)]
         transition-[background-color,border-color,box-shadow,color,opacity,transform] duration-[var(--dur-med)] ease-[var(--ease-premium)]
         disabled:opacity-50 disabled:cursor-not-allowed

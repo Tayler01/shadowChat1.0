@@ -1,19 +1,14 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { useMessages } from '../../hooks/useMessages'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
-import { PinnedMessagesButton } from './PinnedMessagesButton'
 import { useFailedMessages } from '../../hooks/useFailedMessages'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
-import { useClientReset } from '../../hooks/ClientResetContext'
-import { ActiveUsersButton } from './ActiveUsersButton'
-import { WeatherWidget } from './WeatherWidget'
+import { MobileAppHeader } from '../layout/MobileAppHeader'
 import { clearGroupNotifications } from '../../lib/appBadge'
-import { uploadChatFile } from '../../lib/supabase'
 import { getBlockedActionMessage, getCurrentUserChannelBan, formatChannelBanBlockMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
-import toast from 'react-hot-toast'
 import {
   SESSION_RECOVERY_EVENT,
   type SessionRecoveryResult,
@@ -28,9 +23,7 @@ interface ChatViewProps {
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, initialMessageId }) => {
-  const { messages, sendMessage, sending, togglePin, toggleReaction } = useMessages()
-  const pinnedMessages = useMemo(() => messages.filter(m => m.pinned), [messages])
-  const { status: resetStatus } = useClientReset()
+  const { messages, sendMessage, sending } = useMessages()
   const { failedMessages, addFailedMessage, removeFailedMessage } = useFailedMessages('general')
 
   const [uploading, setUploading] = useState(false)
@@ -60,10 +53,11 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
     content: string,
     type?: ChatMessageType,
     fileUrl?: string,
-    replyToId?: string
+    replyToId?: string,
+    thumbnailUrl?: string | null
   ) => {
     try {
-      const msg = await sendMessage(content, type, fileUrl, replyToId)
+      const msg = await sendMessage(content, type, fileUrl, replyToId, thumbnailUrl)
       setReplyTo(null)
       return msg
     } catch (error) {
@@ -82,73 +76,20 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
     }
   }
 
-  const handleShareWeather = async (file: File) => {
-    setUploading(true)
-    try {
-      const url = await uploadChatFile(file)
-      const sent = await handleSendMessage('Weather share', 'image', url)
-      if (sent !== null) {
-        toast.success('Weather shared')
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to share weather'
-      toast.error(message)
-    } finally {
-      setUploading(false)
-    }
-  }
-
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="theme-app-surface flex h-full min-h-0 flex-col text-sm"
     >
-      {/* Header */}
-      <div className="glass-panel-strong relative z-30 flex-shrink-0 border-b border-[var(--border-panel)] px-4 py-1.5 md:px-6">
-        <div className="mx-auto flex min-h-9 w-full max-w-6xl items-center justify-between gap-2.5">
-          <div className="flex min-w-0 items-center">
-            {/* Menu button removed on mobile */}
-            {/* Header title */}
-            <div className="relative -ml-3 flex min-w-0 items-center gap-4 md:ml-0 md:gap-4">
-              <span className="relative h-8 w-20 flex-shrink-0 overflow-visible sm:h-10 sm:w-24 md:hidden">
-                <img
-                  src="/icons/header-logo.png"
-                  alt="SHADO"
-                  className="theme-logo absolute left-0 top-1/2 h-12 w-28 origin-left -translate-y-1/2 scale-[1.3] object-contain object-left sm:h-14 sm:w-32"
-                />
-              </span>
-              <div className="min-w-0">
-                <h1 className="sr-only">General Chat</h1>
-                <p className="truncate text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)] sm:tracking-[0.18em] md:text-xs">
-                  Lounge Channel
-                </p>
-              </div>
-              <div className="hidden items-center gap-2 lg:flex">
-                <span className="rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                  Live feed
-                </span>
-                <span className="theme-accent-chip rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.14em]">
-                  {messages.length} messages loaded
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-shrink-0 items-center gap-1 sm:gap-2">
-            <WeatherWidget
-              onOpenSettings={() => onViewChange('settings')}
-              onShareWeather={handleShareWeather}
-            />
-            <ActiveUsersButton resetStatus={resetStatus} />
-            <PinnedMessagesButton
-              messages={pinnedMessages}
-              onUnpin={togglePin}
-              onToggleReaction={toggleReaction}
-            />
-          </div>
-        </div>
-      </div>
+      <MobileAppHeader
+        currentView={currentView}
+        onViewChange={onViewChange}
+        title="Lounge Channel"
+        srTitle="General Chat"
+        logo
+        collapseOnKeyboard
+      />
 
       {/* Messages */}
       <MessageList

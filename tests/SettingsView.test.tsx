@@ -42,6 +42,10 @@ jest.mock('../src/hooks/useIsDesktop', () => ({
   useIsDesktop: () => true,
 }))
 
+jest.mock('../src/components/chat/WeatherWidget', () => ({
+  WeatherWidget: () => <div data-testid="weather-widget" />,
+}))
+
 jest.mock('../src/hooks/useSoundEffects', () => ({
   useSoundEffects: () => ({ enabled: true, setEnabled: jest.fn() }),
 }))

@@ -46,6 +46,12 @@ const GamesHome = lazy(() =>
   }))
 )
 
+const ShadowPin = lazy(() =>
+  import('./features/shadow-pin/ShadowPin').then(module => ({
+    default: module.ShadowPin,
+  }))
+)
+
 type LocationState = {
   view: View
   conversation: string | null
@@ -53,7 +59,7 @@ type LocationState = {
 }
 
 const isView = (value: string | null): value is View => (
-  value === 'chat' || value === 'dms' || value === 'boards' || value === 'games' || value === 'settings'
+  value === 'chat' || value === 'dms' || value === 'boards' || value === 'games' || value === 'pins' || value === 'settings'
 )
 
 const normalizeViewParam = (value: string | null): View | null => {
@@ -155,6 +161,7 @@ function App() {
       root.style.setProperty('--shadowchat-mobile-scroll-keyboard-inset', `${viewportState.scrollKeyboardInset}px`)
       root.style.setProperty('--shadowchat-toast-top', `calc(${viewportOffsetTop}px + env(safe-area-inset-top) + ${viewportState.toastTopRem}rem)`)
       root.style.setProperty('--shadowchat-toast-top-space', `${viewportState.toastTopSpacePx}px`)
+      root.dataset.shadowchatKeyboard = viewportState.keyboardOpen ? 'open' : 'closed'
     }
 
     const scheduleMobileViewportUpdate = () => {
@@ -205,6 +212,7 @@ function App() {
       root.style.removeProperty('--shadowchat-mobile-scroll-keyboard-inset')
       root.style.removeProperty('--shadowchat-toast-top')
       root.style.removeProperty('--shadowchat-toast-top-space')
+      delete root.dataset.shadowchatKeyboard
     }
   }, [isDesktop])
 
@@ -359,9 +367,28 @@ function App() {
           />
         )
       case 'games':
-        return <GamesHome onImmersiveChange={setGameImmersive} />
+        return (
+          <GamesHome
+            currentView={currentView}
+            onViewChange={handleViewChange}
+            onImmersiveChange={setGameImmersive}
+          />
+        )
+      case 'pins':
+        return (
+          <ShadowPin
+            currentView={currentView}
+            onViewChange={handleViewChange}
+          />
+        )
       case 'settings':
-        return <SettingsView onToggleSidebar={toggleSidebar} />
+        return (
+          <SettingsView
+            currentView={currentView}
+            onViewChange={handleViewChange}
+            onToggleSidebar={toggleSidebar}
+          />
+        )
       default:
         return (
           <ChatView

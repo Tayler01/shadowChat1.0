@@ -126,7 +126,7 @@ export const UserSearchSelect: React.FC<UserSearchSelectProps> = ({
                 className="flex w-full items-center gap-3 border-b border-[rgba(255,255,255,0.04)] px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-[rgba(255,255,255,0.05)] disabled:cursor-wait disabled:opacity-70"
               >
                 <Avatar
-                  src={u.avatar_url}
+                  src={u.avatar_thumbnail_url || u.avatar_url}
                   alt={u.display_name}
                   size="sm"
                   color={u.color}

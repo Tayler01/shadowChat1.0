@@ -91,7 +91,7 @@ test('prompts for settings when no weather location is selected', () => {
 
   render(<WeatherWidget onOpenSettings={openSettings} />)
 
-  fireEvent.click(screen.getByRole('button', { name: /weather settings/i }))
+  fireEvent.click(screen.getByRole('button', { name: /set weather location/i }))
   fireEvent.click(screen.getByRole('button', { name: /open weather settings/i }))
 
   expect(openSettings).toHaveBeenCalledTimes(1)

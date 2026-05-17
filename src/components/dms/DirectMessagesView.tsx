@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   MessageSquare,
   Plus,
-  ArrowLeft,
   ArrowDown,
   X,
   Check,
@@ -20,6 +19,7 @@ import { Input } from '../ui/Input'
 import { MessageInput } from '../chat/MessageInput'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import { MobileNav } from '../layout/MobileNav'
+import { MobileAppHeader } from '../layout/MobileAppHeader'
 import { FailedMessageItem } from '../chat/FailedMessageItem'
 import { FileAttachment } from '../chat/FileAttachment'
 import { VideoAttachment } from '../chat/VideoAttachment'
@@ -37,7 +37,6 @@ import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { useTyping } from '../../hooks/useTyping'
 import { useReadCursor } from '../../hooks/useReadCursor'
 import { useUnreadScroll } from '../../hooks/useUnreadScroll'
-import { getPresenceStateLabel, usePresenceForUser } from '../../hooks/usePresence'
 import { useAllUsers } from '../../hooks/useAllUsers'
 import toast from 'react-hot-toast'
 import type { BasicUser, ChatMessageType, DMMessage, User } from '../../lib/supabase'
@@ -93,7 +92,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
   const isOwn = message.sender_id === currentUserId
   const isIncoming = !isOwn
   const isImageMessage = message.message_type === 'image' && Boolean(message.file_url)
-  const imageMessageSrc = getSupabaseImageTransformUrl(message.file_url, {
+  const imageMessageSrc = message.thumbnail_url || getSupabaseImageTransformUrl(message.file_url, {
     width: 960,
     height: 960,
     resize: 'contain',
@@ -203,7 +202,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
               aria-haspopup="dialog"
             >
               <Avatar
-                src={message.sender?.avatar_url}
+                src={message.sender?.avatar_thumbnail_url || message.sender?.avatar_url}
                 alt={message.sender?.display_name || 'Unknown User'}
                 size="sm"
                 color={message.sender?.color}
@@ -333,6 +332,8 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
 })
 
 function NewDirectMessagePicker({
+  currentView,
+  onViewChange,
   users,
   loading,
   query,
@@ -341,6 +342,8 @@ function NewDirectMessagePicker({
   onSelect,
   onCancel,
 }: {
+  currentView: AppView
+  onViewChange: (view: AppView) => void
   users: BasicUser[]
   loading: boolean
   query: string
@@ -359,31 +362,15 @@ function NewDirectMessagePicker({
 
   return (
     <div className="theme-image-surface flex h-full min-h-0 flex-col">
-      <div className="border-b border-[var(--border-panel)] px-4 pb-4 pt-[calc(env(safe-area-inset-top)_+_1rem)] sm:px-5">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[10px] uppercase tracking-[0.18em] text-[var(--text-muted)]">
-              Direct Messages
-            </p>
-            <h2 className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">
-              New Message
-            </h2>
-            <p className="mt-1 max-w-sm text-sm text-[var(--text-muted)]">
-              Pick someone you do not already have a thread with.
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-11 w-11 shrink-0 rounded-2xl p-0"
-            onClick={onCancel}
-            aria-label="Close new conversation"
-          >
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
-
+      <MobileAppHeader
+        currentView={currentView}
+        onViewChange={onViewChange}
+        title="New Message"
+        eyebrow="Direct Messages"
+        onBack={onCancel}
+        backLabel="Back to direct messages"
+      />
+      <div className="border-b border-[var(--border-panel)] px-4 py-4 sm:px-5">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
           <Input
@@ -431,7 +418,7 @@ function NewDirectMessagePicker({
                   className="glass-panel flex w-full items-center gap-3 rounded-[var(--radius-lg)] px-3.5 py-3 text-left transition-[border-color,background-color,transform] duration-[var(--dur-fast)] hover:border-[var(--border-glow)] hover:bg-[var(--theme-surface-hover)] disabled:cursor-wait disabled:opacity-70"
                 >
                   <Avatar
-                    src={user.avatar_url}
+                    src={user.avatar_thumbnail_url || user.avatar_url}
                     alt={user.display_name}
                     size="md"
                     color={user.color}
@@ -561,10 +548,12 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const handleSendMessage = useCallback(async (
     content: string,
     type?: ChatMessageType,
-    fileUrl?: string
+    fileUrl?: string,
+    replyToId?: string,
+    thumbnailUrl?: string | null
   ) => {
     try {
-      await sendMessage(content, type, fileUrl)
+      await sendMessage(content, type, fileUrl, thumbnailUrl)
     } catch (error) {
       console.error(error)
       toast.error('Failed to send message')
@@ -748,10 +737,6 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   }, [initialMessageId, markLatestRead, messages, setAutoScroll, setFirstUnreadMessageId])
 
   const currentConv = conversations.find(c => c.id === currentConversation)
-  const currentPeerPresence = usePresenceForUser(currentConv?.other_user?.id)
-  const currentPeerPresenceState =
-    currentPeerPresence?.presence_state ||
-    (currentConv?.other_user?.presence_visibility === 'invisible' ? 'invisible' : 'offline')
   const eagerDMAvatarMessageIds = useMemo(() => (
     new Set(messages.slice(-12).map(message => message.id))
   ), [messages])
@@ -783,6 +768,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
       >
         {showNewConversation ? (
           <NewDirectMessagePicker
+            currentView={currentView}
+            onViewChange={onViewChange}
             users={availableDmUsers}
             loading={allUsersLoading}
             query={searchUsername}
@@ -796,56 +783,24 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
           />
         ) : (
           <>
-            <div className="border-b border-[var(--border-panel)] p-4">
-              <div className="mb-4 flex items-center justify-between gap-2 overflow-visible">
-                <div className="flex min-w-0 flex-1 items-center">
-                  {!isDesktop && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onViewChange('chat')}
-                      className="mr-2"
-                      aria-label="Back"
-                    >
-                      <ArrowLeft className="w-4 h-4" />
-                    </Button>
-                  )}
-                  <div className="relative flex min-h-10 min-w-0 items-center gap-3">
-                    <img
-                      src="/icons/header-logo.png"
-                      alt="SHADO"
-                      className="theme-logo absolute -left-10 top-1/2 h-[5.25rem] w-36 -translate-y-1/2 object-contain object-left min-[380px]:-left-12 min-[380px]:h-[5.75rem] min-[380px]:w-44 sm:-left-14 sm:w-48 md:hidden"
-                    />
-                    <div className="min-w-0 pl-24 min-[380px]:pl-28 sm:pl-32 md:pl-0">
-                      <h2 className="truncate text-base font-semibold text-[var(--text-primary)] md:text-lg">
-                        Direct Messages
-                      </h2>
-                      {!isDesktop && (
-                        <p className="truncate text-[11px] text-[var(--text-muted)]">
-                          Open a thread or jump back in.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                <Button
-                  size="sm"
-                  onClick={() => setShowNewConversation(true)}
-                  className="shrink-0 gap-2 p-2 sm:px-3"
-                  aria-label="Start new conversation"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span className="hidden sm:inline">New</span>
-                </Button>
-              </div>
+            <MobileAppHeader
+              currentView={currentView}
+              onViewChange={onViewChange}
+              title="Direct Messages"
+              logo
+              onBack={!isDesktop ? () => onViewChange('chat') : undefined}
+              backLabel="Back to chat"
+            />
+            <Button
+              size="sm"
+              onClick={() => setShowNewConversation(true)}
+              className="theme-floating-action absolute right-3 top-[calc(env(safe-area-inset-top)_+_3.85rem)] z-40 h-11 w-11 rounded-full p-0 md:right-4"
+              aria-label="Start new conversation"
+            >
+              <Plus className="h-5 w-5" />
+            </Button>
 
-              <div className="mb-3 flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                <span>{conversations.length} thread{conversations.length === 1 ? '' : 's'}</span>
-                <span>{conversations.reduce((sum, conversation) => sum + (conversation.unread_count || 0), 0)} unread</span>
-              </div>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)_+_5rem)] md:pb-0">
+            <div className="min-h-0 flex-1 overflow-y-auto pt-14 pb-[calc(env(safe-area-inset-bottom)_+_5rem)] md:pb-0 md:pt-0">
               {conversations.length === 0 ? (
                 <div className="p-6 text-center text-[var(--text-muted)]">
                   <MessageSquare className="mx-auto mb-2 h-8 w-8 opacity-50" />
@@ -873,7 +828,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                     >
                       <div className="flex items-start gap-3">
                         <Avatar
-                          src={conversation.other_user?.avatar_url}
+                          src={conversation.other_user?.avatar_thumbnail_url || conversation.other_user?.avatar_url}
                           alt={conversation.other_user?.display_name || 'Unknown User'}
                           size="md"
                           color={conversation.other_user?.color}
@@ -931,52 +886,25 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
         )}
       </motion.div>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div className={`min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${currentConversation ? 'flex' : 'hidden lg:flex'}`}>
         {currentConversation && currentConv ? (
           <>
-            <div className="glass-panel-strong w-full max-w-full flex-shrink-0 border-b border-[var(--border-panel)] px-4 py-4 sm:px-6">
-              <div className="mx-auto flex min-w-0 max-w-full items-center gap-3 sm:w-full sm:max-w-4xl">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setCurrentConversation(null)}
-                  className="h-10 w-10 rounded-xl p-0 lg:hidden"
-                  aria-label="Back"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                </Button>
-
-                <Avatar
-                  src={currentConv.other_user?.avatar_url}
-                  alt={currentConv.other_user?.display_name || 'Unknown User'}
-                  size="md"
-                  color={currentConv.other_user?.color}
-                  userId={currentConv.other_user?.id}
-                  presenceVisibility={currentConv.other_user?.presence_visibility}
-                  showStatus
-                  loading="eager"
-                  fetchPriority="high"
-                />
-
-                <div className="min-w-0 flex-1">
-                  <h2 className="inline-flex max-w-full items-center gap-1.5 font-semibold text-[var(--text-primary)]">
-                    <span className="truncate">{currentConv.other_user?.display_name}</span>
-                    <UserRoleBadge role={currentConv.other_user?.admin_role} />
-                    <CheckersCrownBadge active={currentConv.other_user?.checkers_crown} />
-                    <ShadowWarSwordBadge active={currentConv.other_user?.war_sword} />
-                    <UserPresenceBadge userId={currentConv.other_user?.id} presenceVisibility={currentConv.other_user?.presence_visibility} />
-                  </h2>
-                  <p className="truncate text-xs sm:text-sm text-[var(--text-muted)]">
-                    @{currentConv.other_user?.username} {'\u2022'} {getPresenceStateLabel(currentPeerPresenceState)}
-                  </p>
-                </div>
-                <img
-                  src="/icons/header-logo.png"
-                  alt="SHADO"
-                  className="theme-logo ml-auto h-12 w-28 shrink-0 object-contain object-right min-[380px]:h-14 min-[380px]:w-32 md:hidden"
-                />
-              </div>
-            </div>
+            <MobileAppHeader
+              currentView={currentView}
+              onViewChange={onViewChange}
+              title={currentConv.other_user?.display_name || 'Direct Message'}
+              avatar={{
+                src: currentConv.other_user?.avatar_thumbnail_url || currentConv.other_user?.avatar_url,
+                alt: currentConv.other_user?.display_name || 'Unknown User',
+                color: currentConv.other_user?.color,
+                userId: currentConv.other_user?.id,
+                presenceVisibility: currentConv.other_user?.presence_visibility,
+              }}
+              onBack={() => setCurrentConversation(null)}
+              backLabel="Back to direct messages"
+              collapseOnKeyboard
+              maxWidthClassName="max-w-4xl"
+            />
 
             <div
               ref={messagesRef}

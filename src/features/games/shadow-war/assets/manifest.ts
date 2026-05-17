@@ -5,6 +5,7 @@ function svgDataUrl(svg: string) {
 export const SHADOW_WAR_ASSETS = {
   assetSheet: '/games/shadow-war/shadow-war-asset-sheet.png',
   battlefield: '/games/shadow-war/battlefield-table.webp',
+  pickerBattlefield: '/games/shadow-war/battlefield-picker.webp',
   cardBack: '/games/shadow-war/card-back.webp',
   banner: '/games/shadow-war/shadow-war-banner.webp',
   logo: '/games/shadow-war/shadow-war-logo.webp',

@@ -444,8 +444,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
       <div className="glass-panel-strong overflow-hidden rounded-[var(--radius-xl)]">
         {/* Banner */}
         <div className="h-32 relative">
-          {profile.banner_url ? (
-            <img src={profile.banner_url} alt="Banner" loading="eager" decoding="async" className="w-full h-full object-cover" />
+          {profile.banner_thumbnail_url || profile.banner_url ? (
+            <img src={profile.banner_thumbnail_url || profile.banner_url} alt="Banner" loading="eager" decoding="async" className="w-full h-full object-cover" />
           ) : (
             <div className="h-full w-full bg-[radial-gradient(circle_at_top_left,rgba(255,240,184,0.18),transparent_26%),linear-gradient(135deg,#17191c,#0f1112_58%,#34250c)]" />
           )}
@@ -470,7 +470,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
           <div className="-mt-16 mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div className="relative inline-flex h-20 w-20 items-center justify-center">
               <Avatar
-                src={profile.avatar_url}
+                src={profile.avatar_thumbnail_url || profile.avatar_url}
                 alt={profile.display_name}
                 size="xl"
                 color={profile.color}
