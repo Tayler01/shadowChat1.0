@@ -27,14 +27,14 @@ test('mobile navigation replaces profile with boards', () => {
   render(<MobileNav currentView="chat" onViewChange={onViewChange} />)
 
   expect(screen.getByText('Boards')).toBeInTheDocument()
-  expect(screen.getByText('Games')).toBeInTheDocument()
+  expect(screen.getByText('Entertainment')).toBeInTheDocument()
   expect(screen.queryByText('Profile')).toBeNull()
 
   fireEvent.click(screen.getByText('Boards'))
   expect(onViewChange).toHaveBeenCalledWith('boards')
   expect(screen.getByText('4')).toBeInTheDocument()
 
-  fireEvent.click(screen.getByText('Games'))
+  fireEvent.click(screen.getByText('Entertainment'))
   expect(onViewChange).toHaveBeenCalledWith('games')
 })
 
@@ -52,13 +52,13 @@ test('sidebar navigation replaces profile with boards', () => {
   )
 
   expect(screen.getByText('Boards')).toBeInTheDocument()
-  expect(screen.getByText('Games')).toBeInTheDocument()
+  expect(screen.getByText('Entertainment')).toBeInTheDocument()
   expect(screen.queryByText('Profile')).toBeNull()
 
   fireEvent.click(screen.getByText('Boards'))
   expect(onViewChange).toHaveBeenCalledWith('boards')
   expect(screen.getByText('4')).toBeInTheDocument()
 
-  fireEvent.click(screen.getByText('Games'))
+  fireEvent.click(screen.getByText('Entertainment'))
   expect(onViewChange).toHaveBeenCalledWith('games')
 })

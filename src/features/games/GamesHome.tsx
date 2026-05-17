@@ -138,7 +138,7 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
       <MobileAppHeader
         currentView={currentView}
         onViewChange={onViewChange}
-        title="Games"
+        title="Entertainment"
         logo
       />
 

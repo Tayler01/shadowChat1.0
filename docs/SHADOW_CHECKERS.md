@@ -1,7 +1,7 @@
 # Shadow Checkers
 
-Shadow Checkers is the second multiplayer game in the ShadowChat Games area.
-It shares the existing Games picker with Shadow War and uses the shared
+Shadow Checkers is the second multiplayer game in the ShadowChat Entertainment area.
+It shares the existing Entertainment picker with Shadow War and uses the shared
 `game_sessions` / `game_session_queue` lobby spine.
 
 ## Rules

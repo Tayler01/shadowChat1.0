@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
 import { CalendarDays, Clock3, Ghost, LockKeyhole, MessageCircle, Palette, ShieldAlert, ShieldCheck, UserRound, X } from 'lucide-react'
@@ -296,10 +297,10 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
     (user.presence_visibility === 'invisible' ? 'invisible' : 'offline')
   const presenceLabel = getPresenceStateLabel(presenceState)
 
-  return (
+  const profilePage = (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center px-4 py-6">
+        <div className="fixed inset-0 z-[120] flex items-stretch justify-center p-0 sm:items-center sm:px-4 sm:py-6">
           <motion.button
             type="button"
             aria-label="Dismiss profile"
@@ -319,7 +320,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 18, scale: 0.98 }}
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="popup-surface relative max-h-[min(86vh,760px)] w-full max-w-lg overflow-y-auto overflow-x-hidden rounded-[var(--radius-xl)]"
+            className="popup-surface relative flex h-full w-full max-w-none flex-col overflow-y-auto overflow-x-hidden rounded-none sm:h-auto sm:max-h-[min(86vh,760px)] sm:max-w-lg sm:rounded-[var(--radius-xl)]"
           >
             <div className="relative h-36 shrink-0 overflow-hidden border-b border-[var(--border-panel)]">
               {user.banner_thumbnail_url || user.banner_url ? (
@@ -610,4 +611,5 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
       )}
     </AnimatePresence>
   )
+  return typeof document === 'undefined' ? profilePage : createPortal(profilePage, document.body)
 }

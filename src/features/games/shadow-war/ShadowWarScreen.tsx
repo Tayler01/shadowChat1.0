@@ -669,7 +669,7 @@ export function ShadowWarScreen({
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.46),rgba(0,0,0,0.04)_42%,rgba(0,0,0,0.46)),linear-gradient(180deg,rgba(0,0,0,0.28),rgba(0,0,0,0.18))]" />
           <button
             type="button"
-            aria-label={selectedSessionId ? 'Back to Shadow War lobbies' : 'Back to games'}
+            aria-label={selectedSessionId ? 'Back to Shadow War lobbies' : 'Back to entertainment'}
             onClick={goBack}
             className="absolute left-1 top-[calc(env(safe-area-inset-top)_+_0.35rem)] flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-transparent bg-black/5 text-[#f0d381] drop-shadow-[0_4px_10px_rgba(0,0,0,0.9)] transition-colors hover:bg-black/18 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/50"
           >

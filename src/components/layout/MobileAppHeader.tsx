@@ -104,7 +104,7 @@ export function MobileAppHeader({
             <button
               type="button"
               onClick={onBack}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.035)] text-[var(--text-primary)] transition-colors hover:border-[var(--border-glow)] hover:text-[var(--theme-accent-readable)]"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center text-[var(--text-primary)] transition-colors hover:text-[var(--theme-accent-readable)]"
               aria-label={backLabel}
             >
               <ArrowLeft className="h-4 w-4" />
@@ -112,7 +112,7 @@ export function MobileAppHeader({
           )}
 
           {logo && (
-            <span className="relative -ml-2 h-8 w-16 shrink-0 overflow-visible min-[380px]:w-20 md:ml-0">
+            <span className="relative -ml-3.5 h-8 w-16 shrink-0 overflow-visible min-[380px]:-ml-3 min-[380px]:w-20 md:ml-0">
               <img
                 src="/icons/header-logo.png"
                 alt="SHADO"

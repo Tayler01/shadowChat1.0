@@ -796,7 +796,7 @@ export function ShadowCheckersScreen({
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(215,170,70,0.18),transparent_30%),linear-gradient(180deg,rgba(0,0,0,0.58),rgba(0,0,0,0.20)_42%,rgba(0,0,0,0.84))]" />
       <header className="relative z-20 shrink-0 border-b border-[#b9934c]/35 bg-black/86 shadow-[0_16px_40px_rgba(0,0,0,0.58)]">
         <div className="flex min-h-[calc(env(safe-area-inset-top)_+_6.2rem)] items-center gap-1.5 px-2 pb-1.5 pt-[calc(env(safe-area-inset-top)_+_0.35rem)]">
-          <button type="button" aria-label={selectedMatchId ? 'Back to Shadow Checkers lobby' : 'Back to games'} onClick={() => selectedMatchId ? actions.selectMatch(null) : onExit?.()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-transparent bg-black/5 text-[#f0d381] hover:bg-white/10">
+          <button type="button" aria-label={selectedMatchId ? 'Back to Shadow Checkers lobby' : 'Back to entertainment'} onClick={() => selectedMatchId ? actions.selectMatch(null) : onExit?.()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-transparent bg-black/5 text-[#f0d381] hover:bg-white/10">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <img src={SHADOW_CHECKERS_ASSETS.logo} alt="Shadow Checkers" className="h-[5.35rem] min-w-0 flex-1 object-contain drop-shadow-[0_12px_28px_rgba(0,0,0,0.72)]" />

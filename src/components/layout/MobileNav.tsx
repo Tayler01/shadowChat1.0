@@ -33,7 +33,7 @@ export function MobileNav({ currentView, onViewChange, className, embedded = fal
       label: 'Boards',
       badge: boardsBadgeCount > 0 ? boardsBadgeCount : null,
     },
-    { id: 'games' as const, icon: Gamepad2, label: 'Games', badge: null },
+    { id: 'games' as const, icon: Gamepad2, label: 'Entertainment', badge: null },
     { id: 'pins' as const, icon: Images, label: 'Pins', badge: null },
   ]
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { toBlob } from 'html-to-image'
 import {
   Cloud,
@@ -166,6 +167,7 @@ export function WeatherWidget({ onOpenSettings, onShareWeather }: WeatherWidgetP
   const [open, setOpen] = useState(false)
   const [sharing, setSharing] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  const popupRef = useRef<HTMLDivElement>(null)
   const weatherShareRef = useRef<HTMLDivElement>(null)
   const current = forecast?.current
 
@@ -173,7 +175,12 @@ export function WeatherWidget({ onOpenSettings, onShareWeather }: WeatherWidgetP
     if (!open) return
 
     const handlePointerDown = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      if (
+        rootRef.current &&
+        !rootRef.current.contains(target) &&
+        !popupRef.current?.contains(target)
+      ) {
         setOpen(false)
       }
     }
@@ -243,6 +250,111 @@ export function WeatherWidget({ onOpenSettings, onShareWeather }: WeatherWidgetP
     }
   }
 
+  const weatherPopup = open ? (
+    <div
+      ref={popupRef}
+      role="dialog"
+      aria-label="Weather forecast"
+      className="popup-surface fixed left-1/2 top-[calc(env(safe-area-inset-top)_+_4.75rem)] z-[90] mt-0 max-h-[calc(100dvh_-_env(safe-area-inset-top)_-_6rem)] w-[min(20rem,calc(100vw_-_1rem))] -translate-x-1/2 overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--border-panel)] shadow-[var(--shadow-panel-strong)] sm:max-h-[calc(100vh_-_8rem)] sm:w-80 sm:max-w-[calc(100vw_-_2rem)]"
+    >
+      <div className="border-b border-[var(--border-subtle)] px-4 py-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+              Weather
+            </p>
+            <p className="mt-1 truncate text-sm font-medium text-[var(--text-primary)]">
+              {preference?.location_name || 'No location selected'}
+            </p>
+          </div>
+          {onShareWeather && current && (
+            <button
+              type="button"
+              onClick={() => void handleShareWeather()}
+              disabled={sharing}
+              data-weather-share-exclude="true"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.035)] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-glow)] hover:text-[var(--theme-accent-readable)] disabled:cursor-wait disabled:opacity-60"
+              aria-label="Share weather to chat"
+            >
+              <Share2 className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {!preference ? (
+        <div className="px-4 py-5">
+          <p className="text-sm leading-6 text-[var(--text-muted)]">
+            Pick a city in Settings so General Chat can show your local weather here.
+          </p>
+          <button
+            type="button"
+            onClick={handleSettings}
+            className="mt-4 w-full rounded-[var(--radius-sm)] border border-[var(--border-panel)] bg-[var(--bg-panel)] px-3 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-glow)] hover:text-[var(--text-gold)]"
+          >
+            Open Weather Settings
+          </button>
+        </div>
+      ) : error ? (
+        <div className="px-4 py-5 text-sm leading-6 text-red-100">
+          {error}
+        </div>
+      ) : !current ? (
+        <div className="px-4 py-5 text-sm text-[var(--text-muted)]">
+          Loading weather.
+        </div>
+      ) : (
+        <div className="space-y-4 p-4">
+          <div className="rounded-[var(--radius-md)] border border-[rgba(215,170,70,0.18)] bg-[rgba(215,170,70,0.06)] p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="text-4xl font-semibold leading-none text-[var(--text-primary)]">
+                  {formatTemperature(current.temperature)}
+                </div>
+                <div className="mt-1 text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
+                  {'\u00b0'}{getTemperatureUnitLabel(forecast.temperatureUnit)}
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[rgba(215,170,70,0.2)] bg-[rgba(255,255,255,0.04)] text-[var(--text-gold)]">
+                  <WeatherIcon kind={current.condition.kind} isDay={current.isDay} className="h-6 w-6" />
+                </span>
+                <p className="mt-2 text-sm font-medium text-[var(--text-primary)]">{current.condition.label}</p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
+              <div className="rounded-[var(--radius-sm)] bg-[rgba(0,0,0,0.18)] p-2">
+                <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Feels</p>
+                <p className="mt-1 font-medium text-[var(--text-primary)]">{formatTemperature(current.apparentTemperature)}</p>
+              </div>
+              <div className="rounded-[var(--radius-sm)] bg-[rgba(0,0,0,0.18)] p-2">
+                <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Humidity</p>
+                <p className="mt-1 font-medium text-[var(--text-primary)]">{Math.round(current.relativeHumidity)}%</p>
+              </div>
+              <div className="rounded-[var(--radius-sm)] bg-[rgba(0,0,0,0.18)] p-2">
+                <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Wind</p>
+                <p className="mt-1 font-medium text-[var(--text-primary)]">{Math.round(current.windSpeed)} mph</p>
+              </div>
+              <div className="rounded-[var(--radius-sm)] bg-[rgba(0,0,0,0.18)] p-2">
+                <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Rain</p>
+                <p className="mt-1 font-medium text-[var(--text-primary)]">{current.precipitation.toFixed(2)} in</p>
+              </div>
+            </div>
+
+            <p className="mt-3 text-xs text-[var(--text-muted)]">{formatUpdated(current.time)}</p>
+          </div>
+
+          <div className="space-y-2">
+            {forecast.daily.map(day => (
+              <ForecastRow key={day.date} day={day} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  ) : null
+
   return (
     <div ref={rootRef} className="relative">
       {current && forecast && (
@@ -278,109 +390,7 @@ export function WeatherWidget({ onOpenSettings, onShareWeather }: WeatherWidgetP
         </span>
       </button>
 
-      {open && (
-        <div
-          role="dialog"
-          aria-label="Weather forecast"
-          className="popup-surface fixed left-1/2 top-[calc(env(safe-area-inset-top)_+_4.75rem)] z-[80] mt-0 max-h-[calc(100dvh_-_env(safe-area-inset-top)_-_6rem)] w-[min(20rem,calc(100vw_-_1rem))] -translate-x-1/2 overflow-y-auto rounded-[var(--radius-lg)] border border-[var(--border-panel)] shadow-[var(--shadow-panel-strong)] sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:max-h-[calc(100vh_-_8rem)] sm:w-80 sm:max-w-[calc(100vw_-_2rem)] sm:translate-x-0 sm:overflow-hidden"
-        >
-          <div className="border-b border-[var(--border-subtle)] px-4 py-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                  Weather
-                </p>
-                <p className="mt-1 truncate text-sm font-medium text-[var(--text-primary)]">
-                  {preference?.location_name || 'No location selected'}
-                </p>
-              </div>
-              {onShareWeather && current && (
-                <button
-                  type="button"
-                  onClick={() => void handleShareWeather()}
-                  disabled={sharing}
-                  data-weather-share-exclude="true"
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.035)] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-glow)] hover:text-[var(--theme-accent-readable)] disabled:cursor-wait disabled:opacity-60"
-                  aria-label="Share weather to chat"
-                >
-                  <Share2 className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {!preference ? (
-            <div className="px-4 py-5">
-              <p className="text-sm leading-6 text-[var(--text-muted)]">
-                Pick a city in Settings so General Chat can show your local weather here.
-              </p>
-              <button
-                type="button"
-                onClick={handleSettings}
-                className="mt-4 w-full rounded-[var(--radius-sm)] border border-[var(--border-panel)] bg-[var(--bg-panel)] px-3 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-glow)] hover:text-[var(--text-gold)]"
-              >
-                Open Weather Settings
-              </button>
-            </div>
-          ) : error ? (
-            <div className="px-4 py-5 text-sm leading-6 text-red-100">
-              {error}
-            </div>
-          ) : !current ? (
-            <div className="px-4 py-5 text-sm text-[var(--text-muted)]">
-              Loading weather.
-            </div>
-          ) : (
-            <div className="space-y-4 p-4">
-              <div className="rounded-[var(--radius-md)] border border-[rgba(215,170,70,0.18)] bg-[rgba(215,170,70,0.06)] p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <div className="text-4xl font-semibold leading-none text-[var(--text-primary)]">
-                      {formatTemperature(current.temperature)}
-                    </div>
-                    <div className="mt-1 text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
-                      {'\u00b0'}{getTemperatureUnitLabel(forecast.temperatureUnit)}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[rgba(215,170,70,0.2)] bg-[rgba(255,255,255,0.04)] text-[var(--text-gold)]">
-                      <WeatherIcon kind={current.condition.kind} isDay={current.isDay} className="h-6 w-6" />
-                    </span>
-                    <p className="mt-2 text-sm font-medium text-[var(--text-primary)]">{current.condition.label}</p>
-                  </div>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                  <div className="rounded-[var(--radius-sm)] bg-[rgba(0,0,0,0.18)] p-2">
-                    <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Feels</p>
-                    <p className="mt-1 font-medium text-[var(--text-primary)]">{formatTemperature(current.apparentTemperature)}</p>
-                  </div>
-                  <div className="rounded-[var(--radius-sm)] bg-[rgba(0,0,0,0.18)] p-2">
-                    <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Humidity</p>
-                    <p className="mt-1 font-medium text-[var(--text-primary)]">{Math.round(current.relativeHumidity)}%</p>
-                  </div>
-                  <div className="rounded-[var(--radius-sm)] bg-[rgba(0,0,0,0.18)] p-2">
-                    <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Wind</p>
-                    <p className="mt-1 font-medium text-[var(--text-primary)]">{Math.round(current.windSpeed)} mph</p>
-                  </div>
-                  <div className="rounded-[var(--radius-sm)] bg-[rgba(0,0,0,0.18)] p-2">
-                    <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">Rain</p>
-                    <p className="mt-1 font-medium text-[var(--text-primary)]">{current.precipitation.toFixed(2)} in</p>
-                  </div>
-                </div>
-
-                <p className="mt-3 text-xs text-[var(--text-muted)]">{formatUpdated(current.time)}</p>
-              </div>
-
-              <div className="space-y-2">
-                {forecast.daily.map(day => (
-                  <ForecastRow key={day.date} day={day} />
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {weatherPopup && (typeof document === 'undefined' ? weatherPopup : createPortal(weatherPopup, document.body))}
     </div>
   )
 }

@@ -85,7 +85,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
       <MobileAppHeader
         currentView={currentView}
         onViewChange={onViewChange}
-        title="Lounge Channel"
+        title="Lounge"
         srTitle="General Chat"
         logo
         collapseOnKeyboard

@@ -161,6 +161,7 @@ async function runProfile(profile, accountA, accountB) {
     await page.goto(config.baseUrl, { waitUntil: 'domcontentloaded' })
     await waitForChatView(page)
     await auditPage(page, profile, '01-chat-launch', { composer: true })
+    await openHeaderPopupsIfAvailable(page, profile, '01b-chat-header-popups')
 
     await focusAndAuditComposer(page, profile, '02-chat-composer')
     const chatMessage = `Mobile PWA chat ${profile.id} ${timestampToken()}`
@@ -179,10 +180,10 @@ async function runProfile(profile, accountA, accountB) {
     await openConversationWithUser(page, accountB)
     await auditPage(page, profile, '08-dm-thread', { composer: true })
     await focusAndAuditComposer(page, profile, '09-dm-composer')
-    await page.getByRole('button', { name: 'Back' }).first().click()
+    await page.getByRole('button', { name: /Back to direct messages/i }).first().click()
     await waitForDmView(page)
     await auditPage(page, profile, '10-dm-list-after-back', { header: false })
-    await page.getByRole('button', { name: 'Back' }).click()
+    await page.getByRole('button', { name: /^Chat$/ }).click()
     await waitForChatView(page)
 
     await goToBoards(page)
@@ -540,6 +541,78 @@ async function openProfileIfAvailable(page, profile, flow) {
   await page.getByRole('dialog').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {})
 }
 
+async function openHeaderPopupsIfAvailable(page, profile, flow) {
+  const checks = [
+    {
+      name: 'weather',
+      button: () => page.locator('header').getByRole('button', { name: /set weather location|\d+.*(?:clear|cloud|fog|rain|snow|storm|drizzle)/i }).first(),
+      dialog: () => page.getByRole('dialog', { name: /weather forecast/i }),
+    },
+    {
+      name: 'active-users',
+      button: () => page.locator('header').getByRole('button', { name: /active users/i }).first(),
+      dialog: () => page.getByRole('dialog', { name: /active users/i }),
+    },
+    {
+      name: 'pinned',
+      button: () => page.locator('header').getByRole('button', { name: /pinned message/i }).first(),
+      dialog: () => page.getByRole('dialog', { name: /pinned messages/i }),
+      optional: true,
+    },
+  ]
+
+  for (const check of checks) {
+    const button = check.button()
+    if (!(await button.isVisible().catch(() => false))) {
+      if (check.optional) {
+        summary.notTested.push({
+          profile: profile.id,
+          flow: `${flow}-${check.name}`,
+          reason: 'No pinned message header button was visible in this account.',
+        })
+        continue
+      }
+      throw new Error(`${profile.id} ${flow}: ${check.name} header button was not visible.`)
+    }
+
+    await button.click()
+    const dialog = check.dialog()
+    await dialog.waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+    await assertDialogAboveFloatingButtons(page, dialog, profile, `${flow}-${check.name}`)
+    await page.keyboard.press('Escape')
+    await dialog.waitFor({ state: 'hidden', timeout: DEFAULT_TIMEOUT_MS }).catch(() => {})
+  }
+}
+
+async function assertDialogAboveFloatingButtons(page, dialog, profile, flow) {
+  const dialogHandle = await dialog.elementHandle()
+  const result = await page.evaluate(dialogElement => {
+    const floating = Array.from(document.querySelectorAll('.theme-floating-action'))[0]
+    if (!dialogElement || !floating) return { ok: true, reason: 'No floating action overlap candidate.' }
+    const dialogRect = dialogElement.getBoundingClientRect()
+    const floatingRect = floating.getBoundingClientRect()
+    const overlaps = !(
+      floatingRect.right <= dialogRect.left ||
+      floatingRect.left >= dialogRect.right ||
+      floatingRect.bottom <= dialogRect.top ||
+      floatingRect.top >= dialogRect.bottom
+    )
+    if (!overlaps) return { ok: true, reason: 'Dialog and floating action do not overlap.' }
+    const x = Math.max(dialogRect.left, Math.min(floatingRect.left + floatingRect.width / 2, dialogRect.right - 1))
+    const y = Math.max(dialogRect.top, Math.min(floatingRect.top + floatingRect.height / 2, dialogRect.bottom - 1))
+    const topElement = document.elementFromPoint(x, y)
+    return {
+      ok: Boolean(topElement && dialogElement.contains(topElement)),
+      reason: topElement ? `Top element was ${topElement.tagName.toLowerCase()}.` : 'No top element found.',
+    }
+  }, dialogHandle)
+  await dialogHandle?.dispose?.()
+
+  if (!result.ok) {
+    throw new Error(`${profile.id} ${flow}: header dialog did not layer above floating controls. ${result.reason}`)
+  }
+}
+
 async function authenticateAccount(page, account) {
   await page.goto(config.baseUrl, { waitUntil: 'domcontentloaded' })
   await waitForBootSurface(page)
@@ -590,7 +663,7 @@ async function waitForBootSurface(page) {
 }
 
 async function waitForChatView(page) {
-  await page.getByText(/Lounge Channel/i).first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByText(/Lounge/i).first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
   await page.locator('textarea:visible').first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
@@ -603,7 +676,7 @@ async function waitForSettingsView(page) {
 }
 
 async function waitForGamesView(page) {
-  await page.getByRole('heading', { name: 'Games' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByRole('heading', { name: 'Entertainment' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
   await page.getByRole('button', { name: 'Open Shadow War' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
@@ -629,15 +702,15 @@ async function goToBoards(page) {
 }
 
 async function goToGames(page) {
-  if (!(await page.getByRole('button', { name: /^Games$/ }).isVisible().catch(() => false))) {
+  if (!(await page.getByRole('button', { name: /^Entertainment$/ }).isVisible().catch(() => false))) {
     const back = page.getByRole('button', { name: 'Back' }).first()
     if (await back.isVisible().catch(() => false)) {
       await back.click()
       await waitForChatView(page).catch(() => {})
     }
   }
-  if (await page.getByRole('button', { name: /^Games$/ }).isVisible().catch(() => false)) {
-    await page.getByRole('button', { name: /^Games$/ }).click()
+  if (await page.getByRole('button', { name: /^Entertainment$/ }).isVisible().catch(() => false)) {
+    await page.getByRole('button', { name: /^Entertainment$/ }).click()
   } else {
     await navigateByViewParam(page, 'games')
   }
@@ -746,7 +819,7 @@ async function simulateBackgroundRefocus(page) {
 }
 
 async function isChatVisible(page) {
-  return page.getByText(/Lounge Channel/i).first().isVisible().catch(() => false)
+  return page.getByText(/Lounge/i).first().isVisible().catch(() => false)
 }
 
 async function installBrowserMocks(context) {

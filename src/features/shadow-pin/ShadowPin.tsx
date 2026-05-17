@@ -160,7 +160,7 @@ function HeartButton({
         'inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]',
         variant === 'pill' && 'rounded-full border border-[rgba(255,255,255,0.14)] bg-[rgba(4,5,6,0.72)] px-2.5 py-1.5 shadow-[0_8px_20px_rgba(0,0,0,0.22)] backdrop-blur-md',
         variant === 'bare' && 'h-9 w-9 rounded-full bg-transparent p-0 drop-shadow-[0_2px_5px_rgba(0,0,0,0.9)]',
-        active && (variant === 'pill' ? 'border-[rgba(244,114,182,0.55)] text-pink-200' : 'text-pink-200'),
+        active && (variant === 'pill' ? 'border-[#ff4d5f]/75 bg-[rgba(255,77,95,0.12)] text-[#ff4d5f]' : 'text-[#ff4d5f]'),
         className
       )}
       aria-pressed={Boolean(active)}
@@ -168,10 +168,18 @@ function HeartButton({
       {variant === 'bare' ? (
         <span className="relative inline-flex h-5 w-5 items-center justify-center">
           <Heart className="absolute h-5 w-5 fill-black text-black opacity-95 [stroke-width:5]" aria-hidden="true" />
-          <Heart className={cn('relative h-5 w-5 stroke-[2.4]', active && 'fill-current')} />
+          {active ? (
+            <span className="relative text-[1.05rem] leading-none" aria-hidden="true">{'\u2764\uFE0F'}</span>
+          ) : (
+            <Heart className="relative h-5 w-5 stroke-[2.4]" />
+          )}
         </span>
       ) : (
-        <Heart className={cn('h-4 w-4', active && 'fill-current')} />
+        active ? (
+          <span className="text-[0.95rem] leading-none" aria-hidden="true">{'\u2764\uFE0F'}</span>
+        ) : (
+          <Heart className="h-4 w-4" />
+        )
       )}
       {showCount && formatCount(count)}
     </button>
@@ -684,6 +692,9 @@ function ShadowPinHome({
   const [modal, setModal] = useState<ModalMode>(null)
 
   const adminRole = user?.admin_role
+  const detailsCategory = modal?.type === 'category-details'
+    ? categoriesState.categories.find(category => category.id === modal.category.id) ?? modal.category
+    : null
   const submitCreate = async (values: ShadowPinCategoryFormValues) => {
     const category = await categoriesState.createCategory(values)
     toast.success('Category created')
@@ -718,7 +729,7 @@ function ShadowPinHome({
       >
         <Plus className="h-5 w-5" />
       </button>
-      <main className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-16">
+      <main className="min-h-0 flex-1 overflow-y-auto px-3 pb-[calc(env(safe-area-inset-bottom)_+_5.4rem)] pt-16 md:pb-6">
         {categoriesState.loading ? (
           <div className="flex h-full items-center justify-center"><LoadingSpinner /></div>
         ) : categoriesState.error ? (
@@ -771,12 +782,12 @@ function ShadowPinHome({
           onDelete={() => removeCategory(modal.category)}
         />
       )}
-      {modal?.type === 'category-details' && (
+      {detailsCategory && (
         <CategoryDetailsModal
-          category={modal.category}
+          category={detailsCategory}
           onClose={() => setModal(null)}
           onHeart={() => {
-            categoriesState.toggleHeart(modal.category.id).catch(err => toast.error(err instanceof Error ? err.message : 'Heart failed'))
+            categoriesState.toggleHeart(detailsCategory.id).catch(err => toast.error(err instanceof Error ? err.message : 'Heart failed'))
           }}
         />
       )}
@@ -825,6 +836,9 @@ function ShadowPinCategoryScreen({
     () => distributeMasonryColumns(imagesState.images, masonryColumnCount),
     [imagesState.images, masonryColumnCount]
   )
+  const viewerImage = modal?.type === 'image-viewer'
+    ? imagesState.images.find(image => image.id === modal.image.id) ?? modal.image
+    : null
 
   return (
     <div className="theme-image-surface relative flex h-full min-h-0 flex-col">
@@ -844,7 +858,7 @@ function ShadowPinCategoryScreen({
       >
         <Plus className="h-5 w-5" />
       </button>
-      <main className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-16">
+      <main className="min-h-0 flex-1 overflow-y-auto px-3 pb-[calc(env(safe-area-inset-bottom)_+_5.4rem)] pt-16 md:pb-6">
         {imagesState.loading && imagesState.images.length === 0 ? (
           <div className="flex h-full items-center justify-center"><LoadingSpinner /></div>
         ) : imagesState.error ? (
@@ -919,12 +933,12 @@ function ShadowPinCategoryScreen({
           onDelete={() => removeImage(modal.image)}
         />
       )}
-      {modal?.type === 'image-viewer' && (
+      {viewerImage && (
         <ImageViewerModal
-          image={modal.image}
+          image={viewerImage}
           onClose={() => setModal(null)}
           onHeart={() => {
-            imagesState.toggleHeart(modal.image.id).catch(err => toast.error(err instanceof Error ? err.message : 'Heart failed'))
+            imagesState.toggleHeart(viewerImage.id).catch(err => toast.error(err instanceof Error ? err.message : 'Heart failed'))
           }}
         />
       )}

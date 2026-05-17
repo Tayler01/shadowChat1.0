@@ -59,7 +59,7 @@ export function Sidebar({
     },
     {
       id: 'games' as const,
-      label: 'Games',
+      label: 'Entertainment',
       icon: Gamepad2,
       badge: null,
     },

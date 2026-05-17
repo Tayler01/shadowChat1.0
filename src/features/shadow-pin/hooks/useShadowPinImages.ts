@@ -89,22 +89,25 @@ export function useShadowPinImages(categoryId: string | null) {
   }, [refresh])
 
   const toggleHeart = useCallback(async (imageId: string) => {
-    setImages(prev => prev.map(image => image.id === imageId
-      ? {
-          ...image,
-          viewer_has_hearted: !image.viewer_has_hearted,
-          heart_count: Math.max(0, image.heart_count + (image.viewer_has_hearted ? -1 : 1)),
-        }
-      : image
-    ))
+    let previousImages: ShadowPinImage[] = []
+    setImages(prev => {
+      previousImages = prev
+      return prev.map(image => image.id === imageId
+        ? {
+            ...image,
+            viewer_has_hearted: !image.viewer_has_hearted,
+            heart_count: Math.max(0, image.heart_count + (image.viewer_has_hearted ? -1 : 1)),
+          }
+        : image
+      )
+    })
     try {
       await toggleShadowPinImageHeart(imageId)
-      await refresh()
     } catch (err) {
-      await refresh()
+      setImages(previousImages)
       throw err
     }
-  }, [refresh])
+  }, [])
 
   return useMemo(() => ({
     category,

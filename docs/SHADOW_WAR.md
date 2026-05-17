@@ -1,7 +1,7 @@
 # Shadow War
 
-Shadow War is the first game in the Shadow Chat games area. The top-level
-`Games` navigation item opens a selector page; choosing Shadow War enters a
+Shadow War is the first game in the Shadow Chat Entertainment area. The top-level
+`Entertainment` navigation item opens a selector page; choosing Shadow War enters a
 full-screen immersive game shell that hides Shadow Chat sidebars, mobile
 navigation, and chat chrome while the duel is active. The selector structure is
 ready for future games without nesting games inside Boards.
@@ -102,7 +102,7 @@ npm run lint
 npm run build
 ```
 
-For visual QA, use a production-style preview and open the Games tab on mobile-sized viewports:
+For visual QA, use a production-style preview and open the Entertainment tab on mobile-sized viewports:
 
 ```powershell
 npm run build
@@ -141,7 +141,7 @@ node scripts/shadow-war-visual-playtest.mjs --headed --slow-mo=80 --no-reuse-ser
 ```
 
 The visual playtest cleans up stale active Shadow War sessions for the two test
-accounts, opens the Games selector, enters Shadow War, verifies the soundtrack
+accounts, opens the Entertainment selector, enters Shadow War, verifies the soundtrack
 asset is mounted, creates and joins a duel, plays a full match through the UI,
 and saves screenshots under `output/playwright/<run-name>/`.
 

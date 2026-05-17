@@ -8,7 +8,7 @@ performance pass across iPhone/WebKit and Android/Chromium flows.
 - Make chat avatars, profile media, Art Board images, and chat attachments load
   quickly on phone networks.
 - Standardize the mobile header and bottom menu so phone chrome behaves
-  consistently across Chat, DMs, Boards, Games, Settings, and Pins.
+  consistently across Chat, DMs, Boards, Entertainment, Settings, and Pins.
 - Keep existing realtime chat and DM behavior intact.
 - Avoid schema-dependent frontend breakage during deploy.
 - Preserve original storage objects while switching row-backed URLs to optimized
@@ -70,7 +70,7 @@ performance pass across iPhone/WebKit and Android/Chromium flows.
 
 8. Mobile shell and game-picker polish
    - Use the shared compact mobile header on General Chat, DMs, Boards and
-     board chats, Art Board, Games, Settings, and Pins.
+     board chats, Art Board, Entertainment, Settings, and Pins.
    - Move Settings to the header and put Pins in the bottom menu.
    - Collapse header and bottom menu while the phone keyboard is open on chat
      composer surfaces, then restore them when the keyboard closes.

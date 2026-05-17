@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Users } from 'lucide-react'
 import { useActiveUsers } from '../../hooks/usePresence'
 import { Avatar } from '../ui/Avatar'
@@ -13,12 +14,18 @@ export function ActiveUsersButton({ resetStatus }: ActiveUsersButtonProps) {
   const activeUsers = useActiveUsers()
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  const popupRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
 
     const handlePointerDown = (event: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+      const target = event.target as Node
+      if (
+        rootRef.current &&
+        !rootRef.current.contains(target) &&
+        !popupRef.current?.contains(target)
+      ) {
         setOpen(false)
       }
     }
@@ -37,6 +44,52 @@ export function ActiveUsersButton({ resetStatus }: ActiveUsersButtonProps) {
     }
   }, [open])
 
+  const activeUsersPopup = open ? (
+    <div
+      ref={popupRef}
+      role="dialog"
+      aria-label="Active users"
+      className="popup-surface fixed left-1/2 top-[calc(env(safe-area-inset-top)_+_4.75rem)] z-[90] w-64 -translate-x-1/2 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-panel)] shadow-[var(--shadow-panel-strong)]"
+    >
+      <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
+        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
+          Active now
+        </span>
+        <span className="rounded-full border border-[rgba(34,197,94,0.22)] bg-[rgba(34,197,94,0.08)] px-2 py-0.5 text-[11px] text-[#86efac]">
+          {activeUsers.length}
+        </span>
+      </div>
+
+      <div className="max-h-80 overflow-y-auto py-1">
+        {activeUsers.length === 0 ? (
+          <div className="px-4 py-5 text-sm text-[var(--text-muted)]">
+            No tracked users are active right now.
+          </div>
+        ) : (
+          activeUsers.map(user => (
+            <div
+              key={user.user_id}
+              className="flex items-center gap-3 px-4 py-2.5"
+            >
+              <Avatar
+                src={user.avatar_url || undefined}
+                alt={user.display_name || user.username || 'Active user'}
+                size="sm"
+                color={user.color || undefined}
+                userId={user.user_id}
+                presenceState="online"
+                showStatus
+              />
+              <span className="min-w-0 truncate text-sm font-medium text-[var(--text-primary)]">
+                {user.display_name || user.username || 'Unknown user'}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  ) : null
+
   return (
     <div ref={rootRef} className="relative">
       <button
@@ -54,50 +107,7 @@ export function ActiveUsersButton({ resetStatus }: ActiveUsersButtonProps) {
         <ClientResetIndicator status={resetStatus} />
       </button>
 
-      {open && (
-        <div
-          role="dialog"
-          aria-label="Active users"
-          className="popup-surface absolute right-0 top-full z-[80] mt-2 w-64 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-panel)] shadow-[var(--shadow-panel-strong)]"
-        >
-          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-3">
-            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-              Active now
-            </span>
-            <span className="rounded-full border border-[rgba(34,197,94,0.22)] bg-[rgba(34,197,94,0.08)] px-2 py-0.5 text-[11px] text-[#86efac]">
-              {activeUsers.length}
-            </span>
-          </div>
-
-          <div className="max-h-80 overflow-y-auto py-1">
-            {activeUsers.length === 0 ? (
-              <div className="px-4 py-5 text-sm text-[var(--text-muted)]">
-                No tracked users are active right now.
-              </div>
-            ) : (
-              activeUsers.map(user => (
-                <div
-                  key={user.user_id}
-                  className="flex items-center gap-3 px-4 py-2.5"
-                >
-                  <Avatar
-                    src={user.avatar_url || undefined}
-                    alt={user.display_name || user.username || 'Active user'}
-                    size="sm"
-                    color={user.color || undefined}
-                    userId={user.user_id}
-                    presenceState="online"
-                    showStatus
-                  />
-                  <span className="min-w-0 truncate text-sm font-medium text-[var(--text-primary)]">
-                    {user.display_name || user.username || 'Unknown user'}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
+      {activeUsersPopup && (typeof document === 'undefined' ? activeUsersPopup : createPortal(activeUsersPopup, document.body))}
     </div>
   )
 }

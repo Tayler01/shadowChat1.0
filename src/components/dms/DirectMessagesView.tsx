@@ -786,10 +786,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
             <MobileAppHeader
               currentView={currentView}
               onViewChange={onViewChange}
-              title="Direct Messages"
+              title="DM"
               logo
-              onBack={!isDesktop ? () => onViewChange('chat') : undefined}
-              backLabel="Back to chat"
             />
             <Button
               size="sm"

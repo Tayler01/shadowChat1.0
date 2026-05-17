@@ -273,7 +273,7 @@ async function tryCreateAdminClient(supabaseUrl) {
 
 async function openShadowWar(page) {
   await navigateByViewParam(page, 'games')
-  await page.getByRole('heading', { name: 'Games' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByRole('heading', { name: 'Entertainment' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
   await page.getByRole('button', { name: 'Open Shadow War' }).click()
   await page.getByText('Choose your table').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }

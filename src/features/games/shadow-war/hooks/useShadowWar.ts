@@ -75,7 +75,7 @@ export function useShadowWar() {
       setError(null)
       return next
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unable to load games'
+      const message = err instanceof Error ? err.message : 'Unable to load entertainment'
       setError(message)
       throw err
     } finally {

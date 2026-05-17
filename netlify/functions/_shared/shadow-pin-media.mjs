@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 
 export const SHADOW_PIN_BUCKET = 'shadow-pin'
 export const MAX_IMAGE_BYTES = 15 * 1024 * 1024
+const MAX_HTML_BYTES = 2 * 1024 * 1024
 export const THUMB_WIDTH = 640
 export const MEDIUM_WIDTH = 1600
 
@@ -130,32 +131,91 @@ export function resolveImageType(contentTypeHeader) {
   }
 }
 
-export async function fetchRemoteImage(urlValue) {
-  const sourceUrl = normalizeImageUrl(urlValue)
-  await assertPublicHost(sourceUrl)
+function isAllowedImageContentType(contentTypeHeader) {
+  const contentType = String(contentTypeHeader || '').split(';')[0]?.trim().toLowerCase()
+  return ALLOWED_CONTENT_TYPES.has(contentType)
+}
 
+function isHtmlContentType(contentTypeHeader) {
+  const contentType = String(contentTypeHeader || '').split(';')[0]?.trim().toLowerCase()
+  return contentType === 'text/html' || contentType === 'application/xhtml+xml'
+}
+
+function decodeHtmlValue(value) {
+  return String(value || '')
+    .replace(/\\u0026/gi, '&')
+    .replace(/\\u002F/gi, '/')
+    .replace(/\\\//g, '/')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .trim()
+}
+
+function getAttribute(tag, name) {
+  const match = tag.match(new RegExp(`${name}\\s*=\\s*(["'])(.*?)\\1`, 'i'))
+  return match ? decodeHtmlValue(match[2]) : null
+}
+
+function extractImageUrlFromHtml(html, pageUrl) {
+  const metaTags = html.match(/<meta\b[^>]*>/gi) || []
+  const preferredMetaNames = new Set([
+    'og:image',
+    'og:image:url',
+    'twitter:image',
+    'twitter:image:src',
+  ])
+
+  for (const tag of metaTags) {
+    const key = (getAttribute(tag, 'property') || getAttribute(tag, 'name') || '').toLowerCase()
+    if (!preferredMetaNames.has(key)) continue
+    const content = getAttribute(tag, 'content')
+    if (content) return new URL(content, pageUrl)
+  }
+
+  const linkTags = html.match(/<link\b[^>]*>/gi) || []
+  for (const tag of linkTags) {
+    const rel = (getAttribute(tag, 'rel') || '').toLowerCase()
+    if (!rel.split(/\s+/).includes('image_src')) continue
+    const href = getAttribute(tag, 'href')
+    if (href) return new URL(href, pageUrl)
+  }
+
+  const pinimgMatch = html.match(/https?:\\\/\\\/i\.pinimg\.com\\\/[^"'<>\s]+/i)
+    || html.match(/https?:\/\/i\.pinimg\.com\/[^"'<>\s]+/i)
+  if (pinimgMatch?.[0]) {
+    return new URL(decodeHtmlValue(pinimgMatch[0]), pageUrl)
+  }
+
+  return null
+}
+
+async function fetchWithTimeout(url, accept) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 9000)
-  let response
   try {
-    response = await fetch(sourceUrl, {
+    return await fetch(url, {
       redirect: 'follow',
       signal: controller.signal,
       headers: {
-        accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif;q=0.9,*/*;q=0.5',
+        accept,
         'user-agent': 'ShadowChat-ShadowPinImporter/1.0',
       },
     })
   } finally {
     clearTimeout(timeout)
   }
+}
+
+async function readImageResponse(response, sourceUrl) {
+  const finalUrl = new URL(response.url || sourceUrl.toString())
+  await assertPublicHost(finalUrl)
 
   if (!response.ok) {
     throw new Error(`Image fetch failed with ${response.status}.`)
   }
-
-  const finalUrl = new URL(response.url || sourceUrl.toString())
-  await assertPublicHost(finalUrl)
 
   const contentLength = Number(response.headers.get('content-length') || '0')
   if (contentLength > MAX_IMAGE_BYTES) {
@@ -174,6 +234,58 @@ export async function fetchRemoteImage(urlValue) {
     extension,
     sizeBytes: arrayBuffer.byteLength,
   }
+}
+
+async function resolveImageResponseFromPage(response, sourceUrl) {
+  const finalUrl = new URL(response.url || sourceUrl.toString())
+  await assertPublicHost(finalUrl)
+
+  const contentLength = Number(response.headers.get('content-length') || '0')
+  if (contentLength > MAX_HTML_BYTES) {
+    throw new Error('Image page is too large to inspect.')
+  }
+
+  const html = await response.text()
+  if (Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES) {
+    throw new Error('Image page is too large to inspect.')
+  }
+
+  const imageUrl = extractImageUrlFromHtml(html, finalUrl)
+  if (!imageUrl) {
+    throw new Error('Could not find an importable image on that page.')
+  }
+  await assertPublicHost(imageUrl)
+
+  return fetchWithTimeout(
+    imageUrl,
+    'image/avif,image/webp,image/png,image/jpeg,image/gif;q=0.9,*/*;q=0.5'
+  )
+}
+
+export async function fetchRemoteImage(urlValue) {
+  const sourceUrl = normalizeImageUrl(urlValue)
+  await assertPublicHost(sourceUrl)
+
+  const response = await fetchWithTimeout(
+    sourceUrl,
+    'image/avif,image/webp,image/png,image/jpeg,image/gif;q=0.9,text/html;q=0.7,*/*;q=0.4'
+  )
+
+  if (!response.ok) {
+    throw new Error(`Image fetch failed with ${response.status}.`)
+  }
+
+  if (isAllowedImageContentType(response.headers.get('content-type'))) {
+    return readImageResponse(response, sourceUrl)
+  }
+
+  if (isHtmlContentType(response.headers.get('content-type'))) {
+    const imageResponse = await resolveImageResponseFromPage(response, sourceUrl)
+    return readImageResponse(imageResponse, sourceUrl)
+  }
+
+  resolveImageType(response.headers.get('content-type'))
+  throw new Error('Use a JPEG, PNG, WebP, or GIF image.')
 }
 
 export async function createDerivatives(buffer) {

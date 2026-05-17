@@ -502,7 +502,7 @@ describe('DirectMessagesView user search', () => {
     expect(screen.queryByRole('button', { name: /shado/i })).not.toBeInTheDocument();
   });
 
-  test('mobile inbox back button returns to chat', async () => {
+  test('mobile inbox uses the shared nav instead of a header back button', async () => {
     const onViewChange = jest.fn();
     const { useIsDesktop } = jest.requireMock('../src/hooks/useIsDesktop') as {
       useIsDesktop: jest.Mock
@@ -517,7 +517,9 @@ describe('DirectMessagesView user search', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /back to chat/i }));
+    expect(screen.queryByRole('button', { name: /back to chat/i })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^chat$/i }));
 
     expect(onViewChange).toHaveBeenCalledWith('chat');
   });
