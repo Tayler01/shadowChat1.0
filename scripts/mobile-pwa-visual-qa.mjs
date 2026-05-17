@@ -199,6 +199,7 @@ async function runProfile(profile, accountA, accountB) {
 
     await goToGames(page)
     await auditPage(page, profile, '15-games-home')
+    await openShadoTvIfAvailable(page, profile)
 
     await goToSettings(page)
     await auditPage(page, profile, '16-settings-hub', { header: false })
@@ -308,6 +309,7 @@ async function auditPage(page, profile, flow, options = {}) {
       .map((element) => {
         const rect = element.getBoundingClientRect()
         return {
+          insideHorizontalScroll: Boolean(element.closest('[data-mobile-horizontal-scroll="true"]')),
           label: element.getAttribute('aria-label') || element.textContent?.replace(/\s+/gu, ' ').trim().slice(0, 60) || element.tagName.toLowerCase(),
           left: Math.round(rect.left),
           right: Math.round(rect.right),
@@ -317,7 +319,7 @@ async function auditPage(page, profile, flow, options = {}) {
           height: Math.round(rect.height),
         }
       })
-      .filter(item => item.left < -2 || item.right > viewportWidth + 2)
+      .filter(item => !item.insideHorizontalScroll && (item.left < -2 || item.right > viewportWidth + 2))
       .slice(0, 12)
 
     const smallTapTargets = Array.from(document.querySelectorAll('button, [role="button"], a[href], input, textarea, select'))
@@ -677,7 +679,40 @@ async function waitForSettingsView(page) {
 
 async function waitForGamesView(page) {
   await page.getByRole('heading', { name: 'Entertainment' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByRole('button', { name: 'Open Shado TV' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
   await page.getByRole('button', { name: 'Open Shadow War' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+}
+
+async function openShadoTvIfAvailable(page, profile) {
+  const shadoTvButton = page.getByRole('button', { name: 'Open Shado TV' })
+  if (!(await shadoTvButton.isVisible().catch(() => false))) {
+    summary.notTested.push({
+      profile: profile.id,
+      flow: '15b-shado-tv-home',
+      reason: 'Shado TV selector button was not visible.',
+    })
+    return
+  }
+
+  await shadoTvButton.click()
+  await page.getByText('Now Playing').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByRole('button', { name: 'Open Classic Cinema' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await auditPage(page, profile, '15b-shado-tv-home', { footer: false })
+
+  await page.getByRole('button', { name: 'Open Classic Cinema' }).click()
+  await page.getByRole('heading', { name: 'Classic Cinema' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await auditPage(page, profile, '15c-shado-tv-channel', { footer: false })
+
+  await page.getByRole('button', { name: 'Open Silver Screen' }).click()
+  await page.getByRole('heading', { name: 'Silver Screen' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await auditPage(page, profile, '15d-shado-tv-video', { footer: false })
+
+  await page.getByRole('button', { name: 'Back within Shado TV' }).click()
+  await page.getByRole('heading', { name: 'Classic Cinema' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByRole('button', { name: 'Back within Shado TV' }).click()
+  await page.getByText('Now Playing').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByRole('button', { name: 'Back to Entertainment' }).click()
+  await waitForGamesView(page)
 }
 
 async function goToDirectMessages(page) {

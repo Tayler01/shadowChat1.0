@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Gamepad2, Volume2, VolumeX } from 'lucide-react'
+import { Film, Gamepad2, Volume2, VolumeX } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { ShadowWarScreen } from './shadow-war/ShadowWarScreen'
 import { SHADOW_WAR_ASSETS } from './shadow-war/assets/manifest'
 import { ShadowCheckersScreen } from './shadow-checkers/ShadowCheckersScreen'
 import { SHADOW_CHECKERS_ASSETS } from './shadow-checkers/assets/manifest'
+import { ShadoTvScreen } from '../entertainment/shado-tv/ShadoTvScreen'
+import { SHADO_TV_ASSETS } from '../entertainment/shado-tv/assets/manifest'
 import { MobileAppHeader } from '../../components/layout/MobileAppHeader'
 import type { AppView } from '../../types/navigation'
 
@@ -14,10 +16,10 @@ interface GamesHomeProps {
   onImmersiveChange?: (immersive: boolean) => void
 }
 
-type SelectedGame = 'shadow-war' | 'shadow-checkers' | null
+type SelectedEntertainment = 'shadow-war' | 'shadow-checkers' | 'shado-tv' | null
 
 export function GamesHome({ currentView, onViewChange, onImmersiveChange }: GamesHomeProps) {
-  const [selectedGame, setSelectedGame] = useState<SelectedGame>(null)
+  const [selectedEntertainment, setSelectedEntertainment] = useState<SelectedEntertainment>(null)
   const [musicPlaying, setMusicPlaying] = useState(false)
   const [audioBlocked, setAudioBlocked] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -55,28 +57,41 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
 
   const enterShadowWar = () => {
     void playMusic(SHADOW_WAR_ASSETS.music)
-    setSelectedGame('shadow-war')
+    setSelectedEntertainment('shadow-war')
     onImmersiveChange?.(true)
   }
 
   const exitShadowWar = () => {
     pauseMusic()
     setAudioBlocked(false)
-    setSelectedGame(null)
+    setSelectedEntertainment(null)
     onImmersiveChange?.(false)
   }
 
   const enterShadowCheckers = () => {
     void playMusic(SHADOW_CHECKERS_ASSETS.music)
     setAudioBlocked(false)
-    setSelectedGame('shadow-checkers')
+    setSelectedEntertainment('shadow-checkers')
     onImmersiveChange?.(true)
   }
 
   const exitShadowCheckers = () => {
     pauseMusic()
     setAudioBlocked(false)
-    setSelectedGame(null)
+    setSelectedEntertainment(null)
+    onImmersiveChange?.(false)
+  }
+
+  const enterShadoTv = () => {
+    pauseMusic()
+    setAudioBlocked(false)
+    setSelectedEntertainment('shado-tv')
+    onImmersiveChange?.(true)
+  }
+
+  const exitShadoTv = () => {
+    setAudioBlocked(false)
+    setSelectedEntertainment(null)
     onImmersiveChange?.(false)
   }
 
@@ -85,13 +100,13 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
       pauseMusic()
       return
     }
-    const source = selectedGame === 'shadow-checkers' ? SHADOW_CHECKERS_ASSETS.music : SHADOW_WAR_ASSETS.music
+    const source = selectedEntertainment === 'shadow-checkers' ? SHADOW_CHECKERS_ASSETS.music : SHADOW_WAR_ASSETS.music
     void playMusic(source)
   }
 
   useEffect(() => {
-    onImmersiveChange?.(selectedGame !== null)
-  }, [onImmersiveChange, selectedGame])
+    onImmersiveChange?.(selectedEntertainment !== null)
+  }, [onImmersiveChange, selectedEntertainment])
 
   useEffect(() => {
     return () => {
@@ -111,7 +126,7 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
   return (
     <>
       {audio}
-      {selectedGame === 'shadow-war' ? (
+      {selectedEntertainment === 'shadow-war' ? (
         <div className="h-full min-h-0 overflow-hidden bg-black">
         <ShadowWarScreen
           onExit={exitShadowWar}
@@ -120,7 +135,7 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
           onToggleMusic={toggleMusic}
         />
         </div>
-      ) : selectedGame === 'shadow-checkers' ? (
+      ) : selectedEntertainment === 'shadow-checkers' ? (
         <div className="h-full min-h-0 overflow-hidden bg-black">
           <ShadowCheckersScreen
             onExit={exitShadowCheckers}
@@ -128,6 +143,10 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
             audioBlocked={audioBlocked}
             onToggleMusic={toggleMusic}
           />
+        </div>
+      ) : selectedEntertainment === 'shado-tv' ? (
+        <div className="h-full min-h-0 overflow-hidden bg-black">
+          <ShadoTvScreen onExit={exitShadoTv} />
         </div>
       ) : (
         <motion.div
@@ -143,6 +162,47 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
       />
 
       <main className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-4 overflow-y-auto px-4 py-5 md:p-6">
+        <button
+          type="button"
+          aria-label="Open Shado TV"
+          onClick={enterShadoTv}
+          className="group relative min-h-[9.75rem] w-full overflow-hidden rounded-[2rem] border border-[rgba(215,170,70,0.42)] bg-[#050403] text-left shadow-[0_24px_60px_rgba(0,0,0,0.48)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[rgba(239,202,114,0.68)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,202,114,0.55)] md:min-h-[12rem]"
+        >
+          <img
+            src={SHADO_TV_ASSETS.pickerBanner}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover opacity-[0.86]"
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
+            width={1440}
+            height={810}
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.92),rgba(0,0,0,0.52)_54%,rgba(0,0,0,0.2)),radial-gradient(circle_at_76%_22%,rgba(215,170,70,0.28),transparent_34%)]" />
+          <div className="absolute inset-x-6 top-4 h-px bg-gradient-to-r from-transparent via-[#f0d381]/55 to-transparent" />
+          <div className="absolute inset-x-6 bottom-4 h-px bg-gradient-to-r from-transparent via-[#8a6328]/60 to-transparent" />
+          <div className="relative flex h-full min-h-[9.75rem] items-center gap-4 px-5 py-5 md:min-h-[12rem] md:px-8">
+            <div className="min-w-0 flex-1">
+              <img
+                src={SHADO_TV_ASSETS.logoMarquee}
+                alt="Shado TV"
+                className="mx-auto mb-3 h-auto w-full max-w-[25rem] object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.85)] md:mx-0"
+                loading="eager"
+                decoding="async"
+                fetchPriority="high"
+                width={1400}
+                height={560}
+              />
+              <p className="mx-auto max-w-xl text-center text-sm leading-6 text-[#d9c79f] md:mx-0 md:text-left md:text-base">
+                A retro cinema streaming room for channels, premieres, and Shado originals.
+              </p>
+            </div>
+            <div className="hidden rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.04)] p-3 text-[#f0d381] md:block">
+              <Film className="h-5 w-5" />
+            </div>
+          </div>
+        </button>
+
         <button
           type="button"
           aria-label="Open Shadow War"
