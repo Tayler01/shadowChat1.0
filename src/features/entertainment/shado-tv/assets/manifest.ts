@@ -3,6 +3,7 @@ const SHADO_TV_ROOT = '/entertainment/shado-tv'
 export const SHADO_TV_ASSETS = {
   pickerBanner: `${SHADO_TV_ROOT}/picker-banner.webp`,
   logoMarquee: `${SHADO_TV_ROOT}/logo-marquee.webp`,
+  headerBanner: `${SHADO_TV_ROOT}/header-banner.webp`,
   homeBackdrop: `${SHADO_TV_ROOT}/home-backdrop.webp`,
   marqueeFrame: `${SHADO_TV_ROOT}/marquee-frame.webp`,
   channelHeroFallback: `${SHADO_TV_ROOT}/channel-hero-fallback.webp`,
@@ -40,7 +41,13 @@ export const SHADO_TV_ASSET_PROMPTS = [
     id: 'shado-tv-logo-marquee',
     output: SHADO_TV_ASSETS.logoMarquee,
     prompt:
-      'Standalone Shado TV marquee logo banner, readable text exactly SHADO TV, vintage theater sign, warm gold bulbs, engraved dark metal, premium black velvet shadows, symmetrical ornamental trim, no extra words, no real brands, no watermark.',
+      'Ultra-wide, short panoramic app header banner for SHADO TV, readable text exactly SHADO TV, slim vintage cinema marquee wordmark, thin gold illuminated outline, low-profile art deco horizontal trim, black obsidian background, warm antique gold glow, no extra words, no real brands, no watermark.',
+  },
+  {
+    id: 'shado-tv-header-banner',
+    output: SHADO_TV_ASSETS.headerBanner,
+    prompt:
+      'Full-width mobile app header banner for SHADO TV, effectively the entire header background, ultra-wide and short, readable text exactly SHADO TV centered in the middle third, clean dark negative space on the far left and far right for app control icons, premium black obsidian background, thin vintage cinema marquee border lines, warm antique gold bulbs and subtle art deco trim, no extra words, no real brands, no watermark.',
   },
   {
     id: 'shado-tv-home-backdrop',

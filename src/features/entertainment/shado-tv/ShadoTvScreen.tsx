@@ -90,19 +90,20 @@ function ShadoTvHeader({
   onAdmin: () => void
 }) {
   return (
-    <header className="relative z-20 flex h-[calc(3.95rem+env(safe-area-inset-top))] shrink-0 items-end justify-center border-b border-[#d7aa46]/22 bg-black/72 px-2 pb-2 pt-[env(safe-area-inset-top)] shadow-[0_10px_32px_rgba(0,0,0,0.55)] backdrop-blur-xl">
-      <div className="absolute bottom-2 left-1 flex items-center">
-        <BackButton onClick={onBack ?? onExit} label={onBack ? 'Back within Shado TV' : 'Back to Entertainment'} />
-      </div>
+    <header className="relative z-20 flex h-[calc(3.95rem+env(safe-area-inset-top))] shrink-0 items-end justify-center overflow-hidden border-b border-[#d7aa46]/22 bg-black px-2 pb-2 pt-[env(safe-area-inset-top)] shadow-[0_10px_32px_rgba(0,0,0,0.55)]">
       <img
-        src={SHADO_TV_ASSETS.logoMarquee}
-        alt="Shado TV"
-        className="h-auto w-[11.75rem] max-w-[calc(100vw-7.25rem)] object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.75)] min-[390px]:w-[13.25rem]"
-        width={1400}
-        height={560}
+        src={SHADO_TV_ASSETS.headerBanner}
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover"
+        width={2400}
+        height={240}
         loading="eager"
         decoding="async"
       />
+      <div className="absolute inset-0 bg-black/12" />
+      <div className="absolute bottom-2 left-1 flex items-center">
+        <BackButton onClick={onBack ?? onExit} label={onBack ? 'Back within Shado TV' : 'Back to Entertainment'} />
+      </div>
       {canManage && (
         <button
           type="button"
