@@ -347,7 +347,6 @@ function ChannelView({
       </section>
 
       <section className="mt-5">
-        <h2 className="mb-3 text-sm font-black uppercase tracking-[0.22em] text-[#f6e0a2]">Newest</h2>
         <div className="grid grid-cols-2 gap-3 min-[430px]:grid-cols-3">
           {channelVideos.map(video => (
             <button
