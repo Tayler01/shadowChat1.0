@@ -9,7 +9,7 @@ Planning baseline date: 2026-05-17.
 
 ## Current Status
 
-As of 2026-05-17:
+As of 2026-05-18:
 
 - The Cinema Marquee first-pass asset suite is approved.
 - Twenty optimized WebP assets are committed under
@@ -22,6 +22,11 @@ As of 2026-05-17:
   authenticated grants, and realtime publication for channels/videos/features.
 - Admin/sub-admin studio controls can create channels/videos, publish or hide
   them, soft-delete them, and restore deleted items as hidden drafts.
+- Admin/sub-admin studio controls can upload custom channel ticket art, channel
+  hero art, video posters, and video thumbnails. The originals live in the
+  private `shado-tv` Supabase Storage bucket, and the app renders signed
+  transformed URLs sized for mobile tickets, heroes, posters, and 16:9
+  thumbnails.
 - The Shado TV player shell supports release-state-aware playback UI, external
   embed rendering with an open-link fallback, and a Supabase-backed Continue
   Watching contract through `shado_tv_watch_progress`.
@@ -70,8 +75,8 @@ As of 2026-05-17:
 - Channel pages have a custom hero/banner area, then videos newest-first.
 - Channel artwork supports multi-asset uploads with a simple mode that can
   derive all needed variants from one uploaded image.
-- Dynamic channel artwork must be processed into optimized derivatives for fast
-  mobile loading.
+- Dynamic channel artwork is stored privately and delivered through signed
+  Supabase image transformations for fast mobile loading.
 
 ### Videos
 
@@ -219,7 +224,8 @@ Required pipeline capabilities:
 - clear processing states: uploaded, queued, processing, ready, failed
 - limited automatic retry and manual retry after failure
 - poster/thumbnail generation from video when custom art is absent
-- custom poster/banner/image uploads
+- custom poster/banner/image uploads through the private `shado-tv` bucket and
+  signed transformed delivery
 - HLS output for native videos
 - recommended renditions:
   - 360p
@@ -265,15 +271,20 @@ mobile QA checkpoints where useful.
    - add migrations/RLS for channels, videos, features, progress, and jobs
    - seed editable placeholder channels/videos
    - implement admin/sub-admin management
-4. Streaming pipeline research and approval: research drafted, approval pending.
+4. Artwork storage and processed image delivery: completed 2026-05-18.
+   - add private Shado TV Storage bucket and RLS policies
+   - store custom artwork paths on channels/videos
+   - deliver signed mobile-sized transformed images
+   - wire admin upload controls for channel and video artwork
+5. Streaming pipeline research and approval: research drafted, approval pending.
    - compare familiar-stack options, such as Render/Supabase Storage, with
      managed video services
    - present recommendation and costs before any new service setup
-5. Video processing and playback:
+6. Video processing and playback:
    - implement approved native upload/processing path
    - support external embed-first playback with fallback
    - implement release states, premieres, and watch progress
-6. Verification and shipping:
+7. Verification and shipping:
    - run lint/typecheck/build
    - run targeted Jest
    - run foreground iPhone/WebKit and Android/Chromium QA

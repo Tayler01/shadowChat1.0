@@ -640,6 +640,25 @@ export const VOICE_BUCKET = 'message-media'
 export const UPLOADS_BUCKET = 'chat-uploads'
 export const ART_BOARD_BUCKET = 'art-board'
 export const SHADOW_PIN_BUCKET = 'shadow-pin'
+export const SHADO_TV_BUCKET = 'shado-tv'
+
+export type ShadoTvArtworkTarget =
+  | 'channel-ticket'
+  | 'channel-hero'
+  | 'video-poster'
+  | 'video-thumbnail'
+
+const SHADO_TV_ARTWORK_UPLOAD_CONFIG: Record<ShadoTvArtworkTarget, {
+  maxWidth: number
+  maxHeight: number
+  quality: number
+  prefix: string
+}> = {
+  'channel-ticket': { maxWidth: 1024, maxHeight: 1536, quality: 0.84, prefix: 'shado-tv-ticket' },
+  'channel-hero': { maxWidth: 1920, maxHeight: 1080, quality: 0.84, prefix: 'shado-tv-hero' },
+  'video-poster': { maxWidth: 1200, maxHeight: 1800, quality: 0.84, prefix: 'shado-tv-poster' },
+  'video-thumbnail': { maxWidth: 1600, maxHeight: 900, quality: 0.82, prefix: 'shado-tv-thumbnail' },
+}
 
 export const uploadVoiceMessage = async (blob: Blob, mimeType = 'audio/webm') => {
   const workingClient = await getWorkingClient()
@@ -746,6 +765,34 @@ export const uploadShadowPinImage = async (
   if (error) throw error
   const { data } = workingClient.storage.from(SHADOW_PIN_BUCKET).getPublicUrl(filePath)
   return { path: filePath, publicUrl: data.publicUrl }
+}
+
+export const uploadShadoTvArtwork = async (
+  file: File,
+  target: ShadoTvArtworkTarget,
+  scopeId?: string
+) => {
+  const workingClient = await getWorkingClient()
+  const { data: { user } } = await workingClient.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  if (!file.type.startsWith('image/')) throw new Error('Choose an image file.')
+
+  const config = SHADO_TV_ARTWORK_UPLOAD_CONFIG[target]
+  const uploadFile = await optimizeImageFile(file, {
+    maxWidth: config.maxWidth,
+    maxHeight: config.maxHeight,
+    quality: config.quality,
+    fileNamePrefix: config.prefix,
+  })
+  const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]+/g, '-').slice(-120) || `${config.prefix}.webp`
+  const folder = `${user.id}/artwork/${target}/${scopeId || Date.now()}`
+  const filePath = `${folder}/${Date.now()}_${safeName}`
+  const { error } = await workingClient.storage.from(SHADO_TV_BUCKET).upload(filePath, uploadFile, {
+    cacheControl: '31536000',
+    contentType: uploadFile.type,
+  })
+  if (error) throw error
+  return { path: filePath }
 }
 
 // Database types matching the actual schema

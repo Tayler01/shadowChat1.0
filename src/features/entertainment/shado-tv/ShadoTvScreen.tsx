@@ -15,8 +15,12 @@ import {
   saveShadoTvWatchProgress,
   softDeleteShadoTvChannel,
   softDeleteShadoTvVideo,
+  updateShadoTvChannelArtwork,
   updateShadoTvChannelVisibility,
+  updateShadoTvVideoArtwork,
   updateShadoTvVideoVisibility,
+  type ShadoTvChannelArtworkKind,
+  type ShadoTvVideoArtworkKind,
 } from './api'
 import {
   type ShadoTvChannel,
@@ -640,7 +644,42 @@ function AdminView({
     )
   }
 
+  const handleChannelArtworkUpload = (
+    channelId: string,
+    kind: ShadoTvChannelArtworkKind,
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    void runStudioAction(
+      `channel-artwork-${kind}-${channelId}`,
+      () => updateShadoTvChannelArtwork(channelId, kind, file),
+      'Channel artwork updated.'
+    )
+  }
+
+  const handleVideoArtworkUpload = (
+    videoId: string,
+    kind: ShadoTvVideoArtworkKind,
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+
+    void runStudioAction(
+      `video-artwork-${kind}-${videoId}`,
+      () => updateShadoTvVideoArtwork(videoId, kind, file),
+      'Video artwork updated.'
+    )
+  }
+
+  const isStudioDisabled = saving !== null || !loadedFromSupabase
   const actionButtonClass = 'rounded-full border border-[#d7aa46]/34 px-3 py-1.5 text-[0.68rem] font-black uppercase tracking-[0.14em] text-[#f6e0a2] transition hover:border-[#f0d381]/70 disabled:cursor-not-allowed disabled:opacity-45'
+  const artworkButtonClass = `${actionButtonClass} inline-flex min-h-9 cursor-pointer items-center justify-center disabled:pointer-events-none`
+  const disabledArtworkButtonClass = `${artworkButtonClass} pointer-events-none opacity-45`
 
   return (
     <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)_+_1.25rem)] pt-4">
@@ -804,66 +843,130 @@ function AdminView({
       <section className="mt-4 rounded-[1rem] border border-[#d7aa46]/24 bg-black/46 p-4">
         <h2 className="text-sm font-black uppercase tracking-[0.18em] text-[#f6e0a2]">Channels</h2>
         <div className="mt-3 grid gap-2">
-          {[...activeChannels, ...deletedChannels].map(channel => (
-            <article key={channel.id} className="rounded-[0.9rem] border border-white/10 bg-white/[0.04] p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h3 className="truncate text-sm font-black text-[#f6e0a2]">{channel.name}</h3>
-                  <p className="mt-1 truncate text-xs text-[#d9c79f]/70">{channel.deletedAt ? 'Deleted' : channel.visibilityStatus}</p>
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  {channel.deletedAt ? (
-                    <button type="button" disabled={saving !== null || !loadedFromSupabase} className={actionButtonClass} onClick={() => void runStudioAction(`restore-channel-${channel.id}`, () => restoreShadoTvChannel(channel.id), 'Channel restored as hidden.')}>
-                      Restore
-                    </button>
-                  ) : (
-                    <>
-                      <button type="button" disabled={saving !== null || !loadedFromSupabase} className={actionButtonClass} onClick={() => void runStudioAction(`toggle-channel-${channel.id}`, () => updateShadoTvChannelVisibility(channel.id, channel.visibilityStatus === 'published' ? 'hidden' : 'published'), 'Channel visibility updated.')}>
-                        {channel.visibilityStatus === 'published' ? 'Hide' : 'Publish'}
+          {[...activeChannels, ...deletedChannels].map(channel => {
+            const artworkDisabled = isStudioDisabled || Boolean(channel.deletedAt)
+
+            return (
+              <article key={channel.id} className="rounded-[0.9rem] border border-white/10 bg-white/[0.04] p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-sm font-black text-[#f6e0a2]">{channel.name}</h3>
+                    <p className="mt-1 truncate text-xs text-[#d9c79f]/70">{channel.deletedAt ? 'Deleted' : channel.visibilityStatus}</p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    {channel.deletedAt ? (
+                      <button type="button" disabled={isStudioDisabled} className={actionButtonClass} onClick={() => void runStudioAction(`restore-channel-${channel.id}`, () => restoreShadoTvChannel(channel.id), 'Channel restored as hidden.')}>
+                        Restore
                       </button>
-                      <button type="button" disabled={saving !== null || !loadedFromSupabase} className={actionButtonClass} onClick={() => void runStudioAction(`delete-channel-${channel.id}`, () => softDeleteShadoTvChannel(channel.id), 'Channel deleted.')}>
-                        Delete
-                      </button>
-                    </>
-                  )}
+                    ) : (
+                      <>
+                        <button type="button" disabled={isStudioDisabled} className={actionButtonClass} onClick={() => void runStudioAction(`toggle-channel-${channel.id}`, () => updateShadoTvChannelVisibility(channel.id, channel.visibilityStatus === 'published' ? 'hidden' : 'published'), 'Channel visibility updated.')}>
+                          {channel.visibilityStatus === 'published' ? 'Hide' : 'Publish'}
+                        </button>
+                        <button type="button" disabled={isStudioDisabled} className={actionButtonClass} onClick={() => void runStudioAction(`delete-channel-${channel.id}`, () => softDeleteShadoTvChannel(channel.id), 'Channel deleted.')}>
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </article>
-          ))}
+                <div className="mt-3 grid grid-cols-[3.25rem_1fr] items-center gap-3">
+                  <img src={channel.ticketAsset} alt="" className="h-16 w-12 rounded-[0.65rem] border border-[#d7aa46]/22 object-cover" loading="lazy" decoding="async" />
+                  <div className="min-w-0">
+                    <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-[#f0d381]/80">Artwork</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <label className={artworkDisabled ? disabledArtworkButtonClass : artworkButtonClass} aria-disabled={artworkDisabled}>
+                        Ticket
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/gif"
+                          className="sr-only"
+                          disabled={artworkDisabled}
+                          onChange={event => handleChannelArtworkUpload(channel.id, 'ticket', event)}
+                        />
+                      </label>
+                      <label className={artworkDisabled ? disabledArtworkButtonClass : artworkButtonClass} aria-disabled={artworkDisabled}>
+                        Hero
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/gif"
+                          className="sr-only"
+                          disabled={artworkDisabled}
+                          onChange={event => handleChannelArtworkUpload(channel.id, 'hero', event)}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            )
+          })}
         </div>
       </section>
 
       <section className="mt-4 rounded-[1rem] border border-[#d7aa46]/24 bg-black/46 p-4">
         <h2 className="text-sm font-black uppercase tracking-[0.18em] text-[#f6e0a2]">Videos</h2>
         <div className="mt-3 grid gap-2">
-          {[...activeVideos, ...deletedVideos].map(video => (
-            <article key={video.id} className="rounded-[0.9rem] border border-white/10 bg-white/[0.04] p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h3 className="truncate text-sm font-black text-[#f6e0a2]">{video.title}</h3>
-                  <p className="mt-1 truncate text-xs text-[#d9c79f]/70">
-                    {video.deletedAt ? 'Deleted' : `${video.visibilityStatus} / ${video.status}`}
-                  </p>
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  {video.deletedAt ? (
-                    <button type="button" disabled={saving !== null || !loadedFromSupabase} className={actionButtonClass} onClick={() => void runStudioAction(`restore-video-${video.id}`, () => restoreShadoTvVideo(video.id), 'Video restored as hidden.')}>
-                      Restore
-                    </button>
-                  ) : (
-                    <>
-                      <button type="button" disabled={saving !== null || !loadedFromSupabase} className={actionButtonClass} onClick={() => void runStudioAction(`toggle-video-${video.id}`, () => updateShadoTvVideoVisibility(video.id, video.visibilityStatus === 'published' ? 'hidden' : 'published'), 'Video visibility updated.')}>
-                        {video.visibilityStatus === 'published' ? 'Hide' : 'Publish'}
+          {[...activeVideos, ...deletedVideos].map(video => {
+            const artworkDisabled = isStudioDisabled || Boolean(video.deletedAt)
+
+            return (
+              <article key={video.id} className="rounded-[0.9rem] border border-white/10 bg-white/[0.04] p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-sm font-black text-[#f6e0a2]">{video.title}</h3>
+                    <p className="mt-1 truncate text-xs text-[#d9c79f]/70">
+                      {video.deletedAt ? 'Deleted' : `${video.visibilityStatus} / ${video.status}`}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    {video.deletedAt ? (
+                      <button type="button" disabled={isStudioDisabled} className={actionButtonClass} onClick={() => void runStudioAction(`restore-video-${video.id}`, () => restoreShadoTvVideo(video.id), 'Video restored as hidden.')}>
+                        Restore
                       </button>
-                      <button type="button" disabled={saving !== null || !loadedFromSupabase} className={actionButtonClass} onClick={() => void runStudioAction(`delete-video-${video.id}`, () => softDeleteShadoTvVideo(video.id), 'Video deleted.')}>
-                        Delete
-                      </button>
-                    </>
-                  )}
+                    ) : (
+                      <>
+                        <button type="button" disabled={isStudioDisabled} className={actionButtonClass} onClick={() => void runStudioAction(`toggle-video-${video.id}`, () => updateShadoTvVideoVisibility(video.id, video.visibilityStatus === 'published' ? 'hidden' : 'published'), 'Video visibility updated.')}>
+                          {video.visibilityStatus === 'published' ? 'Hide' : 'Publish'}
+                        </button>
+                        <button type="button" disabled={isStudioDisabled} className={actionButtonClass} onClick={() => void runStudioAction(`delete-video-${video.id}`, () => softDeleteShadoTvVideo(video.id), 'Video deleted.')}>
+                          Delete
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </article>
-          ))}
+                <div className="mt-3 grid grid-cols-[3.25rem_1fr] items-center gap-3">
+                  <img src={video.posterAsset} alt="" className="h-16 w-12 rounded-[0.65rem] border border-[#d7aa46]/22 object-cover" loading="lazy" decoding="async" />
+                  <div className="min-w-0">
+                    <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-[#f0d381]/80">Artwork</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <label className={artworkDisabled ? disabledArtworkButtonClass : artworkButtonClass} aria-disabled={artworkDisabled}>
+                        Poster
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/gif"
+                          className="sr-only"
+                          disabled={artworkDisabled}
+                          onChange={event => handleVideoArtworkUpload(video.id, 'poster', event)}
+                        />
+                      </label>
+                      <label className={artworkDisabled ? disabledArtworkButtonClass : artworkButtonClass} aria-disabled={artworkDisabled}>
+                        Thumbnail
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/gif"
+                          className="sr-only"
+                          disabled={artworkDisabled}
+                          onChange={event => handleVideoArtworkUpload(video.id, 'thumbnail', event)}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            )
+          })}
         </div>
       </section>
     </main>

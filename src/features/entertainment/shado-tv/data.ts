@@ -10,7 +10,9 @@ export interface ShadoTvChannel {
   tagline: string
   description?: string | null
   ticketAsset: string
+  ticketAssetPath?: string | null
   heroAsset: string
+  heroAssetPath?: string | null
   accent: string
   updatedAtLabel: string
   visibilityStatus?: 'draft' | 'published' | 'hidden'
@@ -26,7 +28,9 @@ export interface ShadoTvVideo {
   subtitle: string
   description: string
   posterAsset: string
+  posterAssetPath?: string | null
   thumbnailAsset: string
+  thumbnailAssetPath?: string | null
   status: ShadoTvVideoStatus
   orientation: ShadoTvOrientation
   durationSeconds?: number | null

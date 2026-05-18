@@ -1,4 +1,10 @@
-import { getWorkingClient } from '../../../lib/supabase'
+import { getMediaThumbnailConfig, type MediaThumbnailProfile } from '../../../lib/mediaAssets'
+import {
+  SHADO_TV_BUCKET,
+  getWorkingClient,
+  uploadShadoTvArtwork,
+  type ShadoTvArtworkTarget,
+} from '../../../lib/supabase'
 import { SHADO_TV_ASSETS } from './assets/manifest'
 import {
   SHADO_TV_CHANNELS,
@@ -20,7 +26,9 @@ interface ShadoTvChannelRow {
   tagline?: string | null
   description?: string | null
   ticket_asset_url?: string | null
+  ticket_asset_path?: string | null
   hero_asset_url?: string | null
+  hero_asset_path?: string | null
   accent_color?: string | null
   visibility_status: ChannelVisibility
   latest_visible_video_at?: string | null
@@ -43,7 +51,9 @@ interface ShadoTvVideoRow {
   duration_seconds?: number | null
   release_label?: string | null
   poster_asset_url?: string | null
+  poster_asset_path?: string | null
   thumbnail_asset_url?: string | null
+  thumbnail_asset_path?: string | null
   trailer_asset_url?: string | null
   external_url?: string | null
   embed_url?: string | null
@@ -98,11 +108,17 @@ export interface ShadoTvVideoFormValues {
   visibilityStatus: ChannelVisibility
 }
 
+export type ShadoTvChannelArtworkKind = 'ticket' | 'hero'
+export type ShadoTvVideoArtworkKind = 'poster' | 'thumbnail'
+
 const fallbackCatalog: ShadoTvCatalog = {
   channels: SHADO_TV_CHANNELS,
   videos: SHADO_TV_VIDEOS,
   loadedFromSupabase: false,
 }
+
+const SIGNED_ARTWORK_TTL_SECONDS = 6 * 60 * 60
+const UNSAFE_SIGNED_TRANSFORM_EXTENSIONS = /\.(gif|svg)(?:$|[?#])/i
 
 function formatDuration(seconds?: number | null) {
   if (seconds == null) return 'Processing'
@@ -203,6 +219,62 @@ function normalizeOrientation(orientation: string): ShadoTvOrientation {
   return orientation === 'vertical' ? 'vertical' : 'horizontal'
 }
 
+type WorkingClient = Awaited<ReturnType<typeof getWorkingClient>>
+
+async function createSignedArtworkUrl(
+  client: WorkingClient,
+  path: string | null | undefined,
+  profile: MediaThumbnailProfile
+) {
+  if (!path) return null
+
+  try {
+    const storage = client.storage.from(SHADO_TV_BUCKET)
+    const options = UNSAFE_SIGNED_TRANSFORM_EXTENSIONS.test(path)
+      ? undefined
+      : { transform: getMediaThumbnailConfig(profile) }
+    const { data, error } = await storage.createSignedUrl(path, SIGNED_ARTWORK_TTL_SECONDS, options)
+    if (error) return null
+    return data?.signedUrl ?? null
+  } catch {
+    return null
+  }
+}
+
+async function hydrateArtworkAssets(
+  client: WorkingClient,
+  channels: ShadoTvChannel[],
+  videos: ShadoTvVideo[]
+) {
+  const hydratedChannels = await Promise.all(channels.map(async channel => {
+    const [ticketAsset, heroAsset] = await Promise.all([
+      createSignedArtworkUrl(client, channel.ticketAssetPath, 'shado-tv-ticket'),
+      createSignedArtworkUrl(client, channel.heroAssetPath, 'shado-tv-hero'),
+    ])
+
+    return {
+      ...channel,
+      ticketAsset: ticketAsset || channel.ticketAsset,
+      heroAsset: heroAsset || channel.heroAsset,
+    }
+  }))
+
+  const hydratedVideos = await Promise.all(videos.map(async video => {
+    const [posterAsset, thumbnailAsset] = await Promise.all([
+      createSignedArtworkUrl(client, video.posterAssetPath, 'shado-tv-poster'),
+      createSignedArtworkUrl(client, video.thumbnailAssetPath, 'shado-tv-thumbnail'),
+    ])
+
+    return {
+      ...video,
+      posterAsset: posterAsset || video.posterAsset,
+      thumbnailAsset: thumbnailAsset || video.thumbnailAsset,
+    }
+  }))
+
+  return { channels: hydratedChannels, videos: hydratedVideos }
+}
+
 function mapChannel(row: ShadoTvChannelRow): ShadoTvChannel {
   return {
     id: row.id,
@@ -211,7 +283,9 @@ function mapChannel(row: ShadoTvChannelRow): ShadoTvChannel {
     tagline: row.tagline || 'A Shado TV channel.',
     description: row.description,
     ticketAsset: row.ticket_asset_url || SHADO_TV_ASSETS.tickets.classic,
+    ticketAssetPath: row.ticket_asset_path ?? null,
     heroAsset: row.hero_asset_url || SHADO_TV_ASSETS.channelHeroFallback,
+    heroAssetPath: row.hero_asset_path ?? null,
     accent: row.accent_color || '#f0d381',
     updatedAtLabel: formatUpdatedLabel(row.latest_visible_video_at || row.updated_at || row.created_at),
     visibilityStatus: row.visibility_status,
@@ -232,7 +306,9 @@ function mapVideo(row: ShadoTvVideoRow, featuresByVideo: Map<string, Set<'prime'
     subtitle: row.subtitle || (status === 'premiere' ? 'Premiere' : status === 'released' ? 'Feature' : 'Preview'),
     description: row.description || 'A Shado TV feature.',
     posterAsset: row.poster_asset_url || SHADO_TV_ASSETS.posters.classicCinema,
+    posterAssetPath: row.poster_asset_path ?? null,
     thumbnailAsset: row.thumbnail_asset_url || SHADO_TV_ASSETS.placeholders.videoHorizontal,
+    thumbnailAssetPath: row.thumbnail_asset_path ?? null,
     status,
     orientation: normalizeOrientation(row.orientation),
     durationSeconds: row.duration_seconds,
@@ -260,13 +336,13 @@ async function fetchCatalogRows(admin = false) {
 
   let channelQuery = client
     .from('shado_tv_channels')
-    .select('id, slug, title, tagline, description, ticket_asset_url, hero_asset_url, accent_color, visibility_status, latest_visible_video_at, deleted_at, updated_at, created_at')
+    .select('id, slug, title, tagline, description, ticket_asset_url, ticket_asset_path, hero_asset_url, hero_asset_path, accent_color, visibility_status, latest_visible_video_at, deleted_at, updated_at, created_at')
     .order('latest_visible_video_at', { ascending: false, nullsFirst: false })
     .order('updated_at', { ascending: false })
 
   let videoQuery = client
     .from('shado_tv_videos')
-    .select('id, channel_id, slug, title, subtitle, description, source_type, visibility_status, release_status, orientation, duration_seconds, release_label, poster_asset_url, thumbnail_asset_url, trailer_asset_url, external_url, embed_url, provider, trailer_release_at, premiere_at, released_at, deleted_at, updated_at, created_at')
+    .select('id, channel_id, slug, title, subtitle, description, source_type, visibility_status, release_status, orientation, duration_seconds, release_label, poster_asset_url, poster_asset_path, thumbnail_asset_url, thumbnail_asset_path, trailer_asset_url, external_url, embed_url, provider, trailer_release_at, premiere_at, released_at, deleted_at, updated_at, created_at')
     .order('updated_at', { ascending: false })
 
   if (!admin) {
@@ -290,6 +366,7 @@ async function fetchCatalogRows(admin = false) {
   if (featureError) throw featureError
 
   return {
+    client,
     channelRows: (channelRows ?? []) as ShadoTvChannelRow[],
     videoRows: (videoRows ?? []) as ShadoTvVideoRow[],
     featureRows: (featureRows ?? []) as ShadoTvFeatureRow[],
@@ -300,7 +377,7 @@ export async function fetchShadoTvCatalog(): Promise<ShadoTvCatalog> {
   const rows = await fetchCatalogRows(false)
   if (!rows) return fallbackCatalog
 
-  const channels = rows.channelRows.map(mapChannel)
+  const mappedChannels = rows.channelRows.map(mapChannel)
   const featuresByVideo = new Map<string, Set<'prime' | 'featured'>>()
   rows.featureRows.forEach(feature => {
     const existing = featuresByVideo.get(feature.video_id) ?? new Set<'prime' | 'featured'>()
@@ -308,13 +385,15 @@ export async function fetchShadoTvCatalog(): Promise<ShadoTvCatalog> {
     featuresByVideo.set(feature.video_id, existing)
   })
 
-  const videos = rows.videoRows
+  const mappedVideos = rows.videoRows
     .map(row => mapVideo(row, featuresByVideo))
-    .filter(video => channels.some(channel => channel.id === video.channelId))
+    .filter(video => mappedChannels.some(channel => channel.id === video.channelId))
 
-  if (channels.length === 0 || videos.length === 0) {
+  if (mappedChannels.length === 0 || mappedVideos.length === 0) {
     return fallbackCatalog
   }
+
+  const { channels, videos } = await hydrateArtworkAssets(rows.client, mappedChannels, mappedVideos)
 
   return {
     channels,
@@ -327,14 +406,15 @@ export async function fetchShadoTvAdminCatalog(): Promise<ShadoTvCatalog> {
   const rows = await fetchCatalogRows(true)
   if (!rows) return fallbackCatalog
 
-  const channels = rows.channelRows.map(mapChannel)
+  const mappedChannels = rows.channelRows.map(mapChannel)
   const featuresByVideo = new Map<string, Set<'prime' | 'featured'>>()
   rows.featureRows.forEach(feature => {
     const existing = featuresByVideo.get(feature.video_id) ?? new Set<'prime' | 'featured'>()
     existing.add(feature.feature_type)
     featuresByVideo.set(feature.video_id, existing)
   })
-  const videos = rows.videoRows.map(row => mapVideo(row, featuresByVideo))
+  const mappedVideos = rows.videoRows.map(row => mapVideo(row, featuresByVideo))
+  const { channels, videos } = await hydrateArtworkAssets(rows.client, mappedChannels, mappedVideos)
 
   return {
     channels,
@@ -365,6 +445,32 @@ export async function createShadoTvChannel(values: ShadoTvChannelFormValues) {
     })
 
   if (error) throw error
+}
+
+export async function updateShadoTvChannelArtwork(
+  channelId: string,
+  kind: ShadoTvChannelArtworkKind,
+  file: File
+) {
+  const target: ShadoTvArtworkTarget = kind === 'ticket' ? 'channel-ticket' : 'channel-hero'
+  const { client, userId } = await getCurrentUserId('update Shado TV channel artwork')
+  const asset = await uploadShadoTvArtwork(file, target, channelId)
+  const updates: Record<string, string | null> = {
+    updated_by: userId,
+    ...(kind === 'ticket'
+      ? { ticket_asset_path: asset.path, ticket_asset_url: null }
+      : { hero_asset_path: asset.path, hero_asset_url: null }),
+  }
+
+  const { error } = await client
+    .from('shado_tv_channels')
+    .update(updates)
+    .eq('id', channelId)
+
+  if (error) {
+    await client.storage.from(SHADO_TV_BUCKET).remove([asset.path]).catch(() => undefined)
+    throw error
+  }
 }
 
 export async function updateShadoTvChannelVisibility(channelId: string, visibilityStatus: ChannelVisibility) {
@@ -448,6 +554,32 @@ export async function createShadoTvVideo(values: ShadoTvVideoFormValues) {
     })
 
   if (error) throw error
+}
+
+export async function updateShadoTvVideoArtwork(
+  videoId: string,
+  kind: ShadoTvVideoArtworkKind,
+  file: File
+) {
+  const target: ShadoTvArtworkTarget = kind === 'poster' ? 'video-poster' : 'video-thumbnail'
+  const { client, userId } = await getCurrentUserId('update Shado TV video artwork')
+  const asset = await uploadShadoTvArtwork(file, target, videoId)
+  const updates: Record<string, string | null> = {
+    updated_by: userId,
+    ...(kind === 'poster'
+      ? { poster_asset_path: asset.path, poster_asset_url: null }
+      : { thumbnail_asset_path: asset.path, thumbnail_asset_url: null }),
+  }
+
+  const { error } = await client
+    .from('shado_tv_videos')
+    .update(updates)
+    .eq('id', videoId)
+
+  if (error) {
+    await client.storage.from(SHADO_TV_BUCKET).remove([asset.path]).catch(() => undefined)
+    throw error
+  }
 }
 
 export async function updateShadoTvVideoVisibility(videoId: string, visibilityStatus: ChannelVisibility) {
