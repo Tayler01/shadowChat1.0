@@ -22,12 +22,15 @@ As of 2026-05-17:
   authenticated grants, and realtime publication for channels/videos/features.
 - Admin/sub-admin studio controls can create channels/videos, publish or hide
   them, soft-delete them, and restore deleted items as hidden drafts.
+- The Shado TV player shell supports release-state-aware playback UI, external
+  embed rendering with an open-link fallback, and a Supabase-backed Continue
+  Watching contract through `shado_tv_watch_progress`.
 - The mobile QA harness includes Shado TV home, channel, and video navigation.
 - Foreground headed mobile QA passed across iPhone/WebKit and
-  Android/Chromium phone profiles:
-  `output/playwright/shado-tv-supabase-headed-20260517/summary.json`.
-- Supabase smoke-post cleanup was verified after QA: matching group and DM test
-  message counts were both `0`.
+  Android/Chromium phone profiles with
+  `node scripts/mobile-pwa-visual-qa.mjs --run-name=shado-tv-polish-final2-headed-20260517 --no-reuse-server --headed --slow-mo=70`.
+- Supabase smoke-post cleanup was verified after QA: matching group, DM, and
+  board-chat test message counts were all `0`.
 - Supabase advisor follow-up: the initial Shado TV migration was followed by
   `20260517230544_shado_tv_rls_policy_consolidation.sql`; after that, the
   performance advisor returned no `shado_tv` findings.
@@ -112,6 +115,25 @@ As of 2026-05-17:
   7. After full release: normal on-demand playback.
 - Continue Watching / resume applies only to fully released on-demand playback,
   not premiere mode.
+
+### Playback Contract
+
+The app shell now has a provider-neutral playback boundary:
+
+- `external_embed` videos can render in the Shado TV theater frame when an
+  embeddable URL is available.
+- External videos also expose an `Open` fallback for providers or URLs that do
+  not allow iframe playback.
+- `native_upload` videos intentionally do not fake playback before a provider is
+  approved. They display the release/processing state and wait for the future
+  playback descriptor.
+- Watch progress is stored in `public.shado_tv_watch_progress` by signed-in
+  user and video. The home screen can render a Continue Watching rail when
+  progress exists.
+- Progress writes are allowed only for released, published videos by RLS.
+- The future native HLS implementation should plug into the current video page
+  by saving real `<video>` `currentTime` updates through the existing
+  `saveShadoTvWatchProgress` API helper.
 
 ### Home Page Featuring
 

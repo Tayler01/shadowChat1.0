@@ -7,6 +7,7 @@ import {
   type ShadoTvOrientation,
   type ShadoTvVideo,
   type ShadoTvVideoStatus,
+  type ShadoTvWatchProgress,
 } from './data'
 
 type ChannelVisibility = 'draft' | 'published' | 'hidden'
@@ -44,6 +45,12 @@ interface ShadoTvVideoRow {
   poster_asset_url?: string | null
   thumbnail_asset_url?: string | null
   trailer_asset_url?: string | null
+  external_url?: string | null
+  embed_url?: string | null
+  provider?: string | null
+  trailer_release_at?: string | null
+  premiere_at?: string | null
+  released_at?: string | null
   deleted_at?: string | null
   updated_at: string
   created_at: string
@@ -53,6 +60,14 @@ interface ShadoTvFeatureRow {
   video_id: string
   feature_type: 'prime' | 'featured'
   sort_order: number
+}
+
+interface ShadoTvWatchProgressRow {
+  video_id: string
+  position_seconds: number
+  duration_seconds?: number | null
+  completed_at?: string | null
+  updated_at: string
 }
 
 export interface ShadoTvCatalog {
@@ -105,6 +120,44 @@ function slugify(value: string) {
     .slice(0, 70)
 
   return slug || `shado-tv-${Date.now()}`
+}
+
+function normalizeExternalVideoUrl(value: string) {
+  const raw = value.trim()
+  if (!raw) return { externalUrl: '', embedUrl: '' }
+
+  try {
+    const url = new URL(raw)
+    const hostname = url.hostname.replace(/^www\./, '')
+
+    if (hostname === 'youtu.be') {
+      const id = url.pathname.split('/').filter(Boolean)[0]
+      return {
+        externalUrl: raw,
+        embedUrl: id ? `https://www.youtube.com/embed/${id}` : raw,
+      }
+    }
+
+    if (hostname === 'youtube.com' || hostname === 'm.youtube.com') {
+      const id = url.searchParams.get('v')
+      return {
+        externalUrl: raw,
+        embedUrl: id ? `https://www.youtube.com/embed/${id}` : raw,
+      }
+    }
+
+    if (hostname === 'vimeo.com') {
+      const id = url.pathname.split('/').filter(Boolean)[0]
+      return {
+        externalUrl: raw,
+        embedUrl: id ? `https://player.vimeo.com/video/${id}` : raw,
+      }
+    }
+  } catch {
+    return { externalUrl: raw, embedUrl: raw }
+  }
+
+  return { externalUrl: raw, embedUrl: raw }
 }
 
 function normalizeText(value: string, maxLength: number, label: string, required = false) {
@@ -187,6 +240,12 @@ function mapVideo(row: ShadoTvVideoRow, featuresByVideo: Map<string, Set<'prime'
     releaseLabel: row.release_label || (status === 'released' ? 'Available now' : 'Coming soon'),
     visibilityStatus: row.visibility_status,
     sourceType: row.source_type,
+    externalUrl: row.external_url ?? null,
+    embedUrl: row.embed_url ?? null,
+    provider: row.provider ?? null,
+    trailerReleaseAt: row.trailer_release_at ?? null,
+    premiereAt: row.premiere_at ?? null,
+    releasedAt: row.released_at ?? null,
     deletedAt: row.deleted_at ?? null,
     featured: features?.has('featured') ?? false,
     prime: features?.has('prime') ?? false,
@@ -207,7 +266,7 @@ async function fetchCatalogRows(admin = false) {
 
   let videoQuery = client
     .from('shado_tv_videos')
-    .select('id, channel_id, slug, title, subtitle, description, source_type, visibility_status, release_status, orientation, duration_seconds, release_label, poster_asset_url, thumbnail_asset_url, trailer_asset_url, deleted_at, updated_at, created_at')
+    .select('id, channel_id, slug, title, subtitle, description, source_type, visibility_status, release_status, orientation, duration_seconds, release_label, poster_asset_url, thumbnail_asset_url, trailer_asset_url, external_url, embed_url, provider, trailer_release_at, premiere_at, released_at, deleted_at, updated_at, created_at')
     .order('updated_at', { ascending: false })
 
   if (!admin) {
@@ -359,6 +418,7 @@ export async function createShadoTvVideo(values: ShadoTvVideoFormValues) {
   const durationSeconds = Number.isFinite(durationMinutes) && durationMinutes > 0
     ? Math.round(durationMinutes * 60)
     : null
+  const external = normalizeExternalVideoUrl(values.externalUrl)
   const { client, userId } = await getCurrentUserId('create Shado TV videos')
 
   const { error } = await client
@@ -379,8 +439,8 @@ export async function createShadoTvVideo(values: ShadoTvVideoFormValues) {
       thumbnail_asset_url: values.orientation === 'vertical'
         ? SHADO_TV_ASSETS.placeholders.videoVertical
         : SHADO_TV_ASSETS.placeholders.videoHorizontal,
-      external_url: values.externalUrl.trim() || null,
-      embed_url: values.embedUrl.trim() || null,
+      external_url: external.externalUrl || null,
+      embed_url: values.embedUrl.trim() || external.embedUrl || null,
       provider: values.sourceType === 'external_embed' ? 'external' : 'placeholder',
       upload_status: values.releaseStatus === 'processing' ? 'processing' : 'ready',
       created_by: userId,
@@ -428,6 +488,61 @@ export async function restoreShadoTvVideo(videoId: string) {
       updated_by: userId,
     })
     .eq('id', videoId)
+
+  if (error) throw error
+}
+
+export async function fetchShadoTvWatchProgress(videoIds: string[]) {
+  if (videoIds.length === 0) return new Map<string, ShadoTvWatchProgress>()
+
+  const client = await getWorkingClient()
+  const { data: { user } } = await client.auth.getUser()
+  if (!user) return new Map<string, ShadoTvWatchProgress>()
+
+  const { data, error } = await client
+    .from('shado_tv_watch_progress')
+    .select('video_id, position_seconds, duration_seconds, completed_at, updated_at')
+    .eq('user_id', user.id)
+    .in('video_id', videoIds)
+
+  if (error) throw error
+
+  const progressMap = new Map<string, ShadoTvWatchProgress>()
+  ;((data ?? []) as ShadoTvWatchProgressRow[]).forEach(progress => {
+    progressMap.set(progress.video_id, {
+      videoId: progress.video_id,
+      positionSeconds: Number(progress.position_seconds ?? 0),
+      durationSeconds: progress.duration_seconds ?? null,
+      completedAt: progress.completed_at ?? null,
+      updatedAt: progress.updated_at,
+    })
+  })
+
+  return progressMap
+}
+
+export async function saveShadoTvWatchProgress(
+  videoId: string,
+  positionSeconds: number,
+  durationSeconds?: number | null
+) {
+  const { client, userId } = await getCurrentUserId('save Shado TV watch progress')
+  const safePosition = Math.max(0, Math.floor(positionSeconds))
+  const safeDuration = durationSeconds == null ? null : Math.max(0, Math.floor(durationSeconds))
+  const completedAt = safeDuration && safeDuration > 0 && safePosition >= safeDuration * 0.9
+    ? new Date().toISOString()
+    : null
+
+  const { error } = await client
+    .from('shado_tv_watch_progress')
+    .upsert({
+      user_id: userId,
+      video_id: videoId,
+      position_seconds: safePosition,
+      duration_seconds: safeDuration,
+      completed_at: completedAt,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,video_id' })
 
   if (error) throw error
 }

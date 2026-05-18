@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, CalendarClock, Clapperboard, Film, Lock, Play, RotateCcw, Settings, Sparkles, Upload } from 'lucide-react'
+import React, { useCallback, useEffect, useState } from 'react'
+import { ArrowLeft, CalendarClock, Clapperboard, ExternalLink, Film, Lock, Play, RotateCcw, Settings, Sparkles, Upload } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../../../hooks/useAuth'
 import { SHADO_TV_ASSETS } from './assets/manifest'
@@ -9,8 +9,10 @@ import {
   createShadoTvVideo,
   fetchShadoTvAdminCatalog,
   fetchShadoTvCatalog,
+  fetchShadoTvWatchProgress,
   restoreShadoTvChannel,
   restoreShadoTvVideo,
+  saveShadoTvWatchProgress,
   softDeleteShadoTvChannel,
   softDeleteShadoTvVideo,
   updateShadoTvChannelVisibility,
@@ -19,6 +21,7 @@ import {
 import {
   type ShadoTvChannel,
   type ShadoTvVideo,
+  type ShadoTvWatchProgress,
 } from './data'
 
 interface ShadoTvScreenProps {
@@ -46,6 +49,18 @@ function getVideosForChannel(videos: ShadoTvVideo[], channelId: string) {
   return videos.filter(video => video.channelId === channelId)
 }
 
+function formatWatchTime(seconds?: number | null) {
+  if (!seconds) return '0:00'
+  const minutes = Math.floor(seconds / 60)
+  const remaining = seconds % 60
+  return `${minutes}:${String(remaining).padStart(2, '0')}`
+}
+
+function getProgressPercent(progress?: ShadoTvWatchProgress | null) {
+  if (!progress?.durationSeconds) return 0
+  return Math.min(100, Math.max(0, Math.round((progress.positionSeconds / progress.durationSeconds) * 100)))
+}
+
 function BackButton({ onClick, label = 'Back' }: { onClick: () => void; label?: string }) {
   return (
     <button
@@ -60,41 +75,36 @@ function BackButton({ onClick, label = 'Back' }: { onClick: () => void; label?: 
 }
 
 function ShadoTvHeader({
-  title,
   onBack,
   onExit,
   canManage,
   onAdmin,
 }: {
-  title?: string
   onBack?: () => void
   onExit: () => void
   canManage: boolean
   onAdmin: () => void
 }) {
   return (
-    <header className="relative z-20 flex h-[calc(3.5rem+env(safe-area-inset-top))] shrink-0 items-end border-b border-[#d7aa46]/22 bg-black/72 px-2 pb-2 pt-[env(safe-area-inset-top)] shadow-[0_10px_32px_rgba(0,0,0,0.55)] backdrop-blur-xl">
-      <div className="flex min-w-0 flex-1 items-center gap-2">
+    <header className="relative z-20 flex h-[calc(3.95rem+env(safe-area-inset-top))] shrink-0 items-end justify-center border-b border-[#d7aa46]/22 bg-black/72 px-2 pb-2 pt-[env(safe-area-inset-top)] shadow-[0_10px_32px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+      <div className="absolute bottom-2 left-1 flex items-center">
         <BackButton onClick={onBack ?? onExit} label={onBack ? 'Back within Shado TV' : 'Back to Entertainment'} />
-        <div className="min-w-0">
-          <img
-            src={SHADO_TV_ASSETS.logoMarquee}
-            alt="Shado TV"
-            className="h-8 w-auto max-w-[9.5rem] object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.75)] min-[390px]:max-w-[11.25rem]"
-            width={1400}
-            height={560}
-            loading="eager"
-            decoding="async"
-          />
-          {title && <p className="truncate text-[10px] font-semibold uppercase tracking-[0.28em] text-[#d9c79f]/76">{title}</p>}
-        </div>
       </div>
+      <img
+        src={SHADO_TV_ASSETS.logoMarquee}
+        alt="Shado TV"
+        className="h-auto w-[11.75rem] max-w-[calc(100vw-7.25rem)] object-contain drop-shadow-[0_6px_18px_rgba(0,0,0,0.75)] min-[390px]:w-[13.25rem]"
+        width={1400}
+        height={560}
+        loading="eager"
+        decoding="async"
+      />
       {canManage && (
         <button
           type="button"
           onClick={onAdmin}
           aria-label="Open Shado TV management"
-          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#d7aa46]/45 bg-black/36 text-[#f6e0a2] shadow-[0_0_24px_rgba(215,170,70,0.16)] transition hover:border-[#f0d381] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
+          className="absolute bottom-2 right-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#d7aa46]/45 bg-black/36 text-[#f6e0a2] shadow-[0_0_24px_rgba(215,170,70,0.16)] transition hover:border-[#f0d381] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
         >
           <Settings className="h-5 w-5" />
         </button>
@@ -120,6 +130,7 @@ function ChannelTicket({ channel, index, onOpen }: { channel: ShadoTvChannel; in
       type="button"
       onClick={onOpen}
       aria-label={`Open ${channel.name}`}
+      data-shado-tv-channel-card="true"
       className="group relative h-[9.4rem] w-[6.2rem] shrink-0 overflow-hidden rounded-[0.9rem] text-center transition-transform duration-300 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/60"
     >
       <img
@@ -146,6 +157,7 @@ function PosterCard({ video, onOpen, priority = false }: { video: ShadoTvVideo; 
       type="button"
       onClick={onOpen}
       aria-label={`Open ${video.title}`}
+      data-shado-tv-video-card="true"
       className="group relative min-h-[13rem] w-[8.75rem] shrink-0 overflow-hidden rounded-[0.85rem] border border-[#d7aa46]/32 bg-black text-left shadow-[0_16px_32px_rgba(0,0,0,0.38)] transition duration-300 hover:-translate-y-1 hover:border-[#f0d381]/70 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
     >
       <img
@@ -169,14 +181,50 @@ function PosterCard({ video, onOpen, priority = false }: { video: ShadoTvVideo; 
   )
 }
 
+function ContinueWatchingCard({
+  video,
+  progress,
+  onOpen,
+}: {
+  video: ShadoTvVideo
+  progress: ShadoTvWatchProgress
+  onOpen: () => void
+}) {
+  const percent = getProgressPercent(progress)
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`Resume ${video.title}`}
+      data-shado-tv-video-card="true"
+      className="relative h-[7.5rem] w-[14rem] shrink-0 overflow-hidden rounded-[1rem] border border-[#d7aa46]/32 bg-black text-left shadow-[0_16px_32px_rgba(0,0,0,0.34)] transition hover:-translate-y-0.5 hover:border-[#f0d381]/70 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
+    >
+      <img src={video.thumbnailAsset} alt="" className="absolute inset-0 h-full w-full object-cover opacity-78" width={1280} height={720} loading="lazy" decoding="async" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/30 to-black/16" />
+      <div className="absolute inset-x-3 bottom-3">
+        <h3 className="truncate text-base font-black uppercase tracking-[0.04em] text-[#f6e0a2]">{video.title}</h3>
+        <p className="mt-0.5 text-xs font-semibold text-[#d9c79f]/78">
+          Resume at {formatWatchTime(progress.positionSeconds)}
+        </p>
+        <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/18">
+          <div className="h-full rounded-full bg-[#f0d381]" style={{ width: `${percent || 6}%` }} />
+        </div>
+      </div>
+    </button>
+  )
+}
+
 function HomeView({
   channels,
   videos,
+  watchProgress,
   onOpenChannel,
   onOpenVideo,
 }: {
   channels: ShadoTvChannel[]
   videos: ShadoTvVideo[]
+  watchProgress: Map<string, ShadoTvWatchProgress>
   onOpenChannel: (channelId: string) => void
   onOpenVideo: (videoId: string) => void
 }) {
@@ -184,6 +232,10 @@ function HomeView({
   const primeChannel = getChannelById(channels, prime.channelId)
   const featuredVideos = videos.filter(video => video.featured)
   const visibleFeaturedVideos = featuredVideos.length > 0 ? featuredVideos : videos.slice(0, 4)
+  const continueVideos = videos
+    .map(video => ({ video, progress: watchProgress.get(video.id) }))
+    .filter((item): item is { video: ShadoTvVideo; progress: ShadoTvWatchProgress } => Boolean(item.progress?.positionSeconds))
+    .slice(0, 6)
 
   return (
     <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)_+_1.25rem)] pt-4">
@@ -224,7 +276,6 @@ function HomeView({
       <section className="mt-5">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-black uppercase tracking-[0.22em] text-[#f6e0a2]">Channels</h2>
-          <span className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-[#d9c79f]/58">Newest first</span>
         </div>
         <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2" data-mobile-horizontal-scroll="true">
           {channels.map((channel, index) => (
@@ -237,6 +288,25 @@ function HomeView({
           ))}
         </div>
       </section>
+
+      {continueVideos.length > 0 && (
+        <section className="mt-5">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-sm font-black uppercase tracking-[0.22em] text-[#f6e0a2]">Continue Watching</h2>
+            <span className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-[#d9c79f]/58">Resume</span>
+          </div>
+          <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2" data-mobile-horizontal-scroll="true">
+            {continueVideos.map(({ video, progress }) => (
+              <ContinueWatchingCard
+                key={video.id}
+                video={video}
+                progress={progress}
+                onOpen={() => onOpenVideo(video.id)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mt-5">
         <div className="mb-2 flex items-center justify-between">
@@ -285,6 +355,7 @@ function ChannelView({
               type="button"
               aria-label={`Open ${video.title}`}
               onClick={() => onOpenVideo(video.id)}
+              data-shado-tv-video-card="true"
               className="overflow-hidden rounded-[0.9rem] border border-[#d7aa46]/26 bg-black/56 text-left shadow-[0_16px_28px_rgba(0,0,0,0.35)] transition hover:-translate-y-0.5 hover:border-[#f0d381]/55 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
             >
               <div className="relative aspect-[2/3] overflow-hidden bg-black">
@@ -297,38 +368,146 @@ function ChannelView({
               </div>
             </button>
           ))}
+          {channelVideos.length === 0 && (
+            <div className="col-span-2 rounded-[1rem] border border-[#d7aa46]/24 bg-black/42 p-4 text-sm font-semibold leading-5 text-[#d9c79f]/78 min-[430px]:col-span-3">
+              No visible videos in this channel yet.
+            </div>
+          )}
         </div>
       </section>
     </main>
   )
 }
 
-function VideoView({ video, channel }: { video: ShadoTvVideo; channel: ShadoTvChannel }) {
+function VideoView({
+  video,
+  channel,
+  progress,
+  onProgressSaved,
+}: {
+  video: ShadoTvVideo
+  channel: ShadoTvChannel
+  progress?: ShadoTvWatchProgress
+  onProgressSaved: () => Promise<void>
+}) {
+  const [showEmbed, setShowEmbed] = useState(false)
+  const [progressMessage, setProgressMessage] = useState<string | null>(null)
+  const [savingProgress, setSavingProgress] = useState(false)
   const isVertical = video.orientation === 'vertical'
   const canPlay = video.status === 'released'
+  const canEmbed = canPlay && video.sourceType === 'external_embed' && Boolean(video.embedUrl)
+  const canOpenExternal = canPlay && video.sourceType === 'external_embed' && Boolean(video.externalUrl)
   const image = video.status === 'processing'
     ? SHADO_TV_ASSETS.placeholders.processing
     : video.status === 'locked' || video.status === 'premiere'
       ? SHADO_TV_ASSETS.placeholders.lockedPremiere
       : video.thumbnailAsset
+  const progressPercent = getProgressPercent(progress)
+
+  const saveStartProgress = async (positionSeconds?: number) => {
+    if (!canPlay) return
+    setSavingProgress(true)
+    setProgressMessage(null)
+    try {
+      await saveShadoTvWatchProgress(
+        video.id,
+        positionSeconds ?? Math.max(1, progress?.positionSeconds ?? 0),
+        video.durationSeconds ?? progress?.durationSeconds ?? null
+      )
+      await onProgressSaved()
+      setProgressMessage('Resume point saved.')
+    } catch (error) {
+      setProgressMessage(error instanceof Error ? error.message : 'Unable to save resume point.')
+    } finally {
+      setSavingProgress(false)
+    }
+  }
+
+  const handlePlay = () => {
+    if (!canPlay) return
+    if (canEmbed) {
+      setShowEmbed(true)
+      void saveStartProgress()
+      return
+    }
+    if (canOpenExternal && video.externalUrl) {
+      void saveStartProgress()
+      window.open(video.externalUrl, '_blank', 'noopener,noreferrer')
+    }
+  }
 
   return (
     <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)_+_1.25rem)] pt-4">
       <section className="overflow-hidden rounded-[1.25rem] border border-[#d7aa46]/34 bg-black/78 shadow-[0_24px_62px_rgba(0,0,0,0.55)]">
         <div className={`relative mx-auto bg-black ${isVertical ? 'aspect-[9/16] max-h-[62vh] max-w-[18rem]' : 'aspect-video w-full'}`}>
-          <img src={image} alt="" className="h-full w-full object-cover" width={isVertical ? 720 : 1280} height={isVertical ? 1280 : 720} loading="eager" decoding="async" />
-          <div className="absolute inset-0 bg-black/18" />
-          <div className="absolute left-3 top-3"><StatusBadge video={video} /></div>
-          <div className="absolute inset-0 flex items-center justify-center">
-            <button
-              type="button"
-              disabled={!canPlay}
-              className="inline-flex h-16 w-16 items-center justify-center rounded-full border border-[#f0d381]/70 bg-black/56 text-[#f6e0a2] shadow-[0_0_42px_rgba(215,170,70,0.3)] backdrop-blur-md transition enabled:hover:bg-[#d7aa46]/20 disabled:opacity-70"
-              aria-label={canPlay ? `Play ${video.title}` : `${video.title} is not available yet`}
-            >
-              {canPlay ? <Play className="ml-1 h-7 w-7 fill-current" /> : <Lock className="h-7 w-7" />}
-            </button>
+          {showEmbed && canEmbed ? (
+            <iframe
+              src={video.embedUrl || undefined}
+              title={video.title}
+              className="absolute inset-0 h-full w-full border-0 bg-black"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          ) : (
+            <>
+              <img src={image} alt="" className="h-full w-full object-cover" width={isVertical ? 720 : 1280} height={isVertical ? 1280 : 720} loading="eager" decoding="async" />
+              <div className="absolute inset-0 bg-black/18" />
+              <div className="absolute left-3 top-3"><StatusBadge video={video} /></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <button
+                  type="button"
+                  disabled={!canPlay || (!canEmbed && !canOpenExternal)}
+                  onClick={handlePlay}
+                  className="inline-flex h-16 w-16 items-center justify-center rounded-full border border-[#f0d381]/70 bg-black/56 text-[#f6e0a2] shadow-[0_0_42px_rgba(215,170,70,0.3)] backdrop-blur-md transition enabled:hover:bg-[#d7aa46]/20 disabled:opacity-70"
+                  aria-label={canPlay ? `Play ${video.title}` : `${video.title} is not available yet`}
+                >
+                  {canPlay ? (canOpenExternal && !canEmbed ? <ExternalLink className="h-7 w-7" /> : <Play className="ml-1 h-7 w-7 fill-current" />) : <Lock className="h-7 w-7" />}
+                </button>
+              </div>
+            </>
+          )}
+          {progressPercent > 0 && (
+            <div className="absolute inset-x-0 bottom-0 h-1 bg-white/16">
+              <div className="h-full bg-[#f0d381]" style={{ width: `${progressPercent}%` }} />
+            </div>
+          )}
+        </div>
+        <div className="border-t border-white/10 bg-black/38 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            {canPlay && (canEmbed || canOpenExternal) ? (
+              <button
+                type="button"
+                onClick={handlePlay}
+                disabled={savingProgress}
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-[#d7aa46]/40 px-4 text-xs font-black uppercase tracking-[0.14em] text-[#f6e0a2] transition hover:border-[#f0d381]/70 disabled:opacity-55"
+              >
+                {canOpenExternal && !canEmbed ? <ExternalLink className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />}
+                {progress?.positionSeconds ? `Resume ${formatWatchTime(progress.positionSeconds)}` : 'Start'}
+              </button>
+            ) : (
+              <span className="text-xs font-semibold text-[#d9c79f]/72">
+                {video.status === 'processing'
+                  ? 'The stream is still processing.'
+                  : video.status === 'released'
+                    ? 'Native streaming connects after the provider is approved.'
+                    : 'This video is locked until its release window.'}
+              </span>
+            )}
+            {canOpenExternal && (
+              <a
+                href={video.externalUrl || undefined}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-white/12 px-4 text-xs font-black uppercase tracking-[0.14em] text-[#d9c79f] transition hover:border-[#d9c79f]/50"
+                onClick={() => void saveStartProgress()}
+              >
+                <ExternalLink className="h-4 w-4" />
+                Open
+              </a>
+            )}
           </div>
+          {progressMessage && <p className="mt-2 text-xs font-semibold text-[#d9c79f]/72">{progressMessage}</p>}
         </div>
         <div className="p-4">
           <p className="text-[0.68rem] font-black uppercase tracking-[0.22em] text-[#f0d381]">{channel.name}</p>
@@ -342,6 +521,14 @@ function VideoView({ video, channel }: { video: ShadoTvVideo; channel: ShadoTvCh
             <div className="rounded-[0.75rem] border border-white/10 bg-white/[0.04] p-3">
               <span className="block text-[0.62rem] font-black uppercase tracking-[0.18em] text-[#f0d381]/80">Release</span>
               <span className="mt-1 block font-semibold">{video.releaseLabel}</span>
+            </div>
+            <div className="rounded-[0.75rem] border border-white/10 bg-white/[0.04] p-3">
+              <span className="block text-[0.62rem] font-black uppercase tracking-[0.18em] text-[#f0d381]/80">Resume</span>
+              <span className="mt-1 block font-semibold">{progress?.positionSeconds ? formatWatchTime(progress.positionSeconds) : 'Not started'}</span>
+            </div>
+            <div className="rounded-[0.75rem] border border-white/10 bg-white/[0.04] p-3">
+              <span className="block text-[0.62rem] font-black uppercase tracking-[0.18em] text-[#f0d381]/80">Source</span>
+              <span className="mt-1 block font-semibold">{video.sourceType === 'external_embed' ? 'External embed' : video.sourceType === 'native_upload' ? 'Native upload' : 'Placeholder'}</span>
             </div>
           </div>
         </div>
@@ -688,6 +875,7 @@ export function ShadoTvScreen({ onExit }: ShadoTvScreenProps) {
   const { user } = useAuth()
   const [view, setView] = useState<ShadoTvView>({ type: 'home' })
   const [catalog, setCatalog] = useState(SHADO_TV_FALLBACK_CATALOG)
+  const [watchProgress, setWatchProgress] = useState<Map<string, ShadoTvWatchProgress>>(new Map())
   const [catalogError, setCatalogError] = useState<string | null>(null)
   const canManage = user?.admin_role === 'admin' || user?.admin_role === 'sub_admin'
   const channels = catalog.channels
@@ -710,17 +898,18 @@ export function ShadoTvScreen({ onExit }: ShadoTvScreenProps) {
     }
   }, [])
 
+  const loadWatchProgress = useCallback(async (catalogVideos = videos) => {
+    const progress = await fetchShadoTvWatchProgress(catalogVideos.map(video => video.id))
+    setWatchProgress(progress)
+  }, [videos])
+
   useEffect(() => {
     void loadCatalog(false)
   }, [loadCatalog])
 
-  const title = useMemo(() => {
-    if (view.type === 'home') return 'Home'
-    if (view.type === 'admin') return 'Studio'
-    if (currentChannel && view.type === 'channel') return currentChannel.name
-    if (currentVideo) return currentVideo.title
-    return undefined
-  }, [currentChannel, currentVideo, view.type])
+  useEffect(() => {
+    void loadWatchProgress(videos)
+  }, [loadWatchProgress, videos])
 
   const goBack = () => {
     if (view.type === 'home') {
@@ -751,7 +940,6 @@ export function ShadoTvScreen({ onExit }: ShadoTvScreenProps) {
       />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(215,170,70,0.18),transparent_34%),linear-gradient(180deg,rgba(0,0,0,0.28),rgba(0,0,0,0.94))]" />
       <ShadoTvHeader
-        title={title}
         onBack={view.type === 'home' ? undefined : goBack}
         onExit={onExit}
         canManage={canManage}
@@ -765,6 +953,7 @@ export function ShadoTvScreen({ onExit }: ShadoTvScreenProps) {
           <HomeView
             channels={channels}
             videos={videos}
+            watchProgress={watchProgress}
             onOpenChannel={channelId => setView({ type: 'channel', channelId })}
             onOpenVideo={videoId => setView({ type: 'video', videoId })}
           />
@@ -776,7 +965,14 @@ export function ShadoTvScreen({ onExit }: ShadoTvScreenProps) {
             onOpenVideo={videoId => setView({ type: 'video', videoId, fromChannelId: currentChannel.id })}
           />
         )}
-        {view.type === 'video' && currentVideo && currentChannel && <VideoView video={currentVideo} channel={currentChannel} />}
+        {view.type === 'video' && currentVideo && currentChannel && (
+          <VideoView
+            video={currentVideo}
+            channel={currentChannel}
+            progress={watchProgress.get(currentVideo.id)}
+            onProgressSaved={() => loadWatchProgress(videos)}
+          />
+        )}
         {view.type === 'admin' && (
           <AdminView
             channels={channels}

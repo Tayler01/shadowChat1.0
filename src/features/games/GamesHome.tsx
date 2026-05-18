@@ -166,7 +166,7 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
           type="button"
           aria-label="Open Shado TV"
           onClick={enterShadoTv}
-          className="group relative min-h-[9.75rem] w-full overflow-hidden rounded-[2rem] border border-[rgba(215,170,70,0.42)] bg-[#050403] text-left shadow-[0_24px_60px_rgba(0,0,0,0.48)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[rgba(239,202,114,0.68)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,202,114,0.55)] md:min-h-[12rem]"
+          className="group relative min-h-[8.25rem] w-full overflow-hidden rounded-[2rem] border border-[rgba(215,170,70,0.42)] bg-[#050403] text-left shadow-[0_24px_60px_rgba(0,0,0,0.48)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[rgba(239,202,114,0.68)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,202,114,0.55)] md:min-h-[10rem]"
         >
           <img
             src={SHADO_TV_ASSETS.pickerBanner}
@@ -181,21 +181,18 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.92),rgba(0,0,0,0.52)_54%,rgba(0,0,0,0.2)),radial-gradient(circle_at_76%_22%,rgba(215,170,70,0.28),transparent_34%)]" />
           <div className="absolute inset-x-6 top-4 h-px bg-gradient-to-r from-transparent via-[#f0d381]/55 to-transparent" />
           <div className="absolute inset-x-6 bottom-4 h-px bg-gradient-to-r from-transparent via-[#8a6328]/60 to-transparent" />
-          <div className="relative flex h-full min-h-[9.75rem] items-center gap-4 px-5 py-5 md:min-h-[12rem] md:px-8">
+          <div className="relative flex h-full min-h-[8.25rem] items-center gap-4 px-5 py-4 md:min-h-[10rem] md:px-8">
             <div className="min-w-0 flex-1">
               <img
                 src={SHADO_TV_ASSETS.logoMarquee}
                 alt="Shado TV"
-                className="mx-auto mb-3 h-auto w-full max-w-[25rem] object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.85)] md:mx-0"
+                className="mx-auto h-auto w-full max-w-[21rem] object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.85)] md:mx-0 md:max-w-[23rem]"
                 loading="eager"
                 decoding="async"
                 fetchPriority="high"
                 width={1400}
                 height={560}
               />
-              <p className="mx-auto max-w-xl text-center text-sm leading-6 text-[#d9c79f] md:mx-0 md:text-left md:text-base">
-                A retro cinema streaming room for channels, premieres, and Shado originals.
-              </p>
             </div>
             <div className="hidden rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.04)] p-3 text-[#f0d381] md:block">
               <Film className="h-5 w-5" />

@@ -34,10 +34,24 @@ export interface ShadoTvVideo {
   releaseLabel: string
   visibilityStatus?: 'draft' | 'published' | 'hidden'
   sourceType?: 'native_upload' | 'external_embed' | 'placeholder'
+  externalUrl?: string | null
+  embedUrl?: string | null
+  provider?: string | null
+  trailerReleaseAt?: string | null
+  premiereAt?: string | null
+  releasedAt?: string | null
   deletedAt?: string | null
   featured?: boolean
   prime?: boolean
   trailerAvailable?: boolean
+}
+
+export interface ShadoTvWatchProgress {
+  videoId: string
+  positionSeconds: number
+  durationSeconds?: number | null
+  completedAt?: string | null
+  updatedAt: string
 }
 
 export const SHADO_TV_CHANNELS: ShadoTvChannel[] = [

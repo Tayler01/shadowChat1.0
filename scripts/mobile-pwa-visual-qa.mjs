@@ -683,6 +683,30 @@ async function waitForGamesView(page) {
   await page.getByRole('button', { name: 'Open Shadow War' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
+async function clickShadoTvChannelByName(page, channelName) {
+  const channelButton = page.locator(`[data-shado-tv-channel-card="true"][aria-label="Open ${channelName}"]`)
+  await channelButton.waitFor({ state: 'visible', timeout: DEFAULT_TIMEOUT_MS })
+  const clicked = await page.evaluate(name => {
+    const button = Array.from(document.querySelectorAll('[data-shado-tv-channel-card="true"]'))
+      .find(element => element.getAttribute('aria-label') === `Open ${name}`)
+    if (!(button instanceof HTMLElement)) return false
+    button.click()
+    return true
+  }, channelName)
+  if (!clicked) throw new Error(`Unable to click Shado TV channel ${channelName}`)
+}
+
+async function clickFirstShadoTvVideo(page) {
+  await page.locator('[data-shado-tv-video-card="true"]').first().waitFor({ state: 'visible', timeout: DEFAULT_TIMEOUT_MS })
+  return page.evaluate(() => {
+    const button = document.querySelector('[data-shado-tv-video-card="true"]')
+    if (!(button instanceof HTMLElement)) return null
+    const label = button.getAttribute('aria-label')
+    button.click()
+    return label?.replace(/^Open\s+/, '').replace(/^Resume\s+/, '') ?? null
+  })
+}
+
 async function openShadoTvIfAvailable(page, profile) {
   const shadoTvButton = page.getByRole('button', { name: 'Open Shado TV' })
   if (!(await shadoTvButton.isVisible().catch(() => false))) {
@@ -699,18 +723,32 @@ async function openShadoTvIfAvailable(page, profile) {
   await page.getByRole('button', { name: 'Open Classic Cinema' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
   await auditPage(page, profile, '15b-shado-tv-home', { footer: false })
 
-  await page.getByRole('button', { name: 'Open Classic Cinema' }).click()
+  await clickShadoTvChannelByName(page, 'Classic Cinema')
   await page.getByRole('heading', { name: 'Classic Cinema' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
   await auditPage(page, profile, '15c-shado-tv-channel', { footer: false })
 
-  await page.getByRole('button', { name: 'Open Silver Screen' }).click()
-  await page.getByRole('heading', { name: 'Silver Screen' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-  await auditPage(page, profile, '15d-shado-tv-video', { footer: false })
+  const channelVideos = page.locator('[data-shado-tv-video-card="true"]')
+  const channelVideoCount = await channelVideos.count()
+  if (channelVideoCount === 0) {
+    summary.notTested.push({
+      profile: profile.id,
+      flow: '15d-shado-tv-video',
+      reason: 'Classic Cinema has no visible videos in the current Shado TV catalog.',
+    })
+  } else {
+    const videoTitle = await clickFirstShadoTvVideo(page)
+    if (videoTitle) {
+      await page.getByRole('heading', { name: videoTitle }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+    }
+    await auditPage(page, profile, '15d-shado-tv-video', { footer: false })
+    await page.getByRole('button', { name: 'Back within Shado TV' }).click()
+    const returnedHome = await page.getByText('Now Playing').waitFor({ timeout: 2500 }).then(() => true).catch(() => false)
+    if (!returnedHome) {
+      await page.getByRole('button', { name: 'Back within Shado TV' }).click()
+      await page.getByText('Now Playing').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+    }
+  }
 
-  await page.getByRole('button', { name: 'Back within Shado TV' }).click()
-  await page.getByRole('heading', { name: 'Classic Cinema' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-  await page.getByRole('button', { name: 'Back within Shado TV' }).click()
-  await page.getByText('Now Playing').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
   await page.getByRole('button', { name: 'Back to Entertainment' }).click()
   await waitForGamesView(page)
 }
