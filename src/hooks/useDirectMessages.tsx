@@ -22,6 +22,7 @@ import {
   withTimeout,
 } from '../lib/supabase';
 import { runRealtimeRecovery } from '../lib/realtimeRecovery';
+import { createRealtimeChannelName } from '../lib/realtimeChannelName';
 import { triggerDMPushNotification } from '../lib/push';
 import {
   createClientMessageId,
@@ -83,7 +84,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
       const convs = await fetchDMConversations();
       setConversations(convs);
     } catch {
-      setConversations([]);
+      // Keep the last known inbox during transient resume/network failures.
     } finally {
       setLoading(false);
     }
@@ -165,7 +166,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
       }
 
       const nextChannel = realtimeClient
-        .channel(`dm_messages:${user.id}`)
+        .channel(createRealtimeChannelName(`dm_messages:${user.id}`))
         .on(
           'postgres_changes',
           {
@@ -768,7 +769,7 @@ export function useConversationMessages(conversationId: string | null) {
       }
 
       const newChannel = realtimeClient
-        .channel(`dm_messages:${conversationId}`)
+        .channel(createRealtimeChannelName(`dm_messages:${conversationId}`))
         .on(
           'postgres_changes',
           {

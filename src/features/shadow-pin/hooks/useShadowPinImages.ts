@@ -8,27 +8,155 @@ import {
   updateShadowPinImage,
 } from '../api/shadowPinApi'
 import type { ShadowPinCategory, ShadowPinImage, ShadowPinImageFormValues } from '../types'
+import { invalidateShadowPinCategoriesCache } from './useShadowPinCategories'
+import { useAuth } from '../../../hooks/useAuth'
+
+const SHADOW_PIN_IMAGE_CACHE_MS = 5 * 60 * 1000
+
+type ImageCacheEntry = {
+  category: ShadowPinCategory | null
+  images: ShadowPinImage[]
+  page: number
+  hasMore: boolean
+  fetchedAt: number
+}
+
+const imageCacheByCategoryId = new Map<string, ImageCacheEntry>()
+const imagePageRequestByKey = new Map<string, Promise<{
+  category: ShadowPinCategory | null
+  images: ShadowPinImage[]
+  hasMore: boolean
+}>>()
+
+const normalizeImage = (image: ShadowPinImage): ShadowPinImage => ({
+  ...image,
+  heart_count: Number(image.heart_count ?? 0),
+  viewer_has_hearted: Boolean(image.viewer_has_hearted),
+})
+
+const sortImages = (images: ShadowPinImage[]) =>
+  [...images].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+const dedupeImages = (images: ShadowPinImage[]) => {
+  const map = new Map<string, ShadowPinImage>()
+  images.forEach(image => {
+    if (!image.deleted_at) map.set(image.id, normalizeImage(image))
+  })
+  return sortImages(Array.from(map.values()))
+}
+
+const getImageCacheKey = (userId: string, categoryId: string) => `${userId}:${categoryId}`
+
+const getFreshImageCache = (cacheKey: string | null) => {
+  if (!cacheKey) return null
+  const cached = imageCacheByCategoryId.get(cacheKey)
+  if (!cached) return null
+  return Date.now() - cached.fetchedAt < SHADOW_PIN_IMAGE_CACHE_MS ? cached : null
+}
+
+const getFreshImageCacheForCategory = (userId: string, categoryId: string | null) => {
+  if (!categoryId) return null
+  return getFreshImageCache(getImageCacheKey(userId, categoryId))
+}
+
+const writeImageCache = (
+  cacheKey: string,
+  entry: Omit<ImageCacheEntry, 'fetchedAt'>
+) => {
+  const nextEntry = {
+    ...entry,
+    images: dedupeImages(entry.images),
+    fetchedAt: Date.now(),
+  }
+  imageCacheByCategoryId.set(cacheKey, nextEntry)
+  return nextEntry
+}
+
+const updateImageCache = (
+  cacheKey: string,
+  updater: (entry: ImageCacheEntry) => Omit<ImageCacheEntry, 'fetchedAt'>
+) => {
+  const current = imageCacheByCategoryId.get(cacheKey)
+  if (!current) return null
+  return writeImageCache(cacheKey, updater(current))
+}
+
+const loadImagePage = async (
+  cacheKey: string,
+  categoryId: string,
+  targetPage: number,
+  force = false
+) => {
+  const requestKey = `${cacheKey}:${targetPage}`
+  const existingRequest = imagePageRequestByKey.get(requestKey)
+  if (!force && existingRequest) return existingRequest
+
+  const request = (async () => {
+    const cached = imageCacheByCategoryId.get(cacheKey)
+    const [category, imageResult] = await Promise.all([
+      targetPage === 0 || !cached?.category || force
+        ? fetchShadowPinCategory(categoryId)
+        : Promise.resolve(cached.category),
+      fetchShadowPinImages(categoryId, targetPage),
+    ])
+
+    return {
+      category,
+      images: imageResult.images,
+      hasMore: imageResult.hasMore,
+    }
+  })().finally(() => {
+    imagePageRequestByKey.delete(requestKey)
+  })
+
+  imagePageRequestByKey.set(requestKey, request)
+  return request
+}
 
 export function useShadowPinImages(categoryId: string | null) {
-  const [category, setCategory] = useState<ShadowPinCategory | null>(null)
-  const [images, setImages] = useState<ShadowPinImage[]>([])
-  const [page, setPage] = useState(0)
-  const [hasMore, setHasMore] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const { user } = useAuth()
+  const cacheUserId = user?.id ?? 'anonymous'
+  const cacheKey = categoryId ? getImageCacheKey(cacheUserId, categoryId) : null
+  const cached = getFreshImageCache(cacheKey)
+  const [category, setCategory] = useState<ShadowPinCategory | null>(cached?.category ?? null)
+  const [images, setImages] = useState<ShadowPinImage[]>(() => cached?.images ?? [])
+  const [page, setPage] = useState(cached?.page ?? 0)
+  const [hasMore, setHasMore] = useState(cached?.hasMore ?? false)
+  const [loading, setLoading] = useState(!cached)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const loadPage = useCallback(async (targetPage: number, append = false) => {
+  const loadPage = useCallback(async (targetPage: number, append = false, force = false) => {
     if (!categoryId) return
-    setLoading(true)
+
+    const nextCacheKey = getImageCacheKey(cacheUserId, categoryId)
+    const freshCache = getFreshImageCache(nextCacheKey)
+    if (!force && freshCache && targetPage <= freshCache.page) {
+      setCategory(freshCache.category)
+      setImages(freshCache.images)
+      setPage(freshCache.page)
+      setHasMore(freshCache.hasMore)
+      setLoading(false)
+      setError(null)
+      return
+    }
+
+    setLoading(!freshCache || force)
     try {
-      const [nextCategory, imageResult] = await Promise.all([
-        fetchShadowPinCategory(categoryId),
-        fetchShadowPinImages(categoryId, targetPage),
-      ])
-      setCategory(nextCategory)
-      setImages(prev => append ? [...prev, ...imageResult.images] : imageResult.images)
-      setHasMore(imageResult.hasMore)
+      const result = await loadImagePage(nextCacheKey, categoryId, targetPage, force)
+      const previousEntry = imageCacheByCategoryId.get(nextCacheKey)
+      const nextImages = append && previousEntry
+        ? dedupeImages([...previousEntry.images, ...result.images])
+        : dedupeImages(result.images)
+      const nextEntry = writeImageCache(nextCacheKey, {
+        category: result.category,
+        images: nextImages,
+        page: targetPage,
+        hasMore: result.hasMore,
+      })
+      setCategory(nextEntry.category)
+      setImages(nextEntry.images)
+      setHasMore(nextEntry.hasMore)
       setPage(targetPage)
       setError(null)
     } catch (err) {
@@ -36,10 +164,10 @@ export function useShadowPinImages(categoryId: string | null) {
     } finally {
       setLoading(false)
     }
-  }, [categoryId])
+  }, [cacheUserId, categoryId])
 
   const refresh = useCallback(async () => {
-    await loadPage(0, false)
+    await loadPage(0, false, true)
   }, [loadPage])
 
   const loadMore = useCallback(async () => {
@@ -48,51 +176,93 @@ export function useShadowPinImages(categoryId: string | null) {
   }, [hasMore, loadPage, loading, page])
 
   useEffect(() => {
+    if (!categoryId) {
+      setCategory(null)
+      setImages([])
+      setPage(0)
+      setHasMore(false)
+      setLoading(false)
+      return
+    }
+
+    const freshCache = getFreshImageCacheForCategory(cacheUserId, categoryId)
+    if (freshCache) {
+      setCategory(freshCache.category)
+      setImages(freshCache.images)
+      setPage(freshCache.page)
+      setHasMore(freshCache.hasMore)
+      setLoading(false)
+      setError(null)
+      return
+    }
+
     setCategory(null)
     setImages([])
     setPage(0)
     setHasMore(false)
-    void refresh()
-  }, [refresh])
+    void loadPage(0, false, false)
+  }, [cacheUserId, categoryId, loadPage])
 
   const createImage = useCallback(async (values: ShadowPinImageFormValues) => {
     if (!categoryId) throw new Error('Category is required.')
     setSaving(true)
     try {
       const image = await createShadowPinImage(categoryId, values)
-      await refresh()
-      return image
+      const nextCacheKey = getImageCacheKey(cacheUserId, categoryId)
+      const nextEntry = writeImageCache(nextCacheKey, {
+        category,
+        images: [image, ...images],
+        page,
+        hasMore,
+      })
+      invalidateShadowPinCategoriesCache(cacheUserId)
+      setImages(nextEntry.images)
+      setPage(nextEntry.page)
+      setHasMore(nextEntry.hasMore)
+      return normalizeImage(image)
     } finally {
       setSaving(false)
     }
-  }, [categoryId, refresh])
+  }, [cacheUserId, category, categoryId, hasMore, images, page])
 
   const updateImage = useCallback(async (imageId: string, values: Pick<ShadowPinImageFormValues, 'title' | 'description'>) => {
+    if (!categoryId) throw new Error('Category is required.')
     setSaving(true)
     try {
       const image = await updateShadowPinImage(imageId, values)
-      await refresh()
-      return image
+      const nextEntry = updateImageCache(getImageCacheKey(cacheUserId, categoryId), current => ({
+        ...current,
+        images: current.images.map(existing => existing.id === image.id ? image : existing),
+      }))
+      if (nextEntry) setImages(nextEntry.images)
+      return normalizeImage(image)
     } finally {
       setSaving(false)
     }
-  }, [refresh])
+  }, [cacheUserId, categoryId])
 
   const removeImage = useCallback(async (imageId: string) => {
+    if (!categoryId) throw new Error('Category is required.')
     setSaving(true)
     try {
       await deleteShadowPinImage(imageId)
-      await refresh()
+      const nextEntry = updateImageCache(getImageCacheKey(cacheUserId, categoryId), current => ({
+        ...current,
+        images: current.images.filter(image => image.id !== imageId),
+      }))
+      invalidateShadowPinCategoriesCache(cacheUserId)
+      if (nextEntry) setImages(nextEntry.images)
     } finally {
       setSaving(false)
     }
-  }, [refresh])
+  }, [cacheUserId, categoryId])
 
   const toggleHeart = useCallback(async (imageId: string) => {
+    if (!categoryId) return
     let previousImages: ShadowPinImage[] = []
     setImages(prev => {
       previousImages = prev
-      return prev.map(image => image.id === imageId
+      const nextImages = prev.map(image => image.id === imageId
         ? {
             ...image,
             viewer_has_hearted: !image.viewer_has_hearted,
@@ -100,14 +270,28 @@ export function useShadowPinImages(categoryId: string | null) {
           }
         : image
       )
+      updateImageCache(getImageCacheKey(cacheUserId, categoryId), current => ({
+        ...current,
+        images: nextImages,
+      }))
+      return nextImages
     })
     try {
-      await toggleShadowPinImageHeart(imageId)
+      const image = await toggleShadowPinImageHeart(imageId)
+      const nextEntry = updateImageCache(getImageCacheKey(cacheUserId, categoryId), current => ({
+        ...current,
+        images: current.images.map(existing => existing.id === image.id ? image : existing),
+      }))
+      if (nextEntry) setImages(nextEntry.images)
     } catch (err) {
       setImages(previousImages)
+      updateImageCache(getImageCacheKey(cacheUserId, categoryId), current => ({
+        ...current,
+        images: previousImages,
+      }))
       throw err
     }
-  }, [])
+  }, [cacheUserId, categoryId])
 
   return useMemo(() => ({
     category,

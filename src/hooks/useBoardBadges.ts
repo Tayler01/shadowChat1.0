@@ -3,6 +3,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import { getRealtimeClient, getWorkingClient } from '../lib/supabase'
 import { BOARD_DEFINITIONS } from '../lib/boards'
 import { runRealtimeRecovery } from '../lib/realtimeRecovery'
+import { createRealtimeChannelName } from '../lib/realtimeChannelName'
 import { shouldRefreshBadgesForNewsFeedPayload } from '../lib/newsFeedVisibility'
 import { useAuth } from './useAuth'
 import { useRealtimeRecovery } from './useRealtimeRecovery'
@@ -140,7 +141,7 @@ function useProvideBoardBadges(): BoardBadgesValue {
       if (!currentClient?.channel) return null
 
       channel = currentClient
-        .channel('public:board_badges')
+        .channel(createRealtimeChannelName('public:board_badges'))
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'board_chat_messages' },

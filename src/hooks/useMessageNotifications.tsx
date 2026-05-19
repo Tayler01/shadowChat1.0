@@ -3,6 +3,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import toast from 'react-hot-toast'
 import { getRealtimeClient, getWorkingClient } from '../lib/supabase'
 import { runRealtimeRecovery } from '../lib/realtimeRecovery'
+import { createRealtimeChannelName } from '../lib/realtimeChannelName'
 import { useAuth } from './useAuth'
 import { useIsDesktop } from './useIsDesktop'
 import { useRealtimeRecovery } from './useRealtimeRecovery'
@@ -61,11 +62,11 @@ export function useMessageNotifications(onOpenConversation: (id: string) => void
       }
 
       const nextChannel = realtimeClient
-      .channel('dm_notifications')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'dm_messages' },
-        async (payload: any) => {
+        .channel(createRealtimeChannelName(`dm_notifications:${user.id}`))
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'dm_messages' },
+          async (payload: any) => {
           if (payload.new.sender_id === user.id) return
 
           const working = await getWorkingClient()

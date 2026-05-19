@@ -14,6 +14,7 @@ import {
 } from '../lib/supabase'
 import { getArtBoardChunksForViewport } from '../lib/artBoard'
 import { runRealtimeRecovery } from '../lib/realtimeRecovery'
+import { createRealtimeChannelName } from '../lib/realtimeChannelName'
 import { useAuth } from './useAuth'
 import { useRealtimeRecovery } from './useRealtimeRecovery'
 
@@ -21,6 +22,7 @@ const ART_BOARD_ITEM_SELECT = `
   *,
   user:users!user_id(id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, presence_visibility, created_at, updated_at)
 `
+const ART_BOARD_CACHE_MS = 60 * 1000
 
 export interface ArtBoardViewportState {
   centerX: number
@@ -110,15 +112,50 @@ const dedupeLinks = (links: ArtBoardLink[]) => {
   return Array.from(next.values()).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 }
 
+type ArtBoardCacheEntry = {
+  items: ArtBoardItem[]
+  recentItems: ArtBoardItem[]
+  links: ArtBoardLink[]
+  loadedChunkKeys: string[]
+  loadedLinkItemIds: string[]
+  fetchedAt: number
+}
+
+const artBoardCacheByUserId = new Map<string, ArtBoardCacheEntry>()
+
+const isFreshArtBoardCache = (cache: ArtBoardCacheEntry | null) =>
+  Boolean(cache && Date.now() - cache.fetchedAt < ART_BOARD_CACHE_MS)
+
+const writeArtBoardCache = (
+  userId: string,
+  items: ArtBoardItem[],
+  recentItems: ArtBoardItem[],
+  links: ArtBoardLink[],
+  loadedChunkKeys: Set<string>,
+  loadedLinkItemIds: Set<string>
+) => {
+  artBoardCacheByUserId.set(userId, {
+    items: dedupeItems(items),
+    recentItems: sortRecentItems(recentItems).slice(0, 18),
+    links: dedupeLinks(links),
+    loadedChunkKeys: Array.from(loadedChunkKeys),
+    loadedLinkItemIds: Array.from(loadedLinkItemIds),
+    fetchedAt: Date.now(),
+  })
+}
+
 export function useArtBoard() {
   const { user } = useAuth()
-  const [items, setItems] = useState<ArtBoardItem[]>([])
-  const [recentItems, setRecentItems] = useState<ArtBoardItem[]>([])
-  const [links, setLinks] = useState<ArtBoardLink[]>([])
-  const [loading, setLoading] = useState(true)
+  const cacheUserId = user?.id ?? 'anonymous'
+  const cachedBoard = artBoardCacheByUserId.get(cacheUserId) ?? null
+  const [items, setItems] = useState<ArtBoardItem[]>(() => cachedBoard?.items ?? [])
+  const [recentItems, setRecentItems] = useState<ArtBoardItem[]>(() => cachedBoard?.recentItems ?? [])
+  const [links, setLinks] = useState<ArtBoardLink[]>(() => cachedBoard?.links ?? [])
+  const [loading, setLoading] = useState(!cachedBoard)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const loadedChunkKeysRef = useRef<Set<string>>(new Set())
+  const loadedChunkKeysRef = useRef<Set<string>>(new Set(cachedBoard?.loadedChunkKeys ?? []))
+  const loadedLinkItemIdsRef = useRef<Set<string>>(new Set(cachedBoard?.loadedLinkItemIds ?? []))
   const channelRef = useRef<RealtimeChannel | null>(null)
   const subscribeRef = useRef<(() => Promise<RealtimeChannel | null>) | null>(null)
 
@@ -152,10 +189,14 @@ export function useArtBoard() {
   const fetchLinksForItems = useCallback(async (ids: string[]) => {
     if (ids.length === 0) {
       setLinks([])
+      loadedLinkItemIdsRef.current.clear()
       return
     }
 
-    const idList = ids.join(',')
+    const missingIds = ids.filter(id => !loadedLinkItemIdsRef.current.has(id))
+    if (missingIds.length === 0) return
+
+    const idList = missingIds.join(',')
     const workingClient = await getWorkingClient()
     const { data, error: fetchError } = await workingClient
       .from('art_board_links')
@@ -163,6 +204,7 @@ export function useArtBoard() {
       .or(`item_a_id.in.(${idList}),item_b_id.in.(${idList})`)
 
     if (fetchError) throw fetchError
+    missingIds.forEach(id => loadedLinkItemIdsRef.current.add(id))
     setLinks(prev => dedupeLinks([...prev, ...((data ?? []) as ArtBoardLink[])]))
   }, [])
 
@@ -218,10 +260,14 @@ export function useArtBoard() {
     }
   }, [fetchLinksForItems, user])
 
-  const refreshHome = useCallback(async () => {
+  const refreshHome = useCallback(async (options: { clearExisting?: boolean } = {}) => {
+    const clearExisting = options.clearExisting ?? true
     loadedChunkKeysRef.current.clear()
-    setItems([])
-    setLinks([])
+    loadedLinkItemIdsRef.current.clear()
+    if (clearExisting) {
+      setItems([])
+      setLinks([])
+    }
     await Promise.all([
       loadViewport({ centerX: 0, centerY: 0, width: 1200, height: 900, zoom: 1 }),
       fetchRecent(),
@@ -230,8 +276,26 @@ export function useArtBoard() {
 
   useEffect(() => {
     if (!user) return
-    void refreshHome()
-  }, [refreshHome, user])
+    const cached = artBoardCacheByUserId.get(cacheUserId) ?? null
+    if (isFreshArtBoardCache(cached)) {
+      loadedChunkKeysRef.current = new Set(cached?.loadedChunkKeys ?? [])
+      loadedLinkItemIdsRef.current = new Set(cached?.loadedLinkItemIds ?? [])
+      setItems(cached?.items ?? [])
+      setRecentItems(cached?.recentItems ?? [])
+      setLinks(cached?.links ?? [])
+      setLoading(false)
+      setError(null)
+      return
+    }
+
+    void refreshHome({ clearExisting: !cached })
+  }, [cacheUserId, refreshHome, user])
+
+  useEffect(() => {
+    if (loading && items.length === 0 && recentItems.length === 0) return
+    if (error && items.length === 0 && recentItems.length === 0) return
+    writeArtBoardCache(cacheUserId, items, recentItems, links, loadedChunkKeysRef.current, loadedLinkItemIdsRef.current)
+  }, [cacheUserId, error, items, links, loading, recentItems])
 
   useEffect(() => {
     if (itemIds.length === 0) return
@@ -271,7 +335,7 @@ export function useArtBoard() {
       if (!currentClient?.channel) return null
 
       channel = currentClient
-        .channel('public:art_board')
+        .channel(createRealtimeChannelName('public:art_board'))
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'art_board_items' },
@@ -279,6 +343,7 @@ export function useArtBoard() {
             if (payload.eventType === 'DELETE') {
               setItems(prev => prev.filter(item => item.id !== payload.old.id))
               setRecentItems(prev => prev.filter(item => item.id !== payload.old.id))
+              loadedLinkItemIdsRef.current.delete(payload.old.id)
               return
             }
 
@@ -383,6 +448,7 @@ export function useArtBoard() {
     setItems(prev => prev.filter(item => item.id !== itemId))
     setRecentItems(prev => prev.filter(item => item.id !== itemId))
     setLinks(prev => prev.filter(link => link.item_a_id !== itemId && link.item_b_id !== itemId))
+    loadedLinkItemIdsRef.current.delete(itemId)
   }, [])
 
   const toggleReaction = useCallback(async (itemId: string, reaction: ArtBoardReaction) => {

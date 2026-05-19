@@ -476,16 +476,20 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     loadOlderMessages,
     loadingMore,
     hasMore,
+    loading: conversationsLoading,
   } = useDirectMessages()
   const { failedMessages, addFailedMessage, removeFailedMessage } = useFailedMessages(currentConversation || 'none')
-  const { users: allUsers, loading: allUsersLoading } = useAllUsers()
-
   const [showNewConversation, setShowNewConversation] = useState(false)
+  const { users: allUsers, loading: allUsersLoading } = useAllUsers({ enabled: showNewConversation })
+  const currentConv = conversations.find(c => c.id === currentConversation)
+  const selectedConversationMissing = Boolean(currentConversation && !currentConv)
+
   const [searchUsername, setSearchUsername] = useState('')
   const [startingUsername, setStartingUsername] = useState<string | null>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
   const prevHeightRef = useRef(0)
   const prevScrollTopRef = useRef(0)
+  const initialConversationAppliedRef = useRef<string | null>(null)
   const initialTargetJumpDoneRef = useRef<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [profileUser, setProfileUser] = useState<User | null>(null)
@@ -497,10 +501,22 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   } = useReadCursor('dm', currentConversation, Boolean(profile?.id && currentConversation))
 
   useEffect(() => {
-    if (initialConversation && currentConversation !== initialConversation) {
+    if (initialConversation && initialConversationAppliedRef.current !== initialConversation) {
+      initialConversationAppliedRef.current = initialConversation
+      if (currentConversation === initialConversation) {
+        return
+      }
       setCurrentConversation(initialConversation)
     }
   }, [initialConversation, currentConversation, setCurrentConversation])
+
+  useEffect(() => {
+    if (isDesktop || conversationsLoading || !selectedConversationMissing) {
+      return
+    }
+
+    setCurrentConversation(null)
+  }, [conversationsLoading, isDesktop, selectedConversationMissing, setCurrentConversation])
 
   useEffect(() => {
     if (!isDesktop || initialConversation || currentConversation || conversations.length === 0) {
@@ -736,7 +752,6 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     })
   }, [initialMessageId, markLatestRead, messages, setAutoScroll, setFirstUnreadMessageId])
 
-  const currentConv = conversations.find(c => c.id === currentConversation)
   const eagerDMAvatarMessageIds = useMemo(() => (
     new Set(messages.slice(-12).map(message => message.id))
   ), [messages])
@@ -1038,8 +1053,45 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
               />
             </MobileChatFooter>
           </>
+        ) : currentConversation ? (
+          <>
+            <MobileAppHeader
+              currentView={currentView}
+              onViewChange={onViewChange}
+              title="Direct Message"
+              onBack={() => setCurrentConversation(null)}
+              backLabel="Back to direct messages"
+              collapseOnKeyboard
+              maxWidthClassName="max-w-4xl"
+            />
+            <div className="flex flex-1 items-center justify-center px-4">
+              <div className="glass-panel max-w-md rounded-[var(--radius-xl)] px-8 py-8 text-center text-[var(--text-muted)]">
+                {conversationsLoading ? (
+                  <>
+                    <LoadingSpinner size="md" className="mx-auto mb-4" />
+                    <h3 className="mb-2 text-lg font-medium text-[var(--text-primary)]">Restoring direct message</h3>
+                    <p className="text-sm">Reconnecting to the inbox after the app resumed.</p>
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare className="mx-auto mb-4 h-12 w-12 opacity-50" />
+                    <h3 className="mb-2 text-lg font-medium text-[var(--text-primary)]">Conversation unavailable</h3>
+                    <p className="text-sm">Return to the inbox and choose a thread again.</p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="mt-5"
+                      onClick={() => setCurrentConversation(null)}
+                    >
+                      Back to inbox
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </>
         ) : (
-            <div className="flex flex-1 items-center justify-center">
+          <div className="flex flex-1 items-center justify-center">
             <div className="glass-panel max-w-md rounded-[var(--radius-xl)] px-8 py-8 text-center text-[var(--text-muted)]">
               <MessageSquare className="mx-auto mb-4 h-12 w-12 opacity-50" />
               <h3 className="mb-2 text-lg font-medium text-[var(--text-primary)]">Select a conversation</h3>

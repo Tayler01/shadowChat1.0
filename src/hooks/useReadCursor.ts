@@ -8,6 +8,7 @@ import {
 } from '../lib/readCursors'
 import { getRealtimeClient, getWorkingClient } from '../lib/supabase'
 import { runRealtimeRecovery } from '../lib/realtimeRecovery'
+import { createRealtimeChannelName } from '../lib/realtimeChannelName'
 import { useAuth } from './useAuth'
 import { useRealtimeRecovery } from './useRealtimeRecovery'
 
@@ -95,7 +96,7 @@ export function useReadCursor(
       if (!currentClient?.channel) return null
 
       channel = currentClient
-        .channel(`public:user_read_cursors:${user.id}:${surface}:${normalizedScopeId}`)
+        .channel(createRealtimeChannelName(`public:user_read_cursors:${user.id}:${surface}:${normalizedScopeId}`))
         .on(
           'postgres_changes',
           {

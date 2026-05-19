@@ -7,10 +7,23 @@ import {
   type NewsChatMessage,
 } from '../lib/supabase'
 import { runRealtimeRecovery } from '../lib/realtimeRecovery'
+import { createRealtimeChannelName } from '../lib/realtimeChannelName'
 import { useAuth } from './useAuth'
 import { useRealtimeRecovery } from './useRealtimeRecovery'
 
 const CHAT_LIMIT = 120
+const NEWS_CHAT_CACHE_MS = 60 * 1000
+
+type NewsChatCacheEntry = {
+  messages: NewsChatMessage[]
+  fetchedAt: number
+}
+
+let newsChatCacheByUserId = new Map<string, NewsChatCacheEntry>()
+
+export function resetNewsChatCacheForTests() {
+  newsChatCacheByUserId = new Map<string, NewsChatCacheEntry>()
+}
 
 const sortChatMessages = (items: NewsChatMessage[]) =>
   [...items].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
@@ -21,16 +34,49 @@ const dedupeChatMessages = (items: NewsChatMessage[]) => {
   return sortChatMessages(Array.from(map.values()))
 }
 
+const getFreshNewsChatCache = (userId: string) => {
+  const newsChatCache = newsChatCacheByUserId.get(userId)
+  if (!newsChatCache) return null
+  return Date.now() - newsChatCache.fetchedAt < NEWS_CHAT_CACHE_MS ? newsChatCache : null
+}
+
+const writeNewsChatCache = (userId: string, messages: NewsChatMessage[]) => {
+  const newsChatCache = {
+    messages: dedupeChatMessages(messages).slice(-CHAT_LIMIT),
+    fetchedAt: Date.now(),
+  }
+  newsChatCacheByUserId.set(userId, newsChatCache)
+  return newsChatCache.messages
+}
+
 export function useNewsChat() {
   const { user } = useAuth()
-  const [messages, setMessages] = useState<NewsChatMessage[]>([])
-  const [loading, setLoading] = useState(true)
+  const cacheUserId = user?.id ?? 'anonymous'
+  const cachedChat = getFreshNewsChatCache(cacheUserId)
+  const [messages, setMessages] = useState<NewsChatMessage[]>(() => cachedChat?.messages ?? [])
+  const [loading, setLoading] = useState(!cachedChat)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const channelRef = useRef<RealtimeChannel | null>(null)
   const subscribeRef = useRef<(() => Promise<RealtimeChannel | null>) | null>(null)
 
-  const fetchMessages = useCallback(async () => {
+  const updateMessages = useCallback((updater: NewsChatMessage[] | ((current: NewsChatMessage[]) => NewsChatMessage[])) => {
+    setMessages(current => {
+      const nextMessages = typeof updater === 'function' ? updater(current) : updater
+      return writeNewsChatCache(cacheUserId, nextMessages)
+    })
+  }, [cacheUserId])
+
+  const fetchMessages = useCallback(async (options: { silent?: boolean; force?: boolean } = {}) => {
+    const cached = getFreshNewsChatCache(cacheUserId)
+    if (!options.force && cached) {
+      setMessages(cached.messages)
+      setLoading(false)
+      setError(null)
+      return
+    }
+
+    if (!options.silent) setLoading(!cached || Boolean(options.force))
     try {
       const workingClient = await getWorkingClient()
       const { data, error: fetchError } = await workingClient
@@ -43,14 +89,14 @@ export function useNewsChat() {
         .limit(CHAT_LIMIT)
 
       if (fetchError) throw fetchError
-      setMessages(sortChatMessages((data ?? []) as unknown as NewsChatMessage[]))
+      setMessages(writeNewsChatCache(cacheUserId, sortChatMessages((data ?? []) as unknown as NewsChatMessage[])))
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load news chat')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [cacheUserId])
 
   const fetchMessage = useCallback(async (id: string) => {
     const workingClient = await getWorkingClient()
@@ -68,11 +114,11 @@ export function useNewsChat() {
   }, [])
 
   useEffect(() => {
-    void fetchMessages()
-  }, [fetchMessages])
+    void fetchMessages({ silent: Boolean(getFreshNewsChatCache(cacheUserId)) })
+  }, [cacheUserId, fetchMessages])
 
   const resetChatChannel = useCallback(async () => {
-    await fetchMessages()
+    await fetchMessages({ force: true, silent: true })
 
     const activeChannel = channelRef.current
     const realtimeClient = getRealtimeClient()
@@ -106,14 +152,14 @@ export function useNewsChat() {
       if (!currentClient?.channel) return null
 
       channel = currentClient
-        .channel('public:news_chat_messages')
+        .channel(createRealtimeChannelName('public:news_chat_messages'))
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'news_chat_messages' },
           async (payload: any) => {
             const message = await fetchMessage(payload.new.id)
             if (!message) return
-            setMessages(prev => dedupeChatMessages([...prev, message]).slice(-CHAT_LIMIT))
+            updateMessages(prev => dedupeChatMessages([...prev, message]).slice(-CHAT_LIMIT))
           }
         )
         .on(
@@ -122,7 +168,7 @@ export function useNewsChat() {
           async (payload: any) => {
             const message = await fetchMessage(payload.new.id)
             if (!message) return
-            setMessages(prev => dedupeChatMessages(prev.map(existing => (
+            updateMessages(prev => dedupeChatMessages(prev.map(existing => (
               existing.id === message.id ? message : existing
             ))))
           }
@@ -131,7 +177,7 @@ export function useNewsChat() {
           'postgres_changes',
           { event: 'DELETE', schema: 'public', table: 'news_chat_messages' },
           (payload: any) => {
-            setMessages(prev => prev.filter(message => message.id !== payload.old.id))
+            updateMessages(prev => prev.filter(message => message.id !== payload.old.id))
           }
         )
         .subscribe((status: string) => {
@@ -154,7 +200,7 @@ export function useNewsChat() {
       }
       channelRef.current = null
     }
-  }, [fetchMessage, user])
+  }, [fetchMessage, updateMessages, user])
 
   const sendMessage = useCallback(async (content: string) => {
     if (!user || !content.trim()) return null
@@ -180,12 +226,12 @@ export function useNewsChat() {
 
       if (insertError) throw insertError
       const message = data as unknown as NewsChatMessage
-      setMessages(prev => dedupeChatMessages([...prev, message]).slice(-CHAT_LIMIT))
+      updateMessages(prev => dedupeChatMessages([...prev, message]).slice(-CHAT_LIMIT))
       return message
     } finally {
       setSending(false)
     }
-  }, [user])
+  }, [updateMessages, user])
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
     if (!user || !content.trim()) return
@@ -199,9 +245,9 @@ export function useNewsChat() {
     if (updateError) throw updateError
     const message = await fetchMessage(messageId)
     if (message) {
-      setMessages(prev => dedupeChatMessages(prev.map(existing => existing.id === message.id ? message : existing)))
+      updateMessages(prev => dedupeChatMessages(prev.map(existing => existing.id === message.id ? message : existing)))
     }
-  }, [fetchMessage, user])
+  }, [fetchMessage, updateMessages, user])
 
   const deleteMessage = useCallback(async (messageId: string) => {
     if (!user) return
@@ -213,8 +259,8 @@ export function useNewsChat() {
       .eq('user_id', user.id)
 
     if (deleteError) throw deleteError
-    setMessages(prev => prev.filter(message => message.id !== messageId))
-  }, [user])
+    updateMessages(prev => prev.filter(message => message.id !== messageId))
+  }, [updateMessages, user])
 
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!user) return
@@ -227,9 +273,9 @@ export function useNewsChat() {
     if (rpcError) throw rpcError
     const message = await fetchMessage(messageId)
     if (message) {
-      setMessages(prev => dedupeChatMessages(prev.map(existing => existing.id === message.id ? message : existing)))
+      updateMessages(prev => dedupeChatMessages(prev.map(existing => existing.id === message.id ? message : existing)))
     }
-  }, [fetchMessage, user])
+  }, [fetchMessage, updateMessages, user])
 
   const markSeen = useCallback(async () => {
     const workingClient = await getWorkingClient()
@@ -241,7 +287,7 @@ export function useNewsChat() {
     loading,
     sending,
     error,
-    refresh: fetchMessages,
+    refresh: () => fetchMessages({ force: true }),
     sendMessage,
     editMessage,
     deleteMessage,

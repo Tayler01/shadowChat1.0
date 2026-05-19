@@ -19,6 +19,7 @@ import { useChannelBanExpirySweep } from './hooks/useChannelBanExpirySweep'
 import { useArtBoardReactionNotifications } from './hooks/useArtBoardReactionNotifications'
 import { useTheme } from './hooks/useTheme'
 import { BoardBadgesProvider } from './hooks/useBoardBadges'
+import { WeatherProvider } from './hooks/useWeatherForecast'
 import { computeMobileViewportState } from './lib/mobileViewport'
 import type { AppView as View } from './types/navigation'
 
@@ -408,38 +409,40 @@ function App() {
             <MessagesProvider>
               <DirectMessagesProvider>
                 <BoardBadgesProvider>
-                  <AppBadgeSync />
-                  <PhoneInstallOnboarding />
-                  <div className={`app-viewport flex flex-col overflow-hidden md:flex-row ${hideAppChrome ? 'bg-black' : ''}`}>
-                    {isDesktop && !hideAppChrome && (
-                      <Sidebar
-                        currentView={currentView}
-                        onViewChange={handleViewChange}
-                        isDarkMode={isDarkMode}
-                        onToggleDarkMode={toggleDarkMode}
-                        isOpen={sidebarOpen}
-                        onClose={closeSidebar}
-                      />
-                    )}
+                  <WeatherProvider>
+                    <AppBadgeSync />
+                    <PhoneInstallOnboarding />
+                    <div className={`app-viewport flex flex-col overflow-hidden md:flex-row ${hideAppChrome ? 'bg-black' : ''}`}>
+                      {isDesktop && !hideAppChrome && (
+                        <Sidebar
+                          currentView={currentView}
+                          onViewChange={handleViewChange}
+                          isDarkMode={isDarkMode}
+                          onToggleDarkMode={toggleDarkMode}
+                          isOpen={sidebarOpen}
+                          onClose={closeSidebar}
+                        />
+                      )}
 
-                    {isDesktop && !hideAppChrome && sidebarOpen && (
-                      <div
-                        className="fixed inset-0 bg-[var(--bg-overlay)] md:hidden"
-                        onClick={closeSidebar}
-                      />
-                    )}
+                      {isDesktop && !hideAppChrome && sidebarOpen && (
+                        <div
+                          className="fixed inset-0 bg-[var(--bg-overlay)] md:hidden"
+                          onClick={closeSidebar}
+                        />
+                      )}
 
-                    <main className="flex-1 flex min-h-0 flex-col min-w-0 overflow-hidden">
-                      <Suspense fallback={<ViewLoadingState />}>
-                        {renderCurrentView()}
-                      </Suspense>
-                    </main>
+                      <main className="flex-1 flex min-h-0 flex-col min-w-0 overflow-hidden">
+                        <Suspense fallback={<ViewLoadingState />}>
+                          {renderCurrentView()}
+                        </Suspense>
+                      </main>
 
-                    {/* Mobile bottom navigation */}
-                    {!hideAppChrome && currentView !== 'chat' && currentView !== 'dms' && !(currentView === 'boards' && boardsChatFooterActive) && (
-                      <MobileNav currentView={currentView} onViewChange={handleViewChange} />
-                    )}
-                  </div>
+                      {/* Mobile bottom navigation */}
+                      {!hideAppChrome && currentView !== 'chat' && currentView !== 'dms' && !(currentView === 'boards' && boardsChatFooterActive) && (
+                        <MobileNav currentView={currentView} onViewChange={handleViewChange} />
+                      )}
+                    </div>
+                  </WeatherProvider>
                 </BoardBadgesProvider>
               </DirectMessagesProvider>
             </MessagesProvider>

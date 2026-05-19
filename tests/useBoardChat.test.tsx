@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { useBoardChat } from '../src/hooks/useBoardChat'
+import { resetBoardChatCacheForTests, useBoardChat } from '../src/hooks/useBoardChat'
 import { useAuth } from '../src/hooks/useAuth'
 import { useRealtimeRecovery } from '../src/hooks/useRealtimeRecovery'
 import {
@@ -86,6 +86,7 @@ let workingClient: {
 
 beforeEach(() => {
   jest.resetAllMocks()
+  resetBoardChatCacheForTests()
   ;(useAuth as jest.Mock).mockReturnValue({ user: { id: 'u1' } })
   ;(ensureSession as jest.Mock).mockResolvedValue(true)
   realtimeHandlers = {}

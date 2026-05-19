@@ -249,6 +249,48 @@ test('startConversation throws when user not found', async () => {
   await expect(result.current.startConversation('missing')).rejects.toThrow('User not found');
 });
 
+test('keeps existing conversations when a resume refresh fails', async () => {
+  const conversation = {
+    id: 'c1',
+    other_user: {
+      id: 'u2',
+      username: 'bob',
+      display_name: 'Bob',
+      avatar_url: '',
+      color: 'red',
+      status: 'online',
+    },
+    last_message: null,
+    unread_count: 0,
+  };
+  const realtimeRecoveryMock = jest.requireMock('../src/hooks/useRealtimeRecovery') as {
+    useRealtimeRecovery: jest.Mock
+  };
+
+  (fetchDMConversations as jest.Mock)
+    .mockResolvedValueOnce([conversation])
+    .mockRejectedValueOnce(new Error('network offline after resume'));
+
+  const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider });
+
+  await waitFor(() => expect(result.current.conversations).toEqual([conversation]));
+  const initialChannelCalls = workingClient.channel.mock.calls.length;
+
+  const recoveryHandler = realtimeRecoveryMock.useRealtimeRecovery.mock.calls[0]?.[0] as (() => void) | undefined;
+  expect(recoveryHandler).toBeDefined();
+
+  act(() => {
+    recoveryHandler?.();
+  });
+
+  await waitFor(() => expect(fetchDMConversations).toHaveBeenCalledTimes(2));
+  await waitFor(() => expect(workingClient.channel.mock.calls.length).toBeGreaterThan(initialChannelCalls));
+  const topics = workingClient.channel.mock.calls.map(([topic]) => topic as string);
+  expect(topics.every(topic => /^dm_messages:u1:/.test(topic))).toBe(true);
+  expect(new Set(topics).size).toBe(topics.length);
+  expect(result.current.conversations).toEqual([conversation]);
+});
+
 test('defers unread message marking until the view records the read position', async () => {
   const unreadMessage = {
     id: 'm1',
@@ -591,5 +633,45 @@ describe('DirectMessagesView user search', () => {
     );
     expect(screen.getByTestId('dm-message-stack')).toHaveClass('min-h-full', 'justify-end');
     expect(screen.getByText('hello from a sparse thread')).toBeInTheDocument();
+  });
+
+  test('mobile stale selected conversation stays recoverable after resume', async () => {
+    const { useIsDesktop } = jest.requireMock('../src/hooks/useIsDesktop') as {
+      useIsDesktop: jest.Mock
+    };
+    useIsDesktop.mockReturnValue(false);
+
+    dmSpy.mockReturnValue({
+      conversations: [],
+      currentConversation: 'missing-conversation',
+      messages: [],
+      loading: false,
+      messagesLoading: false,
+      loadingMore: false,
+      hasMore: false,
+      sending: false,
+      setCurrentConversation: setCurrentConversationMock,
+      startConversation: startConversationMock,
+      sendMessage: jest.fn(),
+      editMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      toggleReaction: jest.fn(),
+      markAsRead: jest.fn(),
+      loadOlderMessages: jest.fn(),
+    } as any);
+
+    render(
+      <DirectMessagesView
+        onToggleSidebar={() => {}}
+        currentView="dms"
+        onViewChange={() => {}}
+      />
+    );
+
+    expect(screen.getByText(/conversation unavailable/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /back to direct messages/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /back to inbox/i }));
+
+    await waitFor(() => expect(setCurrentConversationMock).toHaveBeenCalledWith(null));
   });
 });

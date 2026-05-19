@@ -304,6 +304,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const { scheme, setScheme } = useTheme()
   const isDesktop = useIsDesktop()
   const { signOut, user: currentUser } = useAuth()
+  const shouldLoadAdminUsers = activeSection === 'admin' && activeAdminSection === 'access'
+  const shouldLoadNewsAdmin = activeSection === 'admin' && activeAdminSection === 'news-sources'
+  const shouldLoadPushSettings = activeSection === 'notifications-audio'
   const {
     role: adminRole,
     isAdmin: isFullAdmin,
@@ -313,7 +316,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     savingUserId: adminSavingUserId,
     error: adminAccessError,
     updateSubAdmin,
-  } = useAdminAccess()
+  } = useAdminAccess({ includeUsers: shouldLoadAdminUsers })
   const {
     isAdmin: canManageNewsSources,
     sources: newsSources,
@@ -323,7 +326,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     upsertSource,
     setSourceEnabled,
     deleteSource,
-  } = useNewsAdmin()
+  } = useNewsAdmin({ enabled: shouldLoadNewsAdmin })
   const { canInstall, promptInstall } = usePwaInstallPrompt()
   const { enabled: suggestionsEnabled, setEnabled: setSuggestionsEnabled } = useSuggestionsEnabled()
   const {
@@ -341,7 +344,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     enablePush,
     disablePush,
     updatePreference,
-  } = usePushNotifications()
+  } = usePushNotifications({ enabled: shouldLoadPushSettings })
 
   const devicePushEnabled = subscribed
   const visibleSections = useMemo(
@@ -873,7 +876,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const getAdminSectionMeta = (sectionId: AdminSectionId) => {
     if (sectionId === 'access') {
-      return adminAccessLoading ? 'Loading users' : `${adminAccessUsers.length} users`
+      if (shouldLoadAdminUsers && adminAccessLoading) return 'Loading users'
+      return adminAccessUsers.length > 0 ? `${adminAccessUsers.length} users` : 'Open to load'
     }
 
     if (sectionId === 'bridge-pairing') {
@@ -884,11 +888,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       return 'Bugs & ideas'
     }
 
-    if (newsAdminLoading) {
+    if (shouldLoadNewsAdmin && newsAdminLoading) {
       return 'Loading sources'
     }
 
-    return `${newsSources.length} sources`
+    return newsSources.length > 0 ? `${newsSources.length} sources` : 'Open to load'
   }
 
   const renderAdminHub = () => {

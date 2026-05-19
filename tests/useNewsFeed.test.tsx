@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { useNewsFeed } from '../src/hooks/useNewsFeed'
+import { resetNewsFeedCacheForTests, useNewsFeed } from '../src/hooks/useNewsFeed'
 import { useAuth } from '../src/hooks/useAuth'
 import { getWorkingClient } from '../src/lib/supabase'
 import { getEasternVisibleDay } from '../src/lib/newsFeedVisibility'
@@ -72,6 +72,7 @@ let workingClient: {
 
 beforeEach(() => {
   jest.resetAllMocks()
+  resetNewsFeedCacheForTests()
   ;(useAuth as jest.Mock).mockReturnValue({ user: { id: 'u1' } })
   handlers = {}
   createChannelRef = createChannel(handlers)

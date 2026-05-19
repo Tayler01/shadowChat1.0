@@ -7,6 +7,7 @@ import {
   getWorkingClient,
   type PresenceSnapshot,
 } from '../lib/supabase'
+import { createRealtimeChannelName } from '../lib/realtimeChannelName'
 import type { PresenceState, PresenceVisibility } from '../types'
 
 const PRESENCE_REFRESH_MS = 30000
@@ -279,7 +280,7 @@ export function PresenceProvider({
       }
 
       channel = currentClient
-        .channel('public:presence-state')
+        .channel(createRealtimeChannelName('public:presence-state'))
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'user_presence' },

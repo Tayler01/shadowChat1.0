@@ -1,4 +1,4 @@
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 import {
   MessagesProvider,
   useMessages,
@@ -324,6 +324,49 @@ describe('sendMessage', () => {
     expect(retrySpy).toHaveBeenCalled();
     insertSpy.mockRestore();
     retrySpy.mockRestore();
+  });
+});
+
+describe('realtime recovery', () => {
+  const user = { id: 'user1' } as any;
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    configureWorkingClient();
+    (useAuth as jest.Mock).mockReturnValue({ user });
+    (ensureSession as jest.Mock).mockResolvedValue(true);
+  });
+
+  it('uses a fresh channel topic when recovery resubscribes', async () => {
+    const realtimeRecoveryMock = jest.requireMock('../src/hooks/useRealtimeRecovery') as {
+      useRealtimeRecovery: jest.Mock
+    };
+    workingClient.channel.mockImplementation(() => ({
+      on: jest.fn().mockReturnThis(),
+      subscribe: jest.fn(),
+      send: jest.fn(),
+      state: 'closed',
+    }));
+
+    renderHook(() => useMessages(), { wrapper: MessagesProvider });
+
+    await waitFor(() => expect(workingClient.channel.mock.calls.length).toBeGreaterThan(0));
+    const initialChannelCalls = workingClient.channel.mock.calls.length;
+
+    const recoveryHandler = realtimeRecoveryMock.useRealtimeRecovery.mock.calls[0]?.[0] as
+      | ((result: { ok: true; skipped: false; reason: 'resume' }) => void)
+      | undefined;
+    expect(recoveryHandler).toBeDefined();
+
+    act(() => {
+      recoveryHandler?.({ ok: true, skipped: false, reason: 'resume' });
+    });
+
+    await waitFor(() => expect(workingClient.channel.mock.calls.length).toBeGreaterThan(initialChannelCalls));
+
+    const topics = workingClient.channel.mock.calls.map(([topic]) => topic as string);
+    expect(topics.every(topic => /^public:messages:user1:/.test(topic))).toBe(true);
+    expect(new Set(topics).size).toBe(topics.length);
   });
 });
 

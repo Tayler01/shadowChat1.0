@@ -13,7 +13,7 @@ const DEFAULT_TIMEOUT_MS = 20_000
 
 const scenarioSets = {
   core: ['auth', 'dm', 'mobile-dm-back'],
-  full: ['auth', 'group-chat', 'settings', 'dm', 'resume-send', 'profile-visual', 'mobile-dm-back', 'mobile-settings-visual'],
+  full: ['auth', 'group-chat', 'settings', 'dm', 'resume-send', 'profile-visual', 'mobile-dm-back', 'mobile-dm-refocus', 'mobile-settings-visual'],
 }
 
 const taskKillCommand = process.platform === 'win32' ? 'taskkill' : null
@@ -120,6 +120,12 @@ try {
       if (scenarioName === 'mobile-dm-back') {
         mobileA = await refreshMobileSession(browser, runState, desktopA.account, mobileA)
         await scenarioMobileDmBack(runState, desktopA, desktopB, mobileA)
+        return
+      }
+
+      if (scenarioName === 'mobile-dm-refocus') {
+        mobileA = await refreshMobileSession(browser, runState, desktopA.account, mobileA)
+        await scenarioMobileDmRefocus(runState, desktopA, desktopB, mobileA)
         return
       }
 
@@ -767,11 +773,27 @@ async function scenarioMobileDmBack(state, sessionA, sessionB, mobileSession) {
   await mobileSession.page.getByRole('button', { name: /^DMs$/ }).click()
   await waitForDmView(mobileSession.page)
   await openConversationWithUser(mobileSession.page, sessionB.account, state)
-  await mobileSession.page.getByRole('button', { name: 'Back' }).first().click()
+  await mobileSession.page.getByRole('button', { name: 'Back to direct messages' }).first().click()
   await waitForDmView(mobileSession.page)
-  await mobileSession.page.getByRole('button', { name: 'Back' }).click()
+  await mobileSession.page.getByRole('button', { name: /^Chat$/ }).click()
   await waitForChatView(mobileSession.page)
   await capture(mobileSession.page, state.artifactDir, 'mobile-dm-back')
+}
+
+async function scenarioMobileDmRefocus(state, sessionA, sessionB, mobileSession) {
+  await ensureConversationIsReady(state, sessionA, sessionB)
+  await waitForChatView(mobileSession.page)
+
+  await mobileSession.page.getByRole('button', { name: /^DMs$/ }).click()
+  await waitForDmView(mobileSession.page)
+  await openConversationWithUser(mobileSession.page, sessionB.account, state)
+  await simulateVisibilityResume(mobileSession.page)
+  await expectDmResumeSurface(mobileSession.page)
+
+  const messageText = `Mobile resume dm ${timestampToken()}`
+  await sendThreadMessage(mobileSession.page, messageText)
+  await expectVisibleText(mobileSession.page, messageText, DEFAULT_TIMEOUT_MS)
+  await capture(mobileSession.page, state.artifactDir, 'mobile-dm-refocus')
 }
 
 async function scenarioMobileSettingsVisual(state, mobileSession) {
@@ -955,6 +977,16 @@ async function simulateVisibilityResume(page) {
   await page.evaluate(async () => {
     const originalHidden = Object.getOwnPropertyDescriptor(document, 'hidden')
     const originalVisibilityState = Object.getOwnPropertyDescriptor(document, 'visibilityState')
+    const dispatchPageTransition = (type, persisted) => {
+      if (typeof PageTransitionEvent === 'function') {
+        window.dispatchEvent(new PageTransitionEvent(type, { persisted }))
+        return
+      }
+
+      const event = new Event(type)
+      Object.defineProperty(event, 'persisted', { configurable: true, get: () => persisted })
+      window.dispatchEvent(event)
+    }
 
     let hidden = true
 
@@ -967,11 +999,15 @@ async function simulateVisibilityResume(page) {
       get: () => (hidden ? 'hidden' : 'visible'),
     })
 
+    window.dispatchEvent(new Event('blur'))
+    dispatchPageTransition('pagehide', true)
     document.dispatchEvent(new Event('visibilitychange'))
     await new Promise(resolve => setTimeout(resolve, 250))
 
     hidden = false
     document.dispatchEvent(new Event('visibilitychange'))
+    dispatchPageTransition('pageshow', true)
+    window.dispatchEvent(new Event('focus'))
     await new Promise(resolve => setTimeout(resolve, 1200))
 
     if (originalHidden) {
@@ -986,6 +1022,39 @@ async function simulateVisibilityResume(page) {
       delete document.visibilityState
     }
   })
+}
+
+async function expectDmResumeSurface(page) {
+  await page.waitForFunction(() => {
+    const text = document.body?.innerText || ''
+    if (text.includes('Something went wrong')) {
+      return false
+    }
+
+    const hasVisibleComposer = Array.from(document.querySelectorAll('textarea')).some(element => {
+      const rect = element.getBoundingClientRect()
+      const style = getComputedStyle(element)
+      return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && Number(style.opacity) !== 0
+    })
+    const hasVisibleRecovery = Array.from(document.querySelectorAll('button')).some(button => {
+      const rect = button.getBoundingClientRect()
+      const style = getComputedStyle(button)
+      const label = button.getAttribute('aria-label') || button.textContent || ''
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.visibility !== 'hidden' &&
+        Number(style.opacity) !== 0 &&
+        /Back to direct messages|Back to inbox|Start new conversation/i.test(label)
+      )
+    })
+
+    return hasVisibleComposer || hasVisibleRecovery
+  }, null, { timeout: DEFAULT_TIMEOUT_MS })
+
+  if (await page.getByText('Something went wrong').isVisible().catch(() => false)) {
+    throw new Error('Global error boundary appeared after mobile DM refocus')
+  }
 }
 
 async function sendThreadMessage(page, messageText) {

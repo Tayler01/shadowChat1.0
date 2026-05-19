@@ -6,6 +6,7 @@ import {
   listPublicUserChannelBans,
   type PublicUserChannelBan,
 } from '../lib/moderation'
+import { createRealtimeChannelName } from '../lib/realtimeChannelName'
 
 const CACHE_TTL_MS = 30000
 
@@ -125,7 +126,7 @@ export function useUserChannelBans(userId?: string | null, options: UseUserChann
       if (!currentClient?.channel) return
 
       channel = currentClient
-        .channel(`public:user_channel_bans:${userId}`)
+        .channel(createRealtimeChannelName(`public:user_channel_bans:${userId}`))
         .on(
           'postgres_changes',
           {

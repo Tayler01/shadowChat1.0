@@ -6,6 +6,7 @@ import {
   type NewsFeedItem,
 } from '../lib/supabase'
 import { runRealtimeRecovery } from '../lib/realtimeRecovery'
+import { createRealtimeChannelName } from '../lib/realtimeChannelName'
 import {
   getEasternVisibleDay,
   isCurrentVisibleNewsFeedRow,
@@ -15,6 +16,19 @@ import { useAuth } from './useAuth'
 import { useRealtimeRecovery } from './useRealtimeRecovery'
 
 const FEED_LIMIT = 80
+const NEWS_FEED_CACHE_MS = 60 * 1000
+
+type NewsFeedCacheEntry = {
+  visibleDay: string
+  items: NewsFeedItem[]
+  fetchedAt: number
+}
+
+let newsFeedCacheByUserId = new Map<string, NewsFeedCacheEntry>()
+
+export function resetNewsFeedCacheForTests() {
+  newsFeedCacheByUserId = new Map<string, NewsFeedCacheEntry>()
+}
 
 const sortFeedItems = (items: NewsFeedItem[]) =>
   [...items].sort((a, b) => (
@@ -28,15 +42,50 @@ const dedupeFeedItems = (items: NewsFeedItem[]) => {
   return sortFeedItems(Array.from(map.values()))
 }
 
+const getFreshNewsFeedCache = (userId: string) => {
+  const newsFeedCache = newsFeedCacheByUserId.get(userId)
+  if (!newsFeedCache) return null
+  if (newsFeedCache.visibleDay !== getEasternVisibleDay()) return null
+  return Date.now() - newsFeedCache.fetchedAt < NEWS_FEED_CACHE_MS ? newsFeedCache : null
+}
+
+const writeNewsFeedCache = (userId: string, items: NewsFeedItem[]) => {
+  const newsFeedCache = {
+    visibleDay: getEasternVisibleDay(),
+    items: dedupeFeedItems(items).slice(0, FEED_LIMIT),
+    fetchedAt: Date.now(),
+  }
+  newsFeedCacheByUserId.set(userId, newsFeedCache)
+  return newsFeedCache.items
+}
+
 export function useNewsFeed() {
   const { user } = useAuth()
-  const [items, setItems] = useState<NewsFeedItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const cacheUserId = user?.id ?? 'anonymous'
+  const cachedFeed = getFreshNewsFeedCache(cacheUserId)
+  const [items, setItems] = useState<NewsFeedItem[]>(() => cachedFeed?.items ?? [])
+  const [loading, setLoading] = useState(!cachedFeed)
   const [error, setError] = useState<string | null>(null)
   const channelRef = useRef<RealtimeChannel | null>(null)
   const subscribeRef = useRef<(() => Promise<RealtimeChannel | null>) | null>(null)
 
-  const fetchFeed = useCallback(async () => {
+  const updateItems = useCallback((updater: NewsFeedItem[] | ((current: NewsFeedItem[]) => NewsFeedItem[])) => {
+    setItems(current => {
+      const nextItems = typeof updater === 'function' ? updater(current) : updater
+      return writeNewsFeedCache(cacheUserId, nextItems)
+    })
+  }, [cacheUserId])
+
+  const fetchFeed = useCallback(async (options: { silent?: boolean; force?: boolean } = {}) => {
+    const cached = getFreshNewsFeedCache(cacheUserId)
+    if (!options.force && cached) {
+      setItems(cached.items)
+      setLoading(false)
+      setError(null)
+      return
+    }
+
+    if (!options.silent) setLoading(!cached || Boolean(options.force))
     try {
       const visibleDay = getEasternVisibleDay()
       const workingClient = await getWorkingClient()
@@ -52,14 +101,14 @@ export function useNewsFeed() {
         .limit(FEED_LIMIT)
 
       if (fetchError) throw fetchError
-      setItems(((data ?? []) as unknown as NewsFeedItem[]))
+      setItems(writeNewsFeedCache(cacheUserId, (data ?? []) as unknown as NewsFeedItem[]))
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to load news feed')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [cacheUserId])
 
   const fetchFeedItem = useCallback(async (id: string) => {
     const workingClient = await getWorkingClient()
@@ -77,11 +126,11 @@ export function useNewsFeed() {
   }, [])
 
   useEffect(() => {
-    void fetchFeed()
-  }, [fetchFeed])
+    void fetchFeed({ silent: Boolean(getFreshNewsFeedCache(cacheUserId)) })
+  }, [cacheUserId, fetchFeed])
 
   const resetFeedChannel = useCallback(async () => {
-    await fetchFeed()
+    await fetchFeed({ force: true, silent: true })
 
     const activeChannel = channelRef.current
     const realtimeClient = getRealtimeClient()
@@ -115,7 +164,7 @@ export function useNewsFeed() {
       if (!currentClient?.channel) return null
 
       channel = currentClient
-        .channel('public:news_feed_items')
+        .channel(createRealtimeChannelName('public:news_feed_items'))
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'news_feed_items' },
@@ -124,7 +173,7 @@ export function useNewsFeed() {
 
             const item = await fetchFeedItem(payload.new.id)
             if (!isCurrentVisibleNewsFeedRow(item)) return
-            setItems(prev => dedupeFeedItems([item, ...prev]).slice(0, FEED_LIMIT))
+            updateItems(prev => dedupeFeedItems([item, ...prev]).slice(0, FEED_LIMIT))
           }
         )
         .on(
@@ -132,12 +181,12 @@ export function useNewsFeed() {
           { event: 'UPDATE', schema: 'public', table: 'news_feed_items' },
           async (payload: any) => {
             if (isKnownHiddenOrOtherDayNewsFeedRow(payload.new)) {
-              setItems(prev => prev.filter(existing => existing.id !== payload.new.id))
+              updateItems(prev => prev.filter(existing => existing.id !== payload.new.id))
               return
             }
 
             const item = await fetchFeedItem(payload.new.id)
-            setItems(prev => {
+            updateItems(prev => {
               if (!item || item.hidden) {
                 return prev.filter(existing => existing.id !== payload.new.id)
               }
@@ -152,7 +201,7 @@ export function useNewsFeed() {
           'postgres_changes',
           { event: 'DELETE', schema: 'public', table: 'news_feed_items' },
           (payload: any) => {
-            setItems(prev => prev.filter(item => item.id !== payload.old.id))
+            updateItems(prev => prev.filter(item => item.id !== payload.old.id))
           }
         )
         .subscribe((status: string) => {
@@ -175,7 +224,7 @@ export function useNewsFeed() {
       }
       channelRef.current = null
     }
-  }, [fetchFeedItem, user])
+  }, [fetchFeedItem, updateItems, user])
 
   const toggleReaction = useCallback(async (feedItemId: string, emoji: string) => {
     if (!user) return
@@ -190,9 +239,9 @@ export function useNewsFeed() {
 
     const item = await fetchFeedItem(feedItemId)
     if (item) {
-      setItems(prev => dedupeFeedItems(prev.map(existing => existing.id === item.id ? item : existing)))
+      updateItems(prev => dedupeFeedItems(prev.map(existing => existing.id === item.id ? item : existing)))
     }
-  }, [fetchFeedItem, user])
+  }, [fetchFeedItem, updateItems, user])
 
   const markSeen = useCallback(async () => {
     const workingClient = await getWorkingClient()
@@ -203,7 +252,7 @@ export function useNewsFeed() {
     items,
     loading,
     error,
-    refresh: fetchFeed,
+    refresh: () => fetchFeed({ force: true }),
     markSeen,
     toggleReaction,
   }

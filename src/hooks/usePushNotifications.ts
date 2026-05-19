@@ -16,13 +16,69 @@ import {
   upsertNotificationPreferences,
 } from '../lib/push'
 
-export function usePushNotifications() {
+type UsePushNotificationsOptions = {
+  enabled?: boolean
+}
+
+type PushNotificationState = {
+  preferences: NotificationPreferences | null
+  subscribed: boolean
+  permission: NotificationPermission | 'unsupported'
+  support: PushSupportStatus
+}
+
+const cachedPushStateByUserId = new Map<string, PushNotificationState>()
+const pushStateRequestByUserId = new Map<string, Promise<PushNotificationState>>()
+
+const loadPushState = async (userId: string, force = false) => {
+  const cached = cachedPushStateByUserId.get(userId)
+  if (!force && cached) return cached
+
+  const existingRequest = pushStateRequestByUserId.get(userId)
+  if (!force && existingRequest) return existingRequest
+
+  const request = (async () => {
+    const prefs = await fetchNotificationPreferences(userId)
+    const synced = await syncCurrentDeviceSubscription(userId).catch(() => false)
+    const nextState = {
+      preferences: prefs,
+      subscribed: synced,
+      permission: getNotificationPermission(),
+      support: getPushSupportStatus(),
+    }
+    cachedPushStateByUserId.set(userId, nextState)
+    return nextState
+  })().finally(() => {
+    pushStateRequestByUserId.delete(userId)
+  })
+
+  pushStateRequestByUserId.set(userId, request)
+  return request
+}
+
+const updateCachedPushState = (userId: string, partial: Partial<PushNotificationState>) => {
+  const current = cachedPushStateByUserId.get(userId) ?? {
+    preferences: null,
+    subscribed: false,
+    permission: getNotificationPermission(),
+    support: getPushSupportStatus(),
+  }
+
+  cachedPushStateByUserId.set(userId, {
+    ...current,
+    ...partial,
+  })
+}
+
+export function usePushNotifications(options: UsePushNotificationsOptions = {}) {
+  const enabled = options.enabled ?? true
   const { user } = useAuth()
-  const [support, setSupport] = useState<PushSupportStatus>(() => getPushSupportStatus())
-  const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>(() => getNotificationPermission())
-  const [preferences, setPreferences] = useState<NotificationPreferences | null>(null)
-  const [subscribed, setSubscribed] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const cachedState = user ? cachedPushStateByUserId.get(user.id) : undefined
+  const [support, setSupport] = useState<PushSupportStatus>(() => cachedState?.support ?? getPushSupportStatus())
+  const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>(() => cachedState?.permission ?? getNotificationPermission())
+  const [preferences, setPreferences] = useState<NotificationPreferences | null>(() => cachedState?.preferences ?? null)
+  const [subscribed, setSubscribed] = useState(() => cachedState?.subscribed ?? false)
+  const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -31,10 +87,22 @@ export function usePushNotifications() {
     setPermission(getNotificationPermission())
   }, [])
 
-  const refreshState = useCallback(async () => {
+  const refreshState = useCallback(async (force = false) => {
     if (!user) {
       setPreferences(null)
       setSubscribed(false)
+      setLoading(false)
+      return
+    }
+
+    if (!enabled && !force) {
+      const cached = cachedPushStateByUserId.get(user.id)
+      if (cached) {
+        setPreferences(cached.preferences)
+        setSubscribed(cached.subscribed)
+        setPermission(cached.permission)
+        setSupport(cached.support)
+      }
       setLoading(false)
       return
     }
@@ -43,28 +111,33 @@ export function usePushNotifications() {
     setError(null)
 
     try {
-      const prefs = await fetchNotificationPreferences(user.id)
-      setPreferences(prefs)
-
-      const synced = await syncCurrentDeviceSubscription(user.id).catch(() => false)
-      setSubscribed(synced)
-      setPermission(getNotificationPermission())
-      setSupport(getPushSupportStatus())
+      const nextState = await loadPushState(user.id, force)
+      setPreferences(nextState.preferences)
+      setSubscribed(nextState.subscribed)
+      setPermission(nextState.permission)
+      setSupport(nextState.support)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load notification settings.')
-      setPreferences(getDefaultNotificationPreferences(user.id))
+      const fallbackPreferences = getDefaultNotificationPreferences(user.id)
+      setPreferences(fallbackPreferences)
       setSubscribed(false)
+      updateCachedPushState(user.id, {
+        preferences: fallbackPreferences,
+        subscribed: false,
+        permission: getNotificationPermission(),
+        support: getPushSupportStatus(),
+      })
     } finally {
       setLoading(false)
     }
-  }, [user])
+  }, [enabled, user])
 
   useEffect(() => {
     refreshState()
   }, [refreshState])
 
   useEffect(() => {
-    if (!user) return
+    if (!user || !enabled) return
 
     const refreshWhenVisible = () => {
       if (document.visibilityState === 'hidden') return
@@ -80,7 +153,7 @@ export function usePushNotifications() {
       window.removeEventListener('pageshow', refreshWhenVisible)
       document.removeEventListener('visibilitychange', refreshWhenVisible)
     }
-  }, [refreshState, user])
+  }, [enabled, refreshState, user])
 
   const updatePreference = useCallback(
     async (key: keyof Omit<NotificationPreferences, 'user_id'>, value: NotificationPreferences[typeof key]) => {
@@ -91,6 +164,7 @@ export function usePushNotifications() {
       try {
         const next = await upsertNotificationPreferences(user.id, { [key]: value })
         setPreferences(next)
+        updateCachedPushState(user.id, { preferences: next })
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to save notification preference.')
         throw err
@@ -112,6 +186,12 @@ export function usePushNotifications() {
       setPermission(getNotificationPermission())
       const next = await fetchNotificationPreferences(user.id)
       setPreferences(next)
+      updateCachedPushState(user.id, {
+        preferences: next,
+        subscribed: true,
+        permission: getNotificationPermission(),
+        support: getPushSupportStatus(),
+      })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to enable push notifications.'
       setError(message)
@@ -132,6 +212,12 @@ export function usePushNotifications() {
       setSubscribed(false)
       const next = await fetchNotificationPreferences(user.id)
       setPreferences(next)
+      updateCachedPushState(user.id, {
+        preferences: next,
+        subscribed: false,
+        permission: getNotificationPermission(),
+        support: getPushSupportStatus(),
+      })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to disable push notifications.'
       setError(message)
@@ -150,7 +236,7 @@ export function usePushNotifications() {
     guidanceText: getNotificationGuidanceText(getNotificationGuidance(permission, support)),
     preferences,
     subscribed,
-    loading,
+    loading: loading || Boolean(enabled && user && !cachedPushStateByUserId.has(user.id)),
     saving,
     error,
     enablePush,

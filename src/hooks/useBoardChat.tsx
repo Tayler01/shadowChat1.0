@@ -7,12 +7,29 @@ import {
   type BoardChatMessage,
 } from '../lib/supabase'
 import { runRealtimeRecovery } from '../lib/realtimeRecovery'
+import { createRealtimeChannelName } from '../lib/realtimeChannelName'
 import { MESSAGE_FETCH_LIMIT } from '../config'
 import { useAuth } from './useAuth'
 import { useRealtimeRecovery } from './useRealtimeRecovery'
 
 type FetchMessagesOptions = {
   silent?: boolean
+  force?: boolean
+}
+
+const BOARD_CHAT_CACHE_MS = 60 * 1000
+
+type BoardChatCacheEntry = {
+  messages: BoardChatMessage[]
+  hasMore: boolean
+  loadedOlder: boolean
+  fetchedAt: number
+}
+
+let boardChatCacheByKey = new Map<string, BoardChatCacheEntry>()
+
+export function resetBoardChatCacheForTests() {
+  boardChatCacheByKey = new Map<string, BoardChatCacheEntry>()
 }
 
 const sortChatMessages = (items: BoardChatMessage[]) =>
@@ -29,18 +46,42 @@ const isIncomingUpdateCurrent = (existing: BoardChatMessage, incoming: Partial<B
   return new Date(incoming.updated_at).getTime() >= new Date(existing.updated_at).getTime()
 }
 
+const getBoardChatCacheKey = (userId: string, boardSlug: string) => `${userId}:${boardSlug}`
+
+const getBoardChatCache = (cacheKey: string) => boardChatCacheByKey.get(cacheKey) ?? null
+
+const isFreshBoardChatCache = (cache: BoardChatCacheEntry | null) =>
+  Boolean(cache && Date.now() - cache.fetchedAt < BOARD_CHAT_CACHE_MS)
+
+const writeBoardChatCache = (
+  cacheKey: string,
+  messages: BoardChatMessage[],
+  hasMore: boolean,
+  loadedOlder: boolean
+) => {
+  boardChatCacheByKey.set(cacheKey, {
+    messages: dedupeChatMessages(messages),
+    hasMore,
+    loadedOlder,
+    fetchedAt: Date.now(),
+  })
+}
+
 export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
   const { user } = useAuth()
-  const [messages, setMessages] = useState<BoardChatMessage[]>([])
-  const [loading, setLoading] = useState(true)
+  const cacheUserId = user?.id ?? 'anonymous'
+  const cacheKey = getBoardChatCacheKey(cacheUserId, boardSlug)
+  const cachedChat = getBoardChatCache(cacheKey)
+  const [messages, setMessages] = useState<BoardChatMessage[]>(() => cachedChat?.messages ?? [])
+  const [loading, setLoading] = useState(!cachedChat)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [hasMore, setHasMore] = useState(true)
+  const [hasMore, setHasMore] = useState(cachedChat?.hasMore ?? true)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const channelRef = useRef<RealtimeChannel | null>(null)
   const subscribeRef = useRef<(() => Promise<RealtimeChannel | null>) | null>(null)
   const fetchRequestIdRef = useRef(0)
-  const loadedOlderRef = useRef(false)
+  const loadedOlderRef = useRef(cachedChat?.loadedOlder ?? false)
   const messagesRef = useRef<BoardChatMessage[]>([])
 
   useEffect(() => {
@@ -48,6 +89,16 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
   }, [messages])
 
   const fetchMessages = useCallback(async (options: FetchMessagesOptions = {}) => {
+    const cached = getBoardChatCache(cacheKey)
+    if (!options.force && isFreshBoardChatCache(cached)) {
+      loadedOlderRef.current = cached?.loadedOlder ?? false
+      setMessages(cached?.messages ?? [])
+      setHasMore(cached?.hasMore ?? true)
+      setError(null)
+      setLoading(false)
+      return
+    }
+
     const requestId = fetchRequestIdRef.current + 1
     fetchRequestIdRef.current = requestId
     const showLoading = !options.silent
@@ -97,7 +148,7 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
         setLoading(false)
       }
     }
-  }, [boardSlug, boardTitle])
+  }, [boardSlug, boardTitle, cacheKey])
 
   const fetchMessage = useCallback(async (id: string) => {
     const workingClient = await getWorkingClient()
@@ -116,17 +167,29 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
   }, [boardSlug])
 
   useEffect(() => {
-    loadedOlderRef.current = false
+    const cached = getBoardChatCache(cacheKey)
+    loadedOlderRef.current = cached?.loadedOlder ?? false
     fetchRequestIdRef.current += 1
-    setMessages([])
-    setHasMore(true)
+    setMessages(cached?.messages ?? [])
+    setHasMore(cached?.hasMore ?? true)
     setError(null)
-    setLoading(true)
-    void fetchMessages()
-  }, [fetchMessages])
+    if (isFreshBoardChatCache(cached)) {
+      setLoading(false)
+      return
+    }
+
+    setLoading(!cached)
+    void fetchMessages({ silent: Boolean(cached) })
+  }, [boardSlug, cacheKey, fetchMessages])
+
+  useEffect(() => {
+    if (loading && messages.length === 0) return
+    if (error && messages.length === 0) return
+    writeBoardChatCache(cacheKey, messages, hasMore, loadedOlderRef.current)
+  }, [cacheKey, error, hasMore, loading, messages])
 
   const resetChatChannel = useCallback(async () => {
-    await fetchMessages({ silent: true })
+    await fetchMessages({ force: true, silent: true })
 
     const activeChannel = channelRef.current
     const realtimeClient = getRealtimeClient()
@@ -160,7 +223,7 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
       if (!currentClient?.channel) return null
 
       channel = currentClient
-        .channel(`public:board_chat_messages:${boardSlug}`)
+        .channel(createRealtimeChannelName(`public:board_chat_messages:${boardSlug}`))
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'board_chat_messages', filter: `board_slug=eq.${boardSlug}` },
@@ -342,7 +405,7 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
     hasMore,
     sending,
     error,
-    refresh: fetchMessages,
+    refresh: () => fetchMessages({ force: true }),
     loadOlderMessages,
     sendMessage,
     editMessage,

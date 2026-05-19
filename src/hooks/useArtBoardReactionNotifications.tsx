@@ -3,6 +3,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import toast from 'react-hot-toast'
 import { getRealtimeClient, getWorkingClient, type ArtBoardReaction, type User } from '../lib/supabase'
 import { runRealtimeRecovery } from '../lib/realtimeRecovery'
+import { createRealtimeChannelName } from '../lib/realtimeChannelName'
 import { useAuth } from './useAuth'
 import { useRealtimeRecovery } from './useRealtimeRecovery'
 import { ArtReactionNotification } from '../components/notifications/ArtReactionNotification'
@@ -58,7 +59,7 @@ export function useArtBoardReactionNotifications() {
       }
 
       const nextChannel = realtimeClient
-        .channel(`art_board_reaction_notifications:${user.id}`)
+        .channel(createRealtimeChannelName(`art_board_reaction_notifications:${user.id}`))
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'art_board_reactions' },

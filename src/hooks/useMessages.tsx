@@ -36,6 +36,7 @@ import {
 import { useAuth } from './useAuth';
 import { useRealtimeRecovery } from './useRealtimeRecovery';
 import { useSoundEffects } from './useSoundEffects';
+import { createRealtimeChannelName } from '../lib/realtimeChannelName';
 
 export { useMessages, useOptionalMessages };
 
@@ -454,27 +455,27 @@ function useProvideMessages(): MessagesContextValue {
             if (workingClient && workingClient.removeChannel && typeof workingClient.removeChannel === 'function') {
               await workingClient.removeChannel(channelRef.current);
             }
-          } catch (error) {
-            throw error;
+          } catch {
+            // Ignore cleanup failures; the next subscribe call uses a fresh topic.
           }
           channelRef.current = null;
         }
 
         // Refetch messages with new client
-        await fetchMessages();
+        await fetchMessages().catch(() => undefined);
 
         // Resubscribe to realtime with new client
         if (subscribeRef.current) {
           try {
             const newChannel = await subscribeRef.current();
             channelRef.current = newChannel;
-          } catch (subscribeError) {
-            throw subscribeError;
+          } catch {
+            // The next recovery/focus event will try again.
           }
         }
 
-      } catch (error) {
-        throw error;
+      } catch {
+        await fetchMessages().catch(() => undefined);
       } finally {
         resetInFlightRef.current = null;
       }
@@ -486,14 +487,16 @@ function useProvideMessages(): MessagesContextValue {
   const handleVisible = useCallback(() => {
     const channel = channelRef.current;
     if (channel && channel.state === 'joined') {
-      fetchMessages();
+      void fetchMessages().catch(() => undefined);
       return;
     }
 
     if (clientResetRef.current) {
-      clientResetRef.current();
+      void clientResetRef.current().catch(() => {
+        void fetchMessages().catch(() => undefined);
+      });
     } else {
-      fetchMessages();
+      void fetchMessages().catch(() => undefined);
     }
   }, [fetchMessages]);
 
@@ -501,7 +504,7 @@ function useProvideMessages(): MessagesContextValue {
 
   // Fetch initial messages
   useEffect(() => {
-    fetchMessages();
+    void fetchMessages().catch(() => undefined);
     
     // Store the reset function for visibility refresh
     clientResetRef.current = resetWithFreshClient;
@@ -520,9 +523,6 @@ function useProvideMessages(): MessagesContextValue {
       return;
     }
 
-    // Use a static channel name to prevent duplicate subscriptions
-    const channelName = 'public:messages';
-
     let channel: RealtimeChannel | null = null;
     let currentClient: any = null;
     let disposed = false;
@@ -535,8 +535,8 @@ function useProvideMessages(): MessagesContextValue {
         throw new Error('Realtime client unavailable');
       }
       
-      const newChannel = currentClient
-        .channel(channelName, {
+      // Supabase reuses channels by topic, so each resubscribe gets a fresh topic.
+      const newChannel = currentClient.channel(createRealtimeChannelName(`public:messages:${user.id}`), {
           config: {
             broadcast: { self: true },
             presence: { key: user.id }
@@ -642,10 +642,10 @@ function useProvideMessages(): MessagesContextValue {
               } catch (resetError) {
                 // Fallback to simple resubscription after delay
                 setTimeout(() => {
-                  subscribeToChannel().then(newCh => {
+                  void subscribeToChannel().then(newCh => {
                     channel = newCh;
                     channelRef.current = newCh;
-                  });
+                  }).catch(() => undefined);
                 }, 2000);
               }
               return;
@@ -662,18 +662,18 @@ function useProvideMessages(): MessagesContextValue {
             } catch (resetError) {
               // Fallback to simple resubscription after delay
               setTimeout(() => {
-                subscribeToChannel().then(newCh => {
+                void subscribeToChannel().then(newCh => {
                   channel = newCh;
                   channelRef.current = newCh;
-                });
+                }).catch(() => undefined);
               }, 2000);
             }
           } else if (status === 'CLOSED') {
             setTimeout(() => {
-              subscribeToChannel().then(newCh => {
+              void subscribeToChannel().then(newCh => {
                 channel = newCh;
                 channelRef.current = newCh;
-              });
+              }).catch(() => undefined);
             }, 1000);
           }
         });
