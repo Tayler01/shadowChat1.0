@@ -791,6 +791,37 @@ html, body, #root {
   transform: translate3d(0, -0.35rem, 0) rotate(2.2deg) scale(1.025);
 }
 
+.shadow-pin-image-liked-badge {
+  align-items: center;
+  color: #ff6a88;
+  display: inline-flex;
+  height: 1.9rem;
+  justify-content: center;
+  line-height: 1;
+  pointer-events: none;
+  position: absolute;
+  right: 0.62rem;
+  top: 0.62rem;
+  width: 1.9rem;
+  z-index: 28;
+}
+
+.shadow-pin-image-liked-badge-icon {
+  color: #ff91af;
+  filter:
+    drop-shadow(0 0 1px rgba(255, 233, 238, 0.95))
+    drop-shadow(0 2px 5px rgba(0, 0, 0, 0.72))
+    drop-shadow(0 0 8px rgba(255, 77, 95, 0.72));
+  fill: rgba(255, 77, 95, 0.34);
+  height: 1.45rem;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.75;
+  vector-effect: non-scaling-stroke;
+  width: 1.45rem;
+}
+
 .shadow-pin-radial-layer {
   pointer-events: none;
   position: fixed;
@@ -822,8 +853,6 @@ html, body, #root {
 }
 
 .shadow-pin-radial-action {
-  --shadow-pin-radial-offset-x: 0px;
-  --shadow-pin-radial-offset-y: 0px;
   align-items: center;
   background:
     radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.18), transparent 48%),
@@ -837,12 +866,7 @@ html, body, #root {
   left: 0;
   position: absolute;
   top: 0;
-  transform:
-    translate(
-      calc(-50% + var(--shadow-pin-radial-offset-x)),
-      calc(-50% + var(--shadow-pin-radial-offset-y))
-    )
-    scale(0.86);
+  transform: translate(-50%, -50%) scale(0.86);
   transition:
     background var(--dur-fast) var(--ease-premium),
     border-color var(--dur-fast) var(--ease-premium),
@@ -858,12 +882,7 @@ html, body, #root {
     linear-gradient(180deg, rgba(255, 77, 95, 0.92), rgba(var(--theme-accent-strong-rgb), 0.88));
   border-color: rgba(255, 255, 255, 0.42);
   color: #fff9f9;
-  transform:
-    translate(
-      calc(-50% + var(--shadow-pin-radial-offset-x)),
-      calc(-50% + var(--shadow-pin-radial-offset-y))
-    )
-    scale(1.12);
+  transform: translate(-50%, -50%) scale(1.12);
 }
 
 .shadow-pin-action-feedback {
@@ -885,9 +904,9 @@ html, body, #root {
   filter: blur(0.35px) saturate(1.28);
   mix-blend-mode: normal;
   opacity: 0;
-  transform: translateY(44%) scaleY(0.42);
+  transform: translateY(96%) scaleY(0.38);
   transform-origin: 50% 100%;
-  animation: shadow-pin-action-burn-wave 1050ms var(--ease-premium) both;
+  animation: shadow-pin-action-burn-wave 1180ms var(--ease-premium) both;
 }
 
 .shadow-pin-action-wash::before {
@@ -945,7 +964,7 @@ html, body, #root {
     radial-gradient(circle at 50% 54%, rgba(255, 77, 95, 0.42), transparent 58%),
     linear-gradient(0deg, rgba(255, 77, 95, 0.26), rgba(245, 207, 116, 0.16) 52%, transparent),
     rgba(255, 77, 95, 0.16);
-  animation: shadow-pin-heart-field 900ms var(--ease-premium) both;
+  animation: shadow-pin-heart-field 1120ms var(--ease-premium) both;
 }
 
 .shadow-pin-action-confirm {
@@ -982,7 +1001,7 @@ html, body, #root {
   font-size: 1.7rem;
   line-height: 1;
   transform: translate(-50%, -50%) scale(0.5);
-  animation: shadow-pin-heart-core 680ms var(--ease-premium) both;
+  animation: shadow-pin-heart-core 860ms var(--ease-premium) both;
 }
 
 .shadow-pin-action-heart-particle {
@@ -993,7 +1012,7 @@ html, body, #root {
   line-height: 1;
   opacity: 0;
   transform: translate(-50%, -50%) scale(0.22);
-  animation: shadow-pin-heart-particle 760ms var(--ease-premium) both;
+  animation: shadow-pin-heart-particle 980ms var(--ease-premium) both;
   animation-delay: var(--shadow-pin-heart-delay);
 }
 
@@ -1216,17 +1235,10 @@ html, body, #root {
 
 @keyframes shadow-pin-radial-pop {
   0% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.58);
+    transform: translate(-50%, -50%) scale(0.68);
   }
   100% {
-    opacity: 1;
-    transform:
-      translate(
-        calc(-50% + var(--shadow-pin-radial-offset-x)),
-        calc(-50% + var(--shadow-pin-radial-offset-y))
-      )
-      scale(0.86);
+    transform: translate(-50%, -50%) scale(0.86);
   }
 }
 
@@ -1261,18 +1273,22 @@ html, body, #root {
 @keyframes shadow-pin-action-burn-wave {
   0% {
     opacity: 0;
-    transform: translateY(52%) scaleY(0.32);
+    transform: translateY(108%) scaleY(0.36);
   }
   18% {
     opacity: 1;
   }
-  54% {
+  62% {
     opacity: 0.92;
-    transform: translateY(-6%) scaleY(0.92);
+    transform: translateY(-18%) scaleY(1);
+  }
+  86% {
+    opacity: 0.78;
+    transform: translateY(-86%) scaleY(1.1);
   }
   100% {
     opacity: 0;
-    transform: translateY(-68%) scaleY(1.12);
+    transform: translateY(-122%) scaleY(1.14);
   }
 }
 

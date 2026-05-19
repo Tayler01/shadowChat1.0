@@ -130,19 +130,7 @@ const PIN_ACTION_MOVE_CANCEL_PX = 14
 const PIN_ACTION_SELECT_RADIUS_PX = 48
 const PIN_ACTION_SAFE_MARGIN_PX = 18
 const PIN_ACTION_ICON_RADIUS_PX = 28
-const PIN_ACTION_ROTATION_DEG = 10
-
-const rotatePinAction = (action: PinActionConfig): PinActionConfig => {
-  const angle = PIN_ACTION_ROTATION_DEG * Math.PI / 180
-  const cos = Math.cos(angle)
-  const sin = Math.sin(angle)
-
-  return {
-    ...action,
-    x: Math.round(action.x * cos - action.y * sin),
-    y: Math.round(action.x * sin + action.y * cos),
-  }
-}
+const PIN_ACTION_ARC_RADIUS_PX = 104
 
 const mirrorPinAction = (action: PinActionConfig): PinActionConfig => ({
   ...action,
@@ -150,14 +138,14 @@ const mirrorPinAction = (action: PinActionConfig): PinActionConfig => ({
 })
 
 const makePinActions = (actions: PinActionConfig[], side: PinActionSide) =>
-  actions.map(rotatePinAction).map(action => side === 'right' ? action : mirrorPinAction(action))
+  side === 'right' ? actions : actions.map(mirrorPinAction)
 
 const pinArcAction = (
   id: PinQuickAction,
   label: string,
   angleDeg: number,
   icon: LucideIcon,
-  radius = 104
+  radius = PIN_ACTION_ARC_RADIUS_PX
 ): PinActionConfig => {
   const angle = angleDeg * Math.PI / 180
   return {
@@ -170,15 +158,15 @@ const pinArcAction = (
 }
 
 const BASE_PIN_ACTIONS_RIGHT: PinActionConfig[] = [
-  pinArcAction('heart', 'Heart', -72, Heart),
-  pinArcAction('share', 'Share', -6, Share2),
-  pinArcAction('open', 'Open', 60, Pin),
+  pinArcAction('share', 'Share', -96, Share2),
+  pinArcAction('heart', 'Heart', -60, Heart),
+  pinArcAction('open', 'Open', -24, Pin),
 ]
 const BASE_MANAGE_PIN_ACTIONS_RIGHT: PinActionConfig[] = [
-  pinArcAction('heart', 'Heart', -78, Heart),
-  pinArcAction('share', 'Share', -32, Share2),
-  pinArcAction('open', 'Open', 14, Pin),
-  pinArcAction('edit', 'Edit', 60, Edit3),
+  pinArcAction('share', 'Share', -102, Share2),
+  pinArcAction('heart', 'Heart', -66, Heart),
+  pinArcAction('open', 'Open', -30, Pin),
+  pinArcAction('edit', 'Edit', 6, Edit3),
 ]
 const PIN_ACTIONS: Record<PinActionSide, PinActionConfig[]> = {
   left: makePinActions(BASE_PIN_ACTIONS_RIGHT, 'left'),
@@ -442,6 +430,20 @@ function ImageLikeCount({
     >
       <Heart className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
       <span>{formatCount(count)}</span>
+    </span>
+  )
+}
+
+function ImageLikedBadge({ active }: { active?: boolean }) {
+  if (!active) return null
+
+  return (
+    <span
+      className="shadow-pin-image-liked-badge"
+      data-testid="shadow-pin-image-liked-badge"
+      aria-label="You liked this image"
+    >
+      <Heart className="shadow-pin-image-liked-badge-icon" aria-hidden="true" />
     </span>
   )
 }
@@ -876,9 +878,9 @@ function PinActionRadialMenu({
               key={action.id}
               className={`shadow-pin-radial-action${selected ? ' shadow-pin-radial-action--selected' : ''}`}
               style={{
-                '--shadow-pin-radial-offset-x': `${action.x}px`,
-                '--shadow-pin-radial-offset-y': `${action.y}px`,
-              } as CSSProperties}
+                left: `${action.x}px`,
+                top: `${action.y}px`,
+              }}
               data-testid={`shadow-pin-radial-action-${action.id}`}
               data-action={action.id}
             >
@@ -1094,7 +1096,7 @@ function ImageCard({
     feedbackTimerRef.current = window.setTimeout(() => {
       setFeedback(null)
       feedbackTimerRef.current = null
-    }, 900)
+    }, 1180)
   }
 
   const runQuickAction = async (action: PinQuickAction) => {
@@ -1284,6 +1286,7 @@ function ImageCard({
           }}
           className="block h-full w-full object-cover"
         />
+        <ImageLikedBadge active={image.viewer_has_hearted} />
         <PinActionFeedback feedback={feedback} />
         <PinActionRadialMenu state={radialState} hearted={image.viewer_has_hearted} />
         {isProcessingMedia(image.processing_status) && (

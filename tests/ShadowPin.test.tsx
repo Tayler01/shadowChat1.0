@@ -1,4 +1,4 @@
-import { act, createEvent, fireEvent, render, screen } from '@testing-library/react'
+import { act, createEvent, fireEvent, render, screen, within } from '@testing-library/react'
 import React from 'react'
 import { ShadowPin } from '../src/features/shadow-pin/ShadowPin'
 import { ShadowPinGoldPinBadge } from '../src/features/shadow-pin/components/ShadowPinGoldPinBadge'
@@ -255,6 +255,39 @@ test('ShadowPin image single tap reveals a static heart count without direct ima
   }
 })
 
+test('ShadowPin liked images show a passive top-right heart badge only when liked', () => {
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      { ...image('one', 1200, 900), heart_count: 4, viewer_has_hearted: true },
+      { ...image('two', 900, 1200), heart_count: 0, viewer_has_hearted: false },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  render(<ShadowPin onBack={() => {}} />)
+
+  fireEvent.click(screen.getByText('Fam & Friends'))
+
+  const likedImageCard = screen.getByAltText('Pin one').closest('article')
+  const unlikedImageCard = screen.getByAltText('Pin two').closest('article')
+  expect(likedImageCard).not.toBeNull()
+  expect(unlikedImageCard).not.toBeNull()
+
+  expect(within(likedImageCard!).getByTestId('shadow-pin-image-liked-badge').querySelector('svg')).toBeInTheDocument()
+  expect(within(likedImageCard!).queryByRole('button', { name: /like shadowpin item/i })).not.toBeInTheDocument()
+  expect(within(unlikedImageCard!).queryByTestId('shadow-pin-image-liked-badge')).not.toBeInTheDocument()
+})
+
 test('ShadowPin image long-press opens a radial thumb menu and slide-heart triggers feedback', () => {
   jest.useFakeTimers()
 
@@ -285,19 +318,24 @@ test('ShadowPin image long-press opens a radial thumb menu and slide-heart trigg
     expect(screen.queryByTestId('shadow-pin-radial-action-edit')).not.toBeInTheDocument()
     expect(imageCard).toHaveClass('shadow-pin-action-card--active')
     expect(imageCard).toHaveClass('shadow-pin-action-card--active-left')
+    expect(Array.from(menu.querySelectorAll('[data-action]')).map(element => element.getAttribute('data-action'))).toEqual([
+      'share',
+      'heart',
+      'open',
+    ])
 
     fireShadowPinPointer(imageCard!, 'pointermove', {
       pointerId: 7,
-      clientX: 202,
-      clientY: 226,
+      clientX: 212,
+      clientY: 230,
     })
 
     expect(screen.getByTestId('shadow-pin-radial-menu')).toHaveAttribute('data-selected-action', 'heart')
 
     fireShadowPinPointer(imageCard!, 'pointerup', {
       pointerId: 7,
-      clientX: 202,
-      clientY: 226,
+      clientX: 212,
+      clientY: 230,
     })
 
     expect(mockToggleImageHeart).toHaveBeenCalledWith('one')
@@ -353,16 +391,16 @@ test('ShadowPin radial menu offers edit as a foreground action for image owners'
 
     fireShadowPinPointer(imageCard!, 'pointermove', {
       pointerId: 10,
-      clientX: 196,
-      clientY: 418,
+      clientX: 263,
+      clientY: 331,
     })
 
     expect(screen.getByTestId('shadow-pin-radial-menu')).toHaveAttribute('data-selected-action', 'edit')
 
     fireShadowPinPointer(imageCard!, 'pointerup', {
       pointerId: 10,
-      clientX: 196,
-      clientY: 418,
+      clientX: 263,
+      clientY: 331,
     })
     act(() => {
       jest.advanceTimersByTime(90)
@@ -469,8 +507,8 @@ test('ShadowPin right-column images tilt right and open controls to the left', (
 
     fireShadowPinPointer(imageCard!, 'pointermove', {
       pointerId: 12,
-      clientX: 254,
-      clientY: 224,
+      clientX: 248,
+      clientY: 230,
     })
 
     expect(screen.getByTestId('shadow-pin-radial-menu')).toHaveAttribute('data-selected-action', 'heart')
@@ -550,15 +588,15 @@ test('ShadowPin radial share falls back to copying the image link', async () => 
     })
     fireShadowPinPointer(imageCard!, 'pointermove', {
       pointerId: 9,
-      clientX: 256,
-      clientY: 281,
+      clientX: 149,
+      clientY: 217,
     })
 
     await act(async () => {
       fireShadowPinPointer(imageCard!, 'pointerup', {
         pointerId: 9,
-        clientX: 256,
-        clientY: 281,
+        clientX: 149,
+        clientY: 217,
       })
       await Promise.resolve()
     })
@@ -674,13 +712,13 @@ test('ShadowPin edit image keeps delete visually secondary to save and cancel', 
     })
     fireShadowPinPointer(imageCard!, 'pointermove', {
       pointerId: 13,
-      clientX: 196,
-      clientY: 418,
+      clientX: 263,
+      clientY: 331,
     })
     fireShadowPinPointer(imageCard!, 'pointerup', {
       pointerId: 13,
-      clientX: 196,
-      clientY: 418,
+      clientX: 263,
+      clientY: 331,
     })
     act(() => {
       jest.advanceTimersByTime(90)
