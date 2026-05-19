@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import React from 'react'
 import { ShadowPin } from '../src/features/shadow-pin/ShadowPin'
 import { ShadowPinGoldPinBadge } from '../src/features/shadow-pin/components/ShadowPinGoldPinBadge'
@@ -7,13 +7,14 @@ const mockUseShadowPinCategories = jest.fn()
 const mockUseShadowPinImages = jest.fn()
 const mockToggleCategoryHeart = jest.fn()
 const mockToggleImageHeart = jest.fn()
+let mockAuthUser = {
+  id: 'user-1',
+  admin_role: null,
+}
 
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => ({
-    user: {
-      id: 'user-1',
-      admin_role: null,
-    },
+    user: mockAuthUser,
   }),
 }))
 
@@ -84,6 +85,10 @@ const image = (id: string, width: number, height: number) => ({
 })
 
 beforeEach(() => {
+  mockAuthUser = {
+    id: 'user-1',
+    admin_role: null,
+  }
   mockToggleCategoryHeart.mockReset()
   mockToggleImageHeart.mockReset()
   mockToggleCategoryHeart.mockResolvedValue(undefined)
@@ -163,5 +168,87 @@ test('renders category pins in packed mobile masonry columns', () => {
       configurable: true,
       value: originalInnerWidth,
     })
+  }
+})
+
+test('ShadowPin edit category makes save and cancel primary while delete is deliberate', () => {
+  jest.useFakeTimers()
+  mockUseShadowPinCategories.mockReturnValue({
+    categories: [{ ...category, creator_id: 'user-1' }],
+    loading: false,
+    saving: false,
+    error: null,
+    refresh: jest.fn(),
+    createCategory: jest.fn(),
+    updateCategory: jest.fn(),
+    removeCategory: jest.fn(),
+    toggleHeart: mockToggleCategoryHeart,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    const categoryCard = screen.getByText('Fam & Friends').closest('article')
+    expect(categoryCard).not.toBeNull()
+    fireEvent.pointerDown(categoryCard!)
+    act(() => {
+      jest.advanceTimersByTime(520)
+    })
+    fireEvent.pointerUp(categoryCard!)
+
+    expect(screen.getByRole('heading', { name: /edit category/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^cancel$/i })).toHaveClass('w-full')
+    expect(screen.getByRole('button', { name: /^save$/i })).toHaveClass('w-full')
+
+    const deleteButton = screen.getByRole('button', { name: /delete shadowpin category/i })
+    expect(deleteButton).toHaveTextContent(/delete category/i)
+    expect(deleteButton).toHaveClass('text-red-300/65')
+    expect(deleteButton).not.toHaveClass('w-full')
+    expect(deleteButton).not.toHaveClass('text-white')
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('ShadowPin edit image keeps delete visually secondary to save and cancel', () => {
+  jest.useFakeTimers()
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      { ...image('one', 1200, 900), creator_id: 'user-1' },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+    fireEvent.click(screen.getByAltText('Pin one'))
+    act(() => {
+      jest.advanceTimersByTime(230)
+    })
+    fireEvent.click(screen.getByRole('button', { name: /edit image/i }))
+
+    expect(screen.getByRole('heading', { name: /edit image/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^cancel$/i })).toHaveClass('w-full')
+    expect(screen.getByRole('button', { name: /^save$/i })).toHaveClass('w-full')
+
+    const deleteButton = screen.getByRole('button', { name: /delete shadowpin image/i })
+    expect(deleteButton).toHaveTextContent(/delete image/i)
+    expect(deleteButton).toHaveClass('text-red-300/65')
+    expect(deleteButton).not.toHaveClass('w-full')
+    expect(deleteButton).not.toHaveClass('text-white')
+  } finally {
+    jest.useRealTimers()
   }
 })

@@ -468,17 +468,25 @@ function CategoryFormModal({
             <p className="text-xs text-[var(--text-muted)]">URL cover replacement can be done by creating a new category; file replacement is available here.</p>
           )}
           {error && <p className="rounded-[var(--radius-sm)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
-          <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
-            {onDelete && (
-              <Button type="button" variant="danger" onClick={onDelete} disabled={saving}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </Button>
-            )}
-            <div className="flex flex-1 gap-2 sm:justify-end">
-              <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
-              <Button type="submit" loading={saving}>{saving ? 'Processing image...' : mode === 'create' ? 'Create' : 'Save'}</Button>
+          <div className="space-y-3 border-t border-[var(--border-panel)] pt-4">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
+              <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={onClose} disabled={saving}>Cancel</Button>
+              <Button type="submit" className="w-full sm:w-auto" loading={saving}>{saving ? 'Processing image...' : mode === 'create' ? 'Create' : 'Save'}</Button>
             </div>
+            {onDelete && (
+              <div className="flex justify-end border-t border-[var(--border-panel)] pt-2">
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  disabled={saving}
+                  aria-label="Delete ShadowPin category"
+                  className="inline-flex min-h-8 items-center justify-center rounded-[var(--radius-sm)] px-2.5 py-1.5 text-xs font-medium text-red-300/65 transition-colors hover:bg-red-500/10 hover:text-red-200 focus:outline-none focus:ring-2 focus:ring-red-300/30 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                  Delete category
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </form>
@@ -553,17 +561,25 @@ function ImageFormModal({
             />
           )}
           {error && <p className="rounded-[var(--radius-sm)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
-          <div className="flex flex-col gap-2 sm:flex-row sm:justify-between">
-            {onDelete && (
-              <Button type="button" variant="danger" onClick={onDelete} disabled={saving}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </Button>
-            )}
-            <div className="flex flex-1 gap-2 sm:justify-end">
-              <Button type="button" variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
-              <Button type="submit" loading={saving}>{saving ? 'Processing image...' : mode === 'create' ? 'Add' : 'Save'}</Button>
+          <div className="space-y-3 border-t border-[var(--border-panel)] pt-4">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
+              <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={onClose} disabled={saving}>Cancel</Button>
+              <Button type="submit" className="w-full sm:w-auto" loading={saving}>{saving ? 'Processing image...' : mode === 'create' ? 'Add' : 'Save'}</Button>
             </div>
+            {onDelete && (
+              <div className="flex justify-end border-t border-[var(--border-panel)] pt-2">
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  disabled={saving}
+                  aria-label="Delete ShadowPin image"
+                  className="inline-flex min-h-8 items-center justify-center rounded-[var(--radius-sm)] px-2.5 py-1.5 text-xs font-medium text-red-300/65 transition-colors hover:bg-red-500/10 hover:text-red-200 focus:outline-none focus:ring-2 focus:ring-red-300/30 disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                  Delete image
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </form>
