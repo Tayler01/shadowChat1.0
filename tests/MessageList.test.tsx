@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
 import { MessageList } from '../src/components/chat/MessageList'
 import type { Message } from '../src/lib/supabase'
@@ -198,6 +198,7 @@ describe('MessageList mobile keyboard layout', () => {
   })
 
   it('throttles top-of-history requests when the loader remains visible', async () => {
+    jest.useFakeTimers()
     const loadOlderMessages = jest.fn().mockResolvedValue(undefined)
     const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_000)
     const originalIntersectionObserver = window.IntersectionObserver
@@ -237,15 +238,162 @@ describe('MessageList mobile keyboard layout', () => {
       await Promise.resolve()
       await Promise.resolve()
 
+      nowSpy.mockReturnValue(1_200)
       fireEvent.scroll(scrollContainer)
-      await new Promise(resolve => window.setTimeout(resolve, 0))
+      await act(async () => {
+        jest.advanceTimersByTime(1)
+        await Promise.resolve()
+      })
       expect(loadOlderMessages).toHaveBeenCalledTimes(1)
 
       nowSpy.mockReturnValue(3_000)
-      fireEvent.scroll(scrollContainer)
+      await act(async () => {
+        jest.advanceTimersByTime(1_800)
+        await Promise.resolve()
+      })
       await waitFor(() => expect(loadOlderMessages).toHaveBeenCalledTimes(2))
     } finally {
       nowSpy.mockRestore()
+      jest.useRealTimers()
+      Object.defineProperty(window, 'IntersectionObserver', {
+        configurable: true,
+        value: originalIntersectionObserver,
+      })
+    }
+  })
+
+  it('keeps the visible message anchored when older history is prepended', async () => {
+    const loadOlderMessages = jest.fn().mockResolvedValue(undefined)
+    let currentMessages = [makeMessage(10), makeMessage(11)]
+    let phase: 'before' | 'after' = 'before'
+    const rectSpy = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function getRect(this: HTMLElement) {
+      const element = this as HTMLElement
+      if (element.dataset.testid === 'message-scroll') {
+        return { top: 0, bottom: 600, left: 0, right: 390, width: 390, height: 600, x: 0, y: 0, toJSON: () => {} }
+      }
+
+      if (element.dataset.messageId === 'm10') {
+        const top = phase === 'before' ? 24 : 224
+        return { top, bottom: top + 64, left: 0, right: 390, width: 390, height: 64, x: 0, y: top, toJSON: () => {} }
+      }
+
+      return { top: 700, bottom: 760, left: 0, right: 390, width: 390, height: 60, x: 0, y: 700, toJSON: () => {} }
+    })
+    const originalIntersectionObserver = window.IntersectionObserver
+    Object.defineProperty(window, 'IntersectionObserver', {
+      configurable: true,
+      value: undefined,
+    })
+    window.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+      callback(0)
+      return 1
+    }) as typeof window.requestAnimationFrame
+    window.cancelAnimationFrame = jest.fn()
+
+    const setMessagesMock = () => {
+      mockUseMessages.mockReturnValue({
+        messages: currentMessages,
+        loading: false,
+        editMessage: jest.fn(),
+        deleteMessage: jest.fn(),
+        togglePin: jest.fn(),
+        toggleReaction: jest.fn(),
+        loadOlderMessages,
+        loadingMore: false,
+        hasMore: true,
+      })
+    }
+
+    try {
+      setMessagesMock()
+      const { rerender } = render(<MessageList />)
+      const scrollContainer = screen.getByTestId('message-scroll')
+      Object.defineProperties(scrollContainer, {
+        scrollTop: { configurable: true, value: 0, writable: true },
+        scrollHeight: { configurable: true, value: 900 },
+        clientHeight: { configurable: true, value: 600 },
+      })
+
+      fireEvent.scroll(scrollContainer)
+      expect(loadOlderMessages).toHaveBeenCalledTimes(1)
+
+      phase = 'after'
+      currentMessages = [makeMessage(8), makeMessage(9), ...currentMessages]
+      setMessagesMock()
+      rerender(<MessageList />)
+
+      expect(scrollContainer.scrollTop).toBe(200)
+    } finally {
+      rectSpy.mockRestore()
+      Object.defineProperty(window, 'IntersectionObserver', {
+        configurable: true,
+        value: originalIntersectionObserver,
+      })
+    }
+  })
+
+  it('falls back to scroll-height anchoring when the measured row position is unchanged', async () => {
+    const loadOlderMessages = jest.fn().mockResolvedValue(undefined)
+    let currentMessages = [makeMessage(10), makeMessage(11)]
+    let currentScrollHeight = 900
+    const rectSpy = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function getRect(this: HTMLElement) {
+      const element = this as HTMLElement
+      if (element.dataset.testid === 'message-scroll') {
+        return { top: 0, bottom: 600, left: 0, right: 390, width: 390, height: 600, x: 0, y: 0, toJSON: () => {} }
+      }
+
+      if (element.dataset.messageId === 'm10') {
+        return { top: 24, bottom: 88, left: 0, right: 390, width: 390, height: 64, x: 0, y: 24, toJSON: () => {} }
+      }
+
+      return { top: 700, bottom: 760, left: 0, right: 390, width: 390, height: 60, x: 0, y: 700, toJSON: () => {} }
+    })
+    const originalIntersectionObserver = window.IntersectionObserver
+    Object.defineProperty(window, 'IntersectionObserver', {
+      configurable: true,
+      value: undefined,
+    })
+    window.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+      callback(0)
+      return 1
+    }) as typeof window.requestAnimationFrame
+    window.cancelAnimationFrame = jest.fn()
+
+    const setMessagesMock = () => {
+      mockUseMessages.mockReturnValue({
+        messages: currentMessages,
+        loading: false,
+        editMessage: jest.fn(),
+        deleteMessage: jest.fn(),
+        togglePin: jest.fn(),
+        toggleReaction: jest.fn(),
+        loadOlderMessages,
+        loadingMore: false,
+        hasMore: true,
+      })
+    }
+
+    try {
+      setMessagesMock()
+      const { rerender } = render(<MessageList />)
+      const scrollContainer = screen.getByTestId('message-scroll')
+      Object.defineProperties(scrollContainer, {
+        scrollTop: { configurable: true, value: 0, writable: true },
+        scrollHeight: { configurable: true, get: () => currentScrollHeight },
+        clientHeight: { configurable: true, value: 600 },
+      })
+
+      fireEvent.scroll(scrollContainer)
+      expect(loadOlderMessages).toHaveBeenCalledTimes(1)
+
+      currentScrollHeight = 1_450
+      currentMessages = [makeMessage(8), makeMessage(9), ...currentMessages]
+      setMessagesMock()
+      rerender(<MessageList />)
+
+      expect(scrollContainer.scrollTop).toBe(550)
+    } finally {
+      rectSpy.mockRestore()
       Object.defineProperty(window, 'IntersectionObserver', {
         configurable: true,
         value: originalIntersectionObserver,

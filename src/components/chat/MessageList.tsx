@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowDown } from 'lucide-react'
 import { useMessages } from '../../hooks/useMessages'
 import { useTyping } from '../../hooks/useTyping'
-import { groupMessagesByDate, cn, shouldGroupMessage } from '../../lib/utils'
+import { groupMessagesByDate, shouldGroupMessage } from '../../lib/utils'
 import { MessageItem } from './MessageItem'
 import type { FailedMessage } from '../../hooks/useFailedMessages'
 import { FailedMessageItem } from './FailedMessageItem'
@@ -36,6 +36,7 @@ const HISTORY_LOAD_COOLDOWN_MS = 1800
 type VisibleMessageAnchor = {
   id: string
   top: number
+  scrollHeight: number
 }
 
 const findMessageRowById = (container: HTMLElement, id: string) => {
@@ -70,6 +71,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   const pendingJumpMessageIdRef = useRef<string | null>(null)
   const olderLoadInFlightRef = useRef(false)
   const lastHistoryRequestAtRef = useRef(0)
+  const historyRetryTimerRef = useRef<number | null>(null)
   const scrollFrameRef = useRef<number | null>(null)
   const initialTargetJumpDoneRef = useRef<string | null>(null)
   const [renderWindowStart, setRenderWindowStart] = useState(0)
@@ -137,12 +139,20 @@ export const MessageList: React.FC<MessageListProps> = ({
     return {
       id,
       top: visibleRow.getBoundingClientRect().top - containerRect.top,
+      scrollHeight: container.scrollHeight,
     }
   }, [])
 
   const capturePendingAnchor = useCallback(() => {
     pendingAnchorRef.current = captureVisibleAnchor()
   }, [captureVisibleAnchor])
+
+  const clearHistoryRetry = useCallback(() => {
+    if (historyRetryTimerRef.current !== null) {
+      window.clearTimeout(historyRetryTimerRef.current)
+      historyRetryTimerRef.current = null
+    }
+  }, [])
 
   const requestOlderMessages = useCallback(() => {
     if (loading || loadingMore || olderLoadInFlightRef.current) return
@@ -155,8 +165,18 @@ export const MessageList: React.FC<MessageListProps> = ({
       lastHistoryRequestAtRef.current > 0 &&
       now - lastHistoryRequestAtRef.current < HISTORY_LOAD_COOLDOWN_MS
     ) {
+      const retryDelay = Math.max(80, HISTORY_LOAD_COOLDOWN_MS - (now - lastHistoryRequestAtRef.current) + 24)
+      if (historyRetryTimerRef.current === null) {
+        historyRetryTimerRef.current = window.setTimeout(() => {
+          historyRetryTimerRef.current = null
+          const el = containerRef.current
+          if (!el || el.scrollTop > 120) return
+          requestOlderMessages()
+        }, retryDelay)
+      }
       return
     }
+    clearHistoryRetry()
     lastHistoryRequestAtRef.current = now
 
     capturePendingAnchor()
@@ -178,6 +198,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     loading,
     loadingMore,
     renderWindowStart,
+    clearHistoryRetry,
     setAutoScroll,
   ])
 
@@ -209,14 +230,22 @@ export const MessageList: React.FC<MessageListProps> = ({
     const anchorEl = container ? findMessageRowById(container, anchor.id) : null
     pendingAnchorRef.current = null
 
-    if (!container || !anchorEl) return
+    if (!container) return
 
-    const nextTop = anchorEl.getBoundingClientRect().top - container.getBoundingClientRect().top
-    const delta = nextTop - anchor.top
+    const heightDelta = Math.max(0, container.scrollHeight - anchor.scrollHeight)
+    const nextTop = anchorEl
+      ? anchorEl.getBoundingClientRect().top - container.getBoundingClientRect().top
+      : anchor.top
+    const measuredDelta = nextTop - anchor.top
+    const delta = Math.abs(measuredDelta) > 0.5
+      ? measuredDelta
+      : container.scrollTop <= 120
+      ? heightDelta
+      : 0
     if (Math.abs(delta) > 0.5) {
       container.scrollTop += delta
     }
-  }, [combinedMessages.length, loadingMore, renderWindowStart])
+  }, [combinedMessages.length, renderWindowStart])
 
   useEffect(() => {
     const sentinel = topSentinelRef.current
@@ -242,11 +271,12 @@ export const MessageList: React.FC<MessageListProps> = ({
 
   useEffect(() => {
     return () => {
+      clearHistoryRetry()
       if (scrollFrameRef.current !== null) {
         cancelAnimationFrame(scrollFrameRef.current)
       }
     }
-  }, [])
+  }, [clearHistoryRetry])
 
   useEffect(() => {
     if (autoScroll && typingUsers.length > 0) {
@@ -477,7 +507,7 @@ export const MessageList: React.FC<MessageListProps> = ({
                 <div
                   data-message-row="true"
                   data-message-id={message.id}
-                  className={cn(isGrouped ? 'pt-1 pb-1' : 'pt-4 pb-1', '[content-visibility:auto] [contain-intrinsic-size:0_96px]')}
+                  className={isGrouped ? 'pt-1 pb-1' : 'pt-4 pb-1'}
                 >
                   <MessageItem
                     message={message}
