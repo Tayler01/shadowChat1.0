@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, FormEvent, PointerEvent as ReactPointerEvent } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Edit3,
   Heart,
@@ -113,28 +114,120 @@ const getImageAspectRatio = (item: { image_width?: number | null; image_height?:
 
 const isProcessingMedia = (status?: string | null) => status === 'pending' || status === 'processing'
 
-type PinQuickAction = 'heart' | 'share' | 'open'
-
-const PIN_ACTION_LONG_PRESS_MS = 440
-const PIN_ACTION_MOVE_CANCEL_PX = 14
-const PIN_ACTION_SELECT_RADIUS_PX = 48
-const PIN_ACTIONS: Array<{
+type PinQuickAction = 'heart' | 'share' | 'open' | 'edit'
+type PinActionSide = 'left' | 'right'
+type PinColumnSide = 'left' | 'right'
+type PinActionConfig = {
   id: PinQuickAction
   label: string
   x: number
   y: number
   icon: LucideIcon
-}> = [
-  { id: 'heart', label: 'Heart', x: -70, y: -74, icon: Heart },
-  { id: 'share', label: 'Share', x: 0, y: -96, icon: Share2 },
-  { id: 'open', label: 'Open', x: 70, y: -74, icon: Pin },
-]
+}
 
-const getNearestPinAction = (deltaX: number, deltaY: number): PinQuickAction | null => {
+const PIN_ACTION_LONG_PRESS_MS = 440
+const PIN_ACTION_MOVE_CANCEL_PX = 14
+const PIN_ACTION_SELECT_RADIUS_PX = 48
+const PIN_ACTION_SAFE_MARGIN_PX = 18
+const PIN_ACTION_ICON_RADIUS_PX = 28
+const PIN_ACTION_ROTATION_DEG = 10
+
+const rotatePinAction = (action: PinActionConfig): PinActionConfig => {
+  const angle = PIN_ACTION_ROTATION_DEG * Math.PI / 180
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
+
+  return {
+    ...action,
+    x: Math.round(action.x * cos - action.y * sin),
+    y: Math.round(action.x * sin + action.y * cos),
+  }
+}
+
+const mirrorPinAction = (action: PinActionConfig): PinActionConfig => ({
+  ...action,
+  x: -action.x,
+})
+
+const makePinActions = (actions: PinActionConfig[], side: PinActionSide) =>
+  actions.map(rotatePinAction).map(action => side === 'right' ? action : mirrorPinAction(action))
+
+const pinArcAction = (
+  id: PinQuickAction,
+  label: string,
+  angleDeg: number,
+  icon: LucideIcon,
+  radius = 104
+): PinActionConfig => {
+  const angle = angleDeg * Math.PI / 180
+  return {
+    id,
+    label,
+    x: Math.round(Math.cos(angle) * radius),
+    y: Math.round(Math.sin(angle) * radius),
+    icon,
+  }
+}
+
+const BASE_PIN_ACTIONS_RIGHT: PinActionConfig[] = [
+  pinArcAction('heart', 'Heart', -72, Heart),
+  pinArcAction('share', 'Share', -6, Share2),
+  pinArcAction('open', 'Open', 60, Pin),
+]
+const BASE_MANAGE_PIN_ACTIONS_RIGHT: PinActionConfig[] = [
+  pinArcAction('heart', 'Heart', -78, Heart),
+  pinArcAction('share', 'Share', -32, Share2),
+  pinArcAction('open', 'Open', 14, Pin),
+  pinArcAction('edit', 'Edit', 60, Edit3),
+]
+const PIN_ACTIONS: Record<PinActionSide, PinActionConfig[]> = {
+  left: makePinActions(BASE_PIN_ACTIONS_RIGHT, 'left'),
+  right: makePinActions(BASE_PIN_ACTIONS_RIGHT, 'right'),
+}
+const MANAGE_PIN_ACTIONS: Record<PinActionSide, PinActionConfig[]> = {
+  left: makePinActions(BASE_MANAGE_PIN_ACTIONS_RIGHT, 'left'),
+  right: makePinActions(BASE_MANAGE_PIN_ACTIONS_RIGHT, 'right'),
+}
+
+const getPinActions = (canManageImage: boolean, side: PinActionSide) =>
+  canManageImage ? MANAGE_PIN_ACTIONS[side] : PIN_ACTIONS[side]
+
+const getPinControlSide = (columnSide: PinColumnSide): PinActionSide => columnSide === 'left' ? 'right' : 'left'
+
+const getPinColumnSide = (columnIndex: number, columnCount: number): PinColumnSide => {
+  if (columnCount <= 1) return 'left'
+  return columnIndex < columnCount / 2 ? 'left' : 'right'
+}
+
+const clampPinActionOrigin = (value: number, min: number, max: number) => {
+  if (min > max) return value
+  return Math.min(Math.max(value, min), max)
+}
+
+const getPinActionMenuOrigin = (clientX: number, clientY: number, actions: PinActionConfig[]) => {
+  if (typeof window === 'undefined' || actions.length === 0) return { x: clientX, y: clientY }
+
+  const minOffsetX = Math.min(...actions.map(action => action.x))
+  const maxOffsetX = Math.max(...actions.map(action => action.x))
+  const minOffsetY = Math.min(...actions.map(action => action.y))
+  const maxOffsetY = Math.max(...actions.map(action => action.y))
+  const inset = PIN_ACTION_ICON_RADIUS_PX + PIN_ACTION_SAFE_MARGIN_PX
+
+  return {
+    x: clampPinActionOrigin(clientX, inset - minOffsetX, window.innerWidth - inset - maxOffsetX),
+    y: clampPinActionOrigin(clientY, inset - minOffsetY, window.innerHeight - inset - maxOffsetY),
+  }
+}
+
+const getNearestPinAction = (
+  deltaX: number,
+  deltaY: number,
+  actions: PinActionConfig[]
+): PinQuickAction | null => {
   let nearestId: PinQuickAction | null = null
   let nearestDistance = Infinity
 
-  for (const action of PIN_ACTIONS) {
+  for (const action of actions) {
     const distance = Math.hypot(deltaX - action.x, deltaY - action.y)
     if (distance < nearestDistance) {
       nearestId = action.id
@@ -323,6 +416,33 @@ function HeartButton({
       )}
       {showCount && formatCount(count)}
     </button>
+  )
+}
+
+function ImageLikeCount({
+  count,
+  active,
+  className,
+}: {
+  count: number
+  active?: boolean
+  className?: string
+}) {
+  if (count <= 0) return null
+
+  return (
+    <span
+      className={cn(
+        'shadow-pin-image-like-count inline-flex shrink-0 items-center gap-1 rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(4,5,6,0.62)] px-2 py-1 text-xs font-semibold text-[var(--text-primary)] backdrop-blur-md',
+        active && 'border-[#ff4d5f]/70 bg-[rgba(255,77,95,0.16)] text-[#ff6a7a]',
+        className
+      )}
+      data-testid="shadow-pin-image-like-count"
+      aria-label={`${formatCount(count)} hearts`}
+    >
+      <Heart className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+      <span>{formatCount(count)}</span>
+    </span>
   )
 }
 
@@ -707,6 +827,8 @@ type PinRadialState = {
   originX: number
   originY: number
   selected: PinQuickAction | null
+  controlSide: PinActionSide
+  actions: PinActionConfig[]
 }
 
 type PinActionFeedbackState = {
@@ -719,6 +841,8 @@ const EMPTY_PIN_RADIAL_STATE: PinRadialState = {
   originX: 0,
   originY: 0,
   selected: null,
+  controlSide: 'right',
+  actions: PIN_ACTIONS.right,
 }
 
 function PinActionRadialMenu({
@@ -730,37 +854,42 @@ function PinActionRadialMenu({
 }) {
   if (!state.open) return null
 
-  return (
-    <div
-      className="shadow-pin-radial-menu"
-      style={{ left: state.originX, top: state.originY }}
-      data-testid="shadow-pin-radial-menu"
-      data-selected-action={state.selected || ''}
-      aria-hidden="true"
-    >
-      <span className="shadow-pin-radial-thumb-dot" />
-      {PIN_ACTIONS.map(action => {
-        const Icon = action.icon
-        const selected = state.selected === action.id
-        const label = action.id === 'heart' && hearted ? 'Unlike' : action.label
+  if (typeof document === 'undefined') return null
 
-        return (
-          <span
-            key={action.id}
-            className={`shadow-pin-radial-action${selected ? ' shadow-pin-radial-action--selected' : ''}`}
-            style={{
-              '--shadow-pin-radial-offset-x': `${action.x}px`,
-              '--shadow-pin-radial-offset-y': `${action.y}px`,
-            } as CSSProperties}
-            data-testid={`shadow-pin-radial-action-${action.id}`}
-            data-action={action.id}
-          >
-            <Icon className={cn('h-5 w-5', action.id === 'heart' && hearted && 'fill-current')} />
-            <span className="sr-only">{label}</span>
-          </span>
-        )
-      })}
-    </div>
+  return createPortal(
+    <div className="shadow-pin-radial-layer" data-testid="shadow-pin-radial-layer" aria-hidden="true">
+      <div
+        className="shadow-pin-radial-menu"
+        style={{ left: state.originX, top: state.originY }}
+        data-testid="shadow-pin-radial-menu"
+        data-selected-action={state.selected || ''}
+        data-control-side={state.controlSide}
+      >
+        <span className="shadow-pin-radial-thumb-dot" />
+        {state.actions.map(action => {
+          const Icon = action.icon
+          const selected = state.selected === action.id
+          const label = action.id === 'heart' && hearted ? 'Unlike' : action.label
+
+          return (
+            <span
+              key={action.id}
+              className={`shadow-pin-radial-action${selected ? ' shadow-pin-radial-action--selected' : ''}`}
+              style={{
+                '--shadow-pin-radial-offset-x': `${action.x}px`,
+                '--shadow-pin-radial-offset-y': `${action.y}px`,
+              } as CSSProperties}
+              data-testid={`shadow-pin-radial-action-${action.id}`}
+              data-action={action.id}
+            >
+              <Icon className={cn('h-5 w-5', action.id === 'heart' && hearted && 'fill-current')} />
+              <span className="sr-only">{label}</span>
+            </span>
+          )
+        })}
+      </div>
+    </div>,
+    document.body
   )
 }
 
@@ -771,7 +900,9 @@ function PinActionFeedback({ feedback }: { feedback: PinActionFeedbackState | nu
     ? Share2
     : feedback.action === 'open'
       ? Pin
-      : Heart
+      : feedback.action === 'edit'
+        ? Edit3
+        : Heart
 
   return (
     <span
@@ -806,6 +937,7 @@ function PinActionFeedback({ feedback }: { feedback: PinActionFeedbackState | nu
 function ImageCard({
   image,
   canManageImage,
+  columnSide,
   overlayOpen,
   onToggleOverlay,
   onViewer,
@@ -814,6 +946,7 @@ function ImageCard({
 }: {
   image: ShadowPinImage
   canManageImage: boolean
+  columnSide: PinColumnSide
   overlayOpen: boolean
   onToggleOverlay: () => void
   onViewer: () => void
@@ -827,8 +960,12 @@ function ImageCard({
     pointerId: number
     startClientX: number
     startClientY: number
+    menuOriginX: number
+    menuOriginY: number
+    actions: PinActionConfig[]
     active: boolean
   } | null>(null)
+  const unlockGestureScrollRef = useRef<(() => void) | null>(null)
   const pressConsumedRef = useRef(false)
   const pressConsumedTimerRef = useRef<number | null>(null)
   const feedbackKeyRef = useRef(0)
@@ -839,6 +976,7 @@ function ImageCard({
   const [feedback, setFeedback] = useState<PinActionFeedbackState | null>(null)
   const imageSrc = imageSources[sourceIndex] || image.image_url
   const aspectRatio = getImageAspectRatio(image) || '4 / 5'
+  const controlSide = getPinControlSide(columnSide)
 
   useEffect(() => {
     setSourceIndex(0)
@@ -849,7 +987,68 @@ function ImageCard({
     if (pressRef.current?.timerId) window.clearTimeout(pressRef.current.timerId)
     if (pressConsumedTimerRef.current) window.clearTimeout(pressConsumedTimerRef.current)
     if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current)
+    unlockGestureScrollRef.current?.()
+    unlockGestureScrollRef.current = null
   }, [])
+
+  const unlockGestureScroll = () => {
+    unlockGestureScrollRef.current?.()
+    unlockGestureScrollRef.current = null
+  }
+
+  const lockGestureScroll = () => {
+    if (typeof document === 'undefined' || unlockGestureScrollRef.current) return
+
+    const root = document.documentElement
+    const body = document.body
+    const previousRootOverflow = root.style.overflow
+    const previousRootTouchAction = root.style.touchAction
+    const previousRootOverscrollBehavior = root.style.overscrollBehavior
+    const previousBodyOverflow = body.style.overflow
+    const previousBodyTouchAction = body.style.touchAction
+    const previousBodyOverscrollBehavior = body.style.overscrollBehavior
+
+    root.style.overflow = 'hidden'
+    root.style.touchAction = 'none'
+    root.style.overscrollBehavior = 'none'
+    body.style.overflow = 'hidden'
+    body.style.touchAction = 'none'
+    body.style.overscrollBehavior = 'none'
+
+    const handleTouchMove = (event: TouchEvent) => {
+      event.preventDefault()
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const press = pressRef.current
+      if (!press?.active) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      const selected = getNearestPinAction(
+        finitePointerCoordinate(event.clientX) - press.menuOriginX,
+        finitePointerCoordinate(event.clientY) - press.menuOriginY,
+        press.actions
+      )
+      setRadialState(state => state.open ? { ...state, selected } : state)
+    }
+
+    const listenerOptions: AddEventListenerOptions = { passive: false, capture: true }
+    const removeOptions: EventListenerOptions = { capture: true }
+    document.addEventListener('touchmove', handleTouchMove, listenerOptions)
+    document.addEventListener('pointermove', handlePointerMove, listenerOptions)
+
+    unlockGestureScrollRef.current = () => {
+      document.removeEventListener('touchmove', handleTouchMove, removeOptions)
+      document.removeEventListener('pointermove', handlePointerMove, removeOptions)
+      root.style.overflow = previousRootOverflow
+      root.style.touchAction = previousRootTouchAction
+      root.style.overscrollBehavior = previousRootOverscrollBehavior
+      body.style.overflow = previousBodyOverflow
+      body.style.touchAction = previousBodyTouchAction
+      body.style.overscrollBehavior = previousBodyOverscrollBehavior
+    }
+  }
 
   const resetPressConsumed = () => {
     pressConsumedRef.current = false
@@ -911,6 +1110,11 @@ function ImageCard({
       return
     }
 
+    if (action === 'edit') {
+      window.setTimeout(onEdit, 90)
+      return
+    }
+
     window.setTimeout(onViewer, 90)
   }
 
@@ -928,12 +1132,13 @@ function ImageCard({
       clickTimer.current = null
     }
 
-    const rect = event.currentTarget.getBoundingClientRect()
     const pointerId = event.pointerId
     const startClientX = finitePointerCoordinate(event.clientX)
     const startClientY = finitePointerCoordinate(event.clientY)
-    const originX = startClientX - finitePointerCoordinate(rect.left)
-    const originY = startClientY - finitePointerCoordinate(rect.top)
+    const actions = getPinActions(canManageImage, controlSide)
+    const menuOrigin = getPinActionMenuOrigin(startClientX, startClientY, actions)
+    const originX = menuOrigin.x
+    const originY = menuOrigin.y
     const captureTarget = event.currentTarget
 
     clearPress()
@@ -943,6 +1148,7 @@ function ImageCard({
 
         pressRef.current.active = true
         markPressConsumed()
+        lockGestureScroll()
 
         if (typeof captureTarget.setPointerCapture === 'function') {
           try {
@@ -957,11 +1163,16 @@ function ImageCard({
           originX,
           originY,
           selected: null,
+          controlSide,
+          actions,
         })
       }, PIN_ACTION_LONG_PRESS_MS),
       pointerId,
       startClientX,
       startClientY,
+      menuOriginX: originX,
+      menuOriginY: originY,
+      actions,
       active: false,
     }
   }
@@ -970,11 +1181,13 @@ function ImageCard({
     const press = pressRef.current
     if (!press || press.pointerId !== event.pointerId) return
 
-    const deltaX = finitePointerCoordinate(event.clientX) - press.startClientX
-    const deltaY = finitePointerCoordinate(event.clientY) - press.startClientY
+    const clientX = finitePointerCoordinate(event.clientX)
+    const clientY = finitePointerCoordinate(event.clientY)
+    const moveDeltaX = clientX - press.startClientX
+    const moveDeltaY = clientY - press.startClientY
 
     if (!press.active) {
-      if (Math.hypot(deltaX, deltaY) > PIN_ACTION_MOVE_CANCEL_PX) {
+      if (Math.hypot(moveDeltaX, moveDeltaY) > PIN_ACTION_MOVE_CANCEL_PX) {
         clearPress()
       }
       return
@@ -983,7 +1196,7 @@ function ImageCard({
     event.preventDefault()
     event.stopPropagation()
 
-    const selected = getNearestPinAction(deltaX, deltaY)
+    const selected = getNearestPinAction(clientX - press.menuOriginX, clientY - press.menuOriginY, press.actions)
     setRadialState(state => state.open ? { ...state, selected } : state)
   }
 
@@ -994,8 +1207,9 @@ function ImageCard({
     const wasActive = press.active
     const selected = wasActive
       ? getNearestPinAction(
-        finitePointerCoordinate(event.clientX) - press.startClientX,
-        finitePointerCoordinate(event.clientY) - press.startClientY
+        finitePointerCoordinate(event.clientX) - press.menuOriginX,
+        finitePointerCoordinate(event.clientY) - press.menuOriginY,
+        press.actions
       ) || radialState.selected
       : null
 
@@ -1007,6 +1221,7 @@ function ImageCard({
     event.preventDefault()
     event.stopPropagation()
     setRadialState(EMPTY_PIN_RADIAL_STATE)
+    unlockGestureScroll()
 
     if (selected) {
       void runQuickAction(selected)
@@ -1017,6 +1232,7 @@ function ImageCard({
     clearPress()
     releasePointerCapture(event)
     setRadialState(EMPTY_PIN_RADIAL_STATE)
+    unlockGestureScroll()
   }
 
   const handleClick = () => {
@@ -1040,7 +1256,13 @@ function ImageCard({
   return (
     <article
       ref={cardRef}
-      className={`shadow-pin-action-card block w-full overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(5,6,8,0.62)] shadow-[var(--shadow-panel)]${radialState.open ? ' shadow-pin-action-card--active' : ''}`}
+      className={[
+        'shadow-pin-action-card block w-full overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(5,6,8,0.62)] shadow-[var(--shadow-panel)]',
+        radialState.open ? 'shadow-pin-action-card--active' : '',
+        radialState.open && columnSide === 'left' ? 'shadow-pin-action-card--active-left' : '',
+        radialState.open && columnSide === 'right' ? 'shadow-pin-action-card--active-right' : '',
+      ].filter(Boolean).join(' ')}
+      data-column-side={columnSide}
       onClick={handleClick}
       onContextMenu={event => event.preventDefault()}
       onPointerDown={handlePointerDown}
@@ -1075,17 +1297,12 @@ function ImageCard({
             Using original
           </div>
         )}
-        <HeartButton
-          active={image.viewer_has_hearted}
-          count={image.heart_count}
-          onClick={onHeart}
-          className="absolute right-2 top-2"
-          variant="bare"
-          showCount={false}
-        />
         {overlayOpen && (
           <div className="absolute inset-x-0 bottom-0 space-y-2 bg-[linear-gradient(180deg,rgba(4,5,6,0),rgba(4,5,6,0.9)_20%,rgba(4,5,6,0.96))] p-3 text-[var(--text-primary)]">
-            <h3 className="text-sm font-semibold leading-tight">{image.title}</h3>
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="min-w-0 text-sm font-semibold leading-tight">{image.title}</h3>
+              <ImageLikeCount count={image.heart_count} active={image.viewer_has_hearted} />
+            </div>
             {image.description && <p className="line-clamp-4 whitespace-pre-line text-xs leading-snug text-[var(--text-secondary)]">{image.description}</p>}
             <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
               <Avatar src={image.creator?.avatar_url} alt={getDisplayName(image)} size="sm" />
@@ -1095,19 +1312,6 @@ function ImageCard({
               </span>
             </div>
           </div>
-        )}
-        {overlayOpen && canManageImage && (
-          <button
-            type="button"
-            onClick={event => {
-              event.stopPropagation()
-              onEdit()
-            }}
-            className="absolute left-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(4,5,6,0.68)] text-[var(--text-primary)] backdrop-blur-md"
-            aria-label="Edit image"
-          >
-            <Edit3 className="h-4 w-4" />
-          </button>
         )}
       </div>
     </article>
@@ -1355,11 +1559,13 @@ function ShadowPinCategoryScreen({
                 <div key={columnIndex} className="flex min-w-0 flex-col gap-3">
                   {column.map(image => {
                     const manage = canManage(image, user?.id, adminRole)
+                    const columnSide = getPinColumnSide(columnIndex, masonryColumnCount)
                     return (
                       <div key={image.id} role="listitem" className="min-w-0">
                         <ImageCard
                           image={image}
                           canManageImage={manage}
+                          columnSide={columnSide}
                           overlayOpen={overlayImageId === image.id}
                           onToggleOverlay={() => setOverlayImageId(prev => prev === image.id ? null : image.id)}
                           onViewer={() => setModal({ type: 'image-viewer', image })}

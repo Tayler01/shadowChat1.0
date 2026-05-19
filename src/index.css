@@ -774,19 +774,34 @@ html, body, #root {
 }
 
 .shadow-pin-action-card--active {
+  touch-action: none;
   z-index: 4;
   border-color: rgba(var(--theme-accent-strong-rgb), 0.48);
   box-shadow:
     0 24px 58px rgba(0, 0, 0, 0.36),
     0 0 0 1px rgba(255, 77, 95, 0.16),
     0 0 30px rgba(var(--theme-accent-strong-rgb), 0.16);
+}
+
+.shadow-pin-action-card--active-left {
+  transform: translate3d(0, -0.35rem, 0) rotate(-2.2deg) scale(1.025);
+}
+
+.shadow-pin-action-card--active-right {
   transform: translate3d(0, -0.35rem, 0) rotate(2.2deg) scale(1.025);
+}
+
+.shadow-pin-radial-layer {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 125;
+  overflow: visible;
 }
 
 .shadow-pin-radial-menu {
   pointer-events: none;
   position: absolute;
-  z-index: 46;
   height: 0;
   width: 0;
   filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.38));
@@ -861,21 +876,51 @@ html, body, #root {
 
 .shadow-pin-action-wash {
   position: absolute;
-  inset: -8%;
+  inset: -18%;
   background:
-    radial-gradient(circle at 50% 48%, rgba(255, 77, 95, 0.34), transparent 58%),
-    linear-gradient(
-      110deg,
-      transparent 0%,
-      rgba(255, 77, 95, 0.56) 38%,
-      rgba(245, 207, 116, 0.42) 54%,
-      rgba(var(--theme-accent-strong-rgb), 0.26) 72%,
-      transparent 100%
-    );
+    radial-gradient(ellipse at 48% 92%, rgba(255, 77, 95, 0.78), transparent 44%),
+    radial-gradient(ellipse at 28% 82%, rgba(245, 207, 116, 0.52), transparent 34%),
+    radial-gradient(ellipse at 74% 86%, rgba(255, 255, 255, 0.28), transparent 34%),
+    linear-gradient(0deg, rgba(255, 77, 95, 0.58), rgba(245, 207, 116, 0.3) 44%, rgba(255, 255, 255, 0.12) 62%, transparent 78%);
+  filter: blur(0.35px) saturate(1.28);
   mix-blend-mode: normal;
   opacity: 0;
-  transform: translateX(-42%) skewX(-12deg);
-  animation: shadow-pin-action-wash 980ms var(--ease-premium) both;
+  transform: translateY(44%) scaleY(0.42);
+  transform-origin: 50% 100%;
+  animation: shadow-pin-action-burn-wave 1050ms var(--ease-premium) both;
+}
+
+.shadow-pin-action-wash::before {
+  content: '';
+  position: absolute;
+  left: -8%;
+  right: -8%;
+  top: 52%;
+  height: 4.25rem;
+  border-radius: 999px;
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.62), transparent 26%),
+    linear-gradient(90deg, transparent, rgba(255, 77, 95, 0.86), rgba(245, 207, 116, 0.66), rgba(255, 255, 255, 0.46), transparent);
+  filter: blur(6px);
+  opacity: 1;
+  transform: rotate(-3deg);
+}
+
+.shadow-pin-action-wash::after {
+  content: '';
+  position: absolute;
+  left: -12%;
+  right: -12%;
+  top: 55%;
+  height: 1.35rem;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, transparent, rgba(255, 77, 95, 0.92), rgba(255, 238, 184, 0.88), rgba(255, 255, 255, 0.62), transparent);
+  box-shadow:
+    0 0 16px rgba(255, 77, 95, 0.52),
+    0 0 28px rgba(245, 207, 116, 0.28);
+  opacity: 0.95;
+  transform: rotate(-3deg);
 }
 
 .shadow-pin-action-feedback--share .shadow-pin-action-wash,
@@ -883,13 +928,23 @@ html, body, #root {
   background:
     radial-gradient(circle at 50% 48%, rgba(var(--theme-accent-strong-rgb), 0.28), transparent 58%),
     linear-gradient(110deg, transparent 0%, rgba(var(--theme-accent-strong-rgb), 0.42) 45%, rgba(255, 255, 255, 0.18) 70%, transparent 100%);
+  mix-blend-mode: normal;
+  transform: translateX(-42%) skewX(-12deg);
+  animation: shadow-pin-action-wash 980ms var(--ease-premium) both;
+}
+
+.shadow-pin-action-feedback--share .shadow-pin-action-wash::before,
+.shadow-pin-action-feedback--share .shadow-pin-action-wash::after,
+.shadow-pin-action-feedback--open .shadow-pin-action-wash::before,
+.shadow-pin-action-feedback--open .shadow-pin-action-wash::after {
+  display: none;
 }
 
 .shadow-pin-action-feedback--heart {
   background:
-    radial-gradient(circle at 50% 48%, rgba(255, 77, 95, 0.36), transparent 54%),
-    linear-gradient(180deg, rgba(255, 77, 95, 0.22), rgba(245, 207, 116, 0.14)),
-    rgba(255, 77, 95, 0.14);
+    radial-gradient(circle at 50% 54%, rgba(255, 77, 95, 0.42), transparent 58%),
+    linear-gradient(0deg, rgba(255, 77, 95, 0.26), rgba(245, 207, 116, 0.16) 52%, transparent),
+    rgba(255, 77, 95, 0.16);
   animation: shadow-pin-heart-field 900ms var(--ease-premium) both;
 }
 
@@ -1203,6 +1258,24 @@ html, body, #root {
   }
 }
 
+@keyframes shadow-pin-action-burn-wave {
+  0% {
+    opacity: 0;
+    transform: translateY(52%) scaleY(0.32);
+  }
+  18% {
+    opacity: 1;
+  }
+  54% {
+    opacity: 0.92;
+    transform: translateY(-6%) scaleY(0.92);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-68%) scaleY(1.12);
+  }
+}
+
 @keyframes shadow-pin-heart-field {
   0% {
     opacity: 0;
@@ -1238,6 +1311,8 @@ html, body, #root {
   .shadow-pin-radial-action,
   .shadow-pin-radial-thumb-dot,
   .shadow-pin-action-wash,
+  .shadow-pin-action-wash::before,
+  .shadow-pin-action-wash::after,
   .shadow-pin-action-confirm,
   .shadow-pin-action-heart-core,
   .shadow-pin-action-heart-particle {

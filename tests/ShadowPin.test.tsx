@@ -202,6 +202,59 @@ test('renders category pins in packed mobile masonry columns', () => {
   }
 })
 
+test('ShadowPin image single tap reveals a static heart count without direct image-card controls', () => {
+  jest.useFakeTimers()
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      { ...image('one', 1200, 900), heart_count: 4, viewer_has_hearted: false },
+      image('two', 900, 1200),
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+
+    expect(screen.queryByTestId('shadow-pin-image-like-count')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /like shadowpin item/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /edit image/i })).not.toBeInTheDocument()
+
+    const likedImageCard = screen.getByAltText('Pin one').closest('article')
+    expect(likedImageCard).not.toBeNull()
+    fireEvent.click(likedImageCard!)
+    act(() => {
+      jest.advanceTimersByTime(230)
+    })
+
+    expect(screen.getByTestId('shadow-pin-image-like-count')).toHaveTextContent('4')
+    expect(screen.queryByRole('button', { name: /like shadowpin item/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /edit image/i })).not.toBeInTheDocument()
+
+    const emptyImageCard = screen.getByAltText('Pin two').closest('article')
+    expect(emptyImageCard).not.toBeNull()
+    fireEvent.click(emptyImageCard!)
+    act(() => {
+      jest.advanceTimersByTime(230)
+    })
+
+    expect(screen.queryByTestId('shadow-pin-image-like-count')).not.toBeInTheDocument()
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
 test('ShadowPin image long-press opens a radial thumb menu and slide-heart triggers feedback', () => {
   jest.useFakeTimers()
 
@@ -226,20 +279,25 @@ test('ShadowPin image long-press opens a radial thumb menu and slide-heart trigg
     const menu = screen.getByTestId('shadow-pin-radial-menu')
     expect(menu).toBeInTheDocument()
     expect(menu).toHaveAttribute('data-selected-action', '')
+    expect(menu).toHaveAttribute('data-control-side', 'right')
+    expect(screen.getByTestId('shadow-pin-radial-layer').parentElement).toBe(document.body)
+    expect(imageCard!.querySelector('[data-testid="shadow-pin-radial-menu"]')).toBeNull()
+    expect(screen.queryByTestId('shadow-pin-radial-action-edit')).not.toBeInTheDocument()
     expect(imageCard).toHaveClass('shadow-pin-action-card--active')
+    expect(imageCard).toHaveClass('shadow-pin-action-card--active-left')
 
     fireShadowPinPointer(imageCard!, 'pointermove', {
       pointerId: 7,
-      clientX: 90,
-      clientY: 246,
+      clientX: 202,
+      clientY: 226,
     })
 
     expect(screen.getByTestId('shadow-pin-radial-menu')).toHaveAttribute('data-selected-action', 'heart')
 
     fireShadowPinPointer(imageCard!, 'pointerup', {
       pointerId: 7,
-      clientX: 90,
-      clientY: 246,
+      clientX: 202,
+      clientY: 226,
     })
 
     expect(mockToggleImageHeart).toHaveBeenCalledWith('one')
@@ -247,6 +305,180 @@ test('ShadowPin image long-press opens a radial thumb menu and slide-heart trigg
     expect(screen.getByTestId('shadow-pin-action-feedback')).toHaveAttribute('data-action', 'heart')
     expect(screen.getByTestId('shadow-pin-action-heart-burst')).toBeInTheDocument()
   } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('ShadowPin radial menu offers edit as a foreground action for image owners', () => {
+  jest.useFakeTimers()
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      { ...image('one', 1200, 900), creator_id: 'user-1' },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+
+    const imageCard = screen.getByAltText('Pin one').closest('article')
+    expect(imageCard).not.toBeNull()
+
+    fireShadowPinPointer(imageCard!, 'pointerdown', {
+      pointerId: 10,
+      button: 0,
+      clientX: 160,
+      clientY: 320,
+    })
+    act(() => {
+      jest.advanceTimersByTime(440)
+    })
+
+    expect(screen.getByTestId('shadow-pin-radial-action-edit')).toBeInTheDocument()
+    expect(screen.getByTestId('shadow-pin-radial-layer').parentElement).toBe(document.body)
+    expect(screen.getByTestId('shadow-pin-radial-menu')).toHaveAttribute('data-control-side', 'right')
+    expect(imageCard).toHaveClass('shadow-pin-action-card--active-left')
+
+    fireShadowPinPointer(imageCard!, 'pointermove', {
+      pointerId: 10,
+      clientX: 196,
+      clientY: 418,
+    })
+
+    expect(screen.getByTestId('shadow-pin-radial-menu')).toHaveAttribute('data-selected-action', 'edit')
+
+    fireShadowPinPointer(imageCard!, 'pointerup', {
+      pointerId: 10,
+      clientX: 196,
+      clientY: 418,
+    })
+    act(() => {
+      jest.advanceTimersByTime(90)
+    })
+
+    expect(screen.getByRole('heading', { name: /edit image/i })).toBeInTheDocument()
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('ShadowPin active radial menu locks document scroll while selecting controls', () => {
+  jest.useFakeTimers()
+  const originalRootOverflow = document.documentElement.style.overflow
+  const originalRootTouchAction = document.documentElement.style.touchAction
+  const originalRootOverscrollBehavior = document.documentElement.style.overscrollBehavior
+  const originalBodyOverflow = document.body.style.overflow
+  const originalBodyTouchAction = document.body.style.touchAction
+  const originalBodyOverscrollBehavior = document.body.style.overscrollBehavior
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+
+    const imageCard = screen.getByAltText('Pin one').closest('article')
+    expect(imageCard).not.toBeNull()
+
+    fireShadowPinPointer(imageCard!, 'pointerdown', {
+      pointerId: 11,
+      button: 0,
+      clientX: 160,
+      clientY: 320,
+    })
+    act(() => {
+      jest.advanceTimersByTime(440)
+    })
+
+    expect(document.documentElement.style.overflow).toBe('hidden')
+    expect(document.documentElement.style.touchAction).toBe('none')
+    expect(document.documentElement.style.overscrollBehavior).toBe('none')
+    expect(document.body.style.overflow).toBe('hidden')
+    expect(document.body.style.touchAction).toBe('none')
+    expect(document.body.style.overscrollBehavior).toBe('none')
+
+    const touchMove = createEvent.touchMove(document, {
+      touches: [{ clientX: 160, clientY: 250 }],
+      cancelable: true,
+    })
+    fireEvent(document, touchMove)
+    expect(touchMove.defaultPrevented).toBe(true)
+
+    fireShadowPinPointer(imageCard!, 'pointerup', {
+      pointerId: 11,
+      clientX: 160,
+      clientY: 320,
+    })
+
+    expect(document.documentElement.style.overflow).toBe(originalRootOverflow)
+    expect(document.documentElement.style.touchAction).toBe(originalRootTouchAction)
+    expect(document.documentElement.style.overscrollBehavior).toBe(originalRootOverscrollBehavior)
+    expect(document.body.style.overflow).toBe(originalBodyOverflow)
+    expect(document.body.style.touchAction).toBe(originalBodyTouchAction)
+    expect(document.body.style.overscrollBehavior).toBe(originalBodyOverscrollBehavior)
+  } finally {
+    document.documentElement.style.overflow = originalRootOverflow
+    document.documentElement.style.touchAction = originalRootTouchAction
+    document.documentElement.style.overscrollBehavior = originalRootOverscrollBehavior
+    document.body.style.overflow = originalBodyOverflow
+    document.body.style.touchAction = originalBodyTouchAction
+    document.body.style.overscrollBehavior = originalBodyOverscrollBehavior
+    jest.useRealTimers()
+  }
+})
+
+test('ShadowPin right-column images tilt right and open controls to the left', () => {
+  jest.useFakeTimers()
+  const originalInnerWidth = window.innerWidth
+  Object.defineProperty(window, 'innerWidth', {
+    configurable: true,
+    value: 390,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+
+    const imageCard = screen.getByAltText('Pin two').closest('article')
+    expect(imageCard).not.toBeNull()
+
+    fireShadowPinPointer(imageCard!, 'pointerdown', {
+      pointerId: 12,
+      button: 0,
+      clientX: 300,
+      clientY: 320,
+    })
+    act(() => {
+      jest.advanceTimersByTime(440)
+    })
+
+    expect(imageCard).toHaveClass('shadow-pin-action-card--active-right')
+    expect(screen.getByTestId('shadow-pin-radial-menu')).toHaveAttribute('data-control-side', 'left')
+
+    fireShadowPinPointer(imageCard!, 'pointermove', {
+      pointerId: 12,
+      clientX: 254,
+      clientY: 224,
+    })
+
+    expect(screen.getByTestId('shadow-pin-radial-menu')).toHaveAttribute('data-selected-action', 'heart')
+  } finally {
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      value: originalInnerWidth,
+    })
     jest.useRealTimers()
   }
 })
@@ -318,15 +550,15 @@ test('ShadowPin radial share falls back to copying the image link', async () => 
     })
     fireShadowPinPointer(imageCard!, 'pointermove', {
       pointerId: 9,
-      clientX: 160,
-      clientY: 224,
+      clientX: 256,
+      clientY: 281,
     })
 
     await act(async () => {
       fireShadowPinPointer(imageCard!, 'pointerup', {
         pointerId: 9,
-        clientX: 160,
-        clientY: 224,
+        clientX: 256,
+        clientY: 281,
       })
       await Promise.resolve()
     })
@@ -428,11 +660,31 @@ test('ShadowPin edit image keeps delete visually secondary to save and cancel', 
     render(<ShadowPin onBack={() => {}} />)
 
     fireEvent.click(screen.getByText('Fam & Friends'))
-    fireEvent.click(screen.getByAltText('Pin one'))
-    act(() => {
-      jest.advanceTimersByTime(230)
+
+    const imageCard = screen.getByAltText('Pin one').closest('article')
+    expect(imageCard).not.toBeNull()
+    fireShadowPinPointer(imageCard!, 'pointerdown', {
+      pointerId: 13,
+      button: 0,
+      clientX: 160,
+      clientY: 320,
     })
-    fireEvent.click(screen.getByRole('button', { name: /edit image/i }))
+    act(() => {
+      jest.advanceTimersByTime(440)
+    })
+    fireShadowPinPointer(imageCard!, 'pointermove', {
+      pointerId: 13,
+      clientX: 196,
+      clientY: 418,
+    })
+    fireShadowPinPointer(imageCard!, 'pointerup', {
+      pointerId: 13,
+      clientX: 196,
+      clientY: 418,
+    })
+    act(() => {
+      jest.advanceTimersByTime(90)
+    })
 
     expect(screen.getByRole('heading', { name: /edit image/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^cancel$/i })).toHaveClass('w-full')
