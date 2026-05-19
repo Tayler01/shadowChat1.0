@@ -31,6 +31,7 @@ interface MessageListProps {
 const DEFAULT_RENDER_WINDOW_SIZE = 90
 const RENDER_WINDOW_INCREMENT = 60
 const HISTORY_LOAD_ROOT_MARGIN = '180px 0px 0px 0px'
+const HISTORY_LOAD_SCROLL_THRESHOLD = 180
 const HISTORY_LOAD_COOLDOWN_MS = 1800
 
 type VisibleMessageAnchor = {
@@ -170,7 +171,7 @@ export const MessageList: React.FC<MessageListProps> = ({
         historyRetryTimerRef.current = window.setTimeout(() => {
           historyRetryTimerRef.current = null
           const el = containerRef.current
-          if (!el || el.scrollTop > 120) return
+          if (!el || el.scrollTop > HISTORY_LOAD_SCROLL_THRESHOLD) return
           requestOlderMessages()
         }, retryDelay)
       }
@@ -212,7 +213,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 
       handleUnreadScroll()
 
-      if (typeof IntersectionObserver === 'undefined' && el.scrollTop < 120) {
+      if (el.scrollTop <= HISTORY_LOAD_SCROLL_THRESHOLD) {
         requestOlderMessages()
       }
     })
@@ -239,7 +240,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     const measuredDelta = nextTop - anchor.top
     const delta = Math.abs(measuredDelta) > 0.5
       ? measuredDelta
-      : container.scrollTop <= 120
+      : container.scrollTop <= HISTORY_LOAD_SCROLL_THRESHOLD
       ? heightDelta
       : 0
     if (Math.abs(delta) > 0.5) {

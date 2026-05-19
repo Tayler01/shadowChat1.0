@@ -173,6 +173,48 @@ describe('MessageList mobile keyboard layout', () => {
     expect(mockUseMessages().loadOlderMessages).not.toHaveBeenCalled()
   })
 
+  it('loads older history from the top scroll position even when the observer misses it', async () => {
+    const loadOlderMessages = jest.fn().mockResolvedValue(undefined)
+    const originalIntersectionObserver = window.IntersectionObserver
+    Object.defineProperty(window, 'IntersectionObserver', {
+      configurable: true,
+      value: class MockIntersectionObserver {
+        observe = jest.fn()
+        disconnect = jest.fn()
+      },
+    })
+    mockUseMessages.mockReturnValue({
+      messages: [message],
+      loading: false,
+      editMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      togglePin: jest.fn(),
+      toggleReaction: jest.fn(),
+      loadOlderMessages,
+      loadingMore: false,
+      hasMore: true,
+    })
+
+    try {
+      render(<MessageList />)
+      const scrollContainer = screen.getByTestId('message-scroll')
+      Object.defineProperties(scrollContainer, {
+        scrollTop: { configurable: true, value: 0, writable: true },
+        scrollHeight: { configurable: true, value: 1200 },
+        clientHeight: { configurable: true, value: 600 },
+      })
+
+      fireEvent.scroll(scrollContainer)
+
+      await waitFor(() => expect(loadOlderMessages).toHaveBeenCalledTimes(1))
+    } finally {
+      Object.defineProperty(window, 'IntersectionObserver', {
+        configurable: true,
+        value: originalIntersectionObserver,
+      })
+    }
+  })
+
   it('keeps only the latest group chat window mounted while preserving loaded count metadata', async () => {
     const manyMessages = Array.from({ length: 110 }, (_, index) => makeMessage(index))
     mockUseMessages.mockReturnValue({

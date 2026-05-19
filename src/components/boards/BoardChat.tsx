@@ -27,6 +27,9 @@ import type { ChatBoardDefinition } from '../../lib/boards'
 import type { AppView } from '../../types/navigation'
 import { EmojiPickerOverlay } from '../chat/EmojiPickerOverlay'
 
+const HISTORY_LOAD_SCROLL_THRESHOLD = 180
+const HISTORY_LOAD_COOLDOWN_MS = 1800
+
 function BoardChatRow({
   board,
   message,
@@ -297,6 +300,12 @@ export function BoardChat({
   } = useBoardChat(board.slug, board.title)
   const [draft, setDraft] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
+  const prevHeightRef = useRef(0)
+  const prevScrollTopRef = useRef(0)
+  const olderLoadInFlightRef = useRef(false)
+  const lastHistoryRequestAtRef = useRef(0)
+  const historyRetryTimerRef = useRef<number | null>(null)
+  const scrollFrameRef = useRef<number | null>(null)
   const {
     cursor,
     loading: cursorLoading,
@@ -313,6 +322,7 @@ export function BoardChat({
   const {
     autoScroll,
     firstUnreadMessageId,
+    setAutoScroll,
     handleUnreadScroll,
     scrollToBottom,
   } = useUnreadScroll<BoardChatMessage>({
@@ -329,16 +339,82 @@ export function BoardChat({
     onMarkReadToLatest: markBoardRead,
   })
 
+  const clearHistoryRetry = useCallback(() => {
+    if (historyRetryTimerRef.current !== null) {
+      window.clearTimeout(historyRetryTimerRef.current)
+      historyRetryTimerRef.current = null
+    }
+  }, [])
+
+  const requestOlderMessages = useCallback(() => {
+    const el = scrollRef.current
+    if (!el || loadingMore || !hasMore || olderLoadInFlightRef.current) return
+
+    const now = Date.now()
+    if (
+      lastHistoryRequestAtRef.current > 0 &&
+      now - lastHistoryRequestAtRef.current < HISTORY_LOAD_COOLDOWN_MS
+    ) {
+      const retryDelay = Math.max(80, HISTORY_LOAD_COOLDOWN_MS - (now - lastHistoryRequestAtRef.current) + 24)
+      if (historyRetryTimerRef.current === null) {
+        historyRetryTimerRef.current = window.setTimeout(() => {
+          historyRetryTimerRef.current = null
+          const retryEl = scrollRef.current
+          if (!retryEl || retryEl.scrollTop > HISTORY_LOAD_SCROLL_THRESHOLD) return
+          requestOlderMessages()
+        }, retryDelay)
+      }
+      return
+    }
+
+    clearHistoryRetry()
+    lastHistoryRequestAtRef.current = now
+    prevHeightRef.current = el.scrollHeight
+    prevScrollTopRef.current = el.scrollTop
+    setAutoScroll(false)
+    olderLoadInFlightRef.current = true
+    void loadOlderMessages().finally(() => {
+      olderLoadInFlightRef.current = false
+    })
+  }, [clearHistoryRetry, hasMore, loadingMore, loadOlderMessages, setAutoScroll])
+
   const handleScroll = useCallback(() => {
+    if (scrollFrameRef.current !== null) return
+
+    scrollFrameRef.current = requestAnimationFrame(() => {
+      scrollFrameRef.current = null
+      const el = scrollRef.current
+      if (!el) return
+
+      handleUnreadScroll()
+
+      if (el.scrollTop <= HISTORY_LOAD_SCROLL_THRESHOLD) {
+        requestOlderMessages()
+      }
+    })
+  }, [handleUnreadScroll, requestOlderMessages])
+
+  useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-
-    handleUnreadScroll()
-
-    if (el.scrollTop < 100 && hasMore && !loadingMore) {
-      void loadOlderMessages()
+    if (!loadingMore && prevHeightRef.current) {
+      const diff = el.scrollHeight - prevHeightRef.current
+      el.scrollTop = prevScrollTopRef.current <= 0
+        ? diff
+        : prevScrollTopRef.current + diff
+      prevHeightRef.current = 0
+      prevScrollTopRef.current = 0
     }
-  }, [handleUnreadScroll, hasMore, loadingMore, loadOlderMessages])
+  }, [loadingMore, messages.length])
+
+  useEffect(() => {
+    return () => {
+      clearHistoryRetry()
+      if (scrollFrameRef.current !== null) {
+        cancelAnimationFrame(scrollFrameRef.current)
+      }
+    }
+  }, [clearHistoryRetry])
 
   useEffect(() => {
     let frameId: number | null = null

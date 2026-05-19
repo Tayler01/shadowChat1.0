@@ -56,6 +56,9 @@ interface DirectMessagesViewProps {
   initialMessageId?: string
 }
 
+const HISTORY_LOAD_SCROLL_THRESHOLD = 180
+const HISTORY_LOAD_COOLDOWN_MS = 1800
+
 const PublicProfileDialog = React.lazy(() =>
   import('../profile/PublicProfileDialog').then(module => ({
     default: module.PublicProfileDialog,
@@ -492,6 +495,10 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const messagesRef = useRef<HTMLDivElement>(null)
   const prevHeightRef = useRef(0)
   const prevScrollTopRef = useRef(0)
+  const olderLoadInFlightRef = useRef(false)
+  const lastHistoryRequestAtRef = useRef(0)
+  const historyRetryTimerRef = useRef<number | null>(null)
+  const scrollFrameRef = useRef<number | null>(null)
   const initialConversationAppliedRef = useRef<string | null>(null)
   const initialTargetJumpDoneRef = useRef<string | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -632,18 +639,60 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     onMarkReadToLatest: markDMReadToLatest,
   })
 
-  const handleScroll = useCallback(() => {
-    const el = messagesRef.current
-    if (!el) return
-
-    handleUnreadScroll()
-
-    if (el.scrollTop < 100 && hasMore && !loadingMore) {
-      prevHeightRef.current = el.scrollHeight
-      prevScrollTopRef.current = el.scrollTop
-      void loadOlderMessages()
+  const clearHistoryRetry = useCallback(() => {
+    if (historyRetryTimerRef.current !== null) {
+      window.clearTimeout(historyRetryTimerRef.current)
+      historyRetryTimerRef.current = null
     }
-  }, [handleUnreadScroll, hasMore, loadingMore, loadOlderMessages])
+  }, [])
+
+  const requestOlderMessages = useCallback(() => {
+    const el = messagesRef.current
+    if (!el || loadingMore || !hasMore || olderLoadInFlightRef.current) return
+
+    const now = Date.now()
+    if (
+      lastHistoryRequestAtRef.current > 0 &&
+      now - lastHistoryRequestAtRef.current < HISTORY_LOAD_COOLDOWN_MS
+    ) {
+      const retryDelay = Math.max(80, HISTORY_LOAD_COOLDOWN_MS - (now - lastHistoryRequestAtRef.current) + 24)
+      if (historyRetryTimerRef.current === null) {
+        historyRetryTimerRef.current = window.setTimeout(() => {
+          historyRetryTimerRef.current = null
+          const retryEl = messagesRef.current
+          if (!retryEl || retryEl.scrollTop > HISTORY_LOAD_SCROLL_THRESHOLD) return
+          requestOlderMessages()
+        }, retryDelay)
+      }
+      return
+    }
+
+    clearHistoryRetry()
+    lastHistoryRequestAtRef.current = now
+    prevHeightRef.current = el.scrollHeight
+    prevScrollTopRef.current = el.scrollTop
+    setAutoScroll(false)
+    olderLoadInFlightRef.current = true
+    void loadOlderMessages().finally(() => {
+      olderLoadInFlightRef.current = false
+    })
+  }, [clearHistoryRetry, hasMore, loadingMore, loadOlderMessages, setAutoScroll])
+
+  const handleScroll = useCallback(() => {
+    if (scrollFrameRef.current !== null) return
+
+    scrollFrameRef.current = requestAnimationFrame(() => {
+      scrollFrameRef.current = null
+      const el = messagesRef.current
+      if (!el) return
+
+      handleUnreadScroll()
+
+      if (el.scrollTop <= HISTORY_LOAD_SCROLL_THRESHOLD) {
+        requestOlderMessages()
+      }
+    })
+  }, [handleUnreadScroll, requestOlderMessages])
 
   useEffect(() => {
     initialTargetJumpDoneRef.current = null
@@ -661,6 +710,15 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
       prevScrollTopRef.current = 0
     }
   }, [loadingMore, messages.length])
+
+  useEffect(() => {
+    return () => {
+      clearHistoryRetry()
+      if (scrollFrameRef.current !== null) {
+        cancelAnimationFrame(scrollFrameRef.current)
+      }
+    }
+  }, [clearHistoryRetry])
 
   useEffect(() => {
     if (autoScroll && typingUsers.length > 0) {
