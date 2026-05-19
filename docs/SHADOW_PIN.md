@@ -91,3 +91,14 @@ npm run shadow-pin:backfill-media -- --apply
 - URL cover replacement during category editing is intentionally not included; creators can replace covers with device uploads.
 - Stored assets are preserved after soft deletes. A future cleanup job can archive old unused objects.
 - Pull-to-refresh is not custom-built; views refetch on open/return and after mutations.
+
+## Future UX Todo
+
+- Explore a Pinterest-style mobile long-press action menu for image pins.
+  Desired behavior: press and hold a pin image, tilt/lift the image, show a
+  thumb-friendly radial action menu with heart, share, open/save-style actions,
+  allow slide-to-select, then confirm the selected action with premium feedback
+  such as a heart burst and subtle color wash over the image. Keep this
+  mobile-first and verify on iPhone/WebKit and Android/Chromium so the gesture
+  does not fight normal masonry scrolling, native image context menus, or
+  existing tap-to-open behavior.
