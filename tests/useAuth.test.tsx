@@ -213,7 +213,11 @@ test('signOut calls auth.signOut', async () => {
 test('uploadAvatar calls auth.uploadUserAvatar', async () => {
   const profile = { id: '1' } as any;
   authModule.signUp.mockResolvedValue({ session: {}, profile, user: {} } as any);
-  authModule.uploadUserAvatar.mockResolvedValue('url');
+  authModule.uploadUserAvatar.mockResolvedValue({
+    ...profile,
+    avatar_url: 'url',
+    avatar_thumbnail_url: 'thumb',
+  } as any);
 
   const { result } = await renderUseAuth();
 
@@ -230,12 +234,20 @@ test('uploadAvatar calls auth.uploadUserAvatar', async () => {
   });
 
   expect(authModule.uploadUserAvatar).toHaveBeenCalled();
+  expect(result.current.user).toMatchObject({
+    avatar_url: 'url',
+    avatar_thumbnail_url: 'thumb',
+  });
 });
 
 test('uploadBanner calls auth.uploadUserBanner', async () => {
   const profile = { id: '1' } as any;
   authModule.signUp.mockResolvedValue({ session: {}, profile, user: {} } as any);
-  authModule.uploadUserBanner.mockResolvedValue('url');
+  authModule.uploadUserBanner.mockResolvedValue({
+    ...profile,
+    banner_url: 'url',
+    banner_thumbnail_url: 'thumb',
+  } as any);
 
   const { result } = await renderUseAuth();
 
@@ -252,6 +264,10 @@ test('uploadBanner calls auth.uploadUserBanner', async () => {
   });
 
   expect(authModule.uploadUserBanner).toHaveBeenCalled();
+  expect(result.current.user).toMatchObject({
+    banner_url: 'url',
+    banner_thumbnail_url: 'thumb',
+  });
 });
 
 test('auth state changes defer profile loading until after the callback returns', async () => {

@@ -429,6 +429,44 @@ export async function processShadowPinRow({ admin, targetType, id, userId, requi
   }
 }
 
+async function markDerivativeFailure(admin, table, rowId, error) {
+  const message = error instanceof Error ? error.message : 'Image processing failed.'
+  const { data } = await admin
+    .from(table)
+    .update({
+      processing_status: 'failed',
+      processing_error: message.slice(0, 500),
+    })
+    .eq('id', rowId)
+    .select('*')
+    .single()
+
+  return data
+}
+
+export async function processShadowPinRowForUser({ admin, targetType, id, userId }) {
+  try {
+    return await processShadowPinRow({
+      admin,
+      targetType,
+      id,
+      userId,
+      requireOwnership: true,
+    })
+  } catch (error) {
+    const table = tableFor(targetType)
+    const { data: row, error: rowError } = await admin
+      .from(table)
+      .select('*')
+      .eq('id', id)
+      .is('deleted_at', null)
+      .maybeSingle()
+    if (rowError || !row || row.processing_status !== 'failed') throw error
+    await assertCanMutate(admin, row, userId, true)
+    return row
+  }
+}
+
 export async function createImportedShadowPinItem({
   admin,
   userId,
@@ -496,14 +534,71 @@ export async function createImportedShadowPinItem({
   try {
     return await writeDerivativesForRow(admin, targetType, row, imported.buffer)
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Image processing failed.'
-    await admin
-      .from(table)
-      .update({
-        processing_status: 'failed',
-        processing_error: message.slice(0, 500),
-      })
-      .eq('id', row.id)
-    throw error
+    return await markDerivativeFailure(admin, table, row.id, error) || row
+  }
+}
+
+export async function updateImportedShadowPinCategoryCover({
+  admin,
+  userId,
+  categoryId,
+  title,
+  description,
+  url,
+}) {
+  if (!categoryId) throw new Error('Category is required.')
+
+  const { data: current, error: currentError } = await admin
+    .from('shadow_pin_categories')
+    .select('*')
+    .eq('id', categoryId)
+    .is('deleted_at', null)
+    .maybeSingle()
+  if (currentError) throw currentError
+  if (!current) throw new Error('ShadowPin category is not available.')
+  await assertCanMutate(admin, current, userId, true)
+
+  const imported = await fetchRemoteImage(url)
+  const originalId = crypto.randomUUID()
+  const originalPath = `${userId}/categories/${current.id}/cover/${originalId}/original.${imported.extension}`
+
+  const { error: uploadError } = await admin.storage
+    .from(SHADOW_PIN_BUCKET)
+    .upload(originalPath, imported.buffer, {
+      cacheControl: '31536000',
+      contentType: imported.contentType,
+      upsert: false,
+    })
+  if (uploadError) throw uploadError
+
+  const { data: publicAsset } = admin.storage.from(SHADOW_PIN_BUCKET).getPublicUrl(originalPath)
+  const { data: updated, error: updateError } = await admin
+    .from('shadow_pin_categories')
+    .update({
+      title,
+      description,
+      image_url: publicAsset.publicUrl,
+      image_path: originalPath,
+      image_content_type: imported.contentType,
+      image_size_bytes: imported.sizeBytes,
+      thumbnail_url: null,
+      thumbnail_path: null,
+      medium_url: null,
+      medium_path: null,
+      image_width: null,
+      image_height: null,
+      processing_status: 'processing',
+      processing_error: null,
+      processed_at: null,
+    })
+    .eq('id', current.id)
+    .select('*')
+    .single()
+  if (updateError) throw updateError
+
+  try {
+    return await writeDerivativesForRow(admin, 'category', updated, imported.buffer)
+  } catch (error) {
+    return await markDerivativeFailure(admin, 'shadow_pin_categories', updated.id, error) || updated
   }
 }

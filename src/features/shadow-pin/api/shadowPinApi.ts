@@ -195,6 +195,46 @@ async function processShadowPinMedia<T extends ShadowPinCategory | ShadowPinImag
   return data.item
 }
 
+async function attachViewerCategoryHeart(category: ShadowPinCategory) {
+  const client = await getWorkingClient()
+  const { data: { user } } = await client.auth.getUser()
+  if (!user) return { ...category, viewer_has_hearted: Boolean(category.viewer_has_hearted) }
+
+  const { data: heart, error } = await client
+    .from('shadow_pin_category_hearts')
+    .select('category_id')
+    .eq('user_id', user.id)
+    .eq('category_id', category.id)
+    .maybeSingle()
+
+  if (error) throw error
+  return {
+    ...category,
+    heart_count: Number(category.heart_count ?? 0),
+    viewer_has_hearted: Boolean(heart),
+  }
+}
+
+async function attachViewerImageHeart(image: ShadowPinImage) {
+  const client = await getWorkingClient()
+  const { data: { user } } = await client.auth.getUser()
+  if (!user) return { ...image, viewer_has_hearted: Boolean(image.viewer_has_hearted) }
+
+  const { data: heart, error } = await client
+    .from('shadow_pin_image_hearts')
+    .select('image_id')
+    .eq('user_id', user.id)
+    .eq('image_id', image.id)
+    .maybeSingle()
+
+  if (error) throw error
+  return {
+    ...image,
+    heart_count: Number(image.heart_count ?? 0),
+    viewer_has_hearted: Boolean(heart),
+  }
+}
+
 async function importShadowPinUrl(payload: {
   targetType: 'category' | 'image'
   title: string
@@ -216,6 +256,24 @@ async function importShadowPinUrl(payload: {
     categoryId: payload.categoryId,
   })
   return data
+}
+
+async function replaceShadowPinCategoryCoverFromUrl(payload: {
+  categoryId: string
+  title: string
+  description?: string | null
+  url: string
+}) {
+  const data = await callShadowPinMediaFunction<{
+    category?: ShadowPinCategory
+  }>({
+    action: 'update-category-cover-from-url',
+    categoryId: payload.categoryId,
+    title: payload.title,
+    description: payload.description,
+    url: payload.url,
+  })
+  return data.category as ShadowPinCategory
 }
 
 export async function createShadowPinCategory(values: ShadowPinCategoryFormValues) {
@@ -264,11 +322,25 @@ export async function createShadowPinCategory(values: ShadowPinCategoryFormValue
 
 export async function updateShadowPinCategory(
   categoryId: string,
-  values: Pick<ShadowPinCategoryFormValues, 'title' | 'description'> & { file?: File | null }
+  values: Pick<ShadowPinCategoryFormValues, 'title' | 'description' | 'url'> & { file?: File | null }
 ) {
   const title = normalizeShadowPinText(values.title, 60, 'Title', true)
   const description = normalizeShadowPinText(values.description, 300, 'Description', false)
   const client = await getWorkingClient()
+  const url = values.url?.trim()
+
+  if (values.file && url) {
+    throw new Error('Choose one image source: upload a file or paste an image URL.')
+  }
+
+  if (url) {
+    return replaceShadowPinCategoryCoverFromUrl({
+      categoryId,
+      title,
+      description,
+      url,
+    })
+  }
 
   const update: Record<string, unknown> = {
     title,
@@ -396,7 +468,7 @@ export async function toggleShadowPinCategoryHeart(categoryId: string) {
     target_category_id: categoryId,
   })
   if (error) throw error
-  return data as ShadowPinCategory
+  return attachViewerCategoryHeart(data as ShadowPinCategory)
 }
 
 export async function toggleShadowPinImageHeart(imageId: string) {
@@ -405,5 +477,5 @@ export async function toggleShadowPinImageHeart(imageId: string) {
     target_image_id: imageId,
   })
   if (error) throw error
-  return data as ShadowPinImage
+  return attachViewerImageHeart(data as ShadowPinImage)
 }

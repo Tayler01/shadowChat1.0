@@ -210,6 +210,30 @@ test('shows an error and keeps reply state when uploaded image send resolves to 
   expect((toast as any).error).toHaveBeenCalledWith('Failed to send image')
 })
 
+test('composer reply preview expands long parent messages', async () => {
+  const longReply = [
+    'line one of a longer message',
+    'line two has more detail',
+    'line three is still visible',
+    'line four needs the expanded view',
+  ].join('\n')
+
+  render(
+    <MessageInput
+      onSendMessage={() => {}}
+      replyingTo={{ id: 'parent', content: longReply }}
+      onCancelReply={() => {}}
+    />
+  )
+
+  expect(screen.getByTestId('composer-reply-preview')).toHaveClass('line-clamp-3')
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /show full message/i }))
+  })
+  expect(screen.getByTestId('composer-reply-preview')).not.toHaveClass('line-clamp-3')
+  expect(screen.getByText(/line four needs the expanded view/i)).toBeInTheDocument()
+})
+
 test('sends selected videos as video attachments', async () => {
   uploadChatFile.mockResolvedValueOnce('https://example.com/clip.mp4')
   const onSendMessage = jest.fn().mockResolvedValue({ id: 'm1' })

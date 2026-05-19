@@ -17,6 +17,7 @@ type QuickReactionRailProps = {
 const RAIL_WIDTH = 228
 const RAIL_HEIGHT = 42
 const EDGE_PADDING = 8
+const RAIL_GAP = 6
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max)
@@ -51,12 +52,16 @@ export function QuickReactionRail({
       const footerRect = document
         .querySelector('[data-mobile-chat-footer="true"]')
         ?.getBoundingClientRect()
+      const footerTop = footerRect?.top
+      const footerTopIsUsable = typeof footerTop === 'number'
+        && footerTop > viewportTop + RAIL_HEIGHT + EDGE_PADDING * 2
+        && footerTop < viewportBottom
       const safeTop = viewportTop + EDGE_PADDING
-      const safeBottom = Math.min(viewportBottom, footerRect?.top ?? viewportBottom) - EDGE_PADDING
+      const safeBottom = Math.min(viewportBottom, footerTopIsUsable ? footerTop : viewportBottom) - EDGE_PADDING
       const maxTop = Math.max(safeTop, safeBottom - RAIL_HEIGHT)
-      const topCandidate = rect.top - RAIL_HEIGHT - 6
+      const topCandidate = rect.top - RAIL_HEIGHT - RAIL_GAP
       const top = topCandidate < safeTop
-        ? Math.min(rect.bottom + 6, maxTop)
+        ? Math.min(rect.bottom + RAIL_GAP, maxTop)
         : topCandidate
       const left = clamp(rect.left + 12, EDGE_PADDING, viewportWidth - RAIL_WIDTH - EDGE_PADDING)
 

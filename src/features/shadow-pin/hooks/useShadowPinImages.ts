@@ -81,6 +81,21 @@ const updateImageCache = (
   return writeImageCache(cacheKey, updater(current))
 }
 
+export function invalidateShadowPinImagesCache(categoryId?: string) {
+  if (!categoryId) {
+    imageCacheByCategoryId.clear()
+    imagePageRequestByKey.clear()
+    return
+  }
+
+  for (const key of Array.from(imageCacheByCategoryId.keys())) {
+    if (key.endsWith(`:${categoryId}`)) imageCacheByCategoryId.delete(key)
+  }
+  for (const key of Array.from(imagePageRequestByKey.keys())) {
+    if (key.includes(`:${categoryId}:`)) imagePageRequestByKey.delete(key)
+  }
+}
+
 const loadImagePage = async (
   cacheKey: string,
   categoryId: string,
@@ -260,7 +275,9 @@ export function useShadowPinImages(categoryId: string | null) {
   const toggleHeart = useCallback(async (imageId: string) => {
     if (!categoryId) return
     const currentCacheKey = getImageCacheKey(cacheUserId, categoryId)
-    const currentImage = (imageCacheByCategoryId.get(currentCacheKey)?.images ?? images)
+    const currentImage = (images.find(image => image.id === imageId)
+      ? images
+      : imageCacheByCategoryId.get(currentCacheKey)?.images ?? images)
       .find(image => image.id === imageId)
     if (!currentImage) return
 
@@ -284,10 +301,13 @@ export function useShadowPinImages(categoryId: string | null) {
     })
     try {
       const image = await toggleShadowPinImageHeart(imageId)
+      const resolvedViewerHasHearted = typeof image.viewer_has_hearted === 'boolean'
+        ? image.viewer_has_hearted
+        : nextViewerHasHearted
       const nextEntry = updateImageCache(currentCacheKey, current => ({
         ...current,
         images: current.images.map(existing => existing.id === image.id
-          ? { ...existing, ...image, viewer_has_hearted: nextViewerHasHearted }
+          ? { ...existing, ...image, viewer_has_hearted: resolvedViewerHasHearted }
           : existing),
       }))
       if (nextEntry) setImages(nextEntry.images)

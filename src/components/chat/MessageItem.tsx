@@ -70,6 +70,63 @@ const normalizeEmojiValue = (emoji: string) => {
   return value
 }
 
+const shouldCollapseReplyPreview = (content: string) =>
+  content.length > 160 || content.split(/\r?\n/).length > 3
+
+function ReplyContextPreview({
+  parentMessage,
+  content,
+  onJumpToMessage,
+}: {
+  parentMessage: Message
+  content: string
+  onJumpToMessage?: (messageId: string) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const collapsible = shouldCollapseReplyPreview(content)
+
+  return (
+    <div className="mb-1 flex min-w-0 items-start gap-2 pl-1 text-xs text-[var(--text-muted)]">
+      <span
+        aria-hidden="true"
+        className="mt-0.5 h-5 w-4 shrink-0 rounded-bl-[0.45rem] border-b border-l border-[var(--theme-accent-border-soft)]"
+      />
+      <div className="min-w-0 flex-1 rounded-[var(--radius-sm)] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.035)] px-2.5 py-1.5">
+        <button
+          type="button"
+          onClick={() => onJumpToMessage?.(parentMessage.id)}
+          className="mb-1 inline-flex max-w-full min-w-0 items-center gap-1 text-left transition-colors hover:text-[var(--theme-accent-readable)] hover:underline"
+          aria-label="View parent message"
+        >
+          <span className="truncate">Replying to {parentMessage.user?.display_name || 'Unknown'}</span>
+          <UserRoleBadge role={parentMessage.user?.admin_role} className="shrink-0" />
+          <ShadowPinGoldPinBadge active={parentMessage.user?.shadow_pin_gold_pin} className="shrink-0" />
+          <UserPresenceBadge userId={parentMessage.user?.id} presenceVisibility={parentMessage.user?.presence_visibility} className="shrink-0" />
+        </button>
+        <div
+          className={cn(
+            'whitespace-pre-wrap break-words text-[var(--text-secondary)]',
+            collapsible && !expanded && 'line-clamp-3'
+          )}
+          data-testid="reply-parent-preview"
+        >
+          {content}
+        </div>
+        {collapsible && (
+          <button
+            type="button"
+            onClick={() => setExpanded(current => !current)}
+            className="mt-1 text-[0.7rem] font-semibold text-[var(--theme-accent-readable)]"
+            aria-expanded={expanded}
+          >
+            {expanded ? 'Show less' : 'Show full message'}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export const MessageItem: React.FC<MessageItemProps> = React.memo(
   ({
     message,
@@ -330,27 +387,11 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 onMouseLeave={handleMouseLeaveReactions}
               >
                 {parentMessage && (
-                  <div className="mb-1 flex min-w-0 items-end gap-2 pl-1 text-xs text-[var(--text-muted)]">
-                    <span
-                      aria-hidden="true"
-                      className="h-4 w-4 shrink-0 rounded-bl-[0.45rem] border-b border-l border-[var(--theme-accent-border-soft)]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => onJumpToMessage?.(parentMessage.id)}
-                      className="min-w-0 truncate text-left transition-colors hover:text-[var(--theme-accent-readable)] hover:underline"
-                      aria-label="View parent message"
-                    >
-                      Replying to {parentMessage.user?.display_name || 'Unknown'}
-                      <UserRoleBadge role={parentMessage.user?.admin_role} className="ml-1" />
-                      <ShadowPinGoldPinBadge active={parentMessage.user?.shadow_pin_gold_pin} className="ml-1" />
-                      <UserPresenceBadge userId={parentMessage.user?.id} presenceVisibility={parentMessage.user?.presence_visibility} className="ml-1" />
-                      :
-                      {' '}
-                      {parentPreview.slice(0, 36)}
-                      {parentPreview.length > 36 ? '...' : ''}
-                    </button>
-                  </div>
+                  <ReplyContextPreview
+                    parentMessage={parentMessage}
+                    content={parentPreview}
+                    onJumpToMessage={onJumpToMessage}
+                  />
                 )}
                 <div
                   className={cn(

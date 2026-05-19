@@ -625,7 +625,12 @@ function CategoryFormModal({
     event.preventDefault()
     setError(null)
     try {
-      await onSubmit({ title, description, file, url: mode === 'create' && sourceMode === 'url' ? url : '' })
+      await onSubmit({
+        title,
+        description,
+        file: sourceMode === 'file' ? file : null,
+        url: sourceMode === 'url' ? url : '',
+      })
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to save category')
@@ -662,10 +667,10 @@ function CategoryFormModal({
             setFile={setFile}
             url={url}
             setUrl={setUrl}
-            allowUrl={mode === 'create'}
+            allowUrl
           />
-          {mode === 'edit' && (
-            <p className="text-xs text-[var(--text-muted)]">URL cover replacement can be done by creating a new category; file replacement is available here.</p>
+          {mode === 'edit' && sourceMode === 'file' && !file && (
+            <p className="text-xs text-[var(--text-muted)]">Leave the image empty to keep the current cover.</p>
           )}
           {error && <p className="rounded-[var(--radius-sm)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
           <div className="space-y-3 border-t border-[var(--border-panel)] pt-4">

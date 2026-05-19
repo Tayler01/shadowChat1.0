@@ -136,7 +136,7 @@ export function useShadowPinCategories() {
 
   const updateCategory = useCallback(async (
     categoryId: string,
-    values: Pick<ShadowPinCategoryFormValues, 'title' | 'description'> & { file?: File | null }
+    values: Pick<ShadowPinCategoryFormValues, 'title' | 'description' | 'url'> & { file?: File | null }
   ) => {
     setSaving(true)
     try {
@@ -163,7 +163,9 @@ export function useShadowPinCategories() {
   }, [cacheUserId])
 
   const toggleHeart = useCallback(async (categoryId: string) => {
-    const currentCategory = (categoryCacheByUserId.get(cacheUserId)?.categories ?? categories)
+    const currentCategory = (categories.find(category => category.id === categoryId)
+      ? categories
+      : categoryCacheByUserId.get(cacheUserId)?.categories ?? categories)
       .find(category => category.id === categoryId)
     if (!currentCategory) return
 
@@ -184,9 +186,12 @@ export function useShadowPinCategories() {
     })
     try {
       const category = await toggleShadowPinCategoryHeart(categoryId)
+      const resolvedViewerHasHearted = typeof category.viewer_has_hearted === 'boolean'
+        ? category.viewer_has_hearted
+        : nextViewerHasHearted
       const nextCategories = updateCategoryCache(cacheUserId, current => current.map(existing => (
         existing.id === category.id
-          ? { ...existing, ...category, viewer_has_hearted: nextViewerHasHearted }
+          ? { ...existing, ...category, viewer_has_hearted: resolvedViewerHasHearted }
           : existing
       )))
       setCategories(nextCategories)

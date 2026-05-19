@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { useShadowPinCategories } from '../src/features/shadow-pin/hooks/useShadowPinCategories'
-import { useShadowPinImages } from '../src/features/shadow-pin/hooks/useShadowPinImages'
+import { invalidateShadowPinCategoriesCache, useShadowPinCategories } from '../src/features/shadow-pin/hooks/useShadowPinCategories'
+import { invalidateShadowPinImagesCache, useShadowPinImages } from '../src/features/shadow-pin/hooks/useShadowPinImages'
 
 const mockFetchShadowPinCategories = jest.fn()
 const mockFetchShadowPinCategory = jest.fn()
@@ -58,6 +58,8 @@ const image = {
 }
 
 beforeEach(() => {
+  invalidateShadowPinCategoriesCache()
+  invalidateShadowPinImagesCache()
   mockFetchShadowPinCategories.mockReset()
   mockFetchShadowPinCategory.mockReset()
   mockFetchShadowPinImages.mockReset()
@@ -88,6 +90,50 @@ test('keeps category heart active when the RPC row omits viewer heart state', as
     id: category.id,
     heart_count: 3,
     viewer_has_hearted: true,
+  })
+})
+
+test('uses category heart state returned after the RPC when it differs from optimism', async () => {
+  mockToggleShadowPinCategoryHeart.mockResolvedValue({
+    ...category,
+    heart_count: 3,
+    viewer_has_hearted: false,
+  })
+
+  const { result } = renderHook(() => useShadowPinCategories())
+
+  await waitFor(() => expect(result.current.loading).toBe(false))
+
+  await act(async () => {
+    await result.current.toggleHeart(category.id)
+  })
+
+  expect(result.current.categories[0]).toMatchObject({
+    id: category.id,
+    heart_count: 3,
+    viewer_has_hearted: false,
+  })
+})
+
+test('uses image heart state returned after the RPC when it differs from optimism', async () => {
+  mockToggleShadowPinImageHeart.mockResolvedValue({
+    ...image,
+    heart_count: 1,
+    viewer_has_hearted: false,
+  })
+
+  const { result } = renderHook(() => useShadowPinImages(category.id))
+
+  await waitFor(() => expect(result.current.loading).toBe(false))
+
+  await act(async () => {
+    await result.current.toggleHeart(image.id)
+  })
+
+  expect(result.current.images[0]).toMatchObject({
+    id: image.id,
+    heart_count: 1,
+    viewer_has_hearted: false,
   })
 })
 

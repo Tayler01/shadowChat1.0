@@ -1,4 +1,4 @@
-import { act, createEvent, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import React from 'react'
 import { ShadowPin } from '../src/features/shadow-pin/ShadowPin'
 import { ShadowPinGoldPinBadge } from '../src/features/shadow-pin/components/ShadowPinGoldPinBadge'
@@ -670,6 +670,51 @@ test('ShadowPin edit category makes save and cancel primary while delete is deli
     expect(deleteButton).toHaveClass('text-red-300/65')
     expect(deleteButton).not.toHaveClass('w-full')
     expect(deleteButton).not.toHaveClass('text-white')
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('ShadowPin edit category supports URL cover replacement', async () => {
+  jest.useFakeTimers()
+  const updateCategory = jest.fn().mockResolvedValue(undefined)
+  mockUseShadowPinCategories.mockReturnValue({
+    categories: [{ ...category, creator_id: 'user-1' }],
+    loading: false,
+    saving: false,
+    error: null,
+    refresh: jest.fn(),
+    createCategory: jest.fn(),
+    updateCategory,
+    removeCategory: jest.fn(),
+    toggleHeart: mockToggleCategoryHeart,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    const categoryCard = screen.getByText('Fam & Friends').closest('article')
+    expect(categoryCard).not.toBeNull()
+    fireEvent.pointerDown(categoryCard!)
+    act(() => {
+      jest.advanceTimersByTime(520)
+    })
+    fireEvent.pointerUp(categoryCard!)
+
+    const urlButton = screen.getByRole('button', { name: /^url$/i })
+    expect(urlButton).not.toBeDisabled()
+    fireEvent.click(urlButton)
+    fireEvent.change(screen.getByLabelText(/image url/i), {
+      target: { value: 'https://images.example/new-cover.jpg' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+    await waitFor(() => {
+      expect(updateCategory).toHaveBeenCalledWith(category.id, expect.objectContaining({
+        file: null,
+        url: 'https://images.example/new-cover.jpg',
+      }))
+    })
   } finally {
     jest.useRealTimers()
   }

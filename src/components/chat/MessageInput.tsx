@@ -18,6 +18,9 @@ import { EmojiPickerOverlay } from './EmojiPickerOverlay'
 
 const normalizeComposerValue = (value: string) => (value.trim().length === 0 ? '' : value)
 
+const shouldCollapseReplyPreview = (content: string) =>
+  content.length > 160 || content.split(/\r?\n/).length > 3
+
 interface MessageInputProps {
   onSendMessage: (
     content: string,
@@ -57,6 +60,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [showGifPicker, setShowGifPicker] = useState(false)
   const [showSlashCommands, setShowSlashCommands] = useState(false)
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
+  const [replyPreviewExpanded, setReplyPreviewExpanded] = useState(false)
   const [recording, setRecording] = useState(false)
   const [recordingDuration, setRecordingDuration] = useState(0)
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -68,6 +72,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
+
+  useEffect(() => {
+    setReplyPreviewExpanded(false)
+  }, [replyingTo?.id])
   const audioChunksRef = useRef<Blob[]>([])
   const submittingRef = useRef(false)
   const { enabled: suggestionsEnabled } = useSuggestionsEnabled()
@@ -476,11 +484,31 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       className={`theme-composer-surface relative border-t border-[var(--border-panel)] px-3 pb-3 pt-2.5 md:p-3 ${className}`}
     >
       {replyingTo && (
-        <div className="mb-2 flex items-center justify-between rounded-[var(--radius-xs)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] shadow-[var(--shadow-panel)]">
-          <span className="truncate">Replying to: {replyingTo.content.slice(0, 30)}</span>
-          <button type="button" onClick={onCancelReply} aria-label="Cancel reply">
-            <X className="w-3 h-3" />
-          </button>
+        <div className="mb-2 rounded-[var(--radius-xs)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] shadow-[var(--shadow-panel)]">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="mb-0.5 font-semibold text-[var(--theme-accent-readable)]">Replying to</div>
+              <div
+                className={`whitespace-pre-wrap break-words ${shouldCollapseReplyPreview(replyingTo.content) && !replyPreviewExpanded ? 'line-clamp-3' : 'max-h-32 overflow-y-auto pr-1'}`}
+                data-testid="composer-reply-preview"
+              >
+                {replyingTo.content}
+              </div>
+            </div>
+            <button type="button" onClick={onCancelReply} aria-label="Cancel reply" className="mt-0.5 shrink-0 rounded-full p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+          {shouldCollapseReplyPreview(replyingTo.content) && (
+            <button
+              type="button"
+              onClick={() => setReplyPreviewExpanded(current => !current)}
+              className="mt-1 text-[0.7rem] font-semibold text-[var(--theme-accent-readable)]"
+              aria-expanded={replyPreviewExpanded}
+            >
+              {replyPreviewExpanded ? 'Show less' : 'Show full message'}
+            </button>
+          )}
         </div>
       )}
       {recording && (

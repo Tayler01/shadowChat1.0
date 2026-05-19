@@ -514,6 +514,129 @@ test('clicking reply preview triggers jump callback', async () => {
   expect(cb).toHaveBeenCalledWith('p1')
 })
 
+test('reply preview expands long parent messages in place', async () => {
+  const longContent = [
+    'first line of the original message',
+    'second line with details',
+    'third line with context',
+    'fourth line that should start hidden until expanded',
+  ].join('\n')
+  const parent = { ...baseMessage, id: 'p1', content: longContent, message_type: 'text' } as Message
+  const reply = { ...baseMessage, id: 'c1', content: 'child', message_type: 'text', reply_to: 'p1' } as Message
+
+  render(
+    <MessageItem
+      message={reply}
+      parentMessage={parent}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+      onJumpToMessage={() => {}}
+      containerRef={React.createRef()}
+    />
+  )
+
+  expect(screen.getByTestId('reply-parent-preview')).toHaveClass('line-clamp-3')
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /show full message/i }))
+  })
+  expect(screen.getByTestId('reply-parent-preview')).not.toHaveClass('line-clamp-3')
+  expect(screen.getByText(/fourth line that should start hidden/i)).toBeInTheDocument()
+})
+
+test('keeps quick reactions near a bottom message when keyboard footer geometry is stale', async () => {
+  const footer = document.createElement('div')
+  footer.setAttribute('data-mobile-chat-footer', 'true')
+  document.body.appendChild(footer)
+  const rectSpy = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+  const originalInnerWidth = window.innerWidth
+  const originalInnerHeight = window.innerHeight
+  const originalVisualViewport = window.visualViewport
+
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 })
+  Object.defineProperty(window, 'visualViewport', {
+    configurable: true,
+    value: { offsetTop: 0, offsetLeft: 0, width: 390, height: 580 },
+  })
+
+  rectSpy.mockImplementation(function getMockRect(this: HTMLElement) {
+    if (this === footer) {
+      return {
+        x: 0,
+        y: 32,
+        top: 32,
+        right: 390,
+        bottom: 844,
+        left: 0,
+        width: 390,
+        height: 812,
+        toJSON: () => {},
+      } as DOMRect
+    }
+
+    if (this.getAttribute?.('data-testid') === 'message-bubble-shell') {
+      return {
+        x: 48,
+        y: 500,
+        top: 500,
+        right: 300,
+        bottom: 548,
+        left: 48,
+        width: 252,
+        height: 48,
+        toJSON: () => {},
+      } as DOMRect
+    }
+
+    return {
+      x: 0,
+      y: 0,
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      width: 0,
+      height: 0,
+      toJSON: () => {},
+    } as DOMRect
+  })
+
+  try {
+    render(
+      <MessageItem
+        message={{ ...baseMessage, message_type: 'text', content: 'bottom quick reaction' } as Message}
+        onEdit={async () => {}}
+        onDelete={async () => {}}
+        onTogglePin={async () => {}}
+        onToggleReaction={async () => {}}
+        onJumpToMessage={() => {}}
+        containerRef={React.createRef()}
+      />
+    )
+
+    act(() => {
+      fireEvent.mouseEnter(screen.getByTestId('message-bubble-shell'))
+    })
+
+    await waitFor(() => {
+      const rail = screen.getByRole('toolbar', { name: /quick reactions/i })
+      expect(Number.parseFloat(rail.style.top)).toBeGreaterThan(430)
+      expect(Number.parseFloat(rail.style.top)).toBeLessThan(510)
+    })
+  } finally {
+    footer.remove()
+    rectSpy.mockRestore()
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalInnerWidth })
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: originalInnerHeight })
+    Object.defineProperty(window, 'visualViewport', {
+      configurable: true,
+      value: originalVisualViewport,
+    })
+  }
+})
+
 test('opens the message actions menu upward near the mobile viewport bottom', async () => {
   const container = document.createElement('div')
   const containerRef = { current: container }

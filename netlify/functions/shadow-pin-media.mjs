@@ -3,7 +3,8 @@ import {
   cleanText,
   createAdminClient,
   createImportedShadowPinItem,
-  processShadowPinRow,
+  processShadowPinRowForUser,
+  updateImportedShadowPinCategoryCover,
 } from './_shared/shadow-pin-media.mjs'
 
 const json = (body, statusCode = 200) => ({
@@ -38,14 +39,28 @@ export async function handler(event) {
       const id = typeof body?.id === 'string' ? body.id : ''
       if (!id) return json({ error: 'Image record is required.' }, 400)
 
-      const item = await processShadowPinRow({
+      const item = await processShadowPinRowForUser({
         admin,
         targetType,
         id,
         userId: user.id,
-        requireOwnership: true,
       })
       return json({ ok: true, item })
+    }
+
+    if (action === 'update-category-cover-from-url') {
+      const title = cleanText(body?.title, 60, 'Title', true)
+      const description = cleanText(body?.description, 300, 'Description', false)
+      const category = await updateImportedShadowPinCategoryCover({
+        admin,
+        userId: user.id,
+        categoryId: body?.categoryId,
+        title,
+        description,
+        url: body?.url,
+      })
+
+      return json({ ok: true, category })
     }
 
     if (action === 'create-category-from-url' || action === 'create-image-from-url') {

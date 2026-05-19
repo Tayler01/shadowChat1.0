@@ -265,12 +265,11 @@ export const uploadUserAvatar = async (file: File) => {
 
   const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(filePath)
   const asset = createStoredImageAsset(filePath, data.publicUrl, 'avatar')
-  await updateUserProfile({
+  return updateUserProfile({
     avatar_url: asset.publicUrl,
     avatar_thumbnail_url: asset.thumbnailUrl,
     avatar_thumbnail_path: asset.thumbnailPath,
   })
-  return asset.publicUrl
 }
 
 export const uploadUserBanner = async (file: File) => {
@@ -293,10 +292,9 @@ export const uploadUserBanner = async (file: File) => {
 
   const { data } = supabase.storage.from(BANNER_BUCKET).getPublicUrl(filePath)
   const asset = createStoredImageAsset(filePath, data.publicUrl, 'banner')
-  await updateUserProfile({
+  return updateUserProfile({
     banner_url: asset.publicUrl,
     banner_thumbnail_url: asset.thumbnailUrl,
     banner_thumbnail_path: asset.thumbnailPath,
   })
-  return asset.publicUrl
 }

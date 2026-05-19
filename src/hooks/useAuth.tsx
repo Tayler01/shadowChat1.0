@@ -548,9 +548,9 @@ function useProvideAuth() {
   const uploadAvatar = async (file: File) => {
     if (!user) return;
     try {
-      const url = await uploadUserAvatar(file);
-      updateUserState(prev => (prev ? { ...prev, avatar_url: url } : prev));
-      return url;
+      const updatedUser = await uploadUserAvatar(file);
+      applyUser(updatedUser);
+      return updatedUser.avatar_url;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Avatar upload failed';
       setError(message);
@@ -561,9 +561,9 @@ function useProvideAuth() {
   const uploadBanner = async (file: File) => {
     if (!user) return;
     try {
-      const url = await uploadUserBanner(file);
-      updateUserState(prev => (prev ? { ...prev, banner_url: url } : prev));
-      return url;
+      const updatedUser = await uploadUserBanner(file);
+      applyUser(updatedUser);
+      return updatedUser.banner_url;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Banner upload failed';
       setError(message);

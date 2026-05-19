@@ -8,7 +8,7 @@ same ShadowPin surface directly.
 
 - Public categories for authenticated users.
 - Public image pins inside categories.
-- Device upload or server-side URL import for category covers and image pins.
+- Device upload or server-side URL import for category covers, category cover replacement, and image pins.
 - One heart per user per category or image.
 - Creator/operator edit and soft delete controls.
 - Hidden score ledger for the public gold push-pin identity badge.
@@ -88,7 +88,7 @@ npm run shadow-pin:backfill-media -- --apply
 
 ## Known V1 Limitations
 
-- URL cover replacement during category editing is intentionally not included; creators can replace covers with device uploads.
+- If derivative processing fails, ShadowPin keeps the uploaded/imported original available and marks the row as failed so the user can still see the cover or pin.
 - Stored assets are preserved after soft deletes. A future cleanup job can archive old unused objects.
 - Pull-to-refresh is not custom-built; views refetch on open/return and after mutations.
 
