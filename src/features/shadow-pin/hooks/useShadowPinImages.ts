@@ -259,18 +259,24 @@ export function useShadowPinImages(categoryId: string | null) {
 
   const toggleHeart = useCallback(async (imageId: string) => {
     if (!categoryId) return
+    const currentCacheKey = getImageCacheKey(cacheUserId, categoryId)
+    const currentImage = (imageCacheByCategoryId.get(currentCacheKey)?.images ?? images)
+      .find(image => image.id === imageId)
+    if (!currentImage) return
+
     let previousImages: ShadowPinImage[] = []
+    const nextViewerHasHearted = !currentImage.viewer_has_hearted
     setImages(prev => {
       previousImages = prev
       const nextImages = prev.map(image => image.id === imageId
         ? {
             ...image,
-            viewer_has_hearted: !image.viewer_has_hearted,
+            viewer_has_hearted: nextViewerHasHearted,
             heart_count: Math.max(0, image.heart_count + (image.viewer_has_hearted ? -1 : 1)),
           }
         : image
       )
-      updateImageCache(getImageCacheKey(cacheUserId, categoryId), current => ({
+      updateImageCache(currentCacheKey, current => ({
         ...current,
         images: nextImages,
       }))
@@ -278,20 +284,22 @@ export function useShadowPinImages(categoryId: string | null) {
     })
     try {
       const image = await toggleShadowPinImageHeart(imageId)
-      const nextEntry = updateImageCache(getImageCacheKey(cacheUserId, categoryId), current => ({
+      const nextEntry = updateImageCache(currentCacheKey, current => ({
         ...current,
-        images: current.images.map(existing => existing.id === image.id ? image : existing),
+        images: current.images.map(existing => existing.id === image.id
+          ? { ...existing, ...image, viewer_has_hearted: nextViewerHasHearted }
+          : existing),
       }))
       if (nextEntry) setImages(nextEntry.images)
     } catch (err) {
       setImages(previousImages)
-      updateImageCache(getImageCacheKey(cacheUserId, categoryId), current => ({
+      updateImageCache(currentCacheKey, current => ({
         ...current,
         images: previousImages,
       }))
       throw err
     }
-  }, [cacheUserId, categoryId])
+  }, [cacheUserId, categoryId, images])
 
   return useMemo(() => ({
     category,
