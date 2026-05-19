@@ -11,6 +11,7 @@ import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { CheckersCrownBadge } from '../../features/games/shadow-checkers/components/CheckersCrownBadge'
 import { ShadowWarSwordBadge } from '../../features/games/shadow-war/components/ShadowWarSwordBadge'
+import { ShadowPinGoldPinBadge } from '../../features/shadow-pin/components/ShadowPinGoldPinBadge'
 import { UnreadDivider } from '../chat/UnreadDivider'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import { useAuth } from '../../hooks/useAuth'
@@ -154,6 +155,7 @@ function BoardChatRow({
             <UserRoleBadge role={message.user?.admin_role} />
             <CheckersCrownBadge active={message.user?.checkers_crown} />
             <ShadowWarSwordBadge active={message.user?.war_sword} />
+            <ShadowPinGoldPinBadge active={message.user?.shadow_pin_gold_pin} />
             <UserPresenceBadge userId={message.user?.id} presenceVisibility={message.user?.presence_visibility} />
           </span>
           <span className="text-xs text-[var(--text-muted)]">{formatTime(message.created_at)}</span>

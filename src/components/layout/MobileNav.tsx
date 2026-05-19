@@ -37,13 +37,15 @@ export function MobileNav({ currentView, onViewChange, className, embedded = fal
     { id: 'pins' as const, icon: Images, label: 'Pins', badge: null },
   ]
 
+  const navSurface = embedded
+    ? 'shadowchat-mobile-nav shadowchat-mobile-nav--embedded border-t border-[var(--border-panel)] bg-transparent'
+    : 'shadowchat-mobile-nav shadowchat-mobile-nav--standalone glass-panel-strong border-t border-[var(--border-panel)]'
+
   return (
     <nav
-      className={`${embedded ? 'h-[4.15rem] border-t border-[var(--border-panel)] bg-transparent' : 'glass-panel-strong h-[4.15rem] border-t border-[var(--border-panel)]'} md:hidden ${
-        className || 'fixed bottom-0 inset-x-0 z-50'
-      }`}
+      className={`${navSurface} md:hidden ${className || 'fixed bottom-0 inset-x-0 z-50'}`}
     >
-      <ul className="flex h-full justify-around px-1">
+      <ul className="flex h-[var(--shadowchat-mobile-nav-row-height)] justify-around px-1">
         {navItems.map(item => (
           <li key={item.id} className="relative flex-1">
             <button
@@ -67,6 +69,7 @@ export function MobileNav({ currentView, onViewChange, className, embedded = fal
           </li>
         ))}
       </ul>
+      <div className="shadowchat-mobile-nav-home-spacer" aria-hidden="true" />
     </nav>
   )
 }

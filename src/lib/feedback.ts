@@ -278,7 +278,7 @@ export const fetchAdminFeedbackSubmissions = async (): Promise<AdminFeedbackSubm
   if (submitterIds.length > 0) {
     const { data: submitters, error: submittersError } = await workingClient
       .from('users')
-      .select('id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, presence_visibility')
+      .select('id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, presence_visibility')
       .in('id', submitterIds)
 
     if (submittersError) {

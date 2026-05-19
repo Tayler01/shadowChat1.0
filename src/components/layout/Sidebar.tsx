@@ -3,6 +3,7 @@ import { Gamepad2, Images, MessageSquare, Users, Newspaper, Settings, Moon, Sun,
 import { Avatar } from '../ui/Avatar';
 import { UserRoleBadge } from '../ui/UserRoleBadge';
 import { UserPresenceBadge } from '../ui/UserPresenceBadge';
+import { ShadowPinGoldPinBadge } from '../../features/shadow-pin/components/ShadowPinGoldPinBadge';
 import { useAuth } from '../../hooks/useAuth';
 import { useDirectMessages } from '../../hooks/useDirectMessages';
 import { useBoardBadges } from '../../hooks/useBoardBadges';
@@ -162,6 +163,7 @@ export function Sidebar({
               <p className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">
                 <span className="truncate">{user?.display_name}</span>
                 <UserRoleBadge role={user?.admin_role} />
+                <ShadowPinGoldPinBadge active={user?.shadow_pin_gold_pin} />
                 <UserPresenceBadge userId={user?.id} presenceVisibility={user?.presence_visibility} />
               </p>
               <p className="truncate text-xs text-[var(--text-muted)]">

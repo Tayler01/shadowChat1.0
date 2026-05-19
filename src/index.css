@@ -763,8 +763,80 @@ html, body, #root {
 }
 
 @media (max-width: 767px) {
+  :root {
+    --shadowchat-mobile-nav-row-height: 4.15rem;
+    --shadowchat-mobile-nav-home-clearance: max(env(safe-area-inset-bottom), 0.75rem);
+    --shadowchat-mobile-nav-home-buffer: 0.35rem;
+    --shadowchat-mobile-nav-home-spacer-height: calc(var(--shadowchat-mobile-nav-home-clearance) + var(--shadowchat-mobile-nav-home-buffer));
+  }
+
   .app-viewport {
     height: var(--shadowchat-app-height, var(--shadowchat-visual-viewport-height, 100dvh));
+  }
+
+  .shadowchat-mobile-nav {
+    overflow: hidden;
+  }
+
+  .shadowchat-mobile-nav-home-spacer {
+    position: relative;
+    min-height: var(--shadowchat-mobile-nav-home-spacer-height);
+    border-top: 1px solid var(--border-panel);
+  }
+
+  .shadowchat-mobile-nav-home-spacer::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 3px;
+    border-top: 1px solid var(--border-panel);
+  }
+
+  .shadow-pin-heart-burst {
+    pointer-events: none;
+    position: absolute;
+    inset: 50% auto auto 50%;
+    z-index: 20;
+    height: 0;
+    width: 0;
+  }
+
+  .shadow-pin-heart-burst-ring {
+    position: absolute;
+    height: 2.7rem;
+    width: 2.7rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 94, 118, 0.82);
+    box-shadow:
+      0 0 0 1px rgba(var(--theme-accent-strong-rgb), 0.18),
+      0 0 28px rgba(255, 77, 95, 0.34);
+    transform: translate(-50%, -50%) scale(0.28);
+    animation: shadow-pin-heart-ring 720ms var(--ease-premium) both;
+  }
+
+  .shadow-pin-heart-burst-core {
+    position: absolute;
+    color: #ff5e76;
+    filter: drop-shadow(0 0 14px rgba(255, 77, 95, 0.74));
+    font-size: 1.2rem;
+    line-height: 1;
+    transform: translate(-50%, -50%) scale(0.35);
+    animation: shadow-pin-heart-core 620ms var(--ease-premium) both;
+  }
+
+  .shadow-pin-heart-burst-particle {
+    position: absolute;
+    color: #ff5e76;
+    filter:
+      drop-shadow(0 0 8px rgba(255, 77, 95, 0.72))
+      drop-shadow(0 0 14px rgba(var(--theme-accent-strong-rgb), 0.18));
+    font-size: 0.82rem;
+    line-height: 1;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.22);
+    animation: shadow-pin-heart-particle 760ms var(--ease-premium) both;
+    animation-delay: var(--shadow-pin-heart-delay);
   }
 
   .mobile-keyboard-chrome {
@@ -791,7 +863,7 @@ html, body, #root {
   }
 
   .mobile-keyboard-nav {
-    max-height: 4.2rem;
+    max-height: calc(var(--shadowchat-mobile-nav-row-height) + var(--shadowchat-mobile-nav-home-spacer-height));
     overflow: hidden;
     opacity: 1;
     transform: translateY(0);
@@ -807,6 +879,37 @@ html, body, #root {
     pointer-events: none;
     transform: translateY(100%);
   }
+
+  html[data-shadowchat-keyboard='open'][data-shadowchat-mobile-platform='android'] .shadow-checkers-keyboard-collapse {
+    max-height: 0 !important;
+    margin-bottom: 0 !important;
+    overflow: hidden !important;
+    border-color: transparent !important;
+    opacity: 0;
+    padding-bottom: 0 !important;
+    padding-top: 0 !important;
+    pointer-events: none;
+    transform: translateY(-0.35rem);
+    transition:
+      max-height var(--dur-med) var(--ease-premium),
+      margin var(--dur-med) var(--ease-premium),
+      opacity var(--dur-fast) var(--ease-premium),
+      padding var(--dur-med) var(--ease-premium),
+      transform var(--dur-med) var(--ease-premium);
+  }
+
+  html[data-shadowchat-keyboard='open'][data-shadowchat-mobile-platform='android'] .shadow-checkers-match-surface {
+    padding-bottom: max(env(safe-area-inset-bottom), 0.45rem);
+    padding-top: 0.35rem;
+  }
+
+  html[data-shadowchat-keyboard='open'][data-shadowchat-mobile-platform='android'] .shadow-checkers-match-chat-wrap {
+    min-height: 0;
+  }
+
+  html[data-shadowchat-keyboard='open'][data-shadowchat-mobile-platform='android'] .shadow-checkers-match-chat {
+    min-height: min(16rem, calc(var(--shadowchat-visual-viewport-height, 100dvh) - 1.25rem));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -817,6 +920,71 @@ html, body, #root {
     animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
     transition-duration: 1ms !important;
+  }
+}
+
+@keyframes shadow-pin-heart-ring {
+  0% {
+    opacity: 0.86;
+    transform: translate(-50%, -50%) scale(0.18);
+  }
+  72% {
+    opacity: 0.22;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.35);
+  }
+}
+
+@keyframes shadow-pin-heart-core {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.35) rotate(-10deg);
+  }
+  36% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.2) rotate(8deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -72%) scale(0.74) rotate(0deg);
+  }
+}
+
+@keyframes shadow-pin-heart-particle {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.22) rotate(0deg);
+  }
+  22% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform:
+      translate(calc(-50% + var(--shadow-pin-heart-x)), calc(-50% + var(--shadow-pin-heart-y)))
+      scale(var(--shadow-pin-heart-scale))
+      rotate(var(--shadow-pin-heart-rotate));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shadow-pin-heart-burst,
+  .shadow-pin-heart-burst-ring,
+  .shadow-pin-heart-burst-core,
+  .shadow-pin-heart-burst-particle {
+    animation: none !important;
+  }
+
+  .shadow-pin-heart-burst-particle,
+  .shadow-pin-heart-burst-ring {
+    display: none;
+  }
+
+  .shadow-pin-heart-burst-core {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.9);
   }
 }
 

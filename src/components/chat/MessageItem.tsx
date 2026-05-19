@@ -21,6 +21,7 @@ import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { CheckersCrownBadge } from '../../features/games/shadow-checkers/components/CheckersCrownBadge'
 import { ShadowWarSwordBadge } from '../../features/games/shadow-war/components/ShadowWarSwordBadge'
+import { ShadowPinGoldPinBadge } from '../../features/shadow-pin/components/ShadowPinGoldPinBadge'
 import { formatTime, shouldGroupMessage, cn, getReadableTextColor } from '../../lib/utils'
 import type { Message, User } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -276,6 +277,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 <UserRoleBadge role={message.user?.admin_role} />
                 <CheckersCrownBadge active={message.user?.checkers_crown} />
                 <ShadowWarSwordBadge active={message.user?.war_sword} />
+                <ShadowPinGoldPinBadge active={message.user?.shadow_pin_gold_pin} />
                 <UserPresenceBadge userId={message.user?.id} presenceVisibility={message.user?.presence_visibility} />
               </span>
               <span className="text-xs text-[var(--text-muted)]">
@@ -343,6 +345,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     >
                       Replying to {parentMessage.user?.display_name || 'Unknown'}
                       <UserRoleBadge role={parentMessage.user?.admin_role} className="ml-1" />
+                      <ShadowPinGoldPinBadge active={parentMessage.user?.shadow_pin_gold_pin} className="ml-1" />
                       <UserPresenceBadge userId={parentMessage.user?.id} presenceVisibility={parentMessage.user?.presence_visibility} className="ml-1" />
                       :
                       {' '}

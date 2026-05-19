@@ -11,6 +11,7 @@ import { Input } from '../ui/Input'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
+import { ShadowPinGoldPinBadge } from '../../features/shadow-pin/components/ShadowPinGoldPinBadge'
 import toast from 'react-hot-toast'
 import type { PresenceVisibility } from '../../types'
 
@@ -627,6 +628,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
                   <h1 className="flex min-w-0 items-center gap-2 text-2xl font-bold text-[var(--text-primary)]">
                     <span className="truncate">{profile.display_name}</span>
                     <UserRoleBadge role={profile.admin_role} className="mt-1" />
+                    <ShadowPinGoldPinBadge active={profile.shadow_pin_gold_pin} />
                     <UserPresenceBadge userId={profile.id} presenceVisibility={profile.presence_visibility} />
                   </h1>
                   <p className="text-[var(--text-muted)]">
@@ -718,6 +720,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
                 <div className="mt-2 flex items-center gap-1.5 text-base font-medium text-[var(--text-primary)]">
                   <span className="truncate">{profile.display_name}</span>
                   <UserRoleBadge role={profile.admin_role} />
+                  <ShadowPinGoldPinBadge active={profile.shadow_pin_gold_pin} />
                   <UserPresenceBadge userId={profile.id} presenceVisibility={profile.presence_visibility} />
                 </div>
               </div>

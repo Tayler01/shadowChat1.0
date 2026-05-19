@@ -8,6 +8,7 @@ import { VideoAttachment } from './VideoAttachment'
 import { cn } from '../../lib/utils'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
+import { ShadowPinGoldPinBadge } from '../../features/shadow-pin/components/ShadowPinGoldPinBadge'
 import { getBlockedActionMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
 import { MessageRichText } from './MessageRichText'
@@ -54,6 +55,7 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
           <strong className="inline-flex items-center gap-1">
             {message.user?.display_name}
             <UserRoleBadge role={message.user?.admin_role} />
+            <ShadowPinGoldPinBadge active={message.user?.shadow_pin_gold_pin} />
             <UserPresenceBadge userId={message.user?.id} presenceVisibility={message.user?.presence_visibility} />
           </strong>
           :{' '}

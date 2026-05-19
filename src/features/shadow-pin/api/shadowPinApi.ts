@@ -12,12 +12,12 @@ import type {
 
 const CATEGORY_SELECT = `
   *,
-  creator:users!creator_id(id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, presence_visibility, created_at, updated_at)
+  creator:users!creator_id(id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, presence_visibility, created_at, updated_at)
 `
 
 const IMAGE_SELECT = `
   *,
-  creator:users!creator_id(id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, presence_visibility, created_at, updated_at)
+  creator:users!creator_id(id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, presence_visibility, created_at, updated_at)
 `
 
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])

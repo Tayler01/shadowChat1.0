@@ -703,14 +703,14 @@ export function ShadowCheckersScreen({
     const myTurnSlot = myTurn ? viewerSlot : null
 
     return (
-      <main className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-2 pb-[calc(env(safe-area-inset-bottom)_+_0.65rem)] md:px-6">
-        <section className="mb-2 grid grid-cols-2 items-center gap-2 rounded-[1rem] border border-[#b9934c]/28 bg-black/58 p-2.5">
+      <main className="shadow-checkers-match-surface relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-2 pb-[calc(env(safe-area-inset-bottom)_+_0.65rem)] md:px-6">
+        <section className="shadow-checkers-keyboard-collapse mb-2 grid grid-cols-2 items-center gap-2 rounded-[1rem] border border-[#b9934c]/28 bg-black/58 p-2.5">
           <PlayerChip name={displayName(activeMatch.player_one, 'Player one')} characterKey={activeMatch.player_one_character_key} crown={activeMatch.player_one?.checkers_crown} detail={`${playerOnePieces} pieces`} activeTurn={!state.winner && currentTurnSlot === 'player_one'} turnFlash={showYourTurnBanner && myTurnSlot === 'player_one'} />
           <PlayerChip name={displayName(activeMatch.player_two, 'Open seat')} characterKey={activeMatch.player_two_character_key} crown={activeMatch.player_two?.checkers_crown} detail={`${playerTwoPieces} pieces`} align="right" muted={!activeMatch.player_two} activeTurn={!state.winner && currentTurnSlot === 'player_two'} turnFlash={showYourTurnBanner && myTurnSlot === 'player_two'} />
         </section>
 
         <div className="flex min-h-0 flex-1 flex-col gap-2 xl:grid xl:grid-cols-[minmax(0,1fr)_22rem] xl:gap-3">
-          <section className="relative shrink-0 overflow-hidden rounded-[1.25rem] border border-[#b9934c]/28 bg-[radial-gradient(circle_at_50%_0%,rgba(215,170,70,0.11),rgba(0,0,0,0.66)_42%,rgba(0,0,0,0.82))] p-2.5 shadow-[0_24px_70px_rgba(0,0,0,0.54)] xl:min-h-0 xl:p-3">
+          <section className="shadow-checkers-keyboard-collapse relative shrink-0 overflow-hidden rounded-[1.25rem] border border-[#b9934c]/28 bg-[radial-gradient(circle_at_50%_0%,rgba(215,170,70,0.11),rgba(0,0,0,0.66)_42%,rgba(0,0,0,0.82))] p-2.5 shadow-[0_24px_70px_rgba(0,0,0,0.54)] xl:min-h-0 xl:p-3">
             <div className="relative">
               <ShadowCheckersBoard
                 state={state}
@@ -754,8 +754,8 @@ export function ShadowCheckersScreen({
             </div>
           </section>
 
-          <aside className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden xl:gap-3">
-            <section className="flex min-h-0 flex-1 flex-col rounded-[1rem] border border-[#b9934c]/25 bg-black/58 p-3">
+          <aside className="shadow-checkers-match-chat-wrap flex min-h-0 flex-1 flex-col gap-2 overflow-hidden xl:gap-3">
+            <section className="shadow-checkers-match-chat flex min-h-0 flex-1 flex-col rounded-[1rem] border border-[#b9934c]/25 bg-black/58 p-3">
               <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0d381]">Match Chat</h3>
               <div className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
                 {chat.length === 0 ? <p className="text-sm text-[#b9a16f]">Temporary live chat appears here.</p> : chat.map(message => (
@@ -794,7 +794,7 @@ export function ShadowCheckersScreen({
     <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[#030405] text-[#f6e0a2]">
       <img src={SHADOW_CHECKERS_ASSETS.background} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-[0.56]" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(215,170,70,0.18),transparent_30%),linear-gradient(180deg,rgba(0,0,0,0.58),rgba(0,0,0,0.20)_42%,rgba(0,0,0,0.84))]" />
-      <header className="relative z-20 shrink-0 border-b border-[#b9934c]/35 bg-black/86 shadow-[0_16px_40px_rgba(0,0,0,0.58)]">
+      <header className="shadow-checkers-keyboard-collapse relative z-20 shrink-0 border-b border-[#b9934c]/35 bg-black/86 shadow-[0_16px_40px_rgba(0,0,0,0.58)]">
         <div className="flex min-h-[calc(env(safe-area-inset-top)_+_6.2rem)] items-center gap-1.5 px-2 pb-1.5 pt-[calc(env(safe-area-inset-top)_+_0.35rem)]">
           <button type="button" aria-label={selectedMatchId ? 'Back to Shadow Checkers lobby' : 'Back to entertainment'} onClick={() => selectedMatchId ? actions.selectMatch(null) : onExit?.()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-transparent bg-black/5 text-[#f0d381] hover:bg-white/10">
             <ArrowLeft className="h-5 w-5" />

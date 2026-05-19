@@ -25,6 +25,7 @@ import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
+import { ShadowPinGoldPinBadge } from '../../features/shadow-pin/components/ShadowPinGoldPinBadge'
 
 interface PublicProfileDialogProps {
   user: User | null
@@ -362,6 +363,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                   <h2 id="public-profile-title" className="flex min-w-0 items-center gap-2 text-2xl font-bold text-[var(--text-primary)]">
                     <span className="truncate">{user.display_name || user.username || 'Unknown User'}</span>
                     <UserRoleBadge role={localAdminRole} className="mt-1" />
+                    <ShadowPinGoldPinBadge active={user.shadow_pin_gold_pin} />
                     <UserPresenceBadge userId={user.id} presenceVisibility={user.presence_visibility} />
                   </h2>
                   <p className="truncate text-sm text-[var(--text-muted)]">@{user.username || 'unknown'}</p>

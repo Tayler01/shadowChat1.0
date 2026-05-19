@@ -131,6 +131,7 @@ function App() {
       (nav.platform === 'MacIntel' && nav.maxTouchPoints > 1)
     let frameId: number | null = null
     let settleTimerIds: number[] = []
+    root.dataset.shadowchatMobilePlatform = isIOS ? 'ios' : 'android'
 
     const isEditableFocused = () => {
       const activeElement = document.activeElement
@@ -214,6 +215,7 @@ function App() {
       root.style.removeProperty('--shadowchat-toast-top')
       root.style.removeProperty('--shadowchat-toast-top-space')
       delete root.dataset.shadowchatKeyboard
+      delete root.dataset.shadowchatMobilePlatform
     }
   }, [isDesktop])
 

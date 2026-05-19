@@ -11,23 +11,41 @@ same ShadowPin surface directly.
 - Device upload or server-side URL import for category covers and image pins.
 - One heart per user per category or image.
 - Creator/operator edit and soft delete controls.
+- Hidden score ledger for the public gold push-pin identity badge.
 - No realtime, notifications, comments, tags, search, or filters.
 
 ## Data Model
 
 Migration: `supabase/migrations/20260512203054_shadow_pin_domain.sql`
+Score migration: `supabase/migrations/20260519020527_shadow_pin_hidden_score_gold_pin.sql`
 
 - `shadow_pin_categories`: category metadata, cover asset, soft delete fields,
   heart count, and `latest_image_created_at` for mobile category ordering.
 - `shadow_pin_images`: pin metadata, image asset, optional `category_id` for admin orphaning, soft delete fields, heart count.
 - `shadow_pin_category_hearts`: one heart per user/category.
 - `shadow_pin_image_hearts`: one heart per user/image.
+- `private.shadow_pin_scores`: hidden per-user score totals. Authenticated
+  clients cannot read this ledger.
+- `users.shadow_pin_gold_pin`: public winner flag used for the gold push-pin
+  badge next to the current top scorer's name.
 
 The migration also creates the public Supabase Storage bucket `shadow-pin` with a 15MB limit and JPEG, PNG, WebP, and GIF MIME allow-list. Storage paths are user-prefixed so authenticated users can upload only under their own folder.
 
 The mobile media derivative migration keeps `latest_image_created_at` current
 with a trigger on `shadow_pin_images`. Category lists sort by newest added image
 first, with empty categories below categories that have visible images.
+
+## Hidden Score
+
+ShadowPin image posts are worth 1 point. Non-self hearts received on image pins
+are worth 2 points. Category covers and category hearts do not count toward the
+score.
+
+The score migration refreshes the private score ledger after visible image
+changes and image-heart changes. Each refresh recomputes the current top scorer,
+sets `users.shadow_pin_gold_pin = true` for that user, and clears the flag from
+any previous top scorer. Ties break by total score, received image hearts, image
+count, most recent scored activity, then user id for deterministic results.
 
 ## Permissions
 

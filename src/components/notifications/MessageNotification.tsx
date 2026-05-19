@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Avatar } from '../ui/Avatar'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
+import { ShadowPinGoldPinBadge } from '../../features/shadow-pin/components/ShadowPinGoldPinBadge'
 import type { AdminRole } from '../../lib/supabase'
 import type { PresenceVisibility } from '../../types'
 import type { Toast } from 'react-hot-toast'
@@ -16,6 +17,7 @@ interface MessageNotificationProps {
     avatar_url?: string
     color?: string
     admin_role?: AdminRole | null
+    shadow_pin_gold_pin?: boolean | null
     presence_visibility?: PresenceVisibility | null
   }
   onClick: () => void
@@ -50,6 +52,7 @@ export const MessageNotification: React.FC<MessageNotificationProps> = ({ t, con
             <p className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">
               <span className="truncate">{sender.display_name}</span>
               <UserRoleBadge role={sender.admin_role} />
+              <ShadowPinGoldPinBadge active={sender.shadow_pin_gold_pin} />
               <UserPresenceBadge userId={sender.id} presenceVisibility={sender.presence_visibility} />
             </p>
             <p className="truncate text-sm text-[var(--text-secondary)]">

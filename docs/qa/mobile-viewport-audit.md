@@ -1,6 +1,6 @@
 # Mobile Viewport Audit
 
-Last updated: 2026-05-15
+Last updated: 2026-05-19
 
 ShadowChat defaults to phone-first design and testing. Unless a task explicitly
 states otherwise, viewport decisions should be judged against iPhone/WebKit and
@@ -23,7 +23,7 @@ Android/Chromium phone profiles before desktop convenience.
 
 ## Safe-Area Handling
 
-- Mobile chat, DM, and board footers use `pb-[env(safe-area-inset-bottom)]`.
+- Shared mobile navigation owns the bottom safe-area spacer and home-indicator buffer, including the embedded nav inside chat, DM, and board footers.
 - Chat, DM, and board scroll containers pad bottom content by safe area plus measured mobile footer height.
 - Toast top positioning uses `env(safe-area-inset-top)` plus visual viewport offset CSS variables.
 - Latest automated screenshots show composers clearing the footer and bottom edge across iPhone small, iPhone large, Android medium, and Android small profiles.
@@ -45,6 +45,8 @@ Android/Chromium phone profiles before desktop convenience.
 - General Chat: `MessageList` owns the scroll container and pads for the mobile chat footer.
 - DMs: `DirectMessagesView` owns the thread scroll container and pads for the mobile chat footer.
 - Boards: `BoardChat` owns the board chat scroll container and pads for the mobile chat footer.
+- Shadow Checkers: Android keyboard focus collapses the game header, player row,
+  and board chrome so the match chat composer remains in the compressed viewport.
 - Shadow Pin category images use deterministic responsive masonry columns on mobile; avoid CSS multi-column masonry because Android Chromium can collapse it to one visible column, and avoid row-locked grids because mixed image heights create gaps instead of the intended packed stagger.
 - Settings/profile screens use internal vertical overflow and bottom safe-area padding.
 

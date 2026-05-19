@@ -4,6 +4,7 @@ import { Avatar } from '../ui/Avatar'
 import { Input } from '../ui/Input'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
+import { ShadowPinGoldPinBadge } from '../../features/shadow-pin/components/ShadowPinGoldPinBadge'
 import { useUserSearch } from '../../hooks/useUserSearch'
 import { useAllUsers } from '../../hooks/useAllUsers'
 import type { BasicUser } from '../../lib/supabase'
@@ -43,7 +44,7 @@ export const UserSearchSelect: React.FC<UserSearchSelectProps> = ({
         user.display_name.toLowerCase().includes(normalizedValue)
       )
     : seedUsers
-  const mergedResults = [...results, ...localMatches].filter(
+  const mergedResults = [...localMatches, ...results].filter(
     (user, index, arr) => arr.findIndex(candidate => candidate.id === user.id) === index
   )
   const prioritizedResults = normalizedValue
@@ -141,6 +142,7 @@ export const UserSearchSelect: React.FC<UserSearchSelectProps> = ({
                         <span className="inline-flex max-w-full items-center gap-1.5">
                           <span className="truncate">{u.display_name}</span>
                           <UserRoleBadge role={u.admin_role} />
+                          <ShadowPinGoldPinBadge active={u.shadow_pin_gold_pin} />
                           <UserPresenceBadge userId={u.id} presenceVisibility={u.presence_visibility} />
                         </span>
                       </div>

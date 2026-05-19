@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { CSSProperties, FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Edit3,
   Heart,
@@ -22,6 +22,7 @@ import { cn } from '../../lib/utils'
 import type { AppView } from '../../types/navigation'
 import { useShadowPinCategories } from './hooks/useShadowPinCategories'
 import { useShadowPinImages } from './hooks/useShadowPinImages'
+import { ShadowPinGoldPinBadge } from './components/ShadowPinGoldPinBadge'
 import type {
   ShadowPinCategory,
   ShadowPinCategoryFormValues,
@@ -54,6 +55,26 @@ const canManage = (
   userId?: string,
   adminRole?: string | null
 ) => Boolean(userId && (item.creator_id === userId || adminRole === 'admin' || adminRole === 'sub_admin'))
+
+const HEART_BURST_PARTICLES = [
+  { x: '-1.8rem', y: '-2.1rem', scale: 0.92, rotate: '-24deg', delay: '0ms' },
+  { x: '-0.7rem', y: '-2.65rem', scale: 0.66, rotate: '18deg', delay: '24ms' },
+  { x: '0.65rem', y: '-2.55rem', scale: 0.78, rotate: '-12deg', delay: '12ms' },
+  { x: '1.75rem', y: '-1.9rem', scale: 0.96, rotate: '26deg', delay: '34ms' },
+  { x: '-2.2rem', y: '-0.55rem', scale: 0.7, rotate: '12deg', delay: '46ms' },
+  { x: '2.2rem', y: '-0.45rem', scale: 0.72, rotate: '-18deg', delay: '54ms' },
+  { x: '-1.55rem', y: '1.25rem', scale: 0.62, rotate: '-34deg', delay: '28ms' },
+  { x: '1.45rem', y: '1.2rem', scale: 0.64, rotate: '32deg', delay: '38ms' },
+  { x: '0rem', y: '-3.1rem', scale: 0.58, rotate: '8deg', delay: '68ms' },
+]
+
+const getHeartBurstParticleStyle = (particle: typeof HEART_BURST_PARTICLES[number]) => ({
+  '--shadow-pin-heart-x': particle.x,
+  '--shadow-pin-heart-y': particle.y,
+  '--shadow-pin-heart-scale': particle.scale,
+  '--shadow-pin-heart-rotate': particle.rotate,
+  '--shadow-pin-heart-delay': particle.delay,
+}) as CSSProperties
 
 const getCategoryImageUrl = (category: ShadowPinCategory, size: 'thumb' | 'medium' | 'full' = 'thumb') => {
   if (size === 'thumb') return category.thumbnail_url || category.medium_url || category.image_url
@@ -144,27 +165,68 @@ function HeartButton({
 }: {
   active?: boolean
   count: number
-  onClick: () => void
+  onClick: () => void | Promise<void>
   className?: string
   variant?: 'pill' | 'bare'
   showCount?: boolean
 }) {
+  const [burstKey, setBurstKey] = useState(0)
+  const burstTimeoutRef = useRef<number | null>(null)
+
+  useEffect(() => () => {
+    if (burstTimeoutRef.current) {
+      window.clearTimeout(burstTimeoutRef.current)
+    }
+  }, [])
+
+  const triggerBurst = () => {
+    if (burstTimeoutRef.current) {
+      window.clearTimeout(burstTimeoutRef.current)
+    }
+
+    setBurstKey(key => key + 1)
+    burstTimeoutRef.current = window.setTimeout(() => {
+      setBurstKey(0)
+      burstTimeoutRef.current = null
+    }, 900)
+  }
+
   return (
     <button
       type="button"
       onClick={event => {
         event.stopPropagation()
-        onClick()
+        if (!active) {
+          triggerBurst()
+        }
+        void onClick()
       }}
       className={cn(
-        'inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]',
+        'shadow-pin-heart-button relative inline-flex items-center justify-center gap-1.5 overflow-visible text-xs font-semibold text-[var(--text-primary)]',
+        burstKey > 0 && 'shadow-pin-heart-button--bursting',
         variant === 'pill' && 'rounded-full border border-[rgba(255,255,255,0.14)] bg-[rgba(4,5,6,0.72)] px-2.5 py-1.5 shadow-[0_8px_20px_rgba(0,0,0,0.22)] backdrop-blur-md',
         variant === 'bare' && 'h-9 w-9 rounded-full bg-transparent p-0 drop-shadow-[0_2px_5px_rgba(0,0,0,0.9)]',
         active && (variant === 'pill' ? 'border-[#ff4d5f]/75 bg-[rgba(255,77,95,0.12)] text-[#ff4d5f]' : 'text-[#ff4d5f]'),
         className
       )}
       aria-pressed={Boolean(active)}
+      aria-label={active ? 'Unlike ShadowPin item' : 'Like ShadowPin item'}
     >
+      {burstKey > 0 && (
+        <span key={burstKey} className="shadow-pin-heart-burst" data-testid="shadow-pin-heart-burst" aria-hidden="true">
+          <span className="shadow-pin-heart-burst-ring" />
+          <span className="shadow-pin-heart-burst-core">{'\u2764\uFE0F'}</span>
+          {HEART_BURST_PARTICLES.map((particle, index) => (
+            <span
+              key={`${particle.x}-${particle.y}-${index}`}
+              className="shadow-pin-heart-burst-particle"
+              style={getHeartBurstParticleStyle(particle)}
+            >
+              {'\u2764\uFE0F'}
+            </span>
+          ))}
+        </span>
+      )}
       {variant === 'bare' ? (
         <span className="relative inline-flex h-5 w-5 items-center justify-center">
           <Heart className="absolute h-5 w-5 fill-black text-black opacity-95 [stroke-width:5]" aria-hidden="true" />
@@ -528,7 +590,10 @@ function CategoryDetailsModal({
               <h2 className="text-xl font-semibold text-[var(--text-primary)]">{category.title}</h2>
               <div className="mt-2 flex items-center gap-2 text-sm text-[var(--text-muted)]">
                 <Avatar src={category.creator?.avatar_url} alt={getDisplayName(category)} size="sm" />
-                <span>{getDisplayName(category)}</span>
+                <span className="inline-flex min-w-0 items-center gap-1.5">
+                  <span className="truncate">{getDisplayName(category)}</span>
+                  <ShadowPinGoldPinBadge active={category.creator?.shadow_pin_gold_pin} />
+                </span>
               </div>
             </div>
             <button type="button" onClick={onClose} className="rounded-full p-2 text-[var(--text-secondary)]">
@@ -628,7 +693,10 @@ function ImageCard({
             {image.description && <p className="line-clamp-4 whitespace-pre-line text-xs leading-snug text-[var(--text-secondary)]">{image.description}</p>}
             <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
               <Avatar src={image.creator?.avatar_url} alt={getDisplayName(image)} size="sm" />
-              <span className="truncate">{getDisplayName(image)}</span>
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                <span className="truncate">{getDisplayName(image)}</span>
+                <ShadowPinGoldPinBadge active={image.creator?.shadow_pin_gold_pin} />
+              </span>
             </div>
           </div>
         )}
@@ -674,7 +742,10 @@ function ImageViewerModal({
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">{image.title}</h2>
         <div className="mt-2 flex items-center gap-2 text-sm text-[var(--text-muted)]">
           <Avatar src={image.creator?.avatar_url} alt={getDisplayName(image)} size="sm" />
-          <span>{getDisplayName(image)}</span>
+          <span className="inline-flex min-w-0 items-center gap-1.5">
+            <span className="truncate">{getDisplayName(image)}</span>
+            <ShadowPinGoldPinBadge active={image.creator?.shadow_pin_gold_pin} />
+          </span>
         </div>
         {image.description && <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-[var(--text-secondary)]">{image.description}</p>}
       </div>
