@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useCallback } from 'react'
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useCallback, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowDown } from 'lucide-react'
 import { useMessages } from '../../hooks/useMessages'
@@ -28,6 +28,21 @@ interface MessageListProps {
   initialMessageId?: string
 }
 
+const DEFAULT_RENDER_WINDOW_SIZE = 90
+const RENDER_WINDOW_INCREMENT = 60
+const HISTORY_LOAD_ROOT_MARGIN = '180px 0px 0px 0px'
+const HISTORY_LOAD_COOLDOWN_MS = 1800
+
+type VisibleMessageAnchor = {
+  id: string
+  top: number
+}
+
+const findMessageRowById = (container: HTMLElement, id: string) => {
+  return Array.from(container.querySelectorAll<HTMLElement>('[data-message-row="true"]'))
+    .find(row => row.dataset.messageId === id) ?? null
+}
+
 export const MessageList: React.FC<MessageListProps> = ({
   onReply,
   failedMessages = [],
@@ -50,9 +65,14 @@ export const MessageList: React.FC<MessageListProps> = ({
   const { typingUsers } = useTyping('general')
   const { profile } = useAuth()
   const containerRef = useRef<HTMLDivElement>(null)
-  const prevHeightRef = useRef(0)
-  const prevScrollTopRef = useRef(0)
+  const topSentinelRef = useRef<HTMLDivElement>(null)
+  const pendingAnchorRef = useRef<VisibleMessageAnchor | null>(null)
+  const pendingJumpMessageIdRef = useRef<string | null>(null)
+  const olderLoadInFlightRef = useRef(false)
+  const lastHistoryRequestAtRef = useRef(0)
+  const scrollFrameRef = useRef<number | null>(null)
   const initialTargetJumpDoneRef = useRef<string | null>(null)
+  const [renderWindowStart, setRenderWindowStart] = useState(0)
   const { cursor, loading: cursorLoading, markRead } = useReadCursor('general_chat', 'main', Boolean(profile?.id))
 
   const messageMap = useMemo(() => {
@@ -63,34 +83,9 @@ export const MessageList: React.FC<MessageListProps> = ({
     return msgMap
   }, [messages])
 
-  const jumpToMessage = useCallback(
-    (id: string) => {
-      requestAnimationFrame(() => {
-        const el = document.getElementById(`message-${id}`)
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-          el.classList.add('ring-2', 'ring-[var(--color-accent)]')
-          setTimeout(() => {
-            el.classList.remove('ring-2', 'ring-[var(--color-accent)]')
-          }, 2000)
-        }
-      })
-    },
-    []
-  )
-
   const combinedMessages = useMemo(() => {
     return [...messages].sort((a, b) => a.created_at.localeCompare(b.created_at))
   }, [messages])
-
-  const eagerAvatarMessageIds = useMemo(() => (
-    new Set(combinedMessages.slice(-12).map(message => message.id))
-  ), [combinedMessages])
-
-  const groupedMessages = useMemo(
-    () => groupMessagesByDate(combinedMessages as any[]),
-    [combinedMessages]
-  )
 
   const markGeneralChatRead = useCallback(
     async (message: Message) => {
@@ -125,38 +120,133 @@ export const MessageList: React.FC<MessageListProps> = ({
     onMarkReadToLatest: markGeneralChatRead,
   })
 
-  const handleScroll = useCallback(() => {
-    const el = containerRef.current
-    if (!el) return
+  const captureVisibleAnchor = useCallback((): VisibleMessageAnchor | null => {
+    const container = containerRef.current
+    if (!container) return null
 
-    handleUnreadScroll()
+    const containerRect = container.getBoundingClientRect()
+    const rows = Array.from(container.querySelectorAll<HTMLElement>('[data-message-row="true"]'))
+    const visibleRow = rows.find(row => {
+      const rect = row.getBoundingClientRect()
+      return rect.bottom > containerRect.top + 1 && rect.top < containerRect.bottom - 1
+    })
 
-    if (el.scrollTop < 100 && hasMore && !loadingMore) {
-      prevHeightRef.current = el.scrollHeight
-      prevScrollTopRef.current = el.scrollTop
-      loadOlderMessages()
+    const id = visibleRow?.dataset.messageId
+    if (!visibleRow || !id) return null
+
+    return {
+      id,
+      top: visibleRow.getBoundingClientRect().top - containerRect.top,
     }
-  }, [handleUnreadScroll, hasMore, loadingMore, loadOlderMessages])
+  }, [])
+
+  const capturePendingAnchor = useCallback(() => {
+    pendingAnchorRef.current = captureVisibleAnchor()
+  }, [captureVisibleAnchor])
+
+  const requestOlderMessages = useCallback(() => {
+    if (loading || loadingMore || olderLoadInFlightRef.current) return
+
+    const canRevealLoadedHistory = renderWindowStart > 0
+    if (!canRevealLoadedHistory && !hasMore) return
+
+    const now = Date.now()
+    if (
+      lastHistoryRequestAtRef.current > 0 &&
+      now - lastHistoryRequestAtRef.current < HISTORY_LOAD_COOLDOWN_MS
+    ) {
+      return
+    }
+    lastHistoryRequestAtRef.current = now
+
+    capturePendingAnchor()
+    setAutoScroll(false)
+
+    if (canRevealLoadedHistory) {
+      setRenderWindowStart(current => Math.max(0, current - RENDER_WINDOW_INCREMENT))
+      return
+    }
+
+    olderLoadInFlightRef.current = true
+    void loadOlderMessages().finally(() => {
+      olderLoadInFlightRef.current = false
+    })
+  }, [
+    capturePendingAnchor,
+    hasMore,
+    loadOlderMessages,
+    loading,
+    loadingMore,
+    renderWindowStart,
+    setAutoScroll,
+  ])
+
+  const handleScroll = useCallback(() => {
+    if (scrollFrameRef.current !== null) return
+
+    scrollFrameRef.current = requestAnimationFrame(() => {
+      scrollFrameRef.current = null
+      const el = containerRef.current
+      if (!el) return
+
+      handleUnreadScroll()
+
+      if (typeof IntersectionObserver === 'undefined' && el.scrollTop < 120) {
+        requestOlderMessages()
+      }
+    })
+  }, [handleUnreadScroll, requestOlderMessages])
 
   useEffect(() => {
     initialTargetJumpDoneRef.current = null
   }, [profile?.id])
 
-  // Maintain scroll position when older messages are prepended
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    if (!loadingMore && prevHeightRef.current) {
-      const diff = el.scrollHeight - prevHeightRef.current
-      if (prevScrollTopRef.current <= 0) {
-        el.scrollTop = diff
-      } else {
-        el.scrollTop = prevScrollTopRef.current + diff
-      }
-      prevHeightRef.current = 0
-      prevScrollTopRef.current = 0
+  useLayoutEffect(() => {
+    const anchor = pendingAnchorRef.current
+    if (!anchor) return
+
+    const container = containerRef.current
+    const anchorEl = container ? findMessageRowById(container, anchor.id) : null
+    pendingAnchorRef.current = null
+
+    if (!container || !anchorEl) return
+
+    const nextTop = anchorEl.getBoundingClientRect().top - container.getBoundingClientRect().top
+    const delta = nextTop - anchor.top
+    if (Math.abs(delta) > 0.5) {
+      container.scrollTop += delta
     }
-  }, [loadingMore, messages.length])
+  }, [combinedMessages.length, loadingMore, renderWindowStart])
+
+  useEffect(() => {
+    const sentinel = topSentinelRef.current
+    const container = containerRef.current
+    if (!sentinel || !container || typeof IntersectionObserver === 'undefined') return
+    if (!hasMore && renderWindowStart === 0) return
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(entry => entry.isIntersecting)) {
+          requestOlderMessages()
+        }
+      },
+      {
+        root: container,
+        rootMargin: HISTORY_LOAD_ROOT_MARGIN,
+      }
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, renderWindowStart, requestOlderMessages])
+
+  useEffect(() => {
+    return () => {
+      if (scrollFrameRef.current !== null) {
+        cancelAnimationFrame(scrollFrameRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (autoScroll && typingUsers.length > 0) {
@@ -165,59 +255,119 @@ export const MessageList: React.FC<MessageListProps> = ({
   }, [autoScroll, scrollToBottom, typingUsers.length])
 
   useEffect(() => {
-    let frameId: number | null = null
-    let settleFrameId: number | null = null
-    let settleTimerId: number | null = null
-
-    const keepLatestVisible = () => {
-      if (!autoScroll) return
-
-      if (frameId !== null) {
-        cancelAnimationFrame(frameId)
-      }
-      if (settleFrameId !== null) {
-        cancelAnimationFrame(settleFrameId)
-      }
-      if (settleTimerId !== null) {
-        window.clearTimeout(settleTimerId)
-      }
-
-      frameId = requestAnimationFrame(() => {
-        frameId = null
-        scrollToBottom('auto')
-        settleFrameId = requestAnimationFrame(() => {
-          settleFrameId = null
-          scrollToBottom('auto')
-        })
-        settleTimerId = window.setTimeout(() => {
-          settleTimerId = null
-          scrollToBottom('auto')
-        }, 140)
-      })
+    if (combinedMessages.length === 0) {
+      setRenderWindowStart(0)
+      return
     }
 
-    keepLatestVisible()
-    window.visualViewport?.addEventListener('resize', keepLatestVisible)
-    window.visualViewport?.addEventListener('scroll', keepLatestVisible)
-    window.addEventListener('resize', keepLatestVisible)
-    window.addEventListener('focusin', keepLatestVisible)
+    const latestWindowStart = Math.max(0, combinedMessages.length - DEFAULT_RENDER_WINDOW_SIZE)
 
-    return () => {
-      window.visualViewport?.removeEventListener('resize', keepLatestVisible)
-      window.visualViewport?.removeEventListener('scroll', keepLatestVisible)
-      window.removeEventListener('resize', keepLatestVisible)
-      window.removeEventListener('focusin', keepLatestVisible)
-      if (frameId !== null) {
-        cancelAnimationFrame(frameId)
-      }
-      if (settleFrameId !== null) {
-        cancelAnimationFrame(settleFrameId)
-      }
-      if (settleTimerId !== null) {
-        window.clearTimeout(settleTimerId)
+    if (initialMessageId) {
+      const targetIndex = combinedMessages.findIndex(message => message.id === initialMessageId)
+      if (targetIndex >= 0) {
+        setRenderWindowStart(current => Math.min(current, Math.max(0, targetIndex - 8)))
+        return
       }
     }
-  }, [autoScroll, combinedMessages.length, scrollToBottom])
+
+    if (firstUnreadMessageId) {
+      const unreadIndex = combinedMessages.findIndex(message => message.id === firstUnreadMessageId)
+      if (unreadIndex >= 0) {
+        setRenderWindowStart(current => Math.min(current, Math.max(0, unreadIndex - 8)))
+        return
+      }
+    }
+
+    if (autoScroll) {
+      setRenderWindowStart(latestWindowStart)
+    }
+  }, [autoScroll, combinedMessages, firstUnreadMessageId, initialMessageId])
+
+  useEffect(() => {
+    const maxStart = Math.max(0, combinedMessages.length - 1)
+    setRenderWindowStart(current => Math.min(Math.max(0, current), maxStart))
+  }, [combinedMessages.length])
+
+  const pinnedMessagesBeforeWindow = useMemo(
+    () => combinedMessages.slice(0, renderWindowStart).filter(message => message.pinned),
+    [combinedMessages, renderWindowStart]
+  )
+
+  const renderedMessages = useMemo(() => {
+    const boundedStart = Math.min(renderWindowStart, combinedMessages.length)
+    const seenIds = new Set<string>()
+    const nextMessages: Message[] = []
+
+    for (const message of pinnedMessagesBeforeWindow) {
+      if (!seenIds.has(message.id)) {
+        seenIds.add(message.id)
+        nextMessages.push(message)
+      }
+    }
+
+    for (const message of combinedMessages.slice(boundedStart)) {
+      if (!seenIds.has(message.id)) {
+        seenIds.add(message.id)
+        nextMessages.push(message)
+      }
+    }
+
+    return nextMessages
+  }, [combinedMessages, pinnedMessagesBeforeWindow, renderWindowStart])
+
+  const hiddenBeforeCount = Math.max(0, renderWindowStart - pinnedMessagesBeforeWindow.length)
+
+  const eagerAvatarMessageIds = useMemo(() => (
+    new Set(renderedMessages.slice(-12).map(message => message.id))
+  ), [renderedMessages])
+
+  const groupedMessages = useMemo(
+    () => groupMessagesByDate(renderedMessages as any[]),
+    [renderedMessages]
+  )
+
+  const scrollAndHighlightMessage = useCallback((
+    id: string,
+    ringClassName = 'ring-[var(--color-accent)]',
+    durationMs = 2000
+  ) => {
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`message-${id}`)
+      if (!el) return
+
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('ring-2', ringClassName)
+      window.setTimeout(() => {
+        el.classList.remove('ring-2', ringClassName)
+      }, durationMs)
+    })
+  }, [])
+
+  const jumpToMessage = useCallback(
+    (id: string) => {
+      const targetIndex = combinedMessages.findIndex(message => message.id === id)
+      if (targetIndex >= 0 && targetIndex < renderWindowStart) {
+        pendingJumpMessageIdRef.current = id
+        capturePendingAnchor()
+        setRenderWindowStart(Math.max(0, targetIndex - 8))
+        return
+      }
+
+      scrollAndHighlightMessage(id)
+    },
+    [capturePendingAnchor, combinedMessages, renderWindowStart, scrollAndHighlightMessage]
+  )
+
+  useLayoutEffect(() => {
+    const pendingJumpId = pendingJumpMessageIdRef.current
+    if (!pendingJumpId) return
+
+    const el = document.getElementById(`message-${pendingJumpId}`)
+    if (!el) return
+
+    pendingJumpMessageIdRef.current = null
+    scrollAndHighlightMessage(pendingJumpId)
+  }, [renderedMessages, scrollAndHighlightMessage])
 
   useEffect(() => {
     if (
@@ -238,17 +388,24 @@ export const MessageList: React.FC<MessageListProps> = ({
     setFirstUnreadMessageId(null)
     setAutoScroll(false)
 
-    requestAnimationFrame(() => {
-      const el = document.getElementById(`message-${initialMessageId}`)
-      if (!el) return
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      el.classList.add('ring-2', 'ring-[rgba(34,197,94,0.55)]')
-      void markLatestRead(false)
-      window.setTimeout(() => {
-        el.classList.remove('ring-2', 'ring-[rgba(34,197,94,0.55)]')
-      }, 2200)
-    })
-  }, [combinedMessages, initialMessageId, loading, markLatestRead, setAutoScroll, setFirstUnreadMessageId])
+    const targetIndex = combinedMessages.findIndex(message => message.id === initialMessageId)
+    if (targetIndex >= 0 && targetIndex < renderWindowStart) {
+      pendingJumpMessageIdRef.current = initialMessageId
+      setRenderWindowStart(Math.max(0, targetIndex - 8))
+    }
+
+    scrollAndHighlightMessage(initialMessageId, 'ring-[rgba(34,197,94,0.55)]', 2200)
+    void markLatestRead(false)
+  }, [
+    combinedMessages,
+    initialMessageId,
+    loading,
+    markLatestRead,
+    renderWindowStart,
+    scrollAndHighlightMessage,
+    setAutoScroll,
+    setFirstUnreadMessageId,
+  ])
 
   const handleEdit = useCallback(async (messageId: string, content: string) => {
     try {
@@ -286,9 +443,13 @@ export const MessageList: React.FC<MessageListProps> = ({
       ref={containerRef}
       onScroll={handleScroll}
       data-testid="message-scroll"
+      data-loaded-count={combinedMessages.length}
+      data-rendered-count={renderedMessages.length}
+      data-hidden-before-count={hiddenBeforeCount}
       className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] pt-4 md:px-3 md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
     >
       <div data-testid="message-stack" className="mx-auto flex min-h-full w-full max-w-6xl flex-col justify-end">
+      <div ref={topSentinelRef} aria-hidden="true" className="h-px w-full shrink-0" />
 
       {loadingMore && (
         <div className="flex justify-center py-2 text-sm text-[var(--text-muted)]">
@@ -313,7 +474,11 @@ export const MessageList: React.FC<MessageListProps> = ({
                 {firstUnreadMessageId === message.id && (
                   <UnreadDivider />
                 )}
-                <div className={cn(isGrouped ? 'pt-1 pb-1' : 'pt-4 pb-1', '[content-visibility:auto] [contain-intrinsic-size:0_88px]')}>
+                <div
+                  data-message-row="true"
+                  data-message-id={message.id}
+                  className={cn(isGrouped ? 'pt-1 pb-1' : 'pt-4 pb-1', '[content-visibility:auto] [contain-intrinsic-size:0_96px]')}
+                >
                   <MessageItem
                     message={message}
                     previousMessage={prev}

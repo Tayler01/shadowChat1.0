@@ -143,4 +143,82 @@ describe('useUnreadScroll', () => {
 
     document.body.removeChild(container)
   })
+
+  it('keeps the latest message visible while the mobile visual viewport changes', async () => {
+    const listeners: Record<string, EventListener[]> = {}
+    const originalVisualViewport = window.visualViewport
+    global.ResizeObserver = class {
+      observe = jest.fn()
+      unobserve = jest.fn()
+      disconnect = jest.fn()
+    } as unknown as typeof ResizeObserver
+    const visualViewport = {
+      addEventListener: jest.fn((type: string, listener: EventListener) => {
+        listeners[type] = [...(listeners[type] || []), listener]
+      }),
+      removeEventListener: jest.fn(),
+      height: 520,
+      width: 390,
+      offsetTop: 0,
+      offsetLeft: 0,
+      pageTop: 0,
+      pageLeft: 0,
+      scale: 1,
+    } as unknown as VisualViewport
+
+    Object.defineProperty(window, 'visualViewport', {
+      configurable: true,
+      value: visualViewport,
+    })
+
+    const container = document.createElement('div')
+    const content = document.createElement('div')
+    container.appendChild(content)
+    document.body.appendChild(container)
+    setScrollMetrics(container, 900)
+
+    Object.defineProperty(container, 'scrollTo', {
+      configurable: true,
+      value: jest.fn((options?: ScrollToOptions | number) => {
+        const top = typeof options === 'number' ? options : options?.top
+        container.scrollTop = Number(top)
+      }),
+    })
+
+    renderHook(() =>
+      useUnreadScroll<TestMessage>({
+        containerRef: { current: container },
+        messages: [makeMessage('m1', 1)],
+        loading: false,
+        cursor: null,
+        cursorLoading: false,
+        enabled: true,
+        surfaceKey: 'general_chat:main',
+        getMessageId: message => message.id,
+        getMessageCreatedAt: message => message.created_at,
+        getElementId: id => `message-${id}`,
+        onMarkReadToLatest: jest.fn(),
+      })
+    )
+
+    await waitFor(() => expect(container.scrollTop).toBe(500))
+
+    setScrollMetrics(container, 960)
+    act(() => {
+      listeners.resize?.forEach(listener => listener(new Event('resize')))
+    })
+    expect(container.scrollTop).toBe(560)
+
+    setScrollMetrics(container, 990)
+    act(() => {
+      window.dispatchEvent(new Event('focusin'))
+    })
+    expect(container.scrollTop).toBe(590)
+
+    document.body.removeChild(container)
+    Object.defineProperty(window, 'visualViewport', {
+      configurable: true,
+      value: originalVisualViewport,
+    })
+  })
 })

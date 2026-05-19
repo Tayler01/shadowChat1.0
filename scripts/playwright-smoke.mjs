@@ -839,7 +839,12 @@ async function goToChat(page) {
 }
 
 async function goToSettings(page) {
-  await page.getByRole('button', { name: /^Settings$/ }).click()
+  const desktopSettings = page.getByRole('button', { name: /^Settings$/ }).first()
+  if (await desktopSettings.isVisible().catch(() => false)) {
+    await desktopSettings.click()
+  } else {
+    await page.getByRole('button', { name: 'Open app preferences' }).click()
+  }
   await waitForSettingsView(page)
 }
 
@@ -1074,7 +1079,7 @@ async function sendVisibleMessage(page, messageText) {
 async function reactToMessage(page, messageText, emoji) {
   const wrapper = getMessageWrapperByText(page, messageText)
   await wrapper.hover()
-  await wrapper.getByRole('button', { name: 'Message actions' }).click()
+  await page.getByRole('toolbar', { name: 'Quick reactions' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
   await page.getByRole('button', { name: `React with ${emoji}` }).last().click()
 }
 

@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
 import { MessageList } from '../src/components/chat/MessageList'
 import type { Message } from '../src/lib/supabase'
@@ -97,6 +97,14 @@ const message = {
   },
 } as unknown as Message
 
+const makeMessage = (index: number) => ({
+  ...message,
+  id: `m${index}`,
+  content: `Message ${index}`,
+  created_at: new Date(Date.UTC(2026, 4, 3, 12, 0, index)).toISOString(),
+  updated_at: new Date(Date.UTC(2026, 4, 3, 12, 0, index)).toISOString(),
+}) as unknown as Message
+
 describe('MessageList mobile keyboard layout', () => {
   const originalRequestAnimationFrame = window.requestAnimationFrame
   const originalCancelAnimationFrame = window.cancelAnimationFrame
@@ -156,42 +164,92 @@ describe('MessageList mobile keyboard layout', () => {
     expect(screen.getByText('A tiny group chat thread')).toBeInTheDocument()
   })
 
-  it('keeps the latest group chat message visible while the mobile viewport changes', () => {
-    const listeners: Record<string, EventListener[]> = {}
-    const visualViewport = {
-      addEventListener: jest.fn((type: string, listener: EventListener) => {
-        listeners[type] = [...(listeners[type] || []), listener]
-      }),
-      removeEventListener: jest.fn(),
-      height: 520,
-      width: 390,
-      offsetTop: 0,
-      offsetLeft: 0,
-      pageTop: 0,
-      pageLeft: 0,
-      scale: 1,
-    } as unknown as VisualViewport
+  it('delegates scroll state to the unread-scroll hook without loading history from raw scroll math', () => {
+    render(<MessageList />)
 
-    Object.defineProperty(window, 'visualViewport', {
-      configurable: true,
-      value: visualViewport,
+    fireEvent.scroll(screen.getByTestId('message-scroll'))
+
+    expect(mockHandleUnreadScroll).toHaveBeenCalled()
+    expect(mockUseMessages().loadOlderMessages).not.toHaveBeenCalled()
+  })
+
+  it('keeps only the latest group chat window mounted while preserving loaded count metadata', async () => {
+    const manyMessages = Array.from({ length: 110 }, (_, index) => makeMessage(index))
+    mockUseMessages.mockReturnValue({
+      messages: manyMessages,
+      loading: false,
+      editMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      togglePin: jest.fn(),
+      toggleReaction: jest.fn(),
+      loadOlderMessages: jest.fn(),
+      loadingMore: false,
+      hasMore: false,
     })
 
     render(<MessageList />)
-    mockScrollToBottom.mockClear()
 
-    act(() => {
-      listeners.resize?.forEach(listener => listener(new Event('resize')))
+    await waitFor(() => {
+      expect(screen.queryByText('Message 0')).not.toBeInTheDocument()
+    })
+    expect(screen.getByText('Message 109')).toBeInTheDocument()
+    expect(screen.getByTestId('message-scroll')).toHaveAttribute('data-loaded-count', '110')
+    expect(screen.getByTestId('message-scroll')).toHaveAttribute('data-rendered-count', '90')
+  })
+
+  it('throttles top-of-history requests when the loader remains visible', async () => {
+    const loadOlderMessages = jest.fn().mockResolvedValue(undefined)
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1_000)
+    const originalIntersectionObserver = window.IntersectionObserver
+    Object.defineProperty(window, 'IntersectionObserver', {
+      configurable: true,
+      value: undefined,
+    })
+    window.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+      return window.setTimeout(() => callback(0), 0)
+    }) as typeof window.requestAnimationFrame
+    window.cancelAnimationFrame = ((id: number) => {
+      window.clearTimeout(id)
+    }) as typeof window.cancelAnimationFrame
+    mockUseMessages.mockReturnValue({
+      messages: [message],
+      loading: false,
+      editMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      togglePin: jest.fn(),
+      toggleReaction: jest.fn(),
+      loadOlderMessages,
+      loadingMore: false,
+      hasMore: true,
     })
 
-    expect(mockScrollToBottom).toHaveBeenCalledWith('auto')
+    try {
+      render(<MessageList />)
+      const scrollContainer = screen.getByTestId('message-scroll')
+      Object.defineProperties(scrollContainer, {
+        scrollTop: { configurable: true, value: 0, writable: true },
+        scrollHeight: { configurable: true, value: 1200 },
+        clientHeight: { configurable: true, value: 600 },
+      })
 
-    mockScrollToBottom.mockClear()
+      fireEvent.scroll(scrollContainer)
+      await waitFor(() => expect(loadOlderMessages).toHaveBeenCalledTimes(1))
+      await Promise.resolve()
+      await Promise.resolve()
 
-    act(() => {
-      window.dispatchEvent(new Event('focusin'))
-    })
+      fireEvent.scroll(scrollContainer)
+      await new Promise(resolve => window.setTimeout(resolve, 0))
+      expect(loadOlderMessages).toHaveBeenCalledTimes(1)
 
-    expect(mockScrollToBottom).toHaveBeenCalledWith('auto')
+      nowSpy.mockReturnValue(3_000)
+      fireEvent.scroll(scrollContainer)
+      await waitFor(() => expect(loadOlderMessages).toHaveBeenCalledTimes(2))
+    } finally {
+      nowSpy.mockRestore()
+      Object.defineProperty(window, 'IntersectionObserver', {
+        configurable: true,
+        value: originalIntersectionObserver,
+      })
+    }
   })
 })

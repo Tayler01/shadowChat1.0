@@ -40,6 +40,8 @@ const LinkPreviewCard: React.FC<{ preview: LinkPreview }> = ({ preview }) => {
           <img
             src={preview.image}
             alt={preview.title ? `${preview.title} preview image` : `${host} preview image`}
+            width={1200}
+            height={630}
             loading="lazy"
             decoding="async"
             className="h-full w-full object-cover"

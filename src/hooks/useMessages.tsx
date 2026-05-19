@@ -426,12 +426,14 @@ function useProvideMessages(): MessagesContextValue {
       if (data && data.length > 0) {
         const newMessages = (data as unknown as Message[]).reverse();
         loadedOlderRef.current = true;
-        setMessages(prev => {
-          const pinned = prev.filter(m => m.pinned);
-          const rest = prev.filter(m => !m.pinned);
-          return sortMessagesByCreatedAt(dedupeMessagesById([...pinned, ...newMessages, ...rest]));
+        React.startTransition(() => {
+          setMessages(prev => {
+            const pinned = prev.filter(m => m.pinned);
+            const rest = prev.filter(m => !m.pinned);
+            return sortMessagesByCreatedAt(dedupeMessagesById([...pinned, ...newMessages, ...rest]));
+          });
+          setHasMore(data.length === MESSAGE_FETCH_LIMIT);
         });
-        setHasMore(data.length === MESSAGE_FETCH_LIMIT);
       } else {
         setHasMore(false);
       }

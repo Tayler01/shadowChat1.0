@@ -60,6 +60,9 @@ export function useUnreadScroll<TMessage>({
   const lastMarkedKeyRef = useRef<string | null>(null)
   const readInFlightKeyRef = useRef<string | null>(null)
   const markTimerRef = useRef<number | null>(null)
+  const followFrameRef = useRef<number | null>(null)
+  const followSettleFrameRef = useRef<number | null>(null)
+  const followTimerRef = useRef<number | null>(null)
   const messagesRef = useRef(messages)
   messagesRef.current = messages
   const messageCount = messages.length
@@ -69,8 +72,29 @@ export function useUnreadScroll<TMessage>({
     : `${surfaceKey}:empty`
 
   const setAutoScroll = useCallback((value: boolean) => {
+    if (autoScrollRef.current === value) {
+      return
+    }
+
     autoScrollRef.current = value
     setAutoScrollState(value)
+  }, [])
+
+  const cancelFollowLatest = useCallback(() => {
+    if (followFrameRef.current !== null) {
+      cancelAnimationFrame(followFrameRef.current)
+      followFrameRef.current = null
+    }
+
+    if (followSettleFrameRef.current !== null) {
+      cancelAnimationFrame(followSettleFrameRef.current)
+      followSettleFrameRef.current = null
+    }
+
+    if (followTimerRef.current !== null) {
+      window.clearTimeout(followTimerRef.current)
+      followTimerRef.current = null
+    }
   }, [])
 
   const findFirstUnreadMessage = useCallback(() => {
@@ -149,6 +173,33 @@ export function useUnreadScroll<TMessage>({
     scheduleMarkLatestRead(true)
   }, [containerRef, scheduleMarkLatestRead, setAutoScroll])
 
+  const followLatest = useCallback(() => {
+    if (!autoScrollRef.current) return
+
+    cancelFollowLatest()
+
+    followFrameRef.current = requestAnimationFrame(() => {
+      followFrameRef.current = null
+      if (!autoScrollRef.current) return
+
+      scrollToBottom('auto')
+
+      followSettleFrameRef.current = requestAnimationFrame(() => {
+        followSettleFrameRef.current = null
+        if (autoScrollRef.current) {
+          scrollToBottom('auto')
+        }
+      })
+
+      followTimerRef.current = window.setTimeout(() => {
+        followTimerRef.current = null
+        if (autoScrollRef.current) {
+          scrollToBottom('auto')
+        }
+      }, 140)
+    })
+  }, [cancelFollowLatest, scrollToBottom])
+
   const handleScroll = useCallback(() => {
     const container = containerRef.current
     if (!container) return false
@@ -177,8 +228,9 @@ export function useUnreadScroll<TMessage>({
       if (markTimerRef.current) {
         window.clearTimeout(markTimerRef.current)
       }
+      cancelFollowLatest()
     }
-  }, [])
+  }, [cancelFollowLatest])
 
   useEffect(() => {
     const container = containerRef.current
@@ -191,35 +243,27 @@ export function useUnreadScroll<TMessage>({
       return
     }
 
-    let frameId: number | null = null
-    const followLatest = () => {
-      if (!autoScrollRef.current) return
-
-      if (frameId !== null) {
-        cancelAnimationFrame(frameId)
-      }
-
-      frameId = requestAnimationFrame(() => {
-        frameId = null
-        if (autoScrollRef.current) {
-          scrollToBottom('auto')
-        }
-      })
-    }
-
     const observer = new ResizeObserver(followLatest)
     observer.observe(container)
     if (container.firstElementChild instanceof Element) {
       observer.observe(container.firstElementChild)
     }
 
+    followLatest()
+    window.visualViewport?.addEventListener('resize', followLatest)
+    window.visualViewport?.addEventListener('scroll', followLatest)
+    window.addEventListener('resize', followLatest)
+    window.addEventListener('focusin', followLatest)
+
     return () => {
       observer.disconnect()
-      if (frameId !== null) {
-        cancelAnimationFrame(frameId)
-      }
+      window.visualViewport?.removeEventListener('resize', followLatest)
+      window.visualViewport?.removeEventListener('scroll', followLatest)
+      window.removeEventListener('resize', followLatest)
+      window.removeEventListener('focusin', followLatest)
+      cancelFollowLatest()
     }
-  }, [containerRef, enabled, latestMessageKey, loading, scrollToBottom])
+  }, [cancelFollowLatest, containerRef, enabled, followLatest, latestMessageKey, loading])
 
   useLayoutEffect(() => {
     if (

@@ -77,8 +77,8 @@ test('renders image message', () => {
   expect(img).toHaveAttribute('src', baseMessage.file_url)
   expect(img).toHaveClass('h-auto', 'max-w-[min(20rem,100%)]')
   expect(img).not.toHaveClass('aspect-[4/3]')
-  expect(img).not.toHaveAttribute('width')
-  expect(img).not.toHaveAttribute('height')
+  expect(img).toHaveAttribute('width', '720')
+  expect(img).toHaveAttribute('height', '720')
 })
 
 test('opens uploaded images in a top-level mobile-safe viewer', async () => {

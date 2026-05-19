@@ -32,6 +32,7 @@
     "bridge:bundle:pack": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-bridge-bundle.ps1",
     "bridge:tui:test": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-bridge-tui-layout.ps1",
     "qa:smoke:full:headed": "node scripts/playwright-smoke.mjs --scenario=full --headed",
+    "qa:chat-scroll": "node scripts/group-chat-scroll-probe.mjs",
     "qa:mobile-pwa": "node scripts/mobile-pwa-visual-qa.mjs",
     "qa:themes": "node scripts/theme-visual-qa.mjs",
     "shadow-pin:backfill-media": "node scripts/shadow-pin-backfill-media.mjs",

@@ -230,10 +230,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
 
     return (
       <>
-        <motion.div
+        <div
           id={`message-${message.id}`}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
           className="group relative ml-2 min-w-0 py-1"
         >
         {!isGrouped && (
@@ -381,6 +379,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     <img
                       src={imageMessageSrc}
                       alt="uploaded image"
+                      width={720}
+                      height={720}
                       loading="lazy"
                       decoding="async"
                       draggable={false}
@@ -446,7 +446,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
             </>
           )}
         </div>
-        </motion.div>
+        </div>
         <ImageModal
           open={showImageModal}
           src={message.file_url || ''}
