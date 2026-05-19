@@ -633,6 +633,7 @@ describe('DirectMessagesView user search', () => {
     );
     expect(screen.getByTestId('dm-message-stack')).toHaveClass('min-h-full', 'justify-end');
     expect(screen.getByText('hello from a sparse thread')).toBeInTheDocument();
+    expect(document.getElementById('dm-message-m1')).not.toHaveClass('[content-visibility:auto]');
   });
 
   test('mobile stale selected conversation stays recoverable after resume', async () => {

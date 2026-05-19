@@ -183,11 +183,11 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
   ]
 
   return (
-    <motion.div
+    <div
       id={`dm-message-${message.id}`}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`group flex [content-visibility:auto] [contain-intrinsic-size:0_88px] ${isOwn ? 'justify-end' : 'justify-start'} ${isGrouped ? 'mt-1' : 'mt-4'}`}
+      data-dm-message-row="true"
+      data-message-id={message.id}
+      className={`group flex ${isOwn ? 'justify-end' : 'justify-start'} ${isGrouped ? 'mt-1' : 'mt-4'}`}
     >
       <div
         className={`relative ${
@@ -332,7 +332,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
         alt="uploaded image"
         onClose={() => setShowImageModal(false)}
       />
-    </motion.div>
+    </div>
   )
 })
 
