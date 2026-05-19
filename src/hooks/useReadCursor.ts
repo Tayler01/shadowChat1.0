@@ -18,6 +18,14 @@ type RefreshOptions = {
   silent?: boolean
 }
 
+const readCursorCache = new Map<string, UserReadCursor | null>()
+
+const getReadCursorCacheKey = (
+  userId: string,
+  surface: ReadSurface,
+  scopeId: string
+) => `${userId}:${surface}:${scopeId}`
+
 export function useReadCursor(
   surface: ReadSurface,
   scopeId?: string | null,
@@ -25,14 +33,18 @@ export function useReadCursor(
 ) {
   const { user } = useAuth()
   const normalizedScopeId = useMemo(() => normalizeScopeId(scopeId), [scopeId])
-  const [cursor, setCursor] = useState<UserReadCursor | null>(null)
-  const [loading, setLoading] = useState(true)
+  const cacheKey = enabled && user?.id
+    ? getReadCursorCacheKey(user.id, surface, normalizedScopeId)
+    : null
+  const cachedCursor = cacheKey ? readCursorCache.get(cacheKey) : undefined
+  const [cursor, setCursor] = useState<UserReadCursor | null>(() => cachedCursor ?? null)
+  const [loading, setLoading] = useState(() => Boolean(cacheKey && cachedCursor === undefined))
   const channelRef = useRef<RealtimeChannel | null>(null)
   const subscribeRef = useRef<(() => Promise<RealtimeChannel | null>) | null>(null)
-  const hasLoadedRef = useRef(false)
+  const hasLoadedRef = useRef(cachedCursor !== undefined)
 
   const refresh = useCallback(async (options: RefreshOptions = {}) => {
-    if (!enabled || !user) {
+    if (!enabled || !user || !cacheKey) {
       setCursor(null)
       hasLoadedRef.current = true
       setLoading(false)
@@ -46,6 +58,7 @@ export function useReadCursor(
 
     try {
       const nextCursor = await fetchUserReadCursor(surface, normalizedScopeId)
+      readCursorCache.set(cacheKey, nextCursor)
       setCursor(nextCursor)
       return nextCursor
     } catch {
@@ -55,10 +68,31 @@ export function useReadCursor(
       hasLoadedRef.current = true
       setLoading(false)
     }
-  }, [enabled, normalizedScopeId, surface, user])
+  }, [cacheKey, enabled, normalizedScopeId, surface, user])
 
   useEffect(() => {
-    void refresh()
+    if (!cacheKey) {
+      setCursor(null)
+      hasLoadedRef.current = true
+      setLoading(false)
+      return
+    }
+
+    const nextCachedCursor = readCursorCache.get(cacheKey)
+    if (nextCachedCursor !== undefined) {
+      setCursor(nextCachedCursor)
+      hasLoadedRef.current = true
+      setLoading(false)
+      return
+    }
+
+    setCursor(null)
+    hasLoadedRef.current = false
+    setLoading(true)
+  }, [cacheKey])
+
+  useEffect(() => {
+    void refresh({ silent: hasLoadedRef.current })
   }, [refresh])
 
   const resetCursorChannel = useCallback(async () => {
@@ -110,7 +144,11 @@ export function useReadCursor(
             if (!row || row.surface !== surface || row.scope_id !== normalizedScopeId) {
               return
             }
-            setCursor(payload.eventType === 'DELETE' ? null : (payload.new as UserReadCursor))
+            const nextCursor = payload.eventType === 'DELETE' ? null : (payload.new as UserReadCursor)
+            if (cacheKey) {
+              readCursorCache.set(cacheKey, nextCursor)
+            }
+            setCursor(nextCursor)
           }
         )
         .subscribe((status: string) => {
@@ -133,10 +171,10 @@ export function useReadCursor(
       }
       channelRef.current = null
     }
-  }, [enabled, normalizedScopeId, surface, user])
+  }, [cacheKey, enabled, normalizedScopeId, surface, user])
 
   const markRead = useCallback(async (messageId: string | null, messageCreatedAt?: string | null) => {
-    if (!enabled || !user) return null
+    if (!enabled || !user || !cacheKey) return null
 
     const nextCursor = await setUserReadCursor(
       surface,
@@ -144,9 +182,10 @@ export function useReadCursor(
       messageId,
       messageCreatedAt
     )
+    readCursorCache.set(cacheKey, nextCursor)
     setCursor(nextCursor)
     return nextCursor
-  }, [enabled, normalizedScopeId, surface, user])
+  }, [cacheKey, enabled, normalizedScopeId, surface, user])
 
   return {
     cursor,

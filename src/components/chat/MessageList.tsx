@@ -285,7 +285,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     }
   }, [autoScroll, scrollToBottom, typingUsers.length])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (combinedMessages.length === 0) {
       setRenderWindowStart(0)
       return
@@ -314,7 +314,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     }
   }, [autoScroll, combinedMessages, firstUnreadMessageId, initialMessageId])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const maxStart = Math.max(0, combinedMessages.length - 1)
     setRenderWindowStart(current => Math.min(Math.max(0, current), maxStart))
   }, [combinedMessages.length])

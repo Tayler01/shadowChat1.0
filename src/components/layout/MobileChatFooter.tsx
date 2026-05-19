@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react'
+import React, { useLayoutEffect, useRef } from 'react'
 import { MobileNav } from './MobileNav'
 import type { AppView } from '../../types/navigation'
 
@@ -35,7 +35,7 @@ export function MobileChatFooter({
       : 'var(--shadowchat-keyboard-inset,0px)',
   } as React.CSSProperties
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const root = document.documentElement
 
     const updateFooterHeight = () => {
@@ -61,7 +61,6 @@ export function MobileChatFooter({
       observer?.disconnect()
       window.removeEventListener('resize', updateFooterHeight)
       window.visualViewport?.removeEventListener('resize', updateFooterHeight)
-      root.style.removeProperty('--shadowchat-mobile-chat-footer-height')
     }
   }, [])
 

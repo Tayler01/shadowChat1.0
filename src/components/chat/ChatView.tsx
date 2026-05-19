@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useCallback } from 'react'
-import { motion } from 'framer-motion'
 import { useMessages } from '../../hooks/useMessages'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
@@ -77,11 +76,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="theme-app-surface flex h-full min-h-0 flex-col text-sm"
-    >
+    <div className="theme-app-surface flex h-full min-h-0 flex-col text-sm">
       <MobileAppHeader
         currentView={currentView}
         onViewChange={onViewChange}
@@ -137,6 +132,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
           enableGifPicker
         />
       </MobileChatFooter>
-    </motion.div>
+    </div>
   )
 }

@@ -281,9 +281,7 @@ export function useUnreadScroll<TMessage>({
     const firstUnread = findFirstUnreadMessage()
 
     if (!firstUnread) {
-      requestAnimationFrame(() => {
-        scrollToBottom('auto')
-      })
+      scrollToBottom('auto')
       return
     }
 
