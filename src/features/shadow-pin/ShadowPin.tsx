@@ -1,4 +1,5 @@
-import { CSSProperties, FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { CSSProperties, FormEvent, PointerEvent as ReactPointerEvent } from 'react'
 import {
   Edit3,
   Heart,
@@ -7,10 +8,12 @@ import {
   Loader2,
   Pin,
   Plus,
+  Share2,
   Trash2,
   Upload,
   X,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Avatar } from '../../components/ui/Avatar'
 import { Button } from '../../components/ui/Button'
@@ -109,6 +112,81 @@ const getImageAspectRatio = (item: { image_width?: number | null; image_height?:
   item.image_width && item.image_height ? `${item.image_width} / ${item.image_height}` : undefined
 
 const isProcessingMedia = (status?: string | null) => status === 'pending' || status === 'processing'
+
+type PinQuickAction = 'heart' | 'share' | 'open'
+
+const PIN_ACTION_LONG_PRESS_MS = 440
+const PIN_ACTION_MOVE_CANCEL_PX = 14
+const PIN_ACTION_SELECT_RADIUS_PX = 48
+const PIN_ACTIONS: Array<{
+  id: PinQuickAction
+  label: string
+  x: number
+  y: number
+  icon: LucideIcon
+}> = [
+  { id: 'heart', label: 'Heart', x: -70, y: -74, icon: Heart },
+  { id: 'share', label: 'Share', x: 0, y: -96, icon: Share2 },
+  { id: 'open', label: 'Open', x: 70, y: -74, icon: Pin },
+]
+
+const getNearestPinAction = (deltaX: number, deltaY: number): PinQuickAction | null => {
+  let nearestId: PinQuickAction | null = null
+  let nearestDistance = Infinity
+
+  for (const action of PIN_ACTIONS) {
+    const distance = Math.hypot(deltaX - action.x, deltaY - action.y)
+    if (distance < nearestDistance) {
+      nearestId = action.id
+      nearestDistance = distance
+    }
+  }
+
+  return nearestId && (nearestDistance <= PIN_ACTION_SELECT_RADIUS_PX || deltaY < -52)
+    ? nearestId
+    : null
+}
+
+const getShareUrl = (image: ShadowPinImage) => image.image_url || getPinImageUrl(image, 'full')
+
+const finitePointerCoordinate = (value: number) => Number.isFinite(value) ? value : 0
+
+const isAbortError = (error: unknown) =>
+  typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError'
+
+const copyShadowPinImageLink = async (url: string) => {
+  if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
+    toast.error('Image link is not available to copy')
+    return
+  }
+
+  await navigator.clipboard.writeText(url)
+  toast.success('Image link copied')
+}
+
+const shareShadowPinImage = async (image: ShadowPinImage) => {
+  const url = getShareUrl(image)
+  const shareData = {
+    title: image.title,
+    text: image.description || 'ShadowPin image',
+    url,
+  }
+
+  if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+    try {
+      await navigator.share(shareData)
+      return
+    } catch (error) {
+      if (isAbortError(error)) return
+    }
+  }
+
+  try {
+    await copyShadowPinImageLink(url)
+  } catch {
+    toast.error('Image link could not be copied')
+  }
+}
 
 const getShadowPinMasonryColumnCount = () => {
   if (typeof window === 'undefined') return 2
@@ -624,6 +702,107 @@ function CategoryDetailsModal({
   )
 }
 
+type PinRadialState = {
+  open: boolean
+  originX: number
+  originY: number
+  selected: PinQuickAction | null
+}
+
+type PinActionFeedbackState = {
+  key: number
+  action: PinQuickAction
+}
+
+const EMPTY_PIN_RADIAL_STATE: PinRadialState = {
+  open: false,
+  originX: 0,
+  originY: 0,
+  selected: null,
+}
+
+function PinActionRadialMenu({
+  state,
+  hearted,
+}: {
+  state: PinRadialState
+  hearted?: boolean
+}) {
+  if (!state.open) return null
+
+  return (
+    <div
+      className="shadow-pin-radial-menu"
+      style={{ left: state.originX, top: state.originY }}
+      data-testid="shadow-pin-radial-menu"
+      data-selected-action={state.selected || ''}
+      aria-hidden="true"
+    >
+      <span className="shadow-pin-radial-thumb-dot" />
+      {PIN_ACTIONS.map(action => {
+        const Icon = action.icon
+        const selected = state.selected === action.id
+        const label = action.id === 'heart' && hearted ? 'Unlike' : action.label
+
+        return (
+          <span
+            key={action.id}
+            className={`shadow-pin-radial-action${selected ? ' shadow-pin-radial-action--selected' : ''}`}
+            style={{
+              '--shadow-pin-radial-offset-x': `${action.x}px`,
+              '--shadow-pin-radial-offset-y': `${action.y}px`,
+            } as CSSProperties}
+            data-testid={`shadow-pin-radial-action-${action.id}`}
+            data-action={action.id}
+          >
+            <Icon className={cn('h-5 w-5', action.id === 'heart' && hearted && 'fill-current')} />
+            <span className="sr-only">{label}</span>
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
+function PinActionFeedback({ feedback }: { feedback: PinActionFeedbackState | null }) {
+  if (!feedback) return null
+
+  const Icon = feedback.action === 'share'
+    ? Share2
+    : feedback.action === 'open'
+      ? Pin
+      : Heart
+
+  return (
+    <span
+      key={feedback.key}
+      className={`shadow-pin-action-feedback shadow-pin-action-feedback--${feedback.action}`}
+      data-testid="shadow-pin-action-feedback"
+      data-action={feedback.action}
+      aria-hidden="true"
+    >
+      <span className="shadow-pin-action-wash" data-testid="shadow-pin-action-wash" />
+      {feedback.action === 'heart' && (
+        <span className="shadow-pin-action-heart-burst" data-testid="shadow-pin-action-heart-burst">
+          <span className="shadow-pin-action-heart-core">{'\u2764\uFE0F'}</span>
+          {HEART_BURST_PARTICLES.slice(0, 6).map((particle, index) => (
+            <span
+              key={`${particle.x}-${particle.y}-${index}`}
+              className="shadow-pin-action-heart-particle"
+              style={getHeartBurstParticleStyle(particle)}
+            >
+              {'\u2764\uFE0F'}
+            </span>
+          ))}
+        </span>
+      )}
+      <span className="shadow-pin-action-confirm">
+        <Icon className={cn('h-5 w-5', feedback.action === 'heart' && 'fill-current')} />
+      </span>
+    </span>
+  )
+}
+
 function ImageCard({
   image,
   canManageImage,
@@ -641,10 +820,23 @@ function ImageCard({
   onEdit: () => void
   onHeart: () => void
 }) {
+  const cardRef = useRef<HTMLElement | null>(null)
   const clickTimer = useRef<number | null>(null)
-  const { didLongPress, ...longPressHandlers } = useLongPress(canManageImage ? onEdit : onViewer)
+  const pressRef = useRef<{
+    timerId: number | null
+    pointerId: number
+    startClientX: number
+    startClientY: number
+    active: boolean
+  } | null>(null)
+  const pressConsumedRef = useRef(false)
+  const pressConsumedTimerRef = useRef<number | null>(null)
+  const feedbackKeyRef = useRef(0)
+  const feedbackTimerRef = useRef<number | null>(null)
   const imageSources = useMemo(() => getPinImageSources(image, 'thumb'), [image])
   const [sourceIndex, setSourceIndex] = useState(0)
+  const [radialState, setRadialState] = useState<PinRadialState>(EMPTY_PIN_RADIAL_STATE)
+  const [feedback, setFeedback] = useState<PinActionFeedbackState | null>(null)
   const imageSrc = imageSources[sourceIndex] || image.image_url
   const aspectRatio = getImageAspectRatio(image) || '4 / 5'
 
@@ -652,8 +844,187 @@ function ImageCard({
     setSourceIndex(0)
   }, [image.id, image.thumbnail_url, image.medium_url, image.image_url])
 
+  useEffect(() => () => {
+    if (clickTimer.current) window.clearTimeout(clickTimer.current)
+    if (pressRef.current?.timerId) window.clearTimeout(pressRef.current.timerId)
+    if (pressConsumedTimerRef.current) window.clearTimeout(pressConsumedTimerRef.current)
+    if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current)
+  }, [])
+
+  const resetPressConsumed = () => {
+    pressConsumedRef.current = false
+    if (pressConsumedTimerRef.current) {
+      window.clearTimeout(pressConsumedTimerRef.current)
+      pressConsumedTimerRef.current = null
+    }
+  }
+
+  const markPressConsumed = () => {
+    pressConsumedRef.current = true
+    if (pressConsumedTimerRef.current) window.clearTimeout(pressConsumedTimerRef.current)
+    pressConsumedTimerRef.current = window.setTimeout(() => {
+      pressConsumedRef.current = false
+      pressConsumedTimerRef.current = null
+    }, 420)
+  }
+
+  const clearPressTimer = () => {
+    if (pressRef.current?.timerId) {
+      window.clearTimeout(pressRef.current.timerId)
+      pressRef.current.timerId = null
+    }
+  }
+
+  const clearPress = () => {
+    clearPressTimer()
+    pressRef.current = null
+  }
+
+  const releasePointerCapture = (event: ReactPointerEvent<HTMLElement>) => {
+    const target = event.currentTarget
+    const pointerId = event.pointerId
+    if (typeof target.hasPointerCapture === 'function' && target.hasPointerCapture(pointerId)) {
+      target.releasePointerCapture(pointerId)
+    }
+  }
+
+  const showFeedback = (action: PinQuickAction) => {
+    feedbackKeyRef.current += 1
+    setFeedback({ action, key: feedbackKeyRef.current })
+    if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current)
+    feedbackTimerRef.current = window.setTimeout(() => {
+      setFeedback(null)
+      feedbackTimerRef.current = null
+    }, 900)
+  }
+
+  const runQuickAction = async (action: PinQuickAction) => {
+    showFeedback(action)
+
+    if (action === 'heart') {
+      onHeart()
+      return
+    }
+
+    if (action === 'share') {
+      await shareShadowPinImage(image)
+      return
+    }
+
+    window.setTimeout(onViewer, 90)
+  }
+
+  const handlePointerDown = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.isPrimary === false) return
+    if (typeof event.button === 'number' && event.button !== 0) return
+
+    const target = event.target
+    if (target instanceof Element && target.closest('button, a, input, textarea, select, [role="button"]')) {
+      return
+    }
+
+    if (clickTimer.current) {
+      window.clearTimeout(clickTimer.current)
+      clickTimer.current = null
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect()
+    const pointerId = event.pointerId
+    const startClientX = finitePointerCoordinate(event.clientX)
+    const startClientY = finitePointerCoordinate(event.clientY)
+    const originX = startClientX - finitePointerCoordinate(rect.left)
+    const originY = startClientY - finitePointerCoordinate(rect.top)
+    const captureTarget = event.currentTarget
+
+    clearPress()
+    pressRef.current = {
+      timerId: window.setTimeout(() => {
+        if (!pressRef.current || pressRef.current.pointerId !== pointerId) return
+
+        pressRef.current.active = true
+        markPressConsumed()
+
+        if (typeof captureTarget.setPointerCapture === 'function') {
+          try {
+            captureTarget.setPointerCapture(pointerId)
+          } catch {
+            // Some test/mobile browser paths can reject capture if the pointer has already ended.
+          }
+        }
+
+        setRadialState({
+          open: true,
+          originX,
+          originY,
+          selected: null,
+        })
+      }, PIN_ACTION_LONG_PRESS_MS),
+      pointerId,
+      startClientX,
+      startClientY,
+      active: false,
+    }
+  }
+
+  const handlePointerMove = (event: ReactPointerEvent<HTMLElement>) => {
+    const press = pressRef.current
+    if (!press || press.pointerId !== event.pointerId) return
+
+    const deltaX = finitePointerCoordinate(event.clientX) - press.startClientX
+    const deltaY = finitePointerCoordinate(event.clientY) - press.startClientY
+
+    if (!press.active) {
+      if (Math.hypot(deltaX, deltaY) > PIN_ACTION_MOVE_CANCEL_PX) {
+        clearPress()
+      }
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+
+    const selected = getNearestPinAction(deltaX, deltaY)
+    setRadialState(state => state.open ? { ...state, selected } : state)
+  }
+
+  const handlePointerUp = (event: ReactPointerEvent<HTMLElement>) => {
+    const press = pressRef.current
+    if (!press || press.pointerId !== event.pointerId) return
+
+    const wasActive = press.active
+    const selected = wasActive
+      ? getNearestPinAction(
+        finitePointerCoordinate(event.clientX) - press.startClientX,
+        finitePointerCoordinate(event.clientY) - press.startClientY
+      ) || radialState.selected
+      : null
+
+    clearPress()
+    releasePointerCapture(event)
+
+    if (!wasActive) return
+
+    event.preventDefault()
+    event.stopPropagation()
+    setRadialState(EMPTY_PIN_RADIAL_STATE)
+
+    if (selected) {
+      void runQuickAction(selected)
+    }
+  }
+
+  const handlePointerCancel = (event: ReactPointerEvent<HTMLElement>) => {
+    clearPress()
+    releasePointerCapture(event)
+    setRadialState(EMPTY_PIN_RADIAL_STATE)
+  }
+
   const handleClick = () => {
-    if (didLongPress()) return
+    if (pressConsumedRef.current) {
+      resetPressConsumed()
+      return
+    }
+
     if (clickTimer.current) {
       window.clearTimeout(clickTimer.current)
       clickTimer.current = null
@@ -668,10 +1039,14 @@ function ImageCard({
 
   return (
     <article
-      className="block w-full overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(5,6,8,0.62)] shadow-[var(--shadow-panel)]"
+      ref={cardRef}
+      className={`shadow-pin-action-card block w-full overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(5,6,8,0.62)] shadow-[var(--shadow-panel)]${radialState.open ? ' shadow-pin-action-card--active' : ''}`}
       onClick={handleClick}
       onContextMenu={event => event.preventDefault()}
-      {...longPressHandlers}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
     >
       <div className="relative overflow-hidden" style={{ aspectRatio }}>
         <img
@@ -679,11 +1054,16 @@ function ImageCard({
           alt={image.title}
           loading="lazy"
           decoding="async"
+          draggable={false}
+          onContextMenu={event => event.preventDefault()}
+          onDragStart={event => event.preventDefault()}
           onError={() => {
             setSourceIndex(index => Math.min(index + 1, imageSources.length - 1))
           }}
           className="block h-full w-full object-cover"
         />
+        <PinActionFeedback feedback={feedback} />
+        <PinActionRadialMenu state={radialState} hearted={image.viewer_has_hearted} />
         {isProcessingMedia(image.processing_status) && (
           <div className="absolute inset-x-2 bottom-2 inline-flex items-center justify-center gap-2 rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(4,5,6,0.78)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] backdrop-blur-md">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--theme-accent-readable)]" />

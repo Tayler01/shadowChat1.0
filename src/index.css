@@ -752,6 +752,196 @@ html, body, #root {
   background: var(--theme-app-background);
 }
 
+.shadow-pin-action-card {
+  position: relative;
+  isolation: isolate;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  transition:
+    transform var(--dur-fast) var(--ease-premium),
+    box-shadow var(--dur-fast) var(--ease-premium),
+    border-color var(--dur-fast) var(--ease-premium);
+}
+
+.shadow-pin-action-card img {
+  pointer-events: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  -webkit-user-select: none;
+}
+
+.shadow-pin-action-card--active {
+  z-index: 4;
+  border-color: rgba(var(--theme-accent-strong-rgb), 0.48);
+  box-shadow:
+    0 24px 58px rgba(0, 0, 0, 0.36),
+    0 0 0 1px rgba(255, 77, 95, 0.16),
+    0 0 30px rgba(var(--theme-accent-strong-rgb), 0.16);
+  transform: translate3d(0, -0.35rem, 0) rotate(2.2deg) scale(1.025);
+}
+
+.shadow-pin-radial-menu {
+  pointer-events: none;
+  position: absolute;
+  z-index: 46;
+  height: 0;
+  width: 0;
+  filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.38));
+}
+
+.shadow-pin-radial-thumb-dot {
+  position: absolute;
+  height: 2.75rem;
+  width: 2.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.18), transparent 58%),
+    rgba(4, 5, 6, 0.34);
+  opacity: 0.88;
+  transform: translate(-50%, -50%) scale(0.96);
+  animation: shadow-pin-radial-thumb 180ms var(--ease-premium) both;
+}
+
+.shadow-pin-radial-action {
+  --shadow-pin-radial-offset-x: 0px;
+  --shadow-pin-radial-offset-y: 0px;
+  align-items: center;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.18), transparent 48%),
+    linear-gradient(180deg, rgba(27, 24, 18, 0.94), rgba(7, 8, 10, 0.94));
+  border: 1px solid rgba(var(--theme-accent-strong-rgb), 0.26);
+  border-radius: 999px;
+  color: var(--text-primary);
+  display: inline-flex;
+  height: 3.25rem;
+  justify-content: center;
+  left: 0;
+  position: absolute;
+  top: 0;
+  transform:
+    translate(
+      calc(-50% + var(--shadow-pin-radial-offset-x)),
+      calc(-50% + var(--shadow-pin-radial-offset-y))
+    )
+    scale(0.86);
+  transition:
+    background var(--dur-fast) var(--ease-premium),
+    border-color var(--dur-fast) var(--ease-premium),
+    color var(--dur-fast) var(--ease-premium),
+    transform var(--dur-fast) var(--ease-premium);
+  width: 3.25rem;
+  animation: shadow-pin-radial-pop 180ms var(--ease-premium) both;
+}
+
+.shadow-pin-radial-action--selected {
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.28), transparent 45%),
+    linear-gradient(180deg, rgba(255, 77, 95, 0.92), rgba(var(--theme-accent-strong-rgb), 0.88));
+  border-color: rgba(255, 255, 255, 0.42);
+  color: #fff9f9;
+  transform:
+    translate(
+      calc(-50% + var(--shadow-pin-radial-offset-x)),
+      calc(-50% + var(--shadow-pin-radial-offset-y))
+    )
+    scale(1.12);
+}
+
+.shadow-pin-action-feedback {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 34;
+  overflow: hidden;
+}
+
+.shadow-pin-action-wash {
+  position: absolute;
+  inset: -8%;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(255, 77, 95, 0.34), transparent 58%),
+    linear-gradient(
+      110deg,
+      transparent 0%,
+      rgba(255, 77, 95, 0.56) 38%,
+      rgba(245, 207, 116, 0.42) 54%,
+      rgba(var(--theme-accent-strong-rgb), 0.26) 72%,
+      transparent 100%
+    );
+  mix-blend-mode: normal;
+  opacity: 0;
+  transform: translateX(-42%) skewX(-12deg);
+  animation: shadow-pin-action-wash 980ms var(--ease-premium) both;
+}
+
+.shadow-pin-action-feedback--share .shadow-pin-action-wash,
+.shadow-pin-action-feedback--open .shadow-pin-action-wash {
+  background:
+    radial-gradient(circle at 50% 48%, rgba(var(--theme-accent-strong-rgb), 0.28), transparent 58%),
+    linear-gradient(110deg, transparent 0%, rgba(var(--theme-accent-strong-rgb), 0.42) 45%, rgba(255, 255, 255, 0.18) 70%, transparent 100%);
+}
+
+.shadow-pin-action-feedback--heart {
+  background:
+    radial-gradient(circle at 50% 48%, rgba(255, 77, 95, 0.36), transparent 54%),
+    linear-gradient(180deg, rgba(255, 77, 95, 0.22), rgba(245, 207, 116, 0.14)),
+    rgba(255, 77, 95, 0.14);
+  animation: shadow-pin-heart-field 900ms var(--ease-premium) both;
+}
+
+.shadow-pin-action-confirm {
+  align-items: center;
+  background:
+    radial-gradient(circle at 50% 12%, rgba(255, 255, 255, 0.24), transparent 54%),
+    rgba(5, 6, 8, 0.64);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  color: #fff8f8;
+  display: inline-flex;
+  height: 3.35rem;
+  justify-content: center;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.74);
+  width: 3.35rem;
+  animation: shadow-pin-action-confirm 640ms var(--ease-premium) both;
+}
+
+.shadow-pin-action-heart-burst {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  z-index: 2;
+  height: 0;
+  width: 0;
+}
+
+.shadow-pin-action-heart-core {
+  position: absolute;
+  color: #ff5e76;
+  filter: drop-shadow(0 0 18px rgba(255, 77, 95, 0.82));
+  font-size: 1.7rem;
+  line-height: 1;
+  transform: translate(-50%, -50%) scale(0.5);
+  animation: shadow-pin-heart-core 680ms var(--ease-premium) both;
+}
+
+.shadow-pin-action-heart-particle {
+  position: absolute;
+  color: #ff5e76;
+  filter: drop-shadow(0 0 10px rgba(255, 77, 95, 0.72));
+  font-size: 0.88rem;
+  line-height: 1;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.22);
+  animation: shadow-pin-heart-particle 760ms var(--ease-premium) both;
+  animation-delay: var(--shadow-pin-heart-delay);
+}
+
 @supports (height: 100dvh) {
   html, body, #root {
     height: 100dvh;
@@ -969,11 +1159,88 @@ html, body, #root {
   }
 }
 
+@keyframes shadow-pin-radial-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.58);
+  }
+  100% {
+    opacity: 1;
+    transform:
+      translate(
+        calc(-50% + var(--shadow-pin-radial-offset-x)),
+        calc(-50% + var(--shadow-pin-radial-offset-y))
+      )
+      scale(0.86);
+  }
+}
+
+@keyframes shadow-pin-radial-thumb {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.74);
+  }
+  100% {
+    opacity: 0.88;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+}
+
+@keyframes shadow-pin-action-wash {
+  0% {
+    opacity: 0;
+    transform: translateX(-46%) skewX(-12deg);
+  }
+  24% {
+    opacity: 1;
+  }
+  58% {
+    opacity: 0.72;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(42%) skewX(-12deg);
+  }
+}
+
+@keyframes shadow-pin-heart-field {
+  0% {
+    opacity: 0;
+  }
+  22% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes shadow-pin-action-confirm {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.54) rotate(-8deg);
+  }
+  34% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.04) rotate(4deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -58%) scale(0.84) rotate(0deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shadow-pin-heart-burst,
   .shadow-pin-heart-burst-ring,
   .shadow-pin-heart-burst-core,
-  .shadow-pin-heart-burst-particle {
+  .shadow-pin-heart-burst-particle,
+  .shadow-pin-radial-action,
+  .shadow-pin-radial-thumb-dot,
+  .shadow-pin-action-wash,
+  .shadow-pin-action-confirm,
+  .shadow-pin-action-heart-core,
+  .shadow-pin-action-heart-particle {
     animation: none !important;
   }
 

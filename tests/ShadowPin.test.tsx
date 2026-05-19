@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, createEvent, fireEvent, render, screen } from '@testing-library/react'
 import React from 'react'
 import { ShadowPin } from '../src/features/shadow-pin/ShadowPin'
 import { ShadowPinGoldPinBadge } from '../src/features/shadow-pin/components/ShadowPinGoldPinBadge'
@@ -83,6 +83,37 @@ const image = (id: string, width: number, height: number) => ({
   updated_at: '2026-05-14T12:00:00Z',
   viewer_has_hearted: false,
 })
+
+const fireShadowPinPointer = (
+  element: Element,
+  type: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel',
+  options: {
+    pointerId: number
+    clientX: number
+    clientY: number
+    button?: number
+    isPrimary?: boolean
+  }
+) => {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    button: options.button ?? 0,
+    clientX: options.clientX,
+    clientY: options.clientY,
+  })
+
+  Object.defineProperty(event, 'pointerId', {
+    configurable: true,
+    value: options.pointerId,
+  })
+  Object.defineProperty(event, 'isPrimary', {
+    configurable: true,
+    value: options.isPrimary ?? true,
+  })
+
+  fireEvent(element, event)
+}
 
 beforeEach(() => {
   mockAuthUser = {
@@ -169,6 +200,170 @@ test('renders category pins in packed mobile masonry columns', () => {
       value: originalInnerWidth,
     })
   }
+})
+
+test('ShadowPin image long-press opens a radial thumb menu and slide-heart triggers feedback', () => {
+  jest.useFakeTimers()
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+
+    const imageCard = screen.getByAltText('Pin one').closest('article')
+    expect(imageCard).not.toBeNull()
+
+    fireShadowPinPointer(imageCard!, 'pointerdown', {
+      pointerId: 7,
+      button: 0,
+      clientX: 160,
+      clientY: 320,
+    })
+    act(() => {
+      jest.advanceTimersByTime(440)
+    })
+
+    const menu = screen.getByTestId('shadow-pin-radial-menu')
+    expect(menu).toBeInTheDocument()
+    expect(menu).toHaveAttribute('data-selected-action', '')
+    expect(imageCard).toHaveClass('shadow-pin-action-card--active')
+
+    fireShadowPinPointer(imageCard!, 'pointermove', {
+      pointerId: 7,
+      clientX: 90,
+      clientY: 246,
+    })
+
+    expect(screen.getByTestId('shadow-pin-radial-menu')).toHaveAttribute('data-selected-action', 'heart')
+
+    fireShadowPinPointer(imageCard!, 'pointerup', {
+      pointerId: 7,
+      clientX: 90,
+      clientY: 246,
+    })
+
+    expect(mockToggleImageHeart).toHaveBeenCalledWith('one')
+    expect(screen.queryByTestId('shadow-pin-radial-menu')).not.toBeInTheDocument()
+    expect(screen.getByTestId('shadow-pin-action-feedback')).toHaveAttribute('data-action', 'heart')
+    expect(screen.getByTestId('shadow-pin-action-heart-burst')).toBeInTheDocument()
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('ShadowPin image long-press cancels when the finger starts scrolling before hold', () => {
+  jest.useFakeTimers()
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+
+    const imageCard = screen.getByAltText('Pin one').closest('article')
+    expect(imageCard).not.toBeNull()
+
+    fireShadowPinPointer(imageCard!, 'pointerdown', {
+      pointerId: 8,
+      button: 0,
+      clientX: 160,
+      clientY: 320,
+    })
+    fireShadowPinPointer(imageCard!, 'pointermove', {
+      pointerId: 8,
+      clientX: 160,
+      clientY: 344,
+    })
+    act(() => {
+      jest.advanceTimersByTime(440)
+    })
+
+    expect(screen.queryByTestId('shadow-pin-radial-menu')).not.toBeInTheDocument()
+    expect(mockToggleImageHeart).not.toHaveBeenCalled()
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('ShadowPin radial share falls back to copying the image link', async () => {
+  jest.useFakeTimers()
+  const originalClipboard = navigator.clipboard
+  const originalShare = navigator.share
+  const writeText = jest.fn().mockResolvedValue(undefined)
+
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText },
+  })
+  Object.defineProperty(navigator, 'share', {
+    configurable: true,
+    value: undefined,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+
+    const imageCard = screen.getByAltText('Pin one').closest('article')
+    expect(imageCard).not.toBeNull()
+
+    fireShadowPinPointer(imageCard!, 'pointerdown', {
+      pointerId: 9,
+      button: 0,
+      clientX: 160,
+      clientY: 320,
+    })
+    act(() => {
+      jest.advanceTimersByTime(440)
+    })
+    fireShadowPinPointer(imageCard!, 'pointermove', {
+      pointerId: 9,
+      clientX: 160,
+      clientY: 224,
+    })
+
+    await act(async () => {
+      fireShadowPinPointer(imageCard!, 'pointerup', {
+        pointerId: 9,
+        clientX: 160,
+        clientY: 224,
+      })
+      await Promise.resolve()
+    })
+
+    expect(writeText).toHaveBeenCalledWith('https://images.example/one.jpg')
+    expect(screen.getByTestId('shadow-pin-action-feedback')).toHaveAttribute('data-action', 'share')
+  } finally {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: originalClipboard,
+    })
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: originalShare,
+    })
+    jest.useRealTimers()
+  }
+})
+
+test('ShadowPin image card blocks native image callout and drag surfaces', () => {
+  render(<ShadowPin onBack={() => {}} />)
+
+  fireEvent.click(screen.getByText('Fam & Friends'))
+
+  const imageElement = screen.getByAltText('Pin one')
+  const imageCard = imageElement.closest('article')
+  expect(imageCard).not.toBeNull()
+  expect(imageCard).toHaveClass('shadow-pin-action-card')
+  expect(imageElement).toHaveAttribute('draggable', 'false')
+
+  const contextEvent = createEvent.contextMenu(imageElement)
+  fireEvent(imageElement, contextEvent)
+  expect(contextEvent.defaultPrevented).toBe(true)
+
+  const dragEvent = createEvent.dragStart(imageElement)
+  fireEvent(imageElement, dragEvent)
+  expect(dragEvent.defaultPrevented).toBe(true)
 })
 
 test('ShadowPin edit category makes save and cancel primary while delete is deliberate', () => {
