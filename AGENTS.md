@@ -247,6 +247,14 @@ npx jest --runInBand tests/useDirectMessages.test.tsx
 
 Use `--runInBand` on Windows to reduce flakiness and keep output easier to read.
 
+### Test Data Cleanup
+
+Any automated, smoke, or manual test that creates real app data must clean up
+after itself before the run is considered complete. Delete test messages/posts
+and every uploaded Storage object or derived media object the test created,
+including images, videos, audio or voice clips, and generic file attachments.
+If cleanup cannot be verified, report it as residual risk with the run results.
+
 ### Playwright Debugging
 
 This repo does not keep Playwright specs as the main workflow. Prefer the repo smoke runner for dependable browser checks, then fall back to inline scripts or the Codex Playwright wrapper for custom debugging.

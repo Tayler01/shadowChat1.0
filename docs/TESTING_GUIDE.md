@@ -77,10 +77,13 @@ For user-facing changes, the default browser validation should include at least
 one iPhone/WebKit profile and one Android/Chromium profile through the closest
 repo QA harness or a focused headed check.
 
-When a flow requires real group chat or DM posting for end-to-end proof, create
-the smallest useful test post, verify the behavior, and delete that post
-immediately after the specific test. Do not leave QA/weather/media smoke posts
-behind for a later cleanup batch.
+When a flow requires real group chat, DM, board, News, weather, or media posting
+for end-to-end proof, create the smallest useful test payload, verify the
+behavior, and clean it up immediately after the specific test. Cleanup includes
+test messages/posts plus every uploaded Storage object or derived media object
+the test created: images, videos, audio or voice clips, thumbnails, and generic
+file attachments. Do not leave QA/weather/media smoke data behind for a later
+cleanup batch; if cleanup cannot be verified, report it as residual risk.
 
 ## Recommended Local Browser Loop
 
@@ -195,6 +198,11 @@ What the smoke runner does by default:
 - saves screenshots, logs, storage state, and a JSON summary under `output/playwright/<run-name>/`
 
 When you have changed app code and want the latest build instead of the already-running preview, add `--no-reuse-server`.
+
+Every smoke scenario that writes real chat rows or uploads media is responsible
+for deleting its test data before the run is treated as clean. This especially
+applies to `group-chat`, `dm`, `resume-send`, and any future image, video,
+audio, voice, or generic attachment coverage.
 
 Production smoke is different from local smoke: it must use the two stable, email-confirmed `PLAYWRIGHT_ACCOUNT_*` users from `.env.testing.local` because production signup can require email confirmation and return no active session. See [`docs/PRODUCTION_SMOKE_TESTING.md`](C:/repos/chat2.0/docs/PRODUCTION_SMOKE_TESTING.md:1) for canonical account details, setup, commands, and artifact triage.
 

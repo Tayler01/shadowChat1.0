@@ -8,6 +8,15 @@ The smoke runner can create disposable users for local and preview environments.
 
 This workspace has stable production smoke credentials stored only in the local `.env.testing.local`. Do not commit real smoke account passwords.
 
+## Production Test Data Cleanup
+
+Production smoke must leave the live app clean. Any scenario that creates real
+messages, posts, uploads, or attachments must delete those rows and Storage
+objects before the run is considered complete. This includes test images,
+videos, audio or voice clips, thumbnails or derived media, and generic file
+attachments. If cleanup cannot be verified, keep the payload minimal and record
+the remaining rows or object paths in the deploy notes as residual risk.
+
 ## Canonical Smoke Accounts
 
 Always check for and use these two production smoke users before creating any new test accounts:

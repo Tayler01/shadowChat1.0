@@ -618,6 +618,9 @@ async function scenarioAuth(state, sessionA, sessionB) {
 }
 
 async function scenarioGroupChat(state, sessionA, sessionB) {
+  // Cleanup rule: scenarios that create real chat rows or uploaded media must
+  // remove their test messages and Storage objects before the run is clean.
+  // This includes images, videos, audio/voice clips, and generic attachments.
   await goToChat(sessionA.page)
   await goToChat(sessionB.page)
 
