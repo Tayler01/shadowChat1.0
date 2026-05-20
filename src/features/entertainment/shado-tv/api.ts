@@ -199,6 +199,11 @@ const fallbackCatalog: ShadoTvCatalog = {
 const SIGNED_ARTWORK_TTL_SECONDS = 6 * 60 * 60
 const UNSAFE_SIGNED_TRANSFORM_EXTENSIONS = /\.(gif|svg)(?:$|[?#])/i
 
+function isLocalShadoTvPreview() {
+  return typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('localPreview') === 'shado-tv'
+}
+
 function formatDuration(seconds?: number | null) {
   if (seconds == null) return 'Processing'
   const minutes = Math.floor(seconds / 60)
@@ -496,6 +501,8 @@ async function fetchCatalogRows(admin = false) {
 }
 
 export async function fetchShadoTvCatalog(): Promise<ShadoTvCatalog> {
+  if (isLocalShadoTvPreview()) return fallbackCatalog
+
   const rows = await fetchCatalogRows(false)
   if (!rows) return fallbackCatalog
 

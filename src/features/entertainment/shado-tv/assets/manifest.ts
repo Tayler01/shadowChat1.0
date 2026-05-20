@@ -31,9 +31,15 @@ export const SHADO_TV_ASSETS = {
   },
   crimpShrimp: {
     seriesHubHero: `${CRIMP_SHRIMP_ROOT}/series-hub-hero.webp`,
+    seriesTitleHero: `${CRIMP_SHRIMP_ROOT}/series-title-hero-v2.webp`,
+    countdownParchment: `${CRIMP_SHRIMP_ROOT}/countdown-handmade-paper-real.png`,
     statusComingSoon: `${CRIMP_SHRIMP_ROOT}/status-coming-soon-bg.webp`,
     featuredEpisodeFrame: `${CRIMP_SHRIMP_ROOT}/featured-episode-frame.webp`,
     episodeOneCover: `${CRIMP_SHRIMP_ROOT}/episode-1-cover.webp`,
+    testTrailer: `${CRIMP_SHRIMP_ROOT}/test-trailer.mp4`,
+    moduleTrailers: `${CRIMP_SHRIMP_ROOT}/module-trailers.webp`,
+    moduleCast: `${CRIMP_SHRIMP_ROOT}/module-cast.webp`,
+    moduleUpdates: `${CRIMP_SHRIMP_ROOT}/module-updates.webp`,
   },
 } as const
 

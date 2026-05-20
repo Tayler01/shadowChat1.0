@@ -9,7 +9,6 @@ import {
   saveShadoTvWatchProgress,
 } from './api'
 import {
-  type ShadoTvChannel,
   type ShadoTvContentItem,
   type ShadoTvVideo,
   type ShadoTvWatchProgress,
@@ -29,7 +28,6 @@ type ShadoTvView =
 type HubStatus = 'coming-soon' | 'airing-now' | 'now-streaming'
 
 const SHOW_TITLE = 'The Crimp & Shrimp Show'
-const SHOW_TAGLINE = 'Small thieves. Big trouble. Family comedy from the woods.'
 
 function parseDate(value?: string | null) {
   if (!value) return null
@@ -130,6 +128,36 @@ function getTrailerLabel(video: ShadoTvVideo) {
   return 'Pending'
 }
 
+function isDirectVideoUrl(value?: string | null) {
+  return /\.(mp4|webm|mov|m4v)(?:$|[?#])/i.test(value ?? '')
+}
+
+function StreamFrame({ src, title }: { src: string; title: string }) {
+  if (isDirectVideoUrl(src)) {
+    return (
+      <video
+        src={src}
+        title={title}
+        className="absolute inset-0 h-full w-full bg-black object-contain"
+        controls
+        playsInline
+        preload="metadata"
+      />
+    )
+  }
+
+  return (
+    <iframe
+      src={src}
+      title={title}
+      className="absolute inset-0 h-full w-full border-0 bg-black"
+      allow="accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+      allowFullScreen
+      referrerPolicy="strict-origin-when-cross-origin"
+    />
+  )
+}
+
 function getPrimaryEpisode(videos: ShadoTvVideo[]) {
   return videos.find(video => video.prime)
     ?? [...videos].sort((a, b) => getEpisodeSortTime(a) - getEpisodeSortTime(b))[0]
@@ -191,36 +219,32 @@ function StatusCard({ episode }: { episode?: ShadoTvVideo | null }) {
   }, [])
 
   return (
-    <section className="relative overflow-hidden rounded-lg border border-[#b88452]/35 bg-[#0b0c09] shadow-[0_20px_52px_rgba(0,0,0,0.48)]">
+    <div className="relative isolate overflow-visible px-4 py-3 text-center">
       <img
-        src={SHADO_TV_ASSETS.crimpShrimp.statusComingSoon}
+        src={SHADO_TV_ASSETS.crimpShrimp.countdownParchment}
         alt=""
-        className="absolute inset-0 h-full w-full object-cover opacity-95"
-        width={1792}
-        height={1024}
+        className="pointer-events-none absolute -inset-x-3 -inset-y-4 z-0 h-[calc(100%+2rem)] w-[calc(100%+1.5rem)] object-fill"
+        width={703}
+        height={230}
         loading="eager"
         decoding="async"
       />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.08),rgba(0,0,0,0.3))]" />
-      <div className="relative px-4 py-5 text-center">
-        <p className="text-[0.68rem] font-black uppercase tracking-[0.24em] text-[#7a2e1d]">{target?.label ?? statusCopy[status]}</p>
+      <div className="relative z-10">
+        <p className="text-[0.55rem] font-black uppercase tracking-[0.22em] text-[#6f291b]">{target?.label ?? statusCopy[status]}</p>
         {target ? (
-          <div className="mt-3 grid grid-cols-4 gap-1.5">
+          <div className="mt-2 grid grid-cols-4 gap-1">
             {clock.map(item => (
-              <div key={item.label} className="border-r border-[#7a2e1d]/24 last:border-r-0">
-                <span className="block text-2xl font-black tabular-nums text-[#8f3522]">{String(item.value).padStart(2, '0')}</span>
-                <span className="block text-[0.6rem] font-black uppercase tracking-[0.14em] text-[#3f2519]/76">{item.label}</span>
+              <div key={item.label} className="border-r border-[#5c2b1d]/28 last:border-r-0">
+                <span className="block text-xl font-black tabular-nums leading-none text-[#8b321f]">{String(item.value).padStart(2, '0')}</span>
+                <span className="mt-1 block text-[0.5rem] font-black uppercase tracking-[0.12em] text-[#31180f]/80">{item.label}</span>
               </div>
             ))}
           </div>
         ) : (
-          <p className="mt-3 text-2xl font-black uppercase tracking-[0.08em] text-[#8f3522]">{statusCopy[status]}</p>
+          <p className="mt-2 text-xl font-black uppercase tracking-[0.08em] text-[#8b321f]">{statusCopy[status]}</p>
         )}
-        <p className="mx-auto mt-3 max-w-sm text-xs font-semibold leading-5 text-[#3f2519]/78">
-          {episode ? `${episode.subtitle}: ${episode.title}` : 'The first episode is being prepared for upload.'}
-        </p>
       </div>
-    </section>
+    </div>
   )
 }
 
@@ -244,30 +268,33 @@ function EpisodeCard({
       onClick={onOpen}
       data-shado-tv-video-card="true"
       aria-label={`Open ${video.title}`}
-      className="group relative w-full overflow-hidden rounded-lg border border-[#b88452]/35 bg-[#090907] text-left shadow-[0_18px_46px_rgba(0,0,0,0.42)] transition hover:-translate-y-0.5 hover:border-[#d8b06f]/70 focus:outline-none focus:ring-2 focus:ring-[#a64022]/60"
+      className="group relative w-full overflow-hidden rounded-lg border border-[#b88452]/34 bg-black/24 p-3 text-left shadow-[0_16px_34px_rgba(0,0,0,0.34)] transition hover:border-[#d8b06f]/58 hover:bg-black/30 focus:outline-none focus:ring-2 focus:ring-[#a64022]/60"
     >
       <img
         src={SHADO_TV_ASSETS.crimpShrimp.featuredEpisodeFrame}
         alt=""
-        className="absolute inset-0 h-full w-full object-cover opacity-78"
-        width={1792}
-        height={1024}
-        loading="eager"
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-[0.58] blur-[2px] saturate-[0.9]"
+        loading="lazy"
         decoding="async"
       />
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.38),rgba(0,0,0,0.78))]" />
-      <div className="relative grid min-h-[12rem] grid-cols-[7rem_1fr] gap-3 p-3 min-[420px]:grid-cols-[8.3rem_1fr]">
-        <div className="relative min-h-[10.6rem] overflow-hidden rounded-md border border-[#d8b06f]/36 bg-[#15100b] shadow-[0_12px_24px_rgba(0,0,0,0.42)]">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_22%,rgba(207,142,83,0.2),transparent_34%),linear-gradient(90deg,rgba(5,7,5,0.68),rgba(5,7,5,0.36)_42%,rgba(5,7,5,0.74))]" />
+      <div aria-hidden="true" className="relative z-10 mb-2 flex justify-center gap-1.5">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#d8b06f]/76" />
+        <span className="h-1.5 w-1.5 rounded-full bg-[#d8b06f]/42" />
+        <span className="h-1.5 w-1.5 rounded-full bg-[#d8b06f]/42" />
+      </div>
+      <div className="relative z-10 grid min-h-[12rem] grid-cols-[7rem_1fr] gap-3 min-[420px]:grid-cols-[8.3rem_1fr]">
+        <div className="relative min-h-[10.6rem] overflow-visible">
           <img
             src={video.posterAsset}
             alt=""
-            className="absolute inset-0 h-full w-full object-cover object-top brightness-[1.18] contrast-[1.08] saturate-[1.08]"
+            className="absolute inset-0 h-full w-full object-contain object-center brightness-[1.16] contrast-[1.08] saturate-[1.08] drop-shadow-[0_16px_22px_rgba(0,0,0,0.58)]"
             width={640}
             height={960}
             loading="eager"
             decoding="async"
           />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,220,148,0.08),transparent_38%,rgba(0,0,0,0.12))]" />
         </div>
         <div className="flex min-w-0 flex-col justify-between py-1">
           <div>
@@ -299,25 +326,30 @@ function ModuleCard({
   icon: Icon,
   title,
   subtitle,
+  asset,
   onOpen,
 }: {
   icon: React.ElementType
   title: string
   subtitle: string
+  asset: string
   onOpen: () => void
 }) {
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="relative min-h-[8rem] overflow-hidden rounded-lg border border-[#b88452]/30 bg-[#0b0c09] p-3 text-left shadow-[0_16px_36px_rgba(0,0,0,0.34)] transition hover:-translate-y-0.5 hover:border-[#d8b06f]/65 focus:outline-none focus:ring-2 focus:ring-[#a64022]/55"
+      className="relative aspect-square min-w-[8.75rem] overflow-hidden rounded-lg border border-[#b88452]/24 bg-[#0b0c09] p-3 text-left shadow-[0_16px_36px_rgba(0,0,0,0.34)] transition hover:-translate-y-0.5 hover:border-[#d8b06f]/65 focus:outline-none focus:ring-2 focus:ring-[#a64022]/55"
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_18%,rgba(166,64,34,0.18),transparent_34%),linear-gradient(180deg,rgba(235,199,139,0.06),rgba(0,0,0,0.18))]" />
+      <img src={asset} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" decoding="async" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.06),rgba(0,0,0,0.24)_42%,rgba(0,0,0,0.78))]" />
       <div className="relative flex h-full flex-col justify-between">
-        <Icon className="h-5 w-5 text-[#c89561]" />
+        <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#d8b06f]/32 bg-black/38 text-[#c89561]">
+          <Icon className="h-4 w-4" />
+        </span>
         <div>
-          <h3 className="text-lg font-black uppercase tracking-[0.08em] text-[#f1dbc0]">{title}</h3>
-          <p className="mt-1 text-xs font-semibold leading-5 text-[#dac5a3]/68">{subtitle}</p>
+          <h3 className="text-base font-black uppercase tracking-[0.08em] text-[#f1dbc0]">{title}</h3>
+          <p className="mt-1 line-clamp-2 text-[0.68rem] font-semibold leading-4 text-[#dac5a3]/76">{subtitle}</p>
         </div>
       </div>
     </button>
@@ -325,7 +357,6 @@ function ModuleCard({
 }
 
 function HomeView({
-  channels,
   videos,
   watchProgress,
   onOpenEpisode,
@@ -333,7 +364,6 @@ function HomeView({
   onOpenCast,
   onOpenUpdates,
 }: {
-  channels: ShadoTvChannel[]
   videos: ShadoTvVideo[]
   watchProgress: Map<string, ShadoTvWatchProgress>
   onOpenEpisode: (videoId: string) => void
@@ -341,64 +371,53 @@ function HomeView({
   onOpenCast: () => void
   onOpenUpdates: () => void
 }) {
-  const series = channels[0] ?? SHADO_TV_FALLBACK_CATALOG.channels[0]
   const episodes = videos
   const primaryEpisode = getPrimaryEpisode(episodes)
 
   return (
-    <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)_+_1.25rem)] pt-4">
-      <section className="relative min-h-[18.5rem] overflow-hidden rounded-lg border border-[#b88452]/35 bg-[#050604] shadow-[0_28px_72px_rgba(0,0,0,0.58)]">
+    <main className="mx-auto min-h-0 w-full max-w-[30rem] flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)_+_1.25rem)] pt-4">
+      <section className="relative aspect-square overflow-visible">
         <img
-          src={SHADO_TV_ASSETS.crimpShrimp.seriesHubHero}
+          src={SHADO_TV_ASSETS.crimpShrimp.seriesTitleHero}
           alt=""
-          className="absolute inset-0 h-full w-full object-cover"
-          width={1792}
-          height={1024}
+          className="absolute inset-0 h-full w-full object-cover drop-shadow-[0_28px_54px_rgba(0,0,0,0.62)]"
+          width={1200}
+          height={1200}
           loading="eager"
           decoding="async"
         />
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.42),rgba(0,0,0,0.12)_42%,rgba(0,0,0,0.84)),linear-gradient(180deg,rgba(0,0,0,0.06),rgba(0,0,0,0.72))]" />
-        <div className="relative flex min-h-[18.5rem] flex-col justify-end p-4">
-          <p className="text-[0.68rem] font-black uppercase tracking-[0.24em] text-[#c89561]">Polder Films Presents</p>
-          <h1 className="mt-2 max-w-[16rem] text-4xl font-black uppercase leading-9 text-[#b94728] drop-shadow-[0_5px_18px_rgba(0,0,0,0.88)]">
-            {SHOW_TITLE}
-          </h1>
-          <p className="mt-3 max-w-[18rem] text-sm font-semibold leading-5 text-[#f1dbc0]/84">
-            {series.description || series.tagline || SHOW_TAGLINE}
-          </p>
+        <div className="absolute inset-x-6 bottom-10">
+          <StatusCard episode={primaryEpisode} />
         </div>
       </section>
 
-      <div className="mt-4">
-        <StatusCard episode={primaryEpisode} />
-      </div>
-
-      <section className="mt-5">
+      <section className="mt-4">
         <div className="mb-2 flex items-center justify-between">
           <h2 className="text-sm font-black uppercase tracking-[0.22em] text-[#f1dbc0]">Episodes</h2>
           <span className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[#c89561]">{episodes.length || 0} listed</span>
         </div>
-        <div className="grid gap-3">
+        <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1">
           {episodes.map(video => (
-            <EpisodeCard
-              key={video.id}
-              video={video}
-              progress={watchProgress.get(video.id)}
-              onOpen={() => onOpenEpisode(video.id)}
-            />
+            <div key={video.id} className="min-w-[min(22rem,88vw)] snap-start">
+              <EpisodeCard
+                video={video}
+                progress={watchProgress.get(video.id)}
+                onOpen={() => onOpenEpisode(video.id)}
+              />
+            </div>
           ))}
           {episodes.length === 0 && (
-            <div className="rounded-lg border border-[#b88452]/28 bg-black/42 p-4 text-sm font-semibold leading-5 text-[#dac5a3]/78">
+            <div className="min-w-[min(22rem,88vw)] rounded-lg border border-[#b88452]/28 bg-black/42 p-4 text-sm font-semibold leading-5 text-[#dac5a3]/78">
               No public episodes are visible yet. Add or announce an episode from Shado TV Studio.
             </div>
           )}
         </div>
       </section>
 
-      <section className="mt-5 grid grid-cols-1 gap-3 min-[420px]:grid-cols-3">
-        <ModuleCard icon={Video} title="Trailers" subtitle="Show trailers and episode previews." onOpen={onOpenTrailers} />
-        <ModuleCard icon={Users} title="Cast" subtitle="Global cast and production credits." onOpen={onOpenCast} />
-        <ModuleCard icon={Newspaper} title="Updates" subtitle="Newest production notes and older posts." onOpen={onOpenUpdates} />
+      <section className="-mx-4 mt-5 flex gap-3 overflow-x-auto px-4 pb-1">
+        <ModuleCard icon={Video} title="Trailers" subtitle="Show trailers and episode previews." asset={SHADO_TV_ASSETS.crimpShrimp.moduleTrailers} onOpen={onOpenTrailers} />
+        <ModuleCard icon={Users} title="Cast" subtitle="Global cast and production credits." asset={SHADO_TV_ASSETS.crimpShrimp.moduleCast} onOpen={onOpenCast} />
+        <ModuleCard icon={Newspaper} title="Updates" subtitle="Newest production notes and older posts." asset={SHADO_TV_ASSETS.crimpShrimp.moduleUpdates} onOpen={onOpenUpdates} />
       </section>
     </main>
   )
@@ -437,20 +456,13 @@ function EpisodeView({
       <section className="overflow-hidden rounded-lg border border-[#b88452]/34 bg-[#080806] shadow-[0_24px_62px_rgba(0,0,0,0.52)]">
         <div className="relative aspect-video bg-black">
           {canPlayVideo && video.embedUrl ? (
-            <iframe
-              src={video.embedUrl}
-              title={video.title}
-              className="absolute inset-0 h-full w-full border-0 bg-black"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-              allowFullScreen
-              referrerPolicy="strict-origin-when-cross-origin"
-            />
+            <StreamFrame src={video.embedUrl} title={video.title} />
           ) : (
             <>
               <img
                 src={status === 'coming-soon' ? video.posterAsset : video.thumbnailAsset}
                 alt=""
-                className="h-full w-full object-cover object-top opacity-86"
+                className="h-full w-full object-cover object-top opacity-[0.86]"
                 width={1280}
                 height={720}
                 loading="eager"
@@ -521,14 +533,7 @@ function EpisodeView({
           </div>
           <div className="relative aspect-video bg-black">
             {trailerReady && video.trailerAssetUrl ? (
-              <iframe
-                src={video.trailerAssetUrl}
-                title={`${video.title} trailer`}
-                className="absolute inset-0 h-full w-full border-0 bg-black"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                allowFullScreen
-                referrerPolicy="strict-origin-when-cross-origin"
-              />
+              <StreamFrame src={video.trailerAssetUrl} title={`${video.title} trailer`} />
             ) : (
               <>
                 <img src={SHADO_TV_ASSETS.crimpShrimp.statusComingSoon} alt="" className="h-full w-full object-cover opacity-90" loading="lazy" decoding="async" />
@@ -589,14 +594,7 @@ function TrailersView({ videos, onOpenEpisode }: { videos: ShadoTvVideo[]; onOpe
             </button>
             {isTrailerReleased(video) && video.trailerAssetUrl ? (
               <div className="relative aspect-video border-t border-[#b88452]/18 bg-black">
-                <iframe
-                  src={video.trailerAssetUrl}
-                  title={`${video.title} trailer`}
-                  className="absolute inset-0 h-full w-full border-0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                  allowFullScreen
-                  referrerPolicy="strict-origin-when-cross-origin"
-                />
+                <StreamFrame src={video.trailerAssetUrl} title={`${video.title} trailer`} />
               </div>
             ) : null}
           </article>
@@ -722,7 +720,6 @@ export function ShadoTvScreen({ onExit }: ShadoTvScreenProps) {
     if (view.type === 'home') {
       return (
         <HomeView
-          channels={channels}
           videos={videos}
           watchProgress={watchProgress}
           onOpenEpisode={videoId => setView({ type: 'episode', videoId })}
@@ -763,7 +760,7 @@ export function ShadoTvScreen({ onExit }: ShadoTvScreenProps) {
         </p>
       </PageScaffold>
     )
-  }, [castItems, channels, currentVideo, loadWatchProgress, updateItems, videos, view, watchProgress])
+  }, [castItems, currentVideo, loadWatchProgress, updateItems, videos, view, watchProgress])
 
   return (
     <motion.div
@@ -774,13 +771,13 @@ export function ShadoTvScreen({ onExit }: ShadoTvScreenProps) {
       <img
         src={SHADO_TV_ASSETS.crimpShrimp.seriesHubHero}
         alt=""
-        className="absolute inset-0 h-full w-full object-cover opacity-18"
+        className="absolute inset-0 h-full w-full object-cover opacity-[0.18]"
         width={1792}
         height={1024}
         loading="eager"
         decoding="async"
       />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(166,64,34,0.18),transparent_34%),linear-gradient(180deg,rgba(0,0,0,0.22),rgba(0,0,0,0.94))]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(166,64,34,0.14),transparent_34%),linear-gradient(180deg,rgba(8,7,5,0.9),rgba(0,0,0,0.96))]" />
       <ShadoTvHeader
         onBack={view.type === 'home' ? undefined : goBack}
         onExit={onExit}

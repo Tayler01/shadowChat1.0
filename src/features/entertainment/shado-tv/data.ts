@@ -1,5 +1,7 @@
 import { SHADO_TV_ASSETS } from './assets/manifest'
 
+const EPISODE_ONE_PREMIERE_AT = '2026-07-07T19:00:00-04:00'
+
 export type ShadoTvVideoStatus = 'released' | 'premiere' | 'locked' | 'processing'
 export type ShadoTvOrientation = 'horizontal' | 'vertical'
 export type ShadoTvUploadStatus = 'none' | 'uploaded' | 'queued' | 'processing' | 'ready' | 'failed'
@@ -113,10 +115,10 @@ export const SHADO_TV_VIDEOS: ShadoTvVideo[] = [
     sourceType: 'native_upload',
     provider: 'placeholder',
     uploadStatus: 'none',
-    trailerAssetUrl: null,
-    trailerReleaseAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-    premiereAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    releasedAt: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
+    trailerAssetUrl: SHADO_TV_ASSETS.crimpShrimp.testTrailer,
+    trailerReleaseAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+    premiereAt: EPISODE_ONE_PREMIERE_AT,
+    releasedAt: EPISODE_ONE_PREMIERE_AT,
     prime: true,
     featured: true,
     trailerAvailable: true,
