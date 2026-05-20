@@ -351,14 +351,14 @@ function ModuleCard({
       className="relative aspect-[0.82/1] min-w-0 overflow-hidden rounded-lg border border-[#9a6a43]/30 bg-[#0b0c09] p-2.5 text-left shadow-[0_16px_36px_rgba(0,0,0,0.34)] transition hover:-translate-y-0.5 hover:border-[#9a6a43]/55 focus:outline-none focus:ring-2 focus:ring-[#9a6a43]/55"
     >
       <img src={asset} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" decoding="async" />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.06),rgba(0,0,0,0.24)_42%,rgba(0,0,0,0.78))]" />
-      <div className="relative flex h-full flex-col justify-between">
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.06),rgba(0,0,0,0.2)_38%,rgba(0,0,0,0.72))]" />
+      <div className="relative flex h-full flex-col justify-between pb-2">
         <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#9a6a43]/30 bg-black/38 text-[#d1a15b]">
           <Icon className="h-3.5 w-3.5" />
         </span>
-        <div>
-          <h3 className="text-[0.78rem] font-black uppercase tracking-[0.06em] text-[#f1dbc0]">{title}</h3>
-          <p className="mt-0.5 line-clamp-2 text-[0.56rem] font-semibold leading-3 text-[#dac5a3]/78">{subtitle}</p>
+        <div className="-translate-y-1">
+          <h3 className="text-[0.78rem] font-black uppercase tracking-[0.06em] text-[#dac5a3]">{title}</h3>
+          <p className="mt-0.5 line-clamp-2 text-[0.56rem] font-semibold leading-3 text-[#c8b895]/82">{subtitle}</p>
         </div>
       </div>
     </button>
