@@ -10,12 +10,12 @@ interface AuthGuardProps {
 export function AuthGuard({ children }: AuthGuardProps) {
   const { user, loading, error } = useAuth();
   const isReconnecting = error?.startsWith('Still reconnecting');
-  // Local-only visual QA escape hatch for previewing the public Shado TV shell without test credentials.
-  const isLocalShadoTvPreview = typeof window !== 'undefined'
+  // Local-only visual QA escape hatch for previewing Entertainment surfaces without test credentials.
+  const isLocalEntertainmentPreview = typeof window !== 'undefined'
     && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost')
-    && new URLSearchParams(window.location.search).get('localPreview') === 'shado-tv';
+    && ['shado-tv', 'shadow-mystery'].includes(new URLSearchParams(window.location.search).get('localPreview') ?? '');
 
-  if (isLocalShadoTvPreview) {
+  if (isLocalEntertainmentPreview) {
     return <>{children}</>;
   }
 
