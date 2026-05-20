@@ -1,4 +1,5 @@
 const SHADO_TV_ROOT = '/entertainment/shado-tv'
+const CRIMP_SHRIMP_ROOT = `${SHADO_TV_ROOT}/crimp-shrimp`
 
 export const SHADO_TV_ASSETS = {
   pickerBanner: `${SHADO_TV_ROOT}/picker-banner.webp`,
@@ -27,6 +28,12 @@ export const SHADO_TV_ASSETS = {
     emptyChannel: `${SHADO_TV_ROOT}/placeholders/empty-channel.webp`,
     processing: `${SHADO_TV_ROOT}/placeholders/processing.webp`,
     lockedPremiere: `${SHADO_TV_ROOT}/placeholders/locked-premiere.webp`,
+  },
+  crimpShrimp: {
+    seriesHubHero: `${CRIMP_SHRIMP_ROOT}/series-hub-hero.webp`,
+    statusComingSoon: `${CRIMP_SHRIMP_ROOT}/status-coming-soon-bg.webp`,
+    featuredEpisodeFrame: `${CRIMP_SHRIMP_ROOT}/featured-episode-frame.webp`,
+    episodeOneCover: `${CRIMP_SHRIMP_ROOT}/episode-1-cover.webp`,
   },
 } as const
 

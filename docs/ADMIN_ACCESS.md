@@ -30,6 +30,8 @@ Admin settings are split into subpages under Settings > Admin:
 - Admin Access: full-admin-only sub-admin management from the complete user
   list.
 - ESP Bridge Pairing: operator bridge approval controls.
+- Shado TV Studio: operator episode, trailer, cover, cast, update, visibility,
+  and Bunny-upload controls.
 - News Sources: operator add, pause, enable, and delete controls for tracked
   X/Truth Social accounts.
 - Feedback Review: operator review and deletion for submitted bugs and

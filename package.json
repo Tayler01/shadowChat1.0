@@ -36,7 +36,10 @@
     "qa:mobile-pwa": "node scripts/mobile-pwa-visual-qa.mjs",
     "qa:themes": "node scripts/theme-visual-qa.mjs",
     "shadow-pin:backfill-media": "node scripts/shadow-pin-backfill-media.mjs",
-    "media:backfill-mobile": "node scripts/backfill-mobile-media.mjs"
+    "media:backfill-mobile": "node scripts/backfill-mobile-media.mjs",
+    "video:render:trailer": "remotion render src/remotion/index.ts CrimpShrimpTrailer output/shado-tv-remotion/crimp-shrimp-trailer.mp4 --codec=h264 --crf=20",
+    "video:render:main": "remotion render src/remotion/index.ts CrimpShrimpLaunchFeaturette output/shado-tv-remotion/crimp-shrimp-main-upload-promo.mp4 --codec=h264 --crf=20",
+    "video:render:shado-tv": "npm run video:render:trailer && npm run video:render:main"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
@@ -50,10 +53,12 @@
     "react-hot-toast": "^2.4.1",
     "sentiment": "^5.0.2",
     "sharp": "^0.34.5",
-    "tailwind-merge": "^2.2.0"
+    "tailwind-merge": "^2.2.0",
+    "tus-js-client": "^4.3.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
+    "@remotion/cli": "^4.0.464",
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^14.2.1",
     "@testing-library/user-event": "^14.4.3",
@@ -71,6 +76,7 @@
     "jest-environment-jsdom": "^30.0.4",
     "playwright": "^1.59.1",
     "postcss": "^8.4.35",
+    "remotion": "^4.0.464",
     "tailwindcss": "^3.4.1",
     "ts-jest": "^29.1.1",
     "typescript": "^5.5.3",

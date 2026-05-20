@@ -2,6 +2,8 @@ import { SHADO_TV_ASSETS } from './assets/manifest'
 
 export type ShadoTvVideoStatus = 'released' | 'premiere' | 'locked' | 'processing'
 export type ShadoTvOrientation = 'horizontal' | 'vertical'
+export type ShadoTvUploadStatus = 'none' | 'uploaded' | 'queued' | 'processing' | 'ready' | 'failed'
+export type ShadoTvContentSection = 'cast' | 'updates'
 
 export interface ShadoTvChannel {
   id: string
@@ -41,6 +43,11 @@ export interface ShadoTvVideo {
   externalUrl?: string | null
   embedUrl?: string | null
   provider?: string | null
+  providerAssetId?: string | null
+  providerPlaybackId?: string | null
+  uploadStatus?: ShadoTvUploadStatus
+  uploadError?: string | null
+  trailerAssetUrl?: string | null
   trailerReleaseAt?: string | null
   premiereAt?: string | null
   releasedAt?: string | null
@@ -58,127 +65,144 @@ export interface ShadoTvWatchProgress {
   updatedAt: string
 }
 
+export interface ShadoTvContentItem {
+  id: string
+  channelId: string
+  section: ShadoTvContentSection
+  slug?: string
+  title: string
+  subtitle?: string | null
+  body?: string | null
+  dateLabel?: string | null
+  visibilityStatus?: 'draft' | 'published' | 'hidden'
+  sortOrder: number
+  deletedAt?: string | null
+}
+
 export const SHADO_TV_CHANNELS: ShadoTvChannel[] = [
   {
-    id: 'classic-cinema',
-    name: 'Classic Cinema',
-    tagline: 'Silver-screen legends and midnight restorations.',
-    ticketAsset: SHADO_TV_ASSETS.tickets.classic,
-    heroAsset: SHADO_TV_ASSETS.channelHeroFallback,
-    accent: '#f0d381',
-    updatedAtLabel: 'Updated tonight',
-  },
-  {
-    id: 'neon-nights',
-    name: 'Neon Nights',
-    tagline: 'After-hours premieres with electric city glow.',
-    ticketAsset: SHADO_TV_ASSETS.tickets.neon,
-    heroAsset: SHADO_TV_ASSETS.channelHeroFallback,
-    accent: '#ff6f8f',
-    updatedAtLabel: 'Premiere queued',
-  },
-  {
-    id: 'retro-rewind',
-    name: 'Retro Rewind',
-    tagline: 'Drive-in energy, analog grain, and lost-tape charm.',
-    ticketAsset: SHADO_TV_ASSETS.tickets.rewind,
-    heroAsset: SHADO_TV_ASSETS.channelHeroFallback,
-    accent: '#6eb6ba',
-    updatedAtLabel: 'Updated yesterday',
-  },
-  {
-    id: 'late-shift',
-    name: 'Late Shift',
-    tagline: 'Projection-booth oddities after the lobby lights dim.',
-    ticketAsset: SHADO_TV_ASSETS.tickets.late,
-    heroAsset: SHADO_TV_ASSETS.channelHeroFallback,
-    accent: '#a7ba84',
-    updatedAtLabel: 'Trailer live',
-  },
-  {
-    id: 'pixel-planet',
-    name: 'Pixel Planet',
-    tagline: 'Arcade sci-fi dispatches from the velvet void.',
-    ticketAsset: SHADO_TV_ASSETS.tickets.pixel,
-    heroAsset: SHADO_TV_ASSETS.channelHeroFallback,
-    accent: '#b98ad8',
-    updatedAtLabel: 'New poster drop',
+    id: 'crimp-shrimp',
+    slug: 'crimp-shrimp',
+    name: 'The Crimp & Shrimp Show',
+    tagline: 'Two little troublemakers, one stolen chicken, and a whole lot of small-town mischief.',
+    description: 'A rustic family comedy series from Polder Films about two tiny thieves who keep turning simple plans into bigger trouble.',
+    ticketAsset: SHADO_TV_ASSETS.crimpShrimp.episodeOneCover,
+    heroAsset: SHADO_TV_ASSETS.crimpShrimp.seriesHubHero,
+    accent: '#a64022',
+    updatedAtLabel: 'Premiere loading',
+    visibilityStatus: 'published',
   },
 ]
 
 export const SHADO_TV_VIDEOS: ShadoTvVideo[] = [
   {
-    id: 'silver-screen',
-    channelId: 'classic-cinema',
-    title: 'Silver Screen',
-    subtitle: 'Legends',
-    description: 'A restored noir placeholder for the first Shado TV marquee slot.',
-    posterAsset: SHADO_TV_ASSETS.posters.classicCinema,
-    thumbnailAsset: SHADO_TV_ASSETS.placeholders.videoHorizontal,
-    status: 'released',
-    orientation: 'horizontal',
-    durationLabel: '24:18',
-    releaseLabel: 'Available now',
-    prime: true,
-    featured: true,
-  },
-  {
-    id: 'neon-run',
-    channelId: 'neon-nights',
-    title: 'Neon Run',
-    subtitle: 'Premiere',
-    description: 'A scheduled premiere placeholder with trailer-first release behavior.',
-    posterAsset: SHADO_TV_ASSETS.posters.neonNights,
-    thumbnailAsset: SHADO_TV_ASSETS.placeholders.lockedPremiere,
+    id: 'the-chicken-snatchers',
+    slug: 'the-chicken-snatchers',
+    channelId: 'crimp-shrimp',
+    title: 'The Chicken Snatchers',
+    subtitle: 'Episode 1',
+    description: 'The first Crimp & Shrimp caper sends the two small-time troublemakers into the woods with a bad plan, a nervous chicken, and more trouble than they bargained for.',
+    posterAsset: SHADO_TV_ASSETS.crimpShrimp.episodeOneCover,
+    thumbnailAsset: SHADO_TV_ASSETS.crimpShrimp.featuredEpisodeFrame,
     status: 'premiere',
     orientation: 'horizontal',
-    durationLabel: '28:44',
-    releaseLabel: 'Premieres Friday 9:00 PM',
+    durationSeconds: 30 * 60,
+    durationLabel: '30:00',
+    releaseLabel: 'Premiere coming soon',
+    visibilityStatus: 'published',
+    sourceType: 'native_upload',
+    provider: 'placeholder',
+    uploadStatus: 'none',
+    trailerAssetUrl: null,
+    trailerReleaseAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+    premiereAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    releasedAt: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
+    prime: true,
     featured: true,
     trailerAvailable: true,
   },
+]
+
+export const SHADO_TV_CONTENT_ITEMS: ShadoTvContentItem[] = [
   {
-    id: 'drive-in-rewind',
-    channelId: 'retro-rewind',
-    title: 'Drive-In Rewind',
-    subtitle: 'Double Feature',
-    description: 'A dusk-drive placeholder for rewind channels and featured rows.',
-    posterAsset: SHADO_TV_ASSETS.posters.retroRewind,
-    thumbnailAsset: SHADO_TV_ASSETS.placeholders.videoHorizontal,
-    status: 'released',
-    orientation: 'horizontal',
-    durationLabel: '18:02',
-    releaseLabel: 'Available now',
-    featured: true,
+    id: 'cast-alyssa-polder',
+    channelId: 'crimp-shrimp',
+    section: 'cast',
+    slug: 'alyssa-polder',
+    title: 'Alyssa Polder',
+    subtitle: 'The Crimp',
+    body: 'The older schemer with a straight face and a talent for choosing the wrong shortcut.',
+    sortOrder: 10,
+    visibilityStatus: 'published',
   },
   {
-    id: 'midnight-booth',
-    channelId: 'late-shift',
-    title: 'Midnight Booth',
-    subtitle: 'Trailer',
-    description: 'A late-night projection-room placeholder with trailer availability.',
-    posterAsset: SHADO_TV_ASSETS.posters.lateShift,
-    thumbnailAsset: SHADO_TV_ASSETS.placeholders.videoVertical,
-    status: 'locked',
-    orientation: 'vertical',
-    durationLabel: '11:40',
-    releaseLabel: 'Trailer available',
-    featured: true,
-    trailerAvailable: true,
+    id: 'cast-lindyann-polder',
+    channelId: 'crimp-shrimp',
+    section: 'cast',
+    slug: 'lindyann-polder',
+    title: 'Lindyann Polder',
+    subtitle: 'The Shrimp',
+    body: 'The lookout, sidekick, and accidental conscience of the operation.',
+    sortOrder: 20,
+    visibilityStatus: 'published',
   },
   {
-    id: 'pixel-orbit',
-    channelId: 'pixel-planet',
-    title: 'Pixel Orbit',
-    subtitle: 'Signal Test',
-    description: 'A retro sci-fi placeholder ready for the processing pipeline.',
-    posterAsset: SHADO_TV_ASSETS.posters.pixelPlanet,
-    thumbnailAsset: SHADO_TV_ASSETS.placeholders.processing,
-    status: 'processing',
-    orientation: 'vertical',
-    durationLabel: 'Processing',
-    releaseLabel: 'Preparing stream',
-    featured: false,
+    id: 'cast-amelia-polder',
+    channelId: 'crimp-shrimp',
+    section: 'cast',
+    slug: 'amelia-polder',
+    title: 'Amelia Polder',
+    subtitle: 'Director',
+    body: 'Guiding the woods, wagon tracks, and small-town comedy timing.',
+    sortOrder: 30,
+    visibilityStatus: 'published',
+  },
+  {
+    id: 'cast-elisha-polder',
+    channelId: 'crimp-shrimp',
+    section: 'cast',
+    slug: 'elisha-polder',
+    title: 'Elisha Polder',
+    subtitle: 'Writer',
+    body: 'Building the caper, the family-comedy rhythm, and the trouble that keeps getting bigger.',
+    sortOrder: 40,
+    visibilityStatus: 'published',
+  },
+  {
+    id: 'update-coming-soon-page-live',
+    channelId: 'crimp-shrimp',
+    section: 'updates',
+    slug: 'coming-soon-page-live',
+    title: 'Coming Soon page is live',
+    subtitle: 'Launch prep',
+    body: 'The Crimp & Shrimp show hub is ready for the Episode 1 cover, countdown, trailers, cast, and updates.',
+    dateLabel: 'May 20, 2026',
+    sortOrder: 10,
+    visibilityStatus: 'published',
+  },
+  {
+    id: 'update-trailer-window',
+    channelId: 'crimp-shrimp',
+    section: 'updates',
+    slug: 'trailer-window',
+    title: 'Trailer window scheduled',
+    subtitle: 'Trailer release',
+    body: 'The trailer can be uploaded and published ahead of the full premiere from Shado TV Studio.',
+    dateLabel: 'Coming soon',
+    sortOrder: 20,
+    visibilityStatus: 'published',
+  },
+  {
+    id: 'update-episode-one-premiere',
+    channelId: 'crimp-shrimp',
+    section: 'updates',
+    slug: 'episode-one-premiere',
+    title: 'Episode 1 premiere countdown',
+    subtitle: 'The Chicken Snatchers',
+    body: 'The main upload stays locked with a live countdown until premiere time, then moves into the streaming window.',
+    dateLabel: 'Premiere week',
+    sortOrder: 30,
+    visibilityStatus: 'published',
   },
 ]
 

@@ -9,6 +9,7 @@ import {
   Check,
   Database,
   Download,
+  Film,
   KeyRound,
   LayoutGrid,
   Menu,
@@ -37,6 +38,7 @@ import { NotificationSetupModal } from './NotificationSetupModal'
 import { PhoneInstallGuide } from '../onboarding/PhoneInstallGuide'
 import { FeedbackSubmissionModal } from './FeedbackSubmissionModal'
 import { AdminFeedbackReview } from './AdminFeedbackReview'
+import { ShadoTvStudio } from './ShadoTvStudio'
 import { WeatherLocationSettings } from './WeatherLocationSettings'
 import { ProfileView } from '../profile/ProfileView'
 import { useNewsAdmin } from '../../hooks/useNewsAdmin'
@@ -69,7 +71,7 @@ type SettingsSection = {
   icon: React.ComponentType<{ className?: string }>
 }
 
-type AdminSectionId = 'access' | 'bridge-pairing' | 'news-sources' | 'feedback-review'
+type AdminSectionId = 'access' | 'bridge-pairing' | 'shado-tv-studio' | 'news-sources' | 'feedback-review'
 
 type AdminSection = {
   id: AdminSectionId
@@ -167,6 +169,12 @@ const adminSections: AdminSection[] = [
     title: 'ESP Bridge Pairing',
     description: 'Approve bridge pairing codes for operator-owned devices.',
     icon: KeyRound,
+  },
+  {
+    id: 'shado-tv-studio',
+    title: 'Shado TV Studio',
+    description: 'Manage Crimp & Shrimp episodes, trailers, cast, updates, dates, visibility, and covers.',
+    icon: Film,
   },
   {
     id: 'news-sources',
@@ -888,6 +896,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       return 'Bugs & ideas'
     }
 
+    if (sectionId === 'shado-tv-studio') {
+      return 'Episodes'
+    }
+
     if (shouldLoadNewsAdmin && newsAdminLoading) {
       return 'Loading sources'
     }
@@ -1164,6 +1176,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     const content = {
       access: renderAdminAccessPanel,
       'bridge-pairing': renderBridgePairingPanel,
+      'shado-tv-studio': () => <ShadoTvStudio />,
       'news-sources': renderNewsSourcesPanel,
       'feedback-review': renderFeedbackReviewPanel,
     }[activeAdminSection]()

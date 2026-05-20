@@ -8,13 +8,18 @@ import {
 import { SHADO_TV_ASSETS } from './assets/manifest'
 import {
   SHADO_TV_CHANNELS,
+  SHADO_TV_CONTENT_ITEMS,
   SHADO_TV_VIDEOS,
   type ShadoTvChannel,
+  type ShadoTvContentItem,
+  type ShadoTvContentSection,
   type ShadoTvOrientation,
+  type ShadoTvUploadStatus,
   type ShadoTvVideo,
   type ShadoTvVideoStatus,
   type ShadoTvWatchProgress,
 } from './data'
+import * as tus from 'tus-js-client'
 
 type ChannelVisibility = 'draft' | 'published' | 'hidden'
 type VideoSourceType = 'native_upload' | 'external_embed' | 'placeholder'
@@ -58,6 +63,11 @@ interface ShadoTvVideoRow {
   external_url?: string | null
   embed_url?: string | null
   provider?: string | null
+  provider_asset_id?: string | null
+  provider_playback_id?: string | null
+  provider_payload?: Record<string, unknown> | null
+  upload_status?: ShadoTvUploadStatus
+  upload_error?: string | null
   trailer_release_at?: string | null
   premiere_at?: string | null
   released_at?: string | null
@@ -72,6 +82,22 @@ interface ShadoTvFeatureRow {
   sort_order: number
 }
 
+interface ShadoTvContentBlockRow {
+  id: string
+  channel_id?: string | null
+  section: ShadoTvContentSection
+  slug: string
+  title: string
+  subtitle?: string | null
+  body?: string | null
+  date_label?: string | null
+  visibility_status: ChannelVisibility
+  sort_order: number
+  deleted_at?: string | null
+  updated_at: string
+  created_at: string
+}
+
 interface ShadoTvWatchProgressRow {
   video_id: string
   position_seconds: number
@@ -83,6 +109,7 @@ interface ShadoTvWatchProgressRow {
 export interface ShadoTvCatalog {
   channels: ShadoTvChannel[]
   videos: ShadoTvVideo[]
+  contentItems: ShadoTvContentItem[]
   loadedFromSupabase: boolean
 }
 
@@ -108,12 +135,64 @@ export interface ShadoTvVideoFormValues {
   visibilityStatus: ChannelVisibility
 }
 
+export interface ShadoTvVideoUpdateValues {
+  title: string
+  subtitle: string
+  description: string
+  releaseStatus: ShadoTvVideoStatus
+  orientation: ShadoTvOrientation
+  durationMinutes: string
+  releaseLabel: string
+  trailerReleaseAt: string
+  premiereAt: string
+  releasedAt: string
+}
+
+export interface ShadoTvContentItemFormValues {
+  section: ShadoTvContentSection
+  channelId: string
+  title: string
+  subtitle: string
+  body: string
+  dateLabel: string
+  sortOrder: string
+  visibilityStatus: ChannelVisibility
+}
+
+export interface ShadoTvContentItemUpdateValues {
+  title: string
+  subtitle: string
+  body: string
+  dateLabel: string
+  sortOrder: string
+}
+
 export type ShadoTvChannelArtworkKind = 'ticket' | 'hero'
 export type ShadoTvVideoArtworkKind = 'poster' | 'thumbnail'
+export type ShadoTvBunnyUploadKind = 'episode' | 'trailer'
+
+type ShadoTvBunnyUploadSession = {
+  ok: boolean
+  action: 'create-upload'
+  appVideoId: string
+  uploadKind: ShadoTvBunnyUploadKind
+  bunnyVideoId: string
+  libraryId: string
+  endpoint: string
+  authorizationSignature: string
+  authorizationExpire: number
+  embedUrl: string
+}
+
+type ShadoTvBunnyCompleteResponse = {
+  ok: boolean
+  action: 'complete-upload'
+}
 
 const fallbackCatalog: ShadoTvCatalog = {
   channels: SHADO_TV_CHANNELS,
   videos: SHADO_TV_VIDEOS,
+  contentItems: SHADO_TV_CONTENT_ITEMS,
   loadedFromSupabase: false,
 }
 
@@ -219,6 +298,13 @@ function normalizeOrientation(orientation: string): ShadoTvOrientation {
   return orientation === 'vertical' ? 'vertical' : 'horizontal'
 }
 
+function normalizeUploadStatus(status: string | null | undefined): ShadoTvUploadStatus {
+  if (status === 'uploaded' || status === 'queued' || status === 'processing' || status === 'ready' || status === 'failed') {
+    return status
+  }
+  return 'none'
+}
+
 type WorkingClient = Awaited<ReturnType<typeof getWorkingClient>>
 
 async function createSignedArtworkUrl(
@@ -319,6 +405,11 @@ function mapVideo(row: ShadoTvVideoRow, featuresByVideo: Map<string, Set<'prime'
     externalUrl: row.external_url ?? null,
     embedUrl: row.embed_url ?? null,
     provider: row.provider ?? null,
+    providerAssetId: row.provider_asset_id ?? null,
+    providerPlaybackId: row.provider_playback_id ?? null,
+    uploadStatus: normalizeUploadStatus(row.upload_status),
+    uploadError: row.upload_error ?? null,
+    trailerAssetUrl: row.trailer_asset_url ?? null,
     trailerReleaseAt: row.trailer_release_at ?? null,
     premiereAt: row.premiere_at ?? null,
     releasedAt: row.released_at ?? null,
@@ -326,6 +417,22 @@ function mapVideo(row: ShadoTvVideoRow, featuresByVideo: Map<string, Set<'prime'
     featured: features?.has('featured') ?? false,
     prime: features?.has('prime') ?? false,
     trailerAvailable: Boolean(row.trailer_asset_url),
+  }
+}
+
+function mapContentItem(row: ShadoTvContentBlockRow): ShadoTvContentItem {
+  return {
+    id: row.id,
+    channelId: row.channel_id || '',
+    section: row.section,
+    slug: row.slug,
+    title: row.title,
+    subtitle: row.subtitle ?? null,
+    body: row.body ?? null,
+    dateLabel: row.date_label ?? null,
+    visibilityStatus: row.visibility_status,
+    sortOrder: row.sort_order,
+    deletedAt: row.deleted_at ?? null,
   }
 }
 
@@ -342,7 +449,7 @@ async function fetchCatalogRows(admin = false) {
 
   let videoQuery = client
     .from('shado_tv_videos')
-    .select('id, channel_id, slug, title, subtitle, description, source_type, visibility_status, release_status, orientation, duration_seconds, release_label, poster_asset_url, poster_asset_path, thumbnail_asset_url, thumbnail_asset_path, trailer_asset_url, external_url, embed_url, provider, trailer_release_at, premiere_at, released_at, deleted_at, updated_at, created_at')
+    .select('id, channel_id, slug, title, subtitle, description, source_type, visibility_status, release_status, orientation, duration_seconds, release_label, poster_asset_url, poster_asset_path, thumbnail_asset_url, thumbnail_asset_path, trailer_asset_url, external_url, embed_url, provider, provider_asset_id, provider_playback_id, provider_payload, upload_status, upload_error, trailer_release_at, premiere_at, released_at, deleted_at, updated_at, created_at')
     .order('updated_at', { ascending: false })
 
   if (!admin) {
@@ -365,11 +472,26 @@ async function fetchCatalogRows(admin = false) {
 
   if (featureError) throw featureError
 
+  let contentQuery = client
+    .from('shado_tv_content_blocks')
+    .select('id, channel_id, section, slug, title, subtitle, body, date_label, visibility_status, sort_order, deleted_at, updated_at, created_at')
+    .order('section', { ascending: true })
+    .order('sort_order', { ascending: true })
+    .order('updated_at', { ascending: false })
+
+  if (!admin) {
+    contentQuery = contentQuery.is('deleted_at', null).eq('visibility_status', 'published')
+  }
+
+  const { data: contentRows, error: contentError } = await contentQuery
+  if (contentError) throw contentError
+
   return {
     client,
     channelRows: (channelRows ?? []) as ShadoTvChannelRow[],
     videoRows: (videoRows ?? []) as ShadoTvVideoRow[],
     featureRows: (featureRows ?? []) as ShadoTvFeatureRow[],
+    contentRows: (contentRows ?? []) as ShadoTvContentBlockRow[],
   }
 }
 
@@ -388,16 +510,16 @@ export async function fetchShadoTvCatalog(): Promise<ShadoTvCatalog> {
   const mappedVideos = rows.videoRows
     .map(row => mapVideo(row, featuresByVideo))
     .filter(video => mappedChannels.some(channel => channel.id === video.channelId))
-
-  if (mappedChannels.length === 0 || mappedVideos.length === 0) {
-    return fallbackCatalog
-  }
+  const mappedContentItems = rows.contentRows
+    .map(mapContentItem)
+    .filter(item => mappedChannels.some(channel => channel.id === item.channelId))
 
   const { channels, videos } = await hydrateArtworkAssets(rows.client, mappedChannels, mappedVideos)
 
   return {
     channels,
     videos,
+    contentItems: mappedContentItems,
     loadedFromSupabase: true,
   }
 }
@@ -414,11 +536,13 @@ export async function fetchShadoTvAdminCatalog(): Promise<ShadoTvCatalog> {
     featuresByVideo.set(feature.video_id, existing)
   })
   const mappedVideos = rows.videoRows.map(row => mapVideo(row, featuresByVideo))
+  const mappedContentItems = rows.contentRows.map(mapContentItem)
   const { channels, videos } = await hydrateArtworkAssets(rows.client, mappedChannels, mappedVideos)
 
   return {
     channels,
     videos,
+    contentItems: mappedContentItems,
     loadedFromSupabase: true,
   }
 }
@@ -548,10 +672,51 @@ export async function createShadoTvVideo(values: ShadoTvVideoFormValues) {
       external_url: external.externalUrl || null,
       embed_url: values.embedUrl.trim() || external.embedUrl || null,
       provider: values.sourceType === 'external_embed' ? 'external' : 'placeholder',
-      upload_status: values.releaseStatus === 'processing' ? 'processing' : 'ready',
+      upload_status: values.sourceType === 'external_embed' ? 'ready' : 'none',
       created_by: userId,
       updated_by: userId,
     })
+
+  if (error) throw error
+}
+
+export async function updateShadoTvVideoDetails(videoId: string, values: ShadoTvVideoUpdateValues) {
+  const title = normalizeText(values.title, 120, 'Video title', true)
+  const subtitle = normalizeText(values.subtitle, 120, 'Subtitle')
+  const description = normalizeText(values.description, 2000, 'Description')
+  const releaseLabel = normalizeText(values.releaseLabel, 120, 'Release label')
+  const durationMinutes = Number.parseFloat(values.durationMinutes)
+  const durationSeconds = Number.isFinite(durationMinutes) && durationMinutes > 0
+    ? Math.round(durationMinutes * 60)
+    : null
+  const { client, userId } = await getCurrentUserId('update Shado TV videos')
+
+  const toIsoOrNull = (value: string) => {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    const date = new Date(trimmed)
+    if (Number.isNaN(date.getTime())) {
+      throw new Error('Release dates must be valid date/time values.')
+    }
+    return date.toISOString()
+  }
+
+  const { error } = await client
+    .from('shado_tv_videos')
+    .update({
+      title,
+      subtitle: subtitle || null,
+      description: description || null,
+      release_status: values.releaseStatus,
+      orientation: values.orientation,
+      duration_seconds: durationSeconds,
+      release_label: releaseLabel || null,
+      trailer_release_at: toIsoOrNull(values.trailerReleaseAt),
+      premiere_at: toIsoOrNull(values.premiereAt),
+      released_at: toIsoOrNull(values.releasedAt),
+      updated_by: userId,
+    })
+    .eq('id', videoId)
 
   if (error) throw error
 }
@@ -580,6 +745,96 @@ export async function updateShadoTvVideoArtwork(
     await client.storage.from(SHADO_TV_BUCKET).remove([asset.path]).catch(() => undefined)
     throw error
   }
+}
+
+async function createBunnyUploadSession(
+  videoId: string,
+  uploadKind: ShadoTvBunnyUploadKind,
+  file: File
+) {
+  const client = await getWorkingClient()
+  const { data, error } = await client.functions.invoke('shado-tv-bunny-upload', {
+    body: {
+      action: 'create-upload',
+      videoId,
+      uploadKind,
+      fileName: file.name,
+      fileType: file.type || 'video/mp4',
+      fileSize: file.size,
+    },
+  })
+
+  if (error) throw error
+  return data as ShadoTvBunnyUploadSession
+}
+
+async function completeBunnyUpload(
+  videoId: string,
+  uploadKind: ShadoTvBunnyUploadKind,
+  bunnyVideoId: string
+) {
+  const client = await getWorkingClient()
+  const { data, error } = await client.functions.invoke('shado-tv-bunny-upload', {
+    body: {
+      action: 'complete-upload',
+      videoId,
+      uploadKind,
+      bunnyVideoId,
+    },
+  })
+
+  if (error) throw error
+  return data as ShadoTvBunnyCompleteResponse
+}
+
+export async function uploadShadoTvVideoToBunny(
+  videoId: string,
+  uploadKind: ShadoTvBunnyUploadKind,
+  file: File,
+  onProgress?: (progress: { bytesUploaded: number; bytesTotal: number; percentage: number }) => void
+) {
+  if (!file.type.startsWith('video/')) {
+    throw new Error('Choose a video file.')
+  }
+
+  const session = await createBunnyUploadSession(videoId, uploadKind, file)
+  await new Promise<void>((resolve, reject) => {
+    const upload = new tus.Upload(file, {
+      endpoint: session.endpoint,
+      retryDelays: [0, 1000, 3000, 5000, 10000],
+      metadata: {
+        filetype: file.type || 'video/mp4',
+        title: file.name,
+      },
+      headers: {
+        AuthorizationSignature: session.authorizationSignature,
+        AuthorizationExpire: String(session.authorizationExpire),
+        VideoId: session.bunnyVideoId,
+        LibraryId: session.libraryId,
+      },
+      onError: reject,
+      onProgress(bytesUploaded, bytesTotal) {
+        onProgress?.({
+          bytesUploaded,
+          bytesTotal,
+          percentage: bytesTotal > 0 ? Math.round((bytesUploaded / bytesTotal) * 100) : 0,
+        })
+      },
+      onSuccess() {
+        resolve()
+      },
+    })
+
+    upload.findPreviousUploads().then(previousUploads => {
+      if (previousUploads.length > 0) {
+        upload.resumeFromPreviousUpload(previousUploads[0])
+      }
+      upload.start()
+    }).catch(reject)
+  })
+
+  await completeBunnyUpload(videoId, uploadKind, session.bunnyVideoId)
+  return session
 }
 
 export async function updateShadoTvVideoVisibility(videoId: string, visibilityStatus: ChannelVisibility) {
@@ -620,6 +875,104 @@ export async function restoreShadoTvVideo(videoId: string) {
       updated_by: userId,
     })
     .eq('id', videoId)
+
+  if (error) throw error
+}
+
+function normalizeSortOrder(value: string) {
+  const sortOrder = Number.parseInt(value, 10)
+  return Number.isFinite(sortOrder) ? sortOrder : 0
+}
+
+export async function createShadoTvContentItem(values: ShadoTvContentItemFormValues) {
+  const title = normalizeText(values.title, 160, 'Content title', true)
+  const subtitle = normalizeText(values.subtitle, 200, 'Content subtitle')
+  const body = normalizeText(values.body, 2400, 'Content body')
+  const dateLabel = normalizeText(values.dateLabel, 80, 'Date label')
+  const { client, userId } = await getCurrentUserId('create Shado TV content')
+
+  const { error } = await client
+    .from('shado_tv_content_blocks')
+    .insert({
+      channel_id: values.channelId,
+      section: values.section,
+      slug: slugify(title),
+      title,
+      subtitle: subtitle || null,
+      body: body || null,
+      date_label: dateLabel || null,
+      visibility_status: values.visibilityStatus,
+      sort_order: normalizeSortOrder(values.sortOrder),
+      created_by: userId,
+      updated_by: userId,
+    })
+
+  if (error) throw error
+}
+
+export async function updateShadoTvContentItemDetails(
+  itemId: string,
+  values: ShadoTvContentItemUpdateValues
+) {
+  const title = normalizeText(values.title, 160, 'Content title', true)
+  const subtitle = normalizeText(values.subtitle, 200, 'Content subtitle')
+  const body = normalizeText(values.body, 2400, 'Content body')
+  const dateLabel = normalizeText(values.dateLabel, 80, 'Date label')
+  const { client, userId } = await getCurrentUserId('update Shado TV content')
+
+  const { error } = await client
+    .from('shado_tv_content_blocks')
+    .update({
+      title,
+      subtitle: subtitle || null,
+      body: body || null,
+      date_label: dateLabel || null,
+      sort_order: normalizeSortOrder(values.sortOrder),
+      updated_by: userId,
+    })
+    .eq('id', itemId)
+
+  if (error) throw error
+}
+
+export async function updateShadoTvContentItemVisibility(itemId: string, visibilityStatus: ChannelVisibility) {
+  const { client, userId } = await getCurrentUserId('update Shado TV content')
+  const { error } = await client
+    .from('shado_tv_content_blocks')
+    .update({
+      visibility_status: visibilityStatus,
+      updated_by: userId,
+    })
+    .eq('id', itemId)
+
+  if (error) throw error
+}
+
+export async function softDeleteShadoTvContentItem(itemId: string) {
+  const { client, userId } = await getCurrentUserId('delete Shado TV content')
+  const { error } = await client
+    .from('shado_tv_content_blocks')
+    .update({
+      deleted_at: new Date().toISOString(),
+      deleted_by: userId,
+      updated_by: userId,
+    })
+    .eq('id', itemId)
+
+  if (error) throw error
+}
+
+export async function restoreShadoTvContentItem(itemId: string) {
+  const { client, userId } = await getCurrentUserId('restore Shado TV content')
+  const { error } = await client
+    .from('shado_tv_content_blocks')
+    .update({
+      deleted_at: null,
+      deleted_by: null,
+      visibility_status: 'hidden',
+      updated_by: userId,
+    })
+    .eq('id', itemId)
 
   if (error) throw error
 }

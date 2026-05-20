@@ -1,29 +1,16 @@
-import React, { useCallback, useEffect, useState } from 'react'
-import { ArrowLeft, CalendarClock, Clapperboard, ExternalLink, Film, Lock, Play, RotateCcw, Settings, Sparkles, Upload } from 'lucide-react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { ArrowLeft, ExternalLink, Lock, Newspaper, Play, Radio, Users, Video } from 'lucide-react'
 import { motion } from 'framer-motion'
-import { useAuth } from '../../../hooks/useAuth'
 import { SHADO_TV_ASSETS } from './assets/manifest'
 import {
   SHADO_TV_FALLBACK_CATALOG,
-  createShadoTvChannel,
-  createShadoTvVideo,
-  fetchShadoTvAdminCatalog,
   fetchShadoTvCatalog,
   fetchShadoTvWatchProgress,
-  restoreShadoTvChannel,
-  restoreShadoTvVideo,
   saveShadoTvWatchProgress,
-  softDeleteShadoTvChannel,
-  softDeleteShadoTvVideo,
-  updateShadoTvChannelArtwork,
-  updateShadoTvChannelVisibility,
-  updateShadoTvVideoArtwork,
-  updateShadoTvVideoVisibility,
-  type ShadoTvChannelArtworkKind,
-  type ShadoTvVideoArtworkKind,
 } from './api'
 import {
   type ShadoTvChannel,
+  type ShadoTvContentItem,
   type ShadoTvVideo,
   type ShadoTvWatchProgress,
 } from './data'
@@ -34,35 +21,125 @@ interface ShadoTvScreenProps {
 
 type ShadoTvView =
   | { type: 'home' }
-  | { type: 'channel'; channelId: string }
-  | { type: 'video'; videoId: string; fromChannelId?: string }
-  | { type: 'admin' }
+  | { type: 'episode'; videoId: string }
+  | { type: 'trailers' }
+  | { type: 'cast' }
+  | { type: 'updates' }
 
-const statusCopy: Record<ShadoTvVideo['status'], string> = {
-  released: 'Watch now',
-  premiere: 'Premiere',
-  locked: 'Locked',
-  processing: 'Processing',
+type HubStatus = 'coming-soon' | 'airing-now' | 'now-streaming'
+
+const SHOW_TITLE = 'The Crimp & Shrimp Show'
+const SHOW_TAGLINE = 'Small thieves. Big trouble. Family comedy from the woods.'
+
+function parseDate(value?: string | null) {
+  if (!value) return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
 }
 
-function getChannelById(channels: ShadoTvChannel[], channelId?: string) {
-  return channels.find(channel => channel.id === channelId) ?? channels[0] ?? SHADO_TV_FALLBACK_CATALOG.channels[0]
+function formatDateTime(value?: string | null) {
+  const date = parseDate(value)
+  if (!date) return 'Date not set'
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }
 
-function getVideosForChannel(videos: ShadoTvVideo[], channelId: string) {
-  return videos.filter(video => video.channelId === channelId)
+function formatDuration(seconds?: number | null) {
+  if (!seconds) return 'Runtime pending'
+  const minutes = Math.round(seconds / 60)
+  return `${minutes} min`
 }
 
-function formatWatchTime(seconds?: number | null) {
-  if (!seconds) return '0:00'
-  const minutes = Math.floor(seconds / 60)
-  const remaining = seconds % 60
-  return `${minutes}:${String(remaining).padStart(2, '0')}`
+function formatClock(seconds: number) {
+  const safe = Math.max(0, seconds)
+  const days = Math.floor(safe / 86400)
+  const hours = Math.floor((safe % 86400) / 3600)
+  const minutes = Math.floor((safe % 3600) / 60)
+  const remaining = safe % 60
+
+  return [
+    { label: 'Days', value: days },
+    { label: 'Hrs', value: hours },
+    { label: 'Mins', value: minutes },
+    { label: 'Secs', value: remaining },
+  ]
 }
 
-function getProgressPercent(progress?: ShadoTvWatchProgress | null) {
-  if (!progress?.durationSeconds) return 0
-  return Math.min(100, Math.max(0, Math.round((progress.positionSeconds / progress.durationSeconds) * 100)))
+function getEpisodeSortTime(video: ShadoTvVideo) {
+  return parseDate(video.premiereAt)?.getTime()
+    ?? parseDate(video.releasedAt)?.getTime()
+    ?? 0
+}
+
+function getHubStatus(video?: ShadoTvVideo | null, now = Date.now()): HubStatus {
+  if (!video) return 'coming-soon'
+  const premiereAt = parseDate(video.premiereAt)?.getTime()
+  const releasedAt = parseDate(video.releasedAt)?.getTime()
+  const premiereEnd = premiereAt && video.durationSeconds
+    ? premiereAt + video.durationSeconds * 1000
+    : null
+
+  if (premiereAt && premiereEnd && now >= premiereAt && now < premiereEnd) {
+    return 'airing-now'
+  }
+
+  if ((releasedAt && now >= releasedAt) || (video.status === 'released' && !releasedAt)) {
+    return 'now-streaming'
+  }
+
+  return 'coming-soon'
+}
+
+function getCountdownTarget(video?: ShadoTvVideo | null, now = Date.now()) {
+  if (!video) return null
+  const premiereAt = parseDate(video.premiereAt)
+  const releasedAt = parseDate(video.releasedAt)
+
+  if (premiereAt && premiereAt.getTime() > now) {
+    return {
+      label: 'Premiere starts in',
+      date: premiereAt,
+    }
+  }
+
+  if (releasedAt && releasedAt.getTime() > now) {
+    return {
+      label: 'Now streaming in',
+      date: releasedAt,
+    }
+  }
+
+  return null
+}
+
+function isTrailerReleased(video: ShadoTvVideo, now = Date.now()) {
+  if (!video.trailerAssetUrl) return false
+  const releaseAt = parseDate(video.trailerReleaseAt)
+  return !releaseAt || releaseAt.getTime() <= now
+}
+
+function getTrailerLabel(video: ShadoTvVideo) {
+  if (isTrailerReleased(video)) return 'Available now'
+  if (video.trailerAssetUrl || video.trailerReleaseAt || video.trailerAvailable) {
+    return `Unlocks ${formatDateTime(video.trailerReleaseAt)}`
+  }
+  return 'Pending'
+}
+
+function getPrimaryEpisode(videos: ShadoTvVideo[]) {
+  return videos.find(video => video.prime)
+    ?? [...videos].sort((a, b) => getEpisodeSortTime(a) - getEpisodeSortTime(b))[0]
+    ?? SHADO_TV_FALLBACK_CATALOG.videos[0]
+}
+
+function getContentItems(contentItems: ShadoTvContentItem[], channelId: string, section: ShadoTvContentItem['section']) {
+  return contentItems
+    .filter(item => item.section === section && item.channelId === channelId)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title))
 }
 
 function BackButton({ onClick, label = 'Back' }: { onClick: () => void; label?: string }) {
@@ -71,149 +148,176 @@ function BackButton({ onClick, label = 'Back' }: { onClick: () => void; label?: 
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="inline-flex h-11 w-11 shrink-0 items-center justify-center text-[#f6e0a2] transition hover:text-white focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
+      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#d2b58a]/20 bg-black/20 text-[#e7c489] transition hover:border-[#e3b061]/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-[#a64022]/50"
     >
-      <ArrowLeft className="h-6 w-6" />
+      <ArrowLeft className="h-5 w-5" />
     </button>
   )
 }
 
-function ShadoTvHeader({
-  onBack,
-  onExit,
-  canManage,
-  onAdmin,
-}: {
-  onBack?: () => void
-  onExit: () => void
-  canManage: boolean
-  onAdmin: () => void
-}) {
+function ShadoTvHeader({ onBack, onExit, title }: { onBack?: () => void; onExit: () => void; title?: string }) {
   return (
-    <header className="relative z-20 flex h-[calc(3.95rem+env(safe-area-inset-top))] shrink-0 items-end justify-center overflow-hidden border-b border-[#d7aa46]/22 bg-black px-2 pb-2 pt-[env(safe-area-inset-top)] shadow-[0_10px_32px_rgba(0,0,0,0.55)]">
-      <img
-        src={SHADO_TV_ASSETS.headerBanner}
-        alt=""
-        className="absolute inset-0 h-full w-full object-cover"
-        width={2400}
-        height={240}
-        loading="eager"
-        decoding="async"
-      />
-      <div className="absolute inset-0 bg-black/12" />
-      <div className="absolute bottom-2 left-1 flex items-center">
+    <header className="relative z-20 flex h-[calc(4rem+env(safe-area-inset-top))] shrink-0 items-end border-b border-[#9a6a43]/30 bg-[#070806]/92 px-3 pb-2 pt-[env(safe-area-inset-top)] shadow-[0_12px_34px_rgba(0,0,0,0.55)]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_22%_0%,rgba(166,64,34,0.24),transparent_36%),linear-gradient(180deg,rgba(255,233,184,0.05),transparent)]" />
+      <div className="relative flex w-full items-center justify-between gap-3">
         <BackButton onClick={onBack ?? onExit} label={onBack ? 'Back within Shado TV' : 'Back to Entertainment'} />
+        <div className="min-w-0 text-center">
+          <p className="text-[0.62rem] font-black uppercase tracking-[0.22em] text-[#c89561]">Shado TV</p>
+          <p className="truncate text-sm font-black uppercase tracking-[0.12em] text-[#f1dbc0]">{title ?? SHOW_TITLE}</p>
+        </div>
+        <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#d2b58a]/20 bg-black/20 text-[#c89561]">
+          <Radio className="h-5 w-5" />
+        </span>
       </div>
-      {canManage && (
-        <button
-          type="button"
-          onClick={onAdmin}
-          aria-label="Open Shado TV management"
-          className="absolute bottom-2 right-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#d7aa46]/45 bg-black/36 text-[#f6e0a2] shadow-[0_0_24px_rgba(215,170,70,0.16)] transition hover:border-[#f0d381] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
-        >
-          <Settings className="h-5 w-5" />
-        </button>
-      )}
     </header>
   )
 }
 
-function StatusBadge({ video }: { video: ShadoTvVideo }) {
-  const icon = video.status === 'released' ? Play : video.status === 'premiere' ? CalendarClock : video.status === 'processing' ? RotateCcw : Lock
-  const Icon = icon
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-[#f0d381]/30 bg-black/58 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#f6e0a2] shadow-[0_8px_18px_rgba(0,0,0,0.28)]">
-      <Icon className="h-3.5 w-3.5" />
-      {statusCopy[video.status]}
-    </span>
-  )
-}
+function StatusCard({ episode }: { episode?: ShadoTvVideo | null }) {
+  const [now, setNow] = useState(() => Date.now())
+  const status = getHubStatus(episode, now)
+  const target = getCountdownTarget(episode, now)
+  const seconds = target ? Math.max(0, Math.floor((target.date.getTime() - now) / 1000)) : 0
+  const clock = formatClock(seconds)
+  const statusCopy = {
+    'coming-soon': 'Coming Soon',
+    'airing-now': 'Airing Now',
+    'now-streaming': 'Now Streaming',
+  } satisfies Record<HubStatus, string>
 
-function ChannelTicket({ channel, index, onOpen }: { channel: ShadoTvChannel; index: number; onOpen: () => void }) {
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      aria-label={`Open ${channel.name}`}
-      data-shado-tv-channel-card="true"
-      className="group relative h-[9.4rem] w-[6.2rem] shrink-0 overflow-hidden rounded-[0.9rem] text-center transition-transform duration-300 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/60"
-    >
+    <section className="relative overflow-hidden rounded-lg border border-[#b88452]/35 bg-[#0b0c09] shadow-[0_20px_52px_rgba(0,0,0,0.48)]">
       <img
-        src={channel.ticketAsset}
+        src={SHADO_TV_ASSETS.crimpShrimp.statusComingSoon}
         alt=""
-        className="absolute inset-0 h-full w-full object-cover"
-        width={512}
-        height={768}
-        loading={index < 3 ? 'eager' : 'lazy'}
+        className="absolute inset-0 h-full w-full object-cover opacity-95"
+        width={1792}
+        height={1024}
+        loading="eager"
         decoding="async"
       />
-      <div className="relative flex h-full flex-col items-center justify-center px-3 pt-4 text-[#100b04]">
-        <span className="text-[10px] font-black uppercase tracking-[0.12em] opacity-75">Channel</span>
-        <span className="mt-1 text-3xl font-black leading-none tabular-nums">{String(index + 1).padStart(2, '0')}</span>
-        <span className="mt-2 text-[0.72rem] font-black uppercase leading-[0.92rem] tracking-[0.08em]">{channel.name}</span>
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.08),rgba(0,0,0,0.3))]" />
+      <div className="relative px-4 py-5 text-center">
+        <p className="text-[0.68rem] font-black uppercase tracking-[0.24em] text-[#7a2e1d]">{target?.label ?? statusCopy[status]}</p>
+        {target ? (
+          <div className="mt-3 grid grid-cols-4 gap-1.5">
+            {clock.map(item => (
+              <div key={item.label} className="border-r border-[#7a2e1d]/24 last:border-r-0">
+                <span className="block text-2xl font-black tabular-nums text-[#8f3522]">{String(item.value).padStart(2, '0')}</span>
+                <span className="block text-[0.6rem] font-black uppercase tracking-[0.14em] text-[#3f2519]/76">{item.label}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-3 text-2xl font-black uppercase tracking-[0.08em] text-[#8f3522]">{statusCopy[status]}</p>
+        )}
+        <p className="mx-auto mt-3 max-w-sm text-xs font-semibold leading-5 text-[#3f2519]/78">
+          {episode ? `${episode.subtitle}: ${episode.title}` : 'The first episode is being prepared for upload.'}
+        </p>
       </div>
-    </button>
+    </section>
   )
 }
 
-function PosterCard({ video, onOpen, priority = false }: { video: ShadoTvVideo; onOpen: () => void; priority?: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      aria-label={`Open ${video.title}`}
-      data-shado-tv-video-card="true"
-      className="group relative min-h-[13rem] w-[8.75rem] shrink-0 overflow-hidden rounded-[0.85rem] border border-[#d7aa46]/32 bg-black text-left shadow-[0_16px_32px_rgba(0,0,0,0.38)] transition duration-300 hover:-translate-y-1 hover:border-[#f0d381]/70 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
-    >
-      <img
-        src={video.posterAsset}
-        alt=""
-        className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
-        width={640}
-        height={960}
-        loading={priority ? 'eager' : 'lazy'}
-        decoding="async"
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/18 to-transparent" />
-      <div className="absolute inset-x-2 top-2">
-        <StatusBadge video={video} />
-      </div>
-      <div className="absolute inset-x-3 bottom-3">
-        <h3 className="text-lg font-black uppercase leading-5 tracking-[0.04em] text-[#f6e0a2]">{video.title}</h3>
-        <p className="mt-0.5 text-xs font-semibold text-[#d9c79f]/86">{video.subtitle}</p>
-      </div>
-    </button>
-  )
-}
-
-function ContinueWatchingCard({
+function EpisodeCard({
   video,
   progress,
   onOpen,
 }: {
   video: ShadoTvVideo
-  progress: ShadoTvWatchProgress
+  progress?: ShadoTvWatchProgress
   onOpen: () => void
 }) {
-  const percent = getProgressPercent(progress)
+  const status = getHubStatus(video)
+  const progressPercent = progress?.durationSeconds
+    ? Math.min(100, Math.round((progress.positionSeconds / progress.durationSeconds) * 100))
+    : 0
 
   return (
     <button
       type="button"
       onClick={onOpen}
-      aria-label={`Resume ${video.title}`}
       data-shado-tv-video-card="true"
-      className="relative h-[7.5rem] w-[14rem] shrink-0 overflow-hidden rounded-[1rem] border border-[#d7aa46]/32 bg-black text-left shadow-[0_16px_32px_rgba(0,0,0,0.34)] transition hover:-translate-y-0.5 hover:border-[#f0d381]/70 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
+      aria-label={`Open ${video.title}`}
+      className="group relative w-full overflow-hidden rounded-lg border border-[#b88452]/35 bg-[#090907] text-left shadow-[0_18px_46px_rgba(0,0,0,0.42)] transition hover:-translate-y-0.5 hover:border-[#d8b06f]/70 focus:outline-none focus:ring-2 focus:ring-[#a64022]/60"
     >
-      <img src={video.thumbnailAsset} alt="" className="absolute inset-0 h-full w-full object-cover opacity-78" width={1280} height={720} loading="lazy" decoding="async" />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/30 to-black/16" />
-      <div className="absolute inset-x-3 bottom-3">
-        <h3 className="truncate text-base font-black uppercase tracking-[0.04em] text-[#f6e0a2]">{video.title}</h3>
-        <p className="mt-0.5 text-xs font-semibold text-[#d9c79f]/78">
-          Resume at {formatWatchTime(progress.positionSeconds)}
-        </p>
-        <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/18">
-          <div className="h-full rounded-full bg-[#f0d381]" style={{ width: `${percent || 6}%` }} />
+      <img
+        src={SHADO_TV_ASSETS.crimpShrimp.featuredEpisodeFrame}
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover opacity-78"
+        width={1792}
+        height={1024}
+        loading="eager"
+        decoding="async"
+      />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.38),rgba(0,0,0,0.78))]" />
+      <div className="relative grid min-h-[12rem] grid-cols-[7rem_1fr] gap-3 p-3 min-[420px]:grid-cols-[8.3rem_1fr]">
+        <div className="relative min-h-[10.6rem] overflow-hidden rounded-md border border-[#d8b06f]/36 bg-[#15100b] shadow-[0_12px_24px_rgba(0,0,0,0.42)]">
+          <img
+            src={video.posterAsset}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover object-top brightness-[1.18] contrast-[1.08] saturate-[1.08]"
+            width={640}
+            height={960}
+            loading="eager"
+            decoding="async"
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,220,148,0.08),transparent_38%,rgba(0,0,0,0.12))]" />
+        </div>
+        <div className="flex min-w-0 flex-col justify-between py-1">
+          <div>
+            <span className="inline-flex rounded-full border border-[#d8b06f]/30 bg-black/42 px-2.5 py-1 text-[0.62rem] font-black uppercase tracking-[0.16em] text-[#e5c28f]">
+              {status === 'airing-now' ? 'Airing Now' : status === 'now-streaming' ? 'Now Streaming' : 'Announced'}
+            </span>
+            <p className="mt-3 text-[0.68rem] font-black uppercase tracking-[0.18em] text-[#c89561]">{video.subtitle || 'Episode'}</p>
+            <h2 className="mt-1 text-2xl font-black uppercase leading-7 text-[#b94728] min-[420px]:text-3xl">{video.title}</h2>
+            <p className="mt-2 line-clamp-2 text-xs font-semibold leading-5 text-[#dac5a3]/78">{video.description}</p>
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <span className="text-xs font-bold text-[#d9c79f]/70">{formatDuration(video.durationSeconds)}</span>
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#d8b06f]/55 bg-[#a64022]/20 text-[#f1dbc0]">
+              {status === 'coming-soon' ? <Lock className="h-4 w-4" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}
+            </span>
+          </div>
+        </div>
+      </div>
+      {progressPercent > 0 && (
+        <div className="absolute inset-x-0 bottom-0 h-1 bg-white/12">
+          <div className="h-full bg-[#b94728]" style={{ width: `${progressPercent}%` }} />
+        </div>
+      )}
+    </button>
+  )
+}
+
+function ModuleCard({
+  icon: Icon,
+  title,
+  subtitle,
+  onOpen,
+}: {
+  icon: React.ElementType
+  title: string
+  subtitle: string
+  onOpen: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="relative min-h-[8rem] overflow-hidden rounded-lg border border-[#b88452]/30 bg-[#0b0c09] p-3 text-left shadow-[0_16px_36px_rgba(0,0,0,0.34)] transition hover:-translate-y-0.5 hover:border-[#d8b06f]/65 focus:outline-none focus:ring-2 focus:ring-[#a64022]/55"
+    >
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_18%,rgba(166,64,34,0.18),transparent_34%),linear-gradient(180deg,rgba(235,199,139,0.06),rgba(0,0,0,0.18))]" />
+      <div className="relative flex h-full flex-col justify-between">
+        <Icon className="h-5 w-5 text-[#c89561]" />
+        <div>
+          <h3 className="text-lg font-black uppercase tracking-[0.08em] text-[#f1dbc0]">{title}</h3>
+          <p className="mt-1 text-xs font-semibold leading-5 text-[#dac5a3]/68">{subtitle}</p>
         </div>
       </div>
     </button>
@@ -224,229 +328,117 @@ function HomeView({
   channels,
   videos,
   watchProgress,
-  onOpenChannel,
-  onOpenVideo,
+  onOpenEpisode,
+  onOpenTrailers,
+  onOpenCast,
+  onOpenUpdates,
 }: {
   channels: ShadoTvChannel[]
   videos: ShadoTvVideo[]
   watchProgress: Map<string, ShadoTvWatchProgress>
-  onOpenChannel: (channelId: string) => void
-  onOpenVideo: (videoId: string) => void
+  onOpenEpisode: (videoId: string) => void
+  onOpenTrailers: () => void
+  onOpenCast: () => void
+  onOpenUpdates: () => void
 }) {
-  const prime = videos.find(video => video.prime) ?? videos[0] ?? SHADO_TV_FALLBACK_CATALOG.videos[0]
-  const primeChannel = getChannelById(channels, prime.channelId)
-  const featuredVideos = videos.filter(video => video.featured)
-  const visibleFeaturedVideos = featuredVideos.length > 0 ? featuredVideos : videos.slice(0, 4)
-  const continueVideos = videos
-    .map(video => ({ video, progress: watchProgress.get(video.id) }))
-    .filter((item): item is { video: ShadoTvVideo; progress: ShadoTvWatchProgress } => Boolean(item.progress?.positionSeconds))
-    .slice(0, 6)
+  const series = channels[0] ?? SHADO_TV_FALLBACK_CATALOG.channels[0]
+  const episodes = videos
+  const primaryEpisode = getPrimaryEpisode(episodes)
 
   return (
     <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)_+_1.25rem)] pt-4">
-      <section className="relative overflow-hidden rounded-[1.4rem] border border-[#d7aa46]/34 bg-black/72 shadow-[0_24px_68px_rgba(0,0,0,0.52)]">
+      <section className="relative min-h-[18.5rem] overflow-hidden rounded-lg border border-[#b88452]/35 bg-[#050604] shadow-[0_28px_72px_rgba(0,0,0,0.58)]">
         <img
-          src={SHADO_TV_ASSETS.marqueeFrame}
+          src={SHADO_TV_ASSETS.crimpShrimp.seriesHubHero}
           alt=""
-          className="absolute inset-0 h-full w-full object-cover opacity-80"
-          width={1440}
-          height={768}
+          className="absolute inset-0 h-full w-full object-cover"
+          width={1792}
+          height={1024}
           loading="eager"
           decoding="async"
         />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_16%,rgba(240,211,129,0.2),transparent_30%),linear-gradient(90deg,rgba(0,0,0,0.92),rgba(0,0,0,0.5))]" />
-        <div className="relative flex min-h-[15.5rem] flex-col justify-between p-4">
-          <div>
-            <p className="text-[0.68rem] font-black uppercase tracking-[0.22em] text-[#f0d381]">Now Playing</p>
-            <h1 className="mt-2 max-w-[13rem] text-3xl font-black uppercase leading-8 text-[#f6e0a2]">{prime.title}</h1>
-            <p className="mt-1 text-sm font-semibold text-[#d9c79f]/86">{primeChannel.name}</p>
-          </div>
-          <div className="flex items-end justify-between gap-3">
-            <div className="min-w-0">
-              <StatusBadge video={prime} />
-              <p className="mt-2 text-xs text-[#d9c79f]/76">{prime.durationLabel} / {prime.releaseLabel}</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => onOpenVideo(prime.id)}
-              className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#f0d381]/65 bg-[#d7aa46]/18 text-[#f6e0a2] shadow-[0_0_32px_rgba(215,170,70,0.28)] transition hover:bg-[#d7aa46]/28 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/60"
-              aria-label={`Play ${prime.title}`}
-            >
-              <Play className="ml-0.5 h-5 w-5 fill-current" />
-            </button>
-          </div>
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.42),rgba(0,0,0,0.12)_42%,rgba(0,0,0,0.84)),linear-gradient(180deg,rgba(0,0,0,0.06),rgba(0,0,0,0.72))]" />
+        <div className="relative flex min-h-[18.5rem] flex-col justify-end p-4">
+          <p className="text-[0.68rem] font-black uppercase tracking-[0.24em] text-[#c89561]">Polder Films Presents</p>
+          <h1 className="mt-2 max-w-[16rem] text-4xl font-black uppercase leading-9 text-[#b94728] drop-shadow-[0_5px_18px_rgba(0,0,0,0.88)]">
+            {SHOW_TITLE}
+          </h1>
+          <p className="mt-3 max-w-[18rem] text-sm font-semibold leading-5 text-[#f1dbc0]/84">
+            {series.description || series.tagline || SHOW_TAGLINE}
+          </p>
         </div>
       </section>
 
+      <div className="mt-4">
+        <StatusCard episode={primaryEpisode} />
+      </div>
+
       <section className="mt-5">
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-black uppercase tracking-[0.22em] text-[#f6e0a2]">Channels</h2>
+          <h2 className="text-sm font-black uppercase tracking-[0.22em] text-[#f1dbc0]">Episodes</h2>
+          <span className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[#c89561]">{episodes.length || 0} listed</span>
         </div>
-        <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2" data-mobile-horizontal-scroll="true">
-          {channels.map((channel, index) => (
-            <ChannelTicket
-              key={channel.id}
-              channel={channel}
-              index={index}
-              onOpen={() => onOpenChannel(channel.id)}
+        <div className="grid gap-3">
+          {episodes.map(video => (
+            <EpisodeCard
+              key={video.id}
+              video={video}
+              progress={watchProgress.get(video.id)}
+              onOpen={() => onOpenEpisode(video.id)}
             />
           ))}
-        </div>
-      </section>
-
-      {continueVideos.length > 0 && (
-        <section className="mt-5">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-sm font-black uppercase tracking-[0.22em] text-[#f6e0a2]">Continue Watching</h2>
-            <span className="text-[0.68rem] font-bold uppercase tracking-[0.18em] text-[#d9c79f]/58">Resume</span>
-          </div>
-          <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2" data-mobile-horizontal-scroll="true">
-            {continueVideos.map(({ video, progress }) => (
-              <ContinueWatchingCard
-                key={video.id}
-                video={video}
-                progress={progress}
-                onOpen={() => onOpenVideo(video.id)}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="mt-5">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-sm font-black uppercase tracking-[0.22em] text-[#f6e0a2]">Featured</h2>
-          <Sparkles className="h-4 w-4 text-[#f0d381]" />
-        </div>
-        <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-2" data-mobile-horizontal-scroll="true">
-          {visibleFeaturedVideos.map((video, index) => (
-            <PosterCard key={video.id} video={video} onOpen={() => onOpenVideo(video.id)} priority={index < 2} />
-          ))}
-        </div>
-      </section>
-    </main>
-  )
-}
-
-function ChannelView({
-  channel,
-  videos,
-  onOpenVideo,
-}: {
-  channel: ShadoTvChannel
-  videos: ShadoTvVideo[]
-  onOpenVideo: (videoId: string) => void
-}) {
-  const channelVideos = getVideosForChannel(videos, channel.id)
-
-  return (
-    <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)_+_1.25rem)] pt-4">
-      <section className="relative min-h-[12.5rem] overflow-hidden rounded-[1.35rem] border border-[#d7aa46]/34 bg-black/70 p-4 shadow-[0_24px_62px_rgba(0,0,0,0.5)]">
-        <img src={channel.heroAsset} alt="" className="absolute inset-0 h-full w-full object-cover opacity-78" width={1440} height={720} loading="eager" decoding="async" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/92 via-black/58 to-black/20" />
-        <div className="relative flex min-h-[10.5rem] max-w-[18rem] flex-col justify-end">
-          <p className="text-[0.68rem] font-black uppercase tracking-[0.22em] text-[#f0d381]">{channel.updatedAtLabel}</p>
-          <h1 className="mt-2 text-3xl font-black uppercase leading-8 text-[#f6e0a2]">{channel.name}</h1>
-          <p className="mt-2 text-sm leading-5 text-[#d9c79f]/82">{channel.tagline}</p>
-        </div>
-      </section>
-
-      <section className="mt-5">
-        <div className="grid grid-cols-2 gap-3 min-[430px]:grid-cols-3">
-          {channelVideos.map(video => (
-            <button
-              key={video.id}
-              type="button"
-              aria-label={`Open ${video.title}`}
-              onClick={() => onOpenVideo(video.id)}
-              data-shado-tv-video-card="true"
-              className="overflow-hidden rounded-[0.9rem] border border-[#d7aa46]/26 bg-black/56 text-left shadow-[0_16px_28px_rgba(0,0,0,0.35)] transition hover:-translate-y-0.5 hover:border-[#f0d381]/55 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
-            >
-              <div className="relative aspect-[2/3] overflow-hidden bg-black">
-                <img src={video.posterAsset} alt="" className="h-full w-full object-cover" width={640} height={960} loading="lazy" decoding="async" />
-                <div className="absolute left-2 top-2"><StatusBadge video={video} /></div>
-              </div>
-              <div className="p-2.5">
-                <h3 className="line-clamp-2 text-sm font-black uppercase leading-4 text-[#f6e0a2]">{video.title}</h3>
-                <p className="mt-1 truncate text-xs text-[#d9c79f]/70">{video.durationLabel}</p>
-              </div>
-            </button>
-          ))}
-          {channelVideos.length === 0 && (
-            <div className="col-span-2 rounded-[1rem] border border-[#d7aa46]/24 bg-black/42 p-4 text-sm font-semibold leading-5 text-[#d9c79f]/78 min-[430px]:col-span-3">
-              No visible videos in this channel yet.
+          {episodes.length === 0 && (
+            <div className="rounded-lg border border-[#b88452]/28 bg-black/42 p-4 text-sm font-semibold leading-5 text-[#dac5a3]/78">
+              No public episodes are visible yet. Add or announce an episode from Shado TV Studio.
             </div>
           )}
         </div>
       </section>
+
+      <section className="mt-5 grid grid-cols-1 gap-3 min-[420px]:grid-cols-3">
+        <ModuleCard icon={Video} title="Trailers" subtitle="Show trailers and episode previews." onOpen={onOpenTrailers} />
+        <ModuleCard icon={Users} title="Cast" subtitle="Global cast and production credits." onOpen={onOpenCast} />
+        <ModuleCard icon={Newspaper} title="Updates" subtitle="Newest production notes and older posts." onOpen={onOpenUpdates} />
+      </section>
     </main>
   )
 }
 
-function VideoView({
+function EpisodeView({
   video,
-  channel,
+  castItems,
   progress,
   onProgressSaved,
 }: {
   video: ShadoTvVideo
-  channel: ShadoTvChannel
+  castItems: ShadoTvContentItem[]
   progress?: ShadoTvWatchProgress
   onProgressSaved: () => Promise<void>
 }) {
-  const [showEmbed, setShowEmbed] = useState(false)
-  const [progressMessage, setProgressMessage] = useState<string | null>(null)
-  const [savingProgress, setSavingProgress] = useState(false)
-  const isVertical = video.orientation === 'vertical'
-  const canPlay = video.status === 'released'
-  const canEmbed = canPlay && video.sourceType === 'external_embed' && Boolean(video.embedUrl)
-  const canOpenExternal = canPlay && video.sourceType === 'external_embed' && Boolean(video.externalUrl)
-  const image = video.status === 'processing'
-    ? SHADO_TV_ASSETS.placeholders.processing
-    : video.status === 'locked' || video.status === 'premiere'
-      ? SHADO_TV_ASSETS.placeholders.lockedPremiere
-      : video.thumbnailAsset
-  const progressPercent = getProgressPercent(progress)
+  const [message, setMessage] = useState<string | null>(null)
+  const status = getHubStatus(video)
+  const target = getCountdownTarget(video)
+  const canPlayVideo = (status === 'airing-now' || status === 'now-streaming') && Boolean(video.embedUrl)
+  const trailerReady = isTrailerReleased(video)
 
-  const saveStartProgress = async (positionSeconds?: number) => {
-    if (!canPlay) return
-    setSavingProgress(true)
-    setProgressMessage(null)
+  const saveProgress = async () => {
+    if (status !== 'now-streaming') return
     try {
-      await saveShadoTvWatchProgress(
-        video.id,
-        positionSeconds ?? Math.max(1, progress?.positionSeconds ?? 0),
-        video.durationSeconds ?? progress?.durationSeconds ?? null
-      )
+      await saveShadoTvWatchProgress(video.id, Math.max(1, progress?.positionSeconds ?? 0), video.durationSeconds ?? null)
       await onProgressSaved()
-      setProgressMessage('Resume point saved.')
+      setMessage('Resume point saved.')
     } catch (error) {
-      setProgressMessage(error instanceof Error ? error.message : 'Unable to save resume point.')
-    } finally {
-      setSavingProgress(false)
-    }
-  }
-
-  const handlePlay = () => {
-    if (!canPlay) return
-    if (canEmbed) {
-      setShowEmbed(true)
-      void saveStartProgress()
-      return
-    }
-    if (canOpenExternal && video.externalUrl) {
-      void saveStartProgress()
-      window.open(video.externalUrl, '_blank', 'noopener,noreferrer')
+      setMessage(error instanceof Error ? error.message : 'Unable to save resume point.')
     }
   }
 
   return (
     <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)_+_1.25rem)] pt-4">
-      <section className="overflow-hidden rounded-[1.25rem] border border-[#d7aa46]/34 bg-black/78 shadow-[0_24px_62px_rgba(0,0,0,0.55)]">
-        <div className={`relative mx-auto bg-black ${isVertical ? 'aspect-[9/16] max-h-[62vh] max-w-[18rem]' : 'aspect-video w-full'}`}>
-          {showEmbed && canEmbed ? (
+      <section className="overflow-hidden rounded-lg border border-[#b88452]/34 bg-[#080806] shadow-[0_24px_62px_rgba(0,0,0,0.52)]">
+        <div className="relative aspect-video bg-black">
+          {canPlayVideo && video.embedUrl ? (
             <iframe
-              src={video.embedUrl || undefined}
+              src={video.embedUrl}
               title={video.title}
               className="absolute inset-0 h-full w-full border-0 bg-black"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
@@ -455,544 +447,244 @@ function VideoView({
             />
           ) : (
             <>
-              <img src={image} alt="" className="h-full w-full object-cover" width={isVertical ? 720 : 1280} height={isVertical ? 1280 : 720} loading="eager" decoding="async" />
-              <div className="absolute inset-0 bg-black/18" />
-              <div className="absolute left-3 top-3"><StatusBadge video={video} /></div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <button
-                  type="button"
-                  disabled={!canPlay || (!canEmbed && !canOpenExternal)}
-                  onClick={handlePlay}
-                  className="inline-flex h-16 w-16 items-center justify-center rounded-full border border-[#f0d381]/70 bg-black/56 text-[#f6e0a2] shadow-[0_0_42px_rgba(215,170,70,0.3)] backdrop-blur-md transition enabled:hover:bg-[#d7aa46]/20 disabled:opacity-70"
-                  aria-label={canPlay ? `Play ${video.title}` : `${video.title} is not available yet`}
-                >
-                  {canPlay ? (canOpenExternal && !canEmbed ? <ExternalLink className="h-7 w-7" /> : <Play className="ml-1 h-7 w-7 fill-current" />) : <Lock className="h-7 w-7" />}
-                </button>
+              <img
+                src={status === 'coming-soon' ? video.posterAsset : video.thumbnailAsset}
+                alt=""
+                className="h-full w-full object-cover object-top opacity-86"
+                width={1280}
+                height={720}
+                loading="eager"
+                decoding="async"
+              />
+              <div className="absolute inset-0 bg-black/30" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
+                <span className="inline-flex h-16 w-16 items-center justify-center rounded-full border border-[#d8b06f]/65 bg-black/48 text-[#f1dbc0] shadow-[0_0_34px_rgba(166,64,34,0.3)]">
+                  {status === 'coming-soon' ? <Lock className="h-7 w-7" /> : <Play className="ml-1 h-7 w-7 fill-current" />}
+                </span>
+                <p className="mt-3 text-sm font-black uppercase tracking-[0.18em] text-[#f1dbc0]">
+                  {status === 'airing-now' ? 'Premiere stream ready' : status === 'now-streaming' ? 'Stream upload pending' : 'Locked until premiere'}
+                </p>
+                {target && <p className="mt-1 text-xs font-semibold text-[#dac5a3]/78">{target.label} {formatDateTime(target.date.toISOString())}</p>}
               </div>
             </>
           )}
-          {progressPercent > 0 && (
-            <div className="absolute inset-x-0 bottom-0 h-1 bg-white/16">
-              <div className="h-full bg-[#f0d381]" style={{ width: `${progressPercent}%` }} />
-            </div>
-          )}
         </div>
-        <div className="border-t border-white/10 bg-black/38 px-4 py-3">
-          <div className="flex flex-wrap items-center gap-2">
-            {canPlay && (canEmbed || canOpenExternal) ? (
+        <div className="border-t border-[#b88452]/22 bg-black/34 p-4">
+          <div className="flex flex-wrap gap-2">
+            {canPlayVideo ? (
               <button
                 type="button"
-                onClick={handlePlay}
-                disabled={savingProgress}
-                className="inline-flex h-10 items-center gap-2 rounded-full border border-[#d7aa46]/40 px-4 text-xs font-black uppercase tracking-[0.14em] text-[#f6e0a2] transition hover:border-[#f0d381]/70 disabled:opacity-55"
+                onClick={() => void saveProgress()}
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-[#b88452]/40 px-4 text-xs font-black uppercase tracking-[0.14em] text-[#f1dbc0] transition hover:border-[#d8b06f]/70"
               >
-                {canOpenExternal && !canEmbed ? <ExternalLink className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />}
-                {progress?.positionSeconds ? `Resume ${formatWatchTime(progress.positionSeconds)}` : 'Start'}
+                <Play className="h-4 w-4 fill-current" />
+                {progress?.positionSeconds ? 'Resume' : 'Start'}
               </button>
             ) : (
-              <span className="text-xs font-semibold text-[#d9c79f]/72">
-                {video.status === 'processing'
-                  ? 'The stream is still processing.'
-                  : video.status === 'released'
-                    ? 'Native streaming connects after the provider is approved.'
-                    : 'This video is locked until its release window.'}
+              <span className="inline-flex min-h-10 items-center rounded-full border border-[#b88452]/28 bg-black/24 px-4 text-xs font-black uppercase tracking-[0.14em] text-[#dac5a3]/82">
+                {status === 'airing-now' ? 'Premiere mode ready' : status === 'now-streaming' ? 'Upload stream from Studio' : 'Countdown active'}
               </span>
             )}
-            {canOpenExternal && (
+            {video.externalUrl && (
               <a
-                href={video.externalUrl || undefined}
+                href={video.externalUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex h-10 items-center gap-2 rounded-full border border-white/12 px-4 text-xs font-black uppercase tracking-[0.14em] text-[#d9c79f] transition hover:border-[#d9c79f]/50"
-                onClick={() => void saveStartProgress()}
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-white/12 px-4 text-xs font-black uppercase tracking-[0.14em] text-[#dac5a3] transition hover:border-[#dac5a3]/50"
               >
                 <ExternalLink className="h-4 w-4" />
                 Open
               </a>
             )}
           </div>
-          {progressMessage && <p className="mt-2 text-xs font-semibold text-[#d9c79f]/72">{progressMessage}</p>}
+          {message && <p className="mt-2 text-xs font-semibold text-[#dac5a3]/70">{message}</p>}
         </div>
-        <div className="p-4">
-          <p className="text-[0.68rem] font-black uppercase tracking-[0.22em] text-[#f0d381]">{channel.name}</p>
-          <h1 className="mt-2 text-3xl font-black uppercase leading-8 text-[#f6e0a2]">{video.title}</h1>
-          <p className="mt-2 text-sm leading-5 text-[#d9c79f]/82">{video.description}</p>
-          <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-[#d9c79f]/78">
-            <div className="rounded-[0.75rem] border border-white/10 bg-white/[0.04] p-3">
-              <span className="block text-[0.62rem] font-black uppercase tracking-[0.18em] text-[#f0d381]/80">Runtime</span>
-              <span className="mt-1 block font-semibold">{video.durationLabel}</span>
-            </div>
-            <div className="rounded-[0.75rem] border border-white/10 bg-white/[0.04] p-3">
-              <span className="block text-[0.62rem] font-black uppercase tracking-[0.18em] text-[#f0d381]/80">Release</span>
-              <span className="mt-1 block font-semibold">{video.releaseLabel}</span>
-            </div>
-            <div className="rounded-[0.75rem] border border-white/10 bg-white/[0.04] p-3">
-              <span className="block text-[0.62rem] font-black uppercase tracking-[0.18em] text-[#f0d381]/80">Resume</span>
-              <span className="mt-1 block font-semibold">{progress?.positionSeconds ? formatWatchTime(progress.positionSeconds) : 'Not started'}</span>
-            </div>
-            <div className="rounded-[0.75rem] border border-white/10 bg-white/[0.04] p-3">
-              <span className="block text-[0.62rem] font-black uppercase tracking-[0.18em] text-[#f0d381]/80">Source</span>
-              <span className="mt-1 block font-semibold">{video.sourceType === 'external_embed' ? 'External embed' : video.sourceType === 'native_upload' ? 'Native upload' : 'Placeholder'}</span>
-            </div>
+      </section>
+
+      <section className="mt-4 rounded-lg border border-[#b88452]/28 bg-black/38 p-4">
+        <p className="text-[0.68rem] font-black uppercase tracking-[0.22em] text-[#c89561]">{video.subtitle}</p>
+        <h1 className="mt-2 text-3xl font-black uppercase leading-8 text-[#b94728]">{video.title}</h1>
+        <p className="mt-3 text-sm leading-6 text-[#f1dbc0]/82">{video.description}</p>
+        <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-[#dac5a3]/82">
+          <InfoCell label="Runtime" value={formatDuration(video.durationSeconds)} />
+          <InfoCell label="Premiere" value={formatDateTime(video.premiereAt)} />
+          <InfoCell label="Streaming" value={formatDateTime(video.releasedAt)} />
+          <InfoCell label="Trailer" value={getTrailerLabel(video)} />
+        </div>
+      </section>
+
+      {(video.trailerAssetUrl || video.trailerReleaseAt || video.trailerAvailable) && (
+        <section className="mt-4 overflow-hidden rounded-lg border border-[#b88452]/28 bg-black/38">
+          <div className="border-b border-[#b88452]/18 p-4">
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.22em] text-[#c89561]">Trailer</p>
+            <h2 className="mt-1 text-xl font-black uppercase text-[#f1dbc0]">{trailerReady ? 'Watch the preview' : 'Preview locked'}</h2>
           </div>
+          <div className="relative aspect-video bg-black">
+            {trailerReady && video.trailerAssetUrl ? (
+              <iframe
+                src={video.trailerAssetUrl}
+                title={`${video.title} trailer`}
+                className="absolute inset-0 h-full w-full border-0 bg-black"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                allowFullScreen
+                referrerPolicy="strict-origin-when-cross-origin"
+              />
+            ) : (
+              <>
+                <img src={SHADO_TV_ASSETS.crimpShrimp.statusComingSoon} alt="" className="h-full w-full object-cover opacity-90" loading="lazy" decoding="async" />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/34 p-5 text-center">
+                  <p className="text-sm font-black uppercase tracking-[0.16em] text-[#f1dbc0]">{getTrailerLabel(video)}</p>
+                </div>
+              </>
+            )}
+          </div>
+        </section>
+      )}
+
+      <section className="mt-4 rounded-lg border border-[#b88452]/28 bg-black/38 p-4">
+        <h2 className="text-sm font-black uppercase tracking-[0.18em] text-[#f1dbc0]">Cast</h2>
+        <div className="mt-3 grid gap-2">
+          {castItems.slice(0, 2).map(member => (
+            <div key={member.id} className="rounded-md border border-white/10 bg-white/[0.035] p-3">
+              <p className="text-sm font-black text-[#f1dbc0]">{member.title}</p>
+              {member.subtitle && <p className="text-xs font-semibold text-[#c89561]">{member.subtitle}</p>}
+            </div>
+          ))}
+          {castItems.length === 0 && (
+            <div className="rounded-md border border-white/10 bg-white/[0.035] p-3 text-sm font-semibold text-[#dac5a3]/78">
+              Cast notes are being prepared.
+            </div>
+          )}
         </div>
       </section>
     </main>
   )
 }
 
-function AdminView({
-  channels,
-  videos,
-  loadedFromSupabase,
-  catalogError,
-  onRefresh,
-}: {
-  channels: ShadoTvChannel[]
-  videos: ShadoTvVideo[]
-  loadedFromSupabase: boolean
-  catalogError: string | null
-  onRefresh: () => Promise<void>
-}) {
-  const [channelTitle, setChannelTitle] = useState('')
-  const [channelTagline, setChannelTagline] = useState('')
-  const [channelStatus, setChannelStatus] = useState<'draft' | 'published' | 'hidden'>('hidden')
-  const [videoChannelId, setVideoChannelId] = useState(channels[0]?.id ?? '')
-  const [videoTitle, setVideoTitle] = useState('')
-  const [videoSubtitle, setVideoSubtitle] = useState('')
-  const [videoStatus, setVideoStatus] = useState<ShadoTvVideo['status']>('locked')
-  const [videoOrientation, setVideoOrientation] = useState<ShadoTvVideo['orientation']>('horizontal')
-  const [videoSourceType, setVideoSourceType] = useState<NonNullable<ShadoTvVideo['sourceType']>>('placeholder')
-  const [videoDuration, setVideoDuration] = useState('')
-  const [videoReleaseLabel, setVideoReleaseLabel] = useState('')
-  const [videoExternalUrl, setVideoExternalUrl] = useState('')
-  const [saving, setSaving] = useState<string | null>(null)
-  const [studioMessage, setStudioMessage] = useState<string | null>(null)
-  const processingCount = videos.filter(video => video.status === 'processing').length
-  const premiereCount = videos.filter(video => video.status === 'premiere').length
-  const activeChannels = channels.filter(channel => !channel.deletedAt)
-  const deletedChannels = channels.filter(channel => channel.deletedAt)
-  const deletedVideos = videos.filter(video => video.deletedAt)
-  const activeVideos = videos.filter(video => !video.deletedAt)
+function InfoCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-white/10 bg-white/[0.035] p-3">
+      <span className="block text-[0.62rem] font-black uppercase tracking-[0.18em] text-[#c89561]">{label}</span>
+      <span className="mt-1 block font-semibold">{value}</span>
+    </div>
+  )
+}
 
-  useEffect(() => {
-    if (!videoChannelId && channels[0]?.id) {
-      setVideoChannelId(channels[0].id)
-    }
-  }, [channels, videoChannelId])
-
-  const runStudioAction = async (key: string, action: () => Promise<void>, success: string) => {
-    setSaving(key)
-    setStudioMessage(null)
-    try {
-      await action()
-      await onRefresh()
-      setStudioMessage(success)
-    } catch (error) {
-      setStudioMessage(error instanceof Error ? error.message : 'Shado TV studio action failed.')
-    } finally {
-      setSaving(null)
-    }
-  }
-
-  const handleCreateChannel = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    void runStudioAction(
-      'create-channel',
-      async () => {
-        await createShadoTvChannel({
-          title: channelTitle,
-          tagline: channelTagline,
-          description: '',
-          visibilityStatus: channelStatus,
-        })
-        setChannelTitle('')
-        setChannelTagline('')
-        setChannelStatus('hidden')
-      },
-      'Channel created.'
-    )
-  }
-
-  const handleCreateVideo = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    void runStudioAction(
-      'create-video',
-      async () => {
-        await createShadoTvVideo({
-          channelId: videoChannelId,
-          title: videoTitle,
-          subtitle: videoSubtitle,
-          description: '',
-          sourceType: videoSourceType,
-          releaseStatus: videoStatus,
-          orientation: videoOrientation,
-          durationMinutes: videoDuration,
-          releaseLabel: videoReleaseLabel,
-          externalUrl: videoExternalUrl,
-          embedUrl: videoExternalUrl,
-          visibilityStatus: 'hidden',
-        })
-        setVideoTitle('')
-        setVideoSubtitle('')
-        setVideoDuration('')
-        setVideoReleaseLabel('')
-        setVideoExternalUrl('')
-        setVideoSourceType('placeholder')
-        setVideoStatus('locked')
-      },
-      'Video created.'
-    )
-  }
-
-  const handleChannelArtworkUpload = (
-    channelId: string,
-    kind: ShadoTvChannelArtworkKind,
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file) return
-
-    void runStudioAction(
-      `channel-artwork-${kind}-${channelId}`,
-      () => updateShadoTvChannelArtwork(channelId, kind, file),
-      'Channel artwork updated.'
-    )
-  }
-
-  const handleVideoArtworkUpload = (
-    videoId: string,
-    kind: ShadoTvVideoArtworkKind,
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file) return
-
-    void runStudioAction(
-      `video-artwork-${kind}-${videoId}`,
-      () => updateShadoTvVideoArtwork(videoId, kind, file),
-      'Video artwork updated.'
-    )
-  }
-
-  const isStudioDisabled = saving !== null || !loadedFromSupabase
-  const actionButtonClass = 'rounded-full border border-[#d7aa46]/34 px-3 py-1.5 text-[0.68rem] font-black uppercase tracking-[0.14em] text-[#f6e0a2] transition hover:border-[#f0d381]/70 disabled:cursor-not-allowed disabled:opacity-45'
-  const artworkButtonClass = `${actionButtonClass} inline-flex min-h-9 cursor-pointer items-center justify-center disabled:pointer-events-none`
-  const disabledArtworkButtonClass = `${artworkButtonClass} pointer-events-none opacity-45`
+function TrailersView({ videos, onOpenEpisode }: { videos: ShadoTvVideo[]; onOpenEpisode: (videoId: string) => void }) {
+  const trailerVideos = videos.filter(video => video.trailerAvailable || video.trailerReleaseAt || video.trailerAssetUrl)
 
   return (
-    <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)_+_1.25rem)] pt-4">
-      <section className="rounded-[1.25rem] border border-[#d7aa46]/30 bg-black/68 p-4 shadow-[0_20px_52px_rgba(0,0,0,0.45)]">
-        <p className="text-[0.68rem] font-black uppercase tracking-[0.22em] text-[#f0d381]">Studio</p>
-        <h1 className="mt-2 text-3xl font-black uppercase leading-8 text-[#f6e0a2]">Shado TV Management</h1>
-        <p className="mt-2 text-sm leading-5 text-[#d9c79f]/78">Channels, videos, artwork, processing jobs, and premiere schedules live here.</p>
-      </section>
-
-      <div className="mt-4 grid gap-3">
-        {[
-          { label: 'Channels', value: channels.length, icon: Film },
-          { label: 'Videos', value: videos.length, icon: Clapperboard },
-          { label: 'Premieres', value: premiereCount, icon: CalendarClock },
-          { label: 'Processing', value: processingCount, icon: Upload },
-        ].map(item => {
-          const Icon = item.icon
-          return (
-            <article key={item.label} className="flex items-center justify-between rounded-[1rem] border border-[#d7aa46]/24 bg-white/[0.04] p-4">
-              <div className="flex items-center gap-3">
-                <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#d7aa46]/35 bg-black/42 text-[#f0d381]">
-                  <Icon className="h-5 w-5" />
-                </span>
-                <span className="text-sm font-black uppercase tracking-[0.16em] text-[#f6e0a2]">{item.label}</span>
-              </div>
-              <span className="text-2xl font-black text-[#f6e0a2]">{item.value}</span>
-            </article>
-          )
-        })}
-      </div>
-      <section className="mt-4 rounded-[1rem] border border-[#d7aa46]/22 bg-white/[0.04] p-4">
-        <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[#f0d381]/80">Catalog source</p>
-        <p className="mt-1 text-sm font-semibold text-[#f6e0a2]">
-          {loadedFromSupabase ? 'Supabase Shado TV domain' : 'Approved static fallback'}
-        </p>
-        {catalogError && (
-          <p className="mt-2 text-xs leading-5 text-[#d9c79f]/72">{catalogError}</p>
-        )}
-      </section>
-
-      {studioMessage && (
-        <section className="mt-4 rounded-[1rem] border border-[#d7aa46]/22 bg-[#d7aa46]/10 p-3 text-sm font-semibold text-[#f6e0a2]">
-          {studioMessage}
-        </section>
-      )}
-
-      <section className="mt-4 rounded-[1rem] border border-[#d7aa46]/24 bg-black/46 p-4">
-        <h2 className="text-sm font-black uppercase tracking-[0.18em] text-[#f6e0a2]">Create Channel</h2>
-        <form className="mt-3 grid gap-3" onSubmit={handleCreateChannel}>
-          <input
-            value={channelTitle}
-            onChange={event => setChannelTitle(event.target.value)}
-            placeholder="Channel title"
-            className="h-11 rounded-[0.8rem] border border-[#d7aa46]/24 bg-black/48 px-3 text-sm text-[#f6e0a2] outline-none placeholder:text-[#d9c79f]/46 focus:border-[#f0d381]/70"
-          />
-          <input
-            value={channelTagline}
-            onChange={event => setChannelTagline(event.target.value)}
-            placeholder="Short tagline"
-            className="h-11 rounded-[0.8rem] border border-[#d7aa46]/24 bg-black/48 px-3 text-sm text-[#f6e0a2] outline-none placeholder:text-[#d9c79f]/46 focus:border-[#f0d381]/70"
-          />
-          <div className="flex gap-2">
-            <select
-              value={channelStatus}
-              onChange={event => setChannelStatus(event.target.value as 'draft' | 'published' | 'hidden')}
-              className="h-11 flex-1 rounded-[0.8rem] border border-[#d7aa46]/24 bg-black/48 px-3 text-sm text-[#f6e0a2] outline-none focus:border-[#f0d381]/70"
+    <PageScaffold eyebrow="Trailers" title="Preview the trouble">
+      <div className="grid gap-3">
+        {(trailerVideos.length ? trailerVideos : videos).map(video => (
+          <article key={video.id} className="overflow-hidden rounded-lg border border-[#b88452]/28 bg-black/38">
+            <button
+              type="button"
+              onClick={() => onOpenEpisode(video.id)}
+              className="w-full p-4 text-left transition hover:bg-white/[0.03]"
             >
-              <option value="hidden">Hidden</option>
-              <option value="draft">Draft</option>
-              <option value="published">Published</option>
-            </select>
-            <button type="submit" disabled={saving !== null || !loadedFromSupabase} className={actionButtonClass}>
-              Add
+              <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[#c89561]">Trailer</p>
+              <h2 className="mt-1 text-xl font-black uppercase text-[#f1dbc0]">{video.title}</h2>
+              <p className="mt-2 text-sm leading-5 text-[#dac5a3]/72">{getTrailerLabel(video)}</p>
             </button>
-          </div>
-        </form>
+            {isTrailerReleased(video) && video.trailerAssetUrl ? (
+              <div className="relative aspect-video border-t border-[#b88452]/18 bg-black">
+                <iframe
+                  src={video.trailerAssetUrl}
+                  title={`${video.title} trailer`}
+                  className="absolute inset-0 h-full w-full border-0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                  allowFullScreen
+                  referrerPolicy="strict-origin-when-cross-origin"
+                />
+              </div>
+            ) : null}
+          </article>
+        ))}
+      </div>
+    </PageScaffold>
+  )
+}
+
+function CastView({ items }: { items: ShadoTvContentItem[] }) {
+  return (
+    <PageScaffold eyebrow="Cast" title="The crew">
+      <div className="grid gap-3">
+        {items.map(member => (
+          <article key={member.id} className="rounded-lg border border-[#b88452]/28 bg-black/38 p-4">
+            <p className="text-lg font-black text-[#f1dbc0]">{member.title}</p>
+            {member.subtitle && <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-[#c89561]">{member.subtitle}</p>}
+            {member.body && <p className="mt-3 text-sm leading-6 text-[#dac5a3]/78">{member.body}</p>}
+          </article>
+        ))}
+        {items.length === 0 && (
+          <article className="rounded-lg border border-[#b88452]/28 bg-black/38 p-4 text-sm font-semibold leading-6 text-[#dac5a3]/78">
+            Cast notes are being prepared.
+          </article>
+        )}
+      </div>
+    </PageScaffold>
+  )
+}
+
+function UpdatesView({ items }: { items: ShadoTvContentItem[] }) {
+  return (
+    <PageScaffold eyebrow="Updates" title="Production notes">
+      <div className="grid gap-3">
+        {items.map(update => (
+          <article key={update.id} className="rounded-lg border border-[#b88452]/28 bg-[#0c0b08]/84 p-4">
+            <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[#c89561]">{update.dateLabel || update.subtitle || 'Studio note'}</p>
+            <h2 className="mt-1 text-xl font-black uppercase text-[#f1dbc0]">{update.title}</h2>
+            {update.body && <p className="mt-3 text-sm leading-6 text-[#dac5a3]/78">{update.body}</p>}
+          </article>
+        ))}
+        {items.length === 0 && (
+          <article className="rounded-lg border border-[#b88452]/28 bg-[#0c0b08]/84 p-4 text-sm font-semibold leading-6 text-[#dac5a3]/78">
+            Production notes are being prepared.
+          </article>
+        )}
+      </div>
+    </PageScaffold>
+  )
+}
+
+function PageScaffold({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
+  return (
+    <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)_+_1.25rem)] pt-4">
+      <section className="mb-4 rounded-lg border border-[#b88452]/28 bg-black/42 p-4">
+        <p className="text-[0.68rem] font-black uppercase tracking-[0.22em] text-[#c89561]">{eyebrow}</p>
+        <h1 className="mt-2 text-3xl font-black uppercase leading-8 text-[#b94728]">{title}</h1>
       </section>
-
-      <section className="mt-4 rounded-[1rem] border border-[#d7aa46]/24 bg-black/46 p-4">
-        <h2 className="text-sm font-black uppercase tracking-[0.18em] text-[#f6e0a2]">Create Video</h2>
-        <form className="mt-3 grid gap-3" onSubmit={handleCreateVideo}>
-          <select
-            value={videoChannelId}
-            onChange={event => setVideoChannelId(event.target.value)}
-            className="h-11 rounded-[0.8rem] border border-[#d7aa46]/24 bg-black/48 px-3 text-sm text-[#f6e0a2] outline-none focus:border-[#f0d381]/70"
-          >
-            {activeChannels.map(channel => (
-              <option key={channel.id} value={channel.id}>{channel.name}</option>
-            ))}
-          </select>
-          <input
-            value={videoTitle}
-            onChange={event => setVideoTitle(event.target.value)}
-            placeholder="Video title"
-            className="h-11 rounded-[0.8rem] border border-[#d7aa46]/24 bg-black/48 px-3 text-sm text-[#f6e0a2] outline-none placeholder:text-[#d9c79f]/46 focus:border-[#f0d381]/70"
-          />
-          <input
-            value={videoSubtitle}
-            onChange={event => setVideoSubtitle(event.target.value)}
-            placeholder="Subtitle"
-            className="h-11 rounded-[0.8rem] border border-[#d7aa46]/24 bg-black/48 px-3 text-sm text-[#f6e0a2] outline-none placeholder:text-[#d9c79f]/46 focus:border-[#f0d381]/70"
-          />
-          <div className="grid grid-cols-2 gap-2">
-            <select
-              value={videoSourceType}
-              onChange={event => setVideoSourceType(event.target.value as NonNullable<ShadoTvVideo['sourceType']>)}
-              className="h-11 rounded-[0.8rem] border border-[#d7aa46]/24 bg-black/48 px-3 text-sm text-[#f6e0a2] outline-none focus:border-[#f0d381]/70"
-            >
-              <option value="placeholder">Placeholder</option>
-              <option value="external_embed">External</option>
-              <option value="native_upload">Native</option>
-            </select>
-            <select
-              value={videoStatus}
-              onChange={event => setVideoStatus(event.target.value as ShadoTvVideo['status'])}
-              className="h-11 rounded-[0.8rem] border border-[#d7aa46]/24 bg-black/48 px-3 text-sm text-[#f6e0a2] outline-none focus:border-[#f0d381]/70"
-            >
-              <option value="locked">Locked</option>
-              <option value="released">Released</option>
-              <option value="premiere">Premiere</option>
-              <option value="processing">Processing</option>
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <select
-              value={videoOrientation}
-              onChange={event => setVideoOrientation(event.target.value as ShadoTvVideo['orientation'])}
-              className="h-11 rounded-[0.8rem] border border-[#d7aa46]/24 bg-black/48 px-3 text-sm text-[#f6e0a2] outline-none focus:border-[#f0d381]/70"
-            >
-              <option value="horizontal">Horizontal</option>
-              <option value="vertical">Vertical</option>
-            </select>
-            <input
-              value={videoDuration}
-              onChange={event => setVideoDuration(event.target.value)}
-              inputMode="decimal"
-              placeholder="Minutes"
-              className="h-11 rounded-[0.8rem] border border-[#d7aa46]/24 bg-black/48 px-3 text-sm text-[#f6e0a2] outline-none placeholder:text-[#d9c79f]/46 focus:border-[#f0d381]/70"
-            />
-          </div>
-          <input
-            value={videoReleaseLabel}
-            onChange={event => setVideoReleaseLabel(event.target.value)}
-            placeholder="Release label"
-            className="h-11 rounded-[0.8rem] border border-[#d7aa46]/24 bg-black/48 px-3 text-sm text-[#f6e0a2] outline-none placeholder:text-[#d9c79f]/46 focus:border-[#f0d381]/70"
-          />
-          {videoSourceType === 'external_embed' && (
-            <input
-              value={videoExternalUrl}
-              onChange={event => setVideoExternalUrl(event.target.value)}
-              placeholder="External video URL"
-              className="h-11 rounded-[0.8rem] border border-[#d7aa46]/24 bg-black/48 px-3 text-sm text-[#f6e0a2] outline-none placeholder:text-[#d9c79f]/46 focus:border-[#f0d381]/70"
-            />
-          )}
-          <button type="submit" disabled={saving !== null || !loadedFromSupabase || !videoChannelId} className={`${actionButtonClass} h-11`}>
-            Add Video
-          </button>
-        </form>
-      </section>
-
-      <section className="mt-4 rounded-[1rem] border border-[#d7aa46]/24 bg-black/46 p-4">
-        <h2 className="text-sm font-black uppercase tracking-[0.18em] text-[#f6e0a2]">Channels</h2>
-        <div className="mt-3 grid gap-2">
-          {[...activeChannels, ...deletedChannels].map(channel => {
-            const artworkDisabled = isStudioDisabled || Boolean(channel.deletedAt)
-
-            return (
-              <article key={channel.id} className="rounded-[0.9rem] border border-white/10 bg-white/[0.04] p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="truncate text-sm font-black text-[#f6e0a2]">{channel.name}</h3>
-                    <p className="mt-1 truncate text-xs text-[#d9c79f]/70">{channel.deletedAt ? 'Deleted' : channel.visibilityStatus}</p>
-                  </div>
-                  <div className="flex shrink-0 gap-2">
-                    {channel.deletedAt ? (
-                      <button type="button" disabled={isStudioDisabled} className={actionButtonClass} onClick={() => void runStudioAction(`restore-channel-${channel.id}`, () => restoreShadoTvChannel(channel.id), 'Channel restored as hidden.')}>
-                        Restore
-                      </button>
-                    ) : (
-                      <>
-                        <button type="button" disabled={isStudioDisabled} className={actionButtonClass} onClick={() => void runStudioAction(`toggle-channel-${channel.id}`, () => updateShadoTvChannelVisibility(channel.id, channel.visibilityStatus === 'published' ? 'hidden' : 'published'), 'Channel visibility updated.')}>
-                          {channel.visibilityStatus === 'published' ? 'Hide' : 'Publish'}
-                        </button>
-                        <button type="button" disabled={isStudioDisabled} className={actionButtonClass} onClick={() => void runStudioAction(`delete-channel-${channel.id}`, () => softDeleteShadoTvChannel(channel.id), 'Channel deleted.')}>
-                          Delete
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <div className="mt-3 grid grid-cols-[3.25rem_1fr] items-center gap-3">
-                  <img src={channel.ticketAsset} alt="" className="h-16 w-12 rounded-[0.65rem] border border-[#d7aa46]/22 object-cover" loading="lazy" decoding="async" />
-                  <div className="min-w-0">
-                    <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-[#f0d381]/80">Artwork</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <label className={artworkDisabled ? disabledArtworkButtonClass : artworkButtonClass} aria-disabled={artworkDisabled}>
-                        Ticket
-                        <input
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp,image/gif"
-                          className="sr-only"
-                          disabled={artworkDisabled}
-                          onChange={event => handleChannelArtworkUpload(channel.id, 'ticket', event)}
-                        />
-                      </label>
-                      <label className={artworkDisabled ? disabledArtworkButtonClass : artworkButtonClass} aria-disabled={artworkDisabled}>
-                        Hero
-                        <input
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp,image/gif"
-                          className="sr-only"
-                          disabled={artworkDisabled}
-                          onChange={event => handleChannelArtworkUpload(channel.id, 'hero', event)}
-                        />
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </article>
-            )
-          })}
-        </div>
-      </section>
-
-      <section className="mt-4 rounded-[1rem] border border-[#d7aa46]/24 bg-black/46 p-4">
-        <h2 className="text-sm font-black uppercase tracking-[0.18em] text-[#f6e0a2]">Videos</h2>
-        <div className="mt-3 grid gap-2">
-          {[...activeVideos, ...deletedVideos].map(video => {
-            const artworkDisabled = isStudioDisabled || Boolean(video.deletedAt)
-
-            return (
-              <article key={video.id} className="rounded-[0.9rem] border border-white/10 bg-white/[0.04] p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="truncate text-sm font-black text-[#f6e0a2]">{video.title}</h3>
-                    <p className="mt-1 truncate text-xs text-[#d9c79f]/70">
-                      {video.deletedAt ? 'Deleted' : `${video.visibilityStatus} / ${video.status}`}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 gap-2">
-                    {video.deletedAt ? (
-                      <button type="button" disabled={isStudioDisabled} className={actionButtonClass} onClick={() => void runStudioAction(`restore-video-${video.id}`, () => restoreShadoTvVideo(video.id), 'Video restored as hidden.')}>
-                        Restore
-                      </button>
-                    ) : (
-                      <>
-                        <button type="button" disabled={isStudioDisabled} className={actionButtonClass} onClick={() => void runStudioAction(`toggle-video-${video.id}`, () => updateShadoTvVideoVisibility(video.id, video.visibilityStatus === 'published' ? 'hidden' : 'published'), 'Video visibility updated.')}>
-                          {video.visibilityStatus === 'published' ? 'Hide' : 'Publish'}
-                        </button>
-                        <button type="button" disabled={isStudioDisabled} className={actionButtonClass} onClick={() => void runStudioAction(`delete-video-${video.id}`, () => softDeleteShadoTvVideo(video.id), 'Video deleted.')}>
-                          Delete
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-                <div className="mt-3 grid grid-cols-[3.25rem_1fr] items-center gap-3">
-                  <img src={video.posterAsset} alt="" className="h-16 w-12 rounded-[0.65rem] border border-[#d7aa46]/22 object-cover" loading="lazy" decoding="async" />
-                  <div className="min-w-0">
-                    <p className="text-[0.62rem] font-black uppercase tracking-[0.18em] text-[#f0d381]/80">Artwork</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <label className={artworkDisabled ? disabledArtworkButtonClass : artworkButtonClass} aria-disabled={artworkDisabled}>
-                        Poster
-                        <input
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp,image/gif"
-                          className="sr-only"
-                          disabled={artworkDisabled}
-                          onChange={event => handleVideoArtworkUpload(video.id, 'poster', event)}
-                        />
-                      </label>
-                      <label className={artworkDisabled ? disabledArtworkButtonClass : artworkButtonClass} aria-disabled={artworkDisabled}>
-                        Thumbnail
-                        <input
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp,image/gif"
-                          className="sr-only"
-                          disabled={artworkDisabled}
-                          onChange={event => handleVideoArtworkUpload(video.id, 'thumbnail', event)}
-                        />
-                      </label>
-                    </div>
-                  </div>
-                </div>
-              </article>
-            )
-          })}
-        </div>
-      </section>
+      {children}
     </main>
   )
 }
 
 export function ShadoTvScreen({ onExit }: ShadoTvScreenProps) {
-  const { user } = useAuth()
   const [view, setView] = useState<ShadoTvView>({ type: 'home' })
   const [catalog, setCatalog] = useState(SHADO_TV_FALLBACK_CATALOG)
   const [watchProgress, setWatchProgress] = useState<Map<string, ShadoTvWatchProgress>>(new Map())
   const [catalogError, setCatalogError] = useState<string | null>(null)
-  const canManage = user?.admin_role === 'admin' || user?.admin_role === 'sub_admin'
-  const channels = catalog.channels
   const videos = catalog.videos
-  const currentVideo = view.type === 'video' ? videos.find(video => video.id === view.videoId) : undefined
-  const currentChannel = view.type === 'channel'
-    ? getChannelById(channels, view.channelId)
-    : currentVideo
-      ? getChannelById(channels, currentVideo.channelId)
-      : undefined
+  const channels = catalog.channels
+  const series = channels[0] ?? SHADO_TV_FALLBACK_CATALOG.channels[0]
+  const contentItems = catalog.contentItems
+  const castItems = getContentItems(contentItems, series.id, 'cast')
+  const updateItems = getContentItems(contentItems, series.id, 'updates')
+  const currentVideo = view.type === 'episode' ? videos.find(video => video.id === view.videoId) : undefined
+  const headerTitle = view.type === 'home'
+    ? SHOW_TITLE
+    : view.type === 'episode'
+      ? currentVideo?.title
+      : view.type === 'trailers'
+        ? 'Trailers'
+        : view.type === 'cast'
+          ? 'Cast'
+          : 'Updates'
 
-  const loadCatalog = useCallback(async (admin = false) => {
+  const loadCatalog = useCallback(async () => {
     try {
-      const nextCatalog = admin ? await fetchShadoTvAdminCatalog() : await fetchShadoTvCatalog()
+      const nextCatalog = await fetchShadoTvCatalog()
       setCatalog(nextCatalog)
       setCatalogError(null)
     } catch (error) {
@@ -1002,12 +694,16 @@ export function ShadoTvScreen({ onExit }: ShadoTvScreenProps) {
   }, [])
 
   const loadWatchProgress = useCallback(async (catalogVideos = videos) => {
-    const progress = await fetchShadoTvWatchProgress(catalogVideos.map(video => video.id))
-    setWatchProgress(progress)
+    try {
+      const progress = await fetchShadoTvWatchProgress(catalogVideos.map(video => video.id))
+      setWatchProgress(progress)
+    } catch {
+      setWatchProgress(new Map())
+    }
   }, [videos])
 
   useEffect(() => {
-    void loadCatalog(false)
+    void loadCatalog()
   }, [loadCatalog])
 
   useEffect(() => {
@@ -1019,72 +715,84 @@ export function ShadoTvScreen({ onExit }: ShadoTvScreenProps) {
       onExit()
       return
     }
-    if (view.type === 'video' && view.fromChannelId) {
-      setView({ type: 'channel', channelId: view.fromChannelId })
-      return
-    }
     setView({ type: 'home' })
   }
+
+  const renderedView = useMemo(() => {
+    if (view.type === 'home') {
+      return (
+        <HomeView
+          channels={channels}
+          videos={videos}
+          watchProgress={watchProgress}
+          onOpenEpisode={videoId => setView({ type: 'episode', videoId })}
+          onOpenTrailers={() => setView({ type: 'trailers' })}
+          onOpenCast={() => setView({ type: 'cast' })}
+          onOpenUpdates={() => setView({ type: 'updates' })}
+        />
+      )
+    }
+
+    if (view.type === 'episode' && currentVideo) {
+      return (
+        <EpisodeView
+          video={currentVideo}
+          castItems={castItems}
+          progress={watchProgress.get(currentVideo.id)}
+          onProgressSaved={() => loadWatchProgress(videos)}
+        />
+      )
+    }
+
+    if (view.type === 'trailers') {
+      return <TrailersView videos={videos} onOpenEpisode={videoId => setView({ type: 'episode', videoId })} />
+    }
+
+    if (view.type === 'cast') {
+      return <CastView items={castItems} />
+    }
+
+    if (view.type === 'updates') {
+      return <UpdatesView items={updateItems} />
+    }
+
+    return (
+      <PageScaffold eyebrow="Unavailable" title="Episode hidden">
+        <p className="rounded-lg border border-[#b88452]/28 bg-black/38 p-4 text-sm text-[#dac5a3]/78">
+          This episode is not visible in the viewer catalog.
+        </p>
+      </PageScaffold>
+    )
+  }, [castItems, channels, currentVideo, loadWatchProgress, updateItems, videos, view, watchProgress])
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="relative flex h-full min-h-0 flex-col overflow-hidden bg-black text-white"
+      className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[#050604] text-white"
     >
       <img
-        src={SHADO_TV_ASSETS.homeBackdrop}
+        src={SHADO_TV_ASSETS.crimpShrimp.seriesHubHero}
         alt=""
-        className="absolute inset-0 h-full w-full object-cover opacity-42"
-        width={900}
-        height={1600}
+        className="absolute inset-0 h-full w-full object-cover opacity-18"
+        width={1792}
+        height={1024}
         loading="eager"
         decoding="async"
       />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(215,170,70,0.18),transparent_34%),linear-gradient(180deg,rgba(0,0,0,0.28),rgba(0,0,0,0.94))]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(166,64,34,0.18),transparent_34%),linear-gradient(180deg,rgba(0,0,0,0.22),rgba(0,0,0,0.94))]" />
       <ShadoTvHeader
         onBack={view.type === 'home' ? undefined : goBack}
         onExit={onExit}
-        canManage={canManage}
-        onAdmin={() => {
-          setView({ type: 'admin' })
-          void loadCatalog(true)
-        }}
+        title={headerTitle}
       />
       <div className="relative z-10 flex min-h-0 flex-1 flex-col">
-        {view.type === 'home' && (
-          <HomeView
-            channels={channels}
-            videos={videos}
-            watchProgress={watchProgress}
-            onOpenChannel={channelId => setView({ type: 'channel', channelId })}
-            onOpenVideo={videoId => setView({ type: 'video', videoId })}
-          />
+        {catalogError && (
+          <div className="mx-4 mt-3 rounded-lg border border-[#b88452]/24 bg-black/52 p-3 text-xs font-semibold text-[#dac5a3]/78">
+            Using test catalog: {catalogError}
+          </div>
         )}
-        {view.type === 'channel' && currentChannel && (
-          <ChannelView
-            channel={currentChannel}
-            videos={videos}
-            onOpenVideo={videoId => setView({ type: 'video', videoId, fromChannelId: currentChannel.id })}
-          />
-        )}
-        {view.type === 'video' && currentVideo && currentChannel && (
-          <VideoView
-            video={currentVideo}
-            channel={currentChannel}
-            progress={watchProgress.get(currentVideo.id)}
-            onProgressSaved={() => loadWatchProgress(videos)}
-          />
-        )}
-        {view.type === 'admin' && (
-          <AdminView
-            channels={channels}
-            videos={videos}
-            loadedFromSupabase={catalog.loadedFromSupabase}
-            catalogError={catalogError}
-            onRefresh={() => loadCatalog(true)}
-          />
-        )}
+        {renderedView}
       </div>
     </motion.div>
   )

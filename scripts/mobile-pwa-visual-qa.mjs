@@ -719,21 +719,17 @@ async function openShadoTvIfAvailable(page, profile) {
   }
 
   await shadoTvButton.click()
-  await page.getByText('Now Playing').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-  await page.getByRole('button', { name: 'Open Classic Cinema' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByText('The Crimp & Shrimp Show').first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.locator('[data-shado-tv-video-card="true"]').first().waitFor({ state: 'visible', timeout: DEFAULT_TIMEOUT_MS })
   await auditPage(page, profile, '15b-shado-tv-home', { footer: false })
 
-  await clickShadoTvChannelByName(page, 'Classic Cinema')
-  await page.getByRole('heading', { name: 'Classic Cinema' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-  await auditPage(page, profile, '15c-shado-tv-channel', { footer: false })
-
-  const channelVideos = page.locator('[data-shado-tv-video-card="true"]')
-  const channelVideoCount = await channelVideos.count()
-  if (channelVideoCount === 0) {
+  const episodeCards = page.locator('[data-shado-tv-video-card="true"]')
+  const episodeCount = await episodeCards.count()
+  if (episodeCount === 0) {
     summary.notTested.push({
       profile: profile.id,
       flow: '15d-shado-tv-video',
-      reason: 'Classic Cinema has no visible videos in the current Shado TV catalog.',
+      reason: 'The Crimp & Shrimp Show has no visible episodes in the current Shado TV catalog.',
     })
   } else {
     const videoTitle = await clickFirstShadoTvVideo(page)
@@ -742,11 +738,7 @@ async function openShadoTvIfAvailable(page, profile) {
     }
     await auditPage(page, profile, '15d-shado-tv-video', { footer: false })
     await page.getByRole('button', { name: 'Back within Shado TV' }).click()
-    const returnedHome = await page.getByText('Now Playing').waitFor({ timeout: 2500 }).then(() => true).catch(() => false)
-    if (!returnedHome) {
-      await page.getByRole('button', { name: 'Back within Shado TV' }).click()
-      await page.getByText('Now Playing').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-    }
+    await page.getByText('The Crimp & Shrimp Show').first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
   }
 
   await page.getByRole('button', { name: 'Back to Entertainment' }).click()
