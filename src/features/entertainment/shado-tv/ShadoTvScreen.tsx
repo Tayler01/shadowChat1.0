@@ -187,15 +187,15 @@ function ShadoTvHeader({ onBack, onExit, title }: { onBack?: () => void; onExit:
   return (
     <header className="relative z-20 flex h-[calc(4rem+env(safe-area-inset-top))] shrink-0 items-end border-b border-[#9a6a43]/30 bg-[#070806]/92 px-3 pb-2 pt-[env(safe-area-inset-top)] shadow-[0_12px_34px_rgba(0,0,0,0.55)]">
       <img
-        src={SHADO_TV_ASSETS.headerBanner}
+        src={SHADO_TV_ASSETS.crimpShrimp.seriesHubHero}
         alt=""
-        className="absolute inset-0 h-full w-full object-cover opacity-[0.72]"
-        width={2400}
-        height={240}
+        className="absolute inset-0 h-full w-full object-cover object-[center_40%] opacity-[0.72]"
+        width={1792}
+        height={1024}
         loading="eager"
         decoding="async"
       />
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,6,4,0.88),rgba(5,6,4,0.48)_48%,rgba(5,6,4,0.88)),linear-gradient(180deg,rgba(0,0,0,0.08),rgba(0,0,0,0.46))]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(166,64,34,0.26),transparent_42%),linear-gradient(90deg,rgba(5,6,4,0.86),rgba(5,6,4,0.46)_48%,rgba(5,6,4,0.86)),linear-gradient(180deg,rgba(0,0,0,0.04),rgba(0,0,0,0.52))]" />
       <div className="relative flex w-full items-center justify-between gap-3">
         <BackButton onClick={onBack ?? onExit} label={onBack ? 'Back within Shado TV' : 'Back to Entertainment'} />
         <div className="min-w-0 text-center">
