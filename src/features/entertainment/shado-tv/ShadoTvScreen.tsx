@@ -186,7 +186,16 @@ function BackButton({ onClick, label = 'Back' }: { onClick: () => void; label?: 
 function ShadoTvHeader({ onBack, onExit, title }: { onBack?: () => void; onExit: () => void; title?: string }) {
   return (
     <header className="relative z-20 flex h-[calc(4rem+env(safe-area-inset-top))] shrink-0 items-end border-b border-[#9a6a43]/30 bg-[#070806]/92 px-3 pb-2 pt-[env(safe-area-inset-top)] shadow-[0_12px_34px_rgba(0,0,0,0.55)]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_22%_0%,rgba(166,64,34,0.24),transparent_36%),linear-gradient(180deg,rgba(255,233,184,0.05),transparent)]" />
+      <img
+        src={SHADO_TV_ASSETS.headerBanner}
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover opacity-[0.72]"
+        width={2400}
+        height={240}
+        loading="eager"
+        decoding="async"
+      />
+      <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,6,4,0.88),rgba(5,6,4,0.48)_48%,rgba(5,6,4,0.88)),linear-gradient(180deg,rgba(0,0,0,0.08),rgba(0,0,0,0.46))]" />
       <div className="relative flex w-full items-center justify-between gap-3">
         <BackButton onClick={onBack ?? onExit} label={onBack ? 'Back within Shado TV' : 'Back to Entertainment'} />
         <div className="min-w-0 text-center">
@@ -219,29 +228,29 @@ function StatusCard({ episode }: { episode?: ShadoTvVideo | null }) {
   }, [])
 
   return (
-    <div className="relative isolate overflow-visible px-4 py-3 text-center">
+    <div className="relative isolate overflow-visible px-4 py-2 text-center">
       <img
         src={SHADO_TV_ASSETS.crimpShrimp.countdownParchment}
         alt=""
-        className="pointer-events-none absolute -inset-x-3 -inset-y-4 z-0 h-[calc(100%+2rem)] w-[calc(100%+1.5rem)] object-fill"
+        className="pointer-events-none absolute -inset-x-3 -inset-y-2 z-0 h-[calc(100%+1rem)] w-[calc(100%+1.5rem)] object-fill"
         width={703}
         height={230}
         loading="eager"
         decoding="async"
       />
       <div className="relative z-10">
-        <p className="text-[0.55rem] font-black uppercase tracking-[0.22em] text-[#6f291b]">{target?.label ?? statusCopy[status]}</p>
+        <p className="text-[0.5rem] font-black uppercase tracking-[0.2em] text-[#6f291b]">{target?.label ?? statusCopy[status]}</p>
         {target ? (
-          <div className="mt-2 grid grid-cols-4 gap-1">
+          <div className="mt-1.5 grid grid-cols-4 gap-1">
             {clock.map(item => (
               <div key={item.label} className="border-r border-[#5c2b1d]/28 last:border-r-0">
-                <span className="block text-xl font-black tabular-nums leading-none text-[#8b321f]">{String(item.value).padStart(2, '0')}</span>
-                <span className="mt-1 block text-[0.5rem] font-black uppercase tracking-[0.12em] text-[#31180f]/80">{item.label}</span>
+                <span className="block text-lg font-black tabular-nums leading-none text-[#8b321f]">{String(item.value).padStart(2, '0')}</span>
+                <span className="mt-0.5 block text-[0.46rem] font-black uppercase tracking-[0.1em] text-[#31180f]/80">{item.label}</span>
               </div>
             ))}
           </div>
         ) : (
-          <p className="mt-2 text-xl font-black uppercase tracking-[0.08em] text-[#8b321f]">{statusCopy[status]}</p>
+          <p className="mt-1.5 text-lg font-black uppercase tracking-[0.08em] text-[#8b321f]">{statusCopy[status]}</p>
         )}
       </div>
     </div>
@@ -268,24 +277,24 @@ function EpisodeCard({
       onClick={onOpen}
       data-shado-tv-video-card="true"
       aria-label={`Open ${video.title}`}
-      className="group relative w-full overflow-hidden rounded-lg border border-[#b88452]/34 bg-black/24 p-3 text-left shadow-[0_16px_34px_rgba(0,0,0,0.34)] transition hover:border-[#d8b06f]/58 hover:bg-black/30 focus:outline-none focus:ring-2 focus:ring-[#a64022]/60"
+      className="group relative w-full overflow-hidden rounded-lg border border-[#b88452]/34 bg-black/24 p-2.5 text-left shadow-[0_16px_34px_rgba(0,0,0,0.34)] transition hover:border-[#d8b06f]/58 hover:bg-black/30 focus:outline-none focus:ring-2 focus:ring-[#a64022]/60"
     >
       <img
-        src={SHADO_TV_ASSETS.crimpShrimp.featuredEpisodeFrame}
+        src={SHADO_TV_ASSETS.crimpShrimp.featuredEpisodeBackdrop}
         alt=""
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-[0.58] blur-[2px] saturate-[0.9]"
+        className="pointer-events-none absolute inset-0 h-full w-full scale-105 object-cover opacity-[0.78] blur-[1px] saturate-[1.02]"
         loading="lazy"
         decoding="async"
       />
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_22%,rgba(207,142,83,0.2),transparent_34%),linear-gradient(90deg,rgba(5,7,5,0.68),rgba(5,7,5,0.36)_42%,rgba(5,7,5,0.74))]" />
-      <div aria-hidden="true" className="relative z-10 mb-2 flex justify-center gap-1.5">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_24%,rgba(207,142,83,0.14),transparent_34%),linear-gradient(90deg,rgba(5,7,5,0.52),rgba(5,7,5,0.28)_42%,rgba(5,7,5,0.66))]" />
+      <div aria-hidden="true" className="relative z-10 mb-1.5 flex justify-center gap-1.5">
         <span className="h-1.5 w-1.5 rounded-full bg-[#d8b06f]/76" />
         <span className="h-1.5 w-1.5 rounded-full bg-[#d8b06f]/42" />
         <span className="h-1.5 w-1.5 rounded-full bg-[#d8b06f]/42" />
       </div>
-      <div className="relative z-10 grid min-h-[12rem] grid-cols-[7rem_1fr] gap-3 min-[420px]:grid-cols-[8.3rem_1fr]">
-        <div className="relative min-h-[10.6rem] overflow-visible">
+      <div className="relative z-10 grid min-h-[9.4rem] grid-cols-[5.6rem_1fr] gap-3 min-[420px]:grid-cols-[6.5rem_1fr]">
+        <div className="relative min-h-[8.3rem] overflow-visible">
           <img
             src={video.posterAsset}
             alt=""
@@ -298,16 +307,16 @@ function EpisodeCard({
         </div>
         <div className="flex min-w-0 flex-col justify-between py-1">
           <div>
-            <span className="inline-flex rounded-full border border-[#d8b06f]/30 bg-black/42 px-2.5 py-1 text-[0.62rem] font-black uppercase tracking-[0.16em] text-[#e5c28f]">
+            <span className="inline-flex rounded-full border border-[#d8b06f]/30 bg-black/42 px-2 py-0.5 text-[0.56rem] font-black uppercase tracking-[0.14em] text-[#e5c28f]">
               {status === 'airing-now' ? 'Airing Now' : status === 'now-streaming' ? 'Now Streaming' : 'Announced'}
             </span>
-            <p className="mt-3 text-[0.68rem] font-black uppercase tracking-[0.18em] text-[#c89561]">{video.subtitle || 'Episode'}</p>
-            <h2 className="mt-1 text-2xl font-black uppercase leading-7 text-[#b94728] min-[420px]:text-3xl">{video.title}</h2>
-            <p className="mt-2 line-clamp-2 text-xs font-semibold leading-5 text-[#dac5a3]/78">{video.description}</p>
+            <p className="mt-2 text-[0.62rem] font-black uppercase tracking-[0.16em] text-[#c89561]">{video.subtitle || 'Episode'}</p>
+            <h2 className="mt-0.5 text-xl font-black uppercase leading-6 text-[#b94728] min-[420px]:text-2xl">{video.title}</h2>
+            <p className="mt-1 line-clamp-1 text-xs font-semibold leading-5 text-[#dac5a3]/82">{video.description}</p>
           </div>
-          <div className="mt-3 flex items-center justify-between gap-2">
+          <div className="mt-2 flex items-center justify-between gap-2">
             <span className="text-xs font-bold text-[#d9c79f]/70">{formatDuration(video.durationSeconds)}</span>
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#d8b06f]/55 bg-[#a64022]/20 text-[#f1dbc0]">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#d8b06f]/55 bg-[#a64022]/20 text-[#f1dbc0]">
               {status === 'coming-soon' ? <Lock className="h-4 w-4" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}
             </span>
           </div>
@@ -339,17 +348,17 @@ function ModuleCard({
     <button
       type="button"
       onClick={onOpen}
-      className="relative aspect-square min-w-[8.75rem] overflow-hidden rounded-lg border border-[#b88452]/24 bg-[#0b0c09] p-3 text-left shadow-[0_16px_36px_rgba(0,0,0,0.34)] transition hover:-translate-y-0.5 hover:border-[#d8b06f]/65 focus:outline-none focus:ring-2 focus:ring-[#a64022]/55"
+      className="relative aspect-[0.82/1] min-w-0 overflow-hidden rounded-lg border border-[#b88452]/24 bg-[#0b0c09] p-2.5 text-left shadow-[0_16px_36px_rgba(0,0,0,0.34)] transition hover:-translate-y-0.5 hover:border-[#d8b06f]/65 focus:outline-none focus:ring-2 focus:ring-[#a64022]/55"
     >
       <img src={asset} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" decoding="async" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.06),rgba(0,0,0,0.24)_42%,rgba(0,0,0,0.78))]" />
       <div className="relative flex h-full flex-col justify-between">
-        <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#d8b06f]/32 bg-black/38 text-[#c89561]">
-          <Icon className="h-4 w-4" />
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d8b06f]/32 bg-black/38 text-[#c89561]">
+          <Icon className="h-3.5 w-3.5" />
         </span>
         <div>
-          <h3 className="text-base font-black uppercase tracking-[0.08em] text-[#f1dbc0]">{title}</h3>
-          <p className="mt-1 line-clamp-2 text-[0.68rem] font-semibold leading-4 text-[#dac5a3]/76">{subtitle}</p>
+          <h3 className="text-[0.78rem] font-black uppercase tracking-[0.06em] text-[#f1dbc0]">{title}</h3>
+          <p className="mt-0.5 line-clamp-2 text-[0.56rem] font-semibold leading-3 text-[#dac5a3]/78">{subtitle}</p>
         </div>
       </div>
     </button>
@@ -375,8 +384,8 @@ function HomeView({
   const primaryEpisode = getPrimaryEpisode(episodes)
 
   return (
-    <main className="mx-auto min-h-0 w-full max-w-[30rem] flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)_+_1.25rem)] pt-4">
-      <section className="relative aspect-square overflow-visible">
+    <main className="mx-auto min-h-0 w-full max-w-[30rem] flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)_+_0.75rem)] pt-3">
+      <section className="relative h-[19.75rem] overflow-visible min-[430px]:h-[21rem]">
         <img
           src={SHADO_TV_ASSETS.crimpShrimp.seriesTitleHero}
           alt=""
@@ -386,13 +395,13 @@ function HomeView({
           loading="eager"
           decoding="async"
         />
-        <div className="absolute inset-x-6 bottom-10">
+        <div className="absolute inset-x-7 bottom-12">
           <StatusCard episode={primaryEpisode} />
         </div>
       </section>
 
-      <section className="mt-4">
-        <div className="mb-2 flex items-center justify-between">
+      <section className="mt-2.5">
+        <div className="mb-1.5 flex items-center justify-between">
           <h2 className="text-sm font-black uppercase tracking-[0.22em] text-[#f1dbc0]">Episodes</h2>
           <span className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[#c89561]">{episodes.length || 0} listed</span>
         </div>
@@ -414,7 +423,7 @@ function HomeView({
         </div>
       </section>
 
-      <section className="-mx-4 mt-5 flex gap-3 overflow-x-auto px-4 pb-1">
+      <section className="mt-3 grid grid-cols-3 gap-2">
         <ModuleCard icon={Video} title="Trailers" subtitle="Show trailers and episode previews." asset={SHADO_TV_ASSETS.crimpShrimp.moduleTrailers} onOpen={onOpenTrailers} />
         <ModuleCard icon={Users} title="Cast" subtitle="Global cast and production credits." asset={SHADO_TV_ASSETS.crimpShrimp.moduleCast} onOpen={onOpenCast} />
         <ModuleCard icon={Newspaper} title="Updates" subtitle="Newest production notes and older posts." asset={SHADO_TV_ASSETS.crimpShrimp.moduleUpdates} onOpen={onOpenUpdates} />
