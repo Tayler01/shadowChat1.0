@@ -176,7 +176,7 @@ function BackButton({ onClick, label = 'Back' }: { onClick: () => void; label?: 
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#d2b58a]/20 bg-black/20 text-[#e7c489] transition hover:border-[#e3b061]/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-[#a64022]/50"
+      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#9a6a43]/30 bg-black/20 text-[#e7c489] transition hover:border-[#9a6a43]/55 hover:text-white focus:outline-none focus:ring-2 focus:ring-[#9a6a43]/55"
     >
       <ArrowLeft className="h-5 w-5" />
     </button>
@@ -202,7 +202,7 @@ function ShadoTvHeader({ onBack, onExit, title }: { onBack?: () => void; onExit:
           <p className="text-[0.62rem] font-black uppercase tracking-[0.22em] text-[#c89561]">Shado TV</p>
           <p className="truncate text-sm font-black uppercase tracking-[0.12em] text-[#f1dbc0]">{title ?? SHOW_TITLE}</p>
         </div>
-        <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#d2b58a]/20 bg-black/20 text-[#c89561]">
+        <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#9a6a43]/30 bg-black/20 text-[#c89561]">
           <Radio className="h-5 w-5" />
         </span>
       </div>
@@ -243,7 +243,7 @@ function StatusCard({ episode }: { episode?: ShadoTvVideo | null }) {
         {target ? (
           <div className="mt-1.5 grid grid-cols-4 gap-1">
             {clock.map(item => (
-              <div key={item.label} className="border-r border-[#5c2b1d]/28 last:border-r-0">
+              <div key={item.label} className="border-r border-[#9a6a43]/30 last:border-r-0">
                 <span className="block text-lg font-black tabular-nums leading-none text-[#8b321f]">{String(item.value).padStart(2, '0')}</span>
                 <span className="mt-0.5 block text-[0.46rem] font-black uppercase tracking-[0.1em] text-[#31180f]/80">{item.label}</span>
               </div>
@@ -277,7 +277,7 @@ function EpisodeCard({
       onClick={onOpen}
       data-shado-tv-video-card="true"
       aria-label={`Open ${video.title}`}
-      className="group relative w-full overflow-hidden rounded-lg border border-[#b88452]/34 bg-black/24 p-2.5 text-left shadow-[0_16px_34px_rgba(0,0,0,0.34)] transition hover:border-[#d8b06f]/58 hover:bg-black/30 focus:outline-none focus:ring-2 focus:ring-[#a64022]/60"
+      className="group relative w-full overflow-hidden rounded-lg border border-[#9a6a43]/30 bg-black/24 p-2.5 text-left shadow-[0_16px_34px_rgba(0,0,0,0.34)] transition hover:border-[#9a6a43]/55 hover:bg-black/30 focus:outline-none focus:ring-2 focus:ring-[#9a6a43]/55"
     >
       <img
         src={SHADO_TV_ASSETS.crimpShrimp.featuredEpisodeBackdrop}
@@ -307,7 +307,7 @@ function EpisodeCard({
         </div>
         <div className="flex min-w-0 flex-col justify-between py-1">
           <div>
-            <span className="inline-flex rounded-full border border-[#d8b06f]/30 bg-black/42 px-2 py-0.5 text-[0.56rem] font-black uppercase tracking-[0.14em] text-[#e5c28f]">
+            <span className="inline-flex rounded-full border border-[#9a6a43]/30 bg-black/42 px-2 py-0.5 text-[0.56rem] font-black uppercase tracking-[0.14em] text-[#e5c28f]">
               {status === 'airing-now' ? 'Airing Now' : status === 'now-streaming' ? 'Now Streaming' : 'Announced'}
             </span>
             <p className="mt-2 text-[0.62rem] font-black uppercase tracking-[0.16em] text-[#c89561]">{video.subtitle || 'Episode'}</p>
@@ -316,14 +316,14 @@ function EpisodeCard({
           </div>
           <div className="mt-2 flex items-center justify-between gap-2">
             <span className="text-xs font-bold text-[#d9c79f]/70">{formatDuration(video.durationSeconds)}</span>
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#d8b06f]/55 bg-[#a64022]/20 text-[#f1dbc0]">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#9a6a43]/30 bg-[#a64022]/20 text-[#f1dbc0]">
               {status === 'coming-soon' ? <Lock className="h-4 w-4" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}
             </span>
           </div>
         </div>
       </div>
       {progressPercent > 0 && (
-        <div className="absolute inset-x-0 bottom-0 h-1 bg-white/12">
+        <div className="absolute inset-x-0 bottom-0 h-1 bg-[#d8b06f]/14">
           <div className="h-full bg-[#b94728]" style={{ width: `${progressPercent}%` }} />
         </div>
       )}
@@ -348,12 +348,12 @@ function ModuleCard({
     <button
       type="button"
       onClick={onOpen}
-      className="relative aspect-[0.82/1] min-w-0 overflow-hidden rounded-lg border border-[#b88452]/24 bg-[#0b0c09] p-2.5 text-left shadow-[0_16px_36px_rgba(0,0,0,0.34)] transition hover:-translate-y-0.5 hover:border-[#d8b06f]/65 focus:outline-none focus:ring-2 focus:ring-[#a64022]/55"
+      className="relative aspect-[0.82/1] min-w-0 overflow-hidden rounded-lg border border-[#9a6a43]/30 bg-[#0b0c09] p-2.5 text-left shadow-[0_16px_36px_rgba(0,0,0,0.34)] transition hover:-translate-y-0.5 hover:border-[#9a6a43]/55 focus:outline-none focus:ring-2 focus:ring-[#9a6a43]/55"
     >
       <img src={asset} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" decoding="async" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.06),rgba(0,0,0,0.24)_42%,rgba(0,0,0,0.78))]" />
       <div className="relative flex h-full flex-col justify-between">
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d8b06f]/32 bg-black/38 text-[#c89561]">
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#9a6a43]/30 bg-black/38 text-[#d1a15b]">
           <Icon className="h-3.5 w-3.5" />
         </span>
         <div>
@@ -385,7 +385,7 @@ function HomeView({
 
   return (
     <main className="mx-auto min-h-0 w-full max-w-[30rem] flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)_+_0.75rem)] pt-3">
-      <section className="relative h-[19.75rem] overflow-visible min-[430px]:h-[21rem]">
+      <section className="relative h-[19.75rem] overflow-visible rounded-lg border border-[#9a6a43]/30 bg-black/24 shadow-[0_16px_36px_rgba(0,0,0,0.36)] min-[430px]:h-[21rem]">
         <img
           src={SHADO_TV_ASSETS.crimpShrimp.seriesTitleHero}
           alt=""
@@ -405,9 +405,9 @@ function HomeView({
           <h2 className="text-sm font-black uppercase tracking-[0.22em] text-[#f1dbc0]">Episodes</h2>
           <span className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[#c89561]">{episodes.length || 0} listed</span>
         </div>
-        <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1">
+        <div className="flex snap-x gap-3 overflow-x-auto pb-1">
           {episodes.map(video => (
-            <div key={video.id} className="min-w-[min(22rem,88vw)] snap-start">
+            <div key={video.id} className="w-full flex-none snap-start">
               <EpisodeCard
                 video={video}
                 progress={watchProgress.get(video.id)}
@@ -416,7 +416,7 @@ function HomeView({
             </div>
           ))}
           {episodes.length === 0 && (
-            <div className="min-w-[min(22rem,88vw)] rounded-lg border border-[#b88452]/28 bg-black/42 p-4 text-sm font-semibold leading-5 text-[#dac5a3]/78">
+            <div className="w-full flex-none rounded-lg border border-[#9a6a43]/30 bg-black/42 p-4 text-sm font-semibold leading-5 text-[#dac5a3]/78">
               No public episodes are visible yet. Add or announce an episode from Shado TV Studio.
             </div>
           )}
@@ -462,7 +462,7 @@ function EpisodeView({
 
   return (
     <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)_+_1.25rem)] pt-4">
-      <section className="overflow-hidden rounded-lg border border-[#b88452]/34 bg-[#080806] shadow-[0_24px_62px_rgba(0,0,0,0.52)]">
+      <section className="overflow-hidden rounded-lg border border-[#9a6a43]/30 bg-[#080806] shadow-[0_24px_62px_rgba(0,0,0,0.52)]">
         <div className="relative aspect-video bg-black">
           {canPlayVideo && video.embedUrl ? (
             <StreamFrame src={video.embedUrl} title={video.title} />
@@ -479,7 +479,7 @@ function EpisodeView({
               />
               <div className="absolute inset-0 bg-black/30" />
               <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center">
-                <span className="inline-flex h-16 w-16 items-center justify-center rounded-full border border-[#d8b06f]/65 bg-black/48 text-[#f1dbc0] shadow-[0_0_34px_rgba(166,64,34,0.3)]">
+                <span className="inline-flex h-16 w-16 items-center justify-center rounded-full border border-[#9a6a43]/30 bg-black/48 text-[#f1dbc0] shadow-[0_0_34px_rgba(166,64,34,0.3)]">
                   {status === 'coming-soon' ? <Lock className="h-7 w-7" /> : <Play className="ml-1 h-7 w-7 fill-current" />}
                 </span>
                 <p className="mt-3 text-sm font-black uppercase tracking-[0.18em] text-[#f1dbc0]">
@@ -490,19 +490,19 @@ function EpisodeView({
             </>
           )}
         </div>
-        <div className="border-t border-[#b88452]/22 bg-black/34 p-4">
+        <div className="border-t border-[#9a6a43]/30 bg-black/34 p-4">
           <div className="flex flex-wrap gap-2">
             {canPlayVideo ? (
               <button
                 type="button"
                 onClick={() => void saveProgress()}
-                className="inline-flex h-10 items-center gap-2 rounded-full border border-[#b88452]/40 px-4 text-xs font-black uppercase tracking-[0.14em] text-[#f1dbc0] transition hover:border-[#d8b06f]/70"
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-[#9a6a43]/30 px-4 text-xs font-black uppercase tracking-[0.14em] text-[#f1dbc0] transition hover:border-[#9a6a43]/55"
               >
                 <Play className="h-4 w-4 fill-current" />
                 {progress?.positionSeconds ? 'Resume' : 'Start'}
               </button>
             ) : (
-              <span className="inline-flex min-h-10 items-center rounded-full border border-[#b88452]/28 bg-black/24 px-4 text-xs font-black uppercase tracking-[0.14em] text-[#dac5a3]/82">
+              <span className="inline-flex min-h-10 items-center rounded-full border border-[#9a6a43]/30 bg-black/24 px-4 text-xs font-black uppercase tracking-[0.14em] text-[#dac5a3]/82">
                 {status === 'airing-now' ? 'Premiere mode ready' : status === 'now-streaming' ? 'Upload stream from Studio' : 'Countdown active'}
               </span>
             )}
@@ -511,7 +511,7 @@ function EpisodeView({
                 href={video.externalUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex h-10 items-center gap-2 rounded-full border border-white/12 px-4 text-xs font-black uppercase tracking-[0.14em] text-[#dac5a3] transition hover:border-[#dac5a3]/50"
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-[#9a6a43]/30 px-4 text-xs font-black uppercase tracking-[0.14em] text-[#dac5a3] transition hover:border-[#9a6a43]/55"
               >
                 <ExternalLink className="h-4 w-4" />
                 Open
@@ -522,7 +522,7 @@ function EpisodeView({
         </div>
       </section>
 
-      <section className="mt-4 rounded-lg border border-[#b88452]/28 bg-black/38 p-4">
+      <section className="mt-4 rounded-lg border border-[#9a6a43]/30 bg-black/38 p-4">
         <p className="text-[0.68rem] font-black uppercase tracking-[0.22em] text-[#c89561]">{video.subtitle}</p>
         <h1 className="mt-2 text-3xl font-black uppercase leading-8 text-[#b94728]">{video.title}</h1>
         <p className="mt-3 text-sm leading-6 text-[#f1dbc0]/82">{video.description}</p>
@@ -535,8 +535,8 @@ function EpisodeView({
       </section>
 
       {(video.trailerAssetUrl || video.trailerReleaseAt || video.trailerAvailable) && (
-        <section className="mt-4 overflow-hidden rounded-lg border border-[#b88452]/28 bg-black/38">
-          <div className="border-b border-[#b88452]/18 p-4">
+        <section className="mt-4 overflow-hidden rounded-lg border border-[#9a6a43]/30 bg-black/38">
+          <div className="border-b border-[#9a6a43]/30 p-4">
             <p className="text-[0.68rem] font-black uppercase tracking-[0.22em] text-[#c89561]">Trailer</p>
             <h2 className="mt-1 text-xl font-black uppercase text-[#f1dbc0]">{trailerReady ? 'Watch the preview' : 'Preview locked'}</h2>
           </div>
@@ -555,17 +555,17 @@ function EpisodeView({
         </section>
       )}
 
-      <section className="mt-4 rounded-lg border border-[#b88452]/28 bg-black/38 p-4">
+      <section className="mt-4 rounded-lg border border-[#9a6a43]/30 bg-black/38 p-4">
         <h2 className="text-sm font-black uppercase tracking-[0.18em] text-[#f1dbc0]">Cast</h2>
         <div className="mt-3 grid gap-2">
           {castItems.slice(0, 2).map(member => (
-            <div key={member.id} className="rounded-md border border-white/10 bg-white/[0.035] p-3">
+            <div key={member.id} className="rounded-md border border-[#9a6a43]/30 bg-[#2a190e]/30 p-3">
               <p className="text-sm font-black text-[#f1dbc0]">{member.title}</p>
               {member.subtitle && <p className="text-xs font-semibold text-[#c89561]">{member.subtitle}</p>}
             </div>
           ))}
           {castItems.length === 0 && (
-            <div className="rounded-md border border-white/10 bg-white/[0.035] p-3 text-sm font-semibold text-[#dac5a3]/78">
+            <div className="rounded-md border border-[#9a6a43]/30 bg-[#2a190e]/30 p-3 text-sm font-semibold text-[#dac5a3]/78">
               Cast notes are being prepared.
             </div>
           )}
@@ -577,7 +577,7 @@ function EpisodeView({
 
 function InfoCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border border-white/10 bg-white/[0.035] p-3">
+    <div className="rounded-md border border-[#9a6a43]/30 bg-[#2a190e]/30 p-3">
       <span className="block text-[0.62rem] font-black uppercase tracking-[0.18em] text-[#c89561]">{label}</span>
       <span className="mt-1 block font-semibold">{value}</span>
     </div>
@@ -591,18 +591,18 @@ function TrailersView({ videos, onOpenEpisode }: { videos: ShadoTvVideo[]; onOpe
     <PageScaffold eyebrow="Trailers" title="Preview the trouble">
       <div className="grid gap-3">
         {(trailerVideos.length ? trailerVideos : videos).map(video => (
-          <article key={video.id} className="overflow-hidden rounded-lg border border-[#b88452]/28 bg-black/38">
+          <article key={video.id} className="overflow-hidden rounded-lg border border-[#9a6a43]/30 bg-black/38">
             <button
               type="button"
               onClick={() => onOpenEpisode(video.id)}
-              className="w-full p-4 text-left transition hover:bg-white/[0.03]"
+              className="w-full p-4 text-left transition hover:bg-[#d8b06f]/[0.05]"
             >
               <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[#c89561]">Trailer</p>
               <h2 className="mt-1 text-xl font-black uppercase text-[#f1dbc0]">{video.title}</h2>
               <p className="mt-2 text-sm leading-5 text-[#dac5a3]/72">{getTrailerLabel(video)}</p>
             </button>
             {isTrailerReleased(video) && video.trailerAssetUrl ? (
-              <div className="relative aspect-video border-t border-[#b88452]/18 bg-black">
+              <div className="relative aspect-video border-t border-[#9a6a43]/30 bg-black">
                 <StreamFrame src={video.trailerAssetUrl} title={`${video.title} trailer`} />
               </div>
             ) : null}
@@ -618,14 +618,14 @@ function CastView({ items }: { items: ShadoTvContentItem[] }) {
     <PageScaffold eyebrow="Cast" title="The crew">
       <div className="grid gap-3">
         {items.map(member => (
-          <article key={member.id} className="rounded-lg border border-[#b88452]/28 bg-black/38 p-4">
+          <article key={member.id} className="rounded-lg border border-[#9a6a43]/30 bg-black/38 p-4">
             <p className="text-lg font-black text-[#f1dbc0]">{member.title}</p>
             {member.subtitle && <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-[#c89561]">{member.subtitle}</p>}
             {member.body && <p className="mt-3 text-sm leading-6 text-[#dac5a3]/78">{member.body}</p>}
           </article>
         ))}
         {items.length === 0 && (
-          <article className="rounded-lg border border-[#b88452]/28 bg-black/38 p-4 text-sm font-semibold leading-6 text-[#dac5a3]/78">
+          <article className="rounded-lg border border-[#9a6a43]/30 bg-black/38 p-4 text-sm font-semibold leading-6 text-[#dac5a3]/78">
             Cast notes are being prepared.
           </article>
         )}
@@ -639,14 +639,14 @@ function UpdatesView({ items }: { items: ShadoTvContentItem[] }) {
     <PageScaffold eyebrow="Updates" title="Production notes">
       <div className="grid gap-3">
         {items.map(update => (
-          <article key={update.id} className="rounded-lg border border-[#b88452]/28 bg-[#0c0b08]/84 p-4">
+          <article key={update.id} className="rounded-lg border border-[#9a6a43]/30 bg-[#0c0b08]/84 p-4">
             <p className="text-[0.68rem] font-black uppercase tracking-[0.18em] text-[#c89561]">{update.dateLabel || update.subtitle || 'Studio note'}</p>
             <h2 className="mt-1 text-xl font-black uppercase text-[#f1dbc0]">{update.title}</h2>
             {update.body && <p className="mt-3 text-sm leading-6 text-[#dac5a3]/78">{update.body}</p>}
           </article>
         ))}
         {items.length === 0 && (
-          <article className="rounded-lg border border-[#b88452]/28 bg-[#0c0b08]/84 p-4 text-sm font-semibold leading-6 text-[#dac5a3]/78">
+          <article className="rounded-lg border border-[#9a6a43]/30 bg-[#0c0b08]/84 p-4 text-sm font-semibold leading-6 text-[#dac5a3]/78">
             Production notes are being prepared.
           </article>
         )}
@@ -658,7 +658,7 @@ function UpdatesView({ items }: { items: ShadoTvContentItem[] }) {
 function PageScaffold({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
   return (
     <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)_+_1.25rem)] pt-4">
-      <section className="mb-4 rounded-lg border border-[#b88452]/28 bg-black/42 p-4">
+      <section className="mb-4 rounded-lg border border-[#9a6a43]/30 bg-black/42 p-4">
         <p className="text-[0.68rem] font-black uppercase tracking-[0.22em] text-[#c89561]">{eyebrow}</p>
         <h1 className="mt-2 text-3xl font-black uppercase leading-8 text-[#b94728]">{title}</h1>
       </section>
@@ -764,7 +764,7 @@ export function ShadoTvScreen({ onExit }: ShadoTvScreenProps) {
 
     return (
       <PageScaffold eyebrow="Unavailable" title="Episode hidden">
-        <p className="rounded-lg border border-[#b88452]/28 bg-black/38 p-4 text-sm text-[#dac5a3]/78">
+        <p className="rounded-lg border border-[#9a6a43]/30 bg-black/38 p-4 text-sm text-[#dac5a3]/78">
           This episode is not visible in the viewer catalog.
         </p>
       </PageScaffold>
@@ -794,7 +794,7 @@ export function ShadoTvScreen({ onExit }: ShadoTvScreenProps) {
       />
       <div className="relative z-10 flex min-h-0 flex-1 flex-col">
         {catalogError && (
-          <div className="mx-4 mt-3 rounded-lg border border-[#b88452]/24 bg-black/52 p-3 text-xs font-semibold text-[#dac5a3]/78">
+          <div className="mx-4 mt-3 rounded-lg border border-[#9a6a43]/30 bg-black/52 p-3 text-xs font-semibold text-[#dac5a3]/78">
             Using test catalog: {catalogError}
           </div>
         )}
