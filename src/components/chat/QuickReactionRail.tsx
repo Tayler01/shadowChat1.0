@@ -44,10 +44,20 @@ export function QuickReactionRail({
       if (!anchor) return
 
       const rect = anchor.getBoundingClientRect()
-      const viewportWidth = window.innerWidth
-      const viewportBottom = window.innerHeight
-      const safeTop = EDGE_PADDING
-      const safeBottom = viewportBottom - EDGE_PADDING
+      const viewport = window.visualViewport
+      const viewportTop = viewport?.offsetTop ?? 0
+      const viewportHeight = viewport?.height ?? window.innerHeight
+      const viewportWidth = viewport?.width ?? window.innerWidth
+      const viewportBottom = viewportTop + viewportHeight
+      const footerRect = document
+        .querySelector('[data-mobile-chat-footer="true"]')
+        ?.getBoundingClientRect()
+      const footerTop = footerRect?.top
+      const footerTopIsUsable = typeof footerTop === 'number'
+        && footerTop > viewportTop + RAIL_HEIGHT + EDGE_PADDING * 2
+        && footerTop < viewportBottom
+      const safeTop = viewportTop + EDGE_PADDING
+      const safeBottom = Math.min(viewportBottom, footerTopIsUsable ? footerTop : viewportBottom) - EDGE_PADDING
       const maxTop = Math.max(safeTop, safeBottom - RAIL_HEIGHT)
       const topCandidate = rect.top - RAIL_HEIGHT - RAIL_GAP
       const top = topCandidate < safeTop
