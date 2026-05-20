@@ -22,6 +22,17 @@ const RAIL_GAP = 6
 const clamp = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max)
 
+const toViewportDocumentRect = (rect: DOMRect, viewport: VisualViewport | null) => {
+  const offsetTop = viewport?.offsetTop ?? 0
+  const offsetLeft = viewport?.offsetLeft ?? 0
+
+  return {
+    top: rect.top + offsetTop,
+    bottom: rect.bottom + offsetTop,
+    left: rect.left + offsetLeft,
+  }
+}
+
 export function QuickReactionRail({
   open,
   anchorRef,
@@ -44,26 +55,27 @@ export function QuickReactionRail({
       if (!anchor) return
 
       const rect = anchor.getBoundingClientRect()
-      const viewport = window.visualViewport
+      const viewport = window.visualViewport ?? null
       const viewportTop = viewport?.offsetTop ?? 0
       const viewportHeight = viewport?.height ?? window.innerHeight
       const viewportWidth = viewport?.width ?? window.innerWidth
+      const viewportLeft = viewport?.offsetLeft ?? 0
       const viewportBottom = viewportTop + viewportHeight
-      const footerRect = document
-        .querySelector('[data-mobile-chat-footer="true"]')
-        ?.getBoundingClientRect()
-      const footerTop = footerRect?.top
-      const footerTopIsUsable = typeof footerTop === 'number'
-        && footerTop > viewportTop + RAIL_HEIGHT + EDGE_PADDING * 2
-        && footerTop < viewportBottom
+      const viewportRight = viewportLeft + viewportWidth
+      const anchorBox = toViewportDocumentRect(rect, viewport)
       const safeTop = viewportTop + EDGE_PADDING
-      const safeBottom = Math.min(viewportBottom, footerTopIsUsable ? footerTop : viewportBottom) - EDGE_PADDING
+      const safeBottom = viewportBottom - EDGE_PADDING
       const maxTop = Math.max(safeTop, safeBottom - RAIL_HEIGHT)
-      const topCandidate = rect.top - RAIL_HEIGHT - RAIL_GAP
-      const top = topCandidate < safeTop
-        ? Math.min(rect.bottom + RAIL_GAP, maxTop)
-        : topCandidate
-      const left = clamp(rect.left + 12, EDGE_PADDING, viewportWidth - RAIL_WIDTH - EDGE_PADDING)
+      const aboveTop = anchorBox.top - RAIL_HEIGHT - RAIL_GAP
+      const belowTop = anchorBox.bottom + RAIL_GAP
+      const hasRoomAbove = aboveTop >= safeTop
+      const hasRoomBelow = belowTop + RAIL_HEIGHT <= safeBottom
+      const top = hasRoomAbove || !hasRoomBelow ? aboveTop : belowTop
+      const left = clamp(
+        anchorBox.left + 12,
+        viewportLeft + EDGE_PADDING,
+        Math.max(viewportLeft + EDGE_PADDING, viewportRight - RAIL_WIDTH - EDGE_PADDING)
+      )
 
       setPosition({ top: clamp(top, safeTop, maxTop), left })
     }
@@ -132,6 +144,8 @@ export function QuickReactionRail({
         <button
           key={emoji}
           onClick={() => onReact(emoji)}
+          onPointerDown={event => event.preventDefault()}
+          onMouseDown={event => event.preventDefault()}
           className="inline-flex h-8 w-8 items-center justify-center rounded-full text-base transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.32)]"
           type="button"
           aria-label={`React with ${normalizeEmoji(emoji)}`}
@@ -141,6 +155,8 @@ export function QuickReactionRail({
       ))}
       <button
         onClick={onAddReaction}
+        onPointerDown={event => event.preventDefault()}
+        onMouseDown={event => event.preventDefault()}
         className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[var(--text-secondary)] transition-transform hover:scale-110 hover:text-[var(--theme-accent-readable)] focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.32)]"
         type="button"
         aria-label="Add reaction"

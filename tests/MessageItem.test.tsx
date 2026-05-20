@@ -637,6 +637,138 @@ test('keeps quick reactions near a bottom message when keyboard footer geometry 
   }
 })
 
+test('keeps quick reactions anchored when the mobile footer is mid keyboard transition', async () => {
+  const footer = document.createElement('div')
+  footer.setAttribute('data-mobile-chat-footer', 'true')
+  document.body.appendChild(footer)
+  const rectSpy = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+  const originalInnerWidth = window.innerWidth
+  const originalInnerHeight = window.innerHeight
+  const originalVisualViewport = window.visualViewport
+
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 844 })
+  Object.defineProperty(window, 'visualViewport', {
+    configurable: true,
+    value: { offsetTop: 0, offsetLeft: 0, width: 390, height: 580 },
+  })
+
+  rectSpy.mockImplementation(function getMockRect(this: HTMLElement) {
+    if (this === footer) {
+      return {
+        x: 0,
+        y: 84,
+        top: 84,
+        right: 390,
+        bottom: 844,
+        left: 0,
+        width: 390,
+        height: 760,
+        toJSON: () => {},
+      } as DOMRect
+    }
+
+    if (this.getAttribute?.('data-testid') === 'message-bubble-shell') {
+      return {
+        x: 48,
+        y: 500,
+        top: 500,
+        right: 300,
+        bottom: 548,
+        left: 48,
+        width: 252,
+        height: 48,
+        toJSON: () => {},
+      } as DOMRect
+    }
+
+    return {
+      x: 0,
+      y: 0,
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0,
+      width: 0,
+      height: 0,
+      toJSON: () => {},
+    } as DOMRect
+  })
+
+  try {
+    render(
+      <MessageItem
+        message={{ ...baseMessage, message_type: 'text', content: 'transition quick reaction' } as Message}
+        onEdit={async () => {}}
+        onDelete={async () => {}}
+        onTogglePin={async () => {}}
+        onToggleReaction={async () => {}}
+        onJumpToMessage={() => {}}
+        containerRef={React.createRef()}
+      />
+    )
+
+    act(() => {
+      fireEvent.mouseEnter(screen.getByTestId('message-bubble-shell'))
+    })
+
+    await waitFor(() => {
+      const rail = screen.getByRole('toolbar', { name: /quick reactions/i })
+      expect(Number.parseFloat(rail.style.top)).toBeCloseTo(452, 0)
+    })
+  } finally {
+    footer.remove()
+    rectSpy.mockRestore()
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalInnerWidth })
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: originalInnerHeight })
+    Object.defineProperty(window, 'visualViewport', {
+      configurable: true,
+      value: originalVisualViewport,
+    })
+  }
+})
+
+test('does not steal composer focus when quick reactions are tapped on touch', async () => {
+  const composer = document.createElement('textarea')
+  document.body.appendChild(composer)
+  const onToggleReaction = jest.fn()
+
+  try {
+    composer.focus()
+
+    render(
+      <MessageItem
+        message={{ ...baseMessage, message_type: 'text', content: 'touch quick reaction' } as Message}
+        onEdit={async () => {}}
+        onDelete={async () => {}}
+        onTogglePin={async () => {}}
+        onToggleReaction={onToggleReaction}
+        onJumpToMessage={() => {}}
+        containerRef={React.createRef()}
+      />
+    )
+
+    act(() => {
+      fireEvent.mouseEnter(screen.getByTestId('message-bubble-shell'))
+    })
+
+    const quickReaction = screen.getByRole('button', {
+      name: `React with ${String.fromCodePoint(0x1F44D)}`,
+    })
+    expect(document.activeElement).toBe(composer)
+    expect(fireEvent.pointerDown(quickReaction, { pointerType: 'touch' })).toBe(false)
+    expect(document.activeElement).toBe(composer)
+
+    await act(async () => {
+      fireEvent.click(quickReaction)
+    })
+
+    expect(onToggleReaction).toHaveBeenCalledWith('m1', String.fromCodePoint(0x1F44D))
+  } finally {
+    composer.remove()
+  }
+})
+
 test('opens the message actions menu upward near the mobile viewport bottom', async () => {
   const container = document.createElement('div')
   const containerRef = { current: container }
