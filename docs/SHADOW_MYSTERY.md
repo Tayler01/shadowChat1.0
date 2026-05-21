@@ -9,10 +9,11 @@ As of 2026-05-20:
 
 - Shadow Mystery is wired into the Entertainment picker.
 - The first story list/detail surface is static and mobile-first.
-- The first launch story is `The School That Would Not Close`, about Public
+- The first launch story is `The Devil's School`, about Public
   School Number Four / Annie Lytle School in Jacksonville, Florida.
-- The story is written as an immersive 10-15 minute mystery novella, with facts,
-  folklore, real names, and history woven into the prose.
+- The story is written as an immersive 10-15 minute mystery novella, with the
+  ghost, murderer, cannibal-principal, and devil-worship legends driving the
+  mystery while real names, dates, and history are woven into the prose.
 - The page uses generated picker, cover, header, and section art plus two real
   Wikimedia Commons images optimized into the repo with attribution.
 

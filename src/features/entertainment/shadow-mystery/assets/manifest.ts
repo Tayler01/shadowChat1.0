@@ -25,7 +25,7 @@ export const SHADOW_MYSTERY_ASSET_PROMPTS = [
     id: 'school-four-cover',
     output: SHADOW_MYSTERY_ASSETS.schoolFour.cover,
     prompt:
-      'Original cinematic cover art for a Shadow Mystery longform story titled The School That Would Not Close, inspired by Jacksonville Florida Public School Number Four / Annie Lytle School. A monumental abandoned neoclassical brick school with Doric columns, rain-blackened steps, boarded windows, a faint 1910s classroom memory layered as translucent archival paper, highway glow pressing close in the background, muted antique gold, deep oxblood, sepia paper, black obsidian shadows, elegant mobile novella cover composition with text-safe top and lower bands for app-rendered title, no readable text, no logos, no people, no gore, no satanic symbols, no watermark.',
+      "Original cinematic cover art for a Shadow Mystery longform story titled The Devil's School, inspired by Jacksonville Florida Public School Number Four / Annie Lytle School. A monumental abandoned neoclassical brick school with Doric columns, rain-blackened steps, boarded windows, a faint 1910s classroom memory layered as translucent archival paper, highway glow pressing close in the background, muted antique gold, deep oxblood, sepia paper, black obsidian shadows, elegant mobile novella cover composition with text-safe top and lower bands for app-rendered title, no readable text, no logos, no people, no gore, no satanic symbols, no watermark.",
   },
   {
     id: 'school-four-header',
