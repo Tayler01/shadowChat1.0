@@ -5,17 +5,24 @@ ShadowChat Entertainment area.
 
 ## Current Status
 
-As of 2026-05-20:
+As of 2026-05-22:
 
 - Shadow Mystery is wired into the Entertainment picker.
-- The first story list/detail surface is static and mobile-first.
-- The first launch story is `The Devil's School`, about Public
+- The story list/detail surface is static and mobile-first.
+- The launch story is `The Devil's School`, about Public
   School Number Four / Annie Lytle School in Jacksonville, Florida.
-- The story is written as an immersive 10-15 minute mystery novella, with the
+- The second local proof story is `The Last Tee Time At Camelot`, about Camelot
+  Golf Course and the Pressmen's Home ghost town in Rogersville, Tennessee.
+- Stories are written as immersive 10-15 minute mystery novellas, with the
   ghost, murderer, cannibal-principal, and devil-worship legends driving the
-  mystery while real names, dates, and history are woven into the prose.
-- The page uses generated picker, cover, header, and section art plus two real
-  Wikimedia Commons images optimized into the repo with attribution.
+  School Four mystery while real names, dates, and history are woven into the
+  prose.
+- The Camelot story leans into the lost golfer, ghost course, sanitarium/asylum,
+  warehouse/service-building, candle-rumor, and scorekeeper legends while
+  weaving in the real Pressmen's Home union-town and Camelot course history.
+- The page uses generated picker, cover, header, and section art plus real
+  Wikimedia Commons and National Park Service / National Register images
+  optimized into the repo with attribution.
 
 ## Roadmap
 

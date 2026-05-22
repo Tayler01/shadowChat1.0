@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { BookOpen, Film, Gamepad2, Volume2, VolumeX } from 'lucide-react'
+import { Film, Gamepad2, Volume2, VolumeX } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { ShadowWarScreen } from './shadow-war/ShadowWarScreen'
 import { SHADOW_WAR_ASSETS } from './shadow-war/assets/manifest'
@@ -223,34 +223,18 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
           type="button"
           aria-label="Open Shadow Mystery"
           onClick={enterShadowMystery}
-          className="group relative min-h-[9.75rem] w-full overflow-hidden rounded-[2rem] border border-[rgba(215,170,70,0.42)] bg-[#050403] text-left shadow-[0_24px_60px_rgba(0,0,0,0.48)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[rgba(239,202,114,0.68)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,202,114,0.55)] md:min-h-[12rem]"
+          className="group relative aspect-[1672/941] w-full overflow-hidden rounded-[2rem] border border-[rgba(215,170,70,0.42)] bg-[#050403] shadow-[0_24px_60px_rgba(0,0,0,0.48)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[rgba(239,202,114,0.68)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,202,114,0.55)]"
         >
           <img
             src={SHADOW_MYSTERY_ASSETS.pickerBanner}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover opacity-[0.84]"
+            alt="Shadow Mystery"
+            className="absolute inset-0 h-full w-full object-cover"
             loading="eager"
             decoding="async"
             fetchPriority="high"
-            width={1440}
-            height={810}
+            width={1672}
+            height={941}
           />
-          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.95),rgba(0,0,0,0.62)_52%,rgba(0,0,0,0.2)),radial-gradient(circle_at_76%_24%,rgba(143,47,47,0.32),transparent_36%)]" />
-          <div className="absolute inset-x-6 top-4 h-px bg-gradient-to-r from-transparent via-[#f0d381]/55 to-transparent" />
-          <div className="absolute inset-x-6 bottom-4 h-px bg-gradient-to-r from-transparent via-[#8a6328]/60 to-transparent" />
-          <div className="relative flex h-full min-h-[9.75rem] items-center gap-4 px-5 py-5 md:min-h-[12rem] md:px-8">
-            <div className="min-w-0 flex-1">
-              <p className="mx-auto max-w-xl text-center text-[0.68rem] font-black uppercase tracking-[0.24em] text-[#c89561] md:mx-0 md:text-left">
-                Longform case files
-              </p>
-              <h2 className="mx-auto mt-2 max-w-xl text-center text-4xl font-black uppercase leading-10 text-[#f1dbc0] drop-shadow-[0_8px_24px_rgba(0,0,0,0.85)] md:mx-0 md:text-left md:text-5xl md:leading-[3.2rem]">
-                Shadow Mystery
-              </h2>
-            </div>
-            <div className="hidden rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.04)] p-3 text-[#f0d381] md:block">
-              <BookOpen className="h-5 w-5" />
-            </div>
-          </div>
         </button>
 
         <button

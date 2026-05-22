@@ -1,5 +1,6 @@
 const SHADOW_MYSTERY_ROOT = '/entertainment/shadow-mystery'
 const SCHOOL_FOUR_ROOT = `${SHADOW_MYSTERY_ROOT}/school-four`
+const CAMELOT_GOLF_COURSE_ROOT = `${SHADOW_MYSTERY_ROOT}/camelot-golf-course`
 
 export const SHADOW_MYSTERY_ASSETS = {
   pickerBanner: `${SHADOW_MYSTERY_ROOT}/picker-banner.webp`,
@@ -12,6 +13,17 @@ export const SHADOW_MYSTERY_ASSETS = {
     realPublicSchoolFour2013: `${SCHOOL_FOUR_ROOT}/real/public-school-four-2013.webp`,
     realAnnieLytle2012: `${SCHOOL_FOUR_ROOT}/real/annie-lytle-school-2012.webp`,
   },
+  camelotGolfCourse: {
+    cover: `${CAMELOT_GOLF_COURSE_ROOT}/cover.webp`,
+    header: `${CAMELOT_GOLF_COURSE_ROOT}/header.webp`,
+    sanatoriumCorridor: `${CAMELOT_GOLF_COURSE_ROOT}/sanatorium-corridor.webp`,
+    powerPlantScorecard: `${CAMELOT_GOLF_COURSE_ROOT}/power-plant-scorecard.webp`,
+    realPressmensHomeMall1985: `${CAMELOT_GOLF_COURSE_ROOT}/real/pressmens-home-mall-1985.webp`,
+    realDairyBarn1985: `${CAMELOT_GOLF_COURSE_ROOT}/real/dairy-barn-1985.webp`,
+    realPowerPlant1985: `${CAMELOT_GOLF_COURSE_ROOT}/real/power-plant-1985.webp`,
+    realSulphurSpringGazebo1985: `${CAMELOT_GOLF_COURSE_ROOT}/real/sulphur-spring-gazebo-1985.webp`,
+    realFarmStorageBuilding1985: `${CAMELOT_GOLF_COURSE_ROOT}/real/farm-storage-building-1985.webp`,
+  },
 } as const
 
 export const SHADOW_MYSTERY_ASSET_PROMPTS = [
@@ -19,7 +31,7 @@ export const SHADOW_MYSTERY_ASSET_PROMPTS = [
     id: 'shadow-mystery-picker-banner',
     output: SHADOW_MYSTERY_ASSETS.pickerBanner,
     prompt:
-      'Original cinematic picker banner art for SHADOW MYSTERY, a premium dark mobile entertainment card background for a mystery novella archive inside ShadowChat. A weathered neoclassical abandoned school facade half-seen through rain-streaked glass, highway light trails in the distance, old case-file paper textures, muted antique gold and deep oxblood accents over obsidian black, subtle archival photo grain, text-safe dark space on the left for app-rendered title, no readable text, no logos, no people, no gore, no satanic symbols, no watermark.',
+      'User-selected generated Shadow Mystery picker banner. Premium dark rain-streaked roadside mystery composition with large gold Shadow Mystery lettering, a Last Chance Diner sign, wet pavement, motel/diner lights, case-file maps and photo fragments, muted antique gold over obsidian black, deep oxblood paper accents, archival film grain, no gore, no watermark.',
   },
   {
     id: 'school-four-cover',
@@ -50,5 +62,29 @@ export const SHADOW_MYSTERY_ASSET_PROMPTS = [
     output: SHADOW_MYSTERY_ASSETS.schoolFour.auditoriumFolklore,
     prompt:
       'Original atmospheric illustration for a Shadow Mystery novella folklore section, inside an abandoned school auditorium after decades of rumors. Empty damaged stage, collapsed roof light, old theater seats implied by shadows, chalk dust and graffiti-like abstract marks but no readable words, a cold pool of moonlight, archival photo edges, muted gold and deep oxblood accents, black obsidian darkness, tense and elegant, no people, no gore, no satanic symbols, no logos, no watermark.',
+  },
+  {
+    id: 'camelot-golf-course-cover',
+    output: SHADOW_MYSTERY_ASSETS.camelotGolfCourse.cover,
+    prompt:
+      "Original cinematic mobile novella cover art for a Shadow Mystery story titled The Last Tee Time at Camelot, inspired by the abandoned Camelot Golf Course at Pressmen's Home in Rogersville, Tennessee. An overgrown golf fairway swallowed by Bermuda weeds at dusk, a lone tilted flag on a dark green, the white Castle Barn/dairy barn silhouette and an old power-plant smokestack ghosting through Appalachian mist, a weathered scorecard and tarnished golf club half-buried in wet grass, obsidian black shadows, muted antique gold highlights, deep oxblood accents, archival paper texture, subtle film grain, premium dark ShadowChat mood, text-safe upper and lower bands for app-rendered title, no readable text, no logos, no people, no gore, no watermark.",
+  },
+  {
+    id: 'camelot-golf-course-header',
+    output: SHADOW_MYSTERY_ASSETS.camelotGolfCourse.header,
+    prompt:
+      "Original wide header art for a Shadow Mystery story page about Camelot Golf Course and Pressmen's Home ghost town in Rogersville, Tennessee. Cinematic horizontal case-file panorama: abandoned fairway curling into old resort grounds, a vanished hotel footprint suggested by stone steps, Castle Barn/dairy barn and power plant smokestack in mist, faint sanatorium windows layered like an archival double exposure, old survey-map fragments and scorecard grid texture in the shadows, obsidian black palette with muted antique gold and deep oxblood accents, film grain, text-safe dark center-left for app-rendered title, no readable text, no logos, no people, no gore, no watermark.",
+  },
+  {
+    id: 'camelot-golf-course-sanatorium-corridor',
+    output: SHADOW_MYSTERY_ASSETS.camelotGolfCourse.sanatoriumCorridor,
+    prompt:
+      "Original atmospheric story image for a Shadow Mystery novella section about the sanitarium rumors near Pressmen's Home in Rogersville, Tennessee. A deserted early twentieth-century Appalachian sanatorium corridor at night, empty iron bed frames, tall dark windows, a mineral spring gazebo barely visible outside through mist, peeling plaster, archival sepia photo texture, obsidian shadows, muted antique gold light, deep oxblood edge accents, tense but tasteful ghost-story mood, no readable text, no logos, no people, no gore, no restraints, no watermark.",
+  },
+  {
+    id: 'camelot-golf-course-power-plant-scorecard',
+    output: SHADOW_MYSTERY_ASSETS.camelotGolfCourse.powerPlantScorecard,
+    prompt:
+      "Original atmospheric story image for a Shadow Mystery novella section about industrial ruin folklore at Pressmen's Home and Camelot Golf Course. Inside an abandoned power plant or warehouse-like service building after midnight, old steam machinery silhouettes, broken high windows, wet concrete, weeds entering through the floor, a dusty golf scorecard and white golf ball on a workbench, candle-like work lights suggesting rumor without showing occult symbols, obsidian black shadows, muted antique gold, deep oxblood accents, archival film grain, no readable text, no logos, no people, no gore, no satanic symbols, no watermark.",
   },
 ] as const

@@ -82,7 +82,292 @@ const schoolFourSources: ShadowMysterySource[] = [
   },
 ]
 
+const camelotGolfCourseSources: ShadowMysterySource[] = [
+  {
+    label: 'National Park Service: Pressmen\'s Home Historic District nomination',
+    url: 'https://npgallery.nps.gov/GetAsset/e7c0d55b-f504-4346-a855-5f48e5b87e42',
+    usage:
+      'Historic district dates, union headquarters context, building inventory, tuberculosis sanitarium history, closure timeline, and remaining resource descriptions.',
+  },
+  {
+    label: 'National Park Service: Pressmen\'s Home 1985 photo packet',
+    url: 'https://npgallery.nps.gov/GetAsset/c169552b-09d0-4ef8-b706-ae2c7969d50d',
+    usage:
+      'Official 1985 documentation photographs for the mall, dairy barn, power plant, sulphur spring gazebo, and farm storage building used as real story images.',
+  },
+  {
+    label: 'Wikimedia Commons: Pressmen\'s Home mall 1985',
+    url: 'https://commons.wikimedia.org/wiki/File:Pressmen%27s_Home_mall_1985.png',
+    usage:
+      'Public-domain NPS image rights confirmation and attribution path for the 1985 Pressmen\'s Home mall photograph.',
+  },
+  {
+    label: 'FORETEE: Camelot Golf Course',
+    url: 'https://foretee.com/courses/tennessee/rogersville/usa/camelot-golf-course,-closed-2005/13297',
+    usage:
+      'Camelot course profile, 1972 opening, Robert Thomason design credit, par-73 layout, near-6,900-yard length, and closed-2005 status.',
+  },
+  {
+    label: 'WBIR: Abandoned Places - Pressmen\'s Home',
+    url: 'https://www.wbir.com/article/entertainment/places/abandoned-places/abandoned-places-pressmens-home/51-915a8663-26f1-4ce2-8e98-f6ae2496022d',
+    usage:
+      'Modern abandoned-place framing, ghost-town context, surviving landmarks, and local exploration atmosphere around Pressmen\'s Home.',
+  },
+  {
+    label: 'Sometimes Interesting: Pressmen\'s Home, Tennessee',
+    url: 'https://sometimes-interesting.com/pressmens-home-tennessee/',
+    usage:
+      'Expanded readable history of the union town, resort identity, mineral springs, decline, abandoned structures, and local ruin context.',
+  },
+  {
+    label: 'Wikipedia: Pressmen\'s Home, Tennessee',
+    url: 'https://en.wikipedia.org/wiki/Pressmen%27s_Home,_Tennessee',
+    usage:
+      'High-level place summary, National Register framing, surviving/demolished buildings, and Pressmen\'s Home ghost-town overview.',
+  },
+]
+
 export const SHADOW_MYSTERY_STORIES: ShadowMysteryStory[] = [
+  {
+    id: 'camelot-golf-course',
+    slug: 'camelot-golf-course',
+    title: 'The Last Tee Time At Camelot',
+    subtitle: 'A Shadow Mystery novella from Rogersville, Tennessee',
+    locationLabel: 'Camelot Golf Course, Pressmen\'s Home',
+    publishedAt: '2026-05-22',
+    readTimeMinutes: 15,
+    deck:
+      'The fairways closed in 2005, but the ghost town around them kept taking reservations: a lost golfer, a false asylum, candle rumors in the service buildings, and a scorecard that never stays blank.',
+    coverAsset: SHADOW_MYSTERY_ASSETS.camelotGolfCourse.cover,
+    headerAsset: SHADOW_MYSTERY_ASSETS.camelotGolfCourse.header,
+    chapters: [
+      {
+        id: 'the-road-to-the-kingdom',
+        title: 'The Road To The Kingdom',
+        kicker: 'Pressmen\'s Home Road',
+        image: {
+          asset: SHADOW_MYSTERY_ASSETS.camelotGolfCourse.cover,
+          alt: 'Generated cover art showing an abandoned Camelot Golf Course green near old Pressmen\'s Home structures.',
+          caption:
+            'Camelot was never only a golf course. It was the last manicured edge of a vanished company town, and the weeds came back like witnesses.',
+        },
+        body: [
+          `The last tee time at Camelot was supposed to be a joke, the kind local boys invented when they were old enough to drive but still young enough to believe fear needed a destination. They said you had to turn onto Pressmen's Home Road after midnight, kill the headlights before the old course entrance, and wait until the mountain darkened enough to swallow the flagsticks.`,
+          `If the place wanted you, a cart would appear on the first fairway. No driver. No engine sound at first. Just the pale roof moving through the Bermuda weeds, crossing grass that had not been properly mowed in years. Then came the soft click of clubs knocking together. Then a cough from the tree line. Then the starter's voice, old and wet, asking for your name.`,
+          `Nora Voss heard the story in a gas station ten miles from Rogersville from a man who kept calling the place the Kingdom. Not Camelot. Not Pressmen's Home. The Kingdom. He had a hunter's face, a coffee-stained cup, and the look of someone who had learned not to say too much unless the other person already knew the first half of the story. When Nora asked what happened if you gave the starter your real name, he said, "Then the course keeps score."`,
+          `He laughed afterward, because people laugh after saying something they want to take back. Nora wrote the line in her notebook anyway.`,
+          `The address was ordinary enough to be almost cruel: 908 Pressmens Home Road, Rogersville, Tennessee. A golf listing would tell you Camelot opened in 1972, that Robert Thomason designed it, that the old championship layout played as a par 73 and stretched nearly 6,900 yards through the valley. A map would show it lying north of town, not far in miles, but far enough in mood that the world seemed to lose its newer surfaces on the way in.`,
+          `By daylight, the story softened. You could see the road, the hills, the parcels of land that had been divided and sold, the event barn with its new life, the practical signs of ownership and use. By daylight, abandoned places become real estate and liability. By night they become invitations.`,
+          `Nora came just before sundown, the coward's hour and the investigator's hour. The fairways lay below the old Pressmen's Home buildings like a forgotten carpet. Bermuda grass and brush had erased the clean lines, but the shape of the course was still there if you knew how to look: a sweep of green gone brown, a bunker like a pale wound, cart paths disappearing under leaves, a pond holding the sky with too much patience.`,
+          `The rumor said the first golfer vanished in 2005, the year the course closed. Another version said the missing man was a groundskeeper who refused to leave. A third said there was no golfer at all, only a scorecard found under the Castle Barn door with eighteen names written in a hand nobody recognized. The names were smudged by dew. The last line was blank.`,
+          `Nora had come to find the blank line.`,
+        ],
+      },
+      {
+        id: 'the-town-that-printed-itself',
+        title: 'The Town That Printed Itself',
+        kicker: 'The union city',
+        image: {
+          asset: SHADOW_MYSTERY_ASSETS.camelotGolfCourse.realPressmensHomeMall1985,
+          alt: 'A 1985 National Register photograph of the mall at Pressmen\'s Home in Hawkins County, Tennessee.',
+          caption:
+            'The mall at Pressmen\'s Home in 1985, still carrying the formal geometry of a town built to look permanent even after its reason for existing had moved away.',
+          sourceLabel: 'National Park Service',
+          sourceUrl: 'https://npgallery.nps.gov/GetAsset/c169552b-09d0-4ef8-b706-ae2c7969d50d',
+          credit: 'Martha Gray Hagedorn / National Register of Historic Places',
+          license: 'Public domain',
+        },
+        body: [
+          `Before Camelot had greens, Pressmen's Home had avenues. Before golfers searched for lost balls in the rough, union men crossed the mall between buildings that made a rural Tennessee valley look like it had been typeset by someone with money, belief, and a taste for pageantry.`,
+          `The International Printing Pressmen and Assistants' Union of North America moved its headquarters here in 1911, after construction began the previous fall around the old Hale Springs property. The name sounded domestic, almost tender: Pressmen's Home. But the place was never simply a home. It was headquarters, retirement village, training ground, resort, farm, hospital, chapel, power system, and public dream. A working town with an emblem and a mythology before abandonment ever touched it.`,
+          `Nora walked the edge of the old mall with a photocopy of the National Register nomination folded in her jacket. The document spoke in careful inventory language: hotel, administration and technical trade school, memorial chapel, power plant, dairy barn, garage, farm storage building, telephone building, refrigeration house, sulphur spring gazebo. Twenty-two resources remained in 1985, enough for the federal paperwork to describe what had once been a town built inside an idea.`,
+          `That was the first trick of Pressmen's Home. It made itself sound smaller than it was. Say home and you imagine a roof. This had boilers, classrooms, a printing school, a hotel called the Pressauna, a chapel with stained glass, a cemetery, gardens, barns, steam, milk, telephones, tennis courts, a pool, and a spring. It had a complete vocabulary of living.`,
+          `The second trick was that the place looked ceremonial even in its service buildings. The photo packet from March 1985 caught the mall, the dairy barn, the power plant, and the gazebo with the deadpan honesty of official documentation. No ghost light. No staged ruin. Just buildings still present enough to make their absence in later years feel like an accusation.`,
+          `The resort story was real. The labor story was real. The retirement story was real. Men who had spent their lives around presses, ink, metal, rollers, noise, and deadlines came here because the union promised mountain air, purpose, and dignity after work had taken its measure from their lungs and hands.`,
+          `Local mystery needs ruins, but ruins need a before. Pressmen's Home had a before so large that the after could not contain it. The valley was left with buildings that remembered uses nobody driving past could easily guess. That is when rumor begins its work. It enters the gap between what a place was and what a stranger can still understand.`,
+          `By the time Camelot opened in 1972, the old union machine was already pulling away. The headquarters would move to Washington. The sanitarium had already closed. The great company-town confidence had thinned. The golf course arrived like an attempt to keep the word resort alive after the town beneath it had started speaking in past tense.`,
+          `Nora looked down toward the fairway and imagined a printer setting a line of type: CAMELOT GOLF COURSE. She imagined him locking it into a chase, inking the letters, pulling the first impression. A kingdom, printed over a ghost town.`,
+        ],
+      },
+      {
+        id: 'the-asylum-that-was-not-an-asylum',
+        title: 'The Asylum That Was Not An Asylum',
+        kicker: 'Sanitarium hill',
+        image: {
+          asset: SHADOW_MYSTERY_ASSETS.camelotGolfCourse.sanatoriumCorridor,
+          alt: 'Generated atmospheric art of a deserted sanatorium corridor with a mineral spring gazebo outside.',
+          caption:
+            'The local whisper calls it an asylum. The older documents call it a sanitarium. The difference matters less after dark than it should.',
+        },
+        body: [
+          `Every ghost town eventually receives an asylum, even if history never built one. The word is too useful. It gives the broken windows a patient. It gives locked doors a scream. It turns ordinary sickness into institutional terror and lets teenagers point at any long building on a hill and say, with perfect confidence, that people were kept there against their will.`,
+          `At Pressmen's Home, the rumor had a body to inhabit. The National Register papers described another function of the complex: a sanitarium for union members afflicted with tuberculosis. A government study from 1908 had reported that pressmen carried a high risk of the disease, and the valley's mountain air and mineral springs were sold as part cure, part refuge, part promise.`,
+          `The documents were plain. The building was a hospital for men whose trade had helped ruin their lungs. It closed in 1961. But plain history has never kept a ruin safe from a better word. Sanitarium became sanatorium, sanatorium became asylum, and asylum became the place nobody wanted to drive past slowly.`,
+          `Nora found three versions before dark. In the first, the patients were printers who could still hear presses running in their sleep. In the second, the union hid insane men from the public so the resort guests would not see what the work had done to them. In the third, the doctors played golf at night and used the old course as a map, assigning each hole to a ward. If a patient died before morning, his name was written beside the hole he had never reached.`,
+          `No one could tell her where that story began. That was usually how Nora knew she had found the real machinery. A rumor with one author can be corrected. A rumor with no author belongs to the place.`,
+          `She did not need the asylum story to be true to feel what made it strong. The complex had been built for care and discipline at the same time: retirement, training, treatment, worship, administration. Every building promised order. Every abandoned building later betrays that promise. Once the windows broke and the doors disappeared, the old language of care turned inside out. A bed frame became a cage. A treatment room became a punishment room. A mineral spring became a mouth.`,
+          `The gas-station man had told Nora that if you stood near the old spring gazebo and held your breath, you could hear coughing below the water. He said the cough came three times. Once for the Home. Once for the hospital. Once for the course.`,
+          `She did not believe him when he said it. She believed him less when she found the 1985 photograph of the sulphur spring gazebo, tidy and white and almost pretty, sitting near the old power plant stack. Then dusk lowered itself around the valley, and the word pretty went useless.`,
+          `The first cough Nora heard was probably a bird in the brush. The second was probably her own breath catching in her throat. The third came from somewhere under the hill, soft as paper tearing.`,
+        ],
+      },
+      {
+        id: 'the-mower-that-kept-running',
+        title: 'The Mower That Kept Running',
+        kicker: 'Closed 2005',
+        image: {
+          asset: SHADOW_MYSTERY_ASSETS.camelotGolfCourse.header,
+          alt: 'Generated wide art of the abandoned Camelot fairway running into Pressmen\'s Home ruins.',
+          caption:
+            'The course was added late in the story, but it became the part people could still walk: eighteen holes laid over a town already learning to disappear.',
+        },
+        body: [
+          `Golf courses are supposed to be acts of control. The grass is cut to height. The rough is allowed to threaten but not conquer. Sand stays in its bunkers. Water hazards wear polite edges. A course is nature corrected with money, labor, routine, and the belief that tomorrow morning someone will return with a mower.`,
+          `That is why an abandoned golf course looks wrong in a way other ruins do not. A dead factory is allowed to rust. A closed school is allowed to gather dust. But a fairway that has forgotten its own fairwayness feels like a body refusing burial. The green grows shaggy. The tee boxes sink. The cart path becomes a vein under the leaves. The whole place keeps the grammar of play while losing the possibility of a game.`,
+          `Camelot opened in 1972 as part of the resort expansion around Pressmen's Home. Golf directories still kept the numbers long after the flags came down: Robert Thomason, 18 holes, par 73, nearly 6,900 yards, closed in 2005. The facts had the clipped rhythm of a scorecard. They left out the silence afterward.`,
+          `The mower story filled that silence. Locals said the groundskeeper kept working for weeks after the clubhouse stopped answering its phone. Some said he was paid under the table by a developer who wanted the property to look alive until a sale went through. Some said he was not paid at all and came anyway, because certain men do not know how to quit a place that has given their hands a map.`,
+          `In the oldest version Nora found, the mower stopped on the twelfth fairway with its blades still spinning and no one in the seat. In the meaner version, the man driving it had been killed by someone hiding in the weeds, a drifter from the old service buildings, a faceless murderer who wore a golf glove on one hand because the rumor needed an image sharp enough to survive retelling. In the version told after midnight, the mower never stopped. It only moved underground, cutting the roots of the course in the dark.`,
+          `Nora had no name for the groundskeeper, and she was glad. A real name would make the story uglier and smaller. The figure in the rumor was not a person so much as a job abandoned by history. Someone had to keep the fairways from becoming forest. Someone had to keep the Kingdom presentable. Someone had to make the grass obey.`,
+          `She walked a cart path until it vanished under vines. The air smelled wet, mineral, and faintly metallic from the old industrial buildings uphill. Insects rattled in the grass with a rhythm close enough to machinery that her mind completed the engine before she could stop it.`,
+          `Then, from the direction of the old fourth or fifth hole, something started and died. A cough of motor. A belt squeal. A blade striking stone.`,
+          `Nora stood very still. The sound did not come again. The course kept its score.`,
+        ],
+      },
+      {
+        id: 'the-warehouse-rooms',
+        title: 'The Warehouse Rooms',
+        kicker: 'Power, storage, and the candle story',
+        image: {
+          asset: SHADOW_MYSTERY_ASSETS.camelotGolfCourse.realFarmStorageBuilding1985,
+          alt: 'A 1985 National Register photograph of a farm storage building at Pressmen\'s Home.',
+          caption:
+            'Official records call it a farm storage building. Local rumor turns buildings like this into warehouses, hiding rooms, and places where the scorecards are kept.',
+          sourceLabel: 'National Park Service',
+          sourceUrl: 'https://npgallery.nps.gov/GetAsset/c169552b-09d0-4ef8-b706-ae2c7969d50d',
+          credit: 'Martha Gray Hagedorn / National Register of Historic Places',
+          license: 'Public domain',
+        },
+        body: [
+          `The younger stories did not always know the names of the buildings. That was part of their power. A telephone building became a shack. A refrigeration house became a freezer. A farm storage building became the warehouses. The power plant became the furnace. The old trade school became the factory. Once a place loses its labels, every door can be guilty of anything.`,
+          `Nora heard the warehouse story from an online post written in the breathless grammar of a dare. The writer claimed there were rooms near the course where scorecards were stacked in wet cardboard boxes. Every card had the same date. Every card had a different name. Some names belonged to people who had died before the course opened. Some belonged to people not born yet. One card, the writer said, had been filled out in red pencil by a left-handed child.`,
+          `That last detail was too theatrical. Nora liked it anyway.`,
+          `The industrial buildings gave the rumor its bones. The Pressmen's Home power plant had been real enough to photograph in 1985, its stack rising over the hill with the letters P H down its side. The interior had steam engines and boilers, not devils. But machinery is patient with superstition. It accepts whatever story people pour into it. A boiler can be industry at noon and hell by midnight.`,
+          `The candle story came later. Explorers said they found circles of wax in the service buildings after the course closed. Some said cults had met there, not the hooded kind from bad movies, but small groups of bored, frightened people trying to make the ruin answer. Others said the candles were only teenagers lighting rooms for photographs. That difference mattered to adults. It mattered less to the building. Wax is wax. A circle is a circle. A rumor only needs enough shape to stand in.`,
+          `Nora did not find candles. She found damp leaves, a nail, a strip of black plastic, and the smell of old cold work. She imagined the town in its living years: engines running, presses training students, milk moving through the dairy, phones ringing, chapel bells, golfers decades later shouting over a missed putt. The ruin had not become mysterious because it was empty. It had become mysterious because it had once been so thoroughly full.`,
+          `Near the storage building, her flashlight caught a white dot in the weeds. A golf ball. Too clean. She nudged it with her boot, expecting mud. The ball rolled exactly three inches and stopped against a folded piece of paper.`,
+          `It was not a scorecard. It was a scrap of ledger paper, damp and soft at the edges, with a row of numbers down one side and nothing written where names should have been. Nora told herself old paper blows around old places. She told herself the lines were accounting marks. She did not pick it up.`,
+          `Behind her, something clicked once, like a lighter refusing flame.`,
+        ],
+      },
+      {
+        id: 'the-barn-that-remembers-weddings',
+        title: 'The Barn That Remembers Weddings',
+        kicker: 'Castle Barn',
+        image: {
+          asset: SHADOW_MYSTERY_ASSETS.camelotGolfCourse.realDairyBarn1985,
+          alt: 'A 1985 National Register photograph of the pasteurization plant and dairy barn at Pressmen\'s Home.',
+          caption:
+            'The dairy barn and pasteurization plant in 1985. One of the strangest gifts of Pressmen\'s Home is that parts of the ghost town still know how to host a celebration.',
+          sourceLabel: 'National Park Service',
+          sourceUrl: 'https://npgallery.nps.gov/GetAsset/c169552b-09d0-4ef8-b706-ae2c7969d50d',
+          credit: 'Martha Gray Hagedorn / National Register of Historic Places',
+          license: 'Public domain',
+        },
+        body: [
+          `The Castle Barn made the story complicated because it was not dead. Ruins are easier when they stay ruined. The old dairy barn, white and low against the hills in the 1985 photographs, had survived into a different kind of afterlife, one with event lights, dressed guests, music, and people walking toward one another instead of away.`,
+          `That should have weakened the haunting. Instead it deepened it. A building that can host a wedding inside a ghost town knows two kinds of vows. The public one, spoken in front of family, and the older one, made silently by wood, stone, milk, weather, and labor: I will remain as long as I can.`,
+          `Local rumor treated the barn gently at first. A bride saw a man in work clothes standing near the doors after the reception, then looked again and found only the hillside. A photographer captured a pale line at the edge of an image and later insisted it was a veil moving against the wind, though no one had been standing there. Someone heard cattle lowing after midnight, impossible cattle, a whole dairy herd remembered by a building that no longer needed to feed anyone.`,
+          `Then the golf stories entered. One version said the last scorecard had been found under the barn door, slid inside like a bill. Another said a wedding guest stepped outside during a reception and saw carts crossing the old course in a line, their headlights off, their roofs pale in moonlight. A third said that if a couple took photographs too close to the old course boundary, one picture would always show an extra man standing behind them with a starter's clipboard.`,
+          `Nora had no patience for fake wedding ghosts. They were usually dust, lens flare, or a cousin with a bad sense of timing. But the barn itself unsettled her because it proved Pressmen's Home was not a simple abandoned place. It was a living place in fragments. Some buildings had burned. Some had been demolished. Some stood roofless or altered. Some were sold as parcels, renamed by listings, trimmed into private futures. And some, like the barn, learned how to wear string lights over old labor.`,
+          `That made the ghost town harder to mourn. It had not vanished cleanly. It had been divided, reused, romanticized, photographed, trespassed, protected, bought, sold, and misremembered. The dead parts were not dead enough to stop mattering. The living parts were not alive enough to explain the rest.`,
+          `Nora stood near the edge of the property where the barn's pale shape could still command the valley. The wind moved through the weeds like a crowd shifting in pews. She thought of all the names the place had carried: Hale Springs, Pressmen's Home, Camelot, ghost town, wedding venue, abandoned course, asylum, Kingdom.`,
+          `A place with too many names will eventually answer to the wrong one.`,
+        ],
+      },
+      {
+        id: 'the-power-plant-scorekeeper',
+        title: 'The Power Plant Scorekeeper',
+        kicker: 'Steam and ritual',
+        image: {
+          asset: SHADOW_MYSTERY_ASSETS.camelotGolfCourse.powerPlantScorecard,
+          alt: 'Generated atmospheric art of a power plant room with old machinery, a golf ball, and a scorecard.',
+          caption:
+            'By the power plant, the legends stop behaving like golf stories. They become stories about counting, heat, work, and whatever still wants a name.',
+        },
+        body: [
+          `The murder story changed shape whenever it reached the power plant. On the course, the killer was a groundskeeper. Near the warehouses, he became a squatter. Beside the old sanitarium, he became an orderly who never clocked out. Inside the power plant, he became a scorekeeper.`,
+          `Nora found that version in a comment thread attached to a shaky exploration video. The writer claimed his uncle had gone inside after the course closed and found names carved into a wooden panel near the old machinery. Not initials. Full names. Each followed by a number from one to eighteen. His uncle touched the seventeenth name and heard a golf cart roll across the roof.`,
+          `Someone replied that the names were Satanic. Someone else said there had been sacrifices in the old service rooms. Another person corrected the spelling of Satanic and was ignored, which told Nora the thread had become folklore in its purest modern form: argument as transmission.`,
+          `The cult rumor was newer than the ghost rumor, but it moved faster. It needed only three ingredients: abandoned buildings, candle wax, and a place with a medieval name. Camelot did the rest. People imagined knights turned black-robed, a round table replaced by a circle on concrete, an old union emblem mistaken for a secret sign, golf carts moving in procession between holes like stations of a private mass.`,
+          `Nora did not believe in a cult. She believed in teenagers with flashlights. She believed in explorers who wanted their footage to feel dangerous. She believed in bored adults with too much internet and not enough respect for property lines. But disbelief did not make the power plant friendly. It only removed the easiest explanation.`,
+          `The real power plant had once made the town possible. It took fuel and water and pressure and converted them into light, heat, motion. The machines did not care about prayer or panic. They cared about tolerances. Yet there was something ritualistic in that too: gauges watched, valves turned, pressure raised, pressure released. A boiler room is a church for people who believe in consequences.`,
+          `Nora imagined the scorekeeper standing there with a pencil. Not a demon. Not a murderer with a theatrical blade. A clerk. A patient little man in work clothes, adding numbers while the valley slept. He did not kill anyone in the story. He did something worse. He recorded them. A bad hole. A lost ball. A cough. A door opened in the wrong building. A dare accepted. A name spoken aloud.`,
+          `The golf ball on Nora's path had been too clean. The ledger paper had been too neatly folded. The click behind her had sounded like a lighter, but it could have been a pencil striking a clipboard.`,
+          `By then she understood the last tee time was not a time at all. It was a permission structure. You came to Camelot, you said the rumor out loud, and the place was allowed to count you among the people who had wanted it to be haunted.`,
+        ],
+      },
+      {
+        id: 'the-spring-that-kept-coughing',
+        title: 'The Spring That Kept Coughing',
+        kicker: 'Sulphur water',
+        image: {
+          asset: SHADOW_MYSTERY_ASSETS.camelotGolfCourse.realSulphurSpringGazebo1985,
+          alt: 'A 1985 National Register photograph of the sulphur spring gazebo at Pressmen\'s Home.',
+          caption:
+            'The sulphur spring gazebo in 1985, a small ceremonial shelter over the older promise that the water and air could heal what work had damaged.',
+          sourceLabel: 'National Park Service',
+          sourceUrl: 'https://npgallery.nps.gov/GetAsset/c169552b-09d0-4ef8-b706-ae2c7969d50d',
+          credit: 'Martha Gray Hagedorn / National Register of Historic Places',
+          license: 'Public domain',
+        },
+        body: [
+          `The spring was older than the golf course and more honest than the rumors. It smelled faintly of minerals, of earth making a private chemical confession. People had come to such waters because they wanted the body to be negotiable. Drink this. Breathe here. Rest here. Recover. Begin again.`,
+          `Pressmen's Home had understood the value of that promise. The valley could be framed as cure, retreat, reward. A man spent his life feeding paper through machines and retired to mountain air. A sick member came for the sanitarium and the hope that lungs might be persuaded to stay. A guest came for the hotel. A later visitor came for Camelot. A modern explorer came for proof that something had gone wrong.`,
+          `Nora knelt near the place where the spring story gathered itself. She did not touch the water. The gas-station man had told her not to. He said the coughing below it was not the sick men. It was the town clearing its throat before saying your name.`,
+          `She waited because waiting is how most hauntings are made. Nothing happened for a long time. The sky turned the color of old paper. The course vanished by degrees. The barn whitened, then dulled. The power plant stack became a black mark against the hillside. Somewhere beyond the brush, the cart path held its curve.`,
+          `Then Nora heard the mower again.`,
+          `Not loud. Not near. A low mechanical stutter carried through the valley, too even to be an insect and too irregular to be a car. It moved, stopped, moved again. She pictured the fairway being shaved by an invisible blade. She pictured a cart without headlights. She pictured a starter waiting beside the first tee with a clipboard and a question.`,
+          `Her phone vibrated once. No signal had shown for the last half hour. The screen lit anyway. Calendar alert. No title. No location. Just a time she had not entered: 12:07 AM.`,
+          `Nora laughed, and the sound came out wrong. It was not a ghost. Phones misfire. Apps sync. Old reminders rise from forgotten settings. Technology creates its own supernatural events and then pretends innocence. She deleted the alert.`,
+          `Before the screen went black, she saw the reflection behind her: a pale rectangle moving slowly through the dark fairway, roof-high, quiet as a thought.`,
+        ],
+      },
+      {
+        id: 'the-last-tee-time',
+        title: 'The Last Tee Time',
+        kicker: 'Eighteen names',
+        image: {
+          asset: SHADOW_MYSTERY_ASSETS.camelotGolfCourse.realPowerPlant1985,
+          alt: 'A 1985 National Register photograph of the Pressmen\'s Home power plant exterior and smokestack.',
+          caption:
+            'The power plant stack still gives the valley a vertical mark, the kind of landmark a rumor can use to orient itself after everything else changes.',
+          sourceLabel: 'National Park Service',
+          sourceUrl: 'https://npgallery.nps.gov/GetAsset/c169552b-09d0-4ef8-b706-ae2c7969d50d',
+          credit: 'Martha Gray Hagedorn / National Register of Historic Places',
+          license: 'Public domain',
+        },
+        body: [
+          `At 12:07, Nora was back at the first fairway because every story had pushed her there. The asylum that was not an asylum. The warehouses that were not warehouses. The barn that remembered weddings. The power plant that made steam into light. The spring that coughed. The course that would not stay closed.`,
+          `Mist sat low over the grass. The flag on the old green moved without wind. She told herself she had come for one final look before leaving. She told herself the blank line in the story was only a device, the kind of thing people invented because a blank line knows how to make a reader lean forward.`,
+          `A folded scorecard lay on the tee box.`,
+          `It was dry. That was the first impossibility. Dew silvered the weeds around it, but the card itself was dry as bone. Nora did not touch it at first. She photographed it, because documentation is how modern people make offerings to fear. The image on her phone showed nothing but grass.`,
+          `She picked up the card.`,
+          `No logo. No printed course map. No yardages. Only eighteen ruled spaces and seventeen names written in pencil. Some were faded enough to be older than the paper. Some looked fresh. One belonged to a man whose obituary Nora had seen while researching the union town. One belonged to a woman who had commented on a wedding photo years before. One was the gas-station man, first initial only. One was hers.`,
+          `Nora's name sat on the eighteenth line, written in a careful left hand.`,
+          `The starter's voice came from the dark beyond the cart path. It was not old and wet. It was not monstrous. It was polite, almost bored, the voice of someone who had done a job for too long and wanted to go home.`,
+          `"Playing through?" it asked.`,
+          `Nora should have run. Instead she looked at the course, and for one impossible second Camelot was manicured again. The fairway cut clean through moonlight. The barn roof shone. The power plant stack stood sharp against the hill. The spring gazebo gleamed white. The hotel and chapel and trade school and all the lost rooms of Pressmen's Home held their places as if the town had only been waiting for the right witness to assemble it.`,
+          `Then the Bermuda weeds rose back through everything. The vision closed. The scorecard softened in her hand.`,
+          `By morning, Nora would decide she had written her own name without remembering. She would tell herself the gas-station story had primed her mind. She would call the mower sound a truck on a distant road and the phone alert a glitch. She would file the NPS images, the course profile, the ghost-town sources, the notes about the sanitarium, the barn, the power plant, the parcels, the closures, the burning and demolition and reuse. She would do what historians and mystery writers both do when the dark gives them too much: she would arrange evidence until it became bearable.`,
+          `But at 12:07, standing where the first tee had almost disappeared, Nora folded the card and put it back exactly where she found it.`,
+          `The fairway waited.`,
+          `Somewhere under the hill, something coughed three times.`,
+          `Then the mower started for the eighteenth green.`,
+        ],
+      },
+    ],
+    sources: camelotGolfCourseSources,
+  },
   {
     id: 'school-four',
     slug: 'school-four',
