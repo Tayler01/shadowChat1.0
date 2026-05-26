@@ -35,6 +35,7 @@
     "qa:chat-scroll": "node scripts/group-chat-scroll-probe.mjs",
     "qa:mobile-pwa": "node scripts/mobile-pwa-visual-qa.mjs",
     "qa:themes": "node scripts/theme-visual-qa.mjs",
+    "release:publish": "node scripts/publish-app-release.mjs",
     "shadow-pin:backfill-media": "node scripts/shadow-pin-backfill-media.mjs",
     "media:backfill-mobile": "node scripts/backfill-mobile-media.mjs",
     "video:render:trailer": "remotion render src/remotion/index.ts CrimpShrimpTrailer output/shado-tv-remotion/crimp-shrimp-trailer.mp4 --codec=h264 --crf=20",

@@ -30,6 +30,12 @@ node scripts/playwright-smoke.mjs --scenario=auth,resume-send --headed --no-reus
 
 For the current login persistence behavior, rollback checkpoints, and production smoke expectations, see [`docs/SESSION_PERSISTENCE_RUNBOOK.md`](C:/repos/chat2.0/docs/SESSION_PERSISTENCE_RUNBOOK.md:1).
 
+Before a production deploy that should notify users, update
+[`release-notes/current.json`](C:/repos/chat2.0/release-notes/current.json:1).
+The production Netlify workflow publishes those notes to `public.app_releases`
+after the deploy succeeds. See
+[`docs/APP_RELEASES.md`](C:/repos/chat2.0/docs/APP_RELEASES.md:1).
+
 If the change affects News scraping, run:
 
 ```powershell
@@ -70,6 +76,11 @@ PR previews require the same GitHub Actions repository secrets as production:
 
 - `NETLIFY_AUTH_TOKEN`
 - `NETLIFY_SITE_ID`
+
+Production app-release publishing also requires:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
 The preview workflow intentionally does not deploy to production. It publishes
 the built `dist` directory with:

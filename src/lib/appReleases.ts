@@ -1,0 +1,120 @@
+import {
+  VITE_APP_BUILD_ID,
+  VITE_APP_COMMIT_SHA,
+  VITE_APP_DEPLOY_CONTEXT,
+  VITE_APP_IS_PROD,
+} from './env'
+import type { VisibleAppRelease } from './supabase'
+
+export const CURRENT_APP_BUILD_ID = (VITE_APP_BUILD_ID || '').trim()
+export const CURRENT_APP_COMMIT_SHA = (VITE_APP_COMMIT_SHA || '').trim()
+export const CURRENT_APP_DEPLOY_CONTEXT = (VITE_APP_DEPLOY_CONTEXT || '').trim()
+
+export const APP_RELEASE_CHECKS_ENABLED =
+  Boolean(VITE_APP_IS_PROD) &&
+  CURRENT_APP_DEPLOY_CONTEXT === 'production' &&
+  CURRENT_APP_BUILD_ID.length > 0
+
+export type AppReleasePresentation = {
+  shouldShow: boolean
+  isCurrentBuild: boolean
+  wantsRestart: boolean
+  blocksDismiss: boolean
+  autoRestart: boolean
+  restartLabel: string
+  closeLabel: string
+}
+
+export const isCurrentReleaseBuild = (
+  release: Pick<VisibleAppRelease, 'build_id'>,
+  currentBuildId = CURRENT_APP_BUILD_ID
+) => Boolean(currentBuildId) && release.build_id === currentBuildId
+
+export const getAppReleasePresentation = (
+  release: VisibleAppRelease,
+  currentBuildId = CURRENT_APP_BUILD_ID
+): AppReleasePresentation => {
+  const isCurrentBuild = isCurrentReleaseBuild(release, currentBuildId)
+  const requiresCurrentBuild =
+    release.restart_policy === 'required_restart' ||
+    release.restart_policy === 'critical_force_restart'
+  const autoRestart = !isCurrentBuild && release.restart_policy === 'critical_force_restart'
+  const wantsRestart = !isCurrentBuild && release.restart_policy !== 'notice_only'
+  const blocksDismiss = !isCurrentBuild && requiresCurrentBuild
+  const hasReadReceipt = Boolean(
+    release.acknowledged_at ||
+    release.dismissed_at ||
+    release.restarted_at
+  )
+
+  return {
+    shouldShow: blocksDismiss || !hasReadReceipt,
+    isCurrentBuild,
+    wantsRestart,
+    blocksDismiss,
+    autoRestart,
+    restartLabel: release.restart_policy === 'critical_force_restart'
+      ? 'Restart Now'
+      : release.restart_policy === 'required_restart'
+        ? 'Update Now'
+        : 'Restart Now',
+    closeLabel: isCurrentBuild ? 'Done' : wantsRestart ? 'Later' : 'Got It',
+  }
+}
+
+export const chooseVisibleAppRelease = (
+  releases: VisibleAppRelease[],
+  currentBuildId = CURRENT_APP_BUILD_ID
+) => {
+  return releases.find(release => getAppReleasePresentation(release, currentBuildId).shouldShow) ?? null
+}
+
+export const getClientUserAgent = () => {
+  if (typeof navigator === 'undefined') {
+    return null
+  }
+
+  return navigator.userAgent || null
+}
+
+const AUTO_RESTART_STORAGE_PREFIX = 'shadowchat:release-auto-restart'
+const AUTO_RESTART_COOLDOWN_MS = 2 * 60 * 1000
+
+export const canAutoRestartRelease = (releaseId: string, now = Date.now()) => {
+  if (typeof sessionStorage === 'undefined') {
+    return true
+  }
+
+  try {
+    const storageKey = `${AUTO_RESTART_STORAGE_PREFIX}:${releaseId}`
+    const previousValue = sessionStorage.getItem(storageKey)
+    const previous = previousValue === null ? null : Number(previousValue)
+    if (previous !== null && Number.isFinite(previous) && now - previous < AUTO_RESTART_COOLDOWN_MS) {
+      return false
+    }
+
+    sessionStorage.setItem(storageKey, String(now))
+    return true
+  } catch {
+    return true
+  }
+}
+
+export const restartAppForRelease = async () => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    const registration = await navigator.serviceWorker?.getRegistration?.('/')
+    await registration?.update?.()
+    const waitingWorker = registration?.waiting || registration?.installing
+    waitingWorker?.postMessage?.({ type: 'SKIP_WAITING' })
+  } catch {
+    // Reloading is the reliable part; service-worker update nudging is best-effort.
+  }
+
+  window.setTimeout(() => {
+    window.location.reload()
+  }, 250)
+}

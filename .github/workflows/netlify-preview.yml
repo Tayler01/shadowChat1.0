@@ -27,6 +27,9 @@ jobs:
       NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
       NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
       NETLIFY_CLI_VERSION: 26.0.0
+      VITE_APP_BUILD_ID: ${{ github.sha }}
+      VITE_APP_COMMIT_SHA: ${{ github.sha }}
+      VITE_APP_DEPLOY_CONTEXT: deploy-preview
 
     steps:
       - name: Check out repository

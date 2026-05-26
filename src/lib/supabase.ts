@@ -1218,6 +1218,62 @@ export interface AdminRoleNotification {
   created_at: string
 }
 
+export type AppReleaseRestartPolicy =
+  | 'notice_only'
+  | 'optional_restart'
+  | 'required_restart'
+  | 'critical_force_restart'
+
+export type AppReleaseSeverity = 'info' | 'feature' | 'maintenance' | 'critical'
+
+export interface AppReleaseSection {
+  heading: string
+  items: string[]
+}
+
+export interface AppRelease {
+  id: string
+  build_id: string
+  commit_sha?: string | null
+  deploy_id?: string | null
+  deploy_url?: string | null
+  title: string
+  summary: string
+  sections: AppReleaseSection[]
+  restart_policy: AppReleaseRestartPolicy
+  severity: AppReleaseSeverity
+  published_at: string
+}
+
+export interface AppReleaseReceipt {
+  release_id: string
+  user_id: string
+  delivered_at?: string | null
+  seen_at?: string | null
+  dismissed_at?: string | null
+  acknowledged_at?: string | null
+  restarted_at?: string | null
+  current_build_id?: string | null
+  client_user_agent?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type AppReleaseReceiptEvent =
+  | 'delivered'
+  | 'seen'
+  | 'dismissed'
+  | 'acknowledged'
+  | 'restarted'
+
+export interface VisibleAppRelease extends AppRelease {
+  delivered_at?: string | null
+  seen_at?: string | null
+  dismissed_at?: string | null
+  acknowledged_at?: string | null
+  restarted_at?: string | null
+}
+
 export type ChatMessage = Message | DMMessage
 
 export interface UserSession {
@@ -1470,6 +1526,77 @@ export const markAdminRoleNotificationSeen = async (notificationId: string) => {
   const workingClient = await getWorkingClient()
   const { error } = await workingClient.rpc('mark_admin_role_notification_seen', {
     notification_id: notificationId,
+  })
+  if (error) throw error
+}
+
+const normalizeAppReleaseSections = (value: unknown): AppReleaseSection[] => {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map(section => {
+      if (!section || typeof section !== 'object') {
+        return null
+      }
+
+      const record = section as Record<string, unknown>
+      const heading = typeof record.heading === 'string' ? record.heading.trim() : ''
+      const items = Array.isArray(record.items)
+        ? record.items.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+        : []
+
+      if (!heading && items.length === 0) {
+        return null
+      }
+
+      return {
+        heading: heading || 'Changes',
+        items: items.map(item => item.trim()),
+      }
+    })
+    .filter((section): section is AppReleaseSection => Boolean(section))
+}
+
+const mapVisibleAppRelease = (row: any): VisibleAppRelease => ({
+  id: row.id,
+  build_id: row.build_id,
+  commit_sha: row.commit_sha ?? null,
+  deploy_id: row.deploy_id ?? null,
+  deploy_url: row.deploy_url ?? null,
+  title: row.title,
+  summary: row.summary ?? '',
+  sections: normalizeAppReleaseSections(row.sections),
+  restart_policy: row.restart_policy,
+  severity: row.severity,
+  published_at: row.published_at,
+  delivered_at: row.delivered_at ?? null,
+  seen_at: row.seen_at ?? null,
+  dismissed_at: row.dismissed_at ?? null,
+  acknowledged_at: row.acknowledged_at ?? null,
+  restarted_at: row.restarted_at ?? null,
+})
+
+export const fetchVisibleAppReleases = async () => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_visible_app_releases')
+  if (error) throw error
+  return (data ?? []).map(mapVisibleAppRelease) as VisibleAppRelease[]
+}
+
+export const recordAppReleaseReceipt = async (
+  releaseId: string,
+  event: AppReleaseReceiptEvent,
+  currentBuildId?: string | null,
+  clientUserAgent?: string | null
+) => {
+  const workingClient = await getWorkingClient()
+  const { error } = await workingClient.rpc('record_app_release_receipt', {
+    target_release_id: releaseId,
+    receipt_event: event,
+    current_build_id: currentBuildId ?? null,
+    client_user_agent: clientUserAgent ?? null,
   })
   if (error) throw error
 }

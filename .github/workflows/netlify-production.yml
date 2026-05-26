@@ -21,6 +21,11 @@ jobs:
       NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
       NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
       NETLIFY_CLI_VERSION: 26.0.0
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      VITE_APP_BUILD_ID: ${{ github.sha }}
+      VITE_APP_COMMIT_SHA: ${{ github.sha }}
+      VITE_APP_DEPLOY_CONTEXT: production
 
     steps:
       - name: Check out repository
@@ -35,10 +40,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify Netlify secrets
+      - name: Verify deploy secrets
         run: |
           test -n "$NETLIFY_AUTH_TOKEN" || { echo "NETLIFY_AUTH_TOKEN is not configured."; exit 1; }
           test -n "$NETLIFY_SITE_ID" || { echo "NETLIFY_SITE_ID is not configured."; exit 1; }
+          test -n "$SUPABASE_URL" || { echo "SUPABASE_URL is not configured."; exit 1; }
+          test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "SUPABASE_SERVICE_ROLE_KEY is not configured."; exit 1; }
 
       - name: Lint
         run: npm run lint
@@ -58,4 +65,8 @@ jobs:
             --dir=dist \
             --functions=.netlify/functions \
             --skip-functions-cache \
-            --message "GitHub Actions production deploy ${{ github.sha }}"
+            --message "GitHub Actions production deploy ${{ github.sha }}" \
+            --json > netlify-production.json
+
+      - name: Publish in-app release
+        run: node scripts/publish-app-release.mjs --netlify-json netlify-production.json

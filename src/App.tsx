@@ -13,6 +13,7 @@ import { SoundEffectsProvider } from './hooks/useSoundEffects'
 import { LoadingSpinner } from './components/ui/LoadingSpinner'
 import { AppBadgeSync } from './components/notifications/AppBadgeSync'
 import { PhoneInstallOnboarding } from './components/onboarding/PhoneInstallOnboarding'
+import { AppReleaseGate } from './components/releases/AppReleaseGate'
 import { useSessionResumeRecovery } from './hooks/useSessionResumeRecovery'
 import { useAdminRoleNotifications } from './hooks/useAdminRoleNotifications'
 import { useChannelBanExpirySweep } from './hooks/useChannelBanExpirySweep'
@@ -414,6 +415,7 @@ function App() {
                   <WeatherProvider>
                     <AppBadgeSync />
                     <PhoneInstallOnboarding />
+                    <AppReleaseGate />
                     <div className={`app-viewport flex flex-col overflow-hidden md:flex-row ${hideAppChrome ? 'bg-black' : ''}`}>
                       {isDesktop && !hideAppChrome && (
                         <Sidebar

@@ -1,0 +1,24 @@
+{
+  "title": "Shadow Chat Update Notes",
+  "summary": "Shadow Chat now has a built-in release popup for version notes and app restarts after production deploys.",
+  "restartPolicy": "optional_restart",
+  "severity": "feature",
+  "sections": [
+    {
+      "heading": "New",
+      "items": [
+        "Production releases can publish in-app update notes after Netlify deploys complete.",
+        "The app can ask users to restart when a new version is available.",
+        "Critical releases can require a restart for users still running an older build."
+      ]
+    },
+    {
+      "heading": "Smarter Tracking",
+      "items": [
+        "Shadow Chat records who has seen, dismissed, acknowledged, or restarted for each release.",
+        "Update notes do not keep popping up after a user has already read that release.",
+        "Release notes are stored outside chat messages so Shado posts are no longer needed for app-update announcements."
+      ]
+    }
+  ]
+}
