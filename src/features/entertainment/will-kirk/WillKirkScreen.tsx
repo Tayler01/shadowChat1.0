@@ -1,5 +1,6 @@
 import { ArrowLeft, Film } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { WILL_KIRK_ASSETS } from './assets/manifest'
 
 interface WillKirkScreenProps {
   onExit: () => void
@@ -24,18 +25,24 @@ export function WillKirkScreen({ onExit }: WillKirkScreenProps) {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div className="min-w-0 text-center">
-            <p className="text-[0.62rem] font-black uppercase tracking-[0.24em] text-[#c89561]">Will &amp; Kirk</p>
-            <p className="truncate text-sm font-black uppercase tracking-[0.12em] text-[#f1dbc0]">Grounded</p>
+            <p className="truncate text-sm font-black uppercase tracking-[0.2em] text-[#f1dbc0]">Will &amp; Kirk</p>
           </div>
           <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#d2b58a]/20 bg-black/28 text-[#c89561]">
             <Film className="h-5 w-5" />
           </span>
         </div>
       </header>
-      <main className="relative z-10 flex min-h-0 flex-1 items-center justify-center px-6 text-center">
-        <h1 className="text-4xl font-black uppercase tracking-[0.14em] text-[#f1dbc0] sm:text-5xl">
-          Coming soon!
-        </h1>
+      <main className="relative z-10 flex min-h-0 flex-1 items-center justify-center px-4 py-6 text-center">
+        <img
+          src={WILL_KIRK_ASSETS.comingSoonBanner}
+          alt="Will & Kirk coming soon"
+          className="w-full max-w-5xl rounded-[1.75rem] border border-[rgba(215,170,70,0.34)] object-cover shadow-[0_24px_70px_rgba(0,0,0,0.62)]"
+          width={1440}
+          height={720}
+          loading="eager"
+          decoding="async"
+          fetchPriority="high"
+        />
       </main>
     </motion.div>
   )

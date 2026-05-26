@@ -204,7 +204,7 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
           type="button"
           aria-label="Open Will & Kirk"
           onClick={enterWillKirk}
-          className="group relative aspect-[1440/717] w-full overflow-hidden rounded-[2rem] border border-[rgba(215,170,70,0.42)] bg-[#050403] shadow-[0_24px_60px_rgba(0,0,0,0.48)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[rgba(239,202,114,0.68)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,202,114,0.55)]"
+          className="group relative aspect-[1920/720] w-full shrink-0 overflow-hidden rounded-[2rem] border border-[rgba(215,170,70,0.42)] bg-[#050403] shadow-[0_24px_60px_rgba(0,0,0,0.48)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[rgba(239,202,114,0.68)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,202,114,0.55)]"
         >
           <img
             src={WILL_KIRK_ASSETS.pickerBanner}
@@ -213,8 +213,8 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
             loading="eager"
             decoding="async"
             fetchPriority="high"
-            width={1440}
-            height={717}
+            width={1920}
+            height={720}
           />
         </button>
 
