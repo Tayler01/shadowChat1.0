@@ -1101,6 +1101,7 @@ async function expectDmResumeSurface(page) {
 }
 
 async function sendThreadMessage(page, messageText) {
+  await dismissAppReleaseDialog(page)
   const composer = page.locator('textarea:visible').last()
   await composer.click()
   await composer.fill(messageText)
@@ -1108,6 +1109,7 @@ async function sendThreadMessage(page, messageText) {
 }
 
 async function sendVisibleMessage(page, messageText) {
+  await dismissAppReleaseDialog(page)
   const composer = page.locator('textarea:visible').last()
   await composer.click()
   await composer.fill(messageText)
@@ -1115,6 +1117,7 @@ async function sendVisibleMessage(page, messageText) {
 }
 
 async function reactToMessage(page, messageText, emoji) {
+  await dismissAppReleaseDialog(page)
   const wrapper = getMessageWrapperByText(page, messageText)
   await wrapper.hover()
   await page.getByRole('toolbar', { name: 'Quick reactions' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
@@ -1132,16 +1135,19 @@ function getMessageWrapperByText(page, messageText) {
 }
 
 async function uploadImageAttachment(page, filePath) {
+  await dismissAppReleaseDialog(page)
   await page.locator('input[data-upload-kind="image"]').first().setInputFiles(filePath)
   await page.locator('img[alt="uploaded image"]').last().waitFor({ timeout: 30_000 })
 }
 
 async function uploadFileAttachment(page, filePath) {
+  await dismissAppReleaseDialog(page)
   await page.locator('input[data-upload-kind="file"]').first().setInputFiles(filePath)
   await expectVisibleText(page, path.basename(filePath), 30_000)
 }
 
 async function recordVoiceMessage(page) {
+  await dismissAppReleaseDialog(page)
   await page.getByRole('button', { name: 'Record audio' }).click()
   await expectVisibleText(page, 'Recording...', DEFAULT_TIMEOUT_MS)
   await page.getByRole('button', { name: 'Stop' }).click()
