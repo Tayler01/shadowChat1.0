@@ -1,4 +1,3 @@
-import { createClient } from '@supabase/supabase-js'
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -187,6 +186,27 @@ function firstEnv(...keys) {
   return ''
 }
 
+async function upsertAppRelease(supabaseUrl, serviceRoleKey, row) {
+  const endpoint = new URL('/rest/v1/app_releases', supabaseUrl)
+  endpoint.searchParams.set('on_conflict', 'build_id')
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      'Content-Type': 'application/json',
+      Prefer: 'resolution=merge-duplicates,return=minimal',
+    },
+    body: JSON.stringify(row),
+  })
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '')
+    throw new Error(`Release publish failed (${response.status}): ${body || response.statusText}`)
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2))
   loadLocalEnv()
@@ -237,20 +257,7 @@ async function main() {
     throw new Error('Missing SUPABASE_URL/VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY.')
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    },
-  })
-
-  const { error } = await supabase
-    .from('app_releases')
-    .upsert(row, { onConflict: 'build_id' })
-
-  if (error) {
-    throw error
-  }
+  await upsertAppRelease(supabaseUrl, serviceRoleKey, row)
 
   console.log(`Published app release ${row.build_id}`)
 }
