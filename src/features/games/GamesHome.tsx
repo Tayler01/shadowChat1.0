@@ -9,6 +9,8 @@ import { ShadoTvScreen } from '../entertainment/shado-tv/ShadoTvScreen'
 import { SHADO_TV_ASSETS } from '../entertainment/shado-tv/assets/manifest'
 import { ShadowMysteryScreen } from '../entertainment/shadow-mystery/ShadowMysteryScreen'
 import { SHADOW_MYSTERY_ASSETS } from '../entertainment/shadow-mystery/assets/manifest'
+import { WillKirkScreen } from '../entertainment/will-kirk/WillKirkScreen'
+import { WILL_KIRK_ASSETS } from '../entertainment/will-kirk/assets/manifest'
 import { MobileAppHeader } from '../../components/layout/MobileAppHeader'
 import type { AppView } from '../../types/navigation'
 
@@ -18,7 +20,7 @@ interface GamesHomeProps {
   onImmersiveChange?: (immersive: boolean) => void
 }
 
-type SelectedEntertainment = 'shadow-war' | 'shadow-checkers' | 'shado-tv' | 'shadow-mystery' | null
+type SelectedEntertainment = 'shadow-war' | 'shadow-checkers' | 'shado-tv' | 'shadow-mystery' | 'will-kirk' | null
 
 export function GamesHome({ currentView, onViewChange, onImmersiveChange }: GamesHomeProps) {
   const [selectedEntertainment, setSelectedEntertainment] = useState<SelectedEntertainment>(null)
@@ -110,6 +112,19 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
     onImmersiveChange?.(false)
   }
 
+  const enterWillKirk = () => {
+    pauseMusic()
+    setAudioBlocked(false)
+    setSelectedEntertainment('will-kirk')
+    onImmersiveChange?.(true)
+  }
+
+  const exitWillKirk = () => {
+    setAudioBlocked(false)
+    setSelectedEntertainment(null)
+    onImmersiveChange?.(false)
+  }
+
   const toggleMusic = () => {
     if (musicPlaying) {
       pauseMusic()
@@ -167,6 +182,10 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
         <div className="h-full min-h-0 overflow-hidden bg-black">
           <ShadowMysteryScreen onExit={exitShadowMystery} />
         </div>
+      ) : selectedEntertainment === 'will-kirk' ? (
+        <div className="h-full min-h-0 overflow-hidden bg-black">
+          <WillKirkScreen onExit={exitWillKirk} />
+        </div>
       ) : (
         <motion.div
       initial={{ opacity: 0 }}
@@ -181,6 +200,24 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
       />
 
       <main className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-4 overflow-y-auto px-4 py-5 md:p-6">
+        <button
+          type="button"
+          aria-label="Open Will & Kirk"
+          onClick={enterWillKirk}
+          className="group relative aspect-[1440/717] w-full overflow-hidden rounded-[2rem] border border-[rgba(215,170,70,0.42)] bg-[#050403] shadow-[0_24px_60px_rgba(0,0,0,0.48)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[rgba(239,202,114,0.68)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,202,114,0.55)]"
+        >
+          <img
+            src={WILL_KIRK_ASSETS.pickerBanner}
+            alt="Will & Kirk"
+            className="absolute inset-0 h-full w-full object-cover"
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
+            width={1440}
+            height={717}
+          />
+        </button>
+
         <button
           type="button"
           aria-label="Open Shado TV"
