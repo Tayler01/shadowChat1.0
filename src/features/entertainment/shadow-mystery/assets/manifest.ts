@@ -1,6 +1,7 @@
 const SHADOW_MYSTERY_ROOT = '/entertainment/shadow-mystery'
 const SCHOOL_FOUR_ROOT = `${SHADOW_MYSTERY_ROOT}/school-four`
 const CAMELOT_GOLF_COURSE_ROOT = `${SHADOW_MYSTERY_ROOT}/camelot-golf-course`
+const GLASS_THAT_REMEMBERED_US_ROOT = `${SHADOW_MYSTERY_ROOT}/glass-that-remembered-us`
 
 export const SHADOW_MYSTERY_ASSETS = {
   pickerBanner: `${SHADOW_MYSTERY_ROOT}/picker-banner.webp`,
@@ -23,6 +24,15 @@ export const SHADOW_MYSTERY_ASSETS = {
     realPowerPlant1985: `${CAMELOT_GOLF_COURSE_ROOT}/real/power-plant-1985.webp`,
     realSulphurSpringGazebo1985: `${CAMELOT_GOLF_COURSE_ROOT}/real/sulphur-spring-gazebo-1985.webp`,
     realFarmStorageBuilding1985: `${CAMELOT_GOLF_COURSE_ROOT}/real/farm-storage-building-1985.webp`,
+  },
+  glassThatRememberedUs: {
+    cover: `${GLASS_THAT_REMEMBERED_US_ROOT}/cover.webp`,
+    header: `${GLASS_THAT_REMEMBERED_US_ROOT}/header.webp`,
+    readerWorkshop: `${GLASS_THAT_REMEMBERED_US_ROOT}/reader-workshop.webp`,
+    archiveCaravan: `${GLASS_THAT_REMEMBERED_US_ROOT}/archive-caravan.webp`,
+    realFdaLabRelic: `${GLASS_THAT_REMEMBERED_US_ROOT}/real/fda-lab-relic.webp`,
+    realManufacturingSkidRelic: `${GLASS_THAT_REMEMBERED_US_ROOT}/real/manufacturing-skid-relic.webp`,
+    realVoyagerRecorderRelic: `${GLASS_THAT_REMEMBERED_US_ROOT}/real/voyager-recorder-relic.webp`,
   },
 } as const
 
@@ -86,5 +96,29 @@ export const SHADOW_MYSTERY_ASSET_PROMPTS = [
     output: SHADOW_MYSTERY_ASSETS.camelotGolfCourse.powerPlantScorecard,
     prompt:
       "Original atmospheric story image for a Shadow Mystery novella section about industrial ruin folklore at Pressmen's Home and Camelot Golf Course. Inside an abandoned power plant or warehouse-like service building after midnight, old steam machinery silhouettes, broken high windows, wet concrete, weeds entering through the floor, a dusty golf scorecard and white golf ball on a workbench, candle-like work lights suggesting rumor without showing occult symbols, obsidian black shadows, muted antique gold, deep oxblood accents, archival film grain, no readable text, no logos, no people, no gore, no satanic symbols, no watermark.",
+  },
+  {
+    id: 'glass-that-remembered-us-cover',
+    output: SHADOW_MYSTERY_ASSETS.glassThatRememberedUs.cover,
+    prompt:
+      'Original cinematic cover art for a Shadow Mystery future-fiction novella titled The Glass That Remembered Us. Five hundred years after collapse, two hooded relic readers kneel in a ruined underground archive around a glowing 2mm glass data plate, dead magnetic tape reels and broken server racks around them, faint constellations of laser-written voxels inside the glass, obsidian black shadows, antique gold light, distressed archival texture, text-safe upper band, no logos, no readable text, no gore, no watermark.',
+  },
+  {
+    id: 'glass-that-remembered-us-header',
+    output: SHADOW_MYSTERY_ASSETS.glassThatRememberedUs.header,
+    prompt:
+      'Original wide Shadow Mystery header for a post-apocalyptic glass archive 500 years in the future. A cathedral-like ruined data vault with transparent glass plates hanging like books, a glowing borosilicate shard on a reader table, broken polarization microscope silhouette, vines and dust, dead server stacks, obsidian black and muted antique gold, deep oxblood undertones, cinematic case-file grain, no readable text, no logos, no gore, no watermark.',
+  },
+  {
+    id: 'glass-that-remembered-us-reader-workshop',
+    output: SHADOW_MYSTERY_ASSETS.glassThatRememberedUs.readerWorkshop,
+    prompt:
+      'Original atmospheric section art for a future mystery novella. A teenage relic-reader repairs a polarization microscope in a village workshop, thin borosilicate glass squares on a cloth, hand-cranked light source, chalk diagrams of XYZ voxel layers and femtosecond laser pulses, old brass tools and candle light, archival sepia texture, obsidian shadows, muted gold accents, no readable text, no logos, no gore, no watermark.',
+  },
+  {
+    id: 'glass-that-remembered-us-archive-caravan',
+    output: SHADOW_MYSTERY_ASSETS.glassThatRememberedUs.archiveCaravan,
+    prompt:
+      'Original atmospheric section art for a future Shadow Mystery story. Archive monks carry transparent glass data plates across salt flats under ruined satellite dishes and distant server towers, post-apocalyptic robes, glass plates strapped in metal frames glowing with faint voxel constellations, old-world map fragments in the dust, obsidian black sky, muted gold starlight, distressed archival grain, no readable text, no logos, no gore, no watermark.',
   },
 ] as const

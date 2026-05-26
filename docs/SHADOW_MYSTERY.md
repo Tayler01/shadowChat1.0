@@ -5,7 +5,7 @@ ShadowChat Entertainment area.
 
 ## Current Status
 
-As of 2026-05-22:
+As of 2026-05-25:
 
 - Shadow Mystery is wired into the Entertainment picker.
 - The story list/detail surface is static and mobile-first.
@@ -13,6 +13,9 @@ As of 2026-05-22:
   School Number Four / Annie Lytle School in Jacksonville, Florida.
 - The second local proof story is `The Last Tee Time At Camelot`, about Camelot
   Golf Course and the Pressmen's Home ghost town in Rogersville, Tennessee.
+- The third local proof story is `The Glass That Remembered Us`, a 500-years
+  post-collapse future mystery built around Microsoft Project Silica and
+  borosilicate glass data storage research.
 - Stories are written as immersive 10-15 minute mystery novellas, with the
   ghost, murderer, cannibal-principal, and devil-worship legends driving the
   School Four mystery while real names, dates, and history are woven into the
@@ -20,9 +23,12 @@ As of 2026-05-22:
 - The Camelot story leans into the lost golfer, ghost course, sanitarium/asylum,
   warehouse/service-building, candle-rumor, and scorekeeper legends while
   weaving in the real Pressmen's Home union-town and Camelot course history.
+- The Silica story uses science-fiction mystery rather than local folklore:
+  relic readers, a fear archive, a hidden answer archive, and real glass
+  storage facts woven into the narrative.
 - The page uses generated picker, cover, header, and section art plus real
-  Wikimedia Commons and National Park Service / National Register images
-  optimized into the repo with attribution.
+  Wikimedia Commons, National Park Service / National Register, NASA, and FDA
+  images optimized into the repo with attribution.
 
 ## Roadmap
 
@@ -67,13 +73,14 @@ Static launch assets live under
 Generated art is used for:
 
 - Entertainment picker banner
-- first story cover
-- first story header
+- story covers
+- story headers
 - atmospheric story-section plates
 
 Real images are used only where licensing is clear enough for local optimized
-copies and attribution. The first story uses Wikimedia Commons images credited
-in the UI and source footer.
+copies and attribution. The existing stories use Wikimedia Commons, National
+Park Service / National Register, NASA, and FDA images credited in the UI and
+source footer.
 
 ## Writing Standard
 

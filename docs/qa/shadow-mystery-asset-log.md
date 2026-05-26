@@ -1,6 +1,6 @@
 # Shadow Mystery Asset Log
 
-Last updated: 2026-05-22
+Last updated: 2026-05-25
 
 ## Purpose
 
@@ -36,6 +36,13 @@ paths, dimensions, file sizes, usage, and attribution.
 | `camelot-golf-course-real-power-plant-1985` | Real story image | NPS / National Register photo packet, Martha Gray Hagedorn, public domain | `public/entertainment/shadow-mystery/camelot-golf-course/real/power-plant-1985.webp` | 898x1260 | 76,244 bytes | Real power plant exterior and stack photo |
 | `camelot-golf-course-real-sulphur-spring-gazebo-1985` | Real story image | NPS / National Register photo packet, Martha Gray Hagedorn, public domain | `public/entertainment/shadow-mystery/camelot-golf-course/real/sulphur-spring-gazebo-1985.webp` | 1263x888 | 70,862 bytes | Real sulphur spring gazebo photo |
 | `camelot-golf-course-real-farm-storage-1985` | Real story image | NPS / National Register photo packet, Martha Gray Hagedorn, public domain | `public/entertainment/shadow-mystery/camelot-golf-course/real/farm-storage-building-1985.webp` | 1260x891 | 118,442 bytes | Real farm storage building photo |
+| `glass-that-remembered-us-cover` | Story cover | Generated image `ig_0f3bcaf00316af68016a14daf233f8819595861745497c0008.png` | `public/entertainment/shadow-mystery/glass-that-remembered-us/cover.webp` | 900x1125 | 100,130 bytes | Generated post-collapse glass archive cover art |
+| `glass-that-remembered-us-header` | Story/app header | Generated image `ig_0f3bcaf00316af68016a14db389cb48195a8d5a998a0a63913.png` | `public/entertainment/shadow-mystery/glass-that-remembered-us/header.webp` | 1600x686 | 145,240 bytes | Generated ruined glass reliquary panorama |
+| `glass-that-remembered-us-reader-workshop` | Story section image | Generated image `ig_0f3bcaf00316af68016a14db87c5708195b1405a1f44eaab27.png` | `public/entertainment/shadow-mystery/glass-that-remembered-us/reader-workshop.webp` | 1280x720 | 94,312 bytes | Generated future relic-reader workshop scene |
+| `glass-that-remembered-us-archive-caravan` | Story section image | Generated image `ig_0f3bcaf00316af68016a14dbcdfe348195b019e35a73b75055.png` | `public/entertainment/shadow-mystery/glass-that-remembered-us/archive-caravan.webp` | 1280x720 | 117,574 bytes | Generated archive caravan crossing the salt flats |
+| `glass-that-remembered-us-real-fda-lab` | Real story image | FDA Advanced Manufacturing Research Facility, public-domain U.S. government image, distressed | `public/entertainment/shadow-mystery/glass-that-remembered-us/real/fda-lab-relic.webp` | 1280x830 | 57,710 bytes | Real lab image treated as a recovered old-world archive fragment |
+| `glass-that-remembered-us-real-manufacturing-skid` | Real story image | FDA Advanced Manufacturing Research Facility, public-domain U.S. government image, distressed | `public/entertainment/shadow-mystery/glass-that-remembered-us/real/manufacturing-skid-relic.webp` | 1280x820 | 84,814 bytes | Real equipment image treated as an old-world machine relic |
+| `glass-that-remembered-us-real-voyager-recorder` | Real story image | NASA/JPL-Caltech Voyager digital recorder image, public-domain U.S. government image, distressed | `public/entertainment/shadow-mystery/glass-that-remembered-us/real/voyager-recorder-relic.webp` | 900x1125 | 24,984 bytes | Real digital tape recorder image used as a storage-history relic |
 
 ## Source And License Links
 
@@ -47,6 +54,14 @@ paths, dimensions, file sizes, usage, and attribution.
   `https://npgallery.nps.gov/GetAsset/c169552b-09d0-4ef8-b706-ae2c7969d50d`
 - Pressmen's Home mall public-domain confirmation on Wikimedia Commons:
   `https://commons.wikimedia.org/wiki/File:Pressmen%27s_Home_mall_1985.png`
+- Microsoft Research Project Silica 2026 update:
+  `https://www.microsoft.com/en-us/research/blog/project-silicas-advances-in-glass-storage-technology-featured-in-nature/`
+- Nature phase-voxel glass storage paper:
+  `https://www.nature.com/articles/s41586-025-10042-w`
+- FDA Advanced Manufacturing Research Facility real images:
+  `https://www.fda.gov/drugs/science-and-research-drugs/advanced-manufacturing-research-facility-amrf`
+- NASA Voyager digital recorder real image:
+  `https://science.nasa.gov/image-detail/voyager-digital-recorder/`
 
 ## Optimization Notes
 
@@ -64,3 +79,10 @@ paths, dimensions, file sizes, usage, and attribution.
 - The current Shadow Mystery picker/home-hero banner was selected from
   `C:\Users\tayle\.codex\generated_images\019e50a7-be8d-7670-86c9-dad80192e13d`
   and converted to WebP with repo-local `sharp`.
+- The Silica story generated PNGs were copied from
+  `C:\Users\tayle\.codex\generated_images\019e477e-c146-7581-9c2e-913be453e35a`
+  and converted to distressed WebP with repo-local `sharp`.
+- The Silica story real NASA/FDA images were downloaded into
+  `C:\Users\tayle\.codex\story_runs\glass-that-remembered-us\raw-images`,
+  converted to sepia distressed WebP panels with repo-local `sharp`, and
+  credited in captions and the source footer.
