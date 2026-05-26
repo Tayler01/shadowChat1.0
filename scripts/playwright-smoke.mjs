@@ -564,6 +564,7 @@ async function authenticateAccount(page, state, account, label) {
   await waitForBootSurface(page)
 
   if (await isChatVisible(page)) {
+    await dismissAppReleaseDialog(page)
     const profile = await readVisibleProfile(page).catch(() => null)
     return {
       ...account,
@@ -599,6 +600,7 @@ async function authenticateAccount(page, state, account, label) {
     await waitForChatView(page)
   }
 
+  await dismissAppReleaseDialog(page)
   const profile = await readVisibleProfile(page)
   await capture(page, state.artifactDir, `${label}-ready`)
 
@@ -816,6 +818,8 @@ async function ensureConversationIsReady(state, sessionA, sessionB) {
 }
 
 async function goToDirectMessages(page) {
+  await dismissAppReleaseDialog(page)
+
   if (await page.getByRole('button', { name: 'Start new conversation' }).isVisible().catch(() => false)) {
     return
   }
@@ -837,11 +841,13 @@ async function goToDirectMessages(page) {
 }
 
 async function goToChat(page) {
+  await dismissAppReleaseDialog(page)
   await page.getByRole('button', { name: /^Chat$/ }).click()
   await waitForChatView(page)
 }
 
 async function goToSettings(page) {
+  await dismissAppReleaseDialog(page)
   const desktopSettings = page.getByRole('button', { name: /^Settings$/ }).first()
   if (await desktopSettings.isVisible().catch(() => false)) {
     await desktopSettings.click()
@@ -872,6 +878,35 @@ async function waitForBootSurface(page) {
       text.includes('Direct Messages')
     )
   }, null, { timeout: DEFAULT_TIMEOUT_MS })
+}
+
+async function dismissAppReleaseDialog(page) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const dialog = page.getByRole('dialog').filter({
+      has: page.getByText(/update|what's new|restart/i),
+    }).first()
+
+    if (!(await dialog.isVisible().catch(() => false))) {
+      return
+    }
+
+    const closeButton = dialog.getByRole('button', { name: /^(Done|Got It|Later)$/ }).first()
+    if (await closeButton.isVisible().catch(() => false)) {
+      await closeButton.click()
+      await dialog.waitFor({ state: 'hidden', timeout: DEFAULT_TIMEOUT_MS }).catch(() => undefined)
+      return
+    }
+
+    const restartButton = dialog.getByRole('button', { name: /^(Restart Now|Update Now)$/ }).first()
+    if (await restartButton.isVisible().catch(() => false)) {
+      await restartButton.click()
+      await page.waitForLoadState('domcontentloaded', { timeout: DEFAULT_TIMEOUT_MS }).catch(() => undefined)
+      await page.waitForTimeout(1500)
+      continue
+    }
+
+    return
+  }
 }
 
 async function waitForChatView(page) {
