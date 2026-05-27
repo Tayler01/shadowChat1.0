@@ -1,15 +1,15 @@
 {
   "title": "Shadow Chat Update Notes",
-  "summary": "Shadow Chat now handles rapid production updates without stacking restart prompts.",
+  "summary": "Shadow Chat now rotates legacy medals to the next eligible holder when the primary admin leads a board.",
   "restartPolicy": "optional_restart",
   "severity": "feature",
   "sections": [
     {
       "heading": "New",
       "items": [
-        "Restart prompts now focus on the newest published version.",
-        "Older update prompts no longer queue up after the newest version has been handled.",
-        "Critical releases can still require a restart when users are running an older build."
+        "Shado Pin, Shadow Checkers, and Shadow War medals now skip the primary admin.",
+        "When the admin would be first place, the medal is automatically assigned to the next eligible user.",
+        "Leaderboards now show the medal beside the actual assigned holder instead of assuming it belongs to the first row."
       ]
     },
     {

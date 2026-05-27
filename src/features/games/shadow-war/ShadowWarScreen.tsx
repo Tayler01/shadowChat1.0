@@ -292,7 +292,7 @@ export function ShadowWarScreen({
                 <div className="min-w-0">
                   <p className="inline-flex max-w-full items-center gap-1.5 text-sm font-semibold text-[#f6e0a2]">
                     <span className="truncate">{name}</span>
-                    <ShadowWarSwordBadge active={index === 0 && shouldShowLegacyAchievementBadges(entry.user)} />
+                    <ShadowWarSwordBadge active={shouldShowLegacyAchievementBadges(entry.user) && entry.user?.war_sword} />
                   </p>
                   <p className="truncate text-[11px] text-[#b9a16f]">
                     {entry.wins}W / {entry.losses}L · {winRate(entry)}% · {entry.rounds_won}-{entry.rounds_lost} rounds

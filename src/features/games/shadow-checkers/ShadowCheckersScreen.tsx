@@ -895,7 +895,7 @@ function HallOfFame({ leaderboard }: { leaderboard: Array<{ user_id: string; win
               <div className="min-w-0">
                 <p className="flex items-center gap-1 truncate text-sm font-semibold text-[#f6e0a2]">
                   <span className="truncate">{displayName(row.user)}</span>
-                  <CheckersCrownBadge active={index === 0 && shouldShowLegacyAchievementBadges(row.user)} />
+                  <CheckersCrownBadge active={shouldShowLegacyAchievementBadges(row.user) && row.user?.checkers_crown} />
                 </p>
                 <p className="text-[11px] text-[#b9a16f]">{row.wins}W / {row.losses}L</p>
               </div>
