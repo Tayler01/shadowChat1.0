@@ -35,6 +35,7 @@ interface AuthContextValue {
   ) => Promise<any>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<User>) => Promise<User | void>;
+  refreshProfile: () => Promise<User | null>;
   uploadAvatar: (file: File) => Promise<string | void>;
   uploadBanner: (file: File) => Promise<string | void>;
 }
@@ -545,6 +546,20 @@ function useProvideAuth() {
     }
   };
 
+  const refreshProfile = async () => {
+    try {
+      const profile = await getCurrentUser();
+      if (profile) {
+        applyUser(profile);
+      }
+      return profile;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Profile refresh failed';
+      setError(message);
+      throw err;
+    }
+  };
+
   const uploadAvatar = async (file: File) => {
     if (!user) return;
     try {
@@ -580,6 +595,7 @@ function useProvideAuth() {
     signUp,
     signOut,
     updateProfile,
+    refreshProfile,
     uploadAvatar,
     uploadBanner,
   };

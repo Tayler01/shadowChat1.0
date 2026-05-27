@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 import { ActiveUsersButton } from '../chat/ActiveUsersButton'
 import { PinnedMessagesButton } from '../chat/PinnedMessagesButton'
 import { WeatherWidget } from '../chat/WeatherWidget'
+import { GoldenEggDiscoveryLogo } from '../easter-egg/GoldenEggDiscoveryLogo'
 import { Avatar } from '../ui/Avatar'
 import { useOptionalClientReset } from '../../hooks/ClientResetContext'
 import { useOptionalMessages } from '../../hooks/MessagesContext'
@@ -112,13 +113,7 @@ export function MobileAppHeader({
           )}
 
           {logo && (
-            <span className="relative -ml-3.5 h-8 w-16 shrink-0 overflow-visible min-[380px]:-ml-3 min-[380px]:w-20 md:ml-0">
-              <img
-                src="/icons/header-logo.png"
-                alt="SHADO"
-                className="theme-logo absolute left-0 top-1/2 h-12 w-28 origin-left -translate-y-1/2 scale-[1.18] object-contain object-left min-[380px]:h-14 min-[380px]:w-32"
-              />
-            </span>
+            <GoldenEggDiscoveryLogo />
           )}
 
           {avatar && (

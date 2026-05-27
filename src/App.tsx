@@ -14,6 +14,7 @@ import { LoadingSpinner } from './components/ui/LoadingSpinner'
 import { AppBadgeSync } from './components/notifications/AppBadgeSync'
 import { PhoneInstallOnboarding } from './components/onboarding/PhoneInstallOnboarding'
 import { AppReleaseGate } from './components/releases/AppReleaseGate'
+import { GoldenEggDiscoveryController } from './components/easter-egg/GoldenEggDiscovery'
 import { useSessionResumeRecovery } from './hooks/useSessionResumeRecovery'
 import { useAdminRoleNotifications } from './hooks/useAdminRoleNotifications'
 import { useChannelBanExpirySweep } from './hooks/useChannelBanExpirySweep'
@@ -416,6 +417,7 @@ function App() {
                     <AppBadgeSync />
                     <PhoneInstallOnboarding />
                     <AppReleaseGate />
+                    <GoldenEggDiscoveryController />
                     <div className={`app-viewport flex flex-col overflow-hidden md:flex-row ${hideAppChrome ? 'bg-black' : ''}`}>
                       {isDesktop && !hideAppChrome && (
                         <Sidebar

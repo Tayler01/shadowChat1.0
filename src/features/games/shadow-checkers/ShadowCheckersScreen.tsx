@@ -5,6 +5,7 @@ import { LoadingSpinner } from '../../../components/ui/LoadingSpinner'
 import { useAuth } from '../../../hooks/useAuth'
 import { useAdminAccess } from '../../../hooks/useAdminAccess'
 import { cn } from '../../../lib/utils'
+import { shouldShowLegacyAchievementBadges } from '../../../lib/achievementBadges'
 import type { ShadowCheckersMatch } from '../../../lib/supabase'
 import { SHADOW_CHECKERS_ASSETS, SHADOW_CHECKERS_CHARACTERS, getShadowCheckersCharacter } from './assets/manifest'
 import { ShadowCheckersBoard } from './components/ShadowCheckersBoard'
@@ -575,8 +576,8 @@ export function ShadowCheckersScreen({
           </span>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
-          <PlayerChip name={displayName(match.player_one, 'Creator')} characterKey={match.player_one_character_key} crown={match.player_one?.checkers_crown} />
-          <PlayerChip name={match.player_two ? displayName(match.player_two) : 'Open seat'} characterKey={match.player_two_character_key} crown={match.player_two?.checkers_crown} muted={!match.player_two} />
+          <PlayerChip name={displayName(match.player_one, 'Creator')} characterKey={match.player_one_character_key} crown={shouldShowLegacyAchievementBadges(match.player_one) && match.player_one?.checkers_crown} />
+          <PlayerChip name={match.player_two ? displayName(match.player_two) : 'Open seat'} characterKey={match.player_two_character_key} crown={shouldShowLegacyAchievementBadges(match.player_two) && match.player_two?.checkers_crown} muted={!match.player_two} />
         </div>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {currentUserIsPlayer && (
@@ -705,8 +706,8 @@ export function ShadowCheckersScreen({
     return (
       <main className="shadow-checkers-match-surface relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-2 pb-[calc(env(safe-area-inset-bottom)_+_0.65rem)] md:px-6">
         <section className="shadow-checkers-keyboard-collapse mb-2 grid grid-cols-2 items-center gap-2 rounded-[1rem] border border-[#b9934c]/28 bg-black/58 p-2.5">
-          <PlayerChip name={displayName(activeMatch.player_one, 'Player one')} characterKey={activeMatch.player_one_character_key} crown={activeMatch.player_one?.checkers_crown} detail={`${playerOnePieces} pieces`} activeTurn={!state.winner && currentTurnSlot === 'player_one'} turnFlash={showYourTurnBanner && myTurnSlot === 'player_one'} />
-          <PlayerChip name={displayName(activeMatch.player_two, 'Open seat')} characterKey={activeMatch.player_two_character_key} crown={activeMatch.player_two?.checkers_crown} detail={`${playerTwoPieces} pieces`} align="right" muted={!activeMatch.player_two} activeTurn={!state.winner && currentTurnSlot === 'player_two'} turnFlash={showYourTurnBanner && myTurnSlot === 'player_two'} />
+          <PlayerChip name={displayName(activeMatch.player_one, 'Player one')} characterKey={activeMatch.player_one_character_key} crown={shouldShowLegacyAchievementBadges(activeMatch.player_one) && activeMatch.player_one?.checkers_crown} detail={`${playerOnePieces} pieces`} activeTurn={!state.winner && currentTurnSlot === 'player_one'} turnFlash={showYourTurnBanner && myTurnSlot === 'player_one'} />
+          <PlayerChip name={displayName(activeMatch.player_two, 'Open seat')} characterKey={activeMatch.player_two_character_key} crown={shouldShowLegacyAchievementBadges(activeMatch.player_two) && activeMatch.player_two?.checkers_crown} detail={`${playerTwoPieces} pieces`} align="right" muted={!activeMatch.player_two} activeTurn={!state.winner && currentTurnSlot === 'player_two'} turnFlash={showYourTurnBanner && myTurnSlot === 'player_two'} />
         </section>
 
         <div className="flex min-h-0 flex-1 flex-col gap-2 xl:grid xl:grid-cols-[minmax(0,1fr)_22rem] xl:gap-3">
@@ -894,7 +895,7 @@ function HallOfFame({ leaderboard }: { leaderboard: Array<{ user_id: string; win
               <div className="min-w-0">
                 <p className="flex items-center gap-1 truncate text-sm font-semibold text-[#f6e0a2]">
                   <span className="truncate">{displayName(row.user)}</span>
-                  <CheckersCrownBadge active={index === 0} />
+                  <CheckersCrownBadge active={index === 0 && shouldShowLegacyAchievementBadges(row.user)} />
                 </p>
                 <p className="text-[11px] text-[#b9a16f]">{row.wins}W / {row.losses}L</p>
               </div>

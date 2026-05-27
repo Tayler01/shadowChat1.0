@@ -9,7 +9,7 @@ import {
 } from '../../../../lib/supabase'
 import type { CheckersPosition } from '../engine/types'
 
-const USER_SELECT = 'id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, presence_visibility'
+const USER_SELECT = 'id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, gold_easter_egg, presence_visibility'
 
 export interface ShadowCheckersSnapshot {
   sessions: GameSession[]

@@ -21,12 +21,12 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner'
 import { MobileAppHeader } from '../../components/layout/MobileAppHeader'
+import { UserAchievementBadges } from '../../components/ui/UserAchievementBadges'
 import { useAuth } from '../../hooks/useAuth'
 import { cn } from '../../lib/utils'
 import type { AppView } from '../../types/navigation'
 import { useShadowPinCategories } from './hooks/useShadowPinCategories'
 import { useShadowPinImages } from './hooks/useShadowPinImages'
-import { ShadowPinGoldPinBadge } from './components/ShadowPinGoldPinBadge'
 import type {
   ShadowPinCategory,
   ShadowPinCategoryFormValues,
@@ -813,7 +813,7 @@ function CategoryDetailsModal({
                 <Avatar src={category.creator?.avatar_url} alt={getDisplayName(category)} size="sm" />
                 <span className="inline-flex min-w-0 items-center gap-1.5">
                   <span className="truncate">{getDisplayName(category)}</span>
-                  <ShadowPinGoldPinBadge active={category.creator?.shadow_pin_gold_pin} />
+                  <UserAchievementBadges user={category.creator} />
                 </span>
               </div>
             </div>
@@ -1316,7 +1316,7 @@ function ImageCard({
               <Avatar src={image.creator?.avatar_url} alt={getDisplayName(image)} size="sm" />
               <span className="inline-flex min-w-0 items-center gap-1.5">
                 <span className="truncate">{getDisplayName(image)}</span>
-                <ShadowPinGoldPinBadge active={image.creator?.shadow_pin_gold_pin} />
+                <UserAchievementBadges user={image.creator} />
               </span>
             </div>
           </div>
@@ -1352,7 +1352,7 @@ function ImageViewerModal({
           <Avatar src={image.creator?.avatar_url} alt={getDisplayName(image)} size="sm" />
           <span className="inline-flex min-w-0 items-center gap-1.5">
             <span className="truncate">{getDisplayName(image)}</span>
-            <ShadowPinGoldPinBadge active={image.creator?.shadow_pin_gold_pin} />
+            <UserAchievementBadges user={image.creator} />
           </span>
         </div>
         {image.description && <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-[var(--text-secondary)]">{image.description}</p>}

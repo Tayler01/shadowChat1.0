@@ -3,6 +3,7 @@ import { ArrowLeft, HelpCircle, Loader2, Music, Plus, Shield, Swords, Trophy, Us
 import toast from 'react-hot-toast'
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner'
 import { useAuth } from '../../../hooks/useAuth'
+import { shouldShowLegacyAchievementBadges } from '../../../lib/achievementBadges'
 import { cn } from '../../../lib/utils'
 import type { GameSession, GameSessionPresence, ShadowWarStats } from '../../../lib/supabase'
 import { useShadowWar } from './hooks/useShadowWar'
@@ -291,7 +292,7 @@ export function ShadowWarScreen({
                 <div className="min-w-0">
                   <p className="inline-flex max-w-full items-center gap-1.5 text-sm font-semibold text-[#f6e0a2]">
                     <span className="truncate">{name}</span>
-                    <ShadowWarSwordBadge active={index === 0} />
+                    <ShadowWarSwordBadge active={index === 0 && shouldShowLegacyAchievementBadges(entry.user)} />
                   </p>
                   <p className="truncate text-[11px] text-[#b9a16f]">
                     {entry.wins}W / {entry.losses}L · {winRate(entry)}% · {entry.rounds_won}-{entry.rounds_lost} rounds

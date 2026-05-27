@@ -19,9 +19,7 @@ import { MessageRichText } from './MessageRichText'
 import { ChatMessageActionsMenu, type ChatMessageAction } from './ChatMessageActionsMenu'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
-import { CheckersCrownBadge } from '../../features/games/shadow-checkers/components/CheckersCrownBadge'
-import { ShadowWarSwordBadge } from '../../features/games/shadow-war/components/ShadowWarSwordBadge'
-import { ShadowPinGoldPinBadge } from '../../features/shadow-pin/components/ShadowPinGoldPinBadge'
+import { UserAchievementBadges } from '../ui/UserAchievementBadges'
 import { formatTime, shouldGroupMessage, cn, getReadableTextColor } from '../../lib/utils'
 import type { Message, User } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
@@ -100,7 +98,7 @@ function ReplyContextPreview({
         >
           <span className="truncate">Replying to {parentMessage.user?.display_name || 'Unknown'}</span>
           <UserRoleBadge role={parentMessage.user?.admin_role} className="shrink-0" />
-          <ShadowPinGoldPinBadge active={parentMessage.user?.shadow_pin_gold_pin} className="shrink-0" />
+          <UserAchievementBadges user={parentMessage.user} className="shrink-0" />
           <UserPresenceBadge userId={parentMessage.user?.id} presenceVisibility={parentMessage.user?.presence_visibility} className="shrink-0" />
         </button>
         <div
@@ -330,9 +328,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
               <span className="inline-flex min-w-0 items-center gap-1.5 font-semibold text-[var(--text-primary)]">
                 <span className="truncate">{message.user?.display_name}</span>
                 <UserRoleBadge role={message.user?.admin_role} />
-                <CheckersCrownBadge active={message.user?.checkers_crown} />
-                <ShadowWarSwordBadge active={message.user?.war_sword} />
-                <ShadowPinGoldPinBadge active={message.user?.shadow_pin_gold_pin} />
+                <UserAchievementBadges user={message.user} />
                 <UserPresenceBadge userId={message.user?.id} presenceVisibility={message.user?.presence_visibility} />
               </span>
               <span className="text-xs text-[var(--text-muted)]">

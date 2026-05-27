@@ -983,7 +983,7 @@ async function openConversationWithUser(page, account, state) {
   }
 
   await page.getByRole('button', { name: 'Start new conversation' }).click()
-  await page.getByPlaceholder('Search by username').fill(account.username)
+  await page.getByPlaceholder(/Search by username|Search people/i).fill(account.username)
   const searchRow = page.getByRole('button', { name: new RegExp(`@${escapeRegExp(account.username)}`, 'i') }).first()
   await searchRow.waitFor({ timeout: DEFAULT_TIMEOUT_MS })
   await searchRow.click()

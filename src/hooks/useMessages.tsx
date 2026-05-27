@@ -519,6 +519,36 @@ function useProvideMessages(): MessagesContextValue {
     cacheMessages(messages);
   }, [messages]);
 
+  useEffect(() => {
+    if (!profile) return;
+
+    setMessages(prev => {
+      let changed = false;
+      const nextMessages = prev.map(message => {
+        if (message.user_id !== profile.id || !message.user) {
+          return message;
+        }
+
+        const nextUser = { ...message.user, ...profile };
+        const badgesChanged =
+          message.user.gold_easter_egg !== nextUser.gold_easter_egg ||
+          message.user.checkers_crown !== nextUser.checkers_crown ||
+          message.user.war_sword !== nextUser.war_sword ||
+          message.user.shadow_pin_gold_pin !== nextUser.shadow_pin_gold_pin ||
+          message.user.admin_role !== nextUser.admin_role;
+
+        if (!badgesChanged) {
+          return message;
+        }
+
+        changed = true;
+        return { ...message, user: nextUser } as Message;
+      });
+
+      return changed ? nextMessages : prev;
+    });
+  }, [profile]);
+
   // Subscribe to real-time updates
   useEffect(() => {
     if (!user) {
