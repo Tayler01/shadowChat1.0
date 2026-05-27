@@ -66,7 +66,20 @@ export const chooseVisibleAppRelease = (
   releases: VisibleAppRelease[],
   currentBuildId = CURRENT_APP_BUILD_ID
 ) => {
-  return releases.find(release => getAppReleasePresentation(release, currentBuildId).shouldShow) ?? null
+  const latestRelease = [...releases]
+    .sort((left, right) => {
+      const leftTime = Date.parse(left.published_at)
+      const rightTime = Date.parse(right.published_at)
+      return (Number.isFinite(rightTime) ? rightTime : 0) - (Number.isFinite(leftTime) ? leftTime : 0)
+    })[0]
+
+  if (!latestRelease) {
+    return null
+  }
+
+  return getAppReleasePresentation(latestRelease, currentBuildId).shouldShow
+    ? latestRelease
+    : null
 }
 
 export const getClientUserAgent = () => {

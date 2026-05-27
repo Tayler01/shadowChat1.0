@@ -84,13 +84,41 @@ describe('app release presentation', () => {
     expect(presentation.autoRestart).toBe(true)
   })
 
-  it('chooses the first visible release that still needs attention', () => {
+  it('chooses the newest release when it still needs attention', () => {
     const selected = chooseVisibleAppRelease([
-      release({ id: 'read-release', acknowledged_at: '2026-05-26T12:01:00.000Z' }),
-      release({ id: 'unread-release', build_id: 'test-build' }),
+      release({
+        id: 'older-release',
+        build_id: 'older-build',
+        published_at: '2026-05-26T12:00:00.000Z',
+      }),
+      release({
+        id: 'newest-release',
+        build_id: 'test-build',
+        published_at: '2026-05-27T12:00:00.000Z',
+      }),
     ], 'test-build')
 
-    expect(selected?.id).toBe('unread-release')
+    expect(selected?.id).toBe('newest-release')
+  })
+
+  it('does not fall back to older restart-required releases after the newest release is handled', () => {
+    const selected = chooseVisibleAppRelease([
+      release({
+        id: 'older-required-release',
+        build_id: 'older-build',
+        restart_policy: 'required_restart',
+        published_at: '2026-05-26T12:00:00.000Z',
+      }),
+      release({
+        id: 'newest-restarted-release',
+        build_id: 'newest-build',
+        restart_policy: 'required_restart',
+        published_at: '2026-05-27T12:00:00.000Z',
+        restarted_at: '2026-05-27T12:01:00.000Z',
+      }),
+    ], 'newest-build')
+
+    expect(selected).toBeNull()
   })
 
   it('throttles automatic critical restarts within a browser session', () => {

@@ -1,15 +1,15 @@
 {
   "title": "Shadow Chat Update Notes",
-  "summary": "Shadow Chat now has a built-in release popup for version notes and app restarts after production deploys.",
+  "summary": "Shadow Chat now handles rapid production updates without stacking restart prompts.",
   "restartPolicy": "optional_restart",
   "severity": "feature",
   "sections": [
     {
       "heading": "New",
       "items": [
-        "Production releases can publish in-app update notes after Netlify deploys complete.",
-        "The app can ask users to restart when a new version is available.",
-        "Critical releases can require a restart for users still running an older build."
+        "Restart prompts now focus on the newest published version.",
+        "Older update prompts no longer queue up after the newest version has been handled.",
+        "Critical releases can still require a restart when users are running an older build."
       ]
     },
     {
