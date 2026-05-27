@@ -9,8 +9,7 @@
       "items": [
         "Production releases can publish in-app update notes after Netlify deploys complete.",
         "The app can ask users to restart when a new version is available.",
-        "Critical releases can require a restart for users still running an older build.",
-        "A mobile-only golden egg hunt is now live in Shadow Chat."
+        "Critical releases can require a restart for users still running an older build."
       ]
     },
     {

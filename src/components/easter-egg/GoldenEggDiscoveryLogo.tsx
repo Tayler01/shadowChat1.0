@@ -34,6 +34,8 @@ export function GoldenEggDiscoveryLogo({
       return
     }
 
+    event.preventDefault()
+
     if (event.currentTarget.setPointerCapture) {
       event.currentTarget.setPointerCapture(event.pointerId)
     }
@@ -74,6 +76,7 @@ export function GoldenEggDiscoveryLogo({
         src="/icons/header-logo.png"
         alt="SHADO"
         draggable={false}
+        onDragStart={event => event.preventDefault()}
         className={cn(
           'theme-logo absolute left-0 top-1/2 h-12 w-28 origin-left -translate-y-1/2 scale-[1.18] object-contain object-left min-[380px]:h-14 min-[380px]:w-32',
           imageClassName
