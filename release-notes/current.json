@@ -1,23 +1,22 @@
 {
-  "title": "Shadow Chat Update Notes",
-  "summary": "Shadow Chat now rotates legacy medals to the next eligible holder when the primary admin leads a board.",
-  "restartPolicy": "optional_restart",
-  "severity": "feature",
+  "title": "Shadow Pin Activity Analytics",
+  "summary": "Admin analytics for Shadow Pin are live with refreshed tables, cleaner charts, and a required database-backed update.",
+  "restartPolicy": "required_restart",
+  "severity": "maintenance",
   "sections": [
     {
-      "heading": "New",
+      "heading": "Admin Analytics",
       "items": [
-        "Shado Pin, Shadow Checkers, and Shadow War medals now skip the primary admin.",
-        "When the admin would be first place, the medal is automatically assigned to the next eligible user.",
-        "Leaderboards now show the medal beside the actual assigned holder instead of assuming it belongs to the first row."
+        "Admins and sub-admins can review Shadow Pin visits, active time, post activity, hearts, shares, edits, deletes, and weighted activity scores.",
+        "The analytics page now loads as a lighter admin-only panel with cleaner spreadsheet rows and chart summaries.",
+        "Existing Shadow Pin posts, categories, and hearts have been backfilled into the analytics data."
       ]
     },
     {
-      "heading": "Smarter Tracking",
+      "heading": "Update Required",
       "items": [
-        "Shadow Chat records who has seen, dismissed, acknowledged, or restarted for each release.",
-        "Update notes do not keep popping up after a user has already read that release.",
-        "Release notes are stored outside chat messages so Shado posts are no longer needed for app-update announcements."
+        "Restarting the app makes sure the new analytics code and database functions are loaded together.",
+        "The update prompt will ask older app sessions to refresh before continuing."
       ]
     }
   ]

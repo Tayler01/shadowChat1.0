@@ -291,11 +291,11 @@ test('settings admin panel opens feedback review', () => {
   expect(screen.getByTestId('admin-feedback-review')).toBeInTheDocument()
 })
 
-test('settings admin panel opens Shadow Pin activity', () => {
+test('settings admin panel opens Shadow Pin activity', async () => {
   render(<SettingsView onToggleSidebar={jest.fn()} />)
 
   fireEvent.click(screen.getByRole('button', { name: /admin/i }))
   fireEvent.click(screen.getByRole('button', { name: /shadow pin activity/i }))
 
-  expect(screen.getByTestId('shadow-pin-activity-admin')).toBeInTheDocument()
+  expect(await screen.findByTestId('shadow-pin-activity-admin')).toBeInTheDocument()
 })

@@ -9,8 +9,10 @@ import {
   YAxis,
 } from 'recharts'
 import {
+  AlertTriangle,
   BarChart3,
   CalendarDays,
+  ChevronRight,
   Image as ImageIcon,
   Loader2,
   RefreshCw,
@@ -62,6 +64,10 @@ const chartTabs: Array<{ id: ShadowPinActivityTab; label: string; icon: typeof U
   { id: 'pins', label: 'Pins', icon: ImageIcon },
 ]
 
+const userTableGrid = 'grid-cols-[minmax(14rem,1.4fr)_repeat(7,minmax(5rem,0.7fr))]'
+const categoryTableGrid = 'grid-cols-[minmax(14rem,1.4fr)_repeat(7,minmax(5rem,0.7fr))]'
+const pinTableGrid = 'grid-cols-[minmax(14rem,1.4fr)_repeat(6,minmax(5rem,0.7fr))]'
+
 const getRange = (preset: RangePreset) => {
   const end = new Date()
   const start = new Date(end)
@@ -111,6 +117,11 @@ const formatDelta = (current: number, previous: number) => {
   return `${delta > 0 ? '+' : ''}${formatNumber(delta)}`
 }
 
+const formatChartName = (value: string) => {
+  if (value.length <= 18) return value
+  return `${value.slice(0, 17)}...`
+}
+
 const eventLabels: Record<string, string> = {
   shadow_pin_visit: 'Shadow Pin visit',
   category_visit: 'Category visit',
@@ -142,6 +153,31 @@ function MetricPill({ label, value }: { label: string; value: string }) {
     <span className="inline-flex flex-col rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-2">
       <span className="text-[10px] uppercase tracking-[0.14em] text-[var(--text-muted)]">{label}</span>
       <span className="mt-1 text-sm font-semibold text-[var(--text-primary)]">{value}</span>
+    </span>
+  )
+}
+
+function SpreadsheetHeader({
+  columns,
+  gridClass,
+}: {
+  columns: string[]
+  gridClass: string
+}) {
+  return (
+    <div className={`grid w-full gap-3 rounded-t-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.045)] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] ${gridClass}`}>
+      {columns.map(column => (
+        <span key={column}>{column}</span>
+      ))}
+    </div>
+  )
+}
+
+function StatCell({ value, label }: { value: string; label: string }) {
+  return (
+    <span className="min-w-0">
+      <b className="block text-sm font-semibold text-[var(--text-primary)]">{value}</b>
+      <small className="block truncate text-[11px] uppercase tracking-[0.1em] text-[var(--text-muted)]">{label}</small>
     </span>
   )
 }
@@ -198,20 +234,20 @@ export function ShadowPinActivityAdmin() {
   const chartData = useMemo(() => {
     if (activeTab === 'users') {
       return data.users.slice(0, 10).map(user => ({
-        name: user.display_name || user.username,
+        name: formatChartName(user.display_name || user.username),
         score: Math.round(user.activity_score),
       }))
     }
 
     if (activeTab === 'categories') {
       return data.categories.slice(0, 10).map(category => ({
-        name: category.title,
+        name: formatChartName(category.title),
         score: Math.round(category.activity_score),
       }))
     }
 
     return data.pins.slice(0, 10).map(pin => ({
-      name: pin.title,
+      name: formatChartName(pin.title),
       score: Math.round(pin.activity_score),
     }))
   }, [activeTab, data.categories, data.pins, data.users])
@@ -292,17 +328,24 @@ export function ShadowPinActivityAdmin() {
       </div>
 
       {error && (
-        <div className="rounded-[var(--radius-md)] border border-[rgba(190,52,85,0.35)] bg-[rgba(87,14,28,0.18)] p-3 text-sm text-red-100">
-          {error}
+        <div role="alert" className="flex flex-col gap-3 rounded-[var(--radius-md)] border border-[rgba(190,52,85,0.35)] bg-[rgba(87,14,28,0.18)] p-3 text-sm text-red-100 sm:flex-row sm:items-center sm:justify-between">
+          <span className="inline-flex min-w-0 items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </span>
+          <Button type="button" size="sm" variant="secondary" onClick={() => void load()} disabled={loading} className="w-full justify-center sm:w-auto">
+            Retry
+          </Button>
         </div>
       )}
 
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
         <MetricPill label="Visits" value={formatNumber(totals.visits)} />
         <MetricPill label="Active Time" value={formatDuration(totals.activeSeconds)} />
         <MetricPill label="Score" value={formatNumber(totals.score)} />
         <MetricPill label="Score Delta" value={formatDelta(totals.score, totals.previousScore)} />
         <MetricPill label="Pins Viewed" value={formatNumber(totals.pinsViewed)} />
+        <MetricPill label="Posts" value={formatNumber(totals.posts)} />
       </div>
 
       <div className="grid gap-3 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-3 lg:grid-cols-[1fr_1fr_auto]">
@@ -421,84 +464,105 @@ export function ShadowPinActivityAdmin() {
 
       <div className="glass-panel rounded-[var(--radius-lg)] p-5">
         {activeTab === 'users' && (
-          <div className="space-y-2">
+          <div className="-mx-2 overflow-x-auto px-2 pb-1">
             {data.users.length === 0 ? <EmptyState label="No user activity for this range." /> : data.users.map(user => (
-              <button
-                key={user.user_id}
-                type="button"
-                onClick={() => openUserDrilldown(user.user_id)}
-                className="grid w-full gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-3 text-left transition-colors hover:border-[var(--border-glow)] lg:grid-cols-[1.4fr_repeat(7,minmax(0,0.7fr))]"
-              >
-                <span className="flex min-w-0 items-center gap-3">
-                  <Avatar src={user.avatar_url ?? undefined} alt={user.display_name || user.username} size="sm" />
-                  <span className="min-w-0">
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span className="truncate font-semibold text-[var(--text-primary)]">{user.display_name || user.username}</span>
-                      <UserRoleBadge role={user.admin_role as any} />
+              <div key={user.user_id} className="min-w-[840px]">
+                {user === data.users[0] && (
+                  <SpreadsheetHeader columns={['User', 'Score', 'Visits', 'Active', 'Views', 'Posts', 'Hearts', 'Delta']} gridClass={userTableGrid} />
+                )}
+                <button
+                  type="button"
+                  onClick={() => openUserDrilldown(user.user_id)}
+                  className={`grid w-full gap-3 border-x border-b border-[var(--border-subtle)] bg-[rgba(255,255,255,0.025)] p-3 text-left text-sm transition-colors hover:border-[var(--border-glow)] hover:bg-[rgba(215,170,70,0.055)] ${userTableGrid}`}
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    <Avatar src={user.avatar_url ?? undefined} alt={user.display_name || user.username} size="sm" />
+                    <span className="min-w-0">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate font-semibold text-[var(--text-primary)]">{user.display_name || user.username}</span>
+                        <UserRoleBadge role={user.admin_role as any} />
+                      </span>
+                      <span className="block truncate text-xs text-[var(--text-muted)]">@{user.username}</span>
                     </span>
-                    <span className="block truncate text-xs text-[var(--text-muted)]">@{user.username}</span>
                   </span>
-                </span>
-                <span><b>{formatNumber(user.activity_score)}</b><small> score</small></span>
-                <span><b>{formatNumber(user.visits)}</b><small> visits</small></span>
-                <span><b>{formatDuration(user.active_seconds)}</b><small> active</small></span>
-                <span><b>{formatNumber(user.pins_viewed)}</b><small> views</small></span>
-                <span><b>{formatNumber(user.posts)}</b><small> posts</small></span>
-                <span><b>{formatNumber(user.hearts)}</b><small> hearts</small></span>
-                <span><b>{formatDelta(user.activity_score, user.previous_activity_score)}</b><small> delta</small></span>
-              </button>
+                  <StatCell value={formatNumber(user.activity_score)} label="score" />
+                  <StatCell value={formatNumber(user.visits)} label="visits" />
+                  <StatCell value={formatDuration(user.active_seconds)} label="active" />
+                  <StatCell value={formatNumber(user.pins_viewed)} label="views" />
+                  <StatCell value={formatNumber(user.posts)} label="posts" />
+                  <StatCell value={formatNumber(user.hearts)} label="hearts" />
+                  <span className="inline-flex min-w-0 items-center justify-between gap-2">
+                    <StatCell value={formatDelta(user.activity_score, user.previous_activity_score)} label="delta" />
+                    <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+                  </span>
+                </button>
+              </div>
             ))}
           </div>
         )}
 
         {activeTab === 'categories' && (
-          <div className="space-y-2">
+          <div className="-mx-2 overflow-x-auto px-2 pb-1">
             {data.categories.length === 0 ? <EmptyState label="No category activity for this range." /> : data.categories.map(category => (
-              <button
-                key={category.category_id}
-                type="button"
-                onClick={() => openCategoryDrilldown(category.category_id)}
-                className="grid w-full gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-3 text-left transition-colors hover:border-[var(--border-glow)] lg:grid-cols-[1.4fr_repeat(7,minmax(0,0.7fr))]"
-              >
-                <span className="flex min-w-0 items-center gap-3">
-                  {category.thumbnail_url ? <img src={category.thumbnail_url} alt="" className="h-11 w-11 rounded-[var(--radius-sm)] object-cover" /> : <span className="h-11 w-11 rounded-[var(--radius-sm)] bg-[rgba(255,255,255,0.06)]" />}
-                  <span className="truncate font-semibold text-[var(--text-primary)]">{category.title}</span>
-                </span>
-                <span><b>{formatNumber(category.activity_score)}</b><small> score</small></span>
-                <span><b>{formatNumber(category.visits)}</b><small> visits</small></span>
-                <span><b>{formatDuration(category.active_seconds)}</b><small> active</small></span>
-                <span><b>{formatNumber(category.unique_visitors)}</b><small> users</small></span>
-                <span><b>{formatNumber(category.pin_views)}</b><small> views</small></span>
-                <span><b>{formatNumber(category.pins_created)}</b><small> posts</small></span>
-                <span><b>{formatDelta(category.activity_score, category.previous_activity_score)}</b><small> delta</small></span>
-              </button>
+              <div key={category.category_id} className="min-w-[840px]">
+                {category === data.categories[0] && (
+                  <SpreadsheetHeader columns={['Category', 'Score', 'Visits', 'Active', 'Users', 'Views', 'Posts', 'Delta']} gridClass={categoryTableGrid} />
+                )}
+                <button
+                  type="button"
+                  onClick={() => openCategoryDrilldown(category.category_id)}
+                  className={`grid w-full gap-3 border-x border-b border-[var(--border-subtle)] bg-[rgba(255,255,255,0.025)] p-3 text-left text-sm transition-colors hover:border-[var(--border-glow)] hover:bg-[rgba(215,170,70,0.055)] ${categoryTableGrid}`}
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    {category.thumbnail_url ? <img src={category.thumbnail_url} alt="" className="h-11 w-11 rounded-[var(--radius-sm)] object-cover" /> : <span className="h-11 w-11 rounded-[var(--radius-sm)] bg-[rgba(255,255,255,0.06)]" />}
+                    <span className="truncate font-semibold text-[var(--text-primary)]">{category.title}</span>
+                  </span>
+                  <StatCell value={formatNumber(category.activity_score)} label="score" />
+                  <StatCell value={formatNumber(category.visits)} label="visits" />
+                  <StatCell value={formatDuration(category.active_seconds)} label="active" />
+                  <StatCell value={formatNumber(category.unique_visitors)} label="users" />
+                  <StatCell value={formatNumber(category.pin_views)} label="views" />
+                  <StatCell value={formatNumber(category.pins_created)} label="posts" />
+                  <span className="inline-flex min-w-0 items-center justify-between gap-2">
+                    <StatCell value={formatDelta(category.activity_score, category.previous_activity_score)} label="delta" />
+                    <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+                  </span>
+                </button>
+              </div>
             ))}
           </div>
         )}
 
         {activeTab === 'pins' && (
-          <div className="space-y-2">
+          <div className="-mx-2 overflow-x-auto px-2 pb-1">
             {data.pins.length === 0 ? <EmptyState label="No pin activity for this range." /> : data.pins.map(pin => (
-              <button
-                key={pin.image_id}
-                type="button"
-                onClick={() => openPinDrilldown(pin.image_id)}
-                className="grid w-full gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-3 text-left transition-colors hover:border-[var(--border-glow)] lg:grid-cols-[1.4fr_repeat(6,minmax(0,0.7fr))]"
-              >
-                <span className="flex min-w-0 items-center gap-3">
-                  {pin.thumbnail_url ? <img src={pin.thumbnail_url} alt="" className="h-11 w-11 rounded-[var(--radius-sm)] object-cover" /> : <span className="h-11 w-11 rounded-[var(--radius-sm)] bg-[rgba(255,255,255,0.06)]" />}
-                  <span className="min-w-0">
-                    <span className="block truncate font-semibold text-[var(--text-primary)]">{pin.title}</span>
-                    <span className="block truncate text-xs text-[var(--text-muted)]">{pin.category_title || 'Uncategorized'}</span>
+              <div key={pin.image_id} className="min-w-[780px]">
+                {pin === data.pins[0] && (
+                  <SpreadsheetHeader columns={['Pin', 'Score', 'Views', 'Opens', 'Hearts', 'Shares', 'Delta']} gridClass={pinTableGrid} />
+                )}
+                <button
+                  type="button"
+                  onClick={() => openPinDrilldown(pin.image_id)}
+                  className={`grid w-full gap-3 border-x border-b border-[var(--border-subtle)] bg-[rgba(255,255,255,0.025)] p-3 text-left text-sm transition-colors hover:border-[var(--border-glow)] hover:bg-[rgba(215,170,70,0.055)] ${pinTableGrid}`}
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    {pin.thumbnail_url ? <img src={pin.thumbnail_url} alt="" className="h-11 w-11 rounded-[var(--radius-sm)] object-cover" /> : <span className="h-11 w-11 rounded-[var(--radius-sm)] bg-[rgba(255,255,255,0.06)]" />}
+                    <span className="min-w-0">
+                      <span className="block truncate font-semibold text-[var(--text-primary)]">{pin.title}</span>
+                      <span className="block truncate text-xs text-[var(--text-muted)]">{pin.category_title || 'Uncategorized'}</span>
+                    </span>
                   </span>
-                </span>
-                <span><b>{formatNumber(pin.activity_score)}</b><small> score</small></span>
-                <span><b>{formatNumber(pin.grid_views)}</b><small> views</small></span>
-                <span><b>{formatNumber(pin.opens)}</b><small> opens</small></span>
-                <span><b>{formatNumber(pin.hearts)}</b><small> hearts</small></span>
-                <span><b>{formatNumber(pin.shares)}</b><small> shares</small></span>
-                <span><b>{formatDelta(pin.activity_score, pin.previous_activity_score)}</b><small> delta</small></span>
-              </button>
+                  <StatCell value={formatNumber(pin.activity_score)} label="score" />
+                  <StatCell value={formatNumber(pin.grid_views)} label="views" />
+                  <StatCell value={formatNumber(pin.opens)} label="opens" />
+                  <StatCell value={formatNumber(pin.hearts)} label="hearts" />
+                  <StatCell value={formatNumber(pin.shares)} label="shares" />
+                  <span className="inline-flex min-w-0 items-center justify-between gap-2">
+                    <StatCell value={formatDelta(pin.activity_score, pin.previous_activity_score)} label="delta" />
+                    <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+                  </span>
+                </button>
+              </div>
             ))}
           </div>
         )}

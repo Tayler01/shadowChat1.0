@@ -15,6 +15,29 @@ const toNumber = (value: unknown) => {
   return 0
 }
 
+const getActivityErrorMessage = (error: unknown, fallback: string) => {
+  const message = typeof error === 'object' && error && 'message' in error
+    ? String((error as { message?: unknown }).message ?? '')
+    : ''
+  const code = typeof error === 'object' && error && 'code' in error
+    ? String((error as { code?: unknown }).code ?? '')
+    : ''
+
+  if (
+    code === 'PGRST202' ||
+    message.includes('get_shadow_pin_activity_') ||
+    message.includes('shadow_pin_activity_')
+  ) {
+    return 'Shadow Pin analytics is waiting for the database update. Refresh again after the migration finishes.'
+  }
+
+  return message || fallback
+}
+
+const throwActivityError = (error: unknown, fallback: string): never => {
+  throw new Error(getActivityErrorMessage(error, fallback))
+}
+
 const normalizeUserSummary = (row: Record<string, unknown>): ShadowPinActivityUserSummary => ({
   user_id: String(row.user_id),
   username: String(row.username ?? ''),
@@ -96,7 +119,7 @@ const normalizeTimelineEvent = (row: Record<string, unknown>): ShadowPinActivity
 export async function startShadowPinActivitySession() {
   const client = await getWorkingClient()
   const { data, error } = await client.rpc('start_shadow_pin_activity_session')
-  if (error) throw error
+  if (error) throwActivityError(error, 'Unable to start Shadow Pin analytics session')
   return data as string
 }
 
@@ -106,7 +129,7 @@ export async function finishShadowPinActivitySession(sessionId: string, totalDur
     session_id: sessionId,
     total_duration_seconds: Math.max(0, Math.round(totalDurationSeconds)),
   })
-  if (error) throw error
+  if (error) throwActivityError(error, 'Unable to finish Shadow Pin analytics session')
 }
 
 export async function recordShadowPinActivityEvent(payload: ShadowPinActivityEventPayload) {
@@ -119,7 +142,7 @@ export async function recordShadowPinActivityEvent(payload: ShadowPinActivityEve
     duration_seconds: payload.durationSeconds == null ? null : Math.max(0, Math.round(payload.durationSeconds)),
     metadata: payload.metadata ?? {},
   })
-  if (error) throw error
+  if (error) throwActivityError(error, 'Unable to record Shadow Pin activity')
   return data as string | null
 }
 
@@ -152,10 +175,10 @@ export async function fetchShadowPinActivityDashboard(
     }),
   ])
 
-  if (usersResult.error) throw usersResult.error
-  if (categoriesResult.error) throw categoriesResult.error
-  if (pinsResult.error) throw pinsResult.error
-  if (timelineResult.error) throw timelineResult.error
+  if (usersResult.error) throwActivityError(usersResult.error, 'Unable to load Shadow Pin user activity')
+  if (categoriesResult.error) throwActivityError(categoriesResult.error, 'Unable to load Shadow Pin category activity')
+  if (pinsResult.error) throwActivityError(pinsResult.error, 'Unable to load Shadow Pin pin activity')
+  if (timelineResult.error) throwActivityError(timelineResult.error, 'Unable to load Shadow Pin activity timeline')
 
   return {
     users: ((usersResult.data ?? []) as Record<string, unknown>[]).map(normalizeUserSummary),

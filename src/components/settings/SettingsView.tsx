@@ -40,7 +40,6 @@ import { PhoneInstallGuide } from '../onboarding/PhoneInstallGuide'
 import { FeedbackSubmissionModal } from './FeedbackSubmissionModal'
 import { AdminFeedbackReview } from './AdminFeedbackReview'
 import { ShadoTvStudio } from './ShadoTvStudio'
-import { ShadowPinActivityAdmin } from './ShadowPinActivityAdmin'
 import { WeatherLocationSettings } from './WeatherLocationSettings'
 import { ProfileView } from '../profile/ProfileView'
 import { useNewsAdmin } from '../../hooks/useNewsAdmin'
@@ -49,6 +48,10 @@ import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { MobileAppHeader } from '../layout/MobileAppHeader'
 import type { AppView } from '../../types/navigation'
+
+const ShadowPinActivityAdmin = React.lazy(() =>
+  import('./ShadowPinActivityAdmin').then(module => ({ default: module.ShadowPinActivityAdmin }))
+)
 
 interface SettingsViewProps {
   onToggleSidebar: () => void
@@ -296,6 +299,14 @@ function SectionHeader({
   )
 }
 
+function SettingsPanelLoading({ label }: { label: string }) {
+  return (
+    <div className="glass-panel rounded-[var(--radius-lg)] p-5 text-sm text-[var(--text-muted)]">
+      {label}
+    </div>
+  )
+}
+
 export const SettingsView: React.FC<SettingsViewProps> = ({
   onToggleSidebar,
   currentView = 'settings',
@@ -374,6 +385,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const activeSectionConfig = sections.find(section => section.id === activeSection) ?? null
   const activeAdminSectionConfig =
     visibleAdminSections.find(section => section.id === activeAdminSection) ?? null
+  const headerTitle = activeAdminSectionConfig?.title || activeSectionConfig?.title || 'Settings'
+  const headerEyebrow = activeAdminSectionConfig ? 'Admin' : activeSectionConfig ? 'Settings' : undefined
   const adminFilteredUsers = useMemo(() => {
     const normalizedSearch = adminUserSearch.trim().toLowerCase()
     if (!normalizedSearch) return adminAccessUsers
@@ -1176,6 +1189,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     <AdminFeedbackReview />
   )
 
+  const renderShadowPinActivityPanel = () => (
+    <React.Suspense fallback={<SettingsPanelLoading label="Loading Shadow Pin activity..." />}>
+      <ShadowPinActivityAdmin />
+    </React.Suspense>
+  )
+
   const renderAdmin = () => {
     if (!activeAdminSection) {
       return renderAdminHub()
@@ -1189,24 +1208,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       access: renderAdminAccessPanel,
       'bridge-pairing': renderBridgePairingPanel,
       'shado-tv-studio': () => <ShadoTvStudio />,
-      'shadow-pin-activity': () => <ShadowPinActivityAdmin />,
+      'shadow-pin-activity': renderShadowPinActivityPanel,
       'news-sources': renderNewsSourcesPanel,
       'feedback-review': renderFeedbackReviewPanel,
     }[activeAdminSection]()
 
     return (
-      <div className="space-y-4">
-        <button
-          type="button"
-          onClick={() => setActiveAdminSection(null)}
-          className="inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:border-[var(--border-glow)] hover:text-[var(--text-gold)]"
-          aria-label="Back to admin sections"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Admin
-        </button>
-        {content}
-      </div>
+      <div className="space-y-4">{content}</div>
     )
   }
 
@@ -1343,13 +1351,23 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       'data-privacy': renderDataPrivacy,
       'account-profile': renderAccountProfile,
     }[activeSection]()
+    const showSectionHeader = !(activeSection === 'admin' && activeAdminSection)
 
     return (
       <>
-        <SectionHeader section={activeSectionConfig} onBack={() => setActiveSection(null)} />
+        {showSectionHeader && <SectionHeader section={activeSectionConfig} onBack={() => setActiveSection(null)} />}
         {content}
       </>
     )
+  }
+
+  const handleHeaderBack = () => {
+    if (activeAdminSection) {
+      setActiveAdminSection(null)
+      return
+    }
+
+    setActiveSection(null)
   }
 
   return (
@@ -1357,15 +1375,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       <MobileAppHeader
         currentView={currentView}
         onViewChange={onViewChange}
-        title={activeSectionConfig?.title || 'Settings'}
-        eyebrow={activeSectionConfig ? 'Settings' : undefined}
+        title={headerTitle}
+        eyebrow={headerEyebrow}
         logo={!activeSectionConfig}
         titleElement={activeSectionConfig ? 'p' : undefined}
-        onBack={activeSection ? () => {
-          setActiveSection(null)
-          setActiveAdminSection(null)
-        } : undefined}
-        backLabel="Back"
+        onBack={activeSection ? handleHeaderBack : undefined}
+        backLabel={activeAdminSection ? 'Back to admin sections' : 'Back'}
       />
       <motion.div
         ref={scrollContainerRef}

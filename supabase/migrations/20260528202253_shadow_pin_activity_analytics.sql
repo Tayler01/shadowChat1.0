@@ -533,9 +533,11 @@ BEGIN
     )
   ),
   user_ids AS (
-    SELECT user_id FROM current_metrics
+    SELECT current_metrics.user_id
+    FROM current_metrics
     UNION
-    SELECT user_id FROM current_time_metrics
+    SELECT current_time_metrics.user_id
+    FROM current_time_metrics
   )
   SELECT
     users.id,
@@ -741,13 +743,16 @@ BEGIN
         MAX(images.image_url),
         (ARRAY_AGG(events.thumbnail_url_snapshot ORDER BY events.created_at DESC))[1]
       ) AS thumbnail_url,
-      COALESCE(MAX(images.category_id), MAX(events.category_id)) AS category_id,
+      COALESCE(
+        (ARRAY_AGG(images.category_id ORDER BY events.created_at DESC) FILTER (WHERE images.category_id IS NOT NULL))[1],
+        (ARRAY_AGG(events.category_id ORDER BY events.created_at DESC) FILTER (WHERE events.category_id IS NOT NULL))[1]
+      ) AS category_id,
       COALESCE(
         MAX(categories.title),
         (ARRAY_AGG(events.category_title_snapshot ORDER BY events.created_at DESC))[1],
         'Uncategorized'
       ) AS category_title,
-      MAX(images.creator_id) AS creator_id,
+      (ARRAY_AGG(images.creator_id ORDER BY events.created_at DESC) FILTER (WHERE images.creator_id IS NOT NULL))[1] AS creator_id,
       MAX(creators.username) AS creator_username,
       MAX(creators.display_name) AS creator_display_name,
       MAX(images.created_at) AS created_at,
