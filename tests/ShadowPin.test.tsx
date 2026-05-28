@@ -220,6 +220,36 @@ test('renders category pins in packed mobile masonry columns', () => {
   }
 })
 
+test('restores category list scroll after returning from a category', async () => {
+  const originalRequestAnimationFrame = window.requestAnimationFrame
+  const originalCancelAnimationFrame = window.cancelAnimationFrame
+  window.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+    callback(0)
+    return 1
+  }) as typeof window.requestAnimationFrame
+  window.cancelAnimationFrame = jest.fn()
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    const categoryList = screen.getByRole('main')
+    categoryList.scrollTop = 420
+    fireEvent.scroll(categoryList)
+
+    fireEvent.click(screen.getByText('Fam & Friends').closest('article')!)
+    expect(screen.getByLabelText('Back to Shado Pin')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByLabelText('Back to Shado Pin'))
+
+    await waitFor(() => {
+      expect(screen.getByRole('main').scrollTop).toBe(420)
+    })
+  } finally {
+    window.requestAnimationFrame = originalRequestAnimationFrame
+    window.cancelAnimationFrame = originalCancelAnimationFrame
+  }
+})
+
 test('ShadowPin image single tap reveals a static heart count without direct image-card controls', () => {
   jest.useFakeTimers()
   mockUseShadowPinImages.mockReturnValue({

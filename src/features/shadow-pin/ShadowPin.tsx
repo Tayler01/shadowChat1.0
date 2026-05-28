@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, FormEvent, PointerEvent as ReactPointerEvent } from 'react'
+import type { CSSProperties, FormEvent, MutableRefObject, PointerEvent as ReactPointerEvent, UIEvent } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Edit3,
@@ -53,6 +53,11 @@ type ModalMode =
   | { type: 'edit-image'; image: ShadowPinImage }
   | { type: 'image-viewer'; image: ShadowPinImage }
   | null
+
+type CategoryListScrollMemory = {
+  scrollTop: number
+  shouldRestore: boolean
+}
 
 const getDisplayName = (item: { creator?: ShadowPinCategory['creator'] }) =>
   item.creator?.display_name || item.creator?.username || 'ShadowChat'
@@ -1409,14 +1414,17 @@ function ShadowPinHome({
   currentView,
   onViewChange,
   onOpenCategory,
+  categoryListScrollMemory,
   tracker,
 }: Required<Pick<ShadowPinProps, 'currentView' | 'onViewChange'>> & {
   onOpenCategory: (category: ShadowPinCategory) => void
+  categoryListScrollMemory: MutableRefObject<CategoryListScrollMemory>
   tracker: ShadowPinActivityTracker
 }) {
   const { user } = useAuth()
   const categoriesState = useShadowPinCategories()
   const [modal, setModal] = useState<ModalMode>(null)
+  const categoryScrollRef = useRef<HTMLElement | null>(null)
 
   const adminRole = user?.admin_role
   const detailsCategory = modal?.type === 'category-details'
@@ -1426,7 +1434,7 @@ function ShadowPinHome({
     const category = await categoriesState.createCategory(values)
     tracker.recordCategoryMutation(category, 'category_created')
     toast.success('Category created')
-    onOpenCategory(category)
+    openCategory(category)
   }
 
   const submitEdit = async (category: ShadowPinCategory, values: ShadowPinCategoryFormValues) => {
@@ -1450,6 +1458,35 @@ function ShadowPinHome({
       .catch(err => toast.error(err instanceof Error ? err.message : 'Heart failed'))
   }
 
+  const rememberCategoryScroll = (scrollTop?: number) => {
+    categoryListScrollMemory.current.scrollTop = Math.max(0, scrollTop ?? categoryScrollRef.current?.scrollTop ?? 0)
+  }
+
+  const handleCategoryScroll = (event: UIEvent<HTMLElement>) => {
+    rememberCategoryScroll(event.currentTarget.scrollTop)
+  }
+
+  const openCategory = (category: ShadowPinCategory) => {
+    rememberCategoryScroll()
+    categoryListScrollMemory.current.shouldRestore = true
+    onOpenCategory(category)
+  }
+
+  useEffect(() => {
+    if (categoriesState.loading || !categoryListScrollMemory.current.shouldRestore) return
+
+    const scrollNode = categoryScrollRef.current
+    if (!scrollNode) return
+
+    const targetScrollTop = categoryListScrollMemory.current.scrollTop
+    const frameId = window.requestAnimationFrame(() => {
+      scrollNode.scrollTop = targetScrollTop
+      categoryListScrollMemory.current.shouldRestore = false
+    })
+
+    return () => window.cancelAnimationFrame(frameId)
+  }, [categoriesState.categories.length, categoriesState.loading, categoryListScrollMemory])
+
   return (
     <div className="theme-image-surface relative flex h-full min-h-0 flex-col">
       <MobileAppHeader
@@ -1466,7 +1503,11 @@ function ShadowPinHome({
       >
         <Plus className="h-5 w-5" />
       </button>
-      <main className="min-h-0 flex-1 overflow-y-auto px-3 pb-[calc(env(safe-area-inset-bottom)_+_5.4rem)] pt-16 md:pb-6">
+      <main
+        ref={categoryScrollRef}
+        onScroll={handleCategoryScroll}
+        className="min-h-0 flex-1 overflow-y-auto px-3 pb-[calc(env(safe-area-inset-bottom)_+_5.4rem)] pt-16 md:pb-6"
+      >
         {categoriesState.loading ? (
           <div className="flex h-full items-center justify-center"><LoadingSpinner /></div>
         ) : categoriesState.error ? (
@@ -1489,7 +1530,7 @@ function ShadowPinHome({
                   key={category.id}
                   category={category}
                   canManageCategory={manage}
-                  onOpen={() => onOpenCategory(category)}
+                  onOpen={() => openCategory(category)}
                   onDetails={() => setModal({ type: 'category-details', category })}
                   onEdit={() => setModal({ type: 'edit-category', category })}
                   onHeart={() => toggleCategoryHeart(category)}
@@ -1702,6 +1743,10 @@ export function ShadowPin({
   onViewChange = () => {},
 }: ShadowPinProps) {
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
+  const categoryListScrollMemory = useRef<CategoryListScrollMemory>({
+    scrollTop: 0,
+    shouldRestore: false,
+  })
   const tracker = useShadowPinActivityTracker()
 
   if (activeCategoryId) {
@@ -1721,6 +1766,7 @@ export function ShadowPin({
       currentView={currentView}
       onViewChange={onViewChange}
       onOpenCategory={category => setActiveCategoryId(category.id)}
+      categoryListScrollMemory={categoryListScrollMemory}
       tracker={tracker}
     />
   )
