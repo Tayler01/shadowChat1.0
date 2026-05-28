@@ -7,6 +7,17 @@ const mockUseShadowPinCategories = jest.fn()
 const mockUseShadowPinImages = jest.fn()
 const mockToggleCategoryHeart = jest.fn()
 const mockToggleImageHeart = jest.fn()
+const mockShadowPinActivityTracker = {
+  recordCategoryVisit: jest.fn(),
+  recordPinViewed: jest.fn(),
+  recordPinOpened: jest.fn(),
+  recordShareTapped: jest.fn(),
+  recordCategoryHeart: jest.fn(),
+  recordPinHeart: jest.fn(),
+  recordCategoryMutation: jest.fn(),
+  recordPinMutation: jest.fn(),
+}
+const mockUseShadowPinCategoryDwell = jest.fn()
 let mockAuthUser = {
   id: 'user-1',
   admin_role: null,
@@ -28,6 +39,11 @@ jest.mock('../src/features/shadow-pin/hooks/useShadowPinCategories', () => ({
 
 jest.mock('../src/features/shadow-pin/hooks/useShadowPinImages', () => ({
   useShadowPinImages: () => mockUseShadowPinImages(),
+}))
+
+jest.mock('../src/features/shadow-pin/hooks/useShadowPinActivityTracker', () => ({
+  useShadowPinActivityTracker: () => mockShadowPinActivityTracker,
+  useShadowPinCategoryDwell: (...args: unknown[]) => mockUseShadowPinCategoryDwell(...args),
 }))
 
 const creator = {
@@ -122,6 +138,8 @@ beforeEach(() => {
   }
   mockToggleCategoryHeart.mockReset()
   mockToggleImageHeart.mockReset()
+  Object.values(mockShadowPinActivityTracker).forEach(mockFn => mockFn.mockReset())
+  mockUseShadowPinCategoryDwell.mockReset()
   mockToggleCategoryHeart.mockResolvedValue(undefined)
   mockToggleImageHeart.mockResolvedValue(undefined)
 

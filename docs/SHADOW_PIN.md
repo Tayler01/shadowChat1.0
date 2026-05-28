@@ -12,6 +12,8 @@ same ShadowPin surface directly.
 - One heart per user per category or image.
 - Creator/operator edit and soft delete controls.
 - Hidden score ledger for the public gold push-pin identity badge.
+- Admin-only activity analytics for visits, category dwell, pin visibility,
+  opens, hearts, shares, creation, edits, and deletes.
 - No realtime, notifications, comments, tags, search, or filters.
 
 ## Data Model
@@ -28,6 +30,10 @@ Score migration: `supabase/migrations/20260519020527_shadow_pin_hidden_score_gol
   clients cannot read this ledger.
 - `users.shadow_pin_gold_pin`: public winner flag used for the gold push-pin
   badge next to the current top scorer's name.
+- `shadow_pin_activity_sessions`: logged-in Shadow Pin sessions with qualified
+  visit state and active visible duration.
+- `shadow_pin_activity_events`: raw append-only activity events with
+  privacy-minimal snapshots for admin analytics.
 
 The migration also creates the public Supabase Storage bucket `shadow-pin` with a 15MB limit and JPEG, PNG, WebP, and GIF MIME allow-list. Storage paths are user-prefixed so authenticated users can upload only under their own folder.
 
@@ -50,6 +56,23 @@ count, most recent scored activity, then user id for deterministic results.
 ## Permissions
 
 ShadowPin uses the existing app admin model. `is_app_operator()` is used for admin-class actions, matching nearby operator tooling. Regular users can create categories/images and heart any visible item. Creators can edit their own content and delete their own images. Creators can delete a category only when it has no visible images. Operators can delete populated categories; child images are preserved and uncategorized by setting `category_id` to `NULL`.
+
+Activity analytics are visible only to app operators in Settings > Admin >
+Shadow Pin Activity. Normal users can record their own activity through a
+guarded RPC but cannot read raw or aggregated analytics rows. The analytics
+surface shows display names and usernames, not email addresses.
+
+## Activity Analytics
+
+Shadow Pin activity tracking is logged-in only. Visits qualify after 5 seconds
+in Shadow Pin. Category visits qualify after 3 seconds in a category. Pin views
+count when a pin is visible in the grid for roughly 1 second and are deduped
+once per session per pin.
+
+The admin dashboard defaults to the last 7 days with today, 7-day, 30-day, and
+90-day presets. It includes user, category, and pin chart tabs; spreadsheet-like
+tables; range comparison deltas; and a filtered event timeline. The weighted
+activity score is admin-only and separate from the public gold push-pin score.
 
 ## URL Imports
 

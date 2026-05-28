@@ -154,9 +154,10 @@ export function useShadowPinCategories() {
   const removeCategory = useCallback(async (categoryId: string) => {
     setSaving(true)
     try {
-      await deleteShadowPinCategory(categoryId)
+      const category = await deleteShadowPinCategory(categoryId)
       const nextCategories = updateCategoryCache(cacheUserId, current => current.filter(category => category.id !== categoryId))
       setCategories(nextCategories)
+      return normalizeCategory(category)
     } finally {
       setSaving(false)
     }

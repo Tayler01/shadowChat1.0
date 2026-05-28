@@ -27,6 +27,11 @@ import { cn } from '../../lib/utils'
 import type { AppView } from '../../types/navigation'
 import { useShadowPinCategories } from './hooks/useShadowPinCategories'
 import { useShadowPinImages } from './hooks/useShadowPinImages'
+import {
+  useShadowPinActivityTracker,
+  useShadowPinCategoryDwell,
+  type ShadowPinActivityTracker,
+} from './hooks/useShadowPinActivityTracker'
 import type {
   ShadowPinCategory,
   ShadowPinCategoryFormValues,
@@ -950,6 +955,8 @@ function ImageCard({
   onViewer,
   onEdit,
   onHeart,
+  onShare,
+  onVisible,
 }: {
   image: ShadowPinImage
   canManageImage: boolean
@@ -959,6 +966,8 @@ function ImageCard({
   onViewer: () => void
   onEdit: () => void
   onHeart: () => void
+  onShare: () => void
+  onVisible: () => void
 }) {
   const cardRef = useRef<HTMLElement | null>(null)
   const clickTimer = useRef<number | null>(null)
@@ -997,6 +1006,40 @@ function ImageCard({
     unlockGestureScrollRef.current?.()
     unlockGestureScrollRef.current = null
   }, [])
+
+  useEffect(() => {
+    const node = cardRef.current
+    if (!node || typeof IntersectionObserver === 'undefined') return
+
+    let visibleTimer: number | null = null
+    const clearVisibleTimer = () => {
+      if (visibleTimer) {
+        window.clearTimeout(visibleTimer)
+        visibleTimer = null
+      }
+    }
+
+    const observer = new IntersectionObserver(entries => {
+      const entry = entries[0]
+      if (entry?.isIntersecting) {
+        clearVisibleTimer()
+        visibleTimer = window.setTimeout(() => {
+          visibleTimer = null
+          onVisible()
+        }, 1000)
+        return
+      }
+
+      clearVisibleTimer()
+    }, { threshold: 0.12 })
+
+    observer.observe(node)
+
+    return () => {
+      clearVisibleTimer()
+      observer.disconnect()
+    }
+  }, [image.id, onVisible])
 
   const unlockGestureScroll = () => {
     unlockGestureScrollRef.current?.()
@@ -1113,6 +1156,7 @@ function ImageCard({
     }
 
     if (action === 'share') {
+      onShare()
       await shareShadowPinImage(image)
       return
     }
@@ -1365,7 +1409,11 @@ function ShadowPinHome({
   currentView,
   onViewChange,
   onOpenCategory,
-}: Required<Pick<ShadowPinProps, 'currentView' | 'onViewChange'>> & { onOpenCategory: (category: ShadowPinCategory) => void }) {
+  tracker,
+}: Required<Pick<ShadowPinProps, 'currentView' | 'onViewChange'>> & {
+  onOpenCategory: (category: ShadowPinCategory) => void
+  tracker: ShadowPinActivityTracker
+}) {
   const { user } = useAuth()
   const categoriesState = useShadowPinCategories()
   const [modal, setModal] = useState<ModalMode>(null)
@@ -1376,20 +1424,30 @@ function ShadowPinHome({
     : null
   const submitCreate = async (values: ShadowPinCategoryFormValues) => {
     const category = await categoriesState.createCategory(values)
+    tracker.recordCategoryMutation(category, 'category_created')
     toast.success('Category created')
     onOpenCategory(category)
   }
 
   const submitEdit = async (category: ShadowPinCategory, values: ShadowPinCategoryFormValues) => {
-    await categoriesState.updateCategory(category.id, values)
+    const updatedCategory = await categoriesState.updateCategory(category.id, values)
+    tracker.recordCategoryMutation(updatedCategory, 'category_edited')
     toast.success('Category updated')
   }
 
   const removeCategory = async (category: ShadowPinCategory) => {
     if (!window.confirm(`Delete "${category.title}"?`)) return
-    await categoriesState.removeCategory(category.id)
+    const removedCategory = await categoriesState.removeCategory(category.id)
+    tracker.recordCategoryMutation(removedCategory ?? category, 'category_deleted')
     setModal(null)
     toast.success('Category removed')
+  }
+
+  const toggleCategoryHeart = (category: ShadowPinCategory) => {
+    const added = !category.viewer_has_hearted
+    categoriesState.toggleHeart(category.id)
+      .then(() => tracker.recordCategoryHeart(category, added))
+      .catch(err => toast.error(err instanceof Error ? err.message : 'Heart failed'))
   }
 
   return (
@@ -1434,9 +1492,7 @@ function ShadowPinHome({
                   onOpen={() => onOpenCategory(category)}
                   onDetails={() => setModal({ type: 'category-details', category })}
                   onEdit={() => setModal({ type: 'edit-category', category })}
-                  onHeart={() => {
-                    categoriesState.toggleHeart(category.id).catch(err => toast.error(err instanceof Error ? err.message : 'Heart failed'))
-                  }}
+                  onHeart={() => toggleCategoryHeart(category)}
                 />
               )
             })}
@@ -1465,9 +1521,7 @@ function ShadowPinHome({
         <CategoryDetailsModal
           category={detailsCategory}
           onClose={() => setModal(null)}
-          onHeart={() => {
-            categoriesState.toggleHeart(detailsCategory.id).catch(err => toast.error(err instanceof Error ? err.message : 'Heart failed'))
-          }}
+          onHeart={() => toggleCategoryHeart(detailsCategory)}
         />
       )}
     </div>
@@ -1479,11 +1533,13 @@ function ShadowPinCategoryScreen({
   onViewChange,
   categoryId,
   onBack,
+  tracker,
 }: {
   currentView: AppView
   onViewChange: (view: AppView) => void
   categoryId: string
   onBack: () => void
+  tracker: ShadowPinActivityTracker
 }) {
   const { user } = useAuth()
   const imagesState = useShadowPinImages(categoryId)
@@ -1492,22 +1548,38 @@ function ShadowPinCategoryScreen({
   const adminRole = user?.admin_role
 
   const title = imagesState.category?.title || 'ShadowPin'
+  useShadowPinCategoryDwell(imagesState.category, tracker)
 
   const submitCreate = async (values: ShadowPinImageFormValues) => {
-    await imagesState.createImage(values)
+    const image = await imagesState.createImage(values)
+    tracker.recordPinMutation(image, 'pin_created', imagesState.category)
     toast.success('Image added')
   }
 
   const submitEdit = async (image: ShadowPinImage, values: ShadowPinImageFormValues) => {
-    await imagesState.updateImage(image.id, values)
+    const updatedImage = await imagesState.updateImage(image.id, values)
+    tracker.recordPinMutation(updatedImage, 'pin_edited', imagesState.category)
     toast.success('Image updated')
   }
 
   const removeImage = async (image: ShadowPinImage) => {
     if (!window.confirm(`Delete "${image.title}"?`)) return
-    await imagesState.removeImage(image.id)
+    const removedImage = await imagesState.removeImage(image.id)
+    tracker.recordPinMutation(removedImage ?? image, 'pin_deleted', imagesState.category)
     setModal(null)
     toast.success('Image removed')
+  }
+
+  const toggleImageHeart = (image: ShadowPinImage) => {
+    const added = !image.viewer_has_hearted
+    imagesState.toggleHeart(image.id)
+      .then(() => tracker.recordPinHeart(image, added, imagesState.category))
+      .catch(err => toast.error(err instanceof Error ? err.message : 'Heart failed'))
+  }
+
+  const openImageViewer = (image: ShadowPinImage) => {
+    tracker.recordPinOpened(image, imagesState.category)
+    setModal({ type: 'image-viewer', image })
   }
 
   const masonryColumnCount = useShadowPinMasonryColumnCount()
@@ -1576,11 +1648,11 @@ function ShadowPinCategoryScreen({
                           columnSide={columnSide}
                           overlayOpen={overlayImageId === image.id}
                           onToggleOverlay={() => setOverlayImageId(prev => prev === image.id ? null : image.id)}
-                          onViewer={() => setModal({ type: 'image-viewer', image })}
+                          onViewer={() => openImageViewer(image)}
                           onEdit={() => setModal({ type: 'edit-image', image })}
-                          onHeart={() => {
-                            imagesState.toggleHeart(image.id).catch(err => toast.error(err instanceof Error ? err.message : 'Heart failed'))
-                          }}
+                          onHeart={() => toggleImageHeart(image)}
+                          onShare={() => tracker.recordShareTapped(image, imagesState.category)}
+                          onVisible={() => tracker.recordPinViewed(image, imagesState.category)}
                         />
                       </div>
                     )
@@ -1618,9 +1690,7 @@ function ShadowPinCategoryScreen({
         <ImageViewerModal
           image={viewerImage}
           onClose={() => setModal(null)}
-          onHeart={() => {
-            imagesState.toggleHeart(viewerImage.id).catch(err => toast.error(err instanceof Error ? err.message : 'Heart failed'))
-          }}
+          onHeart={() => toggleImageHeart(viewerImage)}
         />
       )}
     </div>
@@ -1632,6 +1702,7 @@ export function ShadowPin({
   onViewChange = () => {},
 }: ShadowPinProps) {
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
+  const tracker = useShadowPinActivityTracker()
 
   if (activeCategoryId) {
     return (
@@ -1640,6 +1711,7 @@ export function ShadowPin({
         onViewChange={onViewChange}
         categoryId={activeCategoryId}
         onBack={() => setActiveCategoryId(null)}
+        tracker={tracker}
       />
     )
   }
@@ -1649,6 +1721,7 @@ export function ShadowPin({
       currentView={currentView}
       onViewChange={onViewChange}
       onOpenCategory={category => setActiveCategoryId(category.id)}
+      tracker={tracker}
     />
   )
 }

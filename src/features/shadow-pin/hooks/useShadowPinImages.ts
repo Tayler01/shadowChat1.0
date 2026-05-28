@@ -260,13 +260,14 @@ export function useShadowPinImages(categoryId: string | null) {
     if (!categoryId) throw new Error('Category is required.')
     setSaving(true)
     try {
-      await deleteShadowPinImage(imageId)
+      const image = await deleteShadowPinImage(imageId)
       const nextEntry = updateImageCache(getImageCacheKey(cacheUserId, categoryId), current => ({
         ...current,
         images: current.images.filter(image => image.id !== imageId),
       }))
       invalidateShadowPinCategoriesCache(cacheUserId)
       if (nextEntry) setImages(nextEntry.images)
+      return normalizeImage(image)
     } finally {
       setSaving(false)
     }

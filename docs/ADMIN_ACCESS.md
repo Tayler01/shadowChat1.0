@@ -32,6 +32,8 @@ Admin settings are split into subpages under Settings > Admin:
 - ESP Bridge Pairing: operator bridge approval controls.
 - Shado TV Studio: operator episode, trailer, cover, cast, update, visibility,
   and Bunny-upload controls.
+- Shadow Pin Activity: operator analytics for Shadow Pin visits, active time,
+  users, categories, pins, and raw activity drilldown.
 - News Sources: operator add, pause, enable, and delete controls for tracked
   X/Truth Social accounts.
 - Feedback Review: operator review and deletion for submitted bugs and

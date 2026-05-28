@@ -175,6 +175,10 @@ jest.mock('../src/components/settings/AdminFeedbackReview', () => ({
   AdminFeedbackReview: () => <div data-testid="admin-feedback-review">Feedback review panel</div>,
 }))
 
+jest.mock('../src/components/settings/ShadowPinActivityAdmin', () => ({
+  ShadowPinActivityAdmin: () => <div data-testid="shadow-pin-activity-admin">Shadow Pin activity panel</div>,
+}))
+
 jest.mock('../src/components/settings/WeatherLocationSettings', () => ({
   WeatherLocationSettings: () => <div data-testid="weather-location-settings">Weather location settings</div>,
 }))
@@ -233,6 +237,7 @@ test('settings admin panel manages news sources', async () => {
   expect(screen.getByRole('heading', { name: 'Admin Sections' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /admin access/i })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /esp bridge pairing/i })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /shadow pin activity/i })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /news sources/i })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /feedback review/i })).toBeInTheDocument()
   expect(screen.queryByText('shadow@example.com')).not.toBeInTheDocument()
@@ -284,4 +289,13 @@ test('settings admin panel opens feedback review', () => {
   fireEvent.click(screen.getByRole('button', { name: /feedback review/i }))
 
   expect(screen.getByTestId('admin-feedback-review')).toBeInTheDocument()
+})
+
+test('settings admin panel opens Shadow Pin activity', () => {
+  render(<SettingsView onToggleSidebar={jest.fn()} />)
+
+  fireEvent.click(screen.getByRole('button', { name: /admin/i }))
+  fireEvent.click(screen.getByRole('button', { name: /shadow pin activity/i }))
+
+  expect(screen.getByTestId('shadow-pin-activity-admin')).toBeInTheDocument()
 })
