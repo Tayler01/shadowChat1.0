@@ -51,6 +51,14 @@ jobs:
           test -n "$SUPABASE_URL" || { echo "SUPABASE_URL is not configured."; exit 1; }
           test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "SUPABASE_SERVICE_ROLE_KEY is not configured."; exit 1; }
 
+      - name: Write app build metadata
+        run: |
+          cat > .env.production.local <<EOF
+          VITE_APP_BUILD_ID=${VITE_APP_BUILD_ID}
+          VITE_APP_COMMIT_SHA=${VITE_APP_COMMIT_SHA}
+          VITE_APP_DEPLOY_CONTEXT=${VITE_APP_DEPLOY_CONTEXT}
+          EOF
+
       - name: Lint
         run: npm run lint
 
@@ -59,6 +67,9 @@ jobs:
 
       - name: Build with Netlify environment
         run: npx --yes netlify@$NETLIFY_CLI_VERSION build
+
+      - name: Verify app build metadata
+        run: node scripts/verify-app-build-metadata.mjs
 
       - name: Deploy to Netlify production
         run: |

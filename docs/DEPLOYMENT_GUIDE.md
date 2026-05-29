@@ -35,6 +35,9 @@ popup content is generated from the pushed commit range by default, with
 [`release-notes/current.json`](C:/repos/chat2.0/release-notes/current.json:1)
 available only for explicit manual overrides. See
 [`docs/APP_RELEASES.md`](C:/repos/chat2.0/docs/APP_RELEASES.md:1).
+The GitHub workflow also verifies that the compiled app bundle contains the
+release build id and deploy context before it deploys, because the popup gate
+depends on that metadata to know whether users need a restart.
 
 If the change affects News scraping, run:
 

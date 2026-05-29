@@ -39,7 +39,7 @@ export const getAppReleasePresentation = (
     release.restart_policy === 'required_restart' ||
     release.restart_policy === 'critical_force_restart'
   const autoRestart = !isCurrentBuild && release.restart_policy === 'critical_force_restart'
-  const wantsRestart = !isCurrentBuild && release.restart_policy !== 'notice_only'
+  const wantsRestart = release.restart_policy !== 'notice_only'
   const blocksDismiss = !isCurrentBuild && requiresCurrentBuild
   const hasReadReceipt = Boolean(
     release.acknowledged_at ||
@@ -56,7 +56,7 @@ export const getAppReleasePresentation = (
     restartLabel: release.restart_policy === 'critical_force_restart'
       ? 'Restart Now'
       : release.restart_policy === 'required_restart'
-        ? 'Update Now'
+        ? 'Restart Now'
         : 'Restart Now',
     closeLabel: isCurrentBuild ? 'Done' : wantsRestart ? 'Later' : 'Got It',
   }

@@ -39,6 +39,11 @@ The production GitHub Action stamps the Vite build with:
 - `VITE_APP_COMMIT_SHA`
 - `VITE_APP_DEPLOY_CONTEXT=production`
 
+The workflow writes those values into `.env.production.local` before the Netlify
+build, then runs `scripts/verify-app-build-metadata.mjs` against `dist`. If the
+compiled app bundle is missing the build id or deploy context that controls the
+popup gate, the deploy stops before publishing the release row.
+
 After Netlify deploys successfully, the action runs:
 
 ```powershell

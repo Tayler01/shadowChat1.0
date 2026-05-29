@@ -30,7 +30,7 @@ describe('app release presentation', () => {
     sessionStorage.clear()
   })
 
-  it('shows current-build notes without asking for a restart', () => {
+  it('shows current-build notes with a restart prompt until acknowledged', () => {
     const presentation = getAppReleasePresentation(
       release({ build_id: 'test-build' }),
       'test-build'
@@ -38,9 +38,32 @@ describe('app release presentation', () => {
 
     expect(presentation.shouldShow).toBe(true)
     expect(presentation.isCurrentBuild).toBe(true)
-    expect(presentation.wantsRestart).toBe(false)
+    expect(presentation.wantsRestart).toBe(true)
     expect(presentation.blocksDismiss).toBe(false)
     expect(presentation.closeLabel).toBe('Done')
+  })
+
+  it('does not prompt restart for current-build notice-only releases', () => {
+    const presentation = getAppReleasePresentation(
+      release({ build_id: 'test-build', restart_policy: 'notice_only' }),
+      'test-build'
+    )
+
+    expect(presentation.shouldShow).toBe(true)
+    expect(presentation.wantsRestart).toBe(false)
+    expect(presentation.blocksDismiss).toBe(false)
+  })
+
+  it('hides current-build notes after they have been acknowledged', () => {
+    const presentation = getAppReleasePresentation(
+      release({
+        build_id: 'test-build',
+        acknowledged_at: '2026-05-26T12:01:00.000Z',
+      }),
+      'test-build'
+    )
+
+    expect(presentation.shouldShow).toBe(false)
   })
 
   it('lets optional old-build releases be dismissed after the user reads them', () => {

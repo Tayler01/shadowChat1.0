@@ -49,6 +49,14 @@ jobs:
           test -n "$NETLIFY_AUTH_TOKEN" || { echo "NETLIFY_AUTH_TOKEN is not configured."; exit 1; }
           test -n "$NETLIFY_SITE_ID" || { echo "NETLIFY_SITE_ID is not configured."; exit 1; }
 
+      - name: Write app build metadata
+        run: |
+          cat > .env.production.local <<EOF
+          VITE_APP_BUILD_ID=${VITE_APP_BUILD_ID}
+          VITE_APP_COMMIT_SHA=${VITE_APP_COMMIT_SHA}
+          VITE_APP_DEPLOY_CONTEXT=${VITE_APP_DEPLOY_CONTEXT}
+          EOF
+
       - name: Lint
         run: npm run lint
 
@@ -57,6 +65,9 @@ jobs:
 
       - name: Build with Netlify preview environment
         run: npx --yes netlify@$NETLIFY_CLI_VERSION build --context deploy-preview
+
+      - name: Verify app build metadata
+        run: node scripts/verify-app-build-metadata.mjs
 
       - name: Deploy Netlify preview
         run: |

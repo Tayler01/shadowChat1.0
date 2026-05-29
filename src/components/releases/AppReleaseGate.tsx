@@ -97,6 +97,8 @@ export function AppReleaseGate() {
     safeRefresh()
     const intervalId = window.setInterval(safeRefresh, RELEASE_POLL_MS)
     window.addEventListener('focus', safeRefresh)
+    window.addEventListener('pageshow', safeRefresh)
+    window.addEventListener('online', safeRefresh)
     document.addEventListener('visibilitychange', safeRefresh)
 
     try {
@@ -117,6 +119,8 @@ export function AppReleaseGate() {
       disposed = true
       window.clearInterval(intervalId)
       window.removeEventListener('focus', safeRefresh)
+      window.removeEventListener('pageshow', safeRefresh)
+      window.removeEventListener('online', safeRefresh)
       document.removeEventListener('visibilitychange', safeRefresh)
       if (channel) {
         getRealtimeClient()?.removeChannel?.(channel)
