@@ -3,15 +3,20 @@ import type { CSSProperties, FormEvent, MutableRefObject, PointerEvent as ReactP
 import { createPortal } from 'react-dom'
 import {
   Edit3,
+  ExternalLink,
+  Film,
   Heart,
   Image as ImageIcon,
   Link as LinkIcon,
   Loader2,
   Pin,
+  Play,
   Plus,
   Share2,
   Trash2,
   Upload,
+  Volume2,
+  VolumeX,
   X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -117,6 +122,178 @@ const getPinImageSources = (image: ShadowPinImage, size: 'thumb' | 'medium' | 'f
       : uniqueImageSources(image.medium_url, image.thumbnail_url, image.image_url)
   }
   return uniqueImageSources(image.image_url, image.medium_url, image.thumbnail_url)
+}
+
+const isVideoPin = (image: ShadowPinImage) => image.media_type === 'video' || image.media_type === 'external_video'
+const isYoutubeVideoPin = (image: ShadowPinImage) => image.provider === 'youtube' && Boolean(image.video_embed_url)
+const BUNNY_PLAYER_HOST = 'player.mediadelivery.net'
+type VideoIframeMode = 'feed' | 'viewer'
+
+const getVideoPreviewUrl = (image: ShadowPinImage) =>
+  image.video_preview_url || image.video_playback_url || null
+
+const getVideoPlaybackUrl = (image: ShadowPinImage) =>
+  image.video_playback_url || image.video_preview_url || null
+
+const parsePinterestPinId = (image: ShadowPinImage) => {
+  const candidates = [
+    image.provider_playback_id,
+    image.provider_asset_id,
+    image.video_embed_url,
+    image.source_url,
+  ].filter(Boolean) as string[]
+
+  for (const candidate of candidates) {
+    const idMatch = candidate.match(/[?&]id=(\d{6,})/i)
+    if (idMatch?.[1]) return idMatch[1]
+    const slugMatch = candidate.match(/--(\d{6,})(?:[/?#]|$)/)
+    if (slugMatch?.[1]) return slugMatch[1]
+    const pathMatch = candidate.match(/\/pin\/(\d{6,})(?:[/?#]|$)/i)
+    if (pathMatch?.[1]) return pathMatch[1]
+    if (/^\d{6,}$/.test(candidate)) return candidate
+  }
+
+  return ''
+}
+
+const getPinterestEmbedUrl = (image: ShadowPinImage) => {
+  const pinId = parsePinterestPinId(image)
+  if (!pinId) return ''
+  const url = new URL('https://assets.pinterest.com/ext/embed.html')
+  url.searchParams.set('id', pinId)
+  url.searchParams.set('src', 'shado-pin')
+  return url.toString()
+}
+
+const getYoutubeAutoplayUrl = (image: ShadowPinImage, mode: VideoIframeMode = 'feed') => {
+  if (!image.video_embed_url) return ''
+  try {
+    const url = new URL(image.video_embed_url)
+    url.searchParams.set('autoplay', '1')
+    url.searchParams.set('mute', '1')
+    url.searchParams.set('playsinline', '1')
+    url.searchParams.set('controls', mode === 'viewer' ? '1' : '0')
+    url.searchParams.set('enablejsapi', '1')
+    if (typeof window !== 'undefined') {
+      url.searchParams.set('origin', window.location.origin)
+    }
+    url.searchParams.set('rel', '0')
+    if (!url.searchParams.get('playlist') && image.provider_playback_id) {
+      url.searchParams.set('loop', '1')
+      url.searchParams.set('playlist', image.provider_playback_id)
+    }
+    return url.toString()
+  } catch {
+    return image.video_embed_url
+  }
+}
+
+const getVideoIframeUrl = (image: ShadowPinImage, mode: VideoIframeMode = 'feed') => {
+  if (isYoutubeVideoPin(image)) return getYoutubeAutoplayUrl(image, mode)
+  if (image.provider === 'pinterest') return getPinterestEmbedUrl(image)
+  if (!image.video_embed_url || image.provider !== 'bunny_stream') return ''
+
+  try {
+    const url = new URL(image.video_embed_url)
+    if (url.hostname === 'iframe.mediadelivery.net') {
+      url.hostname = BUNNY_PLAYER_HOST
+    }
+    url.searchParams.set('autoplay', 'true')
+    url.searchParams.set('muted', 'true')
+    url.searchParams.set('loop', 'true')
+    url.searchParams.set('preload', 'true')
+    return url.toString()
+  } catch {
+    return image.video_embed_url
+  }
+}
+
+const isIframeVideoPin = (image: ShadowPinImage) => Boolean(getVideoIframeUrl(image))
+
+type BunnyPlayer = {
+  play?: () => void
+  mute?: () => void
+  unmute?: () => void
+}
+
+type BunnyPlayerWindow = Window & {
+  playerjs?: {
+    Player?: new (iframe: HTMLIFrameElement) => BunnyPlayer
+  }
+}
+
+let bunnyPlayerJsPromise: Promise<void> | null = null
+
+const loadBunnyPlayerJs = () => {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return Promise.resolve()
+  }
+
+  const playerWindow = window as BunnyPlayerWindow
+  if (playerWindow.playerjs?.Player) {
+    return Promise.resolve()
+  }
+
+  if (!bunnyPlayerJsPromise) {
+    bunnyPlayerJsPromise = new Promise((resolve, reject) => {
+      const existing = document.querySelector<HTMLScriptElement>('script[data-shadow-pin-bunny-playerjs="true"]')
+      if (existing) {
+        existing.addEventListener('load', () => resolve(), { once: true })
+        existing.addEventListener('error', () => reject(new Error('Unable to load Bunny player controls.')), { once: true })
+        return
+      }
+
+      const script = document.createElement('script')
+      script.src = 'https://assets.mediadelivery.net/playerjs/playerjs-latest.min.js'
+      script.async = true
+      script.dataset.shadowPinBunnyPlayerjs = 'true'
+      script.onload = () => resolve()
+      script.onerror = () => reject(new Error('Unable to load Bunny player controls.'))
+      document.head.appendChild(script)
+    })
+  }
+
+  return bunnyPlayerJsPromise
+}
+
+const sendYouTubePlayerCommand = (iframe: HTMLIFrameElement, command: 'mute' | 'unMute' | 'playVideo') => {
+  try {
+    const origin = new URL(iframe.src).origin
+    iframe.contentWindow?.postMessage(JSON.stringify({
+      event: 'command',
+      func: command,
+      args: [],
+    }), origin)
+  } catch {
+    iframe.contentWindow?.postMessage(JSON.stringify({
+      event: 'command',
+      func: command,
+      args: [],
+    }), '*')
+  }
+}
+
+const syncIframeAudio = (iframe: HTMLIFrameElement | null, provider: ShadowPinImage['provider'], muted: boolean) => {
+  if (!iframe) return
+
+  if (provider === 'youtube') {
+    sendYouTubePlayerCommand(iframe, muted ? 'mute' : 'unMute')
+    sendYouTubePlayerCommand(iframe, 'playVideo')
+    return
+  }
+
+  if (provider === 'bunny_stream') {
+    void loadBunnyPlayerJs()
+      .then(() => {
+        const Player = (window as BunnyPlayerWindow).playerjs?.Player
+        if (!Player) return
+        const player = new Player(iframe)
+        if (muted) player.mute?.()
+        else player.unmute?.()
+        player.play?.()
+      })
+      .catch(() => undefined)
+  }
 }
 
 const getImageAspectRatio = (item: { image_width?: number | null; image_height?: number | null }) =>
@@ -238,7 +415,8 @@ const getNearestPinAction = (
     : null
 }
 
-const getShareUrl = (image: ShadowPinImage) => image.image_url || getPinImageUrl(image, 'full')
+const getShareUrl = (image: ShadowPinImage) =>
+  image.source_url || image.video_embed_url || image.video_playback_url || image.image_url || getPinImageUrl(image, 'full')
 
 const finitePointerCoordinate = (value: number) => Number.isFinite(value) ? value : 0
 
@@ -247,19 +425,19 @@ const isAbortError = (error: unknown) =>
 
 const copyShadowPinImageLink = async (url: string) => {
   if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
-    toast.error('Image link is not available to copy')
+    toast.error('Pin link is not available to copy')
     return
   }
 
   await navigator.clipboard.writeText(url)
-  toast.success('Image link copied')
+  toast.success('Pin link copied')
 }
 
 const shareShadowPinImage = async (image: ShadowPinImage) => {
   const url = getShareUrl(image)
   const shareData = {
     title: image.title,
-    text: image.description || 'ShadowPin image',
+    text: image.description || 'ShadowPin pin',
     url,
   }
 
@@ -275,7 +453,7 @@ const shareShadowPinImage = async (image: ShadowPinImage) => {
   try {
     await copyShadowPinImageLink(url)
   } catch {
-    toast.error('Image link could not be copied')
+    toast.error('Pin link could not be copied')
   }
 }
 
@@ -549,6 +727,7 @@ function SourceInput({
   url,
   setUrl,
   allowUrl = true,
+  mediaKind = 'image',
 }: {
   sourceMode: 'file' | 'url'
   setSourceMode: (mode: 'file' | 'url') => void
@@ -557,7 +736,18 @@ function SourceInput({
   url: string
   setUrl: (url: string) => void
   allowUrl?: boolean
+  mediaKind?: 'image' | 'pin'
 }) {
+  const acceptsVideo = mediaKind === 'pin'
+  const filePrompt = acceptsVideo
+    ? 'Choose an image or short video'
+    : 'Choose a JPEG, PNG, WebP, or GIF image'
+  const fileLimits = acceptsVideo
+    ? 'Images 15MB max. Videos 150MB and 60 seconds max.'
+    : '15MB max'
+  const urlLabel = acceptsVideo ? 'Image or video URL' : 'Image URL'
+  const urlPlaceholder = acceptsVideo ? 'https://youtube.com/shorts/...' : 'https://example.com/image.webp'
+
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2 rounded-[var(--radius-sm)] bg-[rgba(255,255,255,0.04)] p-1">
@@ -587,22 +777,22 @@ function SourceInput({
       </div>
       {sourceMode === 'file' ? (
         <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-2 rounded-[var(--radius-lg)] border border-dashed border-[var(--border-panel)] bg-[rgba(255,255,255,0.04)] px-4 py-5 text-center text-sm text-[var(--text-secondary)]">
-          <ImageIcon className="h-6 w-6 text-[var(--theme-accent-readable)]" />
-          <span>{file ? file.name : 'Choose a JPEG, PNG, WebP, or GIF image'}</span>
-          <span className="text-xs text-[var(--text-muted)]">15MB max</span>
+          {acceptsVideo ? <Film className="h-6 w-6 text-[var(--theme-accent-readable)]" /> : <ImageIcon className="h-6 w-6 text-[var(--theme-accent-readable)]" />}
+          <span>{file ? file.name : filePrompt}</span>
+          <span className="text-xs text-[var(--text-muted)]">{fileLimits}</span>
           <input
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
+            accept={acceptsVideo ? 'image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm,video/x-m4v' : 'image/jpeg,image/png,image/webp,image/gif'}
             className="sr-only"
             onChange={event => setFile(event.target.files?.[0] ?? null)}
           />
         </label>
       ) : (
         <Input
-          label="Image URL"
+          label={urlLabel}
           value={url}
           onChange={event => setUrl(event.target.value)}
-          placeholder="https://example.com/image.webp"
+          placeholder={urlPlaceholder}
         />
       )}
     </div>
@@ -735,10 +925,15 @@ function ImageFormModal({
     event.preventDefault()
     setError(null)
     try {
-      await onSubmit({ title, description, file, url: sourceMode === 'url' ? url : '' })
+      await onSubmit({
+        title,
+        description,
+        file: sourceMode === 'file' ? file : null,
+        url: sourceMode === 'url' ? url : '',
+      })
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to save image')
+      setError(err instanceof Error ? err.message : 'Unable to save pin')
     }
   }
 
@@ -747,8 +942,8 @@ function ImageFormModal({
       <form onSubmit={submit} className="popup-surface max-h-[calc(100dvh-1.5rem)] w-full max-w-xl overflow-y-auto rounded-[var(--radius-lg)] p-4">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-xl font-semibold text-[var(--text-primary)]">{mode === 'create' ? 'Add Image' : 'Edit Image'}</h2>
-            <p className="text-sm text-[var(--text-muted)]">{mode === 'create' ? 'Pin an image into this category.' : 'Update title and description.'}</p>
+            <h2 className="text-xl font-semibold text-[var(--text-primary)]">{mode === 'create' ? 'Add Pin' : 'Edit Pin'}</h2>
+            <p className="text-sm text-[var(--text-muted)]">{mode === 'create' ? 'Pin an image or short video into this category.' : 'Update details or replace the media.'}</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-full p-2 text-[var(--text-secondary)]">
             <X className="h-5 w-5" />
@@ -765,21 +960,23 @@ function ImageFormModal({
               className="obsidian-input min-h-28 w-full resize-none rounded-[var(--radius-sm)] px-3.5 py-2.5 text-sm"
             />
           </label>
-          {mode === 'create' && (
-            <SourceInput
-              sourceMode={sourceMode}
-              setSourceMode={setSourceMode}
-              file={file}
-              setFile={setFile}
-              url={url}
-              setUrl={setUrl}
-            />
+          <SourceInput
+            sourceMode={sourceMode}
+            setSourceMode={setSourceMode}
+            file={file}
+            setFile={setFile}
+            url={url}
+            setUrl={setUrl}
+            mediaKind="pin"
+          />
+          {mode === 'edit' && sourceMode === 'file' && !file && (
+            <p className="text-xs text-[var(--text-muted)]">Leave the media empty to keep the current image or video.</p>
           )}
           {error && <p className="rounded-[var(--radius-sm)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
           <div className="space-y-3 border-t border-[var(--border-panel)] pt-4">
             <div className="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
               <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={onClose} disabled={saving}>Cancel</Button>
-              <Button type="submit" className="w-full sm:w-auto" loading={saving}>{saving ? 'Processing image...' : mode === 'create' ? 'Add' : 'Save'}</Button>
+              <Button type="submit" className="w-full sm:w-auto" loading={saving}>{saving ? 'Processing pin...' : mode === 'create' ? 'Add' : 'Save'}</Button>
             </div>
             {onDelete && (
               <div className="flex justify-end border-t border-[var(--border-panel)] pt-2">
@@ -787,11 +984,11 @@ function ImageFormModal({
                   type="button"
                   onClick={onDelete}
                   disabled={saving}
-                  aria-label="Delete ShadowPin image"
+                  aria-label="Delete ShadowPin pin"
                   className="inline-flex min-h-8 items-center justify-center rounded-[var(--radius-sm)] px-2.5 py-1.5 text-xs font-medium text-red-300/65 transition-colors hover:bg-red-500/10 hover:text-red-200 focus:outline-none focus:ring-2 focus:ring-red-300/30 disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-                  Delete image
+                  Delete pin
                 </button>
               </div>
             )}
@@ -955,8 +1152,13 @@ function ImageCard({
   image,
   canManageImage,
   columnSide,
+  activeVideoId,
+  soundEnabled,
   overlayOpen,
   onToggleOverlay,
+  onVideoFocus,
+  onVideoBlur,
+  onToggleSound,
   onViewer,
   onEdit,
   onHeart,
@@ -966,8 +1168,13 @@ function ImageCard({
   image: ShadowPinImage
   canManageImage: boolean
   columnSide: PinColumnSide
+  activeVideoId: string | null
+  soundEnabled: boolean
   overlayOpen: boolean
   onToggleOverlay: () => void
+  onVideoFocus: () => void
+  onVideoBlur: () => void
+  onToggleSound: () => void
   onViewer: () => void
   onEdit: () => void
   onHeart: () => void
@@ -975,6 +1182,8 @@ function ImageCard({
   onVisible: () => void
 }) {
   const cardRef = useRef<HTMLElement | null>(null)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const clickTimer = useRef<number | null>(null)
   const pressRef = useRef<{
     timerId: number | null
@@ -998,10 +1207,41 @@ function ImageCard({
   const imageSrc = imageSources[sourceIndex] || image.image_url
   const aspectRatio = getImageAspectRatio(image) || '4 / 5'
   const controlSide = getPinControlSide(columnSide)
+  const videoPin = isVideoPin(image)
+  const activeVideo = activeVideoId === image.id && image.processing_status !== 'failed'
+  const nativeVideoSrc = getVideoPreviewUrl(image)
+  const shouldRenderNativeVideo = videoPin && activeVideo && Boolean(nativeVideoSrc)
+  const iframeVideoSrc = videoPin && activeVideo ? getVideoIframeUrl(image) : ''
+  const shouldRenderIframeVideo = videoPin && activeVideo && !nativeVideoSrc && Boolean(iframeVideoSrc)
 
   useEffect(() => {
     setSourceIndex(0)
   }, [image.id, image.thumbnail_url, image.medium_url, image.image_url])
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    if (!shouldRenderNativeVideo) {
+      video.pause()
+      return
+    }
+
+    video.muted = !soundEnabled
+    const play = async () => {
+      try {
+        await video.play()
+      } catch {
+        // Mobile browsers may still require a user gesture for some media paths.
+      }
+    }
+    void play()
+  }, [shouldRenderNativeVideo, soundEnabled, nativeVideoSrc])
+
+  useEffect(() => {
+    if (!shouldRenderIframeVideo) return
+    syncIframeAudio(iframeRef.current, image.provider, !soundEnabled)
+  }, [image.provider, shouldRenderIframeVideo, soundEnabled, iframeVideoSrc])
 
   useEffect(() => () => {
     if (clickTimer.current) window.clearTimeout(clickTimer.current)
@@ -1045,6 +1285,29 @@ function ImageCard({
       observer.disconnect()
     }
   }, [image.id, onVisible])
+
+  useEffect(() => {
+    if (!videoPin) return
+    const node = cardRef.current
+    if (!node || typeof IntersectionObserver === 'undefined') return
+
+    const observer = new IntersectionObserver(entries => {
+      const entry = entries[0]
+      if (!entry) return
+
+      if (entry.isIntersecting && entry.intersectionRatio >= 0.62) {
+        onVideoFocus()
+        return
+      }
+
+      if (!entry.isIntersecting || entry.intersectionRatio < 0.25) {
+        onVideoBlur()
+      }
+    }, { threshold: [0, 0.25, 0.62, 0.85] })
+
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [image.id, onVideoBlur, onVideoFocus, videoPin])
 
   const unlockGestureScroll = () => {
     unlockGestureScrollRef.current?.()
@@ -1327,38 +1590,84 @@ function ImageCard({
       onPointerCancel={handlePointerCancel}
     >
       <div className="relative overflow-hidden" style={{ aspectRatio }}>
-        <img
-          src={imageSrc}
-          alt={image.title}
-          loading="lazy"
-          decoding="async"
-          draggable={false}
-          onContextMenu={event => event.preventDefault()}
-          onDragStart={event => event.preventDefault()}
-          onError={() => {
-            setSourceIndex(index => Math.min(index + 1, imageSources.length - 1))
-          }}
-          className="block h-full w-full object-cover"
-        />
+        {shouldRenderIframeVideo ? (
+          <iframe
+            ref={iframeRef}
+            src={iframeVideoSrc}
+            title={image.title}
+            className="pointer-events-none block h-full w-full border-0"
+            allow="autoplay; encrypted-media; picture-in-picture; web-share"
+            allowFullScreen
+          />
+        ) : shouldRenderNativeVideo && nativeVideoSrc ? (
+          <video
+            ref={videoRef}
+            src={nativeVideoSrc}
+            poster={imageSrc}
+            muted={!soundEnabled}
+            loop
+            playsInline
+            preload="metadata"
+            draggable={false}
+            onContextMenu={event => event.preventDefault()}
+            className="block h-full w-full object-cover"
+          />
+        ) : (
+          <img
+            src={imageSrc}
+            alt={image.title}
+            loading="lazy"
+            decoding="async"
+            draggable={false}
+            onContextMenu={event => event.preventDefault()}
+            onDragStart={event => event.preventDefault()}
+            onError={() => {
+              setSourceIndex(index => Math.min(index + 1, imageSources.length - 1))
+            }}
+            className="block h-full w-full object-cover"
+          />
+        )}
+        {videoPin && overlayOpen && (
+          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(4,5,6,0.68)] px-2 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-primary)] backdrop-blur-md">
+            <Play className="h-3 w-3 fill-current" aria-hidden="true" />
+            Video
+          </span>
+        )}
         <ImageLikedBadge active={image.viewer_has_hearted} />
         <PinActionFeedback feedback={feedback} />
         <PinActionRadialMenu state={radialState} hearted={image.viewer_has_hearted} />
         {isProcessingMedia(image.processing_status) && (
           <div className="absolute inset-x-2 bottom-2 inline-flex items-center justify-center gap-2 rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(4,5,6,0.78)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] backdrop-blur-md">
             <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--theme-accent-readable)]" />
-            Processing image
+            Processing {videoPin ? 'video' : 'image'}
           </div>
         )}
         {image.processing_status === 'failed' && (
           <div className="absolute inset-x-2 bottom-2 rounded-full border border-amber-300/30 bg-amber-500/15 px-3 py-2 text-center text-xs font-semibold text-amber-100 backdrop-blur-md">
-            Using original
+            {videoPin ? 'Video processing failed' : 'Using original'}
           </div>
         )}
         {overlayOpen && (
           <div className="absolute inset-x-0 bottom-0 space-y-2 bg-[linear-gradient(180deg,rgba(4,5,6,0),rgba(4,5,6,0.9)_20%,rgba(4,5,6,0.96))] p-3 text-[var(--text-primary)]">
             <div className="flex items-start justify-between gap-2">
               <h3 className="min-w-0 text-sm font-semibold leading-tight">{image.title}</h3>
-              <ImageLikeCount count={image.heart_count} active={image.viewer_has_hearted} />
+              <div className="flex shrink-0 items-center gap-1.5">
+                {videoPin && (nativeVideoSrc || isIframeVideoPin(image)) && (
+                  <button
+                    type="button"
+                    onClick={event => {
+                      event.stopPropagation()
+                      onToggleSound()
+                    }}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(4,5,6,0.62)] text-[var(--text-primary)] backdrop-blur-md"
+                    aria-pressed={soundEnabled}
+                    aria-label={soundEnabled ? 'Mute video' : 'Unmute video'}
+                  >
+                    {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                  </button>
+                )}
+                <ImageLikeCount count={image.heart_count} active={image.viewer_has_hearted} />
+              </div>
             </div>
             {image.description && <p className="line-clamp-4 whitespace-pre-line text-xs leading-snug text-[var(--text-secondary)]">{image.description}</p>}
             <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
@@ -1384,16 +1693,78 @@ function ImageViewerModal({
   onClose: () => void
   onHeart: () => void
 }) {
+  const [muted, setMuted] = useState(true)
+  const iframeRef = useRef<HTMLIFrameElement | null>(null)
+  const videoPin = isVideoPin(image)
+  const nativeVideoSrc = getVideoPlaybackUrl(image)
+  const iframeSrc = getVideoIframeUrl(image, 'viewer')
+  const sourceUrl = image.source_url || image.video_embed_url
+
+  useEffect(() => {
+    if (!iframeSrc) return
+    syncIframeAudio(iframeRef.current, image.provider, muted)
+  }, [iframeSrc, image.provider, muted])
+
   return (
     <div className="fixed inset-0 z-[98] flex flex-col bg-[rgba(2,3,5,0.94)] p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-sm">
       <div className="mb-3 flex items-center justify-between">
         <button type="button" onClick={onClose} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border-panel)] bg-[rgba(255,255,255,0.06)] text-[var(--text-primary)]">
           <X className="h-5 w-5" />
         </button>
-        <HeartButton active={image.viewer_has_hearted} count={image.heart_count} onClick={onHeart} />
+        <div className="flex items-center gap-2">
+          {videoPin && (nativeVideoSrc || iframeSrc) && (
+            <button
+              type="button"
+              onClick={() => setMuted(value => !value)}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border-panel)] bg-[rgba(255,255,255,0.06)] text-[var(--text-primary)]"
+              aria-pressed={!muted}
+              aria-label={muted ? 'Unmute video' : 'Mute video'}
+            >
+              {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+            </button>
+          )}
+          <HeartButton active={image.viewer_has_hearted} count={image.heart_count} onClick={onHeart} />
+        </div>
       </div>
       <div className="min-h-0 flex-1 overflow-hidden rounded-[var(--radius-lg)] bg-black/40">
-        <img src={getPinImageUrl(image, 'medium')} alt={image.title} className="h-full w-full object-contain" />
+        {videoPin && iframeSrc ? (
+          <iframe
+            ref={iframeRef}
+            src={iframeSrc}
+            title={image.title}
+            className="block h-full w-full border-0"
+            allow="autoplay; encrypted-media; picture-in-picture; web-share"
+            allowFullScreen
+          />
+        ) : videoPin && nativeVideoSrc ? (
+          <video
+            src={nativeVideoSrc}
+            poster={getPinImageUrl(image, 'medium')}
+            className="h-full w-full object-contain"
+            controls
+            autoPlay
+            loop
+            playsInline
+            muted={muted}
+          />
+        ) : videoPin ? (
+          <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+            <img src={getPinImageUrl(image, 'medium')} alt={image.title} className="max-h-[58vh] max-w-full rounded-[var(--radius-lg)] object-contain" />
+            {sourceUrl && (
+              <a
+                href={sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-full border border-[var(--border-panel)] bg-[rgba(255,255,255,0.06)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)]"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Open source video
+              </a>
+            )}
+          </div>
+        ) : (
+          <img src={getPinImageUrl(image, 'medium')} alt={image.title} className="h-full w-full object-contain" />
+        )}
       </div>
       <div className="mt-3 rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(5,6,8,0.72)] p-3">
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">{image.title}</h2>
@@ -1586,6 +1957,8 @@ function ShadowPinCategoryScreen({
   const imagesState = useShadowPinImages(categoryId)
   const [modal, setModal] = useState<ModalMode>(null)
   const [overlayImageId, setOverlayImageId] = useState<string | null>(null)
+  const [activeVideoId, setActiveVideoId] = useState<string | null>(null)
+  const [soundVideoId, setSoundVideoId] = useState<string | null>(null)
   const adminRole = user?.admin_role
 
   const title = imagesState.category?.title || 'ShadowPin'
@@ -1594,13 +1967,13 @@ function ShadowPinCategoryScreen({
   const submitCreate = async (values: ShadowPinImageFormValues) => {
     const image = await imagesState.createImage(values)
     tracker.recordPinMutation(image, 'pin_created', imagesState.category)
-    toast.success('Image added')
+    toast.success('Pin added')
   }
 
   const submitEdit = async (image: ShadowPinImage, values: ShadowPinImageFormValues) => {
     const updatedImage = await imagesState.updateImage(image.id, values)
     tracker.recordPinMutation(updatedImage, 'pin_edited', imagesState.category)
-    toast.success('Image updated')
+    toast.success('Pin updated')
   }
 
   const removeImage = async (image: ShadowPinImage) => {
@@ -1608,7 +1981,7 @@ function ShadowPinCategoryScreen({
     const removedImage = await imagesState.removeImage(image.id)
     tracker.recordPinMutation(removedImage ?? image, 'pin_deleted', imagesState.category)
     setModal(null)
-    toast.success('Image removed')
+    toast.success('Pin removed')
   }
 
   const toggleImageHeart = (image: ShadowPinImage) => {
@@ -1621,6 +1994,15 @@ function ShadowPinCategoryScreen({
   const openImageViewer = (image: ShadowPinImage) => {
     tracker.recordPinOpened(image, imagesState.category)
     setModal({ type: 'image-viewer', image })
+  }
+
+  const focusVideo = (imageId: string) => {
+    setActiveVideoId(imageId)
+  }
+
+  const blurVideo = (imageId: string) => {
+    setActiveVideoId(current => current === imageId ? null : current)
+    setSoundVideoId(current => current === imageId ? null : current)
   }
 
   const masonryColumnCount = useShadowPinMasonryColumnCount()
@@ -1646,7 +2028,7 @@ function ShadowPinCategoryScreen({
         type="button"
         onClick={() => setModal({ type: 'add-image' })}
         className="theme-floating-action absolute right-3 top-[calc(env(safe-area-inset-top)_+_3.85rem)] z-40 inline-flex h-11 w-11 items-center justify-center rounded-full md:right-4"
-        aria-label="Add image"
+        aria-label="Add pin"
       >
         <Plus className="h-5 w-5" />
       </button>
@@ -1665,14 +2047,14 @@ function ShadowPinCategoryScreen({
         ) : imagesState.images.length === 0 ? (
           <div className="mx-auto max-w-md rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(5,6,8,0.58)] p-5 text-center">
             <ImageIcon className="mx-auto mb-3 h-8 w-8 text-[var(--theme-accent-readable)]" />
-            <h2 className="text-lg font-semibold text-[var(--text-primary)]">This category has no images yet.</h2>
-            <p className="mt-1 text-sm text-[var(--text-secondary)]">Tap + to add one.</p>
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">This category has no pins yet.</h2>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">Tap + to add an image or short video.</p>
           </div>
         ) : (
           <>
             <div
               role="list"
-              aria-label="ShadowPin image masonry grid"
+              aria-label="ShadowPin pin masonry grid"
               className="grid items-start gap-3"
               style={{ gridTemplateColumns: `repeat(${masonryColumnCount}, minmax(0, 1fr))` }}
             >
@@ -1687,8 +2069,16 @@ function ShadowPinCategoryScreen({
                           image={image}
                           canManageImage={manage}
                           columnSide={columnSide}
+                          activeVideoId={activeVideoId}
+                          soundEnabled={soundVideoId === image.id}
                           overlayOpen={overlayImageId === image.id}
                           onToggleOverlay={() => setOverlayImageId(prev => prev === image.id ? null : image.id)}
+                          onVideoFocus={() => focusVideo(image.id)}
+                          onVideoBlur={() => blurVideo(image.id)}
+                          onToggleSound={() => {
+                            setActiveVideoId(image.id)
+                            setSoundVideoId(prev => prev === image.id ? null : image.id)
+                          }}
                           onViewer={() => openImageViewer(image)}
                           onEdit={() => setModal({ type: 'edit-image', image })}
                           onHeart={() => toggleImageHeart(image)}

@@ -27,6 +27,8 @@ const getImageMetadata = (image: ShadowPinImage, category?: ShadowPinCategory | 
   category_title: category?.title,
   item_title: image.title,
   thumbnail_url: getImageThumb(image),
+  media_type: image.media_type ?? 'image',
+  provider: image.provider ?? null,
 })
 
 const reportAnalyticsError = (error: unknown) => {

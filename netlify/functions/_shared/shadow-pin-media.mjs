@@ -522,7 +522,26 @@ export async function createImportedShadowPinItem({
   const table = tableFor(targetType)
   const insertPayload = targetType === 'category'
     ? basePayload
-    : { ...basePayload, category_id: activeCategory.id }
+    : {
+        ...basePayload,
+        category_id: activeCategory.id,
+        media_type: 'image',
+        source_type: 'url_import',
+        source_url: normalizeImageUrl(url).toString(),
+        provider: 'shadow_pin_storage',
+        provider_asset_id: null,
+        provider_playback_id: null,
+        provider_payload: {
+          importedFrom: normalizeImageUrl(url).toString(),
+          importedAt: new Date().toISOString(),
+        },
+        video_preview_url: null,
+        video_playback_url: null,
+        video_hls_url: null,
+        video_embed_url: null,
+        duration_seconds: null,
+        video_size_bytes: null,
+      }
 
   const { data: row, error: insertError } = await admin
     .from(table)
@@ -535,6 +554,99 @@ export async function createImportedShadowPinItem({
     return await writeDerivativesForRow(admin, targetType, row, imported.buffer)
   } catch (error) {
     return await markDerivativeFailure(admin, table, row.id, error) || row
+  }
+}
+
+export async function updateImportedShadowPinImage({
+  admin,
+  userId,
+  imageId,
+  title,
+  description,
+  url,
+}) {
+  if (!imageId) throw new Error('Pin is required.')
+
+  const { data: current, error: currentError } = await admin
+    .from('shadow_pin_images')
+    .select('*')
+    .eq('id', imageId)
+    .is('deleted_at', null)
+    .maybeSingle()
+  if (currentError) throw currentError
+  if (!current || !current.category_id) throw new Error('ShadowPin pin is not available.')
+  await assertCanMutate(admin, current, userId, true)
+
+  const { data: category, error: categoryError } = await admin
+    .from('shadow_pin_categories')
+    .select('id')
+    .eq('id', current.category_id)
+    .is('deleted_at', null)
+    .maybeSingle()
+  if (categoryError) throw categoryError
+  if (!category) throw new Error('ShadowPin category is not available.')
+
+  const sourceUrl = normalizeImageUrl(url)
+  const imported = await fetchRemoteImage(sourceUrl.toString())
+  const originalId = crypto.randomUUID()
+  const originalPath = `${userId}/categories/${current.category_id}/pins/${current.id}/${originalId}/original.${imported.extension}`
+
+  const { error: uploadError } = await admin.storage
+    .from(SHADOW_PIN_BUCKET)
+    .upload(originalPath, imported.buffer, {
+      cacheControl: '31536000',
+      contentType: imported.contentType,
+      upsert: false,
+    })
+  if (uploadError) throw uploadError
+
+  const { data: publicAsset } = admin.storage.from(SHADOW_PIN_BUCKET).getPublicUrl(originalPath)
+  const { data: updated, error: updateError } = await admin
+    .from('shadow_pin_images')
+    .update({
+      title,
+      description,
+      image_url: publicAsset.publicUrl,
+      image_path: originalPath,
+      image_content_type: imported.contentType,
+      image_size_bytes: imported.sizeBytes,
+      thumbnail_url: null,
+      thumbnail_path: null,
+      medium_url: null,
+      medium_path: null,
+      image_width: null,
+      image_height: null,
+      processing_status: 'processing',
+      processing_error: null,
+      processed_at: null,
+      media_type: 'image',
+      source_type: 'url_import',
+      source_url: sourceUrl.toString(),
+      provider: 'shadow_pin_storage',
+      provider_asset_id: null,
+      provider_playback_id: null,
+      provider_payload: {
+        importedFrom: sourceUrl.toString(),
+        importedAt: new Date().toISOString(),
+        replacedPreviousProvider: current.provider || null,
+        replacedPreviousAssetId: current.provider_asset_id || null,
+      },
+      video_preview_url: null,
+      video_playback_url: null,
+      video_hls_url: null,
+      video_embed_url: null,
+      duration_seconds: null,
+      video_size_bytes: null,
+    })
+    .eq('id', current.id)
+    .select('*')
+    .single()
+  if (updateError) throw updateError
+
+  try {
+    return await writeDerivativesForRow(admin, 'image', updated, imported.buffer)
+  } catch (error) {
+    return await markDerivativeFailure(admin, 'shadow_pin_images', updated.id, error) || updated
   }
 }
 

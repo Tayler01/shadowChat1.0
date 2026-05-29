@@ -4,6 +4,7 @@ import {
   deleteShadowPinImage,
   fetchShadowPinCategory,
   fetchShadowPinImages,
+  syncShadowPinVideoStatus,
   toggleShadowPinImageHeart,
   updateShadowPinImage,
 } from '../api/shadowPinApi'
@@ -240,11 +241,14 @@ export function useShadowPinImages(categoryId: string | null) {
     }
   }, [cacheUserId, category, categoryId, hasMore, images, page])
 
-  const updateImage = useCallback(async (imageId: string, values: Pick<ShadowPinImageFormValues, 'title' | 'description'>) => {
+  const updateImage = useCallback(async (imageId: string, values: ShadowPinImageFormValues) => {
     if (!categoryId) throw new Error('Category is required.')
     setSaving(true)
     try {
-      const image = await updateShadowPinImage(imageId, values)
+      const image = await updateShadowPinImage(imageId, {
+        ...values,
+        categoryId,
+      })
       const nextEntry = updateImageCache(getImageCacheKey(cacheUserId, categoryId), current => ({
         ...current,
         images: current.images.map(existing => existing.id === image.id ? image : existing),
@@ -255,6 +259,45 @@ export function useShadowPinImages(categoryId: string | null) {
       setSaving(false)
     }
   }, [cacheUserId, categoryId])
+
+  useEffect(() => {
+    if (!categoryId || images.length === 0) return
+    const processingVideoIds = images
+      .filter(image => (
+        image.media_type === 'video' &&
+        (image.processing_status === 'pending' || image.processing_status === 'processing')
+      ))
+      .map(image => image.id)
+
+    if (processingVideoIds.length === 0) return
+
+    let cancelled = false
+    const timeoutId = window.setTimeout(() => {
+      void Promise.allSettled(processingVideoIds.map(imageId => syncShadowPinVideoStatus(imageId)))
+        .then(results => {
+          if (cancelled) return
+          const updatedImages: ShadowPinImage[] = []
+          results.forEach(result => {
+            if (result.status === 'fulfilled') {
+              updatedImages.push(normalizeImage(result.value))
+            }
+          })
+          if (updatedImages.length === 0) return
+
+          const updatedById = new Map(updatedImages.map(image => [image.id, image]))
+          const nextEntry = updateImageCache(getImageCacheKey(cacheUserId, categoryId), current => ({
+            ...current,
+            images: current.images.map(existing => updatedById.get(existing.id) ?? existing),
+          }))
+          if (nextEntry) setImages(nextEntry.images)
+        })
+    }, 12000)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timeoutId)
+    }
+  }, [cacheUserId, categoryId, images])
 
   const removeImage = useCallback(async (imageId: string) => {
     if (!categoryId) throw new Error('Category is required.')

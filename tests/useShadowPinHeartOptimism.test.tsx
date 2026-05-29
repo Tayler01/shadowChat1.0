@@ -24,6 +24,7 @@ jest.mock('../src/features/shadow-pin/api/shadowPinApi', () => ({
   fetchShadowPinCategories: () => mockFetchShadowPinCategories(),
   fetchShadowPinCategory: (categoryId: string) => mockFetchShadowPinCategory(categoryId),
   fetchShadowPinImages: (categoryId: string, page: number) => mockFetchShadowPinImages(categoryId, page),
+  syncShadowPinVideoStatus: jest.fn(),
   toggleShadowPinCategoryHeart: (categoryId: string) => mockToggleShadowPinCategoryHeart(categoryId),
   toggleShadowPinImageHeart: (imageId: string) => mockToggleShadowPinImageHeart(imageId),
   updateShadowPinCategory: jest.fn(),

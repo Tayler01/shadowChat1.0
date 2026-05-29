@@ -52,6 +52,11 @@ verify_jwt = false
 [functions.link-preview]
 verify_jwt = false
 
+# Shadow Pin video validates user JWTs itself so the same endpoint can serve
+# Bunny upload session creation, processing sync, and external-video imports.
+[functions.shadow-pin-video]
+verify_jwt = false
+
 # send-push authenticates either the signed-in user JWT or an internal
 # service-role dispatch from bridge functions. Disabling gateway JWT
 # verification lets the function enforce that mixed contract itself.

@@ -1,14 +1,19 @@
 # ShadowPin
 
-ShadowPin is a logged-in public image board exposed as `Pins` in the mobile
+ShadowPin is a logged-in public pin board exposed as `Pins` in the mobile
 bottom menu and desktop sidebar. Boards stays its own menu item; Pins opens the
 same ShadowPin surface directly.
+
+Short video planning and rollout details live in
+[`docs/SHADOW_PIN_SHORT_VIDEO_ROADMAP.md`](C:/repos/chat2.0/docs/SHADOW_PIN_SHORT_VIDEO_ROADMAP.md:1).
 
 ## V1 Scope
 
 - Public categories for authenticated users.
-- Public image pins inside categories.
+- Public image and short video pins inside categories.
 - Device upload or server-side URL import for category covers, category cover replacement, and image pins.
+- Native short video uploads through Bunny Stream, plus external video pins for
+  YouTube Shorts, X, Pinterest, Instagram, and direct video URLs where possible.
 - One heart per user per category or image.
 - Creator/operator edit and soft delete controls.
 - Hidden score ledger for the public gold push-pin identity badge.
@@ -23,7 +28,9 @@ Score migration: `supabase/migrations/20260519020527_shadow_pin_hidden_score_gol
 
 - `shadow_pin_categories`: category metadata, cover asset, soft delete fields,
   heart count, and `latest_image_created_at` for mobile category ordering.
-- `shadow_pin_images`: pin metadata, image asset, optional `category_id` for admin orphaning, soft delete fields, heart count.
+- `shadow_pin_images`: canonical pin metadata for image, native video, and
+  external video pins; image/poster asset fields; optional `category_id` for
+  admin orphaning; soft delete fields; heart count.
 - `shadow_pin_category_hearts`: one heart per user/category.
 - `shadow_pin_image_hearts`: one heart per user/image.
 - `private.shadow_pin_scores`: hidden per-user score totals. Authenticated
@@ -35,7 +42,11 @@ Score migration: `supabase/migrations/20260519020527_shadow_pin_hidden_score_gol
 - `shadow_pin_activity_events`: raw append-only activity events with
   privacy-minimal snapshots for admin analytics.
 
-The migration also creates the public Supabase Storage bucket `shadow-pin` with a 15MB limit and JPEG, PNG, WebP, and GIF MIME allow-list. Storage paths are user-prefixed so authenticated users can upload only under their own folder.
+The base migration creates the public Supabase Storage bucket `shadow-pin` with
+a 15MB image limit and JPEG, PNG, WebP, and GIF MIME allow-list. Storage paths
+are user-prefixed so authenticated users can upload only under their own folder.
+Native video files are uploaded directly to Bunny Stream; ShadowPin stores the
+poster image in Supabase Storage.
 
 The mobile media derivative migration keeps `latest_image_created_at` current
 with a trigger on `shadow_pin_images`. Category lists sort by newest added image
@@ -77,8 +88,29 @@ activity score is admin-only and separate from the public gold push-pin score.
 ## URL Imports
 
 Function: `supabase/functions/shadow-pin-import-image/index.ts`
+Video function: `supabase/functions/shadow-pin-video/index.ts`
 
 The Edge Function authenticates the caller, validates the URL, rejects local/private hosts where practical, checks image MIME and size, copies the image into `shadow-pin` Storage, then creates the category or image row. The frontend never hotlinks pasted URLs.
+
+Video-like URLs are routed to `shadow-pin-video`. YouTube Shorts get a playable
+iframe URL. Pinterest video pins use direct `pinimg.com` MP4/HLS URLs when the
+page exposes them so the feed can autoplay natively; other providers fall back
+to provider metadata, embeds, and source links where available.
+
+## Short Video Pins
+
+Native video pins use Bunny Stream and the existing `tus-js-client` upload
+pattern from Shado TV. The frontend validates common mobile video formats,
+requires 60 seconds or less, rejects files over 150 MB, captures a poster, and
+uploads the video directly to Bunny after the Edge Function creates the upload
+session.
+
+Feed playback is muted and focus-based. Detail overlays expose the sound toggle,
+while the full-screen viewer loads the higher quality playback URL when one is
+available. If the Bunny pull-zone URL is not configured, native Bunny uploads
+fall back to Bunny iframe playback until direct rendition URLs are available.
+Processing and failed videos are visible to creators and app operators, but
+non-owners only see ready video pins.
 
 ## Image Layout
 
@@ -106,6 +138,7 @@ For remote use, apply the migration and deploy the Edge Function:
 ```powershell
 supabase db push
 supabase functions deploy shadow-pin-import-image
+supabase functions deploy shadow-pin-video
 npm run shadow-pin:backfill-media -- --apply
 ```
 

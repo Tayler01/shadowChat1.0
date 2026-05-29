@@ -206,7 +206,7 @@ test('renders category pins in packed mobile masonry columns', () => {
 
     fireEvent.click(screen.getByText('Fam & Friends'))
 
-    const grid = screen.getByRole('list', { name: /shadowpin image masonry grid/i })
+    const grid = screen.getByRole('list', { name: /shadowpin pin masonry grid/i })
     expect(grid).toHaveClass('grid')
     expect(grid).toHaveStyle({ gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' })
     expect(grid).not.toHaveClass('grid-cols-2')
@@ -217,6 +217,330 @@ test('renders category pins in packed mobile masonry columns', () => {
       configurable: true,
       value: originalInnerWidth,
     })
+  }
+})
+
+test('hides the video label in the feed until pin details are active', () => {
+  jest.useFakeTimers()
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      {
+        ...image('clip', 1080, 1920),
+        media_type: 'video',
+        provider: 'bunny_stream',
+        video_preview_url: 'https://videos.example/clip-480.mp4',
+        video_playback_url: 'https://videos.example/clip-720.mp4',
+        processing_status: 'ready',
+      },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+
+    const videoCard = screen.getByAltText('Pin clip').closest('article')
+    expect(videoCard).not.toBeNull()
+    expect(screen.queryByText('Video')).not.toBeInTheDocument()
+
+    fireEvent.click(videoCard!)
+    act(() => {
+      jest.advanceTimersByTime(240)
+    })
+
+    expect(screen.getByText('Video')).toBeInTheDocument()
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('autoplays a focused native video pin muted in the masonry feed', async () => {
+  const originalIntersectionObserver = global.IntersectionObserver
+  const originalPlay = HTMLMediaElement.prototype.play
+  const observers: Array<{
+    callback: IntersectionObserverCallback
+    disconnect: jest.Mock
+  }> = []
+
+  class MockIntersectionObserver {
+    readonly callback: IntersectionObserverCallback
+    readonly disconnect = jest.fn()
+    readonly observe = jest.fn()
+    readonly unobserve = jest.fn()
+    readonly takeRecords = jest.fn(() => [])
+    readonly root = null
+    readonly rootMargin = ''
+    readonly thresholds = []
+
+    constructor(callback: IntersectionObserverCallback) {
+      this.callback = callback
+      observers.push(this)
+    }
+  }
+
+  Object.defineProperty(global, 'IntersectionObserver', {
+    configurable: true,
+    value: MockIntersectionObserver,
+  })
+  Object.defineProperty(window, 'IntersectionObserver', {
+    configurable: true,
+    value: MockIntersectionObserver,
+  })
+  HTMLMediaElement.prototype.play = jest.fn().mockResolvedValue(undefined)
+
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      {
+        ...image('clip', 1080, 1920),
+        media_type: 'video',
+        provider: 'bunny_stream',
+        video_preview_url: 'https://videos.example/clip-480.mp4',
+        video_playback_url: 'https://videos.example/clip-720.mp4',
+        processing_status: 'ready',
+      },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  try {
+    const { container } = render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+    expect(container.querySelector('video')).not.toBeInTheDocument()
+
+    act(() => {
+      observers.forEach(observer => observer.callback([
+        {
+          isIntersecting: true,
+          intersectionRatio: 0.72,
+          target: screen.getByAltText('Pin clip').closest('article')!,
+        } as unknown as IntersectionObserverEntry,
+      ], observer as unknown as IntersectionObserver))
+    })
+
+    await waitFor(() => {
+      expect(container.querySelector('video')).toBeInTheDocument()
+    })
+    expect(container.querySelector('video')).toHaveAttribute('src', 'https://videos.example/clip-480.mp4')
+    expect(HTMLMediaElement.prototype.play).toHaveBeenCalled()
+  } finally {
+    Object.defineProperty(global, 'IntersectionObserver', {
+      configurable: true,
+      value: originalIntersectionObserver,
+    })
+    Object.defineProperty(window, 'IntersectionObserver', {
+      configurable: true,
+      value: originalIntersectionObserver,
+    })
+    HTMLMediaElement.prototype.play = originalPlay
+  }
+})
+
+test('opens Bunny embed videos in the fullscreen viewer when direct renditions are unavailable', () => {
+  jest.useFakeTimers()
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      {
+        ...image('bunny', 1080, 1920),
+        media_type: 'video',
+        provider: 'bunny_stream',
+        video_embed_url: 'https://iframe.mediadelivery.net/embed/123/video-guid',
+        processing_status: 'ready',
+      },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+    const videoCard = screen.getByAltText('Pin bunny').closest('article')
+    expect(videoCard).not.toBeNull()
+
+    fireEvent.click(videoCard!)
+    fireEvent.click(videoCard!)
+
+    const viewerFrame = screen.getByTitle('Pin bunny')
+    expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('player.mediadelivery.net'))
+    expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('autoplay=true'))
+    expect(viewerFrame).toHaveAttribute('src', expect.not.stringContaining('controls=false'))
+    const srcBeforeUnmute = viewerFrame.getAttribute('src')
+    fireEvent.click(screen.getByLabelText('Unmute video'))
+    expect(viewerFrame).toHaveAttribute('src', srcBeforeUnmute)
+    expect(screen.getByLabelText('Mute video')).toBeInTheDocument()
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('shows iframe video sound controls in pin details without reloading the player', () => {
+  jest.useFakeTimers()
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      {
+        ...image('youtube-detail', 1080, 1920),
+        media_type: 'external_video',
+        provider: 'youtube',
+        provider_playback_id: 'Czrv1RX19G0',
+        video_embed_url: 'https://www.youtube.com/embed/Czrv1RX19G0?playsinline=1&rel=0&loop=1&playlist=Czrv1RX19G0',
+        processing_status: 'ready',
+      },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+    const videoCard = screen.getByAltText('Pin youtube-detail').closest('article')
+    expect(videoCard).not.toBeNull()
+
+    fireEvent.click(videoCard!)
+    act(() => {
+      jest.advanceTimersByTime(240)
+    })
+
+    fireEvent.click(screen.getByLabelText('Unmute video'))
+    expect(screen.getByLabelText('Mute video')).toBeInTheDocument()
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('opens legacy Pinterest video pins with the Pinterest oEmbed iframe', () => {
+  jest.useFakeTimers()
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      {
+        ...image('pinterest', 1080, 1920),
+        media_type: 'external_video',
+        provider: 'pinterest',
+        source_url: 'https://in.pinterest.com/pin/waterproof-360-action-camera-video--342906959154248010/',
+        video_embed_url: 'https://in.pinterest.com/pin/waterproof-360-action-camera-video--342906959154248010/',
+        processing_status: 'ready',
+      },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+    const videoCard = screen.getByAltText('Pin pinterest').closest('article')
+    expect(videoCard).not.toBeNull()
+
+    fireEvent.click(videoCard!)
+    fireEvent.click(videoCard!)
+
+    const viewerFrame = screen.getByTitle('Pin pinterest')
+    expect(viewerFrame).toHaveAttribute('src', 'https://assets.pinterest.com/ext/embed.html?id=342906959154248010&src=shado-pin')
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('opens YouTube video pins with fullscreen player controls', () => {
+  jest.useFakeTimers()
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      {
+        ...image('youtube', 1080, 1920),
+        media_type: 'external_video',
+        provider: 'youtube',
+        provider_playback_id: 'Czrv1RX19G0',
+        video_embed_url: 'https://www.youtube.com/embed/Czrv1RX19G0?playsinline=1&rel=0&loop=1&playlist=Czrv1RX19G0',
+        processing_status: 'ready',
+      },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+    const videoCard = screen.getByAltText('Pin youtube').closest('article')
+    expect(videoCard).not.toBeNull()
+
+    fireEvent.click(videoCard!)
+    fireEvent.click(videoCard!)
+
+    const viewerFrame = screen.getByTitle('Pin youtube')
+    expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('www.youtube.com/embed/Czrv1RX19G0'))
+    expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('autoplay=1'))
+    expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('mute=1'))
+    expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('controls=1'))
+    const srcBeforeUnmute = viewerFrame.getAttribute('src')
+    fireEvent.click(screen.getByLabelText('Unmute video'))
+    expect(viewerFrame).toHaveAttribute('src', srcBeforeUnmute)
+    expect(screen.getByLabelText('Mute video')).toBeInTheDocument()
+  } finally {
+    jest.useRealTimers()
   }
 })
 
@@ -454,7 +778,7 @@ test('ShadowPin radial menu offers edit as a foreground action for image owners'
       jest.advanceTimersByTime(90)
     })
 
-    expect(screen.getByRole('heading', { name: /edit image/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /edit pin/i })).toBeInTheDocument()
   } finally {
     jest.useRealTimers()
   }
@@ -768,6 +1092,73 @@ test('ShadowPin edit category supports URL cover replacement', async () => {
   }
 })
 
+test('ShadowPin edit pin supports URL media replacement', async () => {
+  jest.useFakeTimers()
+  const updateImage = jest.fn().mockResolvedValue({ ...image('one', 1200, 900), creator_id: 'user-1' })
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      { ...image('one', 1200, 900), creator_id: 'user-1' },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage,
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+
+    const imageCard = screen.getByAltText('Pin one').closest('article')
+    expect(imageCard).not.toBeNull()
+    fireShadowPinPointer(imageCard!, 'pointerdown', {
+      pointerId: 14,
+      button: 0,
+      clientX: 160,
+      clientY: 320,
+    })
+    act(() => {
+      jest.advanceTimersByTime(440)
+    })
+    fireShadowPinPointer(imageCard!, 'pointermove', {
+      pointerId: 14,
+      clientX: 263,
+      clientY: 331,
+    })
+    fireShadowPinPointer(imageCard!, 'pointerup', {
+      pointerId: 14,
+      clientX: 263,
+      clientY: 331,
+    })
+    act(() => {
+      jest.advanceTimersByTime(90)
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /^url$/i }))
+    fireEvent.change(screen.getByLabelText(/image or video url/i), {
+      target: { value: 'https://images.example/replacement.jpg' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+
+    await waitFor(() => {
+      expect(updateImage).toHaveBeenCalledWith('one', expect.objectContaining({
+        file: null,
+        url: 'https://images.example/replacement.jpg',
+      }))
+    })
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
 test('ShadowPin edit image keeps delete visually secondary to save and cancel', () => {
   jest.useFakeTimers()
   mockUseShadowPinImages.mockReturnValue({
@@ -817,12 +1208,12 @@ test('ShadowPin edit image keeps delete visually secondary to save and cancel', 
       jest.advanceTimersByTime(90)
     })
 
-    expect(screen.getByRole('heading', { name: /edit image/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /edit pin/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^cancel$/i })).toHaveClass('w-full')
     expect(screen.getByRole('button', { name: /^save$/i })).toHaveClass('w-full')
 
-    const deleteButton = screen.getByRole('button', { name: /delete shadowpin image/i })
-    expect(deleteButton).toHaveTextContent(/delete image/i)
+    const deleteButton = screen.getByRole('button', { name: /delete shadowpin pin/i })
+    expect(deleteButton).toHaveTextContent(/delete pin/i)
     expect(deleteButton).toHaveClass('text-red-300/65')
     expect(deleteButton).not.toHaveClass('w-full')
     expect(deleteButton).not.toHaveClass('text-white')

@@ -5,6 +5,7 @@ import {
   createImportedShadowPinItem,
   processShadowPinRowForUser,
   updateImportedShadowPinCategoryCover,
+  updateImportedShadowPinImage,
 } from './_shared/shadow-pin-media.mjs'
 
 const json = (body, statusCode = 200) => ({
@@ -61,6 +62,21 @@ export async function handler(event) {
       })
 
       return json({ ok: true, category })
+    }
+
+    if (action === 'update-image-from-url') {
+      const title = cleanText(body?.title, 80, 'Title', true)
+      const description = cleanText(body?.description, 500, 'Description', false)
+      const image = await updateImportedShadowPinImage({
+        admin,
+        userId: user.id,
+        imageId: body?.imageId,
+        title,
+        description,
+        url: body?.url,
+      })
+
+      return json({ ok: true, image })
     }
 
     if (action === 'create-category-from-url' || action === 'create-image-from-url') {
