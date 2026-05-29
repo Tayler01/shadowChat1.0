@@ -90,7 +90,7 @@ describe('useUnreadScroll', () => {
     document.body.removeChild(container)
   })
 
-  it('follows late content height changes while auto-scroll is active', async () => {
+  it('coalesces late content height changes while auto-scroll is active', async () => {
     let resizeCallback: ResizeObserverCallback | null = null
     global.ResizeObserver = class {
       constructor(callback: ResizeObserverCallback) {
@@ -108,12 +108,13 @@ describe('useUnreadScroll', () => {
     document.body.appendChild(container)
     setScrollMetrics(container, 900)
 
+    const scrollTo = jest.fn((options?: ScrollToOptions | number) => {
+      const top = typeof options === 'number' ? options : options?.top
+      container.scrollTop = Number(top)
+    })
     Object.defineProperty(container, 'scrollTo', {
       configurable: true,
-      value: jest.fn((options?: ScrollToOptions | number) => {
-        const top = typeof options === 'number' ? options : options?.top
-        container.scrollTop = Number(top)
-      }),
+      value: scrollTo,
     })
 
     renderHook(() =>
@@ -132,14 +133,26 @@ describe('useUnreadScroll', () => {
       })
     )
 
-    await waitFor(() => expect(container.scrollTop).toBe(500))
+    expect(container.scrollTop).toBe(500)
+    const callsAfterInitialPin = scrollTo.mock.calls.length
 
+    setScrollMetrics(container, 940)
+    act(() => {
+      resizeCallback?.([], {} as ResizeObserver)
+    })
     setScrollMetrics(container, 980)
     act(() => {
       resizeCallback?.([], {} as ResizeObserver)
     })
 
+    expect(container.scrollTop).toBe(500)
+
+    await act(async () => {
+      await new Promise(resolve => window.setTimeout(resolve, 170))
+    })
+
     expect(container.scrollTop).toBe(580)
+    expect(scrollTo).toHaveBeenCalledTimes(callsAfterInitialPin + 1)
 
     document.body.removeChild(container)
   })
@@ -201,17 +214,25 @@ describe('useUnreadScroll', () => {
       })
     )
 
-    await waitFor(() => expect(container.scrollTop).toBe(500))
+    expect(container.scrollTop).toBe(500)
 
     setScrollMetrics(container, 960)
     act(() => {
       listeners.resize?.forEach(listener => listener(new Event('resize')))
+    })
+    expect(container.scrollTop).toBe(500)
+    await act(async () => {
+      await new Promise(resolve => window.setTimeout(resolve, 170))
     })
     expect(container.scrollTop).toBe(560)
 
     setScrollMetrics(container, 990)
     act(() => {
       window.dispatchEvent(new Event('focusin'))
+    })
+    expect(container.scrollTop).toBe(560)
+    await act(async () => {
+      await new Promise(resolve => window.setTimeout(resolve, 170))
     })
     expect(container.scrollTop).toBe(590)
 

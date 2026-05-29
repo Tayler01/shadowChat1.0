@@ -33,7 +33,15 @@ import { getBlockedActionMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
 import { EmojiPickerOverlay } from './EmojiPickerOverlay'
 import { QuickReactionRail } from './QuickReactionRail'
-import { getImageMessageDisplaySrc, getMessagePreviewText } from './messageDisplay'
+import {
+  CHAT_MEDIA_INTRINSIC_HEIGHT,
+  CHAT_MEDIA_INTRINSIC_WIDTH,
+  getChatMediaAspectClass,
+  getChatMediaOrientation,
+  getImageMessageDisplaySrc,
+  getMessagePreviewText,
+  type ChatMediaOrientation,
+} from './messageDisplay'
 
 interface MessageItemProps {
   message: Message
@@ -177,6 +185,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const bubbleShellRef = useRef<HTMLDivElement>(null)
     const [showQuickReactions, setShowQuickReactions] = useState(false)
     const [profileUser, setProfileUser] = useState<User | null>(null)
+    const [imageOrientation, setImageOrientation] = useState<ChatMediaOrientation>('portrait')
     const reactionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
     const { enabled: toneEnabled } = useToneAnalysisEnabled()
     const analyzeTone = useToneAnalysis(toneEnabled)
@@ -225,6 +234,10 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         }
       }
     }, [])
+
+    useEffect(() => {
+      setImageOrientation('portrait')
+    }, [imageMessageSrc])
 
     const handleEditSave = async () => {
       if (!editContent.trim()) return
@@ -476,12 +489,20 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     <img
                       src={imageMessageSrc}
                       alt="uploaded image"
-                      width={720}
-                      height={720}
+                      width={CHAT_MEDIA_INTRINSIC_WIDTH}
+                      height={CHAT_MEDIA_INTRINSIC_HEIGHT}
                       loading="lazy"
                       decoding="async"
                       draggable={false}
-                      className="mt-1 block h-auto max-h-[42vh] max-w-[min(10rem,100%)] cursor-pointer rounded-[var(--radius-md)] object-contain shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:max-w-[11rem]"
+                      data-chat-media="image"
+                      className={cn(
+                        'mt-1 block max-h-[42vh] w-[min(10rem,100%)] max-w-full cursor-pointer rounded-[var(--radius-md)] object-cover shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:w-[11rem]',
+                        getChatMediaAspectClass(imageOrientation)
+                      )}
+                      onLoad={event => {
+                        const image = event.currentTarget
+                        setImageOrientation(getChatMediaOrientation(image.naturalWidth, image.naturalHeight))
+                      }}
                       onClick={() => setShowImageModal(true)}
                     />
                   ) : message.message_type === 'video' && message.file_url ? (

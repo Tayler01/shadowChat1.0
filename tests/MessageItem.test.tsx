@@ -75,10 +75,35 @@ test('renders image message', () => {
 
   const img = screen.getByAltText(/uploaded image/i)
   expect(img).toHaveAttribute('src', baseMessage.file_url)
-  expect(img).toHaveClass('h-auto', 'max-w-[min(10rem,100%)]')
-  expect(img).not.toHaveClass('aspect-[4/3]')
-  expect(img).toHaveAttribute('width', '720')
-  expect(img).toHaveAttribute('height', '720')
+  expect(img).toHaveClass('w-[min(10rem,100%)]', 'aspect-[9/16]', 'object-cover')
+  expect(img).not.toHaveClass('h-auto', 'aspect-[4/3]')
+  expect(img).toHaveAttribute('width', '1080')
+  expect(img).toHaveAttribute('height', '1920')
+})
+
+test('adjusts image thumbnail orientation after the image dimensions load', () => {
+  render(
+    <MessageItem
+      message={baseMessage}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+      onJumpToMessage={() => {}}
+      containerRef={React.createRef()}
+    />
+  )
+
+  const img = screen.getByAltText(/uploaded image/i)
+  Object.defineProperty(img, 'naturalWidth', { configurable: true, value: 1600 })
+  Object.defineProperty(img, 'naturalHeight', { configurable: true, value: 900 })
+
+  act(() => {
+    fireEvent.load(img)
+  })
+
+  expect(img).toHaveClass('aspect-video')
+  expect(img).not.toHaveClass('aspect-[9/16]')
 })
 
 test('opens uploaded images in a top-level mobile-safe viewer', async () => {
@@ -150,8 +175,43 @@ test('renders video message', () => {
   const video = container.querySelector('video')
   expect(video).toHaveAttribute('src', videoMessage.file_url)
   expect(video).toHaveAttribute('controls')
+  expect(video).toHaveClass('w-[min(10rem,100%)]', 'aspect-[9/16]', 'object-cover')
+  expect(video).toHaveAttribute('width', '1080')
+  expect(video).toHaveAttribute('height', '1920')
   expect(video).not.toHaveClass('border', 'bg-black', 'shadow-[var(--shadow-panel)]')
   expect(screen.queryByRole('link', { name: /clip.mp4/i })).not.toBeInTheDocument()
+})
+
+test('adjusts video thumbnail orientation after metadata loads', () => {
+  const videoMessage = {
+    ...baseMessage,
+    message_type: 'video',
+    content: '',
+    file_url: 'https://example.com/clip.mp4',
+  } as Message
+
+  const { container } = render(
+    <MessageItem
+      message={videoMessage}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+      onJumpToMessage={() => {}}
+      containerRef={React.createRef()}
+    />
+  )
+
+  const video = container.querySelector('video') as HTMLVideoElement
+  Object.defineProperty(video, 'videoWidth', { configurable: true, value: 1920 })
+  Object.defineProperty(video, 'videoHeight', { configurable: true, value: 1080 })
+
+  act(() => {
+    fireEvent.loadedMetadata(video)
+  })
+
+  expect(video).toHaveClass('aspect-video')
+  expect(video).not.toHaveClass('aspect-[9/16]')
 })
 
 test('renders file message', () => {

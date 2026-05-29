@@ -134,13 +134,14 @@ function normalizeSections(value) {
 function normalizeReleaseNotes(filePath) {
   const notes = readJsonFile(filePath, 'release notes')
   const title = normalizeText(notes.title, 140, 'title', true)
-  const summary = normalizeText(notes.summary, 2000, 'summary')
+  const summary = normalizeText(notes.summary, 2000, 'summary', true)
   const restartPolicy = normalizeText(
-    notes.restartPolicy || notes.restart_policy || 'optional_restart',
+    notes.restartPolicy || notes.restart_policy || 'required_restart',
     80,
     'restartPolicy'
   )
   const severity = normalizeText(notes.severity || 'feature', 80, 'severity')
+  const sections = normalizeSections(notes.sections)
 
   if (!VALID_POLICIES.has(restartPolicy)) {
     throw new Error(`restartPolicy must be one of: ${Array.from(VALID_POLICIES).join(', ')}.`)
@@ -150,10 +151,14 @@ function normalizeReleaseNotes(filePath) {
     throw new Error(`severity must be one of: ${Array.from(VALID_SEVERITIES).join(', ')}.`)
   }
 
+  if (sections.length === 0) {
+    throw new Error('sections must contain at least one feature overview section.')
+  }
+
   return {
     title,
     summary,
-    sections: normalizeSections(notes.sections),
+    sections,
     restart_policy: restartPolicy,
     severity,
   }

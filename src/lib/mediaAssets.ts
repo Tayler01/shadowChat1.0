@@ -21,7 +21,7 @@ export type MediaThumbnailConfig = {
 export const MEDIA_THUMBNAIL_CONFIGS: Record<MediaThumbnailProfile, MediaThumbnailConfig> = {
   avatar: { width: 240, height: 240, resize: 'cover', quality: 82 },
   banner: { width: 960, height: 540, resize: 'cover', quality: 78 },
-  chat: { width: 720, height: 720, resize: 'contain', quality: 76 },
+  chat: { width: 480, height: 854, resize: 'contain', quality: 76 },
   weather: { width: 720, height: 1100, resize: 'contain', quality: 76 },
   'art-board': { width: 720, height: 720, resize: 'cover', quality: 76 },
   'shado-tv-ticket': { width: 512, height: 768, resize: 'cover', quality: 78 },

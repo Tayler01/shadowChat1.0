@@ -6,10 +6,16 @@ of Shado chat posts.
 ## Release Notes Source
 
 Edit [release-notes/current.json](C:/repos/chat2.0/release-notes/current.json:1)
-before a production deploy. The supported restart policies are:
+before a production deploy. Release notes must include a title, summary, and at
+least one section with concrete overview bullets. The publisher defaults to
+`required_restart` so each production update uses the same overview-plus-restart
+popup unless a different policy is chosen explicitly. The supported restart
+policies are:
 
-- `notice_only`: show notes, no restart request.
-- `optional_restart`: ask users on an older build if they want to restart now.
+- `notice_only`: show notes, no restart request. Use only when a restart prompt
+  was intentionally ruled out.
+- `optional_restart`: ask users on an older build if they want to restart now,
+  but allow the popup to be dismissed.
 - `required_restart`: block users on an older build until they restart.
 - `critical_force_restart`: block users on an older build and auto-restart after
   a short countdown.

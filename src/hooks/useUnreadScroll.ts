@@ -3,6 +3,8 @@ import type { UserReadCursor } from '../lib/readCursors'
 
 const READ_SETTLE_MS = 220
 const SHORT_UNREAD_VIEWPORT_RATIO = 0.72
+const FOLLOW_LATEST_SETTLE_MS = 150
+const FOLLOW_LATEST_MAX_WAIT_MS = 800
 
 interface UseUnreadScrollOptions<TMessage> {
   containerRef: RefObject<HTMLElement>
@@ -60,9 +62,8 @@ export function useUnreadScroll<TMessage>({
   const lastMarkedKeyRef = useRef<string | null>(null)
   const readInFlightKeyRef = useRef<string | null>(null)
   const markTimerRef = useRef<number | null>(null)
-  const followFrameRef = useRef<number | null>(null)
-  const followSettleFrameRef = useRef<number | null>(null)
-  const followTimerRef = useRef<number | null>(null)
+  const followSettleTimerRef = useRef<number | null>(null)
+  const followMaxTimerRef = useRef<number | null>(null)
   const messagesRef = useRef(messages)
   messagesRef.current = messages
   const messageCount = messages.length
@@ -81,19 +82,14 @@ export function useUnreadScroll<TMessage>({
   }, [])
 
   const cancelFollowLatest = useCallback(() => {
-    if (followFrameRef.current !== null) {
-      cancelAnimationFrame(followFrameRef.current)
-      followFrameRef.current = null
+    if (followSettleTimerRef.current !== null) {
+      window.clearTimeout(followSettleTimerRef.current)
+      followSettleTimerRef.current = null
     }
 
-    if (followSettleFrameRef.current !== null) {
-      cancelAnimationFrame(followSettleFrameRef.current)
-      followSettleFrameRef.current = null
-    }
-
-    if (followTimerRef.current !== null) {
-      window.clearTimeout(followTimerRef.current)
-      followTimerRef.current = null
+    if (followMaxTimerRef.current !== null) {
+      window.clearTimeout(followMaxTimerRef.current)
+      followMaxTimerRef.current = null
     }
   }, [])
 
@@ -163,42 +159,38 @@ export function useUnreadScroll<TMessage>({
     if (!container) return
 
     const top = Math.max(container.scrollHeight - container.clientHeight, 0)
-    if (typeof container.scrollTo === 'function') {
-      container.scrollTo({ top, behavior })
-    } else {
-      container.scrollTop = top
+    if (Math.abs(container.scrollTop - top) > 1) {
+      if (typeof container.scrollTo === 'function') {
+        container.scrollTo({ top, behavior })
+      } else {
+        container.scrollTop = top
+      }
     }
     setAutoScroll(true)
     setFirstUnreadMessageId(null)
     scheduleMarkLatestRead(true)
   }, [containerRef, scheduleMarkLatestRead, setAutoScroll])
 
+  const flushFollowLatest = useCallback(() => {
+    cancelFollowLatest()
+    if (autoScrollRef.current) {
+      scrollToBottom('auto')
+    }
+  }, [cancelFollowLatest, scrollToBottom])
+
   const followLatest = useCallback(() => {
     if (!autoScrollRef.current) return
 
-    cancelFollowLatest()
+    if (followSettleTimerRef.current !== null) {
+      window.clearTimeout(followSettleTimerRef.current)
+    }
 
-    followFrameRef.current = requestAnimationFrame(() => {
-      followFrameRef.current = null
-      if (!autoScrollRef.current) return
+    followSettleTimerRef.current = window.setTimeout(flushFollowLatest, FOLLOW_LATEST_SETTLE_MS)
 
-      scrollToBottom('auto')
-
-      followSettleFrameRef.current = requestAnimationFrame(() => {
-        followSettleFrameRef.current = null
-        if (autoScrollRef.current) {
-          scrollToBottom('auto')
-        }
-      })
-
-      followTimerRef.current = window.setTimeout(() => {
-        followTimerRef.current = null
-        if (autoScrollRef.current) {
-          scrollToBottom('auto')
-        }
-      }, 140)
-    })
-  }, [cancelFollowLatest, scrollToBottom])
+    if (followMaxTimerRef.current === null) {
+      followMaxTimerRef.current = window.setTimeout(flushFollowLatest, FOLLOW_LATEST_MAX_WAIT_MS)
+    }
+  }, [flushFollowLatest])
 
   const handleScroll = useCallback(() => {
     const container = containerRef.current
@@ -277,7 +269,6 @@ export function useUnreadScroll<TMessage>({
       observer.observe(container.firstElementChild)
     }
 
-    followLatest()
     window.visualViewport?.addEventListener('resize', followLatest)
     window.visualViewport?.addEventListener('scroll', followLatest)
     window.addEventListener('resize', followLatest)

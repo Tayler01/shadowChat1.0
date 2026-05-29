@@ -1,6 +1,8 @@
 import type { ChatMessageType } from '../../lib/supabase'
 import { getSupabaseImageTransformUrl } from '../../lib/storageImageTransforms'
 
+export type ChatMediaOrientation = 'portrait' | 'square' | 'landscape'
+
 export type ReplyTarget = {
   id: string
   content: string
@@ -20,7 +22,34 @@ export type MessagePreviewSource = {
   sender?: { display_name?: string | null; username?: string | null } | null
 }
 
-const IMAGE_THUMBNAIL_DISPLAY_SIZE = 420
+export const CHAT_MEDIA_INTRINSIC_WIDTH = 1080
+export const CHAT_MEDIA_INTRINSIC_HEIGHT = 1920
+
+export const CHAT_MEDIA_ASPECT_CLASSES: Record<ChatMediaOrientation, string> = {
+  portrait: 'aspect-[9/16]',
+  square: 'aspect-square',
+  landscape: 'aspect-video',
+}
+
+const IMAGE_THUMBNAIL_DISPLAY_WIDTH = 480
+const IMAGE_THUMBNAIL_DISPLAY_HEIGHT = 854
+
+export const getChatMediaOrientation = (
+  width?: number | null,
+  height?: number | null
+): ChatMediaOrientation => {
+  if (!width || !height || width <= 0 || height <= 0) {
+    return 'portrait'
+  }
+
+  const ratio = width / height
+  if (ratio >= 1.18) return 'landscape'
+  if (ratio >= 0.82) return 'square'
+  return 'portrait'
+}
+
+export const getChatMediaAspectClass = (orientation: ChatMediaOrientation) =>
+  CHAT_MEDIA_ASPECT_CLASSES[orientation]
 
 export const getImageMessageDisplaySrc = (
   fileUrl?: string | null,
@@ -30,8 +59,8 @@ export const getImageMessageDisplaySrc = (
   if (!fileUrl) return ''
 
   return getSupabaseImageTransformUrl(fileUrl, {
-    width: IMAGE_THUMBNAIL_DISPLAY_SIZE,
-    height: IMAGE_THUMBNAIL_DISPLAY_SIZE,
+    width: IMAGE_THUMBNAIL_DISPLAY_WIDTH,
+    height: IMAGE_THUMBNAIL_DISPLAY_HEIGHT,
     resize: 'contain',
     quality: 76,
   })
