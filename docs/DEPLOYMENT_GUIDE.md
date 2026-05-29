@@ -30,10 +30,10 @@ node scripts/playwright-smoke.mjs --scenario=auth,resume-send --headed --no-reus
 
 For the current login persistence behavior, rollback checkpoints, and production smoke expectations, see [`docs/SESSION_PERSISTENCE_RUNBOOK.md`](C:/repos/chat2.0/docs/SESSION_PERSISTENCE_RUNBOOK.md:1).
 
-Before a production deploy that should notify users, update
-[`release-notes/current.json`](C:/repos/chat2.0/release-notes/current.json:1).
-The production Netlify workflow publishes those notes to `public.app_releases`
-after the deploy succeeds. See
+Production deploys publish an in-app release popup after Netlify succeeds. The
+popup content is generated from the pushed commit range by default, with
+[`release-notes/current.json`](C:/repos/chat2.0/release-notes/current.json:1)
+available only for explicit manual overrides. See
 [`docs/APP_RELEASES.md`](C:/repos/chat2.0/docs/APP_RELEASES.md:1).
 
 If the change affects News scraping, run:

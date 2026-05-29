@@ -11,11 +11,52 @@ const VALID_POLICIES = new Set([
 
 const VALID_SEVERITIES = new Set(['info', 'feature', 'maintenance', 'critical'])
 
-const DEFAULT_RELEASE_NOTES_PATH = path.join('release-notes', 'current.json')
+const DEFAULT_MANUAL_RELEASE_NOTES_PATH = path.join('release-notes', 'current.json')
+
+const AREA_RULES = [
+  {
+    label: 'In-app update popup and release publishing',
+    pattern: /^(src\/components\/releases|src\/lib\/appReleases|scripts\/publish-app-release|docs\/APP_RELEASES|release-notes|\.github\/workflows\/netlify-production)/,
+  },
+  {
+    label: 'General Chat message loading and media',
+    pattern: /^(src\/components\/chat|src\/hooks\/useMessages|src\/hooks\/useUnreadScroll|src\/lib\/mediaAssets|tests\/MessageItem|tests\/useUnreadScroll)/,
+  },
+  {
+    label: 'Direct Messages',
+    pattern: /^(src\/components\/dms|src\/hooks\/useDirectMessages|tests\/useDirectMessages)/,
+  },
+  {
+    label: 'Shadow Pin',
+    pattern: /^(src\/features\/shadow-pin|netlify\/functions\/.*shadow-pin|docs\/SHADOW_PIN|supabase\/.*shadow_pin|tests\/ShadowPin|tests\/useShadowPin)/,
+  },
+  {
+    label: 'News',
+    pattern: /^(src\/components\/news|src\/hooks\/useNews|services\/news-scraper|docs\/NEWS|docs\/LINK_PREVIEWS)/,
+  },
+  {
+    label: 'Backend and database',
+    pattern: /^(supabase\/migrations|supabase\/functions)/,
+  },
+  {
+    label: 'Deploy automation',
+    pattern: /^\.github\/workflows/,
+  },
+  {
+    label: 'Documentation',
+    pattern: /^docs\//,
+  },
+  {
+    label: 'Automated checks',
+    pattern: /^(tests|scripts)\//,
+  },
+]
 
 function parseArgs(argv) {
+  const envReleaseNotesPath = process.env.APP_RELEASE_NOTES_PATH || ''
   const args = {
-    releaseNotesPath: process.env.APP_RELEASE_NOTES_PATH || DEFAULT_RELEASE_NOTES_PATH,
+    releaseNotesPath: envReleaseNotesPath,
+    releaseNotesExplicit: Boolean(envReleaseNotesPath),
     netlifyJsonPath: '',
     dryRun: false,
   }
@@ -23,7 +64,8 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === '--release-notes') {
-      args.releaseNotesPath = argv[index + 1] || args.releaseNotesPath
+      args.releaseNotesPath = argv[index + 1] || DEFAULT_MANUAL_RELEASE_NOTES_PATH
+      args.releaseNotesExplicit = true
       index += 1
     } else if (arg === '--netlify-json') {
       args.netlifyJsonPath = argv[index + 1] || ''
@@ -86,6 +128,34 @@ function getGitValue(args) {
   }
 }
 
+function getGitLines(args) {
+  const value = getGitValue(args)
+  if (!value) {
+    return []
+  }
+
+  return value
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+}
+
+function gitRevisionExists(revision) {
+  if (!revision || isZeroSha(revision)) {
+    return false
+  }
+
+  try {
+    execFileSync('git', ['rev-parse', '--verify', `${revision}^{commit}`], {
+      cwd: process.cwd(),
+      stdio: ['ignore', 'ignore', 'ignore'],
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
 function readJsonFile(filePath, label) {
   try {
     return JSON.parse(fs.readFileSync(filePath, 'utf8'))
@@ -131,8 +201,7 @@ function normalizeSections(value) {
   })
 }
 
-function normalizeReleaseNotes(filePath) {
-  const notes = readJsonFile(filePath, 'release notes')
+function normalizeReleaseNotesObject(notes) {
   const title = normalizeText(notes.title, 140, 'title', true)
   const summary = normalizeText(notes.summary, 2000, 'summary', true)
   const restartPolicy = normalizeText(
@@ -162,6 +231,204 @@ function normalizeReleaseNotes(filePath) {
     restart_policy: restartPolicy,
     severity,
   }
+}
+
+function normalizeReleaseNotes(filePath) {
+  const notes = readJsonFile(filePath, 'release notes')
+  return normalizeReleaseNotesObject(notes)
+}
+
+function isZeroSha(value) {
+  return /^0{7,40}$/i.test(value.trim())
+}
+
+function truncateText(value, maxLength) {
+  const text = value.trim().replace(/\s+/g, ' ')
+  if (text.length <= maxLength) {
+    return text
+  }
+
+  return `${text.slice(0, Math.max(0, maxLength - 3)).trimEnd()}...`
+}
+
+function capitalizeFirst(value) {
+  const text = value.trim()
+  if (!text) {
+    return text
+  }
+
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`
+}
+
+function cleanCommitSubject(subject) {
+  const text = subject
+    .trim()
+    .replace(/^Merge pull request\b.*$/i, '')
+    .replace(/^Merge branch\b.*$/i, '')
+    .replace(/^[a-z]+(?:\([^)]+\))?!?:\s*/i, '')
+    .replace(/\s+/g, ' ')
+
+  return capitalizeFirst(text)
+}
+
+function uniqueTexts(values) {
+  const seen = new Set()
+  const result = []
+
+  for (const value of values) {
+    const text = value.trim()
+    const key = text.toLowerCase()
+    if (!text || seen.has(key)) {
+      continue
+    }
+    seen.add(key)
+    result.push(text)
+  }
+
+  return result
+}
+
+function listToSentence(values) {
+  if (values.length === 0) {
+    return ''
+  }
+
+  if (values.length === 1) {
+    return values[0]
+  }
+
+  if (values.length === 2) {
+    return `${values[0]} and ${values[1]}`
+  }
+
+  return `${values.slice(0, -1).join(', ')}, and ${values.at(-1)}`
+}
+
+function getReleaseBaseCommit(headRevision) {
+  const explicitBase = firstEnv('APP_RELEASE_BEFORE_SHA', 'GITHUB_EVENT_BEFORE')
+  if (explicitBase && !isZeroSha(explicitBase) && gitRevisionExists(explicitBase)) {
+    return explicitBase
+  }
+
+  const previousCommit = getGitValue(['rev-parse', `${headRevision}^`])
+  if (previousCommit && gitRevisionExists(previousCommit)) {
+    return previousCommit
+  }
+
+  return ''
+}
+
+function getReleaseCommitSubjects(baseRevision, headRevision) {
+  const range = baseRevision ? `${baseRevision}..${headRevision}` : headRevision
+  const args = baseRevision
+    ? ['log', '--no-merges', '--format=%s', range]
+    : ['log', '-1', '--format=%s', headRevision]
+  let subjects = getGitLines(args).map(cleanCommitSubject).filter(Boolean)
+
+  if (baseRevision && subjects.length === 0) {
+    subjects = getGitLines(['log', '--format=%s', range])
+      .map(cleanCommitSubject)
+      .filter(Boolean)
+  }
+
+  if (subjects.length === 0) {
+    subjects = getGitLines(['log', '-1', '--format=%s', headRevision])
+      .map(cleanCommitSubject)
+      .filter(Boolean)
+  }
+
+  return uniqueTexts(subjects).slice(0, 8)
+}
+
+function getReleaseChangedFiles(baseRevision, headRevision) {
+  const files = baseRevision
+    ? getGitLines(['diff', '--name-only', `${baseRevision}..${headRevision}`])
+    : getGitLines(['show', '--name-only', '--format=', headRevision])
+
+  return uniqueTexts(files.map(file => file.replace(/\\/g, '/')))
+}
+
+function classifyChangedFiles(files) {
+  const labels = []
+
+  for (const file of files) {
+    const normalizedFile = file.replace(/\\/g, '/')
+    const rule = AREA_RULES.find(candidate => candidate.pattern.test(normalizedFile))
+    if (rule) {
+      labels.push(rule.label)
+    }
+  }
+
+  return uniqueTexts(labels)
+}
+
+function inferReleaseSeverity(files, subjects) {
+  const combined = `${files.join(' ')} ${subjects.join(' ')}`.toLowerCase()
+
+  if (/\b(critical|security|hotfix|urgent)\b/.test(combined)) {
+    return 'critical'
+  }
+
+  if (
+    files.some(file =>
+      /^(scripts\/|\.github\/workflows\/|docs\/|release-notes\/)/.test(file.replace(/\\/g, '/'))
+    )
+  ) {
+    return 'maintenance'
+  }
+
+  return 'feature'
+}
+
+function buildGeneratedReleaseNotes(commitSha) {
+  const headRevision =
+    firstEnv('APP_RELEASE_HEAD_SHA', 'APP_RELEASE_COMMIT_SHA', 'VITE_APP_COMMIT_SHA', 'GITHUB_SHA') ||
+    commitSha ||
+    'HEAD'
+  const baseRevision = getReleaseBaseCommit(headRevision)
+  const subjects = getReleaseCommitSubjects(baseRevision, headRevision)
+  const changedFiles = getReleaseChangedFiles(baseRevision, headRevision)
+  const areas = classifyChangedFiles(changedFiles)
+  const highlights = subjects.length > 0
+    ? subjects
+    : ['Refresh the app with the latest production build']
+  const title = highlights.length === 1
+    ? highlights[0]
+    : areas.length > 0
+      ? `${areas[0]} update`
+      : 'Shadow Chat update'
+  const areaSentence = areas.length > 0
+    ? `It updates ${listToSentence(areas.slice(0, 4)).toLowerCase()}.`
+    : 'It updates the latest production build.'
+  const summary = highlights.length === 1
+    ? `This release includes: ${highlights[0]}. ${areaSentence} Restart or refresh to load the newest version.`
+    : `This release includes ${highlights.length} shipped changes, including ${listToSentence(highlights.slice(0, 3))}. ${areaSentence} Restart or refresh to load the newest version.`
+  const areaItems = areas.length > 0
+    ? areas.map(area => `${area} received production changes in this build.`)
+    : [`${changedFiles.length || 1} project file${changedFiles.length === 1 ? '' : 's'} changed in this build.`]
+
+  return normalizeReleaseNotesObject({
+    title: truncateText(title, 140),
+    summary: truncateText(summary, 2000),
+    restartPolicy: 'required_restart',
+    severity: inferReleaseSeverity(changedFiles, highlights),
+    sections: [
+      {
+        heading: 'Highlights',
+        items: highlights.slice(0, 6).map(item => truncateText(item, 280)),
+      },
+      {
+        heading: 'Updated areas',
+        items: areaItems.slice(0, 6).map(item => truncateText(item, 280)),
+      },
+      {
+        heading: 'Restart required',
+        items: [
+          'Restart or refresh Shadow Chat to load this build and clear the previous cached app version.',
+        ],
+      },
+    ],
+  })
 }
 
 function readNetlifyDeployInfo(filePath) {
@@ -213,11 +480,8 @@ async function upsertAppRelease(supabaseUrl, serviceRoleKey, row) {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2))
   loadLocalEnv()
-
-  const releaseNotesPath = path.resolve(process.cwd(), args.releaseNotesPath)
-  const notes = normalizeReleaseNotes(releaseNotesPath)
+  const args = parseArgs(process.argv.slice(2))
   const netlifyInfo = readNetlifyDeployInfo(args.netlifyJsonPath)
 
   const commitSha =
@@ -232,6 +496,9 @@ async function main() {
   const deployUrl =
     firstEnv('APP_RELEASE_DEPLOY_URL', 'NETLIFY_DEPLOY_URL', 'DEPLOY_URL', 'URL') ||
     netlifyInfo.deployUrl
+  const notes = args.releaseNotesExplicit
+    ? normalizeReleaseNotes(path.resolve(process.cwd(), args.releaseNotesPath))
+    : buildGeneratedReleaseNotes(commitSha)
 
   if (!buildId) {
     throw new Error('Missing build id. Set APP_RELEASE_BUILD_ID or VITE_APP_BUILD_ID.')

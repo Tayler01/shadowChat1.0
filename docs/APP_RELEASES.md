@@ -5,12 +5,20 @@ of Shado chat posts.
 
 ## Release Notes Source
 
-Edit [release-notes/current.json](C:/repos/chat2.0/release-notes/current.json:1)
-before a production deploy. Release notes must include a title, summary, and at
-least one section with concrete overview bullets. The publisher defaults to
-`required_restart` so each production update uses the same overview-plus-restart
-popup unless a different policy is chosen explicitly. The supported restart
-policies are:
+Production deploys generate their release popup title, summary, and sections
+from the pushed commit range by default. This keeps each app-update popup tied
+to the actual update instead of reusing stale copy from the previous release.
+
+For a hand-authored release, pass an explicit notes file:
+
+```powershell
+node scripts/publish-app-release.mjs --release-notes release-notes/current.json --netlify-json netlify-production.json
+```
+
+Manual release notes must include a title, summary, and at least one section
+with concrete overview bullets. The publisher defaults to `required_restart` so
+each production update uses the same overview-plus-restart popup unless a
+different policy is chosen explicitly. The supported restart policies are:
 
 - `notice_only`: show notes, no restart request. Use only when a restart prompt
   was intentionally ruled out.

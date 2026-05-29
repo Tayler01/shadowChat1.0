@@ -26,10 +26,14 @@ jobs:
       VITE_APP_BUILD_ID: ${{ github.sha }}
       VITE_APP_COMMIT_SHA: ${{ github.sha }}
       VITE_APP_DEPLOY_CONTEXT: production
+      APP_RELEASE_BEFORE_SHA: ${{ github.event.before }}
+      APP_RELEASE_HEAD_SHA: ${{ github.sha }}
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
