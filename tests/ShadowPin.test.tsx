@@ -222,6 +222,8 @@ test('renders category pins in packed mobile masonry columns', () => {
 
 test('hides the video label in the feed until pin details are active', () => {
   jest.useFakeTimers()
+  const originalPlay = HTMLMediaElement.prototype.play
+  HTMLMediaElement.prototype.play = jest.fn().mockResolvedValue(undefined)
   mockUseShadowPinImages.mockReturnValue({
     category,
     images: [
@@ -262,6 +264,7 @@ test('hides the video label in the feed until pin details are active', () => {
 
     expect(screen.getByText('Video')).toBeInTheDocument()
   } finally {
+    HTMLMediaElement.prototype.play = originalPlay
     jest.useRealTimers()
   }
 })
@@ -358,6 +361,68 @@ test('autoplays a focused native video pin muted in the masonry feed', async () 
   }
 })
 
+test('tapping a neighboring video pin moves playback focus to that pin', async () => {
+  jest.useFakeTimers()
+  const originalPlay = HTMLMediaElement.prototype.play
+  HTMLMediaElement.prototype.play = jest.fn().mockResolvedValue(undefined)
+
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      {
+        ...image('clip-one', 1080, 1920),
+        media_type: 'video',
+        provider: 'bunny_stream',
+        video_preview_url: 'https://videos.example/clip-one-480.mp4',
+        video_playback_url: 'https://videos.example/clip-one-720.mp4',
+        processing_status: 'ready',
+      },
+      {
+        ...image('clip-two', 1080, 1920),
+        media_type: 'video',
+        provider: 'bunny_stream',
+        video_preview_url: 'https://videos.example/clip-two-480.mp4',
+        video_playback_url: 'https://videos.example/clip-two-720.mp4',
+        processing_status: 'ready',
+      },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  try {
+    const { container } = render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+    const firstCard = screen.getByAltText('Pin clip-one').closest('article')
+    const secondCard = screen.getByAltText('Pin clip-two').closest('article')
+    expect(firstCard).not.toBeNull()
+    expect(secondCard).not.toBeNull()
+
+    fireEvent.click(firstCard!)
+    await waitFor(() => {
+      expect(container.querySelector('video')).toHaveAttribute('src', 'https://videos.example/clip-one-480.mp4')
+    })
+
+    fireEvent.click(secondCard!)
+    await waitFor(() => {
+      expect(container.querySelector('video')).toHaveAttribute('src', 'https://videos.example/clip-two-480.mp4')
+    })
+    expect(container.querySelector('video[src="https://videos.example/clip-one-480.mp4"]')).not.toBeInTheDocument()
+  } finally {
+    HTMLMediaElement.prototype.play = originalPlay
+    jest.useRealTimers()
+  }
+})
+
 test('opens Bunny embed videos in the fullscreen viewer when direct renditions are unavailable', () => {
   jest.useFakeTimers()
   mockUseShadowPinImages.mockReturnValue({
@@ -393,7 +458,7 @@ test('opens Bunny embed videos in the fullscreen viewer when direct renditions a
     fireEvent.click(videoCard!)
     fireEvent.click(videoCard!)
 
-    const viewerFrame = screen.getByTitle('Pin bunny')
+    const viewerFrame = screen.getAllByTitle('Pin bunny')[1]
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('player.mediadelivery.net'))
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('autoplay=true'))
     expect(viewerFrame).toHaveAttribute('src', expect.not.stringContaining('controls=false'))
@@ -487,7 +552,7 @@ test('opens legacy Pinterest video pins with the Pinterest oEmbed iframe', () =>
     fireEvent.click(videoCard!)
     fireEvent.click(videoCard!)
 
-    const viewerFrame = screen.getByTitle('Pin pinterest')
+    const viewerFrame = screen.getAllByTitle('Pin pinterest')[1]
     expect(viewerFrame).toHaveAttribute('src', 'https://assets.pinterest.com/ext/embed.html?id=342906959154248010&src=shado-pin')
   } finally {
     jest.useRealTimers()
@@ -530,7 +595,7 @@ test('opens YouTube video pins with fullscreen player controls', () => {
     fireEvent.click(videoCard!)
     fireEvent.click(videoCard!)
 
-    const viewerFrame = screen.getByTitle('Pin youtube')
+    const viewerFrame = screen.getAllByTitle('Pin youtube')[1]
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('www.youtube.com/embed/Czrv1RX19G0'))
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('autoplay=1'))
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('mute=1'))

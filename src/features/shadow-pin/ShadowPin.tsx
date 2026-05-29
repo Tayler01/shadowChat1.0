@@ -1560,6 +1560,10 @@ function ImageCard({
       return
     }
 
+    if (videoPin) {
+      onVideoFocus()
+    }
+
     if (clickTimer.current) {
       window.clearTimeout(clickTimer.current)
       clickTimer.current = null
