@@ -123,6 +123,9 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
   const isOwn = message.sender_id === currentUserId
   const isIncoming = !isOwn
   const isImageMessage = message.message_type === 'image' && Boolean(message.file_url)
+  const isVideoMessage = message.message_type === 'video' && Boolean(message.file_url)
+  const isFloatingMediaMessage = isImageMessage || isVideoMessage
+  const videoMessageUrl = isVideoMessage ? message.file_url || '' : ''
   const imageMessageSrc = getImageMessageDisplaySrc(message.file_url, message.thumbnail_url)
   const isLocalDelivery = message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
   const isFailedLocalMessage = isOwn && message.delivery_status === 'failed'
@@ -328,11 +331,11 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
         <div
           ref={bubbleShellRef}
           className={`relative w-fit max-w-full rounded-2xl ${showIncomingAvatar ? 'ml-8' : ''} ${
-            isImageMessage ? 'bg-transparent px-0 py-0 shadow-none' : 'px-4 py-2'
+            isFloatingMediaMessage ? 'bg-transparent px-0 py-0 shadow-none' : 'px-4 py-2'
           } ${
             bubbleStyle
               ? ''
-              : isImageMessage
+              : isFloatingMediaMessage
                 ? ''
                 : isOwn
                 ? 'theme-sent-bubble'
@@ -417,8 +420,8 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
               className="mt-1 block h-auto max-h-[42vh] max-w-[min(10rem,100%)] cursor-pointer rounded-[var(--radius-md)] object-contain shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:max-w-[11rem]"
               onClick={() => setShowImageModal(true)}
             />
-          ) : message.message_type === 'video' && message.file_url ? (
-            <VideoAttachment url={message.file_url} meta={message.content} />
+          ) : isVideoMessage ? (
+            <VideoAttachment url={videoMessageUrl} meta={message.content} />
           ) : message.message_type === 'file' && message.file_url ? (
             <FileAttachment url={message.file_url} meta={message.content} />
           ) : (

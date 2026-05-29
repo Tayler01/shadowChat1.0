@@ -179,6 +179,8 @@ test('renders video message', () => {
   expect(video).toHaveAttribute('width', '1080')
   expect(video).toHaveAttribute('height', '1920')
   expect(video).not.toHaveClass('border', 'bg-black', 'shadow-[var(--shadow-panel)]')
+  expect(video?.parentElement).toHaveClass('bg-transparent', 'px-0', 'py-0', 'shadow-none')
+  expect(video?.parentElement).not.toHaveClass('border', 'bg-[var(--bg-panel)]')
   expect(screen.queryByRole('link', { name: /clip.mp4/i })).not.toBeInTheDocument()
 })
 

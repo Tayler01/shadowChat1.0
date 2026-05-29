@@ -200,6 +200,9 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const isShadoAI = message.user?.username === 'shado_ai'
     const isAIMessage = isShadoAI || message.message_type === 'command'
     const isImageMessage = message.message_type === 'image' && Boolean(message.file_url)
+    const isVideoMessage = message.message_type === 'video' && Boolean(message.file_url)
+    const isFloatingMediaMessage = isImageMessage || isVideoMessage
+    const videoMessageUrl = isVideoMessage ? message.file_url || '' : ''
     const imageMessageSrc = getImageMessageDisplaySrc(message.file_url, message.thumbnail_url)
     const parentPreview = parentMessage
       ? getMessagePreviewText(parentMessage)
@@ -465,10 +468,10 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 <div
                   className={cn(
                     'relative peer space-y-1 break-words rounded-[var(--radius-md)]',
-                    isImageMessage
+                    isFloatingMediaMessage
                       ? 'bg-transparent px-0 py-0 text-[var(--text-primary)] shadow-none'
                       : 'px-3 py-2 shadow-[var(--shadow-panel)]',
-                    isImageMessage
+                    isFloatingMediaMessage
                       ? ''
                       : isAIMessage
                       ? 'border border-[var(--border-glow)] bg-[var(--theme-accent-softer)] text-[var(--text-primary)]'
@@ -505,8 +508,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                       }}
                       onClick={() => setShowImageModal(true)}
                     />
-                  ) : message.message_type === 'video' && message.file_url ? (
-                    <VideoAttachment url={message.file_url} meta={message.content} />
+                  ) : isVideoMessage ? (
+                    <VideoAttachment url={videoMessageUrl} meta={message.content} />
                   ) : message.message_type === 'file' && message.file_url ? (
                     <FileAttachment url={message.file_url} meta={message.content} />
                   ) : (
