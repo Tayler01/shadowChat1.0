@@ -16,9 +16,12 @@ export interface MessagesContextValue {
   ) => Promise<Message | null>
   editMessage: (id: string, content: string) => Promise<void>
   deleteMessage: (id: string) => Promise<void>
+  retryFailedMessage: (id: string) => Promise<Message | null>
+  discardFailedMessage: (id: string) => void
   toggleReaction: (id: string, emoji: string) => Promise<void>
   togglePin: (id: string) => Promise<void>
   loadOlderMessages: () => Promise<void>
+  compactToLatestMessages: () => void
 }
 
 export const MessagesContext = createContext<MessagesContextValue | undefined>(undefined)

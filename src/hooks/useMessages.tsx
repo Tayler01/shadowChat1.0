@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import {
   Message,
+  User,
   type ChatMessageType,
   ensureSession,
   refreshSessionLocked,
@@ -37,10 +38,17 @@ import { useAuth } from './useAuth';
 import { useRealtimeRecovery } from './useRealtimeRecovery';
 import { useSoundEffects } from './useSoundEffects';
 import { createRealtimeChannelName } from '../lib/realtimeChannelName';
+import {
+  loadLocalOutboxEntries,
+  removeLocalOutboxEntry,
+  upsertLocalOutboxEntry,
+  type LocalMessageOutboxEntry,
+} from '../lib/localMessageOutbox';
 
 export { useMessages, useOptionalMessages };
 
 const SEND_OPERATION_TIMEOUT_MS = 12000;
+const GROUP_OUTBOX_SCOPE = 'general';
 
 const dedupeMessagesById = (items: Message[]) =>
   items.reduce<Message[]>((acc, item) => upsertMessageIntoState(acc, item), [])
@@ -230,7 +238,7 @@ function useProvideMessages(): MessagesContextValue {
   })();
 
   const [messages, setMessages] = useState<Message[]>(initialMessages);
-  const [loading, setLoading] = useState(initialMessages.length === 0);
+  const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -245,6 +253,22 @@ function useProvideMessages(): MessagesContextValue {
   const sendingRef = useRef(false);
   const latestMessagesRef = useRef<Message[]>(initialMessages);
   const hydrationFetchesRef = useRef<Map<string, Promise<Message | null>>>(new Map());
+
+  const hydrateLocalOutboxMessages = useCallback(() => {
+    if (!user?.id) return;
+
+    const entries = loadLocalOutboxEntries(GROUP_OUTBOX_SCOPE)
+      .filter(entry => entry.senderId === user.id);
+    if (entries.length === 0) return;
+
+    setMessages(prev => {
+      const nextMessages = entries.reduce<Message[]>(
+        (acc, entry) => upsertMessageIntoState(acc, localOutboxEntryToMessage(entry, profile ?? user)),
+        prev
+      );
+      return loadedOlderRef.current ? sortMessagesByCreatedAt(nextMessages) : trimMessageWindow(nextMessages);
+    });
+  }, [profile, user]);
 
   const addNewMessage = useCallback(
     (msg: Message) => {
@@ -358,7 +382,9 @@ function useProvideMessages(): MessagesContextValue {
           return nextMessages;
         });
       } else {
-        setMessages([]);
+        setMessages(prev => prev.filter(
+          message => message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
+        ));
         setHasMore(false);
         if (typeof localStorage !== 'undefined') {
           try {
@@ -442,6 +468,18 @@ function useProvideMessages(): MessagesContextValue {
     }
   }, [messages, loadingMore, hasMore]);
 
+  const compactToLatestMessages = useCallback(() => {
+    loadedOlderRef.current = false;
+    setMessages(prev => {
+      const nextMessages = trimMessageWindow(prev);
+      if (nextMessages === prev || nextMessages.length === prev.length) {
+        return prev;
+      }
+      cacheMessages(nextMessages);
+      return nextMessages;
+    });
+  }, []);
+
   // Reset function to reinitialize everything with fresh client
   const resetWithFreshClient = useCallback(async () => {
     if (resetInFlightRef.current) {
@@ -518,6 +556,10 @@ function useProvideMessages(): MessagesContextValue {
     latestMessagesRef.current = messages;
     cacheMessages(messages);
   }, [messages]);
+
+  useEffect(() => {
+    hydrateLocalOutboxMessages();
+  }, [hydrateLocalOutboxMessages]);
 
   useEffect(() => {
     if (!profile) return;
@@ -737,7 +779,8 @@ function useProvideMessages(): MessagesContextValue {
     messageType: ChatMessageType = 'text',
     fileUrl?: string,
     replyTo?: string,
-    thumbnailUrl?: string | null
+    thumbnailUrl?: string | null,
+    options: SendMessageOptions = {}
   ): Promise<Message | null> => {
     // Text messages require content, but image/audio messages may provide just a file URL
     if (!user || (!content.trim() && !fileUrl)) {
@@ -751,8 +794,8 @@ function useProvideMessages(): MessagesContextValue {
     sendingRef.current = true;
     setSending(true);
     let inserted: Message | null = null;
-    const clientMessageId = createClientMessageId();
-    const createdAt = new Date().toISOString();
+    const clientMessageId = options.clientMessageId || createClientMessageId();
+    const createdAt = options.createdAt || new Date().toISOString();
     const optimisticPayload = prepareMessageData(
       user.id,
       content,
@@ -811,6 +854,7 @@ function useProvideMessages(): MessagesContextValue {
         }
 
         if (data) {
+          removeLocalOutboxEntry(GROUP_OUTBOX_SCOPE, clientMessageId);
           inserted = {
             ...(data as unknown as Message),
             optimistic: false,
@@ -861,6 +905,18 @@ function useProvideMessages(): MessagesContextValue {
         'Message send timed out while reconnecting. Please try again.'
       );
     } catch (error) {
+      upsertLocalOutboxEntry(GROUP_OUTBOX_SCOPE, {
+        id: clientMessageId,
+        clientMessageId,
+        senderId: user.id,
+        content: content.trim(),
+        messageType,
+        fileUrl,
+        thumbnailUrl,
+        replyTo,
+        createdAt,
+        failedAt: new Date().toISOString(),
+      });
       setMessages(prev => markMessageSendFailed(prev, clientMessageId));
       await runRealtimeRecovery('send-error').catch(() => undefined);
       if (error instanceof Error) {
@@ -876,6 +932,40 @@ function useProvideMessages(): MessagesContextValue {
     }
     return inserted;
   }, [addNewMessage, profile, user]);
+
+  const retryFailedMessage = useCallback(async (messageId: string) => {
+    const failedMessage = latestMessagesRef.current.find(message =>
+      (message.id === messageId || message.client_message_id === messageId) &&
+      message.delivery_status === 'failed'
+    );
+
+    if (!failedMessage) return null;
+
+    const clientMessageId = failedMessage.client_message_id || failedMessage.id;
+    const retryContent = failedMessage.message_type === 'audio'
+      ? failedMessage.audio_url || failedMessage.content
+      : failedMessage.content;
+
+    return sendMessage(
+      retryContent,
+      failedMessage.message_type,
+      failedMessage.file_url,
+      failedMessage.reply_to,
+      failedMessage.thumbnail_url,
+      {
+        clientMessageId,
+        createdAt: new Date().toISOString(),
+      }
+    );
+  }, [sendMessage]);
+
+  const discardFailedMessage = useCallback((messageId: string) => {
+    removeLocalOutboxEntry(GROUP_OUTBOX_SCOPE, messageId);
+    setMessages(prev => prev.filter(message => (
+      message.id !== messageId &&
+      message.client_message_id !== messageId
+    )));
+  }, []);
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
     if (!user) return;
@@ -1041,10 +1131,42 @@ function useProvideMessages(): MessagesContextValue {
     sendMessage,
     editMessage,
     deleteMessage,
+    retryFailedMessage,
+    discardFailedMessage,
     toggleReaction,
     togglePin,
     loadOlderMessages,
+    compactToLatestMessages,
   };
+}
+
+const localOutboxEntryToMessage = (
+  entry: LocalMessageOutboxEntry,
+  user?: Partial<User> | null
+) => ({
+  id: entry.clientMessageId,
+  client_message_id: entry.clientMessageId,
+  user_id: entry.senderId,
+  content: entry.messageType === 'audio' ? '' : entry.content,
+  message_type: entry.messageType,
+  file_url: entry.fileUrl,
+  thumbnail_url: entry.thumbnailUrl ?? null,
+  ...(entry.replyTo ? { reply_to: entry.replyTo } : {}),
+  ...(entry.messageType === 'audio' ? { audio_url: entry.content } : {}),
+  reactions: {},
+  pinned: false,
+  pinned_by: null,
+  pinned_at: null,
+  created_at: entry.createdAt,
+  updated_at: entry.failedAt,
+  user,
+  optimistic: true,
+  delivery_status: 'failed',
+} as Message)
+
+type SendMessageOptions = {
+  clientMessageId?: string
+  createdAt?: string
 }
 
 export function MessagesProvider({ children }: { children: React.ReactNode }) {

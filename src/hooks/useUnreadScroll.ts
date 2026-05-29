@@ -227,10 +227,38 @@ export function useUnreadScroll<TMessage>({
     return () => {
       if (markTimerRef.current) {
         window.clearTimeout(markTimerRef.current)
+        markTimerRef.current = null
+      }
+      if (autoScrollRef.current) {
+        void markLatestRead(false)
       }
       cancelFollowLatest()
     }
-  }, [cancelFollowLatest])
+  }, [cancelFollowLatest, markLatestRead])
+
+  useEffect(() => {
+    if (!enabled) return
+
+    const flushReadCursor = () => {
+      if (autoScrollRef.current) {
+        void markLatestRead(false)
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushReadCursor()
+      }
+    }
+
+    window.addEventListener('pagehide', flushReadCursor)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('pagehide', flushReadCursor)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [enabled, markLatestRead])
 
   useEffect(() => {
     const container = containerRef.current

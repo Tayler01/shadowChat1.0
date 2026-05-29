@@ -28,6 +28,7 @@ import {
   createClientMessageId,
   isClientMessageIdSchemaError,
   isMediaThumbnailSchemaError,
+  isReplyToSchemaError,
   markMessageSendFailed,
   mergeRealtimeMessageUpdate,
   upsertMessageIntoState,
@@ -37,6 +38,12 @@ import { useAuth } from './useAuth';
 import { useRealtimeRecovery } from './useRealtimeRecovery';
 import { useSoundEffects } from './useSoundEffects';
 import { clearDMNotifications } from '../lib/appBadge';
+import {
+  loadLocalOutboxEntries,
+  removeLocalOutboxEntry,
+  upsertLocalOutboxEntry,
+  type LocalMessageOutboxEntry,
+} from '../lib/localMessageOutbox';
 
 interface DirectMessagesContextValue {
   conversations: DMConversation[];
@@ -53,8 +60,11 @@ interface DirectMessagesContextValue {
     content: string,
     messageType?: ChatMessageType,
     fileUrl?: string,
+    replyTo?: string,
     thumbnailUrl?: string | null
   ) => Promise<DMMessage | null>;
+  retryFailedMessage: (messageId: string) => Promise<DMMessage | null>;
+  discardFailedMessage: (messageId: string) => void;
   editMessage: (messageId: string, content: string) => Promise<void>;
   deleteMessage: (messageId: string) => Promise<void>;
   toggleReaction: (messageId: string, emoji: string) => Promise<void>;
@@ -64,6 +74,41 @@ interface DirectMessagesContextValue {
 
 const DirectMessagesContext = createContext<DirectMessagesContextValue | undefined>(undefined);
 const SEND_OPERATION_TIMEOUT_MS = 12000;
+
+const getDMOutboxScope = (conversationId: string) => `dm:${conversationId}`;
+
+const sortDMMessagesByCreatedAt = (items: DMMessage[]) =>
+  [...items].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+const localOutboxEntryToDMMessage = (
+  entry: LocalMessageOutboxEntry,
+  conversationId: string,
+  user?: Partial<NonNullable<DMMessage['sender']>> | null
+) => ({
+  id: entry.clientMessageId,
+  client_message_id: entry.clientMessageId,
+  conversation_id: conversationId,
+  sender_id: entry.senderId,
+  content: entry.messageType === 'audio' ? '' : entry.content,
+  message_type: entry.messageType,
+  file_url: entry.fileUrl,
+  thumbnail_url: entry.thumbnailUrl ?? null,
+  ...(entry.replyTo ? { reply_to: entry.replyTo } : {}),
+  ...(entry.messageType === 'audio' ? { audio_url: entry.content } : {}),
+  read_at: undefined,
+  read_by: [entry.senderId],
+  reactions: {},
+  created_at: entry.createdAt,
+  updated_at: entry.failedAt,
+  sender: user,
+  optimistic: true,
+  delivery_status: 'failed',
+} as DMMessage);
+
+type SendDMMessageOptions = {
+  clientMessageId?: string;
+  createdAt?: string;
+}
 
 type FetchConversationMessagesOptions = {
   silent?: boolean;
@@ -200,6 +245,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
                     file_url: payload.new.file_url ?? undefined,
                     thumbnail_url: payload.new.thumbnail_url ?? undefined,
                     media_processed_at: payload.new.media_processed_at ?? undefined,
+                    reply_to: payload.new.reply_to ?? undefined,
                     read_at: payload.new.read_at,
                     reactions: payload.new.reactions,
                     edited_at: payload.new.edited_at,
@@ -337,6 +383,8 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     loading: messagesLoading,
     sending,
     sendMessage: sendConversationMessage,
+    retryFailedMessage: retryConversationFailedMessage,
+    discardFailedMessage,
     editMessage,
     deleteMessage,
     toggleReaction,
@@ -350,9 +398,10 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
       content: string,
       messageType?: ChatMessageType,
       fileUrl?: string,
+      replyTo?: string,
       thumbnailUrl?: string | null
     ) => {
-      const message = await sendConversationMessage(content, messageType, fileUrl, thumbnailUrl);
+      const message = await sendConversationMessage(content, messageType, fileUrl, replyTo, thumbnailUrl);
       if (message) {
         refreshConversationsDebounced();
       }
@@ -360,6 +409,14 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     },
     [refreshConversationsDebounced, sendConversationMessage]
   );
+
+  const retryFailedMessage = useCallback(async (messageId: string) => {
+    const message = await retryConversationFailedMessage(messageId);
+    if (message) {
+      refreshConversationsDebounced();
+    }
+    return message;
+  }, [refreshConversationsDebounced, retryConversationFailedMessage]);
 
   const startConversation = useCallback(async (username: string) => {
     if (!user) return null;
@@ -414,6 +471,8 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     hasMore,
     startConversation,
     sendMessage,
+    retryFailedMessage,
+    discardFailedMessage,
     editMessage,
     deleteMessage,
     toggleReaction,
@@ -448,6 +507,19 @@ export function useConversationMessages(conversationId: string | null) {
     latestMessagesRef.current = messages;
   }, [messages]);
 
+  const hydrateLocalOutboxMessages = useCallback(() => {
+    if (!user?.id || !conversationId) return;
+
+    const entries = loadLocalOutboxEntries(getDMOutboxScope(conversationId))
+      .filter(entry => entry.senderId === user.id);
+    if (entries.length === 0) return;
+
+    setMessages(prev => sortDMMessagesByCreatedAt(entries.reduce<DMMessage[]>(
+      (acc, entry) => upsertMessageIntoState(acc, localOutboxEntryToDMMessage(entry, conversationId, profile ?? user)),
+      prev
+    )));
+  }, [conversationId, profile, user]);
+
   const insertConversationMessage = useCallback(
     async (
       payload: {
@@ -460,6 +532,7 @@ export function useConversationMessages(conversationId: string | null) {
         thumbnail_url?: string;
         media_processed_at?: string;
         audio_url?: string;
+        reply_to?: string;
       }
     ) => {
       const workingClient = await getWorkingClient();
@@ -505,6 +578,26 @@ export function useConversationMessages(conversationId: string | null) {
         };
       }
 
+      if (result.error && payload.reply_to && isReplyToSchemaError(result.error)) {
+        const {
+          reply_to: _replyTo,
+          ...legacyReplyPayload
+        } = payload;
+        const legacyReplyInsertPromise = workingClient
+          .from('dm_messages')
+          .insert(legacyReplyPayload)
+          .select(`
+            *,
+            sender:users!sender_id(*)
+          `)
+          .single();
+
+        result = (await Promise.race([legacyReplyInsertPromise, timeoutPromise])) as {
+          data: DMMessage | null;
+          error: any;
+        };
+      }
+
       if (result.error && payload.client_message_id && isClientMessageIdSchemaError(result.error)) {
         const {
           client_message_id: _clientMessageId,
@@ -522,6 +615,26 @@ export function useConversationMessages(conversationId: string | null) {
           .single();
 
         result = (await Promise.race([legacyInsertPromise, timeoutPromise])) as {
+          data: DMMessage | null;
+          error: any;
+        };
+      }
+
+      if (result.error && payload.reply_to && isReplyToSchemaError(result.error)) {
+        const {
+          reply_to: _replyTo,
+          ...legacyReplyPayload
+        } = payload;
+        const legacyReplyInsertPromise = workingClient
+          .from('dm_messages')
+          .insert(legacyReplyPayload)
+          .select(`
+            *,
+            sender:users!sender_id(*)
+          `)
+          .single();
+
+        result = (await Promise.race([legacyReplyInsertPromise, timeoutPromise])) as {
           data: DMMessage | null;
           error: any;
         };
@@ -641,7 +754,9 @@ export function useConversationMessages(conversationId: string | null) {
 
         if (error) {
           if (!options.silent) {
-            setMessages([]);
+            setMessages(prev => prev.filter(
+              message => message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
+            ));
             setHasMore(false);
           }
         } else {
@@ -651,16 +766,18 @@ export function useConversationMessages(conversationId: string | null) {
             const pendingLocalMessages = prev.filter(
               message => message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
             );
-            return fetchedMessages.reduce<DMMessage[]>(
+            return sortDMMessagesByCreatedAt(fetchedMessages.reduce<DMMessage[]>(
               (acc, message) => upsertMessageIntoState(acc, { ...message, optimistic: false, delivery_status: 'sent' }),
               pendingLocalMessages
-            );
+            ));
           });
         }
       } catch {
         if (!disposed && requestId === fetchRequestIdRef.current) {
           if (!options.silent) {
-            setMessages([]);
+            setMessages(prev => prev.filter(
+              message => message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
+            ));
             setHasMore(false);
           }
         }
@@ -716,6 +833,10 @@ export function useConversationMessages(conversationId: string | null) {
       }
     };
   }, [conversationId, user]);
+
+  useEffect(() => {
+    hydrateLocalOutboxMessages();
+  }, [hydrateLocalOutboxMessages]);
 
   const loadOlderMessages = useCallback(async () => {
     if (loadingMore || !hasMore || !conversationId) return;
@@ -888,7 +1009,9 @@ export function useConversationMessages(conversationId: string | null) {
       content: string,
       messageType: ChatMessageType = 'text',
       fileUrl?: string,
-      thumbnailUrl?: string | null
+      replyTo?: string,
+      thumbnailUrl?: string | null,
+      options: SendDMMessageOptions = {}
     ): Promise<DMMessage | null> => {
     
       const trimmedContent = content.trim();
@@ -901,8 +1024,8 @@ export function useConversationMessages(conversationId: string | null) {
 
       sendingRef.current = true;
       setSending(true);
-      const clientMessageId = createClientMessageId();
-      const createdAt = new Date().toISOString();
+      const clientMessageId = options.clientMessageId || createClientMessageId();
+      const createdAt = options.createdAt || new Date().toISOString();
       const optimisticMessage = {
         id: clientMessageId,
         client_message_id: clientMessageId,
@@ -912,6 +1035,7 @@ export function useConversationMessages(conversationId: string | null) {
         message_type: messageType,
         file_url: fileUrl,
         ...(thumbnailUrl ? { thumbnail_url: thumbnailUrl, media_processed_at: createdAt } : {}),
+        ...(replyTo ? { reply_to: replyTo } : {}),
         ...(messageType === 'audio' ? { audio_url: trimmedContent } : {}),
         read_at: undefined,
         read_by: [user.id],
@@ -940,6 +1064,7 @@ export function useConversationMessages(conversationId: string | null) {
               message_type: messageType,
               file_url: fileUrl,
               ...(thumbnailUrl ? { thumbnail_url: thumbnailUrl, media_processed_at: new Date().toISOString() } : {}),
+              ...(replyTo ? { reply_to: replyTo } : {}),
               ...(messageType === 'audio' ? { audio_url: trimmedContent } : {}),
             };
 
@@ -967,6 +1092,7 @@ export function useConversationMessages(conversationId: string | null) {
             }
 
             if (finalData) {
+              removeLocalOutboxEntry(getDMOutboxScope(conversationId), clientMessageId);
               const message = {
                 ...(finalData as DMMessage),
                 optimistic: false,
@@ -986,6 +1112,18 @@ export function useConversationMessages(conversationId: string | null) {
           'Message send timed out while reconnecting. Please try again.'
         );
       } catch (error) {
+        upsertLocalOutboxEntry(getDMOutboxScope(conversationId), {
+          id: clientMessageId,
+          clientMessageId,
+          senderId: user.id,
+          content: trimmedContent,
+          messageType,
+          fileUrl,
+          thumbnailUrl,
+          replyTo,
+          createdAt,
+          failedAt: new Date().toISOString(),
+        });
         setMessages(prev => markMessageSendFailed(prev, clientMessageId));
         await runRealtimeRecovery('send-error').catch(() => undefined);
         if (error instanceof Error) {
@@ -1000,6 +1138,42 @@ export function useConversationMessages(conversationId: string | null) {
         setSending(false);
       }
     }, [user, conversationId, insertConversationMessage, profile]);
+
+  const retryFailedMessage = useCallback(async (messageId: string) => {
+    const failedMessage = latestMessagesRef.current.find(message =>
+      (message.id === messageId || message.client_message_id === messageId) &&
+      message.delivery_status === 'failed'
+    );
+
+    if (!failedMessage) return null;
+
+    const clientMessageId = failedMessage.client_message_id || failedMessage.id;
+    const retryContent = failedMessage.message_type === 'audio'
+      ? failedMessage.audio_url || failedMessage.content
+      : failedMessage.content;
+
+    return sendMessage(
+      retryContent,
+      failedMessage.message_type,
+      failedMessage.file_url,
+      failedMessage.reply_to ?? undefined,
+      failedMessage.thumbnail_url,
+      {
+        clientMessageId,
+        createdAt: new Date().toISOString(),
+      }
+    );
+  }, [sendMessage]);
+
+  const discardFailedMessage = useCallback((messageId: string) => {
+    if (!conversationId) return;
+
+    removeLocalOutboxEntry(getDMOutboxScope(conversationId), messageId);
+    setMessages(prev => prev.filter(message => (
+      message.id !== messageId &&
+      message.client_message_id !== messageId
+    )));
+  }, [conversationId]);
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
     if (!user || !conversationId || !content.trim()) return;
@@ -1063,6 +1237,8 @@ export function useConversationMessages(conversationId: string | null) {
     loadingMore,
     hasMore,
     sendMessage,
+    retryFailedMessage,
+    discardFailedMessage,
     editMessage,
     deleteMessage,
     toggleReaction,

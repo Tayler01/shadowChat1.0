@@ -117,6 +117,7 @@ let workingClient: WorkingClient;
 
 beforeEach(() => {
   jest.resetAllMocks();
+  window.localStorage.clear();
   (useAuth as jest.Mock).mockReturnValue({ user: { id: 'u1' } });
 
   workingClient = {
@@ -675,4 +676,96 @@ describe('DirectMessagesView user search', () => {
 
     await waitFor(() => expect(setCurrentConversationMock).toHaveBeenCalledWith(null));
   });
+});
+
+test('sends DM replies with reply_to in the insert payload', async () => {
+  const insertFn = jest.fn(() => ({
+    select: () => ({ single: () => Promise.resolve({ data: { id: '1' }, error: null }) })
+  }));
+
+  const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider });
+
+  await waitFor(() => expect(result.current.loading).toBe(false));
+
+  await act(async () => {
+    result.current.setCurrentConversation('conv1');
+  });
+  await waitFor(() => expect(result.current.currentConversation).toBe('conv1'));
+  await waitFor(() => expect(result.current.messagesLoading).toBe(false));
+
+  workingClient.from.mockClear();
+  workingClient.from.mockImplementationOnce(() => createQuery({ insert: insertFn }) as any);
+
+  await act(async () => {
+    await result.current.sendMessage('reply body', 'text', undefined, 'parent-message');
+  });
+
+  expect(insertFn).toHaveBeenCalledWith({
+    conversation_id: 'conv1',
+    sender_id: 'u1',
+    client_message_id: expect.any(String),
+    content: 'reply body',
+    message_type: 'text',
+    reply_to: 'parent-message',
+  });
+});
+
+test('hydrates failed DM sends from local storage and retries them with the same client id', async () => {
+  const persistedClientMessageId = 'client-offline-1';
+  const insertSuccess = jest.fn(() => ({
+    select: () => ({ single: () => Promise.resolve({
+      data: {
+        id: 'server-message',
+        conversation_id: 'conv1',
+        sender_id: 'u1',
+        client_message_id: persistedClientMessageId,
+        content: 'offline note',
+        message_type: 'text',
+        reactions: {},
+        created_at: '2026-05-29T12:00:00.000Z',
+        updated_at: '2026-05-29T12:00:00.000Z',
+      },
+      error: null,
+    }) })
+  }));
+  window.localStorage.setItem('shadowchat:outbox:dm:conv1', JSON.stringify([{
+    id: persistedClientMessageId,
+    clientMessageId: persistedClientMessageId,
+    senderId: 'u1',
+    content: 'offline note',
+    messageType: 'text',
+    createdAt: '2026-05-29T11:59:00.000Z',
+    failedAt: '2026-05-29T12:00:00.000Z',
+  }]));
+
+  const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider });
+
+  await waitFor(() => expect(result.current.loading).toBe(false));
+
+  await act(async () => {
+    result.current.setCurrentConversation('conv1');
+  });
+  await waitFor(() => expect(result.current.currentConversation).toBe('conv1'));
+  await waitFor(() => expect(result.current.messagesLoading).toBe(false));
+
+  await waitFor(() => expect(result.current.messages).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      id: persistedClientMessageId,
+      content: 'offline note',
+      delivery_status: 'failed',
+    }),
+  ])));
+
+  workingClient.from.mockClear();
+  workingClient.from.mockImplementation(() => createQuery({ insert: insertSuccess }) as any);
+
+  await act(async () => {
+    await result.current.retryFailedMessage(persistedClientMessageId);
+  });
+
+  expect(insertSuccess).toHaveBeenCalledWith(expect.objectContaining({
+    client_message_id: persistedClientMessageId,
+    content: 'offline note',
+  }));
+  expect(window.localStorage.getItem('shadowchat:outbox:dm:conv1')).toBeNull();
 });

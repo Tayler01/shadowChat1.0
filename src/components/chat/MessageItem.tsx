@@ -9,6 +9,8 @@ import {
   Plus,
   Copy,
   Check,
+  RefreshCw,
+  XCircle,
 } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
 import { ImageModal } from '../ui/ImageModal'
@@ -29,19 +31,21 @@ import { useToneAnalysis } from '../../hooks/useToneAnalysis'
 import { useToneAnalysisEnabled } from '../../hooks/useToneAnalysisEnabled'
 import { getBlockedActionMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
-import { getSupabaseImageTransformUrl } from '../../lib/storageImageTransforms'
 import { EmojiPickerOverlay } from './EmojiPickerOverlay'
 import { QuickReactionRail } from './QuickReactionRail'
+import { getImageMessageDisplaySrc, getMessagePreviewText } from './messageDisplay'
 
 interface MessageItemProps {
   message: Message
   previousMessage?: Message
   parentMessage?: Message
-  onReply?: (messageId: string, content: string) => void
+  onReply?: (message: Message) => void
   onEdit: (messageId: string, content: string) => Promise<void>
   onDelete: (messageId: string) => Promise<void>
   onTogglePin: (messageId: string) => Promise<void>
   onToggleReaction: (messageId: string, emoji: string) => Promise<void>
+  onRetryFailed?: (messageId: string) => Promise<Message | null>
+  onDiscardFailed?: (messageId: string) => void
   onJumpToMessage?: (messageId: string) => void
   containerRef?: React.RefObject<HTMLDivElement>
   avatarLoading?: 'eager' | 'lazy'
@@ -82,6 +86,9 @@ function ReplyContextPreview({
 }) {
   const [expanded, setExpanded] = useState(false)
   const collapsible = shouldCollapseReplyPreview(content)
+  const previewImageSrc = parentMessage.message_type === 'image'
+    ? getImageMessageDisplaySrc(parentMessage.file_url, parentMessage.thumbnail_url)
+    : ''
 
   return (
     <div className="mb-1 flex min-w-0 items-start gap-2 pl-1 text-xs text-[var(--text-muted)]">
@@ -101,14 +108,33 @@ function ReplyContextPreview({
           <UserAchievementBadges user={parentMessage.user} className="shrink-0" />
           <UserPresenceBadge userId={parentMessage.user?.id} presenceVisibility={parentMessage.user?.presence_visibility} className="shrink-0" />
         </button>
-        <div
-          className={cn(
-            'whitespace-pre-wrap break-words text-[var(--text-secondary)]',
-            collapsible && !expanded && 'line-clamp-3'
+        <div className="flex min-w-0 items-start gap-2">
+          {previewImageSrc && (
+            <button
+              type="button"
+              onClick={() => onJumpToMessage?.(parentMessage.id)}
+              className="shrink-0 rounded-[var(--radius-xs)] focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.32)]"
+              aria-label="View replied image"
+            >
+              <img
+                src={previewImageSrc}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                draggable={false}
+                className="h-12 w-12 rounded-[var(--radius-xs)] object-cover"
+              />
+            </button>
           )}
-          data-testid="reply-parent-preview"
-        >
-          {content}
+          <div
+            className={cn(
+              'min-w-0 flex-1 whitespace-pre-wrap break-words text-[var(--text-secondary)]',
+              collapsible && !expanded && 'line-clamp-3'
+            )}
+            data-testid="reply-parent-preview"
+          >
+            {content}
+          </div>
         </div>
         {collapsible && (
           <button
@@ -135,6 +161,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     onDelete,
     onTogglePin,
     onToggleReaction,
+    onRetryFailed,
+    onDiscardFailed,
     onJumpToMessage,
     containerRef,
     avatarLoading = 'lazy',
@@ -145,6 +173,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const [editContent, setEditContent] = useState(message.content)
     const [showReactionPicker, setShowReactionPicker] = useState(false)
     const [showImageModal, setShowImageModal] = useState(false)
+    const [retryingFailedMessage, setRetryingFailedMessage] = useState(false)
     const bubbleShellRef = useRef<HTMLDivElement>(null)
     const [showQuickReactions, setShowQuickReactions] = useState(false)
     const [profileUser, setProfileUser] = useState<User | null>(null)
@@ -157,18 +186,14 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const isOperator = profile?.admin_role === 'admin' || profile?.admin_role === 'sub_admin'
     const isAuthorOperator = message.user?.admin_role === 'admin' || message.user?.admin_role === 'sub_admin'
     const isLocalDelivery = message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
+    const isFailedLocalMessage = isOwner && message.delivery_status === 'failed'
     const canDelete = isOwner || (isOperator && Boolean(message.user) && !isAuthorOperator)
     const isShadoAI = message.user?.username === 'shado_ai'
     const isAIMessage = isShadoAI || message.message_type === 'command'
     const isImageMessage = message.message_type === 'image' && Boolean(message.file_url)
-    const imageMessageSrc = message.thumbnail_url || getSupabaseImageTransformUrl(message.file_url, {
-      width: 960,
-      height: 960,
-      resize: 'contain',
-      quality: 82,
-    })
+    const imageMessageSrc = getImageMessageDisplaySrc(message.file_url, message.thumbnail_url)
     const parentPreview = parentMessage
-      ? parentMessage.content?.trim() || (parentMessage.message_type === 'image' ? 'Image' : parentMessage.message_type)
+      ? getMessagePreviewText(parentMessage)
       : ''
     const avatarSrc = isShadoAI
       ? message.user?.avatar_thumbnail_url || message.user?.avatar_url || '/icons/app-icon-192.png'
@@ -235,7 +260,42 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
       await onTogglePin(message.id)
     }
 
+    const handleRetryFailed = async () => {
+      if (!onRetryFailed || retryingFailedMessage) return
+
+      setRetryingFailedMessage(true)
+      try {
+        const sent = await onRetryFailed(message.id)
+        if (sent) {
+          toast.success('Message sent')
+        }
+      } catch {
+        toast.error('Still failed to send')
+      } finally {
+        setRetryingFailedMessage(false)
+      }
+    }
+
+    const handleDiscardFailed = () => {
+      onDiscardFailed?.(message.id)
+    }
+
     const messageActions: ChatMessageAction[] = [
+      {
+        id: 'retry',
+        label: retryingFailedMessage ? 'Retrying' : 'Retry',
+        icon: RefreshCw,
+        hidden: !isFailedLocalMessage || !onRetryFailed,
+        onSelect: () => void handleRetryFailed(),
+      },
+      {
+        id: 'discard-failed',
+        label: 'Discard',
+        icon: XCircle,
+        tone: 'danger',
+        hidden: !isFailedLocalMessage || !onDiscardFailed,
+        onSelect: handleDiscardFailed,
+      },
       {
         id: 'copy',
         label: 'Copy',
@@ -254,7 +314,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         label: 'Reply',
         icon: Reply,
         hidden: !onReply || isLocalDelivery,
-        onSelect: () => onReply?.(message.id, message.content),
+        onSelect: () => onReply?.(message),
       },
       {
         id: 'edit',
@@ -421,7 +481,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                       loading="lazy"
                       decoding="async"
                       draggable={false}
-                      className="mt-1 block h-auto max-h-[70vh] max-w-[min(20rem,100%)] cursor-pointer rounded-[var(--radius-md)] object-contain shadow-[0_12px_34px_rgba(0,0,0,0.24)] sm:max-w-xs"
+                      className="mt-1 block h-auto max-h-[42vh] max-w-[min(10rem,100%)] cursor-pointer rounded-[var(--radius-md)] object-contain shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:max-w-[11rem]"
                       onClick={() => setShowImageModal(true)}
                     />
                   ) : message.message_type === 'video' && message.file_url ? (
@@ -480,6 +540,32 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   desktopClassName="fixed left-1/2 top-16 z-[90] max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] sm:absolute sm:bottom-full sm:left-1/2 sm:top-auto sm:mb-2"
                 />
               </div>
+              {isFailedLocalMessage && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-2 pl-1 text-xs text-red-300">
+                  <span>Failed to send</span>
+                  {onRetryFailed && (
+                    <button
+                      type="button"
+                      onClick={() => void handleRetryFailed()}
+                      disabled={retryingFailedMessage}
+                      className="inline-flex items-center gap-1 rounded-full border border-red-300/30 px-2 py-0.5 font-semibold text-red-200 transition-colors hover:border-red-200/50 hover:text-red-100 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <RefreshCw className={cn('h-3 w-3', retryingFailedMessage && 'animate-spin')} />
+                      <span>{retryingFailedMessage ? 'Retrying' : 'Retry'}</span>
+                    </button>
+                  )}
+                  {onDiscardFailed && (
+                    <button
+                      type="button"
+                      onClick={handleDiscardFailed}
+                      className="inline-flex items-center gap-1 rounded-full border border-[rgba(255,255,255,0.12)] px-2 py-0.5 font-semibold text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+                    >
+                      <XCircle className="h-3 w-3" />
+                      <span>Discard</span>
+                    </button>
+                  )}
+                </div>
+              )}
             </>
           )}
         </div>

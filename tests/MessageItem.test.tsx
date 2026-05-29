@@ -75,7 +75,7 @@ test('renders image message', () => {
 
   const img = screen.getByAltText(/uploaded image/i)
   expect(img).toHaveAttribute('src', baseMessage.file_url)
-  expect(img).toHaveClass('h-auto', 'max-w-[min(20rem,100%)]')
+  expect(img).toHaveClass('h-auto', 'max-w-[min(10rem,100%)]')
   expect(img).not.toHaveClass('aspect-[4/3]')
   expect(img).toHaveAttribute('width', '720')
   expect(img).toHaveAttribute('height', '720')
@@ -150,7 +150,8 @@ test('renders video message', () => {
   const video = container.querySelector('video')
   expect(video).toHaveAttribute('src', videoMessage.file_url)
   expect(video).toHaveAttribute('controls')
-  expect(screen.getByRole('link', { name: /clip.mp4/i })).toHaveAttribute('href', videoMessage.file_url)
+  expect(video).not.toHaveClass('border', 'bg-black', 'shadow-[var(--shadow-panel)]')
+  expect(screen.queryByRole('link', { name: /clip.mp4/i })).not.toBeInTheDocument()
 })
 
 test('renders file message', () => {

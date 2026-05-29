@@ -1169,6 +1169,7 @@ export interface DMMessage {
   media_width?: number | null
   media_height?: number | null
   media_processed_at?: string | null
+  reply_to?: string | null
   read_at?: string
   read_by?: string[]
   reactions: Record<string, { count: number; users: string[] }>

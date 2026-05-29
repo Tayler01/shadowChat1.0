@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { useMessages } from '../../hooks/useMessages'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
-import { useFailedMessages } from '../../hooks/useFailedMessages'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import { MobileAppHeader } from '../layout/MobileAppHeader'
 import { clearGroupNotifications } from '../../lib/appBadge'
@@ -14,6 +13,8 @@ import {
 } from '../../lib/sessionRecovery'
 import type { ChatMessageType } from '../../lib/supabase'
 import type { AppView } from '../../types/navigation'
+import type { Message } from '../../lib/supabase'
+import { messageToReplyTarget, type ReplyTarget } from './messageDisplay'
 
 interface ChatViewProps {
   currentView: AppView
@@ -22,11 +23,16 @@ interface ChatViewProps {
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, initialMessageId }) => {
-  const { messages, sendMessage, sending } = useMessages()
-  const { failedMessages, addFailedMessage, removeFailedMessage } = useFailedMessages('general')
+  const {
+    messages,
+    sendMessage,
+    sending,
+    retryFailedMessage,
+    discardFailedMessage,
+  } = useMessages()
 
   const [uploading, setUploading] = useState(false)
-  const [replyTo, setReplyTo] = useState<{ id: string; content: string } | null>(null)
+  const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null)
 
   useEffect(() => {
     void clearGroupNotifications()
@@ -44,8 +50,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
     return () => window.removeEventListener(SESSION_RECOVERY_EVENT, handleSessionRecovery)
   }, [])
 
-  const handleReply = useCallback((id: string, content: string) => {
-    setReplyTo({ id, content })
+  const handleReply = useCallback((message: Message) => {
+    setReplyTo(messageToReplyTarget(message))
   }, [])
 
   const handleSendMessage = async (
@@ -68,9 +74,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
 
       const message = await getBlockedActionMessage('general_chat', error, 'Failed to send message')
       showActionErrorToast(message)
-      if (!(error as { optimisticMessageId?: string })?.optimisticMessageId) {
-        addFailedMessage({ id: Date.now().toString(), type: type || 'text', content: content, dataUrl: fileUrl })
-      }
       return null
     }
   }
@@ -89,11 +92,8 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
       {/* Messages */}
       <MessageList
         onReply={handleReply}
-        failedMessages={failedMessages}
-        onResend={msg => {
-          removeFailedMessage(msg.id)
-          handleSendMessage(msg.content, msg.type, msg.dataUrl)
-        }}
+        onRetryFailed={retryFailedMessage}
+        onDiscardFailed={discardFailedMessage}
         sending={sending}
         uploading={uploading}
         initialMessageId={initialMessageId}

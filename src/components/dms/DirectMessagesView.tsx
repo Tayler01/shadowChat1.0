@@ -10,6 +10,9 @@ import {
   Edit3,
   Trash2,
   Search,
+  Reply,
+  RefreshCw,
+  XCircle,
 } from 'lucide-react'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
 import { useAuth } from '../../hooks/useAuth'
@@ -20,7 +23,6 @@ import { MessageInput } from '../chat/MessageInput'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import { MobileNav } from '../layout/MobileNav'
 import { MobileAppHeader } from '../layout/MobileAppHeader'
-import { FailedMessageItem } from '../chat/FailedMessageItem'
 import { FileAttachment } from '../chat/FileAttachment'
 import { VideoAttachment } from '../chat/VideoAttachment'
 import { MessageRichText } from '../chat/MessageRichText'
@@ -29,8 +31,7 @@ import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { UserAchievementBadges } from '../ui/UserAchievementBadges'
 import { NewsReactionSummaryStrip } from '../news/NewsReactionBar'
-import { useFailedMessages } from '../../hooks/useFailedMessages'
-import { formatTime, shouldGroupMessage, getReadableTextColor } from '../../lib/utils'
+import { formatTime, shouldGroupMessage, getReadableTextColor, cn } from '../../lib/utils'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { useTyping } from '../../hooks/useTyping'
@@ -42,9 +43,15 @@ import type { BasicUser, ChatMessageType, DMMessage, User } from '../../lib/supa
 import { UnreadDivider } from '../chat/UnreadDivider'
 import type { EmojiClickData } from '../../types'
 import type { AppView } from '../../types/navigation'
-import { getSupabaseImageTransformUrl } from '../../lib/storageImageTransforms'
 import { EmojiPickerOverlay } from '../chat/EmojiPickerOverlay'
 import { ImageModal } from '../ui/ImageModal'
+import { QuickReactionRail } from '../chat/QuickReactionRail'
+import {
+  getImageMessageDisplaySrc,
+  getMessagePreviewText,
+  messageToReplyTarget,
+  type ReplyTarget,
+} from '../chat/messageDisplay'
 
 interface DirectMessagesViewProps {
   onToggleSidebar: () => void
@@ -57,6 +64,14 @@ interface DirectMessagesViewProps {
 const HISTORY_LOAD_SCROLL_THRESHOLD = 180
 const HISTORY_LOAD_COOLDOWN_MS = 1800
 
+const normalizeEmojiValue = (emoji: string) => {
+  const value = emoji.trim()
+
+  if (value === '??' || value === '??1') return '\u{1F44D}'
+
+  return value
+}
+
 const PublicProfileDialog = React.lazy(() =>
   import('../profile/PublicProfileDialog').then(module => ({
     default: module.PublicProfileDialog,
@@ -66,10 +81,15 @@ const PublicProfileDialog = React.lazy(() =>
 const DirectMessageBubble = React.memo(function DirectMessageBubble({
   message,
   previousMessage,
+  parentMessage,
   currentUserId,
+  onReply,
   onEdit,
   onDelete,
   onReact,
+  onRetryFailed,
+  onDiscardFailed,
+  onJumpToMessage,
   onOpenProfile,
   containerRef,
   avatarLoading = 'lazy',
@@ -77,10 +97,15 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
 }: {
   message: DMMessage
   previousMessage?: DMMessage
+  parentMessage?: DMMessage
   currentUserId: string | null
+  onReply?: (message: DMMessage) => void
   onEdit: (id: string, content: string) => Promise<void>
   onDelete: (id: string) => Promise<void>
   onReact: (id: string, emoji: string) => Promise<void>
+  onRetryFailed?: (messageId: string) => Promise<DMMessage | null>
+  onDiscardFailed?: (messageId: string) => void
+  onJumpToMessage?: (messageId: string) => void
   onOpenProfile: (user: User | null) => void
   containerRef?: React.RefObject<HTMLDivElement>
   avatarLoading?: 'eager' | 'lazy'
@@ -89,19 +114,23 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(message.content)
   const [showReactionPicker, setShowReactionPicker] = useState(false)
+  const [showQuickReactions, setShowQuickReactions] = useState(false)
   const [showImageModal, setShowImageModal] = useState(false)
+  const [retryingFailedMessage, setRetryingFailedMessage] = useState(false)
+  const bubbleShellRef = useRef<HTMLDivElement>(null)
+  const reactionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isGrouped = shouldGroupMessage(message, previousMessage)
   const isOwn = message.sender_id === currentUserId
   const isIncoming = !isOwn
   const isImageMessage = message.message_type === 'image' && Boolean(message.file_url)
-  const imageMessageSrc = message.thumbnail_url || getSupabaseImageTransformUrl(message.file_url, {
-    width: 960,
-    height: 960,
-    resize: 'contain',
-    quality: 82,
-  })
+  const imageMessageSrc = getImageMessageDisplaySrc(message.file_url, message.thumbnail_url)
   const isLocalDelivery = message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
+  const isFailedLocalMessage = isOwn && message.delivery_status === 'failed'
   const showIncomingAvatar = !isGrouped && !isOwn
+  const parentPreview = parentMessage ? getMessagePreviewText(parentMessage) : ''
+  const parentPreviewImageSrc = parentMessage?.message_type === 'image'
+    ? getImageMessageDisplaySrc(parentMessage.file_url, parentMessage.thumbnail_url)
+    : ''
   const bubbleColor = undefined
   const bubbleStyle = bubbleColor
     ? { backgroundColor: bubbleColor, color: getReadableTextColor(bubbleColor) }
@@ -141,12 +170,68 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
     }
   }
 
+  const handleMouseEnterReactions = () => {
+    if (reactionTimeoutRef.current) {
+      clearTimeout(reactionTimeoutRef.current)
+    }
+    setShowQuickReactions(true)
+  }
+
+  const handleMouseLeaveReactions = () => {
+    reactionTimeoutRef.current = setTimeout(() => {
+      setShowQuickReactions(false)
+    }, 300)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (reactionTimeoutRef.current) {
+        clearTimeout(reactionTimeoutRef.current)
+      }
+    }
+  }, [])
+
   const handleReactionSelect = (emojiData: EmojiClickData) => {
     void reactToMessage(emojiData.emoji)
     setShowReactionPicker(false)
   }
 
+  const retryFailedMessage = async () => {
+    if (!onRetryFailed || retryingFailedMessage) return
+
+    setRetryingFailedMessage(true)
+    try {
+      const sent = await onRetryFailed(message.id)
+      if (sent) {
+        toast.success('Message sent')
+      }
+    } catch {
+      toast.error('Still failed to send')
+    } finally {
+      setRetryingFailedMessage(false)
+    }
+  }
+
+  const discardFailedMessage = () => {
+    onDiscardFailed?.(message.id)
+  }
+
   const actions: ChatMessageAction[] = [
+    {
+      id: 'retry',
+      label: retryingFailedMessage ? 'Retrying' : 'Retry',
+      icon: RefreshCw,
+      hidden: !isFailedLocalMessage || !onRetryFailed,
+      onSelect: () => void retryFailedMessage(),
+    },
+    {
+      id: 'discard-failed',
+      label: 'Discard',
+      icon: XCircle,
+      tone: 'danger',
+      hidden: !isFailedLocalMessage || !onDiscardFailed,
+      onSelect: discardFailedMessage,
+    },
     {
       id: 'copy',
       label: 'Copy',
@@ -159,6 +244,13 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
       icon: Plus,
       hidden: isLocalDelivery,
       onSelect: () => setShowReactionPicker(true),
+    },
+    {
+      id: 'reply',
+      label: 'Reply',
+      icon: Reply,
+      hidden: !onReply || isLocalDelivery,
+      onSelect: () => onReply?.(message),
     },
     {
       id: 'edit',
@@ -234,6 +326,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
         )}
 
         <div
+          ref={bubbleShellRef}
           className={`relative w-fit max-w-full rounded-2xl ${showIncomingAvatar ? 'ml-8' : ''} ${
             isImageMessage ? 'bg-transparent px-0 py-0 shadow-none' : 'px-4 py-2'
           } ${
@@ -246,6 +339,8 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
                 : 'border border-[var(--border-subtle)] bg-[var(--bg-panel)] text-[var(--text-primary)] shadow-[var(--shadow-panel)]'
           }`}
           style={bubbleStyle}
+          onMouseEnter={handleMouseEnterReactions}
+          onMouseLeave={handleMouseLeaveReactions}
         >
           {!editing && (
             <ChatMessageActionsMenu
@@ -253,6 +348,43 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
               containerRef={containerRef}
               className={`absolute top-0 ${isOwn ? '-left-10' : '-right-10'} opacity-80 md:opacity-0 md:group-hover:opacity-80`}
             />
+          )}
+
+          {parentMessage && !editing && (
+            <div className="mb-1 flex min-w-0 items-start gap-2 rounded-[var(--radius-sm)] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.035)] px-2.5 py-1.5 text-xs text-[var(--text-muted)]">
+              {parentPreviewImageSrc && (
+                <button
+                  type="button"
+                  onClick={() => onJumpToMessage?.(parentMessage.id)}
+                  className="shrink-0 rounded-[var(--radius-xs)] focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.32)]"
+                  aria-label="View replied image"
+                >
+                  <img
+                    src={parentPreviewImageSrc}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    draggable={false}
+                    className="h-11 w-11 rounded-[var(--radius-xs)] object-cover"
+                  />
+                </button>
+              )}
+              <div className="min-w-0 flex-1">
+                <button
+                  type="button"
+                  onClick={() => onJumpToMessage?.(parentMessage.id)}
+                  className="mb-0.5 inline-flex max-w-full min-w-0 items-center gap-1 text-left font-semibold text-[var(--theme-accent-readable)] transition-colors hover:underline"
+                  aria-label="View parent message"
+                >
+                  <span className="truncate">
+                    Replying to {parentMessage.sender?.display_name || 'Unknown'}
+                  </span>
+                </button>
+                <div className="min-w-0 whitespace-pre-wrap break-words text-[var(--text-secondary)]">
+                  {parentPreview}
+                </div>
+              </div>
+            </div>
           )}
 
           {editing ? (
@@ -282,7 +414,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
               loading="lazy"
               decoding="async"
               draggable={false}
-              className="mt-1 block h-auto max-h-[70vh] max-w-[min(20rem,100%)] cursor-pointer rounded-[var(--radius-md)] object-contain shadow-[0_12px_34px_rgba(0,0,0,0.24)]"
+              className="mt-1 block h-auto max-h-[42vh] max-w-[min(10rem,100%)] cursor-pointer rounded-[var(--radius-md)] object-contain shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:max-w-[11rem]"
               onClick={() => setShowImageModal(true)}
             />
           ) : message.message_type === 'video' && message.file_url ? (
@@ -309,6 +441,57 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
                   </span>
                 )}
               </p>
+              {isFailedLocalMessage && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-red-300">
+                  <span>Failed to send</span>
+                  {onRetryFailed && (
+                    <button
+                      type="button"
+                      onClick={() => void retryFailedMessage()}
+                      disabled={retryingFailedMessage}
+                      className="inline-flex items-center gap-1 rounded-full border border-red-300/30 px-2 py-0.5 font-semibold text-red-200 transition-colors hover:border-red-200/50 hover:text-red-100 disabled:cursor-wait disabled:opacity-60"
+                    >
+                      <RefreshCw className={cn('h-3 w-3', retryingFailedMessage && 'animate-spin')} />
+                      <span>{retryingFailedMessage ? 'Retrying' : 'Retry'}</span>
+                    </button>
+                  )}
+                  {onDiscardFailed && (
+                    <button
+                      type="button"
+                      onClick={discardFailedMessage}
+                      className="inline-flex items-center gap-1 rounded-full border border-[rgba(255,255,255,0.12)] px-2 py-0.5 font-semibold text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
+                    >
+                      <XCircle className="h-3 w-3" />
+                      <span>Discard</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+          {!editing && (
+            <>
+              <div
+                className="absolute -top-12 -left-2 -right-2 hidden h-16 group-hover:block"
+                onMouseEnter={handleMouseEnterReactions}
+                onMouseLeave={handleMouseLeaveReactions}
+                onPointerDown={event => {
+                  if (event.pointerType !== 'mouse') {
+                    handleMouseEnterReactions()
+                  }
+                }}
+              />
+              <QuickReactionRail
+                open={showQuickReactions && !showReactionPicker && !isLocalDelivery}
+                anchorRef={bubbleShellRef}
+                reactions={['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F389}', '\u{1F64F}']}
+                onReact={reactToMessage}
+                onAddReaction={() => setShowReactionPicker(true)}
+                onClose={() => setShowQuickReactions(false)}
+                onPointerEnter={handleMouseEnterReactions}
+                onPointerLeave={handleMouseLeaveReactions}
+                normalizeEmoji={normalizeEmojiValue}
+              />
             </>
           )}
         </div>
@@ -469,6 +652,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     setCurrentConversation,
     startConversation,
     sendMessage,
+    retryFailedMessage,
+    discardFailedMessage,
     editMessage,
     deleteMessage,
     toggleReaction,
@@ -480,7 +665,6 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     hasMore,
     loading: conversationsLoading,
   } = useDirectMessages()
-  const { failedMessages, addFailedMessage, removeFailedMessage } = useFailedMessages(currentConversation || 'none')
   const [showNewConversation, setShowNewConversation] = useState(false)
   const { users: allUsers, loading: allUsersLoading } = useAllUsers({ enabled: showNewConversation })
   const currentConv = conversations.find(c => c.id === currentConversation)
@@ -498,6 +682,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const initialConversationAppliedRef = useRef<string | null>(null)
   const initialTargetJumpDoneRef = useRef<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null)
   const [profileUser, setProfileUser] = useState<User | null>(null)
   const { typingUsers } = useTyping(currentConversation ? `dm-${currentConversation}` : 'none')
   const {
@@ -575,15 +760,21 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     thumbnailUrl?: string | null
   ) => {
     try {
-      await sendMessage(content, type, fileUrl, thumbnailUrl)
+      const sent = await sendMessage(content, type, fileUrl, replyToId, thumbnailUrl)
+      if (sent) {
+        setReplyTo(null)
+      }
+      return sent
     } catch (error) {
       console.error(error)
       toast.error('Failed to send message')
-      if (!(error as { optimisticMessageId?: string })?.optimisticMessageId) {
-        addFailedMessage({ id: Date.now().toString(), type: type || 'text', content, dataUrl: fileUrl })
-      }
+      return null
     }
-  }, [addFailedMessage, sendMessage])
+  }, [sendMessage])
+
+  const handleReply = useCallback((message: DMMessage) => {
+    setReplyTo(messageToReplyTarget(message))
+  }, [])
 
   const getUnreadDMMessages = useCallback(
     (items: DMMessage[]) => {
@@ -692,6 +883,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
 
   useEffect(() => {
     initialTargetJumpDoneRef.current = null
+    setReplyTo(null)
   }, [currentConversation])
 
   useEffect(() => {
@@ -808,6 +1000,25 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
       }, 2200)
     })
   }, [initialMessageId, markLatestRead, messages, setAutoScroll, setFirstUnreadMessageId])
+
+  const dmMessageMap = useMemo(() => {
+    const map = new Map<string, DMMessage>()
+    messages.forEach(message => map.set(message.id, message))
+    return map
+  }, [messages])
+
+  const jumpToDMMessage = useCallback((id: string) => {
+    requestAnimationFrame(() => {
+      const el = document.getElementById(`dm-message-${id}`)
+      if (!el) return
+
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('ring-2', 'ring-[rgba(34,197,94,0.55)]')
+      window.setTimeout(() => {
+        el.classList.remove('ring-2', 'ring-[rgba(34,197,94,0.55)]')
+      }, 2000)
+    })
+  }, [])
 
   const eagerDMAvatarMessageIds = useMemo(() => (
     new Set(messages.slice(-12).map(message => message.id))
@@ -1009,27 +1220,21 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   <DirectMessageBubble
                     message={message}
                     previousMessage={messages[index - 1]}
+                    parentMessage={dmMessageMap.get(message.reply_to ?? '')}
                     currentUserId={profile?.id ?? null}
+                    onReply={handleReply}
                     onEdit={editMessage}
                     onDelete={deleteMessage}
                     onReact={toggleReaction}
+                    onRetryFailed={retryFailedMessage}
+                    onDiscardFailed={discardFailedMessage}
+                    onJumpToMessage={jumpToDMMessage}
                     onOpenProfile={setProfileUser}
                     containerRef={messagesRef}
                     avatarLoading={eagerDMAvatarMessageIds.has(message.id) ? 'eager' : 'lazy'}
                     avatarFetchPriority={eagerDMAvatarMessageIds.has(message.id) ? 'high' : undefined}
                   />
                 </React.Fragment>
-              ))}
-
-              {failedMessages.map(msg => (
-                <FailedMessageItem
-                  key={msg.id}
-                  message={msg}
-                  onResend={m => {
-                    removeFailedMessage(m.id)
-                    handleSendMessage(m.content, m.type, m.dataUrl)
-                  }}
-                />
               ))}
 
               {(uploading || sending) && (
@@ -1090,7 +1295,10 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   cacheKey={`dm-${currentConversation}`}
                   onUploadStatusChange={setUploading}
                   messages={messages}
+                  replyingTo={replyTo || undefined}
+                  onCancelReply={() => setReplyTo(null)}
                   typingChannel={`dm-${currentConversation}`}
+                  enableGifPicker
                 />
               </div>
             </div>
@@ -1106,7 +1314,10 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 cacheKey={`dm-${currentConversation}`}
                 onUploadStatusChange={setUploading}
                 messages={messages}
+                replyingTo={replyTo || undefined}
+                onCancelReply={() => setReplyTo(null)}
                 typingChannel={`dm-${currentConversation}`}
+                enableGifPicker
               />
             </MobileChatFooter>
           </>

@@ -21,6 +21,7 @@ import {
   uploadUserBanner,
 } from '../lib/auth';
 import { markPhoneInstallOnboardingPending } from '../lib/phoneInstallOnboarding';
+import { clearLocalOutboxScopes } from '../lib/localMessageOutbox';
 
 interface AuthContextValue {
   user: User | null;
@@ -522,6 +523,7 @@ function useProvideAuth() {
               localStorage.removeItem(key);
             }
           });
+          clearLocalOutboxScopes();
         } catch {
           // ignore storage errors
         }

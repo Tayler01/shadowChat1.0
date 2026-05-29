@@ -20,9 +20,11 @@ import { useUnreadScroll } from '../../hooks/useUnreadScroll'
 import { UnreadDivider } from './UnreadDivider'
 
 interface MessageListProps {
-  onReply?: (messageId: string, content: string) => void
+  onReply?: (message: Message) => void
   failedMessages?: FailedMessage[]
   onResend?: (msg: FailedMessage) => void
+  onRetryFailed?: (messageId: string) => Promise<Message | null>
+  onDiscardFailed?: (messageId: string) => void
   sending?: boolean
   uploading?: boolean
   initialMessageId?: string
@@ -49,6 +51,8 @@ export const MessageList: React.FC<MessageListProps> = ({
   onReply,
   failedMessages = [],
   onResend,
+  onRetryFailed,
+  onDiscardFailed,
   sending = false,
   uploading = false,
   initialMessageId,
@@ -61,6 +65,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     togglePin,
     toggleReaction,
     loadOlderMessages,
+    compactToLatestMessages = () => {},
     loadingMore,
     hasMore
   } = useMessages()
@@ -75,7 +80,9 @@ export const MessageList: React.FC<MessageListProps> = ({
   const historyRetryTimerRef = useRef<number | null>(null)
   const scrollFrameRef = useRef<number | null>(null)
   const initialTargetJumpDoneRef = useRef<string | null>(null)
+  const historyIntentRef = useRef(false)
   const [renderWindowStart, setRenderWindowStart] = useState(0)
+  const [historyLoadArmed, setHistoryLoadArmed] = useState(false)
   const { cursor, loading: cursorLoading, markRead } = useReadCursor('general_chat', 'main', Boolean(profile?.id))
 
   const messageMap = useMemo(() => {
@@ -155,7 +162,8 @@ export const MessageList: React.FC<MessageListProps> = ({
     }
   }, [])
 
-  const requestOlderMessages = useCallback(() => {
+  const requestOlderMessages = useCallback((force = false) => {
+    if ((!historyLoadArmed && !force) || !historyIntentRef.current) return
     if (loading || loadingMore || olderLoadInFlightRef.current) return
 
     const canRevealLoadedHistory = renderWindowStart > 0
@@ -168,11 +176,11 @@ export const MessageList: React.FC<MessageListProps> = ({
     ) {
       const retryDelay = Math.max(80, HISTORY_LOAD_COOLDOWN_MS - (now - lastHistoryRequestAtRef.current) + 24)
       if (historyRetryTimerRef.current === null) {
-        historyRetryTimerRef.current = window.setTimeout(() => {
+          historyRetryTimerRef.current = window.setTimeout(() => {
           historyRetryTimerRef.current = null
           const el = containerRef.current
           if (!el || el.scrollTop > HISTORY_LOAD_SCROLL_THRESHOLD) return
-          requestOlderMessages()
+          requestOlderMessages(true)
         }, retryDelay)
       }
       return
@@ -195,6 +203,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   }, [
     capturePendingAnchor,
     hasMore,
+    historyLoadArmed,
     loadOlderMessages,
     loading,
     loadingMore,
@@ -214,14 +223,38 @@ export const MessageList: React.FC<MessageListProps> = ({
       handleUnreadScroll()
 
       if (el.scrollTop <= HISTORY_LOAD_SCROLL_THRESHOLD) {
-        requestOlderMessages()
+        historyIntentRef.current = true
+        requestOlderMessages(true)
       }
     })
   }, [handleUnreadScroll, requestOlderMessages])
 
   useEffect(() => {
     initialTargetJumpDoneRef.current = null
+    historyIntentRef.current = false
+    setHistoryLoadArmed(false)
   }, [profile?.id])
+
+  useEffect(() => {
+    if (loading || cursorLoading || combinedMessages.length === 0) {
+      setHistoryLoadArmed(false)
+      return
+    }
+
+    if (historyLoadArmed) return
+
+    const timer = window.setTimeout(() => {
+      setHistoryLoadArmed(true)
+    }, 650)
+
+    return () => window.clearTimeout(timer)
+  }, [combinedMessages.length, cursorLoading, historyLoadArmed, loading])
+
+  useEffect(() => {
+    if (!autoScroll || initialMessageId) return
+    if (combinedMessages.length <= DEFAULT_RENDER_WINDOW_SIZE) return
+    compactToLatestMessages()
+  }, [autoScroll, combinedMessages.length, compactToLatestMessages, initialMessageId])
 
   useLayoutEffect(() => {
     const anchor = pendingAnchorRef.current
@@ -256,7 +289,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 
     const observer = new IntersectionObserver(
       entries => {
-        if (entries.some(entry => entry.isIntersecting)) {
+        if (historyLoadArmed && historyIntentRef.current && entries.some(entry => entry.isIntersecting)) {
           requestOlderMessages()
         }
       },
@@ -268,7 +301,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 
     observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [hasMore, renderWindowStart, requestOlderMessages])
+  }, [hasMore, historyLoadArmed, renderWindowStart, requestOlderMessages])
 
   useEffect(() => {
     return () => {
@@ -520,6 +553,8 @@ export const MessageList: React.FC<MessageListProps> = ({
                     onTogglePin={togglePin}
                     onToggleReaction={toggleReaction}
                     onJumpToMessage={jumpToMessage}
+                    onRetryFailed={onRetryFailed}
+                    onDiscardFailed={onDiscardFailed}
                     containerRef={containerRef}
                     avatarLoading={eagerAvatarMessageIds.has(message.id) ? 'eager' : 'lazy'}
                     avatarFetchPriority={eagerAvatarMessageIds.has(message.id) ? 'high' : undefined}
@@ -532,7 +567,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       ))}
 
       {failedMessages.map(msg => (
-        <FailedMessageItem key={msg.id} message={msg} onResend={onResend!} />
+        <FailedMessageItem key={msg.id} message={msg} onResend={onResend ?? (() => {})} />
       ))}
 
       {(uploading || sending) && (
@@ -581,7 +616,10 @@ export const MessageList: React.FC<MessageListProps> = ({
       {!autoScroll && (
         <button
           type="button"
-          onClick={() => scrollToBottom()}
+          onClick={() => {
+            compactToLatestMessages()
+            scrollToBottom()
+          }}
           aria-label="Jump to latest"
           className="theme-floating-action fixed right-4 bottom-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.5rem)] z-50 rounded-full p-2 transition-transform hover:-translate-y-0.5 md:bottom-32"
         >

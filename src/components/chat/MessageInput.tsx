@@ -15,6 +15,7 @@ import type { GifResult } from '../../lib/gifs'
 import toast from 'react-hot-toast'
 import { askQuestion } from '../../lib/ai'
 import { EmojiPickerOverlay } from './EmojiPickerOverlay'
+import { getImageMessageDisplaySrc, type ReplyTarget } from './messageDisplay'
 
 const normalizeComposerValue = (value: string) => (value.trim().length === 0 ? '' : value)
 
@@ -35,7 +36,7 @@ interface MessageInputProps {
   cacheKey?: string
   onUploadStatusChange?: (uploading: boolean) => void
   messages?: ChatMessage[]
-  replyingTo?: { id: string; content: string }
+  replyingTo?: ReplyTarget
   onCancelReply?: () => void
   typingChannel?: string
   enableGifPicker?: boolean
@@ -486,13 +487,27 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       {replyingTo && (
         <div className="mb-2 rounded-[var(--radius-xs)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] shadow-[var(--shadow-panel)]">
           <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <div className="mb-0.5 font-semibold text-[var(--theme-accent-readable)]">Replying to</div>
-              <div
-                className={`whitespace-pre-wrap break-words ${shouldCollapseReplyPreview(replyingTo.content) && !replyPreviewExpanded ? 'line-clamp-3' : 'max-h-32 overflow-y-auto pr-1'}`}
-                data-testid="composer-reply-preview"
-              >
-                {replyingTo.content}
+            <div className="flex min-w-0 flex-1 items-start gap-2">
+              {replyingTo.messageType === 'image' && replyingTo.fileUrl && (
+                <img
+                  src={getImageMessageDisplaySrc(replyingTo.fileUrl, replyingTo.thumbnailUrl)}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  draggable={false}
+                  className="h-11 w-11 shrink-0 rounded-[var(--radius-xs)] object-cover"
+                />
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="mb-0.5 font-semibold text-[var(--theme-accent-readable)]">
+                  Replying to{replyingTo.authorName ? ` ${replyingTo.authorName}` : ''}
+                </div>
+                <div
+                  className={`whitespace-pre-wrap break-words ${shouldCollapseReplyPreview(replyingTo.content) && !replyPreviewExpanded ? 'line-clamp-3' : 'max-h-32 overflow-y-auto pr-1'}`}
+                  data-testid="composer-reply-preview"
+                >
+                  {replyingTo.content}
+                </div>
               </div>
             </div>
             <button type="button" onClick={onCancelReply} aria-label="Cancel reply" className="mt-0.5 shrink-0 rounded-full p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)]">

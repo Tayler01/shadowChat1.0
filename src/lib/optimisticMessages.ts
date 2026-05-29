@@ -57,6 +57,10 @@ export function isMediaThumbnailSchemaError(error: any) {
   return isSchemaColumnError(error, ['thumbnail_url', 'thumbnail_path', 'media_processed_at'])
 }
 
+export function isReplyToSchemaError(error: any) {
+  return isSchemaColumnError(error, ['reply_to'])
+}
+
 const getAuthorId = (message: OptimisticMessageFields) => message.user_id ?? message.sender_id ?? null
 
 const timestampsAreClose = (a: string, b: string) => {
