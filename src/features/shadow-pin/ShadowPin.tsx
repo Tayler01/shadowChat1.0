@@ -138,12 +138,22 @@ type VideoVisibilitySnapshot = {
 
 const VIDEO_FOCUS_MIN_INTERSECTION_RATIO = 0.34
 const VIDEO_FOCUS_ROW_EPSILON_PX = 8
+const VIDEO_IFRAME_FALLBACK_CYCLE_MS = 10_000
 
 const getVideoPreviewUrl = (image: ShadowPinImage) =>
   image.video_preview_url || image.video_playback_url || null
 
 const getVideoPlaybackUrl = (image: ShadowPinImage) =>
   image.video_playback_url || image.video_preview_url || null
+
+const getIframeVideoCycleMs = (image: ShadowPinImage) => {
+  const durationSeconds = Number(image.duration_seconds)
+  if (Number.isFinite(durationSeconds) && durationSeconds > 0) {
+    return Math.min(Math.max(Math.ceil(durationSeconds * 1000) + 500, 2500), 65_000)
+  }
+
+  return VIDEO_IFRAME_FALLBACK_CYCLE_MS
+}
 
 const parsePinterestPinId = (image: ShadowPinImage) => {
   const candidates = [
@@ -220,9 +230,16 @@ const getVideoIframeUrl = (image: ShadowPinImage, mode: VideoIframeMode = 'feed'
 
 const isIframeVideoPin = (image: ShadowPinImage) => Boolean(getVideoIframeUrl(image))
 
-const getOrderedVisibleVideoId = (videos: Iterable<VideoVisibilitySnapshot>) => {
+const getOrderedVisibleVideos = (
+  videos: Iterable<VideoVisibilitySnapshot>,
+  skippedVideoIds?: ReadonlySet<string>
+) => {
   const visibleVideos = Array.from(videos)
-    .filter(video => video.visible && video.ratio >= VIDEO_FOCUS_MIN_INTERSECTION_RATIO)
+    .filter(video =>
+      video.visible &&
+      video.ratio >= VIDEO_FOCUS_MIN_INTERSECTION_RATIO &&
+      !skippedVideoIds?.has(video.id)
+    )
 
   visibleVideos.sort((a, b) => {
     const rowDelta = a.top - b.top
@@ -232,7 +249,26 @@ const getOrderedVisibleVideoId = (videos: Iterable<VideoVisibilitySnapshot>) => 
     return b.ratio - a.ratio
   })
 
-  return visibleVideos[0]?.id ?? null
+  return visibleVideos
+}
+
+const getNextOrderedVisibleVideoId = (
+  videos: Iterable<VideoVisibilitySnapshot>,
+  currentId: string,
+  skippedVideoIds?: ReadonlySet<string>
+) => {
+  const orderedVideos = getOrderedVisibleVideos(videos)
+  if (orderedVideos.length === 0) return null
+
+  const currentIndex = orderedVideos.findIndex(video => video.id === currentId)
+  const startIndex = currentIndex >= 0 ? currentIndex : -1
+
+  for (let offset = 1; offset <= orderedVideos.length; offset += 1) {
+    const candidate = orderedVideos[(startIndex + offset) % orderedVideos.length]
+    if (!skippedVideoIds?.has(candidate.id)) return candidate.id
+  }
+
+  return null
 }
 
 type BunnyPlayer = {
@@ -1191,9 +1227,14 @@ function ImageCard({
   columnSide,
   activeVideoId,
   soundEnabled,
+  loopNativeVideo,
+  cycleIframeVideo,
   overlayOpen,
   onToggleOverlay,
   onVideoVisibilityChange,
+  onVideoPlaybackStarted,
+  onVideoPlaybackComplete,
+  onVideoPlaybackUnavailable,
   onToggleSound,
   onViewer,
   onEdit,
@@ -1206,9 +1247,14 @@ function ImageCard({
   columnSide: PinColumnSide
   activeVideoId: string | null
   soundEnabled: boolean
+  loopNativeVideo: boolean
+  cycleIframeVideo: boolean
   overlayOpen: boolean
   onToggleOverlay: () => void
   onVideoVisibilityChange: (visibility: VideoVisibilitySnapshot) => void
+  onVideoPlaybackStarted: (imageId: string) => void
+  onVideoPlaybackComplete: (imageId: string) => void
+  onVideoPlaybackUnavailable: (imageId: string) => void
   onToggleSound: () => void
   onViewer: () => void
   onEdit: () => void
@@ -1248,6 +1294,12 @@ function ImageCard({
   const shouldRenderNativeVideo = videoPin && activeVideo && Boolean(nativeVideoSrc)
   const iframeVideoSrc = videoPin && activeVideo ? getVideoIframeUrl(image) : ''
   const shouldRenderIframeVideo = videoPin && activeVideo && !nativeVideoSrc && Boolean(iframeVideoSrc)
+  const handleVideoPlaybackStarted = useCallback(() => onVideoPlaybackStarted(image.id), [image.id, onVideoPlaybackStarted])
+  const handleVideoPlaybackComplete = useCallback(() => onVideoPlaybackComplete(image.id), [image.id, onVideoPlaybackComplete])
+  const handleVideoPlaybackUnavailable = useCallback(
+    () => onVideoPlaybackUnavailable(image.id),
+    [image.id, onVideoPlaybackUnavailable]
+  )
 
   useEffect(() => {
     setSourceIndex(0)
@@ -1264,13 +1316,27 @@ function ImageCard({
 
     prepareInlineAutoplayVideo(video, !soundEnabled)
     let cancelled = false
+    let started = false
+    let unavailableNotified = false
     const timerIds: number[] = []
+    const markStarted = () => {
+      if (started || cancelled) return
+      started = true
+      handleVideoPlaybackStarted()
+    }
+    const notifyUnavailable = () => {
+      if (started || cancelled || unavailableNotified) return
+      unavailableNotified = true
+      handleVideoPlaybackUnavailable()
+    }
     const play = () => {
       if (cancelled) return
       try {
         const result = video.play()
         if (result && typeof result.catch === 'function') {
-          void result.catch(() => undefined)
+          void result.then(markStarted).catch(() => undefined)
+        } else {
+          markStarted()
         }
       } catch {
         // Mobile browsers may still require a user gesture for some media paths.
@@ -1282,6 +1348,14 @@ function ImageCard({
     timerIds.push(window.setTimeout(play, 120))
     timerIds.push(window.setTimeout(play, 420))
     timerIds.push(window.setTimeout(play, 900))
+    timerIds.push(window.setTimeout(() => {
+      if (!started && (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.error)) {
+        notifyUnavailable()
+      }
+    }, 2600))
+    video.addEventListener('playing', markStarted)
+    video.addEventListener('timeupdate', markStarted)
+    video.addEventListener('error', notifyUnavailable)
     video.addEventListener('loadedmetadata', play)
     video.addEventListener('canplay', play)
 
@@ -1289,15 +1363,24 @@ function ImageCard({
       cancelled = true
       window.cancelAnimationFrame(frameId)
       timerIds.forEach(timerId => window.clearTimeout(timerId))
+      video.removeEventListener('playing', markStarted)
+      video.removeEventListener('timeupdate', markStarted)
+      video.removeEventListener('error', notifyUnavailable)
       video.removeEventListener('loadedmetadata', play)
       video.removeEventListener('canplay', play)
     }
-  }, [shouldRenderNativeVideo, soundEnabled, nativeVideoSrc])
+  }, [shouldRenderNativeVideo, soundEnabled, nativeVideoSrc, handleVideoPlaybackStarted, handleVideoPlaybackUnavailable])
 
   useEffect(() => {
     if (!shouldRenderIframeVideo) return
     syncIframeAudio(iframeRef.current, image.provider, !soundEnabled)
   }, [image.provider, shouldRenderIframeVideo, soundEnabled, iframeVideoSrc])
+
+  useEffect(() => {
+    if (!shouldRenderIframeVideo || !cycleIframeVideo) return
+    const timerId = window.setTimeout(handleVideoPlaybackComplete, getIframeVideoCycleMs(image))
+    return () => window.clearTimeout(timerId)
+  }, [cycleIframeVideo, handleVideoPlaybackComplete, image, shouldRenderIframeVideo])
 
   useEffect(() => () => {
     if (clickTimer.current) window.clearTimeout(clickTimer.current)
@@ -1661,7 +1744,10 @@ function ImageCard({
             className="pointer-events-none block h-full w-full border-0"
             allow="autoplay; encrypted-media; picture-in-picture; web-share"
             loading="eager"
-            onLoad={() => syncIframeAudio(iframeRef.current, image.provider, !soundEnabled)}
+            onLoad={() => {
+              handleVideoPlaybackStarted()
+              syncIframeAudio(iframeRef.current, image.provider, !soundEnabled)
+            }}
             allowFullScreen
           />
         ) : shouldRenderNativeVideo && nativeVideoSrc ? (
@@ -1671,10 +1757,12 @@ function ImageCard({
             poster={imageSrc}
             muted={!soundEnabled}
             autoPlay
-            loop
+            loop={loopNativeVideo}
             playsInline
-            preload="metadata"
+            preload="auto"
             draggable={false}
+            onEnded={handleVideoPlaybackComplete}
+            onError={handleVideoPlaybackUnavailable}
             onContextMenu={event => event.preventDefault()}
             className="block h-full w-full object-cover"
           />
@@ -2027,7 +2115,9 @@ function ShadowPinCategoryScreen({
   const [overlayImageId, setOverlayImageId] = useState<string | null>(null)
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null)
   const [soundVideoId, setSoundVideoId] = useState<string | null>(null)
+  const [playableVisibleVideoCount, setPlayableVisibleVideoCount] = useState(0)
   const videoVisibilityRef = useRef(new Map<string, VideoVisibilitySnapshot>())
+  const skippedVideoIdsRef = useRef(new Set<string>())
   const adminRole = user?.admin_role
 
   const title = imagesState.category?.title || 'ShadowPin'
@@ -2065,18 +2155,60 @@ function ShadowPinCategoryScreen({
     setModal({ type: 'image-viewer', image })
   }
 
+  const syncVideoPlaybackState = useCallback((preferOrderedStart: boolean) => {
+    const visibilityMap = videoVisibilityRef.current
+    const playableVideos = getOrderedVisibleVideos(visibilityMap.values(), skippedVideoIdsRef.current)
+    const nextVideoId = playableVideos[0]?.id ?? null
+    setPlayableVisibleVideoCount(playableVideos.length)
+    setActiveVideoId(current => {
+      if (!nextVideoId) return null
+      const currentPlayable = Boolean(current && playableVideos.some(video => video.id === current))
+      if (!currentPlayable || preferOrderedStart) return nextVideoId
+      return current
+    })
+  }, [])
+
   const updateVideoVisibility = useCallback((visibility: VideoVisibilitySnapshot) => {
     const visibilityMap = videoVisibilityRef.current
+    const wasVisible = visibilityMap.has(visibility.id)
     if (visibility.visible) {
       visibilityMap.set(visibility.id, visibility)
     } else {
       visibilityMap.delete(visibility.id)
+      skippedVideoIdsRef.current.delete(visibility.id)
     }
 
-    const nextVideoId = getOrderedVisibleVideoId(visibilityMap.values())
-    setActiveVideoId(current => current === nextVideoId ? current : nextVideoId)
-    setSoundVideoId(current => current && current !== nextVideoId ? null : current)
+    syncVideoPlaybackState(visibility.visible && !wasVisible)
+  }, [syncVideoPlaybackState])
+
+  const markVideoPlaybackStarted = useCallback((imageId: string) => {
+    if (!skippedVideoIdsRef.current.delete(imageId)) return
+    syncVideoPlaybackState(false)
+  }, [syncVideoPlaybackState])
+
+  const advanceVisibleVideo = useCallback((imageId: string, skipCurrent: boolean) => {
+    const visibilityMap = videoVisibilityRef.current
+    if (skipCurrent && visibilityMap.has(imageId)) {
+      skippedVideoIdsRef.current.add(imageId)
+    }
+
+    const skippedVideoIds = skippedVideoIdsRef.current
+    setPlayableVisibleVideoCount(getOrderedVisibleVideos(visibilityMap.values(), skippedVideoIds).length)
+    const nextVideoId = getNextOrderedVisibleVideoId(visibilityMap.values(), imageId, skippedVideoIds)
+    setActiveVideoId(current => current === imageId ? nextVideoId : current)
   }, [])
+
+  const completeVideoPlayback = useCallback((imageId: string) => {
+    advanceVisibleVideo(imageId, false)
+  }, [advanceVisibleVideo])
+
+  const skipUnavailableVideo = useCallback((imageId: string) => {
+    advanceVisibleVideo(imageId, true)
+  }, [advanceVisibleVideo])
+
+  useEffect(() => {
+    setSoundVideoId(current => current && current !== activeVideoId ? null : current)
+  }, [activeVideoId])
 
   const masonryColumnCount = useShadowPinMasonryColumnCount()
   const masonryColumns = useMemo(
@@ -2144,9 +2276,14 @@ function ShadowPinCategoryScreen({
                           columnSide={columnSide}
                           activeVideoId={activeVideoId}
                           soundEnabled={soundVideoId === image.id}
+                          loopNativeVideo={playableVisibleVideoCount <= 1}
+                          cycleIframeVideo={playableVisibleVideoCount > 1}
                           overlayOpen={overlayImageId === image.id}
                           onToggleOverlay={() => setOverlayImageId(prev => prev === image.id ? null : image.id)}
                           onVideoVisibilityChange={updateVideoVisibility}
+                          onVideoPlaybackStarted={markVideoPlaybackStarted}
+                          onVideoPlaybackComplete={completeVideoPlayback}
+                          onVideoPlaybackUnavailable={skipUnavailableVideo}
                           onToggleSound={() => {
                             setActiveVideoId(image.id)
                             setSoundVideoId(prev => prev === image.id ? null : image.id)
