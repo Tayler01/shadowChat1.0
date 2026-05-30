@@ -741,6 +741,118 @@ test('skips a visible native video that cannot start playback', async () => {
   }
 })
 
+test('skips visible external video pins that only have a thumbnail', async () => {
+  const originalIntersectionObserver = global.IntersectionObserver
+  const originalPlay = HTMLMediaElement.prototype.play
+  const observers: Array<{
+    callback: IntersectionObserverCallback
+    target: Element | null
+    disconnect: jest.Mock
+  }> = []
+
+  class MockIntersectionObserver {
+    readonly callback: IntersectionObserverCallback
+    target: Element | null = null
+    readonly disconnect = jest.fn()
+    readonly unobserve = jest.fn()
+    readonly takeRecords = jest.fn(() => [])
+    readonly root = null
+    readonly rootMargin = ''
+    readonly thresholds = []
+
+    constructor(callback: IntersectionObserverCallback) {
+      this.callback = callback
+      observers.push(this)
+    }
+
+    observe = jest.fn((target: Element) => {
+      this.target = target
+    })
+  }
+
+  Object.defineProperty(global, 'IntersectionObserver', {
+    configurable: true,
+    value: MockIntersectionObserver,
+  })
+  Object.defineProperty(window, 'IntersectionObserver', {
+    configurable: true,
+    value: MockIntersectionObserver,
+  })
+  HTMLMediaElement.prototype.play = jest.fn().mockResolvedValue(undefined)
+
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      {
+        ...image('instagram-thumb-only', 1080, 1920),
+        media_type: 'external_video',
+        provider: 'instagram',
+        source_url: 'https://www.instagram.com/reel/thumbOnly/',
+        processing_status: 'ready',
+      },
+      {
+        ...image('playable-clip', 1080, 1920),
+        media_type: 'video',
+        provider: 'bunny_stream',
+        video_preview_url: 'https://videos.example/playable-clip-480.mp4',
+        video_playback_url: 'https://videos.example/playable-clip-720.mp4',
+        processing_status: 'ready',
+      },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  try {
+    const { container } = render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+    const thumbOnlyCard = screen.getByAltText('Pin instagram-thumb-only').closest('article')
+    const playableCard = screen.getByAltText('Pin playable-clip').closest('article')
+    expect(thumbOnlyCard).not.toBeNull()
+    expect(playableCard).not.toBeNull()
+
+    const sendIntersection = (target: Element, top: number, left: number) => {
+      observers
+        .filter(observer => observer.target === target)
+        .forEach(observer => observer.callback([
+          {
+            isIntersecting: true,
+            intersectionRatio: 0.72,
+            target,
+            boundingClientRect: { top, left } as DOMRectReadOnly,
+          } as unknown as IntersectionObserverEntry,
+        ], observer as unknown as IntersectionObserver))
+    }
+
+    act(() => {
+      sendIntersection(thumbOnlyCard!, 96, 24)
+      sendIntersection(playableCard!, 96, 240)
+    })
+    await waitFor(() => {
+      expect(container.querySelector('video')).toHaveAttribute('src', 'https://videos.example/playable-clip-480.mp4')
+    })
+  } finally {
+    Object.defineProperty(global, 'IntersectionObserver', {
+      configurable: true,
+      value: originalIntersectionObserver,
+    })
+    Object.defineProperty(window, 'IntersectionObserver', {
+      configurable: true,
+      value: originalIntersectionObserver,
+    })
+    HTMLMediaElement.prototype.play = originalPlay
+  }
+})
+
 test('cycles visible iframe videos on a fallback slot when no ended event is available', async () => {
   jest.useFakeTimers()
   const originalIntersectionObserver = global.IntersectionObserver

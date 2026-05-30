@@ -131,6 +131,7 @@ type VideoIframeMode = 'feed' | 'viewer'
 type VideoVisibilitySnapshot = {
   id: string
   visible: boolean
+  playable: boolean
   ratio: number
   top: number
   left: number
@@ -237,6 +238,7 @@ const getOrderedVisibleVideos = (
   const visibleVideos = Array.from(videos)
     .filter(video =>
       video.visible &&
+      video.playable &&
       video.ratio >= VIDEO_FOCUS_MIN_INTERSECTION_RATIO &&
       !skippedVideoIds?.has(video.id)
     )
@@ -1291,8 +1293,10 @@ function ImageCard({
   const videoPin = isVideoPin(image)
   const activeVideo = activeVideoId === image.id && image.processing_status !== 'failed'
   const nativeVideoSrc = getVideoPreviewUrl(image)
+  const feedIframeVideoSrc = videoPin ? getVideoIframeUrl(image) : ''
+  const feedVideoPlayable = videoPin && Boolean(nativeVideoSrc || feedIframeVideoSrc)
   const shouldRenderNativeVideo = videoPin && activeVideo && Boolean(nativeVideoSrc)
-  const iframeVideoSrc = videoPin && activeVideo ? getVideoIframeUrl(image) : ''
+  const iframeVideoSrc = activeVideo ? feedIframeVideoSrc : ''
   const shouldRenderIframeVideo = videoPin && activeVideo && !nativeVideoSrc && Boolean(iframeVideoSrc)
   const handleVideoPlaybackStarted = useCallback(() => onVideoPlaybackStarted(image.id), [image.id, onVideoPlaybackStarted])
   const handleVideoPlaybackComplete = useCallback(() => onVideoPlaybackComplete(image.id), [image.id, onVideoPlaybackComplete])
@@ -1304,6 +1308,12 @@ function ImageCard({
   useEffect(() => {
     setSourceIndex(0)
   }, [image.id, image.thumbnail_url, image.medium_url, image.image_url])
+
+  useEffect(() => {
+    if (videoPin && activeVideo && !feedVideoPlayable) {
+      handleVideoPlaybackUnavailable()
+    }
+  }, [activeVideo, feedVideoPlayable, handleVideoPlaybackUnavailable, videoPin])
 
   useEffect(() => {
     const video = videoRef.current
@@ -1435,6 +1445,7 @@ function ImageCard({
       onVideoVisibilityChange({
         id: image.id,
         visible: visibleOverride ?? (entry.isIntersecting && entry.intersectionRatio >= VIDEO_FOCUS_MIN_INTERSECTION_RATIO),
+        playable: feedVideoPlayable,
         ratio: entry.intersectionRatio,
         top: rect.top,
         left: rect.left,
@@ -1451,9 +1462,9 @@ function ImageCard({
     observer.observe(node)
     return () => {
       observer.disconnect()
-      onVideoVisibilityChange({ id: image.id, visible: false, ratio: 0, top: 0, left: 0 })
+      onVideoVisibilityChange({ id: image.id, visible: false, playable: feedVideoPlayable, ratio: 0, top: 0, left: 0 })
     }
-  }, [image.id, onVideoVisibilityChange, videoPin])
+  }, [feedVideoPlayable, image.id, onVideoVisibilityChange, videoPin])
 
   const unlockGestureScroll = () => {
     unlockGestureScrollRef.current?.()
@@ -2178,7 +2189,7 @@ function ShadowPinCategoryScreen({
       skippedVideoIdsRef.current.delete(visibility.id)
     }
 
-    syncVideoPlaybackState(visibility.visible && !wasVisible)
+    syncVideoPlaybackState(visibility.visible && visibility.playable && !wasVisible)
   }, [syncVideoPlaybackState])
 
   const markVideoPlaybackStarted = useCallback((imageId: string) => {
