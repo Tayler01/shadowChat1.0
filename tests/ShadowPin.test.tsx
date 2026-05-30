@@ -1241,6 +1241,53 @@ test('ShadowPin image single tap reveals a static heart count without direct ima
   }
 })
 
+test('ShadowPin image double tap opens the fullscreen detail viewer', () => {
+  jest.useFakeTimers()
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+
+    const imageCard = screen.getByAltText('Pin one').closest('article')
+    expect(imageCard).not.toBeNull()
+
+    fireShadowPinPointer(imageCard!, 'pointerdown', {
+      pointerId: 21,
+      button: 0,
+      clientX: 160,
+      clientY: 320,
+    })
+    fireShadowPinPointer(imageCard!, 'pointerup', {
+      pointerId: 21,
+      clientX: 160,
+      clientY: 320,
+    })
+    fireEvent.click(imageCard!)
+
+    act(() => {
+      jest.advanceTimersByTime(120)
+    })
+
+    fireShadowPinPointer(imageCard!, 'pointerdown', {
+      pointerId: 22,
+      button: 0,
+      clientX: 160,
+      clientY: 320,
+    })
+    fireShadowPinPointer(imageCard!, 'pointerup', {
+      pointerId: 22,
+      clientX: 160,
+      clientY: 320,
+    })
+    fireEvent.click(imageCard!)
+
+    expect(screen.getByRole('heading', { name: 'Pin one' })).toBeInTheDocument()
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
 test('ShadowPin liked images show a passive top-right heart badge only when liked', () => {
   mockUseShadowPinImages.mockReturnValue({
     category,
@@ -1597,6 +1644,92 @@ test('ShadowPin radial share falls back to copying the image link', async () => 
     Object.defineProperty(navigator, 'share', {
       configurable: true,
       value: originalShare,
+    })
+    jest.useRealTimers()
+  }
+})
+
+test('ShadowPin radial share can copy a second image when modern clipboard fails', async () => {
+  jest.useFakeTimers()
+  const originalClipboard = navigator.clipboard
+  const originalShare = navigator.share
+  const originalExecCommand = document.execCommand
+  const writeText = jest.fn()
+    .mockResolvedValueOnce(undefined)
+    .mockRejectedValueOnce(new Error('clipboard unavailable'))
+  const execCommand = jest.fn().mockReturnValue(true)
+
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText },
+  })
+  Object.defineProperty(navigator, 'share', {
+    configurable: true,
+    value: undefined,
+  })
+  Object.defineProperty(document, 'execCommand', {
+    configurable: true,
+    value: execCommand,
+  })
+
+  const shareViaRadial = async (imageCard: Element, pointerId: number) => {
+    fireShadowPinPointer(imageCard, 'pointerdown', {
+      pointerId,
+      button: 0,
+      clientX: 160,
+      clientY: 320,
+    })
+    act(() => {
+      jest.advanceTimersByTime(440)
+    })
+    fireShadowPinPointer(imageCard, 'pointermove', {
+      pointerId,
+      clientX: 149,
+      clientY: 217,
+    })
+    await act(async () => {
+      fireShadowPinPointer(imageCard, 'pointerup', {
+        pointerId,
+        clientX: 149,
+        clientY: 217,
+      })
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    act(() => {
+      jest.advanceTimersByTime(500)
+    })
+  }
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+
+    const firstImageCard = screen.getByAltText('Pin one').closest('article')
+    const secondImageCard = screen.getByAltText('Pin two').closest('article')
+    expect(firstImageCard).not.toBeNull()
+    expect(secondImageCard).not.toBeNull()
+
+    await shareViaRadial(firstImageCard!, 31)
+    await shareViaRadial(secondImageCard!, 32)
+
+    expect(writeText).toHaveBeenNthCalledWith(1, 'https://images.example/one.jpg')
+    expect(writeText).toHaveBeenNthCalledWith(2, 'https://images.example/two.jpg')
+    expect(execCommand).toHaveBeenCalledWith('copy')
+    expect(screen.getByTestId('shadow-pin-action-feedback')).toHaveAttribute('data-action', 'share')
+  } finally {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: originalClipboard,
+    })
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: originalShare,
+    })
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: originalExecCommand,
     })
     jest.useRealTimers()
   }

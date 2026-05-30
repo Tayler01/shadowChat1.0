@@ -9,6 +9,7 @@ import {
   Image as ImageIcon,
   Link as LinkIcon,
   Loader2,
+  Maximize2,
   Pin,
   Play,
   Plus,
@@ -422,12 +423,12 @@ const pinArcAction = (
 const BASE_PIN_ACTIONS_RIGHT: PinActionConfig[] = [
   pinArcAction('share', 'Share', -96, Share2),
   pinArcAction('heart', 'Heart', -60, Heart),
-  pinArcAction('open', 'Open', -24, Pin),
+  pinArcAction('open', 'Open', -24, Maximize2),
 ]
 const BASE_MANAGE_PIN_ACTIONS_RIGHT: PinActionConfig[] = [
   pinArcAction('share', 'Share', -102, Share2),
   pinArcAction('heart', 'Heart', -66, Heart),
-  pinArcAction('open', 'Open', -30, Pin),
+  pinArcAction('open', 'Open', -30, Maximize2),
   pinArcAction('edit', 'Edit', 6, Edit3),
 ]
 const PIN_ACTIONS: Record<PinActionSide, PinActionConfig[]> = {
@@ -498,14 +499,49 @@ const finitePointerCoordinate = (value: number) => Number.isFinite(value) ? valu
 const isAbortError = (error: unknown) =>
   typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError'
 
+const copyShadowPinImageLinkWithTextArea = (url: string) => {
+  if (typeof document !== 'undefined' && typeof document.execCommand === 'function') {
+    const textArea = document.createElement('textarea')
+    textArea.value = url
+    textArea.setAttribute('readonly', '')
+    textArea.style.position = 'fixed'
+    textArea.style.left = '-9999px'
+    textArea.style.top = '0'
+    document.body.appendChild(textArea)
+    textArea.select()
+    try {
+      if (document.execCommand('copy')) {
+        return true
+      }
+    } finally {
+      document.body.removeChild(textArea)
+    }
+  }
+
+  return false
+}
+
 const copyShadowPinImageLink = async (url: string) => {
-  if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
-    toast.error('Pin link is not available to copy')
+  let clipboardError: unknown = null
+
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success('Pin link copied')
+      return
+    } catch (error) {
+      clipboardError = error
+    }
+  }
+
+  if (copyShadowPinImageLinkWithTextArea(url)) {
+    toast.success('Pin link copied')
     return
   }
 
-  await navigator.clipboard.writeText(url)
-  toast.success('Pin link copied')
+  throw clipboardError instanceof Error
+    ? clipboardError
+    : new Error('Pin link is not available to copy')
 }
 
 const shareShadowPinImage = async (image: ShadowPinImage) => {
@@ -516,7 +552,11 @@ const shareShadowPinImage = async (image: ShadowPinImage) => {
     url,
   }
 
-  if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+  if (
+    typeof navigator !== 'undefined' &&
+    typeof navigator.share === 'function' &&
+    (typeof navigator.canShare !== 'function' || navigator.canShare(shareData))
+  ) {
     try {
       await navigator.share(shareData)
       return
@@ -527,8 +567,8 @@ const shareShadowPinImage = async (image: ShadowPinImage) => {
 
   try {
     await copyShadowPinImageLink(url)
-  } catch {
-    toast.error('Pin link could not be copied')
+  } catch (error) {
+    toast.error(error instanceof Error ? error.message : 'Pin link could not be copied')
   }
 }
 
@@ -1188,7 +1228,7 @@ function PinActionFeedback({ feedback }: { feedback: PinActionFeedbackState | nu
   const Icon = feedback.action === 'share'
     ? Share2
     : feedback.action === 'open'
-      ? Pin
+      ? Maximize2
       : feedback.action === 'edit'
         ? Edit3
         : Heart
@@ -1603,11 +1643,6 @@ function ImageCard({
       return
     }
 
-    if (clickTimer.current) {
-      window.clearTimeout(clickTimer.current)
-      clickTimer.current = null
-    }
-
     const pointerId = event.pointerId
     const startClientX = finitePointerCoordinate(event.clientX)
     const startClientY = finitePointerCoordinate(event.clientY)
@@ -1622,6 +1657,10 @@ function ImageCard({
       timerId: window.setTimeout(() => {
         if (!pressRef.current || pressRef.current.pointerId !== pointerId) return
 
+        if (clickTimer.current) {
+          window.clearTimeout(clickTimer.current)
+          clickTimer.current = null
+        }
         pressRef.current.active = true
         markPressConsumed()
         lockGestureScroll()
