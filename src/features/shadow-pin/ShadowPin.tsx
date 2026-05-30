@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, FormEvent, MutableRefObject, PointerEvent as ReactPointerEvent, UIEvent } from 'react'
 import { createPortal } from 'react-dom'
 import {
@@ -128,6 +128,16 @@ const isVideoPin = (image: ShadowPinImage) => image.media_type === 'video' || im
 const isYoutubeVideoPin = (image: ShadowPinImage) => image.provider === 'youtube' && Boolean(image.video_embed_url)
 const BUNNY_PLAYER_HOST = 'player.mediadelivery.net'
 type VideoIframeMode = 'feed' | 'viewer'
+type VideoVisibilitySnapshot = {
+  id: string
+  visible: boolean
+  ratio: number
+  top: number
+  left: number
+}
+
+const VIDEO_FOCUS_MIN_INTERSECTION_RATIO = 0.34
+const VIDEO_FOCUS_ROW_EPSILON_PX = 8
 
 const getVideoPreviewUrl = (image: ShadowPinImage) =>
   image.video_preview_url || image.video_playback_url || null
@@ -209,6 +219,21 @@ const getVideoIframeUrl = (image: ShadowPinImage, mode: VideoIframeMode = 'feed'
 }
 
 const isIframeVideoPin = (image: ShadowPinImage) => Boolean(getVideoIframeUrl(image))
+
+const getOrderedVisibleVideoId = (videos: Iterable<VideoVisibilitySnapshot>) => {
+  const visibleVideos = Array.from(videos)
+    .filter(video => video.visible && video.ratio >= VIDEO_FOCUS_MIN_INTERSECTION_RATIO)
+
+  visibleVideos.sort((a, b) => {
+    const rowDelta = a.top - b.top
+    if (Math.abs(rowDelta) > VIDEO_FOCUS_ROW_EPSILON_PX) return rowDelta
+    const columnDelta = a.left - b.left
+    if (Math.abs(columnDelta) > 1) return columnDelta
+    return b.ratio - a.ratio
+  })
+
+  return visibleVideos[0]?.id ?? null
+}
 
 type BunnyPlayer = {
   play?: () => void
@@ -294,6 +319,18 @@ const syncIframeAudio = (iframe: HTMLIFrameElement | null, provider: ShadowPinIm
       })
       .catch(() => undefined)
   }
+}
+
+const prepareInlineAutoplayVideo = (video: HTMLVideoElement, muted: boolean) => {
+  video.autoplay = true
+  video.playsInline = true
+  video.defaultMuted = muted
+  video.muted = muted
+  video.setAttribute('autoplay', '')
+  video.setAttribute('playsinline', '')
+  video.setAttribute('webkit-playsinline', '')
+  if (muted) video.setAttribute('muted', '')
+  else video.removeAttribute('muted')
 }
 
 const getImageAspectRatio = (item: { image_width?: number | null; image_height?: number | null }) =>
@@ -1156,8 +1193,7 @@ function ImageCard({
   soundEnabled,
   overlayOpen,
   onToggleOverlay,
-  onVideoFocus,
-  onVideoBlur,
+  onVideoVisibilityChange,
   onToggleSound,
   onViewer,
   onEdit,
@@ -1172,8 +1208,7 @@ function ImageCard({
   soundEnabled: boolean
   overlayOpen: boolean
   onToggleOverlay: () => void
-  onVideoFocus: () => void
-  onVideoBlur: () => void
+  onVideoVisibilityChange: (visibility: VideoVisibilitySnapshot) => void
   onToggleSound: () => void
   onViewer: () => void
   onEdit: () => void
@@ -1227,15 +1262,36 @@ function ImageCard({
       return
     }
 
-    video.muted = !soundEnabled
-    const play = async () => {
+    prepareInlineAutoplayVideo(video, !soundEnabled)
+    let cancelled = false
+    const timerIds: number[] = []
+    const play = () => {
+      if (cancelled) return
       try {
-        await video.play()
+        const result = video.play()
+        if (result && typeof result.catch === 'function') {
+          void result.catch(() => undefined)
+        }
       } catch {
         // Mobile browsers may still require a user gesture for some media paths.
       }
     }
-    void play()
+
+    play()
+    const frameId = window.requestAnimationFrame(play)
+    timerIds.push(window.setTimeout(play, 120))
+    timerIds.push(window.setTimeout(play, 420))
+    timerIds.push(window.setTimeout(play, 900))
+    video.addEventListener('loadedmetadata', play)
+    video.addEventListener('canplay', play)
+
+    return () => {
+      cancelled = true
+      window.cancelAnimationFrame(frameId)
+      timerIds.forEach(timerId => window.clearTimeout(timerId))
+      video.removeEventListener('loadedmetadata', play)
+      video.removeEventListener('canplay', play)
+    }
   }, [shouldRenderNativeVideo, soundEnabled, nativeVideoSrc])
 
   useEffect(() => {
@@ -1291,23 +1347,30 @@ function ImageCard({
     const node = cardRef.current
     if (!node || typeof IntersectionObserver === 'undefined') return
 
+    const updateVisibility = (entry: IntersectionObserverEntry, visibleOverride?: boolean) => {
+      const rect = entry.boundingClientRect ?? node.getBoundingClientRect()
+      onVideoVisibilityChange({
+        id: image.id,
+        visible: visibleOverride ?? (entry.isIntersecting && entry.intersectionRatio >= VIDEO_FOCUS_MIN_INTERSECTION_RATIO),
+        ratio: entry.intersectionRatio,
+        top: rect.top,
+        left: rect.left,
+      })
+    }
+
     const observer = new IntersectionObserver(entries => {
       const entry = entries[0]
       if (!entry) return
 
-      if (entry.isIntersecting && entry.intersectionRatio >= 0.62) {
-        onVideoFocus()
-        return
-      }
-
-      if (!entry.isIntersecting || entry.intersectionRatio < 0.25) {
-        onVideoBlur()
-      }
-    }, { threshold: [0, 0.25, 0.62, 0.85] })
+      updateVisibility(entry)
+    }, { threshold: [0, 0.25, VIDEO_FOCUS_MIN_INTERSECTION_RATIO, 0.5, 0.62, 0.85] })
 
     observer.observe(node)
-    return () => observer.disconnect()
-  }, [image.id, onVideoBlur, onVideoFocus, videoPin])
+    return () => {
+      observer.disconnect()
+      onVideoVisibilityChange({ id: image.id, visible: false, ratio: 0, top: 0, left: 0 })
+    }
+  }, [image.id, onVideoVisibilityChange, videoPin])
 
   const unlockGestureScroll = () => {
     unlockGestureScrollRef.current?.()
@@ -1560,10 +1623,6 @@ function ImageCard({
       return
     }
 
-    if (videoPin) {
-      onVideoFocus()
-    }
-
     if (clickTimer.current) {
       window.clearTimeout(clickTimer.current)
       clickTimer.current = null
@@ -1601,6 +1660,8 @@ function ImageCard({
             title={image.title}
             className="pointer-events-none block h-full w-full border-0"
             allow="autoplay; encrypted-media; picture-in-picture; web-share"
+            loading="eager"
+            onLoad={() => syncIframeAudio(iframeRef.current, image.provider, !soundEnabled)}
             allowFullScreen
           />
         ) : shouldRenderNativeVideo && nativeVideoSrc ? (
@@ -1609,6 +1670,7 @@ function ImageCard({
             src={nativeVideoSrc}
             poster={imageSrc}
             muted={!soundEnabled}
+            autoPlay
             loop
             playsInline
             preload="metadata"
@@ -1738,6 +1800,8 @@ function ImageViewerModal({
             title={image.title}
             className="block h-full w-full border-0"
             allow="autoplay; encrypted-media; picture-in-picture; web-share"
+            loading="eager"
+            onLoad={() => syncIframeAudio(iframeRef.current, image.provider, muted)}
             allowFullScreen
           />
         ) : videoPin && nativeVideoSrc ? (
@@ -1963,6 +2027,7 @@ function ShadowPinCategoryScreen({
   const [overlayImageId, setOverlayImageId] = useState<string | null>(null)
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null)
   const [soundVideoId, setSoundVideoId] = useState<string | null>(null)
+  const videoVisibilityRef = useRef(new Map<string, VideoVisibilitySnapshot>())
   const adminRole = user?.admin_role
 
   const title = imagesState.category?.title || 'ShadowPin'
@@ -2000,14 +2065,18 @@ function ShadowPinCategoryScreen({
     setModal({ type: 'image-viewer', image })
   }
 
-  const focusVideo = (imageId: string) => {
-    setActiveVideoId(imageId)
-  }
+  const updateVideoVisibility = useCallback((visibility: VideoVisibilitySnapshot) => {
+    const visibilityMap = videoVisibilityRef.current
+    if (visibility.visible) {
+      visibilityMap.set(visibility.id, visibility)
+    } else {
+      visibilityMap.delete(visibility.id)
+    }
 
-  const blurVideo = (imageId: string) => {
-    setActiveVideoId(current => current === imageId ? null : current)
-    setSoundVideoId(current => current === imageId ? null : current)
-  }
+    const nextVideoId = getOrderedVisibleVideoId(visibilityMap.values())
+    setActiveVideoId(current => current === nextVideoId ? current : nextVideoId)
+    setSoundVideoId(current => current && current !== nextVideoId ? null : current)
+  }, [])
 
   const masonryColumnCount = useShadowPinMasonryColumnCount()
   const masonryColumns = useMemo(
@@ -2077,8 +2146,7 @@ function ShadowPinCategoryScreen({
                           soundEnabled={soundVideoId === image.id}
                           overlayOpen={overlayImageId === image.id}
                           onToggleOverlay={() => setOverlayImageId(prev => prev === image.id ? null : image.id)}
-                          onVideoFocus={() => focusVideo(image.id)}
-                          onVideoBlur={() => blurVideo(image.id)}
+                          onVideoVisibilityChange={updateVideoVisibility}
                           onToggleSound={() => {
                             setActiveVideoId(image.id)
                             setSoundVideoId(prev => prev === image.id ? null : image.id)

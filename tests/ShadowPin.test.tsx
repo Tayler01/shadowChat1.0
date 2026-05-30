@@ -346,7 +346,12 @@ test('autoplays a focused native video pin muted in the masonry feed', async () 
     await waitFor(() => {
       expect(container.querySelector('video')).toBeInTheDocument()
     })
-    expect(container.querySelector('video')).toHaveAttribute('src', 'https://videos.example/clip-480.mp4')
+    const video = container.querySelector('video')
+    expect(video).toHaveAttribute('src', 'https://videos.example/clip-480.mp4')
+    expect(video).toHaveAttribute('autoplay')
+    expect(video).toHaveAttribute('playsinline')
+    expect(video).toHaveAttribute('webkit-playsinline')
+    expect(video).toHaveAttribute('muted')
     expect(HTMLMediaElement.prototype.play).toHaveBeenCalled()
   } finally {
     Object.defineProperty(global, 'IntersectionObserver', {
@@ -361,28 +366,70 @@ test('autoplays a focused native video pin muted in the masonry feed', async () 
   }
 })
 
-test('tapping a neighboring video pin moves playback focus to that pin', async () => {
-  jest.useFakeTimers()
+test('selects visible video focus by top row, then left-to-right order', async () => {
+  const originalIntersectionObserver = global.IntersectionObserver
   const originalPlay = HTMLMediaElement.prototype.play
+  const observers: Array<{
+    callback: IntersectionObserverCallback
+    target: Element | null
+    disconnect: jest.Mock
+  }> = []
+
+  class MockIntersectionObserver {
+    readonly callback: IntersectionObserverCallback
+    target: Element | null = null
+    readonly disconnect = jest.fn()
+    readonly unobserve = jest.fn()
+    readonly takeRecords = jest.fn(() => [])
+    readonly root = null
+    readonly rootMargin = ''
+    readonly thresholds = []
+
+    constructor(callback: IntersectionObserverCallback) {
+      this.callback = callback
+      observers.push(this)
+    }
+
+    observe = jest.fn((target: Element) => {
+      this.target = target
+    })
+  }
+
+  Object.defineProperty(global, 'IntersectionObserver', {
+    configurable: true,
+    value: MockIntersectionObserver,
+  })
+  Object.defineProperty(window, 'IntersectionObserver', {
+    configurable: true,
+    value: MockIntersectionObserver,
+  })
   HTMLMediaElement.prototype.play = jest.fn().mockResolvedValue(undefined)
 
   mockUseShadowPinImages.mockReturnValue({
     category,
     images: [
       {
-        ...image('clip-one', 1080, 1920),
+        ...image('top-right', 1080, 1920),
         media_type: 'video',
         provider: 'bunny_stream',
-        video_preview_url: 'https://videos.example/clip-one-480.mp4',
-        video_playback_url: 'https://videos.example/clip-one-720.mp4',
+        video_preview_url: 'https://videos.example/top-right-480.mp4',
+        video_playback_url: 'https://videos.example/top-right-720.mp4',
         processing_status: 'ready',
       },
       {
-        ...image('clip-two', 1080, 1920),
+        ...image('lower-left', 1080, 1920),
         media_type: 'video',
         provider: 'bunny_stream',
-        video_preview_url: 'https://videos.example/clip-two-480.mp4',
-        video_playback_url: 'https://videos.example/clip-two-720.mp4',
+        video_preview_url: 'https://videos.example/lower-left-480.mp4',
+        video_playback_url: 'https://videos.example/lower-left-720.mp4',
+        processing_status: 'ready',
+      },
+      {
+        ...image('top-left', 1080, 1920),
+        media_type: 'video',
+        provider: 'bunny_stream',
+        video_preview_url: 'https://videos.example/top-left-480.mp4',
+        video_playback_url: 'https://videos.example/top-left-720.mp4',
         processing_status: 'ready',
       },
     ],
@@ -402,24 +449,50 @@ test('tapping a neighboring video pin moves playback focus to that pin', async (
     const { container } = render(<ShadowPin onBack={() => {}} />)
 
     fireEvent.click(screen.getByText('Fam & Friends'))
-    const firstCard = screen.getByAltText('Pin clip-one').closest('article')
-    const secondCard = screen.getByAltText('Pin clip-two').closest('article')
-    expect(firstCard).not.toBeNull()
-    expect(secondCard).not.toBeNull()
+    const topRightCard = screen.getByAltText('Pin top-right').closest('article')
+    const lowerLeftCard = screen.getByAltText('Pin lower-left').closest('article')
+    const topLeftCard = screen.getByAltText('Pin top-left').closest('article')
+    expect(topRightCard).not.toBeNull()
+    expect(lowerLeftCard).not.toBeNull()
+    expect(topLeftCard).not.toBeNull()
 
-    fireEvent.click(firstCard!)
+    const sendIntersection = (target: Element, top: number, left: number) => {
+      observers
+        .filter(observer => observer.target === target)
+        .forEach(observer => observer.callback([
+          {
+            isIntersecting: true,
+            intersectionRatio: 0.72,
+            target,
+            boundingClientRect: { top, left } as DOMRectReadOnly,
+          } as unknown as IntersectionObserverEntry,
+        ], observer as unknown as IntersectionObserver))
+    }
+
+    act(() => {
+      sendIntersection(lowerLeftCard!, 220, 24)
+      sendIntersection(topRightCard!, 96, 240)
+    })
     await waitFor(() => {
-      expect(container.querySelector('video')).toHaveAttribute('src', 'https://videos.example/clip-one-480.mp4')
+      expect(container.querySelector('video')).toHaveAttribute('src', 'https://videos.example/top-right-480.mp4')
     })
 
-    fireEvent.click(secondCard!)
-    await waitFor(() => {
-      expect(container.querySelector('video')).toHaveAttribute('src', 'https://videos.example/clip-two-480.mp4')
+    act(() => {
+      sendIntersection(topLeftCard!, 96, 24)
     })
-    expect(container.querySelector('video[src="https://videos.example/clip-one-480.mp4"]')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(container.querySelector('video')).toHaveAttribute('src', 'https://videos.example/top-left-480.mp4')
+    })
   } finally {
+    Object.defineProperty(global, 'IntersectionObserver', {
+      configurable: true,
+      value: originalIntersectionObserver,
+    })
+    Object.defineProperty(window, 'IntersectionObserver', {
+      configurable: true,
+      value: originalIntersectionObserver,
+    })
     HTMLMediaElement.prototype.play = originalPlay
-    jest.useRealTimers()
   }
 })
 
@@ -458,7 +531,7 @@ test('opens Bunny embed videos in the fullscreen viewer when direct renditions a
     fireEvent.click(videoCard!)
     fireEvent.click(videoCard!)
 
-    const viewerFrame = screen.getAllByTitle('Pin bunny')[1]
+    const viewerFrame = screen.getByTitle('Pin bunny')
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('player.mediadelivery.net'))
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('autoplay=true'))
     expect(viewerFrame).toHaveAttribute('src', expect.not.stringContaining('controls=false'))
@@ -552,7 +625,7 @@ test('opens legacy Pinterest video pins with the Pinterest oEmbed iframe', () =>
     fireEvent.click(videoCard!)
     fireEvent.click(videoCard!)
 
-    const viewerFrame = screen.getAllByTitle('Pin pinterest')[1]
+    const viewerFrame = screen.getByTitle('Pin pinterest')
     expect(viewerFrame).toHaveAttribute('src', 'https://assets.pinterest.com/ext/embed.html?id=342906959154248010&src=shado-pin')
   } finally {
     jest.useRealTimers()
@@ -595,7 +668,7 @@ test('opens YouTube video pins with fullscreen player controls', () => {
     fireEvent.click(videoCard!)
     fireEvent.click(videoCard!)
 
-    const viewerFrame = screen.getAllByTitle('Pin youtube')[1]
+    const viewerFrame = screen.getByTitle('Pin youtube')
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('www.youtube.com/embed/Czrv1RX19G0'))
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('autoplay=1'))
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('mute=1'))
