@@ -1591,6 +1591,7 @@ test('ShadowPin radial share falls back to copying the image link', async () => 
   jest.useFakeTimers()
   const originalClipboard = navigator.clipboard
   const originalShare = navigator.share
+  const originalExecCommand = document.execCommand
   const writeText = jest.fn().mockResolvedValue(undefined)
 
   Object.defineProperty(navigator, 'clipboard', {
@@ -1598,6 +1599,10 @@ test('ShadowPin radial share falls back to copying the image link', async () => 
     value: { writeText },
   })
   Object.defineProperty(navigator, 'share', {
+    configurable: true,
+    value: undefined,
+  })
+  Object.defineProperty(document, 'execCommand', {
     configurable: true,
     value: undefined,
   })
@@ -1645,18 +1650,24 @@ test('ShadowPin radial share falls back to copying the image link', async () => 
       configurable: true,
       value: originalShare,
     })
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: originalExecCommand,
+    })
     jest.useRealTimers()
   }
 })
 
-test('ShadowPin radial share can copy a second image when modern clipboard fails', async () => {
+test('ShadowPin radial share can copy a second image when platform share is denied', async () => {
   jest.useFakeTimers()
   const originalClipboard = navigator.clipboard
   const originalShare = navigator.share
   const originalExecCommand = document.execCommand
-  const writeText = jest.fn()
-    .mockResolvedValueOnce(undefined)
-    .mockRejectedValueOnce(new Error('clipboard unavailable'))
+  const writeText = jest.fn().mockRejectedValue(new Error('clipboard unavailable'))
+  const share = jest.fn().mockRejectedValue(new DOMException(
+    'The request is not allowed by the user agent or the platform in the current context, possibly because the user denied permission.',
+    'NotAllowedError'
+  ))
   const execCommand = jest.fn().mockReturnValue(true)
 
   Object.defineProperty(navigator, 'clipboard', {
@@ -1665,7 +1676,7 @@ test('ShadowPin radial share can copy a second image when modern clipboard fails
   })
   Object.defineProperty(navigator, 'share', {
     configurable: true,
-    value: undefined,
+    value: share,
   })
   Object.defineProperty(document, 'execCommand', {
     configurable: true,
@@ -1714,9 +1725,9 @@ test('ShadowPin radial share can copy a second image when modern clipboard fails
     await shareViaRadial(firstImageCard!, 31)
     await shareViaRadial(secondImageCard!, 32)
 
-    expect(writeText).toHaveBeenNthCalledWith(1, 'https://images.example/one.jpg')
-    expect(writeText).toHaveBeenNthCalledWith(2, 'https://images.example/two.jpg')
-    expect(execCommand).toHaveBeenCalledWith('copy')
+    expect(share).not.toHaveBeenCalled()
+    expect(writeText).not.toHaveBeenCalled()
+    expect(execCommand).toHaveBeenCalledTimes(2)
     expect(screen.getByTestId('shadow-pin-action-feedback')).toHaveAttribute('data-action', 'share')
   } finally {
     Object.defineProperty(navigator, 'clipboard', {

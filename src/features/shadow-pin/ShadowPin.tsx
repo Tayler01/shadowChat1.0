@@ -496,9 +496,6 @@ const getShareUrl = (image: ShadowPinImage) =>
 
 const finitePointerCoordinate = (value: number) => Number.isFinite(value) ? value : 0
 
-const isAbortError = (error: unknown) =>
-  typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError'
-
 const copyShadowPinImageLinkWithTextArea = (url: string) => {
   if (typeof document !== 'undefined' && typeof document.execCommand === 'function') {
     const textArea = document.createElement('textarea')
@@ -508,7 +505,9 @@ const copyShadowPinImageLinkWithTextArea = (url: string) => {
     textArea.style.left = '-9999px'
     textArea.style.top = '0'
     document.body.appendChild(textArea)
+    textArea.focus()
     textArea.select()
+    textArea.setSelectionRange(0, url.length)
     try {
       if (document.execCommand('copy')) {
         return true
@@ -522,54 +521,22 @@ const copyShadowPinImageLinkWithTextArea = (url: string) => {
 }
 
 const copyShadowPinImageLink = async (url: string) => {
-  let clipboardError: unknown = null
+  if (copyShadowPinImageLinkWithTextArea(url)) {
+    toast.success('Pin link copied')
+    return
+  }
 
   if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
     try {
       await navigator.clipboard.writeText(url)
       toast.success('Pin link copied')
       return
-    } catch (error) {
-      clipboardError = error
+    } catch {
+      // Fall through to a stable product error instead of exposing browser permission text.
     }
   }
 
-  if (copyShadowPinImageLinkWithTextArea(url)) {
-    toast.success('Pin link copied')
-    return
-  }
-
-  throw clipboardError instanceof Error
-    ? clipboardError
-    : new Error('Pin link is not available to copy')
-}
-
-const shareShadowPinImage = async (image: ShadowPinImage) => {
-  const url = getShareUrl(image)
-  const shareData = {
-    title: image.title,
-    text: image.description || 'ShadowPin pin',
-    url,
-  }
-
-  if (
-    typeof navigator !== 'undefined' &&
-    typeof navigator.share === 'function' &&
-    (typeof navigator.canShare !== 'function' || navigator.canShare(shareData))
-  ) {
-    try {
-      await navigator.share(shareData)
-      return
-    } catch (error) {
-      if (isAbortError(error)) return
-    }
-  }
-
-  try {
-    await copyShadowPinImageLink(url)
-  } catch (error) {
-    toast.error(error instanceof Error ? error.message : 'Pin link could not be copied')
-  }
+  throw new Error('Pin link could not be copied')
 }
 
 const getShadowPinMasonryColumnCount = () => {
@@ -1622,7 +1589,11 @@ function ImageCard({
 
     if (action === 'share') {
       onShare()
-      await shareShadowPinImage(image)
+      try {
+        await copyShadowPinImageLink(getShareUrl(image))
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Pin link could not be copied')
+      }
       return
     }
 
