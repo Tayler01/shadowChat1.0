@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, FormEvent, MutableRefObject, PointerEvent as ReactPointerEvent, UIEvent } from 'react'
 import { createPortal } from 'react-dom'
 import {
+  Copy,
   Edit3,
   ExternalLink,
   Film,
@@ -501,9 +502,15 @@ const copyShadowPinImageLinkWithTextArea = (url: string) => {
     const textArea = document.createElement('textarea')
     textArea.value = url
     textArea.setAttribute('readonly', '')
+    textArea.setAttribute('aria-hidden', 'true')
     textArea.style.position = 'fixed'
-    textArea.style.left = '-9999px'
+    textArea.style.left = '0'
     textArea.style.top = '0'
+    textArea.style.width = '1px'
+    textArea.style.height = '1px'
+    textArea.style.opacity = '0'
+    textArea.style.pointerEvents = 'none'
+    textArea.style.fontSize = '16px'
     document.body.appendChild(textArea)
     textArea.focus()
     textArea.select()
@@ -1132,6 +1139,11 @@ type PinActionFeedbackState = {
   action: PinQuickAction
 }
 
+type PinShareSheetState = {
+  open: boolean
+  url: string
+}
+
 const EMPTY_PIN_RADIAL_STATE: PinRadialState = {
   open: false,
   originX: 0,
@@ -1274,6 +1286,7 @@ function ImageCard({
   const cardRef = useRef<HTMLElement | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
+  const shareInputRef = useRef<HTMLInputElement | null>(null)
   const clickTimer = useRef<number | null>(null)
   const pressRef = useRef<{
     timerId: number | null
@@ -1294,7 +1307,9 @@ function ImageCard({
   const [sourceIndex, setSourceIndex] = useState(0)
   const [radialState, setRadialState] = useState<PinRadialState>(EMPTY_PIN_RADIAL_STATE)
   const [feedback, setFeedback] = useState<PinActionFeedbackState | null>(null)
+  const [shareSheet, setShareSheet] = useState<PinShareSheetState>({ open: false, url: '' })
   const imageSrc = imageSources[sourceIndex] || image.image_url
+  const shareUrl = getShareUrl(image)
   const aspectRatio = getImageAspectRatio(image) || '4 / 5'
   const controlSide = getPinControlSide(columnSide)
   const videoPin = isVideoPin(image)
@@ -1315,6 +1330,15 @@ function ImageCard({
   useEffect(() => {
     setSourceIndex(0)
   }, [image.id, image.thumbnail_url, image.medium_url, image.image_url])
+
+  useEffect(() => {
+    if (!shareSheet.open) return
+    const timerId = window.setTimeout(() => {
+      shareInputRef.current?.focus()
+      shareInputRef.current?.select()
+    }, 0)
+    return () => window.clearTimeout(timerId)
+  }, [shareSheet.open, shareSheet.url])
 
   useEffect(() => {
     if (videoPin && activeVideo && !feedVideoPlayable) {
@@ -1579,6 +1603,44 @@ function ImageCard({
     }, 1180)
   }
 
+  const revealShareSheet = () => {
+    setShareSheet({ open: true, url: shareUrl })
+  }
+
+  const closeShareSheet = () => {
+    setShareSheet({ open: false, url: '' })
+  }
+
+  const copyCurrentShareLink = async () => {
+    const url = shareSheet.url || shareUrl
+    try {
+      await copyShadowPinImageLink(url)
+      closeShareSheet()
+    } catch {
+      setShareSheet({ open: true, url })
+      window.setTimeout(() => {
+        shareInputRef.current?.focus()
+        shareInputRef.current?.select()
+      }, 0)
+    }
+  }
+
+  const nativeShareCurrentLink = async () => {
+    const url = shareSheet.url || shareUrl
+    if (typeof navigator === 'undefined' || typeof navigator.share !== 'function') return
+
+    try {
+      await navigator.share({
+        title: image.title,
+        text: image.description || 'ShadowPin pin',
+        url,
+      })
+      closeShareSheet()
+    } catch {
+      setShareSheet({ open: true, url })
+    }
+  }
+
   const runQuickAction = async (action: PinQuickAction) => {
     showFeedback(action)
 
@@ -1590,9 +1652,10 @@ function ImageCard({
     if (action === 'share') {
       onShare()
       try {
-        await copyShadowPinImageLink(getShareUrl(image))
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Pin link could not be copied')
+        await copyShadowPinImageLink(shareUrl)
+        closeShareSheet()
+      } catch {
+        revealShareSheet()
       }
       return
     }
@@ -1855,7 +1918,111 @@ function ImageCard({
           </div>
         )}
       </div>
+      <PinShareSheet
+        open={shareSheet.open}
+        url={shareSheet.url || shareUrl}
+        title={image.title}
+        description={image.description}
+        inputRef={shareInputRef}
+        onClose={closeShareSheet}
+        onCopy={() => { void copyCurrentShareLink() }}
+        onNativeShare={() => { void nativeShareCurrentLink() }}
+      />
     </article>
+  )
+}
+
+function PinShareSheet({
+  open,
+  url,
+  title,
+  description,
+  inputRef,
+  onClose,
+  onCopy,
+  onNativeShare,
+}: {
+  open: boolean
+  url: string
+  title: string
+  description?: string | null
+  inputRef: MutableRefObject<HTMLInputElement | null>
+  onClose: () => void
+  onCopy: () => void
+  onNativeShare: () => void
+}) {
+  if (!open || typeof document === 'undefined') return null
+
+  const canNativeShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[99] flex items-end justify-center bg-[rgba(1,2,4,0.68)] p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur-sm"
+      data-testid="shadow-pin-share-sheet"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Pin link"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(8,9,12,0.96)] p-4 shadow-[var(--shadow-panel)]"
+        onClick={event => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="truncate text-base font-semibold text-[var(--text-primary)]">Pin link</h2>
+            <p className="truncate text-xs text-[var(--text-muted)]">{title}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--border-panel)] bg-[rgba(255,255,255,0.06)] text-[var(--text-primary)]"
+            aria-label="Close share sheet"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <input
+          ref={inputRef}
+          value={url}
+          readOnly
+          onFocus={event => event.currentTarget.select()}
+          className="mt-3 w-full rounded-[var(--radius-md)] border border-[rgba(255,255,255,0.16)] bg-[rgba(255,255,255,0.06)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--theme-accent-readable)]"
+          aria-label="Pin share link"
+        />
+        <div className={cn('mt-3 grid gap-2', canNativeShare ? 'grid-cols-3' : 'grid-cols-2')}>
+          <button
+            type="button"
+            onClick={onCopy}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--border-panel)] bg-[rgba(255,255,255,0.08)] px-3 text-sm font-semibold text-[var(--text-primary)]"
+          >
+            <Copy className="h-4 w-4" />
+            Copy
+          </button>
+          {canNativeShare && (
+            <button
+              type="button"
+              onClick={onNativeShare}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--border-panel)] bg-[rgba(255,255,255,0.08)] px-3 text-sm font-semibold text-[var(--text-primary)]"
+            >
+              <Share2 className="h-4 w-4" />
+              Share
+            </button>
+          )}
+          <a
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--border-panel)] bg-[rgba(255,255,255,0.08)] px-3 text-sm font-semibold text-[var(--text-primary)]"
+          >
+            <ExternalLink className="h-4 w-4" />
+            Open
+          </a>
+        </div>
+        {description && <p className="mt-3 line-clamp-2 text-xs text-[var(--text-secondary)]">{description}</p>}
+      </div>
+    </div>,
+    document.body
   )
 }
 

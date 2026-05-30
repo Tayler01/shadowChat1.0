@@ -1746,6 +1746,91 @@ test('ShadowPin radial share can copy a second image when platform share is deni
   }
 })
 
+test('ShadowPin radial share opens a selectable fallback sheet when copy is blocked', async () => {
+  jest.useFakeTimers()
+  const originalClipboard = navigator.clipboard
+  const originalShare = navigator.share
+  const originalExecCommand = document.execCommand
+  const writeText = jest.fn().mockRejectedValue(new Error('clipboard blocked'))
+  const execCommand = jest.fn()
+    .mockReturnValueOnce(false)
+    .mockReturnValueOnce(true)
+
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: { writeText },
+  })
+  Object.defineProperty(navigator, 'share', {
+    configurable: true,
+    value: undefined,
+  })
+  Object.defineProperty(document, 'execCommand', {
+    configurable: true,
+    value: execCommand,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+
+    const imageCard = screen.getByAltText('Pin one').closest('article')
+    expect(imageCard).not.toBeNull()
+
+    fireShadowPinPointer(imageCard!, 'pointerdown', {
+      pointerId: 41,
+      button: 0,
+      clientX: 160,
+      clientY: 320,
+    })
+    act(() => {
+      jest.advanceTimersByTime(440)
+    })
+    fireShadowPinPointer(imageCard!, 'pointermove', {
+      pointerId: 41,
+      clientX: 149,
+      clientY: 217,
+    })
+
+    await act(async () => {
+      fireShadowPinPointer(imageCard!, 'pointerup', {
+        pointerId: 41,
+        clientX: 149,
+        clientY: 217,
+      })
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(screen.getByTestId('shadow-pin-share-sheet')).toBeInTheDocument()
+    expect(screen.getByLabelText('Pin share link')).toHaveValue('https://images.example/one.jpg')
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /^copy$/i }))
+      await Promise.resolve()
+    })
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('shadow-pin-share-sheet')).not.toBeInTheDocument()
+    })
+    expect(execCommand).toHaveBeenCalledTimes(2)
+  } finally {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: originalClipboard,
+    })
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: originalShare,
+    })
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: originalExecCommand,
+    })
+    jest.useRealTimers()
+  }
+})
+
 test('ShadowPin image card blocks native image callout and drag surfaces', () => {
   render(<ShadowPin onBack={() => {}} />)
 
