@@ -366,6 +366,117 @@ test('autoplays a focused native video pin muted in the masonry feed', async () 
   }
 })
 
+test('switches uploaded Bunny feed videos to the iframe player when sound is enabled', async () => {
+  jest.useFakeTimers()
+  const originalIntersectionObserver = global.IntersectionObserver
+  const originalPlay = HTMLMediaElement.prototype.play
+  const observers: Array<{
+    callback: IntersectionObserverCallback
+    target: Element | null
+    disconnect: jest.Mock
+  }> = []
+
+  class MockIntersectionObserver {
+    readonly callback: IntersectionObserverCallback
+    target: Element | null = null
+    readonly disconnect = jest.fn()
+    readonly unobserve = jest.fn()
+    readonly takeRecords = jest.fn(() => [])
+    readonly root = null
+    readonly rootMargin = ''
+    readonly thresholds = []
+
+    constructor(callback: IntersectionObserverCallback) {
+      this.callback = callback
+      observers.push(this)
+    }
+
+    observe = jest.fn((target: Element) => {
+      this.target = target
+    })
+  }
+
+  Object.defineProperty(global, 'IntersectionObserver', {
+    configurable: true,
+    value: MockIntersectionObserver,
+  })
+  Object.defineProperty(window, 'IntersectionObserver', {
+    configurable: true,
+    value: MockIntersectionObserver,
+  })
+  HTMLMediaElement.prototype.play = jest.fn().mockResolvedValue(undefined)
+
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      {
+        ...image('bunny-feed', 1080, 1920),
+        media_type: 'video',
+        provider: 'bunny_stream',
+        video_preview_url: 'https://vz.example/video-guid/play_480p.mp4',
+        video_playback_url: 'https://vz.example/video-guid/play_720p.mp4',
+        video_embed_url: 'https://iframe.mediadelivery.net/embed/123/video-guid',
+        processing_status: 'ready',
+      },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  try {
+    const { container } = render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+    const videoCard = screen.getByAltText('Pin bunny-feed').closest('article')
+    expect(videoCard).not.toBeNull()
+
+    act(() => {
+      observers
+        .filter(observer => observer.target === videoCard)
+        .forEach(observer => observer.callback([
+          {
+            isIntersecting: true,
+            intersectionRatio: 0.72,
+            target: videoCard!,
+            boundingClientRect: { top: 96, left: 24 } as DOMRectReadOnly,
+          } as unknown as IntersectionObserverEntry,
+        ], observer as unknown as IntersectionObserver))
+    })
+    await waitFor(() => {
+      expect(container.querySelector('video')).toHaveAttribute('src', 'https://vz.example/video-guid/play_480p.mp4')
+    })
+
+    fireEvent.click(videoCard!)
+    act(() => {
+      jest.advanceTimersByTime(240)
+    })
+    fireEvent.click(screen.getByLabelText('Unmute video'))
+
+    await waitFor(() => {
+      expect(screen.getByTitle('Pin bunny-feed')).toHaveAttribute('src', expect.stringContaining('player.mediadelivery.net'))
+    })
+  } finally {
+    Object.defineProperty(global, 'IntersectionObserver', {
+      configurable: true,
+      value: originalIntersectionObserver,
+    })
+    Object.defineProperty(window, 'IntersectionObserver', {
+      configurable: true,
+      value: originalIntersectionObserver,
+    })
+    HTMLMediaElement.prototype.play = originalPlay
+    jest.useRealTimers()
+  }
+})
+
 test('selects visible video focus by top row, then left-to-right order', async () => {
   const originalIntersectionObserver = global.IntersectionObserver
   const originalPlay = HTMLMediaElement.prototype.play
@@ -741,6 +852,136 @@ test('skips a visible native video that cannot start playback', async () => {
   }
 })
 
+test('keeps slow external X videos focused long enough to buffer before skipping', async () => {
+  jest.useFakeTimers()
+  const originalIntersectionObserver = global.IntersectionObserver
+  const originalPlay = HTMLMediaElement.prototype.play
+  const originalLoad = HTMLMediaElement.prototype.load
+  const observers: Array<{
+    callback: IntersectionObserverCallback
+    target: Element | null
+    disconnect: jest.Mock
+  }> = []
+
+  class MockIntersectionObserver {
+    readonly callback: IntersectionObserverCallback
+    target: Element | null = null
+    readonly disconnect = jest.fn()
+    readonly unobserve = jest.fn()
+    readonly takeRecords = jest.fn(() => [])
+    readonly root = null
+    readonly rootMargin = ''
+    readonly thresholds = []
+
+    constructor(callback: IntersectionObserverCallback) {
+      this.callback = callback
+      observers.push(this)
+    }
+
+    observe = jest.fn((target: Element) => {
+      this.target = target
+    })
+  }
+
+  Object.defineProperty(global, 'IntersectionObserver', {
+    configurable: true,
+    value: MockIntersectionObserver,
+  })
+  Object.defineProperty(window, 'IntersectionObserver', {
+    configurable: true,
+    value: MockIntersectionObserver,
+  })
+  HTMLMediaElement.prototype.play = jest.fn(() => new Promise(() => undefined))
+  HTMLMediaElement.prototype.load = jest.fn()
+
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      {
+        ...image('slow-x', 640, 640),
+        media_type: 'external_video',
+        provider: 'x',
+        video_preview_url: 'https://video.twimg.com/amplify_video/123/vid/avc1/320x320/slow.mp4',
+        video_playback_url: 'https://video.twimg.com/amplify_video/123/vid/avc1/640x640/slow.mp4',
+        processing_status: 'ready',
+      },
+      {
+        ...image('next-clip', 1080, 1920),
+        media_type: 'video',
+        provider: 'bunny_stream',
+        video_preview_url: 'https://videos.example/next-clip-480.mp4',
+        video_playback_url: 'https://videos.example/next-clip-720.mp4',
+        processing_status: 'ready',
+      },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  try {
+    const { container } = render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+    const slowCard = screen.getByAltText('Pin slow-x').closest('article')
+    const nextCard = screen.getByAltText('Pin next-clip').closest('article')
+    expect(slowCard).not.toBeNull()
+    expect(nextCard).not.toBeNull()
+
+    const sendIntersection = (target: Element, top: number, left: number) => {
+      observers
+        .filter(observer => observer.target === target)
+        .forEach(observer => observer.callback([
+          {
+            isIntersecting: true,
+            intersectionRatio: 0.72,
+            target,
+            boundingClientRect: { top, left } as DOMRectReadOnly,
+          } as unknown as IntersectionObserverEntry,
+        ], observer as unknown as IntersectionObserver))
+    }
+
+    act(() => {
+      sendIntersection(slowCard!, 96, 24)
+      sendIntersection(nextCard!, 96, 240)
+    })
+    await waitFor(() => {
+      expect(container.querySelector('video')).toHaveAttribute('src', 'https://video.twimg.com/amplify_video/123/vid/avc1/320x320/slow.mp4')
+    })
+
+    await act(async () => {
+      jest.advanceTimersByTime(2700)
+    })
+    expect(container.querySelector('video')).toHaveAttribute('src', 'https://video.twimg.com/amplify_video/123/vid/avc1/320x320/slow.mp4')
+
+    await act(async () => {
+      jest.advanceTimersByTime(5500)
+    })
+    await waitFor(() => {
+      expect(container.querySelector('video')).toHaveAttribute('src', 'https://videos.example/next-clip-480.mp4')
+    })
+  } finally {
+    Object.defineProperty(global, 'IntersectionObserver', {
+      configurable: true,
+      value: originalIntersectionObserver,
+    })
+    Object.defineProperty(window, 'IntersectionObserver', {
+      configurable: true,
+      value: originalIntersectionObserver,
+    })
+    HTMLMediaElement.prototype.play = originalPlay
+    HTMLMediaElement.prototype.load = originalLoad
+    jest.useRealTimers()
+  }
+})
+
 test('skips visible external video pins that only have a thumbnail', async () => {
   const originalIntersectionObserver = global.IntersectionObserver
   const originalPlay = HTMLMediaElement.prototype.play
@@ -1016,6 +1257,76 @@ test('opens Bunny embed videos in the fullscreen viewer when direct renditions a
     expect(viewerFrame).toHaveAttribute('src', srcBeforeUnmute)
     expect(screen.getByLabelText('Mute video')).toBeInTheDocument()
   } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('unmutes Bunny fullscreen players after the iframe player is ready', async () => {
+  jest.useFakeTimers()
+  const readyCallbacks: Array<() => void> = []
+  const mute = jest.fn()
+  const unmute = jest.fn()
+  const play = jest.fn()
+  const Player = jest.fn(() => ({
+    mute,
+    unmute,
+    play,
+    on: (eventName: 'ready', callback: () => void) => {
+      if (eventName === 'ready') readyCallbacks.push(callback)
+    },
+  }))
+  ;(window as unknown as { playerjs?: { Player: typeof Player } }).playerjs = { Player }
+
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      {
+        ...image('bunny-audio', 1080, 1920),
+        media_type: 'video',
+        provider: 'bunny_stream',
+        video_preview_url: 'https://vz.example/video-guid/play_480p.mp4',
+        video_playback_url: 'https://vz.example/video-guid/play_720p.mp4',
+        video_embed_url: 'https://iframe.mediadelivery.net/embed/123/video-guid',
+        processing_status: 'ready',
+      },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+    const videoCard = screen.getByAltText('Pin bunny-audio').closest('article')
+    expect(videoCard).not.toBeNull()
+
+    fireEvent.click(videoCard!)
+    fireEvent.click(videoCard!)
+
+    const viewerFrame = screen.getByTitle('Pin bunny-audio')
+    fireEvent.load(viewerFrame)
+    await waitFor(() => expect(mute).toHaveBeenCalled())
+
+    fireEvent.click(screen.getByLabelText('Unmute video'))
+    await waitFor(() => expect(unmute).toHaveBeenCalled())
+
+    act(() => {
+      readyCallbacks.forEach(callback => callback())
+      jest.advanceTimersByTime(900)
+    })
+    expect(unmute).toHaveBeenCalled()
+    expect(play).toHaveBeenCalled()
+  } finally {
+    delete (window as unknown as { playerjs?: unknown }).playerjs
     jest.useRealTimers()
   }
 })

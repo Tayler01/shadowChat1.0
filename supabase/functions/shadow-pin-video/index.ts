@@ -67,6 +67,7 @@ type ExternalPreview = {
   title?: string
   description?: string
   image?: string
+  previewVideoUrl?: string
   videoUrl?: string
   videoHlsUrl?: string
   mediaWidth?: number
@@ -432,8 +433,8 @@ const validateDirectVideoUrl = async (
   }
 }
 
-const selectBestMp4Variant = (variants: unknown[]) => {
-  const mp4Variants = variants
+const getMp4Variants = (variants: unknown[]) =>
+  variants
     .map(variant => variant && typeof variant === 'object' ? variant as Record<string, unknown> : null)
     .filter((variant): variant is Record<string, unknown> => {
       const type = typeof variant?.content_type === 'string'
@@ -448,15 +449,28 @@ const selectBestMp4Variant = (variants: unknown[]) => {
           : ''
       return type.toLowerCase() === 'video/mp4' && Boolean(url)
     })
-    .sort((a, b) => Number(b.bitrate ?? 0) - Number(a.bitrate ?? 0))
 
-  const selected = mp4Variants[0]
-  const url = typeof selected?.url === 'string'
-    ? selected.url
-    : typeof selected?.src === 'string'
-      ? selected.src
+const getVariantUrl = (variant: Record<string, unknown> | undefined) => {
+  const url = typeof variant?.url === 'string'
+    ? variant.url
+    : typeof variant?.src === 'string'
+      ? variant.src
       : ''
   return url || null
+}
+
+const selectBestMp4Variant = (variants: unknown[]) => {
+  const mp4Variants = getMp4Variants(variants)
+    .sort((a, b) => Number(b.bitrate ?? 0) - Number(a.bitrate ?? 0))
+
+  return getVariantUrl(mp4Variants[0])
+}
+
+const selectPreviewMp4Variant = (variants: unknown[]) => {
+  const mp4Variants = getMp4Variants(variants)
+    .sort((a, b) => Number(a.bitrate ?? 0) - Number(b.bitrate ?? 0))
+
+  return getVariantUrl(mp4Variants[0])
 }
 
 const fetchXSyndicationPreview = async (url: URL): Promise<ExternalPreview | null> => {
@@ -491,6 +505,7 @@ const fetchXSyndicationPreview = async (url: URL): Promise<ExternalPreview | nul
       : null
   const variants = Array.isArray(videoInfo?.variants) ? videoInfo.variants : []
   const videoUrl = selectBestMp4Variant(variants)
+  const previewVideoUrl = selectPreviewMp4Variant(variants) || videoUrl
   if (!videoUrl) return null
 
   const hlsVariant = variants
@@ -539,6 +554,7 @@ const fetchXSyndicationPreview = async (url: URL): Promise<ExternalPreview | nul
     title: 'X Video',
     description: typeof user?.name === 'string' ? user.name : undefined,
     image: poster,
+    previewVideoUrl,
     videoUrl,
     videoHlsUrl: hlsUrl,
     mediaWidth: mediaWidth ?? undefined,
@@ -853,6 +869,7 @@ const mergePreview = (primary: ExternalPreview | null, fallback: ExternalPreview
     title: primary.title || fallback.title,
     description: primary.description || fallback.description,
     image: primary.image || fallback.image,
+    previewVideoUrl: primary.previewVideoUrl || fallback.previewVideoUrl,
     videoUrl: primary.videoUrl || fallback.videoUrl,
     videoHlsUrl: primary.videoHlsUrl || fallback.videoHlsUrl,
     mediaWidth: primary.mediaWidth || fallback.mediaWidth,
@@ -1351,11 +1368,12 @@ const buildExternalRecord = async (
   const preview = mergePreview(providerVideo, mergePreview(oembed, openGraph))
   const youtubeId = provider === 'youtube' ? parseYouTubeId(sourceUrl) : ''
   const pinterestId = provider === 'pinterest' ? parsePinterestId(sourceUrl) : ''
-  const previewVideoUrl = await validateDirectVideoUrl(preview?.videoUrl, provider)
+  const previewVideoUrl = await validateDirectVideoUrl(preview?.previewVideoUrl || preview?.videoUrl, provider)
+  const playbackVideoUrl = await validateDirectVideoUrl(preview?.videoUrl, provider)
   const directSourceVideoUrl = provider === 'external' && isDirectVideoUrl(sourceUrl)
     ? sourceUrl.toString()
     : null
-  const directVideoUrl = directSourceVideoUrl || previewVideoUrl
+  const directVideoUrl = directSourceVideoUrl || playbackVideoUrl || previewVideoUrl
 
   if (provider === 'external' && !directVideoUrl) {
     throw new Error('Paste a YouTube Short, X, Pinterest, Instagram, or direct video URL.')
@@ -1372,10 +1390,13 @@ const buildExternalRecord = async (
   const imageUrl = provider === 'youtube' && youtubeId
     ? `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`
     : preview?.image || FALLBACK_VIDEO_POSTER_URL
-  const videoUrl = provider === 'pinterest'
+  const videoPlaybackUrl = provider === 'pinterest'
     ? (preview?.videoUrl || null)
     : directVideoUrl
-  const shouldUseNativePlatformVideo = Boolean(videoUrl && (provider === 'x' || provider === 'instagram'))
+  const videoPreviewUrl = provider === 'pinterest'
+    ? videoPlaybackUrl
+    : previewVideoUrl || videoPlaybackUrl
+  const shouldUseNativePlatformVideo = Boolean(videoPlaybackUrl && (provider === 'x' || provider === 'instagram'))
   const embedUrl = shouldUseNativePlatformVideo
     ? null
     : provider === 'youtube' && youtubeId
@@ -1385,7 +1406,7 @@ const buildExternalRecord = async (
         : provider === 'pinterest' && pinterestId
           ? `https://assets.pinterest.com/ext/embed.html?id=${pinterestId}&src=shado-pin`
           : provider === 'external'
-            ? videoUrl
+            ? videoPlaybackUrl
             : null
   const providerAssetId = youtubeId || pinterestId || canonicalUrl
 
@@ -1420,8 +1441,8 @@ const buildExternalRecord = async (
       createdBy: userId,
       preview: preview?.providerPayload ?? {},
     },
-    video_preview_url: videoUrl,
-    video_playback_url: videoUrl,
+    video_preview_url: videoPreviewUrl,
+    video_playback_url: videoPlaybackUrl,
     video_hls_url: preview?.videoHlsUrl ?? null,
     video_embed_url: embedUrl,
     duration_seconds: preview?.durationSeconds ?? null,

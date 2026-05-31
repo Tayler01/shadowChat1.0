@@ -142,12 +142,25 @@ type VideoVisibilitySnapshot = {
 const VIDEO_FOCUS_MIN_INTERSECTION_RATIO = 0.34
 const VIDEO_FOCUS_ROW_EPSILON_PX = 8
 const VIDEO_IFRAME_FALLBACK_CYCLE_MS = 10_000
+const NATIVE_VIDEO_STARTUP_GRACE_MS = 2_600
+const EXTERNAL_NATIVE_VIDEO_STARTUP_GRACE_MS = 8_000
+const NATIVE_VIDEO_AUTOPLAY_RETRY_MS = [120, 420, 900]
+const EXTERNAL_NATIVE_VIDEO_AUTOPLAY_RETRY_MS = [120, 420, 900, 1_800, 3_200, 5_200]
 
 const getVideoPreviewUrl = (image: ShadowPinImage) =>
   image.video_preview_url || image.video_playback_url || null
 
 const getVideoPlaybackUrl = (image: ShadowPinImage) =>
   image.video_playback_url || image.video_preview_url || null
+
+const isExternalNativeVideoPin = (image: ShadowPinImage) =>
+  image.media_type === 'external_video' && Boolean(getVideoPreviewUrl(image))
+
+const getNativeVideoStartupGraceMs = (image: ShadowPinImage) =>
+  isExternalNativeVideoPin(image) ? EXTERNAL_NATIVE_VIDEO_STARTUP_GRACE_MS : NATIVE_VIDEO_STARTUP_GRACE_MS
+
+const getNativeVideoAutoplayRetryMs = (image: ShadowPinImage) =>
+  isExternalNativeVideoPin(image) ? EXTERNAL_NATIVE_VIDEO_AUTOPLAY_RETRY_MS : NATIVE_VIDEO_AUTOPLAY_RETRY_MS
 
 const getIframeVideoCycleMs = (image: ShadowPinImage) => {
   const durationSeconds = Number(image.duration_seconds)
@@ -439,6 +452,7 @@ type BunnyPlayer = {
   play?: () => void
   mute?: () => void
   unmute?: () => void
+  on?: (eventName: 'ready', callback: () => void) => void
 }
 
 type BunnyPlayerWindow = Window & {
@@ -513,9 +527,15 @@ const syncIframeAudio = (iframe: HTMLIFrameElement | null, provider: ShadowPinIm
         const Player = (window as BunnyPlayerWindow).playerjs?.Player
         if (!Player) return
         const player = new Player(iframe)
-        if (muted) player.mute?.()
-        else player.unmute?.()
-        player.play?.()
+        const applyAudioState = () => {
+          if (muted) player.mute?.()
+          else player.unmute?.()
+          player.play?.()
+        }
+        applyAudioState()
+        player.on?.('ready', applyAudioState)
+        window.setTimeout(applyAudioState, 250)
+        window.setTimeout(applyAudioState, 900)
       })
       .catch(() => undefined)
   }
@@ -524,6 +544,7 @@ const syncIframeAudio = (iframe: HTMLIFrameElement | null, provider: ShadowPinIm
 const prepareInlineAutoplayVideo = (video: HTMLVideoElement, muted: boolean) => {
   video.autoplay = true
   video.playsInline = true
+  video.preload = 'auto'
   video.defaultMuted = muted
   video.muted = muted
   video.setAttribute('autoplay', '')
@@ -1477,9 +1498,10 @@ function ImageCard({
   const nativeVideoSrc = getVideoPreviewUrl(image)
   const feedIframeVideoSrc = videoPin ? getVideoIframeUrl(image) : ''
   const feedVideoPlayable = videoPin && Boolean(nativeVideoSrc || feedIframeVideoSrc)
-  const shouldRenderNativeVideo = videoPin && activeVideo && Boolean(nativeVideoSrc)
+  const shouldUseSoundIframeVideo = soundEnabled && image.provider === 'bunny_stream' && Boolean(feedIframeVideoSrc)
+  const shouldRenderNativeVideo = videoPin && activeVideo && Boolean(nativeVideoSrc) && !shouldUseSoundIframeVideo
   const iframeVideoSrc = activeVideo ? feedIframeVideoSrc : ''
-  const shouldRenderIframeVideo = videoPin && activeVideo && !nativeVideoSrc && Boolean(iframeVideoSrc)
+  const shouldRenderIframeVideo = videoPin && activeVideo && Boolean(iframeVideoSrc) && (!nativeVideoSrc || shouldUseSoundIframeVideo)
   const handleVideoPlaybackStarted = useCallback(() => onVideoPlaybackStarted(image.id), [image.id, onVideoPlaybackStarted])
   const handleVideoPlaybackComplete = useCallback(() => onVideoPlaybackComplete(image.id), [image.id, onVideoPlaybackComplete])
   const handleVideoPlaybackUnavailable = useCallback(
@@ -1546,14 +1568,14 @@ function ImageCard({
 
     play()
     const frameId = window.requestAnimationFrame(play)
-    timerIds.push(window.setTimeout(play, 120))
-    timerIds.push(window.setTimeout(play, 420))
-    timerIds.push(window.setTimeout(play, 900))
+    getNativeVideoAutoplayRetryMs(image).forEach(delayMs => {
+      timerIds.push(window.setTimeout(play, delayMs))
+    })
     timerIds.push(window.setTimeout(() => {
       if (!started && (video.paused || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || video.error)) {
         notifyUnavailable()
       }
-    }, 2600))
+    }, getNativeVideoStartupGraceMs(image)))
     video.addEventListener('playing', markStarted)
     video.addEventListener('timeupdate', markStarted)
     video.addEventListener('error', notifyUnavailable)
@@ -1570,7 +1592,7 @@ function ImageCard({
       video.removeEventListener('loadedmetadata', play)
       video.removeEventListener('canplay', play)
     }
-  }, [shouldRenderNativeVideo, soundEnabled, nativeVideoSrc, handleVideoPlaybackStarted, handleVideoPlaybackUnavailable])
+  }, [shouldRenderNativeVideo, soundEnabled, nativeVideoSrc, handleVideoPlaybackStarted, handleVideoPlaybackUnavailable, image])
 
   useEffect(() => {
     if (!shouldRenderIframeVideo) return
