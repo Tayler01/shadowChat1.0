@@ -366,7 +366,7 @@ test('autoplays a focused native video pin muted in the masonry feed', async () 
   }
 })
 
-test('switches uploaded Bunny feed videos to the iframe player when sound is enabled', async () => {
+test('keeps uploaded Bunny feed videos on native playback when sound is enabled', async () => {
   jest.useFakeTimers()
   const originalIntersectionObserver = global.IntersectionObserver
   const originalPlay = HTMLMediaElement.prototype.play
@@ -461,7 +461,8 @@ test('switches uploaded Bunny feed videos to the iframe player when sound is ena
     fireEvent.click(screen.getByLabelText('Unmute video'))
 
     await waitFor(() => {
-      expect(screen.getByTitle('Pin bunny-feed')).toHaveAttribute('src', expect.stringContaining('player.mediadelivery.net'))
+      expect(container.querySelector('video')).toHaveAttribute('src', 'https://vz.example/video-guid/play_480p.mp4')
+      expect(container.querySelector('iframe')).not.toBeInTheDocument()
     })
   } finally {
     Object.defineProperty(global, 'IntersectionObserver', {
@@ -1261,6 +1262,52 @@ test('opens Bunny embed videos in the fullscreen viewer when direct renditions a
   }
 })
 
+test('opens uploaded Bunny videos with native renditions in the fullscreen viewer', () => {
+  jest.useFakeTimers()
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      {
+        ...image('bunny-native', 1080, 1920),
+        media_type: 'video',
+        provider: 'bunny_stream',
+        video_preview_url: 'https://vz.example/video-guid/play_480p.mp4',
+        video_playback_url: 'https://vz.example/video-guid/play_1080p.mp4',
+        video_embed_url: 'https://iframe.mediadelivery.net/embed/123/video-guid',
+        processing_status: 'ready',
+      },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  try {
+    const { container } = render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+    const videoCard = screen.getByAltText('Pin bunny-native').closest('article')
+    expect(videoCard).not.toBeNull()
+
+    fireEvent.click(videoCard!)
+    fireEvent.click(videoCard!)
+
+    expect(container.querySelector('video')).toHaveAttribute('src', 'https://vz.example/video-guid/play_1080p.mp4')
+    expect(container.querySelector('iframe')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByLabelText('Unmute video'))
+    expect(screen.getByLabelText('Mute video')).toBeInTheDocument()
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
 test('unmutes Bunny fullscreen players after the iframe player is ready', async () => {
   jest.useFakeTimers()
   const readyCallbacks: Array<() => void> = []
@@ -1284,8 +1331,6 @@ test('unmutes Bunny fullscreen players after the iframe player is ready', async 
         ...image('bunny-audio', 1080, 1920),
         media_type: 'video',
         provider: 'bunny_stream',
-        video_preview_url: 'https://vz.example/video-guid/play_480p.mp4',
-        video_playback_url: 'https://vz.example/video-guid/play_720p.mp4',
         video_embed_url: 'https://iframe.mediadelivery.net/embed/123/video-guid',
         processing_status: 'ready',
       },

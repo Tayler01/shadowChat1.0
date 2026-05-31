@@ -1498,7 +1498,7 @@ function ImageCard({
   const nativeVideoSrc = getVideoPreviewUrl(image)
   const feedIframeVideoSrc = videoPin ? getVideoIframeUrl(image) : ''
   const feedVideoPlayable = videoPin && Boolean(nativeVideoSrc || feedIframeVideoSrc)
-  const shouldUseSoundIframeVideo = soundEnabled && image.provider === 'bunny_stream' && Boolean(feedIframeVideoSrc)
+  const shouldUseSoundIframeVideo = soundEnabled && image.provider === 'bunny_stream' && !nativeVideoSrc && Boolean(feedIframeVideoSrc)
   const shouldRenderNativeVideo = videoPin && activeVideo && Boolean(nativeVideoSrc) && !shouldUseSoundIframeVideo
   const iframeVideoSrc = activeVideo ? feedIframeVideoSrc : ''
   const shouldRenderIframeVideo = videoPin && activeVideo && Boolean(iframeVideoSrc) && (!nativeVideoSrc || shouldUseSoundIframeVideo)
@@ -2260,18 +2260,7 @@ function ImageViewerModal({
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-hidden rounded-[var(--radius-lg)] bg-black/40">
-        {videoPin && iframeSrc ? (
-          <iframe
-            ref={iframeRef}
-            src={iframeSrc}
-            title={image.title}
-            className="block h-full w-full border-0"
-            allow="autoplay; encrypted-media; picture-in-picture; web-share"
-            loading="eager"
-            onLoad={() => syncIframeAudio(iframeRef.current, image.provider, muted)}
-            allowFullScreen
-          />
-        ) : shouldRenderNativeVideo && nativeVideoSrc ? (
+        {shouldRenderNativeVideo && nativeVideoSrc ? (
           <video
             src={nativeVideoSrc}
             poster={getPinImageUrl(image, 'medium')}
@@ -2284,6 +2273,17 @@ function ImageViewerModal({
             onError={() => {
               if (richEmbedFrameUrl || richEmbedSrcDoc) setNativeVideoFailed(true)
             }}
+          />
+        ) : videoPin && iframeSrc ? (
+          <iframe
+            ref={iframeRef}
+            src={iframeSrc}
+            title={image.title}
+            className="block h-full w-full border-0"
+            allow="autoplay; encrypted-media; picture-in-picture; web-share"
+            loading="eager"
+            onLoad={() => syncIframeAudio(iframeRef.current, image.provider, muted)}
+            allowFullScreen
           />
         ) : richEmbedFrameUrl ? (
           <iframe

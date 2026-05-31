@@ -939,12 +939,46 @@ const sha256Hex = async (value: string) => {
   return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
-const buildBunnyPlaybackUrls = (libraryId: string, bunnyVideoId: string, pullZoneUrl: string) => ({
-  embedUrl: `https://player.mediadelivery.net/embed/${libraryId}/${bunnyVideoId}`,
-  hlsUrl: pullZoneUrl ? `${pullZoneUrl}/${bunnyVideoId}/playlist.m3u8` : null,
-  previewUrl: pullZoneUrl ? `${pullZoneUrl}/${bunnyVideoId}/play_480p.mp4` : null,
-  playbackUrl: pullZoneUrl ? `${pullZoneUrl}/${bunnyVideoId}/play_720p.mp4` : null,
-})
+const parseBunnyResolutions = (value: unknown) => {
+  const candidates = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(',')
+      : []
+
+  return Array.from(new Set(
+    candidates
+      .map(candidate => {
+        const match = String(candidate).match(/(\d{3,4})p?/i)
+        return match?.[1] ? Number(match[1]) : NaN
+      })
+      .filter(candidate => Number.isFinite(candidate) && candidate > 0)
+  )).sort((a, b) => a - b)
+}
+
+const pickBunnyResolution = (resolutions: number[], preferredMax: number) => {
+  if (resolutions.length === 0) return null
+  const atOrBelow = resolutions.filter(resolution => resolution <= preferredMax)
+  return atOrBelow.at(-1) ?? resolutions[0]
+}
+
+const buildBunnyPlaybackUrls = (
+  libraryId: string,
+  bunnyVideoId: string,
+  pullZoneUrl: string,
+  availableResolutions?: unknown
+) => {
+  const resolutions = parseBunnyResolutions(availableResolutions)
+  const previewResolution = pickBunnyResolution(resolutions, 480)
+  const playbackResolution = pickBunnyResolution(resolutions, 1080)
+
+  return {
+    embedUrl: `https://player.mediadelivery.net/embed/${libraryId}/${bunnyVideoId}`,
+    hlsUrl: pullZoneUrl ? `${pullZoneUrl}/${bunnyVideoId}/playlist.m3u8` : null,
+    previewUrl: pullZoneUrl && previewResolution ? `${pullZoneUrl}/${bunnyVideoId}/play_${previewResolution}p.mp4` : null,
+    playbackUrl: pullZoneUrl && playbackResolution ? `${pullZoneUrl}/${bunnyVideoId}/play_${playbackResolution}p.mp4` : null,
+  }
+}
 
 const isOperator = async (supabase: SupabaseAdmin, userId: string) => {
   const { data, error } = await supabase.rpc('is_app_operator', { target_user_id: userId })
@@ -1086,7 +1120,7 @@ const buildNativePinRecord = (
   pullZoneUrl: string
 ) => {
   const upload = validateNativeUpload(body)
-  const playback = buildBunnyPlaybackUrls(libraryId, bunnyVideo.guid, pullZoneUrl)
+  const playback = buildBunnyPlaybackUrls(libraryId, bunnyVideo.guid, pullZoneUrl, bunnyVideo.raw.availableResolutions)
   const createdAt = new Date().toISOString()
 
   return {
@@ -1303,9 +1337,10 @@ const handleSyncStatus = async (req: Request, body: VideoPayload) => {
   if (!pin) return notFound('Pin not found.')
   if (!pin.provider_asset_id) return badRequest('Pin does not have a Bunny Stream video id.')
 
-  const { libraryId, apiKey } = getBunnyEnv()
+  const { libraryId, apiKey, pullZoneUrl } = getBunnyEnv()
   const bunnyStatus = await getBunnyVideo(libraryId, apiKey, pin.provider_asset_id)
   const state = getBunnyReadyState(bunnyStatus)
+  const playback = buildBunnyPlaybackUrls(libraryId, pin.provider_asset_id, pullZoneUrl, bunnyStatus.availableResolutions)
   const duration = normalizeNonNegativeInteger(
     bunnyStatus.length ?? bunnyStatus.duration ?? bunnyStatus.durationSeconds
   )
@@ -1318,6 +1353,16 @@ const handleSyncStatus = async (req: Request, body: VideoPayload) => {
       : null
 
   const providerPayload = mergeProviderPayload(pin.provider_payload, {
+    bunny_stream: mergeProviderPayload(pin.provider_payload?.bunny_stream as Record<string, unknown> | null, {
+      libraryId,
+      videoId: pin.provider_asset_id,
+      embedUrl: playback.embedUrl,
+      pullZoneConfigured: Boolean(pullZoneUrl),
+      pullZoneUrl: pullZoneUrl || null,
+      previewUrl: playback.previewUrl,
+      playbackUrl: playback.playbackUrl,
+      hlsUrl: playback.hlsUrl,
+    }),
     bunny_status: {
       syncedAt: new Date().toISOString(),
       state,
@@ -1325,16 +1370,25 @@ const handleSyncStatus = async (req: Request, body: VideoPayload) => {
     },
   })
 
+  const update: Record<string, unknown> = {
+    processing_status: processingStatus,
+    processing_error: processingError,
+    processed_at: processingStatus === 'ready' || processingStatus === 'failed' ? new Date().toISOString() : null,
+    duration_seconds: duration && duration <= MAX_VIDEO_SECONDS ? duration : undefined,
+    provider_payload: providerPayload,
+    updated_at: new Date().toISOString(),
+  }
+
+  if (processingStatus === 'ready') {
+    update.video_preview_url = playback.previewUrl
+    update.video_playback_url = playback.playbackUrl
+    update.video_hls_url = playback.hlsUrl
+    update.video_embed_url = playback.embedUrl
+  }
+
   const { data, error } = await auth.supabase
     .from('shadow_pin_images')
-    .update({
-      processing_status: processingStatus,
-      processing_error: processingError,
-      processed_at: processingStatus === 'ready' || processingStatus === 'failed' ? new Date().toISOString() : null,
-      duration_seconds: duration && duration <= MAX_VIDEO_SECONDS ? duration : undefined,
-      provider_payload: providerPayload,
-      updated_at: new Date().toISOString(),
-    })
+    .update(update)
     .eq('id', imageId)
     .select('*')
     .single()
