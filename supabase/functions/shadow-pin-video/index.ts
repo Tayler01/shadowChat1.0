@@ -319,6 +319,37 @@ const readLimitedText = async (response: Response, maxBytes = 512 * 1024) => {
 const isDirectVideoUrl = (url: URL) =>
   /\.(mp4|m4v|mov|webm|m3u8)(?:$|\?)/i.test(`${url.pathname}${url.search}`)
 
+const parseXStatusId = (url: URL) => {
+  const match = url.pathname.match(/\/status(?:es)?\/(\d{6,})/i)
+  return match?.[1] || ''
+}
+
+const buildXStatusUrl = (url: URL) => {
+  const statusId = parseXStatusId(url)
+  if (!statusId) return url.toString()
+  const username = url.pathname.split('/').filter(Boolean)[0] || 'i'
+  return `https://x.com/${encodeURIComponent(username)}/status/${statusId}`
+}
+
+const buildXSyndicationToken = (statusId: string) =>
+  ((Number(statusId) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, '')
+
+const parseInstagramMediaPath = (url: URL) => {
+  const parts = url.pathname.split('/').filter(Boolean)
+  for (let index = 0; index < parts.length - 1; index += 1) {
+    const type = parts[index]?.toLowerCase()
+    if ((type === 'p' || type === 'reel' || type === 'tv') && parts[index + 1]) {
+      return { type, shortcode: parts[index + 1] }
+    }
+  }
+  return null
+}
+
+const buildInstagramMediaUrl = (url: URL) => {
+  const media = parseInstagramMediaPath(url)
+  return media ? `https://www.instagram.com/${media.type}/${media.shortcode}/` : url.toString()
+}
+
 const isLikelyProviderVideoAssetUrl = (url: URL, provider: Provider) => {
   const host = url.hostname.toLowerCase()
   if (provider === 'x') return host === 'video.twimg.com'
@@ -401,6 +432,130 @@ const validateDirectVideoUrl = async (
   }
 }
 
+const selectBestMp4Variant = (variants: unknown[]) => {
+  const mp4Variants = variants
+    .map(variant => variant && typeof variant === 'object' ? variant as Record<string, unknown> : null)
+    .filter((variant): variant is Record<string, unknown> => {
+      const type = typeof variant?.content_type === 'string'
+        ? variant.content_type
+        : typeof variant?.type === 'string'
+          ? variant.type
+          : ''
+      const url = typeof variant?.url === 'string'
+        ? variant.url
+        : typeof variant?.src === 'string'
+          ? variant.src
+          : ''
+      return type.toLowerCase() === 'video/mp4' && Boolean(url)
+    })
+    .sort((a, b) => Number(b.bitrate ?? 0) - Number(a.bitrate ?? 0))
+
+  const selected = mp4Variants[0]
+  const url = typeof selected?.url === 'string'
+    ? selected.url
+    : typeof selected?.src === 'string'
+      ? selected.src
+      : ''
+  return url || null
+}
+
+const fetchXSyndicationPreview = async (url: URL): Promise<ExternalPreview | null> => {
+  const statusId = parseXStatusId(url)
+  if (!statusId) return null
+
+  const endpoint = new URL('https://cdn.syndication.twimg.com/tweet-result')
+  endpoint.searchParams.set('id', statusId)
+  endpoint.searchParams.set('lang', 'en')
+  endpoint.searchParams.set('token', buildXSyndicationToken(statusId))
+
+  const response = await fetch(endpoint, {
+    signal: AbortSignal.timeout(3500),
+    headers: {
+      accept: 'application/json',
+      'user-agent': 'ShadowChat-ShadowPinVideo/1.0',
+    },
+  })
+  if (!response.ok) return null
+
+  const data = await response.json().catch(() => null)
+  if (!data || typeof data !== 'object') return null
+  const payload = data as Record<string, unknown>
+  const mediaDetails = Array.isArray(payload.mediaDetails) ? payload.mediaDetails : []
+  const media = mediaDetails
+    .map(item => item && typeof item === 'object' ? item as Record<string, unknown> : null)
+    .find(item => item?.video_info && typeof item.video_info === 'object')
+  const videoInfo = media?.video_info && typeof media.video_info === 'object'
+    ? media.video_info as Record<string, unknown>
+    : payload.video && typeof payload.video === 'object'
+      ? payload.video as Record<string, unknown>
+      : null
+  const variants = Array.isArray(videoInfo?.variants) ? videoInfo.variants : []
+  const videoUrl = selectBestMp4Variant(variants)
+  if (!videoUrl) return null
+
+  const hlsVariant = variants
+    .map(variant => variant && typeof variant === 'object' ? variant as Record<string, unknown> : null)
+    .find(variant => {
+      const type = typeof variant?.content_type === 'string'
+        ? variant.content_type
+        : typeof variant?.type === 'string'
+          ? variant.type
+          : ''
+      return type.toLowerCase().includes('mpegurl')
+    })
+  const hlsUrl = typeof hlsVariant?.url === 'string'
+    ? hlsVariant.url
+    : typeof hlsVariant?.src === 'string'
+      ? hlsVariant.src
+      : undefined
+  const poster = typeof media?.media_url_https === 'string'
+    ? media.media_url_https
+    : typeof videoInfo?.poster === 'string'
+      ? videoInfo.poster
+      : undefined
+  const originalInfo = media?.original_info && typeof media.original_info === 'object'
+    ? media.original_info as Record<string, unknown>
+    : null
+  const aspectRatio = Array.isArray(videoInfo?.aspect_ratio)
+    ? videoInfo.aspect_ratio
+    : Array.isArray(videoInfo?.aspectRatio)
+      ? videoInfo.aspectRatio
+      : null
+  const mediaWidth = normalizePositiveInteger(originalInfo?.width) ||
+    (aspectRatio ? normalizePositiveInteger(aspectRatio[0]) : null)
+  const mediaHeight = normalizePositiveInteger(originalInfo?.height) ||
+    (aspectRatio ? normalizePositiveInteger(aspectRatio[1]) : null)
+  const durationMs = normalizeNonNegativeInteger(videoInfo?.duration_millis ?? videoInfo?.durationMs)
+  const user = payload.user && typeof payload.user === 'object'
+    ? payload.user as Record<string, unknown>
+    : null
+  const screenName = typeof user?.screen_name === 'string' ? user.screen_name : null
+  const canonicalUrl = screenName
+    ? `https://x.com/${screenName}/status/${statusId}`
+    : buildXStatusUrl(url)
+
+  return {
+    canonicalUrl,
+    title: 'X Video',
+    description: typeof user?.name === 'string' ? user.name : undefined,
+    image: poster,
+    videoUrl,
+    videoHlsUrl: hlsUrl,
+    mediaWidth: mediaWidth ?? undefined,
+    mediaHeight: mediaHeight ?? undefined,
+    durationSeconds: durationMs !== null ? Math.round(durationMs / 1000) : undefined,
+    providerName: 'X',
+    providerPayload: {
+      xSyndication: {
+        statusId,
+        fetchedAt: new Date().toISOString(),
+        poster,
+        variantCount: variants.length,
+      },
+    },
+  }
+}
+
 const parseYouTubeId = (url: URL) => {
   const host = url.hostname.toLowerCase()
   if (host === 'youtu.be' || host.endsWith('.youtu.be')) {
@@ -440,10 +595,69 @@ const extractIframeSrc = (html: unknown, baseUrl: string) => {
 }
 
 const normalizeEmbeddedUrl = (value: string) =>
-  decodeHtml(value)
+  decodeHtml(value.replace(/\\u([0-9a-f]{4})/gi, (_, code) => String.fromCharCode(Number.parseInt(code, 16))))
     .replace(/\\\//g, '/')
     .replace(/\\u002F/gi, '/')
     .replace(/\\u0026/gi, '&')
+    .replace(/\\\//g, '/')
+
+const isInstagramCdnVideoUrl = (value: string) => {
+  try {
+    const url = new URL(value)
+    const host = url.hostname.toLowerCase()
+    return (
+      isDirectVideoUrl(url) &&
+      (
+        host === 'cdninstagram.com' ||
+        host.endsWith('.cdninstagram.com') ||
+        host === 'fbcdn.net' ||
+        host.endsWith('.fbcdn.net')
+      )
+    )
+  } catch {
+    return false
+  }
+}
+
+const extractInstagramVideoPreview = (html: string, baseUrl: string): Partial<ExternalPreview> | null => {
+  const versionMatches = [...html.matchAll(/"width"\s*:\s*(\d+)\s*,\s*"height"\s*:\s*(\d+)[\s\S]{0,260}?"url"\s*:\s*"([^"]+?\.mp4[^"]*)"/gi)]
+  const versionCandidates = versionMatches
+    .map(match => {
+      const videoUrl = absolutize(normalizeEmbeddedUrl(match[3]), baseUrl)
+      return videoUrl && isInstagramCdnVideoUrl(videoUrl)
+        ? {
+            videoUrl,
+            width: normalizePositiveInteger(match[1]),
+            height: normalizePositiveInteger(match[2]),
+          }
+        : null
+    })
+    .filter((candidate): candidate is { videoUrl: string; width: number | null; height: number | null } => Boolean(candidate))
+
+  const urlCandidates = [...html.matchAll(/"url"\s*:\s*"([^"]+?\.mp4[^"]*)"/gi)]
+    .map(match => absolutize(normalizeEmbeddedUrl(match[1]), baseUrl))
+    .filter((url): url is string => Boolean(url && isInstagramCdnVideoUrl(url)))
+
+  const allUrls = [...new Set([
+    ...versionCandidates.map(candidate => candidate.videoUrl),
+    ...urlCandidates,
+  ])]
+  const selected = versionCandidates[0] || (allUrls[0] ? { videoUrl: allUrls[0], width: null, height: null } : null)
+  if (!selected) return null
+
+  return {
+    videoUrl: selected.videoUrl,
+    mediaWidth: selected.width ?? undefined,
+    mediaHeight: selected.height ?? undefined,
+    providerPayload: {
+      instagramVideo: {
+        videoUrl: selected.videoUrl,
+        extractedAt: new Date().toISOString(),
+        candidateCount: allUrls.length,
+      },
+    },
+  }
+}
 
 const extractPinterestVideoPreview = (html: string, baseUrl: string): Partial<ExternalPreview> | null => {
   const urls = [...html.matchAll(/https?:\\?\/\\?\/[^"'<>\\\s]+?pinimg\.com\/videos\/[^"'<>\\\s]+?\.(?:mp4|m3u8)(?:\?[^"'<>\\\s]*)?/gi)]
@@ -504,7 +718,7 @@ const fetchOEmbedPreview = async (url: URL, provider: Provider): Promise<Externa
     endpoint.searchParams.set('url', buildPinterestOEmbedUrl(url))
   } else if (provider === 'x') {
     endpoint = new URL('https://publish.twitter.com/oembed')
-    endpoint.searchParams.set('url', url.toString())
+    endpoint.searchParams.set('url', buildXStatusUrl(url))
     endpoint.searchParams.set('omit_script', '1')
     endpoint.searchParams.set('hide_thread', '1')
     endpoint.searchParams.set('theme', 'dark')
@@ -516,7 +730,7 @@ const fetchOEmbedPreview = async (url: URL, provider: Provider): Promise<Externa
         : undefined)
     if (accessToken) {
       endpoint = new URL('https://graph.facebook.com/v25.0/instagram_oembed')
-      endpoint.searchParams.set('url', url.toString())
+      endpoint.searchParams.set('url', buildInstagramMediaUrl(url))
       endpoint.searchParams.set('access_token', accessToken)
       endpoint.searchParams.set('omitscript', 'true')
       endpoint.searchParams.set('maxwidth', '658')
@@ -582,10 +796,15 @@ const fetchOpenGraphPreview = async (url: URL): Promise<ExternalPreview | null> 
   }
 
   const provider = detectProvider(finalUrl)
-  const html = await readLimitedText(response, provider === 'pinterest' ? 1536 * 1024 : 512 * 1024)
+  const htmlReadLimit = provider === 'pinterest' || provider === 'instagram'
+    ? 2048 * 1024
+    : 512 * 1024
+  const html = await readLimitedText(response, htmlReadLimit)
   const providerVideoPreview = provider === 'pinterest'
     ? extractPinterestVideoPreview(html, finalUrl.toString())
-    : null
+    : provider === 'instagram'
+      ? extractInstagramVideoPreview(html, finalUrl.toString())
+      : null
   const image = absolutize(
     getMetaContent(html, 'og:image:secure_url') ||
     getMetaContent(html, 'og:image:url') ||
@@ -1124,11 +1343,12 @@ const buildExternalRecord = async (
   sourceUrl: URL
 ) => {
   const provider = detectProvider(sourceUrl)
-  const [openGraph, oembed] = await Promise.all([
+  const [openGraph, oembed, providerVideo] = await Promise.all([
     fetchOpenGraphPreview(sourceUrl).catch(() => null),
     fetchOEmbedPreview(sourceUrl, provider).catch(() => null),
+    provider === 'x' ? fetchXSyndicationPreview(sourceUrl).catch(() => null) : Promise.resolve(null),
   ])
-  const preview = mergePreview(oembed, openGraph)
+  const preview = mergePreview(providerVideo, mergePreview(oembed, openGraph))
   const youtubeId = provider === 'youtube' ? parseYouTubeId(sourceUrl) : ''
   const pinterestId = provider === 'pinterest' ? parsePinterestId(sourceUrl) : ''
   const previewVideoUrl = await validateDirectVideoUrl(preview?.videoUrl, provider)

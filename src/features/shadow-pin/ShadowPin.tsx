@@ -233,7 +233,19 @@ const getExternalRichEmbedPermalink = (image: ShadowPinImage, provider: External
       const validHost = provider === 'x'
         ? /(^|\.)x\.com$|(^|\.)twitter\.com$/i.test(host)
         : /(^|\.)instagram\.com$/i.test(host)
-      if (validHost) return url.toString()
+      if (!validHost) continue
+      if (provider === 'instagram') {
+        const parts = url.pathname.split('/').filter(Boolean)
+        const mediaIndex = parts.findIndex(part => ['p', 'reel', 'tv'].includes(part.toLowerCase()))
+        if (mediaIndex >= 0 && parts[mediaIndex + 1]) {
+          return `https://www.instagram.com/${parts[mediaIndex].toLowerCase()}/${parts[mediaIndex + 1]}/`
+        }
+      }
+      if (provider === 'x') {
+        const statusMatch = url.pathname.match(/\/status(?:es)?\/(\d{6,})/i)
+        if (statusMatch?.[1]) return `https://x.com/i/status/${statusMatch[1]}`
+      }
+      return url.toString()
     } catch {
       // Try the next stored source.
     }
@@ -268,6 +280,33 @@ const getExternalRichEmbedMarkup = (image: ShadowPinImage) => {
   }
 
   return `<blockquote class="instagram-media" data-instgrm-permalink="${escapedPermalink}" data-instgrm-version="14"></blockquote>`
+}
+
+const getExternalRichEmbedFrameUrl = (image: ShadowPinImage) => {
+  if (!isExternalRichEmbedProvider(image.provider)) return ''
+
+  const permalink = getExternalRichEmbedPermalink(image, image.provider)
+  if (!permalink) return ''
+
+  try {
+    const url = new URL(permalink)
+    if (image.provider === 'x') {
+      const statusId = url.pathname.match(/\/status(?:es)?\/(\d{6,})/i)?.[1]
+      if (!statusId) return ''
+      const embed = new URL('https://platform.twitter.com/embed/Tweet.html')
+      embed.searchParams.set('id', statusId)
+      embed.searchParams.set('theme', 'dark')
+      embed.searchParams.set('dnt', 'true')
+      embed.searchParams.set('hideThread', 'true')
+      return embed.toString()
+    }
+
+    const parts = url.pathname.split('/').filter(Boolean)
+    if (parts.length < 2) return ''
+    return `https://www.instagram.com/${parts[0]}/${parts[1]}/embed`
+  } catch {
+    return ''
+  }
 }
 
 const getExternalRichEmbedSrcDoc = (image: ShadowPinImage) => {
@@ -2162,7 +2201,8 @@ function ImageViewerModal({
   const videoPin = isVideoPin(image)
   const nativeVideoSrc = getVideoPlaybackUrl(image)
   const iframeSrc = getVideoIframeUrl(image, 'viewer')
-  const richEmbedSrcDoc = getExternalRichEmbedSrcDoc(image)
+  const richEmbedFrameUrl = getExternalRichEmbedFrameUrl(image)
+  const richEmbedSrcDoc = richEmbedFrameUrl ? '' : getExternalRichEmbedSrcDoc(image)
   const sourceUrl = image.source_url || image.video_embed_url
   const shouldRenderNativeVideo = videoPin && Boolean(nativeVideoSrc) && !nativeVideoFailed
   const canControlViewerAudio = videoPin && (shouldRenderNativeVideo || Boolean(iframeSrc))
@@ -2220,8 +2260,20 @@ function ImageViewerModal({
             playsInline
             muted={muted}
             onError={() => {
-              if (richEmbedSrcDoc) setNativeVideoFailed(true)
+              if (richEmbedFrameUrl || richEmbedSrcDoc) setNativeVideoFailed(true)
             }}
+          />
+        ) : richEmbedFrameUrl ? (
+          <iframe
+            key={image.id}
+            src={richEmbedFrameUrl}
+            title={image.title}
+            className="block h-full w-full border-0 bg-black"
+            allow="autoplay; encrypted-media; picture-in-picture; web-share"
+            loading="eager"
+            referrerPolicy="strict-origin-when-cross-origin"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
+            allowFullScreen
           />
         ) : richEmbedSrcDoc ? (
           <iframe

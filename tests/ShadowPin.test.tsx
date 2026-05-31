@@ -1151,9 +1151,8 @@ test('opens X pins with the official rich embed renderer', () => {
     fireEvent.click(videoCard!)
 
     const viewerFrame = screen.getByTitle('Pin x-rich')
-    const srcDoc = viewerFrame.getAttribute('srcdoc') || ''
-    expect(srcDoc).toContain('platform.x.com/widgets.js')
-    expect(srcDoc).toContain('twitter-tweet')
+    expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('platform.twitter.com/embed/Tweet.html'))
+    expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('id=463440424141459456'))
     expect(viewerFrame).toHaveAttribute('sandbox', expect.stringContaining('allow-scripts'))
   } finally {
     jest.useRealTimers()
@@ -1221,7 +1220,7 @@ test('opens Instagram pins with a fallback rich embed when oEmbed metadata is un
         ...image('instagram-rich', 1080, 1920),
         media_type: 'external_video',
         provider: 'instagram',
-        source_url: 'https://www.instagram.com/reel/thumbOnly/',
+        source_url: 'https://www.instagram.com/autoxprss/reel/thumbOnly/',
         processing_status: 'ready',
       },
     ],
@@ -1248,10 +1247,8 @@ test('opens Instagram pins with a fallback rich embed when oEmbed metadata is un
     fireEvent.click(videoCard!)
 
     const viewerFrame = screen.getByTitle('Pin instagram-rich')
-    const srcDoc = viewerFrame.getAttribute('srcdoc') || ''
-    expect(srcDoc).toContain('www.instagram.com/embed.js')
-    expect(srcDoc).toContain('instagram-media')
-    expect(srcDoc).toContain('data-instgrm-permalink="https://www.instagram.com/reel/thumbOnly/"')
+    expect(viewerFrame).toHaveAttribute('src', 'https://www.instagram.com/reel/thumbOnly/embed')
+    expect(viewerFrame).toHaveAttribute('sandbox', expect.stringContaining('allow-same-origin'))
   } finally {
     jest.useRealTimers()
   }
