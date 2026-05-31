@@ -188,6 +188,127 @@ const getPinterestEmbedUrl = (image: ShadowPinImage) => {
   return url.toString()
 }
 
+type ExternalRichEmbedProvider = 'x' | 'instagram'
+
+const EXTERNAL_RICH_EMBED_SCRIPT_URLS: Record<ExternalRichEmbedProvider, string> = {
+  x: 'https://platform.x.com/widgets.js',
+  instagram: 'https://www.instagram.com/embed.js',
+}
+
+const isExternalRichEmbedProvider = (provider: ShadowPinImage['provider']): provider is ExternalRichEmbedProvider =>
+  provider === 'x' || provider === 'instagram'
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
+
+const escapeHtmlAttribute = (value: string) =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+
+const stripScriptTags = (html: string) => html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '').trim()
+
+const getExternalOEmbedHtml = (image: ShadowPinImage) => {
+  const payload = asRecord(image.provider_payload)
+  const preview = asRecord(payload?.preview)
+  const oembed = asRecord(preview?.oembed) || asRecord(payload?.oembed)
+  return typeof oembed?.html === 'string' ? oembed.html : ''
+}
+
+const getExternalRichEmbedPermalink = (image: ShadowPinImage, provider: ExternalRichEmbedProvider) => {
+  const candidates = [
+    image.source_url,
+    image.video_embed_url,
+    image.provider_asset_id,
+  ].filter(Boolean) as string[]
+
+  for (const candidate of candidates) {
+    try {
+      const url = new URL(candidate)
+      const host = url.hostname.toLowerCase()
+      const validHost = provider === 'x'
+        ? /(^|\.)x\.com$|(^|\.)twitter\.com$/i.test(host)
+        : /(^|\.)instagram\.com$/i.test(host)
+      if (validHost) return url.toString()
+    } catch {
+      // Try the next stored source.
+    }
+  }
+
+  return ''
+}
+
+const getExternalRichEmbedMarkup = (image: ShadowPinImage) => {
+  if (!isExternalRichEmbedProvider(image.provider)) return ''
+
+  const oembedHtml = getExternalOEmbedHtml(image)
+  if (
+    image.provider === 'x' &&
+    /\bclass=["'][^"']*\btwitter-(?:tweet|timeline)\b/i.test(oembedHtml)
+  ) {
+    return stripScriptTags(oembedHtml)
+  }
+  if (
+    image.provider === 'instagram' &&
+    /\bclass=["'][^"']*\binstagram-media\b/i.test(oembedHtml)
+  ) {
+    return stripScriptTags(oembedHtml)
+  }
+
+  const permalink = getExternalRichEmbedPermalink(image, image.provider)
+  if (!permalink) return ''
+  const escapedPermalink = escapeHtmlAttribute(permalink)
+
+  if (image.provider === 'x') {
+    return `<blockquote class="twitter-tweet" data-theme="dark" data-dnt="true"><a href="${escapedPermalink}"></a></blockquote>`
+  }
+
+  return `<blockquote class="instagram-media" data-instgrm-permalink="${escapedPermalink}" data-instgrm-version="14"></blockquote>`
+}
+
+const getExternalRichEmbedSrcDoc = (image: ShadowPinImage) => {
+  if (!isExternalRichEmbedProvider(image.provider)) return ''
+  const markup = getExternalRichEmbedMarkup(image)
+  if (!markup) return ''
+
+  const scriptUrl = EXTERNAL_RICH_EMBED_SCRIPT_URLS[image.provider]
+  const initCall = image.provider === 'x'
+    ? 'window.twttr && window.twttr.widgets && window.twttr.widgets.load && window.twttr.widgets.load();'
+    : 'window.instgrm && window.instgrm.Embeds && window.instgrm.Embeds.process && window.instgrm.Embeds.process();'
+
+  return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <base target="_blank" />
+  <style>
+    html, body { margin: 0; min-height: 100%; background: #000; color: #f6efe0; }
+    body { box-sizing: border-box; display: flex; align-items: center; justify-content: center; overflow: auto; padding: 12px; }
+    .shadow-pin-external-embed { box-sizing: border-box; width: min(100%, ${image.provider === 'instagram' ? '658px' : '550px'}); margin: auto; }
+    .twitter-tweet, .twitter-timeline, .instagram-media { margin-left: auto !important; margin-right: auto !important; max-width: 100% !important; min-width: 0 !important; }
+    iframe { max-width: 100% !important; }
+  </style>
+</head>
+<body>
+  <main class="shadow-pin-external-embed">${markup}</main>
+  <script async src="${scriptUrl}" charset="utf-8"></script>
+  <script>
+    (function () {
+      var init = function () { try { ${initCall} } catch (_) {} };
+      window.addEventListener('load', init);
+      setTimeout(init, 500);
+      setTimeout(init, 1500);
+    })();
+  </script>
+</body>
+</html>`
+}
+
 const getYoutubeAutoplayUrl = (image: ShadowPinImage, mode: VideoIframeMode = 'feed') => {
   if (!image.video_embed_url) return ''
   try {
@@ -2036,11 +2157,19 @@ function ImageViewerModal({
   onHeart: () => void
 }) {
   const [muted, setMuted] = useState(true)
+  const [nativeVideoFailed, setNativeVideoFailed] = useState(false)
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const videoPin = isVideoPin(image)
   const nativeVideoSrc = getVideoPlaybackUrl(image)
   const iframeSrc = getVideoIframeUrl(image, 'viewer')
+  const richEmbedSrcDoc = getExternalRichEmbedSrcDoc(image)
   const sourceUrl = image.source_url || image.video_embed_url
+  const shouldRenderNativeVideo = videoPin && Boolean(nativeVideoSrc) && !nativeVideoFailed
+  const canControlViewerAudio = videoPin && (shouldRenderNativeVideo || Boolean(iframeSrc))
+
+  useEffect(() => {
+    setNativeVideoFailed(false)
+  }, [image.id, nativeVideoSrc])
 
   useEffect(() => {
     if (!iframeSrc) return
@@ -2054,7 +2183,7 @@ function ImageViewerModal({
           <X className="h-5 w-5" />
         </button>
         <div className="flex items-center gap-2">
-          {videoPin && (nativeVideoSrc || iframeSrc) && (
+          {canControlViewerAudio && (
             <button
               type="button"
               onClick={() => setMuted(value => !value)}
@@ -2080,7 +2209,7 @@ function ImageViewerModal({
             onLoad={() => syncIframeAudio(iframeRef.current, image.provider, muted)}
             allowFullScreen
           />
-        ) : videoPin && nativeVideoSrc ? (
+        ) : shouldRenderNativeVideo && nativeVideoSrc ? (
           <video
             src={nativeVideoSrc}
             poster={getPinImageUrl(image, 'medium')}
@@ -2090,6 +2219,21 @@ function ImageViewerModal({
             loop
             playsInline
             muted={muted}
+            onError={() => {
+              if (richEmbedSrcDoc) setNativeVideoFailed(true)
+            }}
+          />
+        ) : richEmbedSrcDoc ? (
+          <iframe
+            key={image.id}
+            srcDoc={richEmbedSrcDoc}
+            title={image.title}
+            className="block h-full w-full border-0 bg-black"
+            allow="encrypted-media; picture-in-picture; web-share"
+            loading="eager"
+            referrerPolicy="strict-origin-when-cross-origin"
+            sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-presentation"
+            allowFullScreen
           />
         ) : videoPin ? (
           <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">

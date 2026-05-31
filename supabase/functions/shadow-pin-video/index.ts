@@ -317,7 +317,89 @@ const readLimitedText = async (response: Response, maxBytes = 512 * 1024) => {
 }
 
 const isDirectVideoUrl = (url: URL) =>
-  /\.(mp4|m4v|mov|webm)(?:$|\?)/i.test(`${url.pathname}${url.search}`)
+  /\.(mp4|m4v|mov|webm|m3u8)(?:$|\?)/i.test(`${url.pathname}${url.search}`)
+
+const isLikelyProviderVideoAssetUrl = (url: URL, provider: Provider) => {
+  const host = url.hostname.toLowerCase()
+  if (provider === 'x') return host === 'video.twimg.com'
+  if (provider === 'instagram') {
+    return (
+      host === 'cdninstagram.com' ||
+      host.endsWith('.cdninstagram.com') ||
+      host === 'fbcdn.net' ||
+      host.endsWith('.fbcdn.net')
+    )
+  }
+  return false
+}
+
+const isPlayableVideoContentType = (contentType: string) => {
+  const normalized = contentType.toLowerCase()
+  return (
+    normalized.startsWith('video/') ||
+    normalized.includes('application/vnd.apple.mpegurl') ||
+    normalized.includes('application/x-mpegurl')
+  )
+}
+
+const probeDirectVideoUrl = async (url: URL): Promise<string | null> => {
+  const requestHeaders = {
+    accept: 'video/*,application/vnd.apple.mpegurl,application/x-mpegurl,*/*;q=0.2',
+    'user-agent': 'ShadowChat-ShadowPinVideo/1.0',
+  }
+
+  const checkResponse = async (response: Response) => {
+    if (!response.ok && response.status !== 206) return null
+    const finalUrl = new URL(response.url || url.toString())
+    await assertPublicHost(finalUrl)
+    const contentType = response.headers.get('content-type') || ''
+    return isPlayableVideoContentType(contentType) || isDirectVideoUrl(finalUrl)
+      ? finalUrl.toString()
+      : null
+  }
+
+  const headResponse = await fetch(url, {
+    method: 'HEAD',
+    redirect: 'follow',
+    signal: AbortSignal.timeout(2500),
+    headers: requestHeaders,
+  }).catch(() => null)
+  if (headResponse) {
+    const playableUrl = await checkResponse(headResponse)
+    if (playableUrl) return playableUrl
+  }
+
+  const rangeResponse = await fetch(url, {
+    method: 'GET',
+    redirect: 'follow',
+    signal: AbortSignal.timeout(3000),
+    headers: {
+      ...requestHeaders,
+      range: 'bytes=0-0',
+    },
+  }).catch(() => null)
+
+  return rangeResponse ? checkResponse(rangeResponse) : null
+}
+
+const validateDirectVideoUrl = async (
+  value: string | undefined | null,
+  provider: Provider
+): Promise<string | null> => {
+  if (!value) return null
+
+  try {
+    const url = new URL(value)
+    await assertPublicHost(url)
+
+    if (isDirectVideoUrl(url)) return url.toString()
+    if (!isLikelyProviderVideoAssetUrl(url, provider)) return null
+
+    return await probeDirectVideoUrl(url)
+  } catch {
+    return null
+  }
+}
 
 const parseYouTubeId = (url: URL) => {
   const host = url.hostname.toLowerCase()
@@ -424,15 +506,20 @@ const fetchOEmbedPreview = async (url: URL, provider: Provider): Promise<Externa
     endpoint = new URL('https://publish.twitter.com/oembed')
     endpoint.searchParams.set('url', url.toString())
     endpoint.searchParams.set('omit_script', '1')
+    endpoint.searchParams.set('hide_thread', '1')
+    endpoint.searchParams.set('theme', 'dark')
+    endpoint.searchParams.set('dnt', '1')
   } else if (provider === 'instagram') {
     const accessToken = Deno.env.get('META_OEMBED_ACCESS_TOKEN') ||
       (Deno.env.get('META_APP_ID') && Deno.env.get('META_APP_SECRET')
         ? `${Deno.env.get('META_APP_ID')}|${Deno.env.get('META_APP_SECRET')}`
         : undefined)
     if (accessToken) {
-      endpoint = new URL('https://graph.facebook.com/v19.0/instagram_oembed')
+      endpoint = new URL('https://graph.facebook.com/v25.0/instagram_oembed')
       endpoint.searchParams.set('url', url.toString())
       endpoint.searchParams.set('access_token', accessToken)
+      endpoint.searchParams.set('omitscript', 'true')
+      endpoint.searchParams.set('maxwidth', '658')
     }
   }
 
@@ -1044,35 +1131,42 @@ const buildExternalRecord = async (
   const preview = mergePreview(oembed, openGraph)
   const youtubeId = provider === 'youtube' ? parseYouTubeId(sourceUrl) : ''
   const pinterestId = provider === 'pinterest' ? parsePinterestId(sourceUrl) : ''
-  const directVideo = provider === 'external' && (isDirectVideoUrl(sourceUrl) || preview?.videoUrl)
+  const previewVideoUrl = await validateDirectVideoUrl(preview?.videoUrl, provider)
+  const directSourceVideoUrl = provider === 'external' && isDirectVideoUrl(sourceUrl)
+    ? sourceUrl.toString()
+    : null
+  const directVideoUrl = directSourceVideoUrl || previewVideoUrl
 
-  if (provider === 'external' && !directVideo) {
+  if (provider === 'external' && !directVideoUrl) {
     throw new Error('Paste a YouTube Short, X, Pinterest, Instagram, or direct video URL.')
   }
 
   const canonicalUrl = preview?.canonicalUrl || sourceUrl.toString()
   const title = titleInput || preview?.title || (
     provider === 'youtube' ? 'YouTube Short' :
-      provider === 'x' ? 'X Video' :
+      provider === 'x' ? 'X Post' :
         provider === 'pinterest' ? 'Pinterest Video' :
-          provider === 'instagram' ? 'Instagram Reel' :
+          provider === 'instagram' ? 'Instagram Post' :
             'Video Pin'
   )
   const imageUrl = provider === 'youtube' && youtubeId
     ? `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`
     : preview?.image || FALLBACK_VIDEO_POSTER_URL
-  const videoUrl = directVideo || provider === 'pinterest'
-    ? (preview?.videoUrl || (directVideo ? sourceUrl.toString() : null))
-    : null
-  const embedUrl = provider === 'youtube' && youtubeId
-    ? buildYoutubeEmbedUrl(youtubeId)
-    : preview?.embedUrl
-      ? preview.embedUrl
-      : provider === 'pinterest' && pinterestId
-        ? `https://assets.pinterest.com/ext/embed.html?id=${pinterestId}&src=shado-pin`
-    : provider === 'external'
-      ? videoUrl
-      : null
+  const videoUrl = provider === 'pinterest'
+    ? (preview?.videoUrl || null)
+    : directVideoUrl
+  const shouldUseNativePlatformVideo = Boolean(videoUrl && (provider === 'x' || provider === 'instagram'))
+  const embedUrl = shouldUseNativePlatformVideo
+    ? null
+    : provider === 'youtube' && youtubeId
+      ? buildYoutubeEmbedUrl(youtubeId)
+      : preview?.embedUrl
+        ? preview.embedUrl
+        : provider === 'pinterest' && pinterestId
+          ? `https://assets.pinterest.com/ext/embed.html?id=${pinterestId}&src=shado-pin`
+          : provider === 'external'
+            ? videoUrl
+            : null
   const providerAssetId = youtubeId || pinterestId || canonicalUrl
 
   return {

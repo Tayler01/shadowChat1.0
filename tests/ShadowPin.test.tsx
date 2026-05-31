@@ -1108,6 +1108,155 @@ test('opens legacy Pinterest video pins with the Pinterest oEmbed iframe', () =>
   }
 })
 
+test('opens X pins with the official rich embed renderer', () => {
+  jest.useFakeTimers()
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      {
+        ...image('x-rich', 1200, 900),
+        media_type: 'external_video',
+        provider: 'x',
+        source_url: 'https://x.com/Interior/status/463440424141459456',
+        provider_payload: {
+          preview: {
+            oembed: {
+              html: '<blockquote class="twitter-tweet"><a href="https://x.com/Interior/status/463440424141459456"></a></blockquote>',
+            },
+          },
+        },
+        processing_status: 'ready',
+      },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+    const videoCard = screen.getByAltText('Pin x-rich').closest('article')
+    expect(videoCard).not.toBeNull()
+
+    fireEvent.click(videoCard!)
+    fireEvent.click(videoCard!)
+
+    const viewerFrame = screen.getByTitle('Pin x-rich')
+    const srcDoc = viewerFrame.getAttribute('srcdoc') || ''
+    expect(srcDoc).toContain('platform.x.com/widgets.js')
+    expect(srcDoc).toContain('twitter-tweet')
+    expect(viewerFrame).toHaveAttribute('sandbox', expect.stringContaining('allow-scripts'))
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('prefers direct X video playback over the post embed when media is available', () => {
+  jest.useFakeTimers()
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      {
+        ...image('x-direct', 1080, 1920),
+        media_type: 'external_video',
+        provider: 'x',
+        source_url: 'https://x.com/Interior/status/463440424141459456',
+        video_preview_url: 'https://video.twimg.com/ext_tw_video/123/pu/vid/480x852/direct.mp4',
+        video_playback_url: 'https://video.twimg.com/ext_tw_video/123/pu/vid/720x1280/direct.mp4',
+        provider_payload: {
+          preview: {
+            oembed: {
+              html: '<blockquote class="twitter-tweet"><p>Post text should not render when a direct video is available.</p><a href="https://x.com/Interior/status/463440424141459456"></a></blockquote>',
+            },
+          },
+        },
+        processing_status: 'ready',
+      },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+    const videoCard = screen.getByAltText('Pin x-direct').closest('article')
+    expect(videoCard).not.toBeNull()
+
+    fireEvent.click(videoCard!)
+    fireEvent.click(videoCard!)
+
+    const viewerVideo = document.body.querySelector('video')
+    expect(viewerVideo).toHaveAttribute('src', 'https://video.twimg.com/ext_tw_video/123/pu/vid/720x1280/direct.mp4')
+    expect(screen.queryByTitle('Pin x-direct')).not.toBeInTheDocument()
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('opens Instagram pins with a fallback rich embed when oEmbed metadata is unavailable', () => {
+  jest.useFakeTimers()
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      {
+        ...image('instagram-rich', 1080, 1920),
+        media_type: 'external_video',
+        provider: 'instagram',
+        source_url: 'https://www.instagram.com/reel/thumbOnly/',
+        processing_status: 'ready',
+      },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+    const videoCard = screen.getByAltText('Pin instagram-rich').closest('article')
+    expect(videoCard).not.toBeNull()
+
+    fireEvent.click(videoCard!)
+    fireEvent.click(videoCard!)
+
+    const viewerFrame = screen.getByTitle('Pin instagram-rich')
+    const srcDoc = viewerFrame.getAttribute('srcdoc') || ''
+    expect(srcDoc).toContain('www.instagram.com/embed.js')
+    expect(srcDoc).toContain('instagram-media')
+    expect(srcDoc).toContain('data-instgrm-permalink="https://www.instagram.com/reel/thumbOnly/"')
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
 test('opens YouTube video pins with fullscreen player controls', () => {
   jest.useFakeTimers()
   mockUseShadowPinImages.mockReturnValue({
