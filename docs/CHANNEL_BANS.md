@@ -1,5 +1,9 @@
 # Channel Ban Moderation
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This doc reflects shipped channel-ban behavior. Pending hardening includes enforcing equivalent ban checks in service-role paths such as bridge group send and AI post-to-chat.
+
 Channel bans let app operators limit where a user can participate without
 touching DMs or account access. Banned users can still read visible content.
 

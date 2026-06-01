@@ -1,5 +1,9 @@
 # Stability And QA Updates (April 2026)
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This document is historical context or planning evidence, not the current implementation checklist. Check [README.md](C:/repos/chat2.0/README.md:1), [AGENTS.md](C:/repos/chat2.0/AGENTS.md:1), and the audit backlog before using it for new work.
+
 This document records the stabilization work completed before the next major feature phase.
 
 ## What Was Fixed
@@ -75,7 +79,7 @@ Relevant files:
 
 ### Settings UI Consistency
 
-- Notification toggles in Settings were restyled and normalized so they match the rest of the app’s switch geometry and semantics.
+- Notification toggles in Settings were restyled and normalized so they match the rest of the appâ€™s switch geometry and semantics.
 
 Relevant files:
 
@@ -83,10 +87,10 @@ Relevant files:
 
 ### Resume / Background Send Reliability
 
-- Realtime now uses Supabase’s documented `worker: true` option so heartbeat timing is less vulnerable to background throttling.
+- Realtime now uses Supabaseâ€™s documented `worker: true` option so heartbeat timing is less vulnerable to background throttling.
 - The app attaches a heartbeat reconnect hook to recover when Realtime reports disconnection or timeout.
 - Resume-time auth recovery is deduplicated and timeout-bounded so stalled session lookups and `setSession()` calls cannot leave sends hanging forever.
-- The heavyweight “recreate the client on every visibility change” path was removed from the shared visibility refresh hook.
+- The heavyweight â€œrecreate the client on every visibility changeâ€ path was removed from the shared visibility refresh hook.
 
 Relevant files:
 
@@ -110,7 +114,7 @@ Relevant files:
 - The critical Home Screen-specific fix was in auth state handling.
 - Supabase warns against doing async Supabase work directly inside `onAuthStateChange` callbacks because it can deadlock session operations.
 - The app now keeps the auth callback synchronous and defers profile/session follow-up work until after the callback returns.
-- This resolved the “Sending...” hang that still persisted in the installed iPhone Home Screen app after the first reconnect hardening pass.
+- This resolved the â€œSending...â€ hang that still persisted in the installed iPhone Home Screen app after the first reconnect hardening pass.
 
 Relevant files:
 
@@ -184,4 +188,4 @@ node scripts/playwright-smoke.mjs --scenario=full --headed --no-reuse-server
 
 - Treat [src/lib/supabase.ts](C:/repos/chat2.0/src/lib/supabase.ts:1), [src/hooks/useAuth.tsx](C:/repos/chat2.0/src/hooks/useAuth.tsx:1), [src/hooks/useMessages.tsx](C:/repos/chat2.0/src/hooks/useMessages.tsx:1), and [src/hooks/useDirectMessages.tsx](C:/repos/chat2.0/src/hooks/useDirectMessages.tsx:1) as a connected stability surface.
 - Do not reintroduce async Supabase calls directly inside `supabase.auth.onAuthStateChange(...)`.
-- Prefer Supabase’s documented reconnect/session behavior over custom client recreation when debugging mobile resume issues.
+- Prefer Supabaseâ€™s documented reconnect/session behavior over custom client recreation when debugging mobile resume issues.

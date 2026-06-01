@@ -1,5 +1,9 @@
 # Shado News Scraper
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This worker guide reflects the current Render scraper surface and should be refreshed after any live Render settings or source-auth changes.
+
 Always-on browser worker for the News Feed. It polls enabled rows from `news_sources`, extracts the latest tracked X or Truth Social post, and writes normalized snapshots to `news_feed_items` with Supabase service-role credentials.
 
 The worker is intentionally outside Supabase Edge Functions. Browser scraping is

@@ -1,5 +1,9 @@
 # ESP Bridge Auth Model Spec
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This is bridge-specific guidance; some sections are planning history and some remain active runbook material. Verify against current firmware, Edge Functions, and [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1) before implementing bridge changes.
+
 This document defines the recommended authentication model for `ShadowChat Bridge v1`.
 
 It turns the earlier roadmap and documentation review into a concrete design decision that can guide pairing, backend schema, realtime behavior, and the `Phase 0` feasibility spike.

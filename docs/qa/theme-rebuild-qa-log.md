@@ -1,5 +1,9 @@
 # Theme Rebuild QA Log
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This file is a QA log or validation checklist. Keep older artifact paths as historical evidence, and add new dated entries after the next browser, mobile, or device validation pass.
+
 Last updated: 2026-05-11
 
 ## Summary

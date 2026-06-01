@@ -1,5 +1,9 @@
 # ESP Bridge Phase 0 Implementation Brief
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This is bridge-specific guidance; some sections are planning history and some remain active runbook material. Verify against current firmware, Edge Functions, and [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1) before implementing bridge changes.
+
 This document is the first implementation-facing work packet for the ESP bridge feature.
 
 It turns the current planning stack into the exact `Phase 0` spike we would build first.

@@ -1,5 +1,9 @@
 # ESP Bridge Feature Roadmap
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This is bridge-specific guidance; some sections are planning history and some remain active runbook material. Verify against current firmware, Edge Functions, and [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1) before implementing bridge changes.
+
 This document defines the planning baseline for the next major feature phase: an ESP-backed bridge that lets an airgapped Windows PC participate in ShadowChat without exposing that PC to the public internet.
 
 This is a product and systems roadmap, not an implementation-complete design. It is intended to guide iterative planning, prototyping, and phased delivery.

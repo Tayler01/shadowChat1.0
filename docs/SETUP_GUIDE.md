@@ -2,6 +2,10 @@
 
 This guide covers the recommended local and hosted setup flow for ShadowChat 1.0.
 
+## Documentation Status - June 1, 2026
+
+This setup guide has been refreshed against the current repo shape. Invite-only signup and expanded email-verification UX are planned but not implemented yet; use [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1) before changing auth setup.
+
 ## Prerequisites
 
 - Node.js 20+
@@ -77,7 +81,7 @@ VITE_WEB_PUSH_PUBLIC_KEY=YOUR_WEB_PUSH_PUBLIC_KEY
 
 ## 3. Create Or Link A Supabase Project
 
-This repo assumes a hosted Supabase project, not a checked-in local `supabase/config.toml`.
+This repo assumes a hosted Supabase project and includes [supabase/config.toml](C:/repos/chat2.0/supabase/config.toml:1) for function-level configuration such as `verify_jwt` settings. Treat [supabase/migrations](C:/repos/chat2.0/supabase/migrations) as the schema source of truth.
 
 Login and link:
 
@@ -146,12 +150,17 @@ supabase functions deploy openai-chat --no-verify-jwt
 supabase functions deploy send-push --no-verify-jwt
 supabase functions deploy link-preview --no-verify-jwt
 supabase functions deploy art-board-import-image
+supabase functions deploy shadow-pin-import-image
+supabase functions deploy shadow-pin-video --no-verify-jwt
+supabase functions deploy delete-account --no-verify-jwt
 ```
 
 `art-board-import-image` is required for Art Board URL imports. It rejects
 private/local URLs and remote images above the `art-board` bucket's 10 MB
 limit. Runtime Art Board delivery uses backend image transformations so users
 do not need to resize normal imported images by hand.
+
+`shadow-pin-video`, `send-push`, `link-preview`, and `delete-account` validate their mixed auth contracts inside the function. Keep their `--no-verify-jwt` deployment mode aligned with [supabase/config.toml](C:/repos/chat2.0/supabase/config.toml:1), and do not remove in-function auth checks.
 
 Deploy bridge functions too when working on the ESP bridge or when a fresh
 Supabase project needs full feature parity:
@@ -208,8 +217,10 @@ node services/news-scraper/src/index.mjs --once
 
 Production uses [render.yaml](C:/repos/chat2.0/render.yaml:1). Required Render
 secrets are `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; optional source
-credentials are `X_USERNAME`, `X_EMAIL`, `X_PASSWORD`, `TRUTH_USERNAME`,
-`TRUTH_EMAIL`, and `TRUTH_PASSWORD`.
+credentials include `X_USERNAME`, `X_EMAIL`, `X_SECONDARY_IDENTIFIER`,
+`X_PASSWORD`, `X_AUTH_TOKEN`, `X_CT0`, `NEWS_X_COOKIE_HEADER`,
+`TRUTH_USERNAME`, `TRUTH_EMAIL`, `TRUTH_PASSWORD`, and
+`NEWS_TRUTH_COOKIE_HEADER`.
 
 Admins and sub-admins manage tracked sources from Settings > Admin > News
 Sources. The admin class is stored in `public.user_roles` as `admin` or
@@ -254,6 +265,9 @@ After setup, verify:
 17. An `admin` or `sub_admin` can delete a normal-user General Chat or board-chat message and the delete propagates to another signed-in client
 18. Avatar upload allows crop/zoom/position adjustment and the saved avatar renders correctly in chat and profile surfaces
 19. A sparse DM thread keeps messages visible when the mobile keyboard opens
+20. Account deletion renders from Settings and reaches the `delete-account` Edge Function only for the signed-in user
+
+Audit note: open self-signup is still the current shipped behavior. Invite-code-only signup and required email verification are planned follow-ups, so fresh projects should not assume those controls exist until the corresponding migrations and auth UI changes land.
 
 ## 10. Optional Preview Mode
 

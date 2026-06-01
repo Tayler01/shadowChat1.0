@@ -2,6 +2,10 @@
 
 Canonical agent instructions for this repo are mirrored here for tools and workflows that look for `AGENT.md` instead of `AGENTS.md`.
 
+## Documentation Status - June 1, 2026
+
+This file is intentionally short. The canonical current handbook is [AGENTS.md](C:/repos/chat2.0/AGENTS.md:1). Current audit follow-ups are tracked in [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1), and the documentation inventory is [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
+
 ## Required Checks
 
 ```powershell
@@ -26,6 +30,8 @@ npm run build
 - [`supabase/functions/send-push/index.ts`](C:/repos/chat2.0/supabase/functions/send-push/index.ts:1)
 - [`docs/ADMIN_ACCESS.md`](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1)
 - [`docs/WEATHER_WIDGET.md`](C:/repos/chat2.0/docs/WEATHER_WIDGET.md:1)
+- [`docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md`](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1)
+- [`docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md`](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1)
 
 ## Testing
 

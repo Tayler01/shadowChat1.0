@@ -1,5 +1,9 @@
 # Real-Device Mobile Validation
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This file is a QA log or validation checklist. Keep older artifact paths as historical evidence, and add new dated entries after the next browser, mobile, or device validation pass.
+
 Use this checklist after `npm run qa:mobile-pwa` passes and before treating a
 mobile/PWA-sensitive release as fully proven. Playwright catches most layout and
 flow regressions, but real installed PWAs still differ around browser chrome,

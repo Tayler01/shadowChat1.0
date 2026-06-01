@@ -1,27 +1,31 @@
 # ESP Bridge Update And Offline Software Plan
 
+## Documentation Status - June 1, 2026
+
+This root-level plan is bridge-specific historical/current context, not the global product plan. The global near-term product backlog is now [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1). Keep this file only for ESP bridge update/offline software work, and refresh it before more bridge release work.
+
 ## Current Documentation Track
 
-Status: refreshed on May 2, 2026
+Status: refreshed on June 1, 2026 after the project documentation audit.
 
 Deliverables:
 
-- refresh README and repo docs for the shipped News tab
-- document the Render News scraper deployment and troubleshooting path
-- document News setup, testing, production smoke, and link-preview secrets
-- document app-wide admin/sub-admin access, role badges, and admin subpages
-- document feedback review, active-user presence, and weather widget behavior
-- keep the ESP bridge plan intact as the bridge-specific source of truth
+- refresh all tracked Markdown documentation with a June 1 status note
+- keep README, AGENTS, AGENT, Architecture, Setup, Testing, Deployment, and Production Smoke aligned with current `main`
+- preserve the June 1 full-audit implementation backlog as the current cross-project next-step source
+- document the project documentation inventory and local ignored `.agents` skill surface
+- keep ESP bridge docs intact but clearly scoped as bridge-specific guidance or historical planning
 
 Acceptance:
 
-- a new contributor can find the News frontend, backend schema, worker, env vars,
-  commands, and known Truth Social blocking risk from the repo docs
+- a new contributor can identify which docs are current guidance, historical
+  context, QA logs, bridge-specific runbooks, or audit follow-ups
 - production handoff clearly separates Netlify, Supabase, and Render deployment
   responsibilities
 - GitHub Actions Netlify production deploy is treated as the default `main`
   deployment path
-- private user settings such as weather location stay out of public profile rows
+- planned work such as invite-only signup, chat read-position stabilization,
+  Supabase hardening, and Netlify headers is described as planned, not shipped
 
 ## Milestone 1: Manifest Foundation
 

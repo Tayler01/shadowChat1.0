@@ -1,5 +1,9 @@
 # Codex Goal Playbooks
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This feature guide is current for the shipped product surface, with any known hardening or polish follow-ups tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
+
 Use these `/goal` prompts when a task is large enough to need repeated inspect,
 patch, verify, and document loops. Keep one goal focused on one durable outcome.
 

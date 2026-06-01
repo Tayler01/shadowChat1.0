@@ -1,5 +1,9 @@
 # Chat Link Previews
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This doc reflects the shipped link-preview flow, but the June 1 audit identified pending SSRF hardening for redirect handling, IPv6/AAAA checks, and shared safe-fetch behavior.
+
 ShadowChat renders `http://`, `https://`, and `www.` URLs in group chat, DMs, and board chats as clickable links. The first URL in a text message can also load a compact preview card.
 
 ## Architecture

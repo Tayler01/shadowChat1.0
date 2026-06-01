@@ -1,5 +1,9 @@
 # ESP Bridge Phase 0 Spike Checklist
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This is bridge-specific guidance; some sections are planning history and some remain active runbook material. Verify against current firmware, Edge Functions, and [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1) before implementing bridge changes.
+
 This checklist defines the first feasibility spike for the ESP bridge feature.
 
 The purpose of Phase 0 is not to build the full product. The purpose is to prove that the core bridge concept works before we invest in full UX, schema, or update systems.

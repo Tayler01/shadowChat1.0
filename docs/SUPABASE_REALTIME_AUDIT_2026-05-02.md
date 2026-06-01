@@ -1,5 +1,9 @@
 # Supabase Realtime Audit - 2026-05-02
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This feature guide is current for the shipped product surface, with any known hardening or polish follow-ups tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
+
 This audit reviews public Supabase tables, their product purpose, and whether
 they should be included in the `supabase_realtime` publication.
 

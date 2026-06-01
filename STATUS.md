@@ -1,10 +1,17 @@
 # ESP Bridge Update And Offline Software Status
 
+## Documentation Status - June 1, 2026
+
+This root-level status file is retained as the ESP bridge update/offline software status log. It is not a global project status page. Current project-wide hardening and polish next steps live in [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1), and the documentation inventory lives in [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
+
 ## Current Repository Note
 
-- May 2, 2026 documentation refresh is in progress for the shipped News tab,
-  Render News scraper, link previews, production deployment, setup, testing,
-  admin access, feedback review, realtime presence, and weather widget runbooks.
+- June 1, 2026 documentation refresh completed for the project docs, agent
+  guides, audit backlog, deployment/setup/testing runbooks, and feature status
+  notes.
+- The June 1 audit backlog now tracks invite-only signup, email-verification
+  UX, General Chat read-position stability, Supabase hardening, service-role
+  checks, URL fetch hardening, Netlify headers, and frontend polish.
 - News is live as an isolated backend domain with `news_sources`,
   `news_feed_items`, `news_chat_messages`, News reactions, badge state, and
   Settings > Admin > News Sources operator controls.
@@ -25,7 +32,7 @@
 
 ## Current Milestone
 
-Milestone 9: plug-and-play tools polish and Android badge stability.
+No active bridge implementation milestone. The current project-wide next-step track is the June 1 audit backlog documented in [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
 
 ## Current Live Device Note
 

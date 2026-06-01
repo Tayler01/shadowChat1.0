@@ -2,6 +2,10 @@
 
 This project uses a mix of static checks, Jest coverage, and real browser validation.
 
+## Documentation Status - June 1, 2026
+
+This guide reflects the current repo scripts. The June 1 audit confirmed `npm run lint`, `npm run typecheck`, `npm run build`, and `npm run qa:chat-scroll -- --cycles=4 --clean-artifacts` pass on current `main`. The chat-scroll script still needs stronger read-cursor assertions before it can prove the first-unread bug is fixed.
+
 ## Mobile-First Testing Default
 
 Unless a task explicitly says otherwise, test and design ShadowChat changes for
@@ -218,6 +222,14 @@ Current smoke scenarios:
 - `profile-visual`: captures the desktop profile screen for visual review
 - `mobile-dm-back`: validates the mobile DM thread back flow
 - `mobile-settings-visual`: checks the mobile settings layout and notification toggle geometry
+
+Dedicated current QA scripts also include:
+
+- `qa:chat-scroll`: probes General Chat scroll stability and frame timing; needs read-cursor correctness assertions as part of the audit backlog.
+- `qa:mobile-pwa`: mobile/PWA visual QA script.
+- `qa:themes`: theme visual QA script.
+- `qa:shadow-war`, `qa:shadow-war:core`, `qa:shadow-war:visual`, and `qa:shadow-checkers`: game-specific smoke coverage.
+- `bridge:tui:test` and `bridge:tui:smoke`: bridge TUI layout and live serial smoke paths.
 
 Boards/News-specific Jest coverage currently lives in:
 

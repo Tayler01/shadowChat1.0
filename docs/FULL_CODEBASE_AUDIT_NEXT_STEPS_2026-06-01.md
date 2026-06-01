@@ -2,6 +2,10 @@
 
 This document turns the June 1, 2026 read-only audit into an implementation backlog. It is intentionally written as next steps, not as a claim that any fixes have been applied.
 
+## Documentation Status - June 1, 2026
+
+This is the current source of truth for the audit backlog. Update this document when an audit item is implemented, intentionally deferred, or replaced by a narrower feature ticket.
+
 ## Audit Scope
 
 The audit covered:

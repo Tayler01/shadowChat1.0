@@ -1,5 +1,9 @@
 # Boards News Feed And Scraper Runbook
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This doc reflects the shipped News tab and Render scraper architecture. Live Render dashboard settings still need verification when scraper deployment is next touched.
+
 This document describes the shipped News Feed board, its Supabase backend, and
 the Render-hosted scraper that keeps the feed current.
 

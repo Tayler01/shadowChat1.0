@@ -2,6 +2,10 @@
 
 Use this workflow after a Netlify production deploy or whenever production auth, session resume, or realtime send behavior needs a browser-level check.
 
+## Documentation Status - June 1, 2026
+
+This runbook is current for the shipped production smoke flow. It should be refreshed after invite-only signup and required email verification are implemented, because those changes will make stable smoke accounts even more important and may require explicit invite/account bootstrap steps.
+
 ## Why Stable Accounts Are Required
 
 The smoke runner can create disposable users for local and preview environments. Production Supabase auth may require email confirmation, so a disposable production signup can complete without returning an active session. Production smoke therefore must sign in with two stable, email-confirmed `PLAYWRIGHT_ACCOUNT_*` users.
@@ -132,14 +136,24 @@ Common failure meanings:
     account for routine smoke traffic.
 11. Keep the latest passing artifact path with the deploy notes.
 
-## Latest Feedback Release Checks
+## Latest Documentation Refresh Deploy
+
+June 1, 2026 documentation refresh:
+
+- Commit `2439624` pushed directly to `main`.
+- GitHub Actions `Netlify Production Deploy` run `26760574110` passed.
+- Workflow completed install, lint, typecheck, Netlify build, metadata verification, production deploy, and in-app release publish.
+
+## Historical Release Checks
+
+### Latest Feedback Release Checks
 
 April 28, 2026 post-deploy checks:
 
 - Production Settings smoke passed: `output/playwright/prod-feedback-settings-postdeploy/summary.json`
 - Production feedback E2E passed with a real submission row and private attachment download: `output/playwright/feedback-prod-e2e-1777419359750/summary.json`
 
-## Latest Weather/Admin Local Release Checks
+### Latest Weather/Admin Local Release Checks
 
 May 2, 2026 local post-build checks:
 
@@ -148,7 +162,7 @@ May 2, 2026 local post-build checks:
 - Headed weather widget preview passed with artifacts under `output/playwright/weather-widget/`
 - Netlify Production Deploy workflow passed for commit `601c3c9`
 
-## Latest Channel Ban Moderation Checks
+### Latest Channel Ban Moderation Checks
 
 May 2, 2026 channel-ban moderation release:
 
@@ -157,7 +171,7 @@ May 2, 2026 channel-ban moderation release:
 - Supabase migration `20260502070543_channel_bans_moderation.sql` applied and migration history aligned
 - Netlify Production Deploy workflow passed for commit `f868bce`
 
-## Latest Boards/Header Checks
+### Latest Boards/Header Checks
 
 May 2, 2026 Boards header and bubble-motion adjustment:
 

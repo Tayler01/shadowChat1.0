@@ -1,5 +1,9 @@
 # Weather Widget
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This doc remains current and is the model for keeping private user preferences out of public profile rows.
+
 The General Chat header includes a small per-user weather widget beside the
 active-user count control.
 

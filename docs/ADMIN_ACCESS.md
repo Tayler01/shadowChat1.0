@@ -1,5 +1,9 @@
 # Admin Access
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This doc reflects the shipped admin model. Pending hardening includes treating `users.admin_role` as display-only and using `user_roles`/operator RPCs for server-side authority everywhere.
+
 ShadowChat now uses one app-wide admin model instead of a News-only operator
 role.
 

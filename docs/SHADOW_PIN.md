@@ -1,5 +1,9 @@
 # ShadowPin
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This doc reflects the shipped ShadowPin image/video surface. Pending hardening includes shared URL-fetch/SSRF improvements and review of activity-table RLS advisor findings.
+
 ShadowPin is a logged-in public pin board exposed as `Pins` in the mobile
 bottom menu and desktop sidebar. Boards stays its own menu item; Pins opens the
 same ShadowPin surface directly.

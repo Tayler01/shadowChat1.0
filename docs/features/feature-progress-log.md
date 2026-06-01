@@ -1,15 +1,26 @@
 # Feature Progress Log
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This feature guide is current for the shipped product surface, with any known hardening or polish follow-ups tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
+
 Use this log for long-running `/goal` work and feature implementations that span
 multiple checkpoints. Keep entries concise, factual, and tied to verification.
 
 ## Current Goal
 
+No active implementation goal is currently recorded here. The latest completed
+long-running goal was first-class short video pins for ShadowPin. The current
+cross-project planning backlog is the June 1 audit next-steps document.
+
+## Latest Completed Goal - ShadowPin Short Video
+
 - Goal: Add first-class short video pins to ShadowPin while preserving the
   existing mixed category feed, admin activity, hearts, and image-pin behavior.
 - Started: 2026-05-29
+- Status: complete
 - Owner/agent: Codex
-- Branch: current local checkout
+- Branch: merged to `main`
 - Related roadmap: [`docs/SHADOW_PIN_SHORT_VIDEO_ROADMAP.md`](C:/repos/chat2.0/docs/SHADOW_PIN_SHORT_VIDEO_ROADMAP.md:1)
 - User decisions: video pins mix with images; category covers stay image-only;
   feed autoplay is muted/focus-based; fullscreen viewer loads high-quality

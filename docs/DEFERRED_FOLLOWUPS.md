@@ -1,5 +1,9 @@
 # Deferred Follow-Ups
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This feature guide is current for the shipped product surface, with any known hardening or polish follow-ups tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
+
 This document keeps small deferred ideas from being lost when stale branches are deleted.
 
 ## Bundle Chunking
@@ -11,6 +15,8 @@ This document keeps small deferred ideas from being lost when stale branches are
 - When revisiting this, run `npm run build` before and after the change and compare the emitted chunk sizes.
 
 ## Audit Improvements - 2026-04-26
+
+Status as of June 1, 2026: these older audit notes are preserved for history, but the current cross-project priority list is [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
 
 Near-future priorities from the full codebase audit, after the P0 fixes:
 

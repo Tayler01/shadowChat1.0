@@ -1,5 +1,9 @@
 # Shadow War Completion Audit
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This document is historical context or planning evidence, not the current implementation checklist. Check [README.md](C:/repos/chat2.0/README.md:1), [AGENTS.md](C:/repos/chat2.0/AGENTS.md:1), and the audit backlog before using it for new work.
+
 Last updated: 2026-05-12
 
 This audit maps the Shadow War goal to concrete evidence. It is intentionally

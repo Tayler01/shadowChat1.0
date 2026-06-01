@@ -2,6 +2,10 @@
 
 This document is a high-signal map of the current ShadowChat codebase.
 
+## Documentation Status - June 1, 2026
+
+This architecture map is current for the shipped `main` branch and now includes the June 1 audit context. Known architecture follow-ups that are not yet implemented are tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1): chat read-position stabilization, invite-only signup, Supabase policy/RPC hardening, service-role bypass checks, shared SSRF-safe fetch handling, and later realtime/send/scroll helper extraction.
+
 ## High-Level System
 
 ```text
@@ -90,7 +94,12 @@ Important domains:
 - [`openai-chat`](C:/repos/chat2.0/supabase/functions/openai-chat/index.ts:1): validates caller session, proxies allowed AI requests to OpenRouter by default, and can post group-chat AI answers as the dedicated `Shado` assistant profile
 - [`send-push`](C:/repos/chat2.0/supabase/functions/send-push/index.ts:1): validates caller session, looks up recipients, enforces notification preferences, and sends web push payloads
 - [`link-preview`](C:/repos/chat2.0/supabase/functions/link-preview/index.ts:1): validates a signed-in bearer token, rejects unsafe targets, and fetches Open Graph/oEmbed metadata for chat, DM, and board-chat link cards
+- [`delete-account`](C:/repos/chat2.0/supabase/functions/delete-account/index.ts:1): validates caller session in code, removes owned storage objects, and deletes the auth user through service-role access
+- [`shadow-pin-video`](C:/repos/chat2.0/supabase/functions/shadow-pin-video/index.ts:1): validates user tokens in code for Bunny upload session creation, processing sync, and external-video import support
+- [`art-board-import-image`](C:/repos/chat2.0/supabase/functions/art-board-import-image/index.ts:1) and [`shadow-pin-import-image`](C:/repos/chat2.0/supabase/functions/shadow-pin-import-image/index.ts:1): authenticated server-side import helpers for public image URLs
 - [`bridge-*`](C:/repos/chat2.0/supabase/functions): bridge pairing, session lifecycle, profile/search, group/DM polling and sending, heartbeat, and update-check functions
+
+Audit note: several Edge Functions intentionally run with Supabase gateway JWT verification disabled and enforce custom authentication in code. Any change to those functions must preserve custom auth, rate limits, RLS-equivalent checks, and service-role boundaries.
 
 ### Background Workers
 

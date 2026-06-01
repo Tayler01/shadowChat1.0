@@ -1,5 +1,9 @@
 # App Release Popups
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This doc reflects the current production app-release popup flow used by the GitHub Actions Netlify deploy.
+
 Shadow Chat publishes app-version notes through the `app_releases` domain instead
 of Shado chat posts.
 

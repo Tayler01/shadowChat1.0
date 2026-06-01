@@ -1,5 +1,9 @@
 # Mobile Performance Optimization Plan
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This feature guide is current for the shipped product surface, with any known hardening or polish follow-ups tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
+
 ShadowChat is phone-first by default. This plan tracks the current mobile
 performance pass across iPhone/WebKit and Android/Chromium flows.
 

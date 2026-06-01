@@ -2,6 +2,10 @@
 
 ShadowChat deploys as a static frontend on Netlify with Supabase as the hosted backend. The News Feed scraper is a separate always-on Render worker.
 
+## Documentation Status - June 1, 2026
+
+This guide reflects the current GitHub Actions, Netlify, Supabase, Render, app-release, and production-smoke flow. Known deployment hardening that is still pending: Netlify security headers/CSP, live Netlify dashboard verification, Render live-secret/log verification, and a review of all `verify_jwt = false` Edge Functions against their in-function auth contracts.
+
 ## Production Pieces
 
 - Frontend hosting: Netlify
@@ -188,9 +192,14 @@ supabase functions deploy bridge-user-profile --no-verify-jwt
 supabase functions deploy bridge-user-search --no-verify-jwt
 supabase functions deploy link-preview --no-verify-jwt
 supabase functions deploy art-board-import-image
+supabase functions deploy shadow-pin-import-image
+supabase functions deploy shadow-pin-video --no-verify-jwt
+supabase functions deploy delete-account --no-verify-jwt
 ```
 
 The bridge functions keep JWT verification disabled at the Supabase function gateway because the firmware bootstrap calls do not carry a browser user token. User-sensitive bridge operations validate the caller's Supabase session inside the function, while device-sensitive operations validate pairing codes or bridge control-plane tokens.
+
+Audit note: any function deployed with `--no-verify-jwt` must keep equivalent endpoint-level auth, authorization, rate limiting, and service-role boundary checks. The June 1 audit specifically calls out follow-ups for bridge group send, bridge discoverability, AI `postToChat`, and URL fetch hardening.
 
 ### Secrets
 
@@ -241,11 +250,15 @@ Optional Render secrets:
 - `PINCHTAB_WS_ENDPOINT`
 - `X_USERNAME`
 - `X_EMAIL`
+- `X_SECONDARY_IDENTIFIER`
 - `X_PASSWORD`
+- `X_AUTH_TOKEN`
+- `X_CT0`
+- `NEWS_X_COOKIE_HEADER`
 - `TRUTH_USERNAME`
 - `TRUTH_EMAIL`
 - `TRUTH_PASSWORD`
-- `NEWS_X_SHARED_CONTEXT`
+- `NEWS_TRUTH_COOKIE_HEADER`
 
 Deploy notes:
 
@@ -263,8 +276,11 @@ Netlify needs the frontend equivalents of:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_WEB_PUSH_PUBLIC_KEY` when push subscriptions are enabled in the UI
+- `VITE_MESSAGE_FETCH_LIMIT` only when deliberately changing chat/DM fetch windows
 
 Check [`.env.example`](C:/repos/chat2.0/.env.example:1) for the expected names.
+
+Do not place Supabase service-role keys, provider API tokens, Render scraper credentials, Bunny keys, or Meta/OpenRouter secrets in `VITE_*` variables.
 
 ## Post-Deploy Smoke
 

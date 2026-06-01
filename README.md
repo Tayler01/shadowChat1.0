@@ -4,6 +4,12 @@ ShadowChat 1.0 is a premium dark realtime chat app built with React, TypeScript,
 
 The project is already wired for hosted Supabase and Netlify deployment. It is designed to behave like a product app, not a demo: realtime messaging, uploads, presence, settings, DMs, and notification flows are all first-class parts of the codebase.
 
+## Documentation Status - June 1, 2026
+
+The documentation set has been refreshed against the current `main` branch after the full codebase audit. The freshest planning source is [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1), and the full documentation inventory is [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
+
+Current known follow-up areas are documentation-backed but not yet implemented: invite-only signup, email-verification UX, General Chat read-position stabilization, Supabase policy/RPC hardening, URL fetch/SSRF hardening, Netlify security headers, and deployment/provider live-setting verification.
+
 ## Stack
 
 - React 18
@@ -39,6 +45,7 @@ The project is already wired for hosted Supabase and Netlify deployment. It is d
 - Settings feedback flow for bug reports and feature ideas with private image attachments
 - Per-user Open-Meteo weather location preference and forecast popup
 - PWA/service-worker foundation for installed mobile and desktop web experiences
+- Phone install onboarding and app-release popups for production release communication
 - Simple app-reopen loading state with consistent `Loading Shado...` copy
 - Premium obsidian-and-gold design system across desktop and mobile
 
@@ -223,6 +230,8 @@ Production is hosted on Netlify, the backend is hosted on Supabase, and the News
 - [services/news-scraper/README.md](C:/repos/chat2.0/services/news-scraper/README.md:1): worker-local command and environment reference
 - [docs/LINK_PREVIEWS.md](C:/repos/chat2.0/docs/LINK_PREVIEWS.md:1): server-side link preview architecture and validation
 - [docs/FEEDBACK_SUBMISSIONS.md](C:/repos/chat2.0/docs/FEEDBACK_SUBMISSIONS.md:1): Settings feedback flow, Supabase storage model, and validation notes
+- [docs/APP_RELEASES.md](C:/repos/chat2.0/docs/APP_RELEASES.md:1): production app-release popup behavior
+- [docs/PHONE_INSTALL_ONBOARDING.md](C:/repos/chat2.0/docs/PHONE_INSTALL_ONBOARDING.md:1): phone install tutorial and notification onboarding
 - [docs/SUPABASE_REALTIME_AUDIT_2026-05-02.md](C:/repos/chat2.0/docs/SUPABASE_REALTIME_AUDIT_2026-05-02.md:1): table-by-table realtime publication decisions
 - [docs/DEFERRED_FOLLOWUPS.md](C:/repos/chat2.0/docs/DEFERRED_FOLLOWUPS.md:1): small follow-up ideas preserved after pruning stale branches
 - [docs/ESP_BRIDGE_FEATURE_ROADMAP.md](C:/repos/chat2.0/docs/ESP_BRIDGE_FEATURE_ROADMAP.md:1): planning baseline and phased roadmap for the airgapped ESP bridge feature

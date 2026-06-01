@@ -2,6 +2,10 @@
 
 This file is the working handbook for agentic contributors operating inside this repository.
 
+## Documentation Status - June 1, 2026
+
+This handbook has been refreshed against current `main` after the June 1 full codebase audit. For planned security, auth, chat-scroll, frontend polish, deployment, and architecture work, read [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1) before editing. For the complete documentation inventory and freshness notes, read [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
+
 ## Mission
 
 Ship product-quality improvements to ShadowChat without breaking realtime chat, DMs, auth, uploads, push notifications, or the premium dark UI language.
@@ -44,6 +48,18 @@ The General Chat weather widget stores location preferences privately in
 `user_weather_preferences`. Before changing weather behavior, read
 [docs/WEATHER_WIDGET.md](C:/repos/chat2.0/docs/WEATHER_WIDGET.md:1). Do not
 put weather location data on public profile rows.
+
+The current near-term hardening track is the June 1 audit backlog:
+
+- General Chat read-position and loading stability
+- invite-only signup and email-verification UX
+- Supabase `public.users`, RPC, RLS, storage, and SECURITY DEFINER hardening
+- service-role bypass checks in bridge and AI post-to-chat paths
+- URL fetch/SSRF hardening across link preview, import, and media proxy flows
+- Netlify security headers and live deploy/provider setting verification
+- frontend mobile polish after scroll/auth risks are stable
+
+When touching any of those areas, keep the work narrowly scoped to the relevant audit item and update the audit next-steps doc if the status changes.
 
 The current major planning and upcoming implementation track is the `ESP bridge` feature for an airgapped Windows PC.
 
@@ -380,6 +396,8 @@ Read and test:
 - [`src/hooks/useAuth.tsx`](C:/repos/chat2.0/src/hooks/useAuth.tsx:1)
 - [`src/lib/auth.ts`](C:/repos/chat2.0/src/lib/auth.ts:1)
 - [`src/lib/supabase.ts`](C:/repos/chat2.0/src/lib/supabase.ts:1)
+
+Planned but not yet implemented: invite-only signup, production email-confirmation UX, and reduced public-profile PII. Keep the distinction clear in docs and final answers.
 
 ### Push Notifications
 

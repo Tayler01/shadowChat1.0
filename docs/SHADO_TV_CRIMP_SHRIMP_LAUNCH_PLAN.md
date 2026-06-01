@@ -1,5 +1,9 @@
 # Shado TV Crimp & Shrimp Launch Plan
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This document is historical context or planning evidence, not the current implementation checklist. Check [README.md](C:/repos/chat2.0/README.md:1), [AGENTS.md](C:/repos/chat2.0/AGENTS.md:1), and the audit backlog before using it for new work.
+
 This plan tracks the work needed to move Shado TV from the old multi-channel
 placeholder surface to the single-series Crimp & Shrimp launch hub.
 

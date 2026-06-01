@@ -1,5 +1,9 @@
 # Liquid Gold Dark Rework
 
+## Documentation Status - June 1, 2026
+
+Reviewed during the June 1, 2026 documentation refresh. This document is historical context or planning evidence, not the current implementation checklist. Check [README.md](C:/repos/chat2.0/README.md:1), [AGENTS.md](C:/repos/chat2.0/AGENTS.md:1), and the audit backlog before using it for new work.
+
 ## Goal
 
 Rework ShadowChat into a premium dark-mode interface built around:
@@ -219,7 +223,7 @@ Applies to emoji picker, notifications, upload menus, reaction menus.
 - use darker overlays
 - use glass panels with stronger blur
 - use thin gold separators or selected states
-- keep content panels readable, not decorative for decoration’s sake
+- keep content panels readable, not decorative for decorationâ€™s sake
 
 ## Page Treatments
 

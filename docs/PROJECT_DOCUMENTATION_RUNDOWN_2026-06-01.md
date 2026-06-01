@@ -2,14 +2,18 @@
 
 This rundown captures the current documentation and agent-file surface in `C:\repos\chat2.0`. It is meant to help future updates start from the right source of truth instead of rediscovering stale or overlapping docs.
 
+## Documentation Status - June 1, 2026
+
+This rundown was updated after the repository documents were refreshed. The file remains an inventory and routing guide; the source documents themselves now carry current status notes or current implementation guidance.
+
 ## Summary
 
 - The repo has a strong documentation base, but it has grown by feature area rather than through a single current index.
 - [AGENTS.md](C:/repos/chat2.0/AGENTS.md:1) is the canonical agent guide. [AGENT.md](C:/repos/chat2.0/AGENT.md:1) is a short compatibility mirror.
-- Several current product docs were refreshed in May 2026, especially Admin, App Releases, Deployment, Phone Install, ShadowPin, mobile, and iOS planning.
-- Several bridge docs are still useful but date from April 2026 planning and should be marked as historical, current, or superseded before the next bridge implementation pass.
-- `README.md` and `docs/ARCHITECTURE.md` are useful but should be refreshed after the upcoming auth, chat-scroll, and security work.
-- `PLAN.md`, `STATUS.md`, and `TASK.md` are bridge-specific but read like active root-level project status. They should be renamed, archived, or clearly labeled as ESP bridge artifacts.
+- Before this refresh, several current product docs had last been updated in May 2026, especially Admin, App Releases, Deployment, Phone Install, ShadowPin, mobile, and iOS planning.
+- Several bridge docs are still useful but date from April 2026 planning. They now carry bridge-specific status notes and should be checked against current firmware/functions before implementation.
+- `README.md` and `docs/ARCHITECTURE.md` have been refreshed for the June 1 audit state, and should be refreshed again after the upcoming auth, chat-scroll, and security work lands.
+- `PLAN.md`, `STATUS.md`, and `TASK.md` are now labeled as bridge-specific status artifacts, not global project status.
 - `.agents/` contains local ignored agent skills. They are not tracked or pushed by default because `.gitignore` ignores `.agents/`.
 
 ## Recommended Documentation Cleanup
@@ -24,7 +28,7 @@ This rundown captures the current documentation and agent-file surface in `C:\re
 
 ## Agent-Facing Files
 
-| File | Last tracked update | Role | Refresh guidance |
+| File | Previous tracked update before June 1 refresh | Role | Refresh guidance |
 | --- | --- | --- | --- |
 | [AGENTS.md](C:/repos/chat2.0/AGENTS.md:1) | 2026-05-19 | Canonical repo handbook for agents. | Refresh after the audit backlog starts changing auth, security, chat scroll, Netlify headers, or Supabase policy workflow. |
 | [AGENT.md](C:/repos/chat2.0/AGENT.md:1) | 2026-05-02 | Compatibility guide for tools that look for singular `AGENT.md`. | Keep short. Link to `AGENTS.md`; do not duplicate the full handbook. |
@@ -32,7 +36,7 @@ This rundown captures the current documentation and agent-file surface in `C:\re
 
 ## Top-Level Project Docs
 
-| File | Last tracked update | Role | Refresh guidance |
+| File | Previous tracked update before June 1 refresh | Role | Refresh guidance |
 | --- | --- | --- | --- |
 | [README.md](C:/repos/chat2.0/README.md:1) | 2026-05-03 | Human entrypoint, stack, feature list, commands, deployment, documentation map. | Refresh after auth/security/chat-scroll work; keep docs map current. |
 | [PLAN.md](C:/repos/chat2.0/PLAN.md:1) | 2026-05-02 | ESP bridge update/offline software plan. | Rename or add a top warning that it is bridge-specific, not global product plan. |
@@ -44,7 +48,7 @@ This rundown captures the current documentation and agent-file surface in `C:\re
 
 ## Core Setup, Testing, Deployment, And Architecture
 
-| File | Last tracked update | Role | Refresh guidance |
+| File | Previous tracked update before June 1 refresh | Role | Refresh guidance |
 | --- | --- | --- | --- |
 | [docs/ARCHITECTURE.md](C:/repos/chat2.0/docs/ARCHITECTURE.md:1) | 2026-05-03 | System map and data-flow overview. | Update after auth invite flow, read-cursor changes, Edge Function hardening, and lib module splits. |
 | [docs/SETUP_GUIDE.md](C:/repos/chat2.0/docs/SETUP_GUIDE.md:1) | 2026-06-01 | Local and hosted setup. | Update for email verification, invite codes, stable smoke accounts, and any new secrets. |
@@ -56,7 +60,7 @@ This rundown captures the current documentation and agent-file surface in `C:\re
 
 ## Current Product And Feature Docs
 
-| File | Last tracked update | Role | Refresh guidance |
+| File | Previous tracked update before June 1 refresh | Role | Refresh guidance |
 | --- | --- | --- | --- |
 | [docs/ADMIN_ACCESS.md](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1) | 2026-05-28 | Admin/sub-admin behavior. | Refresh if `users.admin_role` becomes display-only and server authz moves fully to `user_roles`. |
 | [docs/APP_RELEASES.md](C:/repos/chat2.0/docs/APP_RELEASES.md:1) | 2026-05-29 | App release popup behavior. | Current enough unless release UX changes. |
@@ -73,7 +77,7 @@ This rundown captures the current documentation and agent-file surface in `C:\re
 
 ## Entertainment, Games, And Media Docs
 
-| File | Last tracked update | Role | Refresh guidance |
+| File | Previous tracked update before June 1 refresh | Role | Refresh guidance |
 | --- | --- | --- | --- |
 | [docs/LIQUID_GOLD_DARK_REWORK.md](C:/repos/chat2.0/docs/LIQUID_GOLD_DARK_REWORK.md:1) | 2026-04-20 | Design-direction history. | Historical. Keep unless design system changes again. |
 | [docs/MOBILE_PERFORMANCE_OPTIMIZATION_PLAN.md](C:/repos/chat2.0/docs/MOBILE_PERFORMANCE_OPTIMIZATION_PLAN.md:1) | 2026-05-17 | Mobile performance backlog. | Merge relevant fixed-background and scroll smoothness items from the audit if implementation starts. |
@@ -91,7 +95,7 @@ This rundown captures the current documentation and agent-file surface in `C:\re
 
 ## Feature Progress And QA Docs
 
-| File | Last tracked update | Role | Refresh guidance |
+| File | Previous tracked update before June 1 refresh | Role | Refresh guidance |
 | --- | --- | --- | --- |
 | [docs/features/feature-progress-log.md](C:/repos/chat2.0/docs/features/feature-progress-log.md:1) | 2026-05-29 | Feature progress log. | Add a note when audit backlog implementation starts. |
 | [docs/features/refetch-optimization-backlog.md](C:/repos/chat2.0/docs/features/refetch-optimization-backlog.md:1) | 2026-05-18 | Refetch optimization backlog. | Merge with architecture/performance backlog when optimizing realtime/refetch flows. |
@@ -107,7 +111,7 @@ This rundown captures the current documentation and agent-file surface in `C:\re
 
 ## ESP Bridge Documentation
 
-| File | Last tracked update | Role | Refresh guidance |
+| File | Previous tracked update before June 1 refresh | Role | Refresh guidance |
 | --- | --- | --- | --- |
 | [docs/ESP_BRIDGE_AUTH_MODEL_SPEC.md](C:/repos/chat2.0/docs/ESP_BRIDGE_AUTH_MODEL_SPEC.md:1) | 2026-04-23 | Bridge auth model. | Refresh before bridge security work. |
 | [docs/ESP_BRIDGE_BACKEND_IMPLEMENTATION_PROPOSAL.md](C:/repos/chat2.0/docs/ESP_BRIDGE_BACKEND_IMPLEMENTATION_PROPOSAL.md:1) | 2026-04-23 | Bridge backend proposal. | Mark which parts are implemented vs planned. |
