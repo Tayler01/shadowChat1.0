@@ -75,6 +75,7 @@ Minimum real-device pass:
 | RD-020 | Both | Touch comfort | Tap dense controls: reactions, reply links, board chips, settings controls. | Controls are usable without frequent mistaps. | not run | | |
 | RD-021 | Both | Theme/dark mode | If device/app theme changes are relevant, toggle or inspect theme state. | Premium dark UI remains consistent; no unreadable contrast. | not run | | |
 | RD-022 | Both | Notifications | If push changed, send a notification and tap it. | Notification displays, badge behavior is sane, tap routes to the right place. | not run | | |
+| RD-023 | Both | General Chat read position | After seeded/staging browser scroll QA passes, reopen General Chat with older unread messages and a message deep link. | First unread/deep-link target is visible, Jump to latest reaches the newest message, and realtime incoming messages do not pull an anchored reader to the bottom. | not run | | |
 
 ## Known Emulator Gaps
 

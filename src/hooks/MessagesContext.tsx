@@ -1,12 +1,32 @@
 import React, { createContext, useContext } from 'react'
-import type { Message, ChatMessageType } from '../lib/supabase'
+import type {
+  ChatMessageType,
+  GeneralChatMessageKey,
+  GeneralChatMessageWindowMode,
+  GeneralChatMessageWindowStatus,
+  Message,
+} from '../lib/supabase'
+
+export type MessageWindowMode = GeneralChatMessageWindowMode
+export type MessageWindowStatus = GeneralChatMessageWindowStatus
+
+export interface EnsureMessageWindowOptions {
+  anchor?: GeneralChatMessageKey | null
+  targetLastReadMessageId?: string | null
+  targetLastReadAt?: string | null
+}
 
 export interface MessagesContextValue {
   messages: Message[]
   loading: boolean
   sending: boolean
   loadingMore: boolean
+  hasOlder: boolean
+  hasNewer: boolean
   hasMore: boolean
+  windowMode: MessageWindowMode
+  targetStatus: MessageWindowStatus
+  anchorStatus: MessageWindowStatus
   sendMessage: (
     content: string,
     type?: ChatMessageType,
@@ -20,7 +40,10 @@ export interface MessagesContextValue {
   discardFailedMessage: (id: string) => void
   toggleReaction: (id: string, emoji: string) => Promise<void>
   togglePin: (id: string) => Promise<void>
+  loadLatestMessages: () => Promise<void>
   loadOlderMessages: () => Promise<void>
+  loadNewerMessages: () => Promise<void>
+  ensureMessageWindow: (targetMessageId: string | null, options?: EnsureMessageWindowOptions) => Promise<Message | null>
   compactToLatestMessages: () => void
 }
 

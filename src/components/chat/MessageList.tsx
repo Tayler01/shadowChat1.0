@@ -16,8 +16,9 @@ import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { getBlockedActionMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
 import { useReadCursor } from '../../hooks/useReadCursor'
-import { useUnreadScroll } from '../../hooks/useUnreadScroll'
+import { useUnreadScroll, type UnreadScrollFeedState } from '../../hooks/useUnreadScroll'
 import { UnreadDivider } from './UnreadDivider'
+import { compareMessageKey, isMessageAfterCursor } from '../../lib/readCursors'
 
 interface MessageListProps {
   onReply?: (message: Message) => void
@@ -35,6 +36,21 @@ const RENDER_WINDOW_INCREMENT = 60
 const HISTORY_LOAD_ROOT_MARGIN = '180px 0px 0px 0px'
 const HISTORY_LOAD_SCROLL_THRESHOLD = 180
 const HISTORY_LOAD_COOLDOWN_MS = 1800
+const TARGET_SCROLL_SETTLE_MS = 260
+
+type GeneralChatMessagesApi = ReturnType<typeof useMessages> & {
+  loadLatestMessages?: () => Promise<void> | void
+  ensureMessageWindow?: ReturnType<typeof useMessages>['ensureMessageWindow']
+  windowMode?: ReturnType<typeof useMessages>['windowMode']
+  targetStatus?: ReturnType<typeof useMessages>['targetStatus']
+  anchorStatus?: ReturnType<typeof useMessages>['anchorStatus']
+  hasOlder?: boolean
+  hasNewer?: boolean
+  hasMore?: boolean
+}
+
+type DeepLinkStatus = 'none' | 'resolving' | 'mounting' | 'scrolling' | 'settled' | 'targetUnavailable'
+type WindowModeOverride = Extract<UnreadScrollFeedState, 'historyPrepend' | 'newerAppend' | 'layoutSettling'>
 
 type VisibleMessageAnchor = {
   id: string
@@ -47,6 +63,18 @@ const findMessageRowById = (container: HTMLElement, id: string) => {
     .find(row => row.dataset.messageId === id) ?? null
 }
 
+const compareMessagesByStableKey = (a: Message, b: Message) => compareMessageKey(
+  { created_at: a.created_at, id: a.id },
+  { created_at: b.created_at, id: b.id }
+)
+
+const isServerWindowMessage = (message: Message) => (
+  !message.pinned &&
+  !message.optimistic &&
+  message.delivery_status !== 'sending' &&
+  message.delivery_status !== 'failed'
+)
+
 export const MessageList: React.FC<MessageListProps> = ({
   onReply,
   failedMessages = [],
@@ -57,6 +85,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   uploading = false,
   initialMessageId,
 }) => {
+  const messagesApi = useMessages() as GeneralChatMessagesApi
   const {
     messages,
     loading,
@@ -67,8 +96,16 @@ export const MessageList: React.FC<MessageListProps> = ({
     loadOlderMessages,
     compactToLatestMessages = () => {},
     loadingMore,
-    hasMore
-  } = useMessages()
+    hasOlder: dataHasOlder = false,
+    hasMore: legacyHasMore = false,
+    loadLatestMessages,
+    ensureMessageWindow,
+    windowMode: dataWindowMode = 'latest',
+    targetStatus: dataTargetStatus = 'not_requested',
+    anchorStatus: dataAnchorStatus = 'not_requested',
+    hasNewer = false,
+  } = messagesApi
+  const hasMore = dataHasOlder || legacyHasMore
   const { typingUsers } = useTyping('general')
   const { profile } = useAuth()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -81,8 +118,17 @@ export const MessageList: React.FC<MessageListProps> = ({
   const scrollFrameRef = useRef<number | null>(null)
   const initialTargetJumpDoneRef = useRef<string | null>(null)
   const historyIntentRef = useRef(false)
+  const windowModeTimerRef = useRef<number | null>(null)
+  const deepLinkSettleTimerRef = useRef<number | null>(null)
+  const deepLinkInFlightRef = useRef<string | null>(null)
+  const deepLinkFetchRef = useRef<string | null>(null)
+  const cursorWindowFetchRef = useRef<string | null>(null)
+  const previousLatestMessageIdRef = useRef<string | null>(null)
   const [renderWindowStart, setRenderWindowStart] = useState(0)
   const [historyLoadArmed, setHistoryLoadArmed] = useState(false)
+  const [windowModeOverride, setWindowModeOverride] = useState<WindowModeOverride | null>(null)
+  const [deepLinkStatus, setDeepLinkStatus] = useState<DeepLinkStatus>(initialMessageId ? 'resolving' : 'none')
+  const [cursorWindowResolving, setCursorWindowResolving] = useState(false)
   const { cursor, loading: cursorLoading, markRead } = useReadCursor('general_chat', 'main', Boolean(profile?.id))
 
   const messageMap = useMemo(() => {
@@ -94,8 +140,13 @@ export const MessageList: React.FC<MessageListProps> = ({
   }, [messages])
 
   const combinedMessages = useMemo(() => {
-    return [...messages].sort((a, b) => a.created_at.localeCompare(b.created_at))
+    return [...messages].sort(compareMessagesByStableKey)
   }, [messages])
+
+  const serverWindowMessages = useMemo(
+    () => combinedMessages.filter(isServerWindowMessage),
+    [combinedMessages]
+  )
 
   const markGeneralChatRead = useCallback(
     async (message: Message) => {
@@ -114,16 +165,20 @@ export const MessageList: React.FC<MessageListProps> = ({
     setFirstUnreadMessageId,
     handleUnreadScroll,
     scrollToBottom,
-    markLatestRead,
+    feedState,
+    targetMessageId,
+    lastObservedMessageId,
+    lastFlushedMessageId,
   } = useUnreadScroll<Message>({
     containerRef,
     messages: combinedMessages as Message[],
-    loading,
+    loading: loading || cursorWindowResolving,
     cursor,
     cursorLoading,
     enabled: Boolean(profile?.id),
     surfaceKey: 'general_chat:main',
     initialMessageId,
+    renderSignal: renderWindowStart,
     getMessageId,
     getMessageCreatedAt,
     getElementId: getMessageElementId,
@@ -162,6 +217,29 @@ export const MessageList: React.FC<MessageListProps> = ({
     }
   }, [])
 
+  const clearWindowModeTimer = useCallback(() => {
+    if (windowModeTimerRef.current !== null) {
+      window.clearTimeout(windowModeTimerRef.current)
+      windowModeTimerRef.current = null
+    }
+  }, [])
+
+  const clearDeepLinkSettleTimer = useCallback(() => {
+    if (deepLinkSettleTimerRef.current !== null) {
+      window.clearTimeout(deepLinkSettleTimerRef.current)
+      deepLinkSettleTimerRef.current = null
+    }
+  }, [])
+
+  const setTemporaryWindowMode = useCallback((mode: WindowModeOverride, durationMs = 320) => {
+    clearWindowModeTimer()
+    setWindowModeOverride(mode)
+    windowModeTimerRef.current = window.setTimeout(() => {
+      windowModeTimerRef.current = null
+      setWindowModeOverride(null)
+    }, durationMs)
+  }, [clearWindowModeTimer])
+
   const requestOlderMessages = useCallback((force = false) => {
     if ((!historyLoadArmed && !force) || !historyIntentRef.current) return
     if (loading || loadingMore || olderLoadInFlightRef.current) return
@@ -190,6 +268,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 
     capturePendingAnchor()
     setAutoScroll(false)
+    setTemporaryWindowMode('historyPrepend', 600)
 
     if (canRevealLoadedHistory) {
       setRenderWindowStart(current => Math.max(0, current - RENDER_WINDOW_INCREMENT))
@@ -210,6 +289,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     renderWindowStart,
     clearHistoryRetry,
     setAutoScroll,
+    setTemporaryWindowMode,
   ])
 
   const handleScroll = useCallback(() => {
@@ -231,12 +311,86 @@ export const MessageList: React.FC<MessageListProps> = ({
 
   useEffect(() => {
     initialTargetJumpDoneRef.current = null
+    deepLinkInFlightRef.current = null
+    deepLinkFetchRef.current = null
+    cursorWindowFetchRef.current = null
     historyIntentRef.current = false
     setHistoryLoadArmed(false)
-  }, [profile?.id])
+    setCursorWindowResolving(false)
+    setDeepLinkStatus(initialMessageId ? 'resolving' : 'none')
+    clearDeepLinkSettleTimer()
+  }, [clearDeepLinkSettleTimer, initialMessageId, profile?.id])
 
   useEffect(() => {
-    if (loading || cursorLoading || combinedMessages.length === 0) {
+    if (
+      !profile?.id ||
+      initialMessageId ||
+      !ensureMessageWindow ||
+      loading ||
+      loadingMore ||
+      cursorLoading ||
+      cursorWindowResolving ||
+      !cursor?.last_read_at ||
+      serverWindowMessages.length === 0
+    ) {
+      return
+    }
+
+    const oldestLoaded = serverWindowMessages[0]
+    const latestLoaded = serverWindowMessages[serverWindowMessages.length - 1]
+    if (!oldestLoaded || !latestLoaded) return
+
+    const cursorMessageLoaded = Boolean(
+      cursor.last_read_message_id &&
+      serverWindowMessages.some(message => message.id === cursor.last_read_message_id)
+    )
+    const latestLoadedIsUnread = isMessageAfterCursor({
+      created_at: latestLoaded.created_at,
+      id: latestLoaded.id,
+    }, cursor)
+    const cursorPredatesLoadedWindow = compareMessageKey(
+      { created_at: cursor.last_read_at, id: cursor.last_read_message_id },
+      { created_at: oldestLoaded.created_at, id: oldestLoaded.id }
+    ) < 0
+
+    if (!latestLoadedIsUnread || cursorMessageLoaded || !cursorPredatesLoadedWindow) {
+      return
+    }
+
+    const fetchKey = [
+      profile.id,
+      cursor.scope_id,
+      cursor.last_read_message_id ?? 'timestamp',
+      cursor.last_read_at,
+    ].join(':')
+    if (cursorWindowFetchRef.current === fetchKey) {
+      return
+    }
+
+    cursorWindowFetchRef.current = fetchKey
+    setCursorWindowResolving(true)
+    void ensureMessageWindow(cursor.last_read_message_id ?? null, {
+      targetLastReadMessageId: cursor.last_read_message_id,
+      targetLastReadAt: cursor.last_read_at,
+    })
+      .catch(() => undefined)
+      .finally(() => {
+        setCursorWindowResolving(false)
+      })
+  }, [
+    cursor,
+    cursorLoading,
+    cursorWindowResolving,
+    ensureMessageWindow,
+    initialMessageId,
+    loading,
+    loadingMore,
+    profile?.id,
+    serverWindowMessages,
+  ])
+
+  useEffect(() => {
+    if (loading || cursorLoading || cursorWindowResolving || combinedMessages.length === 0) {
       setHistoryLoadArmed(false)
       return
     }
@@ -248,13 +402,23 @@ export const MessageList: React.FC<MessageListProps> = ({
     }, 650)
 
     return () => window.clearTimeout(timer)
-  }, [combinedMessages.length, cursorLoading, historyLoadArmed, loading])
+  }, [combinedMessages.length, cursorLoading, cursorWindowResolving, historyLoadArmed, loading])
 
   useEffect(() => {
     if (!autoScroll || initialMessageId) return
     if (combinedMessages.length <= DEFAULT_RENDER_WINDOW_SIZE) return
     compactToLatestMessages()
   }, [autoScroll, combinedMessages.length, compactToLatestMessages, initialMessageId])
+
+  useEffect(() => {
+    const latestId = combinedMessages[combinedMessages.length - 1]?.id ?? null
+    const previousLatestId = previousLatestMessageIdRef.current
+    previousLatestMessageIdRef.current = latestId
+
+    if (previousLatestId && latestId && previousLatestId !== latestId) {
+      setTemporaryWindowMode('newerAppend')
+    }
+  }, [combinedMessages, setTemporaryWindowMode])
 
   useLayoutEffect(() => {
     const anchor = pendingAnchorRef.current
@@ -277,9 +441,10 @@ export const MessageList: React.FC<MessageListProps> = ({
       ? heightDelta
       : 0
     if (Math.abs(delta) > 0.5) {
+      setTemporaryWindowMode('layoutSettling')
       container.scrollTop += delta
     }
-  }, [combinedMessages.length, renderWindowStart])
+  }, [combinedMessages.length, renderWindowStart, setTemporaryWindowMode])
 
   useEffect(() => {
     const sentinel = topSentinelRef.current
@@ -306,11 +471,13 @@ export const MessageList: React.FC<MessageListProps> = ({
   useEffect(() => {
     return () => {
       clearHistoryRetry()
+      clearWindowModeTimer()
+      clearDeepLinkSettleTimer()
       if (scrollFrameRef.current !== null) {
         cancelAnimationFrame(scrollFrameRef.current)
       }
     }
-  }, [clearHistoryRetry])
+  }, [clearDeepLinkSettleTimer, clearHistoryRetry, clearWindowModeTimer])
 
   useEffect(() => {
     if (autoScroll && typingUsers.length > 0) {
@@ -380,6 +547,19 @@ export const MessageList: React.FC<MessageListProps> = ({
   }, [combinedMessages, pinnedMessagesBeforeWindow, renderWindowStart])
 
   const hiddenBeforeCount = Math.max(0, renderWindowStart - pinnedMessagesBeforeWindow.length)
+  const hasOlderMessages = renderWindowStart > 0 || hasMore
+  const hasNewerMessages = hasNewer || !autoScroll
+  const targetId = initialMessageId || targetMessageId || firstUnreadMessageId || ''
+  const windowMode: UnreadScrollFeedState = windowModeOverride
+    ?? (loading && combinedMessages.length > 0
+      ? 'reconnectReconciling'
+      : loading || cursorLoading || cursorWindowResolving
+      ? 'resolvingInitial'
+      : initialMessageId && deepLinkStatus === 'targetUnavailable'
+      ? 'targetUnavailable'
+      : initialMessageId && deepLinkStatus !== 'none' && deepLinkStatus !== 'settled'
+      ? 'targetingDeepLink'
+      : feedState)
 
   const eagerAvatarMessageIds = useMemo(() => (
     new Set(renderedMessages.slice(-12).map(message => message.id))
@@ -433,42 +613,119 @@ export const MessageList: React.FC<MessageListProps> = ({
     scrollAndHighlightMessage(pendingJumpId)
   }, [renderedMessages, scrollAndHighlightMessage])
 
-  useEffect(() => {
-    if (
-      loading ||
-      !initialMessageId ||
-      initialTargetJumpDoneRef.current === initialMessageId ||
-      combinedMessages.length === 0
-    ) {
+  useLayoutEffect(() => {
+    if (!initialMessageId) {
+      setDeepLinkStatus('none')
       return
     }
 
-    const target = combinedMessages.find(message => message.id === initialMessageId)
-    if (!target) {
+    if (initialTargetJumpDoneRef.current === initialMessageId) {
       return
     }
 
-    initialTargetJumpDoneRef.current = initialMessageId
+    if (loading) {
+      setDeepLinkStatus('resolving')
+      return
+    }
+
+    const targetIndex = combinedMessages.findIndex(message => message.id === initialMessageId)
+    if (targetIndex < 0) {
+      if (ensureMessageWindow && dataTargetStatus !== 'missing') {
+        if (deepLinkFetchRef.current !== initialMessageId) {
+          deepLinkFetchRef.current = initialMessageId
+          setDeepLinkStatus('resolving')
+          void ensureMessageWindow(initialMessageId)
+            .then(target => {
+              if (deepLinkFetchRef.current === initialMessageId) {
+                deepLinkFetchRef.current = null
+              }
+              if (!target) {
+                setDeepLinkStatus('targetUnavailable')
+              }
+            })
+            .catch(() => {
+              if (deepLinkFetchRef.current === initialMessageId) {
+                deepLinkFetchRef.current = null
+              }
+              setDeepLinkStatus('targetUnavailable')
+            })
+        }
+        return
+      }
+
+      setDeepLinkStatus('targetUnavailable')
+      return
+    }
+
+    deepLinkFetchRef.current = null
     setFirstUnreadMessageId(null)
     setAutoScroll(false)
 
-    const targetIndex = combinedMessages.findIndex(message => message.id === initialMessageId)
-    if (targetIndex >= 0 && targetIndex < renderWindowStart) {
-      pendingJumpMessageIdRef.current = initialMessageId
-      setRenderWindowStart(Math.max(0, targetIndex - 8))
+    const desiredWindowStart = Math.max(0, targetIndex - 8)
+    if (targetIndex < renderWindowStart) {
+      setDeepLinkStatus('mounting')
+      setRenderWindowStart(current => Math.min(current, desiredWindowStart))
+      return
     }
 
-    scrollAndHighlightMessage(initialMessageId, 'ring-[rgba(34,197,94,0.55)]', 2200)
-    void markLatestRead(false)
+    if (!renderedMessages.some(message => message.id === initialMessageId)) {
+      setDeepLinkStatus('mounting')
+      setRenderWindowStart(current => Math.min(current, desiredWindowStart))
+      return
+    }
+
+    if (deepLinkInFlightRef.current === initialMessageId) {
+      return
+    }
+
+    const targetEl = document.getElementById(`message-${initialMessageId}`)
+    if (!(targetEl instanceof HTMLElement)) {
+      setDeepLinkStatus('mounting')
+      return
+    }
+
+    const targetRect = targetEl.getBoundingClientRect()
+    if (targetRect.height <= 0) {
+      setDeepLinkStatus('mounting')
+      return
+    }
+
+    deepLinkInFlightRef.current = initialMessageId
+    setDeepLinkStatus('scrolling')
+    setTemporaryWindowMode('layoutSettling', TARGET_SCROLL_SETTLE_MS + 120)
+
+    requestAnimationFrame(() => {
+      const settledTargetEl = document.getElementById(`message-${initialMessageId}`)
+      if (!(settledTargetEl instanceof HTMLElement)) {
+        deepLinkInFlightRef.current = null
+        setDeepLinkStatus('mounting')
+        return
+      }
+
+      settledTargetEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      settledTargetEl.classList.add('ring-2', 'ring-[rgba(34,197,94,0.55)]')
+
+      clearDeepLinkSettleTimer()
+      deepLinkSettleTimerRef.current = window.setTimeout(() => {
+        deepLinkSettleTimerRef.current = null
+        settledTargetEl.classList.remove('ring-2', 'ring-[rgba(34,197,94,0.55)]')
+        initialTargetJumpDoneRef.current = initialMessageId
+        deepLinkInFlightRef.current = null
+        setDeepLinkStatus('settled')
+      }, TARGET_SCROLL_SETTLE_MS)
+    })
   }, [
+    clearDeepLinkSettleTimer,
     combinedMessages,
+    dataTargetStatus,
+    ensureMessageWindow,
     initialMessageId,
     loading,
-    markLatestRead,
     renderWindowStart,
-    scrollAndHighlightMessage,
+    renderedMessages,
     setAutoScroll,
     setFirstUnreadMessageId,
+    setTemporaryWindowMode,
   ])
 
   const handleEdit = useCallback(async (messageId: string, content: string) => {
@@ -491,16 +748,32 @@ export const MessageList: React.FC<MessageListProps> = ({
     }
   }, [deleteMessage])
 
-  if (loading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="glass-panel rounded-[var(--radius-xl)] px-8 py-6 text-center">
-          <div className="text-[var(--text-secondary)]">Loading the conversation...</div>
-          <div className="mt-2 text-xs text-[var(--text-muted)]">Pulling in the latest messages and thread state.</div>
-        </div>
-      </div>
-    )
-  }
+  const handleJumpToLatest = useCallback(async () => {
+    setTemporaryWindowMode('layoutSettling', TARGET_SCROLL_SETTLE_MS + 160)
+    setAutoScroll(true)
+    setFirstUnreadMessageId(null)
+
+    if (loadLatestMessages) {
+      await Promise.resolve(loadLatestMessages())
+    } else {
+      compactToLatestMessages()
+    }
+
+    requestAnimationFrame(() => {
+      scrollToBottom('auto')
+      requestAnimationFrame(() => scrollToBottom())
+    })
+  }, [
+    compactToLatestMessages,
+    loadLatestMessages,
+    scrollToBottom,
+    setAutoScroll,
+    setFirstUnreadMessageId,
+    setTemporaryWindowMode,
+  ])
+
+  const showInitialLoading = loading && combinedMessages.length === 0
+  const refreshingCachedMessages = loading && combinedMessages.length > 0
 
   return (
     <div
@@ -510,10 +783,39 @@ export const MessageList: React.FC<MessageListProps> = ({
       data-loaded-count={combinedMessages.length}
       data-rendered-count={renderedMessages.length}
       data-hidden-before-count={hiddenBeforeCount}
+      data-window-mode={windowMode}
+      data-target-id={targetId}
+      data-window-target={targetId}
+      data-data-window-mode={dataWindowMode}
+      data-data-target-status={dataTargetStatus}
+      data-data-anchor-status={dataAnchorStatus}
+      data-has-older={String(hasOlderMessages)}
+      data-has-newer={String(hasNewerMessages)}
+      data-last-observed-visible-id={lastObservedMessageId ?? ''}
+      data-last-observed-readable-id={lastObservedMessageId ?? ''}
+      data-last-flushed-read-id={lastFlushedMessageId ?? ''}
+      data-deep-link-status={deepLinkStatus}
+      data-scroll-target-state={feedState}
+      data-scroll-target-id={targetMessageId ?? ''}
       className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] pt-4 md:px-3 md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
     >
       <div data-testid="message-stack" className="mx-auto flex min-h-full w-full max-w-6xl flex-col justify-end">
       <div ref={topSentinelRef} aria-hidden="true" className="h-px w-full shrink-0" />
+
+      {showInitialLoading ? (
+        <div className="flex min-h-full items-center justify-center">
+          <div className="glass-panel rounded-[var(--radius-xl)] px-8 py-6 text-center">
+            <div className="text-[var(--text-secondary)]">Loading the conversation...</div>
+            <div className="mt-2 text-xs text-[var(--text-muted)]">Pulling in the latest messages and thread state.</div>
+          </div>
+        </div>
+      ) : (
+        <>
+      {refreshingCachedMessages && (
+        <div className="flex justify-center py-2 text-sm text-[var(--text-muted)]" data-testid="message-refreshing">
+          <LoadingSpinner size="sm" /> Refreshing...
+        </div>
+      )}
 
       {loadingMore && (
         <div className="flex justify-center py-2 text-sm text-[var(--text-muted)]">
@@ -576,6 +878,8 @@ export const MessageList: React.FC<MessageListProps> = ({
           <span>{uploading ? 'Uploading...' : 'Sending...'}</span>
         </div>
       )}
+        </>
+      )}
 
       <AnimatePresence>
         {typingUsers.length > 0 && (
@@ -617,8 +921,7 @@ export const MessageList: React.FC<MessageListProps> = ({
         <button
           type="button"
           onClick={() => {
-            compactToLatestMessages()
-            scrollToBottom()
+            void handleJumpToLatest()
           }}
           aria-label="Jump to latest"
           className="theme-floating-action fixed right-4 bottom-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.5rem)] z-50 rounded-full p-2 transition-transform hover:-translate-y-0.5 md:bottom-32"

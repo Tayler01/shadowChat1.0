@@ -7,10 +7,13 @@ const mockUseMessages = jest.fn()
 const mockUseTyping = jest.fn()
 const mockUseAuth = jest.fn()
 const mockUseReadCursor = jest.fn()
+const mockUseUnreadScroll = jest.fn()
 const mockScrollToBottom = jest.fn()
 const mockHandleUnreadScroll = jest.fn()
+const mockMarkLatestRead = jest.fn()
 const mockUnreadState = {
   autoScroll: true,
+  firstUnreadMessageId: null as string | null,
 }
 
 jest.mock('framer-motion', () => ({
@@ -39,15 +42,21 @@ jest.mock('../src/hooks/useReadCursor', () => ({
 }))
 
 jest.mock('../src/hooks/useUnreadScroll', () => ({
-  useUnreadScroll: () => ({
-    autoScroll: mockUnreadState.autoScroll,
-    firstUnreadMessageId: null,
-    setAutoScroll: jest.fn(),
-    setFirstUnreadMessageId: jest.fn(),
-    handleUnreadScroll: mockHandleUnreadScroll,
-    scrollToBottom: mockScrollToBottom,
-    markLatestRead: jest.fn(),
-  }),
+  useUnreadScroll: (options: unknown) => mockUseUnreadScroll(options),
+}))
+
+mockUseUnreadScroll.mockImplementation(() => ({
+  autoScroll: mockUnreadState.autoScroll,
+  firstUnreadMessageId: mockUnreadState.firstUnreadMessageId,
+  feedState: mockUnreadState.autoScroll ? 'bottomPinned' : 'userScrolledUp',
+  targetMessageId: mockUnreadState.firstUnreadMessageId,
+  lastObservedMessageId: mockUnreadState.firstUnreadMessageId,
+  lastFlushedMessageId: null,
+  setAutoScroll: jest.fn(),
+  setFirstUnreadMessageId: jest.fn(),
+  handleUnreadScroll: mockHandleUnreadScroll,
+  scrollToBottom: mockScrollToBottom,
+  markLatestRead: mockMarkLatestRead,
 }))
 
 jest.mock('../src/components/chat/MessageItem', () => ({
@@ -109,11 +118,15 @@ describe('MessageList mobile keyboard layout', () => {
   const originalRequestAnimationFrame = window.requestAnimationFrame
   const originalCancelAnimationFrame = window.cancelAnimationFrame
   const originalVisualViewport = window.visualViewport
+  const originalScrollIntoView = HTMLElement.prototype.scrollIntoView
 
   beforeEach(() => {
     mockUnreadState.autoScroll = true
+    mockUnreadState.firstUnreadMessageId = null
+    mockUseUnreadScroll.mockClear()
     mockScrollToBottom.mockClear()
     mockHandleUnreadScroll.mockClear()
+    mockMarkLatestRead.mockClear()
     mockUseMessages.mockReturnValue({
       messages: [message],
       loading: false,
@@ -137,6 +150,10 @@ describe('MessageList mobile keyboard layout', () => {
       return 1
     }) as typeof window.requestAnimationFrame
     window.cancelAnimationFrame = jest.fn()
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: jest.fn(),
+    })
   })
 
   afterEach(() => {
@@ -146,6 +163,14 @@ describe('MessageList mobile keyboard layout', () => {
       configurable: true,
       value: originalVisualViewport,
     })
+    if (originalScrollIntoView) {
+      Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+        configurable: true,
+        value: originalScrollIntoView,
+      })
+    } else {
+      delete (HTMLElement.prototype as Partial<HTMLElement>).scrollIntoView
+    }
     jest.clearAllMocks()
   })
 
@@ -162,6 +187,26 @@ describe('MessageList mobile keyboard layout', () => {
       'justify-end'
     )
     expect(screen.getByText('A tiny group chat thread')).toBeInTheDocument()
+  })
+
+  it('keeps cached messages mounted inside the scroll container while a refresh is loading', () => {
+    mockUseMessages.mockReturnValue({
+      messages: [message],
+      loading: true,
+      editMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      togglePin: jest.fn(),
+      toggleReaction: jest.fn(),
+      loadOlderMessages: jest.fn(),
+      loadingMore: false,
+      hasMore: false,
+    })
+
+    render(<MessageList />)
+
+    expect(screen.getByTestId('message-scroll')).toBeInTheDocument()
+    expect(screen.getByText('A tiny group chat thread')).toBeInTheDocument()
+    expect(screen.queryByText('Loading the conversation...')).not.toBeInTheDocument()
   })
 
   it('delegates scroll state to the unread-scroll hook without loading history from raw scroll math', () => {
@@ -237,6 +282,105 @@ describe('MessageList mobile keyboard layout', () => {
     expect(screen.getByText('Message 109')).toBeInTheDocument()
     expect(screen.getByTestId('message-scroll')).toHaveAttribute('data-loaded-count', '110')
     expect(screen.getByTestId('message-scroll')).toHaveAttribute('data-rendered-count', '90')
+  })
+
+  it('does not mark the latest loaded message read when opening an old deep link', async () => {
+    const manyMessages = Array.from({ length: 120 }, (_, index) => makeMessage(index))
+    mockUseMessages.mockReturnValue({
+      messages: manyMessages,
+      loading: false,
+      editMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      togglePin: jest.fn(),
+      toggleReaction: jest.fn(),
+      loadOlderMessages: jest.fn(),
+      loadingMore: false,
+      hasMore: true,
+    })
+
+    render(<MessageList initialMessageId="m10" />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(mockMarkLatestRead).not.toHaveBeenCalled()
+  })
+
+  it('requests a cursor-anchored window when the stored cursor predates the latest page', async () => {
+    const ensureMessageWindow = jest.fn().mockResolvedValue(null)
+    mockUseMessages.mockReturnValue({
+      messages: [makeMessage(10), makeMessage(11)],
+      loading: false,
+      editMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      togglePin: jest.fn(),
+      toggleReaction: jest.fn(),
+      loadOlderMessages: jest.fn(),
+      ensureMessageWindow,
+      loadingMore: false,
+      hasMore: true,
+      windowMode: 'latest',
+      anchorStatus: 'latest',
+    })
+    mockUseReadCursor.mockReturnValue({
+      cursor: {
+        user_id: 'u1',
+        surface: 'general_chat',
+        scope_id: 'main',
+        last_read_message_id: 'm1',
+        last_read_at: makeMessage(1).created_at,
+        updated_at: makeMessage(1).created_at,
+      },
+      loading: false,
+      markRead: jest.fn(),
+    })
+
+    render(<MessageList />)
+
+    await waitFor(() => {
+      expect(ensureMessageWindow).toHaveBeenCalledWith('m1', {
+        targetLastReadMessageId: 'm1',
+        targetLastReadAt: makeMessage(1).created_at,
+      })
+    })
+  })
+
+  it('orders same-timestamp messages by id before rendering and unread targeting', () => {
+    const timestamp = '2026-05-03T12:00:00.000Z'
+    const laterIdMessage = {
+      ...makeMessage(2),
+      id: '00000000-0000-0000-0000-0000000000b2',
+      content: 'Same timestamp B',
+      created_at: timestamp,
+      updated_at: timestamp,
+    } as unknown as Message
+    const earlierIdMessage = {
+      ...makeMessage(1),
+      id: '00000000-0000-0000-0000-0000000000a1',
+      content: 'Same timestamp A',
+      created_at: timestamp,
+      updated_at: timestamp,
+    } as unknown as Message
+    mockUseMessages.mockReturnValue({
+      messages: [laterIdMessage, earlierIdMessage],
+      loading: false,
+      editMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      togglePin: jest.fn(),
+      toggleReaction: jest.fn(),
+      loadOlderMessages: jest.fn(),
+      loadingMore: false,
+      hasMore: false,
+    })
+
+    render(<MessageList />)
+
+    expect(screen.getByTestId('message-stack').textContent?.indexOf('Same timestamp A'))
+      .toBeLessThan(screen.getByTestId('message-stack').textContent?.indexOf('Same timestamp B') ?? -1)
+    expect(mockUseUnreadScroll).toHaveBeenLastCalledWith(expect.objectContaining({
+      messages: [earlierIdMessage, laterIdMessage],
+    }))
   })
 
   it('throttles top-of-history requests when the loader remains visible', async () => {

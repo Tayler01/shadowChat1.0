@@ -4,7 +4,7 @@ This project uses a mix of static checks, Jest coverage, and real browser valida
 
 ## Documentation Status - June 1, 2026
 
-This guide reflects the current repo scripts. The June 1 audit confirmed `npm run lint`, `npm run typecheck`, `npm run build`, and `npm run qa:chat-scroll -- --cycles=4 --clean-artifacts` pass on current `main`. The chat-scroll script still needs stronger read-cursor assertions before it can prove the first-unread bug is fixed.
+This guide reflects the current repo scripts. The June 1 audit confirmed `npm run lint`, `npm run typecheck`, `npm run build`, and the metrics-only chat scroll probe passed on current `main`. The chat-scroll script now also has seeded read-position scenarios for preview/staging runs that can prove the first-unread, deep-link, same-timestamp, realtime anchoring, and media paths.
 
 ## Mobile-First Testing Default
 
@@ -225,11 +225,40 @@ Current smoke scenarios:
 
 Dedicated current QA scripts also include:
 
-- `qa:chat-scroll`: probes General Chat scroll stability and frame timing; needs read-cursor correctness assertions as part of the audit backlog.
+- `qa:chat-scroll`: defaults to the General Chat `metrics` scenario and probes scroll stability, frame timing, and message-scroll QA attributes.
+- `qa:chat-scroll:metrics`: explicit metrics-only alias; this is the safe path when service-role seeding is unavailable.
+- `qa:chat-scroll:all`: seeded General Chat feed rollout probe for preview/staging only; covers `metrics`, `read-position`, `deep-link`, `same-timestamp`, `realtime-anchored`, and `media`.
 - `qa:mobile-pwa`: mobile/PWA visual QA script.
 - `qa:themes`: theme visual QA script.
 - `qa:shadow-war`, `qa:shadow-war:core`, `qa:shadow-war:visual`, and `qa:shadow-checkers`: game-specific smoke coverage.
 - `bridge:tui:test` and `bridge:tui:smoke`: bridge TUI layout and live serial smoke paths.
+
+### General Chat Scroll Probe
+
+Run the non-seeded timing and DOM instrumentation pass:
+
+```powershell
+npm run qa:chat-scroll:metrics -- --cycles=4
+```
+
+Run the seeded preview/staging rollout pass:
+
+```powershell
+npm run qa:chat-scroll:all -- --no-reuse-server --run-name=general-chat-feed-rollout
+```
+
+Seeded scenarios require:
+
+- `PLAYWRIGHT_ACCOUNT_1_EMAIL` and `PLAYWRIGHT_ACCOUNT_1_PASSWORD`
+- `PLAYWRIGHT_ACCOUNT_2_EMAIL` and `PLAYWRIGHT_ACCOUNT_2_PASSWORD`
+- `PLAYWRIGHT_SUPABASE_URL` or `SUPABASE_URL` / `VITE_SUPABASE_URL`
+- `PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY` or `SUPABASE_SERVICE_ROLE_KEY`
+
+Seeded scenarios insert temporary `public.messages` rows and temporarily replace Account 1's `general_chat/main` read cursor. The runner restores the original cursor and deletes seeded messages in `finally`; if cleanup fails, `summary.json` records residual risk and the affected cleanup category. The media scenario uses an inline data URL image, so it does not create Storage objects.
+
+Do not run seeded scenarios against production data by default. The script refuses the known production Netlify host and Supabase project unless `--allow-production-seed` is passed after explicit approval. Use `metrics` only for production post-deploy scroll timing unless a production data-seeding run has been approved.
+
+The probe records these `data-*` values from `[data-testid="message-scroll"]` in each scenario snapshot: `windowMode`, `targetId`, `hasOlder`, `hasNewer`, `lastObservedVisibleId`, `lastFlushedReadId`, and `deepLinkStatus`.
 
 Boards/News-specific Jest coverage currently lives in:
 

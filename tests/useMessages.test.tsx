@@ -11,10 +11,13 @@ import { useAuth } from '../src/hooks/useAuth';
 import {
   supabase,
   ensureSession,
+  fetchGeneralChatMessageWindow,
   getWorkingClient,
   getRealtimeClient,
+  isGeneralChatMessageWindowRpcUnavailable,
   refreshSessionLocked,
 } from '../src/lib/supabase';
+import type { Message } from '../src/lib/supabase';
 import { runRealtimeRecovery } from '../src/lib/realtimeRecovery';
 
 jest.mock('../src/hooks/useAuth');
@@ -44,6 +47,8 @@ jest.mock('../src/lib/supabase', () => {
     },
     getWorkingClient: jest.fn(),
     getRealtimeClient: jest.fn(),
+    fetchGeneralChatMessageWindow: jest.fn(),
+    isGeneralChatMessageWindowRpcUnavailable: jest.fn(),
     refreshSessionLocked: jest.fn(),
     ensureSession: jest.fn(),
     withTimeout: jest.fn((promise: Promise<unknown>) => promise),
@@ -68,6 +73,9 @@ const createQuery = (overrides: Record<string, unknown> = {}) => {
     select: jest.fn(() => query),
     single: jest.fn().mockResolvedValue({ data: [], error: null }),
     order: jest.fn(() => query),
+    or: jest.fn(() => query),
+    lt: jest.fn(() => query),
+    gt: jest.fn(() => query),
     limit: jest.fn(() => query),
     update: jest.fn(() => query),
     delete: jest.fn(() => query),
@@ -78,6 +86,41 @@ const createQuery = (overrides: Record<string, unknown> = {}) => {
 
   Object.assign(query, overrides);
   return query;
+};
+
+const createThenableQuery = (
+  result: { data: unknown; error: unknown },
+  overrides: Record<string, unknown> = {}
+) => {
+  const query = createQuery(overrides);
+  query.then = (onFulfilled: (value: typeof result) => unknown, onRejected?: (reason: unknown) => unknown) =>
+    Promise.resolve(result).then(onFulfilled, onRejected);
+  query.catch = (onRejected: (reason: unknown) => unknown) =>
+    Promise.resolve(result).catch(onRejected);
+  query.finally = (onFinally: () => void) =>
+    Promise.resolve(result).finally(onFinally);
+  return query;
+};
+
+const makeDbMessage = (id: string, createdAt: string, pinned = false) => ({
+  id,
+  user_id: 'u1',
+  content: `Message ${id}`,
+  message_type: 'text',
+  reactions: {},
+  pinned,
+  pinned_by: null,
+  pinned_at: pinned ? createdAt : null,
+  created_at: createdAt,
+  updated_at: createdAt,
+  user: { id: 'u1', username: 'alice', display_name: 'Alice' },
+}) as unknown as Message;
+
+const makeLatestWindow = () => {
+  const timestamp = '2026-05-03T12:00:00.000Z';
+  return Array.from({ length: 40 }, (_, index) =>
+    makeDbMessage(`m${String(index).padStart(2, '0')}`, timestamp)
+  );
 };
 
 let workingClient: WorkingClient;
@@ -105,6 +148,14 @@ const configureWorkingClient = () => {
     data: { session: {} },
     error: null,
   });
+  (fetchGeneralChatMessageWindow as jest.Mock).mockRejectedValue({
+    code: 'PGRST202',
+    message: 'Could not find function get_general_chat_message_window',
+  });
+  (isGeneralChatMessageWindowRpcUnavailable as jest.Mock).mockImplementation((error: any) =>
+    error?.code === 'PGRST202' ||
+    /get_general_chat_message_window|could not find/i.test(error?.message || '')
+  );
   (runRealtimeRecovery as jest.Mock).mockResolvedValue({ ok: true, skipped: false, reason: 'channel-error' });
 };
 
@@ -218,6 +269,116 @@ describe('helper functions', () => {
     expect(data).toEqual({ id: '1' });
     expect(error).toBeNull();
     insertSpy.mockRestore();
+  });
+});
+
+describe('message fetching windows', () => {
+  const user = { id: 'user1' } as any;
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    configureWorkingClient();
+    (useAuth as jest.Mock).mockReturnValue({
+      user,
+      profile: { id: user.id, username: 'alice', display_name: 'Alice' },
+    });
+    (ensureSession as jest.Mock).mockResolvedValue(true);
+  });
+
+  const renderWithLatestWindow = async (latestWindow = makeLatestWindow()) => {
+    const pinnedQuery = createThenableQuery({ data: [], error: null });
+    const latestQuery = createThenableQuery({
+      data: [...latestWindow].reverse(),
+      error: null,
+    });
+    workingClient.from
+      .mockReturnValueOnce(pinnedQuery as any)
+      .mockReturnValueOnce(latestQuery as any);
+
+    const hook = renderHook(() => useMessages(), { wrapper: MessagesProvider });
+
+    await waitFor(() => expect(hook.result.current.loading).toBe(false));
+    await waitFor(() => expect(hook.result.current.messages).toHaveLength(latestWindow.length));
+
+    return {
+      ...hook,
+      latestWindow,
+      pinnedQuery,
+      latestQuery,
+    };
+  };
+
+  it('requests the latest window with deterministic timestamp and id ordering', async () => {
+    const { latestQuery } = await renderWithLatestWindow();
+
+    expect(latestQuery.order).toHaveBeenCalledWith('created_at', { ascending: false });
+    expect(latestQuery.order).toHaveBeenCalledWith('id', { ascending: false });
+  });
+
+  it('loads older history with a created_at and id keyset when timestamps collide', async () => {
+    const { result, latestWindow } = await renderWithLatestWindow();
+    const anchor = latestWindow[0];
+    const pinnedQuery = createThenableQuery({ data: [], error: null });
+    const olderQuery = createThenableQuery({ data: [], error: null });
+    workingClient.from
+      .mockReturnValueOnce(pinnedQuery as any)
+      .mockReturnValueOnce(olderQuery as any);
+
+    await act(async () => {
+      await result.current.loadOlderMessages();
+    });
+
+    expect(olderQuery.order).toHaveBeenCalledWith('created_at', { ascending: false });
+    expect(olderQuery.order).toHaveBeenCalledWith('id', { ascending: false });
+    expect(olderQuery.or).toHaveBeenCalledWith(
+      `created_at.lt.${anchor.created_at},and(created_at.eq.${anchor.created_at},id.lt.${anchor.id})`
+    );
+    expect(olderQuery.lt).not.toHaveBeenCalledWith('created_at', anchor.created_at);
+  });
+
+  it('marks newer realtime messages pending while an older window is anchored', async () => {
+    let broadcastHandler: ((payload: any) => void) | undefined;
+    workingClient.channel.mockImplementation(() => {
+      const channel: any = {
+        on: jest.fn((event: string, filter: any, handler: any) => {
+          if (event === 'broadcast' && filter?.event === 'new_message') {
+            broadcastHandler = handler;
+          }
+          return channel;
+        }),
+        subscribe: jest.fn(() => channel),
+        send: jest.fn(),
+        state: 'joined',
+      };
+      return channel;
+    });
+
+    const { result } = await renderWithLatestWindow();
+    await waitFor(() => expect(broadcastHandler).toBeDefined());
+
+    const pinnedQuery = createThenableQuery({ data: [], error: null });
+    const olderQuery = createThenableQuery({ data: [], error: null });
+    workingClient.from
+      .mockReturnValueOnce(pinnedQuery as any)
+      .mockReturnValueOnce(olderQuery as any);
+
+    await act(async () => {
+      await result.current.loadOlderMessages();
+    });
+
+    expect(result.current.windowMode).toBe('older');
+
+    const realtimeMessage = {
+      ...makeDbMessage('z-new', '2026-05-03T12:00:01.000Z'),
+      user_id: 'other-user',
+    } as Message;
+
+    await act(async () => {
+      broadcastHandler?.({ payload: realtimeMessage });
+    });
+
+    await waitFor(() => expect(result.current.hasNewer).toBe(true));
+    expect(result.current.messages.some(message => message.id === realtimeMessage.id)).toBe(false);
   });
 });
 

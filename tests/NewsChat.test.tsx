@@ -87,6 +87,8 @@ jest.mock('react-hot-toast', () => {
 })
 
 beforeEach(() => {
+  mockUseNewsChat.mockReset()
+  mockUseNewsChat.mockImplementation(() => buildNewsChatState())
   mockProfile = {
     id: 'user-1',
     username: 'reporter',
@@ -162,7 +164,7 @@ test('news chat lets operators delete normal user messages', async () => {
     display_name: 'Mod',
     admin_role: 'sub_admin',
   }
-  mockUseNewsChat.mockReturnValueOnce(buildNewsChatState([{
+  mockUseNewsChat.mockReturnValue(buildNewsChatState([{
     ...baseMessage,
     user_id: 'user-2',
     user: {
@@ -187,7 +189,7 @@ test('news chat hides operator delete for another operator message', () => {
     display_name: 'Mod',
     admin_role: 'sub_admin',
   }
-  mockUseNewsChat.mockReturnValueOnce(buildNewsChatState([{
+  mockUseNewsChat.mockReturnValue(buildNewsChatState([{
     ...baseMessage,
     user_id: 'user-2',
     user: {
@@ -206,7 +208,7 @@ test('news chat hides operator delete for another operator message', () => {
 
 test('news chat leaves long comments readable and keeps reaction menu in its own column', () => {
   const longComment = `Long comment ${'shadowchat'.repeat(32)} https://example.com/${'story'.repeat(24)}`
-  mockUseNewsChat.mockReturnValueOnce(buildNewsChatState([{ ...baseMessage, content: longComment }]))
+  mockUseNewsChat.mockReturnValue(buildNewsChatState([{ ...baseMessage, content: longComment }]))
 
   render(<NewsChat />)
 

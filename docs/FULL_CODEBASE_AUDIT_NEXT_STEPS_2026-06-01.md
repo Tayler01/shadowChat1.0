@@ -1,6 +1,6 @@
 # Full Codebase Audit Next Steps - 2026-06-01
 
-This document turns the June 1, 2026 read-only audit into an implementation backlog. It is intentionally written as next steps, not as a claim that any fixes have been applied.
+This document turns the June 1, 2026 read-only audit into an implementation backlog and records status updates as fixes land.
 
 ## Documentation Status - June 1, 2026
 
@@ -23,7 +23,7 @@ Coordinator validation during the audit:
 - `npm run lint` passed.
 - `npm run typecheck` passed.
 - `npm run build` passed.
-- `npm run qa:chat-scroll -- --cycles=4 --clean-artifacts` passed, but it does not yet assert read-cursor correctness.
+- Initial `npm run qa:chat-scroll -- --cycles=4 --clean-artifacts` passed during the audit; the implementation branch now adds seeded read-position scenarios behind `npm run qa:chat-scroll:all`.
 - Supabase project `shsqqouecvdoifzufkqm` was checked through read-only connector/advisor queries.
 - Netlify local config was checked. Live Netlify dashboard settings were not verified because `netlify status` timed out locally.
 
@@ -45,7 +45,14 @@ Observed risk:
 - Cached messages can be replaced by a loading panel, creating visible flicker and layout changes.
 - Pagination uses `created_at` only, which can skip or duplicate rows when timestamps collide.
 
-Next steps:
+Implementation status on June 1, 2026:
+
+- Added RPC-backed bounded General Chat windows, separate pinned-message returns, and stable `(created_at, id)` keyset pagination.
+- Added cursor-aware window resolution before the first-unread jump, explicit deep-link/feed states, visibility-based read flushing, and cached-message refresh rendering.
+- Added seeded browser QA scenarios for read position, deep links, same-timestamp windows, realtime anchored reads, and media-layout stability.
+- Remaining production sign-off gates are applying the Supabase migration to the linked project, running `npm run qa:chat-scroll:all` with preview/staging service-role credentials, and doing the phone-sized browser smoke listed below.
+
+Completed feed work in this branch:
 
 1. Add failing tests for a non-null cursor, an unread target older than the latest window, a deep-link target outside the initial window, and a first-unread jump that must not mark the latest row read.
 2. Add a cursor-aware fetch path that loads around `last_read_message_id` or `last_read_at` before falling back to the latest window.
@@ -53,12 +60,13 @@ Next steps:
 4. Advance the read cursor only when the latest loaded message is actually visible near the bottom, not during first-unread positioning.
 5. Keep the scroll container mounted while network refreshes run. Show loading affordances inside the existing container instead of replacing it.
 6. Change older-message pagination to a stable `(created_at, id)` keyset contract and align indexes/RPCs if needed.
-7. Extend `npm run qa:chat-scroll` or add a focused smoke path that asserts read cursor position, not only scroll metrics.
+7. Extend `npm run qa:chat-scroll` or add a focused smoke path that asserts read cursor position, not only scroll metrics. A seeded browser probe now exists behind `npm run qa:chat-scroll:all`.
 
-Validation target:
+Remaining validation target:
 
 - Targeted Jest for `useUnreadScroll`, `MessageList`, and cursor helpers.
-- `npm run qa:chat-scroll -- --cycles=4 --clean-artifacts`.
+- `npm run qa:chat-scroll:metrics -- --cycles=4 --clean-artifacts`.
+- `npm run qa:chat-scroll:all -- --no-reuse-server --run-name=general-chat-feed-rollout` against preview/staging seed credentials.
 - A phone-sized browser smoke with an older unread target, a fully read thread, and a realtime incoming message.
 
 ## P0 - Invite-Only Signup And Email Verification

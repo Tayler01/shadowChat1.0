@@ -21,6 +21,12 @@ videos, audio or voice clips, thumbnails or derived media, and generic file
 attachments. If cleanup cannot be verified, keep the payload minimal and record
 the remaining rows or object paths in the deploy notes as residual risk.
 
+For General Chat scroll timing on production, use the metrics-only probe:
+`npm run qa:chat-scroll:metrics -- --base-url=https://shadowchat-1-0.netlify.app --skip-build`.
+Do not run seeded chat-scroll scenarios against production unless explicit
+production data-seeding approval has been given; the script requires
+`--allow-production-seed` for known production targets.
+
 ## Canonical Smoke Accounts
 
 Always check for and use these two production smoke users before creating any new test accounts:

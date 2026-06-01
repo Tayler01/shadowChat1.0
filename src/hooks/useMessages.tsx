@@ -9,11 +9,18 @@ import {
   Message,
   User,
   type ChatMessageType,
+  fetchGeneralChatMessageWindow,
+  isGeneralChatMessageWindowRpcUnavailable,
   ensureSession,
   refreshSessionLocked,
   getRealtimeClient,
   getWorkingClient,
   withTimeout,
+  type GeneralChatMessageKey,
+  type GeneralChatMessageWindowMode,
+  type GeneralChatMessageWindowRequest,
+  type GeneralChatMessageWindowResult,
+  type GeneralChatMessageWindowStatus,
 } from '../lib/supabase';
 import { runRealtimeRecovery } from '../lib/realtimeRecovery';
 import { triggerGroupPushNotification } from '../lib/push';
@@ -49,21 +56,64 @@ export { useMessages, useOptionalMessages };
 
 const SEND_OPERATION_TIMEOUT_MS = 12000;
 const GROUP_OUTBOX_SCOPE = 'general';
+const MESSAGE_WITH_USER_SELECT = `
+  *,
+  user:users!user_id(*)
+`;
 
 const dedupeMessagesById = (items: Message[]) =>
   items.reduce<Message[]>((acc, item) => upsertMessageIntoState(acc, item), [])
 
-const sortMessagesByCreatedAt = (items: Message[]) =>
-  [...items].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+const compareMessageKeys = (a: GeneralChatMessageKey, b: GeneralChatMessageKey) => {
+  const aCreatedAt = a.created_at || ''
+  const bCreatedAt = b.created_at || ''
+  const aTime = Date.parse(aCreatedAt)
+  const bTime = Date.parse(bCreatedAt)
+  if (Number.isFinite(aTime) && Number.isFinite(bTime) && aTime !== bTime) {
+    return aTime - bTime
+  }
+
+  const timeCompare = aCreatedAt.localeCompare(bCreatedAt)
+  if (timeCompare !== 0) {
+    return timeCompare
+  }
+
+  return (a.id || '').localeCompare(b.id || '')
+}
+
+const sortMessagesByStableKey = (items: Message[]) =>
+  [...items].sort(compareMessageKeys)
+
+const isLocalPendingMessage = (message: Message) =>
+  message.optimistic ||
+  message.delivery_status === 'sending' ||
+  message.delivery_status === 'failed'
+
+const isServerWindowMessage = (message: Message) =>
+  !message.pinned && !isLocalPendingMessage(message)
+
+const getOldestServerWindowMessage = (items: Message[]) =>
+  sortMessagesByStableKey(items.filter(isServerWindowMessage))[0] ?? null
+
+const getNewestServerWindowMessage = (items: Message[]) => {
+  const sorted = sortMessagesByStableKey(items.filter(isServerWindowMessage))
+  return sorted[sorted.length - 1] ?? null
+}
+
+const withSentDeliveryState = (message: Message) => ({
+  ...message,
+  optimistic: false,
+  delivery_status: 'sent' as const,
+})
 
 const trimMessageWindow = (items: Message[]) => {
   const deduped = dedupeMessagesById(items)
   const pinned = deduped.filter(message => message.pinned)
   const regular = deduped.filter(message => !message.pinned)
 
-  return sortMessagesByCreatedAt([
+  return sortMessagesByStableKey([
     ...pinned,
-    ...sortMessagesByCreatedAt(regular).slice(-MESSAGE_FETCH_LIMIT),
+    ...sortMessagesByStableKey(regular).slice(-MESSAGE_FETCH_LIMIT),
   ])
 }
 
@@ -80,6 +130,277 @@ const cacheMessages = (items: Message[]) => {
   } catch {
     // ignore storage errors
   }
+}
+
+const createWindowResult = ({
+  messages,
+  pinnedMessages = [],
+  hasOlder,
+  hasNewer,
+  windowMode,
+  targetStatus = 'not_requested',
+  anchorStatus = 'not_requested',
+}: {
+  messages: Message[]
+  pinnedMessages?: Message[]
+  hasOlder: boolean
+  hasNewer: boolean
+  windowMode: GeneralChatMessageWindowMode
+  targetStatus?: GeneralChatMessageWindowStatus
+  anchorStatus?: GeneralChatMessageWindowStatus
+}): GeneralChatMessageWindowResult => ({
+  messages: messages.map(withSentDeliveryState),
+  pinnedMessages: pinnedMessages.map(withSentDeliveryState),
+  hasOlder,
+  hasNewer,
+  windowMode,
+  targetStatus,
+  anchorStatus,
+})
+
+const combineWindowMessages = (window: GeneralChatMessageWindowResult) =>
+  sortMessagesByStableKey(dedupeMessagesById([
+    ...window.pinnedMessages,
+    ...window.messages,
+  ].map(withSentDeliveryState)))
+
+const fetchPinnedMessages = async (workingClient: any) => {
+  const { data, error } = await workingClient
+    .from('messages')
+    .select(MESSAGE_WITH_USER_SELECT)
+    .eq('pinned', true)
+    .order('pinned_at', { ascending: true })
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
+
+  if (error) throw error
+  return (data || []) as unknown as Message[]
+}
+
+const buildOlderKeysetFilter = (anchor: GeneralChatMessageKey) =>
+  `created_at.lt.${anchor.created_at},and(created_at.eq.${anchor.created_at},id.lt.${anchor.id})`
+
+const buildNewerKeysetFilter = (anchor: GeneralChatMessageKey) =>
+  `created_at.gt.${anchor.created_at},and(created_at.eq.${anchor.created_at},id.gt.${anchor.id})`
+
+const fetchLatestWindowDirect = async (
+  workingClient: any,
+  limit: number
+): Promise<GeneralChatMessageWindowResult> => {
+  const [pinnedMessages, messagesRes] = await Promise.all([
+    fetchPinnedMessages(workingClient),
+    workingClient
+      .from('messages')
+      .select(MESSAGE_WITH_USER_SELECT)
+      .eq('pinned', false)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(limit),
+  ])
+
+  if (messagesRes.error) throw messagesRes.error
+
+  return createWindowResult({
+    messages: sortMessagesByStableKey(((messagesRes.data || []) as unknown as Message[])),
+    pinnedMessages,
+    hasOlder: (messagesRes.data?.length || 0) === limit,
+    hasNewer: false,
+    windowMode: 'latest',
+    anchorStatus: 'latest',
+  })
+}
+
+const fetchOlderWindowDirect = async (
+  workingClient: any,
+  anchor: GeneralChatMessageKey,
+  limit: number
+): Promise<GeneralChatMessageWindowResult> => {
+  const [pinnedMessages, messagesRes] = await Promise.all([
+    fetchPinnedMessages(workingClient),
+    workingClient
+      .from('messages')
+      .select(MESSAGE_WITH_USER_SELECT)
+      .eq('pinned', false)
+      .or(buildOlderKeysetFilter(anchor))
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(limit),
+  ])
+
+  if (messagesRes.error) throw messagesRes.error
+
+  return createWindowResult({
+    messages: sortMessagesByStableKey(((messagesRes.data || []) as unknown as Message[])),
+    pinnedMessages,
+    hasOlder: (messagesRes.data?.length || 0) === limit,
+    hasNewer: false,
+    windowMode: 'older',
+    anchorStatus: 'found',
+  })
+}
+
+const fetchNewerWindowDirect = async (
+  workingClient: any,
+  anchor: GeneralChatMessageKey,
+  limit: number
+): Promise<GeneralChatMessageWindowResult> => {
+  const [pinnedMessages, messagesRes] = await Promise.all([
+    fetchPinnedMessages(workingClient),
+    workingClient
+      .from('messages')
+      .select(MESSAGE_WITH_USER_SELECT)
+      .eq('pinned', false)
+      .or(buildNewerKeysetFilter(anchor))
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .limit(limit),
+  ])
+
+  if (messagesRes.error) throw messagesRes.error
+
+  return createWindowResult({
+    messages: sortMessagesByStableKey(((messagesRes.data || []) as unknown as Message[])),
+    pinnedMessages,
+    hasOlder: false,
+    hasNewer: (messagesRes.data?.length || 0) === limit,
+    windowMode: 'newer',
+    anchorStatus: 'found',
+  })
+}
+
+const fetchTargetWindowDirect = async (
+  workingClient: any,
+  targetMessageId: string | null,
+  limit: number,
+  targetLastReadMessageId?: string | null,
+  targetLastReadAt?: string | null
+): Promise<GeneralChatMessageWindowResult> => {
+  let target: Message | null = null
+  let targetStatus: GeneralChatMessageWindowStatus = 'missing'
+
+  if (targetMessageId) {
+    const targetRes = await workingClient
+      .from('messages')
+      .select(MESSAGE_WITH_USER_SELECT)
+      .eq('id', targetMessageId)
+      .maybeSingle()
+
+    if (targetRes.error) throw targetRes.error
+    target = targetRes.data as unknown as Message | null
+    targetStatus = target ? 'found' : 'missing'
+  }
+
+  if (!target && targetLastReadAt) {
+    const anchor = {
+      created_at: targetLastReadAt,
+      id: targetLastReadMessageId ?? '00000000-0000-0000-0000-000000000000',
+    }
+    const fallbackRes = await workingClient
+      .from('messages')
+      .select(MESSAGE_WITH_USER_SELECT)
+      .eq('pinned', false)
+      .or(buildNewerKeysetFilter(anchor))
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .limit(1)
+
+    if (fallbackRes.error) throw fallbackRes.error
+    target = ((fallbackRes.data || []) as unknown as Message[])[0] ?? null
+    targetStatus = target ? 'timestamp_fallback' : 'missing'
+  }
+
+  if (!target) {
+    return createWindowResult({
+      messages: [],
+      hasOlder: false,
+      hasNewer: false,
+      windowMode: 'target',
+      targetStatus,
+    })
+  }
+
+  const olderLimit = Math.floor((limit - 1) / 2)
+  const newerLimit = Math.max(limit - 1 - olderLimit, 0)
+  const [pinnedMessages, olderRes, newerRes] = await Promise.all([
+    fetchPinnedMessages(workingClient),
+    olderLimit > 0
+      ? workingClient
+        .from('messages')
+        .select(MESSAGE_WITH_USER_SELECT)
+        .eq('pinned', false)
+        .or(buildOlderKeysetFilter(target))
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(olderLimit)
+      : Promise.resolve({ data: [], error: null }),
+    newerLimit > 0
+      ? workingClient
+        .from('messages')
+        .select(MESSAGE_WITH_USER_SELECT)
+        .eq('pinned', false)
+        .or(buildNewerKeysetFilter(target))
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .limit(newerLimit)
+      : Promise.resolve({ data: [], error: null }),
+  ])
+
+  if (olderRes.error) throw olderRes.error
+  if (newerRes.error) throw newerRes.error
+
+  return createWindowResult({
+    messages: sortMessagesByStableKey([
+      ...((olderRes.data || []) as unknown as Message[]),
+      target,
+      ...((newerRes.data || []) as unknown as Message[]),
+    ]),
+    pinnedMessages,
+    hasOlder: olderLimit > 0 && (olderRes.data?.length || 0) === olderLimit,
+    hasNewer: newerLimit > 0 && (newerRes.data?.length || 0) === newerLimit,
+    windowMode: 'target',
+    targetStatus,
+  })
+}
+
+const mergeMessageWindowIntoState = (
+  prev: Message[],
+  window: GeneralChatMessageWindowResult,
+  options: { replaceWindow: boolean; trimToLatest?: boolean }
+) => {
+  const serverMessages = combineWindowMessages(window)
+
+  if (options.replaceWindow) {
+    const pendingLocalMessages = prev.filter(isLocalPendingMessage)
+    const mergedMessages = [...serverMessages, ...pendingLocalMessages].reduce<Message[]>(
+      (acc, message) => upsertMessageIntoState(acc, message),
+      []
+    )
+    return options.trimToLatest === false
+      ? sortMessagesByStableKey(mergedMessages)
+      : trimMessageWindow(mergedMessages)
+  }
+
+  const fetchedById = new Map(serverMessages.map(message => [message.id, message]))
+  const pinnedIds = new Set(serverMessages.filter(message => message.pinned).map(message => message.id))
+  const baseMessages = prev.map(message => {
+    const fetched = fetchedById.get(message.id)
+    if (fetched) {
+      return fetched
+    }
+
+    if (message.pinned && !pinnedIds.has(message.id)) {
+      return { ...message, pinned: false, pinned_by: null, pinned_at: null } as Message
+    }
+
+    return message
+  })
+
+  const mergedMessages = serverMessages.reduce<Message[]>(
+    (acc, message) => upsertMessageIntoState(acc, message),
+    baseMessages
+  )
+
+  return sortMessagesByStableKey(mergedMessages)
 }
 
 // --- Helper functions extracted from sendMessage workflow ---
@@ -241,7 +562,11 @@ function useProvideMessages(): MessagesContextValue {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasOlder, setHasOlder] = useState(true);
+  const [hasNewer, setHasNewer] = useState(false);
+  const [windowMode, setWindowMode] = useState<GeneralChatMessageWindowMode>('latest');
+  const [targetStatus, setTargetStatus] = useState<GeneralChatMessageWindowStatus>('not_requested');
+  const [anchorStatus, setAnchorStatus] = useState<GeneralChatMessageWindowStatus>('not_requested');
   const { user, profile } = useAuth();
   const { playMessage, playReaction } = useSoundEffects();
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -253,6 +578,70 @@ function useProvideMessages(): MessagesContextValue {
   const sendingRef = useRef(false);
   const latestMessagesRef = useRef<Message[]>(initialMessages);
   const hydrationFetchesRef = useRef<Map<string, Promise<Message | null>>>(new Map());
+  const windowModeRef = useRef<GeneralChatMessageWindowMode>('latest');
+  const hasNewerRef = useRef(false);
+  const windowRpcAvailableRef = useRef<boolean | null>(null);
+
+  const setWindowModeValue = useCallback((mode: GeneralChatMessageWindowMode) => {
+    windowModeRef.current = mode;
+    setWindowMode(mode);
+    loadedOlderRef.current = mode !== 'latest';
+  }, []);
+
+  const setHasNewerValue = useCallback((value: boolean) => {
+    hasNewerRef.current = value;
+    setHasNewer(value);
+  }, []);
+
+  const applyWindowMetadata = useCallback((window: GeneralChatMessageWindowResult) => {
+    setHasOlder(window.hasOlder);
+    setHasNewerValue(window.hasNewer);
+    setWindowModeValue(window.windowMode);
+    setTargetStatus(window.targetStatus);
+    setAnchorStatus(window.anchorStatus);
+  }, [setHasNewerValue, setWindowModeValue]);
+
+  const fetchWindowDirect = useCallback(async (request: GeneralChatMessageWindowRequest) => {
+    const workingClient = await getWorkingClient();
+
+    if (request.mode === 'older' && request.anchor) {
+      return fetchOlderWindowDirect(workingClient, request.anchor, request.limit);
+    }
+
+    if (request.mode === 'newer' && request.anchor) {
+      return fetchNewerWindowDirect(workingClient, request.anchor, request.limit);
+    }
+
+    if (request.mode === 'target' && (request.targetMessageId || request.targetLastReadAt)) {
+      return fetchTargetWindowDirect(
+        workingClient,
+        request.targetMessageId ?? null,
+        request.limit,
+        request.targetLastReadMessageId ?? null,
+        request.targetLastReadAt ?? null
+      );
+    }
+
+    return fetchLatestWindowDirect(workingClient, request.limit);
+  }, []);
+
+  const fetchMessageWindow = useCallback(async (request: GeneralChatMessageWindowRequest) => {
+    const canUseCenteredWindowRpc = request.mode === 'latest' || request.mode === 'target';
+    if (canUseCenteredWindowRpc && windowRpcAvailableRef.current !== false) {
+      try {
+        const window = await fetchGeneralChatMessageWindow(request);
+        windowRpcAvailableRef.current = true;
+        return window;
+      } catch (error) {
+        if (!isGeneralChatMessageWindowRpcUnavailable(error)) {
+          throw error;
+        }
+        windowRpcAvailableRef.current = false;
+      }
+    }
+
+    return fetchWindowDirect(request);
+  }, [fetchWindowDirect]);
 
   const hydrateLocalOutboxMessages = useCallback(() => {
     if (!user?.id) return;
@@ -266,126 +655,82 @@ function useProvideMessages(): MessagesContextValue {
         (acc, entry) => upsertMessageIntoState(acc, localOutboxEntryToMessage(entry, profile ?? user)),
         prev
       );
-      return loadedOlderRef.current ? sortMessagesByCreatedAt(nextMessages) : trimMessageWindow(nextMessages);
+      return loadedOlderRef.current ? sortMessagesByStableKey(nextMessages) : trimMessageWindow(nextMessages);
     });
   }, [profile, user]);
 
   const addNewMessage = useCallback(
     (msg: Message) => {
       let added = false;
+      const normalizedMessage = withSentDeliveryState(msg as Message) as Message;
+      const currentMessages = latestMessagesRef.current;
+      const existsInCurrentWindow = findMatchingMessageIndex(currentMessages, normalizedMessage) >= 0;
+      const newestWindowMessage = getNewestServerWindowMessage(currentMessages);
+      const isNewerThanWindow = newestWindowMessage
+        ? compareMessageKeys(normalizedMessage, newestWindowMessage) > 0
+        : true;
+
+      if (
+        windowModeRef.current !== 'latest' &&
+        !existsInCurrentWindow &&
+        user &&
+        normalizedMessage.user_id !== user.id &&
+        isNewerThanWindow
+      ) {
+        setHasNewerValue(true);
+        return;
+      }
+
       setMessages(prev => {
-        const exists = findMatchingMessageIndex(prev, msg) >= 0;
+        const exists = findMatchingMessageIndex(prev, normalizedMessage) >= 0;
         const nextMessages = upsertMessageIntoState(prev, {
-          ...msg,
-          optimistic: false,
-          delivery_status: 'sent',
-        });
+          ...normalizedMessage,
+        } as Message);
         if (nextMessages === prev) return prev;
         added = !exists;
-        return loadedOlderRef.current ? sortMessagesByCreatedAt(nextMessages) : trimMessageWindow(nextMessages);
+        return loadedOlderRef.current ? sortMessagesByStableKey(nextMessages) : trimMessageWindow(nextMessages);
       });
       if (added && user && msg.user_id !== user.id) {
         playMessage();
       }
     },
-    [playMessage, user]
+    [playMessage, setHasNewerValue, user]
   );
 
-  const fetchMessages = useCallback(async () => {
+  const loadLatestMessages = useCallback(async () => {
     const requestId = fetchRequestIdRef.current + 1;
     fetchRequestIdRef.current = requestId;
 
     try {
-      const workingClient = await getWorkingClient();
-      const [pinnedRes, messagesRes] = await Promise.all([
-        workingClient
-          .from('messages')
-          .select(
-            `
-          *,
-          user:users!user_id(*)
-        `,
-          )
-          .eq('pinned', true)
-          .order('pinned_at', { ascending: true }),
-        workingClient
-          .from('messages')
-          .select(
-            `
-          *,
-          user:users!user_id(*)
-        `,
-          )
-          .order('created_at', { ascending: false })
-          .limit(MESSAGE_FETCH_LIMIT),
-      ]);
-
-      const pinnedMessages = (pinnedRes.data || []) as unknown as Message[];
-      const fetchedMessages = ((messagesRes.data || []) as unknown as Message[]).reverse();
-      const data = dedupeMessagesById([...pinnedMessages, ...fetchedMessages]);
-      const error = pinnedRes.error || messagesRes.error;
+      const window = await fetchMessageWindow({
+        mode: 'latest',
+        limit: MESSAGE_FETCH_LIMIT,
+      });
 
       if (requestId !== fetchRequestIdRef.current) {
         return;
       }
 
-      setHasMore((messagesRes.data?.length || 0) === MESSAGE_FETCH_LIMIT);
+      applyWindowMetadata({
+        ...window,
+        windowMode: 'latest',
+        targetStatus: 'not_requested',
+        anchorStatus: window.anchorStatus,
+      });
 
-      if (error) {
-        throw error;
-      } else if (data.length > 0) {
-        const pinnedIds = new Set(pinnedMessages.map(m => m.id));
-
+      if (combineWindowMessages(window).length > 0) {
         setMessages(prev => {
-          if (prev.length === 0 || !loadedOlderRef.current) {
-            const pendingLocalMessages = prev.filter(
-              message => message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
-            );
-            const mergedMessages = [...data as unknown as Message[]].reduce<Message[]>(
-              (acc, message) => upsertMessageIntoState(acc, { ...message, optimistic: false, delivery_status: 'sent' }),
-              pendingLocalMessages
-            );
-            const nextMessages = trimMessageWindow(mergedMessages);
-            cacheMessages(nextMessages);
-            return nextMessages;
-          }
-
-          const fetchedById = new Map(data.map(message => [message.id, message as unknown as Message]));
-          const mergedMap = new Map<string, Message>();
-
-          // Replace or update existing messages
-          prev.forEach(m => {
-            const fetched = fetchedById.get(m.id);
-            let updated = m;
-
-            if (fetched) {
-              updated = fetched;
-            } else if (m.pinned && !pinnedIds.has(m.id)) {
-              updated = { ...m, pinned: false, pinned_by: null, pinned_at: null } as Message;
-            }
-
-            mergedMap.set(updated.id, updated);
+          const nextMessages = mergeMessageWindowIntoState(prev, window, {
+            replaceWindow: true,
+            trimToLatest: true,
           });
-
-          // Add new messages
-          const mergedMessages = data.reduce<Message[]>(
-            (acc, d) => upsertMessageIntoState(acc, {
-              ...(d as unknown as Message),
-              optimistic: false,
-              delivery_status: 'sent',
-            }),
-            Array.from(mergedMap.values())
-          );
-
-          const nextMessages = sortMessagesByCreatedAt(mergedMessages);
           cacheMessages(nextMessages);
           return nextMessages;
         });
       } else {
-        setMessages(prev => prev.filter(
-          message => message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
-        ));
-        setHasMore(false);
+        setMessages(prev => prev.filter(isLocalPendingMessage));
+        setHasOlder(false);
+        setHasNewerValue(false);
         if (typeof localStorage !== 'undefined') {
           try {
             localStorage.removeItem('chatHistory');
@@ -401,7 +746,9 @@ function useProvideMessages(): MessagesContextValue {
         setLoading(false);
       }
     }
-  }, []);
+  }, [applyWindowMetadata, fetchMessageWindow, setHasNewerValue]);
+
+  const fetchMessages = loadLatestMessages;
 
   const hydrateMessage = useCallback((messageId: string) => {
     const existing = hydrationFetchesRef.current.get(messageId);
@@ -429,47 +776,169 @@ function useProvideMessages(): MessagesContextValue {
   }, []);
 
   const loadOlderMessages = useCallback(async () => {
-    if (loadingMore || !hasMore) return;
-    const oldest = messages.find(m => !m.pinned)?.created_at;
-    if (!oldest) return;
+    if (loadingMore || !hasOlder) return;
+    const anchor = getOldestServerWindowMessage(messages);
+    if (!anchor) {
+      setHasOlder(false);
+      return;
+    }
+
     setLoadingMore(true);
+    setAnchorStatus('pending');
+    setTargetStatus('not_requested');
     try {
-      const workingClient = await getWorkingClient();
-      const { data, error } = await workingClient
-        .from('messages')
-        .select(
-          `
-        *,
-        user:users!user_id(*)
-      `,
-        )
-        .lt('created_at', oldest)
-        .order('created_at', { ascending: false })
-        .limit(MESSAGE_FETCH_LIMIT);
+      const window = await fetchMessageWindow({
+        mode: 'older',
+        anchor,
+        limit: MESSAGE_FETCH_LIMIT,
+      });
 
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        const newMessages = (data as unknown as Message[]).reverse();
-        loadedOlderRef.current = true;
-        React.startTransition(() => {
-          setMessages(prev => {
-            const pinned = prev.filter(m => m.pinned);
-            const rest = prev.filter(m => !m.pinned);
-            return sortMessagesByCreatedAt(dedupeMessagesById([...pinned, ...newMessages, ...rest]));
-          });
-          setHasMore(data.length === MESSAGE_FETCH_LIMIT);
+      React.startTransition(() => {
+        setMessages(prev => mergeMessageWindowIntoState(prev, window, {
+          replaceWindow: false,
+        }));
+        applyWindowMetadata({
+          ...window,
+          windowMode: 'older',
+          hasNewer: hasNewerRef.current || window.hasNewer,
+          targetStatus: 'not_requested',
         });
-      } else {
-        setHasMore(false);
-      }
+      });
     } finally {
       setLoadingMore(false);
     }
-  }, [messages, loadingMore, hasMore]);
+  }, [applyWindowMetadata, fetchMessageWindow, hasOlder, loadingMore, messages]);
+
+  const loadNewerMessages = useCallback(async () => {
+    if (loadingMore || !hasNewer) return;
+    const anchor = getNewestServerWindowMessage(messages);
+    if (!anchor) {
+      await loadLatestMessages();
+      return;
+    }
+
+    setLoadingMore(true);
+    setAnchorStatus('pending');
+    setTargetStatus('not_requested');
+    try {
+      const window = await fetchMessageWindow({
+        mode: 'newer',
+        anchor,
+        limit: MESSAGE_FETCH_LIMIT,
+      });
+
+      React.startTransition(() => {
+        setMessages(prev => mergeMessageWindowIntoState(prev, window, {
+          replaceWindow: false,
+        }));
+        applyWindowMetadata({
+          ...window,
+          windowMode: 'newer',
+          hasOlder: hasOlder || window.hasOlder,
+          targetStatus: 'not_requested',
+        });
+      });
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [applyWindowMetadata, fetchMessageWindow, hasNewer, hasOlder, loadLatestMessages, loadingMore, messages]);
+
+  const ensureMessageWindow = useCallback(async (
+    targetMessageId: string | null,
+    options: {
+      anchor?: GeneralChatMessageKey | null
+      targetLastReadMessageId?: string | null
+      targetLastReadAt?: string | null
+    } = {}
+  ) => {
+    if (!targetMessageId && !options.targetLastReadAt && !options.targetLastReadMessageId && !options.anchor) {
+      await loadLatestMessages();
+      return null;
+    }
+
+    const existing = targetMessageId
+      ? latestMessagesRef.current.find(message =>
+        message.id === targetMessageId || message.client_message_id === targetMessageId
+      ) ?? null
+      : null;
+    if (existing) {
+      setTargetStatus('found');
+      setAnchorStatus(options.anchor ? 'found' : 'not_requested');
+      return existing;
+    }
+
+    const requestId = fetchRequestIdRef.current + 1;
+    fetchRequestIdRef.current = requestId;
+    setLoadingMore(true);
+    setTargetStatus('pending');
+    setAnchorStatus(options.anchor ? 'pending' : 'not_requested');
+
+    try {
+      const window = await fetchMessageWindow({
+        mode: 'target',
+        targetMessageId: targetMessageId ?? null,
+        targetLastReadMessageId: options.targetLastReadMessageId ?? null,
+        targetLastReadAt: options.targetLastReadAt ?? null,
+        anchor: options.anchor ?? null,
+        limit: MESSAGE_FETCH_LIMIT,
+      });
+
+      if (requestId !== fetchRequestIdRef.current) {
+        return null;
+      }
+
+      const windowMessages = combineWindowMessages(window);
+      const cursorAnchor = options.targetLastReadAt
+        ? {
+          created_at: options.targetLastReadAt,
+          id: options.targetLastReadMessageId ?? '00000000-0000-0000-0000-000000000000',
+        }
+        : null;
+      const targetMessage = targetMessageId
+        ? windowMessages.find(message => message.id === targetMessageId) ?? null
+        : cursorAnchor
+          ? windowMessages.find(message =>
+            !message.pinned && compareMessageKeys(message, cursorAnchor) > 0
+          ) ?? null
+          : null;
+      applyWindowMetadata({
+        ...window,
+        windowMode: 'target',
+        targetStatus: targetMessage ? 'found' : window.targetStatus,
+        anchorStatus: window.anchorStatus,
+      });
+
+      if (!targetMessage) {
+        return null;
+      }
+
+      React.startTransition(() => {
+        setMessages(prev => mergeMessageWindowIntoState(prev, window, {
+          replaceWindow: true,
+          trimToLatest: false,
+        }));
+      });
+
+      return targetMessage;
+    } finally {
+      if (requestId === fetchRequestIdRef.current) {
+        setLoadingMore(false);
+        setLoading(false);
+      }
+    }
+  }, [applyWindowMetadata, fetchMessageWindow, loadLatestMessages]);
 
   const compactToLatestMessages = useCallback(() => {
+    if (hasNewerRef.current) {
+      void loadLatestMessages().catch(() => undefined);
+      return;
+    }
+
     loadedOlderRef.current = false;
+    setWindowModeValue('latest');
+    setHasNewerValue(false);
+    setTargetStatus('not_requested');
+    setAnchorStatus('not_requested');
     setMessages(prev => {
       const nextMessages = trimMessageWindow(prev);
       if (nextMessages === prev || nextMessages.length === prev.length) {
@@ -478,7 +947,7 @@ function useProvideMessages(): MessagesContextValue {
       cacheMessages(nextMessages);
       return nextMessages;
     });
-  }, []);
+  }, [loadLatestMessages, setHasNewerValue, setWindowModeValue]);
 
   // Reset function to reinitialize everything with fresh client
   const resetWithFreshClient = useCallback(async () => {
@@ -554,8 +1023,10 @@ function useProvideMessages(): MessagesContextValue {
   // Persist messages to localStorage whenever they change
   useEffect(() => {
     latestMessagesRef.current = messages;
-    cacheMessages(messages);
-  }, [messages]);
+    if (!hasNewer) {
+      cacheMessages(messages);
+    }
+  }, [hasNewer, messages]);
 
   useEffect(() => {
     hydrateLocalOutboxMessages();
@@ -820,7 +1291,7 @@ function useProvideMessages(): MessagesContextValue {
         optimistic: true,
         delivery_status: 'sending',
       } as Message);
-      return loadedOlderRef.current ? sortMessagesByCreatedAt(nextMessages) : trimMessageWindow(nextMessages);
+      return loadedOlderRef.current ? sortMessagesByStableKey(nextMessages) : trimMessageWindow(nextMessages);
     });
 
     const executeSend = async () => {
@@ -1127,7 +1598,12 @@ function useProvideMessages(): MessagesContextValue {
     loading,
     sending,
     loadingMore,
-    hasMore,
+    hasOlder,
+    hasNewer,
+    hasMore: hasOlder,
+    windowMode,
+    targetStatus,
+    anchorStatus,
     sendMessage,
     editMessage,
     deleteMessage,
@@ -1135,7 +1611,10 @@ function useProvideMessages(): MessagesContextValue {
     discardFailedMessage,
     toggleReaction,
     togglePin,
+    loadLatestMessages,
     loadOlderMessages,
+    loadNewerMessages,
+    ensureMessageWindow,
     compactToLatestMessages,
   };
 }

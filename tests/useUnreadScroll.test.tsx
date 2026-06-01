@@ -11,6 +11,15 @@ const makeMessage = (id: string, minute: number): TestMessage => ({
   created_at: `2026-05-03T12:${String(minute).padStart(2, '0')}:00.000Z`,
 })
 
+const makeCursor = (messageId: string | null, minute: number) => ({
+  user_id: 'u1',
+  surface: 'general_chat',
+  scope_id: 'main',
+  last_read_message_id: messageId,
+  last_read_at: `2026-05-03T12:${String(minute).padStart(2, '0')}:00.000Z`,
+  updated_at: `2026-05-03T12:${String(minute).padStart(2, '0')}:01.000Z`,
+})
+
 const setScrollMetrics = (element: HTMLElement, scrollHeight: number, clientHeight = 400) => {
   Object.defineProperty(element, 'scrollHeight', {
     configurable: true,
@@ -20,6 +29,36 @@ const setScrollMetrics = (element: HTMLElement, scrollHeight: number, clientHeig
     configurable: true,
     value: clientHeight,
   })
+}
+
+const setRect = (element: HTMLElement, top: number, bottom: number) => {
+  Object.defineProperty(element, 'getBoundingClientRect', {
+    configurable: true,
+    value: jest.fn(() => ({
+      top,
+      bottom,
+      left: 0,
+      right: 390,
+      width: 390,
+      height: bottom - top,
+      x: 0,
+      y: top,
+      toJSON: () => {},
+    })),
+  })
+}
+
+const useFakeTimersWithImmediateRaf = () => {
+  jest.useFakeTimers()
+  const immediateRequestAnimationFrame = jest.fn((callback: FrameRequestCallback) => {
+    callback(0)
+    return 1
+  }) as typeof window.requestAnimationFrame
+  const cancelAnimationFrame = jest.fn()
+  window.requestAnimationFrame = immediateRequestAnimationFrame
+  window.cancelAnimationFrame = cancelAnimationFrame
+  global.requestAnimationFrame = immediateRequestAnimationFrame
+  global.cancelAnimationFrame = cancelAnimationFrame
 }
 
 describe('useUnreadScroll', () => {
@@ -36,6 +75,7 @@ describe('useUnreadScroll', () => {
   })
 
   afterEach(() => {
+    jest.useRealTimers()
     window.requestAnimationFrame = originalRequestAnimationFrame
     window.cancelAnimationFrame = originalCancelAnimationFrame
     global.ResizeObserver = originalResizeObserver
@@ -240,6 +280,177 @@ describe('useUnreadScroll', () => {
     Object.defineProperty(window, 'visualViewport', {
       configurable: true,
       value: originalVisualViewport,
+    })
+  })
+
+  it('uses a non-null cursor to expose the true first unread without marking the latest early', async () => {
+    useFakeTimersWithImmediateRaf()
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    setScrollMetrics(container, 1600)
+    setRect(container, 0, 400)
+
+    const firstUnreadEl = document.createElement('div')
+    firstUnreadEl.id = 'message-m3'
+    firstUnreadEl.scrollIntoView = jest.fn()
+    setRect(firstUnreadEl, 80, 160)
+    container.appendChild(firstUnreadEl)
+
+    const latestEl = document.createElement('div')
+    latestEl.id = 'message-m5'
+    setRect(latestEl, 920, 1000)
+    container.appendChild(latestEl)
+
+    const messages = [
+      makeMessage('m1', 1),
+      makeMessage('m2', 2),
+      makeMessage('m3', 3),
+      makeMessage('m4', 4),
+      makeMessage('m5', 5),
+    ]
+    const onBeforeInitialJump = jest.fn()
+    const onMarkReadToLatest = jest.fn()
+
+    const { result } = renderHook(() =>
+      useUnreadScroll<TestMessage>({
+        containerRef: { current: container },
+        messages,
+        loading: false,
+        cursor: makeCursor('m2', 2),
+        cursorLoading: false,
+        enabled: true,
+        surfaceKey: 'general_chat:main',
+        getMessageId: message => message.id,
+        getMessageCreatedAt: message => message.created_at,
+        getElementId: id => `message-${id}`,
+        onBeforeInitialJump,
+        onMarkReadToLatest,
+      })
+    )
+
+    expect(window.requestAnimationFrame).toHaveBeenCalled()
+    expect(result.current.firstUnreadMessageId).toBe('m3')
+    expect(onBeforeInitialJump).toHaveBeenCalledWith(messages[2])
+    await act(async () => {
+      jest.runOnlyPendingTimers()
+      await Promise.resolve()
+    })
+
+    expect(onMarkReadToLatest).not.toHaveBeenCalled()
+
+    document.body.removeChild(container)
+  })
+
+  it('does not mark the latest row read when the first unread DOM row is missing', async () => {
+    useFakeTimersWithImmediateRaf()
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    setScrollMetrics(container, 1200)
+    setRect(container, 0, 400)
+
+    const messages = [
+      makeMessage('m1', 1),
+      makeMessage('m2', 2),
+      makeMessage('m3', 3),
+    ]
+    const onMarkReadToLatest = jest.fn()
+
+    const { result } = renderHook(() =>
+      useUnreadScroll<TestMessage>({
+        containerRef: { current: container },
+        messages,
+        loading: false,
+        cursor: makeCursor('m1', 1),
+        cursorLoading: false,
+        enabled: true,
+        surfaceKey: 'general_chat:main',
+        getMessageId: message => message.id,
+        getMessageCreatedAt: message => message.created_at,
+        getElementId: id => `message-${id}`,
+        onMarkReadToLatest,
+      })
+    )
+
+    expect(window.requestAnimationFrame).toHaveBeenCalled()
+    expect(result.current.firstUnreadMessageId).toBe('m2')
+    await act(async () => {
+      jest.runOnlyPendingTimers()
+      await Promise.resolve()
+    })
+
+    expect(onMarkReadToLatest).not.toHaveBeenCalled()
+
+    document.body.removeChild(container)
+  })
+
+  it('flushes page visibility changes to the last visible message candidate only', async () => {
+    const originalVisibilityState = document.visibilityState
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'visible',
+    })
+
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    setScrollMetrics(container, 1400)
+    setRect(container, 0, 400)
+    Object.defineProperty(container, 'scrollTop', {
+      configurable: true,
+      value: 180,
+      writable: true,
+    })
+
+    const messages = [
+      makeMessage('m1', 1),
+      makeMessage('m2', 2),
+      makeMessage('m3', 3),
+    ]
+
+    messages.forEach((message, index) => {
+      const row = document.createElement('div')
+      row.id = `message-${message.id}`
+      setRect(row, index === 0 ? -80 : index === 1 ? 120 : 520, index === 0 ? 20 : index === 1 ? 220 : 620)
+      container.appendChild(row)
+    })
+
+    const onMarkReadToLatest = jest.fn()
+
+    const { result } = renderHook(() =>
+      useUnreadScroll<TestMessage>({
+        containerRef: { current: container },
+        messages,
+        loading: true,
+        cursor: null,
+        cursorLoading: false,
+        enabled: true,
+        surfaceKey: 'general_chat:main',
+        getMessageId: message => message.id,
+        getMessageCreatedAt: message => message.created_at,
+        getElementId: id => `message-${id}`,
+        onMarkReadToLatest,
+      })
+    )
+
+    act(() => {
+      result.current.handleUnreadScroll()
+    })
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'hidden',
+    })
+
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'))
+      await Promise.resolve()
+    })
+
+    expect(onMarkReadToLatest).toHaveBeenCalledWith(messages[1])
+
+    document.body.removeChild(container)
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: originalVisibilityState,
     })
   })
 })

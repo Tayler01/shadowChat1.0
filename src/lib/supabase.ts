@@ -855,6 +855,129 @@ export interface Message {
   delivery_status?: 'sending' | 'sent' | 'failed'
 }
 
+export type GeneralChatMessageWindowMode = 'latest' | 'older' | 'newer' | 'target'
+export type GeneralChatMessageWindowStatus =
+  | 'idle'
+  | 'pending'
+  | 'found'
+  | 'resolved'
+  | 'timestamp_fallback'
+  | 'latest'
+  | 'missing'
+  | 'not_requested'
+  | 'error'
+
+export interface GeneralChatMessageKey {
+  created_at: string
+  id: string
+}
+
+export interface GeneralChatMessageWindowRequest {
+  mode: GeneralChatMessageWindowMode
+  limit: number
+  anchor?: GeneralChatMessageKey | null
+  targetMessageId?: string | null
+  targetLastReadMessageId?: string | null
+  targetLastReadAt?: string | null
+}
+
+export interface GeneralChatMessageWindowResult {
+  messages: Message[]
+  pinnedMessages: Message[]
+  hasOlder: boolean
+  hasNewer: boolean
+  windowMode: GeneralChatMessageWindowMode
+  targetStatus: GeneralChatMessageWindowStatus
+  anchorStatus: GeneralChatMessageWindowStatus
+}
+
+const normalizeGeneralChatWindowMode = (
+  value: unknown,
+  fallback: GeneralChatMessageWindowMode
+): GeneralChatMessageWindowMode => {
+  return value === 'latest' || value === 'older' || value === 'newer' || value === 'target'
+    ? value
+    : fallback
+}
+
+const normalizeGeneralChatWindowStatus = (
+  value: unknown,
+  fallback: GeneralChatMessageWindowStatus
+): GeneralChatMessageWindowStatus => {
+  return (
+    value === 'idle' ||
+    value === 'pending' ||
+    value === 'found' ||
+    value === 'resolved' ||
+    value === 'timestamp_fallback' ||
+    value === 'latest' ||
+    value === 'missing' ||
+    value === 'not_requested' ||
+    value === 'error'
+  )
+    ? value
+    : fallback
+}
+
+const normalizeGeneralChatMessages = (value: unknown): Message[] => (
+  Array.isArray(value) ? value as Message[] : []
+)
+
+// RPC signature supplied by the General Chat message-window migration:
+// get_general_chat_message_window(
+//   target_message_id uuid default null,
+//   target_last_read_message_id uuid default null,
+//   target_last_read_at timestamptz default null,
+//   target_limit integer default 50
+// ) returns table(messages jsonb, pinned_messages jsonb, has_older boolean, has_newer boolean, anchor_status text).
+export const fetchGeneralChatMessageWindow = async (
+  request: GeneralChatMessageWindowRequest
+): Promise<GeneralChatMessageWindowResult> => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_general_chat_message_window', {
+    target_message_id: request.targetMessageId ?? null,
+    target_last_read_message_id: request.targetLastReadMessageId ?? null,
+    target_last_read_at: request.targetLastReadAt ?? null,
+    target_limit: request.limit,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  const row = Array.isArray(data) ? data[0] : data
+  const anchorStatus = normalizeGeneralChatWindowStatus(
+    row?.anchor_status ?? row?.anchorStatus,
+    request.targetMessageId || request.targetLastReadMessageId || request.targetLastReadAt
+      ? 'missing'
+      : 'latest'
+  )
+  const targetFallback: GeneralChatMessageWindowStatus = request.targetMessageId
+    ? 'missing'
+    : 'not_requested'
+
+  return {
+    messages: normalizeGeneralChatMessages(row?.messages ?? row?.window_messages),
+    pinnedMessages: normalizeGeneralChatMessages(row?.pinned_messages ?? row?.pinnedMessages),
+    hasOlder: Boolean(row?.has_older ?? row?.hasOlder),
+    hasNewer: Boolean(row?.has_newer ?? row?.hasNewer),
+    windowMode: normalizeGeneralChatWindowMode(row?.window_mode ?? row?.windowMode, request.mode),
+    targetStatus: normalizeGeneralChatWindowStatus(
+      row?.target_status ?? row?.targetStatus,
+      request.targetMessageId && anchorStatus === 'resolved' ? 'found' : targetFallback
+    ),
+    anchorStatus,
+  }
+}
+
+export const isGeneralChatMessageWindowRpcUnavailable = (error: unknown) => {
+  const record = error as { code?: string; message?: string; details?: string; hint?: string }
+  const haystack = `${record?.code || ''} ${record?.message || ''} ${record?.details || ''} ${record?.hint || ''}`
+  return haystack.includes('PGRST202') ||
+    /could not find (the )?function/i.test(haystack) ||
+    /function .*get_general_chat_message_window.* does not exist/i.test(haystack)
+}
+
 export type NewsPlatform = 'x' | 'truth'
 
 export type NewsReactionSummary = Record<string, { count: number; users: string[] }>
