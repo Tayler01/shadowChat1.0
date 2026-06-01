@@ -209,6 +209,8 @@ Production is hosted on Netlify, the backend is hosted on Supabase, and the News
 ## Documentation Map
 
 - [AGENTS.md](C:/repos/chat2.0/AGENTS.md:1): agent-focused working guide for coding, testing, and debugging
+- [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1): current audit backlog for security, auth, chat-scroll, frontend polish, deployment, and architecture follow-ups
+- [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1): documentation and agent-file inventory with refresh guidance
 - [docs/SETUP_GUIDE.md](C:/repos/chat2.0/docs/SETUP_GUIDE.md:1): first-time local and hosted setup
 - [docs/TESTING_GUIDE.md](C:/repos/chat2.0/docs/TESTING_GUIDE.md:1): lint, typecheck, unit tests, smoke tests, and Playwright usage
 - [docs/DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1): GitHub, Netlify, and Supabase deployment workflow
