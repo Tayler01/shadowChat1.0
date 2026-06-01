@@ -63,6 +63,11 @@ verify_jwt = false
 [functions.send-push]
 verify_jwt = false
 
+# Account deletion validates the caller's Supabase user token in code, then
+# uses the service role to remove owned storage objects before deleting auth.
+[functions.delete-account]
+verify_jwt = false
+
 [functions.art-board-import-image]
 enabled = true
 verify_jwt = true
