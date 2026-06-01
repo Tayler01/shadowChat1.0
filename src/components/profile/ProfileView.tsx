@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Camera, Edit3, Eye, Ghost, Minus, Plus, RotateCcw, Save, X, Menu } from 'lucide-react'
+import { Camera, Edit3, Ghost, Minus, Plus, RotateCcw, Save, X, Menu } from 'lucide-react'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useAuth } from '../../hooks/useAuth'
 import { fetchUserStats } from '../../lib/supabase'
@@ -15,11 +15,6 @@ import { UserAchievementBadges } from '../ui/UserAchievementBadges'
 import toast from 'react-hot-toast'
 import type { PresenceVisibility } from '../../types'
 
-const colorOptions = [
-  '#d7aa46', '#c99642', '#b88646', '#9f7340', '#8f6a37',
-  '#c8b08a', '#b59f7f', '#a47b58', '#7b694b', '#5d4a38'
-]
-
 interface ProfileViewProps {
   onToggleSidebar: () => void
   embedded?: boolean
@@ -29,7 +24,6 @@ interface ProfileFormData {
   display_name: string
   status_message: string
   presence_visibility: PresenceVisibility
-  color: string
 }
 
 interface AvatarEditorState {
@@ -308,7 +302,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
     display_name: profile?.display_name || '',
     status_message: profile?.status_message || '',
     presence_visibility: profile?.presence_visibility || 'tracked',
-    color: profile?.color || '#d7aa46'
   })
 
   useEffect(() => {
@@ -334,7 +327,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
       display_name: profile.display_name || '',
       status_message: profile.status_message || '',
       presence_visibility: profile.presence_visibility || 'tracked',
-      color: profile.color || '#d7aa46',
     })
   }, [isEditing, profile])
 
@@ -412,7 +404,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
       display_name: profile?.display_name || '',
       status_message: profile?.status_message || '',
       presence_visibility: profile?.presence_visibility || 'tracked',
-      color: profile?.color || '#d7aa46'
     })
     setIsEditing(false)
   }
@@ -584,26 +575,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
                   </div>
                 </div>
 
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-[var(--text-secondary)]">
-                    Chat Color
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {colorOptions.map((color) => (
-                      <button
-                        key={color}
-                        onClick={() => setFormData(prev => ({ ...prev, color }))}
-                        className={`h-8 w-8 rounded-full border-2 transition-transform hover:scale-110 ${
-                          formData.color === color
-                            ? 'scale-110 border-[var(--gold-5)]'
-                            : 'border-[var(--border-panel)]'
-                        }`}
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                  </div>
-                </div>
-
                 <div className="flex flex-col space-y-3 pt-4 sm:flex-row sm:space-x-3 sm:space-y-0">
                   <Button
                     onClick={handleSave}
@@ -655,16 +626,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
                       {presenceLabel}
                     </span>
                   </div>
-
-                  <div className="flex items-center space-x-2">
-                    <div
-                      className="w-4 h-4 rounded-full border"
-                      style={{ backgroundColor: profile.color }}
-                    />
-                    <span className="text-sm text-[var(--text-secondary)]">
-                      Chat Color
-                    </span>
-                  </div>
                 </div>
 
                 <div className="text-xs text-[var(--text-muted)]">
@@ -702,7 +663,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
       </div>
 
       {!isEditing && (
-        <div className="mt-6 grid gap-4 md:grid-cols-[1.4fr_1fr]">
+        <div className="mt-6">
           <div className="glass-panel rounded-[var(--radius-lg)] p-5">
             <div className="mb-4 flex items-center justify-between">
               <div>
@@ -732,51 +693,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
                 <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">Bio</div>
                 <div className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
                   {profile.status_message?.trim() || 'No bio set yet.'}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="glass-panel rounded-[var(--radius-lg)] p-5">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Presence & Style</h2>
-              <p className="text-sm text-[var(--text-muted)]">How your profile appears around the app.</p>
-            </div>
-
-            <div className="space-y-3">
-              <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">Current presence</div>
-                <div className="mt-2 flex items-center gap-2 text-sm text-[var(--text-primary)]">
-                  {presenceState === 'invisible' ? (
-                    <Ghost className="h-3.5 w-3.5 text-[rgb(213,220,232)]" />
-                  ) : presenceState === 'online' ? (
-                    <div className="h-3 w-3 rounded-full bg-[#22c55e] shadow-[0_0_12px_rgba(34,197,94,0.55)]" />
-                  ) : (
-                    <Eye className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-                  )}
-                  <span>{presenceLabel}</span>
-                </div>
-              </div>
-
-              <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">Chat color</div>
-                <div className="mt-2 flex items-center gap-3">
-                  <div
-                    className="h-8 w-8 rounded-full border border-white/10 shadow-[var(--shadow-panel)]"
-                    style={{ backgroundColor: profile.color }}
-                  />
-                  <span className="text-sm text-[var(--text-secondary)]">Used for your presence accents and profile avatar.</span>
-                </div>
-              </div>
-
-              <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
-                <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">Member since</div>
-                <div className="mt-2 text-sm text-[var(--text-primary)]">
-                  {new Date(profile.created_at).toLocaleDateString(undefined, {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
                 </div>
               </div>
             </div>

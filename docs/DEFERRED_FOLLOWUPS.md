@@ -16,7 +16,7 @@ Near-future priorities from the full codebase audit, after the P0 fixes:
 
 1. Add bridge Edge Function tests for pairing, polling, session refresh, update check, and revoke.
 2. Finish cryptographic update signing: real signing key, release signing pipeline, device-side signature verification, and rejection of `dev-unsigned-sha256-only` outside development.
-3. Replace fake Settings actions with real data export and account deletion flows, or remove them until backend support exists.
+3. Revisit user data export only if it becomes a product requirement; account deletion now has a real guarded flow and the old data/privacy settings surface was removed.
 4. Add a canonical bridge read-state contract test that proves web unread counts and bridge polling agree.
 5. Add connection/session health banners in the web app and TUI for stale session, reconnecting, offline, and revoked states.
 6. Fix sidebar/mobile navigation dead states and unused `onNewDM` wiring.

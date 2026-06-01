@@ -859,7 +859,8 @@ async function goToSettings(page) {
 
 async function openSettingsSection(page, sectionName) {
   await page.getByRole('button', { name: sectionName }).click()
-  await page.getByRole('button', { name: 'Back to settings' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByRole('heading', { name: sectionName }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByRole('button', { name: /^Back$/ }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
 async function goToProfile(page) {
@@ -887,14 +888,14 @@ async function dismissAppReleaseDialog(page) {
     }).first()
 
     if (!(await dialog.isVisible().catch(() => false))) {
-      return
+      break
     }
 
     const closeButton = dialog.getByRole('button', { name: /^(Done|Got It|Later)$/ }).first()
     if (await closeButton.isVisible().catch(() => false)) {
       await closeButton.click()
       await dialog.waitFor({ state: 'hidden', timeout: DEFAULT_TIMEOUT_MS }).catch(() => undefined)
-      return
+      break
     }
 
     const restartButton = dialog.getByRole('button', { name: /^(Restart Now|Update Now)$/ }).first()
@@ -905,7 +906,19 @@ async function dismissAppReleaseDialog(page) {
       continue
     }
 
-    return
+    break
+  }
+
+  const phoneSetupDialog = page.getByRole('dialog').filter({
+    has: page.getByText(/phone setup|add shadow chat/i),
+  }).first()
+
+  if (await phoneSetupDialog.isVisible().catch(() => false)) {
+    const closePhoneSetup = phoneSetupDialog.getByRole('button', { name: /^(Skip for Now|Close phone setup|I Finished Setup)$/ }).first()
+    if (await closePhoneSetup.isVisible().catch(() => false)) {
+      await closePhoneSetup.click()
+      await phoneSetupDialog.waitFor({ state: 'hidden', timeout: DEFAULT_TIMEOUT_MS }).catch(() => undefined)
+    }
   }
 }
 

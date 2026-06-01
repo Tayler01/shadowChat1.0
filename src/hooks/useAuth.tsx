@@ -15,6 +15,7 @@ import {
   signIn as authSignIn,
   signUp as authSignUp,
   signOut as authSignOut,
+  deleteCurrentAccount,
   getCurrentUser,
   updateUserProfile,
   uploadUserAvatar,
@@ -35,6 +36,7 @@ interface AuthContextValue {
     userData: { full_name: string; username: string }
   ) => Promise<any>;
   signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   updateProfile: (updates: Partial<User>) => Promise<User | void>;
   refreshProfile: () => Promise<User | null>;
   uploadAvatar: (file: File) => Promise<string | void>;
@@ -534,6 +536,37 @@ function useProvideAuth() {
     }
   };
 
+  const deleteAccount = async () => {
+    setLoading(true);
+    setError(null);
+    explicitSignOutRef.current = true;
+    try {
+      await deleteCurrentAccount();
+      applyUser(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Account deletion failed';
+      setError(message);
+      throw err;
+    } finally {
+      if (typeof localStorage !== 'undefined') {
+        try {
+          localStorage.removeItem('chatHistory');
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('failed-')) {
+              localStorage.removeItem(key);
+            }
+          });
+          clearLocalOutboxScopes();
+        } catch {
+          // ignore storage errors
+        }
+      }
+
+      setLoading(false);
+      explicitSignOutRef.current = false;
+    }
+  };
+
   const updateProfile = async (updates: Partial<User>) => {
     if (!user) return;
 
@@ -596,6 +629,7 @@ function useProvideAuth() {
     signIn,
     signUp,
     signOut,
+    deleteAccount,
     updateProfile,
     refreshProfile,
     uploadAvatar,

@@ -361,9 +361,8 @@ export const upsertNotificationPreferences = async (
 ) => {
   const workingClient = await getWorkingClient()
   const payload = {
-    ...DEFAULT_PREFERENCES,
-    ...updates,
     user_id: userId,
+    ...updates,
   }
 
   const { data, error } = await workingClient

@@ -210,6 +210,32 @@ test('signOut calls auth.signOut', async () => {
   expect(authModule.signOut).toHaveBeenCalled();
 });
 
+test('deleteAccount calls auth.deleteCurrentAccount and clears local user state', async () => {
+  const profile = { id: '1', email: 'x@y.com' } as any;
+  authModule.signUp.mockResolvedValue({ session: {}, profile, user: {} } as any);
+  authModule.deleteCurrentAccount.mockResolvedValue();
+
+  const { result } = await renderUseAuth();
+  await waitFor(() => expect(result.current.loading).toBe(false));
+
+  await act(async () => {
+    await result.current.signUp('x@y.com', 'pw', { full_name: 'X', username: 'user' });
+  });
+
+  await waitFor(() => expect(result.current.user).toEqual(profile));
+  window.localStorage.setItem('chatHistory', 'cached');
+  window.localStorage.setItem('failed-general', 'queued');
+
+  await act(async () => {
+    await result.current.deleteAccount();
+  });
+
+  expect(authModule.deleteCurrentAccount).toHaveBeenCalled();
+  expect(result.current.user).toBeNull();
+  expect(window.localStorage.getItem('chatHistory')).toBeNull();
+  expect(window.localStorage.getItem('failed-general')).toBeNull();
+});
+
 test('uploadAvatar calls auth.uploadUserAvatar', async () => {
   const profile = { id: '1' } as any;
   authModule.signUp.mockResolvedValue({ session: {}, profile, user: {} } as any);

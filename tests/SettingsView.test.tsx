@@ -7,6 +7,8 @@ const mockSetSourceEnabled = jest.fn()
 const mockDeleteSource = jest.fn()
 const mockRefreshNewsAdmin = jest.fn()
 const mockUpdateSubAdmin = jest.fn()
+const mockUpdatePreference = jest.fn()
+const mockDeleteAccount = jest.fn()
 const mockUseNewsAdmin = jest.fn(() => ({
   isAdmin: true,
   sources: [
@@ -50,10 +52,6 @@ jest.mock('../src/hooks/useSoundEffects', () => ({
   useSoundEffects: () => ({ enabled: true, setEnabled: jest.fn() }),
 }))
 
-jest.mock('../src/hooks/useSuggestedReplies', () => ({
-  useSuggestionsEnabled: () => ({ enabled: false, setEnabled: jest.fn() }),
-}))
-
 jest.mock('../src/hooks/useTheme', () => ({
   useTheme: () => ({ scheme: 'obsidian-gold', setScheme: jest.fn() }),
   colorSchemes: {
@@ -85,7 +83,7 @@ jest.mock('../src/hooks/usePushNotifications', () => ({
     error: '',
     enablePush: jest.fn(),
     disablePush: jest.fn(),
-    updatePreference: jest.fn(),
+    updatePreference: mockUpdatePreference,
     refreshState: jest.fn(),
   }),
 }))
@@ -100,6 +98,7 @@ jest.mock('../src/hooks/usePwaInstallPrompt', () => ({
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => ({
     signOut: jest.fn(),
+    deleteAccount: mockDeleteAccount,
     user: { id: 'admin-1', username: 'caleb', display_name: 'Caleb', admin_role: 'admin' },
   }),
 }))
@@ -196,6 +195,7 @@ jest.mock('react-hot-toast', () => {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  window.scrollTo = jest.fn()
   window.sessionStorage.clear()
 })
 
@@ -209,14 +209,45 @@ test('settings renders section hub and opens account profile detail', () => {
   expect(screen.getByRole('button', { name: /notifications & audio/i })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /app setup & user guide/i })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /account & profile/i })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /^ai$/i })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /data & privacy/i })).not.toBeInTheDocument()
 
   fireEvent.click(screen.getByRole('button', { name: /account & profile/i }))
 
   expect(screen.getByRole('heading', { name: 'Account & Profile' })).toBeInTheDocument()
   expect(screen.getByTestId('embedded-profile')).toHaveAttribute('data-embedded', 'true')
+  expect(screen.queryByRole('button', { name: /back to settings/i })).not.toBeInTheDocument()
 
-  fireEvent.click(screen.getByRole('button', { name: /settings/i }))
+  fireEvent.click(screen.getByRole('button', { name: /^back$/i }))
   expect(screen.getByRole('button', { name: /notifications & audio/i })).toBeInTheDocument()
+})
+
+test('settings notification toggles save independently', () => {
+  render(<SettingsView onToggleSidebar={jest.fn()} />)
+
+  fireEvent.click(screen.getByRole('button', { name: /notifications & audio/i }))
+  fireEvent.click(screen.getByRole('switch', { name: /toggle reactions/i }))
+  fireEvent.click(screen.getByRole('switch', { name: /toggle group chat/i }))
+
+  expect(mockUpdatePreference).toHaveBeenCalledWith('reaction_enabled', true)
+  expect(mockUpdatePreference).toHaveBeenCalledWith('group_enabled', false)
+})
+
+test('settings protects account deletion behind typed confirmation', async () => {
+  jest.spyOn(window, 'confirm').mockReturnValueOnce(true)
+  mockDeleteAccount.mockResolvedValueOnce(undefined)
+
+  render(<SettingsView onToggleSidebar={jest.fn()} />)
+
+  fireEvent.click(screen.getByRole('button', { name: /account & profile/i }))
+  fireEvent.click(screen.getByRole('button', { name: /^delete account$/i }))
+  fireEvent.change(screen.getByPlaceholderText('DELETE'), { target: { value: 'DELETE' } })
+  fireEvent.click(screen.getByRole('button', { name: /permanently delete/i }))
+
+  expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Permanently delete your Shadow Chat account'))
+  await waitFor(() => {
+    expect(mockDeleteAccount).toHaveBeenCalled()
+  })
 })
 
 test('settings opens account profile from requested weather settings section', () => {

@@ -1,14 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
-  ArrowLeft,
   Bell,
   BookOpen,
-  Brain,
   ChevronRight,
   Check,
-  Database,
-  Download,
   Film,
   BarChart3,
   KeyRound,
@@ -30,7 +26,6 @@ import { useAuth } from '../../hooks/useAuth'
 import toast from 'react-hot-toast'
 import { useTheme, colorSchemes, ColorScheme } from '../../hooks/useTheme'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
-import { useSuggestionsEnabled } from '../../hooks/useSuggestedReplies'
 import { useSoundEffects } from '../../hooks/useSoundEffects'
 import { usePushNotifications } from '../../hooks/usePushNotifications'
 import { usePwaInstallPrompt } from '../../hooks/usePwaInstallPrompt'
@@ -61,12 +56,10 @@ interface SettingsViewProps {
 
 type SettingsSectionId =
   | 'notifications-audio'
-  | 'ai'
   | 'feedback'
   | 'app-setup-guide'
   | 'admin'
   | 'color-layout'
-  | 'data-privacy'
   | 'account-profile'
 
 type SettingsSection = {
@@ -94,12 +87,6 @@ const sections: SettingsSection[] = [
     icon: Bell,
   },
   {
-    id: 'ai',
-    title: 'AI',
-    description: 'Assistant and suggestion preferences.',
-    icon: Brain,
-  },
-  {
     id: 'feedback',
     title: 'Feedback',
     description: 'Submit bugs, feature ideas, screenshots, and concepts.',
@@ -122,12 +109,6 @@ const sections: SettingsSection[] = [
     title: 'Color & Layout',
     description: 'Theme palette and interface appearance.',
     icon: Palette,
-  },
-  {
-    id: 'data-privacy',
-    title: 'Data & Privacy',
-    description: 'Data export, privacy controls, and destructive actions.',
-    icon: Database,
   },
   {
     id: 'account-profile',
@@ -254,13 +235,15 @@ function ToggleRow({
         aria-label={`Toggle ${label}`}
         className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full border transition-[background-color,border-color,box-shadow,opacity] ${
           enabled
-            ? 'theme-floating-action'
-            : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.05)]'
+            ? 'border-[rgba(215,170,70,0.58)] bg-[rgba(215,170,70,0.18)] shadow-[inset_0_0_0_1px_rgba(255,240,184,0.12),0_0_14px_rgba(215,170,70,0.18)]'
+            : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.05)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.025)]'
         } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
       >
         <span
           className={`inline-block h-4 w-4 transform rounded-full transition-transform ${
-            enabled ? 'translate-x-6 bg-[var(--theme-accent-strong)]' : 'translate-x-1 bg-[var(--text-secondary)]'
+            enabled
+              ? 'translate-x-6 bg-[rgb(255,240,184)] shadow-[0_0_10px_rgba(255,240,184,0.48)]'
+              : 'translate-x-1 bg-[var(--text-secondary)]'
           }`}
         />
       </button>
@@ -270,22 +253,11 @@ function ToggleRow({
 
 function SectionHeader({
   section,
-  onBack,
 }: {
   section: SettingsSection
-  onBack: () => void
 }) {
   return (
     <div className="mb-5">
-      <button
-        type="button"
-        onClick={onBack}
-        className="mb-4 inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-sm text-[var(--text-secondary)] transition-colors hover:border-[var(--border-glow)] hover:text-[var(--text-gold)]"
-        aria-label="Back to settings"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Settings
-      </button>
       <div className="flex items-start gap-3">
         <span className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)] p-3 text-[var(--text-gold)]">
           <section.icon className="h-5 w-5" />
@@ -316,7 +288,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const [activeSection, setActiveSection] = useState<SettingsSectionId | null>(() => getInitialSettingsSection())
   const [activeAdminSection, setActiveAdminSection] = useState<AdminSectionId | null>(null)
-  const [showDangerZone, setShowDangerZone] = useState(false)
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false)
+  const [deleteAccountConfirmText, setDeleteAccountConfirmText] = useState('')
+  const [deleteAccountSaving, setDeleteAccountSaving] = useState(false)
   const [showNotificationSetup, setShowNotificationSetup] = useState(false)
   const [showPhoneInstallGuide, setShowPhoneInstallGuide] = useState(false)
   const [showFeedbackSubmission, setShowFeedbackSubmission] = useState(false)
@@ -330,7 +304,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [adminUserSearch, setAdminUserSearch] = useState('')
   const { scheme, setScheme } = useTheme()
   const isDesktop = useIsDesktop()
-  const { signOut, user: currentUser } = useAuth()
+  const { signOut, deleteAccount, user: currentUser } = useAuth()
   const shouldLoadAdminUsers = activeSection === 'admin' && activeAdminSection === 'access'
   const shouldLoadNewsAdmin = activeSection === 'admin' && activeAdminSection === 'news-sources'
   const shouldLoadPushSettings = activeSection === 'notifications-audio'
@@ -355,7 +329,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     deleteSource,
   } = useNewsAdmin({ enabled: shouldLoadNewsAdmin })
   const { canInstall, promptInstall } = usePwaInstallPrompt()
-  const { enabled: suggestionsEnabled, setEnabled: setSuggestionsEnabled } = useSuggestionsEnabled()
   const {
     supported,
     canPrompt,
@@ -468,12 +441,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     scrollContainer.scrollTop = 0
   }, [activeAdminSection, activeSection])
 
-  const handleExportData = () => {
-    toast.success('Data export started - you will receive an email when ready')
-  }
+  const handleDeleteAccount = async () => {
+    if (deleteAccountConfirmText.trim().toUpperCase() !== 'DELETE') {
+      toast.error('Type DELETE to confirm account deletion')
+      return
+    }
 
-  const handleDeleteAccount = () => {
-    toast.error('Account deletion is not implemented in this demo')
+    const confirmed = window.confirm('Permanently delete your Shadow Chat account? This removes your login and cannot be undone.')
+    if (!confirmed) return
+
+    try {
+      setDeleteAccountSaving(true)
+      await deleteAccount()
+      toast.success('Account deleted')
+    } catch (err) {
+      console.error(err)
+      toast.error(err instanceof Error ? err.message : 'Failed to delete account')
+    } finally {
+      setDeleteAccountSaving(false)
+    }
   }
 
   const handleSignOut = async () => {
@@ -709,26 +695,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     </div>
   )
 
-  const renderAI = () => (
-    <div className="glass-panel rounded-[var(--radius-lg)] p-5">
-      <div className="mb-4 flex items-center gap-3">
-        <Brain className="h-5 w-5 text-[var(--text-muted)]" />
-        <h2 className="text-lg font-semibold text-[var(--text-primary)]">Assistant Settings</h2>
-      </div>
-      <ToggleRow
-        label="Suggested Replies"
-        description="Show AI generated reply suggestions in the composer."
-        enabled={suggestionsEnabled}
-        onChange={setSuggestionsEnabled}
-      />
-      <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
-        <p className="text-sm text-[var(--text-secondary)]">
-          Mood emoji is disabled in production while it gets more design and behavior work.
-        </p>
-      </div>
-    </div>
-  )
-
   const renderFeedback = () => (
     <div className="glass-panel rounded-[var(--radius-lg)] p-5">
       <div className="mb-4 flex items-center gap-3">
@@ -788,7 +754,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           {[
             ['Chat', 'Use the main feed for shared conversation, replies, pins, reactions, and link previews.'],
             ['DMs', 'Use Direct Messages for private threads and unread tracking.'],
-            ['Settings', 'Use these sections to keep notification, AI, account, and privacy controls organized.'],
+            ['Settings', 'Use these sections to keep notification, account, app setup, and operator controls organized.'],
           ].map(([title, copy]) => (
             <div key={title} className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
               <h3 className="font-medium text-[var(--text-primary)]">{title}</h3>
@@ -1276,57 +1242,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     </div>
   )
 
-  const renderDataPrivacy = () => (
-    <div className="space-y-5">
-      <div className="glass-panel rounded-[var(--radius-lg)] p-5">
-        <div className="mb-4 flex items-center gap-3">
-          <Database className="h-5 w-5 text-[var(--text-muted)]" />
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Data Export</h2>
-        </div>
-        <div className="flex flex-col gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="font-medium text-[var(--text-primary)]">Export My Data</h3>
-            <p className="mt-1 text-sm text-[var(--text-muted)]">Download a copy of your account data and message history.</p>
-          </div>
-          <Button onClick={handleExportData} variant="secondary" className="w-full justify-center sm:w-auto">
-            <Download className="mr-3 h-4 w-4" />
-            Export
-          </Button>
-        </div>
-      </div>
-
-      <div className="glass-panel rounded-[var(--radius-lg)] border border-[rgba(190,52,85,0.28)] p-5">
-        <div className="mb-4 flex items-center gap-3">
-          <Trash2 className="h-5 w-5 text-red-200" />
-          <h2 className="text-lg font-semibold text-red-100">Danger Zone</h2>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowDangerZone(!showDangerZone)}
-          className="w-full rounded-[var(--radius-md)] border border-[rgba(190,52,85,0.28)] bg-[rgba(87,14,28,0.16)] px-4 py-3 text-left text-sm text-red-200 transition-colors hover:border-[rgba(190,52,85,0.42)]"
-        >
-          {showDangerZone ? 'Hide destructive account actions' : 'Show destructive account actions'}
-        </button>
-        {showDangerZone && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            className="mt-4 rounded-[var(--radius-md)] border border-[rgba(190,52,85,0.42)] bg-[rgba(87,14,28,0.28)] p-4"
-          >
-            <h3 className="mb-2 font-medium text-red-100">Delete Account</h3>
-            <p className="mb-4 text-sm text-red-200/80">
-              This action cannot be undone. All your messages and data will be permanently deleted.
-            </p>
-            <Button onClick={handleDeleteAccount} variant="danger" size="sm">
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete Account
-            </Button>
-          </motion.div>
-        )}
-      </div>
-    </div>
-  )
-
   const renderAccountProfile = () => (
     <div className="space-y-5">
       <ProfileView onToggleSidebar={onToggleSidebar} embedded />
@@ -1342,6 +1257,65 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </Button>
         </div>
       </div>
+
+      <div className="glass-panel rounded-[var(--radius-lg)] border border-[rgba(190,52,85,0.24)] p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-red-100">Delete Account</h2>
+            <p className="mt-1 text-sm leading-6 text-red-200/80">
+              Permanently removes your login and profile data from Shadow Chat. This cannot be undone.
+            </p>
+          </div>
+          <Button
+            onClick={() => {
+              setDeleteAccountOpen(open => !open)
+              setDeleteAccountConfirmText('')
+            }}
+            variant="danger"
+            className="w-full justify-center sm:w-auto"
+          >
+            <Trash2 className="mr-3 h-4 w-4" />
+            {deleteAccountOpen ? 'Cancel Delete' : 'Delete Account'}
+          </Button>
+        </div>
+
+        {deleteAccountOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            className="mt-4 rounded-[var(--radius-md)] border border-[rgba(190,52,85,0.36)] bg-[rgba(87,14,28,0.18)] p-4"
+          >
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-red-100">
+                Type DELETE to confirm
+              </span>
+              <input
+                value={deleteAccountConfirmText}
+                onChange={event => setDeleteAccountConfirmText(event.target.value)}
+                autoCapitalize="characters"
+                spellCheck={false}
+                className="obsidian-input w-full rounded-[var(--radius-md)] px-3.5 py-3 font-mono text-sm uppercase tracking-[0.18em]"
+                placeholder="DELETE"
+              />
+            </label>
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs leading-5 text-red-200/75">
+                You will see one final browser confirmation before the account is deleted.
+              </p>
+              <Button
+                onClick={() => void handleDeleteAccount()}
+                variant="danger"
+                disabled={deleteAccountConfirmText.trim().toUpperCase() !== 'DELETE'}
+                loading={deleteAccountSaving}
+                className="w-full justify-center sm:w-auto"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Permanently Delete
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </div>
     </div>
   )
 
@@ -1350,19 +1324,17 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
     const content = {
       'notifications-audio': renderNotificationsAudio,
-      ai: renderAI,
       feedback: renderFeedback,
       'app-setup-guide': renderAppSetupGuide,
       admin: renderAdmin,
       'color-layout': renderColorLayout,
-      'data-privacy': renderDataPrivacy,
       'account-profile': renderAccountProfile,
     }[activeSection]()
     const showSectionHeader = !(activeSection === 'admin' && activeAdminSection)
 
     return (
       <>
-        {showSectionHeader && <SectionHeader section={activeSectionConfig} onBack={() => setActiveSection(null)} />}
+        {showSectionHeader && <SectionHeader section={activeSectionConfig} />}
         {content}
       </>
     )

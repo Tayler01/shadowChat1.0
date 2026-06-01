@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { ensureSession, getWorkingClient, supabase } from './supabase'
 import type { User as SupabaseAuthUser } from '@supabase/supabase-js'
 import type { User as AppUser } from './supabase'
 import { optimizeImageFile } from './imageOptimization'
@@ -175,6 +175,28 @@ export const signOut = async () => {
 
   const { error } = await supabase.auth.signOut()
   if (error) throw error
+}
+
+export const deleteCurrentAccount = async () => {
+  const sessionValid = await ensureSession(true)
+  if (!sessionValid) {
+    throw new Error('Sign in again before deleting your account.')
+  }
+
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.functions.invoke('delete-account', {
+    body: { confirm: 'DELETE' },
+  })
+
+  if (error) {
+    throw new Error(error.message || 'Account deletion failed.')
+  }
+
+  if (data?.error) {
+    throw new Error(data.error)
+  }
+
+  await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined)
 }
 
 export const getCurrentUser = async (): Promise<AppUser | null> => {
