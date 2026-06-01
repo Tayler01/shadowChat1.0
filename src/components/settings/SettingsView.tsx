@@ -761,14 +761,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
         <div className="flex flex-col gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="font-medium text-[var(--text-primary)]">Add Shadow Chat to this phone</h3>
+            <h3 className="font-medium text-[var(--text-primary)]">Watch the phone setup tutorial</h3>
             <p className="mt-1 text-sm text-[var(--text-muted)]">
-              Reopen the guided iPhone or Android Home Screen setup any time.
+              Reopen the iPhone or Android video guide for Home Screen install and notification setup.
             </p>
           </div>
-          <Button onClick={() => setShowPhoneInstallGuide(true)} variant="secondary" className="w-full justify-center sm:w-auto">
-            Open Phone Setup
-          </Button>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Button onClick={() => setShowPhoneInstallGuide(true)} variant="secondary" className="w-full justify-center">
+              <Film className="mr-3 h-4 w-4" />
+              Watch Tutorial
+            </Button>
+            <Button onClick={() => setShowNotificationSetup(true)} variant="ghost" className="w-full justify-center">
+              <Bell className="mr-3 h-4 w-4" />
+              Notification Setup
+            </Button>
+          </div>
         </div>
       </div>
 

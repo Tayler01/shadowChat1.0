@@ -1,8 +1,10 @@
-import React from 'react'
-import { Bell, Copy, ExternalLink, Info, Smartphone } from 'lucide-react'
+import React, { useMemo, useRef } from 'react'
+import { Bell, Copy, ExternalLink, Info, RotateCcw, Smartphone } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Button } from '../ui/Button'
-import type { NotificationGuidance } from '../../lib/push'
+import { getClientPlatformInfo, type NotificationGuidance } from '../../lib/push'
+
+const ANDROID_NOTIFICATION_TUTORIAL_SRC = '/tutorials/shadochat-notifications-android.mp4'
 
 interface NotificationSetupModalProps {
   open: boolean
@@ -25,7 +27,18 @@ export const NotificationSetupModal: React.FC<NotificationSetupModalProps> = ({
   onEnable,
   onInstall,
 }) => {
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const showAndroidTutorial = useMemo(() => getClientPlatformInfo().os === 'android', [])
+
   if (!open) return null
+
+  const replayTutorial = () => {
+    const video = videoRef.current
+    if (!video) return
+
+    video.currentTime = 0
+    void video.play().catch(() => undefined)
+  }
 
   const handleCopy = async () => {
     try {
@@ -38,7 +51,7 @@ export const NotificationSetupModal: React.FC<NotificationSetupModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--bg-overlay)] px-4 backdrop-blur-md">
-      <div className="popup-surface w-full max-w-xl rounded-[var(--radius-lg)] p-6">
+      <div className="popup-surface max-h-[calc(100dvh-2rem)] w-full max-w-3xl overflow-y-auto rounded-[var(--radius-lg)] p-6">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
             <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-glow)] bg-[rgba(255,255,255,0.04)] text-[var(--text-gold)]">
@@ -60,21 +73,51 @@ export const NotificationSetupModal: React.FC<NotificationSetupModalProps> = ({
           </button>
         </div>
 
-        <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
-          <div className="mb-3 flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
-            <Info className="h-4 w-4 text-[var(--text-gold)]" />
-            Setup Steps
+        <div className={showAndroidTutorial ? 'grid gap-4 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1fr)]' : ''}>
+          {showAndroidTutorial && (
+            <div className="min-w-0">
+              <div className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-black shadow-[var(--shadow-panel)]">
+                <div className="aspect-[9/16]">
+                  <video
+                    ref={videoRef}
+                    src={ANDROID_NOTIFICATION_TUTORIAL_SRC}
+                    className="h-full w-full bg-black object-cover"
+                    muted
+                    autoPlay
+                    playsInline
+                    preload="metadata"
+                    controls
+                    aria-label="Android notification setup video"
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={replayTutorial}
+                className="mt-3 inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-xs font-medium uppercase tracking-[0.12em] text-[var(--text-secondary)] hover:border-[var(--border-glow)] hover:text-[var(--text-gold)]"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Replay
+              </button>
+            </div>
+          )}
+
+          <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
+            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">
+              <Info className="h-4 w-4 text-[var(--text-gold)]" />
+              Setup Steps
+            </div>
+            <ol className="space-y-3 text-sm text-[var(--text-secondary)]">
+              {guidance.steps.map((step, index) => (
+                <li key={step} className="flex gap-3">
+                  <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] text-xs text-[var(--text-gold)]">
+                    {index + 1}
+                  </span>
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ol>
           </div>
-          <ol className="space-y-3 text-sm text-[var(--text-secondary)]">
-            {guidance.steps.map((step, index) => (
-              <li key={step} className="flex gap-3">
-                <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] text-xs text-[var(--text-gold)]">
-                  {index + 1}
-                </span>
-                <span>{step}</span>
-              </li>
-            ))}
-          </ol>
         </div>
 
         <div className="mt-5 flex flex-wrap gap-3">

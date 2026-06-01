@@ -241,7 +241,7 @@ After setup, verify:
 4. File/image upload works
 5. Profile updates persist
 6. Push settings screen renders
-7. New-account phone setup opens after signup or first sign-in from the same browser
+7. Phone setup tutorial opens once after first mobile post-login launch and remains available in Settings > App Setup & User Guide
 8. Boards tab loads the low-friction map, feed pills/chat circles/static squares render correctly, labels stay contained, collision feedback works, and the map resets when Boards is reopened
 9. News Chat, Investing Chat, Learning Chat, Crypto Chat, Vibe Coding, AI News, and Projects Chat send and receive messages without duplicate subheaders
 10. An `admin` or `sub_admin` user can add, pause, enable, and delete a News source in Settings > Admin > News Sources
@@ -266,12 +266,12 @@ npx vite preview --host 127.0.0.1 --port 4174
 
 ## 11. End-User Phone Setup
 
-New accounts get a guided Home Screen setup modal. The guide is intentionally simple:
+Phone users get a short setup tutorial after first post-login launch. The guide covers install plus notification setup:
 
-- iPhone: open in Safari, tap Share, tap `Add to Home Screen`, tap `Add`
-- Android: tap `Install Now` when Chrome exposes the native prompt, or use the Chrome menu and choose `Install app` / `Add to Home screen`
+- iPhone: open `https://shadochat.online` in Safari, tap Share, tap `Add to Home Screen`, keep `Open as Web App` on, tap `Add`, then enable notifications from inside Shadow Chat
+- Android: tap `Install Now` when Chrome exposes the native prompt, or use the Chrome menu and choose `Install app` / `Add to Home screen`, then enable notifications from inside Shadow Chat
 
-Users can reopen the guide from Settings under `App Setup & User Guide`.
+Users can replay the tutorial from Settings under `App Setup & User Guide`. Android users also see the notification walkthrough video inside `Notification Setup`.
 
 For implementation and QA details, see [docs/PHONE_INSTALL_ONBOARDING.md](C:/repos/chat2.0/docs/PHONE_INSTALL_ONBOARDING.md:1).
 

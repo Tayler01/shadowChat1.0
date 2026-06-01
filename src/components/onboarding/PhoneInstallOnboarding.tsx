@@ -23,14 +23,30 @@ const isInstalledApp = () => {
   )
 }
 
+const isPhoneLikeDevice = () => {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  const nav = window.navigator as Navigator & { standalone?: boolean }
+  const userAgent = nav.userAgent || ''
+  const isMobileUserAgent =
+    /iPhone|iPod/i.test(userAgent) ||
+    /Android.+Mobile/i.test(userAgent) ||
+    (nav.platform === 'MacIntel' && nav.maxTouchPoints > 1)
+  const hasCoarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false
+  const narrowScreen = Math.min(window.innerWidth, window.screen?.width || window.innerWidth) <= 900
+
+  return isMobileUserAgent || (hasCoarsePointer && narrowScreen)
+}
+
 export function PhoneInstallOnboarding() {
   const { profile } = useAuth()
   const { canInstall, promptInstall } = usePwaInstallPrompt()
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
-    if (profile && shouldShowPhoneInstallOnboarding(profile, isInstalledApp())) {
-      markPhoneInstallOnboardingSeen(profile)
+    if (profile && shouldShowPhoneInstallOnboarding(profile, isInstalledApp(), isPhoneLikeDevice())) {
       toast.dismiss()
       setOpen(true)
     }

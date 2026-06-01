@@ -245,8 +245,8 @@ export const getNotificationGuidance = (
       title: 'Install Shadow Chat First',
       summary: 'On iPhone and iPad, push notifications work after you install Shadow Chat to your Home Screen and open it from there.',
       steps: [
-        'Open Shadow Chat in Safari.',
-        'Tap Share, then choose Add to Home Screen.',
+        'Open https://shadochat.online in Safari.',
+        'Tap Share, choose Add to Home Screen, keep Open as Web App on, then tap Add.',
         'Launch Shadow Chat from your Home Screen.',
         'Return here and enable notifications from the installed app.',
       ],

@@ -1,7 +1,7 @@
 import type { User } from './supabase'
 
 const STORAGE_PREFIX = 'shadowchat:phone-install-onboarding'
-export const PHONE_INSTALL_ONBOARDING_VERSION = 'v1'
+export const PHONE_INSTALL_ONBOARDING_VERSION = 'v2'
 
 type PhoneInstallProfile = Pick<User, 'id' | 'email'>
 
@@ -103,11 +103,12 @@ export const hasPhoneInstallOnboardingPending = (profile: PhoneInstallProfile) =
 
 export const shouldShowPhoneInstallOnboarding = (
   profile: PhoneInstallProfile | null,
-  isInstalled: boolean
+  isInstalled: boolean,
+  isPhoneLikeDevice = true
 ) => {
-  if (!profile || isInstalled || isPhoneInstallOnboardingSeen(profile)) {
+  if (!profile || isInstalled || !isPhoneLikeDevice || isPhoneInstallOnboardingSeen(profile)) {
     return false
   }
 
-  return hasPhoneInstallOnboardingPending(profile)
+  return true
 }
