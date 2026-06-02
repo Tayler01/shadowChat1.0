@@ -50,7 +50,10 @@ Implementation status on June 1, 2026:
 - Added RPC-backed bounded General Chat windows, separate pinned-message returns, and stable `(created_at, id)` keyset pagination.
 - Added cursor-aware window resolution before the first-unread jump, explicit deep-link/feed states, visibility-based read flushing, and cached-message refresh rendering.
 - Added seeded browser QA scenarios for read position, deep links, same-timestamp windows, realtime anchored reads, and media-layout stability.
-- Remaining production sign-off gates are applying the Supabase migration to the linked project, running `npm run qa:chat-scroll:all` with preview/staging service-role credentials, and doing the phone-sized browser smoke listed below.
+- Applied the production Supabase migrations `20260601181119_general_chat_message_window` and `20260601182251_lock_general_chat_read_rpc_acl`.
+- Verified the remote RPC contract, tightened read RPC grants so `anon` cannot execute them, and smoke-tested the production RPC with count-only output.
+- Verified production Netlify deploy `6a1decce55a2f6cfa3f8a5ba` on commit `6ab128c8046d01884246002b44819352d65ffc71`.
+- Ran a live phone-sized seeded read-position smoke against production, then deleted all seeded messages and restored the smoke account cursor.
 
 Completed feed work in this branch:
 
@@ -62,12 +65,14 @@ Completed feed work in this branch:
 6. Change older-message pagination to a stable `(created_at, id)` keyset contract and align indexes/RPCs if needed.
 7. Extend `npm run qa:chat-scroll` or add a focused smoke path that asserts read cursor position, not only scroll metrics. A seeded browser probe now exists behind `npm run qa:chat-scroll:all`.
 
-Remaining validation target:
+Completed validation:
 
-- Targeted Jest for `useUnreadScroll`, `MessageList`, and cursor helpers.
-- `npm run qa:chat-scroll:metrics -- --cycles=4 --clean-artifacts`.
-- `npm run qa:chat-scroll:all -- --no-reuse-server --run-name=general-chat-feed-rollout` against preview/staging seed credentials.
-- A phone-sized browser smoke with an older unread target, a fully read thread, and a realtime incoming message.
+- Targeted Jest for `useUnreadScroll`, `MessageList`, `useMessages`, `readCursors`, and `useReadCursor`: passed.
+- Full Jest suite: passed.
+- `npm run lint`, `npx tsc --noEmit -p tsconfig.app.json`, and `npm run build`: passed.
+- `npm run qa:chat-scroll:metrics -- --cycles=4 --clean-artifacts`: passed locally and against production.
+- Production auth smoke with stable accounts: passed.
+- Production phone-sized seeded first-unread and Jump to latest validation: passed, with cleanup verified.
 
 ## P0 - Invite-Only Signup And Email Verification
 
