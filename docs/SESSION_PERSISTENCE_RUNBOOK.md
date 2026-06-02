@@ -89,7 +89,7 @@ node scripts/playwright-smoke.mjs --scenario=auth,resume-send --headed --no-reus
 Recommended production smoke after deploy:
 
 ```powershell
-node scripts/playwright-smoke.mjs --base-url=https://shadowchat-1-0.netlify.app --scenario=auth,resume-send --account-mode=env --headed --slow-mo=300 --run-name=prod-session-check
+node scripts/playwright-smoke.mjs --base-url=https://shadochat.online --scenario=auth,resume-send --account-mode=env --headed --slow-mo=300 --run-name=prod-session-check
 ```
 
 When using throwaway accounts for auth/session checks, delete:

@@ -161,7 +161,7 @@ The April 28, 2026 release was verified with:
 
 ```powershell
 node scripts/playwright-smoke.mjs --scenario=full --run-name=full-smoke-feedback-release-20260428 --headed --slow-mo=100 --no-reuse-server
-node scripts/playwright-smoke.mjs --base-url=https://shadowchat-1-0.netlify.app --scenario=settings --account-mode=env --run-name=prod-feedback-settings-postdeploy --headed --slow-mo=100 --skip-build
+node scripts/playwright-smoke.mjs --base-url=https://shadochat.online --scenario=settings --account-mode=env --run-name=prod-feedback-settings-postdeploy --headed --slow-mo=100 --skip-build
 ```
 
 The production feedback E2E also created a real feedback row and downloaded the

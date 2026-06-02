@@ -51,7 +51,6 @@ export function LoginForm() {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [formData, setFormData] = useState({
     inviteCode: '',
-    displayName: '',
     username: '',
     email: '',
     password: '',
@@ -178,7 +177,6 @@ export function LoginForm() {
   const validateSignup = () => {
     const newErrors: Record<string, string> = {};
     if (!formData.inviteCode.trim()) newErrors.inviteCode = 'Invite code is required';
-    if (!formData.displayName.trim()) newErrors.displayName = 'Display name is required';
     if (!formData.username.trim()) newErrors.username = 'Username is required';
     if (formData.username.trim().length > 0 && formData.username.trim().length < 3) {
       newErrors.username = 'Username must be at least 3 characters';
@@ -221,7 +219,6 @@ export function LoginForm() {
 
         const result = await signUp(formData.email.trim(), formData.password, {
           inviteCode: formData.inviteCode,
-          displayName: formData.displayName,
           username: formData.username,
         });
 
@@ -345,19 +342,19 @@ export function LoginForm() {
   const renderModeSwitch = view === 'login' || view === 'signup';
 
   return (
-    <div className="theme-page-surface relative flex min-h-[100dvh] items-center justify-center overflow-hidden px-4 py-8">
+    <div className="theme-page-surface relative flex min-h-[100dvh] items-center justify-center overflow-hidden px-4 py-3 sm:py-8">
       <div className="relative w-full max-w-[26rem]">
-        <div className="glass-panel-strong space-y-6 rounded-[var(--radius-xl)] p-7 shadow-[var(--shadow-panel)] sm:p-8">
-          <div className="space-y-4 text-center">
+        <div className="glass-panel-strong space-y-4 rounded-[var(--radius-xl)] p-4 shadow-[var(--shadow-panel)] sm:space-y-5 sm:p-7">
+          <div className="space-y-2 text-center sm:space-y-3">
             <div className="flex justify-center">
               <img
                 src="/icons/header-logo.png"
                 alt="SHADO"
-                className="theme-logo h-20 w-56 object-contain"
+                className="theme-logo h-12 w-40 object-contain sm:h-20 sm:w-56"
               />
             </div>
             <div className="space-y-2">
-              <h1 className="text-2xl font-semibold text-[var(--text-primary)]">{title}</h1>
+              <h1 className="text-xl font-semibold text-[var(--text-primary)] sm:text-2xl">{title}</h1>
               <p className="text-sm leading-6 text-[var(--text-secondary)]">{subtitle}</p>
             </div>
           </div>
@@ -434,42 +431,18 @@ export function LoginForm() {
               </div>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
               {view === 'signup' && (
-                <>
-                  <Input
-                    label="Invite code"
-                    name="inviteCode"
-                    autoComplete="one-time-code"
-                    value={formData.inviteCode}
-                    onChange={handleInputChange}
-                    error={errors.inviteCode}
-                    placeholder="Enter your invite code"
-                    required
-                  />
-
-                  <Input
-                    label="Display name"
-                    name="displayName"
-                    autoComplete="name"
-                    value={formData.displayName}
-                    onChange={handleInputChange}
-                    error={errors.displayName}
-                    placeholder="Name shown in chat"
-                    required
-                  />
-
-                  <Input
-                    label="Username"
-                    name="username"
-                    autoComplete="username"
-                    value={formData.username}
-                    onChange={handleInputChange}
-                    error={errors.username}
-                    placeholder="Choose a username"
-                    required
-                  />
-                </>
+                <Input
+                  label="Invite code"
+                  name="inviteCode"
+                  autoComplete="one-time-code"
+                  value={formData.inviteCode}
+                  onChange={handleInputChange}
+                  error={errors.inviteCode}
+                  placeholder="Enter your invite code"
+                  required
+                />
               )}
 
               {(view === 'login' || view === 'signup' || view === 'forgot-password') && (
@@ -477,11 +450,24 @@ export function LoginForm() {
                   label="Email"
                   type="email"
                   name="email"
-                  autoComplete="email"
+                  autoComplete={view === 'login' ? 'username' : 'email'}
                   value={formData.email}
                   onChange={handleInputChange}
                   error={errors.email}
                   placeholder="Enter your email"
+                  required
+                />
+              )}
+
+              {view === 'signup' && (
+                <Input
+                  label="Username"
+                  name="username"
+                  autoComplete="off"
+                  value={formData.username}
+                  onChange={handleInputChange}
+                  error={errors.username}
+                  placeholder="Choose a public username"
                   required
                 />
               )}

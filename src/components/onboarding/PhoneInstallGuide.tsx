@@ -6,10 +6,8 @@ import {
   Download,
   MoreVertical,
   Plus,
-  RotateCcw,
   Share2,
   Smartphone,
-  X,
 } from 'lucide-react'
 import { Button } from '../ui/Button'
 
@@ -93,14 +91,6 @@ export function PhoneInstallGuide({
     })
   }, [open, platform])
 
-  const replayTutorial = () => {
-    const video = videoRef.current
-    if (!video) return
-
-    video.currentTime = 0
-    void video.play().catch(() => undefined)
-  }
-
   const steps = useMemo<SetupStep[]>(() => {
     if (platform === 'ios') {
       return [
@@ -139,31 +129,20 @@ export function PhoneInstallGuide({
         role="dialog"
         aria-modal="true"
         aria-labelledby="phone-install-guide-title"
-        className="popup-surface flex max-h-[calc(100dvh-1.5rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[var(--radius-lg)] sm:max-h-[calc(100dvh-3rem)]"
+        className="popup-surface flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[var(--radius-lg)] sm:max-h-[calc(100dvh-3rem)]"
       >
         <div className="p-5 pb-0 sm:p-6 sm:pb-0">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[rgba(215,170,70,0.18)] bg-[rgba(215,170,70,0.08)] px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--text-gold)]">
-                <Smartphone className="h-3.5 w-3.5" />
-                Phone setup
-              </div>
-              <h2 id="phone-install-guide-title" className="text-2xl font-semibold leading-tight text-[var(--text-primary)]">
-                Add Shadow Chat and turn on alerts
-              </h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
-                Install the web app first, open it from your Home Screen, then enable notifications from inside Shadow Chat.
-              </p>
+          <div className="min-w-0 text-center">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-[rgba(215,170,70,0.18)] bg-[rgba(215,170,70,0.08)] px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-[var(--text-gold)]">
+              <Smartphone className="h-3.5 w-3.5" />
+              Phone setup
             </div>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="popup-close flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[var(--radius-sm)]"
-              aria-label="Close phone setup"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            <h2 id="phone-install-guide-title" className="text-2xl font-semibold leading-tight text-[var(--text-primary)]">
+              Add Shadow Chat and turn on alerts
+            </h2>
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[var(--text-secondary)]">
+              Install the web app first, open it from your Home Screen, then enable notifications from inside Shadow Chat.
+            </p>
           </div>
 
           <div className="mt-5 grid grid-cols-2 gap-2 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-1">
@@ -192,65 +171,54 @@ export function PhoneInstallGuide({
         </div>
 
         <div className="mt-5 min-h-0 overflow-y-auto px-5 sm:px-6">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)]">
-            <div className="min-w-0">
-              <div className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-black shadow-[var(--shadow-panel)]">
-                <div className="relative aspect-[9/16]">
-                  {!videoUnavailable ? (
-                    <video
-                      key={platform}
-                      ref={videoRef}
-                      src={tutorial.src}
-                      className="h-full w-full bg-black object-cover"
-                      muted
-                      autoPlay
-                      playsInline
-                      preload="metadata"
-                      controls
-                      aria-label={tutorial.label}
-                      onError={() => setVideoUnavailable(true)}
-                    />
-                  ) : (
-                    <div className="flex h-full flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.16),rgba(5,6,7,0.95)_44%,#000)] p-6 text-center">
-                      <Smartphone className="h-10 w-10 text-[var(--text-gold)]" />
-                      <p className="text-sm font-semibold text-[var(--text-primary)]">Video preview is unavailable.</p>
-                      <p className="text-xs leading-5 text-[var(--text-muted)]">Use the setup steps beside this player.</p>
-                    </div>
-                  )}
+          <div className="mx-auto w-full max-w-[23rem] overflow-hidden rounded-[calc(var(--radius-lg)+4px)] border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(215,170,70,0.34),rgba(215,170,70,0.08))] p-1 shadow-[0_18px_46px_rgba(0,0,0,0.38),0_0_32px_rgba(215,170,70,0.12)]">
+            <div className="overflow-hidden rounded-[var(--radius-lg)] bg-black">
+              <div className="relative aspect-[9/16] max-h-[56dvh]">
+                {!videoUnavailable ? (
+                  <video
+                    key={platform}
+                    ref={videoRef}
+                    src={tutorial.src}
+                    className="pointer-events-none h-full w-full bg-black object-cover"
+                    muted
+                    autoPlay
+                    loop
+                    playsInline
+                    preload="auto"
+                    aria-label={tutorial.label}
+                    onContextMenu={event => event.preventDefault()}
+                    onError={() => setVideoUnavailable(true)}
+                  />
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.16),rgba(5,6,7,0.95)_44%,#000)] p-6 text-center">
+                    <Smartphone className="h-10 w-10 text-[var(--text-gold)]" />
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">Video preview is unavailable.</p>
+                    <p className="text-xs leading-5 text-[var(--text-muted)]">Use the setup steps below.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            {steps.map((step, index) => (
+              <div
+                key={step.title}
+                className="flex gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-3.5"
+              >
+                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-[rgba(215,170,70,0.16)] bg-[rgba(215,170,70,0.08)] text-[var(--text-gold)]">
+                  <step.icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-[var(--text-primary)]">
+                    {index + 1}. {step.title}
+                  </p>
+                  <p className="mt-1 text-sm leading-5 text-[var(--text-muted)]">
+                    {step.detail}
+                  </p>
                 </div>
               </div>
-              {!videoUnavailable && (
-                <button
-                  type="button"
-                  onClick={replayTutorial}
-                  className="mt-3 inline-flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-xs font-medium uppercase tracking-[0.12em] text-[var(--text-secondary)] hover:border-[var(--border-glow)] hover:text-[var(--text-gold)]"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  Replay
-                </button>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              {steps.map((step, index) => (
-                <div
-                  key={step.title}
-                  className="flex gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-3.5"
-                >
-                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[var(--radius-sm)] border border-[rgba(215,170,70,0.16)] bg-[rgba(215,170,70,0.08)] text-[var(--text-gold)]">
-                    <step.icon className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-[var(--text-primary)]">
-                      {index + 1}. {step.title}
-                    </p>
-                    <p className="mt-1 text-sm leading-5 text-[var(--text-muted)]">
-                      {step.detail}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+            ))}
           </div>
 
           {platform === 'ios' ? (

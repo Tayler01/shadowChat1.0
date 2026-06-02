@@ -216,7 +216,7 @@ Keep these configured in Supabase:
 - `AI_PROVIDER=openrouter`
 - `OPENROUTER_MODEL=mistralai/mistral-nemo`
 - `AI_ALLOWED_MODELS=mistralai/mistral-nemo`
-- `OPENROUTER_SITE_URL=https://shadowchat-1-0.netlify.app`
+- `OPENROUTER_SITE_URL=https://shadochat.online`
 - `OPENROUTER_APP_NAME=ShadowChat`
 - `WEB_PUSH_PUBLIC_KEY`
 - `WEB_PUSH_PRIVATE_KEY`

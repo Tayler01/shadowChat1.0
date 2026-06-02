@@ -1,8 +1,9 @@
 project_id = "chat2-0"
 
 [auth]
-site_url = "https://shadowchat-1-0.netlify.app"
+site_url = "https://shadochat.online"
 additional_redirect_urls = [
+  "https://shadochat.online",
   "https://shadowchat-1-0.netlify.app",
   "http://localhost:5173",
   "http://localhost:4174",
@@ -16,6 +17,14 @@ enable_signup = true
 enable_confirmations = true
 max_frequency = "1m0s"
 otp_length = 8
+
+[auth.email.template.confirmation]
+subject = "Verify your Shado account"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Reset your Shado password"
+content_path = "./supabase/templates/recovery.html"
 
 [auth.hook.before_user_created]
 enabled = true

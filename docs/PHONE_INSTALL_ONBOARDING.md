@@ -12,7 +12,9 @@ Shadow Chat is a mobile-first PWA. First-time phone users should see a short, si
 - The tutorial does not auto-open if the app is already running in standalone/Home Screen mode.
 - Closing, skipping, finishing setup, or accepting the Android native install prompt marks the tutorial as seen for that user and onboarding version.
 - Settings keeps the same tutorial under `App Setup & User Guide` so users can replay it later.
-- The written steps remain in the modal beside the video for accessibility, failed media loads, and users who prefer scanning.
+- The setup video is the main surface, plays silently without native controls, and is framed by the Shado border.
+- The written steps remain below the video for accessibility, failed media loads, and users who prefer scanning.
+- Notification Setup is a compact steps-and-actions modal; it no longer embeds the Android walkthrough video mid-flow.
 - Account creation can still mark setup as pending in local storage, but the current auto-open rule is first mobile post-login launch, not pending-only.
 
 The marker is local to the browser/device. A user who signs in on a new phone browser can see the tutorial there even if they already dismissed it elsewhere.
@@ -44,12 +46,11 @@ If the `beforeinstallprompt` event is available, the modal can show `Install Now
 
 ## Video Assets
 
-The app expects these silent tutorial videos:
+The app expects this silent tutorial video:
 
 - `public/tutorials/shadochat-setup-android.mp4`
-- `public/tutorials/shadochat-notifications-android.mp4`
 
-The iPhone tab temporarily reuses the Android install tutorial video until a good iPhone-specific recording is ready. The Android production clips are annotated screen recordings from a modern generic Android emulator. Replace these files directly when a new approved take is ready.
+The iPhone tab temporarily reuses the Android install tutorial video until a good iPhone-specific recording is ready. The Android production clip is an annotated screen recording from a modern generic Android emulator. Replace this file directly when a new approved take is ready.
 
 ## Testing
 
@@ -59,9 +60,9 @@ Recommended checks:
 
 1. Open a fresh phone-sized browser context for a user with no `shadowchat:phone-install-onboarding:v2` seen marker.
 2. Sign in and verify the setup tutorial modal opens after the profile loads.
-3. Check iPhone and Android tabs, video playback, written steps, replay, skip, and finish buttons.
+3. Check iPhone and Android tabs, locked video playback, written steps, skip, and finish buttons.
 4. Confirm the modal does not auto-open again after dismissal.
-5. Confirm Settings > App Setup & User Guide can reopen the tutorial and Notification Setup, including the Android notification walkthrough video.
+5. Confirm Settings > App Setup & User Guide can reopen the tutorial and Notification Setup, and that Notification Setup stays steps-first without an embedded video.
 6. Delete any temporary auth user and confirm its `public.users` row is gone.
 
 Useful references:

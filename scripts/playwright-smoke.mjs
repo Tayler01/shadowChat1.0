@@ -592,7 +592,9 @@ async function authenticateAccount(page, state, account, label) {
       }
       await fillInput(page, 'Invite code', account.inviteCode)
     }
-    await fillInput(page, 'Display name', account.displayName)
+    if (account.displayName && await page.locator('input[name="displayName"]').first().isVisible().catch(() => false)) {
+      await fillInput(page, 'Display name', account.displayName)
+    }
     await fillInput(page, 'Username', account.username)
     await fillInput(page, 'Email', account.email)
     await fillInput(page, 'Password', account.password)
@@ -967,12 +969,15 @@ async function isChatVisible(page) {
 }
 
 async function ensureSignupView(page) {
-  if (await page.getByLabel('Display name').isVisible().catch(() => false)) {
+  if (
+    await page.getByLabel('Invite code').isVisible().catch(() => false) ||
+    await page.locator('input[name="username"]').first().isVisible().catch(() => false)
+  ) {
     return
   }
 
   await page.getByRole('button', { name: /Sign up/i }).click()
-  await page.getByLabel('Display name').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByLabel('Invite code').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
 async function ensureSigninView(page) {

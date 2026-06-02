@@ -2,7 +2,7 @@ describe('invite-only signup and email verification QA contract', () => {
   describe('signup invite-code validation UI', () => {
     test.todo('requires an invite code before submitting signup credentials')
     test.todo('shows a focused inline error when the invite code is invalid, expired, disabled, reused, or wrong-email')
-    test.todo('submits a valid invite code with email, password, username, and display name')
+    test.todo('submits a valid invite code with email, password, and username')
     test.todo('shows the pending-verification screen after a valid invite creates an unconfirmed auth user')
   })
 

@@ -111,6 +111,12 @@ and verify Auth config:
 supabase config push --project-ref YOUR_PROJECT_REF --yes
 ```
 
+The Shado-branded confirmation and recovery email subject/body templates live
+under [supabase/templates](C:/repos/chat2.0/supabase/templates). If inboxes show
+`Supabase Auth` as the sender name, configure Supabase Custom SMTP in the hosted
+project with a verified Shado sender name/address; keep SMTP credentials out of
+browser env and out of the repo.
+
 ## 4. Configure Supabase Secrets
 
 Set Edge Function secrets before expecting AI or push features to work:
@@ -123,7 +129,7 @@ Recommended OpenRouter test setup:
 - `AI_PROVIDER=openrouter`
 - `OPENROUTER_MODEL=mistralai/mistral-nemo`
 - `AI_ALLOWED_MODELS=mistralai/mistral-nemo`
-- `OPENROUTER_SITE_URL=https://shadowchat-1-0.netlify.app`
+- `OPENROUTER_SITE_URL=https://shadochat.online`
 - `OPENROUTER_APP_NAME=ShadowChat`
 
 The current cheap paid test model is `mistralai/mistral-nemo`. As of April 26, 2026, OpenRouter lists it around $0.01 per million input tokens and $0.03 per million output tokens. Recheck the [OpenRouter model catalog](https://openrouter.ai/models) and [pricing page](https://openrouter.ai/pricing) before changing production defaults.
@@ -147,7 +153,7 @@ supabase secrets set OPENROUTER_API_KEY=YOUR_OPENROUTER_KEY
 supabase secrets set AI_PROVIDER=openrouter
 supabase secrets set OPENROUTER_MODEL=mistralai/mistral-nemo
 supabase secrets set AI_ALLOWED_MODELS=mistralai/mistral-nemo
-supabase secrets set OPENROUTER_SITE_URL=https://shadowchat-1-0.netlify.app
+supabase secrets set OPENROUTER_SITE_URL=https://shadochat.online
 supabase secrets set OPENROUTER_APP_NAME=ShadowChat
 supabase secrets set WEB_PUSH_PUBLIC_KEY=YOUR_PUBLIC_KEY
 supabase secrets set WEB_PUSH_PRIVATE_KEY=YOUR_PRIVATE_KEY
@@ -297,7 +303,7 @@ Phone users get a short setup tutorial after first post-login launch. The guide 
 - iPhone: open `https://shadochat.online` in Safari, tap Share, tap `Add to Home Screen`, keep `Open as Web App` on, tap `Add`, then enable notifications from inside Shadow Chat
 - Android: tap `Install Now` when Chrome exposes the native prompt, or use the Chrome menu and choose `Install app` / `Add to Home screen`, then enable notifications from inside Shadow Chat
 
-Users can replay the tutorial from Settings under `App Setup & User Guide`. Android users also see the notification walkthrough video inside `Notification Setup`.
+Users can replay the tutorial from Settings under `App Setup & User Guide`. Notification Setup stays as a compact steps-and-actions flow without an embedded video.
 
 For implementation and QA details, see [docs/PHONE_INSTALL_ONBOARDING.md](C:/repos/chat2.0/docs/PHONE_INSTALL_ONBOARDING.md:1).
 

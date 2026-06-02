@@ -94,7 +94,7 @@ const resolveAIConfig = (provider: AIProvider) => {
       url: 'https://openrouter.ai/api/v1/chat/completions',
       headers: {
         'HTTP-Referer':
-          Deno.env.get('OPENROUTER_SITE_URL') || 'https://shadowchat-1-0.netlify.app',
+          Deno.env.get('OPENROUTER_SITE_URL') || 'https://shadochat.online',
         'X-OpenRouter-Title': Deno.env.get('OPENROUTER_APP_NAME') || 'ShadowChat',
       },
     }

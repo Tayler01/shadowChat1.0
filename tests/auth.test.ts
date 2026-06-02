@@ -50,7 +50,6 @@ test('signUp passes normalized invite metadata and redirect URL to Supabase Auth
     email: 'New@Example.com',
     password: 'Secret!123',
     username: ' NewUser ',
-    displayName: ' New User ',
     inviteCode: ' shado-123 ',
   })
 
@@ -64,7 +63,6 @@ test('signUp passes normalized invite metadata and redirect URL to Supabase Auth
       emailRedirectTo: 'http://localhost/?auth=verified',
       data: {
         username: 'newuser',
-        display_name: 'New User',
         invite_code: 'shado-123',
       },
     },
@@ -81,7 +79,6 @@ test('signUp rejects missing invite code before creating an auth user', async ()
     email: 'new@example.com',
     password: 'Secret!123',
     username: 'newuser',
-    displayName: 'New User',
     inviteCode: '   ',
   })).rejects.toThrow('Invite code is required')
 

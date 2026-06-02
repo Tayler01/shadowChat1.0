@@ -44,7 +44,7 @@ attachments. If cleanup cannot be verified, keep the payload minimal and record
 the remaining rows or object paths in the deploy notes as residual risk.
 
 For General Chat scroll timing on production, use the metrics-only probe:
-`npm run qa:chat-scroll:metrics -- --base-url=https://shadowchat-1-0.netlify.app --skip-build`.
+`npm run qa:chat-scroll:metrics -- --base-url=https://shadochat.online --skip-build`.
 Do not run seeded chat-scroll scenarios against production unless explicit
 production data-seeding approval has been given; the script requires
 `--allow-production-seed` for known production targets.
@@ -120,19 +120,19 @@ npm run qa:smoke:prod:headless
 Default direct equivalent:
 
 ```powershell
-node scripts/playwright-smoke.mjs --base-url=https://shadowchat-1-0.netlify.app --scenario=auth,resume-send --account-mode=env --run-name=prod-postdeploy --headed --slow-mo=300
+node scripts/playwright-smoke.mjs --base-url=https://shadochat.online --scenario=auth,resume-send --account-mode=env --run-name=prod-postdeploy --headed --slow-mo=300
 ```
 
 Full production Settings check after a deploy:
 
 ```powershell
-node scripts/playwright-smoke.mjs --base-url=https://shadowchat-1-0.netlify.app --scenario=settings --account-mode=env --run-name=prod-settings-postdeploy --headed --slow-mo=100 --skip-build
+node scripts/playwright-smoke.mjs --base-url=https://shadochat.online --scenario=settings --account-mode=env --run-name=prod-settings-postdeploy --headed --slow-mo=100 --skip-build
 ```
 
 Headless direct equivalent:
 
 ```powershell
-node scripts/playwright-smoke.mjs --base-url=https://shadowchat-1-0.netlify.app --scenario=auth,resume-send --account-mode=env --run-name=prod-postdeploy-headless
+node scripts/playwright-smoke.mjs --base-url=https://shadochat.online --scenario=auth,resume-send --account-mode=env --run-name=prod-postdeploy-headless
 ```
 
 ## Reading Results

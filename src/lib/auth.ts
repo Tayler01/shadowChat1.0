@@ -24,7 +24,6 @@ export interface SignUpData {
   email: string
   password: string
   username: string
-  displayName: string
   inviteCode: string
 }
 
@@ -39,12 +38,24 @@ export interface SignUpResult {
   session: unknown | null
 }
 
-const getAuthRedirectTo = (mode?: 'verified' | 'reset-password') => {
+const OFFICIAL_APP_ORIGIN = 'https://shadochat.online'
+const LEGACY_NETLIFY_APP_ORIGIN = 'https://shadowchat-1-0.netlify.app'
+
+const getAuthRedirectOrigin = () => {
   if (typeof window === 'undefined') {
-    return undefined
+    return OFFICIAL_APP_ORIGIN
   }
 
-  const url = new URL(window.location.origin)
+  const { origin } = window.location
+  if (origin === LEGACY_NETLIFY_APP_ORIGIN) {
+    return OFFICIAL_APP_ORIGIN
+  }
+
+  return origin || OFFICIAL_APP_ORIGIN
+}
+
+const getAuthRedirectTo = (mode?: 'verified' | 'reset-password') => {
+  const url = new URL(getAuthRedirectOrigin())
   if (mode) {
     url.searchParams.set('auth', mode)
   }
@@ -95,7 +106,6 @@ export const signUp = async ({
   email,
   password,
   username,
-  displayName,
   inviteCode,
 }: SignUpData): Promise<SignUpResult> => {
   const normalizedUsername = username.trim().toLowerCase()
@@ -126,7 +136,6 @@ export const signUp = async ({
       emailRedirectTo: getAuthRedirectTo('verified'),
       data: {
         username: normalizedUsername,
-        display_name: displayName.trim(),
         invite_code: normalizedInviteCode,
       },
     },

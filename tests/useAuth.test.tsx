@@ -186,7 +186,6 @@ test('signUp sets user when session returned', async () => {
 
   await act(async () => {
     await result.current.signUp('x@y.com', 'pw', {
-      displayName: 'X',
       username: 'user',
       inviteCode: 'INVITE-123',
     });
@@ -196,7 +195,6 @@ test('signUp sets user when session returned', async () => {
     email: 'x@y.com',
     password: 'pw',
     username: 'user',
-    displayName: 'X',
     inviteCode: 'INVITE-123',
   });
   await waitFor(() => expect(result.current.user).toEqual(profile));
@@ -213,7 +211,6 @@ test('signUp leaves user unauthenticated when email confirmation returns no sess
   let signupResult: any;
   await act(async () => {
     signupResult = await result.current.signUp('pending@example.com', 'pw', {
-      displayName: 'Pending User',
       username: 'pending',
       inviteCode: 'INVITE-PENDING',
     });
@@ -223,7 +220,6 @@ test('signUp leaves user unauthenticated when email confirmation returns no sess
     email: 'pending@example.com',
     password: 'pw',
     username: 'pending',
-    displayName: 'Pending User',
     inviteCode: 'INVITE-PENDING',
   });
   expect(signupResult).toEqual({ session: null, profile: null, user: pendingUser });
@@ -315,7 +311,6 @@ test('deleteAccount calls auth.deleteCurrentAccount and clears local user state'
 
   await act(async () => {
     await result.current.signUp('x@y.com', 'pw', {
-      displayName: 'X',
       username: 'user',
       inviteCode: 'INVITE-123',
     });
@@ -350,7 +345,6 @@ test('uploadAvatar calls auth.uploadUserAvatar', async () => {
 
   await act(async () => {
     await result.current.signUp('x@y.com', 'pw', {
-      displayName: 'X',
       username: 'user',
       inviteCode: 'INVITE-123',
     });
@@ -384,7 +378,6 @@ test('uploadBanner calls auth.uploadUserBanner', async () => {
 
   await act(async () => {
     await result.current.signUp('x@y.com', 'pw', {
-      displayName: 'X',
       username: 'user',
       inviteCode: 'INVITE-123',
     });

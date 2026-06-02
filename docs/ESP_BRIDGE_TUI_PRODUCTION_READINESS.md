@@ -260,7 +260,7 @@ Required Supabase secrets:
 - `AI_PROVIDER=openrouter`
 - `OPENROUTER_MODEL=mistralai/mistral-nemo`
 - `AI_ALLOWED_MODELS=mistralai/mistral-nemo`
-- `OPENROUTER_SITE_URL=https://shadowchat-1-0.netlify.app`
+- `OPENROUTER_SITE_URL=https://shadochat.online`
 - `OPENROUTER_APP_NAME=ShadowChat`
 - `SUPABASE_SERVICE_ROLE_KEY`
 

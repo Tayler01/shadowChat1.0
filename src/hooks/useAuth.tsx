@@ -36,7 +36,7 @@ interface AuthContextValue {
   signUp: (
     email: string,
     password: string,
-    userData: { inviteCode: string; displayName: string; username: string }
+    userData: { inviteCode: string; username: string }
   ) => Promise<any>;
   resendVerificationEmail: (email: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
@@ -524,7 +524,7 @@ function useProvideAuth() {
   const signUp = async (
     email: string,
     password: string,
-    userData: { inviteCode: string; displayName: string; username: string }
+    userData: { inviteCode: string; username: string }
   ) => {
     setLoading(true);
     setError(null);
@@ -533,7 +533,6 @@ function useProvideAuth() {
         email,
         password,
         username: userData.username,
-        displayName: userData.displayName,
         inviteCode: userData.inviteCode,
       });
 
