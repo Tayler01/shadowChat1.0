@@ -199,10 +199,19 @@ What the smoke runner does by default:
 - reuses `http://127.0.0.1:4174` if it is already up
 - otherwise runs `vite build` and starts `vite preview`
 - signs in with `PLAYWRIGHT_ACCOUNT_*` credentials if present
-- otherwise creates disposable Supabase users for a clean DM run
+- otherwise creates disposable Supabase users for a clean DM run only when the
+  target auth project allows disposable signup or per-account invite codes are
+  supplied
 - saves screenshots, logs, storage state, and a JSON summary under `output/playwright/<run-name>/`
 
 When you have changed app code and want the latest build instead of the already-running preview, add `--no-reuse-server`.
+
+Invite-enforced environments should use stable confirmed accounts with
+`--account-mode=env`. If a disposable signup proof is explicitly needed, provide
+single-use codes through `PLAYWRIGHT_ACCOUNT_1_INVITE_CODE` and
+`PLAYWRIGHT_ACCOUNT_2_INVITE_CODE`; email confirmation may still prevent that
+disposable path from entering the app unless the target project is configured
+for the test.
 
 Every smoke scenario that writes real chat rows or uploads media is responsible
 for deleting its test data before the run is treated as clean. This especially

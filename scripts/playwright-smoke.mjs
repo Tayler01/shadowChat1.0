@@ -391,6 +391,11 @@ function buildAccounts(config) {
       password: 'ShadowChat!123456',
       username: `smokea${seed}`.slice(0, 24),
       displayName: 'Smoke User A',
+      inviteCode: getEnvValue(config.envValues, [
+        'PLAYWRIGHT_ACCOUNT_1_INVITE_CODE',
+        'PLAYWRIGHT_ACCOUNT1_INVITE_CODE',
+        'PLAYWRIGHT_INVITE_CODE_1',
+      ]),
     },
     {
       label: 'account-2',
@@ -399,6 +404,11 @@ function buildAccounts(config) {
       password: 'ShadowChat!123456',
       username: `smokeb${seed}`.slice(0, 24),
       displayName: 'Smoke User B',
+      inviteCode: getEnvValue(config.envValues, [
+        'PLAYWRIGHT_ACCOUNT_2_INVITE_CODE',
+        'PLAYWRIGHT_ACCOUNT2_INVITE_CODE',
+        'PLAYWRIGHT_INVITE_CODE_2',
+      ]),
     },
   ]
 }
@@ -419,6 +429,7 @@ function buildEnvAccount(envValues, index) {
     password,
     username: getEnvValue(envValues, prefix.map(value => `${value}USERNAME`)),
     displayName: getEnvValue(envValues, prefix.map(value => `${value}DISPLAY_NAME`)),
+    inviteCode: getEnvValue(envValues, prefix.map(value => `${value}INVITE_CODE`)),
   }
 }
 
@@ -575,16 +586,22 @@ async function authenticateAccount(page, state, account, label) {
 
   if (account.strategy === 'signup') {
     await ensureSignupView(page)
-    await fillInput(page, 'Full Name', account.displayName)
+    if (await page.getByLabel('Invite code').isVisible().catch(() => false)) {
+      if (!account.inviteCode) {
+        throw new Error(`Signup for ${label} requires an invite code. Use PLAYWRIGHT_ACCOUNT_* env vars for existing confirmed users, or provide PLAYWRIGHT_ACCOUNT_${label.endsWith('2') ? '2' : '1'}_INVITE_CODE for disposable signup.`)
+      }
+      await fillInput(page, 'Invite code', account.inviteCode)
+    }
+    await fillInput(page, 'Display name', account.displayName)
     await fillInput(page, 'Username', account.username)
     await fillInput(page, 'Email', account.email)
     await fillInput(page, 'Password', account.password)
-    await page.getByRole('button', { name: 'Create Account' }).click()
+    await page.locator('form').getByRole('button', { name: /^Create account$/i }).click()
 
     const landedInChat = await waitForEither(
       [
         async () => isChatVisible(page),
-        async () => page.getByText('Please check your email to confirm your account.').isVisible().catch(() => false),
+        async () => page.getByText(/verify your email|confirmation link|check your email/i).isVisible().catch(() => false),
       ],
       DEFAULT_TIMEOUT_MS
     )
@@ -596,7 +613,7 @@ async function authenticateAccount(page, state, account, label) {
     await ensureSigninView(page)
     await fillInput(page, 'Email', account.email)
     await fillInput(page, 'Password', account.password)
-    await page.getByRole('button', { name: 'Sign In' }).click()
+    await page.locator('form').getByRole('button', { name: /^Sign in$/i }).click()
     await waitForChatView(page)
   }
 
@@ -875,6 +892,10 @@ async function waitForBootSurface(page) {
     return (
       text.includes('Welcome Back') ||
       text.includes('Join the Chat') ||
+      text.includes('Sign in') ||
+      text.includes('Create account') ||
+      text.includes('Access your Shado account') ||
+      text.includes('Invite code required') ||
       text.includes('General Chat') ||
       text.includes('Direct Messages')
     )
@@ -946,26 +967,28 @@ async function isChatVisible(page) {
 }
 
 async function ensureSignupView(page) {
-  if (await page.getByLabel('Full Name').isVisible().catch(() => false)) {
+  if (await page.getByLabel('Display name').isVisible().catch(() => false)) {
     return
   }
 
   await page.getByRole('button', { name: /Sign up/i }).click()
-  await page.getByLabel('Full Name').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByLabel('Display name').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
 async function ensureSigninView(page) {
-  if (await page.getByRole('button', { name: 'Sign In' }).isVisible().catch(() => false)) {
+  if (await page.locator('form').getByRole('button', { name: /^Sign in$/i }).isVisible().catch(() => false)) {
     return
   }
 
   await page.getByRole('button', { name: /Sign in/i }).click()
-  await page.getByRole('button', { name: 'Sign In' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.locator('form').getByRole('button', { name: /^Sign in$/i }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
 async function fillInput(page, label, value) {
   const fieldNames = {
-    'Full Name': 'full_name',
+    'Full Name': 'displayName',
+    'Display name': 'displayName',
+    'Invite code': 'inviteCode',
     Username: 'username',
     Email: 'email',
     Password: 'password',
