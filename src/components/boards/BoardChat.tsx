@@ -412,61 +412,6 @@ export function BoardChat({
     }
   }, [clearHistoryRetry])
 
-  useEffect(() => {
-    let frameId: number | null = null
-    let settleFrameId: number | null = null
-    let settleTimerId: number | null = null
-
-    const keepLatestVisible = () => {
-      if (!autoScroll) return
-
-      if (frameId !== null) {
-        cancelAnimationFrame(frameId)
-      }
-      if (settleFrameId !== null) {
-        cancelAnimationFrame(settleFrameId)
-      }
-      if (settleTimerId !== null) {
-        window.clearTimeout(settleTimerId)
-      }
-
-      frameId = requestAnimationFrame(() => {
-        frameId = null
-        scrollToBottom('auto')
-        settleFrameId = requestAnimationFrame(() => {
-          settleFrameId = null
-          scrollToBottom('auto')
-        })
-        settleTimerId = window.setTimeout(() => {
-          settleTimerId = null
-          scrollToBottom('auto')
-        }, 140)
-      })
-    }
-
-    keepLatestVisible()
-    window.visualViewport?.addEventListener('resize', keepLatestVisible)
-    window.visualViewport?.addEventListener('scroll', keepLatestVisible)
-    window.addEventListener('resize', keepLatestVisible)
-    window.addEventListener('focusin', keepLatestVisible)
-
-    return () => {
-      window.visualViewport?.removeEventListener('resize', keepLatestVisible)
-      window.visualViewport?.removeEventListener('scroll', keepLatestVisible)
-      window.removeEventListener('resize', keepLatestVisible)
-      window.removeEventListener('focusin', keepLatestVisible)
-      if (frameId !== null) {
-        cancelAnimationFrame(frameId)
-      }
-      if (settleFrameId !== null) {
-        cancelAnimationFrame(settleFrameId)
-      }
-      if (settleTimerId !== null) {
-        window.clearTimeout(settleTimerId)
-      }
-    }
-  }, [autoScroll, messages.length, scrollToBottom])
-
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!draft.trim() || sending) return

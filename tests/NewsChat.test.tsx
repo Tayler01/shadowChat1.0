@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
 import { NewsChat } from '../src/components/news/NewsChat'
 
@@ -106,6 +106,17 @@ afterEach(() => {
   jest.clearAllMocks()
 })
 
+const setScrollerMetrics = (element: HTMLElement, scrollHeight: number, clientHeight = 400) => {
+  Object.defineProperty(element, 'scrollHeight', {
+    configurable: true,
+    value: scrollHeight,
+  })
+  Object.defineProperty(element, 'clientHeight', {
+    configurable: true,
+    value: clientHeight,
+  })
+}
+
 test('news chat renders messages and sends text links', async () => {
   render(<NewsChat />)
 
@@ -133,6 +144,87 @@ test('news chat reserves mobile footer and keyboard space in the message scrolle
     'disabled'
   )
   expect(screen.getAllByPlaceholderText(/drop a link or note in news chat/i)[0]).toHaveClass('text-base', 'md:text-sm')
+})
+
+test('news chat does not snap back to latest after the user scrolls up', async () => {
+  const originalRequestAnimationFrame = window.requestAnimationFrame
+  const originalCancelAnimationFrame = window.cancelAnimationFrame
+  const originalVisualViewport = window.visualViewport
+  const originalResizeObserver = global.ResizeObserver
+  const visualViewportListeners: Partial<Record<string, EventListener[]>> = {}
+
+  window.requestAnimationFrame = ((callback: FrameRequestCallback) => {
+    callback(0)
+    return 1
+  }) as typeof window.requestAnimationFrame
+  window.cancelAnimationFrame = jest.fn()
+  global.ResizeObserver = class {
+    observe = jest.fn()
+    unobserve = jest.fn()
+    disconnect = jest.fn()
+  } as unknown as typeof ResizeObserver
+
+  Object.defineProperty(window, 'visualViewport', {
+    configurable: true,
+    value: {
+      addEventListener: jest.fn((type: string, listener: EventListener) => {
+        visualViewportListeners[type] = [...(visualViewportListeners[type] ?? []), listener]
+      }),
+      removeEventListener: jest.fn(),
+      height: 520,
+      width: 390,
+      offsetTop: 0,
+      offsetLeft: 0,
+      pageTop: 0,
+      pageLeft: 0,
+      scale: 1,
+    } as unknown as VisualViewport,
+  })
+
+  try {
+    render(<NewsChat />)
+
+    const scroller = screen.getByTestId('board-chat-message-scroll')
+    setScrollerMetrics(scroller, 1000)
+    scroller.scrollTop = 600
+
+    const scrollTo = jest.fn((options?: ScrollToOptions | number) => {
+      const top = typeof options === 'number' ? options : options?.top
+      scroller.scrollTop = Number(top)
+    })
+    Object.defineProperty(scroller, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    })
+
+    scroller.scrollTop = 450
+    fireEvent.scroll(scroller)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /jump to latest/i })).toBeInTheDocument()
+    })
+
+    act(() => {
+      visualViewportListeners.scroll?.forEach(listener => listener(new Event('scroll')))
+      visualViewportListeners.resize?.forEach(listener => listener(new Event('resize')))
+      window.dispatchEvent(new Event('focusin'))
+    })
+
+    await act(async () => {
+      await new Promise(resolve => window.setTimeout(resolve, 180))
+    })
+
+    expect(scroller.scrollTop).toBe(450)
+    expect(scrollTo).not.toHaveBeenCalled()
+  } finally {
+    window.requestAnimationFrame = originalRequestAnimationFrame
+    window.cancelAnimationFrame = originalCancelAnimationFrame
+    global.ResizeObserver = originalResizeObserver
+    Object.defineProperty(window, 'visualViewport', {
+      configurable: true,
+      value: originalVisualViewport,
+    })
+  }
 })
 
 test('news chat supports owner edits, deletes, and reactions', async () => {
