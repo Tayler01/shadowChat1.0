@@ -15,6 +15,9 @@ import {
   signIn as authSignIn,
   signUp as authSignUp,
   signOut as authSignOut,
+  resendVerificationEmail as authResendVerificationEmail,
+  sendPasswordResetEmail as authSendPasswordResetEmail,
+  updatePasswordAfterRecovery as authUpdatePasswordAfterRecovery,
   deleteCurrentAccount,
   getCurrentUser,
   updateUserProfile,
@@ -33,8 +36,12 @@ interface AuthContextValue {
   signUp: (
     email: string,
     password: string,
-    userData: { full_name: string; username: string }
+    userData: { inviteCode: string; displayName: string; username: string }
   ) => Promise<any>;
+  resendVerificationEmail: (email: string) => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
+  updatePasswordAfterRecovery: (password: string) => Promise<void>;
+  passwordRecovery: boolean;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   updateProfile: (updates: Partial<User>) => Promise<User | void>;
@@ -47,6 +54,20 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 const AUTH_RESTORE_RETRY_DELAYS_MS = [0, 450, 1200, 2400];
 const STORED_SESSION_RETRY_MS = 10000;
 
+const isPasswordRecoveryRoute = () => {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const url = new URL(window.location.href);
+  if (url.searchParams.get('auth') === 'reset-password' || url.searchParams.get('type') === 'recovery') {
+    return true;
+  }
+
+  const hashParams = new URLSearchParams(url.hash.replace(/^#/, ''));
+  return hashParams.get('auth') === 'reset-password' || hashParams.get('type') === 'recovery';
+};
+
 const wait = (ms: number) =>
   new Promise(resolve => window.setTimeout(resolve, ms));
 
@@ -54,7 +75,9 @@ function useProvideAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [passwordRecovery, setPasswordRecovery] = useState(isPasswordRecoveryRoute);
   const userRef = useRef<User | null>(null);
+  const passwordRecoveryRef = useRef(passwordRecovery);
   const initialLoadRef = useRef(false);
   const mountedRef = useRef(true);
   const authChangeTaskRef = useRef(0);
@@ -65,6 +88,11 @@ function useProvideAuth() {
   const applyUser = (nextUser: User | null) => {
     userRef.current = nextUser;
     setUser(nextUser);
+  };
+
+  const applyPasswordRecovery = (nextPasswordRecovery: boolean) => {
+    passwordRecoveryRef.current = nextPasswordRecovery;
+    setPasswordRecovery(nextPasswordRecovery);
   };
 
   const updateUserState = (updater: (current: User | null) => User | null) => {
@@ -167,6 +195,14 @@ function useProvideAuth() {
         return;
       }
 
+      if (event === 'PASSWORD_RECOVERY') {
+        applyPasswordRecovery(true);
+        applyUser(null);
+        setError(null);
+        setLoading(false);
+        return;
+      }
+
       if (event === 'TOKEN_REFRESHED') {
         if (mountedRef.current && userRef.current) {
           setError(null);
@@ -187,6 +223,14 @@ function useProvideAuth() {
           applyUser(null);
           setLoading(false);
         }
+        return;
+      }
+
+      if (passwordRecoveryRef.current || isPasswordRecoveryRoute()) {
+        applyPasswordRecovery(true);
+        applyUser(null);
+        setError(null);
+        setLoading(false);
         return;
       }
 
@@ -319,6 +363,13 @@ function useProvideAuth() {
         
         
         if (session?.user) {
+          if (passwordRecoveryRef.current || isPasswordRecoveryRoute()) {
+            applyPasswordRecovery(true);
+            applyUser(null);
+            setError(null);
+            return;
+          }
+
           try {
             const profile = await getCurrentUser();
             if (!profile && getStoredRefreshToken()) {
@@ -473,7 +524,7 @@ function useProvideAuth() {
   const signUp = async (
     email: string,
     password: string,
-    userData: { full_name: string; username: string }
+    userData: { inviteCode: string; displayName: string; username: string }
   ) => {
     setLoading(true);
     setError(null);
@@ -482,7 +533,8 @@ function useProvideAuth() {
         email,
         password,
         username: userData.username,
-        displayName: userData.full_name,
+        displayName: userData.displayName,
+        inviteCode: userData.inviteCode,
       });
 
       markPhoneInstallOnboardingPending(email, result.user?.id || result.profile?.id);
@@ -533,6 +585,51 @@ function useProvideAuth() {
 
       setLoading(false);
       explicitSignOutRef.current = false;
+    }
+  };
+
+  const resendVerificationEmail = async (email: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await authResendVerificationEmail(email);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Verification email failed';
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendPasswordReset = async (email: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await authSendPasswordResetEmail(email);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Password reset failed';
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updatePasswordAfterRecovery = async (password: string) => {
+    setLoading(true);
+    setError(null);
+    try {
+      await authUpdatePasswordAfterRecovery(password);
+      await authSignOut().catch(() => supabase.auth.signOut({ scope: 'local' }).catch(() => undefined));
+      applyPasswordRecovery(false);
+      applyUser(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Password update failed';
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -628,6 +725,10 @@ function useProvideAuth() {
     error,
     signIn,
     signUp,
+    resendVerificationEmail,
+    sendPasswordReset,
+    updatePasswordAfterRecovery,
+    passwordRecovery,
     signOut,
     deleteAccount,
     updateProfile,

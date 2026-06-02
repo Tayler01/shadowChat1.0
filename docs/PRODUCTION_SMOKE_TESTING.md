@@ -2,15 +2,37 @@
 
 Use this workflow after a Netlify production deploy or whenever production auth, session resume, or realtime send behavior needs a browser-level check.
 
-## Documentation Status - June 1, 2026
+## Documentation Status - June 2, 2026
 
-This runbook is current for the shipped production smoke flow. It should be refreshed after invite-only signup and required email verification are implemented, because those changes will make stable smoke accounts even more important and may require explicit invite/account bootstrap steps.
+This runbook is current for the shipped production smoke flow and now records
+the invite-only signup/email-verification rollout implications. The auth
+rollout is implemented; production smoke should continue to use stable
+email-confirmed accounts instead of disposable signup.
 
 ## Why Stable Accounts Are Required
 
 The smoke runner can create disposable users for local and preview environments. Production Supabase auth may require email confirmation, so a disposable production signup can complete without returning an active session. Production smoke therefore must sign in with two stable, email-confirmed `PLAYWRIGHT_ACCOUNT_*` users.
 
 This workspace has stable production smoke credentials stored only in the local `.env.testing.local`. Do not commit real smoke account passwords.
+
+## Invite And Email Verification Rollout Impact
+
+Invite-only signup and required email verification make stable production smoke
+accounts a hard deploy prerequisite. Before each production auth deploy:
+
+1. Confirm both canonical smoke users exist in Supabase Auth.
+2. Confirm both users are email-confirmed.
+3. Confirm both users have usable passwords and matching `public.users`
+   profiles.
+4. Confirm local `.env.testing.local` or CI secrets provide both
+   `PLAYWRIGHT_ACCOUNT_*` credential sets.
+5. Run `npm run qa:smoke:prod` after the production deploy so auth regressions
+   are separated from deploy availability issues.
+
+Do not rely on production disposable signup after invite enforcement is enabled.
+If a production signup proof is explicitly approved, use one dedicated test
+invite, confirm the email, verify first login, then disable or expire the
+invite and document any profile cleanup in the deploy notes.
 
 ## Production Test Data Cleanup
 
@@ -71,6 +93,10 @@ Use the two dedicated smoke users above. Do not reuse a personal admin account a
 
 If the accounts are created through normal production signup, finish the email-confirmation step before using them in Playwright. If the accounts are created through an admin path, set the metadata keys `username`, `display_name`, and `full_name` so the `public.users` trigger can bootstrap readable profiles.
 
+Prefer repairing these canonical users through Supabase Auth Admin instead of
+consuming normal product invites. Use a real invite for smoke only when the
+release explicitly needs to prove production signup itself.
+
 ## Commands
 
 Run the recommended local post-deploy smoke in a visible browser:
@@ -122,6 +148,9 @@ Check `summary.json` first. Screenshots, storage state, fixtures, and logs sit b
 Common failure meanings:
 
 - `Signup ... completed without an active session`: production is running in disposable signup mode or the `PLAYWRIGHT_ACCOUNT_*` variables are missing.
+- `Invalid invite`, `Invite required`, or similar errors during production
+  smoke: the runner is using disposable signup or missing env-backed stable
+  accounts. Production smoke should use `--account-mode=env`.
 - `Missing Playwright account ... credentials`: `--account-mode=env` was requested but one of the required email/password variables is absent.
 - Auth requests returning HTTP `402` with `exceed_cached_egress_quota` or `exceed_egress_quota`: Supabase has restricted the project for usage quota. This is not a password or app-code failure. Restore Supabase service from the dashboard or contact Supabase support, then rerun the production smoke. The login screen should show a backend-quota message while the restriction is active.
 - Timeout or browser crash after sign-in: rerun `npm run qa:smoke:prod` or `npm run qa:smoke:prod:headed` to observe the visible browser. On Windows, headed mode is the preferred debug path for local Chromium instability.

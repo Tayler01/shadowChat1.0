@@ -2,9 +2,9 @@
 
 This project uses a mix of static checks, Jest coverage, and real browser validation.
 
-## Documentation Status - June 1, 2026
+## Documentation Status - June 2, 2026
 
-This guide reflects the current repo scripts. The June 1 audit confirmed `npm run lint`, `npm run typecheck`, `npm run build`, and the metrics-only chat scroll probe passed on current `main`. The chat-scroll script now also has seeded read-position scenarios for preview/staging runs that can prove the first-unread, deep-link, same-timestamp, realtime anchoring, and media paths.
+This guide reflects the current repo scripts. The June 1 audit confirmed `npm run lint`, `npm run typecheck`, `npm run build`, and the metrics-only chat scroll probe passed on current `main`. The chat-scroll script now also has seeded read-position scenarios for preview/staging runs that can prove the first-unread, deep-link, same-timestamp, realtime anchoring, and media paths. The June 2 auth rollout added invite-only signup, email verification, password reset, and admin invite tests.
 
 ## Mobile-First Testing Default
 
@@ -66,6 +66,7 @@ Do browser validation when changing:
 - clickable links or link previews
 - uploads
 - auth/session recovery
+- signup, invite-code enforcement, or email verification
 - mobile navigation or composer layout
 - theme and visual polish
 - push notification setup
@@ -209,6 +210,45 @@ applies to `group-chat`, `dm`, `resume-send`, and any future image, video,
 audio, voice, or generic attachment coverage.
 
 Production smoke is different from local smoke: it must use the two stable, email-confirmed `PLAYWRIGHT_ACCOUNT_*` users from `.env.testing.local` because production signup can require email confirmation and return no active session. See [`docs/PRODUCTION_SMOKE_TESTING.md`](C:/repos/chat2.0/docs/PRODUCTION_SMOKE_TESTING.md:1) for canonical account details, setup, commands, and artifact triage.
+
+### Invite-Only Signup And Email Verification QA
+
+Invite-only signup and required email verification are implemented audit work.
+Validate future changes as auth rollouts rather than cosmetic login changes.
+
+Required local checks for the implementation branch:
+
+- `npm run lint`
+- `npx tsc --noEmit -p tsconfig.app.json`
+- `npm run build`
+- focused Jest for auth/login/signup behavior, including `useAuth`, auth
+  helpers, invite SQL contracts, admin invite UI, and the login form
+- targeted Supabase or integration checks for invite-code negative cases and
+  hook ACLs
+
+Required behavior coverage:
+
+- Signup without an invite fails before an auth user or `public.users` profile
+  is created.
+- A valid invite starts signup, stores only safe metadata, and shows the
+  pending email-verification state when no session is returned.
+- Expired, disabled, reused, and wrong-email invite codes fail with concise
+  user-facing errors.
+- Resend-confirmation UX does not create duplicate accounts or expose invite
+  internals.
+- An unconfirmed account cannot enter app surfaces if production policy
+  requires confirmation before sign-in.
+- A confirmed invited account can sign in, load General Chat, send/receive DMs,
+  and survive the resume-send smoke path.
+- Existing confirmed users, including the stable production smoke users, still
+  sign in after the rollout.
+
+Production signup should not be part of routine smoke. If a production invite
+signup proof is explicitly approved, use a single dedicated test invite and
+test email, confirm the email, verify first login, then disable or expire the
+invite and clean up any test profile according to the release notes. Routine
+post-deploy smoke must continue to use stable email-confirmed
+`PLAYWRIGHT_ACCOUNT_*` users.
 
 Auth/session persistence checks and rollback notes live in [`docs/SESSION_PERSISTENCE_RUNBOOK.md`](C:/repos/chat2.0/docs/SESSION_PERSISTENCE_RUNBOOK.md:1). Use that runbook whenever a change touches saved sessions, mobile resume, auth restore, or realtime reconnect behavior.
 

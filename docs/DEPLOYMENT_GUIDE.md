@@ -2,9 +2,9 @@
 
 ShadowChat deploys as a static frontend on Netlify with Supabase as the hosted backend. The News Feed scraper is a separate always-on Render worker.
 
-## Documentation Status - June 1, 2026
+## Documentation Status - June 2, 2026
 
-This guide reflects the current GitHub Actions, Netlify, Supabase, Render, app-release, and production-smoke flow. Known deployment hardening that is still pending: Netlify security headers/CSP, live Netlify dashboard verification, Render live-secret/log verification, and a review of all `verify_jwt = false` Edge Functions against their in-function auth contracts.
+This guide reflects the current GitHub Actions, Netlify, Supabase, Render, app-release, invite-only signup/email-verification rollout, and production-smoke flow. Known deployment hardening that is still pending: Netlify security headers/CSP, live Netlify dashboard verification, Render live-secret/log verification, and a review of all `verify_jwt = false` Edge Functions against their in-function auth contracts.
 
 ## Production Pieces
 
@@ -31,6 +31,9 @@ If the change affects auth, session recovery, or mobile resume behavior, also ru
 ```powershell
 node scripts/playwright-smoke.mjs --scenario=auth,resume-send --headed --no-reuse-server
 ```
+
+For invite-only signup or email-verification changes, also complete the rollout
+checks below before calling the release production-proven.
 
 For the current login persistence behavior, rollback checkpoints, and production smoke expectations, see [`docs/SESSION_PERSISTENCE_RUNBOOK.md`](C:/repos/chat2.0/docs/SESSION_PERSISTENCE_RUNBOOK.md:1).
 
@@ -169,6 +172,10 @@ Recent app-surface migrations to confirm in fresh projects:
 - `20260503191532_admin_delete_non_admin_chat_messages.sql`: operator deletion of normal-user General Chat and board-chat messages.
 - `20260504012117_art_board_domain.sql`: Art Board tables, RLS, realtime publication, public Storage bucket, and moderation scope.
 - `20260504021602_art_board_z_index_bigint.sql`: widens Art Board ordering values for timestamp-based layering.
+- `20260601181119_general_chat_message_window.sql`: bounded General Chat windows for stable read-position loading.
+- `20260601182251_lock_general_chat_read_rpc_acl.sql`: read-position RPC ACL hardening.
+- `20260602012149_invite_only_signup_auth.sql`: private invite ledger, invite validation hook, and auth metadata cleanup.
+- `20260602013640_lock_signup_invite_rpc_acl.sql`: invite RPC and hook execute-grant hardening.
 
 ### Edge Functions
 
@@ -282,30 +289,112 @@ Check [`.env.example`](C:/repos/chat2.0/.env.example:1) for the expected names.
 
 Do not place Supabase service-role keys, provider API tokens, Render scraper credentials, Bunny keys, or Meta/OpenRouter secrets in `VITE_*` variables.
 
+## Invite-Only Signup And Email Verification Rollout Checklist
+
+Invite-only signup and required email verification are implemented. Use this
+checklist for fresh projects, production deploys, and any future auth changes.
+
+### Supabase Preflight
+
+1. Inspect the invite migration, auth hook, and helper RPCs before
+   describing behavior. Confirm invite codes are stored as hashes only, helper
+   access is private, and `anon`/`authenticated` cannot execute internal
+   redemption helpers directly.
+2. Compare local and linked migration state:
+
+```powershell
+supabase migration list --linked
+supabase db push --linked --dry-run
+```
+
+3. Apply pending auth rollout migrations only after the production frontend can
+   send the required invite field:
+
+```powershell
+supabase db push --linked --yes
+```
+
+4. Push and verify Supabase Auth config from [supabase/config.toml](C:/repos/chat2.0/supabase/config.toml:1):
+
+```powershell
+supabase config push --project-ref YOUR_PROJECT_REF --yes
+```
+
+5. Verify the Supabase Auth hook or database function used for invite
+   validation, then run negative checks for missing, expired, disabled, reused,
+   and wrong-email invites.
+6. Verify email confirmation only after Supabase Auth Site URL and redirect
+   allowlist are correct. Include the production Netlify URL, any custom app
+   domain, local preview URLs used for QA, and the PR preview pattern if email
+   links are tested from deploy previews.
+7. Review confirmation email templates and optional SMTP settings before the
+   first production proof. A valid invite signup is not ready until the user can
+   receive and complete the confirmation link.
+8. Confirm the two stable production smoke users exist, are email-confirmed,
+   have passwords, and have matching `public.users` profiles.
+
+### Netlify Preflight
+
+1. Confirm Netlify has only browser-safe `VITE_*` variables for Supabase URL,
+   anon key, push public key, and deliberate frontend settings.
+2. Confirm no service-role keys, invite secrets, provider tokens, or SMTP
+   credentials are exposed through Netlify frontend env vars.
+3. If a deploy preview is used for email-link QA, add the preview URL or alias
+   pattern to the Supabase redirect allowlist before sending test links.
+4. Verify the production deploy domain that users open matches the Supabase
+   Auth Site URL or an allowlisted redirect target.
+
+### Release Sequence
+
+1. Run local lint, typecheck, build, focused auth Jest, and preview browser QA.
+2. Run a staging or preview invite-signup proof with one disposable invite and
+   test email.
+3. Repair and confirm stable production smoke accounts before production
+   enforcement changes.
+4. Deploy the frontend that includes invite/email-verification UX.
+5. Apply or verify the Supabase invite/auth migration and hook configuration.
+6. Verify required email confirmation in Supabase Auth.
+7. Run `npm run qa:smoke:prod` with stable email-confirmed accounts.
+8. If explicitly approved, run one production invite-signup proof, then disable
+   or expire the test invite and document cleanup.
+
+### Rollback Notes
+
+- If sign-in breaks for existing confirmed users, disable the invite hook or
+  revert the auth migration before changing unrelated session code.
+- If signup emails do not arrive, keep existing users live, pause new invite
+  issuance, verify SMTP/templates/Site URL/redirects, and rerun with a single
+  test invite.
+- If production smoke reports signup without an active session, verify
+  `PLAYWRIGHT_ACCOUNT_*` env vars first; routine production smoke should not use
+  disposable signup after this rollout.
+
 ## Post-Deploy Smoke
 
 After deploy, verify:
 
 1. Sign in works
-2. Group chat loads
-3. DM list loads
-4. Realtime group message works
-5. Realtime DM works
-6. Resume-send works after a background/foreground cycle
-7. Settings page renders cleanly on mobile and desktop
-8. A message containing an `https://` or `www.` link renders as a clickable link and loads a compact preview card
-9. Settings feedback can submit a bug or feature report with an image attachment after feedback schema changes
-10. Boards tab loads the low-friction board map, keeps labels inside board objects, avoids visual overlap after collisions, and opens News Feed plus each chat board
-11. Art Board opens from Boards, settles without a stuck loader, exposes header About and floating Add controls, supports pinch zoom on mobile, and keeps item reactions in the three-dot menu with compact count badges
-12. News Chat, Investing Chat, Learning Chat, Crypto Chat, Vibe Coding, AI News, and Projects Chat send, edit, delete, react, render link previews, and avoid duplicate subheaders/manual refresh rows
-13. Settings > Admin > News Sources shows source health for an `admin` or `sub_admin` account
-14. Render worker has checked enabled sources since deploy and today's feed rows match current Eastern-day posts
-15. General Chat header shows active-user count, active-user popup, and weather widget without mobile overlap
-16. Settings > Account & Profile can save or clear a weather location
-17. Settings > Admin > Feedback Review lists submitted feedback for an app operator
-18. An app operator can open another user's profile popup and see Channel bans
-19. A channel-banned user is blocked from the selected channel, board, Art Board, or all interaction while DMs and read access still work
-20. An app operator can delete a normal-user General Chat message and board-chat message, and both disappear for other signed-in users without refresh
+2. For invite/email auth rollouts, stable confirmed users still sign in and an
+   approved one-off invite signup proof completes email confirmation
+3. Group chat loads
+4. DM list loads
+5. Realtime group message works
+6. Realtime DM works
+7. Resume-send works after a background/foreground cycle
+8. Settings page renders cleanly on mobile and desktop
+9. A message containing an `https://` or `www.` link renders as a clickable link and loads a compact preview card
+10. Settings feedback can submit a bug or feature report with an image attachment after feedback schema changes
+11. Boards tab loads the low-friction board map, keeps labels inside board objects, avoids visual overlap after collisions, and opens News Feed plus each chat board
+12. Art Board opens from Boards, settles without a stuck loader, exposes header About and floating Add controls, supports pinch zoom on mobile, and keeps item reactions in the three-dot menu with compact count badges
+13. News Chat, Investing Chat, Learning Chat, Crypto Chat, Vibe Coding, AI News, and Projects Chat send, edit, delete, react, render link previews, and avoid duplicate subheaders/manual refresh rows
+14. Settings > Admin > News Sources shows source health for an `admin` or `sub_admin` account
+15. Render worker has checked enabled sources since deploy and today's feed rows match current Eastern-day posts
+16. General Chat header shows active-user count, active-user popup, and weather widget without mobile overlap
+17. Settings > Account & Profile can save or clear a weather location
+18. Settings > Admin > Feedback Review lists submitted feedback for an app operator
+19. An app operator can open another user's profile popup and see Channel bans
+20. A channel-banned user is blocked from the selected channel, board, Art Board, or all interaction while DMs and read access still work
+21. An app operator can delete a normal-user General Chat message and board-chat message, and both disappear for other signed-in users without refresh
 
 Recommended production smoke for local post-deploy validation:
 
@@ -328,6 +417,14 @@ node scripts/playwright-smoke.mjs --scenario=full --run-name=full-smoke-release 
 ```
 
 ## Production Gotchas
+
+### Invite Signup Or Email Confirmation Fails
+
+After the invite/email rollout lands, a healthy frontend can still block new
+signup if Supabase Auth settings are wrong. Check the invite hook/migration,
+Site URL, redirect allowlist, email templates, SMTP or provider delivery, and
+test-invite state before changing unrelated login/session code. Existing
+confirmed users should still be able to sign in during this investigation.
 
 ### AI Not Working
 

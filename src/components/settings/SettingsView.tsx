@@ -18,6 +18,7 @@ import {
   Search,
   Shield,
   Smartphone,
+  Ticket,
   Trash2,
   Volume2,
 } from 'lucide-react'
@@ -34,6 +35,7 @@ import { NotificationSetupModal } from './NotificationSetupModal'
 import { PhoneInstallGuide } from '../onboarding/PhoneInstallGuide'
 import { FeedbackSubmissionModal } from './FeedbackSubmissionModal'
 import { AdminFeedbackReview } from './AdminFeedbackReview'
+import { AdminInvitesPanel } from './AdminInvitesPanel'
 import { ShadoTvStudio } from './ShadoTvStudio'
 import { WeatherLocationSettings } from './WeatherLocationSettings'
 import { ProfileView } from '../profile/ProfileView'
@@ -69,7 +71,7 @@ type SettingsSection = {
   icon: React.ComponentType<{ className?: string }>
 }
 
-type AdminSectionId = 'access' | 'bridge-pairing' | 'shado-tv-studio' | 'shadow-pin-activity' | 'news-sources' | 'feedback-review'
+type AdminSectionId = 'access' | 'invites' | 'bridge-pairing' | 'shado-tv-studio' | 'shadow-pin-activity' | 'news-sources' | 'feedback-review'
 
 type AdminSection = {
   id: AdminSectionId
@@ -149,6 +151,12 @@ const adminSections: AdminSection[] = [
     description: 'Grant or remove sub-admin access from the complete user list.',
     icon: Shield,
     fullAdminOnly: true,
+  },
+  {
+    id: 'invites',
+    title: 'Invites',
+    description: 'Generate, email-lock, revoke, and review signup invites.',
+    icon: Ticket,
   },
   {
     id: 'bridge-pairing',
@@ -886,6 +894,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       return lastBridgeDeviceId ? 'Recently approved' : 'Pair device'
     }
 
+    if (sectionId === 'invites') {
+      return 'Signup codes'
+    }
+
     if (sectionId === 'feedback-review') {
       return 'Bugs & ideas'
     }
@@ -1179,6 +1191,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
     const content = {
       access: renderAdminAccessPanel,
+      invites: () => <AdminInvitesPanel />,
       'bridge-pairing': renderBridgePairingPanel,
       'shado-tv-studio': () => <ShadoTvStudio />,
       'shadow-pin-activity': renderShadowPinActivityPanel,

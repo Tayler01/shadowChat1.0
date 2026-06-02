@@ -2,9 +2,9 @@
 
 This file is the working handbook for agentic contributors operating inside this repository.
 
-## Documentation Status - June 1, 2026
+## Documentation Status - June 2, 2026
 
-This handbook has been refreshed against current `main` after the June 1 full codebase audit. For planned security, auth, chat-scroll, frontend polish, deployment, and architecture work, read [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1) before editing. For the complete documentation inventory and freshness notes, read [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
+This handbook has been refreshed against current `main` after the June 1 full codebase audit and June 2 invite/email auth hardening. For planned security, auth, chat-scroll, frontend polish, deployment, and architecture work, read [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1) before editing. For the complete documentation inventory and freshness notes, read [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
 
 ## Mission
 
@@ -52,7 +52,7 @@ put weather location data on public profile rows.
 The current near-term hardening track is the June 1 audit backlog:
 
 - General Chat read-position and loading stability
-- invite-only signup and email-verification UX
+- invite-only signup/email-verification production smoke and follow-up polish
 - Supabase `public.users`, RPC, RLS, storage, and SECURITY DEFINER hardening
 - service-role bypass checks in bridge and AI post-to-chat paths
 - URL fetch/SSRF hardening across link preview, import, and media proxy flows
@@ -396,8 +396,10 @@ Read and test:
 - [`src/hooks/useAuth.tsx`](C:/repos/chat2.0/src/hooks/useAuth.tsx:1)
 - [`src/lib/auth.ts`](C:/repos/chat2.0/src/lib/auth.ts:1)
 - [`src/lib/supabase.ts`](C:/repos/chat2.0/src/lib/supabase.ts:1)
+- [`src/lib/adminInvites.ts`](C:/repos/chat2.0/src/lib/adminInvites.ts:1)
+- [`src/components/settings/AdminInvitesPanel.tsx`](C:/repos/chat2.0/src/components/settings/AdminInvitesPanel.tsx:1)
 
-Planned but not yet implemented: invite-only signup, production email-confirmation UX, and reduced public-profile PII. Keep the distinction clear in docs and final answers.
+Invite-only signup and production email confirmation are implemented through Supabase Auth settings, a Before User Created database hook, private invite tables, and Settings > Admin > Invites. Treat auth changes as schema/config-dependent: inspect the invite migrations, confirm remote Auth hook settings when practical, and keep post-deploy smoke separate from local unit proof.
 
 ### Push Notifications
 

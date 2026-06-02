@@ -1,8 +1,8 @@
 # Phone Install Onboarding
 
-## Documentation Status - June 1, 2026
+## Documentation Status - June 2, 2026
 
-Reviewed during the June 1, 2026 documentation refresh. This doc reflects the shipped phone-install tutorial and should be rechecked after the login/signup redesign.
+Reviewed during the June 2, 2026 invite/email auth rollout. This doc reflects the shipped phone-install tutorial and the current post-login onboarding behavior.
 
 Shadow Chat is a mobile-first PWA. First-time phone users should see a short, silent setup tutorial after login so they know how to install the app and enable notifications.
 

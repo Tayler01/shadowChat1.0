@@ -2,9 +2,9 @@
 
 This guide covers the recommended local and hosted setup flow for ShadowChat 1.0.
 
-## Documentation Status - June 1, 2026
+## Documentation Status - June 2, 2026
 
-This setup guide has been refreshed against the current repo shape. Invite-only signup and expanded email-verification UX are planned but not implemented yet; use [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1) before changing auth setup.
+This setup guide has been refreshed against the current repo shape and the June 2 invite-only signup/email-verification rollout. Use [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1) before changing auth setup.
 
 ## Prerequisites
 
@@ -99,6 +99,17 @@ supabase db push
 That applies the migrations under [supabase/migrations](C:/repos/chat2.0/supabase/migrations).
 For hosted projects, use `supabase migration list --linked` after the push to
 confirm the remote project includes the latest app-surface migrations.
+
+For invite-only signup, hosted projects also need the Supabase Auth settings in
+[supabase/config.toml](C:/repos/chat2.0/supabase/config.toml:1): email
+confirmations enabled, the Before User Created hook
+`pg-functions://postgres/public/hook_validate_signup_invite`, the production
+Site URL, and local/preview redirect URLs. After linking a hosted project, push
+and verify Auth config:
+
+```powershell
+supabase config push --project-ref YOUR_PROJECT_REF --yes
+```
 
 ## 4. Configure Supabase Secrets
 
@@ -246,28 +257,29 @@ so the private per-user preference table and RLS policies exist.
 
 After setup, verify:
 
-1. Sign up or sign in
-2. Group chat loads
-3. DM list loads
-4. File/image upload works
-5. Profile updates persist
-6. Push settings screen renders
-7. Phone setup tutorial opens once after first mobile post-login launch and remains available in Settings > App Setup & User Guide
-8. Boards tab loads the low-friction map, feed pills/chat circles/static squares render correctly, labels stay contained, collision feedback works, and the map resets when Boards is reopened
-9. News Chat, Investing Chat, Learning Chat, Crypto Chat, Vibe Coding, AI News, and Projects Chat send and receive messages without duplicate subheaders
-10. An `admin` or `sub_admin` user can add, pause, enable, and delete a News source in Settings > Admin > News Sources
-11. If the scraper is configured, `news_sources.last_checked_at` updates after a worker cycle
-12. A full `admin` user can grant or remove sub-admin access from Settings > Admin > Admin Access and from a profile popup
-13. Settings > Account & Profile can save and clear a weather location
-14. General Chat shows the weather widget and active-user count without overlapping on mobile
-15. An `admin` or `sub_admin` can open another user's profile popup and update channel-ban scopes
-16. A banned user cannot post/react in the selected channel, board, or all-interaction scope, and can still read content and use DMs
-17. An `admin` or `sub_admin` can delete a normal-user General Chat or board-chat message and the delete propagates to another signed-in client
-18. Avatar upload allows crop/zoom/position adjustment and the saved avatar renders correctly in chat and profile surfaces
-19. A sparse DM thread keeps messages visible when the mobile keyboard opens
-20. Account deletion renders from Settings and reaches the `delete-account` Edge Function only for the signed-in user
-
-Audit note: open self-signup is still the current shipped behavior. Invite-code-only signup and required email verification are planned follow-ups, so fresh projects should not assume those controls exist until the corresponding migrations and auth UI changes land.
+1. Generate a 24-hour invite from Settings > Admin > Invites or create a
+   temporary invite through the Supabase RPCs, then sign up with that invite
+2. Confirm the email-verification link, then sign in
+3. Group chat loads
+4. DM list loads
+5. File/image upload works
+6. Profile updates persist
+7. Push settings screen renders
+8. Phone setup tutorial opens once after first mobile post-login launch and remains available in Settings > App Setup & User Guide
+9. Boards tab loads the low-friction map, feed pills/chat circles/static squares render correctly, labels stay contained, collision feedback works, and the map resets when Boards is reopened
+10. News Chat, Investing Chat, Learning Chat, Crypto Chat, Vibe Coding, AI News, and Projects Chat send and receive messages without duplicate subheaders
+11. An `admin` or `sub_admin` user can generate, revoke, and review signup invites from Settings > Admin > Invites
+12. An `admin` or `sub_admin` user can add, pause, enable, and delete a News source in Settings > Admin > News Sources
+13. If the scraper is configured, `news_sources.last_checked_at` updates after a worker cycle
+14. A full `admin` user can grant or remove sub-admin access from Settings > Admin > Admin Access and from a profile popup
+15. Settings > Account & Profile can save and clear a weather location
+16. General Chat shows the weather widget and active-user count without overlapping on mobile
+17. An `admin` or `sub_admin` can open another user's profile popup and update channel-ban scopes
+18. A banned user cannot post/react in the selected channel, board, or all-interaction scope, and can still read content and use DMs
+19. An `admin` or `sub_admin` can delete a normal-user General Chat or board-chat message and the delete propagates to another signed-in client
+20. Avatar upload allows crop/zoom/position adjustment and the saved avatar renders correctly in chat and profile surfaces
+21. A sparse DM thread keeps messages visible when the mobile keyboard opens
+22. Account deletion renders from Settings and reaches the `delete-account` Edge Function only for the signed-in user
 
 ## 10. Optional Preview Mode
 

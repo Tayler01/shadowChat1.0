@@ -2,9 +2,9 @@
 
 This document is a high-signal map of the current ShadowChat codebase.
 
-## Documentation Status - June 1, 2026
+## Documentation Status - June 2, 2026
 
-This architecture map is current for the shipped `main` branch and now includes the June 1 audit context. Known architecture follow-ups that are not yet implemented are tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1): chat read-position stabilization, invite-only signup, Supabase policy/RPC hardening, service-role bypass checks, shared SSRF-safe fetch handling, and later realtime/send/scroll helper extraction.
+This architecture map is current for the shipped `main` branch and now includes the June 1 audit context plus the June 2 invite/email auth rollout. Known architecture follow-ups are tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1): Supabase policy/RPC hardening, service-role bypass checks, shared SSRF-safe fetch handling, frontend polish, and later realtime/send/scroll helper extraction.
 
 ## High-Level System
 

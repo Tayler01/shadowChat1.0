@@ -52,6 +52,7 @@ const renderUseAuth = async () => {
 beforeEach(() => {
   jest.resetAllMocks();
   window.localStorage.clear();
+  window.history.pushState({}, '', '/');
 
   const sb = supabase as SupabaseMock;
   sb.auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
@@ -184,7 +185,11 @@ test('signUp sets user when session returned', async () => {
   await waitFor(() => expect(result.current.loading).toBe(false));
 
   await act(async () => {
-    await result.current.signUp('x@y.com', 'pw', { full_name: 'X', username: 'user' });
+    await result.current.signUp('x@y.com', 'pw', {
+      displayName: 'X',
+      username: 'user',
+      inviteCode: 'INVITE-123',
+    });
   });
 
   expect(authModule.signUp).toHaveBeenCalledWith({
@@ -192,9 +197,40 @@ test('signUp sets user when session returned', async () => {
     password: 'pw',
     username: 'user',
     displayName: 'X',
+    inviteCode: 'INVITE-123',
   });
   await waitFor(() => expect(result.current.user).toEqual(profile));
   expect(hasPhoneInstallOnboardingPending(profile)).toBe(true);
+});
+
+test('signUp leaves user unauthenticated when email confirmation returns no session', async () => {
+  const pendingUser = { id: 'pending-user', email: 'pending@example.com' } as any;
+  authModule.signUp.mockResolvedValue({ session: null, profile: null, user: pendingUser } as any);
+
+  const { result } = await renderUseAuth();
+  await waitFor(() => expect(result.current.loading).toBe(false));
+
+  let signupResult: any;
+  await act(async () => {
+    signupResult = await result.current.signUp('pending@example.com', 'pw', {
+      displayName: 'Pending User',
+      username: 'pending',
+      inviteCode: 'INVITE-PENDING',
+    });
+  });
+
+  expect(authModule.signUp).toHaveBeenCalledWith({
+    email: 'pending@example.com',
+    password: 'pw',
+    username: 'pending',
+    displayName: 'Pending User',
+    inviteCode: 'INVITE-PENDING',
+  });
+  expect(signupResult).toEqual({ session: null, profile: null, user: pendingUser });
+  expect(result.current.user).toBeNull();
+  expect(result.current.loading).toBe(false);
+  expect(result.current.error).toBeNull();
+  expect(hasPhoneInstallOnboardingPending(pendingUser)).toBe(true);
 });
 
 test('signOut calls auth.signOut', async () => {
@@ -210,6 +246,65 @@ test('signOut calls auth.signOut', async () => {
   expect(authModule.signOut).toHaveBeenCalled();
 });
 
+test('resendVerificationEmail delegates to auth helper and clears loading state', async () => {
+  authModule.resendVerificationEmail.mockResolvedValue();
+
+  const { result } = await renderUseAuth();
+  await waitFor(() => expect(result.current.loading).toBe(false));
+
+  await act(async () => {
+    await result.current.resendVerificationEmail('pending@example.com');
+  });
+
+  expect(authModule.resendVerificationEmail).toHaveBeenCalledWith('pending@example.com');
+  expect(result.current.loading).toBe(false);
+  expect(result.current.error).toBeNull();
+});
+
+test('sendPasswordReset delegates to auth helper and surfaces provider errors', async () => {
+  authModule.sendPasswordResetEmail.mockRejectedValue(new Error('Reset email blocked'));
+
+  const { result } = await renderUseAuth();
+  await waitFor(() => expect(result.current.loading).toBe(false));
+
+  let caughtError: unknown;
+  await act(async () => {
+    try {
+      await result.current.sendPasswordReset('reset@example.com');
+    } catch (err) {
+      caughtError = err;
+    }
+  });
+
+  expect(caughtError).toEqual(new Error('Reset email blocked'));
+  expect(authModule.sendPasswordResetEmail).toHaveBeenCalledWith('reset@example.com');
+  expect(result.current.loading).toBe(false);
+  await waitFor(() => expect(result.current.error).toBe('Reset email blocked'));
+});
+
+test('password recovery route stays unauthenticated until password is updated', async () => {
+  window.history.pushState({}, '', '/?auth=reset-password');
+  authModule.updatePasswordAfterRecovery.mockResolvedValue();
+  authModule.signOut.mockResolvedValue();
+
+  const { result } = await renderUseAuth();
+  await waitFor(() => expect(result.current.loading).toBe(false));
+
+  expect(result.current.passwordRecovery).toBe(true);
+  expect(result.current.user).toBeNull();
+
+  await act(async () => {
+    await result.current.updatePasswordAfterRecovery('NewPassword!123');
+  });
+
+  expect(authModule.updatePasswordAfterRecovery).toHaveBeenCalledWith('NewPassword!123');
+  expect(authModule.signOut).toHaveBeenCalled();
+  expect(result.current.passwordRecovery).toBe(false);
+  expect(result.current.user).toBeNull();
+
+  window.history.pushState({}, '', '/');
+});
+
 test('deleteAccount calls auth.deleteCurrentAccount and clears local user state', async () => {
   const profile = { id: '1', email: 'x@y.com' } as any;
   authModule.signUp.mockResolvedValue({ session: {}, profile, user: {} } as any);
@@ -219,7 +314,11 @@ test('deleteAccount calls auth.deleteCurrentAccount and clears local user state'
   await waitFor(() => expect(result.current.loading).toBe(false));
 
   await act(async () => {
-    await result.current.signUp('x@y.com', 'pw', { full_name: 'X', username: 'user' });
+    await result.current.signUp('x@y.com', 'pw', {
+      displayName: 'X',
+      username: 'user',
+      inviteCode: 'INVITE-123',
+    });
   });
 
   await waitFor(() => expect(result.current.user).toEqual(profile));
@@ -250,7 +349,11 @@ test('uploadAvatar calls auth.uploadUserAvatar', async () => {
   await waitFor(() => expect(result.current.loading).toBe(false));
 
   await act(async () => {
-    await result.current.signUp('x@y.com', 'pw', { full_name: 'X', username: 'user' });
+    await result.current.signUp('x@y.com', 'pw', {
+      displayName: 'X',
+      username: 'user',
+      inviteCode: 'INVITE-123',
+    });
   });
 
   await waitFor(() => expect(result.current.user).toEqual(profile));
@@ -280,7 +383,11 @@ test('uploadBanner calls auth.uploadUserBanner', async () => {
   await waitFor(() => expect(result.current.loading).toBe(false));
 
   await act(async () => {
-    await result.current.signUp('x@y.com', 'pw', { full_name: 'X', username: 'user' });
+    await result.current.signUp('x@y.com', 'pw', {
+      displayName: 'X',
+      username: 'user',
+      inviteCode: 'INVITE-123',
+    });
   });
 
   await waitFor(() => expect(result.current.user).toEqual(profile));

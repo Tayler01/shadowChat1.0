@@ -2,9 +2,9 @@
 
 This rundown captures the current documentation and agent-file surface in `C:\repos\chat2.0`. It is meant to help future updates start from the right source of truth instead of rediscovering stale or overlapping docs.
 
-## Documentation Status - June 1, 2026
+## Documentation Status - June 2, 2026
 
-This rundown was updated after the repository documents were refreshed. The file remains an inventory and routing guide; the source documents themselves now carry current status notes or current implementation guidance.
+This rundown was updated after the repository documents were refreshed and after the June 2 invite-only signup/email-verification rollout. The file remains an inventory and routing guide; the source documents themselves now carry current status notes or current implementation guidance.
 
 ## Summary
 
@@ -12,7 +12,7 @@ This rundown was updated after the repository documents were refreshed. The file
 - [AGENTS.md](C:/repos/chat2.0/AGENTS.md:1) is the canonical agent guide. [AGENT.md](C:/repos/chat2.0/AGENT.md:1) is a short compatibility mirror.
 - Before this refresh, several current product docs had last been updated in May 2026, especially Admin, App Releases, Deployment, Phone Install, ShadowPin, mobile, and iOS planning.
 - Several bridge docs are still useful but date from April 2026 planning. They now carry bridge-specific status notes and should be checked against current firmware/functions before implementation.
-- `README.md` and `docs/ARCHITECTURE.md` have been refreshed for the June 1 audit state, and should be refreshed again after the upcoming auth, chat-scroll, and security work lands.
+- `README.md` and `docs/ARCHITECTURE.md` have been refreshed for the June 1 audit state, the chat-scroll fix, and the June 2 auth rollout.
 - `PLAN.md`, `STATUS.md`, and `TASK.md` are now labeled as bridge-specific status artifacts, not global project status.
 - `.agents/` contains local ignored agent skills. They are not tracked or pushed by default because `.gitignore` ignores `.agents/`.
 
@@ -21,7 +21,7 @@ This rundown was updated after the repository documents were refreshed. The file
 1. Keep [AGENTS.md](C:/repos/chat2.0/AGENTS.md:1) canonical and update it after major workflow changes.
 2. Keep [AGENT.md](C:/repos/chat2.0/AGENT.md:1) as a thin compatibility pointer, not a second full handbook.
 3. Use [README.md](C:/repos/chat2.0/README.md:1) as the human entrypoint and keep its documentation map current.
-4. Use [docs/ARCHITECTURE.md](C:/repos/chat2.0/docs/ARCHITECTURE.md:1) as the technical map and refresh it after the planned security/auth/chat changes.
+4. Use [docs/ARCHITECTURE.md](C:/repos/chat2.0/docs/ARCHITECTURE.md:1) as the technical map and refresh it after planned security and shared architecture changes.
 5. Use [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1) as the current audit backlog until the findings are resolved or moved into implementation tickets.
 6. Decide whether local `.agents/` skills should remain machine-local. If any are project-critical, promote sanitized versions into tracked docs or a tracked `docs/agents/` folder instead of force-adding ignored files.
 7. Add a quarterly docs review checklist after the auth/security/chat-scroll work lands.
@@ -30,7 +30,7 @@ This rundown was updated after the repository documents were refreshed. The file
 
 | File | Previous tracked update before June 1 refresh | Role | Refresh guidance |
 | --- | --- | --- | --- |
-| [AGENTS.md](C:/repos/chat2.0/AGENTS.md:1) | 2026-05-19 | Canonical repo handbook for agents. | Refresh after the audit backlog starts changing auth, security, chat scroll, Netlify headers, or Supabase policy workflow. |
+| [AGENTS.md](C:/repos/chat2.0/AGENTS.md:1) | 2026-05-19 | Canonical repo handbook for agents. | Refresh after security, Netlify headers, or Supabase policy workflow changes. |
 | [AGENT.md](C:/repos/chat2.0/AGENT.md:1) | 2026-05-02 | Compatibility guide for tools that look for singular `AGENT.md`. | Keep short. Link to `AGENTS.md`; do not duplicate the full handbook. |
 | [.agents/](C:/repos/chat2.0/.agents) | ignored local files | Local Codex/agent skill installs. | Not tracked. Documented below for awareness only. Do not push unless the repo intentionally changes `.gitignore` policy. |
 
@@ -38,7 +38,7 @@ This rundown was updated after the repository documents were refreshed. The file
 
 | File | Previous tracked update before June 1 refresh | Role | Refresh guidance |
 | --- | --- | --- | --- |
-| [README.md](C:/repos/chat2.0/README.md:1) | 2026-05-03 | Human entrypoint, stack, feature list, commands, deployment, documentation map. | Refresh after auth/security/chat-scroll work; keep docs map current. |
+| [README.md](C:/repos/chat2.0/README.md:1) | 2026-05-03 | Human entrypoint, stack, feature list, commands, deployment, documentation map. | Refresh after security, deployment, or major feature work; keep docs map current. |
 | [PLAN.md](C:/repos/chat2.0/PLAN.md:1) | 2026-05-02 | ESP bridge update/offline software plan. | Rename or add a top warning that it is bridge-specific, not global product plan. |
 | [STATUS.md](C:/repos/chat2.0/STATUS.md:1) | 2026-05-02 | ESP bridge milestone status log. | Archive under `docs/` or rename to bridge-specific status to avoid stale root-level status confusion. |
 | [TASK.md](C:/repos/chat2.0/TASK.md:1) | 2026-04-25 | ESP bridge task statement. | Archive or rename with bridge prefix if still needed. |
@@ -50,13 +50,13 @@ This rundown was updated after the repository documents were refreshed. The file
 
 | File | Previous tracked update before June 1 refresh | Role | Refresh guidance |
 | --- | --- | --- | --- |
-| [docs/ARCHITECTURE.md](C:/repos/chat2.0/docs/ARCHITECTURE.md:1) | 2026-05-03 | System map and data-flow overview. | Update after auth invite flow, read-cursor changes, Edge Function hardening, and lib module splits. |
-| [docs/SETUP_GUIDE.md](C:/repos/chat2.0/docs/SETUP_GUIDE.md:1) | 2026-06-01 | Local and hosted setup. | Update for email verification, invite codes, stable smoke accounts, and any new secrets. |
-| [docs/TESTING_GUIDE.md](C:/repos/chat2.0/docs/TESTING_GUIDE.md:1) | 2026-05-19 | Unit, smoke, and browser testing workflow. | Add read-cursor correctness smoke once built. |
-| [docs/DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1) | 2026-05-29 | GitHub, Netlify, Supabase deployment. | Update after Netlify headers, Node version alignment, and email confirmation setup. |
+| [docs/ARCHITECTURE.md](C:/repos/chat2.0/docs/ARCHITECTURE.md:1) | 2026-05-03 | System map and data-flow overview. | Update after Edge Function hardening, safe-fetch helpers, or lib module splits. |
+| [docs/SETUP_GUIDE.md](C:/repos/chat2.0/docs/SETUP_GUIDE.md:1) | 2026-06-01 | Local and hosted setup. | Update for any new auth config, stable smoke accounts, or new secrets. |
+| [docs/TESTING_GUIDE.md](C:/repos/chat2.0/docs/TESTING_GUIDE.md:1) | 2026-05-19 | Unit, smoke, and browser testing workflow. | Keep auth and chat-scroll smoke expectations current. |
+| [docs/DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1) | 2026-05-29 | GitHub, Netlify, Supabase deployment. | Update after Netlify headers, Node version alignment, or Auth config changes. |
 | [docs/GOAL_PLAYBOOKS.md](C:/repos/chat2.0/docs/GOAL_PLAYBOOKS.md:1) | 2026-05-14 | Goal-mode playbooks. | Add audit-backlog playbook if this becomes a repeated workflow. |
 | [docs/DEFERRED_FOLLOWUPS.md](C:/repos/chat2.0/docs/DEFERRED_FOLLOWUPS.md:1) | 2026-06-01 | Small deferred ideas. | Keep small only; larger audit items now live in the dedicated audit next-steps doc. |
-| [docs/PRODUCTION_SMOKE_TESTING.md](C:/repos/chat2.0/docs/PRODUCTION_SMOKE_TESTING.md:1) | 2026-05-19 | Production smoke strategy. | Update after email verification and invite-only signup change test-account setup. |
+| [docs/PRODUCTION_SMOKE_TESTING.md](C:/repos/chat2.0/docs/PRODUCTION_SMOKE_TESTING.md:1) | 2026-05-19 | Production smoke strategy. | Keep stable email-confirmed smoke-account setup current. |
 
 ## Current Product And Feature Docs
 
@@ -70,9 +70,9 @@ This rundown was updated after the repository documents were refreshed. The file
 | [docs/LINK_PREVIEWS.md](C:/repos/chat2.0/docs/LINK_PREVIEWS.md:1) | 2026-05-02 | Link preview architecture. | Update after shared SSRF-safe fetch helper lands. |
 | [docs/NEWS_TAB_AND_SCRAPER.md](C:/repos/chat2.0/docs/NEWS_TAB_AND_SCRAPER.md:1) | 2026-05-03 | News Feed and Render scraper runbook. | Update after live Render settings verification or scraper changes. |
 | [docs/NATIVE_IOS_APP_PLAN.md](C:/repos/chat2.0/docs/NATIVE_IOS_APP_PLAN.md:1) | 2026-05-28 | Native iOS planning. | Current enough until native work resumes. |
-| [docs/PHONE_INSTALL_ONBOARDING.md](C:/repos/chat2.0/docs/PHONE_INSTALL_ONBOARDING.md:1) | 2026-06-01 | Phone install onboarding. | Current. Recheck after auth/login redesign. |
+| [docs/PHONE_INSTALL_ONBOARDING.md](C:/repos/chat2.0/docs/PHONE_INSTALL_ONBOARDING.md:1) | 2026-06-01 | Phone install onboarding. | Current after auth/login redesign. |
 | [docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md](C:/repos/chat2.0/docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md:1) | 2026-04-23 | Push planning notes. | Refresh against current implementation before more push work. |
-| [docs/SESSION_PERSISTENCE_RUNBOOK.md](C:/repos/chat2.0/docs/SESSION_PERSISTENCE_RUNBOOK.md:1) | 2026-05-02 | Session/mobile resume runbook. | Refresh after invite/email auth changes. |
+| [docs/SESSION_PERSISTENCE_RUNBOOK.md](C:/repos/chat2.0/docs/SESSION_PERSISTENCE_RUNBOOK.md:1) | 2026-05-02 | Session/mobile resume runbook. | Current for session persistence; refresh after future auth-session changes. |
 | [docs/WEATHER_WIDGET.md](C:/repos/chat2.0/docs/WEATHER_WIDGET.md:1) | 2026-05-17 | Weather widget and private preferences. | Current; privacy pattern is a good model for profile data separation. |
 
 ## Entertainment, Games, And Media Docs
@@ -163,9 +163,8 @@ These files exist under `.agents/`, but `.gitignore` excludes that directory. Th
 ## Refresh Order
 
 1. Keep the new audit next-steps doc current as work begins.
-2. Update auth/security docs after invite-only signup and email verification land.
-3. Update chat/realtime docs after read-position fixes land.
-4. Update deployment docs after Netlify headers and live settings are verified.
-5. Update `ARCHITECTURE.md` after shared realtime/send/scroll helpers or Supabase module splits land.
-6. Decide whether root-level bridge status files should be archived or renamed.
-7. Decide whether any `.agents` content should become tracked project documentation.
+2. Update security docs after the next Supabase hardening pass lands.
+3. Update deployment docs after Netlify headers and live settings are verified.
+4. Update `ARCHITECTURE.md` after shared realtime/send/scroll helpers or Supabase module splits land.
+5. Decide whether root-level bridge status files should be archived or renamed.
+6. Decide whether any `.agents` content should become tracked project documentation.

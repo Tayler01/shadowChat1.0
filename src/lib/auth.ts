@@ -25,6 +25,7 @@ export interface SignUpData {
   password: string
   username: string
   displayName: string
+  inviteCode: string
 }
 
 export interface SignInData {
@@ -36,6 +37,18 @@ export interface SignUpResult {
   user: SupabaseAuthUser | null
   profile: AppUser | null
   session: unknown | null
+}
+
+const getAuthRedirectTo = (mode?: 'verified' | 'reset-password') => {
+  if (typeof window === 'undefined') {
+    return undefined
+  }
+
+  const url = new URL(window.location.origin)
+  if (mode) {
+    url.searchParams.set('auth', mode)
+  }
+  return url.toString()
 }
 
 const wait = (ms: number) =>
@@ -83,11 +96,17 @@ export const signUp = async ({
   password,
   username,
   displayName,
+  inviteCode,
 }: SignUpData): Promise<SignUpResult> => {
   const normalizedUsername = username.trim().toLowerCase()
+  const normalizedInviteCode = inviteCode.trim()
 
   if (!normalizedUsername) {
     throw new Error('Username is required')
+  }
+
+  if (!normalizedInviteCode) {
+    throw new Error('Invite code is required')
   }
 
   const { data: isAvailable, error: availabilityError } = await supabase.rpc(
@@ -104,11 +123,13 @@ export const signUp = async ({
     email,
     password,
     options: {
+      emailRedirectTo: getAuthRedirectTo('verified'),
       data: {
         username: normalizedUsername,
         display_name: displayName.trim(),
-      }
-    }
+        invite_code: normalizedInviteCode,
+      },
+    },
   })
 
   if (error) throw error
@@ -126,6 +147,31 @@ export const signUp = async ({
   }
 
   return { user: data.user, profile: null, session: null }
+}
+
+export const resendVerificationEmail = async (email: string) => {
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email,
+    options: {
+      emailRedirectTo: getAuthRedirectTo('verified'),
+    },
+  })
+
+  if (error) throw error
+}
+
+export const sendPasswordResetEmail = async (email: string) => {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: getAuthRedirectTo('reset-password'),
+  })
+
+  if (error) throw error
+}
+
+export const updatePasswordAfterRecovery = async (password: string) => {
+  const { error } = await supabase.auth.updateUser({ password })
+  if (error) throw error
 }
 
 export const signIn = async ({ email, password }: SignInData) => {

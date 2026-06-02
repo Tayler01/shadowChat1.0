@@ -1,5 +1,30 @@
 project_id = "chat2-0"
 
+[auth]
+site_url = "https://shadowchat-1-0.netlify.app"
+additional_redirect_urls = [
+  "https://shadowchat-1-0.netlify.app",
+  "http://localhost:5173",
+  "http://localhost:4174",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:4174",
+]
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+max_frequency = "1m0s"
+otp_length = 8
+
+[auth.hook.before_user_created]
+enabled = true
+uri = "pg-functions://postgres/public/hook_validate_signup_invite"
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
 # Bridge functions perform their own endpoint-level authentication:
 # - device bootstrap endpoints use device id, pairing code, and bridge token checks
 # - user approval/revoke endpoints validate the caller's Supabase user token in code

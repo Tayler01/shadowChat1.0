@@ -83,33 +83,37 @@ Primary files:
 - [src/hooks/useAuth.tsx](C:/repos/chat2.0/src/hooks/useAuth.tsx:473)
 - [supabase/migrations](C:/repos/chat2.0/supabase/migrations)
 
-Observed risk:
+Original observed risk:
 
-- The current signup path calls `supabase.auth.signUp` directly without invite enforcement.
-- Email confirmation UX is only partially handled by the "no session, check email" branch.
-- The login page still contains demo/marketing copy and a larger onboarding explanation than an existing app login needs.
-- Signup asks for "Full Name" even though profile rows are broadly readable.
+- Signup called `supabase.auth.signUp` directly without invite enforcement.
+- Email confirmation UX was only partially handled by the "no session, check email" branch.
+- The login page still contained demo/marketing copy and a larger onboarding explanation than an existing app login needed.
+- Signup asked for "Full Name" even though profile rows are broadly readable.
 
-Next steps:
+Implementation status on June 2, 2026:
 
-1. Add an invite-code field to the signup form, `SignUpData`, `useAuth.signUp`, and `auth.signUp`.
-2. Enforce invite-only signup server-side, preferably with a Supabase Before User Created hook.
-3. Store invite codes as hashes only, with expiration, max uses, disabled state, optional allowed email/domain, created_by, redeemed_by, and redeemed_at.
-4. Keep invite redemption in private schema/table access. Revoke direct `anon`, `authenticated`, and `public` execute access from internal helpers.
-5. Pass invite metadata to Supabase auth only for hook validation, then strip it from public profile metadata.
-6. Enable and verify Supabase email confirmation in production. Configure Site URL and redirect allowlist.
-7. Pass an explicit `emailRedirectTo` in signup.
-8. Add resend-confirmation UX and a pending-verification screen.
-9. Replace login-page marketing/demo text with a quiet app login. Keep only brand, credential fields, invite/signup state, and concise errors.
-10. Change "Full Name" to "Display name" and avoid storing private identity data on public profile rows.
+- Added invite-code signup, pending verification, resend verification, forgot-password, and password-reset flows in the login UI.
+- Replaced login-page marketing/demo copy with a quiet app login and changed signup identity copy to "Display name".
+- Added admin/sub-admin invite management under Settings > Admin > Invites.
+- Added private invite schema and server-side invite enforcement with [20260602012149_invite_only_signup_auth.sql](C:/repos/chat2.0/supabase/migrations/20260602012149_invite_only_signup_auth.sql:1).
+- Added explicit invite RPC and hook ACL hardening with [20260602013640_lock_signup_invite_rpc_acl.sql](C:/repos/chat2.0/supabase/migrations/20260602013640_lock_signup_invite_rpc_acl.sql:1).
+- Pushed both migrations to linked Supabase project `shsqqouecvdoifzufkqm`.
+- Pushed Supabase Auth config for email confirmation, Site URL, redirect allowlist, and the Before User Created hook in [supabase/config.toml](C:/repos/chat2.0/supabase/config.toml:1).
 
-Validation target:
+Completed validation:
 
-- Signup without invite fails before an auth user/profile is created.
-- Signup with valid invite creates an unconfirmed account and shows verification UX.
-- Expired, disabled, reused, and wrong-email invite codes fail.
-- Verified account can sign in. Unverified account cannot enter app surfaces if that is the desired product policy.
-- Existing smoke-test accounts and test docs are updated for email-confirmed users.
+- Focused Jest for auth helpers, `useAuth`, invite SQL contracts, admin invite UI, and Settings admin wiring: passed.
+- `npm run lint`, `npx tsc --noEmit -p tsconfig.app.json`, and `npm run build`: passed.
+- Remote Supabase migration state confirmed versions `20260602012149` and `20260602013640`.
+- Remote function ACLs confirmed invite public RPCs execute only for `authenticated`, and the hook executes only for `supabase_auth_admin`.
+- Remote hook smoke confirmed missing invite returns a 403 error and valid invite validation returns success, with the temporary smoke invite deleted afterward.
+- Supabase config push returned remote API, DB, Auth, and Storage config up to date.
+
+Remaining validation before calling the rollout fully production-proven:
+
+- Deploy the frontend to production and run `npm run qa:smoke:prod` with stable email-confirmed accounts.
+- Run one approved real-email invite signup proof with a disposable inbox or real test inbox, then expire/delete the test invite and clean up any test profile if created.
+- Review optional SMTP/email template polish in the Supabase dashboard before broad user onboarding.
 
 Useful Supabase docs:
 
