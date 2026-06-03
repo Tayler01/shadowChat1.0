@@ -40,6 +40,7 @@ const createQuery = (data: unknown[], error: unknown = null) => {
     select: jest.fn(() => query),
     eq: jest.fn(() => query),
     lt: jest.fn(() => query),
+    or: jest.fn(() => query),
     order: jest.fn(() => query),
     limit: jest.fn().mockResolvedValue({ data, error }),
     maybeSingle: jest.fn().mockResolvedValue({ data: data[0] ?? null, error }),
@@ -111,6 +112,47 @@ test('loads board chat in a 50 message window', async () => {
 
   expect(query.limit).toHaveBeenCalledWith(50)
   expect(result.current.messages.map(message => message.id)).toEqual(['m1'])
+  expect(query.order).toHaveBeenNthCalledWith(1, 'created_at', { ascending: false })
+  expect(query.order).toHaveBeenNthCalledWith(2, 'id', { ascending: false })
+})
+
+test('loads older board chat messages with a stable created_at and id cursor', async () => {
+  const initialMessages = [
+    createMessage('00000000-0000-0000-0000-0000000000b2', 2),
+    createMessage('00000000-0000-0000-0000-0000000000a1', 2),
+    ...Array.from({ length: 48 }, (_, index) =>
+      createMessage(`00000000-0000-0000-0000-0000000001${String(index).padStart(2, '0')}`, index + 3)
+    ),
+  ]
+  const initialQuery = createQuery(initialMessages)
+  const olderQuery = createQuery([
+    createMessage('00000000-0000-0000-0000-000000000090', 1),
+  ])
+  workingClient.from
+    .mockReturnValueOnce(initialQuery)
+    .mockReturnValueOnce(olderQuery)
+
+  const { result } = renderHook(() => useBoardChat('news-chat', 'News Chat'))
+
+  await waitFor(() => expect(result.current.loading).toBe(false))
+
+  await act(async () => {
+    await result.current.loadOlderMessages()
+  })
+
+  expect(olderQuery.or).toHaveBeenCalledWith(
+    'created_at.lt.2026-05-02T12:02:00.000Z,and(created_at.eq.2026-05-02T12:02:00.000Z,id.lt.00000000-0000-0000-0000-0000000000a1)'
+  )
+  expect(olderQuery.order).toHaveBeenNthCalledWith(1, 'created_at', { ascending: false })
+  expect(olderQuery.order).toHaveBeenNthCalledWith(2, 'id', { ascending: false })
+  expect(result.current.messages.map(message => message.id)).toEqual([
+    '00000000-0000-0000-0000-000000000090',
+    '00000000-0000-0000-0000-0000000000a1',
+    '00000000-0000-0000-0000-0000000000b2',
+    ...Array.from({ length: 48 }, (_, index) =>
+      `00000000-0000-0000-0000-0000000001${String(index).padStart(2, '0')}`
+    ),
+  ])
 })
 
 test('realtime recovery refreshes board chat without showing the full loading state again', async () => {

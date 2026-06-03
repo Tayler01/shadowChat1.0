@@ -138,6 +138,8 @@ function BoardChatRow({
   return (
     <div
       id={`board-chat-message-${board.slug}-${message.id}`}
+      data-message-row="true"
+      data-message-id={message.id}
       className="group grid max-w-full grid-cols-[auto_minmax(0,1fr)_2rem] items-start gap-3 px-4 py-3 md:px-5"
     >
       <Avatar
@@ -296,6 +298,7 @@ export function BoardChat({
   } = useBoardChat(board.slug, board.title)
   const [draft, setDraft] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
+  const topSentinelRef = useRef<HTMLDivElement>(null)
   const prevHeightRef = useRef(0)
   const prevScrollTopRef = useRef(0)
   const olderLoadInFlightRef = useRef(false)
@@ -391,6 +394,28 @@ export function BoardChat({
   }, [handleUnreadScroll, requestOlderMessages])
 
   useEffect(() => {
+    const sentinel = topSentinelRef.current
+    const container = scrollRef.current
+    if (!sentinel || !container || typeof IntersectionObserver === 'undefined') return
+    if (!hasMore) return
+
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(entry => entry.isIntersecting)) {
+          requestOlderMessages()
+        }
+      },
+      {
+        root: container,
+        rootMargin: `${HISTORY_LOAD_SCROLL_THRESHOLD}px 0px 0px 0px`,
+      }
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, requestOlderMessages])
+
+  useEffect(() => {
     const el = scrollRef.current
     if (!el) return
     if (!loadingMore && prevHeightRef.current) {
@@ -452,6 +477,7 @@ export function BoardChat({
             </div>
           ) : (
             <div className="py-2">
+              <div ref={topSentinelRef} aria-hidden="true" className="h-px w-full shrink-0" />
               {loadingMore && (
                 <div className="flex justify-center py-2 text-sm text-[var(--text-muted)]">
                   <LoadingSpinner size="sm" /> Loading more...

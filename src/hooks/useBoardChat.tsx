@@ -9,6 +9,7 @@ import {
 import { runRealtimeRecovery } from '../lib/realtimeRecovery'
 import { createRealtimeChannelName } from '../lib/realtimeChannelName'
 import { MESSAGE_FETCH_LIMIT } from '../config'
+import { compareMessageKey } from '../lib/readCursors'
 import { useAuth } from './useAuth'
 import { useRealtimeRecovery } from './useRealtimeRecovery'
 
@@ -33,7 +34,10 @@ export function resetBoardChatCacheForTests() {
 }
 
 const sortChatMessages = (items: BoardChatMessage[]) =>
-  [...items].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+  [...items].sort((a, b) => compareMessageKey(
+    { created_at: a.created_at, id: a.id },
+    { created_at: b.created_at, id: b.id }
+  ))
 
 const dedupeChatMessages = (items: BoardChatMessage[]) => {
   const map = new Map<string, BoardChatMessage>()
@@ -116,6 +120,7 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
         `)
         .eq('board_slug', boardSlug)
         .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
         .limit(MESSAGE_FETCH_LIMIT)
 
       if (fetchError) throw fetchError
@@ -366,8 +371,8 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
 
   const loadOlderMessages = useCallback(async () => {
     if (loadingMore || !hasMore) return
-    const oldest = messages[0]?.created_at
-    if (!oldest) return
+    const oldestMessage = messages[0]
+    if (!oldestMessage) return
 
     setLoadingMore(true)
     try {
@@ -379,8 +384,9 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat') {
           user:users!user_id(*)
         `)
         .eq('board_slug', boardSlug)
-        .lt('created_at', oldest)
+        .or(`created_at.lt.${oldestMessage.created_at},and(created_at.eq.${oldestMessage.created_at},id.lt.${oldestMessage.id})`)
         .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
         .limit(MESSAGE_FETCH_LIMIT)
 
       if (fetchError) throw fetchError

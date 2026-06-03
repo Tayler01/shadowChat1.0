@@ -7,6 +7,7 @@ const mockEditMessage = jest.fn()
 const mockDeleteMessage = jest.fn()
 const mockToggleReaction = jest.fn()
 const mockMarkRead = jest.fn()
+const mockLoadOlderMessages = jest.fn()
 let mockProfile = {
   id: 'user-1',
   username: 'reporter',
@@ -36,9 +37,12 @@ const baseMessage = {
 const buildNewsChatState = (messages = [baseMessage]) => ({
   messages,
   loading: false,
+  loadingMore: false,
+  hasMore: true,
   sending: false,
   error: null,
   refresh: jest.fn(),
+  loadOlderMessages: mockLoadOlderMessages,
   sendMessage: mockSendMessage,
   editMessage: mockEditMessage,
   deleteMessage: mockDeleteMessage,
@@ -100,6 +104,7 @@ beforeEach(() => {
   mockDeleteMessage.mockResolvedValue(undefined)
   mockToggleReaction.mockResolvedValue(undefined)
   mockMarkRead.mockResolvedValue(null)
+  mockLoadOlderMessages.mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -223,6 +228,66 @@ test('news chat does not snap back to latest after the user scrolls up', async (
     Object.defineProperty(window, 'visualViewport', {
       configurable: true,
       value: originalVisualViewport,
+    })
+  }
+})
+
+test('news chat loads older messages when the top sentinel enters view', async () => {
+  const observers: Array<{
+    callback: IntersectionObserverCallback
+    rootMargin: string
+  }> = []
+  const originalIntersectionObserver = window.IntersectionObserver
+
+  Object.defineProperty(window, 'IntersectionObserver', {
+    configurable: true,
+    value: class MockIntersectionObserver {
+      root: Element | Document | null
+      rootMargin: string
+
+      constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
+        observers.push({
+          callback,
+          rootMargin: options?.rootMargin ?? '',
+        })
+        this.root = options?.root ?? null
+        this.rootMargin = options?.rootMargin ?? ''
+      }
+
+      observe = jest.fn()
+      unobserve = jest.fn()
+      disconnect = jest.fn()
+      takeRecords = jest.fn(() => [])
+      thresholds = [0]
+    } as unknown as typeof IntersectionObserver,
+  })
+
+  try {
+    render(<NewsChat />)
+
+    const scroller = screen.getByTestId('board-chat-message-scroll')
+    setScrollerMetrics(scroller, 1000)
+
+    await waitFor(() => {
+      expect(observers.some(observer => observer.rootMargin === '180px 0px 0px 0px')).toBe(true)
+    })
+    const historyObserver = observers.find(observer => observer.rootMargin === '180px 0px 0px 0px')
+    expect(historyObserver).toBeDefined()
+
+    act(() => {
+      historyObserver?.callback([
+        {
+          isIntersecting: true,
+          target: scroller.firstElementChild?.firstElementChild ?? scroller,
+        } as IntersectionObserverEntry,
+      ], {} as IntersectionObserver)
+    })
+
+    expect(mockLoadOlderMessages).toHaveBeenCalledTimes(1)
+  } finally {
+    Object.defineProperty(window, 'IntersectionObserver', {
+      configurable: true,
+      value: originalIntersectionObserver,
     })
   }
 })
