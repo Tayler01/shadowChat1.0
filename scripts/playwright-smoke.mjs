@@ -793,6 +793,7 @@ async function scenarioProfileVisual(state, sessionA) {
 async function scenarioMobileDmBack(state, sessionA, sessionB, mobileSession) {
   await ensureConversationIsReady(state, sessionA, sessionB)
   await waitForChatView(mobileSession.page)
+  await dismissAppReleaseDialog(mobileSession.page)
 
   await mobileSession.page.getByRole('button', { name: /^DMs$/ }).click()
   await waitForDmView(mobileSession.page)
@@ -807,6 +808,7 @@ async function scenarioMobileDmBack(state, sessionA, sessionB, mobileSession) {
 async function scenarioMobileDmRefocus(state, sessionA, sessionB, mobileSession) {
   await ensureConversationIsReady(state, sessionA, sessionB)
   await waitForChatView(mobileSession.page)
+  await dismissAppReleaseDialog(mobileSession.page)
 
   await mobileSession.page.getByRole('button', { name: /^DMs$/ }).click()
   await waitForDmView(mobileSession.page)
@@ -822,6 +824,7 @@ async function scenarioMobileDmRefocus(state, sessionA, sessionB, mobileSession)
 
 async function scenarioMobileSettingsVisual(state, mobileSession) {
   await waitForChatView(mobileSession.page)
+  await dismissAppReleaseDialog(mobileSession.page)
   await goToSettings(mobileSession.page)
   await openSettingsSection(mobileSession.page, 'Notifications & Audio')
   await assertSwitchGeometry(mobileSession.page, 'Toggle Push Notifications', 'Toggle Sound Effects')

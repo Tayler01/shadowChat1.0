@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
-import { isMessageAfterCursor, type UserReadCursor } from '../lib/readCursors'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { compareMessageKey, isMessageAfterCursor, type UserReadCursor } from '../lib/readCursors'
 
 const READ_SETTLE_MS = 220
 const TARGET_SETTLE_MS = 180
-const SHORT_UNREAD_VIEWPORT_RATIO = 0.72
 const FOLLOW_LATEST_SETTLE_MS = 150
 const FOLLOW_LATEST_MAX_WAIT_MS = 800
+const INITIAL_TARGET_MAX_RAF_ATTEMPTS = 5
 
 export type UnreadScrollFeedState =
   | 'resolvingInitial'
@@ -79,6 +79,7 @@ export function useUnreadScroll<TMessage>({
   const targetMessageIdRef = useRef<string | null>(null)
   const initialUnreadJumpDoneRef = useRef(false)
   const initialUnreadTargetIdRef = useRef<string | null>(null)
+  const initialUnreadReadHoldRef = useRef(false)
   const lastMarkedKeyRef = useRef<string | null>(null)
   const readInFlightKeyRef = useRef<string | null>(null)
   const markTimerRef = useRef<number | null>(null)
@@ -89,14 +90,25 @@ export function useUnreadScroll<TMessage>({
   const onMarkReadRef = useRef(onMarkReadToLatest)
   const cursorRef = useRef(cursor)
   const messagesRef = useRef(messages)
+  const loadingRef = useRef(loading)
+  const cursorLoadingRef = useRef(cursorLoading)
   messagesRef.current = messages
   cursorRef.current = cursor
+  loadingRef.current = loading
+  cursorLoadingRef.current = cursorLoading
   onMarkReadRef.current = onMarkReadToLatest
   const messageCount = messages.length
   const latestMessage = messages[messageCount - 1]
   const latestMessageKey = latestMessage
     ? `${surfaceKey}:${getMessageId(latestMessage)}:${getMessageCreatedAt(latestMessage)}`
     : `${surfaceKey}:empty`
+  const messagesById = useMemo(() => {
+    const map = new Map<string, TMessage>()
+    for (const message of messages) {
+      map.set(getMessageId(message), message)
+    }
+    return map
+  }, [getMessageId, messages])
 
   const setFeedState = useCallback((value: UnreadScrollFeedState) => {
     if (feedStateRef.current === value) {
@@ -124,6 +136,37 @@ export function useUnreadScroll<TMessage>({
     autoScrollRef.current = value
     setAutoScrollState(value)
   }, [])
+
+  const isCursorAnchorPending = useCallback(() => {
+    if (!cursor?.last_read_message_id || messages.length === 0) {
+      return false
+    }
+
+    if (messages.some(message => getMessageId(message) === cursor.last_read_message_id)) {
+      return false
+    }
+
+    const oldestMessage = messages[0]
+    const latestMessageInWindow = messages[messages.length - 1]
+    if (!oldestMessage || !latestMessageInWindow) {
+      return false
+    }
+
+    const cursorKey = {
+      created_at: cursor.last_read_at,
+      id: cursor.last_read_message_id,
+    }
+    const oldestKey = {
+      created_at: getMessageCreatedAt(oldestMessage),
+      id: getMessageId(oldestMessage),
+    }
+    const latestKey = {
+      created_at: getMessageCreatedAt(latestMessageInWindow),
+      id: getMessageId(latestMessageInWindow),
+    }
+
+    return compareMessageKey(cursorKey, oldestKey) < 0 || compareMessageKey(cursorKey, latestKey) > 0
+  }, [cursor, getMessageCreatedAt, getMessageId, messages])
 
   const cancelFollowLatest = useCallback(() => {
     if (followSettleTimerRef.current !== null) {
@@ -161,13 +204,16 @@ export function useUnreadScroll<TMessage>({
       if (cursorIndex >= 0) {
         return messages[cursorIndex + 1] ?? null
       }
+      if (isCursorAnchorPending()) {
+        return null
+      }
     }
 
     return messages.find(message => isMessageAfterCursor({
       created_at: getMessageCreatedAt(message),
       id: getMessageId(message),
     }, cursor)) ?? null
-  }, [cursor, getMessageCreatedAt, getMessageId, getUnreadMessages, messages])
+  }, [cursor, getMessageCreatedAt, getMessageId, getUnreadMessages, isCursorAnchorPending, messages])
 
   const getObservedMessage = useCallback((message: TMessage): ObservedMessage<TMessage> => {
     const id = getMessageId(message)
@@ -187,22 +233,47 @@ export function useUnreadScroll<TMessage>({
     const containerRect = container.getBoundingClientRect()
     let candidate: ObservedMessage<TMessage> | null = null
 
-    for (const message of messagesRef.current) {
-      const id = getMessageId(message)
-      const element = document.getElementById(getElementId(id))
-      if (!(element instanceof HTMLElement) || !container.contains(element)) {
-        continue
-      }
+    const mountedRows = Array.from(
+      container.querySelectorAll<HTMLElement>('[data-message-id]')
+    )
 
-      const rect = element.getBoundingClientRect()
-      if (rect.height <= 0 || rect.bottom <= containerRect.top || rect.top >= containerRect.bottom) {
-        continue
-      }
+    if (mountedRows.length > 0) {
+      for (const element of mountedRows) {
+        const id = element.dataset.messageId
+        const message = id ? messagesById.get(id) : null
+        if (!message || !container.contains(element)) {
+          continue
+        }
 
-      const visiblePixels = getReadableVisiblePixels(rect, containerRect)
-      const readableThreshold = Math.min(48, Math.max(12, rect.height * 0.45))
-      if (visiblePixels >= readableThreshold) {
-        candidate = getObservedMessage(message)
+        const rect = element.getBoundingClientRect()
+        if (rect.height <= 0 || rect.bottom <= containerRect.top || rect.top >= containerRect.bottom) {
+          continue
+        }
+
+        const visiblePixels = getReadableVisiblePixels(rect, containerRect)
+        const readableThreshold = Math.min(48, Math.max(12, rect.height * 0.45))
+        if (visiblePixels >= readableThreshold) {
+          candidate = getObservedMessage(message)
+        }
+      }
+    } else {
+      for (const message of messagesRef.current) {
+        const id = getMessageId(message)
+        const element = document.getElementById(getElementId(id))
+        if (!(element instanceof HTMLElement) || !container.contains(element)) {
+          continue
+        }
+
+        const rect = element.getBoundingClientRect()
+        if (rect.height <= 0 || rect.bottom <= containerRect.top || rect.top >= containerRect.bottom) {
+          continue
+        }
+
+        const visiblePixels = getReadableVisiblePixels(rect, containerRect)
+        const readableThreshold = Math.min(48, Math.max(12, rect.height * 0.45))
+        if (visiblePixels >= readableThreshold) {
+          candidate = getObservedMessage(message)
+        }
       }
     }
 
@@ -212,7 +283,7 @@ export function useUnreadScroll<TMessage>({
     }
 
     return candidate ?? lastObservedMessageRef.current
-  }, [containerRef, enabled, getElementId, getMessageId, getObservedMessage])
+  }, [containerRef, enabled, getElementId, getMessageId, getObservedMessage, messagesById])
 
   const isCandidateBeyondCursor = useCallback((candidate: ObservedMessage<TMessage>) => {
     const currentCursor = cursorRef.current
@@ -252,6 +323,8 @@ export function useUnreadScroll<TMessage>({
     clearDivider = false
   ) => {
     if (!enabled || !candidate || !isCandidateBeyondCursor(candidate)) return
+    if (!initialMessageId && !initialUnreadJumpDoneRef.current) return
+    if (initialUnreadReadHoldRef.current && !clearDivider) return
 
     const markKey = candidate.key
     if (lastMarkedKeyRef.current === markKey || readInFlightKeyRef.current === markKey) {
@@ -274,7 +347,7 @@ export function useUnreadScroll<TMessage>({
         setFeedState('bottomPinned')
       }
     }
-  }, [enabled, isCandidateBeyondCursor, setFeedState])
+  }, [enabled, initialMessageId, isCandidateBeyondCursor, setFeedState])
 
   const markObservedRead = useCallback(async (
     clearDivider = false,
@@ -312,6 +385,7 @@ export function useUnreadScroll<TMessage>({
   }, [containerRef])
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    initialUnreadReadHoldRef.current = false
     scrollContainerToBottom(behavior)
     setAutoScroll(true)
     setFirstUnreadMessageId(null)
@@ -329,6 +403,8 @@ export function useUnreadScroll<TMessage>({
 
   const followLatest = useCallback(() => {
     if (!autoScrollRef.current) return
+    if (!initialMessageId && !initialUnreadJumpDoneRef.current) return
+    if (initialUnreadReadHoldRef.current) return
 
     setFeedState('layoutSettling')
 
@@ -341,7 +417,7 @@ export function useUnreadScroll<TMessage>({
     if (followMaxTimerRef.current === null) {
       followMaxTimerRef.current = window.setTimeout(flushFollowLatest, FOLLOW_LATEST_MAX_WAIT_MS)
     }
-  }, [flushFollowLatest, setFeedState])
+  }, [flushFollowLatest, initialMessageId, setFeedState])
 
   const handleScroll = useCallback(() => {
     const container = containerRef.current
@@ -349,9 +425,25 @@ export function useUnreadScroll<TMessage>({
 
     const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= 28
     updateLastObservedMessage()
+
+    if (
+      !initialMessageId &&
+      !initialUnreadJumpDoneRef.current &&
+      (loadingRef.current || cursorLoadingRef.current || targetSettleTimerRef.current !== null)
+    ) {
+      return atBottom
+    }
+
+    if (initialUnreadReadHoldRef.current && !atBottom) {
+      setAutoScroll(false)
+      setFeedState('anchoredCatchup')
+      return false
+    }
+
     setAutoScroll(atBottom)
 
     if (atBottom) {
+      initialUnreadReadHoldRef.current = false
       setFirstUnreadMessageId(null)
       setFeedState('bottomPinned')
       scheduleMarkObservedRead(true)
@@ -360,7 +452,14 @@ export function useUnreadScroll<TMessage>({
     }
 
     return atBottom
-  }, [containerRef, scheduleMarkObservedRead, setAutoScroll, setFeedState, updateLastObservedMessage])
+  }, [
+    containerRef,
+    initialMessageId,
+    scheduleMarkObservedRead,
+    setAutoScroll,
+    setFeedState,
+    updateLastObservedMessage,
+  ])
 
   const completeTargetAfterSettle = useCallback((
     nextState: UnreadScrollFeedState,
@@ -374,6 +473,7 @@ export function useUnreadScroll<TMessage>({
       updateLastObservedMessage()
       initialUnreadJumpDoneRef.current = true
       initialUnreadTargetIdRef.current = null
+      initialUnreadReadHoldRef.current = !markAfterSettled
       setTargetMessageId(null)
       setFeedState(nextState)
       if (markAfterSettled) {
@@ -391,6 +491,7 @@ export function useUnreadScroll<TMessage>({
   useEffect(() => {
     initialUnreadJumpDoneRef.current = false
     initialUnreadTargetIdRef.current = null
+    initialUnreadReadHoldRef.current = false
     lastMarkedKeyRef.current = null
     readInFlightKeyRef.current = null
     lastObservedMessageRef.current = null
@@ -485,10 +586,22 @@ export function useUnreadScroll<TMessage>({
       }
     )
 
-    for (const message of messagesRef.current) {
-      const element = document.getElementById(getElementId(getMessageId(message)))
-      if (element instanceof HTMLElement && container.contains(element)) {
-        observer.observe(element)
+    const mountedRows = Array.from(
+      container.querySelectorAll<HTMLElement>('[data-message-id]')
+    )
+
+    if (mountedRows.length > 0) {
+      for (const element of mountedRows) {
+        if (container.contains(element)) {
+          observer.observe(element)
+        }
+      }
+    } else {
+      for (const message of messagesRef.current) {
+        const element = document.getElementById(getElementId(getMessageId(message)))
+        if (element instanceof HTMLElement && container.contains(element)) {
+          observer.observe(element)
+        }
       }
     }
 
@@ -502,6 +615,7 @@ export function useUnreadScroll<TMessage>({
     getMessageId,
     latestMessageKey,
     messageCount,
+    renderSignal,
     updateLastObservedMessage,
   ])
 
@@ -530,6 +644,11 @@ export function useUnreadScroll<TMessage>({
       return
     }
 
+    if (isCursorAnchorPending()) {
+      setFeedState('reconnectReconciling')
+      return
+    }
+
     const firstUnread = initialUnreadTargetIdRef.current
       ? messages.find(message => getMessageId(message) === initialUnreadTargetIdRef.current) ?? null
       : findFirstUnreadMessage()
@@ -552,39 +671,38 @@ export function useUnreadScroll<TMessage>({
 
     setFeedState('targetingFirstUnread')
 
-    requestAnimationFrame(() => {
-      if (initialUnreadJumpDoneRef.current || targetSettleTimerRef.current !== null) {
+    let frameId: number | null = null
+    let attemptCount = 0
+    let cancelled = false
+
+    const attemptInitialUnreadScroll = () => {
+      if (cancelled || initialUnreadJumpDoneRef.current || targetSettleTimerRef.current !== null) {
         return
       }
 
       const container = containerRef.current
       const firstUnreadEl = document.getElementById(getElementId(firstUnreadId))
-      const latestLoadedMessage = messagesRef.current[messagesRef.current.length - 1]
-      const latestEl = latestLoadedMessage
-        ? document.getElementById(getElementId(getMessageId(latestLoadedMessage)))
-        : null
 
       if (!container || !(firstUnreadEl instanceof HTMLElement) || !container.contains(firstUnreadEl)) {
-        return
-      }
-
-      const firstRect = firstUnreadEl.getBoundingClientRect()
-      const latestRect = latestEl?.getBoundingClientRect()
-      const unreadHeight = latestRect
-        ? Math.max(0, latestRect.bottom - firstRect.top)
-        : Number.POSITIVE_INFINITY
-
-      if (unreadHeight <= container.clientHeight * SHORT_UNREAD_VIEWPORT_RATIO && latestEl) {
-        scrollContainerToBottom('auto')
-        setAutoScroll(true)
-        completeTargetAfterSettle('bottomPinned', true)
+        if (attemptCount < INITIAL_TARGET_MAX_RAF_ATTEMPTS) {
+          attemptCount += 1
+          frameId = requestAnimationFrame(attemptInitialUnreadScroll)
+        }
         return
       }
 
       firstUnreadEl.scrollIntoView({ block: 'start', behavior: 'auto' })
       setAutoScroll(false)
       completeTargetAfterSettle('anchoredCatchup', false)
-    })
+    }
+
+    frameId = requestAnimationFrame(attemptInitialUnreadScroll)
+    return () => {
+      cancelled = true
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId)
+      }
+    }
   }, [
     completeTargetAfterSettle,
     containerRef,
@@ -594,11 +712,11 @@ export function useUnreadScroll<TMessage>({
     getElementId,
     getMessageId,
     initialMessageId,
+    isCursorAnchorPending,
     loading,
     messages,
     onBeforeInitialJump,
     renderSignal,
-    scrollContainerToBottom,
     scrollToBottom,
     setAutoScroll,
     setFeedState,
@@ -618,7 +736,12 @@ export function useUnreadScroll<TMessage>({
 
     updateLastObservedMessage()
 
-    if (autoScroll) {
+    if (targetMessageIdRef.current || initialUnreadTargetIdRef.current) {
+      setFeedState(targetSettleTimerRef.current === null ? 'anchoredCatchup' : 'layoutSettling')
+      return
+    }
+
+    if (autoScroll && !initialUnreadReadHoldRef.current) {
       setFeedState('newerAppend')
       scrollToBottom('auto')
       return

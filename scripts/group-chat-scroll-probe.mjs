@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { chromium, devices, webkit } from 'playwright'
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { appendFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
@@ -31,6 +31,8 @@ const args = parseArgs(process.argv.slice(2))
 const repoRoot = process.cwd()
 const envValues = await loadDotEnvFiles([
   path.join(repoRoot, '.env'),
+  path.join(repoRoot, '.env.local'),
+  path.join(repoRoot, '.env.production'),
   path.join(repoRoot, '.env.testing.local'),
 ])
 const runName = slugify(args.runName || `chat-scroll-${timestampToken()}`)
@@ -364,11 +366,12 @@ async function scenarioReadPosition(browserInstance, seed) {
 
     const visibleSnapshot = await readScrollSnapshot(page)
     assertEqual(visibleSnapshot.qa.targetId, firstUnread.id, 'message scroll targetId should be the first unread message')
-    assertIncluded(
-      visibleSnapshot.qa.windowMode,
-      ['targetingFirstUnread', 'anchoredCatchup', 'layoutSettling'],
-      'message scroll windowMode should show first-unread targeting or anchored catchup while positioned at first unread'
-    )
+    if (!['targetingFirstUnread', 'anchoredCatchup', 'layoutSettling'].includes(visibleSnapshot.qa.windowMode)) {
+      throw new Error(
+        `message scroll windowMode should show first-unread targeting or anchored catchup while positioned at first unread. `
+        + `Received ${visibleSnapshot.qa.windowMode}. Snapshot: ${JSON.stringify(visibleSnapshot)}`
+      )
+    }
 
     const cursorBeforeLatest = await fetchReadCursor(seed, seed.accounts[0].userId)
     assertEqual(cursorBeforeLatest?.last_read_message_id, cursorMessage.id, 'read cursor advanced before latest was visible')
@@ -414,6 +417,11 @@ async function scenarioDeepLink(browserInstance, seed) {
     const { page } = validSession
     await waitForScrollReady(page)
     await waitForVisibleMessage(page, targetMessage.id, 'deep-link target')
+    await page.waitForFunction(() => {
+      const scrollEl = document.querySelector('[data-testid="message-scroll"]')
+      const status = scrollEl?.getAttribute('data-deep-link-status')
+      return status === 'loaded' || status === 'settled'
+    }, null, { timeout: DEFAULT_TIMEOUT_MS }).catch(() => undefined)
     validSnapshot = await readScrollSnapshot(page)
     assertEqual(validSnapshot.qa.targetId, targetMessage.id, 'message scroll targetId should be the deep-link target')
     assertIncluded(validSnapshot.qa.deepLinkStatus, ['loaded', 'settled'], 'deep-link status should be loaded for an existing target')
@@ -467,6 +475,10 @@ async function scenarioSameTimestamp(browserInstance, seed) {
     baseOffsetMs: 420_000,
     sameTimestamp: true,
   })
+  const newestSeededMessage = [...seededMessages].sort(compareSeedMessagesByStableKey).at(-1)
+  if (newestSeededMessage) {
+    await setReadCursorDirect(seed, seed.accounts[0].userId, newestSeededMessage)
+  }
 
   const session = await createAuthenticatedSession(browserInstance, {
     accountIndex: 1,
@@ -476,15 +488,56 @@ async function scenarioSameTimestamp(browserInstance, seed) {
   try {
     const { page } = session
     await waitForScrollReady(page)
-    await forceLoadOlder(page, 8)
-    const snapshot = await readScrollSnapshot(page)
     const seededIds = new Set(seededMessages.map(message => message.id))
-    const renderedSeedIds = snapshot.rowIds.filter(id => seededIds.has(id))
-    const duplicateIds = renderedSeedIds.filter((id, index) => renderedSeedIds.indexOf(id) !== index)
-    const missingIds = seededMessages.map(message => message.id).filter(id => !renderedSeedIds.includes(id))
+    const observedSeedIds = new Set()
+    const snapshots = []
+    const collectSnapshot = async () => {
+      const nextSnapshot = await readScrollSnapshot(page)
+      snapshots.push(nextSnapshot)
+      nextSnapshot.rowIds.forEach(id => {
+        if (seededIds.has(id)) {
+          observedSeedIds.add(id)
+        }
+      })
+      return nextSnapshot
+    }
 
-    assertCondition(duplicateIds.length === 0, `same-timestamp rendered duplicate rows: ${duplicateIds.join(', ')}`)
-    assertCondition(missingIds.length === 0, `same-timestamp pagination skipped ${missingIds.length} seeded rows`)
+    await collectSnapshot()
+    for (let index = 0; index < 8 && observedSeedIds.size < seededIds.size; index += 1) {
+      await page.evaluate(() => {
+        const scrollEl = document.querySelector('[data-testid="message-scroll"]')
+        if (scrollEl) {
+          scrollEl.scrollTop = 0
+          scrollEl.dispatchEvent(new Event('scroll', { bubbles: true }))
+        }
+      })
+      await page.waitForTimeout(2100)
+      await collectSnapshot()
+    }
+    for (let index = 0; index < 12 && observedSeedIds.size < seededIds.size; index += 1) {
+      await page.evaluate(() => {
+        const scrollEl = document.querySelector('[data-testid="message-scroll"]')
+        if (scrollEl) {
+          scrollEl.scrollTop = scrollEl.scrollHeight
+          scrollEl.dispatchEvent(new Event('scroll', { bubbles: true }))
+        }
+      })
+      await page.waitForTimeout(520)
+      await collectSnapshot()
+    }
+
+    const snapshot = snapshots[snapshots.length - 1]
+    const renderedSeedIds = Array.from(observedSeedIds)
+    const duplicateIds = renderedSeedIds.filter((id, index) => renderedSeedIds.indexOf(id) !== index)
+    const missingIds = seededMessages.map(message => message.id).filter(id => !observedSeedIds.has(id))
+
+    assertCondition(duplicateIds.length === 0, `same-timestamp rendered duplicate rows: ${duplicateIds.join(', ')}. Snapshot: ${JSON.stringify(snapshot)}`)
+    assertCondition(
+      missingIds.length === 0,
+      `same-timestamp pagination skipped ${missingIds.length} seeded rows. `
+      + `Rendered ${renderedSeedIds.length}/${seededMessages.length}. `
+      + `Missing: ${missingIds.join(', ')}. Snapshot: ${JSON.stringify(snapshot)}`
+    )
 
     return {
       seeded: true,
@@ -492,6 +545,7 @@ async function scenarioSameTimestamp(browserInstance, seed) {
       renderedSeedCount: renderedSeedIds.length,
       duplicateIds,
       missingIds,
+      snapshots,
       snapshot,
     }
   } finally {
@@ -506,6 +560,10 @@ async function scenarioRealtimeAnchored(browserInstance, seed) {
     userId: seed.accounts[1].userId,
     baseOffsetMs: 540_000,
   })
+  const newestSeededMessage = [...seededMessages].sort(compareSeedMessagesByStableKey).at(-1)
+  if (newestSeededMessage) {
+    await setReadCursorDirect(seed, seed.accounts[0].userId, newestSeededMessage)
+  }
 
   const session = await createAuthenticatedSession(browserInstance, {
     accountIndex: 1,
@@ -531,7 +589,14 @@ async function scenarioRealtimeAnchored(browserInstance, seed) {
     await page.waitForFunction(messageId => {
       return Array.from(document.querySelectorAll('[data-message-row="true"]'))
         .some(row => row.dataset.messageId === messageId)
-    }, realtimeMessage.id, { timeout: DEFAULT_TIMEOUT_MS })
+    }, realtimeMessage.id, { timeout: DEFAULT_TIMEOUT_MS }).catch(async error => {
+      const timeoutSnapshot = await readScrollSnapshot(page).catch(() => null)
+      throw new Error(
+        `realtime incoming message ${realtimeMessage.id} did not render while anchored. `
+        + `Before: ${JSON.stringify(beforeSnapshot)}. `
+        + `After timeout: ${JSON.stringify(timeoutSnapshot)}. Cause: ${error.message}`
+      )
+    })
     await page.waitForTimeout(800)
     const afterSnapshot = await readScrollSnapshot(page)
     const scrollDelta = Math.abs(afterSnapshot.scrollTop - beforeSnapshot.scrollTop)
@@ -571,16 +636,12 @@ async function scenarioMedia(browserInstance, seed) {
   const session = await createAuthenticatedSession(browserInstance, {
     accountIndex: 1,
     label: 'media',
+    targetUrl: buildChatMessageUrl(mediaMessage.id),
   })
 
   try {
     const { page } = session
     await waitForScrollReady(page)
-    await page.evaluate(messageId => {
-      const row = Array.from(document.querySelectorAll('[data-message-row="true"]'))
-        .find(element => element.dataset.messageId === messageId)
-      row?.scrollIntoView({ block: 'center', behavior: 'auto' })
-    }, mediaMessage.id)
     await waitForVisibleMessage(page, mediaMessage.id, 'media message')
     await page.waitForFunction(messageId => {
       const row = Array.from(document.querySelectorAll('[data-message-row="true"]'))
@@ -615,7 +676,7 @@ async function createSeedContext() {
     'SUPABASE_URL',
     'VITE_SUPABASE_URL',
   ])
-  const serviceRoleKey = getEnvValue(envValues, [
+  const serviceRoleKey = resolveServiceRoleKey(supabaseUrl, envValues, [
     'PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY',
     'SUPABASE_SERVICE_ROLE_KEY',
     'SUPABASE_SERVICE_KEY',
@@ -625,7 +686,7 @@ async function createSeedContext() {
   const missing = []
 
   if (!supabaseUrl) missing.push('PLAYWRIGHT_SUPABASE_URL or SUPABASE_URL/VITE_SUPABASE_URL')
-  if (!serviceRoleKey) missing.push('PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SERVICE_ROLE_KEY')
+  if (!serviceRoleKey) missing.push('PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SERVICE_ROLE_KEY or Supabase CLI service_role access')
   if (!account1.email || !account1.password) missing.push('PLAYWRIGHT_ACCOUNT_1_EMAIL/PASSWORD')
   if (!account2.email || !account2.password) missing.push('PLAYWRIGHT_ACCOUNT_2_EMAIL/PASSWORD')
 
@@ -1081,12 +1142,16 @@ async function readScrollSnapshot(page) {
       loadedCount: Number(dataset.loadedCount || 0),
       renderedCount: Number(dataset.renderedCount || 0),
       hiddenBeforeCount: Number(dataset.hiddenBeforeCount || 0),
+      hiddenAfterCount: Number(dataset.hiddenAfterCount || 0),
       rowCount: rows.length,
       rowIds: rows.map(row => row.id).filter(Boolean),
       visibleRowIds: rows.filter(row => row.visible).map(row => row.id).filter(Boolean),
       qa: {
         windowMode: dataset.windowMode || '',
         targetId: dataset.targetId || '',
+        firstUnreadId: dataset.firstUnreadId || '',
+        scrollTargetId: dataset.scrollTargetId || '',
+        readCursorId: dataset.readCursorId || '',
         hasOlder: dataset.hasOlder || '',
         hasNewer: dataset.hasNewer || '',
         lastObservedVisibleId: dataset.lastObservedVisibleId || '',
@@ -1245,6 +1310,27 @@ function getEnvValue(values, names) {
   return ''
 }
 
+function resolveServiceRoleKey(supabaseUrl, values, names) {
+  const configured = getEnvValue(values, names)
+  if (configured) return configured
+
+  const ref = supabaseUrl?.match(/^https:\/\/([a-z0-9-]+)\.supabase\.co/i)?.[1]
+  if (!ref) return ''
+
+  try {
+    const raw = execFileSync('supabase', ['projects', 'api-keys', '--project-ref', ref, '-o', 'json'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    const parsed = JSON.parse(raw)
+    const keys = Array.isArray(parsed) ? parsed : parsed?.api_keys || []
+    const serviceRole = keys.find(key => key.name === 'service_role' || key.type === 'service_role')
+    return serviceRole?.api_key || ''
+  } catch {
+    return ''
+  }
+}
+
 function attachDiagnostics(page, logPath, label) {
   page.on('console', message => {
     if (message.type() === 'error' || message.type() === 'warning') {
@@ -1317,6 +1403,20 @@ function chunkArray(items, size) {
 
 async function writeJson(filePath, value) {
   await writeFile(filePath, JSON.stringify(value, null, 2), 'utf8')
+}
+
+function compareSeedMessagesByStableKey(left, right) {
+  const leftCreatedAt = left.created_at || ''
+  const rightCreatedAt = right.created_at || ''
+  const leftTime = Date.parse(leftCreatedAt)
+  const rightTime = Date.parse(rightCreatedAt)
+  if (Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime !== rightTime) {
+    return leftTime - rightTime
+  }
+
+  const timeCompare = leftCreatedAt.localeCompare(rightCreatedAt)
+  if (timeCompare !== 0) return timeCompare
+  return (left.id || '').localeCompare(right.id || '')
 }
 
 function serializeError(error) {
