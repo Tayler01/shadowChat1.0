@@ -30,8 +30,10 @@ Current boards are:
 - `News Chat`, `Investing Chat`, `Learning Chat`, `Crypto Chat`, `Vibe Coding`,
   `AI News`, and `Projects Chat`: public chat boards backed by the shared
   `board_chat_messages` table. They open with the latest 50 messages, lazy-load
-  older history from the top of the scroller, and support text, link previews,
-  edits, deletes, read cursors, unread dividers, and emoji reactions.
+  older history from the top of the scroller, and use the shared group-chat
+  message core for text, links, media attachments, voice/audio, GIFs, replies,
+  pins, edits, deletes, failed-send retry, read cursors, unread dividers, and
+  emoji reactions.
 - `Art Board`: a static placeholder that currently renders `Coming soon`.
 
 Opened boards use the primary Boards header with a clear back button. The feed
@@ -46,13 +48,13 @@ bridge behavior, push, or message history.
 
 - [src/components/boards/BoardsView.tsx](C:/repos/chat2.0/src/components/boards/BoardsView.tsx:1): top-level Boards experience.
 - [src/components/boards/BoardBubbleMap.tsx](C:/repos/chat2.0/src/components/boards/BoardBubbleMap.tsx:1): low-friction draggable board map with collision transfer, no-overlap spacing, sparkle/audio feedback, and pill spin handling.
-- [src/components/boards/BoardChat.tsx](C:/repos/chat2.0/src/components/boards/BoardChat.tsx:1): reusable board-chat surface.
+- [src/components/boards/BoardChat.tsx](C:/repos/chat2.0/src/components/boards/BoardChat.tsx:1): reusable board-chat surface backed by the shared group-chat message list and composer.
 - [src/components/news/NewsFeed.tsx](C:/repos/chat2.0/src/components/news/NewsFeed.tsx:1): today board rendering and refresh.
 - [src/components/news/NewsFeedItem.tsx](C:/repos/chat2.0/src/components/news/NewsFeedItem.tsx:1): compact feed tile.
 - [src/components/news/NewsFeedModal.tsx](C:/repos/chat2.0/src/components/news/NewsFeedModal.tsx:1): expanded post/media view.
 - [src/components/news/NewsView.tsx](C:/repos/chat2.0/src/components/news/NewsView.tsx:1): compatibility wrapper for older imports.
 - [src/components/news/NewsChat.tsx](C:/repos/chat2.0/src/components/news/NewsChat.tsx:1): compatibility wrapper for the News Chat board.
-- [src/hooks/useBoardChat.tsx](C:/repos/chat2.0/src/hooks/useBoardChat.tsx:1): generic board-chat fetch, realtime, send/edit/delete, reactions, and cursor-facing message shape.
+- [src/hooks/useBoardChat.tsx](C:/repos/chat2.0/src/hooks/useBoardChat.tsx:1): generic board-chat adapter for group-chat-compatible fetch windows, realtime, optimistic send/retry, media/replies/pins, edit/delete, reactions, and cursor-facing message shape.
 - [src/hooks/useBoardBadges.ts](C:/repos/chat2.0/src/hooks/useBoardBadges.ts:1): board unread counts and Sidebar/MobileNav badge count.
 - [src/hooks/useNewsFeed.tsx](C:/repos/chat2.0/src/hooks/useNewsFeed.tsx:1): feed fetch, realtime, reactions, and seen state.
 - [src/hooks/useNewsBadges.ts](C:/repos/chat2.0/src/hooks/useNewsBadges.ts:1): compatibility wrapper over board badges.
@@ -99,6 +101,7 @@ Main RPCs:
 - `hide_news_feed_item`
 - `toggle_news_feed_reaction`
 - `toggle_board_chat_reaction`
+- `toggle_board_chat_pin`
 - `get_board_badge_counts`
 - `mark_news_seen`
 - `count_news_badge_items`

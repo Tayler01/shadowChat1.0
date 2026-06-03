@@ -29,7 +29,7 @@ import toast from 'react-hot-toast'
 import type { EmojiClickData } from '../../types'
 import { useToneAnalysis } from '../../hooks/useToneAnalysis'
 import { useToneAnalysisEnabled } from '../../hooks/useToneAnalysisEnabled'
-import { getBlockedActionMessage } from '../../lib/moderation'
+import { getBlockedActionMessage, type ChannelBanScope } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
 import { EmojiPickerOverlay } from './EmojiPickerOverlay'
 import { QuickReactionRail } from './QuickReactionRail'
@@ -58,6 +58,7 @@ interface MessageItemProps {
   containerRef?: React.RefObject<HTMLDivElement>
   avatarLoading?: 'eager' | 'lazy'
   avatarFetchPriority?: 'high' | 'low' | 'auto'
+  moderationScope?: ChannelBanScope
 }
 
 const PublicProfileDialog = lazy(() =>
@@ -175,6 +176,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     containerRef,
     avatarLoading = 'lazy',
     avatarFetchPriority,
+    moderationScope = 'general_chat',
   }) => {
     const { profile } = useAuth()
     const [isEditing, setIsEditing] = useState(false)
@@ -252,7 +254,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
       try {
         await onToggleReaction(message.id, emoji)
       } catch (error) {
-        const notice = await getBlockedActionMessage('general_chat', error, 'Failed to update reaction')
+        const notice = await getBlockedActionMessage(moderationScope, error, 'Failed to update reaction')
         showActionErrorToast(notice)
       }
     }
@@ -487,7 +489,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     className="text-[0.65rem]"
                   />
                   {message.message_type === 'audio' ? (
-                    <audio controls src={message.audio_url} className="mt-1 max-w-full" />
+                    <audio controls src={message.audio_url ?? undefined} className="mt-1 max-w-full" />
                   ) : isImageMessage ? (
                     <img
                       src={imageMessageSrc}

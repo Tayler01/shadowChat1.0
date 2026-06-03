@@ -834,9 +834,9 @@ export interface Message {
   user_id: string
   content: string
   message_type: ChatMessageType
-  audio_url?: string
-  audio_duration?: number
-  file_url?: string
+  audio_url?: string | null
+  audio_duration?: number | null
+  file_url?: string | null
   thumbnail_url?: string | null
   thumbnail_path?: string | null
   media_width?: number | null
@@ -846,8 +846,8 @@ export interface Message {
   pinned: boolean
   pinned_by?: string | null
   pinned_at?: string | null
-  edited_at?: string
-  reply_to?: string
+  edited_at?: string | null
+  reply_to?: string | null
   created_at: string
   updated_at: string
   user?: User
@@ -1049,16 +1049,32 @@ export interface NewsChatMessage {
   user?: User
 }
 
-export interface BoardChatMessage {
+export interface BoardChatMessage extends Message {
   id: string
   board_slug: string
   user_id: string
   content: string
+  client_message_id?: string | null
+  message_type: ChatMessageType
+  audio_url?: string | null
+  audio_duration?: number | null
+  file_url?: string | null
+  thumbnail_url?: string | null
+  thumbnail_path?: string | null
+  media_width?: number | null
+  media_height?: number | null
+  media_processed_at?: string | null
   edited_at?: string | null
   reactions: NewsReactionSummary
+  pinned: boolean
+  pinned_by?: string | null
+  pinned_at?: string | null
+  reply_to?: string | null
   created_at: string
   updated_at: string
   user?: User
+  optimistic?: boolean
+  delivery_status?: 'sending' | 'sent' | 'failed'
 }
 
 export type GameType = 'shadow_war' | 'shadow_checkers'
@@ -1399,7 +1415,7 @@ export interface VisibleAppRelease extends AppRelease {
   restarted_at?: string | null
 }
 
-export type ChatMessage = Message | DMMessage
+export type ChatMessage = Message | DMMessage | BoardChatMessage
 
 export interface UserSession {
   id: string

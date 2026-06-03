@@ -1420,8 +1420,8 @@ function useProvideMessages(): MessagesContextValue {
     return sendMessage(
       retryContent,
       failedMessage.message_type,
-      failedMessage.file_url,
-      failedMessage.reply_to,
+      failedMessage.file_url ?? undefined,
+      failedMessage.reply_to ?? undefined,
       failedMessage.thumbnail_url,
       {
         clientMessageId,

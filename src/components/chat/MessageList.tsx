@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useCallback, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowDown } from 'lucide-react'
-import { useMessages } from '../../hooks/useMessages'
+import { useOptionalMessages, type MessagesContextValue } from '../../hooks/MessagesContext'
 import { useTyping } from '../../hooks/useTyping'
 import { groupMessagesByDate, shouldGroupMessage } from '../../lib/utils'
 import { MessageItem } from './MessageItem'
@@ -13,14 +13,15 @@ import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { useAuth } from '../../hooks/useAuth'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
-import { getBlockedActionMessage } from '../../lib/moderation'
+import { getBlockedActionMessage, type ChannelBanScope } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
 import { useReadCursor } from '../../hooks/useReadCursor'
 import { useUnreadScroll, type UnreadScrollFeedState } from '../../hooks/useUnreadScroll'
 import { UnreadDivider } from './UnreadDivider'
-import { compareMessageKey, isMessageAfterCursor } from '../../lib/readCursors'
+import { compareMessageKey, isMessageAfterCursor, type ReadSurface } from '../../lib/readCursors'
 
 interface MessageListProps {
+  messagesApi?: MessagesContextValue
   onReply?: (message: Message) => void
   failedMessages?: FailedMessage[]
   onResend?: (msg: FailedMessage) => void
@@ -29,6 +30,13 @@ interface MessageListProps {
   sending?: boolean
   uploading?: boolean
   initialMessageId?: string
+  readCursorSurface?: ReadSurface
+  readCursorScope?: string
+  surfaceKey?: string
+  typingChannel?: string
+  moderationScope?: ChannelBanScope
+  scrollTestId?: string
+  emptyState?: React.ReactNode
 }
 
 const DEFAULT_RENDER_WINDOW_SIZE = 90
@@ -40,12 +48,12 @@ const HISTORY_LOAD_COOLDOWN_MS = 1800
 const TARGET_SCROLL_SETTLE_MS = 260
 const TARGET_SCROLL_VERIFY_ATTEMPTS = 4
 
-type GeneralChatMessagesApi = ReturnType<typeof useMessages> & {
+type GeneralChatMessagesApi = MessagesContextValue & {
   loadLatestMessages?: () => Promise<void> | void
-  ensureMessageWindow?: ReturnType<typeof useMessages>['ensureMessageWindow']
-  windowMode?: ReturnType<typeof useMessages>['windowMode']
-  targetStatus?: ReturnType<typeof useMessages>['targetStatus']
-  anchorStatus?: ReturnType<typeof useMessages>['anchorStatus']
+  ensureMessageWindow?: MessagesContextValue['ensureMessageWindow']
+  windowMode?: MessagesContextValue['windowMode']
+  targetStatus?: MessagesContextValue['targetStatus']
+  anchorStatus?: MessagesContextValue['anchorStatus']
   hasOlder?: boolean
   hasNewer?: boolean
   hasMore?: boolean
@@ -99,6 +107,7 @@ const isServerWindowMessage = (message: Message) => (
 )
 
 export const MessageList: React.FC<MessageListProps> = ({
+  messagesApi: providedMessagesApi,
   onReply,
   failedMessages = [],
   onResend,
@@ -107,8 +116,20 @@ export const MessageList: React.FC<MessageListProps> = ({
   sending = false,
   uploading = false,
   initialMessageId,
+  readCursorSurface = 'general_chat',
+  readCursorScope = 'main',
+  surfaceKey = 'general_chat:main',
+  typingChannel = 'general',
+  moderationScope = 'general_chat',
+  scrollTestId = 'message-scroll',
+  emptyState,
 }) => {
-  const messagesApi = useMessages() as GeneralChatMessagesApi
+  const contextMessagesApi = useOptionalMessages()
+  const messagesApi = (providedMessagesApi ?? contextMessagesApi) as GeneralChatMessagesApi | undefined
+  if (!messagesApi) {
+    throw new Error('MessageList requires a messages API or MessagesProvider')
+  }
+
   const {
     messages,
     loading,
@@ -129,7 +150,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     hasNewer = false,
   } = messagesApi
   const hasMore = dataHasOlder || legacyHasMore
-  const { typingUsers } = useTyping('general')
+  const { typingUsers } = useTyping(typingChannel)
   const { profile } = useAuth()
   const containerRef = useRef<HTMLDivElement>(null)
   const topSentinelRef = useRef<HTMLDivElement>(null)
@@ -156,7 +177,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   const [windowModeOverride, setWindowModeOverride] = useState<WindowModeOverride | null>(null)
   const [deepLinkStatus, setDeepLinkStatus] = useState<DeepLinkStatus>(initialMessageId ? 'resolving' : 'none')
   const [cursorWindowResolving, setCursorWindowResolving] = useState(false)
-  const { cursor, loading: cursorLoading, markRead } = useReadCursor('general_chat', 'main', Boolean(profile?.id))
+  const { cursor, loading: cursorLoading, markRead } = useReadCursor(readCursorSurface, readCursorScope, Boolean(profile?.id))
 
   const messageMap = useMemo(() => {
     const msgMap = new Map<string, Message>()
@@ -245,7 +266,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     cursor,
     cursorLoading,
     enabled: Boolean(profile?.id),
-    surfaceKey: 'general_chat:main',
+    surfaceKey,
     initialMessageId,
     renderSignal: renderWindowStart,
     getMessageId,
@@ -843,20 +864,20 @@ export const MessageList: React.FC<MessageListProps> = ({
       await editMessage(messageId, content)
       toast.success('Message updated')
     } catch (error) {
-      const message = await getBlockedActionMessage('general_chat', error, 'Failed to update message')
+      const message = await getBlockedActionMessage(moderationScope, error, 'Failed to update message')
       showActionErrorToast(message)
     }
-  }, [editMessage])
+  }, [editMessage, moderationScope])
 
   const handleDelete = useCallback(async (messageId: string) => {
     try {
       await deleteMessage(messageId)
       toast.success('Message deleted')
     } catch (error) {
-      const message = await getBlockedActionMessage('general_chat', error, 'Failed to delete message')
+      const message = await getBlockedActionMessage(moderationScope, error, 'Failed to delete message')
       showActionErrorToast(message)
     }
-  }, [deleteMessage])
+  }, [deleteMessage, moderationScope])
 
   const handleJumpToLatest = useCallback(async () => {
     setTemporaryWindowMode('layoutSettling', TARGET_SCROLL_SETTLE_MS + 160)
@@ -889,7 +910,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      data-testid="message-scroll"
+      data-testid={scrollTestId}
       data-loaded-count={combinedMessages.length}
       data-rendered-count={renderedMessages.length}
       data-hidden-before-count={hiddenBeforeCount}
@@ -924,6 +945,8 @@ export const MessageList: React.FC<MessageListProps> = ({
         </div>
       ) : (
         <>
+      {!refreshingCachedMessages && combinedMessages.length === 0 && emptyState}
+
       {refreshingCachedMessages && (
         <div className="flex justify-center py-2 text-sm text-[var(--text-muted)]" data-testid="message-refreshing">
           <LoadingSpinner size="sm" /> Refreshing...
@@ -973,6 +996,7 @@ export const MessageList: React.FC<MessageListProps> = ({
                     containerRef={containerRef}
                     avatarLoading={eagerAvatarMessageIds.has(message.id) ? 'eager' : 'lazy'}
                     avatarFetchPriority={eagerAvatarMessageIds.has(message.id) ? 'high' : undefined}
+                    moderationScope={moderationScope}
                   />
                 </div>
               </React.Fragment>

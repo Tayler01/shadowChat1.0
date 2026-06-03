@@ -60,7 +60,7 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
           </strong>
           :{' '}
           {message.message_type === 'audio' ? (
-            <audio controls src={message.audio_url} className="mt-1 max-w-full" />
+            <audio controls src={message.audio_url ?? undefined} className="mt-1 max-w-full" />
           ) : message.message_type === 'video' && message.file_url ? (
             <VideoAttachment url={message.file_url} meta={message.content} />
           ) : (

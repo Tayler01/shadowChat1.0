@@ -12,6 +12,12 @@ jest.mock('../src/hooks/useAuth')
 jest.mock('../src/hooks/useRealtimeRecovery', () => ({
   useRealtimeRecovery: jest.fn(),
 }))
+jest.mock('../src/hooks/useSoundEffects', () => ({
+  useSoundEffects: () => ({
+    playMessage: jest.fn(),
+    playReaction: jest.fn(),
+  }),
+}))
 jest.mock('../src/config', () => ({
   MESSAGE_FETCH_LIMIT: 50,
 }))
@@ -29,7 +35,12 @@ const createMessage = (id: string, minute: number) => ({
   board_slug: 'news-chat',
   user_id: 'u1',
   content: id,
+  message_type: 'text',
   reactions: {},
+  pinned: false,
+  pinned_by: null,
+  pinned_at: null,
+  reply_to: null,
   created_at: `2026-05-02T12:${String(minute).padStart(2, '0')}:00.000Z`,
   updated_at: `2026-05-02T12:${String(minute).padStart(2, '0')}:00.000Z`,
   user: { id: 'u1', username: 'user', display_name: 'User' },
@@ -51,6 +62,15 @@ const createQuery = (data: unknown[], error: unknown = null) => {
   }
 
   return query
+}
+
+const queueBoardWindow = (messages: unknown[], pinned: unknown[] = []) => {
+  const pinnedQuery = createQuery(pinned)
+  const messagesQuery = createQuery(messages)
+  workingClient.from
+    .mockReturnValueOnce(pinnedQuery)
+    .mockReturnValueOnce(messagesQuery)
+  return { pinnedQuery, messagesQuery }
 }
 
 type RealtimeHandlers = Record<string, (payload: any) => Promise<void> | void>
@@ -103,17 +123,16 @@ beforeEach(() => {
 })
 
 test('loads board chat in a 50 message window', async () => {
-  const query = createQuery([createMessage('m1', 1)])
-  workingClient.from.mockReturnValue(query)
+  const { messagesQuery } = queueBoardWindow([createMessage('m1', 1)])
 
   const { result } = renderHook(() => useBoardChat('news-chat', 'News Chat'))
 
   await waitFor(() => expect(result.current.loading).toBe(false))
 
-  expect(query.limit).toHaveBeenCalledWith(50)
+  expect(messagesQuery.limit).toHaveBeenCalledWith(50)
   expect(result.current.messages.map(message => message.id)).toEqual(['m1'])
-  expect(query.order).toHaveBeenNthCalledWith(1, 'created_at', { ascending: false })
-  expect(query.order).toHaveBeenNthCalledWith(2, 'id', { ascending: false })
+  expect(messagesQuery.order).toHaveBeenNthCalledWith(1, 'created_at', { ascending: false })
+  expect(messagesQuery.order).toHaveBeenNthCalledWith(2, 'id', { ascending: false })
 })
 
 test('loads older board chat messages with a stable created_at and id cursor', async () => {
@@ -124,13 +143,10 @@ test('loads older board chat messages with a stable created_at and id cursor', a
       createMessage(`00000000-0000-0000-0000-0000000001${String(index).padStart(2, '0')}`, index + 3)
     ),
   ]
-  const initialQuery = createQuery(initialMessages)
-  const olderQuery = createQuery([
+  const { messagesQuery: initialQuery } = queueBoardWindow(initialMessages)
+  const { messagesQuery: olderQuery } = queueBoardWindow([
     createMessage('00000000-0000-0000-0000-000000000090', 1),
   ])
-  workingClient.from
-    .mockReturnValueOnce(initialQuery)
-    .mockReturnValueOnce(olderQuery)
 
   const { result } = renderHook(() => useBoardChat('news-chat', 'News Chat'))
 
@@ -161,11 +177,8 @@ test('realtime recovery refreshes board chat without showing the full loading st
     recoveryCallbacks.push(callback)
   })
 
-  const firstQuery = createQuery([createMessage('m1', 1)])
-  const refreshQuery = createQuery([createMessage('m2', 2)])
-  workingClient.from
-    .mockReturnValueOnce(firstQuery)
-    .mockReturnValueOnce(refreshQuery)
+  queueBoardWindow([createMessage('m1', 1)])
+  const { messagesQuery: refreshQuery } = queueBoardWindow([createMessage('m2', 2)])
 
   const { result } = renderHook(() => useBoardChat('news-chat', 'News Chat'))
 
@@ -181,14 +194,13 @@ test('realtime recovery refreshes board chat without showing the full loading st
 })
 
 test('skips realtime update detail fetches for unloaded board chat messages', async () => {
-  const initialQuery = createQuery([createMessage('m1', 1)])
-  workingClient.from.mockReturnValue(initialQuery)
+  queueBoardWindow([createMessage('m1', 1)])
 
   const { result } = renderHook(() => useBoardChat('news-chat', 'News Chat'))
 
   await waitFor(() => expect(result.current.loading).toBe(false))
   await waitFor(() => expect(realtimeHandlers.UPDATE).toBeDefined())
-  expect(workingClient.from).toHaveBeenCalledTimes(1)
+  expect(workingClient.from).toHaveBeenCalledTimes(2)
 
   act(() => {
     realtimeHandlers.UPDATE?.({
@@ -200,19 +212,18 @@ test('skips realtime update detail fetches for unloaded board chat messages', as
     })
   })
 
-  expect(workingClient.from).toHaveBeenCalledTimes(1)
+  expect(workingClient.from).toHaveBeenCalledTimes(2)
   expect(result.current.messages.map(message => message.id)).toEqual(['m1'])
 })
 
 test('merges realtime board chat updates for loaded messages without refetching', async () => {
-  const initialQuery = createQuery([createMessage('m1', 1)])
-  workingClient.from.mockReturnValue(initialQuery)
+  queueBoardWindow([createMessage('m1', 1)])
 
   const { result } = renderHook(() => useBoardChat('news-chat', 'News Chat'))
 
   await waitFor(() => expect(result.current.loading).toBe(false))
   await waitFor(() => expect(realtimeHandlers.UPDATE).toBeDefined())
-  expect(workingClient.from).toHaveBeenCalledTimes(1)
+  expect(workingClient.from).toHaveBeenCalledTimes(2)
 
   act(() => {
     realtimeHandlers.UPDATE?.({
@@ -225,15 +236,14 @@ test('merges realtime board chat updates for loaded messages without refetching'
     })
   })
 
-  expect(workingClient.from).toHaveBeenCalledTimes(1)
+  expect(workingClient.from).toHaveBeenCalledTimes(2)
   expect(result.current.messages[0].content).toBe('edited locally')
   expect(result.current.messages[0].reactions).toEqual({ gold: ['u2'] })
   expect(result.current.messages[0].user).toEqual({ id: 'u1', username: 'user', display_name: 'User' })
 })
 
 test('ignores stale realtime board chat updates for loaded messages', async () => {
-  const initialQuery = createQuery([createMessage('m1', 5)])
-  workingClient.from.mockReturnValue(initialQuery)
+  queueBoardWindow([createMessage('m1', 5)])
 
   const { result } = renderHook(() => useBoardChat('news-chat', 'News Chat'))
 
@@ -250,16 +260,14 @@ test('ignores stale realtime board chat updates for loaded messages', async () =
     })
   })
 
-  expect(workingClient.from).toHaveBeenCalledTimes(1)
+  expect(workingClient.from).toHaveBeenCalledTimes(2)
   expect(result.current.messages[0].content).toBe('m1')
 })
 
 test('deletes board chat messages without client-side owner filtering', async () => {
-  const initialQuery = createQuery([createMessage('m1', 1)])
   const deleteQuery = createQuery([{ id: 'm1' }])
-  workingClient.from
-    .mockReturnValueOnce(initialQuery)
-    .mockReturnValueOnce(deleteQuery)
+  queueBoardWindow([createMessage('m1', 1)])
+  workingClient.from.mockReturnValueOnce(deleteQuery)
 
   const { result } = renderHook(() => useBoardChat('news-chat', 'News Chat'))
 
@@ -278,11 +286,9 @@ test('deletes board chat messages without client-side owner filtering', async ()
 })
 
 test('does not treat zero-row board chat deletes as successful', async () => {
-  const initialQuery = createQuery([createMessage('m1', 1)])
   const deleteQuery = createQuery([])
-  workingClient.from
-    .mockReturnValueOnce(initialQuery)
-    .mockReturnValueOnce(deleteQuery)
+  queueBoardWindow([createMessage('m1', 1)])
+  workingClient.from.mockReturnValueOnce(deleteQuery)
 
   const { result } = renderHook(() => useBoardChat('news-chat', 'News Chat'))
 

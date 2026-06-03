@@ -45,7 +45,7 @@ React UI
 - [`useMessages`](C:/repos/chat2.0/src/hooks/useMessages.tsx:1): group chat state, 50-message initial windows, older-message lazy loading, and realtime
 - [`useDirectMessages`](C:/repos/chat2.0/src/hooks/useDirectMessages.tsx:1): DM state, 50-message thread windows, older-message lazy loading, and realtime
 - [`useNewsFeed`](C:/repos/chat2.0/src/hooks/useNewsFeed.tsx:1): News Feed fetch, realtime, reactions, modal data, and seen state
-- [`useBoardChat`](C:/repos/chat2.0/src/hooks/useBoardChat.tsx:1): shared board-chat 50-message fetch windows, older-message lazy loading, realtime, send/edit/delete, and reactions
+- [`useBoardChat`](C:/repos/chat2.0/src/hooks/useBoardChat.tsx:1): group-chat-compatible board-chat windows, older/newer loading, realtime, optimistic send/retry, media/replies/pins, edit/delete, and reactions
 - [`useBoardBadges`](C:/repos/chat2.0/src/hooks/useBoardBadges.ts:1): per-board unread counts and combined Boards nav badge
 - [`useNewsBadges`](C:/repos/chat2.0/src/hooks/useNewsBadges.ts:1): compatibility wrapper over board badges
 - [`useNewsAdmin`](C:/repos/chat2.0/src/hooks/useNewsAdmin.ts:1): News source admin state and source upsert/toggle RPCs
@@ -207,10 +207,11 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 1. Signed-in user opens a chat board such as News Chat, Investing Chat, Learning Chat, Crypto Chat, Vibe Coding, AI News, or Projects Chat from the low-friction Boards bubble map
 2. Insert hits `board_chat_messages` with the selected `board_slug`
 3. `useBoardChat` receives realtime inserts/updates/deletes for that board
-4. Link text is tokenized client-side and metadata is fetched through `link-preview`
-5. Reactions are toggled through `toggle_board_chat_reaction`
-6. `user_read_cursors` tracks last read by `surface = 'board_chat'` and board slug
-7. The board content renders directly under the primary Boards header/back control with no duplicate subheader or manual refresh row
+4. The shared chat composer handles text, links, media attachments, voice/audio, GIFs, and replies while preserving the board slug
+5. Link text is tokenized client-side and metadata is fetched through `link-preview`
+6. Reactions and pins are toggled through board-scoped RPCs
+7. `user_read_cursors` tracks last read by `surface = 'board_chat'` and board slug
+8. The board content renders directly under the primary Boards header/back control with no duplicate subheader or manual refresh row
 
 ### Boards Landing
 

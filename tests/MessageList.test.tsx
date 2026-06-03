@@ -114,6 +114,12 @@ const makeMessage = (index: number) => ({
   updated_at: new Date(Date.UTC(2026, 4, 3, 12, 0, index)).toISOString(),
 }) as unknown as Message
 
+const messageListElement = (props: React.ComponentProps<typeof MessageList> = {}) => (
+  <MessageList messagesApi={mockUseMessages()} {...props} />
+)
+
+const renderMessageList = (props: React.ComponentProps<typeof MessageList> = {}) => render(messageListElement(props))
+
 describe('MessageList mobile keyboard layout', () => {
   const originalRequestAnimationFrame = window.requestAnimationFrame
   const originalCancelAnimationFrame = window.cancelAnimationFrame
@@ -175,7 +181,7 @@ describe('MessageList mobile keyboard layout', () => {
   })
 
   it('anchors sparse group chat content above the measured mobile footer', () => {
-    render(<MessageList />)
+    renderMessageList()
 
     expect(screen.getByTestId('message-scroll')).toHaveClass(
       'pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)]'
@@ -202,7 +208,7 @@ describe('MessageList mobile keyboard layout', () => {
       hasMore: false,
     })
 
-    render(<MessageList />)
+    renderMessageList()
 
     expect(screen.getByTestId('message-scroll')).toBeInTheDocument()
     expect(screen.getByText('A tiny group chat thread')).toBeInTheDocument()
@@ -210,7 +216,7 @@ describe('MessageList mobile keyboard layout', () => {
   })
 
   it('delegates scroll state to the unread-scroll hook without loading history from raw scroll math', () => {
-    render(<MessageList />)
+    renderMessageList()
 
     fireEvent.scroll(screen.getByTestId('message-scroll'))
 
@@ -241,7 +247,7 @@ describe('MessageList mobile keyboard layout', () => {
     })
 
     try {
-      render(<MessageList />)
+      renderMessageList()
       const scrollContainer = screen.getByTestId('message-scroll')
       Object.defineProperties(scrollContainer, {
         scrollTop: { configurable: true, value: 0, writable: true },
@@ -285,7 +291,7 @@ describe('MessageList mobile keyboard layout', () => {
     })
 
     try {
-      render(<MessageList />)
+      renderMessageList()
       const scrollContainer = screen.getByTestId('message-scroll')
       Object.defineProperties(scrollContainer, {
         scrollTop: { configurable: true, value: 0, writable: true },
@@ -321,7 +327,7 @@ describe('MessageList mobile keyboard layout', () => {
       hasMore: false,
     })
 
-    render(<MessageList />)
+    renderMessageList()
 
     await waitFor(() => {
       expect(screen.queryByText('Message 0')).not.toBeInTheDocument()
@@ -347,7 +353,7 @@ describe('MessageList mobile keyboard layout', () => {
       hasMore: false,
     })
 
-    render(<MessageList />)
+    renderMessageList()
 
     await waitFor(() => {
       expect(screen.queryByText('Message 0')).not.toBeInTheDocument()
@@ -370,7 +376,7 @@ describe('MessageList mobile keyboard layout', () => {
       hasMore: true,
     })
 
-    render(<MessageList initialMessageId="m10" />)
+    renderMessageList({ initialMessageId: 'm10' })
 
     await act(async () => {
       await Promise.resolve()
@@ -408,7 +414,7 @@ describe('MessageList mobile keyboard layout', () => {
       markRead: jest.fn(),
     })
 
-    render(<MessageList />)
+    renderMessageList()
 
     await act(async () => {
       await Promise.resolve()
@@ -451,7 +457,7 @@ describe('MessageList mobile keyboard layout', () => {
       markRead: jest.fn(),
     })
 
-    render(<MessageList />)
+    renderMessageList()
 
     expect(mockUseUnreadScroll).toHaveBeenLastCalledWith(expect.objectContaining({
       loading: false,
@@ -494,7 +500,7 @@ describe('MessageList mobile keyboard layout', () => {
       hasMore: false,
     })
 
-    render(<MessageList />)
+    renderMessageList()
 
     expect(screen.getByTestId('message-stack').textContent?.indexOf('Same timestamp A'))
       .toBeLessThan(screen.getByTestId('message-stack').textContent?.indexOf('Same timestamp B') ?? -1)
@@ -531,7 +537,7 @@ describe('MessageList mobile keyboard layout', () => {
     })
 
     try {
-      render(<MessageList />)
+      renderMessageList()
       const scrollContainer = screen.getByTestId('message-scroll')
       Object.defineProperties(scrollContainer, {
         scrollTop: { configurable: true, value: 0, writable: true },
@@ -612,7 +618,7 @@ describe('MessageList mobile keyboard layout', () => {
 
     try {
       setMessagesMock()
-      const { rerender } = render(<MessageList />)
+      const { rerender } = renderMessageList()
       const scrollContainer = screen.getByTestId('message-scroll')
       Object.defineProperties(scrollContainer, {
         scrollTop: { configurable: true, value: 0, writable: true },
@@ -626,7 +632,7 @@ describe('MessageList mobile keyboard layout', () => {
       phase = 'after'
       currentMessages = [makeMessage(8), makeMessage(9), ...currentMessages]
       setMessagesMock()
-      rerender(<MessageList />)
+      rerender(messageListElement())
 
       expect(scrollContainer.scrollTop).toBe(200)
     } finally {
@@ -681,7 +687,7 @@ describe('MessageList mobile keyboard layout', () => {
 
     try {
       setMessagesMock()
-      const { rerender } = render(<MessageList />)
+      const { rerender } = renderMessageList()
       const scrollContainer = screen.getByTestId('message-scroll')
       Object.defineProperties(scrollContainer, {
         scrollTop: { configurable: true, value: 0, writable: true },
@@ -695,7 +701,7 @@ describe('MessageList mobile keyboard layout', () => {
       currentScrollHeight = 1_450
       currentMessages = [makeMessage(8), makeMessage(9), ...currentMessages]
       setMessagesMock()
-      rerender(<MessageList />)
+      rerender(messageListElement())
 
       expect(scrollContainer.scrollTop).toBe(550)
     } finally {
