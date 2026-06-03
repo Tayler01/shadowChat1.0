@@ -165,7 +165,11 @@ export function useUnreadScroll<TMessage>({
       id: getMessageId(latestMessageInWindow),
     }
 
-    return compareMessageKey(cursorKey, oldestKey) < 0 || compareMessageKey(cursorKey, latestKey) > 0
+    if (compareMessageKey(cursorKey, oldestKey) < 0) {
+      return false
+    }
+
+    return compareMessageKey(cursorKey, latestKey) > 0
   }, [cursor, getMessageCreatedAt, getMessageId, messages])
 
   const cancelFollowLatest = useCallback(() => {

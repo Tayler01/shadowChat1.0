@@ -403,7 +403,7 @@ describe('useUnreadScroll', () => {
     document.body.removeChild(container)
   })
 
-  it('waits for the cursor row before choosing the initial first-unread target', async () => {
+  it('uses the oldest loaded unread row when the stored cursor predates the loaded window', async () => {
     useFakeTimersWithImmediateRaf()
     const container = document.createElement('div')
     document.body.appendChild(container)
@@ -411,7 +411,7 @@ describe('useUnreadScroll', () => {
     setRect(container, 0, 400)
 
     const firstUnreadEl = document.createElement('div')
-    firstUnreadEl.id = 'message-m15'
+    firstUnreadEl.id = 'message-m22'
     firstUnreadEl.scrollIntoView = jest.fn()
     setRect(firstUnreadEl, 80, 160)
     container.appendChild(firstUnreadEl)
@@ -423,41 +423,27 @@ describe('useUnreadScroll', () => {
 
     const onBeforeInitialJump = jest.fn()
 
-    const { result, rerender } = renderHook(
-      ({ messages }: { messages: TestMessage[] }) =>
-        useUnreadScroll<TestMessage>({
-          containerRef: { current: container },
-          messages,
-          loading: false,
-          cursor: makeCursor('m14', 14),
-          cursorLoading: false,
-          enabled: true,
-          surfaceKey: 'general_chat:main',
-          getMessageId: message => message.id,
-          getMessageCreatedAt: message => message.created_at,
-          getElementId: id => `message-${id}`,
-          onBeforeInitialJump,
-          onMarkReadToLatest: jest.fn(),
-        }),
-      { initialProps: { messages: [makeMessage('m22', 22), makeMessage('m23', 23)] } }
+    const { result } = renderHook(() =>
+      useUnreadScroll<TestMessage>({
+        containerRef: { current: container },
+        messages: [makeMessage('m22', 22), makeMessage('m23', 23)],
+        loading: false,
+        cursor: makeCursor('m14', 14),
+        cursorLoading: false,
+        enabled: true,
+        surfaceKey: 'general_chat:main',
+        getMessageId: message => message.id,
+        getMessageCreatedAt: message => message.created_at,
+        getElementId: id => `message-${id}`,
+        onBeforeInitialJump,
+        onMarkReadToLatest: jest.fn(),
+      })
     )
 
-    expect(result.current.firstUnreadMessageId).toBeNull()
-    expect(onBeforeInitialJump).not.toHaveBeenCalled()
-
-    rerender({
-      messages: [
-        makeMessage('m14', 14),
-        makeMessage('m15', 15),
-        makeMessage('m22', 22),
-        makeMessage('m23', 23),
-      ],
-    })
-
     await waitFor(() => {
-      expect(result.current.firstUnreadMessageId).toBe('m15')
+      expect(result.current.firstUnreadMessageId).toBe('m22')
     })
-    expect(onBeforeInitialJump).toHaveBeenCalledWith(makeMessage('m15', 15))
+    expect(onBeforeInitialJump).toHaveBeenCalledWith(makeMessage('m22', 22))
     expect(firstUnreadEl.scrollIntoView).toHaveBeenCalledWith({ block: 'start', behavior: 'auto' })
 
     document.body.removeChild(container)

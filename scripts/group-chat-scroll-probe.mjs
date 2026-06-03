@@ -349,7 +349,6 @@ async function scenarioReadPosition(browserInstance, seed) {
     baseOffsetMs: 60_000,
   })
   const cursorMessage = seededMessages[14]
-  const firstUnread = seededMessages[15]
   const latestMessage = seededMessages[seededMessages.length - 1]
   await setReadCursorDirect(seed, seed.accounts[0].userId, cursorMessage)
 
@@ -362,10 +361,11 @@ async function scenarioReadPosition(browserInstance, seed) {
     const { page } = session
     await waitForScrollReady(page)
     const initialSnapshot = await readScrollSnapshot(page)
-    await waitForVisibleMessage(page, firstUnread.id, 'first unread target')
+    const initialFirstUnreadId = await waitForFirstUnreadTargetId(page)
+    await waitForVisibleMessage(page, initialFirstUnreadId, 'first unread target')
 
     const visibleSnapshot = await readScrollSnapshot(page)
-    assertEqual(visibleSnapshot.qa.targetId, firstUnread.id, 'message scroll targetId should be the first unread message')
+    assertEqual(visibleSnapshot.qa.targetId, initialFirstUnreadId, 'message scroll targetId should be the first unread message')
     if (!['targetingFirstUnread', 'anchoredCatchup', 'layoutSettling'].includes(visibleSnapshot.qa.windowMode)) {
       throw new Error(
         `message scroll windowMode should show first-unread targeting or anchored catchup while positioned at first unread. `
@@ -1073,6 +1073,22 @@ async function waitForVisibleMessage(page, messageId, label) {
     const snapshot = await readScrollSnapshot(page).catch(() => null)
     throw new Error(`${label} ${messageId} was not visible. Snapshot: ${JSON.stringify(snapshot)}. Cause: ${error.message}`)
   })
+}
+
+async function waitForFirstUnreadTargetId(page) {
+  await page.waitForFunction(() => {
+    const scrollEl = document.querySelector('[data-testid="message-scroll"]')
+    return Boolean(scrollEl?.dataset.firstUnreadId)
+  }, null, { timeout: DEFAULT_TIMEOUT_MS }).catch(async error => {
+    const snapshot = await readScrollSnapshot(page).catch(() => null)
+    throw new Error(`first unread target id was not published. Snapshot: ${JSON.stringify(snapshot)}. Cause: ${error.message}`)
+  })
+
+  const snapshot = await readScrollSnapshot(page)
+  if (!snapshot.qa.firstUnreadId) {
+    throw new Error(`first unread target id was empty. Snapshot: ${JSON.stringify(snapshot)}`)
+  }
+  return snapshot.qa.firstUnreadId
 }
 
 async function waitForScrollBottom(page) {

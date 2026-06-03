@@ -150,6 +150,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   const previousLatestMessageIdRef = useRef<string | null>(null)
   const hiddenAfterCountRef = useRef(0)
   const combinedMessagesLengthRef = useRef(0)
+  const renderWindowInitializedRef = useRef(false)
   const [renderWindowStart, setRenderWindowStart] = useState(0)
   const [historyLoadArmed, setHistoryLoadArmed] = useState(false)
   const [windowModeOverride, setWindowModeOverride] = useState<WindowModeOverride | null>(null)
@@ -210,7 +211,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       { created_at: oldestLoaded.created_at, id: oldestLoaded.id }
     ) < 0
 
-    if (!latestLoadedIsUnread || cursorMessageLoaded || !cursorPredatesLoadedWindow) {
+    if (!latestLoadedIsUnread || cursorMessageLoaded || cursorPredatesLoadedWindow) {
       return null
     }
 
@@ -252,6 +253,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     getElementId: getMessageElementId,
     onMarkReadToLatest: markGeneralChatRead,
   })
+  const hasActiveScrollTarget = Boolean(initialMessageId || targetMessageId || firstUnreadMessageId)
 
   const captureVisibleAnchor = useCallback((): VisibleMessageAnchor | null => {
     const container = containerRef.current
@@ -315,6 +317,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   }, [clearWindowModeTimer, firstUnreadMessageId, targetMessageId])
 
   const requestOlderMessages = useCallback((force = false) => {
+    if (hasActiveScrollTarget) return
     if ((!historyLoadArmed && !force) || !historyIntentRef.current) return
     if (loading || loadingMore || olderLoadInFlightRef.current) return
 
@@ -357,6 +360,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     capturePendingAnchor,
     hasMore,
     historyLoadArmed,
+    hasActiveScrollTarget,
     loadOlderMessages,
     loading,
     loadingMore,
@@ -389,7 +393,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 
       handleUnreadScroll()
 
-      if (el.scrollTop <= HISTORY_LOAD_SCROLL_THRESHOLD) {
+      if (!hasActiveScrollTarget && el.scrollTop <= HISTORY_LOAD_SCROLL_THRESHOLD) {
         historyIntentRef.current = true
         requestOlderMessages(true)
         return
@@ -399,7 +403,7 @@ export const MessageList: React.FC<MessageListProps> = ({
         revealNewerLoadedMessages()
       }
     })
-  }, [handleUnreadScroll, requestOlderMessages, revealNewerLoadedMessages])
+  }, [handleUnreadScroll, hasActiveScrollTarget, requestOlderMessages, revealNewerLoadedMessages])
 
   useEffect(() => {
     initialTargetJumpDoneRef.current = null
@@ -553,6 +557,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 
   useLayoutEffect(() => {
     if (combinedMessages.length === 0) {
+      renderWindowInitializedRef.current = false
       setRenderWindowStart(0)
       return
     }
@@ -562,6 +567,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     if (initialMessageId) {
       const targetIndex = combinedMessages.findIndex(message => message.id === initialMessageId)
       if (targetIndex >= 0) {
+        renderWindowInitializedRef.current = true
         setRenderWindowStart(current => resolveWindowStartForTarget(current, targetIndex))
         return
       }
@@ -570,9 +576,16 @@ export const MessageList: React.FC<MessageListProps> = ({
     if (firstUnreadMessageId) {
       const unreadIndex = combinedMessages.findIndex(message => message.id === firstUnreadMessageId)
       if (unreadIndex >= 0) {
+        renderWindowInitializedRef.current = true
         setRenderWindowStart(current => resolveWindowStartForTarget(current, unreadIndex))
         return
       }
+    }
+
+    if (!renderWindowInitializedRef.current) {
+      renderWindowInitializedRef.current = true
+      setRenderWindowStart(latestWindowStart)
+      return
     }
 
     if (autoScroll) {
