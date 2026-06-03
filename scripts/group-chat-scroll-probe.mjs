@@ -902,13 +902,13 @@ async function authenticate(page, targetUrl, values, accountIndex) {
     throw new Error(`Missing PLAYWRIGHT_ACCOUNT_${accountIndex}_EMAIL/PASSWORD for chat scroll probe`)
   }
 
-  if (!(await page.getByRole('button', { name: 'Sign In' }).isVisible().catch(() => false))) {
+  if (!(await page.locator('form').getByRole('button', { name: /^Sign in$/i }).isVisible().catch(() => false))) {
     await page.getByRole('button', { name: /Sign in/i }).click()
   }
 
   await page.locator('input[name="email"]').fill(account.email)
   await page.locator('input[name="password"]').fill(account.password)
-  await page.getByRole('button', { name: 'Sign In' }).click()
+  await page.locator('form').getByRole('button', { name: /^Sign in$/i }).click()
   await waitForChatView(page)
   await dismissAppReleaseDialog(page)
 }
@@ -928,6 +928,10 @@ async function waitForBootSurface(page) {
     return (
       text.includes('Welcome Back') ||
       text.includes('Join the Chat') ||
+      text.includes('Sign in') ||
+      text.includes('Create account') ||
+      text.includes('Access your Shado account') ||
+      text.includes('Invite code required') ||
       text.includes('General Chat') ||
       text.includes('Direct Messages') ||
       text.includes('Lounge')

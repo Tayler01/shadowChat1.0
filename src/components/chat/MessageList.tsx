@@ -157,6 +157,48 @@ export const MessageList: React.FC<MessageListProps> = ({
   const getMessageId = useCallback((message: Message) => message.id, [])
   const getMessageCreatedAt = useCallback((message: Message) => message.created_at, [])
   const getMessageElementId = useCallback((id: string) => `message-${id}`, [])
+  const cursorWindowFetchKey = useMemo(() => {
+    if (
+      !profile?.id ||
+      initialMessageId ||
+      !cursor?.last_read_at ||
+      serverWindowMessages.length === 0
+    ) {
+      return null
+    }
+
+    const oldestLoaded = serverWindowMessages[0]
+    const latestLoaded = serverWindowMessages[serverWindowMessages.length - 1]
+    if (!oldestLoaded || !latestLoaded) return null
+
+    const cursorMessageLoaded = Boolean(
+      cursor.last_read_message_id &&
+      serverWindowMessages.some(message => message.id === cursor.last_read_message_id)
+    )
+    const latestLoadedIsUnread = isMessageAfterCursor({
+      created_at: latestLoaded.created_at,
+      id: latestLoaded.id,
+    }, cursor)
+    const cursorPredatesLoadedWindow = compareMessageKey(
+      { created_at: cursor.last_read_at, id: cursor.last_read_message_id },
+      { created_at: oldestLoaded.created_at, id: oldestLoaded.id }
+    ) < 0
+
+    if (!latestLoadedIsUnread || cursorMessageLoaded || !cursorPredatesLoadedWindow) {
+      return null
+    }
+
+    return [
+      profile.id,
+      cursor.scope_id,
+      cursor.last_read_message_id ?? 'timestamp',
+      cursor.last_read_at,
+    ].join(':')
+  }, [cursor, initialMessageId, profile?.id, serverWindowMessages])
+  const cursorWindowNeeded = Boolean(
+    cursorWindowFetchKey &&
+    cursorWindowFetchRef.current !== cursorWindowFetchKey
+  )
 
   const {
     autoScroll,
@@ -172,7 +214,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   } = useUnreadScroll<Message>({
     containerRef,
     messages: combinedMessages as Message[],
-    loading: loading || cursorWindowResolving,
+    loading: loading || cursorWindowResolving || cursorWindowNeeded,
     cursor,
     cursorLoading,
     enabled: Boolean(profile?.id),
@@ -323,51 +365,18 @@ export const MessageList: React.FC<MessageListProps> = ({
 
   useEffect(() => {
     if (
-      !profile?.id ||
-      initialMessageId ||
-      !ensureMessageWindow ||
+      !cursorWindowFetchKey ||
+      !cursor?.last_read_at ||
       loading ||
       loadingMore ||
       cursorLoading ||
       cursorWindowResolving ||
-      !cursor?.last_read_at ||
-      serverWindowMessages.length === 0
+      cursorWindowFetchRef.current === cursorWindowFetchKey
     ) {
       return
     }
 
-    const oldestLoaded = serverWindowMessages[0]
-    const latestLoaded = serverWindowMessages[serverWindowMessages.length - 1]
-    if (!oldestLoaded || !latestLoaded) return
-
-    const cursorMessageLoaded = Boolean(
-      cursor.last_read_message_id &&
-      serverWindowMessages.some(message => message.id === cursor.last_read_message_id)
-    )
-    const latestLoadedIsUnread = isMessageAfterCursor({
-      created_at: latestLoaded.created_at,
-      id: latestLoaded.id,
-    }, cursor)
-    const cursorPredatesLoadedWindow = compareMessageKey(
-      { created_at: cursor.last_read_at, id: cursor.last_read_message_id },
-      { created_at: oldestLoaded.created_at, id: oldestLoaded.id }
-    ) < 0
-
-    if (!latestLoadedIsUnread || cursorMessageLoaded || !cursorPredatesLoadedWindow) {
-      return
-    }
-
-    const fetchKey = [
-      profile.id,
-      cursor.scope_id,
-      cursor.last_read_message_id ?? 'timestamp',
-      cursor.last_read_at,
-    ].join(':')
-    if (cursorWindowFetchRef.current === fetchKey) {
-      return
-    }
-
-    cursorWindowFetchRef.current = fetchKey
+    cursorWindowFetchRef.current = cursorWindowFetchKey
     setCursorWindowResolving(true)
     void ensureMessageWindow(cursor.last_read_message_id ?? null, {
       targetLastReadMessageId: cursor.last_read_message_id,
@@ -380,13 +389,11 @@ export const MessageList: React.FC<MessageListProps> = ({
   }, [
     cursor,
     cursorLoading,
+    cursorWindowFetchKey,
     cursorWindowResolving,
     ensureMessageWindow,
-    initialMessageId,
     loading,
     loadingMore,
-    profile?.id,
-    serverWindowMessages,
   ])
 
   useEffect(() => {

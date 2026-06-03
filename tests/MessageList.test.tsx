@@ -346,6 +346,52 @@ describe('MessageList mobile keyboard layout', () => {
     })
   })
 
+  it('holds unread targeting while a cursor-anchored startup window is resolving', async () => {
+    const ensureMessageWindow = jest.fn(() => new Promise(() => undefined))
+    mockUseMessages.mockReturnValue({
+      messages: [makeMessage(10), makeMessage(11)],
+      loading: false,
+      editMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      togglePin: jest.fn(),
+      toggleReaction: jest.fn(),
+      loadOlderMessages: jest.fn(),
+      ensureMessageWindow,
+      loadingMore: false,
+      hasMore: true,
+      windowMode: 'latest',
+      anchorStatus: 'latest',
+    })
+    mockUseReadCursor.mockReturnValue({
+      cursor: {
+        user_id: 'u1',
+        surface: 'general_chat',
+        scope_id: 'main',
+        last_read_message_id: 'm1',
+        last_read_at: makeMessage(1).created_at,
+        updated_at: makeMessage(1).created_at,
+      },
+      loading: false,
+      markRead: jest.fn(),
+    })
+
+    render(<MessageList />)
+
+    expect(mockUseUnreadScroll).toHaveBeenLastCalledWith(expect.objectContaining({
+      loading: true,
+      cursor: expect.objectContaining({
+        last_read_message_id: 'm1',
+      }),
+    }))
+
+    await waitFor(() => {
+      expect(ensureMessageWindow).toHaveBeenCalledWith('m1', {
+        targetLastReadMessageId: 'm1',
+        targetLastReadAt: makeMessage(1).created_at,
+      })
+    })
+  })
+
   it('orders same-timestamp messages by id before rendering and unread targeting', () => {
     const timestamp = '2026-05-03T12:00:00.000Z'
     const laterIdMessage = {
