@@ -1,22 +1,29 @@
 {
-  "title": "Shadow Pin Activity Analytics",
-  "summary": "Admin analytics for Shadow Pin are live with refreshed tables, cleaner charts, and a required database-backed update.",
+  "title": "Blush Bloom is here",
+  "summary": "A soft, playful new light theme is now available in Shadow Chat with pearl blush glass, berry accents, lavender haze, peach highlights, and mint shimmer.",
   "restartPolicy": "required_restart",
-  "severity": "maintenance",
+  "severity": "feature",
   "sections": [
     {
-      "heading": "Admin Analytics",
+      "heading": "New Theme",
       "items": [
-        "Admins and sub-admins can review Shadow Pin visits, active time, post activity, hearts, shares, edits, deletes, and weighted activity scores.",
-        "The analytics page now loads as a lighter admin-only panel with cleaner spreadsheet rows and chart summaries.",
-        "Existing Shadow Pin posts, categories, and hearts have been backfilled into the analytics data."
+        "Blush Bloom adds a bright pearl-and-pink look with berry controls, lavender/peach glow, and subtle mint shimmer.",
+        "The theme includes generated backdrop, texture, and picker preview assets so it feels distinct across login, chat, settings, and popups.",
+        "The theme picker now has room for six full theme cards on phone and desktop layouts."
       ]
     },
     {
-      "heading": "Update Required",
+      "heading": "Where To Find It",
       "items": [
-        "Restarting the app makes sure the new analytics code and database functions are loaded together.",
-        "The update prompt will ask older app sessions to refresh before continuing."
+        "Open Settings, then Color & Layout, and select Blush Bloom from the theme cards.",
+        "The launch popup itself uses the Blush Bloom styling so you can preview the new look before switching."
+      ]
+    },
+    {
+      "heading": "Restart Required",
+      "items": [
+        "Restarting or refreshing makes sure the new theme assets, picker layout, and popup styling load together.",
+        "Older app sessions will be prompted to restart before continuing."
       ]
     }
   ]

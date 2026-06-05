@@ -1893,6 +1893,121 @@ html, body, #root {
     -webkit-backdrop-filter: blur(24px) saturate(1.12);
   }
 
+  .app-release-dialog {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .app-release-overlay--blush-bloom {
+    background:
+      linear-gradient(180deg, rgba(82, 35, 65, 0.52), rgba(43, 18, 39, 0.62)),
+      rgba(4, 5, 6, 0.52);
+  }
+
+  .app-release-dialog--blush-bloom {
+    --text-primary: #4d2039;
+    --text-secondary: #6f4261;
+    --text-muted: #936f84;
+    --text-gold: #c43d7c;
+    --border-subtle: rgba(196, 61, 124, 0.2);
+    --border-strong: rgba(196, 61, 124, 0.32);
+    --border-glow: rgba(196, 61, 124, 0.42);
+    --theme-accent-rgb: 196, 61, 124;
+    --theme-accent-strong-rgb: 180, 45, 105;
+    --theme-accent-readable: #b42d69;
+    --theme-accent-text: #fff8fc;
+    --theme-focus-ring: rgba(196, 61, 124, 0.36);
+    --button-primary-bg: linear-gradient(180deg, #d7528f 0%, #b82f6d 100%);
+    --button-primary-inner-bg: linear-gradient(180deg, rgba(255, 125, 176, 0.5), rgba(184, 47, 109, 0.06));
+    --button-primary-highlight: rgba(255, 255, 255, 0.34);
+    --button-primary-sheen: rgba(255, 255, 255, 0.38);
+    --button-primary-hover-shadow: 0 16px 34px rgba(184, 47, 109, 0.26);
+    --shadow-cta: 0 12px 28px rgba(184, 47, 109, 0.22);
+    --theme-popup-surface-bg:
+      linear-gradient(145deg, rgba(255, 252, 254, 0.96), rgba(255, 229, 240, 0.92) 58%, rgba(239, 230, 255, 0.9)),
+      url('/themes/blush-bloom/texture.webp') center / 300px repeat;
+    border-color: rgba(196, 61, 124, 0.34);
+    color: var(--text-primary);
+    box-shadow:
+      0 28px 72px rgba(76, 29, 58, 0.32),
+      0 0 0 1px rgba(255, 255, 255, 0.66),
+      inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  }
+
+  .app-release-dialog--blush-bloom .popup-close {
+    background: rgba(255, 255, 255, 0.72);
+    color: #743053;
+  }
+
+  .app-release-dialog--blush-bloom .app-release-preview {
+    border: 1px solid rgba(196, 61, 124, 0.2);
+    background: rgba(255, 255, 255, 0.62);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.76),
+      0 16px 34px rgba(196, 61, 124, 0.14);
+  }
+
+  .app-release-preview__image {
+    display: block;
+    width: 100%;
+    height: 7.5rem;
+    object-fit: cover;
+  }
+
+  .app-release-preview__caption {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.75rem 0.875rem;
+    color: #87375f;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.72), rgba(255, 228, 241, 0.64));
+  }
+
+  .app-release-dialog--blush-bloom .app-release-restart {
+    border-color: rgba(196, 61, 124, 0.22);
+    background: rgba(255, 224, 238, 0.58);
+  }
+
+  .app-release-dialog--blush-bloom .app-release-section {
+    border-color: rgba(196, 61, 124, 0.18);
+    background: rgba(255, 255, 255, 0.52);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  }
+
+  .app-release-dialog--blush-bloom .app-release-check {
+    color: #c43d7c;
+  }
+
+  .app-release-dialog--blush-bloom .app-release-footer {
+    border-color: rgba(196, 61, 124, 0.18);
+    background: linear-gradient(90deg, rgba(255, 247, 251, 0.9), rgba(255, 228, 241, 0.82));
+  }
+
+  .app-release-dialog--blush-bloom .app-release-primary-action {
+    border-color: rgba(154, 35, 90, 0.5);
+    background: #b82f6d;
+    color: #fff8fc;
+    box-shadow: 0 14px 30px rgba(184, 47, 109, 0.22);
+  }
+
+  .app-release-dialog--blush-bloom .app-release-primary-action > span[aria-hidden]:first-child {
+    background: linear-gradient(180deg, rgba(237, 97, 154, 0.74), rgba(184, 47, 109, 0.95));
+  }
+
+  .app-release-dialog--blush-bloom .app-release-primary-action > span:last-child {
+    color: #fff8fc;
+  }
+
+  @media (min-width: 640px) {
+    .app-release-preview__image {
+      height: 9rem;
+    }
+  }
+
   .popup-close {
     border: 1px solid var(--border-subtle);
     background: rgba(0, 0, 0, 0.35);

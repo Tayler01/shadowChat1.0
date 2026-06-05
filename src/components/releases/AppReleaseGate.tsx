@@ -24,9 +24,11 @@ import {
   getClientUserAgent,
   restartAppForRelease,
 } from '../../lib/appReleases'
+import { cn } from '../../lib/utils'
 
 const RELEASE_POLL_MS = 60000
 const CRITICAL_RESTART_SECONDS = 15
+const BLUSH_BLOOM_RELEASE_PATTERN = /\bblush bloom\b/i
 
 const formatReleaseDate = (value: string) => {
   try {
@@ -56,6 +58,16 @@ const getReleaseBadge = (release: VisibleAppRelease, wantsRestart: boolean) => {
   return "What's new"
 }
 
+const isBlushBloomRelease = (release: VisibleAppRelease) => {
+  const content = [
+    release.title,
+    release.summary,
+    ...release.sections.flatMap(section => [section.heading, ...section.items]),
+  ].join(' ')
+
+  return BLUSH_BLOOM_RELEASE_PATTERN.test(content)
+}
+
 export function AppReleaseGate() {
   const { user } = useAuth()
   const [release, setRelease] = useState<VisibleAppRelease | null>(null)
@@ -66,6 +78,10 @@ export function AppReleaseGate() {
 
   const presentation = useMemo(
     () => release ? getAppReleasePresentation(release) : null,
+    [release]
+  )
+  const blushBloomAnnouncement = useMemo(
+    () => release ? isBlushBloomRelease(release) : false,
     [release]
   )
 
@@ -219,12 +235,20 @@ export function AppReleaseGate() {
   const summary = release.summary.trim()
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-end justify-center bg-[rgba(4,5,6,0.76)] p-3 backdrop-blur-md sm:items-center sm:p-6">
+    <div
+      className={cn(
+        'fixed inset-0 z-[120] flex items-end justify-center bg-[rgba(4,5,6,0.76)] p-3 backdrop-blur-md sm:items-center sm:p-6',
+        blushBloomAnnouncement && 'app-release-overlay--blush-bloom'
+      )}
+    >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="app-release-title"
-        className="popup-surface flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[var(--radius-lg)] sm:max-h-[calc(100dvh-3rem)]"
+        className={cn(
+          'popup-surface app-release-dialog flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[var(--radius-lg)] sm:max-h-[calc(100dvh-3rem)]',
+          blushBloomAnnouncement && 'app-release-dialog--blush-bloom'
+        )}
       >
         <div className="p-5 pb-0 sm:p-6 sm:pb-0">
           <div className="flex items-start justify-between gap-4">
@@ -256,11 +280,26 @@ export function AppReleaseGate() {
               >
                 <X className="h-5 w-5" />
               </button>
-            )}
-          </div>
+              )}
+            </div>
+
+          {blushBloomAnnouncement && (
+            <div className="app-release-preview mt-5 overflow-hidden rounded-[var(--radius-md)]">
+              <img
+                src="/themes/blush-bloom/preview.webp"
+                alt=""
+                className="app-release-preview__image"
+                draggable={false}
+              />
+              <div className="app-release-preview__caption">
+                <span>Blush Bloom</span>
+                <span>Now in Settings</span>
+              </div>
+            </div>
+          )}
 
           {(presentation.wantsRestart || criticalCountdown !== null) && (
-            <div className="mt-5 rounded-[var(--radius-md)] border border-[rgba(215,170,70,0.18)] bg-[rgba(215,170,70,0.07)] p-3.5 text-sm leading-5 text-[var(--text-secondary)]">
+            <div className="app-release-restart mt-5 rounded-[var(--radius-md)] border border-[rgba(215,170,70,0.18)] bg-[rgba(215,170,70,0.07)] p-3.5 text-sm leading-5 text-[var(--text-secondary)]">
               {presentation.autoRestart ? (
                 <p>
                   This update is critical. Shadow Chat will restart{criticalCountdown !== null ? ` in ${criticalCountdown}s` : ''}.
@@ -279,14 +318,14 @@ export function AppReleaseGate() {
             {release.sections.length > 0 ? release.sections.map(section => (
               <section
                 key={section.heading}
-                className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4"
+                className="app-release-section rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4"
               >
                 <h3 className="text-sm font-semibold text-[var(--text-primary)]">{section.heading}</h3>
                 {section.items.length > 0 && (
                   <ul className="mt-3 space-y-2 text-sm leading-5 text-[var(--text-secondary)]">
                     {section.items.map(item => (
                       <li key={item} className="flex gap-2">
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-[var(--text-gold)]" />
+                        <CheckCircle2 className="app-release-check mt-0.5 h-4 w-4 flex-shrink-0 text-[var(--text-gold)]" />
                         <span>{item}</span>
                       </li>
                     ))}
@@ -301,7 +340,7 @@ export function AppReleaseGate() {
           </div>
         </div>
 
-        <div className="mt-5 border-t border-[var(--border-subtle)] bg-[rgba(10,11,12,0.82)] p-5 sm:p-6">
+        <div className="app-release-footer mt-5 border-t border-[var(--border-subtle)] bg-[rgba(10,11,12,0.82)] p-5 sm:p-6">
           <div className="mb-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--text-muted)]">
             {releaseDate && <span>{releaseDate}</span>}
             {release.commit_sha && <span>Build {release.commit_sha.slice(0, 7)}</span>}
@@ -311,7 +350,10 @@ export function AppReleaseGate() {
               <Button
                 onClick={() => void restartForRelease(release)}
                 loading={loadingRestart}
-                className="w-full justify-center"
+                className={cn(
+                  'app-release-primary-action w-full justify-center',
+                  presentation.blocksDismiss && 'sm:col-span-2'
+                )}
               >
                 <RefreshCw className="mr-3 h-4 w-4" />
                 {presentation.restartLabel}

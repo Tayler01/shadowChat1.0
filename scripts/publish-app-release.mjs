@@ -348,6 +348,26 @@ function getReleaseChangedFiles(baseRevision, headRevision) {
   return uniqueTexts(files.map(file => file.replace(/\\/g, '/')))
 }
 
+function getReleaseHeadRevision(commitSha) {
+  return (
+    firstEnv('APP_RELEASE_HEAD_SHA', 'APP_RELEASE_COMMIT_SHA', 'VITE_APP_COMMIT_SHA', 'GITHUB_SHA') ||
+    commitSha ||
+    'HEAD'
+  )
+}
+
+function defaultReleaseNotesChanged(headRevision) {
+  const notesPath = DEFAULT_MANUAL_RELEASE_NOTES_PATH.replace(/\\/g, '/')
+  const absoluteNotesPath = path.resolve(process.cwd(), DEFAULT_MANUAL_RELEASE_NOTES_PATH)
+  if (!fs.existsSync(absoluteNotesPath)) {
+    return false
+  }
+
+  const baseRevision = getReleaseBaseCommit(headRevision)
+  const changedFiles = getReleaseChangedFiles(baseRevision, headRevision)
+  return changedFiles.some(file => file.replace(/\\/g, '/') === notesPath)
+}
+
 function classifyChangedFiles(files) {
   const labels = []
 
@@ -381,10 +401,7 @@ function inferReleaseSeverity(files, subjects) {
 }
 
 function buildGeneratedReleaseNotes(commitSha) {
-  const headRevision =
-    firstEnv('APP_RELEASE_HEAD_SHA', 'APP_RELEASE_COMMIT_SHA', 'VITE_APP_COMMIT_SHA', 'GITHUB_SHA') ||
-    commitSha ||
-    'HEAD'
+  const headRevision = getReleaseHeadRevision(commitSha)
   const baseRevision = getReleaseBaseCommit(headRevision)
   const subjects = getReleaseCommitSubjects(baseRevision, headRevision)
   const changedFiles = getReleaseChangedFiles(baseRevision, headRevision)
@@ -498,7 +515,9 @@ async function main() {
     netlifyInfo.deployUrl
   const notes = args.releaseNotesExplicit
     ? normalizeReleaseNotes(path.resolve(process.cwd(), args.releaseNotesPath))
-    : buildGeneratedReleaseNotes(commitSha)
+    : defaultReleaseNotesChanged(getReleaseHeadRevision(commitSha))
+      ? normalizeReleaseNotes(path.resolve(process.cwd(), DEFAULT_MANUAL_RELEASE_NOTES_PATH))
+      : buildGeneratedReleaseNotes(commitSha)
 
   if (!buildId) {
     throw new Error('Missing build id. Set APP_RELEASE_BUILD_ID or VITE_APP_BUILD_ID.')

@@ -13,7 +13,13 @@ Production deploys generate their release popup title, summary, and sections
 from the pushed commit range by default. This keeps each app-update popup tied
 to the actual update instead of reusing stale copy from the previous release.
 
-For a hand-authored release, pass an explicit notes file:
+If `release-notes/current.json` changes in the pushed commit range, the
+publisher uses that file automatically for the production popup. This is the
+normal path for launch copy that needs deliberate wording or theme-specific
+presentation.
+
+For a hand-authored release outside the normal push flow, pass an explicit notes
+file:
 
 ```powershell
 node scripts/publish-app-release.mjs --release-notes release-notes/current.json --netlify-json netlify-production.json
@@ -54,8 +60,10 @@ After Netlify deploys successfully, the action runs:
 node scripts/publish-app-release.mjs --netlify-json netlify-production.json
 ```
 
-The publisher upserts one `public.app_releases` row for the build id. The app
-then shows the release popup to signed-in users and records per-user state in
+The publisher upserts one `public.app_releases` row for the build id. If the
+push includes `release-notes/current.json`, those notes are used; otherwise the
+popup is generated from the pushed commit range. The app then shows the release
+popup to signed-in users and records per-user state in
 `public.app_release_receipts`.
 
 ## Required Secrets
