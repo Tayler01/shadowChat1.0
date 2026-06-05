@@ -1210,7 +1210,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <LayoutGrid className="h-5 w-5 text-[var(--text-muted)]" />
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">Color Scheme</h2>
       </div>
-      <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 lg:grid-cols-3">
         {(Object.keys(colorSchemes) as ColorScheme[]).map(key => {
           const option = colorSchemes[key]
 

@@ -734,6 +734,96 @@
   --gold-5: #eaf5ff;
 }
 
+:root[data-scheme='blush-bloom'] {
+  color-scheme: light;
+  --theme-accent-rgb: 221 78 133;
+  --theme-accent-strong-rgb: 255 160 196;
+  --theme-page-start: #fff7fb;
+  --theme-page-end: #fce8f1;
+  --theme-shell: #fff8fb;
+  --theme-panel: rgba(255, 255, 255, 0.84);
+  --theme-panel-strong: rgba(255, 255, 255, 0.95);
+  --theme-panel-soft: rgba(221, 78, 133, 0.058);
+  --theme-elevated: #ffffff;
+  --theme-input: rgba(255, 255, 255, 0.8);
+  --theme-input-focus: rgba(255, 255, 255, 0.98);
+  --theme-overlay: rgba(88, 41, 64, 0.34);
+  --theme-text-primary: #36212b;
+  --theme-text-secondary: #745365;
+  --theme-text-muted: #9b7386;
+  --theme-text-inverse: #fff8fb;
+  --theme-accent-readable: #b12c62;
+  --theme-accent-text: #7f1d45;
+  --theme-accent-soft: rgba(221, 78, 133, 0.12);
+  --theme-accent-softer: rgba(221, 78, 133, 0.065);
+  --theme-surface-hover: rgba(221, 78, 133, 0.085);
+  --theme-logo-filter: drop-shadow(0 8px 18px rgba(221, 78, 133, 0.18));
+  --theme-backdrop-image: url('/themes/blush-bloom/backdrop.webp');
+  --theme-texture-image: url('/themes/blush-bloom/texture.webp');
+  --theme-preview-image: url('/themes/blush-bloom/preview.webp');
+  --theme-page-background:
+    radial-gradient(circle at 18% 0%, rgba(255, 160, 196, 0.36), transparent 32%),
+    radial-gradient(circle at 84% 14%, rgba(171, 137, 235, 0.18), transparent 33%),
+    radial-gradient(circle at 52% 4%, rgba(138, 213, 190, 0.12), transparent 24%),
+    linear-gradient(180deg, var(--theme-page-start) 0%, var(--theme-page-end) 100%);
+  --theme-app-background:
+    radial-gradient(circle at 50% 0%, rgba(255, 160, 196, 0.22), transparent 30%),
+    linear-gradient(180deg, var(--theme-shell), var(--theme-page-end));
+  --theme-image-surface-overlay: linear-gradient(180deg, rgba(255, 248, 251, 0.5), rgba(252, 232, 241, 0.72));
+  --theme-image-panel-overlay: linear-gradient(180deg, rgba(255, 250, 252, 0.96), rgba(253, 238, 246, 0.985));
+  --theme-modal-background:
+    radial-gradient(circle at top, rgba(255, 160, 196, 0.28), transparent 34%),
+    linear-gradient(180deg, rgba(255, 250, 252, 0.96), rgba(253, 238, 246, 0.98));
+  --theme-sent-bubble-bg:
+    radial-gradient(circle at 18% 0%, rgba(255, 160, 196, 0.22), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.91), rgba(255, 233, 243, 0.86));
+  --theme-floating-action-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 160, 196, 0.34) 36%, rgba(221, 78, 133, 0.36) 100%);
+  --theme-composer-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(253, 237, 246, 0.98));
+  --theme-panel-cover-bg: linear-gradient(180deg, rgba(255, 251, 253, 0.97), rgba(253, 238, 246, 0.99));
+  --theme-popup-surface-bg:
+    radial-gradient(circle at 18% 0%, rgba(255, 160, 196, 0.2), transparent 34%),
+    radial-gradient(circle at 86% 8%, rgba(138, 213, 190, 0.11), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 235, 245, 0.56)),
+    var(--theme-panel-cover-bg);
+  --mobile-footer-bg: linear-gradient(180deg, rgba(255, 250, 252, 0.91), rgba(253, 238, 246, 0.98));
+  --mobile-footer-shadow: 0 -12px 32px rgba(136, 57, 93, 0.13);
+  --nav-active-bg: rgba(221, 78, 133, 0.13);
+  --nav-hover-bg: rgba(221, 78, 133, 0.07);
+  --nav-icon-bg: rgba(221, 78, 133, 0.07);
+  --border-subtle: rgba(94, 50, 72, 0.13);
+  --border-panel: rgba(94, 50, 72, 0.17);
+  --border-glow: rgba(221, 78, 133, 0.34);
+  --border-strong: rgba(94, 50, 72, 0.24);
+  --state-success: #4e7f68;
+  --state-success-soft: rgba(78, 127, 104, 0.13);
+  --state-warning: #b26a3f;
+  --state-warning-soft: rgba(178, 106, 63, 0.13);
+  --state-danger: #b54268;
+  --state-danger-soft: rgba(181, 66, 104, 0.13);
+  --shadow-panel: 0 12px 32px rgba(136, 57, 93, 0.11);
+  --shadow-panel-strong: 0 18px 50px rgba(136, 57, 93, 0.16);
+  --shadow-accent-soft: 0 0 0 1px rgba(221, 78, 133, 0.2), 0 8px 22px rgba(221, 78, 133, 0.14);
+  --shadow-cta:
+    0 0 0 1px rgba(177, 44, 98, 0.16),
+    0 10px 24px rgba(221, 78, 133, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.68);
+  --button-primary-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 160, 196, 0.42) 36%, rgba(221, 78, 133, 0.42) 100%);
+  --button-primary-inner-bg:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.68), transparent 44%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 227, 241, 0.95));
+  --button-primary-highlight: linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0));
+  --button-primary-sheen: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.64), transparent);
+  --button-primary-hover-shadow:
+    0 0 0 1px rgba(221, 78, 133, 0.24),
+    0 14px 32px rgba(221, 78, 133, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  --gold-1: #7f1d45;
+  --gold-2: #a92d65;
+  --gold-3: #dd4e85;
+  --gold-4: #ff9fc4;
+  --gold-5: #fff1f8;
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }

@@ -48,6 +48,20 @@ test('supports a light theme mode', () => {
   expect(document.documentElement.classList.contains('dark')).toBe(false);
 });
 
+test('supports the blush bloom theme', () => {
+  const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
+
+  act(() => {
+    result.current.setScheme('blush-bloom');
+  });
+
+  expect(result.current.scheme).toBe('blush-bloom');
+  expect(result.current.mode).toBe('light');
+  expect(document.documentElement.dataset.scheme).toBe('blush-bloom');
+  expect(document.documentElement.dataset.themeMode).toBe('light');
+  expect(document.documentElement.classList.contains('blush-bloom')).toBe(true);
+});
+
 test('dark themes publish dark mode metadata', () => {
   const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
 

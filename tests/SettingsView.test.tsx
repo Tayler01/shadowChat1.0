@@ -59,6 +59,7 @@ jest.mock('../src/hooks/useTheme', () => ({
     'aurora-veil': { label: 'Aurora Veil', description: 'Aurora glass', start: '#112233', end: '#58d7d5', mode: 'dark', preview: '/themes/aurora-veil/preview.webp' },
     'neon-circuit': { label: 'Neon Circuit', description: 'Neon glass', start: '#071020', end: '#ff4fd8', mode: 'dark', preview: '/themes/neon-circuit/preview.webp' },
     'moonstone-light': { label: 'Moonstone Light', description: 'Pearl daylight', start: '#fff8e8', end: '#5c82c8', mode: 'light', preview: '/themes/moonstone-light/preview.webp' },
+    'blush-bloom': { label: 'Blush Bloom', description: 'Pearl blush glass', start: '#fff7fb', end: '#ff9fc4', mode: 'light', preview: '/themes/blush-bloom/preview.webp' },
   },
 }))
 

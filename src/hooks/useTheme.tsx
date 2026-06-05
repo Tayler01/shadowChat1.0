@@ -7,6 +7,7 @@ export type ColorScheme =
   | 'ember-slate'
   | 'neon-circuit'
   | 'moonstone-light'
+  | 'blush-bloom'
 
 export type ThemeMode = 'dark' | 'light'
 
@@ -86,6 +87,17 @@ export const colorSchemes: Record<
     preview: '/themes/moonstone-light/preview.webp',
     backdrop: '/themes/moonstone-light/backdrop.webp',
     texture: '/themes/moonstone-light/texture.webp',
+  },
+  'blush-bloom': {
+    label: 'Blush Bloom',
+    description: 'Pearl blush glass with berry, lavender, peach, and mint shimmer.',
+    start: '#fff7fb',
+    end: '#ff9fc4',
+    accent: '#dd4e85',
+    mode: 'light',
+    preview: '/themes/blush-bloom/preview.webp',
+    backdrop: '/themes/blush-bloom/backdrop.webp',
+    texture: '/themes/blush-bloom/texture.webp',
   },
 }
 

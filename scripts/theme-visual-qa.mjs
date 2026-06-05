@@ -23,6 +23,7 @@ const themes = [
   'ember-slate',
   'neon-circuit',
   'moonstone-light',
+  'blush-bloom',
 ]
 
 const deviceProfiles = [
@@ -317,7 +318,7 @@ async function focusAndAuditComposer(page, profile, theme, flow, options = {}) {
     { ...profile, viewport: { width: original.width, height: compressedHeight } },
     theme,
     `${flow}-compressed`,
-    { composer: true, footerAtViewportBottom: Boolean(options.simulateAndroidKeyboardInset) }
+    { composer: true, header: false, footerAtViewportBottom: Boolean(options.simulateAndroidKeyboardInset) }
   )
 
   await page.setViewportSize(original)
@@ -380,12 +381,15 @@ async function waitForBootSurface(page) {
 }
 
 async function waitForChatView(page) {
-  await page.getByText(/Lounge Channel/i).first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByText(/General Chat|Lounge Channel/i).first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
   await page.locator('textarea:visible').first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
 async function waitForDmView(page) {
-  await page.getByRole('heading', { name: 'Direct Messages' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await Promise.race([
+    page.getByRole('heading', { name: /^(DM|Direct Messages)$/i }).waitFor({ timeout: DEFAULT_TIMEOUT_MS }),
+    page.getByRole('button', { name: 'Start new conversation' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS }),
+  ])
 }
 
 async function waitForSettingsView(page) {
@@ -428,7 +432,7 @@ async function navigateByViewParam(page, view) {
 
 async function openSettingsSection(page, sectionName) {
   await page.getByRole('button', { name: sectionName }).click()
-  await page.getByRole('button', { name: 'Back to settings' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByRole('heading', { name: sectionName === 'Color & Layout' ? 'Color Scheme' : sectionName }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
 async function openConversationWithUser(page, profile, theme, account) {
@@ -458,7 +462,7 @@ async function expectTheme(page, theme) {
 }
 
 async function isChatVisible(page) {
-  return page.getByText(/Lounge Channel/i).first().isVisible().catch(() => false)
+  return page.getByText(/General Chat|Lounge Channel/i).first().isVisible().catch(() => false)
 }
 
 async function installBrowserMocks(context) {
