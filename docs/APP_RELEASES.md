@@ -62,9 +62,17 @@ node scripts/publish-app-release.mjs --netlify-json netlify-production.json
 
 The publisher upserts one `public.app_releases` row for the build id. If the
 push includes `release-notes/current.json`, those notes are used; otherwise the
-popup is generated from the pushed commit range. The app then shows the release
-popup to signed-in users and records per-user state in
-`public.app_release_receipts`.
+popup is generated from the pushed commit range.
+
+After the row is written, the publisher also sends a Supabase Realtime Broadcast
+on topic `app-release-updates` with event `app_release_published`. Signed-in app
+sessions listen to that stable topic, refresh the visible release list
+immediately, and fan the signal out to sibling tabs on the same device. The
+Postgres change subscription, focus/online/page-show checks, realtime recovery
+refresh, and the one-minute poll remain as fallback paths.
+
+The app then shows the release popup to signed-in users and records per-user
+state in `public.app_release_receipts`.
 
 ## Required Secrets
 

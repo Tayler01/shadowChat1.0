@@ -14,7 +14,8 @@ import {
   recordAppReleaseReceipt,
   type VisibleAppRelease,
 } from '../../lib/supabase'
-import { createRealtimeChannelName } from '../../lib/realtimeChannelName'
+import { runRealtimeRecovery } from '../../lib/realtimeRecovery'
+import { useRealtimeRecovery } from '../../hooks/useRealtimeRecovery'
 import {
   APP_RELEASE_CHECKS_ENABLED,
   CURRENT_APP_BUILD_ID,
@@ -29,6 +30,10 @@ import { cn } from '../../lib/utils'
 const RELEASE_POLL_MS = 60000
 const CRITICAL_RESTART_SECONDS = 15
 const BLUSH_BLOOM_RELEASE_PATTERN = /\bblush bloom\b/i
+const RELEASE_REALTIME_TOPIC = 'app-release-updates'
+const RELEASE_BROADCAST_EVENT = 'app_release_published'
+const RELEASE_LOCAL_STORAGE_KEY = 'shadowchat:app-release-update-signal'
+const RELEASE_REFRESH_DEBOUNCE_MS = 150
 
 const formatReleaseDate = (value: string) => {
   try {
@@ -95,6 +100,10 @@ export function AppReleaseGate() {
     setRelease(chooseVisibleAppRelease(visibleReleases))
   }, [user])
 
+  useRealtimeRecovery(() => {
+    void refreshReleases()
+  })
+
   useEffect(() => {
     if (!user || !APP_RELEASE_CHECKS_ENABLED) {
       setRelease(null)
@@ -103,41 +112,116 @@ export function AppReleaseGate() {
 
     let disposed = false
     let channel: any = null
+    let localChannel: BroadcastChannel | null = null
+    let refreshTimeoutId: number | null = null
 
-    const safeRefresh = () => {
-      if (!disposed) {
+    const safeRefresh = (immediate = false) => {
+      if (disposed) {
+        return
+      }
+
+      if (refreshTimeoutId !== null) {
+        window.clearTimeout(refreshTimeoutId)
+        refreshTimeoutId = null
+      }
+
+      if (immediate) {
         void refreshReleases()
+        return
+      }
+
+      refreshTimeoutId = window.setTimeout(() => {
+        refreshTimeoutId = null
+        if (!disposed) {
+          void refreshReleases()
+        }
+      }, RELEASE_REFRESH_DEBOUNCE_MS)
+    }
+
+    const fanOutReleaseSignal = (payload: unknown) => {
+      localChannel?.postMessage(payload)
+      try {
+        window.localStorage.setItem(
+          RELEASE_LOCAL_STORAGE_KEY,
+          JSON.stringify({
+            payload,
+            signaled_at: new Date().toISOString(),
+          })
+        )
+      } catch {
+        // local fanout is best-effort; the current tab still refreshes directly.
       }
     }
 
-    safeRefresh()
+    const handleReleasePush = (payload: unknown) => {
+      fanOutReleaseSignal(payload)
+      safeRefresh(true)
+    }
+
+    const handleStorageSignal = (event: StorageEvent) => {
+      if (event.key === RELEASE_LOCAL_STORAGE_KEY && event.newValue) {
+        safeRefresh(true)
+      }
+    }
+    const scheduleRefresh = () => safeRefresh()
+
+    safeRefresh(true)
     const intervalId = window.setInterval(safeRefresh, RELEASE_POLL_MS)
-    window.addEventListener('focus', safeRefresh)
-    window.addEventListener('pageshow', safeRefresh)
-    window.addEventListener('online', safeRefresh)
-    document.addEventListener('visibilitychange', safeRefresh)
+    window.addEventListener('focus', scheduleRefresh)
+    window.addEventListener('pageshow', scheduleRefresh)
+    window.addEventListener('online', scheduleRefresh)
+    window.addEventListener('storage', handleStorageSignal)
+    document.addEventListener('visibilitychange', scheduleRefresh)
 
     try {
+      if ('BroadcastChannel' in window) {
+        localChannel = new BroadcastChannel(RELEASE_REALTIME_TOPIC)
+        localChannel.onmessage = () => safeRefresh(true)
+      }
+
       const client = getRealtimeClient()
       channel = client
-        ?.channel(createRealtimeChannelName('public:app_releases:gate'))
+        ?.channel(RELEASE_REALTIME_TOPIC, {
+          config: { broadcast: { self: false } },
+        })
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'app_releases' },
-          safeRefresh
+          (payload: unknown) => handleReleasePush(payload)
         )
-        .subscribe()
+        .on(
+          'broadcast',
+          { event: RELEASE_BROADCAST_EVENT },
+          (payload: unknown) => handleReleasePush(payload)
+        )
+        .subscribe((status: string) => {
+          if (status === 'SUBSCRIBED') {
+            safeRefresh(true)
+            return
+          }
+
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            void runRealtimeRecovery('channel-error', { sessionReady: true }).finally(() => {
+              safeRefresh()
+            })
+          }
+        })
     } catch {
       channel = null
     }
 
     return () => {
       disposed = true
+      if (refreshTimeoutId !== null) {
+        window.clearTimeout(refreshTimeoutId)
+      }
       window.clearInterval(intervalId)
-      window.removeEventListener('focus', safeRefresh)
-      window.removeEventListener('pageshow', safeRefresh)
-      window.removeEventListener('online', safeRefresh)
-      document.removeEventListener('visibilitychange', safeRefresh)
+      window.removeEventListener('focus', scheduleRefresh)
+      window.removeEventListener('pageshow', scheduleRefresh)
+      window.removeEventListener('online', scheduleRefresh)
+      window.removeEventListener('storage', handleStorageSignal)
+      document.removeEventListener('visibilitychange', scheduleRefresh)
+      localChannel?.close()
       if (channel) {
         getRealtimeClient()?.removeChannel?.(channel)
       }

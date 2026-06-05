@@ -12,6 +12,8 @@ const VALID_POLICIES = new Set([
 const VALID_SEVERITIES = new Set(['info', 'feature', 'maintenance', 'critical'])
 
 const DEFAULT_MANUAL_RELEASE_NOTES_PATH = path.join('release-notes', 'current.json')
+const APP_RELEASE_BROADCAST_TOPIC = 'app-release-updates'
+const APP_RELEASE_BROADCAST_EVENT = 'app_release_published'
 
 const AREA_RULES = [
   {
@@ -496,6 +498,44 @@ async function upsertAppRelease(supabaseUrl, serviceRoleKey, row) {
   }
 }
 
+async function broadcastAppRelease(supabaseUrl, serviceRoleKey, row) {
+  const endpoint = new URL('/realtime/v1/api/broadcast', supabaseUrl)
+  const payload = {
+    build_id: row.build_id,
+    commit_sha: row.commit_sha,
+    deploy_id: row.deploy_id,
+    deploy_url: row.deploy_url,
+    title: row.title,
+    restart_policy: row.restart_policy,
+    severity: row.severity,
+    published_at: row.published_at,
+    sent_at: new Date().toISOString(),
+  }
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messages: [
+        {
+          topic: APP_RELEASE_BROADCAST_TOPIC,
+          event: APP_RELEASE_BROADCAST_EVENT,
+          payload,
+        },
+      ],
+    }),
+  })
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '')
+    throw new Error(`Release broadcast failed (${response.status}): ${body || response.statusText}`)
+  }
+}
+
 async function main() {
   loadLocalEnv()
   const args = parseArgs(process.argv.slice(2))
@@ -549,8 +589,9 @@ async function main() {
   }
 
   await upsertAppRelease(supabaseUrl, serviceRoleKey, row)
+  await broadcastAppRelease(supabaseUrl, serviceRoleKey, row)
 
-  console.log(`Published app release ${row.build_id}`)
+  console.log(`Published and broadcast app release ${row.build_id}`)
 }
 
 main().catch(error => {
