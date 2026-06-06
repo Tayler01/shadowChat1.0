@@ -35,6 +35,10 @@ Track generated theme assets, prompts, optimization notes, final repo paths, and
 | `moonstone-light` | texture | Soft pearl paper texture with subtle prism grain and very pale blue-lavender sheen, clean light UI background, no text, no logo, no objects. | generated/optimized | same generated source as backdrop | `public/themes/moonstone-light/texture.webp` | 1024x1024 WebP, 14,448 bytes, q76, softened crop |
 | `blush-bloom` | backdrop | Low-contrast abstract visual plate for a premium chat app theme called Blush Bloom: translucent blush-pink glass, soft pearl, berry-coral glow, lavender haze, peach highlights, tiny mint sparkle accents, girly and fun but polished, no text, no logo, no UI, no people, no recognizable objects. | generated/optimized | `C:\Users\tayle\.codex\generated_images\019e97b7-08ba-76a2-880d-7c71d283daf8\ig_047d82beb5da0f71016a22beaf9b54819398dd579bd94d59e3.png` | `public/themes/blush-bloom/backdrop.webp` | 1600x1000 WebP, 45,740 bytes, q82 |
 | `blush-bloom` | texture | Soft blush glass and pearl shimmer texture with berry, lavender, peach, and tiny mint accents, flat enough for UI panels, no text, no logo, no objects. | generated/optimized | same generated source as backdrop | `public/themes/blush-bloom/texture.webp` | 1024x1024 WebP, 18,008 bytes, q76, softened crop |
+| `mint-fizz` | backdrop | Low-contrast abstract visual plate for a premium chat app theme called Mint Fizz: light mint glass, aqua shine, soft lime glow, bubbly pearl surfaces, faint blue-lavender prism, fresh but polished, no text, no logo, no UI, no people, no recognizable objects. | generated/optimized | project-local deterministic Sharp SVG generator, 2026-06-05 | `public/themes/mint-fizz/backdrop.webp` | 1600x1000 WebP, 10,176 bytes, q82 |
+| `mint-fizz` | texture | Soft mint glass and pearl shimmer texture with aqua, pale lime, blue, and lavender hints, flat enough for UI panels, no text, no logo, no objects. | generated/optimized | project-local deterministic Sharp SVG generator, 2026-06-05 | `public/themes/mint-fizz/texture.webp` | 1024x1024 WebP, 4,838 bytes, q76 |
+| `silver-halo` | backdrop | Low-contrast abstract visual plate for a premium chat app theme called Silver Halo: graphite glass, chrome ribbons, silver glow, brushed metal haze, cool blue shine, no text, no logo, no UI, no people, no recognizable objects. | generated/optimized | project-local deterministic Sharp SVG generator, 2026-06-05 | `public/themes/silver-halo/backdrop.webp` | 1600x1000 WebP, 22,150 bytes, q82 |
+| `silver-halo` | texture | Dark graphite and silver microtexture with chrome ribbons, soft blue highlights, and brushed glass grain, flat enough for UI panels, no text, no logo, no objects. | generated/optimized | project-local deterministic Sharp SVG generator, 2026-06-05 | `public/themes/silver-halo/texture.webp` | 1024x1024 WebP, 9,822 bytes, q76 |
 
 ## Optimization Log
 
@@ -43,6 +47,8 @@ Track generated theme assets, prompts, optimization notes, final repo paths, and
 - 2026-05-11: Contact sheet for visual inspection created at `output/theme-assets-contact-sheet.png`.
 - 2026-05-11: Verified theme asset references in browser via `npm run qa:themes -- --run-name=theme-visual-all --skip-build`; each theme reported its expected `--theme-backdrop-image` and `--theme-texture-image`.
 - 2026-06-05: Generated and optimized `Blush Bloom` source assets; created `backdrop.webp`, `texture.webp`, and `preview.webp` under `public/themes/blush-bloom/`.
+- 2026-06-05: Generated and optimized `Mint Fizz` and `Silver Halo`; created `backdrop.webp`, `texture.webp`, and `preview.webp` under `public/themes/mint-fizz/` and `public/themes/silver-halo/`.
+- 2026-06-05: Created visual contact sheet at `output/theme-assets-mint-fizz-silver-halo-contact-sheet.png`.
 
 ## Final Asset Inventory
 
@@ -54,3 +60,5 @@ Track generated theme assets, prompts, optimization notes, final repo paths, and
 | `neon-circuit` | `public/themes/neon-circuit/backdrop.webp` | `public/themes/neon-circuit/texture.webp` | `public/themes/neon-circuit/preview.webp` |
 | `moonstone-light` | `public/themes/moonstone-light/backdrop.webp` | `public/themes/moonstone-light/texture.webp` | `public/themes/moonstone-light/preview.webp` |
 | `blush-bloom` | `public/themes/blush-bloom/backdrop.webp` | `public/themes/blush-bloom/texture.webp` | `public/themes/blush-bloom/preview.webp` |
+| `mint-fizz` | `public/themes/mint-fizz/backdrop.webp` | `public/themes/mint-fizz/texture.webp` | `public/themes/mint-fizz/preview.webp` |
+| `silver-halo` | `public/themes/silver-halo/backdrop.webp` | `public/themes/silver-halo/texture.webp` | `public/themes/silver-halo/preview.webp` |

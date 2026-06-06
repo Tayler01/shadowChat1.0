@@ -62,6 +62,34 @@ test('supports the blush bloom theme', () => {
   expect(document.documentElement.classList.contains('blush-bloom')).toBe(true);
 });
 
+test('supports the mint fizz theme', () => {
+  const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
+
+  act(() => {
+    result.current.setScheme('mint-fizz');
+  });
+
+  expect(result.current.scheme).toBe('mint-fizz');
+  expect(result.current.mode).toBe('light');
+  expect(document.documentElement.dataset.scheme).toBe('mint-fizz');
+  expect(document.documentElement.dataset.themeMode).toBe('light');
+  expect(document.documentElement.classList.contains('mint-fizz')).toBe(true);
+});
+
+test('supports the silver halo theme', () => {
+  const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
+
+  act(() => {
+    result.current.setScheme('silver-halo');
+  });
+
+  expect(result.current.scheme).toBe('silver-halo');
+  expect(result.current.mode).toBe('dark');
+  expect(document.documentElement.dataset.scheme).toBe('silver-halo');
+  expect(document.documentElement.dataset.themeMode).toBe('dark');
+  expect(document.documentElement.classList.contains('silver-halo')).toBe(true);
+});
+
 test('dark themes publish dark mode metadata', () => {
   const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
 

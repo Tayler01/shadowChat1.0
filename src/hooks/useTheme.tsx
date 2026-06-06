@@ -8,6 +8,8 @@ export type ColorScheme =
   | 'neon-circuit'
   | 'moonstone-light'
   | 'blush-bloom'
+  | 'mint-fizz'
+  | 'silver-halo'
 
 export type ThemeMode = 'dark' | 'light'
 
@@ -98,6 +100,28 @@ export const colorSchemes: Record<
     preview: '/themes/blush-bloom/preview.webp',
     backdrop: '/themes/blush-bloom/backdrop.webp',
     texture: '/themes/blush-bloom/texture.webp',
+  },
+  'mint-fizz': {
+    label: 'Mint Fizz',
+    description: 'Fresh mint glass with aqua shine, soft lime, and bubbly pearl light.',
+    start: '#f6fff9',
+    end: '#8ce9ce',
+    accent: '#2fbf9b',
+    mode: 'light',
+    preview: '/themes/mint-fizz/preview.webp',
+    backdrop: '/themes/mint-fizz/backdrop.webp',
+    texture: '/themes/mint-fizz/texture.webp',
+  },
+  'silver-halo': {
+    label: 'Silver Halo',
+    description: 'Graphite glass with chrome ribbons, silver glow, and cool blue shine.',
+    start: '#f4f8fb',
+    end: '#596676',
+    accent: '#c8d2dd',
+    mode: 'dark',
+    preview: '/themes/silver-halo/preview.webp',
+    backdrop: '/themes/silver-halo/backdrop.webp',
+    texture: '/themes/silver-halo/texture.webp',
   },
 }
 

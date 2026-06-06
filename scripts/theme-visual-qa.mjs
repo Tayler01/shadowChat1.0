@@ -24,6 +24,8 @@ const themes = [
   'neon-circuit',
   'moonstone-light',
   'blush-bloom',
+  'mint-fizz',
+  'silver-halo',
 ]
 
 const deviceProfiles = [

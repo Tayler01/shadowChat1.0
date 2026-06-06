@@ -824,6 +824,185 @@
   --gold-5: #fff1f8;
 }
 
+:root[data-scheme='mint-fizz'] {
+  color-scheme: light;
+  --theme-accent-rgb: 47 191 155;
+  --theme-accent-strong-rgb: 140 233 206;
+  --theme-page-start: #f6fff9;
+  --theme-page-end: #ddf8ec;
+  --theme-shell: #f8fffb;
+  --theme-panel: rgba(255, 255, 255, 0.84);
+  --theme-panel-strong: rgba(255, 255, 255, 0.95);
+  --theme-panel-soft: rgba(47, 191, 155, 0.06);
+  --theme-elevated: #ffffff;
+  --theme-input: rgba(255, 255, 255, 0.8);
+  --theme-input-focus: rgba(255, 255, 255, 0.98);
+  --theme-overlay: rgba(25, 67, 55, 0.32);
+  --theme-text-primary: #173d32;
+  --theme-text-secondary: #4f7768;
+  --theme-text-muted: #75958a;
+  --theme-text-inverse: #f8fffb;
+  --theme-accent-readable: #1f8d73;
+  --theme-accent-text: #0f4f40;
+  --theme-accent-soft: rgba(47, 191, 155, 0.13);
+  --theme-accent-softer: rgba(47, 191, 155, 0.07);
+  --theme-surface-hover: rgba(47, 191, 155, 0.085);
+  --theme-logo-filter: drop-shadow(0 8px 18px rgba(47, 191, 155, 0.16));
+  --theme-backdrop-image: url('/themes/mint-fizz/backdrop.webp');
+  --theme-texture-image: url('/themes/mint-fizz/texture.webp');
+  --theme-preview-image: url('/themes/mint-fizz/preview.webp');
+  --theme-page-background:
+    radial-gradient(circle at 18% 0%, rgba(140, 233, 206, 0.38), transparent 32%),
+    radial-gradient(circle at 82% 10%, rgba(158, 204, 255, 0.18), transparent 34%),
+    radial-gradient(circle at 48% 6%, rgba(207, 186, 255, 0.13), transparent 25%),
+    linear-gradient(180deg, var(--theme-page-start) 0%, var(--theme-page-end) 100%);
+  --theme-app-background:
+    radial-gradient(circle at 50% 0%, rgba(140, 233, 206, 0.23), transparent 31%),
+    linear-gradient(180deg, var(--theme-shell), var(--theme-page-end));
+  --theme-image-surface-overlay: linear-gradient(180deg, rgba(248, 255, 251, 0.5), rgba(221, 248, 236, 0.72));
+  --theme-image-panel-overlay: linear-gradient(180deg, rgba(253, 255, 254, 0.96), rgba(232, 252, 242, 0.985));
+  --theme-modal-background:
+    radial-gradient(circle at top, rgba(140, 233, 206, 0.26), transparent 34%),
+    linear-gradient(180deg, rgba(253, 255, 254, 0.96), rgba(232, 252, 242, 0.98));
+  --theme-sent-bubble-bg:
+    radial-gradient(circle at 18% 0%, rgba(140, 233, 206, 0.24), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(225, 250, 240, 0.88));
+  --theme-floating-action-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(140, 233, 206, 0.36) 36%, rgba(47, 191, 155, 0.38) 100%);
+  --theme-composer-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(228, 252, 241, 0.98));
+  --theme-panel-cover-bg: linear-gradient(180deg, rgba(253, 255, 254, 0.97), rgba(231, 252, 242, 0.99));
+  --theme-popup-surface-bg:
+    radial-gradient(circle at 18% 0%, rgba(140, 233, 206, 0.22), transparent 34%),
+    radial-gradient(circle at 86% 8%, rgba(156, 201, 255, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(226, 250, 239, 0.58)),
+    var(--theme-panel-cover-bg);
+  --mobile-footer-bg: linear-gradient(180deg, rgba(250, 255, 252, 0.91), rgba(230, 252, 241, 0.98));
+  --mobile-footer-shadow: 0 -12px 32px rgba(39, 133, 111, 0.12);
+  --nav-active-bg: rgba(47, 191, 155, 0.13);
+  --nav-hover-bg: rgba(47, 191, 155, 0.07);
+  --nav-icon-bg: rgba(47, 191, 155, 0.07);
+  --border-subtle: rgba(33, 86, 70, 0.13);
+  --border-panel: rgba(33, 86, 70, 0.17);
+  --border-glow: rgba(47, 191, 155, 0.34);
+  --border-strong: rgba(33, 86, 70, 0.24);
+  --state-success: #2d7f67;
+  --state-success-soft: rgba(45, 127, 103, 0.13);
+  --state-warning: #9b7d34;
+  --state-warning-soft: rgba(155, 125, 52, 0.13);
+  --state-danger: #a94e64;
+  --state-danger-soft: rgba(169, 78, 100, 0.13);
+  --shadow-panel: 0 12px 32px rgba(39, 133, 111, 0.1);
+  --shadow-panel-strong: 0 18px 50px rgba(39, 133, 111, 0.15);
+  --shadow-accent-soft: 0 0 0 1px rgba(47, 191, 155, 0.2), 0 8px 22px rgba(47, 191, 155, 0.13);
+  --shadow-cta:
+    0 0 0 1px rgba(31, 141, 115, 0.16),
+    0 10px 24px rgba(47, 191, 155, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.68);
+  --button-primary-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(140, 233, 206, 0.42) 36%, rgba(47, 191, 155, 0.42) 100%);
+  --button-primary-inner-bg:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.68), transparent 44%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(219, 249, 237, 0.95));
+  --button-primary-highlight: linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0));
+  --button-primary-sheen: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.64), transparent);
+  --button-primary-hover-shadow:
+    0 0 0 1px rgba(47, 191, 155, 0.24),
+    0 14px 32px rgba(47, 191, 155, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  --gold-1: #0f4f40;
+  --gold-2: #1f8d73;
+  --gold-3: #2fbf9b;
+  --gold-4: #8ce9ce;
+  --gold-5: #edfff8;
+}
+
+:root[data-scheme='silver-halo'] {
+  color-scheme: dark;
+  --theme-accent-rgb: 200 210 221;
+  --theme-accent-strong-rgb: 126 232 255;
+  --theme-page-start: #0b0f14;
+  --theme-page-end: #05070a;
+  --theme-shell: #0d1218;
+  --theme-panel: rgba(16, 22, 29, 0.86);
+  --theme-panel-strong: rgba(20, 27, 36, 0.95);
+  --theme-panel-soft: rgba(200, 210, 221, 0.045);
+  --theme-elevated: #151c25;
+  --theme-input: rgba(218, 228, 239, 0.055);
+  --theme-input-focus: rgba(218, 228, 239, 0.095);
+  --theme-overlay: rgba(3, 5, 8, 0.76);
+  --theme-text-primary: #f4f8fb;
+  --theme-text-secondary: #b7c1cc;
+  --theme-text-muted: #7f8b99;
+  --theme-text-inverse: #071016;
+  --theme-accent-readable: #d8e3ee;
+  --theme-accent-text: #f8fbff;
+  --theme-accent-soft: rgba(200, 210, 221, 0.12);
+  --theme-accent-softer: rgba(200, 210, 221, 0.065);
+  --theme-surface-hover: rgba(200, 210, 221, 0.08);
+  --theme-logo-filter: drop-shadow(0 0 18px rgba(200, 210, 221, 0.2)) drop-shadow(0 0 22px rgba(126, 232, 255, 0.12));
+  --theme-backdrop-image: url('/themes/silver-halo/backdrop.webp');
+  --theme-texture-image: url('/themes/silver-halo/texture.webp');
+  --theme-preview-image: url('/themes/silver-halo/preview.webp');
+  --theme-page-background:
+    radial-gradient(circle at 50% -8%, rgba(220, 229, 238, 0.18), transparent 33%),
+    radial-gradient(circle at 84% 12%, rgba(126, 232, 255, 0.1), transparent 30%),
+    linear-gradient(180deg, var(--theme-page-start) 0%, var(--theme-page-end) 100%);
+  --theme-app-background:
+    radial-gradient(circle at 50% 0%, rgba(220, 229, 238, 0.09), transparent 29%),
+    linear-gradient(180deg, var(--theme-shell), var(--theme-page-end));
+  --theme-image-surface-overlay: linear-gradient(180deg, rgba(9, 13, 18, 0.18), rgba(5, 7, 10, 0.34));
+  --theme-image-panel-overlay: linear-gradient(180deg, rgba(12, 16, 22, 0.96), rgba(9, 12, 17, 0.985));
+  --theme-modal-background:
+    radial-gradient(circle at top, rgba(220, 229, 238, 0.13), transparent 34%),
+    linear-gradient(180deg, rgba(19, 25, 33, 0.96), rgba(8, 11, 15, 0.98));
+  --theme-sent-bubble-bg:
+    radial-gradient(circle at 18% 0%, rgba(220, 229, 238, 0.18), transparent 42%),
+    linear-gradient(180deg, rgba(31, 39, 49, 0.88), rgba(17, 23, 31, 0.92));
+  --theme-floating-action-bg: linear-gradient(180deg, rgba(220, 229, 238, 0.22), rgba(200, 210, 221, 0.13) 36%, rgba(200, 210, 221, 0.46) 100%);
+  --theme-composer-bg: linear-gradient(180deg, rgba(19, 25, 33, 0.94), rgba(8, 11, 15, 0.98));
+  --theme-panel-cover-bg: linear-gradient(180deg, rgba(13, 18, 24, 0.97), rgba(9, 12, 17, 0.99));
+  --theme-popup-surface-bg:
+    radial-gradient(circle at 18% 0%, rgba(220, 229, 238, 0.14), transparent 34%),
+    radial-gradient(circle at 86% 8%, rgba(126, 232, 255, 0.08), transparent 30%),
+    linear-gradient(180deg, rgba(200, 210, 221, 0.08), rgba(200, 210, 221, 0.035)),
+    var(--theme-panel-cover-bg);
+  --mobile-footer-bg: linear-gradient(180deg, rgba(15, 20, 27, 0.91), rgba(7, 10, 14, 0.98));
+  --mobile-footer-shadow: 0 -12px 32px rgba(0, 0, 0, 0.34);
+  --nav-active-bg: rgba(200, 210, 221, 0.12);
+  --nav-hover-bg: rgba(200, 210, 221, 0.07);
+  --nav-icon-bg: rgba(200, 210, 221, 0.07);
+  --border-subtle: rgba(200, 210, 221, 0.13);
+  --border-panel: rgba(200, 210, 221, 0.17);
+  --border-glow: rgba(200, 210, 221, 0.32);
+  --border-strong: rgba(200, 210, 221, 0.24);
+  --state-success: #9ebbb0;
+  --state-success-soft: rgba(158, 187, 176, 0.13);
+  --state-warning: #c4aa6d;
+  --state-warning-soft: rgba(196, 170, 109, 0.13);
+  --state-danger: #d27786;
+  --state-danger-soft: rgba(210, 119, 134, 0.13);
+  --shadow-panel: 0 12px 32px rgba(0, 0, 0, 0.26);
+  --shadow-panel-strong: 0 18px 50px rgba(0, 0, 0, 0.36);
+  --shadow-accent-soft: 0 0 0 1px rgba(200, 210, 221, 0.2), 0 8px 22px rgba(126, 232, 255, 0.1);
+  --shadow-cta:
+    0 0 0 1px rgba(220, 229, 238, 0.18),
+    0 10px 24px rgba(126, 232, 255, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --button-primary-bg: linear-gradient(180deg, rgba(244, 248, 251, 0.26), rgba(200, 210, 221, 0.18) 36%, rgba(200, 210, 221, 0.52) 100%);
+  --button-primary-inner-bg:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.22), transparent 44%),
+    linear-gradient(180deg, rgba(33, 41, 51, 0.94), rgba(15, 20, 27, 0.95));
+  --button-primary-highlight: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0));
+  --button-primary-sheen: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.36), transparent);
+  --button-primary-hover-shadow:
+    0 0 0 1px rgba(220, 229, 238, 0.24),
+    0 14px 32px rgba(126, 232, 255, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  --gold-1: #788594;
+  --gold-2: #9aa6b4;
+  --gold-3: #c8d2dd;
+  --gold-4: #edf4fa;
+  --gold-5: #ffffff;
+}
+
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -1898,53 +2077,61 @@ html, body, #root {
     isolation: isolate;
   }
 
-  .app-release-overlay--blush-bloom {
+  .app-release-overlay--theme-launch {
     background:
-      linear-gradient(180deg, rgba(82, 35, 65, 0.52), rgba(43, 18, 39, 0.62)),
+      linear-gradient(180deg, rgba(28, 64, 56, 0.32), rgba(65, 43, 67, 0.34), rgba(10, 13, 18, 0.68)),
       rgba(4, 5, 6, 0.52);
   }
 
-  .app-release-dialog--blush-bloom {
-    --text-primary: #4d2039;
-    --text-secondary: #6f4261;
-    --text-muted: #936f84;
-    --text-gold: #c43d7c;
-    --border-subtle: rgba(196, 61, 124, 0.2);
-    --border-strong: rgba(196, 61, 124, 0.32);
-    --border-glow: rgba(196, 61, 124, 0.42);
-    --theme-accent-rgb: 196, 61, 124;
-    --theme-accent-strong-rgb: 180, 45, 105;
-    --theme-accent-readable: #b42d69;
+  .app-release-dialog--theme-launch {
+    --text-primary: #233a36;
+    --text-secondary: #4f6863;
+    --text-muted: #76928b;
+    --text-gold: #238e75;
+    --border-subtle: rgba(47, 191, 155, 0.2);
+    --border-strong: rgba(47, 191, 155, 0.3);
+    --border-glow: rgba(47, 191, 155, 0.42);
+    --theme-accent-rgb: 47 191 155;
+    --theme-accent-strong-rgb: 200 210 221;
+    --theme-accent-readable: #238e75;
     --theme-accent-text: #fff8fc;
-    --theme-focus-ring: rgba(196, 61, 124, 0.36);
-    --button-primary-bg: linear-gradient(180deg, #d7528f 0%, #b82f6d 100%);
-    --button-primary-inner-bg: linear-gradient(180deg, rgba(255, 125, 176, 0.5), rgba(184, 47, 109, 0.06));
+    --theme-focus-ring: rgba(47, 191, 155, 0.34);
+    --button-primary-bg: linear-gradient(180deg, #48cfae 0%, #238e75 100%);
+    --button-primary-inner-bg: linear-gradient(180deg, rgba(170, 249, 220, 0.5), rgba(35, 142, 117, 0.08));
     --button-primary-highlight: rgba(255, 255, 255, 0.34);
     --button-primary-sheen: rgba(255, 255, 255, 0.38);
-    --button-primary-hover-shadow: 0 16px 34px rgba(184, 47, 109, 0.26);
-    --shadow-cta: 0 12px 28px rgba(184, 47, 109, 0.22);
+    --button-primary-hover-shadow: 0 16px 34px rgba(35, 142, 117, 0.24);
+    --shadow-cta: 0 12px 28px rgba(35, 142, 117, 0.2);
     --theme-popup-surface-bg:
-      linear-gradient(145deg, rgba(255, 252, 254, 0.96), rgba(255, 229, 240, 0.92) 58%, rgba(239, 230, 255, 0.9)),
-      url('/themes/blush-bloom/texture.webp') center / 300px repeat;
-    border-color: rgba(196, 61, 124, 0.34);
+      radial-gradient(circle at 12% 0%, rgba(140, 233, 206, 0.24), transparent 32%),
+      radial-gradient(circle at 86% 8%, rgba(200, 210, 221, 0.22), transparent 34%),
+      linear-gradient(145deg, rgba(252, 255, 253, 0.96), rgba(226, 250, 240, 0.92) 48%, rgba(237, 244, 250, 0.92)),
+      url('/themes/mint-fizz/texture.webp') center / 300px repeat;
+    border-color: rgba(47, 191, 155, 0.32);
     color: var(--text-primary);
     box-shadow:
-      0 28px 72px rgba(76, 29, 58, 0.32),
+      0 28px 72px rgba(29, 76, 65, 0.24),
       0 0 0 1px rgba(255, 255, 255, 0.66),
       inset 0 1px 0 rgba(255, 255, 255, 0.82);
   }
 
-  .app-release-dialog--blush-bloom .popup-close {
+  .app-release-dialog--theme-launch .popup-close {
     background: rgba(255, 255, 255, 0.72);
-    color: #743053;
+    color: #1f6c5a;
   }
 
-  .app-release-dialog--blush-bloom .app-release-preview {
-    border: 1px solid rgba(196, 61, 124, 0.2);
+  .app-release-dialog--theme-launch .app-release-preview {
+    border: 1px solid rgba(47, 191, 155, 0.2);
     background: rgba(255, 255, 255, 0.62);
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.76),
-      0 16px 34px rgba(196, 61, 124, 0.14);
+      0 16px 34px rgba(47, 191, 155, 0.13);
+  }
+
+  .app-release-preview__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1px;
   }
 
   .app-release-preview__image {
@@ -1954,57 +2141,65 @@ html, body, #root {
     object-fit: cover;
   }
 
+  .app-release-preview__image--tile {
+    height: 6.75rem;
+  }
+
   .app-release-preview__caption {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
     padding: 0.75rem 0.875rem;
-    color: #87375f;
+    color: #1f6c5a;
     font-size: 0.75rem;
     font-weight: 700;
     line-height: 1.2;
-    background: linear-gradient(90deg, rgba(255, 255, 255, 0.72), rgba(255, 228, 241, 0.64));
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.74), rgba(226, 250, 240, 0.68), rgba(236, 243, 249, 0.7));
   }
 
-  .app-release-dialog--blush-bloom .app-release-restart {
-    border-color: rgba(196, 61, 124, 0.22);
-    background: rgba(255, 224, 238, 0.58);
+  .app-release-dialog--theme-launch .app-release-restart {
+    border-color: rgba(47, 191, 155, 0.22);
+    background: rgba(225, 250, 240, 0.58);
   }
 
-  .app-release-dialog--blush-bloom .app-release-section {
-    border-color: rgba(196, 61, 124, 0.18);
+  .app-release-dialog--theme-launch .app-release-section {
+    border-color: rgba(47, 191, 155, 0.18);
     background: rgba(255, 255, 255, 0.52);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
   }
 
-  .app-release-dialog--blush-bloom .app-release-check {
-    color: #c43d7c;
+  .app-release-dialog--theme-launch .app-release-check {
+    color: #238e75;
   }
 
-  .app-release-dialog--blush-bloom .app-release-footer {
-    border-color: rgba(196, 61, 124, 0.18);
-    background: linear-gradient(90deg, rgba(255, 247, 251, 0.9), rgba(255, 228, 241, 0.82));
+  .app-release-dialog--theme-launch .app-release-footer {
+    border-color: rgba(47, 191, 155, 0.18);
+    background: linear-gradient(90deg, rgba(248, 255, 251, 0.9), rgba(226, 250, 240, 0.82), rgba(237, 244, 250, 0.78));
   }
 
-  .app-release-dialog--blush-bloom .app-release-primary-action {
-    border-color: rgba(154, 35, 90, 0.5);
-    background: #b82f6d;
+  .app-release-dialog--theme-launch .app-release-primary-action {
+    border-color: rgba(35, 142, 117, 0.5);
+    background: #238e75;
     color: #fff8fc;
-    box-shadow: 0 14px 30px rgba(184, 47, 109, 0.22);
+    box-shadow: 0 14px 30px rgba(35, 142, 117, 0.2);
   }
 
-  .app-release-dialog--blush-bloom .app-release-primary-action > span[aria-hidden]:first-child {
-    background: linear-gradient(180deg, rgba(237, 97, 154, 0.74), rgba(184, 47, 109, 0.95));
+  .app-release-dialog--theme-launch .app-release-primary-action > span[aria-hidden]:first-child {
+    background: linear-gradient(180deg, rgba(89, 211, 176, 0.74), rgba(35, 142, 117, 0.95));
   }
 
-  .app-release-dialog--blush-bloom .app-release-primary-action > span:last-child {
+  .app-release-dialog--theme-launch .app-release-primary-action > span:last-child {
     color: #fff8fc;
   }
 
   @media (min-width: 640px) {
     .app-release-preview__image {
       height: 9rem;
+    }
+
+    .app-release-preview__image--tile {
+      height: 8.25rem;
     }
   }
 

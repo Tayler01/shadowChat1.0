@@ -29,11 +29,32 @@ import { cn } from '../../lib/utils'
 
 const RELEASE_POLL_MS = 60000
 const CRITICAL_RESTART_SECONDS = 15
-const BLUSH_BLOOM_RELEASE_PATTERN = /\bblush bloom\b/i
+const THEME_RELEASE_PATTERN = /\b(blush bloom|mint fizz|silver halo)\b/i
 const RELEASE_REALTIME_TOPIC = 'app-release-updates'
 const RELEASE_BROADCAST_EVENT = 'app_release_published'
 const RELEASE_LOCAL_STORAGE_KEY = 'shadowchat:app-release-update-signal'
 const RELEASE_REFRESH_DEBOUNCE_MS = 150
+
+const RELEASE_THEME_PREVIEWS = [
+  {
+    label: 'Blush Bloom',
+    caption: 'Pearl blush',
+    preview: '/themes/blush-bloom/preview.webp',
+    pattern: /\bblush bloom\b/i,
+  },
+  {
+    label: 'Mint Fizz',
+    caption: 'Fresh mint',
+    preview: '/themes/mint-fizz/preview.webp',
+    pattern: /\bmint fizz\b/i,
+  },
+  {
+    label: 'Silver Halo',
+    caption: 'Chrome glow',
+    preview: '/themes/silver-halo/preview.webp',
+    pattern: /\bsilver halo\b/i,
+  },
+] as const
 
 const formatReleaseDate = (value: string) => {
   try {
@@ -63,14 +84,21 @@ const getReleaseBadge = (release: VisibleAppRelease, wantsRestart: boolean) => {
   return "What's new"
 }
 
-const isBlushBloomRelease = (release: VisibleAppRelease) => {
-  const content = [
+const getReleaseSearchContent = (release: VisibleAppRelease) => (
+  [
     release.title,
     release.summary,
     ...release.sections.flatMap(section => [section.heading, ...section.items]),
   ].join(' ')
+)
 
-  return BLUSH_BLOOM_RELEASE_PATTERN.test(content)
+const isThemeRelease = (release: VisibleAppRelease) => (
+  THEME_RELEASE_PATTERN.test(getReleaseSearchContent(release))
+)
+
+const getReleaseThemePreviews = (release: VisibleAppRelease) => {
+  const content = getReleaseSearchContent(release)
+  return RELEASE_THEME_PREVIEWS.filter(theme => theme.pattern.test(content))
 }
 
 export function AppReleaseGate() {
@@ -85,8 +113,12 @@ export function AppReleaseGate() {
     () => release ? getAppReleasePresentation(release) : null,
     [release]
   )
-  const blushBloomAnnouncement = useMemo(
-    () => release ? isBlushBloomRelease(release) : false,
+  const themeLaunchAnnouncement = useMemo(
+    () => release ? isThemeRelease(release) : false,
+    [release]
+  )
+  const themeLaunchPreviews = useMemo(
+    () => release ? getReleaseThemePreviews(release) : [],
     [release]
   )
 
@@ -322,7 +354,7 @@ export function AppReleaseGate() {
     <div
       className={cn(
         'fixed inset-0 z-[120] flex items-end justify-center bg-[rgba(4,5,6,0.76)] p-3 backdrop-blur-md sm:items-center sm:p-6',
-        blushBloomAnnouncement && 'app-release-overlay--blush-bloom'
+        themeLaunchAnnouncement && 'app-release-overlay--theme-launch'
       )}
     >
       <div
@@ -331,7 +363,7 @@ export function AppReleaseGate() {
         aria-labelledby="app-release-title"
         className={cn(
           'popup-surface app-release-dialog flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[var(--radius-lg)] sm:max-h-[calc(100dvh-3rem)]',
-          blushBloomAnnouncement && 'app-release-dialog--blush-bloom'
+          themeLaunchAnnouncement && 'app-release-dialog--theme-launch'
         )}
       >
         <div className="p-5 pb-0 sm:p-6 sm:pb-0">
@@ -367,17 +399,31 @@ export function AppReleaseGate() {
               )}
             </div>
 
-          {blushBloomAnnouncement && (
-            <div className="app-release-preview mt-5 overflow-hidden rounded-[var(--radius-md)]">
-              <img
-                src="/themes/blush-bloom/preview.webp"
-                alt=""
-                className="app-release-preview__image"
-                draggable={false}
-              />
+          {themeLaunchPreviews.length > 0 && (
+            <div
+              className={cn(
+                'app-release-preview mt-5 overflow-hidden rounded-[var(--radius-md)]',
+                themeLaunchPreviews.length > 1 && 'app-release-preview--multi'
+              )}
+            >
+              <div className={cn(themeLaunchPreviews.length > 1 && 'app-release-preview__grid')}>
+                {themeLaunchPreviews.map(item => (
+                  <img
+                    key={item.preview}
+                    src={item.preview}
+                    alt={`${item.label} theme preview`}
+                    title={`${item.label} - ${item.caption}`}
+                    className={cn(
+                      'app-release-preview__image',
+                      themeLaunchPreviews.length > 1 && 'app-release-preview__image--tile'
+                    )}
+                    draggable={false}
+                  />
+                ))}
+              </div>
               <div className="app-release-preview__caption">
-                <span>Blush Bloom</span>
-                <span>Now in Settings</span>
+                <span>{themeLaunchPreviews.length > 1 ? 'Theme Drop' : 'Theme Launch'}</span>
+                <span>{themeLaunchPreviews.length > 1 ? 'New themes in Settings' : 'Now in Settings'}</span>
               </div>
             </div>
           )}

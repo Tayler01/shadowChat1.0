@@ -1,28 +1,28 @@
 {
-  "title": "Blush Bloom is here",
-  "summary": "A soft, playful new light theme is now available in Shadow Chat with pearl blush glass, berry accents, lavender haze, peach highlights, and mint shimmer.",
+  "title": "Mint Fizz and Silver Halo are live",
+  "summary": "Two new Shadow Chat themes are here: a fresh mint-green glass theme and a sleek graphite theme with silver/chrome accents.",
   "restartPolicy": "required_restart",
   "severity": "feature",
   "sections": [
     {
-      "heading": "New Theme",
+      "heading": "New Themes",
       "items": [
-        "Blush Bloom adds a bright pearl-and-pink look with berry controls, lavender/peach glow, and subtle mint shimmer.",
-        "The theme includes generated backdrop, texture, and picker preview assets so it feels distinct across login, chat, settings, and popups.",
-        "The theme picker now has room for six full theme cards on phone and desktop layouts."
+        "Mint Fizz adds a light mint-glass look with aqua shine, soft lime glow, bubbly pearl surfaces, and fresh green accents.",
+        "Silver Halo adds a dark graphite-glass look with chrome ribbons, silver controls, and cool blue shine.",
+        "Both themes include generated backdrop, texture, and picker preview assets so each one feels like its own full look."
       ]
     },
     {
-      "heading": "Where To Find It",
+      "heading": "Where To Find Them",
       "items": [
-        "Open Settings, then Color & Layout, and select Blush Bloom from the theme cards.",
-        "The launch popup itself uses the Blush Bloom styling so you can preview the new look before switching."
+        "Open Settings, then Color & Layout, and choose Mint Fizz or Silver Halo from the theme cards.",
+        "The update popup now previews new theme drops with theme artwork, so future launches can show the look before you switch."
       ]
     },
     {
       "heading": "Restart Required",
       "items": [
-        "Restarting or refreshing makes sure the new theme assets, picker layout, and popup styling load together.",
+        "Restarting or refreshing makes sure the new theme assets, picker cards, and popup styling load together.",
         "Older app sessions will be prompted to restart before continuing."
       ]
     }

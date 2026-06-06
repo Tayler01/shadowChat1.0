@@ -4,7 +4,7 @@
 
 Reviewed during the June 1, 2026 documentation refresh. This file is a QA log or validation checklist. Keep older artifact paths as historical evidence, and add new dated entries after the next browser, mobile, or device validation pass.
 
-Last updated: 2026-05-11
+Last updated: 2026-06-05
 
 ## Summary
 
@@ -24,12 +24,14 @@ Theme rebuild QA passed the first end-to-end implementation loop on 2026-05-11.
 | THEME-003 | fixed/verified | all themes | iPhone small WebKit, Android medium Chromium | theme picker | Open Settings -> Color & Layout. | `output/playwright/theme-visual-all/*-09-theme-picker.png` | Theme picker only showed simple gradients and did not preview generated assets. | `src/components/settings/SettingsView.tsx`, `src/hooks/useTheme.tsx`, `public/themes/*/preview.webp` | `npm run qa:themes -- --run-name=theme-visual-all --skip-build` | Picker now uses generated preview imagery plus theme descriptions. |
 | THEME-004 | verified warning | default mobile data set | all mobile PWA profiles | reactions/tiny inline controls | Run broad mobile PWA sweep. | `output/playwright/mobile-pwa-theme-rebuild-2/summary.json` | Existing reaction chips and some inline message affordances are smaller than 32px. | none in this pass | `npm run qa:mobile-pwa -- --run-name=mobile-pwa-theme-rebuild-2 --skip-build` | Logged as warnings only because they are existing dense inline controls and not clipped primary actions. |
 | THEME-005 | fixed/verified | all themes | Android real keyboard report, Android medium simulated inset, iPhone small/large regression sweep | board chats only | Open a board chat on Android, focus composer, observe composer/nav double-lift into the middle of the screen. | `output/playwright/android-board-keyboard-fix/summary.json`, `output/playwright/mobile-pwa-board-keyboard-fix/summary.json` | Board chat needed to ignore Android keyboard inset because the viewport already shrinks there; applying the inset again double-lifted the mobile footer. | `src/components/layout/MobileChatFooter.tsx`, `src/components/boards/BoardChat.tsx`, `tests/NewsChat.test.tsx`, QA scripts | `npm run qa:themes -- --profiles=android-medium-chromium --run-name=android-board-keyboard-fix --skip-build`; `npm run qa:mobile-pwa -- --run-name=mobile-pwa-board-keyboard-fix --skip-build` | Scoped to board chats; iOS still uses keyboard inset. |
+| THEME-006 | verified | Mint Fizz, Silver Halo | iPhone small WebKit, Android medium Chromium | chat, DMs, boards, settings, theme picker, composer compressed states | Run focused theme visual sweep for the two new themes. | `output/playwright/theme-mint-silver/summary.json` | New theme additions needed asset/CSS-var verification across mobile surfaces. | `src/hooks/useTheme.tsx`, `src/index.css`, `scripts/theme-visual-qa.mjs`, `public/themes/mint-fizz/*`, `public/themes/silver-halo/*` | `npm run qa:themes -- --themes=mint-fizz,silver-halo --run-name=theme-mint-silver --skip-build` | Passed with expected theme assets, theme modes, and zero horizontal overflow. |
 
 ## Final Summary
 
 Implemented and verified:
 
 - New independent themes: Obsidian Gold, Aurora Veil, Ember Slate, Neon Circuit, and Moonstone Light.
+- Added follow-up themes: Mint Fizz and Silver Halo.
 - Generated and optimized `backdrop.webp`, `texture.webp`, and `preview.webp` assets for each theme.
 - Added semantic theme tokens, compatibility aliases, theme-aware global surfaces, scrollbars, popup/input surfaces, buttons, composer surfaces, sent bubbles, nav badges, sidebars, and theme picker cards.
 - Fixed the reproduced Android/DM header width issue with mobile-safe flex constraints.
@@ -43,9 +45,11 @@ Verification:
 - `npx jest --runInBand tests/useTheme.test.tsx tests/SettingsView.test.tsx`
 - `npm run qa:themes -- --run-name=theme-visual-all --skip-build`
 - `npm run qa:mobile-pwa -- --run-name=mobile-pwa-theme-rebuild-2 --skip-build`
+- `npm run qa:themes -- --themes=mint-fizz,silver-halo --run-name=theme-mint-silver --skip-build`
 
 Artifacts:
 
 - `output/theme-assets-contact-sheet.png`
 - `output/playwright/theme-visual-all/summary.json`
 - `output/playwright/mobile-pwa-theme-rebuild-2/summary.json`
+- `output/playwright/theme-mint-silver/summary.json`
