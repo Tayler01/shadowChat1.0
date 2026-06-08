@@ -2,6 +2,7 @@ import React from 'react'
 import { Copy, ExternalLink, Play, Share2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Button } from '../ui/Button'
+import { NewsMediaImage } from './NewsMediaImage'
 import { formatTime } from '../../lib/utils'
 import type { NewsFeedItem } from '../../lib/supabase'
 
@@ -103,12 +104,12 @@ export function NewsFeedModal({
               {primaryMedia ? (
                 <div className="overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.035)]">
                   <div className="relative flex max-h-[72vh] min-h-48 items-center justify-center overflow-auto bg-black/30 p-2">
-                    <img
-                      src={primaryMedia.thumbnail_url || primaryMedia.url}
+                    <NewsMediaImage
+                      media={primaryMedia}
                       alt={primaryMedia.alt || item.headline}
                       loading="eager"
-                      decoding="async"
                       className="max-h-[68vh] max-w-full object-contain"
+                      fallbackClassName="h-56 w-full max-w-sm rounded-[var(--radius-sm)]"
                     />
                     {primaryMedia.type === 'video' && (
                       <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,240,184,0.42)] bg-[rgba(0,0,0,0.62)] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-[rgb(255,240,184)]">
@@ -134,7 +135,7 @@ export function NewsFeedModal({
                       rel="noopener noreferrer"
                       className="aspect-square overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)]"
                     >
-                      <img src={media.thumbnail_url || media.url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                      <NewsMediaImage media={media} alt="" className="h-full w-full object-cover" />
                     </a>
                   ))}
                 </div>

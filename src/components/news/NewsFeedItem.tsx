@@ -1,6 +1,7 @@
 import React from 'react'
 import { Play } from 'lucide-react'
 import { NewsReactionBar, NewsReactionSummaryStrip } from './NewsReactionBar'
+import { NewsMediaImage } from './NewsMediaImage'
 import { formatTime } from '../../lib/utils'
 import type { NewsFeedItem as NewsFeedItemType } from '../../lib/supabase'
 
@@ -56,11 +57,9 @@ export function NewsFeedItem({
 
         {media && (
           <div className="relative mt-7 flex h-14 w-16 shrink-0 items-center justify-center overflow-hidden sm:h-20 sm:w-24">
-            <img
-              src={media.thumbnail_url || media.url}
+            <NewsMediaImage
+              media={media}
               alt={media.alt || item.headline}
-              loading="lazy"
-              decoding="async"
               className="h-full w-full rounded-[var(--radius-sm)] object-cover"
             />
             {media.type === 'video' && (

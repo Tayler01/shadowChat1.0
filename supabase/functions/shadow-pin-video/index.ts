@@ -3,6 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4'
 import {
   assertPublicUrl,
   normalizePublicHttpUrl,
+  readLimitedArrayBuffer,
   safeFetch,
 } from '../_shared/safe-fetch.ts'
 
@@ -13,6 +14,8 @@ const corsHeaders = {
 
 const MAX_VIDEO_BYTES = 150 * 1024 * 1024
 const MAX_VIDEO_SECONDS = 60
+const SHADOW_PIN_BUCKET = 'shadow-pin'
+const MAX_PREVIEW_IMAGE_BYTES = 15 * 1024 * 1024
 const DAILY_NATIVE_UPLOAD_LIMIT = 5
 const FALLBACK_VIDEO_POSTER_URL = '/entertainment/shado-tv/placeholders/video-vertical.webp'
 const ALLOWED_NATIVE_VIDEO_TYPES = new Set([
@@ -21,11 +24,23 @@ const ALLOWED_NATIVE_VIDEO_TYPES = new Set([
   'video/webm',
   'video/x-m4v',
 ])
+const ALLOWED_PREVIEW_IMAGE_TYPES = new Map([
+  ['image/jpeg', 'jpg'],
+  ['image/png', 'png'],
+  ['image/webp', 'webp'],
+  ['image/gif', 'gif'],
+])
 const SAFE_VIDEO_URL_OPTIONS = {
   credentialMessage: 'URL credentials are not allowed.',
   invalidSchemeMessage: 'Only http and https video links are supported.',
   tooLongMessage: 'sourceUrl is required.',
   unsafeHostMessage: 'Private links cannot be imported.',
+}
+const SAFE_PREVIEW_IMAGE_URL_OPTIONS = {
+  credentialMessage: 'URL credentials are not allowed.',
+  invalidSchemeMessage: 'Only public http and https preview image links are supported.',
+  tooLongMessage: 'Preview image URL is required.',
+  unsafeHostMessage: 'Private preview image links cannot be imported.',
 }
 
 type Provider = 'bunny_stream' | 'youtube' | 'x' | 'pinterest' | 'instagram' | 'external'
@@ -87,6 +102,13 @@ type ExternalPreview = {
   embedUrl?: string
   providerName?: string
   providerPayload?: Record<string, unknown>
+}
+
+type StoredPreviewImage = {
+  imageUrl: string
+  imagePath: string
+  contentType: string
+  sizeBytes: number
 }
 
 const json = (body: unknown, status = 200) =>
@@ -395,6 +417,69 @@ const validateDirectVideoUrl = async (
 
     return await probeDirectVideoUrl(url)
   } catch {
+    return null
+  }
+}
+
+const resolvePreviewImageType = (contentTypeHeader: string | null) => {
+  const contentType = (contentTypeHeader ?? '').split(';')[0]?.trim().toLowerCase()
+  if (!contentType || !ALLOWED_PREVIEW_IMAGE_TYPES.has(contentType)) {
+    throw new Error('Preview image is not a supported image type.')
+  }
+  return {
+    contentType,
+    extension: ALLOWED_PREVIEW_IMAGE_TYPES.get(contentType) ?? 'img',
+  }
+}
+
+const storeExternalPreviewImage = async (
+  supabase: SupabaseAdmin,
+  userId: string,
+  categoryId: string,
+  imageId: string,
+  imageUrl: string | undefined | null
+): Promise<StoredPreviewImage | null> => {
+  if (!imageUrl) return null
+
+  try {
+    const sourceUrl = normalizePublicHttpUrl(imageUrl, SAFE_PREVIEW_IMAGE_URL_OPTIONS)
+    await assertPublicUrl(sourceUrl, SAFE_PREVIEW_IMAGE_URL_OPTIONS)
+    const response = await safeFetch(sourceUrl, {
+      signal: AbortSignal.timeout(8000),
+      headers: {
+        accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif;q=0.9,*/*;q=0.5',
+        'user-agent': 'ShadowChat-ShadowPinPreview/1.0',
+      },
+    }, SAFE_PREVIEW_IMAGE_URL_OPTIONS)
+
+    if (!response.ok) {
+      throw new Error(`Preview image fetch failed with ${response.status}.`)
+    }
+
+    const finalUrl = new URL(response.url || sourceUrl.toString())
+    await assertPublicUrl(finalUrl, SAFE_PREVIEW_IMAGE_URL_OPTIONS)
+    const { contentType, extension } = resolvePreviewImageType(response.headers.get('content-type'))
+    const bytes = await readLimitedArrayBuffer(response, MAX_PREVIEW_IMAGE_BYTES, 'Preview image is larger than 15MB.')
+    const imagePath = `${userId}/categories/${categoryId}/pins/${imageId}/external-preview.${extension}`
+
+    const { error: uploadError } = await supabase.storage
+      .from(SHADOW_PIN_BUCKET)
+      .upload(imagePath, new Blob([bytes], { type: contentType }), {
+        cacheControl: '31536000',
+        contentType,
+        upsert: true,
+      })
+    if (uploadError) throw uploadError
+
+    const { data: publicAsset } = supabase.storage.from(SHADOW_PIN_BUCKET).getPublicUrl(imagePath)
+    return {
+      imageUrl: publicAsset.publicUrl,
+      imagePath,
+      contentType,
+      sizeBytes: bytes.byteLength,
+    }
+  } catch (error) {
+    console.warn('Unable to store external preview image', error instanceof Error ? error.message : String(error))
     return null
   }
 }
@@ -1372,11 +1457,13 @@ const buildYoutubeEmbedUrl = (youtubeId: string) => {
 }
 
 const buildExternalRecord = async (
+  supabase: SupabaseAdmin,
   userId: string,
   categoryId: string,
   titleInput: string,
   descriptionInput: string | null,
-  sourceUrl: URL
+  sourceUrl: URL,
+  imageId = crypto.randomUUID()
 ) => {
   const provider = detectProvider(sourceUrl)
   const [openGraph, oembed, providerVideo] = await Promise.all([
@@ -1406,9 +1493,12 @@ const buildExternalRecord = async (
           provider === 'instagram' ? 'Instagram Post' :
             'Video Pin'
   )
-  const imageUrl = provider === 'youtube' && youtubeId
+  const storedPreviewImage = provider === 'instagram' || provider === 'x' || provider === 'pinterest'
+    ? await storeExternalPreviewImage(supabase, userId, categoryId, imageId, preview?.image)
+    : null
+  const imageUrl = storedPreviewImage?.imageUrl || (provider === 'youtube' && youtubeId
     ? `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`
-    : preview?.image || FALLBACK_VIDEO_POSTER_URL
+    : preview?.image || FALLBACK_VIDEO_POSTER_URL)
   const videoPlaybackUrl = provider === 'pinterest'
     ? (preview?.videoUrl || null)
     : directVideoUrl
@@ -1430,14 +1520,15 @@ const buildExternalRecord = async (
   const providerAssetId = youtubeId || pinterestId || canonicalUrl
 
   return {
+    id: imageId,
     category_id: categoryId,
     creator_id: userId,
     title: title.slice(0, 120),
     description: descriptionInput || preview?.description?.slice(0, 500) || null,
     image_url: imageUrl,
-    image_path: `external:${provider}:${providerAssetId}`,
-    image_content_type: null,
-    image_size_bytes: null,
+    image_path: storedPreviewImage?.imagePath || `external:${provider}:${providerAssetId}`,
+    image_content_type: storedPreviewImage?.contentType || null,
+    image_size_bytes: storedPreviewImage?.sizeBytes || null,
     thumbnail_url: imageUrl,
     thumbnail_path: null,
     medium_url: imageUrl,
@@ -1458,7 +1549,19 @@ const buildExternalRecord = async (
       canonicalUrl,
       createdAt: new Date().toISOString(),
       createdBy: userId,
-      preview: preview?.providerPayload ?? {},
+      preview: {
+        ...(preview?.providerPayload ?? {}),
+        image: preview?.image ?? null,
+        storedPreview: storedPreviewImage
+          ? {
+              imageUrl: storedPreviewImage.imageUrl,
+              imagePath: storedPreviewImage.imagePath,
+              contentType: storedPreviewImage.contentType,
+              sizeBytes: storedPreviewImage.sizeBytes,
+              storedAt: new Date().toISOString(),
+            }
+          : null,
+      },
     },
     video_preview_url: videoPreviewUrl,
     video_playback_url: videoPlaybackUrl,
@@ -1483,7 +1586,7 @@ const handleCreateExternal = async (req: Request, body: VideoPayload) => {
   await assertPublicHost(sourceUrl)
   await ensureCategory(auth.supabase, categoryId)
 
-  const record = await buildExternalRecord(auth.userId, categoryId, title, description, sourceUrl)
+  const record = await buildExternalRecord(auth.supabase, auth.userId, categoryId, title, description, sourceUrl)
   const { data, error } = await auth.supabase
     .from('shadow_pin_images')
     .insert(record)
@@ -1509,7 +1612,7 @@ const handleReplaceExternal = async (req: Request, body: VideoPayload) => {
   const sourceUrl = normalizeUrl(body.sourceUrl)
   await assertPublicHost(sourceUrl)
 
-  const record = await buildExternalRecord(pin.creator_id, pin.category_id, title || pin.title, description ?? pin.description, sourceUrl)
+  const record = await buildExternalRecord(auth.supabase, pin.creator_id, pin.category_id, title || pin.title, description ?? pin.description, sourceUrl, imageId)
   const providerPayload = mergeProviderPayload(pin.provider_payload, {
     previous_media: {
       providerAssetId: pin.provider_asset_id,

@@ -100,6 +100,12 @@ Video-like URLs are routed to `shadow-pin-video`. YouTube Shorts get a playable
 iframe URL. Pinterest video pins use direct `pinimg.com` MP4/HLS URLs when the
 page exposes them so the feed can autoplay natively; other providers fall back
 to provider metadata, embeds, and source links where available.
+When a provider exposes a still preview for Instagram, X, or Pinterest, the
+video function should copy that first-image poster into `shadow-pin` Storage
+and point the card preview at the Shado-owned asset. If the copy is blocked,
+the row may still keep provider metadata, but the frontend must fail over
+through every candidate and render a nonblank placeholder instead of leaving a
+broken image frame.
 
 ## Short Video Pins
 

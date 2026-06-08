@@ -1610,6 +1610,53 @@ test('opens Instagram pins with a fallback rich embed when oEmbed metadata is un
   }
 })
 
+test('uses stored Instagram provider preview metadata as the pin card image', () => {
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      {
+        ...image('instagram-stored-preview', 1080, 1920),
+        image_url: 'https://scontent.example/expired.jpg',
+        thumbnail_url: null,
+        medium_url: null,
+        media_type: 'external_video',
+        provider: 'instagram',
+        source_url: 'https://www.instagram.com/p/frontImage/',
+        provider_payload: {
+          preview: {
+            image: 'https://scontent.example/fresh-og.jpg',
+            storedPreview: {
+              imageUrl: 'https://storage.example/shadow-pin/frontImage.jpg',
+              imagePath: 'user/categories/cat-1/pins/instagram-stored-preview/external-preview.jpg',
+              contentType: 'image/jpeg',
+              sizeBytes: 1234,
+            },
+          },
+        },
+        processing_status: 'ready',
+      },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  render(<ShadowPin onBack={() => {}} />)
+
+  fireEvent.click(screen.getByText('Fam & Friends'))
+  expect(screen.getByAltText('Pin instagram-stored-preview')).toHaveAttribute(
+    'src',
+    'https://storage.example/shadow-pin/frontImage.jpg'
+  )
+})
+
 test('opens YouTube video pins with fullscreen player controls', () => {
   jest.useFakeTimers()
   mockUseShadowPinImages.mockReturnValue({

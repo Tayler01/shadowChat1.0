@@ -97,33 +97,65 @@ const getHeartBurstParticleStyle = (particle: typeof HEART_BURST_PARTICLES[numbe
   '--shadow-pin-heart-delay': particle.delay,
 }) as CSSProperties
 
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
+
+const asPreviewSource = (value: unknown) => {
+  if (typeof value !== 'string') return ''
+  const source = value.trim()
+  return /^(https?:\/\/|\/)/i.test(source) ? source : ''
+}
+
+const uniqueImageSources = (...sources: Array<string | null | undefined>) =>
+  sources.filter((source, index, all): source is string => Boolean(source && all.indexOf(source) === index))
+
 const getCategoryImageUrl = (category: ShadowPinCategory, size: 'thumb' | 'medium' | 'full' = 'thumb') => {
   if (size === 'thumb') return category.thumbnail_url || category.medium_url || category.image_url
   if (size === 'medium') return category.medium_url || category.thumbnail_url || category.image_url
   return category.image_url
 }
 
+const getProviderPreviewImageUrl = (image: ShadowPinImage) => {
+  const payload = asRecord(image.provider_payload)
+  const preview = asRecord(payload?.preview)
+  const oembed = asRecord(preview?.oembed) || asRecord(payload?.oembed)
+  const openGraph = asRecord(preview?.openGraph) || asRecord(payload?.openGraph)
+  const storedPreview = asRecord(preview?.storedPreview) || asRecord(payload?.storedPreview)
+  const providerPreview = asRecord(payload?.providerPreview)
+
+  return uniqueImageSources(
+    asPreviewSource(storedPreview?.imageUrl),
+    asPreviewSource(storedPreview?.publicUrl),
+    asPreviewSource(preview?.storedImageUrl),
+    asPreviewSource(preview?.image),
+    asPreviewSource(providerPreview?.imageUrl),
+    asPreviewSource(oembed?.thumbnail_url),
+    asPreviewSource(openGraph?.image)
+  )[0] || ''
+}
+
 const getPinImageUrl = (image: ShadowPinImage, size: 'thumb' | 'medium' | 'full' = 'thumb') => {
-  if (size === 'thumb') return image.thumbnail_url || image.medium_url || image.image_url
+  const providerPreviewImageUrl = getProviderPreviewImageUrl(image)
+  if (size === 'thumb') return image.thumbnail_url || image.medium_url || providerPreviewImageUrl || image.image_url
   if (size === 'medium') {
     return image.image_content_type === 'image/gif'
       ? image.image_url
-      : image.medium_url || image.thumbnail_url || image.image_url
+      : image.medium_url || image.thumbnail_url || providerPreviewImageUrl || image.image_url
   }
-  return image.image_url
+  return image.image_url || image.medium_url || image.thumbnail_url || providerPreviewImageUrl
 }
 
-const uniqueImageSources = (...sources: Array<string | null | undefined>) =>
-  sources.filter((source, index, all): source is string => Boolean(source && all.indexOf(source) === index))
-
 const getPinImageSources = (image: ShadowPinImage, size: 'thumb' | 'medium' | 'full' = 'thumb') => {
-  if (size === 'thumb') return uniqueImageSources(image.thumbnail_url, image.medium_url, image.image_url)
+  const providerPreviewImageUrl = getProviderPreviewImageUrl(image)
+  if (size === 'thumb') return uniqueImageSources(image.thumbnail_url, image.medium_url, providerPreviewImageUrl, image.image_url)
   if (size === 'medium') {
     return image.image_content_type === 'image/gif'
       ? uniqueImageSources(image.image_url, image.medium_url, image.thumbnail_url)
-      : uniqueImageSources(image.medium_url, image.thumbnail_url, image.image_url)
+      : uniqueImageSources(image.medium_url, image.thumbnail_url, providerPreviewImageUrl, image.image_url)
   }
-  return uniqueImageSources(image.image_url, image.medium_url, image.thumbnail_url)
+  return uniqueImageSources(image.image_url, image.medium_url, image.thumbnail_url, providerPreviewImageUrl)
 }
 
 const isVideoPin = (image: ShadowPinImage) => image.media_type === 'video' || image.media_type === 'external_video'
@@ -210,11 +242,6 @@ const EXTERNAL_RICH_EMBED_SCRIPT_URLS: Record<ExternalRichEmbedProvider, string>
 
 const isExternalRichEmbedProvider = (provider: ShadowPinImage['provider']): provider is ExternalRichEmbedProvider =>
   provider === 'x' || provider === 'instagram'
-
-const asRecord = (value: unknown): Record<string, unknown> | null =>
-  value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null
 
 const escapeHtmlAttribute = (value: string) =>
   value
@@ -1485,7 +1512,9 @@ function ImageCard({
   const feedbackKeyRef = useRef(0)
   const feedbackTimerRef = useRef<number | null>(null)
   const imageSources = useMemo(() => getPinImageSources(image, 'thumb'), [image])
+  const imageSourcesKey = imageSources.join('\n')
   const [sourceIndex, setSourceIndex] = useState(0)
+  const [imageLoadFailed, setImageLoadFailed] = useState(imageSources.length === 0)
   const [radialState, setRadialState] = useState<PinRadialState>(EMPTY_PIN_RADIAL_STATE)
   const [feedback, setFeedback] = useState<PinActionFeedbackState | null>(null)
   const [shareSheet, setShareSheet] = useState<PinShareSheetState>({ open: false, url: '' })
@@ -1511,7 +1540,8 @@ function ImageCard({
 
   useEffect(() => {
     setSourceIndex(0)
-  }, [image.id, image.thumbnail_url, image.medium_url, image.image_url])
+    setImageLoadFailed(imageSources.length === 0)
+  }, [image.id, imageSources.length, imageSourcesKey])
 
   useEffect(() => {
     if (!shareSheet.open) return
@@ -2020,7 +2050,7 @@ function ImageCard({
           <video
             ref={videoRef}
             src={nativeVideoSrc}
-            poster={imageSrc}
+            poster={imageLoadFailed ? undefined : imageSrc}
             muted={!soundEnabled}
             autoPlay
             loop={loopNativeVideo}
@@ -2032,6 +2062,13 @@ function ImageCard({
             onContextMenu={event => event.preventDefault()}
             className="block h-full w-full object-cover"
           />
+        ) : imageLoadFailed ? (
+          <div
+            className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,rgba(215,170,70,0.12),rgba(5,6,8,0.9))] text-[rgba(255,240,184,0.72)]"
+            aria-label={`${image.title} preview unavailable`}
+          >
+            <ImageIcon className="h-7 w-7" aria-hidden="true" />
+          </div>
         ) : (
           <img
             src={imageSrc}
@@ -2042,7 +2079,12 @@ function ImageCard({
             onContextMenu={event => event.preventDefault()}
             onDragStart={event => event.preventDefault()}
             onError={() => {
-              setSourceIndex(index => Math.min(index + 1, imageSources.length - 1))
+              setSourceIndex(index => {
+                const nextIndex = index + 1
+                if (nextIndex < imageSources.length) return nextIndex
+                setImageLoadFailed(true)
+                return index
+              })
             }}
             className="block h-full w-full object-cover"
           />
