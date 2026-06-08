@@ -11,7 +11,8 @@ BEGIN
   LIMIT 1;
 
   IF target_user_id IS NULL THEN
-    RAISE EXCEPTION 'Could not grant news_admin: no public.users row found for @caleb';
+    RAISE NOTICE 'Could not grant news_admin: no public.users row found for @caleb; skipping local grant.';
+    RETURN;
   END IF;
 
   INSERT INTO public.user_roles (user_id, role)
