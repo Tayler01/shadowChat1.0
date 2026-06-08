@@ -9,6 +9,7 @@ const mockRefreshNewsAdmin = jest.fn()
 const mockUpdateSubAdmin = jest.fn()
 const mockUpdatePreference = jest.fn()
 const mockDeleteAccount = jest.fn()
+const mockUseAdminAccess = jest.fn()
 const mockUseNewsAdmin = jest.fn(() => ({
   isAdmin: true,
   sources: [
@@ -117,7 +118,10 @@ jest.mock('../src/hooks/useNewsAdmin', () => ({
 }))
 
 jest.mock('../src/hooks/useAdminAccess', () => ({
-  useAdminAccess: () => ({
+  useAdminAccess: () => mockUseAdminAccess(),
+}))
+
+const buildAdminAccessState = () => ({
     role: 'admin',
     isAdmin: true,
     isOperator: true,
@@ -158,8 +162,7 @@ jest.mock('../src/hooks/useAdminAccess', () => ({
     error: null,
     refresh: jest.fn(),
     updateSubAdmin: mockUpdateSubAdmin,
-  }),
-}))
+})
 
 jest.mock('../src/lib/bridge', () => ({
   approveBridgePairing: jest.fn(),
@@ -181,6 +184,10 @@ jest.mock('../src/components/settings/FeedbackSubmissionModal', () => ({
 
 jest.mock('../src/components/settings/AdminFeedbackReview', () => ({
   AdminFeedbackReview: () => <div data-testid="admin-feedback-review">Feedback review panel</div>,
+}))
+
+jest.mock('../src/components/settings/AdminAutomationApprovals', () => ({
+  AdminAutomationApprovals: () => <div data-testid="admin-automation-approvals">Automation approvals panel</div>,
 }))
 
 jest.mock('../src/components/settings/AdminInvitesPanel', () => ({
@@ -208,6 +215,7 @@ jest.mock('react-hot-toast', () => {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  mockUseAdminAccess.mockReturnValue(buildAdminAccessState())
   window.scrollTo = jest.fn()
   window.sessionStorage.clear()
 })
@@ -281,6 +289,7 @@ test('settings admin panel manages news sources', async () => {
   expect(screen.getByRole('heading', { name: 'Admin Sections' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /admin access/i })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /invites/i })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /automation approvals/i })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /esp bridge pairing/i })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /shadow pin activity/i })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /news sources/i })).toBeInTheDocument()
@@ -334,6 +343,31 @@ test('settings admin panel opens feedback review', () => {
   fireEvent.click(screen.getByRole('button', { name: /feedback review/i }))
 
   expect(screen.getByTestId('admin-feedback-review')).toBeInTheDocument()
+})
+
+test('settings admin panel opens automation approvals', () => {
+  render(<SettingsView onToggleSidebar={jest.fn()} />)
+
+  fireEvent.click(screen.getByRole('button', { name: /admin/i }))
+  fireEvent.click(screen.getByRole('button', { name: /automation approvals/i }))
+
+  expect(screen.getByTestId('admin-automation-approvals')).toBeInTheDocument()
+})
+
+test('settings hides automation approvals from sub-admins', () => {
+  mockUseAdminAccess.mockReturnValue({
+    ...buildAdminAccessState(),
+    role: 'sub_admin',
+    isAdmin: false,
+    isOperator: true,
+  })
+
+  render(<SettingsView onToggleSidebar={jest.fn()} />)
+
+  fireEvent.click(screen.getByRole('button', { name: /admin/i }))
+
+  expect(screen.getByRole('button', { name: /invites/i })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /automation approvals/i })).not.toBeInTheDocument()
 })
 
 test('settings admin panel opens invites', () => {

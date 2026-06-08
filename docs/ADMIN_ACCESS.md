@@ -35,6 +35,9 @@ Admin settings are split into subpages under Settings > Admin:
   list.
 - Invites: operator invite-code generation, optional email locks, revocation,
   and redemption review for invite-only signup rollout.
+- Automation Approvals: full-admin-only review queue for scan, build,
+  documentation, and batch packets. Approval records intent only; it does not
+  push, merge, deploy, or start a runner.
 - ESP Bridge Pairing: operator bridge approval controls.
 - Shado TV Studio: operator episode, trailer, cover, cast, update, visibility,
   and Bunny-upload controls.
@@ -92,6 +95,9 @@ Main tables:
   optional email locks, creator/revoker/redeemer tracking, and RLS enabled.
 - `private.signup_invite_redemptions`: private redemption history for signup
   audit and support review.
+- `public.automation_approval_packets`: full-admin-only review packets for
+  improvement automation candidates and batch handoffs.
+- `public.automation_approval_packet_events`: append-only queue audit events.
 
 Main RPCs:
 
@@ -105,13 +111,19 @@ Main RPCs:
 - `create_signup_invite`
 - `revoke_signup_invite`
 - `list_signup_invites`
+- `approve_automation_approval_packet`
+- `reject_automation_approval_packet`
+- `archive_automation_approval_packet`
 - `list_user_channel_bans`
 - `set_user_channel_bans`
 - `is_user_channel_banned`
 
 Only full admins can call the role-management RPCs that list users or grant and
-revoke sub-admin access. App operators can use admin-class product tools guarded
-by `is_app_operator`.
+revoke sub-admin access. Automation approval RPCs are also full-admin-only.
+App operators can use admin-class product tools guarded by `is_app_operator`.
+
+For the automation queue model, see
+[docs/AUTOMATION_APPROVAL_QUEUE.md](C:/repos/chat2.0/docs/AUTOMATION_APPROVAL_QUEUE.md:1).
 
 For the channel-ban model and enforcement map, see
 [docs/CHANNEL_BANS.md](C:/repos/chat2.0/docs/CHANNEL_BANS.md:1).

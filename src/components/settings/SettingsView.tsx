@@ -9,6 +9,7 @@ import {
   BarChart3,
   KeyRound,
   LayoutGrid,
+  ListChecks,
   Menu,
   MessageSquarePlus,
   Newspaper,
@@ -34,6 +35,7 @@ import { approveBridgePairing } from '../../lib/bridge'
 import { NotificationSetupModal } from './NotificationSetupModal'
 import { PhoneInstallGuide } from '../onboarding/PhoneInstallGuide'
 import { FeedbackSubmissionModal } from './FeedbackSubmissionModal'
+import { AdminAutomationApprovals } from './AdminAutomationApprovals'
 import { AdminFeedbackReview } from './AdminFeedbackReview'
 import { AdminInvitesPanel } from './AdminInvitesPanel'
 import { ShadoTvStudio } from './ShadoTvStudio'
@@ -71,7 +73,15 @@ type SettingsSection = {
   icon: React.ComponentType<{ className?: string }>
 }
 
-type AdminSectionId = 'access' | 'invites' | 'bridge-pairing' | 'shado-tv-studio' | 'shadow-pin-activity' | 'news-sources' | 'feedback-review'
+type AdminSectionId =
+  | 'access'
+  | 'invites'
+  | 'automation-approvals'
+  | 'bridge-pairing'
+  | 'shado-tv-studio'
+  | 'shadow-pin-activity'
+  | 'news-sources'
+  | 'feedback-review'
 
 type AdminSection = {
   id: AdminSectionId
@@ -157,6 +167,13 @@ const adminSections: AdminSection[] = [
     title: 'Invites',
     description: 'Generate, email-lock, revoke, and review signup invites.',
     icon: Ticket,
+  },
+  {
+    id: 'automation-approvals',
+    title: 'Automation Approvals',
+    description: 'Review scan, build, docs, and batch packets before action.',
+    icon: ListChecks,
+    fullAdminOnly: true,
   },
   {
     id: 'bridge-pairing',
@@ -917,6 +934,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       return 'Signup codes'
     }
 
+    if (sectionId === 'automation-approvals') {
+      return 'Review queue'
+    }
+
     if (sectionId === 'feedback-review') {
       return 'Bugs & ideas'
     }
@@ -1193,6 +1214,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     <AdminFeedbackReview />
   )
 
+  const renderAutomationApprovalsPanel = () => (
+    <AdminAutomationApprovals />
+  )
+
   const renderShadowPinActivityPanel = () => (
     <React.Suspense fallback={<SettingsPanelLoading label="Loading Shadow Pin activity..." />}>
       <ShadowPinActivityAdmin />
@@ -1211,6 +1236,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     const content = {
       access: renderAdminAccessPanel,
       invites: () => <AdminInvitesPanel />,
+      'automation-approvals': renderAutomationApprovalsPanel,
       'bridge-pairing': renderBridgePairingPanel,
       'shado-tv-studio': () => <ShadoTvStudio />,
       'shadow-pin-activity': renderShadowPinActivityPanel,
