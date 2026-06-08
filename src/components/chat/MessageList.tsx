@@ -106,6 +106,11 @@ const isServerWindowMessage = (message: Message) => (
   message.delivery_status !== 'failed'
 )
 
+const isReadCursorMessage = (message: Message) => (
+  isServerWindowMessage(message) &&
+  message.message_type !== 'hype'
+)
+
 export const MessageList: React.FC<MessageListProps> = ({
   messagesApi: providedMessagesApi,
   onReply,
@@ -191,13 +196,14 @@ export const MessageList: React.FC<MessageListProps> = ({
     return [...messages].sort(compareMessagesByStableKey)
   }, [messages])
 
-  const serverWindowMessages = useMemo(
-    () => combinedMessages.filter(isServerWindowMessage),
+  const readCursorMessages = useMemo(
+    () => combinedMessages.filter(isReadCursorMessage),
     [combinedMessages]
   )
 
   const markGeneralChatRead = useCallback(
     async (message: Message) => {
+      if (!isReadCursorMessage(message)) return
       await markRead(message.id, message.created_at)
     },
     [markRead]
@@ -210,18 +216,18 @@ export const MessageList: React.FC<MessageListProps> = ({
       !profile?.id ||
       initialMessageId ||
       !cursor?.last_read_at ||
-      serverWindowMessages.length === 0
+      readCursorMessages.length === 0
     ) {
       return null
     }
 
-    const oldestLoaded = serverWindowMessages[0]
-    const latestLoaded = serverWindowMessages[serverWindowMessages.length - 1]
+    const oldestLoaded = readCursorMessages[0]
+    const latestLoaded = readCursorMessages[readCursorMessages.length - 1]
     if (!oldestLoaded || !latestLoaded) return null
 
     const cursorMessageLoaded = Boolean(
       cursor.last_read_message_id &&
-      serverWindowMessages.some(message => message.id === cursor.last_read_message_id)
+      readCursorMessages.some(message => message.id === cursor.last_read_message_id)
     )
     const latestLoadedIsUnread = isMessageAfterCursor({
       created_at: latestLoaded.created_at,
@@ -242,7 +248,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       cursor.last_read_message_id ?? 'timestamp',
       cursor.last_read_at,
     ].join(':')
-  }, [cursor, initialMessageId, profile?.id, serverWindowMessages])
+  }, [cursor, initialMessageId, profile?.id, readCursorMessages])
   const cursorWindowNeeded = Boolean(
     cursorWindowFetchKey &&
     cursorWindowFetchRef.current !== cursorWindowFetchKey
@@ -261,7 +267,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     lastFlushedMessageId,
   } = useUnreadScroll<Message>({
     containerRef,
-    messages: combinedMessages as Message[],
+    messages: readCursorMessages as Message[],
     loading: loading || cursorWindowResolving || cursorWindowNeeded,
     cursor,
     cursorLoading,

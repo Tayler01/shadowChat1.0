@@ -308,8 +308,8 @@ BEGIN
     'bell',
     COALESCE(actor_meta, '{}'::jsonb) || jsonb_build_object(
       'kind', 'bell',
-      'title', COALESCE(actor_meta->>'actor_display_name', 'Someone') || ' rang Hype',
-      'summary', COALESCE(actor_meta->>'actor_display_name', 'Someone') || ' rang the Hype bell'
+      'title', COALESCE(actor_meta->>'actor_display_name', 'Someone') || ' hyped',
+      'summary', COALESCE(actor_meta->>'actor_display_name', 'Someone') || ' hyped'
     )
   )
   RETURNING * INTO inserted_event;
@@ -322,7 +322,7 @@ BEGIN
   )
   VALUES (
     current_user_id,
-    'rang Hype',
+    'hyped',
     'hype',
     '{}'::jsonb
   );

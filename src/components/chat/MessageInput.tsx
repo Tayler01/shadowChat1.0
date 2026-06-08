@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { Film, Send, Smile, Command, Plus, Mic, X } from 'lucide-react'
+import { BellRing, Film, Send, Smile, Command, Plus, Mic, X } from 'lucide-react'
 import { useTyping } from '../../hooks/useTyping'
 import { Button } from '../ui/Button'
-import { processSlashCommand, slashCommands } from '../../lib/utils'
+import { cn, processSlashCommand, slashCommands } from '../../lib/utils'
 import type { ChatMessage, ChatMessageType } from '../../lib/supabase'
 import { uploadVoiceMessage, uploadChatFile, uploadChatImageAsset } from '../../lib/supabase'
 import type { EmojiClickData } from '../../types'
@@ -18,8 +18,12 @@ import { EmojiPickerOverlay } from './EmojiPickerOverlay'
 import { getImageMessageDisplaySrc, type ReplyTarget } from './messageDisplay'
 import { MessageHypeBadge } from './MessageHypeBadge'
 import { getHypeTier } from '../../lib/hypePresentation'
+import { useOptionalHype } from '../../hooks/useHype'
+import { getBlockedActionMessage } from '../../lib/moderation'
+import { showActionErrorToast } from '../../lib/toastNotifications'
 
 const normalizeComposerValue = (value: string) => (value.trim().length === 0 ? '' : value)
+const HYPE_SEND_LONG_PRESS_MS = 650
 
 const shouldCollapseReplyPreview = (content: string) =>
   content.length > 160 || content.split(/\r?\n/).length > 3
@@ -42,7 +46,6 @@ interface MessageInputProps {
   onCancelReply?: () => void
   typingChannel?: string
   enableGifPicker?: boolean
-  leadingAccessory?: React.ReactNode
 }
 
 export const MessageInput: React.FC<MessageInputProps> = ({
@@ -57,7 +60,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   onCancelReply,
   typingChannel = 'general',
   enableGifPicker = false,
-  leadingAccessory,
 }) => {
   const { draft, setDraft, clear } = useDraft(cacheKey)
   const [message, setMessage] = useState(draft)
@@ -68,8 +70,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [replyPreviewExpanded, setReplyPreviewExpanded] = useState(false)
   const [recording, setRecording] = useState(false)
   const [recordingDuration, setRecordingDuration] = useState(0)
+  const [hypePressing, setHypePressing] = useState(false)
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const hypeLongPressTimerRef = useRef<number | null>(null)
+  const hypeLongPressTriggeredRef = useRef(false)
   const { startTyping, stopTyping } = useTyping(typingChannel)
+  const hype = useOptionalHype()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const attachmentMenuRef = useRef<HTMLDivElement>(null)
   const replyHypeCount = replyingTo?.hypeCount ?? 0
@@ -87,6 +93,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const submittingRef = useRef(false)
   const { enabled: suggestionsEnabled } = useSuggestionsEnabled()
   const { suggestions } = useSuggestedReplies(messages, suggestionsEnabled)
+  const hypeRemaining = hype?.status?.remaining ?? 0
+  const canLongPressHype = Boolean(
+    hype &&
+    !disabled &&
+    !hype.loadingStatus &&
+    !hype.ringing &&
+    hypeRemaining > 0
+  )
 
   const setComposerMessage = useCallback((value: string) => {
     const nextMessage = normalizeComposerValue(value)
@@ -181,6 +195,16 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
   }, [recording])
 
+  const clearHypeLongPressTimer = useCallback(() => {
+    if (hypeLongPressTimerRef.current !== null) {
+      window.clearTimeout(hypeLongPressTimerRef.current)
+      hypeLongPressTimerRef.current = null
+    }
+    setHypePressing(false)
+  }, [])
+
+  useEffect(() => clearHypeLongPressTimer, [clearHypeLongPressTimer])
+
 
   // Auto-resize textarea
   useEffect(() => {
@@ -202,7 +226,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }, 0)
   }, [])
 
-  const sendCurrentMessage = async () => {
+  const sendCurrentMessage = useCallback(async () => {
     const currentMessage = message.trim()
 
     if (!currentMessage || disabled || submittingRef.current) {
@@ -258,7 +282,55 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       submittingRef.current = false
       restoreComposerFocus()
     }
-  }
+  }, [
+    clear,
+    disabled,
+    message,
+    messages,
+    onCancelReply,
+    onSendMessage,
+    replyingTo?.id,
+    restoreComposerFocus,
+    stopTyping,
+  ])
+
+  const ringHypeFromSendButton = useCallback(async () => {
+    if (!hype || !canLongPressHype) return
+
+    hypeLongPressTriggeredRef.current = true
+    setHypePressing(false)
+    try {
+      await hype.ringBell()
+    } catch (error) {
+      const message = await getBlockedActionMessage('general_chat', error, 'Failed to Hype')
+      showActionErrorToast(message)
+    }
+  }, [canLongPressHype, hype])
+
+  const handleSendPointerDown = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return
+    if (!canLongPressHype) return
+
+    hypeLongPressTriggeredRef.current = false
+    setHypePressing(true)
+    hypeLongPressTimerRef.current = window.setTimeout(() => {
+      hypeLongPressTimerRef.current = null
+      void ringHypeFromSendButton()
+    }, HYPE_SEND_LONG_PRESS_MS)
+  }, [canLongPressHype, ringHypeFromSendButton])
+
+  const handleSendPointerEnd = useCallback(() => {
+    clearHypeLongPressTimer()
+  }, [clearHypeLongPressTimer])
+
+  const handleSendClick = useCallback(() => {
+    if (hypeLongPressTriggeredRef.current) {
+      hypeLongPressTriggeredRef.current = false
+      return
+    }
+
+    void sendCurrentMessage()
+  }, [sendCurrentMessage])
 
   const handleSubmit = (
     e: React.FormEvent<HTMLFormElement> | React.KeyboardEvent<HTMLTextAreaElement>
@@ -706,8 +778,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           />
         </div>
 
-        {leadingAccessory}
-
         <div className="flex-1">
           <textarea
             ref={textareaRef}
@@ -749,13 +819,22 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
         <Button
           type="button"
-          disabled={!message.trim() || disabled}
-          className="h-12 w-12 rounded-xl p-0"
-          aria-label="Send message"
+          disabled={disabled || (!message.trim() && !canLongPressHype)}
+          className={cn(
+            'h-12 w-12 rounded-xl p-0',
+            canLongPressHype && 'border-[rgba(var(--theme-accent-strong-rgb),0.28)]',
+            (hypePressing || hype?.ringing) && 'border-[rgba(var(--theme-accent-strong-rgb),0.76)] bg-[rgba(var(--theme-accent-rgb),0.16)] text-[var(--theme-accent-readable)] shadow-[0_0_24px_rgba(var(--theme-accent-rgb),0.26)]'
+          )}
+          aria-label={canLongPressHype ? `Send message. Hold for Hype ${hypeRemaining}/${hype?.status?.limit_per_day ?? 2}` : 'Send message'}
+          title={canLongPressHype ? `Tap to send. Hold for Hype ${hypeRemaining}/${hype?.status?.limit_per_day ?? 2}.` : 'Send message'}
           onMouseDown={e => e.preventDefault()}
-          onClick={() => void sendCurrentMessage()}
+          onPointerDown={handleSendPointerDown}
+          onPointerUp={handleSendPointerEnd}
+          onPointerLeave={handleSendPointerEnd}
+          onPointerCancel={handleSendPointerEnd}
+          onClick={handleSendClick}
         >
-          <Send className="w-5 h-5" />
+          {hype?.ringing ? <BellRing className="h-5 w-5" /> : <Send className="w-5 h-5" />}
         </Button>
       </form>
     </div>

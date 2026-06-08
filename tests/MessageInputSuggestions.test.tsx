@@ -8,6 +8,10 @@ jest.mock('../src/hooks/useTyping', () => ({
   useTyping: () => ({ startTyping: jest.fn(), stopTyping: jest.fn() })
 }))
 
+jest.mock('../src/hooks/useHype', () => ({
+  useOptionalHype: () => undefined,
+}))
+
 jest.mock('../src/hooks/useSuggestedReplies')
 
 jest.mock('../src/lib/supabase', () => ({

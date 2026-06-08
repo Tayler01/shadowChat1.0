@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
-import { compareMessageKey, isMessageAfterCursor, type UserReadCursor } from '../lib/readCursors'
+import { isMessageAfterCursor, type UserReadCursor } from '../lib/readCursors'
 
 const READ_SETTLE_MS = 220
 const TARGET_SETTLE_MS = 180
@@ -137,41 +137,6 @@ export function useUnreadScroll<TMessage>({
     setAutoScrollState(value)
   }, [])
 
-  const isCursorAnchorPending = useCallback(() => {
-    if (!cursor?.last_read_message_id || messages.length === 0) {
-      return false
-    }
-
-    if (messages.some(message => getMessageId(message) === cursor.last_read_message_id)) {
-      return false
-    }
-
-    const oldestMessage = messages[0]
-    const latestMessageInWindow = messages[messages.length - 1]
-    if (!oldestMessage || !latestMessageInWindow) {
-      return false
-    }
-
-    const cursorKey = {
-      created_at: cursor.last_read_at,
-      id: cursor.last_read_message_id,
-    }
-    const oldestKey = {
-      created_at: getMessageCreatedAt(oldestMessage),
-      id: getMessageId(oldestMessage),
-    }
-    const latestKey = {
-      created_at: getMessageCreatedAt(latestMessageInWindow),
-      id: getMessageId(latestMessageInWindow),
-    }
-
-    if (compareMessageKey(cursorKey, oldestKey) < 0) {
-      return false
-    }
-
-    return compareMessageKey(cursorKey, latestKey) > 0
-  }, [cursor, getMessageCreatedAt, getMessageId, messages])
-
   const cancelFollowLatest = useCallback(() => {
     if (followSettleTimerRef.current !== null) {
       window.clearTimeout(followSettleTimerRef.current)
@@ -208,16 +173,13 @@ export function useUnreadScroll<TMessage>({
       if (cursorIndex >= 0) {
         return messages[cursorIndex + 1] ?? null
       }
-      if (isCursorAnchorPending()) {
-        return null
-      }
     }
 
     return messages.find(message => isMessageAfterCursor({
       created_at: getMessageCreatedAt(message),
       id: getMessageId(message),
     }, cursor)) ?? null
-  }, [cursor, getMessageCreatedAt, getMessageId, getUnreadMessages, isCursorAnchorPending, messages])
+  }, [cursor, getMessageCreatedAt, getMessageId, getUnreadMessages, messages])
 
   const getObservedMessage = useCallback((message: TMessage): ObservedMessage<TMessage> => {
     const id = getMessageId(message)
@@ -648,11 +610,6 @@ export function useUnreadScroll<TMessage>({
       return
     }
 
-    if (isCursorAnchorPending()) {
-      setFeedState('reconnectReconciling')
-      return
-    }
-
     const firstUnread = initialUnreadTargetIdRef.current
       ? messages.find(message => getMessageId(message) === initialUnreadTargetIdRef.current) ?? null
       : findFirstUnreadMessage()
@@ -716,7 +673,6 @@ export function useUnreadScroll<TMessage>({
     getElementId,
     getMessageId,
     initialMessageId,
-    isCursorAnchorPending,
     loading,
     messages,
     onBeforeInitialJump,

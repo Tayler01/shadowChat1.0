@@ -21,6 +21,19 @@ jest.mock('../src/hooks/useSuggestedReplies', () => ({
   useSuggestionsEnabled: () => ({ enabled: false, setEnabled: jest.fn() })
 }))
 
+const mockUseOptionalHype = jest.fn()
+jest.mock('../src/hooks/useHype', () => ({
+  useOptionalHype: () => mockUseOptionalHype(),
+}))
+
+jest.mock('../src/lib/moderation', () => ({
+  getBlockedActionMessage: jest.fn(async (_scope: string, _error: unknown, fallback: string) => fallback),
+}))
+
+jest.mock('../src/lib/toastNotifications', () => ({
+  showActionErrorToast: jest.fn(),
+}))
+
 jest.mock('../src/lib/gifs', () => ({
   searchKlipyGifs: jest.fn().mockResolvedValue({
     gifs: [
@@ -53,6 +66,7 @@ const { searchKlipyGifs } = jest.requireMock('../src/lib/gifs') as {
 
 beforeEach(() => {
   jest.resetAllMocks()
+  mockUseOptionalHype.mockReturnValue(undefined)
   searchKlipyGifs.mockResolvedValue({
     gifs: [
       {
@@ -172,6 +186,42 @@ test('clears immediately and blocks repeated send taps while pending', async () 
     resolveSend()
     await pendingSend
   })
+})
+
+test('long pressing the send button rings Hype without sending the draft', async () => {
+  jest.useFakeTimers()
+  const ringBell = jest.fn().mockResolvedValue(null)
+  const onSendMessage = jest.fn()
+  mockUseOptionalHype.mockReturnValue({
+    status: { used: 0, remaining: 2, limit_per_day: 2, reset_at: '2026-06-08T04:00:00Z' },
+    loadingStatus: false,
+    ringing: false,
+    ringBell,
+  })
+
+  try {
+    render(<MessageInput onSendMessage={onSendMessage} />)
+    const textarea = screen.getByRole('textbox')
+    const sendButton = screen.getByRole('button', { name: /hold for hype/i })
+
+    await act(async () => {
+      fireEvent.change(textarea, { target: { value: 'ship it' } })
+    })
+
+    fireEvent.pointerDown(sendButton, { pointerType: 'touch' })
+    await act(async () => {
+      jest.advanceTimersByTime(650)
+      await Promise.resolve()
+    })
+    fireEvent.pointerUp(sendButton, { pointerType: 'touch' })
+    fireEvent.click(sendButton)
+
+    expect(ringBell).toHaveBeenCalledTimes(1)
+    expect(onSendMessage).not.toHaveBeenCalled()
+    expect(textarea).toHaveValue('ship it')
+  } finally {
+    jest.useRealTimers()
+  }
 })
 
 test('shows an error and keeps reply state when uploaded image send resolves to null', async () => {

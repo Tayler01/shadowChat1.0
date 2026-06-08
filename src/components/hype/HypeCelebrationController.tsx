@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { BellRing, PartyPopper, Sparkles, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { useHype } from '../../hooks/useHype'
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(value, max))
@@ -21,19 +21,20 @@ export function HypeCelebrationController() {
 
   const particles = useMemo(() => {
     const intensity = clamp(activeCelebration?.intensity ?? 1, 1, 8)
-    const count = Math.min(168, 64 + intensity * 18)
+    const count = Math.min(360, 128 + intensity * 34)
     return Array.from({ length: count }, (_, index) => {
-      const lane = index % 12
+      const lane = (index * 37) % 101
       const side = index % 2 === 0 ? -1 : 1
-      const spread = 26 + (index % 9) * 7
       const color = CONFETTI_COLORS[index % CONFETTI_COLORS.length]
       return {
         id: index,
-        x: `${side * (spread + lane * 3)}vw`,
-        y: `${-20 - (index % 8) * 6}vh`,
-        delay: `${(index % 20) * 22}ms`,
-        rotate: `${side * (120 + index * 13)}deg`,
-        size: `${index % 5 === 0 ? 10 : index % 3 === 0 ? 7 : 5}px`,
+        startX: `${lane}vw`,
+        drift: `${side * (8 + (index % 11) * 1.6)}vw`,
+        fall: `${112 + (index % 9) * 6}vh`,
+        delay: `${(index % 28) * 34}ms`,
+        duration: `${5200 + (index % 10) * 180 + intensity * 120}ms`,
+        rotate: `${side * (160 + index * 17)}deg`,
+        size: `${index % 5 === 0 ? 11 : index % 3 === 0 ? 8 : 5}px`,
         radius: index % 4 === 0 ? '999px' : index % 5 === 0 ? '1px' : '3px',
         colorStart: color[0],
         colorEnd: color[1],
@@ -50,14 +51,12 @@ export function HypeCelebrationController() {
   const authorName = metadata.message_author_display_name || 'a message'
   const title = activeCelebration.mode === 'catchup' && activeCelebration.events.length > 1
     ? `${activeCelebration.events.length} Hypes`
-    : latest.event_type === 'message'
-      ? 'Message Hyped'
-      : 'Hype!'
+    : `${actorName} hyped`
   const subtitle = activeCelebration.mode === 'catchup' && activeCelebration.events.length > 1
     ? 'Caught up while you were away.'
     : latest.event_type === 'message'
-      ? `${actorName} celebrated ${authorName}.`
-      : `${actorName} rang the bell.`
+      ? `${authorName}'s message`
+      : ''
 
   return createPortal(
     <div
@@ -78,9 +77,11 @@ export function HypeCelebrationController() {
           key={particle.id}
           className="hype-celebration__particle"
           style={{
-            '--hype-particle-x': particle.x,
-            '--hype-particle-y': particle.y,
+            '--hype-particle-start-x': particle.startX,
+            '--hype-particle-drift': particle.drift,
+            '--hype-particle-fall': particle.fall,
             '--hype-particle-delay': particle.delay,
+            '--hype-particle-duration': particle.duration,
             '--hype-particle-rotate': particle.rotate,
             '--hype-particle-size': particle.size,
             '--hype-particle-radius': particle.radius,
@@ -91,22 +92,19 @@ export function HypeCelebrationController() {
         />
       ))}
       <div className="hype-celebration__content">
-        <div className="hype-celebration__spark hype-celebration__spark--left" aria-hidden="true">
-          <Sparkles className="h-full w-full" />
+        <div className="hype-celebration__nameplate" aria-hidden="true">
+          <img
+            src="/hype/hype-celebration-nameplate.webp"
+            alt=""
+            className="hype-celebration__asset"
+            draggable={false}
+          />
         </div>
-        <div className="hype-celebration__icon" aria-hidden="true">
-          {latest.event_type === 'message' ? (
-            <PartyPopper className="h-16 w-16" />
-          ) : (
-            <BellRing className="h-16 w-16" />
-          )}
+        <div className="hype-celebration__copy">
+          <p className="hype-celebration__eyebrow">Hype x{activeCelebration.intensity}</p>
+          <h2 className="hype-celebration__title">{title}</h2>
+          {subtitle && <p className="hype-celebration__subtitle">{subtitle}</p>}
         </div>
-        <div className="hype-celebration__spark hype-celebration__spark--right" aria-hidden="true">
-          <Sparkles className="h-full w-full" />
-        </div>
-        <p className="hype-celebration__eyebrow">Hype x{activeCelebration.intensity}</p>
-        <h2 className="hype-celebration__title">{title}</h2>
-        <p className="hype-celebration__subtitle">{subtitle}</p>
       </div>
       <button
         type="button"

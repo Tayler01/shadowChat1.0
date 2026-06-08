@@ -9,6 +9,10 @@ jest.mock('../src/hooks/useTyping', () => ({
   useTyping: () => ({ startTyping: jest.fn(), stopTyping: jest.fn() })
 }))
 
+jest.mock('../src/hooks/useHype', () => ({
+  useOptionalHype: () => undefined,
+}))
+
 jest.mock('../src/lib/supabase', () => ({
   uploadVoiceMessage: jest.fn(),
   uploadChatFile: jest.fn(),

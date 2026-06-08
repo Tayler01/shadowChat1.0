@@ -709,7 +709,7 @@ test('keeps quick reactions near a bottom message when keyboard footer geometry 
 test('renders Hype system events as lightweight non-reactable rows', () => {
   render(
     <MessageItem
-      message={{ ...baseMessage, message_type: 'hype', content: 'rang Hype' } as Message}
+      message={{ ...baseMessage, message_type: 'hype', content: 'hyped' } as Message}
       onEdit={async () => {}}
       onDelete={async () => {}}
       onTogglePin={async () => {}}
@@ -718,7 +718,7 @@ test('renders Hype system events as lightweight non-reactable rows', () => {
     />
   )
 
-  expect(screen.getByTestId('hype-system-event')).toHaveTextContent('Alice rang Hype')
+  expect(screen.getByTestId('hype-system-event')).toHaveTextContent('Alice hyped')
   expect(screen.queryByRole('button', { name: /message actions/i })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /add reaction/i })).not.toBeInTheDocument()
 })

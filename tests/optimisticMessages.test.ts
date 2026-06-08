@@ -10,6 +10,8 @@ type TestMessage = {
   created_at: string
   updated_at: string
   reactions: Record<string, { count: number; users: string[] }>
+  hype_count?: number
+  hype_users?: Array<{ user_id: string; display_name: string }>
   user?: { id: string; username: string }
   optimistic?: boolean
   delivery_status?: 'sending' | 'sent' | 'failed'
@@ -58,6 +60,29 @@ test('mergeRealtimeMessageUpdate ignores stale payloads', () => {
   })
 
   expect(merged).toBeNull()
+})
+
+test('mergeRealtimeMessageUpdate applies realtime Hype summary fields', () => {
+  const existing = baseMessage()
+  const merged = mergeRealtimeMessageUpdate(
+    existing,
+    {
+      id: 'm1',
+      updated_at: '2026-05-14T12:01:00.000Z',
+      hype_count: 5,
+      hype_users: [
+        { user_id: 'u2', display_name: 'Maya' },
+      ],
+    },
+    { user: existing.user }
+  )
+
+  expect(merged).toMatchObject({
+    id: 'm1',
+    hype_count: 5,
+    hype_users: [{ user_id: 'u2', display_name: 'Maya' }],
+    user: existing.user,
+  })
 })
 
 test('upsertMessageIntoState still reconciles optimistic messages by client id', () => {

@@ -309,7 +309,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     if (message.message_type === 'hype') {
       return (
         <div id={`message-${message.id}`} className="hype-system-event" data-testid="hype-system-event">
-          <span>{message.user?.display_name || message.user?.username || 'Someone'} rang Hype</span>
+          <span>{message.user?.display_name || message.user?.username || 'Someone'} hyped</span>
           <span className="ml-1" aria-hidden="true">{'\u{1F389}'}</span>
           <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">{formatTime(message.created_at)}</span>
         </div>
