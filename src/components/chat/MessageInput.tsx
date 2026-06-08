@@ -16,6 +16,8 @@ import toast from 'react-hot-toast'
 import { askQuestion } from '../../lib/ai'
 import { EmojiPickerOverlay } from './EmojiPickerOverlay'
 import { getImageMessageDisplaySrc, type ReplyTarget } from './messageDisplay'
+import { MessageHypeBadge } from './MessageHypeBadge'
+import { getHypeTier } from '../../lib/hypePresentation'
 
 const normalizeComposerValue = (value: string) => (value.trim().length === 0 ? '' : value)
 
@@ -40,6 +42,7 @@ interface MessageInputProps {
   onCancelReply?: () => void
   typingChannel?: string
   enableGifPicker?: boolean
+  leadingAccessory?: React.ReactNode
 }
 
 export const MessageInput: React.FC<MessageInputProps> = ({
@@ -54,6 +57,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   onCancelReply,
   typingChannel = 'general',
   enableGifPicker = false,
+  leadingAccessory,
 }) => {
   const { draft, setDraft, clear } = useDraft(cacheKey)
   const [message, setMessage] = useState(draft)
@@ -68,6 +72,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const { startTyping, stopTyping } = useTyping(typingChannel)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const attachmentMenuRef = useRef<HTMLDivElement>(null)
+  const replyHypeCount = replyingTo?.hypeCount ?? 0
+  const replyHypeTier = getHypeTier(replyHypeCount)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -485,7 +491,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       className={`theme-composer-surface relative border-t border-[var(--border-panel)] px-3 pb-3 pt-2.5 md:p-3 ${className}`}
     >
       {replyingTo && (
-        <div className="mb-2 rounded-[var(--radius-xs)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] shadow-[var(--shadow-panel)]">
+        <div
+          className={`mb-2 rounded-[var(--radius-xs)] border border-[var(--border-subtle)] bg-[var(--bg-panel)] px-2.5 py-1.5 text-xs text-[var(--text-secondary)] shadow-[var(--shadow-panel)] ${replyHypeTier > 0 ? 'hype-message-shell hype-message-bubble' : ''}`}
+          data-hype-tier={replyHypeTier || undefined}
+        >
+          <MessageHypeBadge count={replyHypeCount} users={replyingTo.hypeUsers ?? []} className="float-right ml-2" />
           <div className="flex items-start justify-between gap-2">
             <div className="flex min-w-0 flex-1 items-start gap-2">
               {replyingTo.messageType === 'image' && replyingTo.fileUrl && (
@@ -695,6 +705,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             className="hidden"
           />
         </div>
+
+        {leadingAccessory}
 
         <div className="flex-1">
           <textarea

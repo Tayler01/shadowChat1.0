@@ -49,7 +49,12 @@ jest.mock('../src/components/chat/WeatherWidget', () => ({
 }))
 
 jest.mock('../src/hooks/useSoundEffects', () => ({
-  useSoundEffects: () => ({ enabled: true, setEnabled: jest.fn() }),
+  useSoundEffects: () => ({
+    enabled: true,
+    setEnabled: jest.fn(),
+    hypeEnabled: true,
+    setHypeEnabled: jest.fn(),
+  }),
 }))
 
 jest.mock('../src/hooks/useTheme', () => ({
@@ -79,6 +84,7 @@ jest.mock('../src/hooks/usePushNotifications', () => ({
       reply_enabled: true,
       reaction_enabled: false,
       group_enabled: true,
+      hype_enabled: true,
     },
     subscribed: true,
     loading: false,

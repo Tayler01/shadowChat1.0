@@ -12,11 +12,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-type PushEventType = 'dm_message' | 'group_message'
+type PushEventType = 'dm_message' | 'group_message' | 'hype_event'
 
 type SendPushRequestBody = {
   type?: PushEventType
   messageId?: string
+  eventId?: string
   senderUserId?: string
   origin?: 'app' | 'bridge'
   bridgeDeviceId?: string
@@ -26,6 +27,7 @@ type NotificationPrefs = {
   user_id: string
   dm_enabled?: boolean
   group_enabled?: boolean
+  hype_enabled?: boolean
   mute_until: string | null
 }
 
@@ -80,6 +82,16 @@ type GroupMessageRecord = {
         display_name: string | null
       }>
     | null
+}
+
+type HypeEventRecord = {
+  id: string
+  actor_id: string | null
+  event_type: 'bell' | 'message'
+  message_id: string | null
+  message_author_id: string | null
+  metadata: Record<string, unknown> | null
+  created_at: string
 }
 
 const unauthorized = (message: string) =>
@@ -713,6 +725,168 @@ const sendGroupPush = async (
   })
 }
 
+const getTextValue = (value: unknown) => (
+  typeof value === 'string' && value.trim() ? value.trim() : ''
+)
+
+const sendHypePush = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  vapid: VapidKeys,
+  authUserId: string,
+  eventId: string
+) => {
+  const { data: event, error: eventError } = await supabase
+    .from('hype_events')
+    .select('id, actor_id, event_type, message_id, message_author_id, metadata, created_at')
+    .eq('id', eventId)
+    .single()
+
+  if (eventError || !event) {
+    return json({ error: 'Hype event not found' }, 404)
+  }
+
+  const hypeEvent = event as HypeEventRecord
+  if (hypeEvent.actor_id !== authUserId) {
+    return unauthorized('You can only send notifications for your own Hype events')
+  }
+
+  const metadata = hypeEvent.metadata ?? {}
+  const actorName = getTextValue(metadata.actor_display_name) || 'Someone'
+  const authorName = getTextValue(metadata.message_author_display_name) || 'a message'
+  const title = hypeEvent.event_type === 'message'
+    ? `${actorName} Hyped ${authorName}`
+    : `${actorName} rang Hype`
+  const body = hypeEvent.event_type === 'message'
+    ? 'A message is getting celebrated in ShadowChat.'
+    : 'Hype is building in ShadowChat.'
+  const route = hypeEvent.message_id
+    ? `/?view=chat&message=${hypeEvent.message_id}`
+    : '/?view=chat'
+
+  const { data: recipientPreferences, error: prefsError } = await supabase
+    .from('notification_preferences')
+    .select('user_id, hype_enabled, mute_until')
+    .eq('hype_enabled', true)
+    .neq('user_id', authUserId)
+
+  if (prefsError) {
+    throw prefsError
+  }
+
+  const eligibleRecipients = ((recipientPreferences ?? []) as NotificationPrefs[]).filter(
+    (prefs) => !isMuted(prefs)
+  )
+
+  if (!eligibleRecipients.length) {
+    return json({ skipped: true, reason: 'No recipients have Hype push enabled' })
+  }
+
+  const eventTime = new Date(hypeEvent.created_at).getTime()
+  const stackBucket = Number.isFinite(eventTime)
+    ? Math.floor(eventTime / 60000)
+    : Math.floor(Date.now() / 60000)
+
+  const perRecipientResults = await Promise.all(
+    eligibleRecipients.map(async (prefs) => {
+      const subscriptions = await getActiveSubscriptions(supabase, prefs.user_id)
+      if (!subscriptions.length) {
+        return {
+          userId: prefs.user_id,
+          skipped: true,
+          reason: 'No active push subscriptions',
+          delivered: 0,
+          removedSubscriptions: 0,
+          results: [],
+        }
+      }
+
+      const dedupeKey = `hype:${stackBucket}:${prefs.user_id}`
+      const eventRecord = await upsertNotificationEvent(
+        supabase,
+        {
+          user_id: prefs.user_id,
+          type: 'hype_event',
+          entity_id: hypeEvent.id,
+          payload: {
+            title,
+            body,
+            route,
+            sender_id: authUserId,
+            event_id: hypeEvent.id,
+            event_type: hypeEvent.event_type,
+            stack_bucket: stackBucket,
+          },
+        },
+        dedupeKey
+      )
+
+      if (eventRecord.sent_at) {
+        return {
+          userId: prefs.user_id,
+          skipped: true,
+          reason: 'Collapsed into recent Hype notification',
+          delivered: 0,
+          removedSubscriptions: 0,
+          results: [],
+        }
+      }
+
+      const pushMessage: PushMessage = {
+        data: JSON.stringify({
+          title,
+          body,
+          tag: `hype:${stackBucket}`,
+          data: {
+            url: route,
+            route,
+            type: 'hype_event',
+            eventId: hypeEvent.id,
+            eventType: hypeEvent.event_type,
+            messageId: hypeEvent.message_id,
+            senderId: authUserId,
+            stackBucket,
+          },
+        }),
+        options: {
+          ttl: 300,
+          urgency: 'normal',
+        },
+      }
+
+      const delivery = await deliverPushToSubscriptions(supabase, vapid, subscriptions, pushMessage)
+
+      if (delivery.deliveredCount > 0) {
+        await supabase
+          .from('notification_events')
+          .update({ sent_at: new Date().toISOString() })
+          .eq('id', eventRecord.id)
+      }
+
+      return {
+        userId: prefs.user_id,
+        skipped: false,
+        ...delivery,
+      }
+    })
+  )
+
+  const getDeliveredCount = (result: Record<string, unknown>) =>
+    Number(result.deliveredCount ?? result.delivered ?? 0)
+
+  return json({
+    deliveredRecipients: perRecipientResults.filter((result) => getDeliveredCount(result) > 0).length,
+    deliveredSubscriptions: perRecipientResults.reduce(
+      (sum, result) => sum + getDeliveredCount(result),
+      0
+    ),
+    removedSubscriptions: perRecipientResults.reduce(
+      (sum, result) => sum + Number(result.removedSubscriptions ?? 0),
+      0
+    ),
+    results: perRecipientResults,
+  })
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -727,10 +901,15 @@ serve(async (req) => {
 
     const type = body?.type as PushEventType | undefined
     const messageId = typeof body?.messageId === 'string' ? body.messageId : ''
+    const eventId = typeof body?.eventId === 'string' ? body.eventId : ''
     const origin = getPushOrigin(body)
     const bridgeDeviceId = typeof body?.bridgeDeviceId === 'string' ? body.bridgeDeviceId : undefined
 
-    if (!messageId || (type !== 'dm_message' && type !== 'group_message')) {
+    if (
+      (type !== 'hype_event' && !messageId) ||
+      (type === 'hype_event' && !eventId) ||
+      (type !== 'dm_message' && type !== 'group_message' && type !== 'hype_event')
+    ) {
       return json({ error: 'Unsupported notification payload' }, 400)
     }
 
@@ -739,6 +918,10 @@ serve(async (req) => {
 
     if (type === 'dm_message') {
       return await sendDmPush(supabase, vapid, auth.userId, messageId, origin, bridgeDeviceId)
+    }
+
+    if (type === 'hype_event') {
+      return await sendHypePush(supabase, vapid, auth.userId, eventId)
     }
 
     return await sendGroupPush(supabase, vapid, auth.userId, messageId, origin, bridgeDeviceId)

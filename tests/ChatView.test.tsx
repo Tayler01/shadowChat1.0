@@ -52,6 +52,10 @@ jest.mock('../src/components/chat/MessageInput', () => ({
   MessageInput: () => <div data-testid="message-input" />,
 }))
 
+jest.mock('../src/components/hype/HypeBellButton', () => ({
+  HypeBellButton: () => <button type="button" data-testid="hype-bell-button" />,
+}))
+
 jest.mock('../src/components/chat/PinnedMessagesButton', () => ({
   PinnedMessagesButton: ({ messages }: { messages: unknown[] }) => (
     <button type="button" data-testid="pinned-messages-button">

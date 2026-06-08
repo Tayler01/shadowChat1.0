@@ -8,6 +8,7 @@ export interface NotificationPreferences {
   reply_enabled: boolean
   reaction_enabled: boolean
   group_enabled: boolean
+  hype_enabled: boolean
   quiet_hours_start: string | null
   quiet_hours_end: string | null
   mute_until: string | null
@@ -40,6 +41,7 @@ const DEFAULT_PREFERENCES = {
   reply_enabled: true,
   reaction_enabled: false,
   group_enabled: false,
+  hype_enabled: true,
   quiet_hours_start: null,
   quiet_hours_end: null,
   mute_until: null,
@@ -339,7 +341,7 @@ export const fetchNotificationPreferences = async (userId: string) => {
   const { data, error } = await workingClient
     .from('notification_preferences')
     .select(
-      'user_id, dm_enabled, mention_enabled, reply_enabled, reaction_enabled, group_enabled, quiet_hours_start, quiet_hours_end, mute_until'
+      'user_id, dm_enabled, mention_enabled, reply_enabled, reaction_enabled, group_enabled, hype_enabled, quiet_hours_start, quiet_hours_end, mute_until'
     )
     .eq('user_id', userId)
     .maybeSingle()
@@ -369,7 +371,7 @@ export const upsertNotificationPreferences = async (
     .from('notification_preferences')
     .upsert(payload, { onConflict: 'user_id' })
     .select(
-      'user_id, dm_enabled, mention_enabled, reply_enabled, reaction_enabled, group_enabled, quiet_hours_start, quiet_hours_end, mute_until'
+      'user_id, dm_enabled, mention_enabled, reply_enabled, reaction_enabled, group_enabled, hype_enabled, quiet_hours_start, quiet_hours_end, mute_until'
     )
     .single()
 
@@ -528,6 +530,22 @@ export const triggerGroupPushNotification = async (messageId: string) => {
     body: {
       type: 'group_message',
       messageId,
+    },
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export const triggerHypePushNotification = async (eventId: string) => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.functions.invoke('send-push', {
+    body: {
+      type: 'hype_event',
+      eventId,
     },
   })
 

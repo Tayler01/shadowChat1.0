@@ -236,6 +236,10 @@ self.addEventListener('notificationclick', (event) => {
     targetUrl = `/?view=dms&conversation=${encodeURIComponent(data.conversationId)}&message=${encodeURIComponent(data.messageId)}`
   } else if (data.type === 'group_message' && data.messageId) {
     targetUrl = `/?view=chat&message=${encodeURIComponent(data.messageId)}`
+  } else if (data.type === 'hype_event') {
+    targetUrl = data.messageId
+      ? `/?view=chat&message=${encodeURIComponent(data.messageId)}`
+      : '/?view=chat'
   }
   const targetHref = new URL(targetUrl, self.location.origin).href
 

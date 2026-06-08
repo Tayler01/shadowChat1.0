@@ -292,7 +292,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   currentView = 'settings',
   onViewChange = () => {},
 }) => {
-  const { enabled: sounds, setEnabled: setSounds } = useSoundEffects()
+  const {
+    enabled: sounds,
+    setEnabled: setSounds,
+    hypeEnabled: hypeSounds,
+    setHypeEnabled: setHypeSounds,
+  } = useSoundEffects()
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const [activeSection, setActiveSection] = useState<SettingsSectionId | null>(() => getInitialSettingsSection())
   const [activeAdminSection, setActiveAdminSection] = useState<AdminSectionId | null>(null)
@@ -411,6 +416,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               description: 'Notify when new messages arrive in the main group chat.',
               enabled: preferences.group_enabled,
               onChange: (enabled: boolean) => updatePreference('group_enabled', enabled),
+            },
+            {
+              label: 'Hype',
+              description: 'Notify when the room starts celebrating.',
+              enabled: preferences.hype_enabled,
+              onChange: (enabled: boolean) => updatePreference('hype_enabled', enabled),
             },
           ]
         : []
@@ -682,6 +693,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             enabled={sounds}
             onChange={setSounds}
           />
+          <div className="mt-3">
+            <ToggleRow
+              label="Hype Sounds"
+              description="Play dedicated bell and message celebration sounds."
+              enabled={hypeSounds}
+              onChange={setHypeSounds}
+            />
+          </div>
         </div>
       </div>
 

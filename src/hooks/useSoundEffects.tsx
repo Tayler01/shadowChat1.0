@@ -12,8 +12,12 @@ import { getWorkingClient } from '../lib/supabase'
 interface SoundEffectsContextValue {
   enabled: boolean
   setEnabled: (v: boolean) => void
+  hypeEnabled: boolean
+  setHypeEnabled: (v: boolean) => void
   playMessage: () => void
   playReaction: () => void
+  playHypeBell: () => void
+  playHypeMessage: () => void
 }
 
 const SoundEffectsContext = createContext<SoundEffectsContextValue | undefined>(undefined)
@@ -33,6 +37,15 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
   const [enabled, setEnabled] = useState(() => {
     if (typeof localStorage !== 'undefined') {
       const stored = localStorage.getItem('soundEffectsEnabled')
+      if (stored === null) return true
+      return stored === 'true'
+    }
+    return true
+  })
+
+  const [hypeEnabled, setHypeEnabled] = useState(() => {
+    if (typeof localStorage !== 'undefined') {
+      const stored = localStorage.getItem('hypeSoundEffectsEnabled')
       if (stored === null) return true
       return stored === 'true'
     }
@@ -64,6 +77,14 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
       // ignore storage errors
     }
   }, [enabled])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('hypeSoundEffectsEnabled', String(hypeEnabled))
+    } catch {
+      // ignore storage errors
+    }
+  }, [hypeEnabled])
 
   useEffect(() => {
     ;(async () => {
@@ -143,7 +164,61 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
   const playMessage = useCallback(() => play(messageAudioRef.current), [play])
   const playReaction = useCallback(() => play(reactionAudioRef.current), [play])
 
-  return { enabled, setEnabled, playMessage, playReaction }
+  const playHypeTone = useCallback((variant: 'bell' | 'message') => {
+    if (!hypeEnabled || typeof window === 'undefined') return
+
+    const audioWindow = window as typeof window & { webkitAudioContext?: typeof AudioContext }
+    const AudioContextCtor = window.AudioContext ?? audioWindow.webkitAudioContext
+    if (!AudioContextCtor) return
+
+    try {
+      const context = new AudioContextCtor()
+      const master = context.createGain()
+      master.gain.setValueAtTime(0.0001, context.currentTime)
+      master.gain.exponentialRampToValueAtTime(0.16, context.currentTime + 0.018)
+      master.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 1.05)
+      master.connect(context.destination)
+
+      const notes = variant === 'bell'
+        ? [784, 988, 1175, 1568]
+        : [523, 659, 880, 1319]
+
+      notes.forEach((frequency, index) => {
+        const start = context.currentTime + index * 0.085
+        const oscillator = context.createOscillator()
+        const gain = context.createGain()
+        oscillator.type = variant === 'bell' ? 'triangle' : 'sine'
+        oscillator.frequency.setValueAtTime(frequency, start)
+        gain.gain.setValueAtTime(0.0001, start)
+        gain.gain.exponentialRampToValueAtTime(index === 0 ? 0.22 : 0.13, start + 0.018)
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.48)
+        oscillator.connect(gain)
+        gain.connect(master)
+        oscillator.start(start)
+        oscillator.stop(start + 0.52)
+      })
+
+      window.setTimeout(() => {
+        context.close().catch(() => {})
+      }, 1300)
+    } catch {
+      // Visual feedback still runs if browser audio is blocked.
+    }
+  }, [hypeEnabled])
+
+  const playHypeBell = useCallback(() => playHypeTone('bell'), [playHypeTone])
+  const playHypeMessage = useCallback(() => playHypeTone('message'), [playHypeTone])
+
+  return {
+    enabled,
+    setEnabled,
+    hypeEnabled,
+    setHypeEnabled,
+    playMessage,
+    playReaction,
+    playHypeBell,
+    playHypeMessage,
+  }
 }
 
 export function SoundEffectsProvider({ children }: { children: React.ReactNode }) {

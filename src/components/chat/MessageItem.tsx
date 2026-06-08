@@ -11,6 +11,7 @@ import {
   Check,
   RefreshCw,
   XCircle,
+  PartyPopper,
 } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
 import { ImageModal } from '../ui/ImageModal'
@@ -33,6 +34,9 @@ import { getBlockedActionMessage, type ChannelBanScope } from '../../lib/moderat
 import { showActionErrorToast } from '../../lib/toastNotifications'
 import { EmojiPickerOverlay } from './EmojiPickerOverlay'
 import { QuickReactionRail } from './QuickReactionRail'
+import { useOptionalHype } from '../../hooks/useHype'
+import { getHypeTier } from '../../lib/hypePresentation'
+import { MessageHypeBadge } from './MessageHypeBadge'
 import {
   CHAT_MEDIA_INTRINSIC_HEIGHT,
   CHAT_MEDIA_INTRINSIC_WIDTH,
@@ -95,6 +99,8 @@ function ReplyContextPreview({
 }) {
   const [expanded, setExpanded] = useState(false)
   const collapsible = shouldCollapseReplyPreview(content)
+  const hypeCount = parentMessage.hype_count ?? 0
+  const hypeTier = getHypeTier(hypeCount)
   const previewImageSrc = parentMessage.message_type === 'image'
     ? getImageMessageDisplaySrc(parentMessage.file_url, parentMessage.thumbnail_url)
     : ''
@@ -105,7 +111,14 @@ function ReplyContextPreview({
         aria-hidden="true"
         className="mt-0.5 h-5 w-4 shrink-0 rounded-bl-[0.45rem] border-b border-l border-[var(--theme-accent-border-soft)]"
       />
-      <div className="min-w-0 flex-1 rounded-[var(--radius-sm)] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.035)] px-2.5 py-1.5">
+      <div
+        className={cn(
+          'min-w-0 flex-1 rounded-[var(--radius-sm)] border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.035)] px-2.5 py-1.5',
+          hypeTier > 0 && 'hype-message-shell hype-message-bubble'
+        )}
+        data-hype-tier={hypeTier || undefined}
+      >
+        <MessageHypeBadge count={hypeCount} users={parentMessage.hype_users ?? []} className="float-right ml-2" />
         <button
           type="button"
           onClick={() => onJumpToMessage?.(parentMessage.id)}
@@ -179,6 +192,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     moderationScope = 'general_chat',
   }) => {
     const { profile } = useAuth()
+    const hype = useOptionalHype()
     const [isEditing, setIsEditing] = useState(false)
     const [editContent, setEditContent] = useState(message.content)
     const [showReactionPicker, setShowReactionPicker] = useState(false)
@@ -209,6 +223,10 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const parentPreview = parentMessage
       ? getMessagePreviewText(parentMessage)
       : ''
+    const hypeCount = message.hype_count ?? 0
+    const hypeTier = getHypeTier(hypeCount)
+    const hypeUsers = message.hype_users ?? []
+    const hasCurrentUserHyped = hypeUsers.some(user => user.user_id === profile?.id)
     const avatarSrc = isShadoAI
       ? message.user?.avatar_thumbnail_url || message.user?.avatar_url || '/icons/app-icon-192.png'
       : message.user?.avatar_thumbnail_url || message.user?.avatar_url
@@ -278,6 +296,26 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
       await onTogglePin(message.id)
     }
 
+    const handleHypeMessage = async () => {
+      if (!hype) return
+      try {
+        await hype.hypeMessage(message.id)
+      } catch (error) {
+        const notice = await getBlockedActionMessage(moderationScope, error, 'Failed to Hype message')
+        showActionErrorToast(notice)
+      }
+    }
+
+    if (message.message_type === 'hype') {
+      return (
+        <div id={`message-${message.id}`} className="hype-system-event" data-testid="hype-system-event">
+          <span>{message.user?.display_name || message.user?.username || 'Someone'} rang Hype</span>
+          <span className="ml-1" aria-hidden="true">{'\u{1F389}'}</span>
+          <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">{formatTime(message.created_at)}</span>
+        </div>
+      )
+    }
+
     const handleRetryFailed = async () => {
       if (!onRetryFailed || retryingFailedMessage) return
 
@@ -333,6 +371,13 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         icon: Reply,
         hidden: !onReply || isLocalDelivery,
         onSelect: () => onReply?.(message),
+      },
+      {
+        id: 'hype',
+        label: hype?.hypingMessageIds.has(message.id) ? 'Hyping' : 'Hype',
+        icon: PartyPopper,
+        hidden: !hype || isOwner || isLocalDelivery || hasCurrentUserHyped || (hype.status !== null && hype.status.remaining <= 0),
+        onSelect: () => void handleHypeMessage(),
       },
       {
         id: 'edit',
@@ -455,7 +500,11 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
             <>
               <div
                 ref={bubbleShellRef}
-                className="relative inline-block max-w-[calc(100%-3rem)] group/message md:max-w-full"
+                className={cn(
+                  'relative inline-block max-w-[calc(100%-3rem)] group/message md:max-w-full',
+                  hypeTier > 0 && 'hype-message-shell'
+                )}
+                data-hype-tier={hypeTier || undefined}
                 data-testid="message-bubble-shell"
                 onMouseEnter={handleMouseEnterReactions}
                 onMouseLeave={handleMouseLeaveReactions}
@@ -470,6 +519,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 <div
                   className={cn(
                     'relative peer space-y-1 break-words rounded-[var(--radius-md)]',
+                    hypeTier > 0 && 'hype-message-bubble',
                     isFloatingMediaMessage
                       ? 'bg-transparent px-0 py-0 text-[var(--text-primary)] shadow-none'
                       : 'px-3 py-2 shadow-[var(--shadow-panel)]',
@@ -483,6 +533,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   )}
                   style={bubbleStyle}
                 >
+                  <MessageHypeBadge count={hypeCount} users={hypeUsers} className="float-right ml-2" />
                   <MessageReactions
                     message={message}
                     onReact={handleReaction}

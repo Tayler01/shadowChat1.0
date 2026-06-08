@@ -1,4 +1,4 @@
-import type { ChatMessageType } from '../../lib/supabase'
+import type { ChatMessageType, HypeUserSummary } from '../../lib/supabase'
 import { getSupabaseImageTransformUrl } from '../../lib/storageImageTransforms'
 
 export type ChatMediaOrientation = 'portrait' | 'square' | 'landscape'
@@ -10,6 +10,8 @@ export type ReplyTarget = {
   fileUrl?: string | null
   thumbnailUrl?: string | null
   authorName?: string | null
+  hypeCount?: number
+  hypeUsers?: HypeUserSummary[]
 }
 
 export type MessagePreviewSource = {
@@ -20,6 +22,8 @@ export type MessagePreviewSource = {
   thumbnail_url?: string | null
   user?: { display_name?: string | null; username?: string | null } | null
   sender?: { display_name?: string | null; username?: string | null } | null
+  hype_count?: number | null
+  hype_users?: HypeUserSummary[] | null
 }
 
 export const CHAT_MEDIA_INTRINSIC_WIDTH = 1080
@@ -86,6 +90,7 @@ export const getMessagePreviewText = (message: MessagePreviewSource) => {
   if (message.message_type === 'video') return 'Video'
   if (message.message_type === 'audio') return 'Voice message'
   if (message.message_type === 'file') return parseAttachmentName(text) || text || 'File attachment'
+  if (message.message_type === 'hype') return 'Hype'
 
   return text || message.message_type
 }
@@ -102,4 +107,6 @@ export const messageToReplyTarget = (message: MessagePreviewSource): ReplyTarget
     message.sender?.display_name ||
     message.sender?.username ||
     null,
+  hypeCount: message.hype_count ?? 0,
+  hypeUsers: message.hype_users ?? [],
 })

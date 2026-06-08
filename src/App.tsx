@@ -5,6 +5,7 @@ import { Sidebar } from './components/layout/Sidebar'
 import { ChatView } from './components/chat/ChatView'
 import { MessagesProvider } from './hooks/useMessages'
 import { DirectMessagesProvider } from './hooks/useDirectMessages'
+import { HypeProvider } from './hooks/useHype'
 import { MobileNav } from './components/layout/MobileNav'
 import { useIsDesktop } from './hooks/useIsDesktop'
 import { useMessageNotifications } from './hooks/useMessageNotifications'
@@ -15,6 +16,7 @@ import { AppBadgeSync } from './components/notifications/AppBadgeSync'
 import { PhoneInstallOnboarding } from './components/onboarding/PhoneInstallOnboarding'
 import { AppReleaseGate } from './components/releases/AppReleaseGate'
 import { GoldenEggDiscoveryController } from './components/easter-egg/GoldenEggDiscovery'
+import { HypeCelebrationController } from './components/hype/HypeCelebrationController'
 import { useSessionResumeRecovery } from './hooks/useSessionResumeRecovery'
 import { useAdminRoleNotifications } from './hooks/useAdminRoleNotifications'
 import { useChannelBanExpirySweep } from './hooks/useChannelBanExpirySweep'
@@ -411,14 +413,16 @@ function App() {
         <ClientResetProvider>
           <SoundEffectsProvider>
             <MessagesProvider>
-              <DirectMessagesProvider>
-                <BoardBadgesProvider>
-                  <WeatherProvider>
-                    <AppBadgeSync />
-                    <PhoneInstallOnboarding />
-                    <AppReleaseGate />
-                    <GoldenEggDiscoveryController />
-                    <div className={`app-viewport flex flex-col overflow-hidden md:flex-row ${hideAppChrome ? 'bg-black' : ''}`}>
+              <HypeProvider>
+                <DirectMessagesProvider>
+                  <BoardBadgesProvider>
+                    <WeatherProvider>
+                      <AppBadgeSync />
+                      <PhoneInstallOnboarding />
+                      <AppReleaseGate />
+                      <GoldenEggDiscoveryController />
+                      <HypeCelebrationController />
+                      <div className={`app-viewport flex flex-col overflow-hidden md:flex-row ${hideAppChrome ? 'bg-black' : ''}`}>
                       {isDesktop && !hideAppChrome && (
                         <Sidebar
                           currentView={currentView}
@@ -447,10 +451,11 @@ function App() {
                       {!hideAppChrome && currentView !== 'chat' && currentView !== 'dms' && !(currentView === 'boards' && boardsChatFooterActive) && (
                         <MobileNav currentView={currentView} onViewChange={handleViewChange} />
                       )}
-                    </div>
-                  </WeatherProvider>
-                </BoardBadgesProvider>
-              </DirectMessagesProvider>
+                      </div>
+                    </WeatherProvider>
+                  </BoardBadgesProvider>
+                </DirectMessagesProvider>
+              </HypeProvider>
             </MessagesProvider>
           </SoundEffectsProvider>
         </ClientResetProvider>

@@ -4,7 +4,9 @@ import { Button } from '../ui/Button'
 import type { Message } from '../../lib/supabase'
 import type { EmojiClickData } from '../../types'
 import { MessageReactions } from './MessageItem'
+import { MessageHypeBadge } from './MessageHypeBadge'
 import { VideoAttachment } from './VideoAttachment'
+import { FileAttachment } from './FileAttachment'
 import { cn } from '../../lib/utils'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
@@ -13,6 +15,8 @@ import { getBlockedActionMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
 import { MessageRichText } from './MessageRichText'
 import { EmojiPickerOverlay } from './EmojiPickerOverlay'
+import { getImageMessageDisplaySrc } from './messageDisplay'
+import { getHypeTier } from '../../lib/hypePresentation'
 
 const QUICK_REACTIONS = ['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F389}', '\u{1F64F}']
 
@@ -28,6 +32,11 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
   onToggleReaction,
 }) => {
   const [showPicker, setShowPicker] = useState(false)
+  const hypeCount = message.hype_count ?? 0
+  const hypeTier = getHypeTier(hypeCount)
+  const imageMessageSrc = message.message_type === 'image'
+    ? getImageMessageDisplaySrc(message.file_url, message.thumbnail_url)
+    : ''
 
   const handleReaction = async (emoji: string) => {
     try {
@@ -44,8 +53,15 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
   }
 
   return (
-    <div className="glass-panel relative flex items-start rounded-[var(--radius-md)] p-3 group">
+    <div
+      className={cn(
+        'glass-panel relative flex items-start rounded-[var(--radius-md)] p-3 group',
+        hypeTier > 0 && 'hype-message-shell hype-message-bubble'
+      )}
+      data-hype-tier={hypeTier || undefined}
+    >
       <div className="flex-1 min-w-0 space-y-1">
+        <MessageHypeBadge count={hypeCount} users={message.hype_users ?? []} className="float-right ml-2" />
         <MessageReactions
           message={message}
           onReact={handleReaction}
@@ -61,8 +77,19 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
           :{' '}
           {message.message_type === 'audio' ? (
             <audio controls src={message.audio_url ?? undefined} className="mt-1 max-w-full" />
+          ) : imageMessageSrc ? (
+            <img
+              src={imageMessageSrc}
+              alt="pinned uploaded image"
+              loading="lazy"
+              decoding="async"
+              draggable={false}
+              className="mt-2 max-h-40 max-w-full rounded-[var(--radius-md)] object-cover"
+            />
           ) : message.message_type === 'video' && message.file_url ? (
             <VideoAttachment url={message.file_url} meta={message.content} />
+          ) : message.message_type === 'file' && message.file_url ? (
+            <FileAttachment url={message.file_url} meta={message.content} />
           ) : (
             <MessageRichText content={message.content} className="inline whitespace-pre-wrap" />
           )}

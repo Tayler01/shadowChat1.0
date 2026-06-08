@@ -4,6 +4,7 @@ import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import { MobileAppHeader } from '../layout/MobileAppHeader'
+import { HypeBellButton } from '../hype/HypeBellButton'
 import { clearGroupNotifications } from '../../lib/appBadge'
 import { getBlockedActionMessage, getCurrentUserChannelBan, formatChannelBanBlockMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
@@ -111,6 +112,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
             replyingTo={replyTo || undefined}
             onCancelReply={() => setReplyTo(null)}
             enableGifPicker
+            leadingAccessory={<HypeBellButton />}
           />
         </div>
       </div>
@@ -130,6 +132,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
           replyingTo={replyTo || undefined}
           onCancelReply={() => setReplyTo(null)}
           enableGifPicker
+          leadingAccessory={<HypeBellButton compact />}
         />
       </MobileChatFooter>
     </div>

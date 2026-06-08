@@ -9,6 +9,7 @@ let mockAuthState = {
   user: { id: 'u1' },
   profile: { id: 'u1', admin_role: null as 'admin' | 'sub_admin' | null },
 }
+let mockHypeContext: any = null
 
 jest.mock('../src/config', () => ({
   PRESENCE_INTERVAL_MS: 30000,
@@ -17,6 +18,10 @@ jest.mock('../src/config', () => ({
 
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => mockAuthState,
+}))
+
+jest.mock('../src/hooks/useHype', () => ({
+  useOptionalHype: () => mockHypeContext,
 }))
 
 jest.mock('../src/hooks/useToneAnalysisEnabled')
@@ -57,6 +62,7 @@ beforeEach(() => {
     user: { id: 'u1' },
     profile: { id: 'u1', admin_role: null },
   }
+  mockHypeContext = null
   mockedToneEnabled.mockReturnValue({ enabled: true, setEnabled: jest.fn() })
 })
 
@@ -698,6 +704,85 @@ test('keeps quick reactions near a bottom message when keyboard footer geometry 
       value: originalVisualViewport,
     })
   }
+})
+
+test('renders Hype system events as lightweight non-reactable rows', () => {
+  render(
+    <MessageItem
+      message={{ ...baseMessage, message_type: 'hype', content: 'rang Hype' } as Message}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+      containerRef={React.createRef()}
+    />
+  )
+
+  expect(screen.getByTestId('hype-system-event')).toHaveTextContent('Alice rang Hype')
+  expect(screen.queryByRole('button', { name: /message actions/i })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /add reaction/i })).not.toBeInTheDocument()
+})
+
+test('offers Hype for another user message and calls the Hype action', async () => {
+  const hypeMessage = jest.fn().mockResolvedValue(null)
+  mockHypeContext = {
+    status: { used: 0, remaining: 2, limit_per_day: 2, reset_at: '2026-06-08T04:00:00Z' },
+    hypingMessageIds: new Set<string>(),
+    hypeMessage,
+  }
+
+  render(
+    <MessageItem
+      message={{
+        ...baseMessage,
+        user_id: 'u2',
+        message_type: 'text',
+        content: 'good news',
+        user: { ...(baseMessage.user as any), id: 'u2', display_name: 'Bob', username: 'bob' },
+      } as Message}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+      containerRef={React.createRef()}
+    />
+  )
+
+  await userEvent.click(screen.getByRole('button', { name: /message actions/i }))
+  await userEvent.click(await screen.findByRole('menuitem', { name: /hype/i }))
+
+  expect(hypeMessage).toHaveBeenCalledWith('m1')
+})
+
+test('shows Hype count and tap list on celebrated messages', async () => {
+  render(
+    <MessageItem
+      message={{
+        ...baseMessage,
+        message_type: 'text',
+        content: 'celebrated',
+        hype_count: 3,
+        hype_users: [
+          { user_id: 'u2', display_name: 'Bob', username: 'bob' },
+          { user_id: 'u3', display_name: 'Maya', username: 'maya' },
+        ],
+      } as Message}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+      containerRef={React.createRef()}
+    />
+  )
+
+  const chip = screen.getByRole('button', { name: /hyped by bob, maya/i })
+  expect(chip).toHaveTextContent('3')
+
+  await userEvent.click(chip)
+
+  expect(screen.getByText('Hyped by')).toBeInTheDocument()
+  expect(screen.getByText('Bob')).toBeInTheDocument()
+  expect(screen.getByText('Maya')).toBeInTheDocument()
 })
 
 test('keeps quick reactions anchored when the mobile footer is mid keyboard transition', async () => {

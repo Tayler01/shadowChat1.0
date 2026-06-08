@@ -826,7 +826,47 @@ export interface User {
   updated_at: string
 }
 
-export type ChatMessageType = 'text' | 'command' | 'audio' | 'image' | 'video' | 'file'
+export type ChatMessageType = 'text' | 'command' | 'audio' | 'image' | 'video' | 'file' | 'hype'
+
+export type HypeEventType = 'bell' | 'message'
+
+export interface HypeUserSummary {
+  user_id: string
+  display_name: string
+  username?: string | null
+  created_at?: string
+}
+
+export interface HypeEventMetadata {
+  kind?: HypeEventType
+  title?: string
+  summary?: string
+  actor_id?: string
+  actor_display_name?: string
+  actor_username?: string | null
+  message_author_id?: string
+  message_author_display_name?: string
+  message_author_username?: string | null
+  message_preview?: string
+}
+
+export interface HypeEvent {
+  id: string
+  actor_id: string | null
+  event_type: HypeEventType
+  message_id: string | null
+  message_author_id: string | null
+  metadata: HypeEventMetadata
+  created_at: string
+  expires_at: string
+}
+
+export interface HypeStatus {
+  used: number
+  remaining: number
+  limit_per_day: number
+  reset_at: string
+}
 
 export interface Message {
   id: string
@@ -843,6 +883,8 @@ export interface Message {
   media_height?: number | null
   media_processed_at?: string | null
   reactions: Record<string, { count: number; users: string[] }>
+  hype_count?: number
+  hype_users?: HypeUserSummary[]
   pinned: boolean
   pinned_by?: string | null
   pinned_at?: string | null
@@ -976,6 +1018,114 @@ export const isGeneralChatMessageWindowRpcUnavailable = (error: unknown) => {
   return haystack.includes('PGRST202') ||
     /could not find (the )?function/i.test(haystack) ||
     /function .*get_general_chat_message_window.* does not exist/i.test(haystack)
+}
+
+const normalizeHypeEvent = (value: any): HypeEvent => ({
+  id: String(value.id),
+  actor_id: value.actor_id ?? null,
+  event_type: value.event_type === 'message' ? 'message' : 'bell',
+  message_id: value.message_id ?? null,
+  message_author_id: value.message_author_id ?? null,
+  metadata: (value.metadata && typeof value.metadata === 'object' ? value.metadata : {}) as HypeEventMetadata,
+  created_at: String(value.created_at),
+  expires_at: String(value.expires_at),
+})
+
+const firstHypeEvent = (data: unknown): HypeEvent | null => {
+  const row = Array.isArray(data) ? data[0] : data
+  return row ? normalizeHypeEvent(row) : null
+}
+
+const normalizeHypeStatus = (data: unknown): HypeStatus => {
+  const row = Array.isArray(data) ? data[0] : data as any
+  return {
+    used: Number(row?.used ?? 0),
+    remaining: Number(row?.remaining ?? 0),
+    limit_per_day: Number(row?.limit_per_day ?? 2),
+    reset_at: String(row?.reset_at ?? ''),
+  }
+}
+
+export const fetchHypeStatus = async (): Promise<HypeStatus> => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_hype_status')
+
+  if (error) {
+    throw error
+  }
+
+  return normalizeHypeStatus(data)
+}
+
+export const ringHypeBell = async (): Promise<HypeEvent> => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('ring_hype_bell')
+
+  if (error) {
+    throw error
+  }
+
+  const event = firstHypeEvent(data)
+  if (!event) {
+    throw new Error('Hype event was not created.')
+  }
+
+  return event
+}
+
+export const hypeMessage = async (messageId: string): Promise<HypeEvent> => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('hype_message', {
+    target_message_id: messageId,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  const event = firstHypeEvent(data)
+  if (!event) {
+    throw new Error('Hype event was not created.')
+  }
+
+  return event
+}
+
+export const fetchHypeEvent = async (eventId: string): Promise<HypeEvent | null> => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_hype_event', {
+    event_id: eventId,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return firstHypeEvent(data)
+}
+
+export const fetchPendingHypeEvents = async (): Promise<HypeEvent[]> => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_pending_hype_events')
+
+  if (error) {
+    throw error
+  }
+
+  return Array.isArray(data) ? data.map(normalizeHypeEvent) : []
+}
+
+export const markHypeEventsPlayed = async (eventIds: string[]) => {
+  if (!eventIds.length) return
+
+  const workingClient = await getWorkingClient()
+  const { error } = await workingClient.rpc('mark_hype_events_played', {
+    event_ids: eventIds,
+  })
+
+  if (error) {
+    throw error
+  }
 }
 
 export type NewsPlatform = 'x' | 'truth'

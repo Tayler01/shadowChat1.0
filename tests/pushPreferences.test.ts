@@ -21,6 +21,7 @@ beforeEach(() => {
       reply_enabled: true,
       reaction_enabled: true,
       group_enabled: true,
+      hype_enabled: true,
       quiet_hours_start: null,
       quiet_hours_end: null,
       mute_until: null,
