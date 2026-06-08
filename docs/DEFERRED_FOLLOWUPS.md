@@ -13,6 +13,7 @@ This document keeps small deferred ideas from being lost when stale branches are
 - The only idea worth revisiting is a fresh, current-main implementation of `build.rollupOptions.output.manualChunks` in [vite.config.ts](C:/repos/chat2.0/vite.config.ts:1).
 - Do not blindly restore `sourcemap: true` for production unless production source maps are intentionally desired.
 - When revisiting this, run `npm run build` before and after the change and compare the emitted chunk sizes.
+- On 2026-06-08, `npm run build` still passed with the existing Vite large-chunk warning. Keep this as the tail-end fix after the current approved security/database/UX/feature/performance batch unless Tayler reprioritizes it.
 
 ## Audit Improvements - 2026-04-26
 
