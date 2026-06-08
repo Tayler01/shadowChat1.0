@@ -1,9 +1,8 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { resetNewsFeedCacheForTests, useNewsFeed } from '../src/hooks/useNewsFeed'
+import { resetNewsChatCacheForTests, useNewsChat } from '../src/hooks/useNewsChat'
 import { useAuth } from '../src/hooks/useAuth'
 import { useRealtimeRecovery } from '../src/hooks/useRealtimeRecovery'
 import { getWorkingClient } from '../src/lib/supabase'
-import { getEasternVisibleDay } from '../src/lib/newsFeedVisibility'
 
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: jest.fn(),
@@ -15,6 +14,7 @@ jest.mock('../src/lib/realtimeRecovery', () => ({
   runRealtimeRecovery: jest.fn().mockResolvedValue({ ok: true }),
 }))
 jest.mock('../src/lib/supabase', () => ({
+  ensureSession: jest.fn().mockResolvedValue(true),
   getRealtimeClient: jest.fn(),
   getWorkingClient: jest.fn(),
 }))
@@ -25,26 +25,36 @@ type TestChannel = {
   subscribe: jest.Mock<TestChannel, []>
 }
 
-const createFeedItem = (id: string, visibleDay = getEasternVisibleDay()) => ({
+const createMessage = (id: string) => ({
   id,
-  title: id,
-  summary: `${id} summary`,
-  source_url: `https://example.com/${id}`,
-  image_url: null,
-  hidden: false,
-  visible_day: visibleDay,
-  detected_at: '2026-05-02T12:00:00.000Z',
-  created_at: '2026-05-02T12:00:00.000Z',
-  source: null,
+  user_id: 'u1',
+  content: `${id} content`,
+  reactions: {},
+  created_at: `2026-05-02T12:00:0${id.endsWith('2') ? '2' : '1'}.000Z`,
+  updated_at: `2026-05-02T12:00:0${id.endsWith('2') ? '2' : '1'}.000Z`,
+  edited_at: null,
+  deleted_at: null,
+  user: {
+    id: 'u1',
+    username: 'news',
+    display_name: 'News User',
+    avatar_url: null,
+    color: '#d7aa46',
+    admin_role: null,
+  },
 })
 
 const createQuery = (data: unknown[]) => {
   const query: Record<string, jest.Mock> = {
     select: jest.fn(() => query),
-    eq: jest.fn(() => query),
     order: jest.fn(() => query),
     limit: jest.fn().mockResolvedValue({ data, error: null }),
+    eq: jest.fn(() => query),
     maybeSingle: jest.fn().mockResolvedValue({ data: data[0] ?? null, error: null }),
+    insert: jest.fn(() => query),
+    single: jest.fn().mockResolvedValue({ data: data[0] ?? null, error: null }),
+    update: jest.fn(() => query),
+    delete: jest.fn(() => query),
   }
 
   return query
@@ -53,7 +63,7 @@ const createQuery = (data: unknown[]) => {
 const createChannel = (handlers: HandlerMap): TestChannel => {
   const channel: TestChannel = {
     on: jest.fn((_: string, config: { event: string }, handler: HandlerMap[string]) => {
-    handlers[config.event] = handler
+      handlers[config.event] = handler
       return channel
     }),
     subscribe: jest.fn(() => channel),
@@ -73,7 +83,7 @@ let workingClient: {
 
 beforeEach(() => {
   jest.resetAllMocks()
-  resetNewsFeedCacheForTests()
+  resetNewsChatCacheForTests()
   ;(useAuth as jest.Mock).mockReturnValue({ user: { id: 'u1' } })
   handlers = {}
   createChannelRef = createChannel(handlers)
@@ -86,51 +96,30 @@ beforeEach(() => {
   ;(getWorkingClient as jest.Mock).mockResolvedValue(workingClient)
 })
 
-test('skips detail fetches for hidden news feed inserts', async () => {
-  const initialQuery = createQuery([])
-  workingClient.from.mockReturnValue(initialQuery)
+test('applies inserted news chat messages from realtime', async () => {
+  const message = createMessage('message-1')
+  workingClient.from
+    .mockReturnValueOnce(createQuery([]))
+    .mockReturnValueOnce(createQuery([message]))
 
-  const { result } = renderHook(() => useNewsFeed())
+  const { result } = renderHook(() => useNewsChat())
 
   await waitFor(() => expect(result.current.loading).toBe(false))
-  expect(workingClient.from).toHaveBeenCalledTimes(1)
 
   await act(async () => {
     await handlers.INSERT?.({
       eventType: 'INSERT',
-      new: { id: 'hidden-item', hidden: true, visible_day: getEasternVisibleDay() },
+      new: { id: 'message-1' },
     })
   })
 
-  expect(workingClient.from).toHaveBeenCalledTimes(1)
-  expect(result.current.items).toEqual([])
+  expect(result.current.messages).toEqual([message])
 })
 
-test('removes hidden news feed updates without a detail refetch', async () => {
-  const initialQuery = createQuery([createFeedItem('visible-item')])
-  workingClient.from.mockReturnValue(initialQuery)
+test('removes the news chat realtime channel on unmount', async () => {
+  workingClient.from.mockReturnValue(createQuery([]))
 
-  const { result } = renderHook(() => useNewsFeed())
-
-  await waitFor(() => expect(result.current.items).toHaveLength(1))
-  expect(workingClient.from).toHaveBeenCalledTimes(1)
-
-  await act(async () => {
-    await handlers.UPDATE?.({
-      eventType: 'UPDATE',
-      new: { id: 'visible-item', hidden: true, visible_day: getEasternVisibleDay() },
-    })
-  })
-
-  expect(workingClient.from).toHaveBeenCalledTimes(1)
-  expect(result.current.items).toEqual([])
-})
-
-test('removes the news feed realtime channel on unmount', async () => {
-  const initialQuery = createQuery([])
-  workingClient.from.mockReturnValue(initialQuery)
-
-  const { result, unmount } = renderHook(() => useNewsFeed())
+  const { result, unmount } = renderHook(() => useNewsChat())
 
   await waitFor(() => expect(result.current.loading).toBe(false))
   await waitFor(() => expect(workingClient.channel).toHaveBeenCalledTimes(1))
@@ -140,12 +129,11 @@ test('removes the news feed realtime channel on unmount', async () => {
   expect(workingClient.removeChannel).toHaveBeenCalledWith(createChannelRef)
 })
 
-test('resubscribes the news feed realtime channel after recovery', async () => {
-  const initialQuery = createQuery([])
+test('resubscribes the news chat realtime channel after recovery', async () => {
   const nextChannel = createChannel({})
-  workingClient.from.mockReturnValue(initialQuery)
+  workingClient.from.mockReturnValue(createQuery([]))
 
-  const { result } = renderHook(() => useNewsFeed())
+  const { result } = renderHook(() => useNewsChat())
 
   await waitFor(() => expect(result.current.loading).toBe(false))
   await waitFor(() => expect(workingClient.channel).toHaveBeenCalledTimes(1))

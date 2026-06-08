@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { RealtimeChannel } from '@supabase/supabase-js'
 import {
   ensureSession,
   getRealtimeClient,
@@ -8,6 +7,10 @@ import {
 } from '../lib/supabase'
 import { runRealtimeRecovery } from '../lib/realtimeRecovery'
 import { createRealtimeChannelName } from '../lib/realtimeChannelName'
+import {
+  createRealtimeSubscriptionManager,
+  isRecoverableRealtimeStatus,
+} from '../lib/realtimeSubscription'
 import { useAuth } from './useAuth'
 import { useRealtimeRecovery } from './useRealtimeRecovery'
 
@@ -57,8 +60,10 @@ export function useNewsChat() {
   const [loading, setLoading] = useState(!cachedChat)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const channelRef = useRef<RealtimeChannel | null>(null)
-  const subscribeRef = useRef<(() => Promise<RealtimeChannel | null>) | null>(null)
+  const subscriptionRef = useRef<ReturnType<typeof createRealtimeSubscriptionManager> | null>(null)
+  if (!subscriptionRef.current) {
+    subscriptionRef.current = createRealtimeSubscriptionManager({ getFallbackClient: getRealtimeClient })
+  }
 
   const updateMessages = useCallback((updater: NewsChatMessage[] | ((current: NewsChatMessage[]) => NewsChatMessage[])) => {
     setMessages(current => {
@@ -119,21 +124,7 @@ export function useNewsChat() {
 
   const resetChatChannel = useCallback(async () => {
     await fetchMessages({ force: true, silent: true })
-
-    const activeChannel = channelRef.current
-    const realtimeClient = getRealtimeClient()
-    if (activeChannel && realtimeClient?.removeChannel) {
-      try {
-        realtimeClient.removeChannel(activeChannel)
-      } catch {
-        // ignore channel cleanup failures
-      }
-    }
-
-    channelRef.current = null
-    if (subscribeRef.current) {
-      channelRef.current = await subscribeRef.current().catch(() => null)
-    }
+    await subscriptionRef.current?.resubscribe().catch(() => null)
   }, [fetchMessages])
 
   useRealtimeRecovery(() => {
@@ -143,15 +134,14 @@ export function useNewsChat() {
   useEffect(() => {
     if (!user) return
 
-    let channel: RealtimeChannel | null = null
-    let currentClient: any = null
+    const subscriptionManager = subscriptionRef.current
 
-    const subscribe = async (): Promise<RealtimeChannel | null> => {
-      currentClient = await getWorkingClient().catch(() => getRealtimeClient())
+    const subscribe = async () => {
+      let currentClient = await getWorkingClient().catch(() => getRealtimeClient())
       currentClient = currentClient || getRealtimeClient()
       if (!currentClient?.channel) return null
 
-      channel = currentClient
+      const channel = currentClient
         .channel(createRealtimeChannelName('public:news_chat_messages'))
         .on(
           'postgres_changes',
@@ -181,24 +171,20 @@ export function useNewsChat() {
           }
         )
         .subscribe((status: string) => {
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          if (isRecoverableRealtimeStatus(status)) {
             void runRealtimeRecovery('channel-error')
           }
         })
 
-      channelRef.current = channel
-      return channel
+      return { channel, client: currentClient }
     }
 
-    subscribeRef.current = subscribe
-    void subscribe()
+    subscriptionManager?.setSubscribe(subscribe)
+    void subscriptionManager?.start(subscribe).catch(() => null)
 
     return () => {
-      subscribeRef.current = null
-      if (channel && currentClient?.removeChannel) {
-        currentClient.removeChannel(channel)
-      }
-      channelRef.current = null
+      subscriptionManager?.clearSubscribe(subscribe)
+      void subscriptionManager?.stop()
     }
   }, [fetchMessage, updateMessages, user])
 

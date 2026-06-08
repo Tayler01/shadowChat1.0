@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { RealtimeChannel } from '@supabase/supabase-js'
 import {
   getRealtimeClient,
   getWorkingClient,
@@ -7,6 +6,10 @@ import {
 } from '../lib/supabase'
 import { runRealtimeRecovery } from '../lib/realtimeRecovery'
 import { createRealtimeChannelName } from '../lib/realtimeChannelName'
+import {
+  createRealtimeSubscriptionManager,
+  isRecoverableRealtimeStatus,
+} from '../lib/realtimeSubscription'
 import {
   getEasternVisibleDay,
   isCurrentVisibleNewsFeedRow,
@@ -66,8 +69,10 @@ export function useNewsFeed() {
   const [items, setItems] = useState<NewsFeedItem[]>(() => cachedFeed?.items ?? [])
   const [loading, setLoading] = useState(!cachedFeed)
   const [error, setError] = useState<string | null>(null)
-  const channelRef = useRef<RealtimeChannel | null>(null)
-  const subscribeRef = useRef<(() => Promise<RealtimeChannel | null>) | null>(null)
+  const subscriptionRef = useRef<ReturnType<typeof createRealtimeSubscriptionManager> | null>(null)
+  if (!subscriptionRef.current) {
+    subscriptionRef.current = createRealtimeSubscriptionManager({ getFallbackClient: getRealtimeClient })
+  }
 
   const updateItems = useCallback((updater: NewsFeedItem[] | ((current: NewsFeedItem[]) => NewsFeedItem[])) => {
     setItems(current => {
@@ -131,21 +136,7 @@ export function useNewsFeed() {
 
   const resetFeedChannel = useCallback(async () => {
     await fetchFeed({ force: true, silent: true })
-
-    const activeChannel = channelRef.current
-    const realtimeClient = getRealtimeClient()
-    if (activeChannel && realtimeClient?.removeChannel) {
-      try {
-        realtimeClient.removeChannel(activeChannel)
-      } catch {
-        // ignore channel cleanup failures
-      }
-    }
-
-    channelRef.current = null
-    if (subscribeRef.current) {
-      channelRef.current = await subscribeRef.current().catch(() => null)
-    }
+    await subscriptionRef.current?.resubscribe().catch(() => null)
   }, [fetchFeed])
 
   useRealtimeRecovery(() => {
@@ -155,15 +146,14 @@ export function useNewsFeed() {
   useEffect(() => {
     if (!user) return
 
-    let channel: RealtimeChannel | null = null
-    let currentClient: any = null
+    const subscriptionManager = subscriptionRef.current
 
-    const subscribe = async (): Promise<RealtimeChannel | null> => {
-      currentClient = await getWorkingClient().catch(() => getRealtimeClient())
+    const subscribe = async () => {
+      let currentClient = await getWorkingClient().catch(() => getRealtimeClient())
       currentClient = currentClient || getRealtimeClient()
       if (!currentClient?.channel) return null
 
-      channel = currentClient
+      const channel = currentClient
         .channel(createRealtimeChannelName('public:news_feed_items'))
         .on(
           'postgres_changes',
@@ -205,24 +195,20 @@ export function useNewsFeed() {
           }
         )
         .subscribe((status: string) => {
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          if (isRecoverableRealtimeStatus(status)) {
             void runRealtimeRecovery('channel-error')
           }
         })
 
-      channelRef.current = channel
-      return channel
+      return { channel, client: currentClient }
     }
 
-    subscribeRef.current = subscribe
-    void subscribe()
+    subscriptionManager?.setSubscribe(subscribe)
+    void subscriptionManager?.start(subscribe).catch(() => null)
 
     return () => {
-      subscribeRef.current = null
-      if (channel && currentClient?.removeChannel) {
-        currentClient.removeChannel(channel)
-      }
-      channelRef.current = null
+      subscriptionManager?.clearSubscribe(subscribe)
+      void subscriptionManager?.stop()
     }
   }, [fetchFeedItem, updateItems, user])
 
