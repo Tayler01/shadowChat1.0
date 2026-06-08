@@ -1,6 +1,12 @@
-import dns from 'node:dns/promises'
 import sharp from 'sharp'
 import { createClient } from '@supabase/supabase-js'
+import {
+  assertPublicUrl,
+  normalizePublicHttpUrl,
+  readLimitedArrayBuffer,
+  readLimitedText,
+  safeFetch,
+} from './safe-fetch.mjs'
 
 export const SHADOW_PIN_BUCKET = 'shadow-pin'
 export const MAX_IMAGE_BYTES = 15 * 1024 * 1024
@@ -14,15 +20,12 @@ const ALLOWED_CONTENT_TYPES = new Map([
   ['image/webp', 'webp'],
   ['image/gif', 'gif'],
 ])
-
-const PRIVATE_IPV4_RANGES = [
-  /^0\./,
-  /^10\./,
-  /^127\./,
-  /^169\.254\./,
-  /^192\.168\./,
-  /^172\.(1[6-9]|2\d|3[0-1])\./,
-]
+const SAFE_IMAGE_URL_OPTIONS = {
+  credentialMessage: 'URL credentials are not allowed.',
+  invalidSchemeMessage: 'Only public http and https image URLs can be imported.',
+  tooLongMessage: 'A valid image URL is required.',
+  unsafeHostMessage: 'Private or local image URLs cannot be imported.',
+}
 
 export function getRuntimeEnv(name) {
   return globalThis.Netlify?.env?.get?.(name) || process.env[name]
@@ -67,57 +70,11 @@ export function cleanText(value, maxLength, label, required) {
 }
 
 export function normalizeImageUrl(value) {
-  const trimmed = String(value || '').trim()
-  if (!trimmed || trimmed.length > 2048) {
-    throw new Error('A valid image URL is required.')
-  }
-
-  const withScheme = /^www\./i.test(trimmed) ? `https://${trimmed}` : trimmed
-  const parsed = new URL(withScheme)
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error('Only public http and https image URLs can be imported.')
-  }
-  parsed.username = ''
-  parsed.password = ''
-  parsed.hash = ''
-  return parsed
-}
-
-function isPrivateIpv4(value) {
-  return PRIVATE_IPV4_RANGES.some(pattern => pattern.test(value))
-}
-
-function isUnsafeHost(host) {
-  const normalized = host.toLowerCase()
-  return (
-    normalized === 'localhost' ||
-    normalized.endsWith('.localhost') ||
-    normalized.endsWith('.local') ||
-    normalized === '::1' ||
-    normalized === '[::1]' ||
-    normalized.startsWith('fc') ||
-    normalized.startsWith('fd') ||
-    normalized.startsWith('fe80') ||
-    isPrivateIpv4(normalized)
-  )
+  return normalizePublicHttpUrl(value, SAFE_IMAGE_URL_OPTIONS)
 }
 
 export async function assertPublicHost(url) {
-  const host = url.hostname.toLowerCase()
-  if (isUnsafeHost(host)) {
-    throw new Error('Private or local image URLs cannot be imported.')
-  }
-
-  try {
-    const records = await dns.lookup(host, { all: true, verbatim: false })
-    if (records.some(record => record.family === 4 && isPrivateIpv4(record.address))) {
-      throw new Error('Private or local image URLs cannot be imported.')
-    }
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('Private or local')) {
-      throw error
-    }
-  }
+  await assertPublicUrl(url, SAFE_IMAGE_URL_OPTIONS)
 }
 
 export function resolveImageType(contentTypeHeader) {
@@ -196,14 +153,13 @@ async function fetchWithTimeout(url, accept) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 9000)
   try {
-    return await fetch(url, {
-      redirect: 'follow',
+    return await safeFetch(url, {
       signal: controller.signal,
       headers: {
         accept,
         'user-agent': 'ShadowChat-ShadowPinImporter/1.0',
       },
-    })
+    }, SAFE_IMAGE_URL_OPTIONS)
   } finally {
     clearTimeout(timeout)
   }
@@ -223,10 +179,7 @@ async function readImageResponse(response, sourceUrl) {
   }
 
   const { contentType, extension } = resolveImageType(response.headers.get('content-type'))
-  const arrayBuffer = await response.arrayBuffer()
-  if (arrayBuffer.byteLength > MAX_IMAGE_BYTES) {
-    throw new Error('Image is larger than 15MB.')
-  }
+  const arrayBuffer = await readLimitedArrayBuffer(response, MAX_IMAGE_BYTES, 'Image is larger than 15MB.')
 
   return {
     buffer: Buffer.from(arrayBuffer),
@@ -245,10 +198,7 @@ async function resolveImageResponseFromPage(response, sourceUrl) {
     throw new Error('Image page is too large to inspect.')
   }
 
-  const html = await response.text()
-  if (Buffer.byteLength(html, 'utf8') > MAX_HTML_BYTES) {
-    throw new Error('Image page is too large to inspect.')
-  }
+  const html = await readLimitedText(response, MAX_HTML_BYTES, 'Image page is too large to inspect.')
 
   const imageUrl = extractImageUrlFromHtml(html, finalUrl)
   if (!imageUrl) {

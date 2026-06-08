@@ -6,6 +6,11 @@ import {
   type PushSubscription,
   type VapidKeys,
 } from 'npm:@block65/webcrypto-web-push@1.0.2'
+import {
+  assertPublicUrl,
+  normalizePublicHttpUrl,
+  safeFetch,
+} from '../_shared/safe-fetch.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,6 +46,12 @@ type StoredSubscription = {
 type NotificationEventRow = {
   id: string
   sent_at: string | null
+}
+const SAFE_PUSH_ENDPOINT_OPTIONS = {
+  credentialMessage: 'Push endpoint credentials are not allowed.',
+  invalidSchemeMessage: 'Only https push endpoints are supported.',
+  tooLongMessage: 'A valid push endpoint is required.',
+  unsafeHostMessage: 'Private or local push endpoints cannot be used.',
 }
 
 type DmMessageRecord = {
@@ -105,6 +116,8 @@ const json = (body: unknown, status = 200) =>
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
+const ensureResponse = (response: Response | undefined) =>
+  response ?? json({ error: 'Push action did not return a response.' }, 500)
 
 const truncate = (value: string, maxLength: number) => {
   if (value.length <= maxLength) return value
@@ -269,6 +282,25 @@ const upsertNotificationEvent = async (
   return data as NotificationEventRow
 }
 
+const normalizePushEndpoint = async (value: string) => {
+  const endpoint = normalizePublicHttpUrl(value, SAFE_PUSH_ENDPOINT_OPTIONS)
+  if (endpoint.protocol !== 'https:') {
+    throw new Error('Only https push endpoints are supported.')
+  }
+  await assertPublicUrl(endpoint, SAFE_PUSH_ENDPOINT_OPTIONS)
+  return endpoint
+}
+
+const toPushRequestInit = (payload: Awaited<ReturnType<typeof buildPushPayload>>): RequestInit => {
+  const bodyBytes = new Uint8Array(payload.body)
+  const body = bodyBytes.buffer as ArrayBuffer
+
+  return {
+    ...payload,
+    body,
+  }
+}
+
 const deliverPushToSubscriptions = async (
   supabase: ReturnType<typeof getSupabaseAdmin>,
   vapid: VapidKeys,
@@ -286,14 +318,25 @@ const deliverPushToSubscriptions = async (
         },
       }
 
-      const payload = await buildPushPayload(message, subscription, vapid)
-      const response = await fetch(subscription.endpoint, payload)
+      try {
+        const endpoint = await normalizePushEndpoint(subscriptionRow.endpoint)
+        const payload = await buildPushPayload(message, subscription, vapid)
+        const response = await safeFetch(endpoint, toPushRequestInit(payload), SAFE_PUSH_ENDPOINT_OPTIONS)
 
-      return {
-        id: subscriptionRow.id,
-        endpoint: subscriptionRow.endpoint,
-        status: response.status,
-        ok: response.ok,
+        return {
+          id: subscriptionRow.id,
+          endpoint: subscriptionRow.endpoint,
+          status: response.status,
+          ok: response.ok,
+        }
+      } catch (error) {
+        return {
+          id: subscriptionRow.id,
+          endpoint: subscriptionRow.endpoint,
+          status: 400,
+          ok: false,
+          error: error instanceof Error ? error.message : 'Invalid push endpoint',
+        }
       }
     })
   )
@@ -887,7 +930,7 @@ const sendHypePush = async (
   })
 }
 
-serve(async (req) => {
+serve(async (req): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -896,7 +939,7 @@ serve(async (req) => {
     const body = await req.json() as SendPushRequestBody
     const auth = await authenticateRequest(req, body)
     if ('error' in auth) {
-      return auth.error
+      return ensureResponse(auth.error)
     }
 
     const type = body?.type as PushEventType | undefined
@@ -917,14 +960,14 @@ serve(async (req) => {
     const vapid = getVapidKeys()
 
     if (type === 'dm_message') {
-      return await sendDmPush(supabase, vapid, auth.userId, messageId, origin, bridgeDeviceId)
+      return ensureResponse(await sendDmPush(supabase, vapid, auth.userId, messageId, origin, bridgeDeviceId))
     }
 
     if (type === 'hype_event') {
-      return await sendHypePush(supabase, vapid, auth.userId, eventId)
+      return ensureResponse(await sendHypePush(supabase, vapid, auth.userId, eventId))
     }
 
-    return await sendGroupPush(supabase, vapid, auth.userId, messageId, origin, bridgeDeviceId)
+    return ensureResponse(await sendGroupPush(supabase, vapid, auth.userId, messageId, origin, bridgeDeviceId))
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     return json({ error: message }, 500)

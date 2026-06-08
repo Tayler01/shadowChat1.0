@@ -1,5 +1,10 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4'
+import {
+  assertPublicUrl,
+  normalizePublicHttpUrl,
+  safeFetch,
+} from '../_shared/safe-fetch.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -16,6 +21,12 @@ const ALLOWED_NATIVE_VIDEO_TYPES = new Set([
   'video/webm',
   'video/x-m4v',
 ])
+const SAFE_VIDEO_URL_OPTIONS = {
+  credentialMessage: 'URL credentials are not allowed.',
+  invalidSchemeMessage: 'Only http and https video links are supported.',
+  tooLongMessage: 'sourceUrl is required.',
+  unsafeHostMessage: 'Private links cannot be imported.',
+}
 
 type Provider = 'bunny_stream' | 'youtube' | 'x' | 'pinterest' | 'instagram' | 'external'
 type VideoAction =
@@ -88,6 +99,8 @@ const badRequest = (message: string) => json({ error: message }, 400)
 const unauthorized = (message: string) => json({ error: message }, 401)
 const forbidden = (message: string) => json({ error: message }, 403)
 const notFound = (message: string) => json({ error: message }, 404)
+const ensureResponse = (response: Response | undefined) =>
+  response ?? json({ error: 'Shadow Pin video action did not return a response.' }, 500)
 
 const getSupabaseEnv = () => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -186,57 +199,12 @@ const normalizeNonNegativeInteger = (value: unknown) => {
 const normalizeOptionalPath = (value: unknown) =>
   typeof value === 'string' && value.trim() ? value.trim() : null
 
-const isPrivateIpv4 = (host: string) => {
-  const parts = host.split('.').map(part => Number(part))
-  if (parts.length !== 4 || parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)) {
-    return false
-  }
-
-  const [a, b] = parts
-  return (
-    a === 10 ||
-    a === 127 ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168) ||
-    a === 0
-  )
-}
-
 const normalizeUrl = (value: string) => {
-  const withScheme = /^www\./i.test(value.trim()) ? `https://${value.trim()}` : value.trim()
-  const parsed = new URL(withScheme)
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error('Only http and https video links are supported.')
-  }
-  parsed.username = ''
-  parsed.password = ''
-  parsed.hash = ''
-  return parsed
+  return normalizePublicHttpUrl(value, SAFE_VIDEO_URL_OPTIONS)
 }
 
 const assertPublicHost = async (url: URL) => {
-  const host = url.hostname.toLowerCase()
-  if (
-    host === 'localhost' ||
-    host.endsWith('.localhost') ||
-    host.endsWith('.local') ||
-    host === '::1' ||
-    isPrivateIpv4(host)
-  ) {
-    throw new Error('Private links cannot be imported.')
-  }
-
-  try {
-    const records = await Deno.resolveDns(host, 'A')
-    if (records.some(isPrivateIpv4)) {
-      throw new Error('Private links cannot be imported.')
-    }
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('Private links')) {
-      throw error
-    }
-  }
+  await assertPublicUrl(url, SAFE_VIDEO_URL_OPTIONS)
 }
 
 const decodeHtml = (value: string) =>
@@ -390,26 +358,24 @@ const probeDirectVideoUrl = async (url: URL): Promise<string | null> => {
       : null
   }
 
-  const headResponse = await fetch(url, {
+  const headResponse = await safeFetch(url, {
     method: 'HEAD',
-    redirect: 'follow',
     signal: AbortSignal.timeout(2500),
     headers: requestHeaders,
-  }).catch(() => null)
+  }, SAFE_VIDEO_URL_OPTIONS).catch(() => null)
   if (headResponse) {
     const playableUrl = await checkResponse(headResponse)
     if (playableUrl) return playableUrl
   }
 
-  const rangeResponse = await fetch(url, {
+  const rangeResponse = await safeFetch(url, {
     method: 'GET',
-    redirect: 'follow',
     signal: AbortSignal.timeout(3000),
     headers: {
       ...requestHeaders,
       range: 'bytes=0-0',
     },
-  }).catch(() => null)
+  }, SAFE_VIDEO_URL_OPTIONS).catch(() => null)
 
   return rangeResponse ? checkResponse(rangeResponse) : null
 }
@@ -553,10 +519,10 @@ const fetchXSyndicationPreview = async (url: URL): Promise<ExternalPreview | nul
     canonicalUrl,
     title: 'X Video',
     description: typeof user?.name === 'string' ? user.name : undefined,
-    image: poster,
-    previewVideoUrl,
-    videoUrl,
-    videoHlsUrl: hlsUrl,
+    image: poster ?? undefined,
+    previewVideoUrl: previewVideoUrl ?? undefined,
+    videoUrl: videoUrl ?? undefined,
+    videoHlsUrl: hlsUrl ?? undefined,
     mediaWidth: mediaWidth ?? undefined,
     mediaHeight: mediaHeight ?? undefined,
     durationSeconds: durationMs !== null ? Math.round(durationMs / 1000) : undefined,
@@ -784,14 +750,13 @@ const fetchOEmbedPreview = async (url: URL, provider: Provider): Promise<Externa
 }
 
 const fetchOpenGraphPreview = async (url: URL): Promise<ExternalPreview | null> => {
-  const response = await fetch(url, {
-    redirect: 'follow',
+  const response = await safeFetch(url, {
     signal: AbortSignal.timeout(4500),
     headers: {
       accept: 'text/html,application/xhtml+xml,video/*',
       'user-agent': 'ShadowChat-ShadowPinVideo/1.0',
     },
-  })
+  }, SAFE_VIDEO_URL_OPTIONS)
 
   if (!response.ok) return null
   const finalUrl = new URL(response.url || url.toString())
@@ -1617,7 +1582,7 @@ const handleDeleteVideoAsset = async (req: Request, body: VideoPayload) => {
   return json({ ok: true, image: data })
 }
 
-serve(async req => {
+serve(async (req): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -1630,19 +1595,19 @@ serve(async req => {
     const body = await readJson<VideoPayload>(req)
     switch (body.action) {
       case 'create-upload':
-        return await handleCreateUpload(req, body)
+        return ensureResponse(await handleCreateUpload(req, body))
       case 'replace-upload':
-        return await handleReplaceUpload(req, body)
+        return ensureResponse(await handleReplaceUpload(req, body))
       case 'complete-upload':
-        return await handleCompleteUpload(req, body)
+        return ensureResponse(await handleCompleteUpload(req, body))
       case 'sync-status':
-        return await handleSyncStatus(req, body)
+        return ensureResponse(await handleSyncStatus(req, body))
       case 'create-external':
-        return await handleCreateExternal(req, body)
+        return ensureResponse(await handleCreateExternal(req, body))
       case 'replace-external':
-        return await handleReplaceExternal(req, body)
+        return ensureResponse(await handleReplaceExternal(req, body))
       case 'delete-video-asset':
-        return await handleDeleteVideoAsset(req, body)
+        return ensureResponse(await handleDeleteVideoAsset(req, body))
       default:
         return badRequest('Unsupported Shadow Pin video action.')
     }

@@ -1,5 +1,11 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4'
+import {
+  assertPublicUrl,
+  normalizePublicHttpUrl,
+  readLimitedArrayBuffer,
+  safeFetch,
+} from '../_shared/safe-fetch.ts'
 
 const SHADOW_PIN_BUCKET = 'shadow-pin'
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024
@@ -9,6 +15,12 @@ const ALLOWED_CONTENT_TYPES = new Map([
   ['image/webp', 'webp'],
   ['image/gif', 'gif'],
 ])
+const SAFE_IMAGE_URL_OPTIONS = {
+  credentialMessage: 'URL credentials are not allowed.',
+  invalidSchemeMessage: 'Only public http and https image URLs can be imported.',
+  tooLongMessage: 'A valid image URL is required.',
+  unsafeHostMessage: 'Private or local image URLs cannot be imported.',
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -73,66 +85,11 @@ const authenticate = async (authorization: string) => {
 }
 
 const normalizeUrl = (value: string) => {
-  const trimmed = value.trim()
-  const withScheme = /^www\./i.test(trimmed) ? `https://${trimmed}` : trimmed
-  const parsed = new URL(withScheme)
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error('Only public http and https image URLs can be imported.')
-  }
-  parsed.username = ''
-  parsed.password = ''
-  parsed.hash = ''
-  return parsed
-}
-
-const isPrivateIpv4 = (host: string) => {
-  const parts = host.split('.').map(part => Number(part))
-  if (parts.length !== 4 || parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)) {
-    return false
-  }
-
-  const [a, b] = parts
-  return (
-    a === 0 ||
-    a === 10 ||
-    a === 127 ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168)
-  )
-}
-
-const isUnsafeHost = (host: string) => {
-  const normalized = host.toLowerCase()
-  return (
-    normalized === 'localhost' ||
-    normalized.endsWith('.localhost') ||
-    normalized.endsWith('.local') ||
-    normalized === '::1' ||
-    normalized === '[::1]' ||
-    normalized.startsWith('fc') ||
-    normalized.startsWith('fd') ||
-    normalized.startsWith('fe80') ||
-    isPrivateIpv4(normalized)
-  )
+  return normalizePublicHttpUrl(value, SAFE_IMAGE_URL_OPTIONS)
 }
 
 const assertPublicHost = async (url: URL) => {
-  const host = url.hostname.toLowerCase()
-  if (isUnsafeHost(host)) {
-    throw new Error('Private or local image URLs cannot be imported.')
-  }
-
-  try {
-    const records = await Deno.resolveDns(host, 'A')
-    if (records.some(isPrivateIpv4)) {
-      throw new Error('Private or local image URLs cannot be imported.')
-    }
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('Private or local')) {
-      throw error
-    }
-  }
+  await assertPublicUrl(url, SAFE_IMAGE_URL_OPTIONS)
 }
 
 const resolveImageType = (contentTypeHeader: string | null) => {
@@ -206,14 +163,13 @@ serve(async req => {
       activeCategory = data
     }
 
-    const response = await fetch(sourceUrl, {
-      redirect: 'follow',
+    const response = await safeFetch(sourceUrl, {
       signal: AbortSignal.timeout(8000),
       headers: {
         accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif;q=0.9,*/*;q=0.5',
         'user-agent': 'ShadowChat-ShadowPinImporter/1.0',
       },
-    })
+    }, SAFE_IMAGE_URL_OPTIONS)
 
     if (!response.ok) {
       throw new Error(`Image fetch failed with ${response.status}`)
@@ -222,16 +178,8 @@ serve(async req => {
     const finalUrl = new URL(response.url || sourceUrl.toString())
     await assertPublicHost(finalUrl)
 
-    const contentLength = Number(response.headers.get('content-length') ?? '0')
-    if (contentLength > MAX_IMAGE_BYTES) {
-      throw new Error('Image is larger than 15MB.')
-    }
-
     const { contentType, extension } = resolveImageType(response.headers.get('content-type'))
-    const bytes = await response.arrayBuffer()
-    if (bytes.byteLength > MAX_IMAGE_BYTES) {
-      throw new Error('Image is larger than 15MB.')
-    }
+    const bytes = await readLimitedArrayBuffer(response, MAX_IMAGE_BYTES, 'Image is larger than 15MB.')
 
     const recordId = crypto.randomUUID()
     const path = targetType === 'category'

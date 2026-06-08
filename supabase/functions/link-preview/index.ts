@@ -1,8 +1,19 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import {
+  assertPublicUrl,
+  normalizePublicHttpUrl,
+  safeFetch,
+} from '../_shared/safe-fetch.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+const SAFE_LINK_URL_OPTIONS = {
+  credentialMessage: 'URL credentials are not allowed.',
+  invalidSchemeMessage: 'Only http and https links can be previewed.',
+  tooLongMessage: 'A valid url is required.',
+  unsafeHostMessage: 'Private links cannot be previewed.',
 }
 
 type LinkPreviewPayload = {
@@ -65,56 +76,11 @@ const authenticate = async (authorization: string) => {
 }
 
 const normalizeUrl = (value: string) => {
-  const withScheme = /^www\./i.test(value.trim()) ? `https://${value.trim()}` : value.trim()
-  const parsed = new URL(withScheme)
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error('Only http and https links can be previewed.')
-  }
-  parsed.username = ''
-  parsed.password = ''
-  parsed.hash = ''
-  return parsed
-}
-
-const isPrivateIpv4 = (host: string) => {
-  const parts = host.split('.').map(part => Number(part))
-  if (parts.length !== 4 || parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)) {
-    return false
-  }
-
-  const [a, b] = parts
-  return (
-    a === 10 ||
-    a === 127 ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168) ||
-    a === 0
-  )
+  return normalizePublicHttpUrl(value, SAFE_LINK_URL_OPTIONS)
 }
 
 const assertPublicHost = async (url: URL) => {
-  const host = url.hostname.toLowerCase()
-  if (
-    host === 'localhost' ||
-    host.endsWith('.localhost') ||
-    host.endsWith('.local') ||
-    host === '::1' ||
-    isPrivateIpv4(host)
-  ) {
-    throw new Error('Private links cannot be previewed.')
-  }
-
-  try {
-    const records = await Deno.resolveDns(host, 'A')
-    if (records.some(isPrivateIpv4)) {
-      throw new Error('Private links cannot be previewed.')
-    }
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('Private links')) {
-      throw error
-    }
-  }
+  await assertPublicUrl(url, SAFE_LINK_URL_OPTIONS)
 }
 
 const decodeHtml = (value: string) =>
@@ -355,14 +321,13 @@ const fetchOEmbedPreview = async (url: URL): Promise<LinkPreview | null> => {
 }
 
 const fetchOpenGraphPreview = async (url: URL): Promise<LinkPreview> => {
-  const response = await fetch(url, {
-    redirect: 'follow',
+  const response = await safeFetch(url, {
     signal: AbortSignal.timeout(4500),
     headers: {
       accept: 'text/html,application/xhtml+xml',
       'user-agent': 'ShadowChat-LinkPreview/1.0',
     },
-  })
+  }, SAFE_LINK_URL_OPTIONS)
 
   if (!response.ok) {
     throw new Error(`Preview fetch failed with ${response.status}`)
