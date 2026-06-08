@@ -105,6 +105,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
           <MessageInput
             onSendMessage={handleSendMessage}
             placeholder='Try "@ai" to ask AI anything'
+            disabled={sending || uploading}
             cacheKey="general"
             onUploadStatusChange={setUploading}
             messages={messages}
@@ -123,6 +124,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
         <MessageInput
           onSendMessage={handleSendMessage}
           placeholder='Try "@ai" to ask AI anything'
+          disabled={sending || uploading}
           className="border-t border-[var(--border-panel)]"
           cacheKey="general"
           onUploadStatusChange={setUploading}

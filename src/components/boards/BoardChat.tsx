@@ -88,6 +88,7 @@ export function BoardChat({
           <MessageInput
             onSendMessage={handleSendMessage}
             placeholder={`Message ${board.title}`}
+            disabled={sending || uploading}
             cacheKey={cacheKey}
             onUploadStatusChange={setUploading}
             messages={messages as BoardChatMessage[]}
@@ -103,6 +104,7 @@ export function BoardChat({
         <MessageInput
           onSendMessage={handleSendMessage}
           placeholder={`Message ${board.title}`}
+          disabled={sending || uploading}
           className="border-t border-[var(--border-panel)]"
           cacheKey={cacheKey}
           onUploadStatusChange={setUploading}

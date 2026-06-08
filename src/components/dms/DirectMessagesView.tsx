@@ -1315,6 +1315,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 <MessageInput
                   onSendMessage={handleSendMessage}
                   placeholder="Message..."
+                  disabled={sending || uploading}
                   cacheKey={`dm-${currentConversation}`}
                   onUploadStatusChange={setUploading}
                   messages={messages}
@@ -1333,6 +1334,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
               <MessageInput
                 onSendMessage={handleSendMessage}
                 placeholder="Message..."
+                disabled={sending || uploading}
                 className="border-t border-[var(--border-panel)]"
                 cacheKey={`dm-${currentConversation}`}
                 onUploadStatusChange={setUploading}
