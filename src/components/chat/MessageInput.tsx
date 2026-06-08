@@ -85,6 +85,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
+  const suppressNextSendClickRef = useRef(false)
 
   useEffect(() => {
     setReplyPreviewExpanded(false)
@@ -319,11 +320,27 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }, HYPE_SEND_LONG_PRESS_MS)
   }, [canLongPressHype, ringHypeFromSendButton])
 
-  const handleSendPointerEnd = useCallback(() => {
+  const handleSendPointerEnd = useCallback((event?: React.PointerEvent<HTMLButtonElement>) => {
     clearHypeLongPressTimer()
-  }, [clearHypeLongPressTimer])
+    if (event?.pointerType !== 'touch' && event?.pointerType !== 'pen') return
+
+    event.preventDefault()
+    suppressNextSendClickRef.current = true
+
+    if (hypeLongPressTriggeredRef.current) {
+      hypeLongPressTriggeredRef.current = false
+      return
+    }
+
+    void sendCurrentMessage()
+  }, [clearHypeLongPressTimer, sendCurrentMessage])
 
   const handleSendClick = useCallback(() => {
+    if (suppressNextSendClickRef.current) {
+      suppressNextSendClickRef.current = false
+      return
+    }
+
     if (hypeLongPressTriggeredRef.current) {
       hypeLongPressTriggeredRef.current = false
       return
@@ -830,8 +847,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           onMouseDown={e => e.preventDefault()}
           onPointerDown={handleSendPointerDown}
           onPointerUp={handleSendPointerEnd}
-          onPointerLeave={handleSendPointerEnd}
-          onPointerCancel={handleSendPointerEnd}
+          onPointerLeave={clearHypeLongPressTimer}
+          onPointerCancel={clearHypeLongPressTimer}
+          onTouchStart={event => event.preventDefault()}
           onContextMenu={event => event.preventDefault()}
           draggable={false}
           onClick={handleSendClick}

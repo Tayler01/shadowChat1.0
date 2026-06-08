@@ -1,5 +1,5 @@
 import { act, render, screen } from '@testing-library/react'
-import { fireEvent, waitFor } from '@testing-library/react'
+import { createEvent, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { MessageInput } from '../src/components/chat/MessageInput'
@@ -227,6 +227,31 @@ test('long pressing the send button rings Hype without sending the draft', async
   } finally {
     jest.useRealTimers()
   }
+})
+
+test('touch tapping the send button sends once and suppresses text selection', async () => {
+  const onSendMessage = jest.fn()
+
+  render(<MessageInput onSendMessage={onSendMessage} />)
+  const textarea = screen.getByRole('textbox')
+  const sendButton = screen.getByRole('button', { name: 'Send message' })
+
+  await act(async () => {
+    fireEvent.change(textarea, { target: { value: 'tap send' } })
+  })
+
+  const touchStart = createEvent.touchStart(sendButton)
+  const preventDefault = jest.spyOn(touchStart, 'preventDefault')
+  fireEvent(sendButton, touchStart)
+  expect(preventDefault).toHaveBeenCalled()
+
+  fireEvent.pointerUp(sendButton, { pointerType: 'touch' })
+  fireEvent.click(sendButton)
+
+  await waitFor(() => {
+    expect(onSendMessage).toHaveBeenCalledTimes(1)
+  })
+  expect(onSendMessage).toHaveBeenCalledWith('tap send', 'text', undefined, undefined)
 })
 
 test('shows an error and keeps reply state when uploaded image send resolves to null', async () => {
