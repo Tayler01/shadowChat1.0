@@ -26,6 +26,11 @@ const getHostLabel = (preview: LinkPreview) => {
 const LinkPreviewCard: React.FC<{ preview: LinkPreview }> = ({ preview }) => {
   const href = preview.canonicalUrl || preview.url
   const host = getHostLabel(preview)
+  const [imageLoadFailed, setImageLoadFailed] = useState(false)
+
+  useEffect(() => {
+    setImageLoadFailed(false)
+  }, [preview.image])
 
   return (
     <a
@@ -37,15 +42,25 @@ const LinkPreviewCard: React.FC<{ preview: LinkPreview }> = ({ preview }) => {
     >
       {preview.image && (
         <div className="relative aspect-[1.91/1] w-full overflow-hidden border-b border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)]">
-          <img
-            src={preview.image}
-            alt={preview.title ? `${preview.title} preview image` : `${host} preview image`}
-            width={1200}
-            height={630}
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover"
-          />
+          {imageLoadFailed ? (
+            <div
+              className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,rgba(215,170,70,0.12),rgba(5,6,8,0.9))] text-[rgba(255,240,184,0.72)]"
+              aria-label={`${preview.title || host} preview image unavailable`}
+            >
+              <ExternalLink className="h-5 w-5" aria-hidden="true" />
+            </div>
+          ) : (
+            <img
+              src={preview.image}
+              alt={preview.title ? `${preview.title} preview image` : `${host} preview image`}
+              width={1200}
+              height={630}
+              loading="lazy"
+              decoding="async"
+              onError={() => setImageLoadFailed(true)}
+              className="h-full w-full object-cover"
+            />
+          )}
           {preview.mediaType === 'video' && (
             <span className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border border-[rgba(255,240,184,0.42)] bg-[rgba(0,0,0,0.62)] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-[rgb(255,240,184)] shadow-[0_8px_20px_rgba(0,0,0,0.35)]">
               <Play className="h-3 w-3 fill-current" />
@@ -116,8 +131,13 @@ export const MessageRichText: React.FC<MessageRichTextProps> = ({
     )
 
     observer.observe(element)
+    const fallbackTimer = window.setTimeout(() => {
+      setShouldFetchPreview(true)
+      observer.disconnect()
+    }, 1500)
 
     return () => {
+      window.clearTimeout(fallbackTimer)
       observer.disconnect()
     }
   }, [firstUrl, showPreview])

@@ -22,6 +22,12 @@ ShadowChat renders `http://`, `https://`, and `www.` URLs in group chat, DMs, an
 - If X removes those public media hints, the official fallback is X API v2 post lookup with `expansions=attachments.media_keys` and `media.fields=url,preview_image_url,type`, which requires a bearer token and should be added as a server-side secret before relying on it in production.
 - YouTube and Vimeo links also use provider oEmbed fallbacks so video thumbnails still appear when the page HTML does not expose usable Open Graph metadata to the function.
 - Facebook/Instagram/Meta oEmbed support can use `META_OEMBED_ACCESS_TOKEN`, or `META_APP_ID` plus `META_APP_SECRET`, as Supabase Edge Function secrets. Do not expose these values through frontend `VITE_*` env vars.
+- Instagram preview image URLs from `cdninstagram.com` and related Meta CDN
+  hosts are unstable on iOS Safari and can expire or return device-specific
+  failures. When `SUPABASE_SERVICE_ROLE_KEY` is available, `link-preview`
+  copies those preview images into the public `message-media` bucket and returns
+  the Shado-hosted URL to chat clients. If the copy fails, clients still keep
+  the text card and render a nonblank image fallback instead of a broken frame.
 
 ## Deployment
 
@@ -44,6 +50,7 @@ Run:
 npm run lint
 npx tsc --noEmit -p tsconfig.app.json
 npx jest --runInBand --runTestsByPath tests/linkPreview.test.ts tests/MessageItem.test.tsx
+npx jest --runInBand tests/MessageRichText.test.tsx tests/safeFetchIntegrationContract.test.ts
 npm run build
 ```
 

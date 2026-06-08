@@ -44,4 +44,14 @@ describe('SEC-001 safe-fetch integration contracts', () => {
     expect(source).toContain('Only https push endpoints are supported.')
     expect(source).not.toContain('fetch(subscription.endpoint')
   })
+
+  it('stores Instagram link-preview images before returning them to chat clients', () => {
+    const source = read('supabase/functions/link-preview/index.ts')
+    expect(source).toContain("const LINK_PREVIEW_IMAGE_BUCKET = 'message-media'")
+    expect(source).toContain('shouldStorePreviewImage')
+    expect(source).toContain('isInstagramHost')
+    expect(source).toContain('isInstagramPreviewImageHost')
+    expect(source).toContain('storePreviewImage')
+    expect(source).toContain('.upload(path, new Blob([bytes]')
+  })
 })

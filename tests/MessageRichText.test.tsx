@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MessageRichText } from '../src/components/chat/MessageRichText'
 import { fetchLinkPreview } from '../src/lib/linkPreview'
 
@@ -54,6 +54,26 @@ test('renders preview images and video thumbnail labels', async () => {
     )
   })
   expect(screen.getByText('Video')).toBeInTheDocument()
+})
+
+test('keeps the preview card visible when the preview image fails to load', async () => {
+  mockedFetchPreview.mockResolvedValue({
+    url: 'https://www.instagram.com/p/example/',
+    canonicalUrl: 'https://www.instagram.com/p/example/',
+    title: 'Instagram post',
+    description: 'A post from Instagram.',
+    image: 'https://scontent.example.com/expired.jpg',
+    mediaType: 'image',
+    siteName: 'Instagram',
+  })
+
+  render(<MessageRichText content="look https://www.instagram.com/p/example/" />)
+
+  const image = await screen.findByRole('img', { name: /instagram post preview image/i })
+  fireEvent.error(image)
+
+  expect(screen.getByLabelText('Instagram post preview image unavailable')).toBeInTheDocument()
+  expect(screen.getByText('A post from Instagram.')).toBeInTheDocument()
 })
 
 test('does not request metadata when preview rendering is disabled', () => {

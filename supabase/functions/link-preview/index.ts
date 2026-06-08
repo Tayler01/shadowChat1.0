@@ -1,7 +1,9 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4'
 import {
   assertPublicUrl,
   normalizePublicHttpUrl,
+  readLimitedArrayBuffer,
   safeFetch,
 } from '../_shared/safe-fetch.ts'
 
@@ -9,11 +11,25 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+const LINK_PREVIEW_IMAGE_BUCKET = 'message-media'
+const MAX_PREVIEW_IMAGE_BYTES = 4 * 1024 * 1024
+const ALLOWED_PREVIEW_IMAGE_TYPES = new Map([
+  ['image/jpeg', 'jpg'],
+  ['image/png', 'png'],
+  ['image/webp', 'webp'],
+  ['image/gif', 'gif'],
+])
 const SAFE_LINK_URL_OPTIONS = {
   credentialMessage: 'URL credentials are not allowed.',
   invalidSchemeMessage: 'Only http and https links can be previewed.',
   tooLongMessage: 'A valid url is required.',
   unsafeHostMessage: 'Private links cannot be previewed.',
+}
+const SAFE_PREVIEW_IMAGE_URL_OPTIONS = {
+  credentialMessage: 'URL credentials are not allowed.',
+  invalidSchemeMessage: 'Only public http and https preview image links are supported.',
+  tooLongMessage: 'Preview image URL is required.',
+  unsafeHostMessage: 'Private preview image links cannot be imported.',
 }
 
 type LinkPreviewPayload = {
@@ -46,12 +62,22 @@ const json = (body: unknown, status = 200) =>
 const getSupabaseEnv = () => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Supabase environment variables are not configured')
   }
 
-  return { supabaseUrl, supabaseAnonKey }
+  return { supabaseUrl, supabaseAnonKey, serviceRoleKey }
+}
+
+const getSupabaseAdmin = () => {
+  const { supabaseUrl, serviceRoleKey } = getSupabaseEnv()
+  if (!serviceRoleKey) return null
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
 }
 
 const authenticate = async (authorization: string) => {
@@ -125,6 +151,34 @@ const absolutize = (value: string | undefined, baseUrl: string) => {
     return new URL(value, baseUrl).toString()
   } catch {
     return undefined
+  }
+}
+
+const isInstagramHost = (url: URL) => /(^|\.)instagram\.com$/i.test(url.hostname)
+
+const isInstagramPreviewImageHost = (value: string | undefined) => {
+  if (!value) return false
+  try {
+    const url = new URL(value)
+    const host = url.hostname.toLowerCase()
+    return (
+      host === 'cdninstagram.com' ||
+      host.endsWith('.cdninstagram.com') ||
+      host === 'fbcdn.net' ||
+      host.endsWith('.fbcdn.net')
+    )
+  } catch {
+    return false
+  }
+}
+
+const isPublicStorageUrl = (value: string | undefined) => {
+  if (!value) return false
+  try {
+    const url = new URL(value)
+    return url.pathname.includes(`/storage/v1/object/public/${LINK_PREVIEW_IMAGE_BUCKET}/`)
+  } catch {
+    return false
   }
 }
 
@@ -239,6 +293,82 @@ const readLimitedText = async (response: Response, maxBytes = 512 * 1024) => {
   }
 
   return new TextDecoder().decode(merged)
+}
+
+const resolvePreviewImageType = (contentTypeHeader: string | null) => {
+  const contentType = (contentTypeHeader ?? '').split(';')[0]?.trim().toLowerCase()
+  if (!contentType || !ALLOWED_PREVIEW_IMAGE_TYPES.has(contentType)) {
+    throw new Error('Preview image is not a supported image type.')
+  }
+  return {
+    contentType,
+    extension: ALLOWED_PREVIEW_IMAGE_TYPES.get(contentType) ?? 'img',
+  }
+}
+
+const hashPreviewKey = async (value: string) => {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return Array.from(new Uint8Array(digest))
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 40)
+}
+
+const shouldStorePreviewImage = (sourceUrl: URL, preview: LinkPreview) =>
+  Boolean(
+    preview.image &&
+    !isPublicStorageUrl(preview.image) &&
+    (isInstagramHost(sourceUrl) || isInstagramPreviewImageHost(preview.image))
+  )
+
+const storePreviewImage = async (preview: LinkPreview): Promise<string | null> => {
+  if (!preview.image) return null
+  const admin = getSupabaseAdmin()
+  if (!admin) return null
+
+  try {
+    const sourceUrl = normalizePublicHttpUrl(preview.image, SAFE_PREVIEW_IMAGE_URL_OPTIONS)
+    await assertPublicUrl(sourceUrl, SAFE_PREVIEW_IMAGE_URL_OPTIONS)
+    const response = await safeFetch(sourceUrl, {
+      signal: AbortSignal.timeout(8000),
+      headers: {
+        accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif;q=0.9,*/*;q=0.5',
+        'user-agent': 'ShadowChat-LinkPreviewImage/1.0',
+      },
+    }, SAFE_PREVIEW_IMAGE_URL_OPTIONS)
+
+    if (!response.ok) {
+      throw new Error(`Preview image fetch failed with ${response.status}.`)
+    }
+
+    const finalUrl = new URL(response.url || sourceUrl.toString())
+    await assertPublicUrl(finalUrl, SAFE_PREVIEW_IMAGE_URL_OPTIONS)
+    const { contentType, extension } = resolvePreviewImageType(response.headers.get('content-type'))
+    const bytes = await readLimitedArrayBuffer(response, MAX_PREVIEW_IMAGE_BYTES, 'Preview image is larger than 4MB.')
+    const key = await hashPreviewKey(preview.canonicalUrl || preview.url)
+    const path = `link-previews/${key}.${extension}`
+
+    const { error: uploadError } = await admin.storage
+      .from(LINK_PREVIEW_IMAGE_BUCKET)
+      .upload(path, new Blob([bytes], { type: contentType }), {
+        cacheControl: '604800',
+        contentType,
+        upsert: true,
+      })
+    if (uploadError) throw uploadError
+
+    const { data: publicAsset } = admin.storage.from(LINK_PREVIEW_IMAGE_BUCKET).getPublicUrl(path)
+    return publicAsset.publicUrl
+  } catch (error) {
+    console.warn('Unable to store link preview image', error instanceof Error ? error.message : String(error))
+    return null
+  }
+}
+
+const makePreviewImageDurable = async (sourceUrl: URL, preview: LinkPreview) => {
+  if (!shouldStorePreviewImage(sourceUrl, preview)) return preview
+  const storedImage = await storePreviewImage(preview)
+  return storedImage ? { ...preview, image: storedImage } : preview
 }
 
 const getOEmbedEndpoint = (url: URL) => {
@@ -410,13 +540,14 @@ serve(async req => {
     if (!preview) {
       throw new Error('Unable to load link preview.')
     }
+    const durablePreview = await makePreviewImageDurable(url, preview)
 
     return json({
       ok: true,
       preview: {
-        ...preview,
-        title: preview.title?.slice(0, 180),
-        description: preview.description?.slice(0, 280),
+        ...durablePreview,
+        title: durablePreview.title?.slice(0, 180),
+        description: durablePreview.description?.slice(0, 280),
       },
     })
   } catch (error) {

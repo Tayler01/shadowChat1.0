@@ -21,7 +21,7 @@ type CachedPreview = {
 }
 
 const URL_PATTERN = /\b((?:https?:\/\/|www\.)[^\s<>"']+)/gi
-const CACHE_PREFIX = 'shadowchat:link-preview:'
+const CACHE_PREFIX = 'shadowchat:link-preview:v2:'
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const memoryCache = new Map<string, CachedPreview>()
 const pendingRequests = new Map<string, Promise<LinkPreview | null>>()
