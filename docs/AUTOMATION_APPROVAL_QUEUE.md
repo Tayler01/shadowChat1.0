@@ -21,6 +21,28 @@ V1 is queue-only:
 - no runner starts from approval
 - no code is pushed, merged, deployed, or executed from approval
 
+## Finished Automation Contract
+
+The intended automation wrapper is a single scheduled local workflow. Once it
+is built, the run should:
+
+1. verify local tool health and stop for dead-stop setup issues
+2. scan the repo for 5-10 candidates in each improvement category
+3. run 3-5 category-local subagent reviews to choose one candidate per category
+4. submit the five selected candidates for approval before build work
+5. build approved candidates one at a time with scouting, research, roadmap,
+   implementation, and candidate-level testing
+6. run combined local verification after all five candidates are done
+7. package changed files, rationale, risks, checks, cleanup proof, screenshots,
+   branch links, preview links, and artifacts into one review packet
+8. wait for Tayler's final approval
+9. push only approved candidates directly to `main` and watch CI/deploy/remote
+   state
+
+The queue remains the human gate in that loop. It records approval intent and
+review artifacts, but it should not hide failed tests, start builds, push code,
+or mutate production state without an explicit approval step.
+
 ## Backend Surface
 
 Main tables:

@@ -225,7 +225,7 @@ function App() {
 
 
   const toggleDarkMode = () => {
-    setScheme(scheme === 'moonstone-light' ? 'obsidian-gold' : 'moonstone-light')
+    setScheme(scheme === 'moonstone-light' ? 'original' : 'moonstone-light')
   }
 
   const toggleSidebar = () => {

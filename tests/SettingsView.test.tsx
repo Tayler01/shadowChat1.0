@@ -59,15 +59,16 @@ jest.mock('../src/hooks/useSoundEffects', () => ({
 }))
 
 jest.mock('../src/hooks/useTheme', () => ({
-  useTheme: () => ({ scheme: 'obsidian-gold', setScheme: jest.fn() }),
+  useTheme: () => ({ scheme: 'original', setScheme: jest.fn() }),
   colorSchemes: {
-    'obsidian-gold': { label: 'Obsidian Gold', description: 'Gold glass', start: '#111111', end: '#d7aa46', mode: 'dark', preview: '/themes/obsidian-gold/preview.webp' },
-    'aurora-veil': { label: 'Aurora Veil', description: 'Aurora glass', start: '#112233', end: '#58d7d5', mode: 'dark', preview: '/themes/aurora-veil/preview.webp' },
-    'neon-circuit': { label: 'Neon Circuit', description: 'Neon glass', start: '#071020', end: '#ff4fd8', mode: 'dark', preview: '/themes/neon-circuit/preview.webp' },
-    'moonstone-light': { label: 'Moonstone Light', description: 'Pearl daylight', start: '#fff8e8', end: '#5c82c8', mode: 'light', preview: '/themes/moonstone-light/preview.webp' },
-    'blush-bloom': { label: 'Blush Bloom', description: 'Pearl blush glass', start: '#fff7fb', end: '#ff9fc4', mode: 'light', preview: '/themes/blush-bloom/preview.webp' },
-    'mint-fizz': { label: 'Mint Fizz', description: 'Fresh mint glass', start: '#f6fff9', end: '#8ce9ce', mode: 'light', preview: '/themes/mint-fizz/preview.webp' },
-    'silver-halo': { label: 'Silver Halo', description: 'Chrome graphite glass', start: '#f4f8fb', end: '#596676', mode: 'dark', preview: '/themes/silver-halo/preview.webp' },
+    original: { label: 'Original', description: 'Classic black and gold', start: '#0c0d0e', end: '#080909', mode: 'dark', preview: '', backdrop: '' },
+    'obsidian-gold': { label: 'Obsidian Gold', description: 'Gold glass', start: '#111111', end: '#d7aa46', mode: 'dark', preview: '/themes/obsidian-gold/backdrop.webp', backdrop: '/themes/obsidian-gold/backdrop.webp' },
+    'aurora-veil': { label: 'Aurora Veil', description: 'Aurora glass', start: '#112233', end: '#58d7d5', mode: 'dark', preview: '/themes/aurora-veil/preview.webp', backdrop: '/themes/aurora-veil/backdrop.webp' },
+    'neon-circuit': { label: 'Neon Circuit', description: 'Neon glass', start: '#071020', end: '#ff4fd8', mode: 'dark', preview: '/themes/neon-circuit/preview.webp', backdrop: '/themes/neon-circuit/backdrop.webp' },
+    'moonstone-light': { label: 'Moonstone Light', description: 'Pearl daylight', start: '#fff8e8', end: '#5c82c8', mode: 'light', preview: '/themes/moonstone-light/preview.webp', backdrop: '/themes/moonstone-light/backdrop.webp' },
+    'blush-bloom': { label: 'Blush Bloom', description: 'Pearl blush glass', start: '#fff7fb', end: '#ff9fc4', mode: 'light', preview: '/themes/blush-bloom/preview.webp', backdrop: '/themes/blush-bloom/backdrop.webp' },
+    'mint-fizz': { label: 'Mint Fizz', description: 'Fresh mint glass', start: '#f6fff9', end: '#8ce9ce', mode: 'light', preview: '/themes/mint-fizz/backdrop.webp', backdrop: '/themes/mint-fizz/backdrop.webp' },
+    'silver-halo': { label: 'Silver Halo', description: 'Chrome graphite glass', start: '#f4f8fb', end: '#596676', mode: 'dark', preview: '/themes/silver-halo/backdrop.webp', backdrop: '/themes/silver-halo/backdrop.webp' },
   },
 }))
 

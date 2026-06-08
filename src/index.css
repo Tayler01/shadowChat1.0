@@ -34,14 +34,14 @@
     --theme-focus-ring: rgba(var(--theme-accent-rgb), 0.24);
     --theme-surface-hover: rgba(255, 255, 255, 0.06);
     --theme-logo-filter: drop-shadow(0 0 18px rgba(var(--theme-accent-rgb), 0.22));
-    --theme-backdrop-image: url('/themes/obsidian-gold/backdrop.webp');
-    --theme-texture-image: url('/themes/obsidian-gold/texture.webp');
-    --theme-preview-image: url('/themes/obsidian-gold/preview.webp');
+    --theme-backdrop-image: none;
+    --theme-texture-image: none;
+    --theme-preview-image: none;
     --theme-page-background:
-      radial-gradient(circle at 50% -8%, rgba(var(--theme-accent-strong-rgb), 0.15), transparent 32%),
+      radial-gradient(circle at 50% -8%, rgb(var(--theme-accent-strong-rgb) / 0.15), transparent 32%),
       linear-gradient(180deg, var(--theme-page-start) 0%, var(--theme-page-end) 100%);
     --theme-app-background:
-      radial-gradient(circle at 50% 0%, rgba(var(--theme-accent-rgb), 0.08), transparent 28%),
+      radial-gradient(circle at 50% 0%, rgb(var(--theme-accent-rgb) / 0.08), transparent 28%),
       linear-gradient(180deg, var(--theme-shell), var(--theme-page-end));
     --theme-image-surface-overlay: linear-gradient(180deg, rgba(6, 8, 10, 0.06), rgba(6, 8, 10, 0.2));
     --theme-image-panel-overlay: linear-gradient(180deg, rgba(7, 8, 9, 0.97), rgba(8, 9, 10, 0.985));
@@ -515,6 +515,32 @@
   animation: shadow-war-cinematic-title 1250ms cubic-bezier(0.2, 0.82, 0.22, 1) 4560ms forwards;
 }
 
+:root[data-scheme='original'] {
+  --theme-accent-rgb: 215 170 70;
+  --theme-accent-strong-rgb: 239 202 114;
+  --theme-page-start: #0c0d0e;
+  --theme-page-end: #080909;
+  --theme-shell: #0d0f10;
+  --theme-panel: rgba(18, 20, 22, 0.84);
+  --theme-panel-strong: rgba(24, 26, 29, 0.94);
+  --theme-panel-soft: rgba(255, 255, 255, 0.03);
+  --theme-elevated: #17191c;
+  --theme-text-primary: #f6f2e8;
+  --theme-text-secondary: #c8c0b1;
+  --theme-text-muted: #8f8779;
+  --theme-text-inverse: #0b0b0b;
+  --theme-accent-readable: #f1d38a;
+  --theme-accent-text: #f8e9bc;
+  --theme-backdrop-image: none;
+  --theme-texture-image: none;
+  --theme-preview-image: none;
+  --gold-1: #6f5318;
+  --gold-2: #9a7421;
+  --gold-3: #c9972f;
+  --gold-4: #edc86a;
+  --gold-5: #fff0b8;
+}
+
 :root[data-scheme='obsidian-gold'] {
   --theme-accent-rgb: 215 170 70;
   --theme-accent-strong-rgb: 239 202 114;
@@ -533,7 +559,7 @@
   --theme-accent-text: #f8e9bc;
   --theme-backdrop-image: url('/themes/obsidian-gold/backdrop.webp');
   --theme-texture-image: url('/themes/obsidian-gold/texture.webp');
-  --theme-preview-image: url('/themes/obsidian-gold/preview.webp');
+  --theme-preview-image: url('/themes/obsidian-gold/backdrop.webp');
   --gold-1: #6f5318;
   --gold-2: #9a7421;
   --gold-3: #c9972f;
@@ -850,7 +876,7 @@
   --theme-logo-filter: drop-shadow(0 8px 18px rgba(47, 191, 155, 0.16));
   --theme-backdrop-image: url('/themes/mint-fizz/backdrop.webp');
   --theme-texture-image: url('/themes/mint-fizz/texture.webp');
-  --theme-preview-image: url('/themes/mint-fizz/preview.webp');
+  --theme-preview-image: url('/themes/mint-fizz/backdrop.webp');
   --theme-page-background:
     radial-gradient(circle at 18% 0%, rgba(140, 233, 206, 0.38), transparent 32%),
     radial-gradient(circle at 82% 10%, rgba(158, 204, 255, 0.18), transparent 34%),
@@ -940,7 +966,7 @@
   --theme-logo-filter: drop-shadow(0 0 18px rgba(200, 210, 221, 0.2)) drop-shadow(0 0 22px rgba(126, 232, 255, 0.12));
   --theme-backdrop-image: url('/themes/silver-halo/backdrop.webp');
   --theme-texture-image: url('/themes/silver-halo/texture.webp');
-  --theme-preview-image: url('/themes/silver-halo/preview.webp');
+  --theme-preview-image: url('/themes/silver-halo/backdrop.webp');
   --theme-page-background:
     radial-gradient(circle at 50% -8%, rgba(220, 229, 238, 0.18), transparent 33%),
     radial-gradient(circle at 84% 12%, rgba(126, 232, 255, 0.1), transparent 30%),
@@ -1018,7 +1044,14 @@ html, body, #root {
 
 .app-viewport {
   height: 100vh;
-  background: var(--theme-app-background);
+  background:
+    var(--theme-image-surface-overlay),
+    var(--theme-texture-image),
+    var(--theme-backdrop-image),
+    var(--theme-app-background);
+  background-position: center, center top, center, center;
+  background-repeat: no-repeat, repeat, no-repeat, no-repeat;
+  background-size: auto, 720px 720px, cover, auto;
 }
 
 .shadow-pin-action-card {
@@ -1032,6 +1065,14 @@ html, body, #root {
     transform var(--dur-fast) var(--ease-premium),
     box-shadow var(--dur-fast) var(--ease-premium),
     border-color var(--dur-fast) var(--ease-premium);
+}
+
+.hype-send-button {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  user-select: none;
 }
 
 .shadow-pin-action-card img {
@@ -2443,14 +2484,8 @@ html, body, #root {
 }
 
 @layer components {
-  .theme-page-surface {
-    background: var(--theme-page-background);
-  }
-
-  .theme-app-surface {
-    background: var(--theme-app-background);
-  }
-
+  .theme-page-surface,
+  .theme-app-surface,
   .theme-image-surface {
     background:
       var(--theme-image-surface-overlay),

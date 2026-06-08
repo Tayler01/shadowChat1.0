@@ -821,7 +821,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           type="button"
           disabled={disabled || (!message.trim() && !canLongPressHype)}
           className={cn(
-            'h-12 w-12 rounded-xl p-0',
+            'hype-send-button h-12 w-12 rounded-xl p-0',
             canLongPressHype && 'border-[rgba(var(--theme-accent-strong-rgb),0.28)]',
             (hypePressing || hype?.ringing) && 'border-[rgba(var(--theme-accent-strong-rgb),0.76)] bg-[rgba(var(--theme-accent-rgb),0.16)] text-[var(--theme-accent-readable)] shadow-[0_0_24px_rgba(var(--theme-accent-rgb),0.26)]'
           )}
@@ -832,6 +832,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           onPointerUp={handleSendPointerEnd}
           onPointerLeave={handleSendPointerEnd}
           onPointerCancel={handleSendPointerEnd}
+          onContextMenu={event => event.preventDefault()}
+          draggable={false}
           onClick={handleSendClick}
         >
           {hype?.ringing ? <BellRing className="h-5 w-5" /> : <Send className="w-5 h-5" />}

@@ -219,6 +219,11 @@ test('long pressing the send button rings Hype without sending the draft', async
     expect(ringBell).toHaveBeenCalledTimes(1)
     expect(onSendMessage).not.toHaveBeenCalled()
     expect(textarea).toHaveValue('ship it')
+    expect(sendButton).toHaveClass('hype-send-button')
+
+    const contextMenuEvent = new MouseEvent('contextmenu', { bubbles: true, cancelable: true })
+    sendButton.dispatchEvent(contextMenuEvent)
+    expect(contextMenuEvent.defaultPrevented).toBe(true)
   } finally {
     jest.useRealTimers()
   }

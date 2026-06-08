@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 
 export type ColorScheme =
+  | 'original'
   | 'obsidian-gold'
   | 'aurora-veil'
   | 'ember-slate'
@@ -35,14 +36,25 @@ export const colorSchemes: Record<
     texture: string
   }
 > = {
+  original: {
+    label: 'Original',
+    description: 'The classic black-and-gold ShadowChat surface.',
+    start: '#0c0d0e',
+    end: '#080909',
+    accent: '#d7aa46',
+    mode: 'dark',
+    preview: '',
+    backdrop: '',
+    texture: '',
+  },
   'obsidian-gold': {
     label: 'Obsidian Gold',
-    description: 'Black glass, liquid metal, and restrained gold.',
+    description: 'Black glass, liquid metal, and gold backdrop art.',
     start: '#fff0b8',
     end: '#9a7421',
     accent: '#d7aa46',
     mode: 'dark',
-    preview: '/themes/obsidian-gold/preview.webp',
+    preview: '/themes/obsidian-gold/backdrop.webp',
     backdrop: '/themes/obsidian-gold/backdrop.webp',
     texture: '/themes/obsidian-gold/texture.webp',
   },
@@ -108,7 +120,7 @@ export const colorSchemes: Record<
     end: '#8ce9ce',
     accent: '#2fbf9b',
     mode: 'light',
-    preview: '/themes/mint-fizz/preview.webp',
+    preview: '/themes/mint-fizz/backdrop.webp',
     backdrop: '/themes/mint-fizz/backdrop.webp',
     texture: '/themes/mint-fizz/texture.webp',
   },
@@ -119,34 +131,34 @@ export const colorSchemes: Record<
     end: '#596676',
     accent: '#c8d2dd',
     mode: 'dark',
-    preview: '/themes/silver-halo/preview.webp',
+    preview: '/themes/silver-halo/backdrop.webp',
     backdrop: '/themes/silver-halo/backdrop.webp',
     texture: '/themes/silver-halo/texture.webp',
   },
 }
 
 const legacySchemeMap: Record<string, ColorScheme> = {
-  indigo: 'obsidian-gold',
+  indigo: 'original',
   teal: 'aurora-veil',
   rose: 'ember-slate',
   violet: 'aurora-veil',
   orange: 'ember-slate',
   contrast: 'moonstone-light',
-  'obsidian-champagne': 'aurora-veil',
+  'obsidian-champagne': 'original',
   'graphite-amber': 'ember-slate',
   'carbon-ivory': 'neon-circuit',
 }
 
 function normalizeScheme(value: string | null): ColorScheme {
   if (!value) {
-    return 'obsidian-gold'
+    return 'original'
   }
 
   if (value in colorSchemes) {
     return value as ColorScheme
   }
 
-  return legacySchemeMap[value] || 'obsidian-gold'
+  return legacySchemeMap[value] || 'original'
 }
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -154,7 +166,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (typeof window !== 'undefined') {
       return normalizeScheme(localStorage.getItem('colorScheme'))
     }
-    return 'obsidian-gold'
+    return 'original'
   })
 
   useEffect(() => {

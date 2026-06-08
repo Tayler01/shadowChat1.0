@@ -18,6 +18,7 @@ const viteCommand = hasLocalViteScript ? process.execPath : platformCommand('vit
 const viteBaseArgs = hasLocalViteScript ? [viteScriptPath] : []
 
 const themes = [
+  'original',
   'obsidian-gold',
   'aurora-veil',
   'ember-slate',

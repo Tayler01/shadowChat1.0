@@ -1258,6 +1258,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2 lg:grid-cols-3">
         {(Object.keys(colorSchemes) as ColorScheme[]).map(key => {
           const option = colorSchemes[key]
+          const previewImage = option.backdrop || option.preview
+          const previewBackground = previewImage
+            ? `linear-gradient(135deg, rgba(0,0,0,0.08), rgba(0,0,0,0.34)), url(${previewImage}), linear-gradient(135deg, ${option.start}, ${option.end})`
+            : `radial-gradient(circle at 50% 0%, rgba(215,170,70,0.16), transparent 34%), linear-gradient(135deg, ${option.start}, ${option.end})`
 
           return (
             <button
@@ -1275,7 +1279,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <span
                 className="relative mb-3 block h-16 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-cover bg-center"
                 style={{
-                  backgroundImage: `linear-gradient(135deg, rgba(0,0,0,0.08), rgba(0,0,0,0.34)), url(${option.preview}), linear-gradient(135deg, ${option.start}, ${option.end})`,
+                  backgroundImage: previewBackground,
                 }}
               >
                 {scheme === key && (

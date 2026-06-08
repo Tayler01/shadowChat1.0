@@ -1,5 +1,5 @@
 import { renderHook, act } from '@testing-library/react';
-import { ThemeProvider, useTheme } from '../src/hooks/useTheme';
+import { ThemeProvider, colorSchemes, useTheme } from '../src/hooks/useTheme';
 
 beforeEach(() => {
   document.documentElement.className = '';
@@ -7,10 +7,18 @@ beforeEach(() => {
   localStorage.clear();
 });
 
-test('defaults to obsidian-gold scheme', () => {
+test('defaults to original scheme', () => {
   const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
-  expect(result.current.scheme).toBe('obsidian-gold');
-  expect(document.documentElement.classList.contains('obsidian-gold')).toBe(true);
+  expect(result.current.scheme).toBe('original');
+  expect(document.documentElement.classList.contains('original')).toBe(true);
+});
+
+test('lists original first and uses backdrop previews for art themes', () => {
+  expect(Object.keys(colorSchemes)[0]).toBe('original');
+  expect(colorSchemes.original.label).toBe('Original');
+  expect(colorSchemes['obsidian-gold'].label).toBe('Obsidian Gold');
+  expect(colorSchemes['mint-fizz'].preview).toBe(colorSchemes['mint-fizz'].backdrop);
+  expect(colorSchemes['silver-halo'].preview).toBe(colorSchemes['silver-halo'].backdrop);
 });
 
 test('changing scheme updates document.classList', () => {
@@ -21,7 +29,7 @@ test('changing scheme updates document.classList', () => {
   });
 
   expect(document.documentElement.classList.contains('aurora-veil')).toBe(true);
-  expect(document.documentElement.classList.contains('obsidian-gold')).toBe(false);
+  expect(document.documentElement.classList.contains('original')).toBe(false);
 });
 
 test('supports additional color schemes', () => {
@@ -32,6 +40,19 @@ test('supports additional color schemes', () => {
   });
 
   expect(document.documentElement.classList.contains('neon-circuit')).toBe(true);
+});
+
+test('supports the obsidian gold theme separately from original', () => {
+  const { result } = renderHook(() => useTheme(), { wrapper: ThemeProvider });
+
+  act(() => {
+    result.current.setScheme('obsidian-gold');
+  });
+
+  expect(result.current.scheme).toBe('obsidian-gold');
+  expect(document.documentElement.dataset.scheme).toBe('obsidian-gold');
+  expect(document.documentElement.classList.contains('obsidian-gold')).toBe(true);
+  expect(document.documentElement.classList.contains('original')).toBe(false);
 });
 
 test('supports a light theme mode', () => {
