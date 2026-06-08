@@ -51,6 +51,7 @@ interface DirectMessagesContextValue {
   currentConversation: string | null;
   setCurrentConversation: React.Dispatch<React.SetStateAction<string | null>>;
   messages: DMMessage[];
+  messagesConversationId: string | null;
   messagesLoading: boolean;
   sending: boolean;
   loadingMore: boolean;
@@ -380,6 +381,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
 
   const {
     messages,
+    conversationId: messagesConversationId,
     loading: messagesLoading,
     sending,
     sendMessage: sendConversationMessage,
@@ -465,6 +467,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     currentConversation,
     setCurrentConversation,
     messages,
+    messagesConversationId,
     messagesLoading,
     sending,
     loadingMore,
@@ -483,6 +486,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
 
 export function useConversationMessages(conversationId: string | null) {
   const [messages, setMessages] = useState<DMMessage[]>([]);
+  const [loadedConversationId, setLoadedConversationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -721,6 +725,7 @@ export function useConversationMessages(conversationId: string | null) {
       fetchRequestIdRef.current += 1;
       clientResetRef.current = undefined;
       setMessages([]);
+      setLoadedConversationId(null);
       setHasMore(true);
       setLoading(false);
       return;
@@ -732,6 +737,7 @@ export function useConversationMessages(conversationId: string | null) {
       const requestId = fetchRequestIdRef.current + 1;
       fetchRequestIdRef.current = requestId;
       if (!options.silent) {
+        setLoadedConversationId(null);
         setLoading(true);
       }
 
@@ -783,6 +789,7 @@ export function useConversationMessages(conversationId: string | null) {
         }
       } finally {
         if (!disposed && requestId === fetchRequestIdRef.current) {
+          setLoadedConversationId(conversationId);
           setLoading(false);
         }
       }
@@ -822,6 +829,7 @@ export function useConversationMessages(conversationId: string | null) {
     clientResetRef.current = resetWithFreshClient;
 
     setMessages([]);
+    setLoadedConversationId(null);
     setHasMore(true);
     void fetchMessages();
 
@@ -1232,6 +1240,7 @@ export function useConversationMessages(conversationId: string | null) {
 
   return {
     messages,
+    conversationId: loadedConversationId,
     loading,
     sending,
     loadingMore,

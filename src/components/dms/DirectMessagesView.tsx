@@ -652,6 +652,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     conversations,
     currentConversation,
     messages,
+    messagesConversationId,
     setCurrentConversation,
     startConversation,
     sendMessage,
@@ -672,6 +673,11 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const { users: allUsers, loading: allUsersLoading } = useAllUsers({ enabled: showNewConversation })
   const currentConv = conversations.find(c => c.id === currentConversation)
   const selectedConversationMissing = Boolean(currentConversation && !currentConv)
+  const showInboxLoading = conversationsLoading && conversations.length === 0
+  const showInboxEmpty = !conversationsLoading && conversations.length === 0
+  const selectedThreadLoaded = Boolean(currentConversation && messagesConversationId === currentConversation)
+  const showThreadInitialLoading = (!selectedThreadLoaded || messagesLoading) && messages.length === 0
+  const showThreadEmpty = selectedThreadLoaded && !messagesLoading && messages.length === 0 && !loadingMore
 
   const [searchUsername, setSearchUsername] = useState('')
   const [startingUsername, setStartingUsername] = useState<string | null>(null)
@@ -1085,7 +1091,13 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
             </Button>
 
             <div className="min-h-0 flex-1 overflow-y-auto pt-14 pb-[calc(env(safe-area-inset-bottom)_+_5rem)] md:pb-0 md:pt-0">
-              {conversations.length === 0 ? (
+              {showInboxLoading ? (
+                <div className="p-6 text-center text-[var(--text-muted)]">
+                  <LoadingSpinner size="md" className="mx-auto mb-3" />
+                  <p className="text-sm text-[var(--text-primary)]">Loading direct messages</p>
+                  <p className="mt-1 text-xs">Restoring your inbox.</p>
+                </div>
+              ) : showInboxEmpty ? (
                 <div className="p-6 text-center text-[var(--text-muted)]">
                   <MessageSquare className="mx-auto mb-2 h-8 w-8 opacity-50" />
                   <p className="text-sm text-[var(--text-primary)]">No conversations yet</p>
@@ -1202,7 +1214,15 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 </div>
               )}
 
-              {messages.length === 0 && !loadingMore && (
+              {showThreadInitialLoading && (
+                <div className="glass-panel rounded-[var(--radius-xl)] px-8 py-8 text-center text-[var(--text-muted)]">
+                  <LoadingSpinner size="md" className="mx-auto mb-4" />
+                  <h3 className="mb-2 text-lg font-medium text-[var(--text-primary)]">Loading messages</h3>
+                  <p className="text-sm">Restoring this thread before showing the latest conversation state.</p>
+                </div>
+              )}
+
+              {showThreadEmpty && (
                 <div className="glass-panel rounded-[var(--radius-xl)] px-8 py-8 text-center text-[var(--text-muted)]">
                   <MessageSquare className="mx-auto mb-4 h-12 w-12 opacity-50" />
                   <h3 className="mb-2 inline-flex max-w-full items-center justify-center gap-1.5 text-lg font-medium text-[var(--text-primary)]">

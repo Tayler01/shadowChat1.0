@@ -419,6 +419,7 @@ describe('DirectMessagesView user search', () => {
       conversations: [],
       currentConversation: null,
       messages: [],
+      messagesConversationId: null,
       loading: false,
       setCurrentConversation: setCurrentConversationMock,
       startConversation: startConversationMock,
@@ -523,6 +524,7 @@ describe('DirectMessagesView user search', () => {
       }],
       currentConversation: null,
       messages: [],
+      messagesConversationId: null,
       loading: false,
       setCurrentConversation: setCurrentConversationMock,
       startConversation: startConversationMock,
@@ -567,6 +569,180 @@ describe('DirectMessagesView user search', () => {
     expect(onViewChange).toHaveBeenCalledWith('chat');
   });
 
+  test('shows inbox loading state instead of empty state while conversations restore', () => {
+    dmSpy.mockReturnValue({
+      conversations: [],
+      currentConversation: null,
+      messages: [],
+      messagesConversationId: null,
+      loading: true,
+      messagesLoading: false,
+      loadingMore: false,
+      hasMore: false,
+      sending: false,
+      setCurrentConversation: setCurrentConversationMock,
+      startConversation: startConversationMock,
+      sendMessage: jest.fn(),
+      editMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      toggleReaction: jest.fn(),
+      markAsRead: jest.fn(),
+      loadOlderMessages: jest.fn(),
+    } as any);
+
+    render(
+      <DirectMessagesView
+        onToggleSidebar={() => {}}
+        currentView="dms"
+        onViewChange={() => {}}
+      />
+    );
+
+    expect(screen.getByText(/loading direct messages/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no conversations yet/i)).not.toBeInTheDocument();
+  });
+
+  test('shows thread loading state instead of first-message prompt while messages restore', () => {
+    const conversation = {
+      id: 'c1',
+      other_user: {
+        id: 'u2',
+        username: 'bob',
+        display_name: 'Bob',
+        avatar_url: '',
+        color: 'red',
+        status: 'online',
+      },
+      last_message: null,
+      unread_count: 0,
+    };
+
+    dmSpy.mockReturnValue({
+      conversations: [conversation],
+      currentConversation: 'c1',
+      messages: [],
+      messagesConversationId: null,
+      loading: false,
+      messagesLoading: true,
+      loadingMore: false,
+      hasMore: false,
+      sending: false,
+      setCurrentConversation: setCurrentConversationMock,
+      startConversation: startConversationMock,
+      sendMessage: jest.fn(),
+      editMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      toggleReaction: jest.fn(),
+      markAsRead: jest.fn(),
+      loadOlderMessages: jest.fn(),
+    } as any);
+
+    render(
+      <DirectMessagesView
+        onToggleSidebar={() => {}}
+        currentView="dms"
+        onViewChange={() => {}}
+      />
+    );
+
+    expect(screen.getByText(/loading messages/i)).toBeInTheDocument();
+    expect(screen.queryByText(/say hello/i)).not.toBeInTheDocument();
+  });
+
+  test('keeps thread loading state during selected conversation transitions', () => {
+    const conversation = {
+      id: 'c1',
+      other_user: {
+        id: 'u2',
+        username: 'bob',
+        display_name: 'Bob',
+        avatar_url: '',
+        color: 'red',
+        status: 'online',
+      },
+      last_message: null,
+      unread_count: 0,
+    };
+
+    dmSpy.mockReturnValue({
+      conversations: [conversation],
+      currentConversation: 'c1',
+      messages: [],
+      messagesConversationId: null,
+      loading: false,
+      messagesLoading: false,
+      loadingMore: false,
+      hasMore: false,
+      sending: false,
+      setCurrentConversation: setCurrentConversationMock,
+      startConversation: startConversationMock,
+      sendMessage: jest.fn(),
+      editMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      toggleReaction: jest.fn(),
+      markAsRead: jest.fn(),
+      loadOlderMessages: jest.fn(),
+    } as any);
+
+    render(
+      <DirectMessagesView
+        onToggleSidebar={() => {}}
+        currentView="dms"
+        onViewChange={() => {}}
+      />
+    );
+
+    expect(screen.getByText(/loading messages/i)).toBeInTheDocument();
+    expect(screen.queryByText(/say hello/i)).not.toBeInTheDocument();
+  });
+
+  test('shows first-message prompt after an empty selected thread finishes loading', () => {
+    const conversation = {
+      id: 'c1',
+      other_user: {
+        id: 'u2',
+        username: 'bob',
+        display_name: 'Bob',
+        avatar_url: '',
+        color: 'red',
+        status: 'online',
+      },
+      last_message: null,
+      unread_count: 0,
+    };
+
+    dmSpy.mockReturnValue({
+      conversations: [conversation],
+      currentConversation: 'c1',
+      messages: [],
+      messagesConversationId: 'c1',
+      loading: false,
+      messagesLoading: false,
+      loadingMore: false,
+      hasMore: false,
+      sending: false,
+      setCurrentConversation: setCurrentConversationMock,
+      startConversation: startConversationMock,
+      sendMessage: jest.fn(),
+      editMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      toggleReaction: jest.fn(),
+      markAsRead: jest.fn(),
+      loadOlderMessages: jest.fn(),
+    } as any);
+
+    render(
+      <DirectMessagesView
+        onToggleSidebar={() => {}}
+        currentView="dms"
+        onViewChange={() => {}}
+      />
+    );
+
+    expect(screen.getByText(/say hello to bob/i)).toBeInTheDocument();
+    expect(screen.queryByText(/loading messages/i)).not.toBeInTheDocument();
+  });
+
   test('mobile thread keeps sparse messages bottom-aligned above the chat footer', () => {
     const { useIsDesktop } = jest.requireMock('../src/hooks/useIsDesktop') as {
       useIsDesktop: jest.Mock
@@ -605,6 +781,7 @@ describe('DirectMessagesView user search', () => {
         updated_at: '2026-05-03T12:00:00.000Z',
         sender: { id: 'u1', username: 'me', display_name: 'Me' },
       }],
+      messagesConversationId: 'c1',
       loading: false,
       messagesLoading: false,
       loadingMore: false,
@@ -647,6 +824,7 @@ describe('DirectMessagesView user search', () => {
       conversations: [],
       currentConversation: 'missing-conversation',
       messages: [],
+      messagesConversationId: null,
       loading: false,
       messagesLoading: false,
       loadingMore: false,
