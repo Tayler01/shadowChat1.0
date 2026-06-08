@@ -152,6 +152,8 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
       aria-hidden="true"
     />
   )
+  const pickerCardClass = 'group relative h-[8.25rem] w-full shrink-0 overflow-hidden rounded-[2rem] border border-[rgba(215,170,70,0.42)] bg-[#050403] text-left shadow-[0_24px_60px_rgba(0,0,0,0.48)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[rgba(239,202,114,0.68)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,202,114,0.55)] md:h-[10rem]'
+  const pickerCardContentClass = 'relative flex h-full items-center gap-4 px-5 py-4 md:px-8'
 
   return (
     <>
@@ -204,7 +206,7 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
           type="button"
           aria-label="Open Will & Kirk"
           onClick={enterWillKirk}
-          className="group relative aspect-[1920/720] w-full shrink-0 overflow-hidden rounded-[2rem] border border-[rgba(215,170,70,0.42)] bg-[#050403] shadow-[0_24px_60px_rgba(0,0,0,0.48)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[rgba(239,202,114,0.68)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,202,114,0.55)]"
+          className={pickerCardClass}
         >
           <img
             src={WILL_KIRK_ASSETS.pickerBanner}
@@ -222,7 +224,7 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
           type="button"
           aria-label="Open Shado TV"
           onClick={enterShadoTv}
-          className="group relative min-h-[8.25rem] w-full overflow-hidden rounded-[2rem] border border-[rgba(215,170,70,0.42)] bg-[#050403] text-left shadow-[0_24px_60px_rgba(0,0,0,0.48)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[rgba(239,202,114,0.68)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,202,114,0.55)] md:min-h-[10rem]"
+          className={pickerCardClass}
         >
           <img
             src={SHADO_TV_ASSETS.pickerBanner}
@@ -237,7 +239,7 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.92),rgba(0,0,0,0.52)_54%,rgba(0,0,0,0.2)),radial-gradient(circle_at_76%_22%,rgba(215,170,70,0.28),transparent_34%)]" />
           <div className="absolute inset-x-6 top-4 h-px bg-gradient-to-r from-transparent via-[#f0d381]/55 to-transparent" />
           <div className="absolute inset-x-6 bottom-4 h-px bg-gradient-to-r from-transparent via-[#8a6328]/60 to-transparent" />
-          <div className="relative flex h-full min-h-[8.25rem] items-center gap-4 px-5 py-4 md:min-h-[10rem] md:px-8">
+          <div className={pickerCardContentClass}>
             <div className="min-w-0 flex-1">
               <img
                 src={SHADO_TV_ASSETS.logoMarquee}
@@ -260,7 +262,7 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
           type="button"
           aria-label="Open Shadow Mystery"
           onClick={enterShadowMystery}
-          className="group relative aspect-[1672/941] w-full overflow-hidden rounded-[2rem] border border-[rgba(215,170,70,0.42)] bg-[#050403] shadow-[0_24px_60px_rgba(0,0,0,0.48)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[rgba(239,202,114,0.68)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,202,114,0.55)]"
+          className={pickerCardClass}
         >
           <img
             src={SHADOW_MYSTERY_ASSETS.pickerBanner}
@@ -278,7 +280,7 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
           type="button"
           aria-label="Open Shadow War"
           onClick={enterShadowWar}
-          className="group relative min-h-[8.25rem] w-full overflow-hidden rounded-[2rem] border border-[rgba(215,170,70,0.42)] bg-[#050403] text-left shadow-[0_24px_60px_rgba(0,0,0,0.48)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[rgba(239,202,114,0.68)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,202,114,0.55)] md:min-h-[10rem]"
+          className={pickerCardClass}
         >
           <img
             src={SHADOW_WAR_ASSETS.pickerBattlefield}
@@ -293,7 +295,7 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.94),rgba(0,0,0,0.58)_52%,rgba(0,0,0,0.32)),radial-gradient(circle_at_78%_28%,rgba(215,170,70,0.24),transparent_34%)]" />
           <div className="absolute inset-x-6 top-4 h-px bg-gradient-to-r from-transparent via-[#f0d381]/55 to-transparent" />
           <div className="absolute inset-x-6 bottom-4 h-px bg-gradient-to-r from-transparent via-[#8a6328]/60 to-transparent" />
-          <div className="relative flex h-full min-h-[8.25rem] items-center gap-4 px-5 py-4 md:min-h-[10rem] md:px-8">
+          <div className={pickerCardContentClass}>
             <div className="min-w-0 flex-1">
               <img
                 src={SHADOW_WAR_ASSETS.logo}
@@ -316,7 +318,7 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
           type="button"
           aria-label="Open Shadow Checkers"
           onClick={enterShadowCheckers}
-          className="group relative min-h-[8.25rem] w-full overflow-hidden rounded-[2rem] border border-[rgba(215,170,70,0.42)] bg-[#050403] text-left shadow-[0_24px_60px_rgba(0,0,0,0.48)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[rgba(239,202,114,0.68)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,202,114,0.55)] md:min-h-[10rem]"
+          className={pickerCardClass}
         >
           <img
             src={SHADOW_CHECKERS_ASSETS.pickerArt}
@@ -330,7 +332,7 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(0,0,0,0.94),rgba(0,0,0,0.56)_52%,rgba(0,0,0,0.24)),radial-gradient(circle_at_78%_28%,rgba(215,170,70,0.24),transparent_34%)]" />
           <div className="absolute inset-x-6 top-4 h-px bg-gradient-to-r from-transparent via-[#f0d381]/55 to-transparent" />
           <div className="absolute inset-x-6 bottom-4 h-px bg-gradient-to-r from-transparent via-[#8a6328]/60 to-transparent" />
-          <div className="relative flex h-full min-h-[8.25rem] items-center gap-4 px-5 py-4 md:min-h-[10rem] md:px-8">
+          <div className={pickerCardContentClass}>
             <div className="min-w-0 flex-1">
               <img
                 src={SHADOW_CHECKERS_ASSETS.pickerLogo}

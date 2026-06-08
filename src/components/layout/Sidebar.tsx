@@ -93,12 +93,13 @@ export function Sidebar({
       </button>
       {/* Header */}
       <div className="flex h-20 items-center overflow-visible border-b border-[var(--border-panel)] px-5">
-        <div className="flex w-full items-center">
+        <div className="flex w-full items-center gap-3">
           <img
-            src="/icons/header-logo.png"
+            src="/icons/header-logo-safe.png"
             alt="SHADO"
-            className="h-24 w-full object-contain object-left"
+            className="h-12 w-12 shrink-0 rounded-[var(--radius-md)] object-contain shadow-[0_10px_24px_rgba(0,0,0,0.28)]"
           />
+          <span className="text-lg font-semibold tracking-[0.26em] text-[var(--text-primary)]">SHADO</span>
         </div>
       </div>
 

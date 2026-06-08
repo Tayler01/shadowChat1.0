@@ -92,6 +92,8 @@ export const getClientUserAgent = () => {
 
 const AUTO_RESTART_STORAGE_PREFIX = 'shadowchat:release-auto-restart'
 const AUTO_RESTART_COOLDOWN_MS = 2 * 60 * 1000
+const RELEASE_RESTART_CONTROLLER_TIMEOUT_MS = 2600
+const RELEASE_RESTART_RELOAD_SETTLE_MS = 150
 
 export const canAutoRestartRelease = (releaseId: string, now = Date.now()) => {
   if (typeof sessionStorage === 'undefined') {
@@ -113,21 +115,82 @@ export const canAutoRestartRelease = (releaseId: string, now = Date.now()) => {
   }
 }
 
+const wait = (ms: number) => new Promise(resolve => window.setTimeout(resolve, ms))
+
+const waitForControllerChange = async (timeoutMs = RELEASE_RESTART_CONTROLLER_TIMEOUT_MS) => {
+  if (typeof navigator === 'undefined' || !navigator.serviceWorker?.addEventListener) {
+    return
+  }
+
+  await new Promise<void>(resolve => {
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timeoutId)
+      navigator.serviceWorker.removeEventListener('controllerchange', finish)
+      resolve()
+    }
+    const timeoutId = window.setTimeout(finish, timeoutMs)
+    navigator.serviceWorker.addEventListener('controllerchange', finish, { once: true })
+  })
+}
+
+const waitForWorkerActivation = async (
+  worker: ServiceWorker | null | undefined,
+  timeoutMs = RELEASE_RESTART_CONTROLLER_TIMEOUT_MS
+) => {
+  if (!worker || worker.state === 'activated') {
+    return
+  }
+
+  await new Promise<void>(resolve => {
+    let settled = false
+    const finish = () => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timeoutId)
+      worker.removeEventListener('statechange', handleStateChange)
+      resolve()
+    }
+    const handleStateChange = () => {
+      if (worker.state === 'activated' || worker.state === 'redundant') {
+        finish()
+      }
+    }
+    const timeoutId = window.setTimeout(finish, timeoutMs)
+    worker.addEventListener('statechange', handleStateChange)
+  })
+}
+
 export const restartAppForRelease = async () => {
   if (typeof window === 'undefined') {
     return
   }
 
+  let shouldWaitForServiceWorker = false
+
   try {
     const registration = await navigator.serviceWorker?.getRegistration?.('/')
     await registration?.update?.()
-    const waitingWorker = registration?.waiting || registration?.installing
-    waitingWorker?.postMessage?.({ type: 'SKIP_WAITING' })
+    const installingWorker = registration?.installing
+    const waitingWorker = registration?.waiting || installingWorker
+
+    if (waitingWorker) {
+      shouldWaitForServiceWorker = true
+      waitingWorker.postMessage?.({ type: 'SKIP_WAITING' })
+      await Promise.race([
+        waitForControllerChange(),
+        waitForWorkerActivation(waitingWorker),
+      ])
+    }
   } catch {
     // Reloading is the reliable part; service-worker update nudging is best-effort.
   }
 
-  window.setTimeout(() => {
-    window.location.reload()
-  }, 250)
+  if (shouldWaitForServiceWorker) {
+    await wait(RELEASE_RESTART_RELOAD_SETTLE_MS)
+  }
+
+  window.location.reload()
 }

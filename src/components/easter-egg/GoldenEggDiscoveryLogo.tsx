@@ -67,18 +67,18 @@ export function GoldenEggDiscoveryLogo({
       onPointerLeave={clearHold}
       onContextMenu={event => event.preventDefault()}
       className={cn(
-        'gold-egg-logo-trigger relative -ml-3.5 h-8 w-16 shrink-0 overflow-visible min-[380px]:-ml-3 min-[380px]:w-20 md:ml-0',
+        'gold-egg-logo-trigger relative h-10 w-10 shrink-0 overflow-visible rounded-[0.8rem] border border-[rgba(215,170,70,0.22)] bg-[#070809] shadow-[0_10px_24px_rgba(0,0,0,0.38),inset_0_1px_0_rgba(255,255,255,0.08)] md:h-11 md:w-11',
         isHolding && 'gold-egg-logo-trigger--holding',
         className
       )}
     >
       <img
-        src="/icons/header-logo.png"
+        src="/icons/app-icon-512.png"
         alt="SHADO"
         draggable={false}
         onDragStart={event => event.preventDefault()}
         className={cn(
-          'theme-logo absolute left-0 top-1/2 h-12 w-28 origin-left -translate-y-1/2 scale-[1.18] object-contain object-left min-[380px]:h-14 min-[380px]:w-32',
+          'theme-logo absolute inset-0 h-full w-full rounded-[0.74rem] object-cover drop-shadow-[0_8px_18px_rgba(0,0,0,0.28)]',
           imageClassName
         )}
       />

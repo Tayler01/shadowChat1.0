@@ -29,6 +29,10 @@ import { useSoundEffects } from './useSoundEffects'
 
 const HYPE_STACK_WINDOW_MS = 60_000
 const HYPE_DISPLAY_MS = 4600
+const HYPE_STARTUP_ANIMATION_DELAY_MS = 2_000
+const HYPE_STARTUP_QUEUE_LIMIT = 20
+const HYPE_LOCAL_RECEIPTS_PREFIX = 'shadowchat:hype-played-events'
+const HYPE_LOCAL_RECEIPT_LIMIT = 360
 
 export type HypeCelebrationState = {
   key: number
@@ -65,6 +69,86 @@ const normalizeRealtimeHypeEvent = (value: any): HypeEvent => ({
 
 const isExpired = (event: HypeEvent) => new Date(event.expires_at).getTime() <= Date.now()
 
+type LocalHypeReceipt = {
+  id: string
+  expiresAt: string
+  storedAt: number
+}
+
+const getLocalReceiptsKey = (userId: string) => `${HYPE_LOCAL_RECEIPTS_PREFIX}:${userId}`
+
+const readLocalHypeReceipts = (userId: string): LocalHypeReceipt[] => {
+  if (typeof window === 'undefined') return []
+
+  try {
+    const raw = window.localStorage.getItem(getLocalReceiptsKey(userId))
+    if (!raw) return []
+
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+
+    const now = Date.now()
+    const receipts = parsed
+      .map((item): LocalHypeReceipt | null => {
+        if (!item || typeof item !== 'object') return null
+
+        const id = typeof item.id === 'string' ? item.id : ''
+        const expiresAt = typeof item.expiresAt === 'string' ? item.expiresAt : ''
+        const expiresTime = Date.parse(expiresAt)
+        const storedAt = Number(item.storedAt)
+
+        if (!id || !Number.isFinite(expiresTime) || expiresTime <= now) {
+          return null
+        }
+
+        return {
+          id,
+          expiresAt,
+          storedAt: Number.isFinite(storedAt) ? storedAt : now,
+        }
+      })
+      .filter((item): item is LocalHypeReceipt => Boolean(item))
+
+    if (receipts.length !== parsed.length) {
+      window.localStorage.setItem(getLocalReceiptsKey(userId), JSON.stringify(receipts))
+    }
+
+    return receipts
+  } catch {
+    return []
+  }
+}
+
+const getLocalHypeReceiptIds = (userId: string) =>
+  new Set(readLocalHypeReceipts(userId).map(receipt => receipt.id))
+
+const rememberLocalHypeReceipts = (userId: string, events: HypeEvent[]) => {
+  if (typeof window === 'undefined' || events.length === 0) return
+
+  try {
+    const now = Date.now()
+    const receiptMap = new Map(readLocalHypeReceipts(userId).map(receipt => [receipt.id, receipt]))
+
+    events.forEach(event => {
+      if (isExpired(event)) return
+      receiptMap.set(event.id, {
+        id: event.id,
+        expiresAt: event.expires_at,
+        storedAt: now,
+      })
+    })
+
+    const receipts = [...receiptMap.values()]
+      .filter(receipt => Date.parse(receipt.expiresAt) > now)
+      .sort((left, right) => right.storedAt - left.storedAt)
+      .slice(0, HYPE_LOCAL_RECEIPT_LIMIT)
+
+    window.localStorage.setItem(getLocalReceiptsKey(userId), JSON.stringify(receipts))
+  } catch {
+    // Server receipts still provide the authoritative cross-device record.
+  }
+}
+
 export function HypeProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
   const { loading: messagesLoading } = useMessages()
@@ -74,9 +158,12 @@ export function HypeProvider({ children }: { children: React.ReactNode }) {
   const [ringing, setRinging] = useState(false)
   const [hypingMessageIds, setHypingMessageIds] = useState<Set<string>>(() => new Set())
   const [activeCelebration, setActiveCelebration] = useState<HypeCelebrationState | null>(null)
+  const [presentationReady, setPresentationReady] = useState(false)
   const handledEventIdsRef = useRef<Set<string>>(new Set())
   const stackRef = useRef<{ startedAt: number; count: number; events: HypeEvent[] } | null>(null)
+  const startupQueueRef = useRef<HypeEvent[]>([])
   const displayTimerRef = useRef<number | null>(null)
+  const startupDelayTimerRef = useRef<number | null>(null)
   const fetchedPendingForUserRef = useRef<string | null>(null)
 
   const clearDisplayTimer = useCallback(() => {
@@ -94,6 +181,13 @@ export function HypeProvider({ children }: { children: React.ReactNode }) {
       displayTimerRef.current = null
     }, HYPE_DISPLAY_MS)
   }, [clearDisplayTimer])
+
+  const clearStartupDelayTimer = useCallback(() => {
+    if (startupDelayTimerRef.current !== null) {
+      window.clearTimeout(startupDelayTimerRef.current)
+      startupDelayTimerRef.current = null
+    }
+  }, [])
 
   const refreshStatus = useCallback(async () => {
     if (!user) {
@@ -113,15 +207,20 @@ export function HypeProvider({ children }: { children: React.ReactNode }) {
     void refreshStatus()
   }, [refreshStatus])
 
-  const markPlayed = useCallback((events: HypeEvent[]) => {
-    const ids = events.map(event => event.id)
+  const recordPlayed = useCallback((events: HypeEvent[]) => {
+    const freshEvents = events.filter(event => !isExpired(event))
+    const ids = freshEvents.map(event => event.id)
     if (!ids.length) return
-    void markHypeEventsPlayed(ids).catch(() => undefined)
-  }, [])
 
-  const showLiveEvent = useCallback((event: HypeEvent) => {
-    if (isExpired(event) || handledEventIdsRef.current.has(event.id)) return
-    handledEventIdsRef.current.add(event.id)
+    freshEvents.forEach(event => handledEventIdsRef.current.add(event.id))
+    if (user?.id) {
+      rememberLocalHypeReceipts(user.id, freshEvents)
+    }
+    void markHypeEventsPlayed(ids).catch(() => undefined)
+  }, [user?.id])
+
+  const presentLiveEvent = useCallback((event: HypeEvent) => {
+    if (isExpired(event)) return
 
     const now = Date.now()
     const currentStack = stackRef.current
@@ -151,15 +250,13 @@ export function HypeProvider({ children }: { children: React.ReactNode }) {
     } else {
       playHypeBell()
     }
-    markPlayed([event])
     scheduleDismiss()
-  }, [markPlayed, playHypeBell, playHypeMessage, scheduleDismiss])
+  }, [playHypeBell, playHypeMessage, scheduleDismiss])
 
-  const showCatchupEvents = useCallback((events: HypeEvent[]) => {
-    const freshEvents = events.filter(event => !isExpired(event) && !handledEventIdsRef.current.has(event.id))
+  const presentCatchupEvents = useCallback((events: HypeEvent[]) => {
+    const freshEvents = events.filter(event => !isExpired(event))
     if (!freshEvents.length) return
 
-    freshEvents.forEach(event => handledEventIdsRef.current.add(event.id))
     const latestEvent = freshEvents[freshEvents.length - 1]
     const key = Date.now()
     stackRef.current = {
@@ -180,9 +277,79 @@ export function HypeProvider({ children }: { children: React.ReactNode }) {
     } else {
       playHypeBell()
     }
-    markPlayed(freshEvents)
     scheduleDismiss()
-  }, [markPlayed, playHypeBell, playHypeMessage, scheduleDismiss])
+  }, [playHypeBell, playHypeMessage, scheduleDismiss])
+
+  const queueStartupEvents = useCallback((events: HypeEvent[]) => {
+    const existingIds = new Set(startupQueueRef.current.map(event => event.id))
+    const queuedEvents = events.filter(event => !isExpired(event) && !existingIds.has(event.id))
+    if (!queuedEvents.length) return
+
+    startupQueueRef.current = [...startupQueueRef.current, ...queuedEvents].slice(-HYPE_STARTUP_QUEUE_LIMIT)
+  }, [])
+
+  const flushStartupQueue = useCallback(() => {
+    const queuedEvents = startupQueueRef.current.filter(event => !isExpired(event))
+    startupQueueRef.current = []
+    if (!queuedEvents.length) return
+
+    if (queuedEvents.length === 1) {
+      presentLiveEvent(queuedEvents[0])
+      return
+    }
+
+    presentCatchupEvents(queuedEvents)
+  }, [presentCatchupEvents, presentLiveEvent])
+
+  const showLiveEvent = useCallback((event: HypeEvent, options: { immediate?: boolean } = {}) => {
+    if (isExpired(event)) return
+
+    const localReceiptIds = user?.id ? getLocalHypeReceiptIds(user.id) : new Set<string>()
+    if (handledEventIdsRef.current.has(event.id) || localReceiptIds.has(event.id)) {
+      recordPlayed([event])
+      return
+    }
+    recordPlayed([event])
+
+    if (!options.immediate && !presentationReady) {
+      queueStartupEvents([event])
+      return
+    }
+
+    presentLiveEvent(event)
+  }, [presentationReady, presentLiveEvent, queueStartupEvents, recordPlayed, user?.id])
+
+  const showCatchupEvents = useCallback((events: HypeEvent[]) => {
+    const localReceiptIds = user?.id ? getLocalHypeReceiptIds(user.id) : new Set<string>()
+    const skippedEvents: HypeEvent[] = []
+    const freshEvents: HypeEvent[] = []
+
+    events.forEach(event => {
+      if (isExpired(event)) return
+
+      if (handledEventIdsRef.current.has(event.id) || localReceiptIds.has(event.id)) {
+        skippedEvents.push(event)
+        return
+      }
+
+      freshEvents.push(event)
+    })
+
+    if (skippedEvents.length) {
+      recordPlayed(skippedEvents)
+    }
+
+    if (!freshEvents.length) return
+
+    recordPlayed(freshEvents)
+
+    if (!presentationReady) {
+      queueStartupEvents(freshEvents)
+      return
+    }
+
+    presentCatchupEvents(freshEvents)
+  }, [presentCatchupEvents, presentationReady, queueStartupEvents, recordPlayed, user?.id])
 
   const ringBell = useCallback(async () => {
     if (!user || ringing) return null
@@ -190,7 +357,7 @@ export function HypeProvider({ children }: { children: React.ReactNode }) {
     setRinging(true)
     try {
       const event = await ringHypeBellRpc()
-      showLiveEvent(event)
+      showLiveEvent(event, { immediate: true })
       void triggerHypePushNotification(event.id).catch(() => undefined)
       void refreshStatus().catch(() => undefined)
       return event
@@ -205,7 +372,7 @@ export function HypeProvider({ children }: { children: React.ReactNode }) {
     setHypingMessageIds(prev => new Set(prev).add(messageId))
     try {
       const event = await hypeMessageRpc(messageId)
-      showLiveEvent(event)
+      showLiveEvent(event, { immediate: true })
       void triggerHypePushNotification(event.id).catch(() => undefined)
       void refreshStatus().catch(() => undefined)
       return event
@@ -226,6 +393,42 @@ export function HypeProvider({ children }: { children: React.ReactNode }) {
       .then(showCatchupEvents)
       .catch(() => undefined)
   }, [messagesLoading, showCatchupEvents, user])
+
+  useEffect(() => {
+    if (!user) {
+      clearStartupDelayTimer()
+      startupQueueRef.current = []
+      setPresentationReady(false)
+      return
+    }
+
+    if (messagesLoading) {
+      clearStartupDelayTimer()
+      setPresentationReady(false)
+      return
+    }
+
+    setPresentationReady(false)
+
+    if (typeof window === 'undefined') {
+      setPresentationReady(true)
+      return
+    }
+
+    clearStartupDelayTimer()
+    startupDelayTimerRef.current = window.setTimeout(() => {
+      setPresentationReady(true)
+      startupDelayTimerRef.current = null
+    }, HYPE_STARTUP_ANIMATION_DELAY_MS)
+
+    return clearStartupDelayTimer
+  }, [clearStartupDelayTimer, messagesLoading, user])
+
+  useEffect(() => {
+    if (presentationReady) {
+      flushStartupQueue()
+    }
+  }, [flushStartupQueue, presentationReady])
 
   useEffect(() => {
     if (!user) return
@@ -276,7 +479,10 @@ export function HypeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [showLiveEvent, user])
 
-  useEffect(() => () => clearDisplayTimer(), [clearDisplayTimer])
+  useEffect(() => () => {
+    clearDisplayTimer()
+    clearStartupDelayTimer()
+  }, [clearDisplayTimer, clearStartupDelayTimer])
 
   const dismissCelebration = useCallback(() => {
     clearDisplayTimer()
