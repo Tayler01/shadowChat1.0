@@ -9,9 +9,27 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
 
 ## Current Goal
 
-No active implementation goal is currently recorded here. The latest completed
-long-running goal was first-class short video pins for ShadowPin. The current
-cross-project planning backlog is the June 1 audit next-steps document.
+### Shadow Runner Playable Prototype Prep
+
+- Goal: Rebuild the Shadow Runner title/menu surface as clean asset-driven UI,
+  keep the gated phone-first flow stable, preserve current gameplay geometry,
+  and prepare the next Phaser playable-prototype checkpoint.
+- Started: 2026-06-09
+- Status: active
+- Owner/agent: Codex
+- Branch: `main`
+- Current checkpoint: blank-scroll menu base, separate live button panels,
+  tighter title-menu hit areas, and automated Chrome mobile smoke coverage.
+- Prototype backlog:
+  - Add gameplay HUD assets and DOM overlay: player health, enemy health,
+    score/coins, pause, and checkpoint/finish feedback.
+  - Keep movement rules in the existing simulation boundary and Phaser scene
+    thin; do not tune level difficulty from automated test failures alone.
+  - Add one reviewed enemy type first, then sword/jump defeat feedback.
+  - Build one short test route around movement, jump, double jump, attack,
+    crouch, one enemy, one tilt platform, and one finish marker.
+  - Run real iPhone and Android checks for rotation, safe areas, load speed,
+    and touch highlight behavior after each pushed visual/gameplay checkpoint.
 
 ## Latest Completed Goal - ShadowPin Short Video
 

@@ -1,5 +1,5 @@
 import React from 'react'
-import { ArrowLeft, Volume2, VolumeX } from 'lucide-react'
+import { ArrowLeft, Castle, Settings, Sword, Volume2, VolumeX } from 'lucide-react'
 import { SHADOW_RUNNER_ASSETS } from './assets/manifest'
 import { ShadowRunnerGame } from './ShadowRunnerGame'
 
@@ -58,7 +58,7 @@ const SHADOW_RUNNER_IMAGE_SOURCES = [
   SHADOW_RUNNER_ASSETS.home.background,
   SHADOW_RUNNER_ASSETS.home.titleScroll,
   SHADOW_RUNNER_ASSETS.home.blankMenuScroll,
-  SHADOW_RUNNER_ASSETS.home.bottomMenuScroll,
+  SHADOW_RUNNER_ASSETS.home.blankMenuButton,
   SHADOW_RUNNER_ASSETS.home.missionScrollStand,
   SHADOW_RUNNER_ASSETS.home.starSheet,
   SHADOW_RUNNER_ASSETS.home.torchStrip,
@@ -215,6 +215,12 @@ function spriteStripStyle(source: string, frame: number, frameCount: number): Re
     backgroundSize: `${frameCount * 100}% 100%`,
     imageRendering: 'pixelated',
   }
+}
+
+function MenuButtonIcon({ id }: { id: typeof MENU_BUTTONS[number]['id'] }) {
+  if (id === 'start') return <Sword className="h-[34%] w-[34%] stroke-[3]" aria-hidden="true" />
+  if (id === 'levels') return <Castle className="h-[34%] w-[34%] stroke-[3]" aria-hidden="true" />
+  return <Settings className="h-[34%] w-[34%] stroke-[3]" aria-hidden="true" />
 }
 
 interface ShadowRunnerAccessGateProps {
@@ -469,7 +475,7 @@ export function ShadowRunnerScreen({
               <img
                 src={SHADOW_RUNNER_ASSETS.home.bannerStand}
                 alt=""
-                className="pointer-events-none absolute bottom-[24%] left-[8%] z-[3] w-[7.2%]"
+                className="pointer-events-none absolute bottom-[27.5%] left-[8%] z-[3] w-[7.2%]"
                 draggable={false}
               />
               <img
@@ -507,7 +513,7 @@ export function ShadowRunnerScreen({
 
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute bottom-[24%] left-[37%] z-[6] aspect-square w-[18%] drop-shadow-[0_28px_40px_rgba(0,0,0,0.72)]"
+                className="pointer-events-none absolute bottom-[27.5%] left-[37%] z-[6] aspect-square w-[18%] drop-shadow-[0_28px_40px_rgba(0,0,0,0.72)]"
                 style={{
                   ...spriteStripStyle(SHADOW_RUNNER_ASSETS.hero.menuIdleCapeStrip, heroFrame, 8),
                 }}
@@ -515,7 +521,7 @@ export function ShadowRunnerScreen({
 
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute bottom-[24.5%] left-[17%] z-[4] aspect-square w-[7.2%] drop-shadow-[0_0_32px_rgba(238,143,34,0.5)]"
+                className="pointer-events-none absolute bottom-[28%] left-[17%] z-[4] aspect-square w-[7.2%] drop-shadow-[0_0_32px_rgba(238,143,34,0.5)]"
                 style={{
                   ...spriteStripStyle(SHADOW_RUNNER_ASSETS.home.torchStrip, torchFrame, 8),
                 }}
@@ -524,7 +530,7 @@ export function ShadowRunnerScreen({
               <img
                 src={SHADOW_RUNNER_ASSETS.home.missionScrollStand}
                 alt=""
-                className="shadow-runner-float pointer-events-none absolute bottom-[24.5%] left-[74%] z-[4] w-[6.4%] drop-shadow-[0_20px_35px_rgba(0,0,0,0.55)]"
+                className="shadow-runner-float pointer-events-none absolute bottom-[28%] left-[74%] z-[4] w-[6.4%] drop-shadow-[0_20px_35px_rgba(0,0,0,0.55)]"
                 draggable={false}
               />
 
@@ -533,7 +539,7 @@ export function ShadowRunnerScreen({
                 style={SHADOW_RUNNER_MENU_STYLE}
               >
                 <img
-                  src={SHADOW_RUNNER_ASSETS.home.bottomMenuScroll}
+                  src={SHADOW_RUNNER_ASSETS.home.blankMenuScroll}
                   alt=""
                   className="pointer-events-none h-full w-full select-none object-contain drop-shadow-[0_20px_45px_rgba(0,0,0,0.7)]"
                   draggable={false}
@@ -544,10 +550,21 @@ export function ShadowRunnerScreen({
                     type="button"
                     aria-label={`${button.label} button`}
                     onClick={() => handleMenuButton(button.id)}
-                    className="absolute top-[21%] h-[58%] rounded-[0.45rem] border border-transparent bg-transparent transition hover:border-[#f0d381]/45 hover:bg-[#f0d381]/10 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/65 active:bg-[#f0d381]/20"
+                    className="absolute top-[21%] h-[58%] overflow-hidden rounded-[0.42rem] border border-transparent bg-transparent text-[#140e07] transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#f0d381]/65"
                     style={{ left: button.left, width: button.width }}
                   >
-                    <span className="sr-only">{button.label}</span>
+                    <img
+                      src={SHADOW_RUNNER_ASSETS.home.blankMenuButton}
+                      alt=""
+                      className="pointer-events-none absolute inset-0 h-full w-full object-fill"
+                      draggable={false}
+                    />
+                    <span className="relative z-10 flex h-full w-full flex-col items-center justify-center gap-0.5 drop-shadow-[0_1px_0_rgba(255,239,183,0.55)]">
+                      <MenuButtonIcon id={button.id} />
+                      <span className="text-[0.52rem] font-black uppercase leading-none min-[740px]:text-[0.62rem] min-[980px]:text-xs">
+                        {button.label}
+                      </span>
+                    </span>
                   </button>
                 ))}
               </div>

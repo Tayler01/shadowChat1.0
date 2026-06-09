@@ -6,7 +6,7 @@
 | --- | --- | ---: | --- | --- |
 | Clean castle-night background | `assets/background/bg_title_castle_night_clean.png` | 1672 x 941 | No | Full-screen background plate with moon, sky, distant buildings, ruins, foliage, and stone ledge. |
 | Title parchment | `assets/ui/ui_title_scroll_shadow_runner.png` | 1536 x 1024 | Yes | Foreground title banner with baked `SHADOW RUNNER` text. |
-| Blank menu scroll | `generated/blank-menu-scroll-imagegen-source.png` / `sliced/blank-menu-scroll.png` / `optimized/blank-menu-scroll.webp` | 1667 x 565 runtime | Yes | Generated blank parchment scroll base for the private-build gate and future separated menu buttons. |
+| Blank menu scroll | `generated/blank-menu-scroll-imagegen-source.png` / `sliced/blank-menu-scroll.png` / `optimized/blank-menu-scroll.webp` | 1792 x 462 runtime | Yes | Generated blank parchment scroll base for the private-build gate and separated menu buttons. |
 | Blank menu button | `generated/blank-menu-button-imagegen-source.png` / `sliced/blank-menu-button.png` / `optimized/blank-menu-button.webp` | 1141 x 642 runtime | Yes | Generated blank parchment button panel for future separate menu controls and tighter hit areas. |
 | Bottom menu scroll | `assets/ui/ui_bottom_menu_scroll.png` | 1912 x 823 | Yes | Bottom parchment menu with baked `START`, `LEVELS`, and `OPTIONS` panels. |
 | Mission scroll stand | `assets/ui/prop_mission_scroll_stand.png` | 1254 x 1254 | Yes | Small blank parchment notice board/scroll prop for the foreground. |
