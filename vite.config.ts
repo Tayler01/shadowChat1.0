@@ -33,6 +33,10 @@ export default defineConfig({
             return 'vendor-motion'
           }
 
+          if (packageName === 'phaser') {
+            return 'vendor-phaser'
+          }
+
           return 'vendor-ui'
         },
       },

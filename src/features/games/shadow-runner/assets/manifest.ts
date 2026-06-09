@@ -17,5 +17,8 @@ export const SHADOW_RUNNER_ASSETS = {
   },
   hero: {
     menuIdleCapeStrip: `${ASSET_ROOT}/sprites/strips/shadow-runner-menu-idle-cape-8f-128.png`,
+    runStrip: `${ASSET_ROOT}/sprites/strips/shadow-runner-run-6f-128.png`,
+    jumpAirStrip: `${ASSET_ROOT}/sprites/strips/shadow-runner-jump-air-6f-128.png`,
+    swordAttackStrip: `${ASSET_ROOT}/sprites/strips/shadow-runner-sword-attack-5f-128.png`,
   },
 } as const
