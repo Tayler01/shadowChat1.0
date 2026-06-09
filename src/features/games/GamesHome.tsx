@@ -23,6 +23,57 @@ interface GamesHomeProps {
 }
 
 type SelectedEntertainment = 'shadow-runner' | 'shadow-war' | 'shadow-checkers' | 'shado-tv' | 'shadow-mystery' | 'will-kirk' | null
+type LockableScreenOrientation = ScreenOrientation & {
+  lock?: (orientation: 'landscape') => Promise<void>
+}
+
+let shadowRunnerRequestedFullscreen = false
+
+async function requestShadowRunnerLandscapeMode() {
+  if (typeof document === 'undefined' || typeof window === 'undefined') return
+
+  try {
+    const fullscreenTarget = document.documentElement
+    if (!document.fullscreenElement && fullscreenTarget.requestFullscreen) {
+      const fullscreenRequest = fullscreenTarget.requestFullscreen({ navigationUI: 'hide' })
+        .then(() => {
+          shadowRunnerRequestedFullscreen = document.fullscreenElement === fullscreenTarget
+        })
+        .catch(() => {
+          shadowRunnerRequestedFullscreen = false
+        })
+
+      await Promise.race([
+        fullscreenRequest,
+        new Promise(resolve => window.setTimeout(resolve, 900)),
+      ])
+    }
+  } catch {
+    shadowRunnerRequestedFullscreen = false
+  }
+
+  try {
+    await (window.screen.orientation as LockableScreenOrientation | undefined)?.lock?.('landscape')
+  } catch {
+    // Unsupported on iOS Safari and some browsers unless fullscreen is active.
+  }
+}
+
+function releaseShadowRunnerLandscapeMode() {
+  if (typeof document === 'undefined' || typeof window === 'undefined') return
+
+  try {
+    window.screen.orientation?.unlock?.()
+  } catch {
+    // Some browsers expose lock without unlock or reject unlock outside fullscreen.
+  }
+
+  if (shadowRunnerRequestedFullscreen && document.fullscreenElement && document.exitFullscreen) {
+    void document.exitFullscreen().catch(() => {})
+  }
+
+  shadowRunnerRequestedFullscreen = false
+}
 
 export function GamesHome({ currentView, onViewChange, onImmersiveChange }: GamesHomeProps) {
   const [selectedEntertainment, setSelectedEntertainment] = useState<SelectedEntertainment>(null)
@@ -89,6 +140,7 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
   }
 
   const enterShadowRunner = () => {
+    void requestShadowRunnerLandscapeMode()
     void playMusic(SHADOW_RUNNER_ASSETS.music)
     setAudioBlocked(false)
     setSelectedEntertainment('shadow-runner')
@@ -96,6 +148,7 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
   }
 
   const exitShadowRunner = () => {
+    releaseShadowRunnerLandscapeMode()
     pauseMusic()
     setAudioBlocked(false)
     setSelectedEntertainment(null)
@@ -161,6 +214,7 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
 
   useEffect(() => {
     return () => {
+      releaseShadowRunnerLandscapeMode()
       pauseMusic()
       onImmersiveChange?.(false)
     }
