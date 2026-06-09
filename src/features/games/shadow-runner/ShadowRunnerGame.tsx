@@ -1,23 +1,31 @@
 import React from 'react'
 import {
   ArrowDown,
-  ArrowLeft,
   ChevronLeft,
   ChevronRight,
   ChevronsUp,
   CircleDot,
+  Home,
+  LogOut,
+  Music,
+  Pause,
+  Play,
   Sword,
   Volume2,
   VolumeX,
 } from 'lucide-react'
 import { createShadowRunnerInputState, type ShadowRunnerAction } from './game/input'
 import type { ShadowRunnerHudState } from './game/simulation'
+import { ShadowRunnerScrollMenu, type ShadowRunnerScrollMenuAction } from './ShadowRunnerScrollMenu'
 
 interface ShadowRunnerGameProps {
   musicPlaying?: boolean
   audioBlocked?: boolean
+  soundEffectsEnabled?: boolean
   onBackToTitle?: () => void
+  onExitToEntertainment?: () => void
   onToggleMusic?: () => void
+  onToggleSoundEffects?: () => void
 }
 
 const DEFAULT_HUD: ShadowRunnerHudState = {
@@ -39,6 +47,7 @@ const SHADOW_RUNNER_GAME_STYLES = `
     width: 100%;
     -webkit-touch-callout: none;
     -webkit-user-drag: none;
+    -webkit-user-select: none;
     image-rendering: pixelated;
     touch-action: none;
     user-select: none;
@@ -47,10 +56,19 @@ const SHADOW_RUNNER_GAME_STYLES = `
   .shadow-runner-touch-button {
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
+    -webkit-user-select: none;
     touch-action: none;
     user-select: none;
   }
 `
+
+type ShadowRunnerPhaserGameHandle = {
+  destroy: (removeCanvas: boolean, noReturn?: boolean) => void
+  scene?: {
+    pause: (key: string) => void
+    resume: (key: string) => void
+  }
+}
 
 function HealthPips({ current, max }: { current: number; max: number }) {
   return (
@@ -125,18 +143,29 @@ function TouchButton({
 export function ShadowRunnerGame({
   musicPlaying = false,
   audioBlocked = false,
+  soundEffectsEnabled = true,
   onBackToTitle,
+  onExitToEntertainment,
   onToggleMusic,
+  onToggleSoundEffects,
 }: ShadowRunnerGameProps) {
   const gameMountRef = React.useRef<HTMLDivElement | null>(null)
+  const gameRef = React.useRef<ShadowRunnerPhaserGameHandle | null>(null)
   const inputRef = React.useRef(createShadowRunnerInputState())
   const [hud, setHud] = React.useState<ShadowRunnerHudState>(DEFAULT_HUD)
   const [ready, setReady] = React.useState(false)
   const [loadError, setLoadError] = React.useState<string | null>(null)
+  const [pauseOpen, setPauseOpen] = React.useState(false)
+  const [confirmExit, setConfirmExit] = React.useState<null | 'title' | 'entertainment'>(null)
+  const menuOpen = pauseOpen || confirmExit !== null
+
+  const clearPressedActions = React.useCallback(() => {
+    inputRef.current = createShadowRunnerInputState()
+  }, [])
 
   React.useEffect(() => {
     let disposed = false
-    let game: { destroy: (removeCanvas: boolean, noReturn?: boolean) => void } | null = null
+    let game: ShadowRunnerPhaserGameHandle | null = null
 
     setReady(false)
     setLoadError(null)
@@ -152,7 +181,8 @@ export function ShadowRunnerGame({
           onReady: () => {
             if (!disposed) setReady(true)
           },
-        })
+        }) as ShadowRunnerPhaserGameHandle
+        gameRef.current = game
       })
       .catch(error => {
         if (disposed) return
@@ -163,10 +193,25 @@ export function ShadowRunnerGame({
       disposed = true
       inputRef.current = createShadowRunnerInputState()
       game?.destroy(true)
+      gameRef.current = null
     }
   }, [])
 
+  React.useEffect(() => {
+    const game = gameRef.current
+    if (!game?.scene) return
+
+    if (menuOpen) {
+      clearPressedActions()
+      game.scene.pause('ShadowRunnerLevelScene')
+    } else {
+      game.scene.resume('ShadowRunnerLevelScene')
+    }
+  }, [clearPressedActions, menuOpen])
+
   const setAction = React.useCallback((action: ShadowRunnerAction, pressed: boolean) => {
+    if (menuOpen) return
+
     const state = inputRef.current
     const wasPressed = state[action]
 
@@ -179,7 +224,75 @@ export function ShadowRunnerGame({
     }
 
     state[action] = pressed
+  }, [menuOpen])
+
+  const openPauseMenu = React.useCallback(() => {
+    clearPressedActions()
+    setConfirmExit(null)
+    setPauseOpen(true)
+  }, [clearPressedActions])
+
+  const closePauseMenu = React.useCallback(() => {
+    setConfirmExit(null)
+    setPauseOpen(false)
   }, [])
+
+  const pauseActions = React.useMemo<ShadowRunnerScrollMenuAction[]>(() => [
+    {
+      id: 'resume',
+      label: 'Resume',
+      icon: <Play className="h-4 w-4 stroke-[3]" />,
+      onClick: closePauseMenu,
+    },
+    {
+      id: 'music',
+      label: musicPlaying ? 'Music On' : audioBlocked ? 'Start Music' : 'Music Off',
+      icon: <Music className="h-4 w-4 stroke-[3]" />,
+      onClick: () => onToggleMusic?.(),
+    },
+    {
+      id: 'sound-effects',
+      label: soundEffectsEnabled ? 'Sound On' : 'Sound Off',
+      icon: soundEffectsEnabled ? <Volume2 className="h-4 w-4 stroke-[3]" /> : <VolumeX className="h-4 w-4 stroke-[3]" />,
+      onClick: () => onToggleSoundEffects?.(),
+    },
+    {
+      id: 'main-menu',
+      label: 'Main Menu',
+      icon: <Home className="h-4 w-4 stroke-[3]" />,
+      onClick: () => setConfirmExit('title'),
+    },
+    {
+      id: 'exit',
+      label: 'Exit',
+      icon: <LogOut className="h-4 w-4 stroke-[3]" />,
+      tone: 'danger',
+      onClick: () => setConfirmExit('entertainment'),
+    },
+  ], [audioBlocked, closePauseMenu, musicPlaying, onToggleMusic, onToggleSoundEffects, soundEffectsEnabled])
+
+  const confirmActions = React.useMemo<ShadowRunnerScrollMenuAction[]>(() => [
+    {
+      id: 'stay',
+      label: 'Stay',
+      icon: <Play className="h-4 w-4 stroke-[3]" />,
+      onClick: () => setConfirmExit(null),
+    },
+    {
+      id: 'confirm',
+      label: confirmExit === 'title' ? 'Main Menu' : 'Exit',
+      icon: confirmExit === 'title' ? <Home className="h-4 w-4 stroke-[3]" /> : <LogOut className="h-4 w-4 stroke-[3]" />,
+      tone: 'danger',
+      onClick: () => {
+        closePauseMenu()
+        if (confirmExit === 'title') {
+          onBackToTitle?.()
+          return
+        }
+        onExitToEntertainment?.()
+      },
+    },
+  ], [closePauseMenu, confirmExit, onBackToTitle, onExitToEntertainment])
 
   return (
     <div
@@ -208,17 +321,6 @@ export function ShadowRunnerGame({
       )}
 
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 px-[max(0.85rem,env(safe-area-inset-left))] pt-[max(0.7rem,env(safe-area-inset-top))]">
-        <div className="pointer-events-auto flex items-center gap-2">
-          <button
-            type="button"
-            aria-label="Back to Shadow Runner title"
-            onClick={onBackToTitle}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#e8c46b]/40 bg-black/48 text-[#f3d88d] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-md transition hover:border-[#f0d381]/70 hover:bg-[#2c2110]/75 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-        </div>
-
         <div className="pointer-events-auto flex min-w-0 max-w-[58vw] items-center gap-2 rounded-lg border border-[#f0d381]/30 bg-black/48 px-3 py-2 text-[0.68rem] font-black uppercase tracking-[0.12em] text-[#f0d381] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-md">
           <HealthPips current={hud.health} max={hud.maxHealth} />
           <span className="h-4 w-px bg-[#f0d381]/30" />
@@ -230,16 +332,15 @@ export function ShadowRunnerGame({
 
         <button
           type="button"
-          aria-label={musicPlaying ? 'Pause Castle Bard music' : 'Play Castle Bard music'}
-          onClick={onToggleMusic}
-          className="pointer-events-auto inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-[#e8c46b]/40 bg-black/48 px-3 text-[#f3d88d] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-md transition hover:border-[#f0d381]/70 hover:bg-[#2c2110]/75 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
+          aria-label="Open pause menu"
+          onClick={openPauseMenu}
+          className="pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#e8c46b]/40 bg-black/48 text-[#f3d88d] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-md transition hover:border-[#f0d381]/70 hover:bg-[#2c2110]/75 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
         >
-          {musicPlaying ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
-          {audioBlocked && <span className="hidden text-xs font-semibold sm:inline">Tap</span>}
+          <Pause className="h-5 w-5" />
         </button>
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between px-[max(1rem,env(safe-area-inset-left))] pb-[max(0.85rem,env(safe-area-inset-bottom))]">
+      <div className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between px-[max(1rem,env(safe-area-inset-left))] pb-[max(0.85rem,env(safe-area-inset-bottom))] transition-opacity ${menuOpen ? 'opacity-35' : 'opacity-100'}`}>
         <div className="pointer-events-auto flex items-end gap-2">
           <TouchButton action="left" ariaLabel="Move left" onActionChange={setAction}>
             <ChevronLeft className="h-7 w-7" />
@@ -266,6 +367,22 @@ export function ShadowRunnerGame({
         <CircleDot className="mr-2 h-4 w-4 text-[#f0d381]" />
         {hud.enemyHealth}/{hud.enemyMaxHealth}
       </div>
+
+      {pauseOpen && !confirmExit && (
+        <ShadowRunnerScrollMenu
+          title="Pause"
+          subtitle="Level One"
+          actions={pauseActions}
+        />
+      )}
+
+      {confirmExit && (
+        <ShadowRunnerScrollMenu
+          title={confirmExit === 'title' ? 'Leave Level?' : 'Exit Game?'}
+          subtitle={confirmExit === 'title' ? 'Return to title screen' : 'Return to entertainment'}
+          actions={confirmActions}
+        />
+      )}
     </div>
   )
 }

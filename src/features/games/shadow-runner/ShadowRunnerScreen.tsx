@@ -1,7 +1,8 @@
 import React from 'react'
-import { ArrowLeft, Castle, Settings, Sword, Volume2, VolumeX } from 'lucide-react'
+import { ArrowLeft, Castle, LogOut, Music, Settings, Sword, Volume2, VolumeX, X } from 'lucide-react'
 import { SHADOW_RUNNER_ASSETS } from './assets/manifest'
 import { ShadowRunnerGame } from './ShadowRunnerGame'
+import { ShadowRunnerScrollMenu, type ShadowRunnerScrollMenuAction } from './ShadowRunnerScrollMenu'
 
 interface ShadowRunnerScreenProps {
   onExit?: () => void
@@ -19,9 +20,9 @@ type OrientationWindow = Window & typeof globalThis & {
 }
 
 const MENU_BUTTONS = [
-  { id: 'start', label: 'Start', left: '12.2%', width: '21.6%' },
-  { id: 'levels', label: 'Levels', left: '39%', width: '21.8%' },
-  { id: 'options', label: 'Options', left: '65.8%', width: '21.6%' },
+  { id: 'start', label: 'Start', left: '14.4%', width: '18.6%' },
+  { id: 'levels', label: 'Levels', left: '40.7%', width: '18.6%' },
+  { id: 'options', label: 'Options', left: '66.9%', width: '18.6%' },
 ] as const
 
 const SHADOW_RUNNER_ACCESS_CODE = '123456'
@@ -51,12 +52,15 @@ const SHADOW_RUNNER_STAGE_STYLE = {
 } as React.CSSProperties
 
 const SHADOW_RUNNER_MENU_STYLE = {
-  aspectRatio: '1792 / 462',
+  width: '58%',
+  height: '22.5%',
 } as React.CSSProperties
 
 const SHADOW_RUNNER_IMAGE_SOURCES = [
   SHADOW_RUNNER_ASSETS.home.background,
   SHADOW_RUNNER_ASSETS.home.titleScroll,
+  SHADOW_RUNNER_ASSETS.home.optionsScroll,
+  SHADOW_RUNNER_ASSETS.home.optionsMenuButton,
   SHADOW_RUNNER_ASSETS.home.blankMenuScroll,
   SHADOW_RUNNER_ASSETS.home.blankMenuButton,
   SHADOW_RUNNER_ASSETS.home.missionScrollStand,
@@ -91,12 +95,20 @@ const SHADOW_RUNNER_INLINE_STYLES = `
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
     -webkit-user-drag: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    touch-action: none;
     user-select: none;
   }
 
   .shadow-runner-no-select {
     overscroll-behavior: none;
-    touch-action: manipulation;
+  }
+
+  .shadow-runner-no-select ::selection {
+    background: transparent;
+    color: inherit;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -198,6 +210,45 @@ function useImagePreload(sources: readonly string[]) {
   }, [sources])
 
   return ready
+}
+
+function useShadowRunnerInteractionLock(rootRef: React.RefObject<HTMLElement>) {
+  React.useEffect(() => {
+    const containsTarget = (event: Event) => {
+      const root = rootRef.current
+      const target = event.target
+      return Boolean(root && target instanceof Node && root.contains(target))
+    }
+
+    const preventInsideGame = (event: Event) => {
+      if (!containsTarget(event)) return
+      event.preventDefault()
+    }
+
+    const clearGameSelection = () => {
+      const root = rootRef.current
+      const selection = window.getSelection()
+      if (!root || !selection || selection.rangeCount === 0 || selection.isCollapsed) return
+
+      const anchorInGame = selection.anchorNode ? root.contains(selection.anchorNode) : false
+      const focusInGame = selection.focusNode ? root.contains(selection.focusNode) : false
+      if (anchorInGame || focusInGame) {
+        selection.removeAllRanges()
+      }
+    }
+
+    document.addEventListener('contextmenu', preventInsideGame, true)
+    document.addEventListener('selectstart', preventInsideGame, true)
+    document.addEventListener('dragstart', preventInsideGame, true)
+    document.addEventListener('selectionchange', clearGameSelection)
+
+    return () => {
+      document.removeEventListener('contextmenu', preventInsideGame, true)
+      document.removeEventListener('selectstart', preventInsideGame, true)
+      document.removeEventListener('dragstart', preventInsideGame, true)
+      document.removeEventListener('selectionchange', clearGameSelection)
+    }
+  }, [rootRef])
 }
 
 function getShadowRunnerAccessUnlocked() {
@@ -349,14 +400,19 @@ export function ShadowRunnerScreen({
   audioBlocked = false,
   onToggleMusic,
 }: ShadowRunnerScreenProps) {
+  const rootRef = React.useRef<HTMLElement | null>(null)
   const heroFrame = useSpriteFrame(8, 150)
   const torchFrame = useSpriteFrame(8, 105)
   const orientationGateActive = useRotateGate()
   const [screen, setScreen] = React.useState<'title' | 'play'>('title')
   const [accessUnlocked, setAccessUnlocked] = React.useState(getShadowRunnerAccessUnlocked)
+  const [titleOptionsOpen, setTitleOptionsOpen] = React.useState(false)
+  const [soundEffectsEnabled, setSoundEffectsEnabled] = React.useState(true)
   const assetsReady = useImagePreload(SHADOW_RUNNER_IMAGE_SOURCES)
   const showRotateGate = orientationGateActive
   const audioContextRef = React.useRef<AudioContext | null>(null)
+
+  useShadowRunnerInteractionLock(rootRef)
 
   React.useEffect(() => {
     return () => {
@@ -367,6 +423,8 @@ export function ShadowRunnerScreen({
   }, [])
 
   const playButtonChime = React.useCallback(() => {
+    if (!soundEffectsEnabled) return
+
     const AudioContextCtor = window.AudioContext ?? (window as WebAudioWindow).webkitAudioContext
     if (!AudioContextCtor) return
 
@@ -396,20 +454,68 @@ export function ShadowRunnerScreen({
       oscillator.start(start)
       oscillator.stop(start + 0.2)
     })
-  }, [])
+  }, [soundEffectsEnabled])
 
   const handleMenuButton = React.useCallback((buttonId: typeof MENU_BUTTONS[number]['id']) => {
     playButtonChime()
 
     if (buttonId === 'start') {
       setScreen('play')
+      return
+    }
+
+    if (buttonId === 'options') {
+      setTitleOptionsOpen(true)
     }
   }, [playButtonChime])
 
+  const titleOptionsActions = React.useMemo<ShadowRunnerScrollMenuAction[]>(() => [
+    {
+      id: 'close',
+      label: 'Close',
+      icon: <X className="h-4 w-4 stroke-[3]" />,
+      onClick: () => {
+        playButtonChime()
+        setTitleOptionsOpen(false)
+      },
+    },
+    {
+      id: 'music',
+      label: musicPlaying ? 'Music On' : audioBlocked ? 'Start Music' : 'Music Off',
+      icon: musicPlaying ? <Music className="h-4 w-4 stroke-[3]" /> : <Music className="h-4 w-4 stroke-[3]" />,
+      onClick: () => {
+        playButtonChime()
+        onToggleMusic?.()
+      },
+    },
+    {
+      id: 'sound-effects',
+      label: soundEffectsEnabled ? 'Sound On' : 'Sound Off',
+      icon: soundEffectsEnabled ? <Volume2 className="h-4 w-4 stroke-[3]" /> : <VolumeX className="h-4 w-4 stroke-[3]" />,
+      onClick: () => {
+        playButtonChime()
+        setSoundEffectsEnabled(current => !current)
+      },
+    },
+    {
+      id: 'exit',
+      label: 'Exit',
+      icon: <LogOut className="h-4 w-4 stroke-[3]" />,
+      tone: 'danger',
+      onClick: () => {
+        playButtonChime()
+        onExit?.()
+      },
+    },
+  ], [audioBlocked, musicPlaying, onExit, onToggleMusic, playButtonChime, soundEffectsEnabled])
+
   return (
     <section
+      ref={rootRef}
       className="shadow-runner-no-select relative h-full min-h-[100dvh] w-full overflow-hidden bg-[#02040a] text-[#f6e6bb]"
       onContextMenu={event => event.preventDefault()}
+      onDragStart={event => event.preventDefault()}
+      onSelect={event => event.preventDefault()}
     >
       <style>{SHADOW_RUNNER_INLINE_STYLES}</style>
 
@@ -431,7 +537,10 @@ export function ShadowRunnerScreen({
             musicPlaying={musicPlaying}
             audioBlocked={audioBlocked}
             onToggleMusic={onToggleMusic}
+            soundEffectsEnabled={soundEffectsEnabled}
+            onToggleSoundEffects={() => setSoundEffectsEnabled(current => !current)}
             onBackToTitle={() => setScreen('title')}
+            onExitToEntertainment={onExit}
           />
         ) : (
           <>
@@ -485,25 +594,6 @@ export function ShadowRunnerScreen({
                 draggable={false}
               />
 
-              <button
-                type="button"
-                aria-label="Back to Entertainment"
-                onClick={onExit}
-                className="absolute left-[3%] top-[4%] z-20 inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#e8c46b]/40 bg-black/45 text-[#f3d88d] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-md transition hover:border-[#f0d381]/70 hover:bg-[#2c2110]/75 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </button>
-
-              <button
-                type="button"
-                aria-label={musicPlaying ? 'Pause Castle Bard music' : 'Play Castle Bard music'}
-                onClick={onToggleMusic}
-                className="absolute right-[3%] top-[4%] z-20 inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-[#e8c46b]/40 bg-black/45 px-3 text-[#f3d88d] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-md transition hover:border-[#f0d381]/70 hover:bg-[#2c2110]/75 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
-              >
-                {musicPlaying ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
-                {audioBlocked && <span className="hidden text-xs font-semibold sm:inline">Tap</span>}
-              </button>
-
               <img
                 src={SHADOW_RUNNER_ASSETS.home.titleScroll}
                 alt="Shadow Runner"
@@ -530,18 +620,18 @@ export function ShadowRunnerScreen({
               <img
                 src={SHADOW_RUNNER_ASSETS.home.missionScrollStand}
                 alt=""
-                className="shadow-runner-float pointer-events-none absolute bottom-[28%] left-[74%] z-[4] w-[6.4%] drop-shadow-[0_20px_35px_rgba(0,0,0,0.55)]"
+                className="shadow-runner-float pointer-events-none absolute bottom-[26.4%] left-[74%] z-[4] w-[6.4%] drop-shadow-[0_20px_35px_rgba(0,0,0,0.55)]"
                 draggable={false}
               />
 
               <div
-                className="absolute bottom-[4%] left-1/2 z-10 w-[48%] -translate-x-1/2"
+                className="absolute bottom-[4%] left-1/2 z-10 -translate-x-1/2"
                 style={SHADOW_RUNNER_MENU_STYLE}
               >
                 <img
                   src={SHADOW_RUNNER_ASSETS.home.blankMenuScroll}
                   alt=""
-                  className="pointer-events-none h-full w-full select-none object-contain drop-shadow-[0_20px_45px_rgba(0,0,0,0.7)]"
+                  className="pointer-events-none h-full w-full select-none object-fill drop-shadow-[0_20px_45px_rgba(0,0,0,0.7)]"
                   draggable={false}
                 />
                 {MENU_BUTTONS.map(button => (
@@ -550,7 +640,7 @@ export function ShadowRunnerScreen({
                     type="button"
                     aria-label={`${button.label} button`}
                     onClick={() => handleMenuButton(button.id)}
-                    className="absolute top-[21%] h-[58%] overflow-hidden rounded-[0.42rem] border border-transparent bg-transparent text-[#140e07] transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#f0d381]/65"
+                    className="absolute top-[23%] h-[54%] overflow-hidden rounded-[0.42rem] border border-transparent bg-transparent text-[#140e07] transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#f0d381]/65"
                     style={{ left: button.left, width: button.width }}
                   >
                     <img
@@ -568,6 +658,14 @@ export function ShadowRunnerScreen({
                   </button>
                 ))}
               </div>
+
+              {titleOptionsOpen && (
+                <ShadowRunnerScrollMenu
+                  title="Options"
+                  subtitle="Private Build"
+                  actions={titleOptionsActions}
+                />
+              )}
             </div>
           </>
         )}

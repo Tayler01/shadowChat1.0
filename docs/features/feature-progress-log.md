@@ -20,6 +20,16 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
 - Branch: `main`
 - Current checkpoint: blank-scroll menu base, separate live button panels,
   tighter title-menu hit areas, and automated Chrome mobile smoke coverage.
+- Latest pass, 2026-06-09: generated dedicated options-scroll and options-row
+  button assets; removed title back/sound controls; added title Options and
+  in-game Pause scroll menus; widened the title menu scroll without increasing
+  height; lowered the right mission-scroll pedestal; and hardened long-press
+  selection/context-menu suppression across the Shadow Runner surface.
+- Verification: `npm run lint`, `npx tsc --noEmit -p tsconfig.app.json`, and
+  `npm run build` passed. Chrome mobile visual smoke passed at `740x390` and
+  `932x430` with zero title-button scroll overrun and canceled `selectstart`
+  / `contextmenu` events. Evidence:
+  `output/playwright/shadow-runner-options-pass/final/`.
 - Prototype backlog:
   - Add gameplay HUD assets and DOM overlay: player health, enemy health,
     score/coins, pause, and checkpoint/finish feedback.

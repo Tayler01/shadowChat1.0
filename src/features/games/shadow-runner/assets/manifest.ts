@@ -7,6 +7,8 @@ export const SHADOW_RUNNER_ASSETS = {
   home: {
     background: `${HOME_ROOT}/optimized/bg-title-castle-night.webp`,
     titleScroll: `${HOME_ROOT}/optimized/title-scroll-shadow-runner.webp`,
+    optionsScroll: `${HOME_ROOT}/optimized/options-scroll-panel.webp`,
+    optionsMenuButton: `${HOME_ROOT}/optimized/options-menu-row-button.webp`,
     blankMenuScroll: `${HOME_ROOT}/optimized/blank-menu-scroll.webp`,
     blankMenuButton: `${HOME_ROOT}/optimized/blank-menu-button.webp`,
     bottomMenuScroll: `${HOME_ROOT}/optimized/bottom-menu-scroll.webp`,
