@@ -1,7 +1,7 @@
 {
   "game": "shadow-runner",
   "assetSet": "home-screen-v1-first-pass",
-  "status": "first_pass_review",
+  "status": "runtime_optimized_review",
   "source": "C:/Users/tayle/OneDrive/Desktop/Shadow Runner Home Assets",
   "copiedAt": "2026-06-08",
   "scope": "Landscape home/title screen background, parchment UI, decorative props, and ambient effects.",
@@ -40,6 +40,13 @@
       "alpha": false,
       "purpose": "Full-screen moonlit castle ruin home-screen background plate."
     },
+    "backgroundRuntime": {
+      "id": "bg-title-castle-night-runtime",
+      "file": "/games/shadow-runner/home-assets/optimized/bg-title-castle-night.webp",
+      "dimensions": { "width": 1672, "height": 941 },
+      "alpha": false,
+      "purpose": "Optimized runtime background plate for faster first game load."
+    },
     "titleScroll": {
       "id": "ui-title-scroll-shadow-runner",
       "file": "/games/shadow-runner/home-assets/assets/ui/ui_title_scroll_shadow_runner.png",
@@ -49,10 +56,10 @@
     },
     "titleScrollRuntime": {
       "id": "title-scroll-shadow-runner",
-      "file": "/games/shadow-runner/home-assets/sliced/title-scroll-shadow-runner.png",
+      "file": "/games/shadow-runner/home-assets/optimized/title-scroll-shadow-runner.webp",
       "dimensions": { "width": 1421, "height": 662 },
       "alpha": true,
-      "purpose": "Trimmed runtime title banner used by the first home screen."
+      "purpose": "Optimized trimmed runtime title banner used by the fixed-ratio home screen."
     },
     "bottomMenu": {
       "id": "ui-bottom-menu-scroll",
@@ -63,10 +70,10 @@
     },
     "bottomMenuRuntime": {
       "id": "bottom-menu-scroll",
-      "file": "/games/shadow-runner/home-assets/sliced/bottom-menu-scroll.png",
+      "file": "/games/shadow-runner/home-assets/optimized/bottom-menu-scroll.webp",
       "dimensions": { "width": 1792, "height": 462 },
       "alpha": true,
-      "purpose": "Trimmed runtime menu strip used for tighter landscape phone composition and button hit areas."
+      "purpose": "Optimized trimmed runtime menu strip used for tighter landscape phone composition and button hit areas."
     },
     "missionScroll": {
       "id": "prop-mission-scroll-stand",
@@ -74,6 +81,13 @@
       "dimensions": { "width": 1254, "height": 1254 },
       "alpha": true,
       "purpose": "Blank mission scroll stand foreground prop."
+    },
+    "missionScrollRuntime": {
+      "id": "mission-scroll-stand-runtime",
+      "file": "/games/shadow-runner/home-assets/optimized/mission-scroll-stand.webp",
+      "dimensions": { "width": 1254, "height": 1254 },
+      "alpha": true,
+      "purpose": "Optimized runtime mission scroll prop for the fixed-ratio home screen."
     },
     "torch": {
       "id": "fx-torch-flame-strip",
@@ -100,6 +114,13 @@
       "intendedSprites": 12,
       "reviewNote": "Visual layout reads as 4 columns by 3 rows, but the height is not evenly divisible by 3. Prefer explicit atlas regions or a sliced cleanup pass."
     },
+    "starsRuntime": {
+      "id": "fx-star-twinkle-sheet-runtime",
+      "file": "/games/shadow-runner/home-assets/optimized/star-twinkle-sheet.webp",
+      "dimensions": { "width": 1536, "height": 1024 },
+      "alpha": true,
+      "purpose": "Optimized runtime star atlas used for brighter animated shimmer overlays."
+    },
     "banners": {
       "id": "prop-purple-banners-sheet",
       "file": "/games/shadow-runner/home-assets/assets/props/prop_purple_banners_sheet.png",
@@ -109,7 +130,7 @@
     },
     "bannerStand": {
       "id": "banner-stand",
-      "file": "/games/shadow-runner/home-assets/sliced/banner-stand.png",
+      "file": "/games/shadow-runner/home-assets/optimized/banner-stand.webp",
       "alpha": true,
       "purpose": "Runtime-ready standing purple banner prop."
     },
@@ -121,7 +142,7 @@
     },
     "bannerPennant": {
       "id": "banner-pennant",
-      "file": "/games/shadow-runner/home-assets/sliced/banner-pennant.png",
+      "file": "/games/shadow-runner/home-assets/optimized/banner-pennant.webp",
       "alpha": true,
       "purpose": "Runtime-ready small pennant prop."
     },

@@ -1,5 +1,6 @@
-const STATIC_ASSET_CACHE = 'shadowchat-static-assets-v1'
+const STATIC_ASSET_CACHE = 'shadowchat-static-assets-v2'
 const STATIC_ASSET_CACHE_PREFIX = 'shadowchat-static-assets-'
+const CACHEABLE_STATIC_ASSET_EXTENSIONS = /\.(?:avif|css|gif|jpe?g|js|json|mp3|png|svg|webp|woff2?)$/i
 
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting())
@@ -35,7 +36,11 @@ const isCacheableStaticAssetRequest = (request) => {
 
   try {
     const url = new URL(request.url)
-    return url.origin === self.location.origin && url.pathname.startsWith('/assets/')
+    if (url.origin !== self.location.origin || !CACHEABLE_STATIC_ASSET_EXTENSIONS.test(url.pathname)) {
+      return false
+    }
+
+    return url.pathname.startsWith('/assets/') || url.pathname.startsWith('/games/shadow-runner/')
   } catch {
     return false
   }

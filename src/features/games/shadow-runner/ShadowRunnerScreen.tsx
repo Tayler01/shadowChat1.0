@@ -24,29 +24,48 @@ const MENU_BUTTONS = [
 ] as const
 
 const STAR_OVERLAYS = [
-  { left: '18.5%', top: '7.5%', size: '1rem', position: '0% 0%', delay: '0s' },
-  { left: '22.5%', top: '18%', size: '0.85rem', position: '33.333% 0%', delay: '0.65s' },
-  { left: '29.5%', top: '7%', size: '1.15rem', position: '66.666% 0%', delay: '1.25s' },
-  { left: '33.5%', top: '19%', size: '0.95rem', position: '100% 0%', delay: '1.85s' },
-  { left: '37%', top: '12%', size: '0.8rem', position: '0% 50%', delay: '0.35s' },
-  { left: '19.5%', top: '25%', size: '0.72rem', position: '33.333% 50%', delay: '2.15s' },
-  { left: '39.5%', top: '24%', size: '0.78rem', position: '100% 50%', delay: '2.45s' },
-  { left: '45%', top: '13%', size: '1.05rem', position: '66.666% 0%', delay: '1.5s' },
-  { left: '63%', top: '9%', size: '1.25rem', position: '100% 0%', delay: '0.35s' },
+  { left: '17.5%', top: '6.5%', size: '1rem', position: '0% 0%', delay: '0s' },
+  { left: '20%', top: '15%', size: '0.82rem', position: '33.333% 0%', delay: '0.65s' },
+  { left: '23.5%', top: '23%', size: '0.74rem', position: '100% 50%', delay: '2.15s' },
+  { left: '27.5%', top: '6%', size: '1.15rem', position: '66.666% 0%', delay: '1.25s' },
+  { left: '30.5%', top: '18%', size: '1rem', position: '100% 0%', delay: '1.85s' },
+  { left: '34%', top: '11%', size: '0.86rem', position: '0% 50%', delay: '0.35s' },
+  { left: '36.5%', top: '24%', size: '0.78rem', position: '33.333% 50%', delay: '2.45s' },
+  { left: '42%', top: '13%', size: '1.08rem', position: '66.666% 0%', delay: '1.5s' },
+  { left: '53%', top: '6%', size: '0.72rem', position: '100% 50%', delay: '2.8s' },
+  { left: '62%', top: '9%', size: '1.25rem', position: '100% 0%', delay: '0.35s' },
+  { left: '69%', top: '18%', size: '0.86rem', position: '0% 0%', delay: '2.2s' },
   { left: '75%', top: '18%', size: '1.15rem', position: '0% 50%', delay: '1.1s' },
+  { left: '81%', top: '8%', size: '0.8rem', position: '66.666% 50%', delay: '2.6s' },
   { left: '86%', top: '12%', size: '0.9rem', position: '33.333% 50%', delay: '1.8s' },
+  { left: '91%', top: '21%', size: '0.72rem', position: '100% 0%', delay: '3s' },
 ] as const
 
-const BOTTOM_MENU_STYLE = {
-  '--shadow-runner-menu-height': 'clamp(4.35rem, 17vh, 7rem)',
-  height: 'var(--shadow-runner-menu-height)',
-  width: 'min(56vw, 39rem)',
+const SHADOW_RUNNER_STAGE_STYLE = {
+  width: 'min(100vw, calc(100dvh * 1.777))',
+  height: 'min(100dvh, calc(100vw / 1.777))',
 } as React.CSSProperties
+
+const SHADOW_RUNNER_MENU_STYLE = {
+  aspectRatio: '1792 / 462',
+} as React.CSSProperties
+
+const SHADOW_RUNNER_IMAGE_SOURCES = [
+  SHADOW_RUNNER_ASSETS.home.background,
+  SHADOW_RUNNER_ASSETS.home.titleScroll,
+  SHADOW_RUNNER_ASSETS.home.bottomMenuScroll,
+  SHADOW_RUNNER_ASSETS.home.missionScrollStand,
+  SHADOW_RUNNER_ASSETS.home.starSheet,
+  SHADOW_RUNNER_ASSETS.home.torchStrip,
+  SHADOW_RUNNER_ASSETS.home.bannerStand,
+  SHADOW_RUNNER_ASSETS.home.bannerPennant,
+  SHADOW_RUNNER_ASSETS.hero.menuIdleCapeStrip,
+] as const
 
 const SHADOW_RUNNER_INLINE_STYLES = `
   @keyframes shadow-runner-star-shimmer {
-    0%, 100% { opacity: 0.35; transform: scale(0.8) rotate(0deg); filter: drop-shadow(0 0 0 rgba(240,211,129,0)); }
-    45% { opacity: 1; transform: scale(1.1) rotate(6deg); filter: drop-shadow(0 0 10px rgba(240,211,129,0.8)); }
+    0%, 100% { opacity: 0.45; transform: scale(0.82) rotate(0deg); filter: brightness(1.15) drop-shadow(0 0 2px rgba(240,211,129,0.25)); }
+    45% { opacity: 1; transform: scale(1.28) rotate(6deg); filter: brightness(1.65) drop-shadow(0 0 16px rgba(255,228,145,0.95)); }
   }
 
   @keyframes shadow-runner-float {
@@ -127,6 +146,42 @@ function useRotateGate() {
   return showRotateGate
 }
 
+function useImagePreload(sources: readonly string[]) {
+  const [ready, setReady] = React.useState(false)
+
+  React.useEffect(() => {
+    let cancelled = false
+    let remaining = sources.length
+
+    if (remaining === 0) {
+      setReady(true)
+      return
+    }
+
+    setReady(false)
+    sources.forEach(source => {
+      const image = new Image()
+      const settle = () => {
+        remaining -= 1
+        if (!cancelled && remaining <= 0) {
+          setReady(true)
+        }
+      }
+
+      image.onload = settle
+      image.onerror = settle
+      image.decoding = 'async'
+      image.src = source
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [sources])
+
+  return ready
+}
+
 function spriteStripStyle(source: string, frame: number, frameCount: number): React.CSSProperties {
   const position = frameCount > 1 ? `${(frame / (frameCount - 1)) * 100}% 0%` : '0% 0%'
 
@@ -147,7 +202,10 @@ export function ShadowRunnerScreen({
 }: ShadowRunnerScreenProps) {
   const heroFrame = useSpriteFrame(8, 150)
   const torchFrame = useSpriteFrame(8, 105)
-  const showRotateGate = useRotateGate()
+  const orientationGateActive = useRotateGate()
+  const [forceStage, setForceStage] = React.useState(false)
+  const assetsReady = useImagePreload(SHADOW_RUNNER_IMAGE_SOURCES)
+  const showRotateGate = orientationGateActive && !forceStage
   const audioContextRef = React.useRef<AudioContext | null>(null)
 
   React.useEffect(() => {
@@ -199,9 +257,26 @@ export function ShadowRunnerScreen({
         <p className="mt-3 max-w-xs text-sm font-semibold uppercase tracking-[0.12em] text-[#d9c79f]">
           Shadow Runner plays sideways.
         </p>
+        <button
+          type="button"
+          onClick={() => setForceStage(true)}
+          className="mt-6 rounded-full border border-[#f0d381]/45 bg-[#2c2110]/70 px-5 py-2 text-xs font-black uppercase tracking-[0.16em] text-[#f0d381] shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
+        >
+          Continue
+        </button>
       </div>
 
-      <div className={`${showRotateGate ? 'hidden' : 'block'} shadow-runner-landscape-stage absolute inset-0`}>
+      <div className={`${showRotateGate ? 'hidden' : 'flex'} shadow-runner-landscape-stage absolute inset-0 items-center justify-center bg-black`}>
+      {!assetsReady && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-black px-6 text-center">
+          <p className="text-sm font-black uppercase tracking-[0.22em] text-[#f0d381]">Loading</p>
+        </div>
+      )}
+
+      <div
+        className={`shadow-runner-playfield relative overflow-hidden transition-opacity duration-300 ${assetsReady ? 'opacity-100' : 'opacity-0'}`}
+        style={SHADOW_RUNNER_STAGE_STYLE}
+      >
       <img
         src={SHADOW_RUNNER_ASSETS.home.background}
         alt=""
@@ -232,13 +307,13 @@ export function ShadowRunnerScreen({
       <img
         src={SHADOW_RUNNER_ASSETS.home.bannerStand}
         alt=""
-        className="pointer-events-none absolute bottom-[clamp(6.1rem,18vh,9.2rem)] left-[6.5%] z-[3] hidden w-[clamp(4.2rem,7vw,7rem)] sm:block"
+        className="pointer-events-none absolute bottom-[22.5%] left-[8%] z-[3] w-[7.2%]"
         draggable={false}
       />
       <img
         src={SHADOW_RUNNER_ASSETS.home.bannerPennant}
         alt=""
-        className="pointer-events-none absolute right-[4%] top-[8%] z-[3] hidden w-[clamp(3.75rem,6vw,6.5rem)] sm:block"
+        className="pointer-events-none absolute right-[3.5%] top-[6.5%] z-[3] w-[6%]"
         draggable={false}
       />
 
@@ -246,7 +321,7 @@ export function ShadowRunnerScreen({
         type="button"
         aria-label="Back to Entertainment"
         onClick={onExit}
-        className="absolute left-[max(1rem,env(safe-area-inset-left))] top-[max(1rem,env(safe-area-inset-top))] z-20 inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#e8c46b]/40 bg-black/45 text-[#f3d88d] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-md transition hover:border-[#f0d381]/70 hover:bg-[#2c2110]/75 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
+        className="absolute left-[3%] top-[4%] z-20 inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#e8c46b]/40 bg-black/45 text-[#f3d88d] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-md transition hover:border-[#f0d381]/70 hover:bg-[#2c2110]/75 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
       >
         <ArrowLeft className="h-5 w-5" />
       </button>
@@ -255,7 +330,7 @@ export function ShadowRunnerScreen({
         type="button"
         aria-label={musicPlaying ? 'Pause Castle Bard music' : 'Play Castle Bard music'}
         onClick={onToggleMusic}
-        className="absolute right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] z-20 inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-[#e8c46b]/40 bg-black/45 px-3 text-[#f3d88d] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-md transition hover:border-[#f0d381]/70 hover:bg-[#2c2110]/75 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
+        className="absolute right-[3%] top-[4%] z-20 inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full border border-[#e8c46b]/40 bg-black/45 px-3 text-[#f3d88d] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-md transition hover:border-[#f0d381]/70 hover:bg-[#2c2110]/75 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
       >
         {musicPlaying ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
         {audioBlocked && <span className="hidden text-xs font-semibold sm:inline">Tap</span>}
@@ -264,38 +339,36 @@ export function ShadowRunnerScreen({
       <img
         src={SHADOW_RUNNER_ASSETS.home.titleScroll}
         alt="Shadow Runner"
-        className="pointer-events-none absolute left-[34%] top-[4%] z-[5] w-[min(52vw,28rem)] drop-shadow-[0_24px_60px_rgba(0,0,0,0.6)] md:left-[34%] md:w-[min(34vw,30rem)]"
+        className="pointer-events-none absolute left-[29%] top-[4%] z-[5] w-[42%] drop-shadow-[0_24px_60px_rgba(0,0,0,0.6)]"
         draggable={false}
       />
 
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute left-[37%] z-[6] aspect-square w-[clamp(7.6rem,16vw,15rem)] drop-shadow-[0_28px_40px_rgba(0,0,0,0.72)]"
+        className="pointer-events-none absolute bottom-[22.5%] left-[37%] z-[6] aspect-square w-[18%] drop-shadow-[0_28px_40px_rgba(0,0,0,0.72)]"
         style={{
           ...spriteStripStyle(SHADOW_RUNNER_ASSETS.hero.menuIdleCapeStrip, heroFrame, 8),
-          bottom: 'clamp(5.9rem, 23vh, 10rem)',
         }}
       />
 
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute left-[14%] z-[4] aspect-square w-[clamp(3.8rem,6.4vw,6.2rem)] drop-shadow-[0_0_32px_rgba(238,143,34,0.5)]"
+        className="pointer-events-none absolute bottom-[23%] left-[17%] z-[4] aspect-square w-[7.2%] drop-shadow-[0_0_32px_rgba(238,143,34,0.5)]"
         style={{
           ...spriteStripStyle(SHADOW_RUNNER_ASSETS.home.torchStrip, torchFrame, 8),
-          bottom: 'clamp(6.2rem, 19vh, 8.9rem)',
         }}
       />
 
       <img
         src={SHADOW_RUNNER_ASSETS.home.missionScrollStand}
         alt=""
-        className="shadow-runner-float pointer-events-none absolute bottom-[clamp(5.8rem,18vh,8.8rem)] left-[68%] z-[4] hidden w-[clamp(3.4rem,6vw,5.8rem)] drop-shadow-[0_20px_35px_rgba(0,0,0,0.55)] md:block"
+        className="shadow-runner-float pointer-events-none absolute bottom-[23%] left-[74%] z-[4] w-[6.4%] drop-shadow-[0_20px_35px_rgba(0,0,0,0.55)]"
         draggable={false}
       />
 
       <div
-        className="absolute bottom-[max(1rem,calc(env(safe-area-inset-bottom)+0.8rem))] left-1/2 z-10 -translate-x-1/2"
-        style={BOTTOM_MENU_STYLE}
+        className="absolute bottom-[4%] left-1/2 z-10 w-[48%] -translate-x-1/2"
+        style={SHADOW_RUNNER_MENU_STYLE}
       >
         <img
           src={SHADOW_RUNNER_ASSETS.home.bottomMenuScroll}
@@ -315,6 +388,7 @@ export function ShadowRunnerScreen({
             <span className="sr-only">{button.label}</span>
           </button>
         ))}
+      </div>
       </div>
       </div>
     </section>
