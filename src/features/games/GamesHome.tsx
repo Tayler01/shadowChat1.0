@@ -5,6 +5,8 @@ import { ShadowWarScreen } from './shadow-war/ShadowWarScreen'
 import { SHADOW_WAR_ASSETS } from './shadow-war/assets/manifest'
 import { ShadowCheckersScreen } from './shadow-checkers/ShadowCheckersScreen'
 import { SHADOW_CHECKERS_ASSETS } from './shadow-checkers/assets/manifest'
+import { ShadowRunnerScreen } from './shadow-runner/ShadowRunnerScreen'
+import { SHADOW_RUNNER_ASSETS } from './shadow-runner/assets/manifest'
 import { ShadoTvScreen } from '../entertainment/shado-tv/ShadoTvScreen'
 import { SHADO_TV_ASSETS } from '../entertainment/shado-tv/assets/manifest'
 import { ShadowMysteryScreen } from '../entertainment/shadow-mystery/ShadowMysteryScreen'
@@ -20,7 +22,7 @@ interface GamesHomeProps {
   onImmersiveChange?: (immersive: boolean) => void
 }
 
-type SelectedEntertainment = 'shadow-war' | 'shadow-checkers' | 'shado-tv' | 'shadow-mystery' | 'will-kirk' | null
+type SelectedEntertainment = 'shadow-runner' | 'shadow-war' | 'shadow-checkers' | 'shado-tv' | 'shadow-mystery' | 'will-kirk' | null
 
 export function GamesHome({ currentView, onViewChange, onImmersiveChange }: GamesHomeProps) {
   const [selectedEntertainment, setSelectedEntertainment] = useState<SelectedEntertainment>(null)
@@ -86,6 +88,20 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
     onImmersiveChange?.(false)
   }
 
+  const enterShadowRunner = () => {
+    void playMusic(SHADOW_RUNNER_ASSETS.music)
+    setAudioBlocked(false)
+    setSelectedEntertainment('shadow-runner')
+    onImmersiveChange?.(true)
+  }
+
+  const exitShadowRunner = () => {
+    pauseMusic()
+    setAudioBlocked(false)
+    setSelectedEntertainment(null)
+    onImmersiveChange?.(false)
+  }
+
   const enterShadoTv = () => {
     pauseMusic()
     setAudioBlocked(false)
@@ -130,7 +146,12 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
       pauseMusic()
       return
     }
-    const source = selectedEntertainment === 'shadow-checkers' ? SHADOW_CHECKERS_ASSETS.music : SHADOW_WAR_ASSETS.music
+    const source =
+      selectedEntertainment === 'shadow-checkers'
+        ? SHADOW_CHECKERS_ASSETS.music
+        : selectedEntertainment === 'shadow-runner'
+          ? SHADOW_RUNNER_ASSETS.music
+          : SHADOW_WAR_ASSETS.music
     void playMusic(source)
   }
 
@@ -158,7 +179,16 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
   return (
     <>
       {audio}
-      {selectedEntertainment === 'shadow-war' ? (
+      {selectedEntertainment === 'shadow-runner' ? (
+        <div className="h-full min-h-0 overflow-hidden bg-black">
+          <ShadowRunnerScreen
+            onExit={exitShadowRunner}
+            musicPlaying={musicPlaying}
+            audioBlocked={audioBlocked}
+            onToggleMusic={toggleMusic}
+          />
+        </div>
+      ) : selectedEntertainment === 'shadow-war' ? (
         <div className="h-full min-h-0 overflow-hidden bg-black">
         <ShadowWarScreen
           onExit={exitShadowWar}
@@ -211,6 +241,24 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
           <img
             src={WILL_KIRK_ASSETS.pickerBanner}
             alt="Will & Kirk"
+            className="absolute inset-0 h-full w-full object-cover"
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
+            width={1920}
+            height={720}
+          />
+        </button>
+
+        <button
+          type="button"
+          aria-label="Open Shadow Runner"
+          onClick={enterShadowRunner}
+          className={pickerCardClass}
+        >
+          <img
+            src={SHADOW_RUNNER_ASSETS.pickerBanner}
+            alt="Shadow Runner"
             className="absolute inset-0 h-full w-full object-cover"
             loading="eager"
             decoding="async"

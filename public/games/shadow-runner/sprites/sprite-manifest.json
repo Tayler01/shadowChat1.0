@@ -1,0 +1,97 @@
+{
+  "game": "shadow-runner",
+  "assetSet": "hero-v1-first-pass",
+  "status": "first_pass_review",
+  "frameSize": {
+    "width": 128,
+    "height": 128
+  },
+  "anchor": "bottom-center",
+  "sourceStyle": "Game Boy Color-inspired pixel art, shadow knight messenger, parchment-era medieval fantasy",
+  "notes": [
+    "These are first-pass normalized sprite strips built from generated concept sources.",
+    "Frames are transparent PNGs, normalized to 128x128, and aligned to the bottom-center content anchor.",
+    "Frame labels are stored in filenames and this manifest. Do not bake labels into runtime sprite pixels.",
+    "Menu idle is the strongest strip for the current home screen direction.",
+    "Run, jump-air, and sword-attack are usable as timing and silhouette anchors, but should receive a stricter consistency pass before final implementation."
+  ],
+  "animations": {
+    "menuIdleCape": {
+      "id": "menu-idle-cape",
+      "purpose": "Home screen and menu stance cape wind loop",
+      "loop": true,
+      "recommendedFps": 8,
+      "frameCount": 8,
+      "strip": "/games/shadow-runner/sprites/strips/shadow-runner-menu-idle-cape-8f-128.png",
+      "preview": "/games/shadow-runner/sprites/previews/shadow-runner-menu-idle-cape-8f-preview.png",
+      "rawSource": "/games/shadow-runner/sprites/raw/shadow-runner-menu-idle-cape-8f-source.png",
+      "transparentSource": "/games/shadow-runner/sprites/transparent/shadow-runner-menu-idle-cape-8f-strip.png",
+      "frames": [
+        { "index": 1, "label": "rest", "file": "/games/shadow-runner/sprites/frames/menu-idle-cape/01-rest.png" },
+        { "index": 2, "label": "slight-lift", "file": "/games/shadow-runner/sprites/frames/menu-idle-cape/02-slight-lift.png" },
+        { "index": 3, "label": "cape-billow-left", "file": "/games/shadow-runner/sprites/frames/menu-idle-cape/03-cape-billow-left.png" },
+        { "index": 4, "label": "full-billow", "file": "/games/shadow-runner/sprites/frames/menu-idle-cape/04-full-billow.png" },
+        { "index": 5, "label": "cape-curl", "file": "/games/shadow-runner/sprites/frames/menu-idle-cape/05-cape-curl.png" },
+        { "index": 6, "label": "settling", "file": "/games/shadow-runner/sprites/frames/menu-idle-cape/06-settling.png" },
+        { "index": 7, "label": "soft-flutter", "file": "/games/shadow-runner/sprites/frames/menu-idle-cape/07-soft-flutter.png" },
+        { "index": 8, "label": "return-rest", "file": "/games/shadow-runner/sprites/frames/menu-idle-cape/08-return-rest.png" }
+      ]
+    },
+    "run": {
+      "id": "run",
+      "purpose": "Right-facing gameplay run cycle",
+      "loop": true,
+      "recommendedFps": 10,
+      "frameCount": 6,
+      "strip": "/games/shadow-runner/sprites/strips/shadow-runner-run-6f-128.png",
+      "preview": "/games/shadow-runner/sprites/previews/shadow-runner-run-6f-preview.png",
+      "rawSource": "/games/shadow-runner/sprites/raw/shadow-runner-run-6f-source.png",
+      "transparentSource": "/games/shadow-runner/sprites/transparent/shadow-runner-run-6f-strip.png",
+      "frames": [
+        { "index": 1, "label": "contact-a", "file": "/games/shadow-runner/sprites/frames/run/01-contact-a.png" },
+        { "index": 2, "label": "passing-a", "file": "/games/shadow-runner/sprites/frames/run/02-passing-a.png" },
+        { "index": 3, "label": "stride-extension-a", "file": "/games/shadow-runner/sprites/frames/run/03-stride-extension-a.png" },
+        { "index": 4, "label": "contact-b", "file": "/games/shadow-runner/sprites/frames/run/04-contact-b.png" },
+        { "index": 5, "label": "passing-b", "file": "/games/shadow-runner/sprites/frames/run/05-passing-b.png" },
+        { "index": 6, "label": "stride-extension-b", "file": "/games/shadow-runner/sprites/frames/run/06-stride-extension-b.png" }
+      ]
+    },
+    "jumpAir": {
+      "id": "jump-air",
+      "purpose": "Jump, double-jump, fall, and land action sequence",
+      "loop": false,
+      "recommendedFps": 10,
+      "frameCount": 6,
+      "strip": "/games/shadow-runner/sprites/strips/shadow-runner-jump-air-6f-128.png",
+      "preview": "/games/shadow-runner/sprites/previews/shadow-runner-jump-air-6f-preview.png",
+      "rawSource": "/games/shadow-runner/sprites/raw/shadow-runner-jump-air-6f-source.png",
+      "transparentSource": "/games/shadow-runner/sprites/transparent/shadow-runner-jump-air-6f-strip.png",
+      "frames": [
+        { "index": 1, "label": "takeoff-crouch", "file": "/games/shadow-runner/sprites/frames/jump-air/01-takeoff-crouch.png" },
+        { "index": 2, "label": "rising", "file": "/games/shadow-runner/sprites/frames/jump-air/02-rising.png" },
+        { "index": 3, "label": "apex-float", "file": "/games/shadow-runner/sprites/frames/jump-air/03-apex-float.png" },
+        { "index": 4, "label": "double-jump-swirl", "file": "/games/shadow-runner/sprites/frames/jump-air/04-double-jump-swirl.png" },
+        { "index": 5, "label": "falling", "file": "/games/shadow-runner/sprites/frames/jump-air/05-falling.png" },
+        { "index": 6, "label": "landing-impact", "file": "/games/shadow-runner/sprites/frames/jump-air/06-landing-impact.png" }
+      ]
+    },
+    "swordAttack": {
+      "id": "sword-attack",
+      "purpose": "Ground sword attack sequence",
+      "loop": false,
+      "recommendedFps": 12,
+      "frameCount": 5,
+      "strip": "/games/shadow-runner/sprites/strips/shadow-runner-sword-attack-5f-128.png",
+      "preview": "/games/shadow-runner/sprites/previews/shadow-runner-sword-attack-5f-preview.png",
+      "rawSource": "/games/shadow-runner/sprites/raw/shadow-runner-sword-attack-5f-source.png",
+      "transparentSource": "/games/shadow-runner/sprites/transparent/shadow-runner-sword-attack-5f-strip.png",
+      "frames": [
+        { "index": 1, "label": "ready", "file": "/games/shadow-runner/sprites/frames/sword-attack/01-ready.png" },
+        { "index": 2, "label": "windup", "file": "/games/shadow-runner/sprites/frames/sword-attack/02-windup.png" },
+        { "index": 3, "label": "main-slash", "file": "/games/shadow-runner/sprites/frames/sword-attack/03-main-slash.png" },
+        { "index": 4, "label": "follow-through", "file": "/games/shadow-runner/sprites/frames/sword-attack/04-follow-through.png" },
+        { "index": 5, "label": "recovery", "file": "/games/shadow-runner/sprites/frames/sword-attack/05-recovery.png" }
+      ]
+    }
+  }
+}

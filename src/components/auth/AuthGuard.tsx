@@ -13,7 +13,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   // Local-only visual QA escape hatch for previewing Entertainment surfaces without test credentials.
   const isLocalEntertainmentPreview = typeof window !== 'undefined'
     && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost')
-    && ['shado-tv', 'shadow-mystery'].includes(new URLSearchParams(window.location.search).get('localPreview') ?? '');
+    && ['shado-tv', 'shadow-mystery', 'shadow-runner'].includes(new URLSearchParams(window.location.search).get('localPreview') ?? '');
 
   if (isLocalEntertainmentPreview) {
     return <>{children}</>;

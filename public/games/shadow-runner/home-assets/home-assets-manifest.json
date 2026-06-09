@@ -1,0 +1,156 @@
+{
+  "game": "shadow-runner",
+  "assetSet": "home-screen-v1-first-pass",
+  "status": "first_pass_review",
+  "source": "C:/Users/tayle/OneDrive/Desktop/Shadow Runner Home Assets",
+  "copiedAt": "2026-06-08",
+  "scope": "Landscape home/title screen background, parchment UI, decorative props, and ambient effects.",
+  "excluded": [
+    "hero character sprite",
+    "button pressed/hover states",
+    "final sliced star atlas regions"
+  ],
+  "layerOrder": [
+    "background",
+    "stars",
+    "banners",
+    "torch",
+    "hero",
+    "missionScroll",
+    "titleScroll",
+    "bottomMenu"
+  ],
+  "assets": {
+    "pickerBanner": {
+      "id": "shadow-runner-picker-banner",
+      "file": "/games/shadow-runner/shadow-runner-picker-banner.webp",
+      "dimensions": { "width": 1920, "height": 720 },
+      "alpha": false,
+      "purpose": "Entertainment picker card banner."
+    },
+    "music": {
+      "id": "castle-bard",
+      "file": "/games/shadow-runner/audio/castle-bard.mp3",
+      "purpose": "Shadow Runner home screen background music, started from the Entertainment picker click."
+    },
+    "background": {
+      "id": "bg-title-castle-night-clean",
+      "file": "/games/shadow-runner/home-assets/assets/background/bg_title_castle_night_clean.png",
+      "dimensions": { "width": 1672, "height": 941 },
+      "alpha": false,
+      "purpose": "Full-screen moonlit castle ruin home-screen background plate."
+    },
+    "titleScroll": {
+      "id": "ui-title-scroll-shadow-runner",
+      "file": "/games/shadow-runner/home-assets/assets/ui/ui_title_scroll_shadow_runner.png",
+      "dimensions": { "width": 1536, "height": 1024 },
+      "alpha": true,
+      "purpose": "Parchment title banner with baked SHADOW RUNNER text."
+    },
+    "titleScrollRuntime": {
+      "id": "title-scroll-shadow-runner",
+      "file": "/games/shadow-runner/home-assets/sliced/title-scroll-shadow-runner.png",
+      "dimensions": { "width": 1421, "height": 662 },
+      "alpha": true,
+      "purpose": "Trimmed runtime title banner used by the first home screen."
+    },
+    "bottomMenu": {
+      "id": "ui-bottom-menu-scroll",
+      "file": "/games/shadow-runner/home-assets/assets/ui/ui_bottom_menu_scroll.png",
+      "dimensions": { "width": 1912, "height": 823 },
+      "alpha": true,
+      "purpose": "Parchment menu with baked START, LEVELS, and OPTIONS labels."
+    },
+    "bottomMenuRuntime": {
+      "id": "bottom-menu-scroll",
+      "file": "/games/shadow-runner/home-assets/sliced/bottom-menu-scroll.png",
+      "dimensions": { "width": 1792, "height": 462 },
+      "alpha": true,
+      "purpose": "Trimmed runtime menu strip used for tighter landscape phone composition and button hit areas."
+    },
+    "missionScroll": {
+      "id": "prop-mission-scroll-stand",
+      "file": "/games/shadow-runner/home-assets/assets/ui/prop_mission_scroll_stand.png",
+      "dimensions": { "width": 1254, "height": 1254 },
+      "alpha": true,
+      "purpose": "Blank mission scroll stand foreground prop."
+    },
+    "torch": {
+      "id": "fx-torch-flame-strip",
+      "file": "/games/shadow-runner/home-assets/assets/effects/fx_torch_flame_strip.png",
+      "dimensions": { "width": 2172, "height": 724 },
+      "alpha": true,
+      "purpose": "Torch or brazier flame animation strip.",
+      "intendedFrames": 8,
+      "reviewNote": "Width is not evenly divisible by 8, so do not blindly slice into equal integer frame widths without review."
+    },
+    "torchRuntime": {
+      "id": "torch-flame-8f-192",
+      "file": "/games/shadow-runner/home-assets/sliced/torch-flame-8f-192.png",
+      "dimensions": { "width": 1536, "height": 192 },
+      "alpha": true,
+      "purpose": "Runtime-friendly normalized 8-frame torch strip."
+    },
+    "stars": {
+      "id": "fx-star-twinkle-sheet",
+      "file": "/games/shadow-runner/home-assets/assets/effects/fx_star_twinkle_sheet.png",
+      "dimensions": { "width": 1536, "height": 1024 },
+      "alpha": true,
+      "purpose": "Moonlit sparkle/star overlay atlas.",
+      "intendedSprites": 12,
+      "reviewNote": "Visual layout reads as 4 columns by 3 rows, but the height is not evenly divisible by 3. Prefer explicit atlas regions or a sliced cleanup pass."
+    },
+    "banners": {
+      "id": "prop-purple-banners-sheet",
+      "file": "/games/shadow-runner/home-assets/assets/props/prop_purple_banners_sheet.png",
+      "dimensions": { "width": 1774, "height": 887 },
+      "alpha": true,
+      "purpose": "Three decorative purple banner props."
+    },
+    "bannerStand": {
+      "id": "banner-stand",
+      "file": "/games/shadow-runner/home-assets/sliced/banner-stand.png",
+      "alpha": true,
+      "purpose": "Runtime-ready standing purple banner prop."
+    },
+    "bannerHanging": {
+      "id": "banner-hanging",
+      "file": "/games/shadow-runner/home-assets/sliced/banner-hanging.png",
+      "alpha": true,
+      "purpose": "Runtime-ready hanging purple banner prop."
+    },
+    "bannerPennant": {
+      "id": "banner-pennant",
+      "file": "/games/shadow-runner/home-assets/sliced/banner-pennant.png",
+      "alpha": true,
+      "purpose": "Runtime-ready small pennant prop."
+    },
+    "contactSheet": {
+      "id": "contact-sheet",
+      "file": "/games/shadow-runner/home-assets/previews/contact_sheet.png",
+      "dimensions": { "width": 918, "height": 1338 },
+      "alpha": false,
+      "purpose": "Visual review contact sheet for the home asset bundle."
+    }
+  },
+  "docs": {
+    "bundleReadme": "/games/shadow-runner/home-assets/README.md",
+    "assetIndex": "/games/shadow-runner/home-assets/docs/ASSET_INDEX.md",
+    "assetPrompts": "/games/shadow-runner/home-assets/docs/asset_prompts.md"
+  },
+  "review": {
+    "strengths": [
+      "The background, title scroll, bottom menu, and mission scroll are visually aligned with the Shadow Runner direction.",
+      "Title and button text are spelled correctly and readable.",
+      "Final UI, prop, and effect cutouts have alpha channels.",
+      "The background has clear space for title, hero, and bottom menu composition."
+    ],
+    "needsFollowUp": [
+      "Compose with the approved hero menu-idle stance to verify platform/ledge alignment.",
+      "Decide whether the bottom menu should stay baked or be split into blank button art plus live text/icons.",
+      "Generate or slice interactive button states if the menu becomes clickable.",
+      "Normalize the torch strip into reviewed frame regions.",
+      "Normalize the star sheet into explicit atlas regions."
+    ]
+  }
+}
