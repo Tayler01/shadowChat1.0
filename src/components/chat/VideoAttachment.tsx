@@ -123,7 +123,7 @@ export const VideoAttachment: React.FC<VideoAttachmentProps> = ({ url, className
       height={CHAT_MEDIA_INTRINSIC_HEIGHT}
       data-chat-media="video"
       className={cn(
-        'mt-1 block max-h-[42vh] w-[min(10rem,100%)] max-w-full rounded-[var(--radius-md)] object-cover sm:w-[11rem]',
+        'mt-1 block max-h-[42vh] w-40 max-w-full rounded-[var(--radius-md)] object-cover sm:w-44',
         getChatMediaAspectClass(orientation),
         className
       )}

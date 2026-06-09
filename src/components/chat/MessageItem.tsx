@@ -552,8 +552,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                       data-chat-media-frame="true"
                       data-hype-tier={usesMediaHypeFrame ? hypeTier : undefined}
                       className={cn(
-                        'relative mt-1 inline-block max-w-full rounded-[var(--radius-md)] align-top',
-                        usesMediaHypeFrame && 'hype-message-shell hype-message-bubble'
+                        'chat-media-frame relative mt-1 inline-block max-w-full rounded-[var(--radius-md)] align-top',
+                        usesMediaHypeFrame && 'hype-message-shell chat-media-frame--hyped'
                       )}
                     >
                       <img
@@ -566,7 +566,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                         draggable={false}
                         data-chat-media="image"
                         className={cn(
-                          'block max-h-[42vh] w-[min(10rem,100%)] max-w-full cursor-pointer rounded-[var(--radius-md)] object-cover shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:w-[11rem]',
+                          'block max-h-[42vh] w-40 max-w-full cursor-pointer rounded-[var(--radius-md)] object-cover shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:w-44',
                           getChatMediaAspectClass(imageOrientation)
                         )}
                         onLoad={event => {
@@ -575,13 +575,13 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                         }}
                         onClick={() => setShowImageModal(true)}
                       />
-                      <div className="pointer-events-none absolute left-1 right-1 top-1 z-10 flex justify-end">
+                      <div className="chat-media-frame__hype pointer-events-none absolute left-1.5 right-1.5 top-1.5 z-10 flex justify-end">
                         <MessageHypeBadge count={hypeCount} users={hypeUsers} className="pointer-events-auto" />
                       </div>
                       <MessageReactions
                         message={message}
                         onReact={handleReaction}
-                        className="pointer-events-auto absolute bottom-1 right-1 z-10 w-auto max-w-[calc(100%-0.5rem)] justify-end text-[0.65rem]"
+                        className="chat-media-frame__reactions pointer-events-auto absolute bottom-1.5 right-1.5 z-10 w-auto max-w-[calc(100%-0.75rem)] justify-end text-[0.65rem]"
                       />
                     </div>
                   ) : isVideoMessage ? (
@@ -589,18 +589,18 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                       data-chat-media-frame="true"
                       data-hype-tier={usesMediaHypeFrame ? hypeTier : undefined}
                       className={cn(
-                        'relative mt-1 inline-block max-w-full rounded-[var(--radius-md)] align-top',
-                        usesMediaHypeFrame && 'hype-message-shell hype-message-bubble'
+                        'chat-media-frame relative mt-1 inline-block max-w-full rounded-[var(--radius-md)] align-top',
+                        usesMediaHypeFrame && 'hype-message-shell chat-media-frame--hyped'
                       )}
                     >
                       <VideoAttachment url={videoMessageUrl} meta={message.content} className="mt-0" />
-                      <div className="pointer-events-none absolute left-1 right-1 top-1 z-10 flex justify-end">
+                      <div className="chat-media-frame__hype pointer-events-none absolute left-1.5 right-1.5 top-1.5 z-10 flex justify-end">
                         <MessageHypeBadge count={hypeCount} users={hypeUsers} className="pointer-events-auto" />
                       </div>
                       <MessageReactions
                         message={message}
                         onReact={handleReaction}
-                        className="pointer-events-auto absolute bottom-1 right-1 z-10 w-auto max-w-[calc(100%-0.5rem)] justify-end text-[0.65rem]"
+                        className="chat-media-frame__reactions pointer-events-auto absolute bottom-1.5 right-1.5 z-10 w-auto max-w-[calc(100%-0.75rem)] justify-end text-[0.65rem]"
                       />
                     </div>
                   ) : message.message_type === 'file' && message.file_url ? (
