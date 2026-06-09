@@ -13,6 +13,10 @@ type WebAudioWindow = Window & typeof globalThis & {
   webkitAudioContext?: typeof AudioContext
 }
 
+type OrientationWindow = Window & typeof globalThis & {
+  orientation?: number
+}
+
 const MENU_BUTTONS = [
   { id: 'start', label: 'Start', left: '12.2%', width: '21.6%' },
   { id: 'levels', label: 'Levels', left: '39%', width: '21.8%' },
@@ -58,20 +62,6 @@ const SHADOW_RUNNER_INLINE_STYLES = `
     animation: shadow-runner-float 4.8s ease-in-out infinite;
   }
 
-  .shadow-runner-rotate-gate {
-    display: none;
-  }
-
-  @media (orientation: portrait) {
-    .shadow-runner-landscape-stage {
-      display: none;
-    }
-
-    .shadow-runner-rotate-gate {
-      display: flex;
-    }
-  }
-
   @media (prefers-reduced-motion: reduce) {
     .shadow-runner-star,
     .shadow-runner-float {
@@ -79,6 +69,18 @@ const SHADOW_RUNNER_INLINE_STYLES = `
     }
   }
 `
+
+function isLandscapeViewport() {
+  const viewport = window.visualViewport
+  const width = viewport?.width ?? window.innerWidth
+  const height = viewport?.height ?? window.innerHeight
+  const orientation = window.screen.orientation
+  const legacyOrientation = (window as OrientationWindow).orientation
+
+  return width > height
+    || Math.abs(orientation?.angle ?? 0) === 90
+    || Math.abs(legacyOrientation ?? 0) === 90
+}
 
 function useSpriteFrame(frameCount: number, intervalMs: number) {
   const [frame, setFrame] = React.useState(0)
@@ -95,6 +97,34 @@ function useSpriteFrame(frameCount: number, intervalMs: number) {
   }, [frameCount, intervalMs])
 
   return frame
+}
+
+function useRotateGate() {
+  const [showRotateGate, setShowRotateGate] = React.useState(() => {
+    if (typeof window === 'undefined') return false
+    return !isLandscapeViewport()
+  })
+
+  React.useEffect(() => {
+    const updateGate = () => setShowRotateGate(!isLandscapeViewport())
+    const viewport = window.visualViewport
+    const orientation = window.screen.orientation
+
+    updateGate()
+    window.addEventListener('resize', updateGate)
+    window.addEventListener('orientationchange', updateGate)
+    viewport?.addEventListener('resize', updateGate)
+    orientation?.addEventListener('change', updateGate)
+
+    return () => {
+      window.removeEventListener('resize', updateGate)
+      window.removeEventListener('orientationchange', updateGate)
+      viewport?.removeEventListener('resize', updateGate)
+      orientation?.removeEventListener('change', updateGate)
+    }
+  }, [])
+
+  return showRotateGate
 }
 
 function spriteStripStyle(source: string, frame: number, frameCount: number): React.CSSProperties {
@@ -117,6 +147,7 @@ export function ShadowRunnerScreen({
 }: ShadowRunnerScreenProps) {
   const heroFrame = useSpriteFrame(8, 150)
   const torchFrame = useSpriteFrame(8, 105)
+  const showRotateGate = useRotateGate()
   const audioContextRef = React.useRef<AudioContext | null>(null)
 
   React.useEffect(() => {
@@ -163,14 +194,14 @@ export function ShadowRunnerScreen({
     <section className="relative h-full min-h-[100dvh] w-full overflow-hidden bg-[#02040a] text-[#f6e6bb]">
       <style>{SHADOW_RUNNER_INLINE_STYLES}</style>
 
-      <div className="shadow-runner-rotate-gate absolute inset-0 z-50 flex-col items-center justify-center bg-black px-8 text-center">
+      <div className={`${showRotateGate ? 'flex' : 'hidden'} shadow-runner-rotate-gate absolute inset-0 z-50 flex-col items-center justify-center bg-black px-8 text-center`}>
         <p className="text-2xl font-black uppercase tracking-[0.18em] text-[#f0d381]">Rotate Phone</p>
         <p className="mt-3 max-w-xs text-sm font-semibold uppercase tracking-[0.12em] text-[#d9c79f]">
           Shadow Runner plays sideways.
         </p>
       </div>
 
-      <div className="shadow-runner-landscape-stage absolute inset-0">
+      <div className={`${showRotateGate ? 'hidden' : 'block'} shadow-runner-landscape-stage absolute inset-0`}>
       <img
         src={SHADOW_RUNNER_ASSETS.home.background}
         alt=""
