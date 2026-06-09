@@ -814,6 +814,62 @@ describe('DirectMessagesView user search', () => {
     expect(document.getElementById('dm-message-m1')).not.toHaveClass('[content-visibility:auto]');
   });
 
+  test('keeps the mobile DM composer enabled while a send is pending so iOS preserves keyboard focus', () => {
+    const { useIsDesktop } = jest.requireMock('../src/hooks/useIsDesktop') as {
+      useIsDesktop: jest.Mock
+    };
+    useIsDesktop.mockReturnValue(false);
+
+    const conversation = {
+      id: 'c1',
+      other_user: {
+        id: 'u2',
+        username: 'bob',
+        display_name: 'Bob',
+        avatar_url: '',
+        color: 'red',
+        status: 'online',
+      },
+      last_message: null,
+      unread_count: 0,
+    };
+
+    dmSpy.mockReturnValue({
+      conversations: [conversation],
+      currentConversation: 'c1',
+      messages: [],
+      messagesConversationId: 'c1',
+      loading: false,
+      messagesLoading: false,
+      loadingMore: false,
+      hasMore: false,
+      sending: true,
+      uploading: false,
+      setCurrentConversation: setCurrentConversationMock,
+      startConversation: startConversationMock,
+      sendMessage: jest.fn(),
+      editMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      toggleReaction: jest.fn(),
+      markAsRead: jest.fn(),
+      loadOlderMessages: jest.fn(),
+    } as any);
+
+    render(
+      <DirectMessagesView
+        onToggleSidebar={() => {}}
+        currentView="dms"
+        onViewChange={() => {}}
+      />
+    );
+
+    const composers = screen.getAllByPlaceholderText('Message...') as HTMLTextAreaElement[];
+
+    expect(composers).toHaveLength(2);
+    expect(composers[0]).toBeDisabled();
+    expect(composers[1]).not.toBeDisabled();
+  });
+
   test('mobile stale selected conversation stays recoverable after resume', async () => {
     const { useIsDesktop } = jest.requireMock('../src/hooks/useIsDesktop') as {
       useIsDesktop: jest.Mock

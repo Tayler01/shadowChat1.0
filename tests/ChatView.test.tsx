@@ -2,26 +2,32 @@ import { render, screen } from '@testing-library/react'
 import React from 'react'
 import { ChatView } from '../src/components/chat/ChatView'
 
+const createMessagesState = () => ({
+  messages: [
+    {
+      id: 'pinned-1',
+      user_id: 'u1',
+      content: 'pinned text',
+      message_type: 'text',
+      pinned: true,
+      reactions: {},
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      user: { display_name: 'Alice' },
+    },
+  ],
+  sendMessage: jest.fn(),
+  sending: false,
+  togglePin: jest.fn(),
+  toggleReaction: jest.fn(),
+  retryFailedMessage: jest.fn(),
+  discardFailedMessage: jest.fn(),
+})
+
+let mockMessagesState = createMessagesState()
+
 jest.mock('../src/hooks/useMessages', () => ({
-  useMessages: () => ({
-    messages: [
-      {
-        id: 'pinned-1',
-        user_id: 'u1',
-        content: 'pinned text',
-        message_type: 'text',
-        pinned: true,
-        reactions: {},
-        created_at: '2026-01-01T00:00:00.000Z',
-        updated_at: '2026-01-01T00:00:00.000Z',
-        user: { display_name: 'Alice' },
-      },
-    ],
-    sendMessage: jest.fn(),
-    sending: false,
-    togglePin: jest.fn(),
-    toggleReaction: jest.fn(),
-  }),
+  useMessages: () => mockMessagesState,
 }))
 
 jest.mock('../src/hooks/MessagesContext', () => ({
@@ -49,7 +55,13 @@ jest.mock('../src/components/chat/MessageList', () => ({
 }))
 
 jest.mock('../src/components/chat/MessageInput', () => ({
-  MessageInput: () => <div data-testid="message-input" />,
+  MessageInput: ({ disabled, className }: { disabled?: boolean; className?: string }) => (
+    <div
+      data-testid="message-input"
+      data-disabled={String(Boolean(disabled))}
+      data-class-name={className || ''}
+    />
+  ),
 }))
 
 jest.mock('../src/components/hype/HypeBellButton', () => ({
@@ -95,9 +107,31 @@ jest.mock('../src/lib/sessionRecovery', () => ({
   SESSION_RECOVERY_EVENT: 'shadowchat:session-recovery',
 }))
 
+beforeEach(() => {
+  mockMessagesState = createMessagesState()
+})
+
 test('renders pinned messages as a header button instead of a feed bar', () => {
   render(<ChatView currentView="chat" onViewChange={() => {}} />)
 
   expect(screen.getByTestId('pinned-messages-button')).toHaveTextContent('1')
   expect(screen.getByTestId('message-list')).toBeInTheDocument()
+})
+
+test('keeps the mobile composer enabled while a send is pending so iOS preserves keyboard focus', () => {
+  mockMessagesState = {
+    ...createMessagesState(),
+    sending: true,
+  }
+
+  render(<ChatView currentView="chat" onViewChange={() => {}} />)
+
+  const composers = screen.getAllByTestId('message-input')
+  const desktopComposer = composers.find(composer => composer.getAttribute('data-class-name') === '')
+  const mobileComposer = composers.find(composer =>
+    composer.getAttribute('data-class-name')?.includes('border-t')
+  )
+
+  expect(desktopComposer).toHaveAttribute('data-disabled', 'true')
+  expect(mobileComposer).toHaveAttribute('data-disabled', 'false')
 })
