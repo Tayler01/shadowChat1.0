@@ -37,12 +37,18 @@ const SHADOW_RUNNER_GAME_STYLES = `
     display: block;
     height: 100%;
     width: 100%;
+    -webkit-touch-callout: none;
+    -webkit-user-drag: none;
     image-rendering: pixelated;
+    touch-action: none;
+    user-select: none;
   }
 
   .shadow-runner-touch-button {
-    touch-action: none;
     -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    touch-action: none;
+    user-select: none;
   }
 `
 
@@ -80,14 +86,22 @@ function TouchButton({
 }: TouchButtonProps) {
   const press = React.useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
     event.preventDefault()
-    event.currentTarget.setPointerCapture(event.pointerId)
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      // Some synthetic or browser-generated pointer events have no active pointer to capture.
+    }
     onActionChange(action, true)
   }, [action, onActionChange])
 
   const release = React.useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
     event.preventDefault()
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId)
+    try {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId)
+      }
+    } catch {
+      // Keep mobile controls responsive even when capture state is browser-dependent.
     }
     onActionChange(action, false)
   }, [action, onActionChange])
@@ -100,6 +114,7 @@ function TouchButton({
       onPointerUp={release}
       onPointerCancel={release}
       onLostPointerCapture={() => onActionChange(action, false)}
+      onContextMenu={event => event.preventDefault()}
       className={`shadow-runner-touch-button inline-flex items-center justify-center rounded-full border border-[#f0d381]/45 bg-black/50 text-[#f6e6bb] shadow-[0_14px_34px_rgba(0,0,0,0.5)] backdrop-blur-md transition active:scale-95 active:border-[#f0d381]/80 active:bg-[#4a3418]/80 ${size === 'large' ? 'h-16 w-16' : 'h-14 w-14'}`}
     >
       {children}
@@ -167,7 +182,10 @@ export function ShadowRunnerGame({
   }, [])
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-[#02040a] text-[#f6e6bb]">
+    <div
+      className="shadow-runner-no-select relative h-full w-full overflow-hidden bg-[#02040a] text-[#f6e6bb]"
+      onContextMenu={event => event.preventDefault()}
+    >
       <style>{SHADOW_RUNNER_GAME_STYLES}</style>
 
       <div

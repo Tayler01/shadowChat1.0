@@ -10,6 +10,8 @@ Excluded: the main character, because Tayler is working on the hero character sh
 
 - `assets/background/` - final opaque background plate.
 - `assets/ui/` - final transparent parchment title/menu/mission-scroll UI assets.
+- `generated/blank-menu-scroll-imagegen-source.png`, `sliced/blank-menu-scroll.png`, and `optimized/blank-menu-scroll.webp` - generated blank parchment scroll base for the private-build gate and future separated menu buttons.
+- `generated/blank-menu-button-imagegen-source.png`, `sliced/blank-menu-button.png`, and `optimized/blank-menu-button.webp` - generated blank parchment button panel for future separate menu controls and tighter hit areas.
 - `assets/props/` - final transparent decorative banner props.
 - `assets/effects/` - final transparent torch and star animation sheets.
 - `raw_chromakey/` - original green-screen files used to create transparent PNGs.

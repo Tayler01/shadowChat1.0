@@ -61,6 +61,24 @@
       "alpha": true,
       "purpose": "Optimized trimmed runtime title banner used by the fixed-ratio home screen."
     },
+    "blankMenuScrollRuntime": {
+      "id": "blank-menu-scroll",
+      "file": "/games/shadow-runner/home-assets/optimized/blank-menu-scroll.webp",
+      "sourceFile": "/games/shadow-runner/home-assets/generated/blank-menu-scroll-imagegen-source.png",
+      "transparentSourceFile": "/games/shadow-runner/home-assets/sliced/blank-menu-scroll.png",
+      "dimensions": { "width": 1667, "height": 565 },
+      "alpha": true,
+      "purpose": "Generated blank parchment scroll base for the private-build gate and future separated menu buttons."
+    },
+    "blankMenuButtonRuntime": {
+      "id": "blank-menu-button",
+      "file": "/games/shadow-runner/home-assets/optimized/blank-menu-button.webp",
+      "sourceFile": "/games/shadow-runner/home-assets/generated/blank-menu-button-imagegen-source.png",
+      "transparentSourceFile": "/games/shadow-runner/home-assets/sliced/blank-menu-button.png",
+      "dimensions": { "width": 1141, "height": 642 },
+      "alpha": true,
+      "purpose": "Generated blank parchment button panel for future separate menu controls and tighter hit areas."
+    },
     "bottomMenu": {
       "id": "ui-bottom-menu-scroll",
       "file": "/games/shadow-runner/home-assets/assets/ui/ui_bottom_menu_scroll.png",

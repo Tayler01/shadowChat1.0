@@ -24,6 +24,9 @@ const MENU_BUTTONS = [
   { id: 'options', label: 'Options', left: '65.8%', width: '21.6%' },
 ] as const
 
+const SHADOW_RUNNER_ACCESS_CODE = '123456'
+const SHADOW_RUNNER_ACCESS_SESSION_KEY = 'shadow-runner-access-unlocked'
+
 const STAR_OVERLAYS = [
   { left: '17.5%', top: '6.5%', size: '1rem', position: '0% 0%', delay: '0s' },
   { left: '20%', top: '15%', size: '0.82rem', position: '33.333% 0%', delay: '0.65s' },
@@ -54,6 +57,7 @@ const SHADOW_RUNNER_MENU_STYLE = {
 const SHADOW_RUNNER_IMAGE_SOURCES = [
   SHADOW_RUNNER_ASSETS.home.background,
   SHADOW_RUNNER_ASSETS.home.titleScroll,
+  SHADOW_RUNNER_ASSETS.home.blankMenuScroll,
   SHADOW_RUNNER_ASSETS.home.bottomMenuScroll,
   SHADOW_RUNNER_ASSETS.home.missionScrollStand,
   SHADOW_RUNNER_ASSETS.home.starSheet,
@@ -80,6 +84,19 @@ const SHADOW_RUNNER_INLINE_STYLES = `
 
   .shadow-runner-float {
     animation: shadow-runner-float 4.8s ease-in-out infinite;
+  }
+
+  .shadow-runner-no-select,
+  .shadow-runner-no-select * {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-drag: none;
+    user-select: none;
+  }
+
+  .shadow-runner-no-select {
+    overscroll-behavior: none;
+    touch-action: manipulation;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -183,6 +200,11 @@ function useImagePreload(sources: readonly string[]) {
   return ready
 }
 
+function getShadowRunnerAccessUnlocked() {
+  if (typeof window === 'undefined') return false
+  return window.sessionStorage.getItem(SHADOW_RUNNER_ACCESS_SESSION_KEY) === 'true'
+}
+
 function spriteStripStyle(source: string, frame: number, frameCount: number): React.CSSProperties {
   const position = frameCount > 1 ? `${(frame / (frameCount - 1)) * 100}% 0%` : '0% 0%'
 
@@ -195,6 +217,126 @@ function spriteStripStyle(source: string, frame: number, frameCount: number): Re
   }
 }
 
+interface ShadowRunnerAccessGateProps {
+  onUnlock: () => void
+  onExit?: () => void
+}
+
+function ShadowRunnerAccessGate({ onUnlock, onExit }: ShadowRunnerAccessGateProps) {
+  const [digits, setDigits] = React.useState(() => Array.from({ length: SHADOW_RUNNER_ACCESS_CODE.length }, () => ''))
+  const [error, setError] = React.useState(false)
+  const digitsRef = React.useRef(digits)
+  const inputRefs = React.useRef<Array<HTMLInputElement | null>>([])
+
+  const submitCode = React.useCallback((nextDigits: string[]) => {
+    const candidate = nextDigits.join('')
+
+    if (candidate.length < SHADOW_RUNNER_ACCESS_CODE.length) return
+
+    if (candidate === SHADOW_RUNNER_ACCESS_CODE) {
+      window.sessionStorage.setItem(SHADOW_RUNNER_ACCESS_SESSION_KEY, 'true')
+      onUnlock()
+      return
+    }
+
+    setError(true)
+    const emptyDigits = Array.from({ length: SHADOW_RUNNER_ACCESS_CODE.length }, () => '')
+    digitsRef.current = emptyDigits
+    setDigits(emptyDigits)
+    window.setTimeout(() => inputRefs.current[0]?.focus(), 30)
+  }, [onUnlock])
+
+  const updateDigit = React.useCallback((index: number, value: string) => {
+    const digit = value.replace(/\D/g, '').slice(-1)
+    const next = [...digitsRef.current]
+    next[index] = digit
+    digitsRef.current = next
+
+    setError(false)
+    setDigits(next)
+
+    if (digit && index < SHADOW_RUNNER_ACCESS_CODE.length - 1) {
+      window.setTimeout(() => inputRefs.current[index + 1]?.focus(), 30)
+    }
+
+    submitCode(next)
+  }, [submitCode])
+
+  const handleKeyDown = React.useCallback((index: number, event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Backspace' && !digits[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus()
+    }
+  }, [digits])
+
+  React.useEffect(() => {
+    inputRefs.current[0]?.focus()
+  }, [])
+
+  return (
+    <div className="shadow-runner-no-select absolute inset-0 z-40 flex items-center justify-center bg-[#02040a] px-5 text-center">
+      <img
+        src={SHADOW_RUNNER_ASSETS.home.background}
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover opacity-45"
+        draggable={false}
+      />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_8%,rgba(240,211,129,0.14),transparent_34%),linear-gradient(180deg,rgba(0,0,0,0.66),rgba(0,0,0,0.92))]" />
+
+      <button
+        type="button"
+        aria-label="Back to Entertainment"
+        onClick={onExit}
+        className="absolute left-[max(1rem,env(safe-area-inset-left))] top-[max(0.85rem,env(safe-area-inset-top))] z-10 inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#e8c46b]/40 bg-black/45 text-[#f3d88d] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-md transition hover:border-[#f0d381]/70 hover:bg-[#2c2110]/75 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
+      >
+        <ArrowLeft className="h-5 w-5" />
+      </button>
+
+      <div className="relative z-10 flex w-full max-w-[42rem] flex-col items-center px-2">
+        <img
+          src={SHADOW_RUNNER_ASSETS.home.titleScroll}
+          alt="Shadow Runner"
+          className="pointer-events-none mb-[-0.8rem] w-[min(82vw,30rem)] drop-shadow-[0_18px_45px_rgba(0,0,0,0.72)]"
+          draggable={false}
+        />
+
+        <div className="relative mt-[-0.2rem] aspect-[1667/565] w-[min(92vw,39rem)]">
+          <img
+            src={SHADOW_RUNNER_ASSETS.home.blankMenuScroll}
+            alt=""
+            className="pointer-events-none absolute inset-0 h-full w-full object-contain drop-shadow-[0_24px_56px_rgba(0,0,0,0.78)]"
+            draggable={false}
+          />
+          <div className="absolute inset-x-[17%] top-[30%] flex flex-col items-center text-[#130d06]">
+            <p className="text-[0.66rem] font-black uppercase tracking-[0.24em] text-[#120d07] drop-shadow-[0_1px_0_rgba(255,240,184,0.55)] sm:text-xs">Access Code</p>
+            <div className="mt-1.5 flex justify-center gap-1.5 sm:mt-2 sm:gap-2.5">
+              {digits.map((digit, index) => (
+                <input
+                  key={index}
+                  ref={node => {
+                    inputRefs.current[index] = node
+                  }}
+                  aria-label={`Access code digit ${index + 1}`}
+                  value={digit}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={1}
+                  autoComplete="off"
+                  onChange={event => updateDigit(index, event.target.value)}
+                  onKeyDown={event => handleKeyDown(index, event)}
+                  className="h-8 w-7 rounded border border-[#120d07]/75 bg-[#23190d]/92 text-center text-base font-black text-[#f6e6bb] shadow-[inset_0_2px_8px_rgba(0,0,0,0.55),0_1px_0_rgba(255,240,184,0.35)] outline-none transition focus:border-[#f0d381] focus:ring-2 focus:ring-[#120d07]/35 sm:h-10 sm:w-9 sm:text-lg"
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+        <p className={`mt-[-0.35rem] min-h-4 text-[0.58rem] font-black uppercase tracking-[0.18em] drop-shadow-[0_2px_8px_rgba(0,0,0,0.75)] sm:text-[0.66rem] ${error ? 'text-[#f1a0aa]' : 'text-[#f0d381]'}`}>
+          {error ? 'Try Again' : 'Private Build'}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 export function ShadowRunnerScreen({
   onExit,
   musicPlaying = false,
@@ -205,6 +347,7 @@ export function ShadowRunnerScreen({
   const torchFrame = useSpriteFrame(8, 105)
   const orientationGateActive = useRotateGate()
   const [screen, setScreen] = React.useState<'title' | 'play'>('title')
+  const [accessUnlocked, setAccessUnlocked] = React.useState(getShadowRunnerAccessUnlocked)
   const assetsReady = useImagePreload(SHADOW_RUNNER_IMAGE_SOURCES)
   const showRotateGate = orientationGateActive
   const audioContextRef = React.useRef<AudioContext | null>(null)
@@ -258,7 +401,10 @@ export function ShadowRunnerScreen({
   }, [playButtonChime])
 
   return (
-    <section className="relative h-full min-h-[100dvh] w-full overflow-hidden bg-[#02040a] text-[#f6e6bb]">
+    <section
+      className="shadow-runner-no-select relative h-full min-h-[100dvh] w-full overflow-hidden bg-[#02040a] text-[#f6e6bb]"
+      onContextMenu={event => event.preventDefault()}
+    >
       <style>{SHADOW_RUNNER_INLINE_STYLES}</style>
 
       <div className={`${showRotateGate ? 'flex' : 'hidden'} shadow-runner-rotate-gate absolute inset-0 z-50 flex-col items-center justify-center bg-black px-8 text-center`}>
@@ -269,7 +415,12 @@ export function ShadowRunnerScreen({
       </div>
 
       <div className={`${showRotateGate ? 'hidden' : 'flex'} shadow-runner-landscape-stage absolute inset-0 items-center justify-center bg-black`}>
-        {screen === 'play' ? (
+        {!accessUnlocked ? (
+          <ShadowRunnerAccessGate
+            onExit={onExit}
+            onUnlock={() => setAccessUnlocked(true)}
+          />
+        ) : screen === 'play' ? (
           <ShadowRunnerGame
             musicPlaying={musicPlaying}
             audioBlocked={audioBlocked}
@@ -318,7 +469,7 @@ export function ShadowRunnerScreen({
               <img
                 src={SHADOW_RUNNER_ASSETS.home.bannerStand}
                 alt=""
-                className="pointer-events-none absolute bottom-[22.5%] left-[8%] z-[3] w-[7.2%]"
+                className="pointer-events-none absolute bottom-[24%] left-[8%] z-[3] w-[7.2%]"
                 draggable={false}
               />
               <img
@@ -356,7 +507,7 @@ export function ShadowRunnerScreen({
 
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute bottom-[22.5%] left-[37%] z-[6] aspect-square w-[18%] drop-shadow-[0_28px_40px_rgba(0,0,0,0.72)]"
+                className="pointer-events-none absolute bottom-[24%] left-[37%] z-[6] aspect-square w-[18%] drop-shadow-[0_28px_40px_rgba(0,0,0,0.72)]"
                 style={{
                   ...spriteStripStyle(SHADOW_RUNNER_ASSETS.hero.menuIdleCapeStrip, heroFrame, 8),
                 }}
@@ -364,7 +515,7 @@ export function ShadowRunnerScreen({
 
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute bottom-[23%] left-[17%] z-[4] aspect-square w-[7.2%] drop-shadow-[0_0_32px_rgba(238,143,34,0.5)]"
+                className="pointer-events-none absolute bottom-[24.5%] left-[17%] z-[4] aspect-square w-[7.2%] drop-shadow-[0_0_32px_rgba(238,143,34,0.5)]"
                 style={{
                   ...spriteStripStyle(SHADOW_RUNNER_ASSETS.home.torchStrip, torchFrame, 8),
                 }}
@@ -373,7 +524,7 @@ export function ShadowRunnerScreen({
               <img
                 src={SHADOW_RUNNER_ASSETS.home.missionScrollStand}
                 alt=""
-                className="shadow-runner-float pointer-events-none absolute bottom-[23%] left-[74%] z-[4] w-[6.4%] drop-shadow-[0_20px_35px_rgba(0,0,0,0.55)]"
+                className="shadow-runner-float pointer-events-none absolute bottom-[24.5%] left-[74%] z-[4] w-[6.4%] drop-shadow-[0_20px_35px_rgba(0,0,0,0.55)]"
                 draggable={false}
               />
 
