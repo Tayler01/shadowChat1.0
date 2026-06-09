@@ -227,6 +227,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const hypeTier = getHypeTier(hypeCount)
     const hypeUsers = message.hype_users ?? []
     const hasCurrentUserHyped = hypeUsers.some(user => user.user_id === profile?.id)
+    const usesMediaHypeFrame = isFloatingMediaMessage && hypeTier > 0
+    const usesBubbleHypeFrame = !isFloatingMediaMessage && hypeTier > 0
     const avatarSrc = isShadoAI
       ? message.user?.avatar_thumbnail_url || message.user?.avatar_url || '/icons/app-icon-192.png'
       : message.user?.avatar_thumbnail_url || message.user?.avatar_url
@@ -502,7 +504,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 ref={bubbleShellRef}
                 className={cn(
                   'relative inline-block max-w-[calc(100%-3rem)] group/message md:max-w-full',
-                  hypeTier > 0 && 'hype-message-shell'
+                  usesBubbleHypeFrame && 'hype-message-shell'
                 )}
                 data-hype-tier={hypeTier || undefined}
                 data-testid="message-bubble-shell"
@@ -519,7 +521,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 <div
                   className={cn(
                     'relative peer space-y-1 break-words rounded-[var(--radius-md)]',
-                    hypeTier > 0 && 'hype-message-bubble',
+                    usesBubbleHypeFrame && 'hype-message-bubble',
                     isFloatingMediaMessage
                       ? 'bg-transparent px-0 py-0 text-[var(--text-primary)] shadow-none'
                       : 'px-3 py-2 shadow-[var(--shadow-panel)]',
@@ -533,36 +535,74 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   )}
                   style={bubbleStyle}
                 >
-                  <MessageHypeBadge count={hypeCount} users={hypeUsers} className="float-right ml-2" />
-                  <MessageReactions
-                    message={message}
-                    onReact={handleReaction}
-                    className="text-[0.65rem]"
-                  />
+                  {!isFloatingMediaMessage && (
+                    <>
+                      <MessageHypeBadge count={hypeCount} users={hypeUsers} className="float-right ml-2" />
+                      <MessageReactions
+                        message={message}
+                        onReact={handleReaction}
+                        className="text-[0.65rem]"
+                      />
+                    </>
+                  )}
                   {message.message_type === 'audio' ? (
                     <audio controls src={message.audio_url ?? undefined} className="mt-1 max-w-full" />
                   ) : isImageMessage ? (
-                    <img
-                      src={imageMessageSrc}
-                      alt="uploaded image"
-                      width={CHAT_MEDIA_INTRINSIC_WIDTH}
-                      height={CHAT_MEDIA_INTRINSIC_HEIGHT}
-                      loading="lazy"
-                      decoding="async"
-                      draggable={false}
-                      data-chat-media="image"
+                    <div
+                      data-chat-media-frame="true"
+                      data-hype-tier={usesMediaHypeFrame ? hypeTier : undefined}
                       className={cn(
-                        'mt-1 block max-h-[42vh] w-[min(10rem,100%)] max-w-full cursor-pointer rounded-[var(--radius-md)] object-cover shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:w-[11rem]',
-                        getChatMediaAspectClass(imageOrientation)
+                        'relative mt-1 inline-block max-w-full rounded-[var(--radius-md)] align-top',
+                        usesMediaHypeFrame && 'hype-message-shell hype-message-bubble'
                       )}
-                      onLoad={event => {
-                        const image = event.currentTarget
-                        setImageOrientation(getChatMediaOrientation(image.naturalWidth, image.naturalHeight))
-                      }}
-                      onClick={() => setShowImageModal(true)}
-                    />
+                    >
+                      <img
+                        src={imageMessageSrc}
+                        alt="uploaded image"
+                        width={CHAT_MEDIA_INTRINSIC_WIDTH}
+                        height={CHAT_MEDIA_INTRINSIC_HEIGHT}
+                        loading="lazy"
+                        decoding="async"
+                        draggable={false}
+                        data-chat-media="image"
+                        className={cn(
+                          'block max-h-[42vh] w-[min(10rem,100%)] max-w-full cursor-pointer rounded-[var(--radius-md)] object-cover shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:w-[11rem]',
+                          getChatMediaAspectClass(imageOrientation)
+                        )}
+                        onLoad={event => {
+                          const image = event.currentTarget
+                          setImageOrientation(getChatMediaOrientation(image.naturalWidth, image.naturalHeight))
+                        }}
+                        onClick={() => setShowImageModal(true)}
+                      />
+                      <div className="pointer-events-none absolute left-1 right-1 top-1 z-10 flex justify-end">
+                        <MessageHypeBadge count={hypeCount} users={hypeUsers} className="pointer-events-auto" />
+                      </div>
+                      <MessageReactions
+                        message={message}
+                        onReact={handleReaction}
+                        className="pointer-events-auto absolute bottom-1 right-1 z-10 w-auto max-w-[calc(100%-0.5rem)] justify-end text-[0.65rem]"
+                      />
+                    </div>
                   ) : isVideoMessage ? (
-                    <VideoAttachment url={videoMessageUrl} meta={message.content} />
+                    <div
+                      data-chat-media-frame="true"
+                      data-hype-tier={usesMediaHypeFrame ? hypeTier : undefined}
+                      className={cn(
+                        'relative mt-1 inline-block max-w-full rounded-[var(--radius-md)] align-top',
+                        usesMediaHypeFrame && 'hype-message-shell hype-message-bubble'
+                      )}
+                    >
+                      <VideoAttachment url={videoMessageUrl} meta={message.content} className="mt-0" />
+                      <div className="pointer-events-none absolute left-1 right-1 top-1 z-10 flex justify-end">
+                        <MessageHypeBadge count={hypeCount} users={hypeUsers} className="pointer-events-auto" />
+                      </div>
+                      <MessageReactions
+                        message={message}
+                        onReact={handleReaction}
+                        className="pointer-events-auto absolute bottom-1 right-1 z-10 w-auto max-w-[calc(100%-0.5rem)] justify-end text-[0.65rem]"
+                      />
+                    </div>
                   ) : message.message_type === 'file' && message.file_url ? (
                     <FileAttachment url={message.file_url} meta={message.content} />
                   ) : (

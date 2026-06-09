@@ -6,15 +6,17 @@ import {
   getChatMediaOrientation,
   type ChatMediaOrientation,
 } from './messageDisplay'
+import { cn } from '../../lib/utils'
 
 interface VideoAttachmentProps {
   url: string
   meta?: string
+  className?: string
 }
 
 const VIDEO_AUTOPLAY_THRESHOLD = 0.6
 
-export const VideoAttachment: React.FC<VideoAttachmentProps> = ({ url }) => {
+export const VideoAttachment: React.FC<VideoAttachmentProps> = ({ url, className }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const shouldAutoPlayRef = useRef(false)
   const hasPreparedAutoplayRef = useRef(false)
@@ -120,10 +122,11 @@ export const VideoAttachment: React.FC<VideoAttachmentProps> = ({ url }) => {
       width={CHAT_MEDIA_INTRINSIC_WIDTH}
       height={CHAT_MEDIA_INTRINSIC_HEIGHT}
       data-chat-media="video"
-      className={[
+      className={cn(
         'mt-1 block max-h-[42vh] w-[min(10rem,100%)] max-w-full rounded-[var(--radius-md)] object-cover sm:w-[11rem]',
         getChatMediaAspectClass(orientation),
-      ].join(' ')}
+        className
+      )}
       onLoadedMetadata={event => {
         const video = event.currentTarget
         setOrientation(getChatMediaOrientation(video.videoWidth, video.videoHeight))

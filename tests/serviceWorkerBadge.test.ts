@@ -267,7 +267,8 @@ describe('service worker app badge handling', () => {
 
     await Promise.allSettled(pending)
 
-    expect(caches.delete).toHaveBeenCalledTimes(1)
+    expect(caches.delete).toHaveBeenCalledTimes(2)
     expect(caches.delete).toHaveBeenCalledWith('shadowchat-static-assets-v0')
+    expect(caches.delete).toHaveBeenCalledWith('shadowchat-static-assets-v1')
   })
 })

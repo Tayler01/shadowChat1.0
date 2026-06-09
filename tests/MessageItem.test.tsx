@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { MessageItem } from '../src/components/chat/MessageItem'
@@ -112,6 +112,41 @@ test('adjusts image thumbnail orientation after the image dimensions load', () =
   expect(img).not.toHaveClass('aspect-[9/16]')
 })
 
+test('shrink-wraps hyped image media frames to the rendered image', () => {
+  const hypedImageMessage = {
+    ...baseMessage,
+    hype_count: 2,
+    hype_users: [{ user_id: 'u2', display_name: 'Bob', username: 'bob' }],
+    reactions: {
+      '❤️': { count: 3, users: ['u2', 'u3', 'u4'] },
+    },
+  } as unknown as Message
+
+  render(
+    <MessageItem
+      message={hypedImageMessage}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+      onJumpToMessage={() => {}}
+      containerRef={React.createRef()}
+    />
+  )
+
+  const img = screen.getByAltText(/uploaded image/i)
+  const mediaFrame = img.closest('[data-chat-media-frame="true"]')
+  const bubbleShell = screen.getByTestId('message-bubble-shell')
+
+  expect(mediaFrame).not.toBeNull()
+  expect(mediaFrame).toHaveClass('inline-block', 'hype-message-shell', 'hype-message-bubble')
+  expect(mediaFrame).toHaveAttribute('data-hype-tier', '2')
+  expect(bubbleShell).not.toHaveClass('hype-message-shell')
+  expect(img).toHaveClass('block', 'w-[min(10rem,100%)]')
+  expect(within(mediaFrame as HTMLElement).getByRole('button', { name: /Hyped by Bob/i })).toBeInTheDocument()
+  expect(within(mediaFrame as HTMLElement).getByRole('button', { name: /Reaction ❤️ count 3/i })).toBeInTheDocument()
+})
+
 test('opens uploaded images in a top-level mobile-safe viewer', async () => {
   render(
     <MessageItem
@@ -185,8 +220,12 @@ test('renders video message', () => {
   expect(video).toHaveAttribute('width', '1080')
   expect(video).toHaveAttribute('height', '1920')
   expect(video).not.toHaveClass('border', 'bg-black', 'shadow-[var(--shadow-panel)]')
-  expect(video?.parentElement).toHaveClass('bg-transparent', 'px-0', 'py-0', 'shadow-none')
-  expect(video?.parentElement).not.toHaveClass('border', 'bg-[var(--bg-panel)]')
+  const mediaFrame = video?.closest('[data-chat-media-frame="true"]')
+  expect(mediaFrame).not.toBeNull()
+  expect(mediaFrame).toHaveClass('inline-block', 'max-w-full')
+  expect(mediaFrame).not.toHaveClass('border', 'bg-[var(--bg-panel)]')
+  expect(mediaFrame?.parentElement).toHaveClass('bg-transparent', 'px-0', 'py-0', 'shadow-none')
+  expect(mediaFrame?.parentElement).not.toHaveClass('border', 'bg-[var(--bg-panel)]')
   expect(screen.queryByRole('link', { name: /clip.mp4/i })).not.toBeInTheDocument()
 })
 
