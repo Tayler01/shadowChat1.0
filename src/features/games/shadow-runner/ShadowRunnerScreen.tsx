@@ -14,24 +14,29 @@ type WebAudioWindow = Window & typeof globalThis & {
 }
 
 const MENU_BUTTONS = [
-  { id: 'start', label: 'Start', left: '12.4%', width: '22.2%' },
-  { id: 'levels', label: 'Levels', left: '38.8%', width: '22.4%' },
-  { id: 'options', label: 'Options', left: '65.4%', width: '22.2%' },
+  { id: 'start', label: 'Start', left: '12.2%', width: '21.6%' },
+  { id: 'levels', label: 'Levels', left: '39%', width: '21.8%' },
+  { id: 'options', label: 'Options', left: '65.8%', width: '21.6%' },
 ] as const
 
 const STAR_OVERLAYS = [
-  { left: '18%', top: '14%', size: '1.35rem', position: '0% 0%', delay: '0s' },
-  { left: '30%', top: '10%', size: '1rem', position: '33.333% 0%', delay: '0.9s' },
-  { left: '47%', top: '12%', size: '1.2rem', position: '66.666% 0%', delay: '1.5s' },
-  { left: '63%', top: '9%', size: '1.45rem', position: '100% 0%', delay: '0.35s' },
+  { left: '18.5%', top: '7.5%', size: '1rem', position: '0% 0%', delay: '0s' },
+  { left: '22.5%', top: '18%', size: '0.85rem', position: '33.333% 0%', delay: '0.65s' },
+  { left: '29.5%', top: '7%', size: '1.15rem', position: '66.666% 0%', delay: '1.25s' },
+  { left: '33.5%', top: '19%', size: '0.95rem', position: '100% 0%', delay: '1.85s' },
+  { left: '37%', top: '12%', size: '0.8rem', position: '0% 50%', delay: '0.35s' },
+  { left: '19.5%', top: '25%', size: '0.72rem', position: '33.333% 50%', delay: '2.15s' },
+  { left: '39.5%', top: '24%', size: '0.78rem', position: '100% 50%', delay: '2.45s' },
+  { left: '45%', top: '13%', size: '1.05rem', position: '66.666% 0%', delay: '1.5s' },
+  { left: '63%', top: '9%', size: '1.25rem', position: '100% 0%', delay: '0.35s' },
   { left: '75%', top: '18%', size: '1.15rem', position: '0% 50%', delay: '1.1s' },
   { left: '86%', top: '12%', size: '0.9rem', position: '33.333% 50%', delay: '1.8s' },
 ] as const
 
 const BOTTOM_MENU_STYLE = {
-  '--shadow-runner-menu-height': 'clamp(7.5rem, 34vh, 13rem)',
+  '--shadow-runner-menu-height': 'clamp(4.35rem, 17vh, 7rem)',
   height: 'var(--shadow-runner-menu-height)',
-  width: 'min(86vw, calc(var(--shadow-runner-menu-height) * 3.88))',
+  width: 'min(56vw, 39rem)',
 } as React.CSSProperties
 
 const SHADOW_RUNNER_INLINE_STYLES = `
@@ -196,7 +201,7 @@ export function ShadowRunnerScreen({
       <img
         src={SHADOW_RUNNER_ASSETS.home.bannerStand}
         alt=""
-        className="pointer-events-none absolute left-[4%] top-[13%] z-[3] hidden w-[clamp(4.5rem,8vw,8rem)] sm:block"
+        className="pointer-events-none absolute bottom-[clamp(6.1rem,18vh,9.2rem)] left-[6.5%] z-[3] hidden w-[clamp(4.2rem,7vw,7rem)] sm:block"
         draggable={false}
       />
       <img
@@ -228,32 +233,32 @@ export function ShadowRunnerScreen({
       <img
         src={SHADOW_RUNNER_ASSETS.home.titleScroll}
         alt="Shadow Runner"
-        className="pointer-events-none absolute left-1/2 top-[3.5%] z-[5] w-[min(76vw,45rem)] -translate-x-1/2 drop-shadow-[0_24px_60px_rgba(0,0,0,0.6)] md:left-auto md:right-[5%] md:w-[min(47vw,40rem)] md:translate-x-0"
+        className="pointer-events-none absolute left-[34%] top-[4%] z-[5] w-[min(52vw,28rem)] drop-shadow-[0_24px_60px_rgba(0,0,0,0.6)] md:left-[34%] md:w-[min(34vw,30rem)]"
         draggable={false}
       />
 
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute left-[8%] z-[6] aspect-square w-[clamp(8rem,18vw,17rem)] drop-shadow-[0_28px_40px_rgba(0,0,0,0.72)] sm:left-[13%]"
+        className="pointer-events-none absolute left-[37%] z-[6] aspect-square w-[clamp(7.6rem,16vw,15rem)] drop-shadow-[0_28px_40px_rgba(0,0,0,0.72)]"
         style={{
           ...spriteStripStyle(SHADOW_RUNNER_ASSETS.hero.menuIdleCapeStrip, heroFrame, 8),
-          bottom: 'clamp(6.6rem, 18vh, 11.8rem)',
+          bottom: 'clamp(5.9rem, 23vh, 10rem)',
         }}
       />
 
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute left-[5.5%] z-[4] aspect-square w-[clamp(4.5rem,8vw,7.5rem)] drop-shadow-[0_0_32px_rgba(238,143,34,0.5)] sm:left-[7.5%]"
+        className="pointer-events-none absolute left-[14%] z-[4] aspect-square w-[clamp(3.8rem,6.4vw,6.2rem)] drop-shadow-[0_0_32px_rgba(238,143,34,0.5)]"
         style={{
           ...spriteStripStyle(SHADOW_RUNNER_ASSETS.home.torchStrip, torchFrame, 8),
-          bottom: 'clamp(8.4rem, 22vh, 13.2rem)',
+          bottom: 'clamp(6.2rem, 19vh, 8.9rem)',
         }}
       />
 
       <img
         src={SHADOW_RUNNER_ASSETS.home.missionScrollStand}
         alt=""
-        className="shadow-runner-float pointer-events-none absolute bottom-[clamp(7rem,18vh,11rem)] left-[37%] z-[4] hidden w-[clamp(4.2rem,8vw,7.2rem)] drop-shadow-[0_20px_35px_rgba(0,0,0,0.55)] md:block"
+        className="shadow-runner-float pointer-events-none absolute bottom-[clamp(5.8rem,18vh,8.8rem)] left-[68%] z-[4] hidden w-[clamp(3.4rem,6vw,5.8rem)] drop-shadow-[0_20px_35px_rgba(0,0,0,0.55)] md:block"
         draggable={false}
       />
 
@@ -273,7 +278,7 @@ export function ShadowRunnerScreen({
             type="button"
             aria-label={`${button.label} button`}
             onClick={playButtonChime}
-            className="absolute top-[27%] h-[42%] rounded-[0.45rem] border border-transparent bg-transparent transition hover:border-[#f0d381]/45 hover:bg-[#f0d381]/10 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/65 active:bg-[#f0d381]/20"
+            className="absolute top-[21%] h-[58%] rounded-[0.45rem] border border-transparent bg-transparent transition hover:border-[#f0d381]/45 hover:bg-[#f0d381]/10 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/65 active:bg-[#f0d381]/20"
             style={{ left: button.left, width: button.width }}
           >
             <span className="sr-only">{button.label}</span>
