@@ -140,6 +140,17 @@ Observed risk:
 - `mark_dm_messages_read` needs a participant authorization guard.
 - Supabase advisors flagged mutable function search paths, authenticated-callable SECURITY DEFINER functions, public-table RLS gaps, and storage policy concerns.
 
+Implementation status on June 8, 2026:
+
+- Added and remotely applied
+  [20260608132000_harden_dm_read_participant_guard.sql](C:/repos/chat2.0/supabase/migrations/20260608132000_harden_dm_read_participant_guard.sql:1),
+  which blocks `mark_dm_messages_read` unless the caller participates in the
+  conversation. The linked Supabase migration list and `supabase db push
+  --dry-run` both showed the remote database current through
+  `20260608200000`.
+- The broader `public.users`, role-authority, storage, and advisor cleanup
+  items remain open.
+
 Next steps:
 
 1. Move email and other private identity fields out of `public.users` into a private/admin-only table or safe RPC/view.
@@ -209,15 +220,34 @@ Observed risk:
 - URL fetchers have some protections, but they mainly resolve A records and validate final URLs after fetch redirects.
 - IPv6, AAAA records, private/reserved ranges, redirect hops, and DNS rebinding behavior need a shared hardened contract.
 
+Implementation status on June 8, 2026:
+
+- Added shared safe-fetch helpers for Supabase Edge Functions and Netlify
+  functions. The helpers normalize public HTTP(S) URLs, reject URL
+  credentials, block local/private/reserved IPv4 and IPv6 targets including
+  IPv4-mapped IPv6 forms, resolve A and AAAA records, follow redirects
+  manually, validate each hop before fetching it, cap redirect count, and
+  enforce response byte limits.
+- Integrated the Supabase helper in `link-preview`, `art-board-import-image`,
+  `shadow-pin-import-image`, `shadow-pin-video`, and `send-push` repo code, and
+  mirrored the Netlify helper in the ShadowPin media helper path.
+- Added focused unit/contract coverage in `tests/safeFetch.test.ts`,
+  `tests/safeFetchIntegrationContract.test.ts`, and
+  `tests/netlifySafeFetch.node.test.mjs`.
+- Remote function inventory showed June 8 deployments for `link-preview` and
+  `shadow-pin-video`. `art-board-import-image`, `shadow-pin-import-image`, and
+  `send-push` still reported older deployment timestamps, so production
+  coverage for those adopters remains an open deployment/smoke item.
+
 Next steps:
 
-1. Create a shared safe-fetch helper for Supabase functions where possible.
-2. Use manual redirect handling with `redirect: 'manual'`.
-3. Validate each redirect target before following it.
-4. Resolve and block unsafe A and AAAA records.
-5. Block loopback, private, link-local, ULA, multicast, metadata IPs, `0.0.0.0`, carrier-grade NAT ranges, and IPv4-mapped IPv6 forms.
-6. Cap redirects, response size, content type, and fetch duration.
-7. Mirror equivalent hardening in the Netlify media helper.
+1. Redeploy and smoke `art-board-import-image`, `shadow-pin-import-image`, and
+   `send-push` before treating shared safe-fetch coverage as fully live in
+   production.
+2. Run deployed function smoke with known safe public URLs and blocked private
+   URL cases.
+3. Keep adding provider-specific allow/deny tests as URL import and preview
+   behavior expands.
 
 Validation target:
 
@@ -280,6 +310,16 @@ Next steps:
 6. Review profile/settings modal overflow on small screens.
 7. Disable expensive fixed backgrounds on mobile if browser traces show scroll smoothness cost.
 
+Implementation status on June 8, 2026:
+
+- DM loading and empty-state handling was tightened in
+  [src/components/dms/DirectMessagesView.tsx](C:/repos/chat2.0/src/components/dms/DirectMessagesView.tsx:1)
+  and [src/hooks/useDirectMessages.tsx](C:/repos/chat2.0/src/hooks/useDirectMessages.tsx:1),
+  with focused coverage in `tests/useDirectMessages.test.tsx`.
+- Message send touch handling and active-send composer disables were hardened
+  across General Chat, DMs, and board chat. Mobile visual/browser validation is
+  still needed before closing the broader frontend polish item.
+
 Validation target:
 
 - Preview build visual pass on iPhone-sized and Android-sized Chromium viewports.
@@ -306,6 +346,16 @@ Next steps:
 5. Revisit Rollup manual chunks for emoji picker, games/entertainment, Supabase/vendor, and lower-frequency settings/admin surfaces.
 6. Review unindexed foreign keys and RLS initplan warnings from Supabase performance advisors.
 7. Treat unused-index warnings carefully; do not drop indexes only because stats are currently quiet.
+
+Implementation status on June 8, 2026:
+
+- A pilot shared realtime subscription lifecycle helper landed in
+  [src/lib/realtimeSubscription.ts](C:/repos/chat2.0/src/lib/realtimeSubscription.ts:1)
+  and is now used by News Feed and News Chat with focused Jest coverage. This
+  starts the extraction track but does not yet cover General Chat, DMs, boards,
+  or presence.
+- The Vite large-chunk warning remains open and is tracked in
+  [docs/DEFERRED_FOLLOWUPS.md](C:/repos/chat2.0/docs/DEFERRED_FOLLOWUPS.md:1).
 
 Validation target:
 

@@ -1,8 +1,8 @@
 # ShadowPin
 
-## Documentation Status - June 1, 2026
+## Documentation Status - June 8, 2026
 
-Reviewed during the June 1, 2026 documentation refresh. This doc reflects the shipped ShadowPin image/video surface. Pending hardening includes shared URL-fetch/SSRF improvements and review of activity-table RLS advisor findings.
+Updated after the June 8, 2026 shared safe-fetch and Instagram preview hardening. Repo code now uses the shared safe-fetch contract for ShadowPin image/video URL ingestion paths. Remote function inventory during the evening doc-freshness pass showed `shadow-pin-video` deployed on June 8, while `shadow-pin-import-image` still showed an older deployment timestamp; redeploy and smoke the image import function before claiming production image-import safe-fetch coverage.
 
 ShadowPin is a logged-in public pin board exposed as `Pins` in the mobile
 bottom menu and desktop sidebar. Boards stays its own menu item; Pins opens the
@@ -94,7 +94,11 @@ activity score is admin-only and separate from the public gold push-pin score.
 Function: `supabase/functions/shadow-pin-import-image/index.ts`
 Video function: `supabase/functions/shadow-pin-video/index.ts`
 
-The Edge Function authenticates the caller, validates the URL, rejects local/private hosts where practical, checks image MIME and size, copies the image into `shadow-pin` Storage, then creates the category or image row. The frontend never hotlinks pasted URLs.
+The Edge Function authenticates the caller, validates the URL through the
+shared safe-fetch helper, rejects local/private/reserved hosts and unsafe
+redirect hops, checks image MIME and size, copies the image into `shadow-pin`
+Storage, then creates the category or image row. The frontend never hotlinks
+pasted URLs.
 
 Video-like URLs are routed to `shadow-pin-video`. YouTube Shorts get a playable
 iframe URL. Pinterest video pins use direct `pinimg.com` MP4/HLS URLs when the
@@ -141,6 +145,7 @@ npm run lint
 npm run typecheck
 npm run build
 npx jest --runInBand tests/BoardBubbleMap.test.tsx
+npx jest --runInBand tests/safeFetch.test.ts tests/safeFetchIntegrationContract.test.ts
 ```
 
 For remote use, apply the migration and deploy the Edge Function:

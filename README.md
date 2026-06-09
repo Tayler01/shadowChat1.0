@@ -4,11 +4,11 @@ ShadowChat 1.0 is a premium dark realtime chat app built with React, TypeScript,
 
 The project is already wired for hosted Supabase and Netlify deployment. It is designed to behave like a product app, not a demo: realtime messaging, uploads, presence, settings, DMs, and notification flows are all first-class parts of the codebase.
 
-## Documentation Status - June 2, 2026
+## Documentation Status - June 8, 2026
 
-The documentation set has been refreshed against the current `main` branch after the full codebase audit and the first auth-hardening implementation pass. The freshest planning source is [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1), and the full documentation inventory is [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
+The documentation set has been refreshed against the current `main` branch after the June 8 Hype, safe-fetch, automation approval queue, DM read-guard, and News realtime-helper work. The freshest planning source is [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1), and the full documentation inventory is [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
 
-Current known follow-up areas are documentation-backed: Supabase policy/RPC hardening, URL fetch/SSRF hardening, Netlify security headers, provider live-setting verification, frontend polish, and post-deploy auth smoke for the invite-only signup/email-verification rollout.
+Current known follow-up areas are documentation-backed: Supabase policy/RPC hardening, remaining production deployment/smoke for shared URL fetch hardening outside the already-deployed link-preview and ShadowPin video functions, Netlify security headers, provider live-setting verification, frontend polish, and post-deploy auth smoke for the invite-only signup/email-verification rollout.
 
 ## Stack
 
@@ -32,6 +32,9 @@ Current known follow-up areas are documentation-backed: Supabase policy/RPC hard
 - User profiles with adjustable avatar crop/zoom, banner, status, role badges, presence visibility, theme color, and admin moderation controls
 - File, image, and voice-message uploads
 - Message reactions, pinning, editing, and deletion
+- Hype bell and message Hype celebrations with daily limits, bonus credits,
+  realtime events, permanent message Hype summaries, and optional Hype push
+  notifications
 - Slash commands and reply/thread affordances
 - AI reply and summary hooks through a secured Supabase Edge Function
 - Boards tab with a low-friction draggable board map, feed pills, chat circles, static board squares, collision sparkle/sound feedback, the existing News Feed, News Chat, Investing Chat, Learning Chat, Crypto Chat, and a shared Art Board mood canvas
@@ -79,6 +82,11 @@ Backend lives under [`supabase`](C:/repos/chat2.0/supabase).
 - Admin roles use `public.user_roles`, `public.admin_role_audit`, `public.admin_role_notifications`, and the synced public `users.admin_role` badge field.
 - Channel bans use `public.user_channel_bans` plus RLS/RPC enforcement for General Chat, individual board chats, and all interaction.
 - Weather locations use private `public.user_weather_preferences` rows scoped by RLS to the owning user.
+- Hype uses `public.hype_events`, `public.message_hypes`,
+  `public.hype_event_receipts`, and `public.hype_bonus_grants`; the linked
+  Supabase project was confirmed current through migration `20260608200000`.
+- Automation approval review packets use `public.automation_approval_packets`
+  and `public.automation_approval_packet_events`.
 
 Always-on background services live under [`services`](C:/repos/chat2.0/services).
 
@@ -171,7 +179,7 @@ node scripts/playwright-smoke.mjs --scenario=full --run-name=full-smoke-release 
 ## Realtime, Push, and AI Notes
 
 - Realtime depends on the migrations having been pushed to the target Supabase project.
-- Browser push depends on the service worker, VAPID keys, the `send-push` edge function, and at least one active subscription row.
+- Browser push depends on the service worker, VAPID keys, the `send-push` edge function, and at least one active subscription row. Hype notifications use the same function with the `hype_event` event type.
 - AI features depend on the `openai-chat` edge function and configured Supabase AI provider secrets.
 - Active-user dots and the General Chat user-count popup depend on `user_presence`, `users.presence_visibility`, and the `update_user_last_active`, `list_presence_states`, and `get_active_users` RPCs.
 - News Feed realtime depends on the isolated News migrations, the `shado-news-scraper` Render worker, and the source health/cursor fields in `news_sources`.

@@ -1,8 +1,8 @@
 # Chat Link Previews
 
-## Documentation Status - June 1, 2026
+## Documentation Status - June 8, 2026
 
-Reviewed during the June 1, 2026 documentation refresh. This doc reflects the shipped link-preview flow, but the June 1 audit identified pending SSRF hardening for redirect handling, IPv6/AAAA checks, and shared safe-fetch behavior.
+Updated after the June 8, 2026 shared safe-fetch and Instagram preview hardening. The linked Supabase project showed `link-preview` active with a June 8 deployment timestamp during the evening doc-freshness pass.
 
 ShadowChat renders `http://`, `https://`, and `www.` URLs in group chat, DMs, and board chats as clickable links. The first URL in a text message can also load a compact preview card.
 
@@ -17,6 +17,11 @@ ShadowChat renders `http://`, `https://`, and `www.` URLs in group chat, DMs, an
 - The Edge Function requires a signed-in Supabase bearer token even though gateway JWT verification is disabled for deployment compatibility.
 - Only `http` and `https` URLs are accepted.
 - Localhost, `.local`, loopback, link-local, and private IPv4 targets are rejected before fetch. Redirect destinations are checked too.
+- Remote fetches go through the shared Supabase safe-fetch helper, which
+  resolves A and AAAA records, blocks local/private/reserved IPv4 and IPv6
+  targets, blocks IPv4-mapped IPv6 private targets, follows redirects manually,
+  validates each redirect target before fetch, and fails closed when the host
+  cannot be verified as public.
 - Remote fetches use short timeouts and read at most 512 KB of HTML.
 - X/Twitter links merge `publish.twitter.com`/`publish.x.com` oEmbed text with image metadata. X often omits `og:image` from normal logged-out fetches even though iMessage-style preview crawlers receive a card image, so the function also extracts first-party `pbs.twimg.com/media/...` assets from public X post HTML and normalizes them to a large thumbnail.
 - If X removes those public media hints, the official fallback is X API v2 post lookup with `expansions=attachments.media_keys` and `media.fields=url,preview_image_url,type`, which requires a bearer token and should be added as a server-side secret before relying on it in production.
@@ -42,6 +47,12 @@ git push origin main
 The push to `main` starts the GitHub Actions Netlify production deploy. Use
 `npx netlify deploy --prod` only as a manual fallback.
 
+After deploy, confirm the remote function timestamp with:
+
+```powershell
+supabase functions list
+```
+
 ## Validation
 
 Run:
@@ -51,6 +62,7 @@ npm run lint
 npx tsc --noEmit -p tsconfig.app.json
 npx jest --runInBand --runTestsByPath tests/linkPreview.test.ts tests/MessageItem.test.tsx
 npx jest --runInBand tests/MessageRichText.test.tsx tests/safeFetchIntegrationContract.test.ts
+npx jest --runInBand tests/safeFetch.test.ts
 npm run build
 ```
 

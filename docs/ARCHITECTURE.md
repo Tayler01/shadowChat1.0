@@ -2,9 +2,9 @@
 
 This document is a high-signal map of the current ShadowChat codebase.
 
-## Documentation Status - June 2, 2026
+## Documentation Status - June 8, 2026
 
-This architecture map is current for the shipped `main` branch and now includes the June 1 audit context plus the June 2 invite/email auth rollout. Known architecture follow-ups are tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1): Supabase policy/RPC hardening, service-role bypass checks, shared SSRF-safe fetch handling, frontend polish, and later realtime/send/scroll helper extraction.
+This architecture map is current for the shipped `main` branch and now includes the June 8 Hype, safe-fetch, automation approval queue, DM read-guard, and News realtime-helper work. Known architecture follow-ups are tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1): remaining Supabase policy/RPC hardening, service-role bypass checks, production deployment/smoke for all shared safe-fetch adopters, frontend polish, and broader realtime/send/scroll helper extraction.
 
 ## High-Level System
 
@@ -50,6 +50,7 @@ React UI
 - [`useNewsBadges`](C:/repos/chat2.0/src/hooks/useNewsBadges.ts:1): compatibility wrapper over board badges
 - [`useNewsAdmin`](C:/repos/chat2.0/src/hooks/useNewsAdmin.ts:1): News source admin state and source upsert/toggle RPCs
 - [`useAdminAccess`](C:/repos/chat2.0/src/hooks/useAdminAccess.ts:1): full-admin/sub-admin access state and role updates
+- [`useHype`](C:/repos/chat2.0/src/hooks/useHype.tsx:1): Hype bell/message celebrations, pending event receipts, daily status, and push trigger state
 - [`useWeatherPreference`](C:/repos/chat2.0/src/hooks/useWeatherPreference.ts:1): private per-user weather location load/save/clear
 - [`useWeatherForecast`](C:/repos/chat2.0/src/hooks/useWeatherForecast.ts:1): Open-Meteo forecast refresh for the header widget after preference changes and on a periodic timer
 - [`usePushNotifications`](C:/repos/chat2.0/src/hooks/usePushNotifications.ts:1): push subscription UX
@@ -64,6 +65,7 @@ React UI
 - [`ai.ts`](C:/repos/chat2.0/src/lib/ai.ts:1): authenticated AI function calls
 - [`weather.ts`](C:/repos/chat2.0/src/lib/weather.ts:1): Open-Meteo geocoding/forecast mapping and private weather preference helpers
 - [`moderation.ts`](C:/repos/chat2.0/src/lib/moderation.ts:1): channel-ban scopes, durations, and moderation RPC wrappers
+- [`realtimeSubscription.ts`](C:/repos/chat2.0/src/lib/realtimeSubscription.ts:1): pilot shared Supabase realtime lifecycle helper currently used by News Feed and News Chat
 - [`utils.ts`](C:/repos/chat2.0/src/lib/utils.ts:1): shared formatting and UI helpers
 
 ## Backend Layers
@@ -87,19 +89,27 @@ Important domains:
 - foreground presence visibility and active-user state
 - private per-user weather preferences
 - push subscriptions and notification preferences
+- Hype events, per-message Hype summaries, event receipts, daily limits, and bonus-credit grants
+- full-admin automation approval packets and append-only packet events
 - ESP bridge control-plane and update-manifest tables
 
 ### Edge Functions
 
 - [`openai-chat`](C:/repos/chat2.0/supabase/functions/openai-chat/index.ts:1): validates caller session, proxies allowed AI requests to OpenRouter by default, and can post group-chat AI answers as the dedicated `Shado` assistant profile
 - [`send-push`](C:/repos/chat2.0/supabase/functions/send-push/index.ts:1): validates caller session, looks up recipients, enforces notification preferences, and sends web push payloads
-- [`link-preview`](C:/repos/chat2.0/supabase/functions/link-preview/index.ts:1): validates a signed-in bearer token, rejects unsafe targets, and fetches Open Graph/oEmbed metadata for chat, DM, and board-chat link cards
+- [`link-preview`](C:/repos/chat2.0/supabase/functions/link-preview/index.ts:1): validates a signed-in bearer token, rejects unsafe targets through the shared safe-fetch helper, and fetches Open Graph/oEmbed metadata for chat, DM, and board-chat link cards
 - [`delete-account`](C:/repos/chat2.0/supabase/functions/delete-account/index.ts:1): validates caller session in code, removes owned storage objects, and deletes the auth user through service-role access
 - [`shadow-pin-video`](C:/repos/chat2.0/supabase/functions/shadow-pin-video/index.ts:1): validates user tokens in code for Bunny upload session creation, processing sync, and external-video import support
-- [`art-board-import-image`](C:/repos/chat2.0/supabase/functions/art-board-import-image/index.ts:1) and [`shadow-pin-import-image`](C:/repos/chat2.0/supabase/functions/shadow-pin-import-image/index.ts:1): authenticated server-side import helpers for public image URLs
+- [`art-board-import-image`](C:/repos/chat2.0/supabase/functions/art-board-import-image/index.ts:1) and [`shadow-pin-import-image`](C:/repos/chat2.0/supabase/functions/shadow-pin-import-image/index.ts:1): authenticated server-side import helpers for public image URLs using the shared safe-fetch contract in repo code
 - [`bridge-*`](C:/repos/chat2.0/supabase/functions): bridge pairing, session lifecycle, profile/search, group/DM polling and sending, heartbeat, and update-check functions
 
 Audit note: several Edge Functions intentionally run with Supabase gateway JWT verification disabled and enforce custom authentication in code. Any change to those functions must preserve custom auth, rate limits, RLS-equivalent checks, and service-role boundaries.
+
+Remote function status checked on June 8, 2026: `link-preview` and
+`shadow-pin-video` had June 8 deployments, while `art-board-import-image`,
+`shadow-pin-import-image`, and `send-push` still reported older deployment
+timestamps. Do not claim production-safe-fetch coverage for those older remote
+functions until they are redeployed and smoked.
 
 ### Background Workers
 
@@ -184,6 +194,18 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 4. Realtime subscription reconciles inserts and updates across clients
 5. Optional push fan-out can be triggered for group notifications
 6. Profile/role/presence decorations are joined or resolved from public user and presence state
+
+### Hype Event
+
+1. User rings the Hype bell or Hypes another user's General Chat message.
+2. The client calls `ring_hype_bell` or `hype_message`.
+3. The RPC enforces authentication, General Chat channel-ban status, the normal
+   two-per-day allowance, and any available bonus Hype credits.
+4. `hype_events` publishes a short-lived realtime event; message Hypes also
+   update the permanent `messages.hype_count` and `messages.hype_users`
+   summary.
+5. Clients render the celebration overlay once per event receipt and can trigger
+   optional `hype_event` push delivery through `send-push`.
 
 ### Direct Message
 

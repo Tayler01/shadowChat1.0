@@ -1,8 +1,8 @@
 # Admin Access
 
-## Documentation Status - June 2, 2026
+## Documentation Status - June 8, 2026
 
-Reviewed during the June 2, 2026 invite/email auth rollout. This doc reflects the shipped admin model and the Settings > Admin > Invites surface. Pending hardening includes treating `users.admin_role` as display-only and using `user_roles`/operator RPCs for server-side authority everywhere.
+Updated after the June 8, 2026 automation approval queue rollout. This doc reflects the shipped admin model, Settings > Admin > Invites, and Settings > Admin > Automation Approvals surfaces. Pending hardening includes treating `users.admin_role` as display-only and using `user_roles`/operator RPCs for server-side authority everywhere.
 
 ShadowChat now uses one app-wide admin model instead of a News-only operator
 role.

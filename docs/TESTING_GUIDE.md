@@ -2,9 +2,9 @@
 
 This project uses a mix of static checks, Jest coverage, and real browser validation.
 
-## Documentation Status - June 2, 2026
+## Documentation Status - June 8, 2026
 
-This guide reflects the current repo scripts. The June 1 audit confirmed `npm run lint`, `npm run typecheck`, `npm run build`, and the metrics-only chat scroll probe passed on current `main`. The chat-scroll script now also has seeded read-position scenarios for preview/staging runs that can prove the first-unread, deep-link, same-timestamp, realtime anchoring, and media paths. The June 2 auth rollout added invite-only signup, email verification, password reset, and admin invite tests.
+This guide reflects the current repo scripts. The June 1 audit confirmed `npm run lint`, `npm run typecheck`, `npm run build`, and the metrics-only chat scroll probe passed on current `main`. The chat-scroll script now also has seeded read-position scenarios for preview/staging runs that can prove the first-unread, deep-link, same-timestamp, realtime anchoring, and media paths. The June 2 auth rollout added invite-only signup, email verification, password reset, and admin invite tests. The June 8 work added Hype, safe-fetch, automation approval queue, DM read-guard, and News realtime-helper coverage.
 
 ## Mobile-First Testing Default
 
@@ -49,11 +49,14 @@ Current coverage is strongest around:
 - group chat hooks
 - DM hooks
 - message input behavior
+- Hype presentation, usage state, and push preference behavior
 - thread reply and pinned message UI
 - session refresh and realtime reset helpers
 - theme and user search hooks
 - Boards map routing, Art Board routing, and board-chat rendering
 - admin feedback review
+- automation approval queue access and UI behavior
+- shared safe-fetch URL policy for Supabase and Netlify URL fetchers
 - weather widget and location settings
 
 ## When To Add Manual Browser QA
@@ -77,6 +80,8 @@ Do browser validation when changing:
 - General Chat weather widget or Account & Profile weather location settings
 - mobile GIF/emoji pickers, quick reaction rails, image preview modals, or
   Shadow Pin image masonry
+- Hype overlays, Hype message badges, send-button touch behavior, or any
+  composer disabled-state change
 
 For user-facing changes, the default browser validation should include at least
 one iPhone/WebKit profile and one Android/Chromium profile through the closest
@@ -315,6 +320,9 @@ Boards/News-specific Jest coverage currently lives in:
 - [tests/ArtBoard.test.tsx](C:/repos/chat2.0/tests/ArtBoard.test.tsx:1)
 - [tests/NewsChat.test.tsx](C:/repos/chat2.0/tests/NewsChat.test.tsx:1)
 - [tests/linkPreview.test.ts](C:/repos/chat2.0/tests/linkPreview.test.ts:1)
+- [tests/safeFetch.test.ts](C:/repos/chat2.0/tests/safeFetch.test.ts:1)
+- [tests/safeFetchIntegrationContract.test.ts](C:/repos/chat2.0/tests/safeFetchIntegrationContract.test.ts:1)
+- [tests/netlifySafeFetch.node.test.mjs](C:/repos/chat2.0/tests/netlifySafeFetch.node.test.mjs:1)
 
 Admin/weather focused Jest coverage currently lives in:
 

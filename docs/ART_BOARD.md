@@ -1,8 +1,8 @@
 # Art Board
 
-## Documentation Status - June 1, 2026
+## Documentation Status - June 8, 2026
 
-Reviewed during the June 1, 2026 documentation refresh. This feature guide is current for the shipped product surface, with any known hardening or polish follow-ups tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
+Updated after the June 8, 2026 shared safe-fetch hardening. Repo code now routes Art Board URL imports through the shared safe-fetch helper, but the linked Supabase function inventory still showed `art-board-import-image` with an older deployment timestamp during the evening doc-freshness pass. Redeploy and smoke that function before claiming production Art Board import safe-fetch coverage. Broader known hardening or polish follow-ups remain tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
 
 Art Board is the shared visual mood-board surface under Boards. It is a
 separate backend domain from News Feed, board chats, DMs, and General Chat.
@@ -59,9 +59,10 @@ Storage:
 - `art-board`: public image bucket for uploaded and imported images.
 - Users can write only inside their own first-level folder.
 - Imported URLs are fetched through `art-board-import-image` so private/local
-  URLs are rejected and copied into Storage. The function rejects imports over
-  the bucket's 10 MB limit, and the frontend requests backend-transformed
-  delivery URLs for canvas, detail, and linked-item thumbnails.
+  URLs, unsafe DNS answers, and unsafe redirect hops are rejected before the
+  image is copied into Storage. The function rejects imports over the bucket's
+  10 MB limit, and the frontend requests backend-transformed delivery URLs for
+  canvas, detail, and linked-item thumbnails.
 - `thumbnail_url`, `thumbnail_path`, `image_width`, `image_height`, and
   `media_processed_at` live on `public.art_board_items` after the mobile media
   derivative migration.
@@ -90,6 +91,7 @@ Minimum checks after Art Board changes:
 npm run lint
 npx tsc --noEmit -p tsconfig.app.json
 npx jest tests/NewsView.test.tsx tests/ArtBoard.test.tsx --runInBand
+npx jest --runInBand tests/safeFetch.test.ts tests/safeFetchIntegrationContract.test.ts
 npm run build
 npx supabase db lint --linked --fail-on error
 ```
