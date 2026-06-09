@@ -203,8 +203,9 @@ export function ShadowRunnerScreen({
   const heroFrame = useSpriteFrame(8, 150)
   const torchFrame = useSpriteFrame(8, 105)
   const orientationGateActive = useRotateGate()
+  const [forceStage, setForceStage] = React.useState(false)
   const assetsReady = useImagePreload(SHADOW_RUNNER_IMAGE_SOURCES)
-  const showRotateGate = orientationGateActive
+  const showRotateGate = orientationGateActive && !forceStage
   const audioContextRef = React.useRef<AudioContext | null>(null)
 
   React.useEffect(() => {
@@ -256,6 +257,13 @@ export function ShadowRunnerScreen({
         <p className="mt-3 max-w-xs text-sm font-semibold uppercase tracking-[0.12em] text-[#d9c79f]">
           Shadow Runner plays sideways.
         </p>
+        <button
+          type="button"
+          onClick={() => setForceStage(true)}
+          className="mt-6 rounded-full border border-[#f0d381]/45 bg-[#2c2110]/70 px-5 py-2 text-xs font-black uppercase tracking-[0.16em] text-[#f0d381] shadow-[0_12px_32px_rgba(0,0,0,0.45)]"
+        >
+          Continue
+        </button>
       </div>
 
       <div className={`${showRotateGate ? 'hidden' : 'flex'} shadow-runner-landscape-stage absolute inset-0 items-center justify-center bg-black`}>
@@ -299,13 +307,13 @@ export function ShadowRunnerScreen({
       <img
         src={SHADOW_RUNNER_ASSETS.home.bannerStand}
         alt=""
-        className="pointer-events-none absolute bottom-[26%] left-[8%] z-[3] w-[7.2%]"
+        className="pointer-events-none absolute bottom-[22.5%] left-[8%] z-[3] w-[7.2%]"
         draggable={false}
       />
       <img
         src={SHADOW_RUNNER_ASSETS.home.bannerPennant}
         alt=""
-        className="pointer-events-none absolute right-[0.4%] top-[10.5%] z-[3] w-[5.4%]"
+        className="pointer-events-none absolute right-[3.5%] top-[6.5%] z-[3] w-[6%]"
         draggable={false}
       />
 
@@ -337,7 +345,7 @@ export function ShadowRunnerScreen({
 
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute bottom-[25.5%] left-[37%] z-[6] aspect-square w-[18%] drop-shadow-[0_28px_40px_rgba(0,0,0,0.72)]"
+        className="pointer-events-none absolute bottom-[22.5%] left-[37%] z-[6] aspect-square w-[18%] drop-shadow-[0_28px_40px_rgba(0,0,0,0.72)]"
         style={{
           ...spriteStripStyle(SHADOW_RUNNER_ASSETS.hero.menuIdleCapeStrip, heroFrame, 8),
         }}
@@ -345,7 +353,7 @@ export function ShadowRunnerScreen({
 
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute bottom-[26.5%] left-[17%] z-[4] aspect-square w-[7.2%] drop-shadow-[0_0_32px_rgba(238,143,34,0.5)]"
+        className="pointer-events-none absolute bottom-[23%] left-[17%] z-[4] aspect-square w-[7.2%] drop-shadow-[0_0_32px_rgba(238,143,34,0.5)]"
         style={{
           ...spriteStripStyle(SHADOW_RUNNER_ASSETS.home.torchStrip, torchFrame, 8),
         }}
@@ -354,7 +362,7 @@ export function ShadowRunnerScreen({
       <img
         src={SHADOW_RUNNER_ASSETS.home.missionScrollStand}
         alt=""
-        className="shadow-runner-float pointer-events-none absolute bottom-[26%] left-[74%] z-[4] w-[6.4%] drop-shadow-[0_20px_35px_rgba(0,0,0,0.55)]"
+        className="shadow-runner-float pointer-events-none absolute bottom-[23%] left-[74%] z-[4] w-[6.4%] drop-shadow-[0_20px_35px_rgba(0,0,0,0.55)]"
         draggable={false}
       />
 
