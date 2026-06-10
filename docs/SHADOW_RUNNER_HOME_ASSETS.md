@@ -1,6 +1,6 @@
 # Shadow Runner Home Screen Assets
 
-Status: first-pass review assets.
+Status: current title/menu asset pack for the private playable prototype.
 
 The home-screen asset pack from the Desktop has been copied into:
 
@@ -21,6 +21,10 @@ The Desktop source remains untouched:
 | Runtime title scroll | `public/games/shadow-runner/home-assets/sliced/title-scroll-shadow-runner.png` | Trimmed title scroll used by the live home screen to avoid transparent padding taking layout space. |
 | Bottom menu scroll | `public/games/shadow-runner/home-assets/assets/ui/ui_bottom_menu_scroll.png` | Baked `START`, `LEVELS`, and `OPTIONS` menu. |
 | Runtime bottom menu scroll | `public/games/shadow-runner/home-assets/sliced/bottom-menu-scroll.png` | Trimmed menu strip used by the live home screen for tighter button areas on landscape phones. |
+| Runtime blank menu scroll | `public/games/shadow-runner/home-assets/optimized/blank-menu-scroll.webp` | Blank scroll used by the title menu and private-build access gate so labels and controls can be rendered live. |
+| Runtime blank menu button | `public/games/shadow-runner/home-assets/optimized/blank-menu-button.webp` | Blank row/button panel used for live Start, Levels, and Options hit targets. |
+| Options scroll panel | `public/games/shadow-runner/home-assets/optimized/options-scroll-panel.webp` | Scroll panel used by title Options and in-game Pause menus. |
+| Options row button | `public/games/shadow-runner/home-assets/optimized/options-menu-row-button.webp` | Dedicated row-button asset for scroll-menu actions. |
 | Mission scroll stand | `public/games/shadow-runner/home-assets/assets/ui/prop_mission_scroll_stand.png` | Blank foreground prop for mission text or decorative menu staging. |
 | Torch strip | `public/games/shadow-runner/home-assets/assets/effects/fx_torch_flame_strip.png` | Intended 8-frame strip, but needs reviewed slicing because the width is not evenly divisible by 8. |
 | Runtime torch strip | `public/games/shadow-runner/home-assets/sliced/torch-flame-8f-192.png` | Normalized 8-frame `192 x 192` strip used by the first home screen. |
@@ -43,19 +47,40 @@ The Desktop source remains untouched:
 ## Review Notes
 
 - The core direction is strong enough for a title-screen composition pass.
-- The first live home screen uses the generated picker banner, Castle Bard
+- The live Shadow Runner surface uses the generated picker banner, Castle Bard
   music, animated menu-idle cape strip, normalized torch strip, sparkle sheet,
-  sliced banner props, title scroll, mission scroll, and bottom menu scroll.
+  sliced banner props, title scroll, mission scroll, blank menu panels, options
+  scroll panels, and live React-rendered labels/icons.
 - The background has a useful foreground ledge for the hero, but the approved
   hero stance still needs to be placed against it to verify scale and foot
   alignment.
-- The title scroll and menu are currently baked images. That is fine for a
-  concept anchor, but live UI may be easier if we later split the menu into
-  blank panels and render labels/icons in-game.
+- The title menu now uses blank panels with live Start, Levels, and Options
+  controls instead of relying on baked labels for interaction.
 - The torch and star sheets should not be blindly sliced by equal dimensions
   without visual review.
 - Raw chroma-key sources are preserved under
   `public/games/shadow-runner/home-assets/raw_chromakey/`.
+
+## Current Runtime Wiring
+
+- Picker entry: `src/features/games/GamesHome.tsx`
+- Title/access/rotate gate: `src/features/games/shadow-runner/ShadowRunnerScreen.tsx`
+- Playable level shell: `src/features/games/shadow-runner/ShadowRunnerGame.tsx`
+- Phaser scene factory: `src/features/games/shadow-runner/game/createShadowRunnerPhaserGame.ts`
+- Asset manifest: `src/features/games/shadow-runner/assets/manifest.ts`
+
+The current prototype is intentionally Shadow Runner-scoped: it uses an
+in-surface rotate gate and 16:9 playfield sizing instead of changing the global
+PWA manifest, viewport, fullscreen state, or browser orientation lock. The
+June 9 rollback notes are in
+[`docs/PRODUCTION_ROLLBACK_AND_MEDIA_FRAME_FIX_2026-06-09.md`](C:/repos/chat2.0/docs/PRODUCTION_ROLLBACK_AND_MEDIA_FRAME_FIX_2026-06-09.md:1).
+
+## Latest Verification
+
+The latest Shadow Runner options-menu pass recorded `npm run lint`,
+`npx tsc --noEmit -p tsconfig.app.json`, and `npm run build` as passing, then
+captured mobile landscape visual checks at `740x390` and `932x430`. Artifacts
+live under `output/playwright/shadow-runner-options-pass/final/`.
 
 ## Manifest
 

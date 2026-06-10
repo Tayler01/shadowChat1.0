@@ -2,9 +2,9 @@
 
 This document is a high-signal map of the current ShadowChat codebase.
 
-## Documentation Status - June 8, 2026
+## Documentation Status - June 9, 2026
 
-This architecture map is current for the shipped `main` branch and now includes the June 8 Hype, safe-fetch, automation approval queue, DM read-guard, and News realtime-helper work. Known architecture follow-ups are tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1): remaining Supabase policy/RPC hardening, service-role bypass checks, production deployment/smoke for all shared safe-fetch adopters, frontend polish, and broader realtime/send/scroll helper extraction.
+This architecture map is current for the shipped `main` branch and now includes the June 9 Shadow Runner playable-prototype work, Shadow Runner menu polish, mobile composer focus fix, and chat media-frame polish. Known architecture follow-ups are tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1): remaining Supabase policy/RPC hardening, service-role bypass checks, production deployment/smoke for all shared safe-fetch adopters, frontend polish, and broader realtime/send/scroll helper extraction.
 
 ## High-Level System
 
@@ -38,6 +38,8 @@ React UI
 - [`src/components/profile`](C:/repos/chat2.0/src/components/profile): user profile experience, including avatar crop/zoom/position editing before upload
 - [`src/components/settings`](C:/repos/chat2.0/src/components/settings): sectioned settings, notification setup, feedback, admin tools, and weather location
 - [`src/components/layout`](C:/repos/chat2.0/src/components/layout): shell, nav, and responsive structure
+- [`src/features/games`](C:/repos/chat2.0/src/features/games): Entertainment picker and game surfaces. Shadow Runner currently lives under [`src/features/games/shadow-runner`](C:/repos/chat2.0/src/features/games/shadow-runner) with an asset-driven title screen, private access gate, rotate gate, lazy-loaded Phaser level, DOM HUD/touch controls, title/options scroll menus, and pause/exit confirmation menus.
+- [`src/features/entertainment`](C:/repos/chat2.0/src/features/entertainment): non-game Entertainment surfaces such as Shado TV, Shadow Mystery, and Will & Kirk.
 
 ### Hooks
 
@@ -254,6 +256,17 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 5. Links are non-directional rows in `art_board_links`; reactions toggle through `toggle_art_board_reaction`
 6. `art_board_items`, `art_board_links`, and `art_board_reactions` publish low-frequency realtime updates, but live drag state is not streamed
 7. `art_board` and `all_interaction` bans block writes while preserving read/browse access
+
+### Shadow Runner
+
+1. User opens Shadow Runner from the Entertainment picker, which starts the shared Castle Bard audio from the picker click when the browser allows autoplay from that gesture
+2. The game surface enters the app's immersive Entertainment shell without changing global PWA orientation, viewport, fullscreen, manifest, or app-shell settings
+3. A local private-build access gate stores unlock state in session storage
+4. Portrait phones see a Shadow Runner-only rotate gate; landscape viewports render the fixed 16:9 title/playfield stage
+5. The title screen preloads the home/menu assets, animates the menu-idle hero strip, and renders Start, Levels, and Options over blank scroll/button assets
+6. Start mounts the lazy-loaded Phaser `ShadowRunnerLevelScene` through `ShadowRunnerGame`; movement input stays in a React-owned input ref and the Phaser scene stays responsible for the canvas level
+7. DOM HUD and touch controls sit over the canvas; pause/options scroll menus pause the Phaser scene, clear pressed actions, and keep music/sound toggles in the React shell
+8. The June 9 rollback intentionally removed global orientation/fullscreen behavior because it affected mobile app header, footer, composer, and PWA layout outside Shadow Runner
 
 ### Channel Ban Enforcement
 

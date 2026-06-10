@@ -4,9 +4,9 @@ ShadowChat 1.0 is a premium dark realtime chat app built with React, TypeScript,
 
 The project is already wired for hosted Supabase and Netlify deployment. It is designed to behave like a product app, not a demo: realtime messaging, uploads, presence, settings, DMs, and notification flows are all first-class parts of the codebase.
 
-## Documentation Status - June 8, 2026
+## Documentation Status - June 9, 2026
 
-The documentation set has been refreshed against the current `main` branch after the June 8 Hype, safe-fetch, automation approval queue, DM read-guard, and News realtime-helper work. The freshest planning source is [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1), and the full documentation inventory is [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
+The documentation set has been refreshed against the current `main` branch after the June 9 Shadow Runner playable-prototype work, Shadow Runner title/options polish, mobile composer focus fix, and chat media-frame polish. The freshest planning source is [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1), and the full documentation inventory is [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
 
 Current known follow-up areas are documentation-backed: Supabase policy/RPC hardening, remaining production deployment/smoke for shared URL fetch hardening outside the already-deployed link-preview and ShadowPin video functions, Netlify security headers, provider live-setting verification, frontend polish, and post-deploy auth smoke for the invite-only signup/email-verification rollout.
 
@@ -17,6 +17,7 @@ Current known follow-up areas are documentation-backed: Supabase policy/RPC hard
 - Vite
 - Tailwind CSS
 - Framer Motion
+- Phaser for the Shadow Runner playable prototype
 - Supabase Auth, Postgres, Realtime, Storage, and Edge Functions
 - Netlify for static hosting
 - Render worker service for the always-on News scraper
@@ -35,6 +36,8 @@ Current known follow-up areas are documentation-backed: Supabase policy/RPC hard
 - Hype bell and message Hype celebrations with daily limits, bonus credits,
   realtime events, permanent message Hype summaries, and optional Hype push
   notifications
+- Hype-aware image/video media frames that keep badges and reactions inside
+  shrink-wrapped media cards without changing text/file/audio bubbles
 - Slash commands and reply/thread affordances
 - AI reply and summary hooks through a secured Supabase Edge Function
 - Boards tab with a low-friction draggable board map, feed pills, chat circles, static board squares, collision sparkle/sound feedback, the existing News Feed, News Chat, Investing Chat, Learning Chat, Crypto Chat, and a shared Art Board mood canvas
@@ -50,6 +53,10 @@ Current known follow-up areas are documentation-backed: Supabase policy/RPC hard
 - PWA/service-worker foundation for installed mobile and desktop web experiences
 - Phone install onboarding and app-release popups for production release communication
 - Simple app-reopen loading state with consistent `Loading Shado...` copy
+- Entertainment area with Shadow Runner, Shadow War, Shadow Checkers, Shado TV,
+  Shadow Mystery, and Will & Kirk surfaces; Shadow Runner is currently a
+  private, landscape-gated playable prototype with a Phaser level, title menu,
+  title/options scroll menus, touch controls, pause menu, and Castle Bard music
 - Premium obsidian-and-gold design system across desktop and mobile
 
 ## Current Project Shape
@@ -63,6 +70,8 @@ Frontend lives under [`src`](C:/repos/chat2.0/src).
 - [`src/components/boards`](C:/repos/chat2.0/src/components/boards) contains the Boards map, board routing, and reusable board-chat UI.
 - [`src/components/art`](C:/repos/chat2.0/src/components/art) contains the Art Board canvas, add flows, item controls, linking, and detail popup.
 - [`src/components/news`](C:/repos/chat2.0/src/components/news) contains the News Feed, feed item, reaction, modal UI, and compatibility wrappers for older imports.
+- [`src/features/games`](C:/repos/chat2.0/src/features/games) contains the Entertainment picker and game surfaces, including the Shadow Runner Phaser prototype under [`src/features/games/shadow-runner`](C:/repos/chat2.0/src/features/games/shadow-runner).
+- [`src/features/entertainment`](C:/repos/chat2.0/src/features/entertainment) contains non-game Entertainment surfaces such as Shado TV and Shadow Mystery.
 - [`src/components/chat/WeatherWidget.tsx`](C:/repos/chat2.0/src/components/chat/WeatherWidget.tsx:1) contains the General Chat weather pill and forecast popup.
 - [`src/components/settings/WeatherLocationSettings.tsx`](C:/repos/chat2.0/src/components/settings/WeatherLocationSettings.tsx:1) contains the per-user weather location picker.
 - [`src/hooks/useBoardChat.tsx`](C:/repos/chat2.0/src/hooks/useBoardChat.tsx), [`src/hooks/useBoardBadges.ts`](C:/repos/chat2.0/src/hooks/useBoardBadges.ts), [`src/hooks/useNewsFeed.tsx`](C:/repos/chat2.0/src/hooks/useNewsFeed.tsx), and [`src/hooks/useNewsAdmin.ts`](C:/repos/chat2.0/src/hooks/useNewsAdmin.ts) own the Boards and News client behavior.
@@ -233,6 +242,9 @@ Production is hosted on Netlify, the backend is hosted on Supabase, and the News
 - [docs/ADMIN_ACCESS.md](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1): app-wide admin/sub-admin roles, badges, settings, and RPCs
 - [docs/CHANNEL_BANS.md](C:/repos/chat2.0/docs/CHANNEL_BANS.md:1): profile-popup moderation controls and database-enforced channel bans
 - [docs/ART_BOARD.md](C:/repos/chat2.0/docs/ART_BOARD.md:1): shared Art Board canvas, schema, storage, moderation, and validation
+- [docs/SHADOW_RUNNER_HOME_ASSETS.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_HOME_ASSETS.md:1): Shadow Runner title/menu asset pack, current playable-prototype wiring, and asset follow-ups
+- [docs/SHADOW_RUNNER_SPRITES.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_SPRITES.md:1): Shadow Runner hero sprite strips, gameplay usage, and pending sprite cleanup
+- [docs/PRODUCTION_ROLLBACK_AND_MEDIA_FRAME_FIX_2026-06-09.md](C:/repos/chat2.0/docs/PRODUCTION_ROLLBACK_AND_MEDIA_FRAME_FIX_2026-06-09.md:1): June 9 orientation rollback notes and durable chat media-frame fix
 - [docs/WEATHER_WIDGET.md](C:/repos/chat2.0/docs/WEATHER_WIDGET.md:1): General Chat weather widget, private location preferences, and validation
 - [docs/NEWS_TAB_AND_SCRAPER.md](C:/repos/chat2.0/docs/NEWS_TAB_AND_SCRAPER.md:1): Boards-era News Feed backend, scraper lifecycle, Render setup, and troubleshooting
 - [services/news-scraper/README.md](C:/repos/chat2.0/services/news-scraper/README.md:1): worker-local command and environment reference

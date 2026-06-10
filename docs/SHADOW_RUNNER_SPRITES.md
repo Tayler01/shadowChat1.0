@@ -1,6 +1,7 @@
 # Shadow Runner Sprite Assets
 
-Status: first-pass review assets.
+Status: first-pass review assets, with the menu-idle strip currently wired into
+the live title screen and gameplay strips feeding the playable prototype.
 
 These files start the production sprite pipeline for the Shadow Runner hero.
 They are not final shipping sprites yet, but they are normalized enough to test
@@ -67,14 +68,28 @@ motion, frame timing, and home-screen composition.
 ## Review Notes
 
 - `menu-idle-cape` is the strongest first-pass strip and is a good candidate for
-  the home screen anchor.
+  the home screen anchor; it is currently wired into the live title screen.
 - `run` has readable movement, but the sword and cloak should be stabilized in a
-  stricter second pass.
+  stricter second pass. The playable prototype uses it for movement timing.
 - `jump-air` includes effect pixels in the double-jump and landing frames. This
   can be useful for concept timing, but final effects may need a separate strip.
+  The playable prototype uses it for the jump/double-jump read.
 - `sword-attack` has a strong slash read, but the follow-through frame turns the
   hero partly away from the gameplay-facing direction. This should be corrected
-  before final implementation.
+  before final implementation. The prototype currently uses it for attack
+  feedback, so treat animation cleanup separately from gameplay tuning.
+
+## Current Runtime Wiring
+
+- Home/title hero loop: `src/features/games/shadow-runner/ShadowRunnerScreen.tsx`
+- Gameplay canvas and DOM controls: `src/features/games/shadow-runner/ShadowRunnerGame.tsx`
+- Phaser scene and animation setup: `src/features/games/shadow-runner/game/createShadowRunnerPhaserGame.ts`
+- Movement/action state: `src/features/games/shadow-runner/game/input.ts`
+- Simulation boundary and HUD state: `src/features/games/shadow-runner/game/simulation.ts`
+
+Keep the React input/shell boundary and Phaser scene boundary separate when
+iterating on sprite timing. Visual defects in the first-pass strips should be
+fixed in the asset pipeline, not by changing the simulation rules to hide them.
 
 ## Manifest
 
