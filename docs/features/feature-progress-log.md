@@ -20,6 +20,7 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
 - Branch: `main`
 - Current checkpoint: blank-scroll menu base, separate live button panels,
   tighter title-menu hit areas, and automated Chrome mobile smoke coverage.
+- Roadmap: [`docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md`](C:/repos/chat2.0/docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md:1)
 - Latest pass, 2026-06-09: generated dedicated options-scroll and options-row
   button assets; removed title back/sound controls; added title Options and
   in-game Pause scroll menus; widened the title menu scroll without increasing

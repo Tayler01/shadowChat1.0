@@ -25,6 +25,7 @@ type CursorKeys = Phaser.Types.Input.Keyboard.CursorKeys
 const GAME_WIDTH = 960
 const GAME_HEIGHT = 540
 const HERO_SCALE = 0.78
+const SENTRY_SCALE = 0.68
 const PLAYER_SPEED = 260
 const CROUCH_SPEED = 128
 const JUMP_VELOCITY = -620
@@ -68,6 +69,8 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   private enemy?: Phaser.Physics.Arcade.Sprite
   private playerHealthBar?: Phaser.GameObjects.Graphics
   private enemyHealthBar?: Phaser.GameObjects.Graphics
+  private playerHealthFrame?: Phaser.GameObjects.Image
+  private enemyHealthFrame?: Phaser.GameObjects.Image
   private slashArc?: Phaser.GameObjects.Graphics
   private lastJumpPresses = 0
   private lastAttackPresses = 0
@@ -98,6 +101,16 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.load.spritesheet('shadow-runner-attack', SHADOW_RUNNER_ASSETS.hero.swordAttackStrip, {
       frameWidth: 128,
       frameHeight: 128,
+    })
+    this.load.spritesheet('clockwork-sentry', SHADOW_RUNNER_ASSETS.enemies.clockworkSentryStrip, {
+      frameWidth: 128,
+      frameHeight: 128,
+    })
+    this.load.image('shadow-runner-health-frame', SHADOW_RUNNER_ASSETS.gameplay.healthBarFrame)
+    this.load.image('shadow-runner-hit-spark', SHADOW_RUNNER_ASSETS.gameplay.hitSpark)
+    this.load.spritesheet('shadow-runner-coin-sparkle', SHADOW_RUNNER_ASSETS.gameplay.coinSparkleStrip, {
+      frameWidth: 119,
+      frameHeight: 145,
     })
   }
 
@@ -164,6 +177,42 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       key: 'runner-attack',
       frames: this.anims.generateFrameNumbers('shadow-runner-attack', { start: 0, end: 4 }),
       frameRate: 13,
+      repeat: 0,
+    })
+    this.anims.create({
+      key: 'sentry-idle',
+      frames: [{ key: 'clockwork-sentry', frame: 0 }],
+      frameRate: 1,
+      repeat: 0,
+    })
+    this.anims.create({
+      key: 'sentry-walk',
+      frames: this.anims.generateFrameNumbers('clockwork-sentry', { start: 0, end: 2 }),
+      frameRate: 5,
+      repeat: -1,
+    })
+    this.anims.create({
+      key: 'sentry-attack',
+      frames: [{ key: 'clockwork-sentry', frame: 3 }],
+      frameRate: 1,
+      repeat: 0,
+    })
+    this.anims.create({
+      key: 'sentry-hit',
+      frames: [{ key: 'clockwork-sentry', frame: 4 }],
+      frameRate: 1,
+      repeat: 0,
+    })
+    this.anims.create({
+      key: 'sentry-defeated',
+      frames: [{ key: 'clockwork-sentry', frame: 5 }],
+      frameRate: 1,
+      repeat: 0,
+    })
+    this.anims.create({
+      key: 'coin-sparkle',
+      frames: this.anims.generateFrameNumbers('shadow-runner-coin-sparkle', { start: 0, end: 3 }),
+      frameRate: 11,
       repeat: 0,
     })
   }
@@ -233,14 +282,17 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     const enemyStart = SHADOW_RUNNER_LEVEL_ONE.enemyStart
     this.enemy = this.physics.add.sprite(enemyStart.x, enemyStart.y, 'clockwork-sentry')
     this.enemy.setOrigin(0.5, 1)
-    this.enemy.setSize(42, 58)
-    this.enemy.setOffset(11, 6)
+    this.enemy.setScale(SENTRY_SCALE)
+    this.enemy.setSize(50, 70)
+    this.enemy.setOffset(39, 58)
     this.enemy.setCollideWorldBounds(false)
     this.enemy.setMaxVelocity(105, 920)
-    this.enemy.setFlipX(true)
+    this.enemy.play('sentry-walk')
 
     this.playerHealthBar = this.add.graphics()
     this.enemyHealthBar = this.add.graphics()
+    this.playerHealthFrame = this.add.image(0, 0, 'shadow-runner-health-frame')
+    this.enemyHealthFrame = this.add.image(0, 0, 'shadow-runner-health-frame')
     this.slashArc = this.add.graphics()
 
     this.physics.add.collider(this.player, this.platforms!)
@@ -331,7 +383,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
     const direction = this.state.enemy.direction
     enemy.setVelocityX(direction * 82)
-    enemy.setFlipX(direction < 0)
+    enemy.setFlipX(direction > 0)
 
     const enemyBody = enemy.body as Phaser.Physics.Arcade.Body
     if (
@@ -344,9 +396,13 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     }
 
     if (time - this.state.enemy.lastDamagedAt < 180) {
+      enemy.play('sentry-hit', true)
       enemy.setTint(0xffe08a)
     } else {
       enemy.clearTint()
+      if (enemy.anims.currentAnim?.key !== 'sentry-walk') {
+        enemy.play('sentry-walk', true)
+      }
     }
   }
 
@@ -399,8 +455,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
         enemy.setVelocityX(facing * 190)
         this.addHitFlash(enemy.x, enemy.y - 42)
         if (!this.state.enemy.alive) {
-          enemy.disableBody(true, true)
-          this.addDustPuff(enemy.x, enemy.y - 28)
+          this.defeatEnemy(enemy)
         }
       }
     }
@@ -421,8 +476,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
         this.addHitFlash(enemy.x, enemy.y - 42)
       }
       if (!this.state.enemy.alive) {
-        enemy.disableBody(true, true)
-        this.addDustPuff(enemy.x, enemy.y - 28)
+        this.defeatEnemy(enemy)
       }
       return
     }
@@ -466,6 +520,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
     coin.setData('collected', true)
     collectShadowRunnerCoin(this.state)
+    this.addCoinSparkle(coin.x, coin.y)
     this.tweens.add({
       targets: coin,
       scale: 1.8,
@@ -475,6 +530,15 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       ease: 'Quad.easeOut',
       onComplete: () => coin.disableBody(true, true),
     })
+  }
+
+  private defeatEnemy(enemy: Phaser.Physics.Arcade.Sprite) {
+    const body = enemy.body as Phaser.Physics.Arcade.Body
+    body.enable = false
+    enemy.setVelocity(0, 0)
+    enemy.clearTint()
+    enemy.play('sentry-defeated', true)
+    this.addDustPuff(enemy.x, enemy.y - 28)
   }
 
   private updateHeroAnimation(time: number, moving: boolean, onFloor: boolean) {
@@ -502,17 +566,19 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   }
 
   private updateHealthBars() {
-    this.drawHealthBar(this.playerHealthBar, this.player?.x ?? 0, (this.player?.y ?? 0) - 94, this.state.player.health, this.state.player.maxHealth)
+    this.drawHealthBar(this.playerHealthBar, this.playerHealthFrame, this.player?.x ?? 0, (this.player?.y ?? 0) - 94, this.state.player.health, this.state.player.maxHealth)
 
     if (this.enemy && this.state.enemy.alive) {
-      this.drawHealthBar(this.enemyHealthBar, this.enemy.x, this.enemy.y - 74, this.state.enemy.health, this.state.enemy.maxHealth)
+      this.drawHealthBar(this.enemyHealthBar, this.enemyHealthFrame, this.enemy.x, this.enemy.y - 74, this.state.enemy.health, this.state.enemy.maxHealth)
     } else {
       this.enemyHealthBar?.clear()
+      this.enemyHealthFrame?.setVisible(false)
     }
   }
 
   private drawHealthBar(
     graphics: Phaser.GameObjects.Graphics | undefined,
+    frame: Phaser.GameObjects.Image | undefined,
     x: number,
     y: number,
     health: number,
@@ -524,7 +590,13 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     const height = 8
     const ratio = Phaser.Math.Clamp(health / maxHealth, 0, 1)
 
+    frame?.setVisible(true)
+    frame?.setPosition(x, y + 2)
+    frame?.setDisplaySize(66, 16)
+    frame?.setDepth(21)
+
     graphics.clear()
+    graphics.setDepth(20)
     graphics.fillStyle(0x02040a, 0.78)
     graphics.fillRect(x - width / 2 - 2, y - 2, width + 4, height + 4)
     graphics.fillStyle(0x4b1821, 0.9)
@@ -567,16 +639,24 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   }
 
   private addHitFlash(x: number, y: number) {
-    const flash = this.add.star(x, y, 6, 6, 22, 0xf0d381, 0.96)
+    const flash = this.add.image(x, y, 'shadow-runner-hit-spark')
+    flash.setDisplaySize(66, 58)
     this.tweens.add({
       targets: flash,
-      scale: 1.45,
+      scale: 1.2,
       alpha: 0,
       rotation: 0.9,
       duration: 190,
       ease: 'Quad.easeOut',
       onComplete: () => flash.destroy(),
     })
+  }
+
+  private addCoinSparkle(x: number, y: number) {
+    const sparkle = this.add.sprite(x, y, 'shadow-runner-coin-sparkle')
+    sparkle.setDisplaySize(56, 68)
+    sparkle.play('coin-sparkle')
+    sparkle.on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sparkle.destroy())
   }
 
   private createTextures() {

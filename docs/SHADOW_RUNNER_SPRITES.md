@@ -25,6 +25,7 @@ motion, frame timing, and home-screen composition.
 | run | 6 | yes | Right-facing gameplay run cycle | `public/games/shadow-runner/sprites/strips/shadow-runner-run-6f-128.png` | `public/games/shadow-runner/sprites/previews/shadow-runner-run-6f-preview.png` |
 | jump-air | 6 | no | Takeoff, rise, apex, double jump, fall, land | `public/games/shadow-runner/sprites/strips/shadow-runner-jump-air-6f-128.png` | `public/games/shadow-runner/sprites/previews/shadow-runner-jump-air-6f-preview.png` |
 | sword-attack | 5 | no | Ground sword attack | `public/games/shadow-runner/sprites/strips/shadow-runner-sword-attack-5f-128.png` | `public/games/shadow-runner/sprites/previews/shadow-runner-sword-attack-5f-preview.png` |
+| clockwork-sentry | 6 | partial | First playable enemy: idle, patrol, attack, hit, defeated | `public/games/shadow-runner/sprites/strips/clockwork-sentry-6f-128.png` | `public/games/shadow-runner/sprites/previews/clockwork-sentry-6f-preview.png` |
 
 ## Frame Labels
 
@@ -65,6 +66,15 @@ motion, frame timing, and home-screen composition.
 4. follow-through
 5. recovery
 
+### clockwork-sentry
+
+1. idle
+2. patrol-a
+3. patrol-b
+4. spear-thrust
+5. hit-stunned
+6. defeated
+
 ## Review Notes
 
 - `menu-idle-cape` is the strongest first-pass strip and is a good candidate for
@@ -78,6 +88,9 @@ motion, frame timing, and home-screen composition.
   hero partly away from the gameplay-facing direction. This should be corrected
   before final implementation. The prototype currently uses it for attack
   feedback, so treat animation cleanup separately from gameplay tuning.
+- `clockwork-sentry` is now the first runtime enemy strip. The first three
+  frames loop for patrol, frame 5 is used for hit/stun feedback, and frame 6 is
+  kept visible as the defeated state instead of hiding the enemy immediately.
 
 ## Current Runtime Wiring
 

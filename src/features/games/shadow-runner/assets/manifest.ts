@@ -1,5 +1,6 @@
 const ASSET_ROOT = '/games/shadow-runner'
 const HOME_ROOT = `${ASSET_ROOT}/home-assets`
+const GAMEPLAY_ROOT = `${ASSET_ROOT}/gameplay-assets`
 
 export const SHADOW_RUNNER_ASSETS = {
   pickerBanner: `${ASSET_ROOT}/shadow-runner-picker-banner.webp`,
@@ -24,5 +25,19 @@ export const SHADOW_RUNNER_ASSETS = {
     runStrip: `${ASSET_ROOT}/sprites/strips/shadow-runner-run-6f-128.png`,
     jumpAirStrip: `${ASSET_ROOT}/sprites/strips/shadow-runner-jump-air-6f-128.png`,
     swordAttackStrip: `${ASSET_ROOT}/sprites/strips/shadow-runner-sword-attack-5f-128.png`,
+  },
+  enemies: {
+    clockworkSentryStrip: `${ASSET_ROOT}/sprites/strips/clockwork-sentry-6f-128.png`,
+  },
+  gameplay: {
+    hudPlaque: `${GAMEPLAY_ROOT}/optimized/hud-status-bar.webp`,
+    healthBarFrame: `${GAMEPLAY_ROOT}/optimized/health-bar-frame-clean.webp`,
+    healthFill: `${GAMEPLAY_ROOT}/optimized/health-fill.webp`,
+    heartFull: `${GAMEPLAY_ROOT}/optimized/heart-full.webp`,
+    heartEmpty: `${GAMEPLAY_ROOT}/optimized/heart-empty.webp`,
+    coinIcon: `${GAMEPLAY_ROOT}/optimized/coin-icon-clean.webp`,
+    levelCompleteBanner: `${GAMEPLAY_ROOT}/optimized/level-complete-banner.webp`,
+    hitSpark: `${GAMEPLAY_ROOT}/sliced/hit-spark.png`,
+    coinSparkleStrip: `${GAMEPLAY_ROOT}/sliced/coin-sparkle-strip.png`,
   },
 } as const
