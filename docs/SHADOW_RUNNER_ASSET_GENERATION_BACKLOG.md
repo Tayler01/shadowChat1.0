@@ -633,10 +633,14 @@ draws them with Phaser graphics or reuses title art.
     `center-walkway`, `east-ledge`, and `upper-coin-shelf`.
 
 - [ ] **Tilt bridge / wobble platform**
-  - Current state: `shadow-runner-tilt-stone` is generated from rectangles and
-    rotated by tween.
+  - Current state: generated `tilt-bridge-v1-256x80.png` is wired in runtime
+    and aligned to the collision platform. The rectangular
+    `shadow-runner-tilt-stone` remains a fallback only.
   - Generate: short floating stone platform, crumbling bridge plank, or chain
     bridge variant with bottom-center or center anchor.
+  - Gameplay direction: later levels should use more aggressive tilt angles,
+    faster wobble timing, and pits or spikes on either side so the bridge can
+    eventually dump the player off if they wait too long.
   - Suggested files:
     - `public/games/shadow-runner/level-assets/platforms/tilt-bridge.png`
     - `public/games/shadow-runner/level-assets/platforms/tilt-bridge-damaged.png`

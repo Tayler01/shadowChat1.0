@@ -5,6 +5,7 @@ import {
   ChevronRight,
   ChevronsUp,
   Home,
+  Map,
   Music,
   Pause,
   Play,
@@ -28,6 +29,9 @@ interface ShadowRunnerGameProps {
   audioBlocked?: boolean
   soundEffectsEnabled?: boolean
   onBackToTitle?: () => void
+  onBackToMap?: () => void
+  nextLevelId?: ShadowRunnerPlayableLevelId
+  onPlayLevel?: (levelId: ShadowRunnerPlayableLevelId) => void
   onLevelComplete?: (levelId: ShadowRunnerPlayableLevelId) => void
   onToggleMusic?: () => void
   onToggleSoundEffects?: () => void
@@ -174,6 +178,9 @@ export function ShadowRunnerGame({
   audioBlocked = false,
   soundEffectsEnabled = true,
   onBackToTitle,
+  onBackToMap,
+  nextLevelId,
+  onPlayLevel,
   onLevelComplete,
   onToggleMusic,
   onToggleSoundEffects,
@@ -346,6 +353,36 @@ export function ShadowRunnerGame({
     },
   ], [onBackToTitle, restartLevel])
 
+  const levelCompleteActions = React.useMemo<ShadowRunnerScrollMenuAction[]>(() => {
+    const returnToMap = onBackToMap ?? onBackToTitle
+    const actions: ShadowRunnerScrollMenuAction[] = [
+      {
+        id: 'return-map',
+        label: 'Return to Map',
+        icon: <Map className="h-4 w-4 stroke-[3]" />,
+        onClick: () => returnToMap?.(),
+      },
+    ]
+
+    if (nextLevelId && onPlayLevel) {
+      actions.push({
+        id: 'next-route',
+        label: 'Next Route',
+        icon: <ChevronRight className="h-4 w-4 stroke-[3]" />,
+        onClick: () => onPlayLevel(nextLevelId),
+      })
+      return actions
+    }
+
+    actions.unshift({
+      id: 'restart',
+      label: 'Retry Route',
+      icon: <RotateCcw className="h-4 w-4 stroke-[3]" />,
+      onClick: restartLevel,
+    })
+    return actions
+  }, [nextLevelId, onBackToMap, onBackToTitle, onPlayLevel, restartLevel])
+
   return (
     <div
       className="shadow-runner-no-select relative h-full w-full overflow-hidden bg-[#02040a] text-[#f6e6bb]"
@@ -489,10 +526,7 @@ export function ShadowRunnerGame({
             </div>
 
             <div className="mt-[-0.35rem] grid w-[70%] grid-cols-2 gap-2">
-              {[
-                { id: 'restart', label: 'Restart', icon: <RotateCcw className="h-4 w-4 stroke-[3]" />, onClick: restartLevel },
-                { id: 'main-menu', label: 'Main Menu', icon: <Home className="h-4 w-4 stroke-[3]" />, onClick: onBackToTitle },
-              ].map(action => (
+              {levelCompleteActions.map(action => (
                 <button
                   key={action.id}
                   type="button"

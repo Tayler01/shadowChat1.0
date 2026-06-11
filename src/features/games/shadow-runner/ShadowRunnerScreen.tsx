@@ -323,6 +323,15 @@ function markCampaignLevelComplete(
   return nextProgress
 }
 
+function getNextPlayableLevelId(levelId: ShadowRunnerPlayableLevelId): ShadowRunnerPlayableLevelId | undefined {
+  if (levelId === 'tutorial') return 'level-1'
+
+  const campaignLevel = SHADOW_RUNNER_CAMPAIGN_LEVELS.find(level => level.playableLevelId === levelId)
+  if (!campaignLevel) return undefined
+
+  return SHADOW_RUNNER_CAMPAIGN_LEVELS.find(level => level.levelNumber === campaignLevel.levelNumber + 1)?.playableLevelId
+}
+
 function spriteStripStyle(source: string, frame: number, frameCount: number): React.CSSProperties {
   const position = frameCount > 1 ? `${(frame / (frameCount - 1)) * 100}% 0%` : '0% 0%'
 
@@ -491,7 +500,7 @@ function ShadowRunnerLevelMap({ progress, onBack, onPlayLevel }: ShadowRunnerLev
         type="button"
         aria-label="Back to Shadow Runner menu"
         onClick={onBack}
-        className="absolute left-[max(0.8rem,env(safe-area-inset-left))] top-[max(0.7rem,env(safe-area-inset-top))] z-20 inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#e8c46b]/40 bg-black/50 text-[#f3d88d] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-md transition hover:border-[#f0d381]/70 hover:bg-[#2c2110]/75 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
+        className="absolute left-[max(0.8rem,env(safe-area-inset-left))] top-[max(0.7rem,env(safe-area-inset-top))] z-30 inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#e8c46b]/40 bg-black/50 text-[#f3d88d] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-md transition hover:border-[#f0d381]/70 hover:bg-[#2c2110]/75 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
       >
         <ArrowLeft className="h-5 w-5" />
       </button>
@@ -532,7 +541,7 @@ function ShadowRunnerLevelMap({ progress, onBack, onPlayLevel }: ShadowRunnerLev
         ))}
       </svg>
 
-      <div className="absolute inset-0 z-20">
+      <div className="pointer-events-none absolute inset-0 z-20">
         {SHADOW_RUNNER_CAMPAIGN_LEVELS.map(level => {
           const completed = isCampaignLevelCompleted(progress, level.id)
           const unlocked = isCampaignLevelUnlocked(progress, level)
@@ -549,7 +558,7 @@ function ShadowRunnerLevelMap({ progress, onBack, onPlayLevel }: ShadowRunnerLev
                   onPlayLevel(level.playableLevelId)
                 }
               }}
-              className={`group absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center transition focus:outline-none focus:ring-2 focus:ring-[#f0d381]/65 ${
+              className={`group pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center transition focus:outline-none focus:ring-2 focus:ring-[#f0d381]/65 ${
                 playable ? 'cursor-pointer active:scale-95' : 'cursor-default'
               }`}
               style={{
@@ -745,6 +754,9 @@ export function ShadowRunnerScreen({
             soundEffectsEnabled={soundEffectsEnabled}
             onToggleSoundEffects={() => setSoundEffectsEnabled(current => !current)}
             onBackToTitle={() => setScreen('title')}
+            onBackToMap={() => setScreen('levels')}
+            nextLevelId={getNextPlayableLevelId(activeLevelId)}
+            onPlayLevel={playCampaignLevel}
             onLevelComplete={handleLevelComplete}
           />
         ) : screen === 'levels' ? (

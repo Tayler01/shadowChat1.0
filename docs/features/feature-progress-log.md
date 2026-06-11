@@ -42,6 +42,16 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
   generated full-screen parchment campaign map, ten individual generated
   location-button assets, and a dotted route overlay that reflects
   locked/unlocked/completed progression.
+- Latest pass, 2026-06-11: fixed the campaign-map back arrow hit area, changed
+  the level-complete overlay to `Return to Map` / `Next Route`, aligned the
+  generated tilt-bridge art to its collision plane, and documented progressive
+  campaign difficulty plus future stronger tilt/dump-off bridge behavior.
+- Verification, 2026-06-11: `npm run lint`,
+  `npx tsc --noEmit -p tsconfig.app.json`, `npm run build`, and
+  Chrome-channel production-preview smoke passed for map back navigation,
+  Level 1 completion actions, return-to-map unlock state, and tilt-bridge
+  visual alignment; evidence in
+  `output/playwright/shadow-runner-map-actions-pass/`.
 - Verification, 2026-06-11: `npm run lint`,
   `npx tsc --noEmit -p tsconfig.app.json`, `npm run build`, manifest JSON
   parse, and Chrome-channel production-preview visual smoke passed for the

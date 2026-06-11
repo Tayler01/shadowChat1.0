@@ -13,6 +13,9 @@ enemy, and reach a finish gate.
 - Use generated assets for new game-facing UI, enemies, and feedback art.
 - Preserve movement rules unless playtests reveal a real usability issue.
 - Do not tune difficulty because automated tests are poor at platformers.
+- Campaign levels must progress in complexity and difficulty. Each new map
+  should either introduce a mechanic, combine prior mechanics in a harder way,
+  increase speed/timing pressure, or add a new enemy/hazard pattern.
 - Keep gameplay rules in `simulation.ts` and keep Phaser mostly as renderer,
   camera, physics, animation, and effects.
 - Keep mobile controls readable and low-chrome. The playfield should remain
@@ -64,8 +67,21 @@ enemy, and reach a finish gate.
    - Overhead health bars are readable over hero and sentry.
    - Coin pickup sparkles and score increments.
    - Enemy hit/defeat effects are visible.
-   - Finish gate shows a level-complete overlay with Restart, Main Menu, and
-     Exit controls.
+   - Finish gate shows a level-complete overlay with Return to Map and Next
+     Route when a playable next level exists.
+
+## Campaign Difficulty Direction
+
+- Level 1: readable training challenge with one tilt bridge, one sentry, one
+  spike pit, and basic double-jump timing.
+- Level 2: longer route with more vertical movement, two tilt bridges, more
+  coins, and tighter market-roof gaps.
+- Later maps should add complexity step-by-step: faster moving/tilting
+  platforms, pits or spikes around tilt bridges, more enemy variety,
+  chase/timing pressure, hidden collectibles, and mixed mechanics.
+- Tilt bridges should eventually tilt far enough to dump the player off if
+  they wait too long or land poorly. That should be tuned as a gameplay pass,
+  not as an automated-test difficulty adjustment.
 
 ## Verification Gates
 

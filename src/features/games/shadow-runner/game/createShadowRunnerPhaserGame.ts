@@ -346,8 +346,8 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
             texture: 'shadow-runner-tilt-bridge',
             useImage: true,
             displayWidth: platform.width + 18,
-            displayHeight: 58,
-            visualOffsetY: 16,
+            displayHeight: 54,
+            visualOffsetY: 2,
             depth: 4,
           }
         : { texture: 'shadow-runner-tilt-stone' })
