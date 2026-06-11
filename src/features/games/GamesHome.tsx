@@ -7,6 +7,10 @@ import { ShadowCheckersScreen } from './shadow-checkers/ShadowCheckersScreen'
 import { SHADOW_CHECKERS_ASSETS } from './shadow-checkers/assets/manifest'
 import { ShadowRunnerScreen } from './shadow-runner/ShadowRunnerScreen'
 import { SHADOW_RUNNER_ASSETS } from './shadow-runner/assets/manifest'
+import {
+  SHADOW_RUNNER_MUSIC_ENABLED_STORAGE_KEY,
+  readShadowRunnerAudioPreference,
+} from './shadow-runner/audio'
 import { ShadoTvScreen } from '../entertainment/shado-tv/ShadoTvScreen'
 import { SHADO_TV_ASSETS } from '../entertainment/shado-tv/assets/manifest'
 import { ShadowMysteryScreen } from '../entertainment/shadow-mystery/ShadowMysteryScreen'
@@ -89,7 +93,11 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
   }
 
   const enterShadowRunner = () => {
-    void playMusic(SHADOW_RUNNER_ASSETS.music)
+    if (readShadowRunnerAudioPreference(SHADOW_RUNNER_MUSIC_ENABLED_STORAGE_KEY, true)) {
+      void playMusic(SHADOW_RUNNER_ASSETS.music)
+    } else {
+      pauseMusic()
+    }
     setAudioBlocked(false)
     setSelectedEntertainment('shadow-runner')
     onImmersiveChange?.(true)
@@ -155,6 +163,10 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
     void playMusic(source)
   }
 
+  const playShadowRunnerMusic = useCallback(() => {
+    void playMusic(SHADOW_RUNNER_ASSETS.music)
+  }, [playMusic])
+
   useEffect(() => {
     onImmersiveChange?.(selectedEntertainment !== null)
   }, [onImmersiveChange, selectedEntertainment])
@@ -184,8 +196,8 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
           <ShadowRunnerScreen
             onExit={exitShadowRunner}
             musicPlaying={musicPlaying}
-            audioBlocked={audioBlocked}
-            onToggleMusic={toggleMusic}
+            onPlayMusic={playShadowRunnerMusic}
+            onPauseMusic={pauseMusic}
           />
         </div>
       ) : selectedEntertainment === 'shadow-war' ? (

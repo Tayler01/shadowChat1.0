@@ -259,14 +259,15 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 
 ### Shadow Runner
 
-1. User opens Shadow Runner from the Entertainment picker, which starts the shared Castle Bard audio from the picker click when the browser allows autoplay from that gesture
+1. User opens Shadow Runner from the Entertainment picker, which starts the shared Castle Bard lobby audio by default when the browser allows autoplay from that gesture
 2. The game surface enters the app's immersive Entertainment shell without changing global PWA orientation, viewport, fullscreen, manifest, or app-shell settings
 3. A local private-build access gate stores unlock state in session storage
 4. Portrait phones see a Shadow Runner-only rotate gate; landscape viewports render the fixed 16:9 title/playfield stage
 5. The title screen preloads the home/menu assets, animates the menu-idle hero strip, and renders Start, Levels, and Options over blank scroll/button assets
 6. Start mounts the lazy-loaded Phaser `ShadowRunnerLevelScene` through `ShadowRunnerGame`; movement input stays in a React-owned input ref and the Phaser scene stays responsible for the canvas level
-7. DOM HUD and touch controls sit over the canvas; pause/options scroll menus pause the Phaser scene, clear pressed actions, and keep music/sound toggles in the React shell
-8. The June 9 rollback intentionally removed global orientation/fullscreen behavior because it affected mobile app header, footer, composer, and PWA layout outside Shadow Runner
+7. DOM HUD and touch controls sit over the canvas; pause/options scroll menus pause the Phaser scene, clear pressed actions, keep SFX toggles in the React shell, and leave gameplay music off by automatically pausing lobby music while the Phaser level is mounted
+8. Shadow Runner SFX are original generated WAV assets under `public/games/shadow-runner/audio/sfx`; React pools short effects and Phaser emits named gameplay sound events for jump, land, attack, hit, coin, defeat, respawn, failure, and completion feedback
+9. The June 9 rollback intentionally removed global orientation/fullscreen behavior because it affected mobile app header, footer, composer, and PWA layout outside Shadow Runner
 
 ### Channel Ban Enforcement
 

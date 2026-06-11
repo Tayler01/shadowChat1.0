@@ -6,7 +6,6 @@ import {
   ChevronsUp,
   Home,
   Map,
-  Music,
   Pause,
   Play,
   RotateCcw,
@@ -15,6 +14,7 @@ import {
   VolumeX,
 } from 'lucide-react'
 import { SHADOW_RUNNER_ASSETS } from './assets/manifest'
+import type { ShadowRunnerSoundEvent } from './audio'
 import { createShadowRunnerInputState, type ShadowRunnerAction } from './game/input'
 import {
   getShadowRunnerLevelConfig,
@@ -26,16 +26,14 @@ import { ShadowRunnerScrollMenu, type ShadowRunnerScrollMenuAction } from './Sha
 
 interface ShadowRunnerGameProps {
   levelId: ShadowRunnerPlayableLevelId
-  musicPlaying?: boolean
-  audioBlocked?: boolean
   soundEffectsEnabled?: boolean
   onBackToTitle?: () => void
   onBackToMap?: () => void
   nextLevelId?: ShadowRunnerPlayableLevelId
   onPlayLevel?: (levelId: ShadowRunnerPlayableLevelId) => void
   onLevelComplete?: (levelId: ShadowRunnerPlayableLevelId) => void
-  onToggleMusic?: () => void
   onToggleSoundEffects?: () => void
+  onSoundEvent?: (event: ShadowRunnerSoundEvent) => void
 }
 
 function createDefaultHud(levelId: ShadowRunnerPlayableLevelId): ShadowRunnerHudState {
@@ -88,8 +86,34 @@ const SHADOW_RUNNER_GAME_STYLES = `
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
     -webkit-user-select: none;
+    height: var(--shadow-runner-action-size);
     touch-action: none;
     user-select: none;
+    width: var(--shadow-runner-action-size);
+  }
+
+  .shadow-runner-touch-button[data-control-size="large"] {
+    --shadow-runner-action-size: var(--shadow-runner-action-large);
+  }
+
+  .shadow-runner-touch-button svg {
+    height: 68%;
+    width: 68%;
+  }
+
+  .shadow-runner-dpad {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    height: var(--shadow-runner-dpad-size);
+    touch-action: none;
+    user-select: none;
+    width: var(--shadow-runner-dpad-size);
+  }
+
+  .shadow-runner-dpad svg {
+    height: 40%;
+    width: 40%;
   }
 `
 
@@ -100,6 +124,8 @@ type ShadowRunnerPhaserGameHandle = {
     resume: (key: string) => void
   }
 }
+
+type DirectionPadAction = 'left' | 'right' | 'crouch'
 
 function LifePips({ current, max }: { current: number; max: number }) {
   return (
@@ -118,6 +144,96 @@ function LifePips({ current, max }: { current: number; max: number }) {
         />
       ))}
     </span>
+  )
+}
+
+function getDirectionPadAction(
+  element: HTMLElement,
+  event: Pick<React.PointerEvent<HTMLElement>, 'clientX' | 'clientY'>,
+): DirectionPadAction {
+  const rect = element.getBoundingClientRect()
+  const x = (event.clientX - rect.left) / rect.width
+  const y = (event.clientY - rect.top) / rect.height
+
+  if (y > 0.58 && x > 0.24 && x < 0.76) return 'crouch'
+  return x < 0.5 ? 'left' : 'right'
+}
+
+interface DirectionPadProps {
+  onActionChange: (action: ShadowRunnerAction, pressed: boolean) => void
+}
+
+function DirectionPad({ onActionChange }: DirectionPadProps) {
+  const activeActionRef = React.useRef<DirectionPadAction | null>(null)
+
+  const setActiveAction = React.useCallback((nextAction: DirectionPadAction | null) => {
+    const previousAction = activeActionRef.current
+    if (previousAction === nextAction) return
+
+    if (previousAction) {
+      onActionChange(previousAction, false)
+    }
+
+    activeActionRef.current = nextAction
+
+    if (nextAction) {
+      onActionChange(nextAction, true)
+    }
+  }, [onActionChange])
+
+  const press = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      // Some synthetic or browser-generated pointer events have no active pointer to capture.
+    }
+    setActiveAction(getDirectionPadAction(event.currentTarget, event))
+  }, [setActiveAction])
+
+  const move = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    if (!activeActionRef.current) return
+    event.preventDefault()
+    setActiveAction(getDirectionPadAction(event.currentTarget, event))
+  }, [setActiveAction])
+
+  const release = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    try {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId)
+      }
+    } catch {
+      // Keep mobile controls responsive even when capture state is browser-dependent.
+    }
+    setActiveAction(null)
+  }, [setActiveAction])
+
+  React.useEffect(() => () => setActiveAction(null), [setActiveAction])
+
+  return (
+    <div
+      role="group"
+      aria-label="Movement controls"
+      onPointerDown={press}
+      onPointerMove={move}
+      onPointerUp={release}
+      onPointerCancel={release}
+      onLostPointerCapture={() => setActiveAction(null)}
+      onContextMenu={event => event.preventDefault()}
+      className="shadow-runner-dpad relative isolate rounded-full text-[#f8eac0] drop-shadow-[0_16px_28px_rgba(0,0,0,0.58)]"
+    >
+      <img
+        src={SHADOW_RUNNER_ASSETS.gameplay.touchControlButton}
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-[-8%] z-0 h-[116%] w-[116%] object-contain opacity-95"
+        draggable={false}
+      />
+      <ChevronLeft className="pointer-events-none absolute left-[8%] top-1/2 z-10 -translate-y-1/2 stroke-[3.4] drop-shadow-[0_2px_2px_rgba(0,0,0,0.72)]" aria-hidden="true" />
+      <ChevronRight className="pointer-events-none absolute right-[8%] top-1/2 z-10 -translate-y-1/2 stroke-[3.4] drop-shadow-[0_2px_2px_rgba(0,0,0,0.72)]" aria-hidden="true" />
+      <ArrowDown className="pointer-events-none absolute bottom-[8%] left-1/2 z-10 -translate-x-1/2 stroke-[3.4] drop-shadow-[0_2px_2px_rgba(0,0,0,0.72)]" aria-hidden="true" />
+    </div>
   )
 }
 
@@ -167,13 +283,14 @@ function TouchButton({
       onPointerCancel={release}
       onLostPointerCapture={() => onActionChange(action, false)}
       onContextMenu={event => event.preventDefault()}
-      className={`shadow-runner-touch-button relative isolate inline-flex items-center justify-center rounded-full text-[#f8eac0] drop-shadow-[0_16px_28px_rgba(0,0,0,0.58)] transition active:scale-95 ${size === 'large' ? 'h-[clamp(4.1rem,17svh,5.35rem)] w-[clamp(4.1rem,17svh,5.35rem)]' : 'h-[clamp(3.6rem,15svh,4.75rem)] w-[clamp(3.6rem,15svh,4.75rem)]'}`}
+      data-control-size={size}
+      className="shadow-runner-touch-button relative isolate inline-flex items-center justify-center rounded-full text-[#f8eac0] drop-shadow-[0_16px_28px_rgba(0,0,0,0.58)] transition active:scale-95"
     >
       <img
         src={SHADOW_RUNNER_ASSETS.gameplay.touchControlButton}
         alt=""
         aria-hidden="true"
-        className="pointer-events-none absolute inset-[-8%] z-0 h-[116%] w-[116%] object-contain opacity-95"
+        className="pointer-events-none absolute inset-[-8%] z-0 h-[116%] w-[116%] object-contain opacity-[0.78]"
         draggable={false}
       />
       <span className="pointer-events-none relative z-10 flex items-center justify-center drop-shadow-[0_2px_2px_rgba(0,0,0,0.72)]">
@@ -185,29 +302,30 @@ function TouchButton({
 
 export function ShadowRunnerGame({
   levelId,
-  musicPlaying = false,
-  audioBlocked = false,
   soundEffectsEnabled = true,
   onBackToTitle,
   onBackToMap,
   nextLevelId,
   onPlayLevel,
   onLevelComplete,
-  onToggleMusic,
   onToggleSoundEffects,
+  onSoundEvent,
 }: ShadowRunnerGameProps) {
   const gameMountRef = React.useRef<HTMLDivElement | null>(null)
   const gameRef = React.useRef<ShadowRunnerPhaserGameHandle | null>(null)
   const inputRef = React.useRef(createShadowRunnerInputState())
+  const levelConfig = React.useMemo(() => getShadowRunnerLevelConfig(levelId), [levelId])
   const [hud, setHud] = React.useState<ShadowRunnerHudState>(() => createDefaultHud(levelId))
   const [ready, setReady] = React.useState(false)
   const [loadError, setLoadError] = React.useState<string | null>(null)
   const [pauseOpen, setPauseOpen] = React.useState(false)
   const [confirmExit, setConfirmExit] = React.useState<null | 'title'>(null)
   const [restartToken, setRestartToken] = React.useState(0)
+  const [routeIntroVisible, setRouteIntroVisible] = React.useState(true)
   const completionReportedRef = React.useRef(false)
   const menuOpen = pauseOpen || confirmExit !== null
   const overlayOpen = menuOpen || hud.defeated || hud.outOfLives
+  const routeIntroLine = levelConfig.introLine ?? hud.objective
 
   const clearPressedActions = React.useCallback(() => {
     inputRef.current = createShadowRunnerInputState()
@@ -234,6 +352,7 @@ export function ShadowRunnerGame({
           onReady: () => {
             if (!disposed) setReady(true)
           },
+          onSoundEvent,
         }) as ShadowRunnerPhaserGameHandle
         gameRef.current = game
       })
@@ -248,6 +367,12 @@ export function ShadowRunnerGame({
       game?.destroy(true)
       gameRef.current = null
     }
+  }, [levelId, onSoundEvent, restartToken])
+
+  React.useEffect(() => {
+    setRouteIntroVisible(true)
+    const timer = window.setTimeout(() => setRouteIntroVisible(false), 2800)
+    return () => window.clearTimeout(timer)
   }, [levelId, restartToken])
 
   React.useEffect(() => {
@@ -288,20 +413,23 @@ export function ShadowRunnerGame({
   const openPauseMenu = React.useCallback(() => {
     clearPressedActions()
     setConfirmExit(null)
+    onSoundEvent?.('pause')
     setPauseOpen(true)
-  }, [clearPressedActions])
+  }, [clearPressedActions, onSoundEvent])
 
   const closePauseMenu = React.useCallback(() => {
+    onSoundEvent?.('resume')
     setConfirmExit(null)
     setPauseOpen(false)
-  }, [])
+  }, [onSoundEvent])
 
   const restartLevel = React.useCallback(() => {
     clearPressedActions()
     setConfirmExit(null)
     setPauseOpen(false)
+    onSoundEvent?.('level-select')
     setRestartToken(current => current + 1)
-  }, [clearPressedActions])
+  }, [clearPressedActions, onSoundEvent])
 
   const pauseActions = React.useMemo<ShadowRunnerScrollMenuAction[]>(() => [
     {
@@ -311,31 +439,34 @@ export function ShadowRunnerGame({
       onClick: closePauseMenu,
     },
     {
-      id: 'music',
-      label: musicPlaying ? 'Music On' : audioBlocked ? 'Start Music' : 'Music Off',
-      icon: <Music className="h-4 w-4 stroke-[3]" />,
-      onClick: () => onToggleMusic?.(),
-    },
-    {
       id: 'sound-effects',
       label: soundEffectsEnabled ? 'Sound On' : 'Sound Off',
       icon: soundEffectsEnabled ? <Volume2 className="h-4 w-4 stroke-[3]" /> : <VolumeX className="h-4 w-4 stroke-[3]" />,
-      onClick: () => onToggleSoundEffects?.(),
+      onClick: () => {
+        onSoundEvent?.('menu-click')
+        onToggleSoundEffects?.()
+      },
     },
     {
       id: 'main-menu',
       label: 'Quit Level',
       icon: <Home className="h-4 w-4 stroke-[3]" />,
-      onClick: () => setConfirmExit('title'),
+      onClick: () => {
+        onSoundEvent?.('menu-back')
+        setConfirmExit('title')
+      },
     },
-  ], [audioBlocked, closePauseMenu, musicPlaying, onToggleMusic, onToggleSoundEffects, soundEffectsEnabled])
+  ], [closePauseMenu, onSoundEvent, onToggleSoundEffects, soundEffectsEnabled])
 
   const confirmActions = React.useMemo<ShadowRunnerScrollMenuAction[]>(() => [
     {
       id: 'stay',
       label: 'Stay',
       icon: <Play className="h-4 w-4 stroke-[3]" />,
-      onClick: () => setConfirmExit(null),
+      onClick: () => {
+        onSoundEvent?.('menu-back')
+        setConfirmExit(null)
+      },
     },
     {
       id: 'confirm',
@@ -343,11 +474,13 @@ export function ShadowRunnerGame({
       icon: <Home className="h-4 w-4 stroke-[3]" />,
       tone: 'danger',
       onClick: () => {
-        closePauseMenu()
+        onSoundEvent?.('menu-back')
+        setConfirmExit(null)
+        setPauseOpen(false)
         onBackToTitle?.()
       },
     },
-  ], [closePauseMenu, onBackToTitle])
+  ], [onBackToTitle, onSoundEvent])
 
   const routeFailedActions = React.useMemo<ShadowRunnerScrollMenuAction[]>(() => [
     {
@@ -360,9 +493,12 @@ export function ShadowRunnerGame({
       id: 'main-menu',
       label: 'Main Menu',
       icon: <Home className="h-4 w-4 stroke-[3]" />,
-      onClick: () => onBackToTitle?.(),
+      onClick: () => {
+        onSoundEvent?.('menu-back')
+        onBackToTitle?.()
+      },
     },
-  ], [onBackToTitle, restartLevel])
+  ], [onBackToTitle, onSoundEvent, restartLevel])
 
   const levelCompleteActions = React.useMemo<ShadowRunnerScrollMenuAction[]>(() => {
     const returnToMap = onBackToMap ?? onBackToTitle
@@ -371,7 +507,10 @@ export function ShadowRunnerGame({
         id: 'return-map',
         label: 'Return to Map',
         icon: <Map className="h-4 w-4 stroke-[3]" />,
-        onClick: () => returnToMap?.(),
+        onClick: () => {
+          onSoundEvent?.('menu-back')
+          returnToMap?.()
+        },
       },
     ]
 
@@ -380,7 +519,10 @@ export function ShadowRunnerGame({
         id: 'next-route',
         label: 'Next Route',
         icon: <ChevronRight className="h-4 w-4 stroke-[3]" />,
-        onClick: () => onPlayLevel(nextLevelId),
+        onClick: () => {
+          onSoundEvent?.('level-select')
+          onPlayLevel(nextLevelId)
+        },
       })
       return actions
     }
@@ -392,7 +534,7 @@ export function ShadowRunnerGame({
       onClick: restartLevel,
     })
     return actions
-  }, [nextLevelId, onBackToMap, onBackToTitle, onPlayLevel, restartLevel])
+  }, [nextLevelId, onBackToMap, onBackToTitle, onPlayLevel, onSoundEvent, restartLevel])
 
   return (
     <div
@@ -416,6 +558,27 @@ export function ShadowRunnerGame({
             {loadError && (
               <p className="mt-2 max-w-sm text-xs font-semibold text-[#d9c79f]">{loadError}</p>
             )}
+          </div>
+        </div>
+      )}
+
+      {ready && routeIntroVisible && !overlayOpen && (
+        <div className="pointer-events-none absolute left-1/2 top-[17%] z-20 w-[min(58vw,28rem)] -translate-x-1/2 text-center text-[#150e07] drop-shadow-[0_18px_38px_rgba(0,0,0,0.58)]">
+          <div className="relative h-16 min-[740px]:h-[4.6rem]">
+            <img
+              src={SHADOW_RUNNER_ASSETS.home.optionsMenuButton}
+              alt=""
+              className="absolute inset-0 h-full w-full object-fill"
+              draggable={false}
+            />
+            <div className="absolute inset-x-[11%] inset-y-[20%] flex flex-col items-center justify-center overflow-hidden">
+              <p className="text-[0.48rem] font-black uppercase leading-none tracking-[0.18em] text-[#5a3818] min-[740px]:text-[0.58rem]">
+                Mission
+              </p>
+              <p className="mt-1 line-clamp-2 text-[0.6rem] font-black uppercase leading-[1.08] tracking-[0.08em] min-[740px]:text-[0.72rem]">
+                {routeIntroLine}
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -462,26 +625,33 @@ export function ShadowRunnerGame({
         </button>
       </div>
 
-      <div className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between px-[max(1rem,env(safe-area-inset-left))] pb-[max(1.08rem,env(safe-area-inset-bottom))] transition-opacity ${overlayOpen ? 'opacity-35' : 'opacity-100'}`}>
-        <div className="pointer-events-auto flex items-end gap-[clamp(0.35rem,1.5vw,0.5rem)]">
-          <TouchButton action="left" ariaLabel="Move left" onActionChange={setAction}>
-            <ChevronLeft className="h-7 w-7" />
-          </TouchButton>
-          <TouchButton action="right" ariaLabel="Move right" onActionChange={setAction}>
-            <ChevronRight className="h-7 w-7" />
-          </TouchButton>
-          <TouchButton action="crouch" ariaLabel="Crouch" onActionChange={setAction}>
-            <ArrowDown className="h-6 w-6" />
-          </TouchButton>
+      <div className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between px-[max(0.65rem,env(safe-area-inset-left))] pb-[max(0.5rem,env(safe-area-inset-bottom))] transition-opacity ${overlayOpen ? 'opacity-35' : 'opacity-100'}`}>
+        <div
+          className="pointer-events-auto"
+          style={{
+            '--shadow-runner-dpad-size': 'clamp(6.12rem, 25.5svh, 8.08rem)',
+          } as React.CSSProperties}
+        >
+          <DirectionPad onActionChange={setAction} />
         </div>
 
-        <div className="pointer-events-auto flex items-end gap-[clamp(0.45rem,1.8vw,0.75rem)]">
-          <TouchButton action="jump" ariaLabel="Jump" onActionChange={setAction} size="large">
-            <ChevronsUp className="h-8 w-8" />
-          </TouchButton>
-          <TouchButton action="attack" ariaLabel="Sword attack" onActionChange={setAction} size="large">
-            <Sword className="h-8 w-8" />
-          </TouchButton>
+        <div
+          className="pointer-events-auto relative h-[calc(var(--shadow-runner-action-large)*1.34)] w-[calc(var(--shadow-runner-action-large)*1.42)]"
+          style={{
+            '--shadow-runner-action-size': 'clamp(6.12rem, 25.5svh, 8.08rem)',
+            '--shadow-runner-action-large': 'clamp(6.12rem, 25.5svh, 8.08rem)',
+          } as React.CSSProperties}
+        >
+          <div className="absolute right-0 top-0">
+            <TouchButton action="attack" ariaLabel="Sword attack" onActionChange={setAction} size="large">
+              <Sword className="stroke-[3]" />
+            </TouchButton>
+          </div>
+          <div className="absolute bottom-0 left-0">
+            <TouchButton action="jump" ariaLabel="Jump" onActionChange={setAction} size="large">
+              <ChevronsUp className="stroke-[3]" />
+            </TouchButton>
+          </div>
         </div>
       </div>
 
@@ -536,7 +706,7 @@ export function ShadowRunnerGame({
               </div>
             </div>
 
-            <div className="mt-[-0.35rem] grid w-[70%] grid-cols-2 gap-2">
+            <div className="mt-[-0.35rem] grid w-[76%] grid-cols-2 gap-1.5 min-[740px]:gap-2">
               {levelCompleteActions.map(action => (
                 <button
                   key={action.id}
@@ -550,9 +720,9 @@ export function ShadowRunnerGame({
                     className="pointer-events-none absolute inset-0 h-full w-full object-fill"
                     draggable={false}
                   />
-                  <span className="relative z-10 flex h-full items-center justify-center gap-1.5 px-2 drop-shadow-[0_1px_0_rgba(255,239,183,0.5)]">
+                  <span className="relative z-10 flex h-full min-w-0 items-center justify-center gap-1 px-2 drop-shadow-[0_1px_0_rgba(255,239,183,0.5)]">
                     <span aria-hidden="true">{action.icon}</span>
-                    <span className="truncate text-[0.54rem] font-black uppercase leading-none tracking-[0.08em] min-[740px]:text-[0.64rem]">
+                    <span className="min-w-0 truncate whitespace-nowrap text-[0.52rem] font-black uppercase leading-none tracking-[0.06em] min-[740px]:text-[0.6rem]">
                       {action.label}
                     </span>
                   </span>

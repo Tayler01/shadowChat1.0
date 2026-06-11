@@ -2,6 +2,16 @@ import React from 'react'
 import { ArrowLeft, CheckCircle2, Lock, LogOut, Map, Music, Settings, Sword, Volume2, VolumeX, X } from 'lucide-react'
 import { SHADOW_RUNNER_ASSETS } from './assets/manifest'
 import {
+  SHADOW_RUNNER_MUSIC_ENABLED_STORAGE_KEY,
+  SHADOW_RUNNER_SFX_ENABLED_STORAGE_KEY,
+  SHADOW_RUNNER_SOUND_ASSETS,
+  SHADOW_RUNNER_SOUND_EVENTS,
+  SHADOW_RUNNER_SOUND_VOLUME,
+  readShadowRunnerAudioPreference,
+  type ShadowRunnerSoundEvent,
+  writeShadowRunnerAudioPreference,
+} from './audio'
+import {
   SHADOW_RUNNER_CAMPAIGN_LEVELS,
   type ShadowRunnerCampaignLevel,
   type ShadowRunnerPlayableLevelId,
@@ -12,12 +22,8 @@ import { ShadowRunnerScrollMenu, type ShadowRunnerScrollMenuAction } from './Sha
 interface ShadowRunnerScreenProps {
   onExit?: () => void
   musicPlaying?: boolean
-  audioBlocked?: boolean
-  onToggleMusic?: () => void
-}
-
-type WebAudioWindow = Window & typeof globalThis & {
-  webkitAudioContext?: typeof AudioContext
+  onPlayMusic?: () => void
+  onPauseMusic?: () => void
 }
 
 type OrientationWindow = Window & typeof globalThis & {
@@ -33,6 +39,7 @@ const MENU_BUTTONS = [
 const SHADOW_RUNNER_ACCESS_CODE = '123456'
 const SHADOW_RUNNER_ACCESS_SESSION_KEY = 'shadow-runner-access-unlocked'
 const SHADOW_RUNNER_PROGRESS_KEY = 'shadow-runner-campaign-progress-v1'
+const SHADOW_RUNNER_SFX_POOL_SIZE = 4
 
 const STAR_OVERLAYS = [
   { left: '17.5%', top: '6.5%', size: '1rem', position: '0% 0%', delay: '0s' },
@@ -380,9 +387,10 @@ function MenuButtonIcon({ id }: { id: typeof MENU_BUTTONS[number]['id'] }) {
 interface ShadowRunnerAccessGateProps {
   onUnlock: () => void
   onExit?: () => void
+  onSoundEvent?: (event: ShadowRunnerSoundEvent) => void
 }
 
-function ShadowRunnerAccessGate({ onUnlock, onExit }: ShadowRunnerAccessGateProps) {
+function ShadowRunnerAccessGate({ onUnlock, onExit, onSoundEvent }: ShadowRunnerAccessGateProps) {
   const [digits, setDigits] = React.useState(() => Array.from({ length: SHADOW_RUNNER_ACCESS_CODE.length }, () => ''))
   const [error, setError] = React.useState(false)
   const digitsRef = React.useRef(digits)
@@ -395,16 +403,18 @@ function ShadowRunnerAccessGate({ onUnlock, onExit }: ShadowRunnerAccessGateProp
 
     if (candidate === SHADOW_RUNNER_ACCESS_CODE) {
       window.sessionStorage.setItem(SHADOW_RUNNER_ACCESS_SESSION_KEY, 'true')
+      onSoundEvent?.('level-select')
       onUnlock()
       return
     }
 
+    onSoundEvent?.('menu-denied')
     setError(true)
     const emptyDigits = Array.from({ length: SHADOW_RUNNER_ACCESS_CODE.length }, () => '')
     digitsRef.current = emptyDigits
     setDigits(emptyDigits)
     window.setTimeout(() => inputRefs.current[0]?.focus(), 30)
-  }, [onUnlock])
+  }, [onSoundEvent, onUnlock])
 
   const updateDigit = React.useCallback((index: number, value: string) => {
     const digit = value.replace(/\D/g, '').slice(-1)
@@ -445,7 +455,10 @@ function ShadowRunnerAccessGate({ onUnlock, onExit }: ShadowRunnerAccessGateProp
       <button
         type="button"
         aria-label="Back to Entertainment"
-        onClick={onExit}
+        onClick={() => {
+          onSoundEvent?.('menu-back')
+          onExit?.()
+        }}
         className="absolute left-[max(1rem,env(safe-area-inset-left))] top-[max(0.85rem,env(safe-area-inset-top))] z-10 inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#e8c46b]/40 bg-black/45 text-[#f3d88d] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-md transition hover:border-[#f0d381]/70 hover:bg-[#2c2110]/75 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
       >
         <ArrowLeft className="h-5 w-5" />
@@ -501,6 +514,7 @@ interface ShadowRunnerLevelMapProps {
   progress: ShadowRunnerCampaignProgress
   onBack: () => void
   onPlayLevel: (levelId: ShadowRunnerPlayableLevelId) => void
+  onSoundEvent?: (event: ShadowRunnerSoundEvent) => void
 }
 
 interface ShadowRunnerLevelDetailPopupProps {
@@ -508,6 +522,7 @@ interface ShadowRunnerLevelDetailPopupProps {
   progress: ShadowRunnerCampaignProgress
   onClose: () => void
   onPlayLevel: (levelId: ShadowRunnerPlayableLevelId) => void
+  onSoundEvent?: (event: ShadowRunnerSoundEvent) => void
 }
 
 function ShadowRunnerLevelDetailPopup({
@@ -515,6 +530,7 @@ function ShadowRunnerLevelDetailPopup({
   progress,
   onClose,
   onPlayLevel,
+  onSoundEvent,
 }: ShadowRunnerLevelDetailPopupProps) {
   const state = getCampaignLevelState(progress, level)
   const primaryLabel = state.completed ? 'Replay' : state.playable ? 'Start' : state.unlocked ? 'In Build' : 'Locked'
@@ -538,7 +554,10 @@ function ShadowRunnerLevelDetailPopup({
         <button
           type="button"
           aria-label="Close level details"
-          onClick={onClose}
+          onClick={() => {
+            onSoundEvent?.('menu-back')
+            onClose()
+          }}
           className="absolute right-[17.2%] top-[15.5%] z-10 inline-flex h-[6.2%] aspect-square items-center justify-center rounded-full border border-[#2b1a08]/70 bg-[#1b1208]/78 text-[#f6e6bb] shadow-[0_8px_18px_rgba(0,0,0,0.42)] transition active:scale-95 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/70"
         >
           <X className="h-[52%] w-[52%] stroke-[3]" aria-hidden="true" />
@@ -591,6 +610,7 @@ function ShadowRunnerLevelDetailPopup({
             disabled={primaryDisabled}
             onClick={() => {
               if (level.playableLevelId) {
+                onSoundEvent?.('level-select')
                 onPlayLevel(level.playableLevelId)
               }
             }}
@@ -612,7 +632,10 @@ function ShadowRunnerLevelDetailPopup({
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => {
+              onSoundEvent?.('menu-back')
+              onClose()
+            }}
             className="relative isolate h-full w-[47%] overflow-hidden text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#130d06] transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#f0d381]/70 min-[740px]:text-[0.62rem] min-[930px]:text-[0.74rem]"
           >
             <img
@@ -629,7 +652,7 @@ function ShadowRunnerLevelDetailPopup({
   )
 }
 
-function ShadowRunnerLevelMap({ progress, onBack, onPlayLevel }: ShadowRunnerLevelMapProps) {
+function ShadowRunnerLevelMap({ progress, onBack, onPlayLevel, onSoundEvent }: ShadowRunnerLevelMapProps) {
   const [selectedLevelId, setSelectedLevelId] = React.useState<string | null>(null)
   const routeSegments = SHADOW_RUNNER_CAMPAIGN_LEVELS.slice(0, -1).map((level, index) => ({
     from: level,
@@ -656,7 +679,10 @@ function ShadowRunnerLevelMap({ progress, onBack, onPlayLevel }: ShadowRunnerLev
       <button
         type="button"
         aria-label="Back to Shadow Runner menu"
-        onClick={onBack}
+        onClick={() => {
+          onSoundEvent?.('menu-back')
+          onBack()
+        }}
         className="absolute left-[max(0.8rem,env(safe-area-inset-left))] top-[max(0.7rem,env(safe-area-inset-top))] z-30 inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#e8c46b]/40 bg-black/50 text-[#f3d88d] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-md transition hover:border-[#f0d381]/70 hover:bg-[#2c2110]/75 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
       >
         <ArrowLeft className="h-5 w-5" />
@@ -707,7 +733,10 @@ function ShadowRunnerLevelMap({ progress, onBack, onPlayLevel }: ShadowRunnerLev
               key={level.id}
               type="button"
               aria-label={`${level.title} details, ${state.statusLabel}`}
-              onClick={() => setSelectedLevelId(level.id)}
+              onClick={() => {
+                onSoundEvent?.(state.unlocked ? 'menu-click' : 'menu-denied')
+                setSelectedLevelId(level.id)
+              }}
               className={`group pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center transition focus:outline-none focus:ring-2 focus:ring-[#f0d381]/65 ${
                 state.unlocked ? 'cursor-pointer active:scale-95' : 'cursor-pointer'
               }`}
@@ -742,6 +771,7 @@ function ShadowRunnerLevelMap({ progress, onBack, onPlayLevel }: ShadowRunnerLev
           progress={progress}
           onClose={() => setSelectedLevelId(null)}
           onPlayLevel={onPlayLevel}
+          onSoundEvent={onSoundEvent}
         />
       )}
     </div>
@@ -751,8 +781,8 @@ function ShadowRunnerLevelMap({ progress, onBack, onPlayLevel }: ShadowRunnerLev
 export function ShadowRunnerScreen({
   onExit,
   musicPlaying = false,
-  audioBlocked = false,
-  onToggleMusic,
+  onPlayMusic,
+  onPauseMusic,
 }: ShadowRunnerScreenProps) {
   const rootRef = React.useRef<HTMLElement | null>(null)
   const heroFrame = useSpriteFrame(8, 150)
@@ -763,63 +793,127 @@ export function ShadowRunnerScreen({
   const [campaignProgress, setCampaignProgress] = React.useState(readShadowRunnerProgress)
   const [accessUnlocked, setAccessUnlocked] = React.useState(getShadowRunnerAccessUnlocked)
   const [titleOptionsOpen, setTitleOptionsOpen] = React.useState(false)
-  const [soundEffectsEnabled, setSoundEffectsEnabled] = React.useState(true)
+  const [musicEnabled, setMusicEnabled] = React.useState(() => readShadowRunnerAudioPreference(SHADOW_RUNNER_MUSIC_ENABLED_STORAGE_KEY, true))
+  const [soundEffectsEnabled, setSoundEffectsEnabled] = React.useState(() => readShadowRunnerAudioPreference(SHADOW_RUNNER_SFX_ENABLED_STORAGE_KEY, true))
+  const sfxPoolsRef = React.useRef<Partial<Record<ShadowRunnerSoundEvent, HTMLAudioElement[]>>>({})
+  const sfxPoolCursorRef = React.useRef<Partial<Record<ShadowRunnerSoundEvent, number>>>({})
   const assetsReady = useImagePreload(SHADOW_RUNNER_IMAGE_SOURCES)
   const showRotateGate = orientationGateActive
-  const audioContextRef = React.useRef<AudioContext | null>(null)
 
   useShadowRunnerInteractionLock(rootRef)
 
   React.useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.Audio === 'undefined') return
+
+    SHADOW_RUNNER_SOUND_EVENTS.forEach(event => {
+      if (sfxPoolsRef.current[event]) return
+      sfxPoolsRef.current[event] = Array.from({ length: SHADOW_RUNNER_SFX_POOL_SIZE }, () => {
+        const audio = new window.Audio(SHADOW_RUNNER_SOUND_ASSETS[event])
+        audio.preload = 'auto'
+        audio.volume = SHADOW_RUNNER_SOUND_VOLUME[event]
+        return audio
+      })
+    })
+
     return () => {
-      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
-        void audioContextRef.current.close()
-      }
+      SHADOW_RUNNER_SOUND_EVENTS.forEach(event => {
+        sfxPoolsRef.current[event]?.forEach(audio => {
+          audio.pause()
+          audio.removeAttribute('src')
+          try {
+            audio.load()
+          } catch {
+            // Some test environments stub media elements incompletely.
+          }
+        })
+      })
+      sfxPoolsRef.current = {}
     }
   }, [])
 
-  const playButtonChime = React.useCallback(() => {
-    if (!soundEffectsEnabled) return
+  React.useEffect(() => {
+    writeShadowRunnerAudioPreference(SHADOW_RUNNER_MUSIC_ENABLED_STORAGE_KEY, musicEnabled)
+  }, [musicEnabled])
 
-    const AudioContextCtor = window.AudioContext ?? (window as WebAudioWindow).webkitAudioContext
-    if (!AudioContextCtor) return
+  React.useEffect(() => {
+    writeShadowRunnerAudioPreference(SHADOW_RUNNER_SFX_ENABLED_STORAGE_KEY, soundEffectsEnabled)
+  }, [soundEffectsEnabled])
 
-    const context = audioContextRef.current ?? new AudioContextCtor()
-    audioContextRef.current = context
-
-    if (context.state === 'suspended') {
-      void context.resume()
+  React.useEffect(() => {
+    if (screen === 'play') {
+      onPauseMusic?.()
+      return
     }
 
-    const now = context.currentTime
-    const notes = [523.25, 659.25, 783.99]
+    if (musicEnabled) {
+      onPlayMusic?.()
+    } else {
+      onPauseMusic?.()
+    }
+  }, [musicEnabled, onPauseMusic, onPlayMusic, screen])
 
-    notes.forEach((frequency, index) => {
-      const start = now + index * 0.045
-      const oscillator = context.createOscillator()
-      const gain = context.createGain()
+  const playShadowRunnerSound = React.useCallback((event: ShadowRunnerSoundEvent) => {
+    if (!soundEffectsEnabled) return
 
-      oscillator.type = 'triangle'
-      oscillator.frequency.setValueAtTime(frequency, start)
-      gain.gain.setValueAtTime(0.0001, start)
-      gain.gain.exponentialRampToValueAtTime(0.09, start + 0.012)
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.18)
+    if (typeof window === 'undefined' || typeof window.Audio === 'undefined') return
 
-      oscillator.connect(gain)
-      gain.connect(context.destination)
-      oscillator.start(start)
-      oscillator.stop(start + 0.2)
+    let pool = sfxPoolsRef.current[event]
+    if (!pool) {
+      pool = Array.from({ length: SHADOW_RUNNER_SFX_POOL_SIZE }, () => {
+        const audio = new window.Audio(SHADOW_RUNNER_SOUND_ASSETS[event])
+        audio.preload = 'auto'
+        audio.volume = SHADOW_RUNNER_SOUND_VOLUME[event]
+        return audio
+      })
+      sfxPoolsRef.current[event] = pool
+    }
+
+    const cursor = sfxPoolCursorRef.current[event] ?? 0
+    const audio = pool.find(candidate => candidate.paused || candidate.ended) ?? pool[cursor % pool.length]
+    sfxPoolCursorRef.current[event] = cursor + 1
+    audio.volume = SHADOW_RUNNER_SOUND_VOLUME[event]
+
+    try {
+      audio.currentTime = 0
+    } catch {
+      // Browser media can refuse seeking before metadata loads; playback still attempts.
+    }
+
+    void audio.play().catch(() => {
+      // Autoplay can block until a gesture; visual feedback still carries the action.
     })
   }, [soundEffectsEnabled])
 
-  const handleMenuButton = React.useCallback((buttonId: typeof MENU_BUTTONS[number]['id']) => {
-    playButtonChime()
+  const playButtonChime = React.useCallback(() => {
+    playShadowRunnerSound('menu-click')
+  }, [playShadowRunnerSound])
 
+  const toggleSoundEffects = React.useCallback(() => {
+    setSoundEffectsEnabled(current => !current)
+  }, [])
+
+  const toggleMusicPreference = React.useCallback(() => {
+    playButtonChime()
+    setMusicEnabled(current => {
+      const next = !current
+      if (next) {
+        onPlayMusic?.()
+      } else {
+        onPauseMusic?.()
+      }
+      return next
+    })
+  }, [onPauseMusic, onPlayMusic, playButtonChime])
+
+  const handleMenuButton = React.useCallback((buttonId: typeof MENU_BUTTONS[number]['id']) => {
     if (buttonId === 'tutorial') {
+      playShadowRunnerSound('level-select')
       setActiveLevelId('tutorial')
       setScreen('play')
       return
     }
+
+    playButtonChime()
 
     if (buttonId === 'levels') {
       setScreen('levels')
@@ -829,17 +923,19 @@ export function ShadowRunnerScreen({
     if (buttonId === 'options') {
       setTitleOptionsOpen(true)
     }
-  }, [playButtonChime])
+  }, [playButtonChime, playShadowRunnerSound])
 
   const playCampaignLevel = React.useCallback((levelId: ShadowRunnerPlayableLevelId) => {
-    playButtonChime()
+    playShadowRunnerSound('level-select')
     setActiveLevelId(levelId)
     setScreen('play')
-  }, [playButtonChime])
+  }, [playShadowRunnerSound])
 
   const handleLevelComplete = React.useCallback((levelId: ShadowRunnerPlayableLevelId) => {
     setCampaignProgress(current => markCampaignLevelComplete(current, levelId))
   }, [])
+
+  const titleMusicLabel = !musicEnabled ? 'Music Off' : musicPlaying ? 'Music On' : 'Start Music'
 
   const titleOptionsActions = React.useMemo<ShadowRunnerScrollMenuAction[]>(() => [
     {
@@ -847,18 +943,15 @@ export function ShadowRunnerScreen({
       label: 'Close',
       icon: <X className="h-4 w-4 stroke-[3]" />,
       onClick: () => {
-        playButtonChime()
+        playShadowRunnerSound('menu-back')
         setTitleOptionsOpen(false)
       },
     },
     {
       id: 'music',
-      label: musicPlaying ? 'Music On' : audioBlocked ? 'Start Music' : 'Music Off',
+      label: titleMusicLabel,
       icon: musicPlaying ? <Music className="h-4 w-4 stroke-[3]" /> : <Music className="h-4 w-4 stroke-[3]" />,
-      onClick: () => {
-        playButtonChime()
-        onToggleMusic?.()
-      },
+      onClick: toggleMusicPreference,
     },
     {
       id: 'sound-effects',
@@ -866,7 +959,7 @@ export function ShadowRunnerScreen({
       icon: soundEffectsEnabled ? <Volume2 className="h-4 w-4 stroke-[3]" /> : <VolumeX className="h-4 w-4 stroke-[3]" />,
       onClick: () => {
         playButtonChime()
-        setSoundEffectsEnabled(current => !current)
+        toggleSoundEffects()
       },
     },
     {
@@ -875,11 +968,11 @@ export function ShadowRunnerScreen({
       icon: <LogOut className="h-4 w-4 stroke-[3]" />,
       tone: 'danger',
       onClick: () => {
-        playButtonChime()
+        playShadowRunnerSound('menu-back')
         onExit?.()
       },
     },
-  ], [audioBlocked, musicPlaying, onExit, onToggleMusic, playButtonChime, soundEffectsEnabled])
+  ], [musicPlaying, onExit, playButtonChime, playShadowRunnerSound, soundEffectsEnabled, titleMusicLabel, toggleMusicPreference, toggleSoundEffects])
 
   return (
     <section
@@ -903,15 +996,14 @@ export function ShadowRunnerScreen({
           <ShadowRunnerAccessGate
             onExit={onExit}
             onUnlock={() => setAccessUnlocked(true)}
+            onSoundEvent={playShadowRunnerSound}
           />
         ) : screen === 'play' ? (
           <ShadowRunnerGame
             levelId={activeLevelId}
-            musicPlaying={musicPlaying}
-            audioBlocked={audioBlocked}
-            onToggleMusic={onToggleMusic}
             soundEffectsEnabled={soundEffectsEnabled}
-            onToggleSoundEffects={() => setSoundEffectsEnabled(current => !current)}
+            onToggleSoundEffects={toggleSoundEffects}
+            onSoundEvent={playShadowRunnerSound}
             onBackToTitle={() => setScreen('title')}
             onBackToMap={() => setScreen('levels')}
             nextLevelId={getNextPlayableLevelId(activeLevelId)}
@@ -922,10 +1014,10 @@ export function ShadowRunnerScreen({
           <ShadowRunnerLevelMap
             progress={campaignProgress}
             onBack={() => {
-              playButtonChime()
               setScreen('title')
             }}
             onPlayLevel={playCampaignLevel}
+            onSoundEvent={playShadowRunnerSound}
           />
         ) : (
           <>

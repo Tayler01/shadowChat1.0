@@ -58,6 +58,9 @@ enemy, and reach a finish gate.
    - Keep full mobile controls: left, right, crouch, jump, attack.
    - Ensure hold-to-copy remains disabled on every gameplay control.
    - Keep Pause as the only persistent upper-right game menu control.
+   - Use a split-thumb phone layout: movement/crouch on the lower-left D-pad,
+     jump/attack on the lower-right action cluster, and keep the center route
+     lane as clear as practical.
 
 3. Combat
    - Sentry can be avoided, stomped, or defeated by sword.
@@ -136,3 +139,19 @@ enemy, and reach a finish gate.
   `output/playwright/shadow-runner-goal-20260611-square-frame/`,
   `output/playwright/shadow-runner-goal-20260611-postbuild/`, and
   `output/playwright/shadow-runner-goal-20260611-routes/`.
+
+## June 11, 2026 - Level 3 Hardening And Control Research
+
+- Researched mobile control guidance and moved gameplay input from a wide
+  five-button strip to a split-thumb layout: a large generated D-pad on the
+  lower left for left/right/crouch and two large generated action buttons near
+  the lower-right edge for jump/attack.
+- Extended `Ivy Viaduct` with a longer finish path, more coin/spike pressure,
+  a final Barrel Roller, faster tilt-bridge timing, and stronger tilt slide
+  influence without weakening the prior movement/combat rules.
+- Added local-preview-only enemy/player debug snapshots so automated and
+  foreground QA can catch stuck/falling enemies without shipping debug UI to
+  normal users.
+- Latest verification artifacts:
+  `output/playwright/shadow-runner-controls-research/` and
+  `output/playwright/shadow-runner-foreground/`.

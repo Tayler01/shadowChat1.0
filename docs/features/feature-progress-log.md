@@ -57,6 +57,33 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
   tilt-bridge visuals, gameplay slide influence from tilting bridges,
   functional crouch/crawl movement, generated translucent mobile control
   buttons, and a generated level-detail thumbnail frame.
+- Latest pass, 2026-06-11: generated original Shadow Runner WAV sound effects,
+  added a reusable audio manifest/preferences layer, wired menu/map/pause and
+  Phaser gameplay events to pooled SFX playback, and changed music behavior so
+  the Castle Bard loop is on by default in the lobby/title/map but pauses
+  automatically during playable levels.
+- Latest pass, 2026-06-11: hardened the Level 3 `Ivy Viaduct` route with a
+  longer finish path, faster/heavier tilt bridges, extra spikes/coins/enemy
+  pressure, safer Barrel Roller patrol bounds, local-preview enemy debug
+  snapshots, story-facing mission/completion text, and a researched split-thumb
+  mobile control layout with a large D-pad plus right-corner jump/attack
+  controls.
+- Verification, 2026-06-11: `npm run lint`,
+  `npx tsc --noEmit -p tsconfig.app.json`, and `npm run build` passed.
+  WebKit mobile landscape captures verified the revised controls at `932x430`
+  and `740x390`; headed Chrome-channel foreground playtest verified Level 3
+  patrol snapshots, combat/health, jump/crouch/attack input, and a focused
+  Level 3 completion check. Evidence in
+  `output/playwright/shadow-runner-controls-research/` and
+  `output/playwright/shadow-runner-foreground/`.
+- Verification, 2026-06-11: `npm run shadow-runner:audio`,
+  generated WAV header validation, `npm run lint`,
+  `npx tsc --noEmit -p tsconfig.app.json`, `npm run build`, and
+  `npx jest --runInBand` passed. Chrome-channel production-preview audio
+  probes verified lobby music start, gameplay music pause, lobby resume on
+  main-menu return, no in-game music button, all 19 SFX files fetch as RIFF
+  WAVs, and touch gameplay SFX for jump, double jump, sword swing, land, and
+  pause. Evidence in `output/playwright/shadow-runner-audio-pass/`.
 - Verification, 2026-06-11: `npm run lint`,
   `npx tsc --noEmit -p tsconfig.app.json`, and `npm run build` passed.
   Chrome-channel production-preview visual smoke passed for Level 1/2 detail
