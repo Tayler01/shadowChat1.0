@@ -17,6 +17,9 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
 | Hit spark | `public/games/shadow-runner/gameplay-assets/sliced/hit-spark.png` | Phaser hit feedback image used for sword and stomp hits. |
 | Coin sparkle strip | `public/games/shadow-runner/gameplay-assets/sliced/coin-sparkle-strip.png` | Phaser coin pickup sparkle strip. |
 | Clockwork Sentry strip | `public/games/shadow-runner/sprites/strips/clockwork-sentry-v2-6f-128.png` | First playable enemy runtime strip. |
+| Barrel Roller strip | `public/games/shadow-runner/sprites/strips/barrel-roller-v1-5f-128.png` | Level 3 enemy strip with idle, roll, impact, hit, and defeated states. |
+| Ivy Viaduct background | `public/games/shadow-runner/level-assets/level-3/background/ivy-viaduct-background.webp` | Level 3 route backdrop. |
+| Ivy Viaduct terrain/hazards sheet | `public/games/shadow-runner/level-assets/level-3/terrain/ivy-viaduct-terrain-hazards-v1-transparent.png` | Level 3 platform/ruin visual source registered as Phaser terrain frames. |
 
 ## Source Preservation
 
@@ -42,3 +45,6 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
   `src/features/games/shadow-runner/ShadowRunnerGame.tsx`
 - Phaser preload, sentry animation, overhead health, and pickup/hit effects:
   `src/features/games/shadow-runner/game/createShadowRunnerPhaserGame.ts`
+- Level 3 now registers a second terrain frame set for the generated Ivy
+  Viaduct sheet and uses kind-aware enemy animation helpers for Clockwork
+  Sentry and Barrel Roller runtime states.

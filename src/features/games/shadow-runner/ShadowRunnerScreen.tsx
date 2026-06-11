@@ -73,7 +73,8 @@ const SHADOW_RUNNER_IMAGE_SOURCES = [
   SHADOW_RUNNER_ASSETS.home.optionsScroll,
   SHADOW_RUNNER_ASSETS.home.optionsMenuButton,
   SHADOW_RUNNER_ASSETS.home.campaignMap,
-  SHADOW_RUNNER_ASSETS.home.levelDetailPanel,
+  SHADOW_RUNNER_ASSETS.home.levelMapScrollPanel,
+  SHADOW_RUNNER_ASSETS.home.levelThumbnailSquareFrame,
   SHADOW_RUNNER_ASSETS.home.blankMenuScroll,
   SHADOW_RUNNER_ASSETS.home.blankMenuButton,
   SHADOW_RUNNER_ASSETS.home.missionScrollStand,
@@ -526,9 +527,9 @@ function ShadowRunnerLevelDetailPopup({
 
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 px-[max(0.65rem,env(safe-area-inset-left))] py-3 backdrop-blur-[1px]">
-      <div className="relative aspect-[1657/785] w-[min(94vw,56rem)] max-h-[88dvh] drop-shadow-[0_28px_70px_rgba(0,0,0,0.78)]">
+      <div className="relative aspect-[1500/844] w-[min(94vw,54rem)] max-h-[88dvh] drop-shadow-[0_28px_70px_rgba(0,0,0,0.78)]">
         <img
-          src={SHADOW_RUNNER_ASSETS.home.levelDetailPanel}
+          src={SHADOW_RUNNER_ASSETS.home.levelMapScrollPanel}
           alt=""
           className="pointer-events-none absolute inset-0 h-full w-full object-contain"
           draggable={false}
@@ -538,13 +539,13 @@ function ShadowRunnerLevelDetailPopup({
           type="button"
           aria-label="Close level details"
           onClick={onClose}
-          className="absolute right-[6.8%] top-[7.5%] z-10 inline-flex h-[9%] aspect-square items-center justify-center rounded-full border border-[#2b1a08]/70 bg-[#1b1208]/75 text-[#f6e6bb] shadow-[0_8px_18px_rgba(0,0,0,0.42)] transition active:scale-95 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/70"
+          className="absolute right-[9.2%] top-[9.4%] z-10 inline-flex h-[8.2%] aspect-square items-center justify-center rounded-full border border-[#2b1a08]/70 bg-[#1b1208]/75 text-[#f6e6bb] shadow-[0_8px_18px_rgba(0,0,0,0.42)] transition active:scale-95 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/70"
         >
           <X className="h-[52%] w-[52%] stroke-[3]" aria-hidden="true" />
         </button>
 
-        <div className="absolute left-[10.9%] top-[24%] aspect-[16/9] w-[37.4%]">
-          <div className="absolute bottom-[13.8%] left-[8.8%] right-[8.8%] top-[15.6%] overflow-hidden rounded-[0.62rem] bg-[#0a0e15] shadow-[inset_0_0_26px_rgba(0,0,0,0.64)]">
+        <div className="absolute left-[15%] top-[23%] aspect-square w-[22.4%]">
+          <div className="absolute inset-[14%] overflow-hidden rounded-[0.58rem] bg-[#0a0e15] shadow-[inset_0_0_26px_rgba(0,0,0,0.64)]">
             <img
               src={level.thumbnail}
               alt=""
@@ -554,14 +555,14 @@ function ShadowRunnerLevelDetailPopup({
             <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_58%,rgba(0,0,0,0.38))]" />
           </div>
           <img
-            src={SHADOW_RUNNER_ASSETS.home.levelThumbnailFrame}
+            src={SHADOW_RUNNER_ASSETS.home.levelThumbnailSquareFrame}
             alt=""
-            className="pointer-events-none absolute inset-0 h-full w-full object-fill drop-shadow-[0_12px_28px_rgba(0,0,0,0.42)]"
+            className="pointer-events-none absolute inset-0 h-full w-full object-contain drop-shadow-[0_12px_28px_rgba(0,0,0,0.42)]"
             draggable={false}
           />
         </div>
 
-        <div className="absolute left-[52%] top-[20.5%] flex h-[42%] w-[35.5%] flex-col overflow-hidden text-[#160f07]">
+        <div className="absolute left-[41.5%] top-[21.5%] flex h-[43%] w-[42%] flex-col overflow-hidden text-[#160f07]">
           <div className="flex items-start justify-between gap-2.5">
             <div className="min-w-0">
               <p className="text-[0.48rem] font-black uppercase leading-none tracking-[0.2em] text-[#4c2c10] min-[740px]:text-[0.56rem] min-[930px]:text-[0.64rem]">
@@ -584,7 +585,7 @@ function ShadowRunnerLevelDetailPopup({
           </div>
         </div>
 
-        <div className="absolute left-[50.5%] top-[68.5%] flex h-[15%] w-[39%] items-center gap-[5%]">
+        <div className="absolute left-[40.5%] top-[69%] flex h-[13.8%] w-[44%] items-center gap-[6%]">
           <button
             type="button"
             disabled={primaryDisabled}
@@ -593,11 +594,17 @@ function ShadowRunnerLevelDetailPopup({
                 onPlayLevel(level.playableLevelId)
               }
             }}
-            className={`h-full w-[47%] rounded-[0.5rem] text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#130d06] transition focus:outline-none focus:ring-2 focus:ring-[#f0d381]/70 min-[740px]:text-[0.62rem] min-[930px]:text-[0.74rem] ${
+            className={`relative isolate h-full w-[47%] overflow-hidden text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#130d06] transition focus:outline-none focus:ring-2 focus:ring-[#f0d381]/70 min-[740px]:text-[0.62rem] min-[930px]:text-[0.74rem] ${
               primaryDisabled ? 'cursor-default opacity-[0.58] grayscale' : 'active:scale-[0.98]'
             }`}
           >
-            <span className="inline-flex items-center justify-center gap-1">
+            <img
+              src={SHADOW_RUNNER_ASSETS.home.blankMenuButton}
+              alt=""
+              className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-fill"
+              draggable={false}
+            />
+            <span className="inline-flex h-full w-full items-center justify-center gap-1">
               {state.playable ? <Sword className="h-4 w-4 stroke-[3]" aria-hidden="true" /> : <Lock className="h-4 w-4 stroke-[3]" aria-hidden="true" />}
               {primaryLabel}
             </span>
@@ -606,9 +613,15 @@ function ShadowRunnerLevelDetailPopup({
           <button
             type="button"
             onClick={onClose}
-            className="h-full w-[47%] rounded-[0.5rem] text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#130d06] transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#f0d381]/70 min-[740px]:text-[0.62rem] min-[930px]:text-[0.74rem]"
+            className="relative isolate h-full w-[47%] overflow-hidden text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#130d06] transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#f0d381]/70 min-[740px]:text-[0.62rem] min-[930px]:text-[0.74rem]"
           >
-            Return
+            <img
+              src={SHADOW_RUNNER_ASSETS.home.blankMenuButton}
+              alt=""
+              className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-fill"
+              draggable={false}
+            />
+            <span className="inline-flex h-full w-full items-center justify-center">Return</span>
           </button>
         </div>
       </div>

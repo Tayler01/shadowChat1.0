@@ -25,8 +25,9 @@ The Desktop source remains untouched:
 | Runtime blank menu button | `public/games/shadow-runner/home-assets/optimized/blank-menu-button.webp` | Blank row/button panel used for live Start, Levels, and Options hit targets. |
 | Runtime campaign map | `public/games/shadow-runner/home-assets/optimized/campaign-map.webp` | Generated full-screen parchment world map used by the campaign level-select route screen. |
 | Runtime campaign map location buttons | `public/games/shadow-runner/home-assets/optimized/map-location-buttons/*.webp` | Ten individual generated location-button assets used as tappable map stops. |
-| Runtime level-detail panel | `public/games/shadow-runner/home-assets/optimized/level-detail-panel.webp` | Generated blank parchment popup used for campaign-map route details, locked/playable/completed state, and live Start/Replay/Return actions. |
-| Runtime level-map scroll panel | `public/games/shadow-runner/home-assets/optimized/level-map-scroll-panel.webp` | Generated blank parchment map panel used by the 10-map level-select screen. |
+| Runtime level-detail panel | `public/games/shadow-runner/home-assets/optimized/level-detail-panel.webp` | Legacy generated detail panel with baked rectangular thumbnail treatment; retained as source reference but no longer used by the live popup. |
+| Runtime level-map scroll panel | `public/games/shadow-runner/home-assets/optimized/level-map-scroll-panel.webp` | Generated blank parchment panel used by the 10-map level-select screen and the current mission detail popup. |
+| Runtime square thumbnail frame | `public/games/shadow-runner/home-assets/optimized/level-thumbnail-square-frame.webp` | Generated square frame used for mission detail popup thumbnails. |
 | Options scroll panel | `public/games/shadow-runner/home-assets/optimized/options-scroll-panel.webp` | Scroll panel used by title Options and in-game Pause menus. |
 | Options row button | `public/games/shadow-runner/home-assets/optimized/options-menu-row-button.webp` | Dedicated row-button asset for scroll-menu actions. |
 | Mission scroll stand | `public/games/shadow-runner/home-assets/assets/ui/prop_mission_scroll_stand.png` | Blank foreground prop for mission text or decorative menu staging. |
@@ -61,8 +62,9 @@ The Desktop source remains untouched:
 - The title menu now uses blank panels with live Start Tutorial, Select Level,
   and Options controls instead of relying on baked labels for interaction.
 - Select Level opens a generated full-screen parchment campaign map with live
-  dotted route lines, ten individual location-button assets, a generated
-  parchment level-detail popup, and locked/unlocked/completed states.
+  dotted route lines, ten individual location-button assets, a generated blank
+  parchment popup, square mission thumbnail frames, and
+  locked/unlocked/completed states.
 - The torch and star sheets should not be blindly sliced by equal dimensions
   without visual review.
 - Raw chroma-key sources are preserved under
@@ -84,10 +86,14 @@ June 9 rollback notes are in
 
 ## Latest Verification
 
-The latest Shadow Runner options-menu pass recorded `npm run lint`,
+The June 11 Shadow Runner phone-gameplay pass recorded `npm run lint`,
 `npx tsc --noEmit -p tsconfig.app.json`, and `npm run build` as passing, then
-captured mobile landscape visual checks at `740x390` and `932x430`. Artifacts
-live under `output/playwright/shadow-runner-options-pass/final/`.
+captured Chrome-channel mobile checks for landscape `932x430` and `740x390`,
+portrait rotate-gate `390x740`, Level 1 and Level 2 finish flows, and the
+square mission-detail popup. Artifacts live under
+`output/playwright/shadow-runner-goal-20260611-square-frame/`,
+`output/playwright/shadow-runner-goal-20260611-postbuild/`, and
+`output/playwright/shadow-runner-goal-20260611-routes/`.
 
 ## Manifest
 

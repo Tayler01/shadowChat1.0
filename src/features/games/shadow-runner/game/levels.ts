@@ -7,6 +7,7 @@ export interface ShadowRunnerRect {
   width: number
   height: number
   visualId?: string
+  terrainSet?: 'stone' | 'ivy'
 }
 
 export interface ShadowRunnerTiltPlatform extends ShadowRunnerRect {
@@ -24,7 +25,7 @@ export interface ShadowRunnerPoint {
   y: number
 }
 
-export type ShadowRunnerEnemyKind = 'clockwork-sentry'
+export type ShadowRunnerEnemyKind = 'clockwork-sentry' | 'barrel-roller'
 
 export interface ShadowRunnerEnemyConfig extends ShadowRunnerPoint {
   kind: ShadowRunnerEnemyKind
@@ -33,9 +34,10 @@ export interface ShadowRunnerEnemyConfig extends ShadowRunnerPoint {
   patrolLeft: number
   patrolRight: number
   direction: 1 | -1
+  patrolSpeed?: number
 }
 
-export type ShadowRunnerPlayableLevelId = 'tutorial' | 'level-1' | 'level-2'
+export type ShadowRunnerPlayableLevelId = 'tutorial' | 'level-1' | 'level-2' | 'level-3'
 
 export interface ShadowRunnerLevelConfig {
   id: ShadowRunnerPlayableLevelId
@@ -261,6 +263,107 @@ export const SHADOW_RUNNER_LEVEL_TWO: ShadowRunnerLevelConfig = {
   ],
 }
 
+export const SHADOW_RUNNER_LEVEL_THREE: ShadowRunnerLevelConfig = {
+  id: 'level-3',
+  campaignLevel: 3,
+  title: 'Ivy Viaduct',
+  subtitle: 'Campaign Route 3',
+  objective: 'Hold the broken bridges',
+  completionLine: 'Ivy Viaduct secured.',
+  backgroundAsset: SHADOW_RUNNER_ASSETS.levels.ivyViaductBackground,
+  worldWidth: 3860,
+  worldHeight: 540,
+  playerStart: { id: 'start', x: 118, y: 400 },
+  enemies: [
+    {
+      id: 'viaduct-barrel-a',
+      kind: 'barrel-roller',
+      x: 870,
+      y: 370,
+      health: 2,
+      maxHealth: 2,
+      patrolLeft: 700,
+      patrolRight: 1070,
+      direction: 1,
+      patrolSpeed: 126,
+    },
+    {
+      id: 'viaduct-barrel-b',
+      kind: 'barrel-roller',
+      x: 1790,
+      y: 388,
+      health: 2,
+      maxHealth: 2,
+      patrolLeft: 1645,
+      patrolRight: 2035,
+      direction: -1,
+      patrolSpeed: 142,
+    },
+    {
+      id: 'viaduct-sentry',
+      kind: 'clockwork-sentry',
+      x: 2600,
+      y: 382,
+      health: 3,
+      maxHealth: 3,
+      patrolLeft: 2460,
+      patrolRight: 2770,
+      direction: -1,
+      patrolSpeed: 88,
+    },
+    {
+      id: 'viaduct-barrel-c',
+      kind: 'barrel-roller',
+      x: 3260,
+      y: 392,
+      health: 3,
+      maxHealth: 3,
+      patrolLeft: 3065,
+      patrolRight: 3500,
+      direction: 1,
+      patrolSpeed: 154,
+    },
+  ],
+  finish: { id: 'viaduct-east-gate', x: 3708, y: 280, width: 74, height: 150 },
+  platforms: [
+    { id: 'ivy-west-walkway', x: 0, y: 428, width: 560, height: 72, terrainSet: 'ivy' },
+    { id: 'ivy-stone-step-a', x: 652, y: 392, width: 170, height: 42, terrainSet: 'ivy' },
+    { id: 'ivy-barrel-lane-a', visualId: 'ivy-bridge-a', x: 890, y: 420, width: 330, height: 64, terrainSet: 'ivy' },
+    { id: 'ivy-upper-shelf-a', x: 1135, y: 284, width: 176, height: 34, terrainSet: 'ivy' },
+    { id: 'ivy-plank-lane-a', visualId: 'ivy-plank-a', x: 1480, y: 416, width: 520, height: 58, terrainSet: 'ivy' },
+    { id: 'ivy-stone-step-b', visualId: 'ivy-stone-step-a', x: 2110, y: 376, width: 168, height: 42, terrainSet: 'ivy' },
+    { id: 'ivy-sentry-lane', visualId: 'ivy-center-arch', x: 2390, y: 412, width: 470, height: 72, terrainSet: 'ivy' },
+    { id: 'ivy-plank-lane-b', visualId: 'ivy-plank-b', x: 3000, y: 424, width: 520, height: 58, terrainSet: 'ivy' },
+    { id: 'ivy-final-ledge', visualId: 'ivy-east-ledge', x: 3588, y: 404, width: 272, height: 76, terrainSet: 'ivy' },
+  ],
+  tiltPlatforms: [
+    { id: 'ivy-tilt-bridge-a', x: 1286, y: 352, width: 166, height: 28, visualHeight: 52, visualOffsetY: -12, wobbleDurationMs: 960, wobbleRotation: 0.115, slideForce: 1080, maxSlideSpeed: 142 },
+    { id: 'ivy-tilt-bridge-b', x: 2288, y: 348, width: 158, height: 28, visualHeight: 52, visualOffsetY: -12, wobbleDurationMs: 820, wobbleRotation: 0.13, slideForce: 1180, maxSlideSpeed: 158 },
+    { id: 'ivy-tilt-bridge-c', x: 2862, y: 360, width: 150, height: 28, visualHeight: 50, visualOffsetY: -12, wobbleDurationMs: 760, wobbleRotation: 0.145, slideForce: 1260, maxSlideSpeed: 172 },
+  ],
+  spikes: [
+    { id: 'ivy-start-spikes', x: 538, y: 438, width: 112, height: 28 },
+    { id: 'ivy-bridge-spikes-a', x: 1216, y: 438, width: 92, height: 28 },
+    { id: 'ivy-mid-spikes', x: 2006, y: 438, width: 102, height: 28 },
+    { id: 'ivy-sentry-spikes', x: 2784, y: 394, width: 76, height: 24 },
+    { id: 'ivy-final-spikes', x: 3512, y: 438, width: 74, height: 28 },
+  ],
+  coins: [
+    { id: 'coin-1', x: 310, y: 338 },
+    { id: 'coin-2', x: 710, y: 310 },
+    { id: 'coin-3', x: 1038, y: 324 },
+    { id: 'coin-4', x: 1210, y: 232 },
+    { id: 'coin-5', x: 1392, y: 278 },
+    { id: 'coin-6', x: 1660, y: 318 },
+    { id: 'coin-7', x: 1940, y: 318 },
+    { id: 'coin-8', x: 2308, y: 284 },
+    { id: 'coin-9', x: 2570, y: 314 },
+    { id: 'coin-10', x: 2888, y: 286 },
+    { id: 'coin-11', x: 3210, y: 332 },
+    { id: 'coin-12', x: 3440, y: 332 },
+  ],
+}
+
 export function getShadowRunnerLevelEnemies(level: ShadowRunnerLevelConfig) {
   return level.enemies ?? (level.enemy ? [level.enemy] : [])
 }
@@ -269,6 +372,7 @@ export const SHADOW_RUNNER_LEVEL_CONFIGS: Record<ShadowRunnerPlayableLevelId, Sh
   tutorial: SHADOW_RUNNER_TUTORIAL_LEVEL,
   'level-1': SHADOW_RUNNER_FULL_LEVEL_ONE,
   'level-2': SHADOW_RUNNER_LEVEL_TWO,
+  'level-3': SHADOW_RUNNER_LEVEL_THREE,
 }
 
 export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
@@ -312,6 +416,7 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     thumbnail: SHADOW_RUNNER_ASSETS.levels.ivyViaductThumbnail320,
     locationButton: SHADOW_RUNNER_ASSETS.levels.ivyViaductLocationButton,
     mapPosition: { left: 35, top: 37 },
+    playableLevelId: 'level-3',
   },
   {
     id: 'level-4',

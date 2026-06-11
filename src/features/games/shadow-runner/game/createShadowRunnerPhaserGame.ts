@@ -5,6 +5,7 @@ import {
   getShadowRunnerLevelConfig,
   getShadowRunnerLevelEnemies,
   type ShadowRunnerEnemyConfig,
+  type ShadowRunnerEnemyKind,
   type ShadowRunnerLevelConfig,
   type ShadowRunnerPlayableLevelId,
   type ShadowRunnerTiltPlatform,
@@ -36,8 +37,10 @@ const GAME_WIDTH = 960
 const GAME_HEIGHT = 540
 const HERO_SCALE = 0.78
 const SENTRY_SCALE = 0.68
+const BARREL_SCALE = 0.58
 const PLAYER_SPEED = 260
 const SENTRY_PATROL_SPEED = 82
+const BARREL_PATROL_SPEED = 132
 const CRAWL_SPEED = 112
 const JUMP_VELOCITY = -620
 const DOUBLE_JUMP_VELOCITY = -560
@@ -74,6 +77,17 @@ const TERRAIN_CROPS: Record<string, TextureCrop> = {
   'center-walkway': { x: 48, y: 113, width: 368, height: 162 },
   'east-ledge': { x: 864, y: 106, width: 351, height: 194 },
   'upper-coin-shelf': { x: 493, y: 368, width: 258, height: 178 },
+}
+
+const IVY_TERRAIN_CROPS: Record<string, TextureCrop> = {
+  'ivy-west-walkway': { x: 42, y: 58, width: 500, height: 150 },
+  'ivy-stone-step-a': { x: 1188, y: 92, width: 138, height: 90 },
+  'ivy-bridge-a': { x: 44, y: 420, width: 224, height: 104 },
+  'ivy-upper-shelf-a': { x: 437, y: 238, width: 96, height: 144 },
+  'ivy-plank-a': { x: 322, y: 421, width: 202, height: 104 },
+  'ivy-center-arch': { x: 46, y: 235, width: 346, height: 154 },
+  'ivy-plank-b': { x: 570, y: 420, width: 214, height: 100 },
+  'ivy-east-ledge': { x: 785, y: 62, width: 246, height: 130 },
 }
 
 const TERRAIN_FRAME_PREFIX = 'terrain-'
@@ -186,7 +200,12 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       frameWidth: 128,
       frameHeight: 128,
     })
+    this.load.spritesheet('barrel-roller', SHADOW_RUNNER_ASSETS.enemies.barrelRollerStrip, {
+      frameWidth: 128,
+      frameHeight: 128,
+    })
     this.load.image('shadow-runner-terrain-atlas', SHADOW_RUNNER_ASSETS.level.terrainAtlas)
+    this.load.image('shadow-runner-ivy-terrain-atlas', SHADOW_RUNNER_ASSETS.levels.ivyViaductTerrainHazards)
     this.load.image('shadow-runner-tilt-bridge', SHADOW_RUNNER_ASSETS.level.tiltBridge256)
     this.load.spritesheet('shadow-runner-coin', SHADOW_RUNNER_ASSETS.level.coinStrip48, {
       frameWidth: 48,
@@ -313,6 +332,36 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       repeat: 0,
     })
     this.anims.create({
+      key: 'barrel-idle',
+      frames: [{ key: 'barrel-roller', frame: 0 }],
+      frameRate: 1,
+      repeat: 0,
+    })
+    this.anims.create({
+      key: 'barrel-roll',
+      frames: this.anims.generateFrameNumbers('barrel-roller', { start: 0, end: 2 }),
+      frameRate: 8,
+      repeat: -1,
+    })
+    this.anims.create({
+      key: 'barrel-impact',
+      frames: [{ key: 'barrel-roller', frame: 2 }],
+      frameRate: 1,
+      repeat: 0,
+    })
+    this.anims.create({
+      key: 'barrel-hit',
+      frames: [{ key: 'barrel-roller', frame: 3 }],
+      frameRate: 1,
+      repeat: 0,
+    })
+    this.anims.create({
+      key: 'barrel-defeated',
+      frames: [{ key: 'barrel-roller', frame: 4 }],
+      frameRate: 1,
+      repeat: 0,
+    })
+    this.anims.create({
       key: 'coin-spin',
       frames: this.anims.generateFrameNumbers('shadow-runner-coin', { start: 0, end: 7 }),
       frameRate: 10,
@@ -345,11 +394,14 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
     this.level.platforms.forEach(platform => {
       const frameKey = getTerrainFrameKey(platform.visualId ?? platform.id)
-      const hasTerrainFrame = this.textures.exists('shadow-runner-terrain-atlas')
-        && this.textures.get('shadow-runner-terrain-atlas').has(frameKey)
+      const terrainTexture = platform.terrainSet === 'ivy'
+        ? 'shadow-runner-ivy-terrain-atlas'
+        : 'shadow-runner-terrain-atlas'
+      const hasTerrainFrame = this.textures.exists(terrainTexture)
+        && this.textures.get(terrainTexture).has(frameKey)
 
       addStaticPlatform(this, this.platforms!, platform, hasTerrainFrame
-        ? { texture: 'shadow-runner-terrain-atlas', frame: frameKey, useImage: true }
+        ? { texture: terrainTexture, frame: frameKey, useImage: true }
         : { texture: 'shadow-runner-stone' })
     })
 
@@ -463,16 +515,26 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   }
 
   private createEnemySprite(enemyStart: ShadowRunnerEnemyConfig) {
-    const enemy = this.physics.add.sprite(enemyStart.x, enemyStart.y, 'clockwork-sentry')
+    const enemyTexture = enemyStart.kind === 'barrel-roller' ? 'barrel-roller' : 'clockwork-sentry'
+    const enemy = this.physics.add.sprite(enemyStart.x, enemyStart.y, enemyTexture)
     enemy.setName(enemyStart.id)
     enemy.setData('enemyId', enemyStart.id)
+    enemy.setData('enemyKind', enemyStart.kind)
     enemy.setOrigin(0.5, 1)
-    enemy.setScale(SENTRY_SCALE)
-    enemy.setSize(50, 70)
-    enemy.setOffset(39, 58)
     enemy.setCollideWorldBounds(false)
-    enemy.setMaxVelocity(120, 920)
-    enemy.play('sentry-walk')
+    if (enemyStart.kind === 'barrel-roller') {
+      enemy.setScale(BARREL_SCALE)
+      enemy.setSize(58, 48)
+      enemy.setOffset(35, 72)
+      enemy.setMaxVelocity(196, 920)
+      enemy.play('barrel-roll')
+    } else {
+      enemy.setScale(SENTRY_SCALE)
+      enemy.setSize(50, 70)
+      enemy.setOffset(39, 58)
+      enemy.setMaxVelocity(128, 920)
+      enemy.play('sentry-walk')
+    }
     return enemy
   }
 
@@ -522,6 +584,42 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
   private getEnemyId(enemy: Phaser.Physics.Arcade.Sprite) {
     return String(enemy.getData('enemyId') ?? enemy.name)
+  }
+
+  private getEnemyKind(enemy: Phaser.Physics.Arcade.Sprite): ShadowRunnerEnemyKind {
+    return (enemy.getData('enemyKind') as ShadowRunnerEnemyKind | undefined)
+      ?? this.getEnemyState(enemy)?.kind
+      ?? 'clockwork-sentry'
+  }
+
+  private getEnemyPatrolSpeed(enemyState: ShadowRunnerEnemyState) {
+    return enemyState.patrolSpeed
+      ?? (enemyState.kind === 'barrel-roller' ? BARREL_PATROL_SPEED : SENTRY_PATROL_SPEED)
+  }
+
+  private getEnemyAnimation(enemyKind: ShadowRunnerEnemyKind, state: 'walk' | 'attack' | 'hit' | 'defeated') {
+    if (enemyKind === 'barrel-roller') {
+      return state === 'walk'
+        ? 'barrel-roll'
+        : state === 'attack'
+          ? 'barrel-impact'
+          : state === 'hit'
+            ? 'barrel-hit'
+            : 'barrel-defeated'
+    }
+
+    return state === 'walk'
+      ? 'sentry-walk'
+      : state === 'attack'
+        ? 'sentry-attack'
+        : state === 'hit'
+          ? 'sentry-hit'
+          : 'sentry-defeated'
+  }
+
+  private setEnemyFacing(enemy: Phaser.Physics.Arcade.Sprite, direction: 1 | -1) {
+    const enemyKind = this.getEnemyKind(enemy)
+    enemy.setFlipX(enemyKind === 'barrel-roller' ? direction < 0 : direction > 0)
   }
 
   private getEnemyState(enemy: Phaser.Physics.Arcade.Sprite): ShadowRunnerEnemyState | undefined {
@@ -658,39 +756,43 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.enemies.forEach(enemy => {
       const enemyState = this.getEnemyState(enemy)
       if (!enemyState?.alive) return
+      const enemyKind = this.getEnemyKind(enemy)
 
       if (time < enemyState.attackUntil) {
         enemy.setVelocityX(0)
       } else {
         const direction = enemyState.direction
-        enemy.setVelocityX(direction * SENTRY_PATROL_SPEED)
-        enemy.setFlipX(direction > 0)
+        const patrolSpeed = this.getEnemyPatrolSpeed(enemyState)
+        enemy.setVelocityX(direction * patrolSpeed)
+        this.setEnemyFacing(enemy, direction)
 
         if (direction < 0 && enemy.x <= enemyState.patrolLeft) {
           enemy.setX(enemyState.patrolLeft)
           enemyState.direction = 1
-          enemy.setVelocityX(SENTRY_PATROL_SPEED)
-          enemy.setFlipX(true)
+          enemy.setVelocityX(patrolSpeed)
+          this.setEnemyFacing(enemy, 1)
         } else if (direction > 0 && enemy.x >= enemyState.patrolRight) {
           enemy.setX(enemyState.patrolRight)
           enemyState.direction = -1
-          enemy.setVelocityX(-SENTRY_PATROL_SPEED)
-          enemy.setFlipX(false)
+          enemy.setVelocityX(-patrolSpeed)
+          this.setEnemyFacing(enemy, -1)
         }
       }
 
       if (time - enemyState.lastDamagedAt < 180) {
-        enemy.play('sentry-hit', true)
+        enemy.play(this.getEnemyAnimation(enemyKind, 'hit'), true)
         enemy.setTint(0xffe08a)
       } else if (time < enemyState.attackUntil) {
         enemy.clearTint()
-        if (enemy.anims.currentAnim?.key !== 'sentry-attack') {
-          enemy.play('sentry-attack', true)
+        const attackAnimation = this.getEnemyAnimation(enemyKind, 'attack')
+        if (enemy.anims.currentAnim?.key !== attackAnimation) {
+          enemy.play(attackAnimation, true)
         }
       } else {
         enemy.clearTint()
-        if (enemy.anims.currentAnim?.key !== 'sentry-walk') {
-          enemy.play('sentry-walk', true)
+        const walkAnimation = this.getEnemyAnimation(enemyKind, 'walk')
+        if (enemy.anims.currentAnim?.key !== walkAnimation) {
+          enemy.play(walkAnimation, true)
         }
       }
     })
@@ -782,10 +884,11 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
     const damaged = this.damagePlayerFromHazard(time, enemy.x)
     if (damaged) {
-      enemyState.attackUntil = time + 280
+      const enemyKind = this.getEnemyKind(enemy)
+      enemyState.attackUntil = time + (enemyKind === 'barrel-roller' ? 340 : 280)
       enemyState.direction = player.x < enemy.x ? -1 : 1
-      enemy.setFlipX(enemyState.direction > 0)
-      enemy.play('sentry-attack', true)
+      this.setEnemyFacing(enemy, enemyState.direction)
+      enemy.play(this.getEnemyAnimation(enemyKind, 'attack'), true)
     }
   }
 
@@ -798,6 +901,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       : (this.player.x < sourceX ? -220 : 220)
     this.player.setVelocity(knockback, -290)
     this.player.setTint(0xffd0b3)
+    this.cameras.main.shake(90, 0.0022)
 
     this.time.delayedCall(190, () => {
       this.player?.clearTint()
@@ -860,7 +964,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     body.enable = false
     enemy.setVelocity(0, 0)
     enemy.clearTint()
-    enemy.play('sentry-defeated', true)
+    enemy.play(this.getEnemyAnimation(this.getEnemyKind(enemy), 'defeated'), true)
     this.addDustPuff(enemy.x, enemy.y - 28)
   }
 
@@ -1101,14 +1205,36 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       sentry.generateTexture('clockwork-sentry', 64, 64)
       sentry.destroy()
     }
+
+    if (!this.textures.exists('barrel-roller')) {
+      const barrel = this.make.graphics({ x: 0, y: 0 })
+      barrel.fillStyle(0x16120d, 1)
+      barrel.fillCircle(32, 34, 22)
+      barrel.fillStyle(0x5d4022, 1)
+      barrel.fillCircle(32, 34, 18)
+      barrel.lineStyle(4, 0xc49a45, 1)
+      barrel.strokeCircle(32, 34, 18)
+      barrel.lineStyle(3, 0x0a0705, 1)
+      barrel.strokeCircle(32, 34, 23)
+      barrel.fillStyle(0xe9c96c, 1)
+      barrel.fillRect(18, 24, 28, 4)
+      barrel.fillRect(18, 40, 28, 4)
+      barrel.generateTexture('barrel-roller', 64, 64)
+      barrel.destroy()
+    }
   }
 
   private registerTerrainFrames() {
-    if (!this.textures.exists('shadow-runner-terrain-atlas')) return
+    this.registerTerrainFrameSet('shadow-runner-terrain-atlas', TERRAIN_CROPS)
+    this.registerTerrainFrameSet('shadow-runner-ivy-terrain-atlas', IVY_TERRAIN_CROPS)
+  }
 
-    const terrainTexture = this.textures.get('shadow-runner-terrain-atlas')
+  private registerTerrainFrameSet(textureKey: string, crops: Record<string, TextureCrop>) {
+    if (!this.textures.exists(textureKey)) return
 
-    Object.entries(TERRAIN_CROPS).forEach(([platformId, crop]) => {
+    const terrainTexture = this.textures.get(textureKey)
+
+    Object.entries(crops).forEach(([platformId, crop]) => {
       const frameKey = getTerrainFrameKey(platformId)
       if (!terrainTexture.has(frameKey)) {
         terrainTexture.add(frameKey, 0, crop.x, crop.y, crop.width, crop.height)

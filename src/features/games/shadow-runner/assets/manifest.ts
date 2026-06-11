@@ -16,6 +16,7 @@ export const SHADOW_RUNNER_ASSETS = {
     campaignMap: `${HOME_ROOT}/optimized/campaign-map.webp`,
     levelDetailPanel: `${HOME_ROOT}/optimized/level-detail-panel.webp`,
     levelThumbnailFrame: `${HOME_ROOT}/optimized/level-thumbnail-frame.webp`,
+    levelThumbnailSquareFrame: `${HOME_ROOT}/optimized/level-thumbnail-square-frame.webp`,
     levelMapScrollPanel: `${HOME_ROOT}/optimized/level-map-scroll-panel.webp`,
     bottomMenuScroll: `${HOME_ROOT}/optimized/bottom-menu-scroll.webp`,
     missionScrollStand: `${HOME_ROOT}/optimized/mission-scroll-stand.webp`,
@@ -33,6 +34,7 @@ export const SHADOW_RUNNER_ASSETS = {
   },
   enemies: {
     clockworkSentryStrip: `${ASSET_ROOT}/sprites/strips/clockwork-sentry-v2-6f-128.png`,
+    barrelRollerStrip: `${ASSET_ROOT}/sprites/strips/barrel-roller-v1-5f-128.png`,
     candleJesterStrip: `${ASSET_ROOT}/sprites/strips/candle-jester-v1-5f-128.png`,
   },
   gameplay: {
@@ -62,6 +64,8 @@ export const SHADOW_RUNNER_ASSETS = {
     lanternMarketThumbnail160: `${LEVEL_ROOT}/level-2/ui/lantern-market-roofs-thumbnail-160x90.webp`,
     lanternMarketThumbnail320: `${LEVEL_ROOT}/level-2/ui/lantern-market-roofs-thumbnail-320x180.webp`,
     lanternMarketBackground: `${LEVEL_ROOT}/level-2/background/lantern-market-roofs-background.webp`,
+    ivyViaductBackground: `${LEVEL_ROOT}/level-3/background/ivy-viaduct-background.webp`,
+    ivyViaductTerrainHazards: `${LEVEL_ROOT}/level-3/terrain/ivy-viaduct-terrain-hazards-v1-transparent.png`,
     ivyViaductThumbnail160: `${LEVEL_ROOT}/level-3/ui/ivy-viaduct-thumbnail-160x90.webp`,
     ivyViaductThumbnail320: `${LEVEL_ROOT}/level-3/ui/ivy-viaduct-thumbnail-320x180.webp`,
     bellTowerThumbnail160: `${LEVEL_ROOT}/level-4/ui/bell-tower-archives-thumbnail-160x90.webp`,

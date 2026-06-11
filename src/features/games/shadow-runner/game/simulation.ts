@@ -1,4 +1,4 @@
-import type { ShadowRunnerEnemyConfig, ShadowRunnerLevelConfig } from './levels'
+import type { ShadowRunnerEnemyConfig, ShadowRunnerEnemyKind, ShadowRunnerLevelConfig } from './levels'
 
 export interface ShadowRunnerHudState {
   lives: number
@@ -21,12 +21,14 @@ export interface ShadowRunnerHudState {
 
 export interface ShadowRunnerEnemyState {
   id: string
+  kind: ShadowRunnerEnemyKind
   health: number
   maxHealth: number
   alive: boolean
   direction: 1 | -1
   patrolLeft: number
   patrolRight: number
+  patrolSpeed?: number
   lastDamagedAt: number
   attackUntil: number
 }
@@ -60,12 +62,14 @@ export interface ShadowRunnerSimulationState {
 function createEnemyState(enemy: ShadowRunnerEnemyConfig): ShadowRunnerEnemyState {
   return {
     id: enemy.id,
+    kind: enemy.kind,
     health: enemy.health,
     maxHealth: enemy.maxHealth,
     alive: true,
     direction: enemy.direction,
     patrolLeft: enemy.patrolLeft,
     patrolRight: enemy.patrolRight,
+    patrolSpeed: enemy.patrolSpeed,
     lastDamagedAt: 0,
     attackUntil: 0,
   }
@@ -74,6 +78,7 @@ function createEnemyState(enemy: ShadowRunnerEnemyConfig): ShadowRunnerEnemyStat
 function createEmptyEnemyState(): ShadowRunnerEnemyState {
   return {
     id: 'none',
+    kind: 'clockwork-sentry',
     health: 0,
     maxHealth: 0,
     alive: false,

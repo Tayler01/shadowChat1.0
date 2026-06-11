@@ -116,3 +116,23 @@ enemy, and reach a finish gate.
   multiple sentries, tilt bridge influence, and finish feedback.
 - The checkpoint is verified, documented in the progress log, committed, and
   pushed to `main`.
+
+## June 11, 2026 - Phone Gameplay Stabilization And Level 3 Foundation
+
+- Added the playable Level 3 foundation: `Ivy Viaduct`, using the generated
+  viaduct background, generated ivy terrain/hazard sheet, three Barrel Roller
+  patrols, one Clockwork Sentry, tighter spike placement, faster tilt bridges,
+  and a longer finish route.
+- Extended enemy state from sentry-only to kind-aware runtime state so Barrel
+  Roller patrol speed, animation, hit, impact, and defeated frames are handled
+  without changing the existing sentry loop.
+- Kept Level 1 and Level 2 difficulty direction intact; validation used QA
+  teleport plus normal rightward finish movement instead of weakening route
+  geometry for automation.
+- Converted campaign-map mission detail popups to square thumbnail frames by
+  using the generated square map-location frame asset on top of the blank
+  scroll panel.
+- Latest verification artifacts:
+  `output/playwright/shadow-runner-goal-20260611-square-frame/`,
+  `output/playwright/shadow-runner-goal-20260611-postbuild/`, and
+  `output/playwright/shadow-runner-goal-20260611-routes/`.
