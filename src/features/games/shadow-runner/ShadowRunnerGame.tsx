@@ -30,6 +30,8 @@ interface ShadowRunnerGameProps {
 }
 
 const DEFAULT_HUD: ShadowRunnerHudState = {
+  lives: 3,
+  maxLives: 3,
   health: 3,
   maxHealth: 3,
   enemyHealth: 3,
@@ -39,6 +41,7 @@ const DEFAULT_HUD: ShadowRunnerHudState = {
   score: 0,
   objective: 'Reach the east gate',
   defeated: false,
+  outOfLives: false,
 }
 
 const SHADOW_RUNNER_GAME_STYLES = `
@@ -71,10 +74,10 @@ type ShadowRunnerPhaserGameHandle = {
   }
 }
 
-function HealthPips({ current, max }: { current: number; max: number }) {
+function LifePips({ current, max }: { current: number; max: number }) {
   return (
     <span
-      aria-label={`Health ${current} of ${max}`}
+      aria-label={`Lives ${current} of ${max}`}
       className="flex items-center justify-center gap-1"
     >
       {Array.from({ length: max }, (_item, index) => (
@@ -163,7 +166,7 @@ export function ShadowRunnerGame({
   const [confirmExit, setConfirmExit] = React.useState<null | 'title' | 'entertainment'>(null)
   const [restartToken, setRestartToken] = React.useState(0)
   const menuOpen = pauseOpen || confirmExit !== null
-  const overlayOpen = menuOpen || hud.defeated
+  const overlayOpen = menuOpen || hud.defeated || hud.outOfLives
 
   const clearPressedActions = React.useCallback(() => {
     inputRef.current = createShadowRunnerInputState()
@@ -308,6 +311,28 @@ export function ShadowRunnerGame({
     },
   ], [closePauseMenu, confirmExit, onBackToTitle, onExitToEntertainment])
 
+  const routeFailedActions = React.useMemo<ShadowRunnerScrollMenuAction[]>(() => [
+    {
+      id: 'try-again',
+      label: 'Retry',
+      icon: <RotateCcw className="h-4 w-4 stroke-[3]" />,
+      onClick: restartLevel,
+    },
+    {
+      id: 'main-menu',
+      label: 'Main Menu',
+      icon: <Home className="h-4 w-4 stroke-[3]" />,
+      onClick: () => onBackToTitle?.(),
+    },
+    {
+      id: 'exit',
+      label: 'Exit',
+      icon: <LogOut className="h-4 w-4 stroke-[3]" />,
+      tone: 'danger',
+      onClick: () => onExitToEntertainment?.(),
+    },
+  ], [onBackToTitle, onExitToEntertainment, restartLevel])
+
   return (
     <div
       className="shadow-runner-no-select relative h-full w-full overflow-hidden bg-[#02040a] text-[#f6e6bb]"
@@ -343,7 +368,7 @@ export function ShadowRunnerGame({
             draggable={false}
           />
           <div className="absolute inset-y-[21%] left-[14.5%] flex w-[30%] items-center justify-center">
-            <HealthPips current={hud.health} max={hud.maxHealth} />
+            <LifePips current={hud.lives} max={hud.maxLives} />
           </div>
           <div
             aria-label={`Coins collected ${hud.coins}`}
@@ -402,7 +427,7 @@ export function ShadowRunnerGame({
       {pauseOpen && !confirmExit && (
         <ShadowRunnerScrollMenu
           title="Pause"
-          subtitle="Level One"
+          subtitle="East Gate Run"
           actions={pauseActions}
         />
       )}
@@ -412,6 +437,14 @@ export function ShadowRunnerGame({
           title={confirmExit === 'title' ? 'Leave Level?' : 'Exit Game?'}
           subtitle={confirmExit === 'title' ? 'Return to title screen' : 'Return to entertainment'}
           actions={confirmActions}
+        />
+      )}
+
+      {hud.outOfLives && !menuOpen && (
+        <ShadowRunnerScrollMenu
+          title="Route Failed"
+          subtitle="The east gate is still waiting"
+          actions={routeFailedActions}
         />
       )}
 

@@ -1,6 +1,7 @@
 const ASSET_ROOT = '/games/shadow-runner'
 const HOME_ROOT = `${ASSET_ROOT}/home-assets`
 const GAMEPLAY_ROOT = `${ASSET_ROOT}/gameplay-assets`
+const LEVEL_ROOT = `${ASSET_ROOT}/level-assets`
 
 export const SHADOW_RUNNER_ASSETS = {
   pickerBanner: `${ASSET_ROOT}/shadow-runner-picker-banner.webp`,
@@ -39,5 +40,13 @@ export const SHADOW_RUNNER_ASSETS = {
     levelCompleteBanner: `${GAMEPLAY_ROOT}/optimized/level-complete-banner.webp`,
     hitSpark: `${GAMEPLAY_ROOT}/sliced/hit-spark.png`,
     coinSparkleStrip: `${GAMEPLAY_ROOT}/sliced/coin-sparkle-strip.png`,
+  },
+  level: {
+    terrainAtlas: `${LEVEL_ROOT}/terrain/stone-ruins-terrain-v1.png`,
+    coinStrip48: `${LEVEL_ROOT}/collectibles/gold-coin-8f-48.png`,
+    spikeRow64: `${LEVEL_ROOT}/hazards/floor-spikes-64x28.png`,
+    eastGate96: `${LEVEL_ROOT}/props/east-gate-96x180.png`,
+    landingDustStrip: `${LEVEL_ROOT}/vfx/landing-dust-6f-64.png`,
+    swordSlashStrip: `${LEVEL_ROOT}/vfx/sword-slash-6f-96.png`,
   },
 } as const

@@ -9,6 +9,7 @@ import {
   damageShadowRunnerPlayer,
   getShadowRunnerHudState,
   restoreShadowRunnerPlayer,
+  spendShadowRunnerLife,
   type ShadowRunnerHudState,
   type ShadowRunnerSimulationState,
 } from './simulation'
@@ -33,17 +34,53 @@ const JUMP_VELOCITY = -620
 const DOUBLE_JUMP_VELOCITY = -560
 const GRAVITY_Y = 1640
 
+interface TextureCrop {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+const TERRAIN_CROPS: Record<string, TextureCrop> = {
+  'west-walkway': { x: 48, y: 113, width: 368, height: 162 },
+  'broken-step-a': { x: 463, y: 113, width: 340, height: 162 },
+  'broken-step-b': { x: 864, y: 106, width: 351, height: 194 },
+  'center-walkway': { x: 48, y: 113, width: 368, height: 162 },
+  'east-ledge': { x: 864, y: 106, width: 351, height: 194 },
+  'upper-coin-shelf': { x: 493, y: 368, width: 258, height: 178 },
+}
+
+function isShadowRunnerLocalQaEnabled() {
+  if (typeof window === 'undefined') return false
+
+  const host = window.location.hostname
+  const localHost = host === '127.0.0.1' || host === 'localhost'
+
+  return localHost && new URLSearchParams(window.location.search).get('localPreview') === 'shadow-runner'
+}
+
 function addStaticPlatform(
   scene: Phaser.Scene,
   group: Phaser.Physics.Arcade.StaticGroup,
   rect: { x: number; y: number; width: number; height: number },
   texture = 'shadow-runner-stone',
+  crop?: TextureCrop,
 ) {
   const centerX = rect.x + rect.width / 2
   const centerY = rect.y + rect.height / 2
-  const visual = scene.add.tileSprite(centerX, centerY, rect.width, rect.height, texture)
+  const visual = crop
+    ? scene.add.image(centerX, centerY, texture)
+    : scene.add.tileSprite(centerX, centerY, rect.width, rect.height, texture)
+
   visual.setOrigin(0.5)
-  visual.setTileScale(1, 1)
+  visual.setDepth(3)
+
+  if (crop && visual instanceof Phaser.GameObjects.Image) {
+    visual.setCrop(crop.x, crop.y, crop.width, crop.height)
+    visual.setDisplaySize(rect.width, rect.height)
+  } else if (visual instanceof Phaser.GameObjects.TileSprite) {
+    visual.setTileScale(1, 1)
+  }
 
   const platform = scene.add.rectangle(centerX, centerY, rect.width, rect.height, 0x000000, 0)
   group.add(platform)
@@ -73,6 +110,8 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   private playerHealthFrame?: Phaser.GameObjects.Image
   private enemyHealthFrame?: Phaser.GameObjects.Image
   private slashArc?: Phaser.GameObjects.Graphics
+  private slashSprite?: Phaser.GameObjects.Sprite
+  private readonly qaEnabled = isShadowRunnerLocalQaEnabled()
   private lastJumpPresses = 0
   private lastAttackPresses = 0
   private jumpsUsed = 0
@@ -106,6 +145,21 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.load.spritesheet('clockwork-sentry', SHADOW_RUNNER_ASSETS.enemies.clockworkSentryStrip, {
       frameWidth: 128,
       frameHeight: 128,
+    })
+    this.load.image('shadow-runner-terrain-atlas', SHADOW_RUNNER_ASSETS.level.terrainAtlas)
+    this.load.spritesheet('shadow-runner-coin', SHADOW_RUNNER_ASSETS.level.coinStrip48, {
+      frameWidth: 48,
+      frameHeight: 48,
+    })
+    this.load.image('shadow-runner-spike-row', SHADOW_RUNNER_ASSETS.level.spikeRow64)
+    this.load.image('shadow-runner-east-gate', SHADOW_RUNNER_ASSETS.level.eastGate96)
+    this.load.spritesheet('shadow-runner-landing-dust', SHADOW_RUNNER_ASSETS.level.landingDustStrip, {
+      frameWidth: 64,
+      frameHeight: 64,
+    })
+    this.load.spritesheet('shadow-runner-sword-slash', SHADOW_RUNNER_ASSETS.level.swordSlashStrip, {
+      frameWidth: 96,
+      frameHeight: 96,
     })
     this.load.image('shadow-runner-health-frame', SHADOW_RUNNER_ASSETS.gameplay.healthBarFrame)
     this.load.image('shadow-runner-hit-spark', SHADOW_RUNNER_ASSETS.gameplay.hitSpark)
@@ -211,6 +265,24 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       repeat: 0,
     })
     this.anims.create({
+      key: 'coin-spin',
+      frames: this.anims.generateFrameNumbers('shadow-runner-coin', { start: 0, end: 7 }),
+      frameRate: 10,
+      repeat: -1,
+    })
+    this.anims.create({
+      key: 'landing-dust',
+      frames: this.anims.generateFrameNumbers('shadow-runner-landing-dust', { start: 0, end: 5 }),
+      frameRate: 18,
+      repeat: 0,
+    })
+    this.anims.create({
+      key: 'sword-slash',
+      frames: this.anims.generateFrameNumbers('shadow-runner-sword-slash', { start: 0, end: 5 }),
+      frameRate: 20,
+      repeat: 0,
+    })
+    this.anims.create({
       key: 'coin-sparkle',
       frames: this.anims.generateFrameNumbers('shadow-runner-coin-sparkle', { start: 0, end: 3 }),
       frameRate: 11,
@@ -224,7 +296,8 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.coins = this.physics.add.staticGroup()
 
     SHADOW_RUNNER_LEVEL_ONE.platforms.forEach(platform => {
-      addStaticPlatform(this, this.platforms!, platform)
+      const crop = this.textures.exists('shadow-runner-terrain-atlas') ? TERRAIN_CROPS[platform.id] : undefined
+      addStaticPlatform(this, this.platforms!, platform, crop ? 'shadow-runner-terrain-atlas' : 'shadow-runner-stone', crop)
     })
 
     SHADOW_RUNNER_LEVEL_ONE.tiltPlatforms.forEach((platform, index) => {
@@ -248,9 +321,11 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     SHADOW_RUNNER_LEVEL_ONE.coins.forEach(coin => {
       const coinSprite = this.coins!.create(coin.x, coin.y, 'shadow-runner-coin') as Phaser.Physics.Arcade.Sprite
       coinSprite.setName(coin.id)
-      coinSprite.setCircle(12, 2, 2)
+      coinSprite.setScale(0.74)
+      coinSprite.setCircle(16, 8, 8)
       coinSprite.setImmovable(true)
       coinSprite.setData('collected', false)
+      coinSprite.play('coin-spin')
       this.tweens.add({
         targets: coinSprite,
         y: coin.y - 8,
@@ -263,9 +338,16 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     })
 
     const finish = SHADOW_RUNNER_LEVEL_ONE.finish
-    this.add.rectangle(finish.x + finish.width / 2, finish.y + finish.height / 2, finish.width, finish.height, 0x211b2e, 0.64)
-    this.add.rectangle(finish.x + finish.width / 2, finish.y + 24, finish.width + 18, 18, 0xd2a649, 0.86)
-    this.add.rectangle(finish.x + finish.width / 2, finish.y + finish.height - 14, finish.width + 24, 18, 0x5f4420, 0.94)
+    if (this.textures.exists('shadow-runner-east-gate')) {
+      const gate = this.add.image(finish.x + finish.width / 2, finish.y + finish.height, 'shadow-runner-east-gate')
+      gate.setOrigin(0.5, 1)
+      gate.setDisplaySize(96, 180)
+      gate.setDepth(5)
+    } else {
+      this.add.rectangle(finish.x + finish.width / 2, finish.y + finish.height / 2, finish.width, finish.height, 0x211b2e, 0.64)
+      this.add.rectangle(finish.x + finish.width / 2, finish.y + 24, finish.width + 18, 18, 0xd2a649, 0.86)
+      this.add.rectangle(finish.x + finish.width / 2, finish.y + finish.height - 14, finish.width + 24, 18, 0x5f4420, 0.94)
+    }
   }
 
   private createActors() {
@@ -295,6 +377,12 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.playerHealthFrame = this.add.image(0, 0, 'shadow-runner-health-frame')
     this.enemyHealthFrame = this.add.image(0, 0, 'shadow-runner-health-frame')
     this.slashArc = this.add.graphics()
+    this.slashSprite = this.add.sprite(0, 0, 'shadow-runner-sword-slash')
+    this.slashSprite.setVisible(false)
+    this.slashSprite.setDepth(30)
+    this.slashSprite.on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => {
+      this.slashSprite?.setVisible(false)
+    })
 
     this.physics.add.collider(this.player, this.platforms!)
     this.physics.add.collider(this.enemy, this.platforms!)
@@ -317,6 +405,47 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       shift: Phaser.Input.Keyboard.KeyCodes.SHIFT,
       s: Phaser.Input.Keyboard.KeyCodes.S,
     }) as Record<'a' | 'd' | 'w' | 'space' | 'z' | 'j' | 'shift' | 's', Phaser.Input.Keyboard.Key> | undefined
+
+    if (this.qaEnabled) {
+      this.registerQaShortcuts()
+    }
+  }
+
+  private registerQaShortcuts() {
+    this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
+      if (event.code === 'Digit2') {
+        this.teleportPlayerForQa(SHADOW_RUNNER_LEVEL_ONE.enemyStart.x - 120, SHADOW_RUNNER_LEVEL_ONE.enemyStart.y)
+      } else if (event.code === 'Digit3') {
+        const finish = SHADOW_RUNNER_LEVEL_ONE.finish
+        this.teleportPlayerForQa(finish.x - 90, finish.y + finish.height)
+      } else if (event.code === 'KeyH') {
+        this.damagePlayerFromHazard(this.time.now)
+      } else if (event.code === 'KeyK') {
+        this.damageEnemyForQa()
+      }
+    })
+  }
+
+  private teleportPlayerForQa(x: number, y: number) {
+    if (!this.player) return
+
+    this.player.setVelocity(0, 0)
+    this.player.setPosition(x, y)
+    this.cameras.main.centerOn(x, y - 80)
+  }
+
+  private damageEnemyForQa() {
+    const enemy = this.enemy
+    if (!enemy || !this.state.enemy.alive) return
+
+    const damaged = damageClockworkSentry(this.state, this.time.now, 1)
+    if (!damaged) return
+
+    this.addHitFlash(enemy.x, enemy.y - 42)
+    if (!this.state.enemy.alive) {
+      this.defeatEnemy(enemy)
+    }
+    this.emitHud(true)
   }
 
   private updatePlayer(time: number) {
@@ -431,6 +560,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.state.player.attackingUntil = time + 265
     this.state.player.attackCooldownUntil = time + 420
     this.player?.play('runner-attack', true)
+    this.playSwordSlash()
   }
 
   private resolveAttackHit(time: number) {
@@ -448,9 +578,11 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     const slashY = player.y - 46
 
     this.slashArc?.clear()
-    this.slashArc?.lineStyle(5, 0xf0d381, 0.94)
-    this.slashArc?.arc(slashX, slashY, 34, facing === 1 ? -0.9 : 2.2, facing === 1 ? 0.9 : 4.05)
-    this.slashArc?.strokePath()
+    if (!this.slashSprite?.visible) {
+      this.slashArc?.lineStyle(5, 0xf0d381, 0.94)
+      this.slashArc?.arc(slashX, slashY, 34, facing === 1 ? -0.9 : 2.2, facing === 1 ? 0.9 : 4.05)
+      this.slashArc?.strokePath()
+    }
 
     if (reachX > 0 && reachX < 106 && vertical < 74) {
       const damaged = damageClockworkSentry(this.state, time, 1)
@@ -500,14 +632,28 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     })
 
     if (this.state.player.health <= 0) {
-      this.time.delayedCall(260, () => {
-        this.respawnPlayer()
-      })
+      this.handlePlayerHealthDepleted()
     }
   }
 
+  private handlePlayerHealthDepleted() {
+    const hasLivesLeft = spendShadowRunnerLife(this.state)
+    this.emitHud(true)
+
+    if (!hasLivesLeft) {
+      this.player?.setVelocity(0, 0)
+      this.player?.setTint(0x6d7380)
+      this.addDustPuff(this.player?.x ?? 0, (this.player?.y ?? 0) - 28)
+      return
+    }
+
+    this.time.delayedCall(260, () => {
+      this.respawnPlayer()
+    })
+  }
+
   private respawnPlayer() {
-    if (!this.player) return
+    if (!this.player || this.state.outOfLives) return
 
     restoreShadowRunnerPlayer(this.state)
     this.jumpsUsed = 0
@@ -590,26 +736,29 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     if (!graphics) return
 
     const width = 58
-    const height = 8
+    const height = 7
     const ratio = Phaser.Math.Clamp(health / maxHealth, 0, 1)
 
     frame?.setVisible(true)
-    frame?.setPosition(x, y + 2)
-    frame?.setDisplaySize(66, 16)
-    frame?.setDepth(21)
+    frame?.setPosition(x, y)
+    frame?.setDisplaySize(74, 18)
+    frame?.setDepth(32)
 
     graphics.clear()
-    graphics.setDepth(20)
-    graphics.fillStyle(0x02040a, 0.78)
-    graphics.fillRect(x - width / 2 - 2, y - 2, width + 4, height + 4)
-    graphics.fillStyle(0x4b1821, 0.9)
-    graphics.fillRect(x - width / 2, y, width, height)
-    graphics.fillStyle(0xf0d381, 0.95)
-    graphics.fillRect(x - width / 2, y, width * ratio, height)
+    graphics.setDepth(33)
+    graphics.fillStyle(0x170305, 0.95)
+    graphics.fillRect(x - width / 2, y - height / 2, width, height)
+
+    if (ratio > 0) {
+      graphics.fillStyle(0xe21d2f, 0.98)
+      graphics.fillRect(x - width / 2, y - height / 2, width * ratio, height)
+      graphics.fillStyle(0xff6b61, 0.78)
+      graphics.fillRect(x - width / 2 + 1, y - height / 2 + 1, Math.max(0, width * ratio - 2), 1)
+    }
   }
 
   private checkFinish() {
-    if (!this.player || this.state.defeated) return
+    if (!this.player || this.state.defeated || this.state.outOfLives) return
 
     const finish = SHADOW_RUNNER_LEVEL_ONE.finish
     if (this.player.x > finish.x && this.player.y > finish.y - 8) {
@@ -630,6 +779,15 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   }
 
   private addDustPuff(x: number, y: number) {
+    if (this.textures.exists('shadow-runner-landing-dust')) {
+      const puff = this.add.sprite(x, y, 'shadow-runner-landing-dust')
+      puff.setDepth(18)
+      puff.setScale(0.9)
+      puff.play('landing-dust')
+      puff.on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => puff.destroy())
+      return
+    }
+
     const puff = this.add.circle(x, y, 8, 0xd6c18a, 0.42)
     this.tweens.add({
       targets: puff,
@@ -660,6 +818,18 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     sparkle.setDisplaySize(56, 68)
     sparkle.play('coin-sparkle')
     sparkle.on(Phaser.Animations.Events.ANIMATION_COMPLETE, () => sparkle.destroy())
+  }
+
+  private playSwordSlash() {
+    if (!this.player || !this.slashSprite || !this.textures.exists('shadow-runner-sword-slash')) return
+
+    const facing = this.state.player.facing
+    this.slashArc?.clear()
+    this.slashSprite.setVisible(true)
+    this.slashSprite.setPosition(this.player.x + facing * 50, this.player.y - 46)
+    this.slashSprite.setFlipX(facing < 0)
+    this.slashSprite.setScale(0.86)
+    this.slashSprite.play('sword-slash', true)
   }
 
   private createTextures() {

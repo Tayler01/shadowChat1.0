@@ -13,7 +13,8 @@
     "Frames are transparent PNGs, normalized to 128x128, and aligned to the bottom-center content anchor.",
     "Frame labels are stored in filenames and this manifest. Do not bake labels into runtime sprite pixels.",
     "Menu idle is the strongest strip for the current home screen direction.",
-    "Run, jump-air, and sword-attack are usable as timing and silhouette anchors, but should receive a stricter consistency pass before final implementation."
+    "Run, jump-air, and sword-attack are usable as timing and silhouette anchors, but should receive a stricter consistency pass before final implementation.",
+    "Enemies should not read like the Shadow Runner hero unless they are intentionally rival runners; use distinct palettes, capes or scarves, head shapes, postures, and tools."
   ],
   "animations": {
     "menuIdleCape": {
@@ -110,6 +111,26 @@
         { "index": 4, "label": "spear-thrust", "file": "/games/shadow-runner/sprites/frames/clockwork-sentry-v2/04-spear-thrust.png" },
         { "index": 5, "label": "hit-stunned", "file": "/games/shadow-runner/sprites/frames/clockwork-sentry-v2/05-hit-stunned.png" },
         { "index": 6, "label": "defeated", "file": "/games/shadow-runner/sprites/frames/clockwork-sentry-v2/06-defeated.png" }
+      ]
+    },
+    "lanternBanditScout": {
+      "id": "lantern-bandit-scout",
+      "purpose": "Map 2 Lantern Market enemy: idle, run, lantern-pole jab, hit, and defeated states",
+      "loop": false,
+      "recommendedFps": 8,
+      "frameCount": 5,
+      "strip": "/games/shadow-runner/sprites/strips/lantern-bandit-scout-v1-5f-128.png",
+      "preview": "/games/shadow-runner/sprites/previews/lantern-bandit-scout-v1-5f-preview.png",
+      "rawSource": "/games/shadow-runner/sprites/raw/lantern-bandit-scout-v1-source.png",
+      "transparentSource": "/games/shadow-runner/sprites/transparent/lantern-bandit-scout-v1-5f-strip.png",
+      "alternateStrip": "/games/shadow-runner/sprites/strips/lantern-bandit-scout-v1-5f-192.png",
+      "styleNotes": "Accepted v1 intentionally avoids the hero silhouette: burgundy cap, rust-orange scarf/cape, tan vest, visible face, hunched thief posture, and lantern-pole attack.",
+      "frames": [
+        { "index": 1, "label": "idle", "file": "/games/shadow-runner/sprites/frames/lantern-bandit-scout-v1/01-idle.png" },
+        { "index": 2, "label": "run", "file": "/games/shadow-runner/sprites/frames/lantern-bandit-scout-v1/02-run.png" },
+        { "index": 3, "label": "lantern-pole-jab", "file": "/games/shadow-runner/sprites/frames/lantern-bandit-scout-v1/03-lantern-pole-jab.png" },
+        { "index": 4, "label": "hit-stunned", "file": "/games/shadow-runner/sprites/frames/lantern-bandit-scout-v1/04-hit-stunned.png" },
+        { "index": 5, "label": "defeated", "file": "/games/shadow-runner/sprites/frames/lantern-bandit-scout-v1/05-defeated.png" }
       ]
     }
   }

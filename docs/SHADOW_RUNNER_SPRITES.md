@@ -16,6 +16,9 @@ motion, frame timing, and home-screen composition.
 - Human review previews include frame labels on a dark band.
 - The hero should remain the same shadow knight messenger: hooded dark cloak,
   gray armor, glowing gold eyes, sword, and messenger satchel.
+- Enemy sprites must not read like the hero unless they are intentionally rival
+  runners. Give each enemy a distinct silhouette, palette, head shape, posture,
+  and tool or weapon. A different cape/scarf color is the minimum bar.
 
 ## Generated Strips
 
@@ -26,6 +29,7 @@ motion, frame timing, and home-screen composition.
 | jump-air | 6 | no | Takeoff, rise, apex, double jump, fall, land | `public/games/shadow-runner/sprites/strips/shadow-runner-jump-air-6f-128.png` | `public/games/shadow-runner/sprites/previews/shadow-runner-jump-air-6f-preview.png` |
 | sword-attack | 5 | no | Ground sword attack | `public/games/shadow-runner/sprites/strips/shadow-runner-sword-attack-5f-128.png` | `public/games/shadow-runner/sprites/previews/shadow-runner-sword-attack-5f-preview.png` |
 | clockwork-sentry | 6 | partial | First playable enemy: idle, patrol, attack, hit, defeated | `public/games/shadow-runner/sprites/strips/clockwork-sentry-v2-6f-128.png` | `public/games/shadow-runner/sprites/previews/clockwork-sentry-v2-6f-preview.png` |
+| lantern-bandit-scout | 5 | partial | Map 2 enemy: idle, run, lantern-pole jab, hit, defeated | `public/games/shadow-runner/sprites/strips/lantern-bandit-scout-v1-5f-128.png` | `public/games/shadow-runner/sprites/previews/lantern-bandit-scout-v1-5f-preview.png` |
 
 ## Frame Labels
 
@@ -75,6 +79,14 @@ motion, frame timing, and home-screen composition.
 5. hit-stunned
 6. defeated
 
+### lantern-bandit-scout
+
+1. idle
+2. run
+3. lantern-pole-jab
+4. hit-stunned
+5. defeated
+
 ## Review Notes
 
 - `menu-idle-cape` is the strongest first-pass strip and is a good candidate for
@@ -93,6 +105,11 @@ motion, frame timing, and home-screen composition.
   for hit/stun feedback, and frame 6 is kept visible as the defeated state
   instead of hiding the enemy immediately. The earlier v1 strip is preserved as
   source history but is no longer wired into the playable prototype.
+- `lantern-bandit-scout` is generated for Map 2, but is not wired into runtime
+  yet. The accepted v1 art intentionally avoids the hero silhouette: burgundy
+  cap, rust-orange scarf/cape, tan vest, visible face, hunched thief posture,
+  and lantern-pole attack. A hooded first pass was rejected because it looked
+  too close to the Shadow Runner hero.
 
 ## Current Runtime Wiring
 
