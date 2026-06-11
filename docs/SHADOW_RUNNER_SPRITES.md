@@ -30,6 +30,8 @@ motion, frame timing, and home-screen composition.
 | sword-attack | 5 | no | Ground sword attack | `public/games/shadow-runner/sprites/strips/shadow-runner-sword-attack-5f-128.png` | `public/games/shadow-runner/sprites/previews/shadow-runner-sword-attack-5f-preview.png` |
 | clockwork-sentry | 6 | partial | First playable enemy: idle, patrol, attack, hit, defeated | `public/games/shadow-runner/sprites/strips/clockwork-sentry-v2-6f-128.png` | `public/games/shadow-runner/sprites/previews/clockwork-sentry-v2-6f-preview.png` |
 | lantern-bandit-scout | 5 | partial | Map 2 enemy: idle, run, lantern-pole jab, hit, defeated | `public/games/shadow-runner/sprites/strips/lantern-bandit-scout-v1-5f-128.png` | `public/games/shadow-runner/sprites/previews/lantern-bandit-scout-v1-5f-preview.png` |
+| barrel-roller | 5 | partial | Map 3 trap-enemy: idle, roll, impact, stunned, broken | `public/games/shadow-runner/sprites/strips/barrel-roller-v1-5f-128.png` | `public/games/shadow-runner/sprites/previews/barrel-roller-v1-5f-preview.png` |
+| scroll-thief | 5 | partial | Map 4 enemy: idle, dash, satchel swipe, hit, defeated | `public/games/shadow-runner/sprites/strips/scroll-thief-v1-5f-128.png` | `public/games/shadow-runner/sprites/previews/scroll-thief-v1-5f-preview.png` |
 
 ## Frame Labels
 
@@ -87,6 +89,22 @@ motion, frame timing, and home-screen composition.
 4. hit-stunned
 5. defeated
 
+### barrel-roller
+
+1. idle-barrel
+2. rolling
+3. charge-impact
+4. stunned-cracked
+5. broken-defeated
+
+### scroll-thief
+
+1. idle-scroll
+2. quick-dash
+3. satchel-swipe
+4. hit-stunned
+5. defeated
+
 ## Review Notes
 
 - `menu-idle-cape` is the strongest first-pass strip and is a good candidate for
@@ -110,6 +128,14 @@ motion, frame timing, and home-screen composition.
   cap, rust-orange scarf/cape, tan vest, visible face, hunched thief posture,
   and lantern-pole attack. A hooded first pass was rejected because it looked
   too close to the Shadow Runner hero.
+- `barrel-roller` is generated for Map 3, but is not wired into runtime yet.
+  It is intentionally non-humanoid, with no hood, cape, satchel, sword, or
+  hero-like pose, so it reads as a rolling trap enemy instead of a character
+  variant.
+- `scroll-thief` is generated for Map 4, but is not wired into runtime yet.
+  It uses a teal short cape/sash, cream shirt, burgundy trousers, scholar cap,
+  visible face, and scroll/satchel-swipe silhouette so it reads as an archive
+  thief rather than another hooded Shadow Runner.
 
 ## Current Runtime Wiring
 

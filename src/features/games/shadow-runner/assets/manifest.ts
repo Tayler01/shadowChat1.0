@@ -43,6 +43,7 @@ export const SHADOW_RUNNER_ASSETS = {
   },
   level: {
     terrainAtlas: `${LEVEL_ROOT}/terrain/stone-ruins-terrain-v1.png`,
+    tiltBridge256: `${LEVEL_ROOT}/terrain/tilt-bridge-v1-256x80.png`,
     coinStrip48: `${LEVEL_ROOT}/collectibles/gold-coin-8f-48.png`,
     spikeRow64: `${LEVEL_ROOT}/hazards/floor-spikes-64x28.png`,
     eastGate96: `${LEVEL_ROOT}/props/east-gate-96x180.png`,

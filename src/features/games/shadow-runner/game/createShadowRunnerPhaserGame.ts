@@ -41,6 +41,16 @@ interface TextureCrop {
   height: number
 }
 
+interface PlatformVisualOptions {
+  texture?: string
+  frame?: string | number
+  useImage?: boolean
+  displayWidth?: number
+  displayHeight?: number
+  visualOffsetY?: number
+  depth?: number
+}
+
 const TERRAIN_CROPS: Record<string, TextureCrop> = {
   'west-walkway': { x: 48, y: 113, width: 368, height: 162 },
   'broken-step-a': { x: 463, y: 113, width: 340, height: 162 },
@@ -48,6 +58,12 @@ const TERRAIN_CROPS: Record<string, TextureCrop> = {
   'center-walkway': { x: 48, y: 113, width: 368, height: 162 },
   'east-ledge': { x: 864, y: 106, width: 351, height: 194 },
   'upper-coin-shelf': { x: 493, y: 368, width: 258, height: 178 },
+}
+
+const TERRAIN_FRAME_PREFIX = 'terrain-'
+
+function getTerrainFrameKey(platformId: string) {
+  return `${TERRAIN_FRAME_PREFIX}${platformId}`
 }
 
 function isShadowRunnerLocalQaEnabled() {
@@ -63,21 +79,23 @@ function addStaticPlatform(
   scene: Phaser.Scene,
   group: Phaser.Physics.Arcade.StaticGroup,
   rect: { x: number; y: number; width: number; height: number },
-  texture = 'shadow-runner-stone',
-  crop?: TextureCrop,
+  options: PlatformVisualOptions = {},
 ) {
   const centerX = rect.x + rect.width / 2
   const centerY = rect.y + rect.height / 2
-  const visual = crop
-    ? scene.add.image(centerX, centerY, texture)
-    : scene.add.tileSprite(centerX, centerY, rect.width, rect.height, texture)
+  const texture = options.texture ?? 'shadow-runner-stone'
+  const displayWidth = options.displayWidth ?? rect.width
+  const displayHeight = options.displayHeight ?? rect.height
+  const visualY = centerY + (options.visualOffsetY ?? 0)
+  const visual = options.useImage || options.frame !== undefined
+    ? scene.add.image(centerX, visualY, texture, options.frame)
+    : scene.add.tileSprite(centerX, visualY, rect.width, rect.height, texture)
 
   visual.setOrigin(0.5)
-  visual.setDepth(3)
+  visual.setDepth(options.depth ?? 3)
 
-  if (crop && visual instanceof Phaser.GameObjects.Image) {
-    visual.setCrop(crop.x, crop.y, crop.width, crop.height)
-    visual.setDisplaySize(rect.width, rect.height)
+  if (visual instanceof Phaser.GameObjects.Image) {
+    visual.setDisplaySize(displayWidth, displayHeight)
   } else if (visual instanceof Phaser.GameObjects.TileSprite) {
     visual.setTileScale(1, 1)
   }
@@ -115,6 +133,9 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   private lastJumpPresses = 0
   private lastAttackPresses = 0
   private jumpsUsed = 0
+  private wasOnFloor = false
+  private enemyAttackUntil = 0
+  private finishSparked = false
   private lastHudSignature = ''
 
   constructor(options: Omit<CreateShadowRunnerGameOptions, 'parent'>) {
@@ -147,6 +168,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       frameHeight: 128,
     })
     this.load.image('shadow-runner-terrain-atlas', SHADOW_RUNNER_ASSETS.level.terrainAtlas)
+    this.load.image('shadow-runner-tilt-bridge', SHADOW_RUNNER_ASSETS.level.tiltBridge256)
     this.load.spritesheet('shadow-runner-coin', SHADOW_RUNNER_ASSETS.level.coinStrip48, {
       frameWidth: 48,
       frameHeight: 48,
@@ -171,8 +193,12 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
   create() {
     this.state = createInitialShadowRunnerSimulation()
+    this.wasOnFloor = false
+    this.enemyAttackUntil = 0
+    this.finishSparked = false
     this.physics.world.setBounds(0, 0, SHADOW_RUNNER_LEVEL_ONE.worldWidth, SHADOW_RUNNER_LEVEL_ONE.worldHeight)
     this.createTextures()
+    this.registerTerrainFrames()
     this.createBackground()
     this.createAnimations()
     this.createLevel()
@@ -296,12 +322,27 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.coins = this.physics.add.staticGroup()
 
     SHADOW_RUNNER_LEVEL_ONE.platforms.forEach(platform => {
-      const crop = this.textures.exists('shadow-runner-terrain-atlas') ? TERRAIN_CROPS[platform.id] : undefined
-      addStaticPlatform(this, this.platforms!, platform, crop ? 'shadow-runner-terrain-atlas' : 'shadow-runner-stone', crop)
+      const frameKey = getTerrainFrameKey(platform.id)
+      const hasTerrainFrame = this.textures.exists('shadow-runner-terrain-atlas')
+        && this.textures.get('shadow-runner-terrain-atlas').has(frameKey)
+
+      addStaticPlatform(this, this.platforms!, platform, hasTerrainFrame
+        ? { texture: 'shadow-runner-terrain-atlas', frame: frameKey, useImage: true }
+        : { texture: 'shadow-runner-stone' })
     })
 
     SHADOW_RUNNER_LEVEL_ONE.tiltPlatforms.forEach((platform, index) => {
-      const sprite = addStaticPlatform(this, this.platforms!, platform, 'shadow-runner-tilt-stone')
+      const hasTiltAsset = this.textures.exists('shadow-runner-tilt-bridge')
+      const sprite = addStaticPlatform(this, this.platforms!, platform, hasTiltAsset
+        ? {
+            texture: 'shadow-runner-tilt-bridge',
+            useImage: true,
+            displayWidth: platform.width + 18,
+            displayHeight: 58,
+            visualOffsetY: 16,
+            depth: 4,
+          }
+        : { texture: 'shadow-runner-tilt-stone' })
       sprite.setData('tilt-platform', true)
       sprite.setData('baseRotation', index % 2 === 0 ? -0.05 : 0.05)
       this.tweens.add({
@@ -315,7 +356,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     })
 
     SHADOW_RUNNER_LEVEL_ONE.spikes.forEach(spike => {
-      addStaticPlatform(this, this.spikes!, spike, 'shadow-runner-spike-row')
+      addStaticPlatform(this, this.spikes!, spike, { texture: 'shadow-runner-spike-row' })
     })
 
     SHADOW_RUNNER_LEVEL_ONE.coins.forEach(coin => {
@@ -471,6 +512,9 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
     if (onFloor && body.velocity.y >= 0) {
       this.jumpsUsed = 0
+      if (!this.wasOnFloor && time > 320) {
+        this.addDustPuff(player.x, player.y - 22)
+      }
     }
 
     if (left !== right) {
@@ -505,31 +549,41 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     }
 
     this.updateHeroAnimation(time, left || right, onFloor)
+    this.wasOnFloor = onFloor
   }
 
   private updateEnemy(time: number) {
     const enemy = this.enemy
     if (!enemy || !this.state.enemy.alive) return
 
-    const direction = this.state.enemy.direction
-    enemy.setVelocityX(direction * SENTRY_PATROL_SPEED)
-    enemy.setFlipX(direction > 0)
+    if (time < this.enemyAttackUntil) {
+      enemy.setVelocityX(0)
+    } else {
+      const direction = this.state.enemy.direction
+      enemy.setVelocityX(direction * SENTRY_PATROL_SPEED)
+      enemy.setFlipX(direction > 0)
 
-    if (direction < 0 && enemy.x <= this.state.enemy.patrolLeft) {
-      enemy.setX(this.state.enemy.patrolLeft)
-      this.state.enemy.direction = 1
-      enemy.setVelocityX(SENTRY_PATROL_SPEED)
-      enemy.setFlipX(true)
-    } else if (direction > 0 && enemy.x >= this.state.enemy.patrolRight) {
-      enemy.setX(this.state.enemy.patrolRight)
-      this.state.enemy.direction = -1
-      enemy.setVelocityX(-SENTRY_PATROL_SPEED)
-      enemy.setFlipX(false)
+      if (direction < 0 && enemy.x <= this.state.enemy.patrolLeft) {
+        enemy.setX(this.state.enemy.patrolLeft)
+        this.state.enemy.direction = 1
+        enemy.setVelocityX(SENTRY_PATROL_SPEED)
+        enemy.setFlipX(true)
+      } else if (direction > 0 && enemy.x >= this.state.enemy.patrolRight) {
+        enemy.setX(this.state.enemy.patrolRight)
+        this.state.enemy.direction = -1
+        enemy.setVelocityX(-SENTRY_PATROL_SPEED)
+        enemy.setFlipX(false)
+      }
     }
 
     if (time - this.state.enemy.lastDamagedAt < 180) {
       enemy.play('sentry-hit', true)
       enemy.setTint(0xffe08a)
+    } else if (time < this.enemyAttackUntil) {
+      enemy.clearTint()
+      if (enemy.anims.currentAnim?.key !== 'sentry-attack') {
+        enemy.play('sentry-attack', true)
+      }
     } else {
       enemy.clearTint()
       if (enemy.anims.currentAnim?.key !== 'sentry-walk') {
@@ -616,14 +670,22 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       return
     }
 
-    this.damagePlayerFromHazard(time)
+    const damaged = this.damagePlayerFromHazard(time, enemy.x)
+    if (damaged) {
+      this.enemyAttackUntil = time + 280
+      this.state.enemy.direction = player.x < enemy.x ? -1 : 1
+      enemy.setFlipX(this.state.enemy.direction > 0)
+      enemy.play('sentry-attack', true)
+    }
   }
 
-  private damagePlayerFromHazard(time: number) {
+  private damagePlayerFromHazard(time: number, sourceX?: number) {
     const damaged = damageShadowRunnerPlayer(this.state, time)
-    if (!damaged || !this.player) return
+    if (!damaged || !this.player) return false
 
-    const knockback = this.state.player.facing === 1 ? -220 : 220
+    const knockback = sourceX === undefined
+      ? (this.state.player.facing === 1 ? -220 : 220)
+      : (this.player.x < sourceX ? -220 : 220)
     this.player.setVelocity(knockback, -290)
     this.player.setTint(0xffd0b3)
 
@@ -634,6 +696,8 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     if (this.state.player.health <= 0) {
       this.handlePlayerHealthDepleted()
     }
+
+    return true
   }
 
   private handlePlayerHealthDepleted() {
@@ -765,6 +829,11 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       this.state.defeated = true
       this.state.objective = 'Gate reached'
       this.state.player.score += 300
+      if (!this.finishSparked) {
+        this.finishSparked = true
+        this.addDustPuff(finish.x + finish.width / 2, finish.y + finish.height - 20)
+        this.addCoinSparkle(finish.x + finish.width / 2, finish.y + 38)
+      }
       this.emitHud(true)
     }
   }
@@ -905,6 +974,19 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       sentry.generateTexture('clockwork-sentry', 64, 64)
       sentry.destroy()
     }
+  }
+
+  private registerTerrainFrames() {
+    if (!this.textures.exists('shadow-runner-terrain-atlas')) return
+
+    const terrainTexture = this.textures.get('shadow-runner-terrain-atlas')
+
+    Object.entries(TERRAIN_CROPS).forEach(([platformId, crop]) => {
+      const frameKey = getTerrainFrameKey(platformId)
+      if (!terrainTexture.has(frameKey)) {
+        terrainTexture.add(frameKey, 0, crop.x, crop.y, crop.width, crop.height)
+      }
+    })
   }
 }
 

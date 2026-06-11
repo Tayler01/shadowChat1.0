@@ -132,6 +132,46 @@
         { "index": 4, "label": "hit-stunned", "file": "/games/shadow-runner/sprites/frames/lantern-bandit-scout-v1/04-hit-stunned.png" },
         { "index": 5, "label": "defeated", "file": "/games/shadow-runner/sprites/frames/lantern-bandit-scout-v1/05-defeated.png" }
       ]
+    },
+    "barrelRoller": {
+      "id": "barrel-roller",
+      "purpose": "Map 3 Ivy Viaduct trap-enemy: idle barrel, rolling, impact, stunned cracked, and broken defeated states",
+      "loop": false,
+      "recommendedFps": 8,
+      "frameCount": 5,
+      "strip": "/games/shadow-runner/sprites/strips/barrel-roller-v1-5f-128.png",
+      "preview": "/games/shadow-runner/sprites/previews/barrel-roller-v1-5f-preview.png",
+      "rawSource": "/games/shadow-runner/sprites/raw/barrel-roller-v1-source.png",
+      "transparentSource": "/games/shadow-runner/sprites/transparent/barrel-roller-v1-5f-strip.png",
+      "alternateStrip": "/games/shadow-runner/sprites/strips/barrel-roller-v1-5f-192.png",
+      "styleNotes": "Accepted v1 is intentionally non-humanoid, with no hood, cape, satchel, sword, or hero-like pose.",
+      "frames": [
+        { "index": 1, "label": "idle-barrel", "file": "/games/shadow-runner/sprites/frames/barrel-roller-v1/01-idle-barrel.png" },
+        { "index": 2, "label": "rolling", "file": "/games/shadow-runner/sprites/frames/barrel-roller-v1/02-rolling.png" },
+        { "index": 3, "label": "charge-impact", "file": "/games/shadow-runner/sprites/frames/barrel-roller-v1/03-charge-impact.png" },
+        { "index": 4, "label": "stunned-cracked", "file": "/games/shadow-runner/sprites/frames/barrel-roller-v1/04-stunned-cracked.png" },
+        { "index": 5, "label": "broken-defeated", "file": "/games/shadow-runner/sprites/frames/barrel-roller-v1/05-broken-defeated.png" }
+      ]
+    },
+    "scrollThief": {
+      "id": "scroll-thief",
+      "purpose": "Map 4 Bell Tower Archives enemy: idle with stolen scroll, quick dash, satchel swipe, hit, and defeated states",
+      "loop": false,
+      "recommendedFps": 10,
+      "frameCount": 5,
+      "strip": "/games/shadow-runner/sprites/strips/scroll-thief-v1-5f-128.png",
+      "preview": "/games/shadow-runner/sprites/previews/scroll-thief-v1-5f-preview.png",
+      "rawSource": "/games/shadow-runner/sprites/raw/scroll-thief-v1-source.png",
+      "transparentSource": "/games/shadow-runner/sprites/transparent/scroll-thief-v1-5f-strip.png",
+      "alternateStrip": "/games/shadow-runner/sprites/strips/scroll-thief-v1-5f-192.png",
+      "styleNotes": "Accepted v1 uses a teal short cape/sash, cream shirt, burgundy trousers, scholar cap, visible face, and scroll/satchel-swipe silhouette instead of a dark hooded runner silhouette.",
+      "frames": [
+        { "index": 1, "label": "idle-scroll", "file": "/games/shadow-runner/sprites/frames/scroll-thief-v1/01-idle-scroll.png" },
+        { "index": 2, "label": "quick-dash", "file": "/games/shadow-runner/sprites/frames/scroll-thief-v1/02-quick-dash.png" },
+        { "index": 3, "label": "satchel-swipe", "file": "/games/shadow-runner/sprites/frames/scroll-thief-v1/03-satchel-swipe.png" },
+        { "index": 4, "label": "hit-stunned", "file": "/games/shadow-runner/sprites/frames/scroll-thief-v1/04-hit-stunned.png" },
+        { "index": 5, "label": "defeated", "file": "/games/shadow-runner/sprites/frames/scroll-thief-v1/05-defeated.png" }
+      ]
     }
   }
 }

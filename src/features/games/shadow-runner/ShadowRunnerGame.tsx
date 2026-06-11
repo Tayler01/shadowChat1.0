@@ -5,7 +5,6 @@ import {
   ChevronRight,
   ChevronsUp,
   Home,
-  LogOut,
   Music,
   Pause,
   Play,
@@ -24,7 +23,6 @@ interface ShadowRunnerGameProps {
   audioBlocked?: boolean
   soundEffectsEnabled?: boolean
   onBackToTitle?: () => void
-  onExitToEntertainment?: () => void
   onToggleMusic?: () => void
   onToggleSoundEffects?: () => void
 }
@@ -45,6 +43,15 @@ const DEFAULT_HUD: ShadowRunnerHudState = {
 }
 
 const SHADOW_RUNNER_GAME_STYLES = `
+  .shadow-runner-no-select,
+  .shadow-runner-no-select * {
+    -webkit-touch-callout: none;
+    -webkit-user-drag: none;
+    -webkit-user-select: none;
+    touch-action: none;
+    user-select: none;
+  }
+
   .shadow-runner-game-stage canvas {
     display: block;
     height: 100%;
@@ -140,7 +147,7 @@ function TouchButton({
       onPointerCancel={release}
       onLostPointerCapture={() => onActionChange(action, false)}
       onContextMenu={event => event.preventDefault()}
-      className={`shadow-runner-touch-button inline-flex items-center justify-center rounded-full border border-[#f0d381]/45 bg-black/50 text-[#f6e6bb] shadow-[0_14px_34px_rgba(0,0,0,0.5)] backdrop-blur-md transition active:scale-95 active:border-[#f0d381]/80 active:bg-[#4a3418]/80 ${size === 'large' ? 'h-16 w-16' : 'h-14 w-14'}`}
+      className={`shadow-runner-touch-button inline-flex items-center justify-center rounded-full border border-[#f0d381]/45 bg-black/50 text-[#f6e6bb] shadow-[0_14px_34px_rgba(0,0,0,0.5)] backdrop-blur-md transition active:scale-95 active:border-[#f0d381]/80 active:bg-[#4a3418]/80 ${size === 'large' ? 'h-[clamp(3.25rem,14svh,4rem)] w-[clamp(3.25rem,14svh,4rem)]' : 'h-[clamp(2.85rem,12svh,3.5rem)] w-[clamp(2.85rem,12svh,3.5rem)]'}`}
     >
       {children}
     </button>
@@ -152,7 +159,6 @@ export function ShadowRunnerGame({
   audioBlocked = false,
   soundEffectsEnabled = true,
   onBackToTitle,
-  onExitToEntertainment,
   onToggleMusic,
   onToggleSoundEffects,
 }: ShadowRunnerGameProps) {
@@ -163,7 +169,7 @@ export function ShadowRunnerGame({
   const [ready, setReady] = React.useState(false)
   const [loadError, setLoadError] = React.useState<string | null>(null)
   const [pauseOpen, setPauseOpen] = React.useState(false)
-  const [confirmExit, setConfirmExit] = React.useState<null | 'title' | 'entertainment'>(null)
+  const [confirmExit, setConfirmExit] = React.useState<null | 'title'>(null)
   const [restartToken, setRestartToken] = React.useState(0)
   const menuOpen = pauseOpen || confirmExit !== null
   const overlayOpen = menuOpen || hud.defeated || hud.outOfLives
@@ -275,16 +281,9 @@ export function ShadowRunnerGame({
     },
     {
       id: 'main-menu',
-      label: 'Main Menu',
+      label: 'Quit Level',
       icon: <Home className="h-4 w-4 stroke-[3]" />,
       onClick: () => setConfirmExit('title'),
-    },
-    {
-      id: 'exit',
-      label: 'Exit',
-      icon: <LogOut className="h-4 w-4 stroke-[3]" />,
-      tone: 'danger',
-      onClick: () => setConfirmExit('entertainment'),
     },
   ], [audioBlocked, closePauseMenu, musicPlaying, onToggleMusic, onToggleSoundEffects, soundEffectsEnabled])
 
@@ -297,19 +296,15 @@ export function ShadowRunnerGame({
     },
     {
       id: 'confirm',
-      label: confirmExit === 'title' ? 'Main Menu' : 'Exit',
-      icon: confirmExit === 'title' ? <Home className="h-4 w-4 stroke-[3]" /> : <LogOut className="h-4 w-4 stroke-[3]" />,
+      label: 'Main Menu',
+      icon: <Home className="h-4 w-4 stroke-[3]" />,
       tone: 'danger',
       onClick: () => {
         closePauseMenu()
-        if (confirmExit === 'title') {
-          onBackToTitle?.()
-          return
-        }
-        onExitToEntertainment?.()
+        onBackToTitle?.()
       },
     },
-  ], [closePauseMenu, confirmExit, onBackToTitle, onExitToEntertainment])
+  ], [closePauseMenu, onBackToTitle])
 
   const routeFailedActions = React.useMemo<ShadowRunnerScrollMenuAction[]>(() => [
     {
@@ -324,14 +319,7 @@ export function ShadowRunnerGame({
       icon: <Home className="h-4 w-4 stroke-[3]" />,
       onClick: () => onBackToTitle?.(),
     },
-    {
-      id: 'exit',
-      label: 'Exit',
-      icon: <LogOut className="h-4 w-4 stroke-[3]" />,
-      tone: 'danger',
-      onClick: () => onExitToEntertainment?.(),
-    },
-  ], [onBackToTitle, onExitToEntertainment, restartLevel])
+  ], [onBackToTitle, restartLevel])
 
   return (
     <div
@@ -402,7 +390,7 @@ export function ShadowRunnerGame({
       </div>
 
       <div className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between px-[max(1rem,env(safe-area-inset-left))] pb-[max(0.85rem,env(safe-area-inset-bottom))] transition-opacity ${overlayOpen ? 'opacity-35' : 'opacity-100'}`}>
-        <div className="pointer-events-auto flex items-end gap-2">
+        <div className="pointer-events-auto flex items-end gap-[clamp(0.35rem,1.5vw,0.5rem)]">
           <TouchButton action="left" ariaLabel="Move left" onActionChange={setAction}>
             <ChevronLeft className="h-7 w-7" />
           </TouchButton>
@@ -414,7 +402,7 @@ export function ShadowRunnerGame({
           </TouchButton>
         </div>
 
-        <div className="pointer-events-auto flex items-end gap-3">
+        <div className="pointer-events-auto flex items-end gap-[clamp(0.45rem,1.8vw,0.75rem)]">
           <TouchButton action="jump" ariaLabel="Jump" onActionChange={setAction} size="large">
             <ChevronsUp className="h-8 w-8" />
           </TouchButton>
@@ -434,8 +422,8 @@ export function ShadowRunnerGame({
 
       {confirmExit && (
         <ShadowRunnerScrollMenu
-          title={confirmExit === 'title' ? 'Leave Level?' : 'Exit Game?'}
-          subtitle={confirmExit === 'title' ? 'Return to title screen' : 'Return to entertainment'}
+          title="Quit Level?"
+          subtitle="Return to Shadow Runner menu"
           actions={confirmActions}
         />
       )}
@@ -464,18 +452,18 @@ export function ShadowRunnerGame({
                 draggable={false}
               />
               <div className="absolute inset-x-[13%] top-[27%] text-center">
-                <p className="text-sm font-black uppercase leading-none tracking-[0.18em] min-[740px]:text-xl">Level Complete</p>
-                <p className="mt-1 text-[0.58rem] font-black uppercase tracking-[0.12em] text-[#3a2611] min-[740px]:text-xs">
-                  {hud.coins}/{hud.totalCoins} coins - {hud.score} score
+                <p className="text-[0.54rem] font-black uppercase tracking-[0.16em] text-[#5a3818] min-[740px]:text-[0.66rem]">East Gate Run</p>
+                <p className="mt-0.5 text-sm font-black uppercase leading-none tracking-[0.16em] min-[740px]:text-xl">Level Complete</p>
+                <p className="mt-1 text-[0.56rem] font-black uppercase tracking-[0.1em] text-[#3a2611] min-[740px]:text-xs">
+                  Coins {hud.coins} of {hud.totalCoins} - Score {hud.score}
                 </p>
               </div>
             </div>
 
-            <div className="mt-[-0.35rem] grid w-[86%] grid-cols-3 gap-2">
+            <div className="mt-[-0.35rem] grid w-[70%] grid-cols-2 gap-2">
               {[
                 { id: 'restart', label: 'Restart', icon: <RotateCcw className="h-4 w-4 stroke-[3]" />, onClick: restartLevel },
-                { id: 'main-menu', label: 'Main', icon: <Home className="h-4 w-4 stroke-[3]" />, onClick: onBackToTitle },
-                { id: 'exit', label: 'Exit', icon: <LogOut className="h-4 w-4 stroke-[3]" />, onClick: onExitToEntertainment },
+                { id: 'main-menu', label: 'Main Menu', icon: <Home className="h-4 w-4 stroke-[3]" />, onClick: onBackToTitle },
               ].map(action => (
                 <button
                   key={action.id}

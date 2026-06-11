@@ -499,7 +499,7 @@ export function ShadowRunnerScreen({
     },
     {
       id: 'exit',
-      label: 'Exit',
+      label: 'Exit Game',
       icon: <LogOut className="h-4 w-4 stroke-[3]" />,
       tone: 'danger',
       onClick: () => {
@@ -540,7 +540,6 @@ export function ShadowRunnerScreen({
             soundEffectsEnabled={soundEffectsEnabled}
             onToggleSoundEffects={() => setSoundEffectsEnabled(current => !current)}
             onBackToTitle={() => setScreen('title')}
-            onExitToEntertainment={onExit}
           />
         ) : (
           <>

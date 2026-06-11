@@ -108,7 +108,8 @@ Status on 2026-06-11: the runtime-ready Level 1 files are registered in
 The game now uses the terrain chunk sheet as platform visual art, the 48 px
 gold coin strip for pickups, the 64 x 28 spike row for hazards, the 96 x 180
 east gate as the finish marker, and the 64/96 px dust and sword-slash strips
-for gameplay VFX. Source and preview files remain cataloged for review.
+for gameplay VFX. The generated tilt bridge asset is wired as the moving
+bridge visual. Source and preview files remain cataloged for review.
 
 - Clockwork Sentry v2:
   - source: `public/games/shadow-runner/sprites/raw/clockwork-sentry-v2-source.png`
@@ -123,8 +124,13 @@ for gameplay VFX. Source and preview files remain cataloged for review.
   - source: `public/games/shadow-runner/level-assets/terrain/stone-ruins-terrain-v1-source.png`
   - transparent sheet: `public/games/shadow-runner/level-assets/terrain/stone-ruins-terrain-v1.png`
   - preview: `public/games/shadow-runner/level-assets/terrain/stone-ruins-terrain-v1-preview.png`
-  - note: wired as stretched platform visual crops. This is a platform/chunk
-    sheet, not a strict 32 x 32 tile atlas.
+  - note: wired as registered Phaser texture-frame platform visuals. This is a
+    platform/chunk sheet, not a strict 32 x 32 tile atlas.
+- Tilt bridge:
+  - source: `public/games/shadow-runner/level-assets/terrain/tilt-bridge-v1-source.png`
+  - transparent source: `public/games/shadow-runner/level-assets/terrain/tilt-bridge-v1-transparent.png`
+  - runtime asset: `public/games/shadow-runner/level-assets/terrain/tilt-bridge-v1-256x80.png`
+  - note: wired as the animated moving bridge visual in Level 1.
 - Gold coin pickup:
   - source: `public/games/shadow-runner/level-assets/collectibles/gold-coin-v1-source.png`
   - transparent strip: `public/games/shadow-runner/level-assets/collectibles/gold-coin-v1-transparent-strip.png`
@@ -184,6 +190,60 @@ for gameplay VFX. Source and preview files remain cataloged for review.
 - Batch contact sheet:
   `public/games/shadow-runner/level-assets/level-2/batch-2-lantern-market-contact-sheet.png`
 
+### 2026-06-11 Batch 3 Ivy Viaduct
+
+- Ivy Viaduct gameplay background:
+  - source: `public/games/shadow-runner/level-assets/level-3/background/ivy-viaduct-background-source.png`
+  - optimized background: `public/games/shadow-runner/level-assets/level-3/background/ivy-viaduct-background.webp`
+- Ivy Viaduct terrain and hazard source sheet:
+  - source: `public/games/shadow-runner/level-assets/level-3/terrain/ivy-viaduct-terrain-hazards-v1-source.png`
+  - transparent sheet: `public/games/shadow-runner/level-assets/level-3/terrain/ivy-viaduct-terrain-hazards-v1-transparent.png`
+  - includes mossy viaduct blocks, arch underside pieces, ledge caps, vine
+    overlays, wet ledges, crumbling bridge planks, falling-stone pieces,
+    shallow pit warning marker, spike-pit dressing, broken banner, runner route
+    marks, dust puffs, and stone chunks.
+- Ivy Viaduct level-select thumbnail:
+  - source: `public/games/shadow-runner/level-assets/level-3/ui/ivy-viaduct-thumbnail-source.png`
+  - runtime options: `public/games/shadow-runner/level-assets/level-3/ui/ivy-viaduct-thumbnail-320x180.webp` and `public/games/shadow-runner/level-assets/level-3/ui/ivy-viaduct-thumbnail-160x90.webp`
+- Barrel Roller v1:
+  - source: `public/games/shadow-runner/sprites/raw/barrel-roller-v1-source.png`
+  - transparent strip: `public/games/shadow-runner/sprites/transparent/barrel-roller-v1-5f-strip.png`
+  - runtime strips: `public/games/shadow-runner/sprites/strips/barrel-roller-v1-5f-128.png` and `public/games/shadow-runner/sprites/strips/barrel-roller-v1-5f-192.png`
+  - frames: `public/games/shadow-runner/sprites/frames/barrel-roller-v1/*.png`
+  - preview: `public/games/shadow-runner/sprites/previews/barrel-roller-v1-5f-preview.png`
+  - note: generated as a non-humanoid object/trap enemy so it cannot read as
+    the Shadow Runner hero.
+- Batch contact sheet:
+  `public/games/shadow-runner/level-assets/level-3/batch-3-ivy-viaduct-contact-sheet.png`
+
+### 2026-06-11 Batch 4 Bell Tower Archives
+
+- Bell Tower Archives gameplay background:
+  - source: `public/games/shadow-runner/level-assets/level-4/background/bell-tower-archives-background-source.png`
+  - optimized background: `public/games/shadow-runner/level-assets/level-4/background/bell-tower-archives-background.webp`
+- Bell Tower Archives props and hazard source sheet:
+  - source: `public/games/shadow-runner/level-assets/level-4/props/bell-tower-archives-props-hazards-v1-source.png`
+  - transparent sheet: `public/games/shadow-runner/level-assets/level-4/props/bell-tower-archives-props-hazards-v1-transparent.png`
+  - includes tower ledges, narrow wall platforms, bell platform, ladders,
+    chains, archive shelves, scroll piles, sealed-letter and message pedestals,
+    forged-order scroll, archive seal, arrow-slit hazards, projectile arrows,
+    impact sparks, candle stand, bell rope, window slit, purple archive banner,
+    and wood supports.
+- Bell Tower Archives level-select thumbnail:
+  - source: `public/games/shadow-runner/level-assets/level-4/ui/bell-tower-archives-thumbnail-source.png`
+  - runtime options: `public/games/shadow-runner/level-assets/level-4/ui/bell-tower-archives-thumbnail-320x180.webp` and `public/games/shadow-runner/level-assets/level-4/ui/bell-tower-archives-thumbnail-160x90.webp`
+- Scroll Thief v1:
+  - source: `public/games/shadow-runner/sprites/raw/scroll-thief-v1-source.png`
+  - transparent strip: `public/games/shadow-runner/sprites/transparent/scroll-thief-v1-5f-strip.png`
+  - runtime strips: `public/games/shadow-runner/sprites/strips/scroll-thief-v1-5f-128.png` and `public/games/shadow-runner/sprites/strips/scroll-thief-v1-5f-192.png`
+  - frames: `public/games/shadow-runner/sprites/frames/scroll-thief-v1/*.png`
+  - preview: `public/games/shadow-runner/sprites/previews/scroll-thief-v1-5f-preview.png`
+  - note: teal short cape/sash, cream shirt, burgundy trousers, scholar cap,
+    visible face, and scroll/satchel-swipe silhouette keep it distinct from the
+    Shadow Runner hero.
+- Batch contact sheet:
+  `public/games/shadow-runner/level-assets/level-4/batch-4-bell-tower-archives-contact-sheet.png`
+
 ## Lore-Driven Missing Assets By Map
 
 This list comes from `docs/SHADOW_RUNNER_STORY_LORE.md`, especially the
@@ -199,8 +259,9 @@ Status key:
 ### Campaign-Wide Missing Packs
 
 - [ ] **Gameplay background/parallax system for all maps**
-  - Current state: Map 1 gameplay reuses the title background. Maps 2-10 have
-    no production gameplay backgrounds yet.
+  - Current state: Map 1 gameplay reuses the title background. Maps 2 and 3
+    have generated background plates saved but not wired into gameplay. Maps
+    4-10 have no production gameplay backgrounds yet.
   - Generate per map: sky, far background, midground route, foreground
     silhouettes, and optional haze/light layer.
   - Suggested path shape:
@@ -286,36 +347,54 @@ Still missing:
 Lore hook: mossy platforms, crumbling bridges, spike pits, moving/falling
 stones, and the physical collapse of the Relay roads.
 
+Have or generated:
+
+- **Generated:** Ivy Viaduct gameplay background source and optimized WebP.
+- **Generated:** mossy viaduct terrain/hazard source sheet with cracked blocks,
+  vine overlays, wet ledges, arch blocks, crumbling bridge plank states,
+  falling-stone pieces, pit markers, spike-pit dressing, route marks, dust, and
+  broken banner.
+- **Generated:** Barrel Roller v1 trap-enemy strip and frames.
+- **Generated:** Map 3 level-select thumbnail in 320 x 180 and 160 x 90.
+
 Still missing:
 
-- [ ] Ivy Viaduct gameplay background/parallax set.
-- [ ] Mossy stone terrain palette: cracked blocks, vine overlays, wet ledges,
-  arch blocks, and broken wall chunks.
-- [ ] Crumbling bridge plank strip or break-state sheet.
-- [ ] Moving/falling stone platform variants.
-- [ ] Shallow pit marker art and repeatable spike-pit dressing.
-- [ ] Collapsing-stone warning dust and impact VFX.
-- [ ] Abandoned runner route marks and damaged purple banners.
-- [ ] Map 3 level-select thumbnail and moon-shard slot indicator.
+- [ ] True split parallax layers for sky, far arches, mid viaduct, foreground
+  ledges, and damp haze/waterfall accents.
+- [ ] Individual sliced terrain/hazard pieces from the generated source sheet,
+  if the runtime does not use the sheet directly.
+- [ ] Moving/falling stone platform runtime strip or state slices.
+- [ ] Crumbling bridge runtime strip or break-state slices.
+- [ ] Moon-shard slot indicator and hidden-shard UI state for the level-select
+  tile.
 
 ### Map 4 - Bell Tower Archives
 
 Lore hook: vertical climbs, arrow slits, scroll pickups, thief ambushes, and
 the first proof that the lockdown order was forged.
 
+Have or generated:
+
+- **Generated:** Bell Tower Archives gameplay background source and optimized
+  WebP.
+- **Generated:** props/hazards source sheet with tower ledges, wall platforms,
+  bell platform, ladders, chains, archive shelves, scroll piles, pedestals,
+  forged-order scroll, archive seal, arrow-slit hazards, projectile arrows,
+  impact sparks, candle stand, bell rope, window slit, banner, and wood
+  supports.
+- **Generated:** Scroll Thief v1 production strip and frames.
+- **Generated:** Map 4 level-select thumbnail in 320 x 180 and 160 x 90.
+
 Still missing:
 
-- [ ] Bell Tower Archives gameplay background/parallax set.
-- [ ] Vertical tower terrain: bell platforms, archive shelves, stone stairs,
-  narrow ledges, window slits, and hanging chains.
-- [ ] Scroll Thief production strip.
+- [ ] True split parallax layers for moonlit exterior, deep tower interior,
+  archive shelves, foreground stone, and candlelight overlays.
+- [ ] Individual sliced terrain/hazard pieces from the generated source sheet,
+  if the runtime does not use the sheet directly.
 - [ ] Tower Archer production strip if arrow-slit hazards become active
   enemies instead of only trap props.
-- [ ] Arrow slit wall hazard, projectile arrow strip, and impact spark.
-- [ ] Scroll pickup, forged-order scroll, message pedestal, archive seal, and
-  sealed letter prop.
-- [ ] Bell swing or bell-rope interactive prop, if used in level scripting.
-- [ ] Map 4 level-select thumbnail and archive-seal completion icon.
+- [ ] Bell swing or bell-rope interactive animation, if used in level scripting.
+- [ ] Archive-seal completion icon and locked/unlocked level-select tile state.
 
 ### Map 5 - Candle Fair Ruins
 
@@ -815,13 +894,13 @@ Concept-sheet items that are not yet production runtime assets.
 
 Most image generation from this batch is complete in the current working tree.
 Remaining work is Level 1 background art, optional strict tile-atlas work, a
-tilt bridge/platform asset, player damage feedback, and wiring the generated
-runtime assets into Phaser.
+player damage feedback strip, and future runtime slices for any strict tilemap
+path.
 
 1. [x] Clockwork Sentry full recreation.
 2. [ ] Strict 32 x 32 stone terrain tileset, if tilemap-first runtime is used.
 3. [x] Walkway/ledge trims.
-4. [ ] Tilt bridge platform.
+4. [x] Tilt bridge platform.
 5. [x] Spike hazard strip.
 6. [x] In-world coin pickup strip.
 7. [x] East gate / finish marker.

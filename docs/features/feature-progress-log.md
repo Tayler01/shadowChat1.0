@@ -29,6 +29,17 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
 - Latest pass, 2026-06-10: wired the cleaner `clockwork-sentry-v2` runtime
   strip, kept the sentry on deterministic patrol bounds instead of side-block
   direction flips, and documented the clean HUD/heart/coin/health assets.
+- Latest pass, 2026-06-11: fixed Level 1 terrain rendering by registering
+  named Phaser frames from the generated stone sheet, generated and wired a
+  dedicated tilt-bridge asset, added landing/contact/finish feedback polish,
+  and cataloged the new Barrel Roller plus Ivy Viaduct asset batch.
+- Verification, 2026-06-11: `npm run lint`,
+  `npx tsc --noEmit -p tsconfig.app.json`, `npm run build`, and
+  `npx jest --runInBand` passed. Chrome-channel production-preview visual
+  smoke passed at `932x430`; evidence in
+  `output/playwright/shadow-runner-level1-goal/` shows visible generated stone
+  chunks, the generated tilt bridge, sentry state, pause menu without `Exit
+  Game`, and level-complete actions limited to restart/main menu.
 - Verification: `npm run lint`, `npx tsc --noEmit -p tsconfig.app.json`, and
   `npm run build` passed. Chrome mobile visual smoke passed at `740x390` and
   `932x430` with zero title-button scroll overrun and canceled `selectstart`
