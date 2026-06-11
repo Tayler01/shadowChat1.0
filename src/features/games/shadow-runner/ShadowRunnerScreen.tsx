@@ -543,36 +543,44 @@ function ShadowRunnerLevelDetailPopup({
           <X className="h-[52%] w-[52%] stroke-[3]" aria-hidden="true" />
         </button>
 
-        <div className="absolute left-[12.8%] top-[20.5%] h-[56.5%] w-[33.5%] overflow-hidden rounded-[0.45rem] border border-[#1a1108]/70 bg-[#0a0e15] shadow-[inset_0_0_22px_rgba(0,0,0,0.55)]">
+        <div className="absolute left-[10.9%] top-[24%] aspect-[16/9] w-[37.4%]">
+          <div className="absolute bottom-[13.8%] left-[8.8%] right-[8.8%] top-[15.6%] overflow-hidden rounded-[0.62rem] bg-[#0a0e15] shadow-[inset_0_0_26px_rgba(0,0,0,0.64)]">
+            <img
+              src={level.thumbnail}
+              alt=""
+              className={`h-full w-full object-cover ${state.unlocked ? '' : 'grayscale brightness-[0.42] contrast-[0.9]'}`}
+              draggable={false}
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_58%,rgba(0,0,0,0.38))]" />
+          </div>
           <img
-            src={level.thumbnail}
+            src={SHADOW_RUNNER_ASSETS.home.levelThumbnailFrame}
             alt=""
-            className={`h-full w-full object-cover ${state.unlocked ? '' : 'grayscale brightness-[0.42] contrast-[0.9]'}`}
+            className="pointer-events-none absolute inset-0 h-full w-full object-fill drop-shadow-[0_12px_28px_rgba(0,0,0,0.42)]"
             draggable={false}
           />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_54%,rgba(0,0,0,0.44))]" />
         </div>
 
-        <div className="absolute left-[51.5%] top-[19%] flex h-[43%] w-[36%] flex-col overflow-hidden text-[#160f07]">
-          <div className="flex items-start justify-between gap-2">
+        <div className="absolute left-[52%] top-[20.5%] flex h-[42%] w-[35.5%] flex-col overflow-hidden text-[#160f07]">
+          <div className="flex items-start justify-between gap-2.5">
             <div className="min-w-0">
               <p className="text-[0.48rem] font-black uppercase leading-none tracking-[0.2em] text-[#4c2c10] min-[740px]:text-[0.56rem] min-[930px]:text-[0.64rem]">
                 Level {level.levelNumber}
               </p>
-              <h2 className="mt-1 text-[0.68rem] font-black uppercase leading-[0.95] text-[#130d06] drop-shadow-[0_1px_0_rgba(255,238,178,0.55)] min-[740px]:text-[0.82rem] min-[930px]:text-[1rem]">
+              <h2 className="mt-1 text-[0.64rem] font-black uppercase leading-[0.98] text-[#130d06] drop-shadow-[0_1px_0_rgba(255,238,178,0.55)] min-[740px]:text-[0.78rem] min-[930px]:text-[0.96rem]">
                 {level.title}
               </h2>
             </div>
-            <span className={`shrink-0 rounded border px-2 py-1 text-[0.45rem] font-black uppercase leading-none tracking-[0.12em] shadow-[0_4px_10px_rgba(0,0,0,0.18)] min-[740px]:text-[0.52rem] ${statusClassName}`}>
+            <span className={`shrink-0 rounded border px-1.5 py-1 text-[0.42rem] font-black uppercase leading-none tracking-[0.12em] shadow-[0_4px_10px_rgba(0,0,0,0.18)] min-[740px]:px-2 min-[740px]:text-[0.5rem] ${statusClassName}`}>
               {state.statusLabel}
             </span>
           </div>
 
-          <div className="mt-2 grid gap-1.5 text-[0.52rem] font-black uppercase leading-[1.08] text-[#231608] min-[740px]:text-[0.62rem] min-[930px]:text-[0.7rem]">
+          <div className="mt-2.5 grid gap-1.5 text-[0.5rem] font-black uppercase leading-[1.12] text-[#231608] min-[740px]:text-[0.58rem] min-[930px]:text-[0.68rem]">
             <p>{level.objective}</p>
             <p className="text-[#573614]">{level.routeType} - Tier {level.difficultyTier}/10</p>
             <p className="text-[#573614]">{level.difficultyLabel}</p>
-            <p className="max-w-[23rem] text-[#38220d]">{state.unlocked ? level.mechanicPreview : getCampaignLevelRequirement(level)}</p>
+            <p className="max-w-[22rem] text-[#38220d]">{state.unlocked ? level.mechanicPreview : getCampaignLevelRequirement(level)}</p>
           </div>
         </div>
 

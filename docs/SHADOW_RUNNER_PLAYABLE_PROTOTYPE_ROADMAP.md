@@ -75,10 +75,12 @@ enemy, and reach a finish gate.
 
 ## Campaign Difficulty Direction
 
-- Level 1: readable training challenge with one tilt bridge, one sentry, one
-  spike pit, and basic double-jump timing.
-- Level 2: longer route with more vertical movement, two tilt bridges, more
-  coins, and tighter market-roof gaps.
+- Level 1: readable training challenge that is longer than the tutorial, with
+  two sentries, two tilt bridges, wider spike gaps, coins, and basic
+  double-jump timing.
+- Level 2: longer market-roof route with more vertical movement, three
+  sentries, three faster tilt bridges, more coins, and denser spikes around
+  timing hazards.
 - Each map stop carries a route type, difficulty tier, difficulty label, and
   mechanic preview so future route design can stay ordered from simple to
   complex.
@@ -110,7 +112,7 @@ enemy, and reach a finish gate.
 - Gameplay assets are documented in
   [`docs/SHADOW_RUNNER_GAMEPLAY_ASSETS.md`](C:/repos/chat2.0/docs/SHADOW_RUNNER_GAMEPLAY_ASSETS.md:1).
 - Required new assets are generated, optimized, and referenced in the manifest.
-- Level 1 has one playable loop around controls, pickups, hazards, sentry, and
-  finish feedback.
+- Level 1 and Level 2 have playable loops around controls, pickups, hazards,
+  multiple sentries, tilt bridge influence, and finish feedback.
 - The checkpoint is verified, documented in the progress log, committed, and
   pushed to `main`.

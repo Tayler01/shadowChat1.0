@@ -1,4 +1,4 @@
-import type { ShadowRunnerLevelConfig } from './levels'
+import type { ShadowRunnerEnemyConfig, ShadowRunnerLevelConfig } from './levels'
 
 export interface ShadowRunnerHudState {
   lives: number
@@ -19,6 +19,18 @@ export interface ShadowRunnerHudState {
   outOfLives: boolean
 }
 
+export interface ShadowRunnerEnemyState {
+  id: string
+  health: number
+  maxHealth: number
+  alive: boolean
+  direction: 1 | -1
+  patrolLeft: number
+  patrolRight: number
+  lastDamagedAt: number
+  attackUntil: number
+}
+
 export interface ShadowRunnerSimulationState {
   player: {
     lives: number
@@ -32,15 +44,8 @@ export interface ShadowRunnerSimulationState {
     attackCooldownUntil: number
     lastDamagedAt: number
   }
-  enemy: {
-    health: number
-    maxHealth: number
-    alive: boolean
-    direction: 1 | -1
-    patrolLeft: number
-    patrolRight: number
-    lastDamagedAt: number
-  }
+  enemy: ShadowRunnerEnemyState
+  enemies: ShadowRunnerEnemyState[]
   level: {
     id: string
     title: string
@@ -52,10 +57,40 @@ export interface ShadowRunnerSimulationState {
   outOfLives: boolean
 }
 
+function createEnemyState(enemy: ShadowRunnerEnemyConfig): ShadowRunnerEnemyState {
+  return {
+    id: enemy.id,
+    health: enemy.health,
+    maxHealth: enemy.maxHealth,
+    alive: true,
+    direction: enemy.direction,
+    patrolLeft: enemy.patrolLeft,
+    patrolRight: enemy.patrolRight,
+    lastDamagedAt: 0,
+    attackUntil: 0,
+  }
+}
+
+function createEmptyEnemyState(): ShadowRunnerEnemyState {
+  return {
+    id: 'none',
+    health: 0,
+    maxHealth: 0,
+    alive: false,
+    direction: -1,
+    patrolLeft: 0,
+    patrolRight: 0,
+    lastDamagedAt: 0,
+    attackUntil: 0,
+  }
+}
+
 export function createInitialShadowRunnerSimulation(
   level: ShadowRunnerLevelConfig,
 ): ShadowRunnerSimulationState {
-  const enemy = level.enemy
+  const enemies = level.enemies ?? (level.enemy ? [level.enemy] : [])
+  const enemyStates = enemies.map(createEnemyState)
+  const primaryEnemy = enemyStates[0] ?? createEmptyEnemyState()
 
   return {
     player: {
@@ -70,15 +105,8 @@ export function createInitialShadowRunnerSimulation(
       attackCooldownUntil: 0,
       lastDamagedAt: 0,
     },
-    enemy: {
-      health: enemy?.health ?? 0,
-      maxHealth: enemy?.maxHealth ?? 0,
-      alive: Boolean(enemy),
-      direction: enemy?.direction ?? -1,
-      patrolLeft: enemy?.patrolLeft ?? 0,
-      patrolRight: enemy?.patrolRight ?? 0,
-      lastDamagedAt: 0,
-    },
+    enemy: primaryEnemy,
+    enemies: enemyStates,
     level: {
       id: level.id,
       title: level.title,
@@ -95,13 +123,15 @@ export function getShadowRunnerHudState(
   state: ShadowRunnerSimulationState,
   totalCoins: number,
 ): ShadowRunnerHudState {
+  const activeEnemy = state.enemies.find(enemy => enemy.alive) ?? state.enemies[0] ?? state.enemy
+
   return {
     lives: state.player.lives,
     maxLives: state.player.maxLives,
     health: state.player.health,
     maxHealth: state.player.maxHealth,
-    enemyHealth: state.enemy.alive ? state.enemy.health : 0,
-    enemyMaxHealth: state.enemy.maxHealth,
+    enemyHealth: activeEnemy?.alive ? activeEnemy.health : 0,
+    enemyMaxHealth: activeEnemy?.maxHealth ?? 0,
     levelId: state.level.id,
     levelTitle: state.level.title,
     levelSubtitle: state.level.subtitle,
@@ -140,17 +170,28 @@ export function spendShadowRunnerLife(state: ShadowRunnerSimulationState) {
   return state.player.lives > 0
 }
 
-export function damageShadowRunnerEnemy(state: ShadowRunnerSimulationState, time: number, amount: number) {
-  if (!state.enemy.alive || time - state.enemy.lastDamagedAt < 220) return false
+export function damageShadowRunnerEnemy(
+  state: ShadowRunnerSimulationState,
+  time: number,
+  amount: number,
+  enemyId?: string,
+) {
+  const enemy = enemyId
+    ? state.enemies.find(current => current.id === enemyId)
+    : state.enemies.find(current => current.alive)
 
-  state.enemy.lastDamagedAt = time
-  state.enemy.health = Math.max(0, state.enemy.health - amount)
+  if (!enemy?.alive || time - enemy.lastDamagedAt < 220) return false
+
+  enemy.lastDamagedAt = time
+  enemy.health = Math.max(0, enemy.health - amount)
   state.player.score += amount === 1 ? 50 : 75
 
-  if (state.enemy.health <= 0) {
-    state.enemy.alive = false
+  if (enemy.health <= 0) {
+    enemy.alive = false
     state.player.score += 150
-    state.objective = 'Gate path clear'
+    if (!state.enemies.some(current => current.alive)) {
+      state.objective = 'Gate path clear'
+    }
   }
 
   return true

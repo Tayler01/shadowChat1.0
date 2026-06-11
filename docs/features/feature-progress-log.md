@@ -52,6 +52,17 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
   for all 10 stops, preloaded campaign thumbnails to avoid black popup frames,
   and made Level 2 tilt-bridge wobble metadata slightly faster without
   changing collision.
+- Latest pass, 2026-06-11: extended Level 1 and Level 2 into longer routes
+  with multiple Clockwork Sentries, denser Level 2 spike placement, raised
+  tilt-bridge visuals, gameplay slide influence from tilting bridges,
+  functional crouch/crawl movement, generated translucent mobile control
+  buttons, and a generated level-detail thumbnail frame.
+- Verification, 2026-06-11: `npm run lint`,
+  `npx tsc --noEmit -p tsconfig.app.json`, and `npm run build` passed.
+  Chrome-channel production-preview visual smoke passed for Level 1/2 detail
+  popups and Level 1/2 gameplay controls/enemy/hazard captures at `932x430`
+  and `740x390`; evidence in
+  `output/playwright/shadow-runner-next-goal/`.
 - Verification, 2026-06-11: `npm run lint`,
   `npx tsc --noEmit -p tsconfig.app.json`, `npm run build`, manifest JSON
   parse, and Chrome-channel production-preview smoke passed for playable,

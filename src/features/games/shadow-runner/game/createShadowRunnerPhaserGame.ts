@@ -3,8 +3,11 @@ import { SHADOW_RUNNER_ASSETS } from '../assets/manifest'
 import type { ShadowRunnerInputRef } from './input'
 import {
   getShadowRunnerLevelConfig,
+  getShadowRunnerLevelEnemies,
+  type ShadowRunnerEnemyConfig,
   type ShadowRunnerLevelConfig,
   type ShadowRunnerPlayableLevelId,
+  type ShadowRunnerTiltPlatform,
 } from './levels'
 import {
   collectShadowRunnerCoin,
@@ -14,6 +17,7 @@ import {
   getShadowRunnerHudState,
   restoreShadowRunnerPlayer,
   spendShadowRunnerLife,
+  type ShadowRunnerEnemyState,
   type ShadowRunnerHudState,
   type ShadowRunnerSimulationState,
 } from './simulation'
@@ -34,7 +38,7 @@ const HERO_SCALE = 0.78
 const SENTRY_SCALE = 0.68
 const PLAYER_SPEED = 260
 const SENTRY_PATROL_SPEED = 82
-const CROUCH_SPEED = 128
+const CRAWL_SPEED = 112
 const JUMP_VELOCITY = -620
 const DOUBLE_JUMP_VELOCITY = -560
 const GRAVITY_Y = 1640
@@ -54,6 +58,13 @@ interface PlatformVisualOptions {
   displayHeight?: number
   visualOffsetY?: number
   depth?: number
+}
+
+type PlatformVisual = Phaser.GameObjects.Image | Phaser.GameObjects.TileSprite
+
+interface TiltPlatformRuntime {
+  config: ShadowRunnerTiltPlatform
+  visual: PlatformVisual
 }
 
 const TERRAIN_CROPS: Record<string, TextureCrop> = {
@@ -85,7 +96,7 @@ function addStaticPlatform(
   group: Phaser.Physics.Arcade.StaticGroup,
   rect: { x: number; y: number; width: number; height: number },
   options: PlatformVisualOptions = {},
-) {
+): PlatformVisual {
   const centerX = rect.x + rect.width / 2
   const centerY = rect.y + rect.height / 2
   const texture = options.texture ?? 'shadow-runner-stone'
@@ -128,11 +139,12 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   private spikes?: Phaser.Physics.Arcade.StaticGroup
   private coins?: Phaser.Physics.Arcade.StaticGroup
   private player?: Phaser.Physics.Arcade.Sprite
-  private enemy?: Phaser.Physics.Arcade.Sprite
+  private enemies: Phaser.Physics.Arcade.Sprite[] = []
+  private tiltPlatforms: TiltPlatformRuntime[] = []
   private playerHealthBar?: Phaser.GameObjects.Graphics
-  private enemyHealthBar?: Phaser.GameObjects.Graphics
+  private enemyHealthBars: Phaser.GameObjects.Graphics[] = []
   private playerHealthFrame?: Phaser.GameObjects.Image
-  private enemyHealthFrame?: Phaser.GameObjects.Image
+  private enemyHealthFrames: Phaser.GameObjects.Image[] = []
   private slashArc?: Phaser.GameObjects.Graphics
   private slashSprite?: Phaser.GameObjects.Sprite
   private readonly qaEnabled = isShadowRunnerLocalQaEnabled()
@@ -140,7 +152,6 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   private lastAttackPresses = 0
   private jumpsUsed = 0
   private wasOnFloor = false
-  private enemyAttackUntil = 0
   private finishSparked = false
   private lastHudSignature = ''
 
@@ -201,8 +212,11 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
   create() {
     this.state = createInitialShadowRunnerSimulation(this.level)
+    this.enemies = []
+    this.enemyHealthBars = []
+    this.enemyHealthFrames = []
+    this.tiltPlatforms = []
     this.wasOnFloor = false
-    this.enemyAttackUntil = 0
     this.finishSparked = false
     this.physics.world.setBounds(0, 0, this.level.worldWidth, this.level.worldHeight)
     this.createTextures()
@@ -225,7 +239,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     if (!this.player) return
 
     this.updatePlayer(time)
-    this.updateEnemy(time)
+    this.updateEnemies(time)
     this.updateHealthBars()
     this.checkFinish()
     this.emitHud()
@@ -348,13 +362,16 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
             useImage: true,
             displayWidth: platform.width + 18,
             displayHeight: platform.visualHeight ?? 54,
-            visualOffsetY: platform.visualOffsetY ?? 2,
+            visualOffsetY: platform.visualOffsetY ?? -10,
             depth: 4,
           }
         : { texture: 'shadow-runner-tilt-stone' })
+      const startRotation = index % 2 === 0 ? -0.05 : 0.05
       sprite.setData('tilt-platform', true)
-      sprite.setData('baseRotation', index % 2 === 0 ? -0.05 : 0.05)
-      sprite.setRotation(index % 2 === 0 ? -0.05 : 0.05)
+      sprite.setData('baseRotation', startRotation)
+      sprite.setData('currentRotation', startRotation)
+      sprite.setRotation(startRotation)
+      this.tiltPlatforms.push({ config: platform, visual: sprite })
       this.tweens.add({
         targets: sprite,
         rotation: index % 2 === 0 ? wobbleRotation : -wobbleRotation,
@@ -362,6 +379,9 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
         yoyo: true,
         repeat: -1,
         ease: 'Sine.inOut',
+        onUpdate: () => {
+          sprite.setData('currentRotation', sprite.rotation)
+        },
       })
     })
 
@@ -413,22 +433,16 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.player.setOffset(43, 58)
     this.player.play('runner-idle')
 
-    const enemyStart = this.level.enemy
-    if (enemyStart) {
-      this.enemy = this.physics.add.sprite(enemyStart.x, enemyStart.y, 'clockwork-sentry')
-      this.enemy.setOrigin(0.5, 1)
-      this.enemy.setScale(SENTRY_SCALE)
-      this.enemy.setSize(50, 70)
-      this.enemy.setOffset(39, 58)
-      this.enemy.setCollideWorldBounds(false)
-      this.enemy.setMaxVelocity(105, 920)
-      this.enemy.play('sentry-walk')
-    }
-
     this.playerHealthBar = this.add.graphics()
-    this.enemyHealthBar = this.add.graphics()
     this.playerHealthFrame = this.add.image(0, 0, 'shadow-runner-health-frame')
-    this.enemyHealthFrame = this.add.image(0, 0, 'shadow-runner-health-frame')
+
+    getShadowRunnerLevelEnemies(this.level).forEach(enemyStart => {
+      const enemy = this.createEnemySprite(enemyStart)
+      this.enemies.push(enemy)
+      this.enemyHealthBars.push(this.add.graphics())
+      this.enemyHealthFrames.push(this.add.image(0, 0, 'shadow-runner-health-frame'))
+    })
+
     this.slashArc = this.add.graphics()
     this.slashSprite = this.add.sprite(0, 0, 'shadow-runner-sword-slash')
     this.slashSprite.setVisible(false)
@@ -438,14 +452,28 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     })
 
     this.physics.add.collider(this.player, this.platforms!)
-    if (this.enemy) {
-      this.physics.add.collider(this.enemy, this.platforms!)
-      this.physics.add.overlap(this.player, this.enemy, () => this.handlePlayerEnemyOverlap(this.time.now))
-    }
+    this.enemies.forEach(enemy => {
+      this.physics.add.collider(enemy, this.platforms!)
+      this.physics.add.overlap(this.player!, enemy, () => this.handlePlayerEnemyOverlap(this.time.now, enemy))
+    })
     this.physics.add.overlap(this.player, this.spikes!, () => this.damagePlayerFromHazard(this.time.now))
     this.physics.add.overlap(this.player, this.coins!, (_player, coin) => {
       this.collectCoin(coin as Phaser.Physics.Arcade.Sprite)
     })
+  }
+
+  private createEnemySprite(enemyStart: ShadowRunnerEnemyConfig) {
+    const enemy = this.physics.add.sprite(enemyStart.x, enemyStart.y, 'clockwork-sentry')
+    enemy.setName(enemyStart.id)
+    enemy.setData('enemyId', enemyStart.id)
+    enemy.setOrigin(0.5, 1)
+    enemy.setScale(SENTRY_SCALE)
+    enemy.setSize(50, 70)
+    enemy.setOffset(39, 58)
+    enemy.setCollideWorldBounds(false)
+    enemy.setMaxVelocity(120, 920)
+    enemy.play('sentry-walk')
+    return enemy
   }
 
   private createInput() {
@@ -469,7 +497,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   private registerQaShortcuts() {
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       if (event.code === 'Digit2') {
-        const enemy = this.level.enemy
+        const enemy = this.getFirstAliveEnemyConfig()
         if (enemy) {
           this.teleportPlayerForQa(enemy.x - 120, enemy.y)
         }
@@ -492,15 +520,36 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.cameras.main.centerOn(x, y - 80)
   }
 
-  private damageEnemyForQa() {
-    const enemy = this.enemy
-    if (!enemy || !this.state.enemy.alive) return
+  private getEnemyId(enemy: Phaser.Physics.Arcade.Sprite) {
+    return String(enemy.getData('enemyId') ?? enemy.name)
+  }
 
-    const damaged = damageShadowRunnerEnemy(this.state, this.time.now, 1)
+  private getEnemyState(enemy: Phaser.Physics.Arcade.Sprite): ShadowRunnerEnemyState | undefined {
+    const enemyId = this.getEnemyId(enemy)
+    return this.state.enemies.find(current => current.id === enemyId)
+  }
+
+  private getFirstAliveEnemy() {
+    return this.enemies.find(enemy => this.getEnemyState(enemy)?.alive)
+  }
+
+  private getFirstAliveEnemyConfig() {
+    return getShadowRunnerLevelEnemies(this.level).find(enemy => {
+      const state = this.state.enemies.find(current => current.id === enemy.id)
+      return state?.alive
+    })
+  }
+
+  private damageEnemyForQa() {
+    const enemy = this.getFirstAliveEnemy()
+    if (!enemy) return
+
+    const enemyState = this.getEnemyState(enemy)
+    const damaged = damageShadowRunnerEnemy(this.state, this.time.now, 1, this.getEnemyId(enemy))
     if (!damaged) return
 
     this.addHitFlash(enemy.x, enemy.y - 42)
-    if (!this.state.enemy.alive) {
+    if (!enemyState?.alive) {
       this.defeatEnemy(enemy)
     }
     this.emitHud(true)
@@ -516,6 +565,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     const left = input.left || Boolean(cursors?.left.isDown) || Boolean(keys?.a.isDown)
     const right = input.right || Boolean(cursors?.right.isDown) || Boolean(keys?.d.isDown)
     const crouch = input.crouch || Boolean(keys?.shift.isDown) || Boolean(keys?.s.isDown)
+    const crouching = crouch && onFloor
     const jumpPress = input.jumpPresses !== this.lastJumpPresses
       || Boolean(cursors?.up && Phaser.Input.Keyboard.JustDown(cursors.up))
       || Boolean(keys?.w && Phaser.Input.Keyboard.JustDown(keys.w))
@@ -538,18 +588,22 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       const direction = right ? 1 : -1
       this.state.player.facing = direction
       player.setFlipX(direction < 0)
-      player.setVelocityX((crouch ? CROUCH_SPEED : PLAYER_SPEED) * direction)
+      player.setVelocityX((crouching ? CRAWL_SPEED : PLAYER_SPEED) * direction)
     } else {
       player.setVelocityX(0)
     }
 
-    if (crouch && onFloor) {
-      player.setSize(42, 50)
-      player.setOffset(43, 78)
+    if (crouching) {
+      player.setScale(HERO_SCALE, HERO_SCALE * 0.72)
+      player.setSize(42, 48)
+      player.setOffset(43, 82)
     } else {
+      player.setScale(HERO_SCALE, HERO_SCALE)
       player.setSize(42, 70)
       player.setOffset(43, 58)
     }
+
+    this.applyTiltPlatformInfluence(left, right, onFloor)
 
     if (jumpPress) {
       this.tryJump(onFloor)
@@ -565,48 +619,81 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       this.damagePlayerFromHazard(time)
     }
 
-    this.updateHeroAnimation(time, left || right, onFloor)
+    this.updateHeroAnimation(time, left || right, onFloor, crouching)
     this.wasOnFloor = onFloor
   }
 
-  private updateEnemy(time: number) {
-    const enemy = this.enemy
-    if (!enemy || !this.state.enemy.alive) return
+  private applyTiltPlatformInfluence(left: boolean, right: boolean, onFloor: boolean) {
+    if (!this.player || !onFloor) return
 
-    if (time < this.enemyAttackUntil) {
-      enemy.setVelocityX(0)
-    } else {
-      const direction = this.state.enemy.direction
-      enemy.setVelocityX(direction * SENTRY_PATROL_SPEED)
-      enemy.setFlipX(direction > 0)
+    const body = this.player.body as Phaser.Physics.Arcade.Body
+    const platform = this.getStandingTiltPlatform(body)
+    if (!platform) return
 
-      if (direction < 0 && enemy.x <= this.state.enemy.patrolLeft) {
-        enemy.setX(this.state.enemy.patrolLeft)
-        this.state.enemy.direction = 1
-        enemy.setVelocityX(SENTRY_PATROL_SPEED)
-        enemy.setFlipX(true)
-      } else if (direction > 0 && enemy.x >= this.state.enemy.patrolRight) {
-        enemy.setX(this.state.enemy.patrolRight)
-        this.state.enemy.direction = -1
-        enemy.setVelocityX(-SENTRY_PATROL_SPEED)
-        enemy.setFlipX(false)
-      }
-    }
+    const rotation = Number(platform.visual.getData('currentRotation') ?? platform.visual.rotation ?? 0)
+    const slideForce = platform.config.slideForce ?? 860
+    const maxSlideSpeed = platform.config.maxSlideSpeed ?? 110
+    const slideVelocity = Phaser.Math.Clamp(rotation * slideForce, -maxSlideSpeed, maxSlideSpeed)
 
-    if (time - this.state.enemy.lastDamagedAt < 180) {
-      enemy.play('sentry-hit', true)
-      enemy.setTint(0xffe08a)
-    } else if (time < this.enemyAttackUntil) {
-      enemy.clearTint()
-      if (enemy.anims.currentAnim?.key !== 'sentry-attack') {
-        enemy.play('sentry-attack', true)
+    if (Math.abs(slideVelocity) < 5) return
+
+    const inputDamping = left || right ? 0.34 : 1
+    const nextVelocity = Phaser.Math.Clamp(body.velocity.x + slideVelocity * inputDamping, -360, 360)
+    this.player.setVelocityX(nextVelocity)
+  }
+
+  private getStandingTiltPlatform(body: Phaser.Physics.Arcade.Body) {
+    const footY = body.bottom
+    const centerX = body.center.x
+
+    return this.tiltPlatforms.find(platform => {
+      const rect = platform.config
+      const horizontallyInside = centerX >= rect.x - 8 && centerX <= rect.x + rect.width + 8
+      const verticallyAligned = Math.abs(footY - rect.y) <= 16
+      return horizontallyInside && verticallyAligned
+    })
+  }
+
+  private updateEnemies(time: number) {
+    this.enemies.forEach(enemy => {
+      const enemyState = this.getEnemyState(enemy)
+      if (!enemyState?.alive) return
+
+      if (time < enemyState.attackUntil) {
+        enemy.setVelocityX(0)
+      } else {
+        const direction = enemyState.direction
+        enemy.setVelocityX(direction * SENTRY_PATROL_SPEED)
+        enemy.setFlipX(direction > 0)
+
+        if (direction < 0 && enemy.x <= enemyState.patrolLeft) {
+          enemy.setX(enemyState.patrolLeft)
+          enemyState.direction = 1
+          enemy.setVelocityX(SENTRY_PATROL_SPEED)
+          enemy.setFlipX(true)
+        } else if (direction > 0 && enemy.x >= enemyState.patrolRight) {
+          enemy.setX(enemyState.patrolRight)
+          enemyState.direction = -1
+          enemy.setVelocityX(-SENTRY_PATROL_SPEED)
+          enemy.setFlipX(false)
+        }
       }
-    } else {
-      enemy.clearTint()
-      if (enemy.anims.currentAnim?.key !== 'sentry-walk') {
-        enemy.play('sentry-walk', true)
+
+      if (time - enemyState.lastDamagedAt < 180) {
+        enemy.play('sentry-hit', true)
+        enemy.setTint(0xffe08a)
+      } else if (time < enemyState.attackUntil) {
+        enemy.clearTint()
+        if (enemy.anims.currentAnim?.key !== 'sentry-attack') {
+          enemy.play('sentry-attack', true)
+        }
+      } else {
+        enemy.clearTint()
+        if (enemy.anims.currentAnim?.key !== 'sentry-walk') {
+          enemy.play('sentry-walk', true)
+        }
       }
-    }
+    })
   }
 
   private tryJump(onFloor: boolean) {
@@ -636,15 +723,12 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
   private resolveAttackHit(time: number) {
     const player = this.player
-    const enemy = this.enemy
-    if (!player || !enemy || !this.state.enemy.alive || time > this.state.player.attackingUntil) {
+    if (!player || time > this.state.player.attackingUntil) {
       this.slashArc?.clear()
       return
     }
 
     const facing = this.state.player.facing
-    const reachX = facing === 1 ? enemy.x - player.x : player.x - enemy.x
-    const vertical = Math.abs(enemy.y - player.y)
     const slashX = player.x + facing * 48
     const slashY = player.y - 46
 
@@ -655,33 +739,42 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       this.slashArc?.strokePath()
     }
 
-    if (reachX > 0 && reachX < 106 && vertical < 74) {
-      const damaged = damageShadowRunnerEnemy(this.state, time, 1)
-      if (damaged) {
-        enemy.setVelocityX(facing * 190)
-        this.addHitFlash(enemy.x, enemy.y - 42)
-        if (!this.state.enemy.alive) {
-          this.defeatEnemy(enemy)
-        }
+    const enemy = this.enemies.find(current => {
+      const enemyState = this.getEnemyState(current)
+      if (!enemyState?.alive) return false
+
+      const reachX = facing === 1 ? current.x - player.x : player.x - current.x
+      const vertical = Math.abs(current.y - player.y)
+      return reachX > 0 && reachX < 106 && vertical < 74
+    })
+    if (!enemy) return
+
+    const enemyState = this.getEnemyState(enemy)
+    const damaged = damageShadowRunnerEnemy(this.state, time, 1, this.getEnemyId(enemy))
+    if (damaged) {
+      enemy.setVelocityX(facing * 190)
+      this.addHitFlash(enemy.x, enemy.y - 42)
+      if (!enemyState?.alive) {
+        this.defeatEnemy(enemy)
       }
     }
   }
 
-  private handlePlayerEnemyOverlap(time: number) {
+  private handlePlayerEnemyOverlap(time: number, enemy: Phaser.Physics.Arcade.Sprite) {
     const player = this.player
-    const enemy = this.enemy
-    if (!player || !enemy || !this.state.enemy.alive) return
+    const enemyState = this.getEnemyState(enemy)
+    if (!player || !enemyState?.alive) return
 
     const body = player.body as Phaser.Physics.Arcade.Body
     const isStomp = body.velocity.y > 130 && player.y < enemy.y - 24
 
     if (isStomp) {
-      const damaged = damageShadowRunnerEnemy(this.state, time, 2)
+      const damaged = damageShadowRunnerEnemy(this.state, time, 2, this.getEnemyId(enemy))
       player.setVelocityY(-390)
       if (damaged) {
         this.addHitFlash(enemy.x, enemy.y - 42)
       }
-      if (!this.state.enemy.alive) {
+      if (!enemyState.alive) {
         this.defeatEnemy(enemy)
       }
       return
@@ -689,9 +782,9 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
     const damaged = this.damagePlayerFromHazard(time, enemy.x)
     if (damaged) {
-      this.enemyAttackUntil = time + 280
-      this.state.enemy.direction = player.x < enemy.x ? -1 : 1
-      enemy.setFlipX(this.state.enemy.direction > 0)
+      enemyState.attackUntil = time + 280
+      enemyState.direction = player.x < enemy.x ? -1 : 1
+      enemy.setFlipX(enemyState.direction > 0)
       enemy.play('sentry-attack', true)
     }
   }
@@ -771,7 +864,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.addDustPuff(enemy.x, enemy.y - 28)
   }
 
-  private updateHeroAnimation(time: number, moving: boolean, onFloor: boolean) {
+  private updateHeroAnimation(time: number, moving: boolean, onFloor: boolean, crouching: boolean) {
     if (!this.player) return
 
     if (time < this.state.player.attackingUntil) return
@@ -779,6 +872,17 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     if (!onFloor) {
       if (this.player.anims.currentAnim?.key !== 'runner-jump') {
         this.player.play('runner-jump', true)
+      }
+      return
+    }
+
+    if (crouching) {
+      if (moving) {
+        if (this.player.anims.currentAnim?.key !== 'runner-run') {
+          this.player.play('runner-run', true)
+        }
+      } else if (this.player.anims.currentAnim?.key !== 'runner-idle') {
+        this.player.play('runner-idle', true)
       }
       return
     }
@@ -798,12 +902,18 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   private updateHealthBars() {
     this.drawHealthBar(this.playerHealthBar, this.playerHealthFrame, this.player?.x ?? 0, (this.player?.y ?? 0) - 94, this.state.player.health, this.state.player.maxHealth)
 
-    if (this.enemy && this.state.enemy.alive) {
-      this.drawHealthBar(this.enemyHealthBar, this.enemyHealthFrame, this.enemy.x, this.enemy.y - 74, this.state.enemy.health, this.state.enemy.maxHealth)
-    } else {
-      this.enemyHealthBar?.clear()
-      this.enemyHealthFrame?.setVisible(false)
-    }
+    this.enemies.forEach((enemy, index) => {
+      const enemyState = this.getEnemyState(enemy)
+      const healthBar = this.enemyHealthBars[index]
+      const healthFrame = this.enemyHealthFrames[index]
+
+      if (enemyState?.alive) {
+        this.drawHealthBar(healthBar, healthFrame, enemy.x, enemy.y - 74, enemyState.health, enemyState.maxHealth)
+      } else {
+        healthBar?.clear()
+        healthFrame?.setVisible(false)
+      }
+    })
   }
 
   private drawHealthBar(
@@ -818,7 +928,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
     const width = 58
     const height = 7
-    const ratio = Phaser.Math.Clamp(health / maxHealth, 0, 1)
+    const ratio = maxHealth > 0 ? Phaser.Math.Clamp(health / maxHealth, 0, 1) : 0
 
     frame?.setVisible(true)
     frame?.setPosition(x, y)

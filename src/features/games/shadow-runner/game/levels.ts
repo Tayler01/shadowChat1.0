@@ -14,6 +14,8 @@ export interface ShadowRunnerTiltPlatform extends ShadowRunnerRect {
   visualOffsetY?: number
   wobbleDurationMs?: number
   wobbleRotation?: number
+  slideForce?: number
+  maxSlideSpeed?: number
 }
 
 export interface ShadowRunnerPoint {
@@ -51,6 +53,7 @@ export interface ShadowRunnerLevelConfig {
   spikes: ShadowRunnerRect[]
   coins: ShadowRunnerPoint[]
   enemy?: ShadowRunnerEnemyConfig
+  enemies?: ShadowRunnerEnemyConfig[]
   finish: ShadowRunnerRect
 }
 
@@ -113,35 +116,51 @@ export const SHADOW_RUNNER_FULL_LEVEL_ONE: ShadowRunnerLevelConfig = {
   objective: 'Reach the east gate',
   completionLine: 'East Gate Run cleared.',
   backgroundAsset: BASE_BACKGROUND,
-  worldWidth: 2240,
+  worldWidth: 2920,
   worldHeight: 540,
   playerStart: { id: 'start', x: 112, y: 404 },
-  enemy: {
-    id: 'clockwork-sentry',
-    kind: 'clockwork-sentry',
-    x: 1480,
-    y: 392,
-    health: 3,
-    maxHealth: 3,
-    patrolLeft: 1240,
-    patrolRight: 1600,
-    direction: -1,
-  },
-  finish: { id: 'east-gate', x: 2070, y: 282, width: 74, height: 150 },
+  enemies: [
+    {
+      id: 'gate-clockwork-sentry',
+      kind: 'clockwork-sentry',
+      x: 1480,
+      y: 392,
+      health: 3,
+      maxHealth: 3,
+      patrolLeft: 1240,
+      patrolRight: 1600,
+      direction: -1,
+    },
+    {
+      id: 'courtyard-clockwork-sentry',
+      kind: 'clockwork-sentry',
+      x: 2405,
+      y: 392,
+      health: 3,
+      maxHealth: 3,
+      patrolLeft: 2305,
+      patrolRight: 2640,
+      direction: 1,
+    },
+  ],
+  finish: { id: 'east-gate', x: 2762, y: 282, width: 74, height: 150 },
   platforms: [
     { id: 'west-walkway', x: 0, y: 432, width: 520, height: 72 },
     { id: 'broken-step-a', x: 612, y: 400, width: 148, height: 42 },
     { id: 'broken-step-b', x: 850, y: 366, width: 182, height: 42 },
     { id: 'center-walkway', x: 1130, y: 432, width: 690, height: 72 },
     { id: 'east-ledge', x: 1910, y: 404, width: 330, height: 76 },
+    { id: 'final-walkway', visualId: 'center-walkway', x: 2350, y: 432, width: 570, height: 72 },
     { id: 'upper-coin-shelf', x: 1325, y: 286, width: 170, height: 34 },
   ],
   tiltPlatforms: [
-    { id: 'tilt-bridge', x: 1038, y: 354, width: 168, height: 28, visualHeight: 54, visualOffsetY: 2, wobbleDurationMs: 1150, wobbleRotation: 0.08 },
+    { id: 'tilt-bridge', x: 1038, y: 354, width: 168, height: 28, visualHeight: 54, visualOffsetY: -12, wobbleDurationMs: 1150, wobbleRotation: 0.08, slideForce: 860, maxSlideSpeed: 92 },
+    { id: 'courtyard-tilt-bridge', x: 2186, y: 374, width: 156, height: 28, visualHeight: 52, visualOffsetY: -12, wobbleDurationMs: 1040, wobbleRotation: 0.095, slideForce: 930, maxSlideSpeed: 104 },
   ],
   spikes: [
     { id: 'pit-spikes', x: 532, y: 486, width: 196, height: 28 },
     { id: 'sentry-spikes', x: 1708, y: 414, width: 70, height: 24 },
+    { id: 'courtyard-gap-spikes', x: 2254, y: 486, width: 104, height: 28 },
   ],
   coins: [
     { id: 'coin-1', x: 330, y: 338 },
@@ -151,6 +170,9 @@ export const SHADOW_RUNNER_FULL_LEVEL_ONE: ShadowRunnerLevelConfig = {
     { id: 'coin-5', x: 1368, y: 232 },
     { id: 'coin-6', x: 1448, y: 232 },
     { id: 'coin-7', x: 1960, y: 322 },
+    { id: 'coin-8', x: 2218, y: 286 },
+    { id: 'coin-9', x: 2460, y: 338 },
+    { id: 'coin-10', x: 2688, y: 338 },
   ],
 }
 
@@ -162,37 +184,66 @@ export const SHADOW_RUNNER_LEVEL_TWO: ShadowRunnerLevelConfig = {
   objective: 'Cross the market roofs',
   completionLine: 'The market rooftops are clear.',
   backgroundAsset: SHADOW_RUNNER_ASSETS.levels.lanternMarketBackground,
-  worldWidth: 2480,
+  worldWidth: 3420,
   worldHeight: 540,
   playerStart: { id: 'start', x: 120, y: 396 },
-  enemy: {
-    id: 'market-clockwork-sentry',
-    kind: 'clockwork-sentry',
-    x: 1710,
-    y: 386,
-    health: 3,
-    maxHealth: 3,
-    patrolLeft: 1540,
-    patrolRight: 1880,
-    direction: -1,
-  },
-  finish: { id: 'market-east-gate', x: 2304, y: 280, width: 74, height: 150 },
+  enemies: [
+    {
+      id: 'market-roof-sentry-a',
+      kind: 'clockwork-sentry',
+      x: 1518,
+      y: 386,
+      health: 3,
+      maxHealth: 3,
+      patrolLeft: 1365,
+      patrolRight: 1570,
+      direction: -1,
+    },
+    {
+      id: 'market-roof-sentry-b',
+      kind: 'clockwork-sentry',
+      x: 2385,
+      y: 374,
+      health: 3,
+      maxHealth: 3,
+      patrolLeft: 2250,
+      patrolRight: 2635,
+      direction: 1,
+    },
+    {
+      id: 'market-gate-sentry',
+      kind: 'clockwork-sentry',
+      x: 3025,
+      y: 380,
+      health: 4,
+      maxHealth: 4,
+      patrolLeft: 2925,
+      patrolRight: 3225,
+      direction: -1,
+    },
+  ],
+  finish: { id: 'market-east-gate', x: 3294, y: 280, width: 74, height: 150 },
   platforms: [
     { id: 'west-walkway', x: 0, y: 424, width: 430, height: 72 },
     { id: 'broken-step-a', x: 542, y: 378, width: 156, height: 42 },
     { id: 'broken-step-b', x: 790, y: 340, width: 190, height: 42 },
     { id: 'center-walkway', x: 1110, y: 412, width: 450, height: 72 },
     { id: 'upper-coin-shelf', x: 1340, y: 284, width: 182, height: 34 },
-    { id: 'center-walkway', x: 1650, y: 408, width: 410, height: 72 },
-    { id: 'east-ledge', x: 2185, y: 402, width: 295, height: 76 },
+    { id: 'market-roof-a', visualId: 'center-walkway', x: 1650, y: 408, width: 410, height: 72 },
+    { id: 'market-roof-b', visualId: 'east-ledge', x: 2230, y: 390, width: 470, height: 76 },
+    { id: 'market-roof-c', visualId: 'center-walkway', x: 2920, y: 398, width: 500, height: 72 },
   ],
   tiltPlatforms: [
-    { id: 'tilt-bridge', x: 992, y: 330, width: 168, height: 28, visualHeight: 54, visualOffsetY: 2, wobbleDurationMs: 980, wobbleRotation: 0.1 },
-    { id: 'tilt-bridge-2', x: 2050, y: 348, width: 158, height: 28, visualHeight: 52, visualOffsetY: 2, wobbleDurationMs: 900, wobbleRotation: 0.12 },
+    { id: 'tilt-bridge', x: 992, y: 330, width: 168, height: 28, visualHeight: 54, visualOffsetY: -12, wobbleDurationMs: 980, wobbleRotation: 0.1, slideForce: 960, maxSlideSpeed: 118 },
+    { id: 'tilt-bridge-2', x: 2050, y: 348, width: 158, height: 28, visualHeight: 52, visualOffsetY: -12, wobbleDurationMs: 900, wobbleRotation: 0.12, slideForce: 1040, maxSlideSpeed: 136 },
+    { id: 'tilt-bridge-3', x: 2720, y: 358, width: 162, height: 28, visualHeight: 52, visualOffsetY: -12, wobbleDurationMs: 840, wobbleRotation: 0.13, slideForce: 1120, maxSlideSpeed: 150 },
   ],
   spikes: [
-    { id: 'market-gap-spikes', x: 430, y: 484, width: 150, height: 28 },
-    { id: 'market-sentry-spikes', x: 1926, y: 414, width: 76, height: 24 },
+    { id: 'market-gap-spikes', x: 430, y: 424, width: 180, height: 28 },
+    { id: 'market-bridge-spikes-a', x: 984, y: 438, width: 116, height: 28 },
+    { id: 'market-sentry-spikes', x: 1898, y: 384, width: 126, height: 24 },
+    { id: 'market-bridge-spikes-b', x: 2075, y: 438, width: 136, height: 28 },
+    { id: 'market-final-spikes', x: 2718, y: 438, width: 156, height: 28 },
   ],
   coins: [
     { id: 'coin-1', x: 288, y: 332 },
@@ -203,7 +254,15 @@ export const SHADOW_RUNNER_LEVEL_TWO: ShadowRunnerLevelConfig = {
     { id: 'coin-6', x: 1475, y: 232 },
     { id: 'coin-7', x: 1715, y: 314 },
     { id: 'coin-8', x: 2240, y: 318 },
+    { id: 'coin-9', x: 2398, y: 304 },
+    { id: 'coin-10', x: 2728, y: 278 },
+    { id: 'coin-11', x: 3025, y: 308 },
+    { id: 'coin-12', x: 3210, y: 308 },
   ],
+}
+
+export function getShadowRunnerLevelEnemies(level: ShadowRunnerLevelConfig) {
+  return level.enemies ?? (level.enemy ? [level.enemy] : [])
 }
 
 export const SHADOW_RUNNER_LEVEL_CONFIGS: Record<ShadowRunnerPlayableLevelId, ShadowRunnerLevelConfig> = {
@@ -221,7 +280,7 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     difficultyTier: 1,
     difficultyLabel: 'Courier Trial',
     routeType: 'Training Route',
-    mechanicPreview: 'Basic gaps, one tilt bridge, one sentry',
+    mechanicPreview: 'Longer gate run, two sentries, two tilt bridges, wider spike gaps',
     thumbnail: SHADOW_RUNNER_ASSETS.levels.eastGateRunThumbnail320,
     locationButton: SHADOW_RUNNER_ASSETS.levels.eastGateRunLocationButton,
     mapPosition: { left: 18, top: 59 },
@@ -235,7 +294,7 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     difficultyTier: 2,
     difficultyLabel: 'Market Timing',
     routeType: 'Rooftop Route',
-    mechanicPreview: 'Longer jumps, two faster tilt bridges',
+    mechanicPreview: 'Market roof chain with three sentries, faster tilt bridges, and denser spikes',
     thumbnail: SHADOW_RUNNER_ASSETS.levels.lanternMarketThumbnail320,
     locationButton: SHADOW_RUNNER_ASSETS.levels.lanternMarketLocationButton,
     mapPosition: { left: 44, top: 58 },

@@ -45,6 +45,8 @@ These assets exist in the repo and are referenced by current runtime code.
   `public/games/shadow-runner/home-assets/optimized/map-location-buttons/*.webp`
 - Campaign level-detail popup panel:
   `public/games/shadow-runner/home-assets/optimized/level-detail-panel.webp`
+- Campaign level-detail thumbnail frame:
+  `public/games/shadow-runner/home-assets/optimized/level-thumbnail-frame.webp`
 - Options/pause scroll panel:
   `public/games/shadow-runner/home-assets/optimized/options-scroll-panel.webp`
 - Options/pause row button:
@@ -95,6 +97,8 @@ These assets exist in the repo and are referenced by current runtime code.
   `public/games/shadow-runner/gameplay-assets/optimized/health-fill.webp`
 - Level-complete banner:
   `public/games/shadow-runner/gameplay-assets/optimized/level-complete-banner.webp`
+- Touch control button:
+  `public/games/shadow-runner/gameplay-assets/optimized/touch-control-button.webp`
 - Hit spark:
   `public/games/shadow-runner/gameplay-assets/sliced/hit-spark.png`
 - Coin sparkle strip:

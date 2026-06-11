@@ -18,6 +18,7 @@ import { SHADOW_RUNNER_ASSETS } from './assets/manifest'
 import { createShadowRunnerInputState, type ShadowRunnerAction } from './game/input'
 import {
   getShadowRunnerLevelConfig,
+  getShadowRunnerLevelEnemies,
   type ShadowRunnerPlayableLevelId,
 } from './game/levels'
 import type { ShadowRunnerHudState } from './game/simulation'
@@ -39,14 +40,15 @@ interface ShadowRunnerGameProps {
 
 function createDefaultHud(levelId: ShadowRunnerPlayableLevelId): ShadowRunnerHudState {
   const level = getShadowRunnerLevelConfig(levelId)
+  const enemy = getShadowRunnerLevelEnemies(level)[0]
 
   return {
     lives: 3,
     maxLives: 3,
     health: 3,
     maxHealth: 3,
-    enemyHealth: level.enemy?.health ?? 0,
-    enemyMaxHealth: level.enemy?.maxHealth ?? 0,
+    enemyHealth: enemy?.health ?? 0,
+    enemyMaxHealth: enemy?.maxHealth ?? 0,
     levelId: level.id,
     levelTitle: level.title,
     levelSubtitle: level.subtitle,
@@ -165,9 +167,18 @@ function TouchButton({
       onPointerCancel={release}
       onLostPointerCapture={() => onActionChange(action, false)}
       onContextMenu={event => event.preventDefault()}
-      className={`shadow-runner-touch-button inline-flex items-center justify-center rounded-full border border-[#f0d381]/45 bg-black/50 text-[#f6e6bb] shadow-[0_14px_34px_rgba(0,0,0,0.5)] backdrop-blur-md transition active:scale-95 active:border-[#f0d381]/80 active:bg-[#4a3418]/80 ${size === 'large' ? 'h-[clamp(3.25rem,14svh,4rem)] w-[clamp(3.25rem,14svh,4rem)]' : 'h-[clamp(2.85rem,12svh,3.5rem)] w-[clamp(2.85rem,12svh,3.5rem)]'}`}
+      className={`shadow-runner-touch-button relative isolate inline-flex items-center justify-center rounded-full text-[#f8eac0] drop-shadow-[0_16px_28px_rgba(0,0,0,0.58)] transition active:scale-95 ${size === 'large' ? 'h-[clamp(4.1rem,17svh,5.35rem)] w-[clamp(4.1rem,17svh,5.35rem)]' : 'h-[clamp(3.6rem,15svh,4.75rem)] w-[clamp(3.6rem,15svh,4.75rem)]'}`}
     >
-      {children}
+      <img
+        src={SHADOW_RUNNER_ASSETS.gameplay.touchControlButton}
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-[-8%] z-0 h-[116%] w-[116%] object-contain opacity-95"
+        draggable={false}
+      />
+      <span className="pointer-events-none relative z-10 flex items-center justify-center drop-shadow-[0_2px_2px_rgba(0,0,0,0.72)]">
+        {children}
+      </span>
     </button>
   )
 }
@@ -451,7 +462,7 @@ export function ShadowRunnerGame({
         </button>
       </div>
 
-      <div className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between px-[max(1rem,env(safe-area-inset-left))] pb-[max(0.85rem,env(safe-area-inset-bottom))] transition-opacity ${overlayOpen ? 'opacity-35' : 'opacity-100'}`}>
+      <div className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between px-[max(1rem,env(safe-area-inset-left))] pb-[max(1.08rem,env(safe-area-inset-bottom))] transition-opacity ${overlayOpen ? 'opacity-35' : 'opacity-100'}`}>
         <div className="pointer-events-auto flex items-end gap-[clamp(0.35rem,1.5vw,0.5rem)]">
           <TouchButton action="left" ariaLabel="Move left" onActionChange={setAction}>
             <ChevronLeft className="h-7 w-7" />
