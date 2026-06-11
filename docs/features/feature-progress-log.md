@@ -38,6 +38,15 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
   added a locked grayscale 10-level campaign map, moved full Level 1 behind the
   map flow, kept the tutorial route short, introduced reusable level metadata
   for future maps, and cataloged the new Candle Jester / Candle Fair assets.
+- Latest pass, 2026-06-11: replaced the card-grid level selector with a
+  generated full-screen parchment campaign map, ten individual generated
+  location-button assets, and a dotted route overlay that reflects
+  locked/unlocked/completed progression.
+- Verification, 2026-06-11: `npm run lint`,
+  `npx tsc --noEmit -p tsconfig.app.json`, `npm run build`, manifest JSON
+  parse, and Chrome-channel production-preview visual smoke passed for the
+  full-screen campaign map at `932x430` and `740x390`; evidence in
+  `output/playwright/shadow-runner-campaign-map-pass/`.
 - Verification, 2026-06-11: `npm run lint`,
   `npx tsc --noEmit -p tsconfig.app.json`, `npm run build`, and
   `npx jest --runInBand` passed. Chrome-channel production-preview visual

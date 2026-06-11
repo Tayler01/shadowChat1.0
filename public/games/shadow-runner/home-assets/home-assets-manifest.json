@@ -79,6 +79,30 @@
       "alpha": true,
       "purpose": "Generated blank parchment button panel for future separate menu controls and tighter hit areas."
     },
+    "campaignMapRuntime": {
+      "id": "campaign-map",
+      "file": "/games/shadow-runner/home-assets/optimized/campaign-map.webp",
+      "sourceFile": "/games/shadow-runner/home-assets/generated/campaign-map-imagegen-source.png",
+      "dimensions": { "width": 1672, "height": 941 },
+      "alpha": false,
+      "purpose": "Generated full-screen parchment world map for the campaign level-select screen with live markers and dotted route overlays."
+    },
+    "mapLocationButtonFrameRuntime": {
+      "id": "map-location-button-frame",
+      "sourceFile": "/games/shadow-runner/home-assets/generated/map-location-button-frame-imagegen-source.png",
+      "transparentSourceFile": "/games/shadow-runner/home-assets/sliced/map-location-button-frame.png",
+      "dimensions": { "width": 256, "height": 256 },
+      "alpha": true,
+      "purpose": "Generated ornate frame used to compose individual campaign-map location button assets."
+    },
+    "mapLocationButtonsRuntime": {
+      "id": "map-location-buttons",
+      "directory": "/games/shadow-runner/home-assets/optimized/map-location-buttons/",
+      "count": 10,
+      "dimensions": { "width": 256, "height": 256 },
+      "alpha": true,
+      "purpose": "Ten individual location button assets for the campaign map. Levels 1-5 use their level art; levels 6-10 use generated campaign-map landmark crops until full level packs exist."
+    },
     "levelMapScrollPanelRuntime": {
       "id": "level-map-scroll-panel",
       "file": "/games/shadow-runner/home-assets/optimized/level-map-scroll-panel.webp",

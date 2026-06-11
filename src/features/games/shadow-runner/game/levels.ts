@@ -53,6 +53,11 @@ export interface ShadowRunnerCampaignLevel {
   title: string
   objective: string
   thumbnail: string
+  locationButton: string
+  mapPosition: {
+    left: number
+    top: number
+  }
   playableLevelId?: ShadowRunnerPlayableLevelId
 }
 
@@ -203,6 +208,8 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     title: 'East Gate Run',
     objective: 'Reach the east gate',
     thumbnail: SHADOW_RUNNER_ASSETS.levels.eastGateRunThumbnail320,
+    locationButton: SHADOW_RUNNER_ASSETS.levels.eastGateRunLocationButton,
+    mapPosition: { left: 18, top: 59 },
     playableLevelId: 'level-1',
   },
   {
@@ -211,6 +218,8 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     title: 'Lantern Market Roofs',
     objective: 'Cross the market roofs',
     thumbnail: SHADOW_RUNNER_ASSETS.levels.lanternMarketThumbnail320,
+    locationButton: SHADOW_RUNNER_ASSETS.levels.lanternMarketLocationButton,
+    mapPosition: { left: 44, top: 58 },
     playableLevelId: 'level-2',
   },
   {
@@ -219,6 +228,8 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     title: 'Ivy Viaduct',
     objective: 'Hold the broken bridges',
     thumbnail: SHADOW_RUNNER_ASSETS.levels.ivyViaductThumbnail320,
+    locationButton: SHADOW_RUNNER_ASSETS.levels.ivyViaductLocationButton,
+    mapPosition: { left: 35, top: 37 },
   },
   {
     id: 'level-4',
@@ -226,6 +237,8 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     title: 'Bell Tower Archives',
     objective: 'Find the forged order',
     thumbnail: SHADOW_RUNNER_ASSETS.levels.bellTowerThumbnail320,
+    locationButton: SHADOW_RUNNER_ASSETS.levels.bellTowerLocationButton,
+    mapPosition: { left: 64, top: 49 },
   },
   {
     id: 'level-5',
@@ -233,6 +246,8 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     title: 'Candle Fair Ruins',
     objective: 'Slip through the fair',
     thumbnail: SHADOW_RUNNER_ASSETS.levels.candleFairThumbnail320,
+    locationButton: SHADOW_RUNNER_ASSETS.levels.candleFairLocationButton,
+    mapPosition: { left: 77, top: 25 },
   },
   {
     id: 'level-6',
@@ -240,6 +255,8 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     title: 'Clockmaker Yard',
     objective: 'Break the gear lock',
     thumbnail: SHADOW_RUNNER_ASSETS.home.background,
+    locationButton: SHADOW_RUNNER_ASSETS.levels.clockmakerYardLocationButton,
+    mapPosition: { left: 56, top: 31 },
   },
   {
     id: 'level-7',
@@ -247,6 +264,8 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     title: 'Moonlit Causeway',
     objective: 'Recover the shard',
     thumbnail: SHADOW_RUNNER_ASSETS.home.background,
+    locationButton: SHADOW_RUNNER_ASSETS.levels.moonlitCausewayLocationButton,
+    mapPosition: { left: 78, top: 61 },
   },
   {
     id: 'level-8',
@@ -254,6 +273,8 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     title: 'Courier Catacombs',
     objective: 'Open the relay door',
     thumbnail: SHADOW_RUNNER_ASSETS.home.background,
+    locationButton: SHADOW_RUNNER_ASSETS.levels.courierCatacombsLocationButton,
+    mapPosition: { left: 38, top: 84 },
   },
   {
     id: 'level-9',
@@ -261,6 +282,8 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     title: 'Captain Gate',
     objective: 'Survive the watch',
     thumbnail: SHADOW_RUNNER_ASSETS.home.background,
+    locationButton: SHADOW_RUNNER_ASSETS.levels.captainGateLocationButton,
+    mapPosition: { left: 78, top: 78 },
   },
   {
     id: 'level-10',
@@ -268,6 +291,8 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     title: 'Dawn Relay Spire',
     objective: 'Light the relay',
     thumbnail: SHADOW_RUNNER_ASSETS.home.background,
+    locationButton: SHADOW_RUNNER_ASSETS.levels.dawnRelaySpireLocationButton,
+    mapPosition: { left: 88, top: 47 },
   },
 ]
 

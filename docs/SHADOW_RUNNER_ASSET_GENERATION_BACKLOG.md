@@ -39,6 +39,10 @@ These assets exist in the repo and are referenced by current runtime code.
   `public/games/shadow-runner/home-assets/optimized/blank-menu-scroll.webp`
 - Blank title/access/menu button:
   `public/games/shadow-runner/home-assets/optimized/blank-menu-button.webp`
+- Campaign map:
+  `public/games/shadow-runner/home-assets/optimized/campaign-map.webp`
+- Campaign map location buttons:
+  `public/games/shadow-runner/home-assets/optimized/map-location-buttons/*.webp`
 - Options/pause scroll panel:
   `public/games/shadow-runner/home-assets/optimized/options-scroll-panel.webp`
 - Options/pause row button:
@@ -303,12 +307,14 @@ Status key:
     both.
 
 - [ ] **Level-select art for the 10-map campaign**
-  - Current state: generated level-map parchment panel plus thumbnails for
-    Maps 1-5.
-  - Need: locked parchment tile, unlocked tile, completed wax seal, perfect-run
-    purple crest, moon-shard glint, and thumbnails for Maps 6-10.
-  - Suggested thumbnails: 160 x 90 or 320 x 180 source, exported down for
-    phone UI.
+  - Current state: generated full-screen campaign map background with live
+    dotted route markers, plus ten individual location-button assets. Maps 1-5
+    use generated level art; Maps 6-10 currently use campaign-map landmark
+    crops until those full map packs exist.
+  - Need: completion seal marker, perfect-run purple crest, moon-shard glint,
+    and final landmark-specific marker variants for Maps 6-10.
+  - Suggested detail art: 160 x 90 or 320 x 180 source, exported down for
+    phone UI only when a level detail surface is added.
 
 - [ ] **Mission and completion lore objects**
   - Need: sealed letter, wax seal stamp, decoded line plaque, route seal, final

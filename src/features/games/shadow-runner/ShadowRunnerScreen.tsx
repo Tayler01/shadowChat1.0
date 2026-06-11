@@ -57,6 +57,11 @@ const SHADOW_RUNNER_STAGE_STYLE = {
   height: 'min(100dvh, calc(100vw / 1.777))',
 } as React.CSSProperties
 
+const SHADOW_RUNNER_MAP_STAGE_STYLE = {
+  width: '100vw',
+  height: '100dvh',
+} as React.CSSProperties
+
 const SHADOW_RUNNER_MENU_STYLE = {
   width: '58%',
   height: '22.5%',
@@ -67,7 +72,7 @@ const SHADOW_RUNNER_IMAGE_SOURCES = [
   SHADOW_RUNNER_ASSETS.home.titleScroll,
   SHADOW_RUNNER_ASSETS.home.optionsScroll,
   SHADOW_RUNNER_ASSETS.home.optionsMenuButton,
-  SHADOW_RUNNER_ASSETS.home.levelMapScrollPanel,
+  SHADOW_RUNNER_ASSETS.home.campaignMap,
   SHADOW_RUNNER_ASSETS.home.blankMenuScroll,
   SHADOW_RUNNER_ASSETS.home.blankMenuButton,
   SHADOW_RUNNER_ASSETS.home.missionScrollStand,
@@ -76,7 +81,7 @@ const SHADOW_RUNNER_IMAGE_SOURCES = [
   SHADOW_RUNNER_ASSETS.home.bannerStand,
   SHADOW_RUNNER_ASSETS.home.bannerPennant,
   SHADOW_RUNNER_ASSETS.hero.menuIdleCapeStrip,
-  ...SHADOW_RUNNER_CAMPAIGN_LEVELS.slice(0, 4).map(level => level.thumbnail),
+  ...SHADOW_RUNNER_CAMPAIGN_LEVELS.map(level => level.locationButton),
 ] as const
 
 const SHADOW_RUNNER_INLINE_STYLES = `
@@ -463,18 +468,24 @@ interface ShadowRunnerLevelMapProps {
 }
 
 function ShadowRunnerLevelMap({ progress, onBack, onPlayLevel }: ShadowRunnerLevelMapProps) {
+  const routeSegments = SHADOW_RUNNER_CAMPAIGN_LEVELS.slice(0, -1).map((level, index) => ({
+    from: level,
+    to: SHADOW_RUNNER_CAMPAIGN_LEVELS[index + 1],
+    unlocked: isCampaignLevelUnlocked(progress, SHADOW_RUNNER_CAMPAIGN_LEVELS[index + 1]),
+  }))
+
   return (
     <div
       className="shadow-runner-playfield relative overflow-hidden"
-      style={SHADOW_RUNNER_STAGE_STYLE}
+      style={SHADOW_RUNNER_MAP_STAGE_STYLE}
     >
       <img
-        src={SHADOW_RUNNER_ASSETS.home.background}
+        src={SHADOW_RUNNER_ASSETS.home.campaignMap}
         alt=""
-        className="absolute inset-0 h-full w-full object-cover"
+        className="absolute inset-0 h-full w-full object-fill"
         draggable={false}
       />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_26%_24%,rgba(246,215,132,0.1),transparent_18%),linear-gradient(180deg,rgba(2,4,10,0.32),rgba(2,4,10,0.62))]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_17%_13%,rgba(246,215,132,0.1),transparent_18%),linear-gradient(90deg,rgba(0,0,0,0.2),transparent_14%,transparent_86%,rgba(0,0,0,0.22)),linear-gradient(180deg,rgba(2,4,10,0.08),rgba(2,4,10,0.24))]" />
 
       <button
         type="button"
@@ -485,74 +496,85 @@ function ShadowRunnerLevelMap({ progress, onBack, onPlayLevel }: ShadowRunnerLev
         <ArrowLeft className="h-5 w-5" />
       </button>
 
-      <div className="absolute inset-x-[4%] bottom-[2.5%] top-[10%] z-10">
-        <img
-          src={SHADOW_RUNNER_ASSETS.home.levelMapScrollPanel}
-          alt=""
-          className="pointer-events-none absolute inset-0 h-full w-full object-fill drop-shadow-[0_28px_70px_rgba(0,0,0,0.78)]"
-          draggable={false}
-        />
+      <div className="pointer-events-none absolute left-1/2 top-[3.5%] z-20 -translate-x-1/2 rounded border border-[#6b4a20]/60 bg-[#e3bf72]/90 px-4 py-1 text-[0.62rem] font-black uppercase tracking-[0.22em] text-[#171006] shadow-[0_10px_24px_rgba(0,0,0,0.34)] min-[740px]:text-xs">
+        Level Map
+      </div>
 
-        <p className="absolute inset-x-[18%] top-[21%] text-center text-[0.66rem] font-black uppercase leading-none tracking-[0.2em] text-[#120d07] drop-shadow-[0_1px_0_rgba(255,239,183,0.55)] min-[740px]:text-sm">
-          Level Map
-        </p>
+      <svg
+        className="pointer-events-none absolute inset-0 z-10 h-full w-full"
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        aria-hidden="true"
+      >
+        {routeSegments.map(segment => (
+          <g key={`${segment.from.id}-${segment.to.id}`}>
+            <line
+              x1={segment.from.mapPosition.left}
+              y1={segment.from.mapPosition.top}
+              x2={segment.to.mapPosition.left}
+              y2={segment.to.mapPosition.top}
+              stroke="rgba(12,8,4,0.82)"
+              strokeWidth="1.45"
+              strokeLinecap="round"
+              strokeDasharray="0.25 1.85"
+            />
+            <line
+              x1={segment.from.mapPosition.left}
+              y1={segment.from.mapPosition.top}
+              x2={segment.to.mapPosition.left}
+              y2={segment.to.mapPosition.top}
+              stroke={segment.unlocked ? '#f0d381' : 'rgba(226,204,151,0.42)'}
+              strokeWidth="0.62"
+              strokeLinecap="round"
+              strokeDasharray="0.25 1.85"
+            />
+          </g>
+        ))}
+      </svg>
 
-        <div className="absolute bottom-[10%] left-[10%] right-[10%] top-[32%] grid grid-cols-5 gap-[clamp(0.25rem,0.9vw,0.55rem)]">
-          {SHADOW_RUNNER_CAMPAIGN_LEVELS.map(level => {
-            const completed = isCampaignLevelCompleted(progress, level.id)
-            const unlocked = isCampaignLevelUnlocked(progress, level)
-            const playable = unlocked && Boolean(level.playableLevelId)
+      <div className="absolute inset-0 z-20">
+        {SHADOW_RUNNER_CAMPAIGN_LEVELS.map(level => {
+          const completed = isCampaignLevelCompleted(progress, level.id)
+          const unlocked = isCampaignLevelUnlocked(progress, level)
+          const playable = unlocked && Boolean(level.playableLevelId)
 
-            return (
-              <button
-                key={level.id}
-                type="button"
-                disabled={!playable}
-                aria-label={`${level.title}${unlocked ? '' : ' locked'}`}
-                onClick={() => {
-                  if (level.playableLevelId) {
-                    onPlayLevel(level.playableLevelId)
-                  }
-                }}
-                className={`group relative overflow-hidden rounded-[0.38rem] border bg-[#150e07] text-left shadow-[0_9px_20px_rgba(0,0,0,0.32)] transition focus:outline-none focus:ring-2 focus:ring-[#120d07]/45 ${
-                  playable ? 'border-[#6f4b1f] active:scale-[0.98]' : 'cursor-default border-[#2a2016]'
-                }`}
-              >
-                <img
-                  src={level.thumbnail}
-                  alt=""
-                  className={`absolute inset-0 h-full w-full object-cover transition ${
-                    unlocked ? 'brightness-[0.78]' : 'grayscale brightness-[0.23] contrast-[0.86]'
-                  }`}
-                  draggable={false}
-                />
-                <div className={`absolute inset-0 ${unlocked ? 'bg-gradient-to-t from-black/82 via-black/24 to-black/12' : 'bg-black/56'}`} />
-
-                <div className="relative z-10 flex h-full flex-col justify-between p-[clamp(0.28rem,0.9vw,0.55rem)]">
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="inline-flex h-[clamp(1.15rem,3.2vw,1.7rem)] min-w-[clamp(1.15rem,3.2vw,1.7rem)] items-center justify-center rounded-full border border-[#f0d381]/50 bg-black/58 text-[0.58rem] font-black text-[#f0d381] min-[740px]:text-xs">
-                      {level.levelNumber}
-                    </span>
-                    {completed ? (
-                      <CheckCircle2 className="h-[clamp(0.95rem,2.4vw,1.25rem)] w-[clamp(0.95rem,2.4vw,1.25rem)] text-[#f0d381]" />
-                    ) : !unlocked ? (
-                      <Lock className="h-[clamp(0.95rem,2.4vw,1.25rem)] w-[clamp(0.95rem,2.4vw,1.25rem)] text-[#c8b07a]" />
-                    ) : null}
-                  </div>
-
-                  <div>
-                    <p className="line-clamp-3 text-[clamp(0.42rem,1.18vw,0.64rem)] font-black uppercase leading-tight tracking-[0.06em] text-[#f8e4ab] drop-shadow-[0_2px_6px_rgba(0,0,0,0.85)]">
-                      {level.title}
-                    </p>
-                    <p className="mt-0.5 line-clamp-1 text-[clamp(0.38rem,1vw,0.56rem)] font-black uppercase tracking-[0.08em] text-[#d7c192]">
-                      {!unlocked ? 'Locked' : playable ? level.objective : 'In Production'}
-                    </p>
-                  </div>
-                </div>
-              </button>
-            )
-          })}
-        </div>
+          return (
+            <button
+              key={level.id}
+              type="button"
+              disabled={!playable}
+              aria-label={`${level.title}${unlocked ? '' : ' locked'}`}
+              onClick={() => {
+                if (level.playableLevelId) {
+                  onPlayLevel(level.playableLevelId)
+                }
+              }}
+              className={`group absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center transition focus:outline-none focus:ring-2 focus:ring-[#f0d381]/65 ${
+                playable ? 'cursor-pointer active:scale-95' : 'cursor-default'
+              }`}
+              style={{
+                left: `${level.mapPosition.left}%`,
+                top: `${level.mapPosition.top}%`,
+              }}
+            >
+              <img
+                src={level.locationButton}
+                alt=""
+                className={`h-auto w-[clamp(4.75rem,11.4vw,7.4rem)] drop-shadow-[0_13px_24px_rgba(0,0,0,0.55)] transition ${
+                  unlocked
+                    ? 'brightness-100'
+                    : 'grayscale brightness-[0.36] contrast-[0.82] opacity-90'
+                } ${playable ? 'group-active:scale-95' : ''}`}
+                draggable={false}
+              />
+              {completed ? (
+                <CheckCircle2 className="absolute right-[9%] top-[10%] h-[clamp(0.95rem,2.4vw,1.25rem)] w-[clamp(0.95rem,2.4vw,1.25rem)] rounded-full bg-[#171006] p-0.5 text-[#f0d381] shadow-[0_5px_12px_rgba(0,0,0,0.45)]" />
+              ) : !unlocked ? (
+                <Lock className="absolute right-[10%] top-[12%] h-[clamp(0.95rem,2.4vw,1.25rem)] w-[clamp(0.95rem,2.4vw,1.25rem)] rounded-full bg-[#171717]/94 p-0.5 text-[#d7c192] shadow-[0_5px_12px_rgba(0,0,0,0.45)]" />
+              ) : null}
+            </button>
+          )
+        })}
       </div>
     </div>
   )
