@@ -73,6 +73,7 @@ const SHADOW_RUNNER_IMAGE_SOURCES = [
   SHADOW_RUNNER_ASSETS.home.optionsScroll,
   SHADOW_RUNNER_ASSETS.home.optionsMenuButton,
   SHADOW_RUNNER_ASSETS.home.campaignMap,
+  SHADOW_RUNNER_ASSETS.home.levelDetailPanel,
   SHADOW_RUNNER_ASSETS.home.blankMenuScroll,
   SHADOW_RUNNER_ASSETS.home.blankMenuButton,
   SHADOW_RUNNER_ASSETS.home.missionScrollStand,
@@ -82,6 +83,7 @@ const SHADOW_RUNNER_IMAGE_SOURCES = [
   SHADOW_RUNNER_ASSETS.home.bannerPennant,
   SHADOW_RUNNER_ASSETS.hero.menuIdleCapeStrip,
   ...SHADOW_RUNNER_CAMPAIGN_LEVELS.map(level => level.locationButton),
+  ...SHADOW_RUNNER_CAMPAIGN_LEVELS.map(level => level.thumbnail),
 ] as const
 
 const SHADOW_RUNNER_INLINE_STYLES = `
@@ -308,6 +310,30 @@ function isCampaignLevelUnlocked(progress: ShadowRunnerCampaignProgress, level: 
   return isCampaignLevelCompleted(progress, `level-${level.levelNumber - 1}`)
 }
 
+function getCampaignLevelState(progress: ShadowRunnerCampaignProgress, level: ShadowRunnerCampaignLevel) {
+  const completed = isCampaignLevelCompleted(progress, level.id)
+  const unlocked = isCampaignLevelUnlocked(progress, level)
+  const playable = unlocked && Boolean(level.playableLevelId)
+
+  return {
+    completed,
+    unlocked,
+    playable,
+    statusLabel: completed
+      ? 'Cleared'
+      : !unlocked
+        ? 'Locked'
+        : playable
+          ? 'Ready'
+          : 'In Build',
+  }
+}
+
+function getCampaignLevelRequirement(level: ShadowRunnerCampaignLevel) {
+  if (level.levelNumber <= 1) return 'First route available'
+  return `Clear Level ${level.levelNumber - 1} to unlock`
+}
+
 function markCampaignLevelComplete(
   progress: ShadowRunnerCampaignProgress,
   levelId: ShadowRunnerPlayableLevelId,
@@ -476,12 +502,122 @@ interface ShadowRunnerLevelMapProps {
   onPlayLevel: (levelId: ShadowRunnerPlayableLevelId) => void
 }
 
+interface ShadowRunnerLevelDetailPopupProps {
+  level: ShadowRunnerCampaignLevel
+  progress: ShadowRunnerCampaignProgress
+  onClose: () => void
+  onPlayLevel: (levelId: ShadowRunnerPlayableLevelId) => void
+}
+
+function ShadowRunnerLevelDetailPopup({
+  level,
+  progress,
+  onClose,
+  onPlayLevel,
+}: ShadowRunnerLevelDetailPopupProps) {
+  const state = getCampaignLevelState(progress, level)
+  const primaryLabel = state.completed ? 'Replay' : state.playable ? 'Start' : state.unlocked ? 'In Build' : 'Locked'
+  const primaryDisabled = !state.playable || !level.playableLevelId
+  const statusClassName = state.completed
+    ? 'border-[#6f5b23]/80 bg-[#f0d381]/90 text-[#171006]'
+    : state.playable
+      ? 'border-[#744f1d]/80 bg-[#301d0d]/82 text-[#f0d381]'
+      : 'border-[#5a5548]/70 bg-[#111111]/82 text-[#d7c192]'
+
+  return (
+    <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 px-[max(0.65rem,env(safe-area-inset-left))] py-3 backdrop-blur-[1px]">
+      <div className="relative aspect-[1657/785] w-[min(94vw,56rem)] max-h-[88dvh] drop-shadow-[0_28px_70px_rgba(0,0,0,0.78)]">
+        <img
+          src={SHADOW_RUNNER_ASSETS.home.levelDetailPanel}
+          alt=""
+          className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+          draggable={false}
+        />
+
+        <button
+          type="button"
+          aria-label="Close level details"
+          onClick={onClose}
+          className="absolute right-[6.8%] top-[7.5%] z-10 inline-flex h-[9%] aspect-square items-center justify-center rounded-full border border-[#2b1a08]/70 bg-[#1b1208]/75 text-[#f6e6bb] shadow-[0_8px_18px_rgba(0,0,0,0.42)] transition active:scale-95 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/70"
+        >
+          <X className="h-[52%] w-[52%] stroke-[3]" aria-hidden="true" />
+        </button>
+
+        <div className="absolute left-[12.8%] top-[20.5%] h-[56.5%] w-[33.5%] overflow-hidden rounded-[0.45rem] border border-[#1a1108]/70 bg-[#0a0e15] shadow-[inset_0_0_22px_rgba(0,0,0,0.55)]">
+          <img
+            src={level.thumbnail}
+            alt=""
+            className={`h-full w-full object-cover ${state.unlocked ? '' : 'grayscale brightness-[0.42] contrast-[0.9]'}`}
+            draggable={false}
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_54%,rgba(0,0,0,0.44))]" />
+        </div>
+
+        <div className="absolute left-[51.5%] top-[19%] flex h-[43%] w-[36%] flex-col overflow-hidden text-[#160f07]">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-[0.48rem] font-black uppercase leading-none tracking-[0.2em] text-[#4c2c10] min-[740px]:text-[0.56rem] min-[930px]:text-[0.64rem]">
+                Level {level.levelNumber}
+              </p>
+              <h2 className="mt-1 text-[0.68rem] font-black uppercase leading-[0.95] text-[#130d06] drop-shadow-[0_1px_0_rgba(255,238,178,0.55)] min-[740px]:text-[0.82rem] min-[930px]:text-[1rem]">
+                {level.title}
+              </h2>
+            </div>
+            <span className={`shrink-0 rounded border px-2 py-1 text-[0.45rem] font-black uppercase leading-none tracking-[0.12em] shadow-[0_4px_10px_rgba(0,0,0,0.18)] min-[740px]:text-[0.52rem] ${statusClassName}`}>
+              {state.statusLabel}
+            </span>
+          </div>
+
+          <div className="mt-2 grid gap-1.5 text-[0.52rem] font-black uppercase leading-[1.08] text-[#231608] min-[740px]:text-[0.62rem] min-[930px]:text-[0.7rem]">
+            <p>{level.objective}</p>
+            <p className="text-[#573614]">{level.routeType} - Tier {level.difficultyTier}/10</p>
+            <p className="text-[#573614]">{level.difficultyLabel}</p>
+            <p className="max-w-[23rem] text-[#38220d]">{state.unlocked ? level.mechanicPreview : getCampaignLevelRequirement(level)}</p>
+          </div>
+        </div>
+
+        <div className="absolute left-[50.5%] top-[68.5%] flex h-[15%] w-[39%] items-center gap-[5%]">
+          <button
+            type="button"
+            disabled={primaryDisabled}
+            onClick={() => {
+              if (level.playableLevelId) {
+                onPlayLevel(level.playableLevelId)
+              }
+            }}
+            className={`h-full w-[47%] rounded-[0.5rem] text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#130d06] transition focus:outline-none focus:ring-2 focus:ring-[#f0d381]/70 min-[740px]:text-[0.62rem] min-[930px]:text-[0.74rem] ${
+              primaryDisabled ? 'cursor-default opacity-[0.58] grayscale' : 'active:scale-[0.98]'
+            }`}
+          >
+            <span className="inline-flex items-center justify-center gap-1">
+              {state.playable ? <Sword className="h-4 w-4 stroke-[3]" aria-hidden="true" /> : <Lock className="h-4 w-4 stroke-[3]" aria-hidden="true" />}
+              {primaryLabel}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-full w-[47%] rounded-[0.5rem] text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#130d06] transition active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#f0d381]/70 min-[740px]:text-[0.62rem] min-[930px]:text-[0.74rem]"
+          >
+            Return
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ShadowRunnerLevelMap({ progress, onBack, onPlayLevel }: ShadowRunnerLevelMapProps) {
+  const [selectedLevelId, setSelectedLevelId] = React.useState<string | null>(null)
   const routeSegments = SHADOW_RUNNER_CAMPAIGN_LEVELS.slice(0, -1).map((level, index) => ({
     from: level,
     to: SHADOW_RUNNER_CAMPAIGN_LEVELS[index + 1],
     unlocked: isCampaignLevelUnlocked(progress, SHADOW_RUNNER_CAMPAIGN_LEVELS[index + 1]),
   }))
+  const selectedLevel = selectedLevelId
+    ? SHADOW_RUNNER_CAMPAIGN_LEVELS.find(level => level.id === selectedLevelId)
+    : undefined
 
   return (
     <div
@@ -543,23 +679,16 @@ function ShadowRunnerLevelMap({ progress, onBack, onPlayLevel }: ShadowRunnerLev
 
       <div className="pointer-events-none absolute inset-0 z-20">
         {SHADOW_RUNNER_CAMPAIGN_LEVELS.map(level => {
-          const completed = isCampaignLevelCompleted(progress, level.id)
-          const unlocked = isCampaignLevelUnlocked(progress, level)
-          const playable = unlocked && Boolean(level.playableLevelId)
+          const state = getCampaignLevelState(progress, level)
 
           return (
             <button
               key={level.id}
               type="button"
-              disabled={!playable}
-              aria-label={`${level.title}${unlocked ? '' : ' locked'}`}
-              onClick={() => {
-                if (level.playableLevelId) {
-                  onPlayLevel(level.playableLevelId)
-                }
-              }}
+              aria-label={`${level.title} details, ${state.statusLabel}`}
+              onClick={() => setSelectedLevelId(level.id)}
               className={`group pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 items-center justify-center transition focus:outline-none focus:ring-2 focus:ring-[#f0d381]/65 ${
-                playable ? 'cursor-pointer active:scale-95' : 'cursor-default'
+                state.unlocked ? 'cursor-pointer active:scale-95' : 'cursor-pointer'
               }`}
               style={{
                 left: `${level.mapPosition.left}%`,
@@ -570,21 +699,30 @@ function ShadowRunnerLevelMap({ progress, onBack, onPlayLevel }: ShadowRunnerLev
                 src={level.locationButton}
                 alt=""
                 className={`h-auto w-[clamp(4.75rem,11.4vw,7.4rem)] drop-shadow-[0_13px_24px_rgba(0,0,0,0.55)] transition ${
-                  unlocked
+                  state.unlocked
                     ? 'brightness-100'
                     : 'grayscale brightness-[0.36] contrast-[0.82] opacity-90'
-                } ${playable ? 'group-active:scale-95' : ''}`}
+                } ${state.playable ? 'group-active:scale-95' : ''}`}
                 draggable={false}
               />
-              {completed ? (
+              {state.completed ? (
                 <CheckCircle2 className="absolute right-[9%] top-[10%] h-[clamp(0.95rem,2.4vw,1.25rem)] w-[clamp(0.95rem,2.4vw,1.25rem)] rounded-full bg-[#171006] p-0.5 text-[#f0d381] shadow-[0_5px_12px_rgba(0,0,0,0.45)]" />
-              ) : !unlocked ? (
+              ) : !state.playable ? (
                 <Lock className="absolute right-[10%] top-[12%] h-[clamp(0.95rem,2.4vw,1.25rem)] w-[clamp(0.95rem,2.4vw,1.25rem)] rounded-full bg-[#171717]/94 p-0.5 text-[#d7c192] shadow-[0_5px_12px_rgba(0,0,0,0.45)]" />
               ) : null}
             </button>
           )
         })}
       </div>
+
+      {selectedLevel && (
+        <ShadowRunnerLevelDetailPopup
+          level={selectedLevel}
+          progress={progress}
+          onClose={() => setSelectedLevelId(null)}
+          onPlayLevel={onPlayLevel}
+        />
+      )}
     </div>
   )
 }

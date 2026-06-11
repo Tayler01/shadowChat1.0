@@ -46,6 +46,18 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
   the level-complete overlay to `Return to Map` / `Next Route`, aligned the
   generated tilt-bridge art to its collision plane, and documented progressive
   campaign difficulty plus future stronger tilt/dump-off bridge behavior.
+- Latest pass, 2026-06-11: generated and wired a blank parchment
+  level-detail popup for the full-screen campaign map, changed map stops to
+  inspect before start/replay, added route type/difficulty/mechanic metadata
+  for all 10 stops, preloaded campaign thumbnails to avoid black popup frames,
+  and made Level 2 tilt-bridge wobble metadata slightly faster without
+  changing collision.
+- Verification, 2026-06-11: `npm run lint`,
+  `npx tsc --noEmit -p tsconfig.app.json`, `npm run build`, manifest JSON
+  parse, and Chrome-channel production-preview smoke passed for playable,
+  locked, completed, return-to-map, Level 2 unlock/start, and canvas launch
+  flows at `932x430` and `740x390`; evidence in
+  `output/playwright/shadow-runner-level-detail-goal/final/`.
 - Verification, 2026-06-11: `npm run lint`,
   `npx tsc --noEmit -p tsconfig.app.json`, `npm run build`, and
   Chrome-channel production-preview smoke passed for map back navigation,

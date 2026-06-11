@@ -341,22 +341,24 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
     this.level.tiltPlatforms.forEach((platform, index) => {
       const hasTiltAsset = this.textures.exists('shadow-runner-tilt-bridge')
+      const wobbleRotation = platform.wobbleRotation ?? 0.08
       const sprite = addStaticPlatform(this, this.platforms!, platform, hasTiltAsset
         ? {
             texture: 'shadow-runner-tilt-bridge',
             useImage: true,
             displayWidth: platform.width + 18,
-            displayHeight: 54,
-            visualOffsetY: 2,
+            displayHeight: platform.visualHeight ?? 54,
+            visualOffsetY: platform.visualOffsetY ?? 2,
             depth: 4,
           }
         : { texture: 'shadow-runner-tilt-stone' })
       sprite.setData('tilt-platform', true)
       sprite.setData('baseRotation', index % 2 === 0 ? -0.05 : 0.05)
+      sprite.setRotation(index % 2 === 0 ? -0.05 : 0.05)
       this.tweens.add({
         targets: sprite,
-        rotation: index % 2 === 0 ? 0.08 : -0.08,
-        duration: 1150,
+        rotation: index % 2 === 0 ? wobbleRotation : -wobbleRotation,
+        duration: platform.wobbleDurationMs ?? 1150,
         yoyo: true,
         repeat: -1,
         ease: 'Sine.inOut',

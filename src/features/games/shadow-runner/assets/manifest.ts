@@ -14,6 +14,7 @@ export const SHADOW_RUNNER_ASSETS = {
     blankMenuScroll: `${HOME_ROOT}/optimized/blank-menu-scroll.webp`,
     blankMenuButton: `${HOME_ROOT}/optimized/blank-menu-button.webp`,
     campaignMap: `${HOME_ROOT}/optimized/campaign-map.webp`,
+    levelDetailPanel: `${HOME_ROOT}/optimized/level-detail-panel.webp`,
     levelMapScrollPanel: `${HOME_ROOT}/optimized/level-map-scroll-panel.webp`,
     bottomMenuScroll: `${HOME_ROOT}/optimized/bottom-menu-scroll.webp`,
     missionScrollStand: `${HOME_ROOT}/optimized/mission-scroll-stand.webp`,

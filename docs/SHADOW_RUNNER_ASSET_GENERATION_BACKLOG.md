@@ -43,6 +43,8 @@ These assets exist in the repo and are referenced by current runtime code.
   `public/games/shadow-runner/home-assets/optimized/campaign-map.webp`
 - Campaign map location buttons:
   `public/games/shadow-runner/home-assets/optimized/map-location-buttons/*.webp`
+- Campaign level-detail popup panel:
+  `public/games/shadow-runner/home-assets/optimized/level-detail-panel.webp`
 - Options/pause scroll panel:
   `public/games/shadow-runner/home-assets/optimized/options-scroll-panel.webp`
 - Options/pause row button:

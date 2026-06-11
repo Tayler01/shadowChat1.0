@@ -9,6 +9,13 @@ export interface ShadowRunnerRect {
   visualId?: string
 }
 
+export interface ShadowRunnerTiltPlatform extends ShadowRunnerRect {
+  visualHeight?: number
+  visualOffsetY?: number
+  wobbleDurationMs?: number
+  wobbleRotation?: number
+}
+
 export interface ShadowRunnerPoint {
   id: string
   x: number
@@ -40,7 +47,7 @@ export interface ShadowRunnerLevelConfig {
   worldHeight: number
   playerStart: ShadowRunnerPoint
   platforms: ShadowRunnerRect[]
-  tiltPlatforms: ShadowRunnerRect[]
+  tiltPlatforms: ShadowRunnerTiltPlatform[]
   spikes: ShadowRunnerRect[]
   coins: ShadowRunnerPoint[]
   enemy?: ShadowRunnerEnemyConfig
@@ -52,6 +59,10 @@ export interface ShadowRunnerCampaignLevel {
   levelNumber: number
   title: string
   objective: string
+  difficultyTier: number
+  difficultyLabel: string
+  routeType: string
+  mechanicPreview: string
   thumbnail: string
   locationButton: string
   mapPosition: {
@@ -81,7 +92,7 @@ export const SHADOW_RUNNER_TUTORIAL_LEVEL: ShadowRunnerLevelConfig = {
     { id: 'east-ledge', x: 1192, y: 404, width: 388, height: 76 },
   ],
   tiltPlatforms: [
-    { id: 'tilt-bridge', x: 1020, y: 354, width: 168, height: 28 },
+    { id: 'tilt-bridge', x: 1020, y: 354, width: 168, height: 28, visualHeight: 54, visualOffsetY: 2, wobbleDurationMs: 1250, wobbleRotation: 0.075 },
   ],
   spikes: [
     { id: 'pit-spikes', x: 532, y: 486, width: 132, height: 28 },
@@ -126,7 +137,7 @@ export const SHADOW_RUNNER_FULL_LEVEL_ONE: ShadowRunnerLevelConfig = {
     { id: 'upper-coin-shelf', x: 1325, y: 286, width: 170, height: 34 },
   ],
   tiltPlatforms: [
-    { id: 'tilt-bridge', x: 1038, y: 354, width: 168, height: 28 },
+    { id: 'tilt-bridge', x: 1038, y: 354, width: 168, height: 28, visualHeight: 54, visualOffsetY: 2, wobbleDurationMs: 1150, wobbleRotation: 0.08 },
   ],
   spikes: [
     { id: 'pit-spikes', x: 532, y: 486, width: 196, height: 28 },
@@ -176,8 +187,8 @@ export const SHADOW_RUNNER_LEVEL_TWO: ShadowRunnerLevelConfig = {
     { id: 'east-ledge', x: 2185, y: 402, width: 295, height: 76 },
   ],
   tiltPlatforms: [
-    { id: 'tilt-bridge', x: 992, y: 330, width: 168, height: 28 },
-    { id: 'tilt-bridge-2', x: 2050, y: 348, width: 158, height: 28 },
+    { id: 'tilt-bridge', x: 992, y: 330, width: 168, height: 28, visualHeight: 54, visualOffsetY: 2, wobbleDurationMs: 980, wobbleRotation: 0.1 },
+    { id: 'tilt-bridge-2', x: 2050, y: 348, width: 158, height: 28, visualHeight: 52, visualOffsetY: 2, wobbleDurationMs: 900, wobbleRotation: 0.12 },
   ],
   spikes: [
     { id: 'market-gap-spikes', x: 430, y: 484, width: 150, height: 28 },
@@ -207,6 +218,10 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     levelNumber: 1,
     title: 'East Gate Run',
     objective: 'Reach the east gate',
+    difficultyTier: 1,
+    difficultyLabel: 'Courier Trial',
+    routeType: 'Training Route',
+    mechanicPreview: 'Basic gaps, one tilt bridge, one sentry',
     thumbnail: SHADOW_RUNNER_ASSETS.levels.eastGateRunThumbnail320,
     locationButton: SHADOW_RUNNER_ASSETS.levels.eastGateRunLocationButton,
     mapPosition: { left: 18, top: 59 },
@@ -217,6 +232,10 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     levelNumber: 2,
     title: 'Lantern Market Roofs',
     objective: 'Cross the market roofs',
+    difficultyTier: 2,
+    difficultyLabel: 'Market Timing',
+    routeType: 'Rooftop Route',
+    mechanicPreview: 'Longer jumps, two faster tilt bridges',
     thumbnail: SHADOW_RUNNER_ASSETS.levels.lanternMarketThumbnail320,
     locationButton: SHADOW_RUNNER_ASSETS.levels.lanternMarketLocationButton,
     mapPosition: { left: 44, top: 58 },
@@ -227,6 +246,10 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     levelNumber: 3,
     title: 'Ivy Viaduct',
     objective: 'Hold the broken bridges',
+    difficultyTier: 3,
+    difficultyLabel: 'Bridge Pressure',
+    routeType: 'Crumbling Route',
+    mechanicPreview: 'Falling stones, barrels, tighter spike pits',
     thumbnail: SHADOW_RUNNER_ASSETS.levels.ivyViaductThumbnail320,
     locationButton: SHADOW_RUNNER_ASSETS.levels.ivyViaductLocationButton,
     mapPosition: { left: 35, top: 37 },
@@ -236,6 +259,10 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     levelNumber: 4,
     title: 'Bell Tower Archives',
     objective: 'Find the forged order',
+    difficultyTier: 4,
+    difficultyLabel: 'Vertical Climb',
+    routeType: 'Tower Route',
+    mechanicPreview: 'Narrow ledges, arrow slits, scroll thieves',
     thumbnail: SHADOW_RUNNER_ASSETS.levels.bellTowerThumbnail320,
     locationButton: SHADOW_RUNNER_ASSETS.levels.bellTowerLocationButton,
     mapPosition: { left: 64, top: 49 },
@@ -245,6 +272,10 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     levelNumber: 5,
     title: 'Candle Fair Ruins',
     objective: 'Slip through the fair',
+    difficultyTier: 5,
+    difficultyLabel: 'Trick Hazards',
+    routeType: 'Fairground Route',
+    mechanicPreview: 'Fake pickups, candle traps, jester tricks',
     thumbnail: SHADOW_RUNNER_ASSETS.levels.candleFairThumbnail320,
     locationButton: SHADOW_RUNNER_ASSETS.levels.candleFairLocationButton,
     mapPosition: { left: 77, top: 25 },
@@ -254,6 +285,10 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     levelNumber: 6,
     title: 'Clockmaker Yard',
     objective: 'Break the gear lock',
+    difficultyTier: 6,
+    difficultyLabel: 'Clockwork Pace',
+    routeType: 'Machine Route',
+    mechanicPreview: 'Faster platforms, gears, guarded switches',
     thumbnail: SHADOW_RUNNER_ASSETS.home.background,
     locationButton: SHADOW_RUNNER_ASSETS.levels.clockmakerYardLocationButton,
     mapPosition: { left: 56, top: 31 },
@@ -263,6 +298,10 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     levelNumber: 7,
     title: 'Moonlit Causeway',
     objective: 'Recover the shard',
+    difficultyTier: 7,
+    difficultyLabel: 'Causeway Chase',
+    routeType: 'Timed Route',
+    mechanicPreview: 'Moving bridges, chase pressure, spike gaps',
     thumbnail: SHADOW_RUNNER_ASSETS.home.background,
     locationButton: SHADOW_RUNNER_ASSETS.levels.moonlitCausewayLocationButton,
     mapPosition: { left: 78, top: 61 },
@@ -272,6 +311,10 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     levelNumber: 8,
     title: 'Courier Catacombs',
     objective: 'Open the relay door',
+    difficultyTier: 8,
+    difficultyLabel: 'Hidden Paths',
+    routeType: 'Branching Route',
+    mechanicPreview: 'Secret chambers, optional shards, ambushes',
     thumbnail: SHADOW_RUNNER_ASSETS.home.background,
     locationButton: SHADOW_RUNNER_ASSETS.levels.courierCatacombsLocationButton,
     mapPosition: { left: 38, top: 84 },
@@ -281,6 +324,10 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     levelNumber: 9,
     title: 'Captain Gate',
     objective: 'Survive the watch',
+    difficultyTier: 9,
+    difficultyLabel: 'Captain Watch',
+    routeType: 'Boss Gate',
+    mechanicPreview: 'Mixed patrols, ranged pressure, captain duel',
     thumbnail: SHADOW_RUNNER_ASSETS.home.background,
     locationButton: SHADOW_RUNNER_ASSETS.levels.captainGateLocationButton,
     mapPosition: { left: 78, top: 78 },
@@ -290,6 +337,10 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     levelNumber: 10,
     title: 'Dawn Relay Spire',
     objective: 'Light the relay',
+    difficultyTier: 10,
+    difficultyLabel: 'Final Relay',
+    routeType: 'Finale Route',
+    mechanicPreview: 'All mechanics mixed with relay timing',
     thumbnail: SHADOW_RUNNER_ASSETS.home.background,
     locationButton: SHADOW_RUNNER_ASSETS.levels.dawnRelaySpireLocationButton,
     mapPosition: { left: 88, top: 47 },

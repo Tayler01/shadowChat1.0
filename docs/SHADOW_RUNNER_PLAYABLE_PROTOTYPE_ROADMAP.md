@@ -16,6 +16,9 @@ enemy, and reach a finish gate.
 - Campaign levels must progress in complexity and difficulty. Each new map
   should either introduce a mechanic, combine prior mechanics in a harder way,
   increase speed/timing pressure, or add a new enemy/hazard pattern.
+- Campaign-map location buttons should open a level-detail panel first. The
+  panel owns Start, Replay, locked, and in-build states so map taps do not
+  accidentally launch a route.
 - Keep gameplay rules in `simulation.ts` and keep Phaser mostly as renderer,
   camera, physics, animation, and effects.
 - Keep mobile controls readable and low-chrome. The playfield should remain
@@ -76,6 +79,9 @@ enemy, and reach a finish gate.
   spike pit, and basic double-jump timing.
 - Level 2: longer route with more vertical movement, two tilt bridges, more
   coins, and tighter market-roof gaps.
+- Each map stop carries a route type, difficulty tier, difficulty label, and
+  mechanic preview so future route design can stay ordered from simple to
+  complex.
 - Later maps should add complexity step-by-step: faster moving/tilting
   platforms, pits or spikes around tilt bridges, more enemy variety,
   chase/timing pressure, hidden collectibles, and mixed mechanics.

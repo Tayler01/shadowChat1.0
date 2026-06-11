@@ -13,6 +13,7 @@ Excluded: the main character, because Tayler is working on the hero character sh
 - `generated/blank-menu-scroll-imagegen-source.png`, `sliced/blank-menu-scroll.png`, and `optimized/blank-menu-scroll.webp` - generated blank parchment scroll base for the private-build gate and future separated menu buttons.
 - `generated/blank-menu-button-imagegen-source.png`, `sliced/blank-menu-button.png`, and `optimized/blank-menu-button.webp` - generated blank parchment button panel for future separate menu controls and tighter hit areas.
 - `generated/campaign-map-imagegen-source.png` and `optimized/campaign-map.webp` - generated full-screen parchment world map for the campaign level-select screen.
+- `generated/level-detail-panel-imagegen-source.png`, `sliced/level-detail-panel.png`, and `optimized/level-detail-panel.webp` - generated blank parchment popup panel for campaign-map level details.
 - `generated/map-location-button-frame-imagegen-source.png`, `sliced/map-location-button-frame.png`, and `optimized/map-location-buttons/*.webp` - generated frame plus ten individual campaign-map location button assets.
 - `generated/level-map-scroll-panel-chromakey-source.png`, `sliced/level-map-scroll-panel.png`, and `optimized/level-map-scroll-panel.webp` - generated wide blank parchment panel for the 10-map level-select screen.
 - `assets/props/` - final transparent decorative banner props.

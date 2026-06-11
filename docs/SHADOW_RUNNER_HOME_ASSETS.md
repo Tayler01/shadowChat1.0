@@ -25,6 +25,7 @@ The Desktop source remains untouched:
 | Runtime blank menu button | `public/games/shadow-runner/home-assets/optimized/blank-menu-button.webp` | Blank row/button panel used for live Start, Levels, and Options hit targets. |
 | Runtime campaign map | `public/games/shadow-runner/home-assets/optimized/campaign-map.webp` | Generated full-screen parchment world map used by the campaign level-select route screen. |
 | Runtime campaign map location buttons | `public/games/shadow-runner/home-assets/optimized/map-location-buttons/*.webp` | Ten individual generated location-button assets used as tappable map stops. |
+| Runtime level-detail panel | `public/games/shadow-runner/home-assets/optimized/level-detail-panel.webp` | Generated blank parchment popup used for campaign-map route details, locked/playable/completed state, and live Start/Replay/Return actions. |
 | Runtime level-map scroll panel | `public/games/shadow-runner/home-assets/optimized/level-map-scroll-panel.webp` | Generated blank parchment map panel used by the 10-map level-select screen. |
 | Options scroll panel | `public/games/shadow-runner/home-assets/optimized/options-scroll-panel.webp` | Scroll panel used by title Options and in-game Pause menus. |
 | Options row button | `public/games/shadow-runner/home-assets/optimized/options-menu-row-button.webp` | Dedicated row-button asset for scroll-menu actions. |
@@ -60,8 +61,8 @@ The Desktop source remains untouched:
 - The title menu now uses blank panels with live Start Tutorial, Select Level,
   and Options controls instead of relying on baked labels for interaction.
 - Select Level opens a generated full-screen parchment campaign map with live
-  dotted route lines, ten individual location-button assets, and
-  locked/unlocked/completed states.
+  dotted route lines, ten individual location-button assets, a generated
+  parchment level-detail popup, and locked/unlocked/completed states.
 - The torch and star sheets should not be blindly sliced by equal dimensions
   without visual review.
 - Raw chroma-key sources are preserved under

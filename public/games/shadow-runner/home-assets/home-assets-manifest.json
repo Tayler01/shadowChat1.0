@@ -87,6 +87,15 @@
       "alpha": false,
       "purpose": "Generated full-screen parchment world map for the campaign level-select screen with live markers and dotted route overlays."
     },
+    "levelDetailPanelRuntime": {
+      "id": "level-detail-panel",
+      "file": "/games/shadow-runner/home-assets/optimized/level-detail-panel.webp",
+      "sourceFile": "/games/shadow-runner/home-assets/generated/level-detail-panel-imagegen-source.png",
+      "transparentSourceFile": "/games/shadow-runner/home-assets/sliced/level-detail-panel.png",
+      "dimensions": { "width": 1657, "height": 785 },
+      "alpha": true,
+      "purpose": "Generated blank parchment panel for campaign-map level details, live route metadata, and Start/Replay/Return actions."
+    },
     "mapLocationButtonFrameRuntime": {
       "id": "map-location-button-frame",
       "sourceFile": "/games/shadow-runner/home-assets/generated/map-location-button-frame-imagegen-source.png",
