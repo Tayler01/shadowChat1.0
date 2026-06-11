@@ -1,3 +1,5 @@
+import type { ShadowRunnerLevelConfig } from './levels'
+
 export interface ShadowRunnerHudState {
   lives: number
   maxLives: number
@@ -5,6 +7,10 @@ export interface ShadowRunnerHudState {
   maxHealth: number
   enemyHealth: number
   enemyMaxHealth: number
+  levelId: string
+  levelTitle: string
+  levelSubtitle: string
+  completionLine: string
   coins: number
   totalCoins: number
   score: number
@@ -35,12 +41,22 @@ export interface ShadowRunnerSimulationState {
     patrolRight: number
     lastDamagedAt: number
   }
+  level: {
+    id: string
+    title: string
+    subtitle: string
+    completionLine: string
+  }
   objective: string
   defeated: boolean
   outOfLives: boolean
 }
 
-export function createInitialShadowRunnerSimulation(): ShadowRunnerSimulationState {
+export function createInitialShadowRunnerSimulation(
+  level: ShadowRunnerLevelConfig,
+): ShadowRunnerSimulationState {
+  const enemy = level.enemy
+
   return {
     player: {
       lives: 3,
@@ -55,15 +71,21 @@ export function createInitialShadowRunnerSimulation(): ShadowRunnerSimulationSta
       lastDamagedAt: 0,
     },
     enemy: {
-      health: 3,
-      maxHealth: 3,
-      alive: true,
-      direction: -1,
-      patrolLeft: 1240,
-      patrolRight: 1600,
+      health: enemy?.health ?? 0,
+      maxHealth: enemy?.maxHealth ?? 0,
+      alive: Boolean(enemy),
+      direction: enemy?.direction ?? -1,
+      patrolLeft: enemy?.patrolLeft ?? 0,
+      patrolRight: enemy?.patrolRight ?? 0,
       lastDamagedAt: 0,
     },
-    objective: 'Reach the east gate',
+    level: {
+      id: level.id,
+      title: level.title,
+      subtitle: level.subtitle,
+      completionLine: level.completionLine,
+    },
+    objective: level.objective,
     defeated: false,
     outOfLives: false,
   }
@@ -80,6 +102,10 @@ export function getShadowRunnerHudState(
     maxHealth: state.player.maxHealth,
     enemyHealth: state.enemy.alive ? state.enemy.health : 0,
     enemyMaxHealth: state.enemy.maxHealth,
+    levelId: state.level.id,
+    levelTitle: state.level.title,
+    levelSubtitle: state.level.subtitle,
+    completionLine: state.level.completionLine,
     coins: state.player.coins,
     totalCoins,
     score: state.player.score,
@@ -114,7 +140,7 @@ export function spendShadowRunnerLife(state: ShadowRunnerSimulationState) {
   return state.player.lives > 0
 }
 
-export function damageClockworkSentry(state: ShadowRunnerSimulationState, time: number, amount: number) {
+export function damageShadowRunnerEnemy(state: ShadowRunnerSimulationState, time: number, amount: number) {
   if (!state.enemy.alive || time - state.enemy.lastDamagedAt < 220) return false
 
   state.enemy.lastDamagedAt = time

@@ -64,6 +64,15 @@ reference.
 - Runtime use: `landing-dust-6f-64.png` handles double-jump, respawn, and
   defeat puffs; `sword-slash-6f-96.png` handles the attack VFX.
 
+### UI
+
+- `level-1/ui/east-gate-run-thumbnail-source.png`: generated Level 1
+  level-select thumbnail source.
+- `level-1/ui/east-gate-run-thumbnail-320x180.webp`: level-select thumbnail
+  export.
+- `level-1/ui/east-gate-run-thumbnail-160x90.webp`: compact level-select
+  thumbnail export.
+
 ## Batch 2 Lantern Market Roofs - 2026-06-10
 
 Map 2 source batch for `Lantern Market Roofs`. These are saved for review and
@@ -215,3 +224,56 @@ The Scroll Thief enemy strip is stored with the shared sprite assets:
 Style note: Scroll Thief is intentionally separated from the hero with a teal
 short cape/sash, cream shirt, burgundy trousers, scholar cap, visible face, and
 scroll/satchel-swipe silhouette instead of a dark hooded runner silhouette.
+
+## Batch 5 Candle Fair Ruins - 2026-06-11
+
+Map 5 source batch for `Candle Fair Ruins`. These are saved for review and
+future runtime wiring.
+
+### Background
+
+- `level-5/background/candle-fair-ruins-background-source.png`: generated
+  gameplay background source.
+- `level-5/background/candle-fair-ruins-background.webp`: optimized gameplay
+  background export.
+
+### Props, Terrain, And Hazards
+
+- `level-5/props/candle-fair-props-hazards-v1-source.png`: generated
+  chroma-key source sheet.
+- `level-5/props/candle-fair-props-hazards-v1-transparent.png`: transparent
+  source sheet with fair booth platforms, tattered tent pieces, burned planks,
+  candle clusters, torch ember strips, swinging lantern positions, lantern
+  chain, fake gold/crest/moon-shard pickups, reveal smoke, ember trails, burned
+  scrolls, false-route signs, jester mask icon, fair banner scraps, wax puddle,
+  and rubble.
+
+### UI
+
+- `level-5/ui/candle-fair-ruins-thumbnail-source.png`: generated thumbnail
+  source.
+- `level-5/ui/candle-fair-ruins-thumbnail-320x180.webp`: level-select
+  thumbnail export.
+- `level-5/ui/candle-fair-ruins-thumbnail-160x90.webp`: compact level-select
+  thumbnail export.
+
+### Preview
+
+- `level-5/batch-5-candle-fair-ruins-contact-sheet.png`: review contact sheet
+  combining background, thumbnail, props/hazards, and enemy preview.
+
+### Enemy Sprite
+
+The Candle Jester enemy strip is stored with the shared sprite assets:
+
+- `../sprites/raw/candle-jester-v1-source.png`
+- `../sprites/transparent/candle-jester-v1-5f-strip.png`
+- `../sprites/strips/candle-jester-v1-5f-128.png`
+- `../sprites/strips/candle-jester-v1-5f-192.png`
+- `../sprites/previews/candle-jester-v1-5f-preview.png`
+- `../sprites/frames/candle-jester-v1/*.png`
+
+Style note: Candle Jester is intentionally separated from the hero with a
+cream mask, red-and-gold jester cap, red/gold motley tunic, curled shoes,
+candle wand, and fake coin silhouette instead of a dark hooded runner
+silhouette.

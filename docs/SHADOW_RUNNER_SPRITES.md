@@ -32,6 +32,7 @@ motion, frame timing, and home-screen composition.
 | lantern-bandit-scout | 5 | partial | Map 2 enemy: idle, run, lantern-pole jab, hit, defeated | `public/games/shadow-runner/sprites/strips/lantern-bandit-scout-v1-5f-128.png` | `public/games/shadow-runner/sprites/previews/lantern-bandit-scout-v1-5f-preview.png` |
 | barrel-roller | 5 | partial | Map 3 trap-enemy: idle, roll, impact, stunned, broken | `public/games/shadow-runner/sprites/strips/barrel-roller-v1-5f-128.png` | `public/games/shadow-runner/sprites/previews/barrel-roller-v1-5f-preview.png` |
 | scroll-thief | 5 | partial | Map 4 enemy: idle, dash, satchel swipe, hit, defeated | `public/games/shadow-runner/sprites/strips/scroll-thief-v1-5f-128.png` | `public/games/shadow-runner/sprites/previews/scroll-thief-v1-5f-preview.png` |
+| candle-jester | 5 | partial | Map 5 enemy: idle, skip, candle trick, hit, defeated | `public/games/shadow-runner/sprites/strips/candle-jester-v1-5f-128.png` | `public/games/shadow-runner/sprites/previews/candle-jester-v1-5f-preview.png` |
 
 ## Frame Labels
 
@@ -105,6 +106,14 @@ motion, frame timing, and home-screen composition.
 4. hit-stunned
 5. defeated
 
+### candle-jester
+
+1. idle-grin
+2. skipping-run
+3. candle-trick
+4. hit-stunned
+5. defeated
+
 ## Review Notes
 
 - `menu-idle-cape` is the strongest first-pass strip and is a good candidate for
@@ -136,6 +145,10 @@ motion, frame timing, and home-screen composition.
   It uses a teal short cape/sash, cream shirt, burgundy trousers, scholar cap,
   visible face, and scroll/satchel-swipe silhouette so it reads as an archive
   thief rather than another hooded Shadow Runner.
+- `candle-jester` is generated for Map 5, but is not wired into runtime yet.
+  It uses a cream theatrical mask, red-and-gold jester cap, motley tunic,
+  curled shoes, candle wand, and fake coin silhouette so it reads as a trickster
+  enemy rather than another hooded Shadow Runner.
 
 ## Current Runtime Wiring
 

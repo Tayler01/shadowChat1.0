@@ -172,6 +172,26 @@
         { "index": 4, "label": "hit-stunned", "file": "/games/shadow-runner/sprites/frames/scroll-thief-v1/04-hit-stunned.png" },
         { "index": 5, "label": "defeated", "file": "/games/shadow-runner/sprites/frames/scroll-thief-v1/05-defeated.png" }
       ]
+    },
+    "candleJester": {
+      "id": "candle-jester",
+      "purpose": "Map 5 Candle Fair Ruins enemy: idle grin, skipping run, candle trick attack, hit, and defeated states",
+      "loop": false,
+      "recommendedFps": 10,
+      "frameCount": 5,
+      "strip": "/games/shadow-runner/sprites/strips/candle-jester-v1-5f-128.png",
+      "preview": "/games/shadow-runner/sprites/previews/candle-jester-v1-5f-preview.png",
+      "rawSource": "/games/shadow-runner/sprites/raw/candle-jester-v1-source.png",
+      "transparentSource": "/games/shadow-runner/sprites/transparent/candle-jester-v1-5f-strip.png",
+      "alternateStrip": "/games/shadow-runner/sprites/strips/candle-jester-v1-5f-192.png",
+      "styleNotes": "Accepted v1 uses a cream theatrical mask, red-and-gold jester cap, motley tunic, curled shoes, candle wand, and fake coin silhouette instead of a dark hooded runner silhouette.",
+      "frames": [
+        { "index": 1, "label": "idle-grin", "file": "/games/shadow-runner/sprites/frames/candle-jester-v1/01-idle-grin.png" },
+        { "index": 2, "label": "skipping-run", "file": "/games/shadow-runner/sprites/frames/candle-jester-v1/02-skipping-run.png" },
+        { "index": 3, "label": "candle-trick", "file": "/games/shadow-runner/sprites/frames/candle-jester-v1/03-candle-trick.png" },
+        { "index": 4, "label": "hit-stunned", "file": "/games/shadow-runner/sprites/frames/candle-jester-v1/04-hit-stunned.png" },
+        { "index": 5, "label": "defeated", "file": "/games/shadow-runner/sprites/frames/candle-jester-v1/05-defeated.png" }
+      ]
     }
   }
 }

@@ -15,31 +15,45 @@ import {
 } from 'lucide-react'
 import { SHADOW_RUNNER_ASSETS } from './assets/manifest'
 import { createShadowRunnerInputState, type ShadowRunnerAction } from './game/input'
+import {
+  getShadowRunnerLevelConfig,
+  type ShadowRunnerPlayableLevelId,
+} from './game/levels'
 import type { ShadowRunnerHudState } from './game/simulation'
 import { ShadowRunnerScrollMenu, type ShadowRunnerScrollMenuAction } from './ShadowRunnerScrollMenu'
 
 interface ShadowRunnerGameProps {
+  levelId: ShadowRunnerPlayableLevelId
   musicPlaying?: boolean
   audioBlocked?: boolean
   soundEffectsEnabled?: boolean
   onBackToTitle?: () => void
+  onLevelComplete?: (levelId: ShadowRunnerPlayableLevelId) => void
   onToggleMusic?: () => void
   onToggleSoundEffects?: () => void
 }
 
-const DEFAULT_HUD: ShadowRunnerHudState = {
-  lives: 3,
-  maxLives: 3,
-  health: 3,
-  maxHealth: 3,
-  enemyHealth: 3,
-  enemyMaxHealth: 3,
-  coins: 0,
-  totalCoins: 7,
-  score: 0,
-  objective: 'Reach the east gate',
-  defeated: false,
-  outOfLives: false,
+function createDefaultHud(levelId: ShadowRunnerPlayableLevelId): ShadowRunnerHudState {
+  const level = getShadowRunnerLevelConfig(levelId)
+
+  return {
+    lives: 3,
+    maxLives: 3,
+    health: 3,
+    maxHealth: 3,
+    enemyHealth: level.enemy?.health ?? 0,
+    enemyMaxHealth: level.enemy?.maxHealth ?? 0,
+    levelId: level.id,
+    levelTitle: level.title,
+    levelSubtitle: level.subtitle,
+    completionLine: level.completionLine,
+    coins: 0,
+    totalCoins: level.coins.length,
+    score: 0,
+    objective: level.objective,
+    defeated: false,
+    outOfLives: false,
+  }
 }
 
 const SHADOW_RUNNER_GAME_STYLES = `
@@ -155,22 +169,25 @@ function TouchButton({
 }
 
 export function ShadowRunnerGame({
+  levelId,
   musicPlaying = false,
   audioBlocked = false,
   soundEffectsEnabled = true,
   onBackToTitle,
+  onLevelComplete,
   onToggleMusic,
   onToggleSoundEffects,
 }: ShadowRunnerGameProps) {
   const gameMountRef = React.useRef<HTMLDivElement | null>(null)
   const gameRef = React.useRef<ShadowRunnerPhaserGameHandle | null>(null)
   const inputRef = React.useRef(createShadowRunnerInputState())
-  const [hud, setHud] = React.useState<ShadowRunnerHudState>(DEFAULT_HUD)
+  const [hud, setHud] = React.useState<ShadowRunnerHudState>(() => createDefaultHud(levelId))
   const [ready, setReady] = React.useState(false)
   const [loadError, setLoadError] = React.useState<string | null>(null)
   const [pauseOpen, setPauseOpen] = React.useState(false)
   const [confirmExit, setConfirmExit] = React.useState<null | 'title'>(null)
   const [restartToken, setRestartToken] = React.useState(0)
+  const completionReportedRef = React.useRef(false)
   const menuOpen = pauseOpen || confirmExit !== null
   const overlayOpen = menuOpen || hud.defeated || hud.outOfLives
 
@@ -184,7 +201,8 @@ export function ShadowRunnerGame({
 
     setReady(false)
     setLoadError(null)
-    setHud(DEFAULT_HUD)
+    setHud(createDefaultHud(levelId))
+    completionReportedRef.current = false
 
     void import('./game/createShadowRunnerPhaserGame')
       .then(({ createShadowRunnerPhaserGame }) => {
@@ -193,6 +211,7 @@ export function ShadowRunnerGame({
         game = createShadowRunnerPhaserGame({
           parent: gameMountRef.current,
           input: inputRef,
+          levelId,
           onHudChange: setHud,
           onReady: () => {
             if (!disposed) setReady(true)
@@ -211,7 +230,13 @@ export function ShadowRunnerGame({
       game?.destroy(true)
       gameRef.current = null
     }
-  }, [restartToken])
+  }, [levelId, restartToken])
+
+  React.useEffect(() => {
+    if (!hud.defeated || completionReportedRef.current) return
+    completionReportedRef.current = true
+    onLevelComplete?.(levelId)
+  }, [hud.defeated, levelId, onLevelComplete])
 
   React.useEffect(() => {
     const game = gameRef.current
@@ -415,7 +440,7 @@ export function ShadowRunnerGame({
       {pauseOpen && !confirmExit && (
         <ShadowRunnerScrollMenu
           title="Pause"
-          subtitle="East Gate Run"
+          subtitle={hud.levelTitle}
           actions={pauseActions}
         />
       )}
@@ -452,9 +477,12 @@ export function ShadowRunnerGame({
                 draggable={false}
               />
               <div className="absolute inset-x-[13%] top-[27%] text-center">
-                <p className="text-[0.54rem] font-black uppercase tracking-[0.16em] text-[#5a3818] min-[740px]:text-[0.66rem]">East Gate Run</p>
+                <p className="text-[0.54rem] font-black uppercase tracking-[0.16em] text-[#5a3818] min-[740px]:text-[0.66rem]">{hud.levelTitle}</p>
                 <p className="mt-0.5 text-sm font-black uppercase leading-none tracking-[0.16em] min-[740px]:text-xl">Level Complete</p>
                 <p className="mt-1 text-[0.56rem] font-black uppercase tracking-[0.1em] text-[#3a2611] min-[740px]:text-xs">
+                  {hud.completionLine}
+                </p>
+                <p className="mt-0.5 text-[0.48rem] font-black uppercase tracking-[0.08em] text-[#3a2611] min-[740px]:text-[0.58rem]">
                   Coins {hud.coins} of {hud.totalCoins} - Score {hud.score}
                 </p>
               </div>

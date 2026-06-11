@@ -1,11 +1,15 @@
 import Phaser from 'phaser'
 import { SHADOW_RUNNER_ASSETS } from '../assets/manifest'
-import { SHADOW_RUNNER_LEVEL_ONE } from './levelOne'
 import type { ShadowRunnerInputRef } from './input'
+import {
+  getShadowRunnerLevelConfig,
+  type ShadowRunnerLevelConfig,
+  type ShadowRunnerPlayableLevelId,
+} from './levels'
 import {
   collectShadowRunnerCoin,
   createInitialShadowRunnerSimulation,
-  damageClockworkSentry,
+  damageShadowRunnerEnemy,
   damageShadowRunnerPlayer,
   getShadowRunnerHudState,
   restoreShadowRunnerPlayer,
@@ -17,6 +21,7 @@ import {
 interface CreateShadowRunnerGameOptions {
   parent: HTMLElement
   input: ShadowRunnerInputRef
+  levelId?: ShadowRunnerPlayableLevelId
   onHudChange: (state: ShadowRunnerHudState) => void
   onReady?: () => void
 }
@@ -112,10 +117,11 @@ function addStaticPlatform(
 
 class ShadowRunnerLevelScene extends Phaser.Scene {
   private readonly controls: ShadowRunnerInputRef
+  private readonly level: ShadowRunnerLevelConfig
   private readonly onHudChange: (state: ShadowRunnerHudState) => void
   private readonly onReady?: () => void
 
-  private state: ShadowRunnerSimulationState = createInitialShadowRunnerSimulation()
+  private state: ShadowRunnerSimulationState
   private cursors?: CursorKeys
   private keys?: Record<'a' | 'd' | 'w' | 'space' | 'z' | 'j' | 'shift' | 's', Phaser.Input.Keyboard.Key>
   private platforms?: Phaser.Physics.Arcade.StaticGroup
@@ -141,12 +147,14 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   constructor(options: Omit<CreateShadowRunnerGameOptions, 'parent'>) {
     super('ShadowRunnerLevelScene')
     this.controls = options.input
+    this.level = getShadowRunnerLevelConfig(options.levelId ?? 'tutorial')
+    this.state = createInitialShadowRunnerSimulation(this.level)
     this.onHudChange = options.onHudChange
     this.onReady = options.onReady
   }
 
   preload() {
-    this.load.image('shadow-runner-bg', SHADOW_RUNNER_ASSETS.home.background)
+    this.load.image('shadow-runner-bg', this.level.backgroundAsset)
     this.load.spritesheet('shadow-runner-idle', SHADOW_RUNNER_ASSETS.hero.menuIdleCapeStrip, {
       frameWidth: 128,
       frameHeight: 128,
@@ -192,11 +200,11 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   }
 
   create() {
-    this.state = createInitialShadowRunnerSimulation()
+    this.state = createInitialShadowRunnerSimulation(this.level)
     this.wasOnFloor = false
     this.enemyAttackUntil = 0
     this.finishSparked = false
-    this.physics.world.setBounds(0, 0, SHADOW_RUNNER_LEVEL_ONE.worldWidth, SHADOW_RUNNER_LEVEL_ONE.worldHeight)
+    this.physics.world.setBounds(0, 0, this.level.worldWidth, this.level.worldHeight)
     this.createTextures()
     this.registerTerrainFrames()
     this.createBackground()
@@ -205,7 +213,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.createActors()
     this.createInput()
 
-    this.cameras.main.setBounds(0, 0, SHADOW_RUNNER_LEVEL_ONE.worldWidth, SHADOW_RUNNER_LEVEL_ONE.worldHeight)
+    this.cameras.main.setBounds(0, 0, this.level.worldWidth, this.level.worldHeight)
     this.cameras.main.startFollow(this.player!, true, 0.12, 0.12, -110, 52)
     this.cameras.main.setDeadzone(190, 92)
 
@@ -321,8 +329,8 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.spikes = this.physics.add.staticGroup()
     this.coins = this.physics.add.staticGroup()
 
-    SHADOW_RUNNER_LEVEL_ONE.platforms.forEach(platform => {
-      const frameKey = getTerrainFrameKey(platform.id)
+    this.level.platforms.forEach(platform => {
+      const frameKey = getTerrainFrameKey(platform.visualId ?? platform.id)
       const hasTerrainFrame = this.textures.exists('shadow-runner-terrain-atlas')
         && this.textures.get('shadow-runner-terrain-atlas').has(frameKey)
 
@@ -331,7 +339,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
         : { texture: 'shadow-runner-stone' })
     })
 
-    SHADOW_RUNNER_LEVEL_ONE.tiltPlatforms.forEach((platform, index) => {
+    this.level.tiltPlatforms.forEach((platform, index) => {
       const hasTiltAsset = this.textures.exists('shadow-runner-tilt-bridge')
       const sprite = addStaticPlatform(this, this.platforms!, platform, hasTiltAsset
         ? {
@@ -355,11 +363,11 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       })
     })
 
-    SHADOW_RUNNER_LEVEL_ONE.spikes.forEach(spike => {
+    this.level.spikes.forEach(spike => {
       addStaticPlatform(this, this.spikes!, spike, { texture: 'shadow-runner-spike-row' })
     })
 
-    SHADOW_RUNNER_LEVEL_ONE.coins.forEach(coin => {
+    this.level.coins.forEach((coin, index) => {
       const coinSprite = this.coins!.create(coin.x, coin.y, 'shadow-runner-coin') as Phaser.Physics.Arcade.Sprite
       coinSprite.setName(coin.id)
       coinSprite.setScale(0.74)
@@ -373,12 +381,12 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
         duration: 900,
         yoyo: true,
         repeat: -1,
-        delay: SHADOW_RUNNER_LEVEL_ONE.coins.indexOf(coin) * 90,
+        delay: index * 90,
         ease: 'Sine.inOut',
       })
     })
 
-    const finish = SHADOW_RUNNER_LEVEL_ONE.finish
+    const finish = this.level.finish
     if (this.textures.exists('shadow-runner-east-gate')) {
       const gate = this.add.image(finish.x + finish.width / 2, finish.y + finish.height, 'shadow-runner-east-gate')
       gate.setOrigin(0.5, 1)
@@ -392,7 +400,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   }
 
   private createActors() {
-    const start = SHADOW_RUNNER_LEVEL_ONE.playerStart
+    const start = this.level.playerStart
     this.player = this.physics.add.sprite(start.x, start.y, 'shadow-runner-idle')
     this.player.setOrigin(0.5, 1)
     this.player.setScale(HERO_SCALE)
@@ -403,15 +411,17 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.player.setOffset(43, 58)
     this.player.play('runner-idle')
 
-    const enemyStart = SHADOW_RUNNER_LEVEL_ONE.enemyStart
-    this.enemy = this.physics.add.sprite(enemyStart.x, enemyStart.y, 'clockwork-sentry')
-    this.enemy.setOrigin(0.5, 1)
-    this.enemy.setScale(SENTRY_SCALE)
-    this.enemy.setSize(50, 70)
-    this.enemy.setOffset(39, 58)
-    this.enemy.setCollideWorldBounds(false)
-    this.enemy.setMaxVelocity(105, 920)
-    this.enemy.play('sentry-walk')
+    const enemyStart = this.level.enemy
+    if (enemyStart) {
+      this.enemy = this.physics.add.sprite(enemyStart.x, enemyStart.y, 'clockwork-sentry')
+      this.enemy.setOrigin(0.5, 1)
+      this.enemy.setScale(SENTRY_SCALE)
+      this.enemy.setSize(50, 70)
+      this.enemy.setOffset(39, 58)
+      this.enemy.setCollideWorldBounds(false)
+      this.enemy.setMaxVelocity(105, 920)
+      this.enemy.play('sentry-walk')
+    }
 
     this.playerHealthBar = this.add.graphics()
     this.enemyHealthBar = this.add.graphics()
@@ -426,8 +436,10 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     })
 
     this.physics.add.collider(this.player, this.platforms!)
-    this.physics.add.collider(this.enemy, this.platforms!)
-    this.physics.add.overlap(this.player, this.enemy, () => this.handlePlayerEnemyOverlap(this.time.now))
+    if (this.enemy) {
+      this.physics.add.collider(this.enemy, this.platforms!)
+      this.physics.add.overlap(this.player, this.enemy, () => this.handlePlayerEnemyOverlap(this.time.now))
+    }
     this.physics.add.overlap(this.player, this.spikes!, () => this.damagePlayerFromHazard(this.time.now))
     this.physics.add.overlap(this.player, this.coins!, (_player, coin) => {
       this.collectCoin(coin as Phaser.Physics.Arcade.Sprite)
@@ -455,9 +467,12 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   private registerQaShortcuts() {
     this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
       if (event.code === 'Digit2') {
-        this.teleportPlayerForQa(SHADOW_RUNNER_LEVEL_ONE.enemyStart.x - 120, SHADOW_RUNNER_LEVEL_ONE.enemyStart.y)
+        const enemy = this.level.enemy
+        if (enemy) {
+          this.teleportPlayerForQa(enemy.x - 120, enemy.y)
+        }
       } else if (event.code === 'Digit3') {
-        const finish = SHADOW_RUNNER_LEVEL_ONE.finish
+        const finish = this.level.finish
         this.teleportPlayerForQa(finish.x - 90, finish.y + finish.height)
       } else if (event.code === 'KeyH') {
         this.damagePlayerFromHazard(this.time.now)
@@ -479,7 +494,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     const enemy = this.enemy
     if (!enemy || !this.state.enemy.alive) return
 
-    const damaged = damageClockworkSentry(this.state, this.time.now, 1)
+    const damaged = damageShadowRunnerEnemy(this.state, this.time.now, 1)
     if (!damaged) return
 
     this.addHitFlash(enemy.x, enemy.y - 42)
@@ -544,7 +559,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
     this.resolveAttackHit(time)
 
-    if (player.y > SHADOW_RUNNER_LEVEL_ONE.worldHeight + 90) {
+    if (player.y > this.level.worldHeight + 90) {
       this.damagePlayerFromHazard(time)
     }
 
@@ -639,7 +654,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     }
 
     if (reachX > 0 && reachX < 106 && vertical < 74) {
-      const damaged = damageClockworkSentry(this.state, time, 1)
+      const damaged = damageShadowRunnerEnemy(this.state, time, 1)
       if (damaged) {
         enemy.setVelocityX(facing * 190)
         this.addHitFlash(enemy.x, enemy.y - 42)
@@ -659,7 +674,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     const isStomp = body.velocity.y > 130 && player.y < enemy.y - 24
 
     if (isStomp) {
-      const damaged = damageClockworkSentry(this.state, time, 2)
+      const damaged = damageShadowRunnerEnemy(this.state, time, 2)
       player.setVelocityY(-390)
       if (damaged) {
         this.addHitFlash(enemy.x, enemy.y - 42)
@@ -722,7 +737,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     restoreShadowRunnerPlayer(this.state)
     this.jumpsUsed = 0
     this.player.setVelocity(0, 0)
-    this.player.setPosition(SHADOW_RUNNER_LEVEL_ONE.playerStart.x, SHADOW_RUNNER_LEVEL_ONE.playerStart.y)
+    this.player.setPosition(this.level.playerStart.x, this.level.playerStart.y)
     this.player.clearTint()
     this.addDustPuff(this.player.x, this.player.y - 28)
     this.emitHud(true)
@@ -824,10 +839,10 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   private checkFinish() {
     if (!this.player || this.state.defeated || this.state.outOfLives) return
 
-    const finish = SHADOW_RUNNER_LEVEL_ONE.finish
+    const finish = this.level.finish
     if (this.player.x > finish.x && this.player.y > finish.y - 8) {
       this.state.defeated = true
-      this.state.objective = 'Gate reached'
+      this.state.objective = this.level.completionLine
       this.state.player.score += 300
       if (!this.finishSparked) {
         this.finishSparked = true
@@ -839,7 +854,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   }
 
   private emitHud(force = false) {
-    const hud = getShadowRunnerHudState(this.state, SHADOW_RUNNER_LEVEL_ONE.coins.length)
+    const hud = getShadowRunnerHudState(this.state, this.level.coins.length)
     const signature = JSON.stringify(hud)
     if (!force && signature === this.lastHudSignature) return
 
@@ -1016,6 +1031,7 @@ export function createShadowRunnerPhaserGame(options: CreateShadowRunnerGameOpti
     scene: [
       new ShadowRunnerLevelScene({
         input: options.input,
+        levelId: options.levelId,
         onHudChange: options.onHudChange,
         onReady: options.onReady,
       }),

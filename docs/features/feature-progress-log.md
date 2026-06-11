@@ -18,8 +18,8 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
 - Status: active
 - Owner/agent: Codex
 - Branch: `main`
-- Current checkpoint: blank-scroll menu base, separate live button panels,
-  tighter title-menu hit areas, and automated Chrome mobile smoke coverage.
+- Current checkpoint: Start Tutorial / Select Level split, campaign level-map
+  progression, reusable level configs, and first Level 2 prototype route.
 - Roadmap: [`docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md`](C:/repos/chat2.0/docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md:1)
 - Latest pass, 2026-06-09: generated dedicated options-scroll and options-row
   button assets; removed title back/sound controls; added title Options and
@@ -33,6 +33,16 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
   named Phaser frames from the generated stone sheet, generated and wired a
   dedicated tilt-bridge asset, added landing/contact/finish feedback polish,
   and cataloged the new Barrel Roller plus Ivy Viaduct asset batch.
+- Latest pass, 2026-06-11: split the title actions into `Start Tutorial` and
+  `Select Level`, generated a branded level-map scroll plus Level 1 thumbnail,
+  added a locked grayscale 10-level campaign map, moved full Level 1 behind the
+  map flow, kept the tutorial route short, introduced reusable level metadata
+  for future maps, and cataloged the new Candle Jester / Candle Fair assets.
+- Verification, 2026-06-11: `npm run lint`,
+  `npx tsc --noEmit -p tsconfig.app.json`, `npm run build`, and
+  `npx jest --runInBand` passed. Chrome-channel production-preview visual
+  smoke passed for locked map, Level 1 completion unlock, and Level 2 launch;
+  evidence in `output/playwright/shadow-runner-level-map-goal/`.
 - Verification, 2026-06-11: `npm run lint`,
   `npx tsc --noEmit -p tsconfig.app.json`, `npm run build`, and
   `npx jest --runInBand` passed. Chrome-channel production-preview visual

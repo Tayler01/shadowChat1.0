@@ -244,6 +244,34 @@ bridge visual. Source and preview files remain cataloged for review.
 - Batch contact sheet:
   `public/games/shadow-runner/level-assets/level-4/batch-4-bell-tower-archives-contact-sheet.png`
 
+### 2026-06-11 Batch 5 Candle Fair Ruins
+
+- Candle Fair Ruins gameplay background:
+  - source: `public/games/shadow-runner/level-assets/level-5/background/candle-fair-ruins-background-source.png`
+  - optimized background: `public/games/shadow-runner/level-assets/level-5/background/candle-fair-ruins-background.webp`
+- Candle Fair Ruins props and hazard source sheet:
+  - source: `public/games/shadow-runner/level-assets/level-5/props/candle-fair-props-hazards-v1-source.png`
+  - transparent sheet: `public/games/shadow-runner/level-assets/level-5/props/candle-fair-props-hazards-v1-transparent.png`
+  - includes fair booth platforms, tattered tent pieces, burned planks, candle
+    clusters, torch ember strips, swinging lantern positions, lantern chain,
+    fake gold/crest/moon-shard pickups, reveal smoke, ember trails, burned
+    scrolls, false-route signs, jester mask icon, fair banner scraps, wax
+    puddle, and rubble.
+- Candle Fair Ruins level-select thumbnail:
+  - source: `public/games/shadow-runner/level-assets/level-5/ui/candle-fair-ruins-thumbnail-source.png`
+  - runtime options: `public/games/shadow-runner/level-assets/level-5/ui/candle-fair-ruins-thumbnail-320x180.webp` and `public/games/shadow-runner/level-assets/level-5/ui/candle-fair-ruins-thumbnail-160x90.webp`
+- Candle Jester v1:
+  - source: `public/games/shadow-runner/sprites/raw/candle-jester-v1-source.png`
+  - transparent strip: `public/games/shadow-runner/sprites/transparent/candle-jester-v1-5f-strip.png`
+  - runtime strips: `public/games/shadow-runner/sprites/strips/candle-jester-v1-5f-128.png` and `public/games/shadow-runner/sprites/strips/candle-jester-v1-5f-192.png`
+  - frames: `public/games/shadow-runner/sprites/frames/candle-jester-v1/*.png`
+  - preview: `public/games/shadow-runner/sprites/previews/candle-jester-v1-5f-preview.png`
+  - note: cream mask, red-and-gold jester cap, red/gold motley tunic, curled
+    shoes, candle wand, and fake coin silhouette keep it distinct from the
+    Shadow Runner hero.
+- Batch contact sheet:
+  `public/games/shadow-runner/level-assets/level-5/batch-5-candle-fair-ruins-contact-sheet.png`
+
 ## Lore-Driven Missing Assets By Map
 
 This list comes from `docs/SHADOW_RUNNER_STORY_LORE.md`, especially the
@@ -275,8 +303,10 @@ Status key:
     both.
 
 - [ ] **Level-select art for the 10-map campaign**
+  - Current state: generated level-map parchment panel plus thumbnails for
+    Maps 1-5.
   - Need: locked parchment tile, unlocked tile, completed wax seal, perfect-run
-    purple crest, moon-shard glint, and one thumbnail per map.
+    purple crest, moon-shard glint, and thumbnails for Maps 6-10.
   - Suggested thumbnails: 160 x 90 or 320 x 180 source, exported down for
     phone UI.
 
@@ -305,15 +335,16 @@ Have or generated:
 - **Generated:** floor spikes.
 - **Generated:** east gate finish marker.
 - **Generated:** landing dust and sword slash VFX.
+- **Generated:** tilt bridge runtime asset.
+- **Generated:** Map 1 level-select thumbnail in 320 x 180 and 160 x 90.
 
 Still missing:
 
 - [ ] Gameplay background/parallax set for the east gate route.
 - [ ] Strict 32 x 32 stone terrain tile atlas, if tilemap-first runtime is used.
-- [ ] Tilt bridge or wobble platform art.
 - [ ] Player-hit stars or invulnerability shimmer.
 - [ ] Defeat dust variant separate from landing dust, if desired.
-- [ ] Map 1 level-select thumbnail and completion seal.
+- [ ] Map 1 completion seal.
 - [ ] Sealed-letter completion stamp for "East Gate opened."
 
 ### Map 2 - Lantern Market Roofs
@@ -401,18 +432,27 @@ Still missing:
 Lore hook: trick hazards, fake pickups, swinging lanterns, and jester enemies
 spreading false signals.
 
+Have or generated:
+
+- **Generated:** Candle Fair Ruins gameplay background source and optimized
+  WebP.
+- **Generated:** props/hazards source sheet with fair booth platforms, tattered
+  tent pieces, burned planks, candles, ember strips, swinging lantern positions,
+  fake pickups, reveal smoke, ember trails, burned scrolls, false-route signs,
+  jester mask icon, fair banners, wax puddle, and rubble.
+- **Generated:** Candle Jester v1 production strip and frames.
+- **Generated:** Map 5 level-select thumbnail in 320 x 180 and 160 x 90.
+
 Still missing:
 
-- [ ] Candle Fair gameplay background/parallax set.
-- [ ] Fair-ruins terrain: booth platforms, collapsed tents, candle stands,
-  fair banners, and burned wood planks.
-- [ ] Candle Jester production strip.
-- [ ] Fake pickup variants for gold coin, crest coin, and moon shard.
-- [ ] Pickup reveal/smoke puff VFX for trick objects.
-- [ ] Swinging lantern hazard and ember trail VFX.
-- [ ] Burned scroll props and misinformation clue pieces.
-- [ ] Candle clusters, torch embers, and false-route signs.
-- [ ] Map 5 level-select thumbnail and jester-mask completion icon.
+- [ ] True split parallax layers for moonlit sky, ruined fair midground,
+  foreground booths, lantern lines, and candlelight overlays.
+- [ ] Individual sliced terrain/hazard pieces from the generated source sheet,
+  if the runtime does not use the sheet directly.
+- [ ] Swinging lantern runtime strip with collision-safe frame bounds.
+- [ ] Fake pickup reveal/runtime smoke strip separated from the source sheet.
+- [ ] Torch ember and wax puddle runtime slices.
+- [ ] Locked/unlocked level-select tile state.
 
 ### Map 6 - Gearvault Causeway
 

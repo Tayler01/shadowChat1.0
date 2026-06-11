@@ -13,6 +13,7 @@ export const SHADOW_RUNNER_ASSETS = {
     optionsMenuButton: `${HOME_ROOT}/optimized/options-menu-row-button.webp`,
     blankMenuScroll: `${HOME_ROOT}/optimized/blank-menu-scroll.webp`,
     blankMenuButton: `${HOME_ROOT}/optimized/blank-menu-button.webp`,
+    levelMapScrollPanel: `${HOME_ROOT}/optimized/level-map-scroll-panel.webp`,
     bottomMenuScroll: `${HOME_ROOT}/optimized/bottom-menu-scroll.webp`,
     missionScrollStand: `${HOME_ROOT}/optimized/mission-scroll-stand.webp`,
     starSheet: `${HOME_ROOT}/optimized/star-twinkle-sheet.webp`,
@@ -29,6 +30,7 @@ export const SHADOW_RUNNER_ASSETS = {
   },
   enemies: {
     clockworkSentryStrip: `${ASSET_ROOT}/sprites/strips/clockwork-sentry-v2-6f-128.png`,
+    candleJesterStrip: `${ASSET_ROOT}/sprites/strips/candle-jester-v1-5f-128.png`,
   },
   gameplay: {
     hudPlaque: `${GAMEPLAY_ROOT}/optimized/hud-status-bar.webp`,
@@ -49,5 +51,19 @@ export const SHADOW_RUNNER_ASSETS = {
     eastGate96: `${LEVEL_ROOT}/props/east-gate-96x180.png`,
     landingDustStrip: `${LEVEL_ROOT}/vfx/landing-dust-6f-64.png`,
     swordSlashStrip: `${LEVEL_ROOT}/vfx/sword-slash-6f-96.png`,
+  },
+  levels: {
+    eastGateRunThumbnail160: `${LEVEL_ROOT}/level-1/ui/east-gate-run-thumbnail-160x90.webp`,
+    eastGateRunThumbnail320: `${LEVEL_ROOT}/level-1/ui/east-gate-run-thumbnail-320x180.webp`,
+    lanternMarketThumbnail160: `${LEVEL_ROOT}/level-2/ui/lantern-market-roofs-thumbnail-160x90.webp`,
+    lanternMarketThumbnail320: `${LEVEL_ROOT}/level-2/ui/lantern-market-roofs-thumbnail-320x180.webp`,
+    lanternMarketBackground: `${LEVEL_ROOT}/level-2/background/lantern-market-roofs-background.webp`,
+    ivyViaductThumbnail160: `${LEVEL_ROOT}/level-3/ui/ivy-viaduct-thumbnail-160x90.webp`,
+    ivyViaductThumbnail320: `${LEVEL_ROOT}/level-3/ui/ivy-viaduct-thumbnail-320x180.webp`,
+    bellTowerThumbnail160: `${LEVEL_ROOT}/level-4/ui/bell-tower-archives-thumbnail-160x90.webp`,
+    bellTowerThumbnail320: `${LEVEL_ROOT}/level-4/ui/bell-tower-archives-thumbnail-320x180.webp`,
+    candleFairThumbnail160: `${LEVEL_ROOT}/level-5/ui/candle-fair-ruins-thumbnail-160x90.webp`,
+    candleFairThumbnail320: `${LEVEL_ROOT}/level-5/ui/candle-fair-ruins-thumbnail-320x180.webp`,
+    candleFairBackground: `${LEVEL_ROOT}/level-5/background/candle-fair-ruins-background.webp`,
   },
 } as const

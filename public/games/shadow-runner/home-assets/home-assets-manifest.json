@@ -79,6 +79,15 @@
       "alpha": true,
       "purpose": "Generated blank parchment button panel for future separate menu controls and tighter hit areas."
     },
+    "levelMapScrollPanelRuntime": {
+      "id": "level-map-scroll-panel",
+      "file": "/games/shadow-runner/home-assets/optimized/level-map-scroll-panel.webp",
+      "sourceFile": "/games/shadow-runner/home-assets/generated/level-map-scroll-panel-chromakey-source.png",
+      "transparentSourceFile": "/games/shadow-runner/home-assets/sliced/level-map-scroll-panel.png",
+      "dimensions": { "width": 1500, "height": 844 },
+      "alpha": true,
+      "purpose": "Generated wide blank parchment scroll panel for the 10-map level-select screen."
+    },
     "bottomMenu": {
       "id": "ui-bottom-menu-scroll",
       "file": "/games/shadow-runner/home-assets/assets/ui/ui_bottom_menu_scroll.png",

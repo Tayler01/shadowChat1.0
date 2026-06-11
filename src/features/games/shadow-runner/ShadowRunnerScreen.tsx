@@ -1,6 +1,11 @@
 import React from 'react'
-import { ArrowLeft, Castle, LogOut, Music, Settings, Sword, Volume2, VolumeX, X } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Lock, LogOut, Map, Music, Settings, Sword, Volume2, VolumeX, X } from 'lucide-react'
 import { SHADOW_RUNNER_ASSETS } from './assets/manifest'
+import {
+  SHADOW_RUNNER_CAMPAIGN_LEVELS,
+  type ShadowRunnerCampaignLevel,
+  type ShadowRunnerPlayableLevelId,
+} from './game/levels'
 import { ShadowRunnerGame } from './ShadowRunnerGame'
 import { ShadowRunnerScrollMenu, type ShadowRunnerScrollMenuAction } from './ShadowRunnerScrollMenu'
 
@@ -20,13 +25,14 @@ type OrientationWindow = Window & typeof globalThis & {
 }
 
 const MENU_BUTTONS = [
-  { id: 'start', label: 'Start', left: '14.4%', width: '18.6%' },
-  { id: 'levels', label: 'Levels', left: '40.7%', width: '18.6%' },
-  { id: 'options', label: 'Options', left: '66.9%', width: '18.6%' },
+  { id: 'tutorial', label: 'Start Tutorial', labelLines: ['Start', 'Tutorial'], left: '14.4%', width: '18.6%' },
+  { id: 'levels', label: 'Select Level', labelLines: ['Select', 'Level'], left: '40.7%', width: '18.6%' },
+  { id: 'options', label: 'Options', labelLines: ['Options'], left: '66.9%', width: '18.6%' },
 ] as const
 
 const SHADOW_RUNNER_ACCESS_CODE = '123456'
 const SHADOW_RUNNER_ACCESS_SESSION_KEY = 'shadow-runner-access-unlocked'
+const SHADOW_RUNNER_PROGRESS_KEY = 'shadow-runner-campaign-progress-v1'
 
 const STAR_OVERLAYS = [
   { left: '17.5%', top: '6.5%', size: '1rem', position: '0% 0%', delay: '0s' },
@@ -61,6 +67,7 @@ const SHADOW_RUNNER_IMAGE_SOURCES = [
   SHADOW_RUNNER_ASSETS.home.titleScroll,
   SHADOW_RUNNER_ASSETS.home.optionsScroll,
   SHADOW_RUNNER_ASSETS.home.optionsMenuButton,
+  SHADOW_RUNNER_ASSETS.home.levelMapScrollPanel,
   SHADOW_RUNNER_ASSETS.home.blankMenuScroll,
   SHADOW_RUNNER_ASSETS.home.blankMenuButton,
   SHADOW_RUNNER_ASSETS.home.missionScrollStand,
@@ -69,6 +76,7 @@ const SHADOW_RUNNER_IMAGE_SOURCES = [
   SHADOW_RUNNER_ASSETS.home.bannerStand,
   SHADOW_RUNNER_ASSETS.home.bannerPennant,
   SHADOW_RUNNER_ASSETS.hero.menuIdleCapeStrip,
+  ...SHADOW_RUNNER_CAMPAIGN_LEVELS.slice(0, 4).map(level => level.thumbnail),
 ] as const
 
 const SHADOW_RUNNER_INLINE_STYLES = `
@@ -256,6 +264,60 @@ function getShadowRunnerAccessUnlocked() {
   return window.sessionStorage.getItem(SHADOW_RUNNER_ACCESS_SESSION_KEY) === 'true'
 }
 
+interface ShadowRunnerCampaignProgress {
+  completedLevels: string[]
+}
+
+const EMPTY_SHADOW_RUNNER_PROGRESS: ShadowRunnerCampaignProgress = {
+  completedLevels: [],
+}
+
+function readShadowRunnerProgress(): ShadowRunnerCampaignProgress {
+  if (typeof window === 'undefined') return EMPTY_SHADOW_RUNNER_PROGRESS
+
+  try {
+    const raw = window.localStorage.getItem(SHADOW_RUNNER_PROGRESS_KEY)
+    if (!raw) return EMPTY_SHADOW_RUNNER_PROGRESS
+
+    const parsed = JSON.parse(raw) as Partial<ShadowRunnerCampaignProgress>
+    if (!Array.isArray(parsed.completedLevels)) return EMPTY_SHADOW_RUNNER_PROGRESS
+
+    return {
+      completedLevels: parsed.completedLevels.filter((level): level is string => typeof level === 'string'),
+    }
+  } catch {
+    return EMPTY_SHADOW_RUNNER_PROGRESS
+  }
+}
+
+function writeShadowRunnerProgress(progress: ShadowRunnerCampaignProgress) {
+  window.localStorage.setItem(SHADOW_RUNNER_PROGRESS_KEY, JSON.stringify(progress))
+}
+
+function isCampaignLevelCompleted(progress: ShadowRunnerCampaignProgress, levelId: string) {
+  return progress.completedLevels.includes(levelId)
+}
+
+function isCampaignLevelUnlocked(progress: ShadowRunnerCampaignProgress, level: ShadowRunnerCampaignLevel) {
+  if (level.levelNumber === 1) return true
+  return isCampaignLevelCompleted(progress, `level-${level.levelNumber - 1}`)
+}
+
+function markCampaignLevelComplete(
+  progress: ShadowRunnerCampaignProgress,
+  levelId: ShadowRunnerPlayableLevelId,
+): ShadowRunnerCampaignProgress {
+  if (!levelId.startsWith('level-') || progress.completedLevels.includes(levelId)) {
+    return progress
+  }
+
+  const nextProgress = {
+    completedLevels: [...progress.completedLevels, levelId],
+  }
+  writeShadowRunnerProgress(nextProgress)
+  return nextProgress
+}
+
 function spriteStripStyle(source: string, frame: number, frameCount: number): React.CSSProperties {
   const position = frameCount > 1 ? `${(frame / (frameCount - 1)) * 100}% 0%` : '0% 0%'
 
@@ -269,8 +331,8 @@ function spriteStripStyle(source: string, frame: number, frameCount: number): Re
 }
 
 function MenuButtonIcon({ id }: { id: typeof MENU_BUTTONS[number]['id'] }) {
-  if (id === 'start') return <Sword className="h-[34%] w-[34%] stroke-[3]" aria-hidden="true" />
-  if (id === 'levels') return <Castle className="h-[34%] w-[34%] stroke-[3]" aria-hidden="true" />
+  if (id === 'tutorial') return <Sword className="h-[34%] w-[34%] stroke-[3]" aria-hidden="true" />
+  if (id === 'levels') return <Map className="h-[34%] w-[34%] stroke-[3]" aria-hidden="true" />
   return <Settings className="h-[34%] w-[34%] stroke-[3]" aria-hidden="true" />
 }
 
@@ -394,6 +456,108 @@ function ShadowRunnerAccessGate({ onUnlock, onExit }: ShadowRunnerAccessGateProp
   )
 }
 
+interface ShadowRunnerLevelMapProps {
+  progress: ShadowRunnerCampaignProgress
+  onBack: () => void
+  onPlayLevel: (levelId: ShadowRunnerPlayableLevelId) => void
+}
+
+function ShadowRunnerLevelMap({ progress, onBack, onPlayLevel }: ShadowRunnerLevelMapProps) {
+  return (
+    <div
+      className="shadow-runner-playfield relative overflow-hidden"
+      style={SHADOW_RUNNER_STAGE_STYLE}
+    >
+      <img
+        src={SHADOW_RUNNER_ASSETS.home.background}
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover"
+        draggable={false}
+      />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_26%_24%,rgba(246,215,132,0.1),transparent_18%),linear-gradient(180deg,rgba(2,4,10,0.32),rgba(2,4,10,0.62))]" />
+
+      <button
+        type="button"
+        aria-label="Back to Shadow Runner menu"
+        onClick={onBack}
+        className="absolute left-[max(0.8rem,env(safe-area-inset-left))] top-[max(0.7rem,env(safe-area-inset-top))] z-20 inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#e8c46b]/40 bg-black/50 text-[#f3d88d] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-md transition hover:border-[#f0d381]/70 hover:bg-[#2c2110]/75 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
+      >
+        <ArrowLeft className="h-5 w-5" />
+      </button>
+
+      <div className="absolute inset-x-[4%] bottom-[2.5%] top-[10%] z-10">
+        <img
+          src={SHADOW_RUNNER_ASSETS.home.levelMapScrollPanel}
+          alt=""
+          className="pointer-events-none absolute inset-0 h-full w-full object-fill drop-shadow-[0_28px_70px_rgba(0,0,0,0.78)]"
+          draggable={false}
+        />
+
+        <p className="absolute inset-x-[18%] top-[21%] text-center text-[0.66rem] font-black uppercase leading-none tracking-[0.2em] text-[#120d07] drop-shadow-[0_1px_0_rgba(255,239,183,0.55)] min-[740px]:text-sm">
+          Level Map
+        </p>
+
+        <div className="absolute bottom-[10%] left-[10%] right-[10%] top-[32%] grid grid-cols-5 gap-[clamp(0.25rem,0.9vw,0.55rem)]">
+          {SHADOW_RUNNER_CAMPAIGN_LEVELS.map(level => {
+            const completed = isCampaignLevelCompleted(progress, level.id)
+            const unlocked = isCampaignLevelUnlocked(progress, level)
+            const playable = unlocked && Boolean(level.playableLevelId)
+
+            return (
+              <button
+                key={level.id}
+                type="button"
+                disabled={!playable}
+                aria-label={`${level.title}${unlocked ? '' : ' locked'}`}
+                onClick={() => {
+                  if (level.playableLevelId) {
+                    onPlayLevel(level.playableLevelId)
+                  }
+                }}
+                className={`group relative overflow-hidden rounded-[0.38rem] border bg-[#150e07] text-left shadow-[0_9px_20px_rgba(0,0,0,0.32)] transition focus:outline-none focus:ring-2 focus:ring-[#120d07]/45 ${
+                  playable ? 'border-[#6f4b1f] active:scale-[0.98]' : 'cursor-default border-[#2a2016]'
+                }`}
+              >
+                <img
+                  src={level.thumbnail}
+                  alt=""
+                  className={`absolute inset-0 h-full w-full object-cover transition ${
+                    unlocked ? 'brightness-[0.78]' : 'grayscale brightness-[0.23] contrast-[0.86]'
+                  }`}
+                  draggable={false}
+                />
+                <div className={`absolute inset-0 ${unlocked ? 'bg-gradient-to-t from-black/82 via-black/24 to-black/12' : 'bg-black/56'}`} />
+
+                <div className="relative z-10 flex h-full flex-col justify-between p-[clamp(0.28rem,0.9vw,0.55rem)]">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="inline-flex h-[clamp(1.15rem,3.2vw,1.7rem)] min-w-[clamp(1.15rem,3.2vw,1.7rem)] items-center justify-center rounded-full border border-[#f0d381]/50 bg-black/58 text-[0.58rem] font-black text-[#f0d381] min-[740px]:text-xs">
+                      {level.levelNumber}
+                    </span>
+                    {completed ? (
+                      <CheckCircle2 className="h-[clamp(0.95rem,2.4vw,1.25rem)] w-[clamp(0.95rem,2.4vw,1.25rem)] text-[#f0d381]" />
+                    ) : !unlocked ? (
+                      <Lock className="h-[clamp(0.95rem,2.4vw,1.25rem)] w-[clamp(0.95rem,2.4vw,1.25rem)] text-[#c8b07a]" />
+                    ) : null}
+                  </div>
+
+                  <div>
+                    <p className="line-clamp-3 text-[clamp(0.42rem,1.18vw,0.64rem)] font-black uppercase leading-tight tracking-[0.06em] text-[#f8e4ab] drop-shadow-[0_2px_6px_rgba(0,0,0,0.85)]">
+                      {level.title}
+                    </p>
+                    <p className="mt-0.5 line-clamp-1 text-[clamp(0.38rem,1vw,0.56rem)] font-black uppercase tracking-[0.08em] text-[#d7c192]">
+                      {!unlocked ? 'Locked' : playable ? level.objective : 'In Production'}
+                    </p>
+                  </div>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ShadowRunnerScreen({
   onExit,
   musicPlaying = false,
@@ -404,7 +568,9 @@ export function ShadowRunnerScreen({
   const heroFrame = useSpriteFrame(8, 150)
   const torchFrame = useSpriteFrame(8, 105)
   const orientationGateActive = useRotateGate()
-  const [screen, setScreen] = React.useState<'title' | 'play'>('title')
+  const [screen, setScreen] = React.useState<'title' | 'levels' | 'play'>('title')
+  const [activeLevelId, setActiveLevelId] = React.useState<ShadowRunnerPlayableLevelId>('tutorial')
+  const [campaignProgress, setCampaignProgress] = React.useState(readShadowRunnerProgress)
   const [accessUnlocked, setAccessUnlocked] = React.useState(getShadowRunnerAccessUnlocked)
   const [titleOptionsOpen, setTitleOptionsOpen] = React.useState(false)
   const [soundEffectsEnabled, setSoundEffectsEnabled] = React.useState(true)
@@ -459,8 +625,14 @@ export function ShadowRunnerScreen({
   const handleMenuButton = React.useCallback((buttonId: typeof MENU_BUTTONS[number]['id']) => {
     playButtonChime()
 
-    if (buttonId === 'start') {
+    if (buttonId === 'tutorial') {
+      setActiveLevelId('tutorial')
       setScreen('play')
+      return
+    }
+
+    if (buttonId === 'levels') {
+      setScreen('levels')
       return
     }
 
@@ -468,6 +640,16 @@ export function ShadowRunnerScreen({
       setTitleOptionsOpen(true)
     }
   }, [playButtonChime])
+
+  const playCampaignLevel = React.useCallback((levelId: ShadowRunnerPlayableLevelId) => {
+    playButtonChime()
+    setActiveLevelId(levelId)
+    setScreen('play')
+  }, [playButtonChime])
+
+  const handleLevelComplete = React.useCallback((levelId: ShadowRunnerPlayableLevelId) => {
+    setCampaignProgress(current => markCampaignLevelComplete(current, levelId))
+  }, [])
 
   const titleOptionsActions = React.useMemo<ShadowRunnerScrollMenuAction[]>(() => [
     {
@@ -534,12 +716,23 @@ export function ShadowRunnerScreen({
           />
         ) : screen === 'play' ? (
           <ShadowRunnerGame
+            levelId={activeLevelId}
             musicPlaying={musicPlaying}
             audioBlocked={audioBlocked}
             onToggleMusic={onToggleMusic}
             soundEffectsEnabled={soundEffectsEnabled}
             onToggleSoundEffects={() => setSoundEffectsEnabled(current => !current)}
             onBackToTitle={() => setScreen('title')}
+            onLevelComplete={handleLevelComplete}
+          />
+        ) : screen === 'levels' ? (
+          <ShadowRunnerLevelMap
+            progress={campaignProgress}
+            onBack={() => {
+              playButtonChime()
+              setScreen('title')
+            }}
+            onPlayLevel={playCampaignLevel}
           />
         ) : (
           <>
@@ -648,10 +841,12 @@ export function ShadowRunnerScreen({
                       className="pointer-events-none absolute inset-0 h-full w-full object-fill"
                       draggable={false}
                     />
-                    <span className="relative z-10 flex h-full w-full flex-col items-center justify-center gap-0.5 drop-shadow-[0_1px_0_rgba(255,239,183,0.55)]">
-                      <MenuButtonIcon id={button.id} />
-                      <span className="text-[0.52rem] font-black uppercase leading-none min-[740px]:text-[0.62rem] min-[980px]:text-xs">
-                        {button.label}
+                      <span className="relative z-10 flex h-full w-full flex-col items-center justify-center gap-0.5 drop-shadow-[0_1px_0_rgba(255,239,183,0.55)]">
+                        <MenuButtonIcon id={button.id} />
+                      <span className="flex flex-col items-center text-[0.45rem] font-black uppercase leading-[0.9] tracking-[0.06em] min-[740px]:text-[0.54rem] min-[980px]:text-[0.66rem]">
+                        {button.labelLines.map(line => (
+                          <span key={line}>{line}</span>
+                        ))}
                       </span>
                     </span>
                   </button>

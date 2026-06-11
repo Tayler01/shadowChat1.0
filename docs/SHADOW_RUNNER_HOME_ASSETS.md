@@ -23,6 +23,7 @@ The Desktop source remains untouched:
 | Runtime bottom menu scroll | `public/games/shadow-runner/home-assets/sliced/bottom-menu-scroll.png` | Trimmed menu strip used by the live home screen for tighter button areas on landscape phones. |
 | Runtime blank menu scroll | `public/games/shadow-runner/home-assets/optimized/blank-menu-scroll.webp` | Blank scroll used by the title menu and private-build access gate so labels and controls can be rendered live. |
 | Runtime blank menu button | `public/games/shadow-runner/home-assets/optimized/blank-menu-button.webp` | Blank row/button panel used for live Start, Levels, and Options hit targets. |
+| Runtime level-map scroll panel | `public/games/shadow-runner/home-assets/optimized/level-map-scroll-panel.webp` | Generated blank parchment map panel used by the 10-map level-select screen. |
 | Options scroll panel | `public/games/shadow-runner/home-assets/optimized/options-scroll-panel.webp` | Scroll panel used by title Options and in-game Pause menus. |
 | Options row button | `public/games/shadow-runner/home-assets/optimized/options-menu-row-button.webp` | Dedicated row-button asset for scroll-menu actions. |
 | Mission scroll stand | `public/games/shadow-runner/home-assets/assets/ui/prop_mission_scroll_stand.png` | Blank foreground prop for mission text or decorative menu staging. |
@@ -54,8 +55,10 @@ The Desktop source remains untouched:
 - The background has a useful foreground ledge for the hero, but the approved
   hero stance still needs to be placed against it to verify scale and foot
   alignment.
-- The title menu now uses blank panels with live Start, Levels, and Options
-  controls instead of relying on baked labels for interaction.
+- The title menu now uses blank panels with live Start Tutorial, Select Level,
+  and Options controls instead of relying on baked labels for interaction.
+- Select Level opens a generated parchment level-map panel with live locked,
+  unlocked, and completed state overlays.
 - The torch and star sheets should not be blindly sliced by equal dimensions
   without visual review.
 - Raw chroma-key sources are preserved under
