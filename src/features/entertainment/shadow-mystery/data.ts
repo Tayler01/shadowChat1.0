@@ -39,6 +39,63 @@ export interface ShadowMysteryStory {
   sources: ShadowMysterySource[]
 }
 
+const sleepThatWouldntEndSources: ShadowMysterySource[] = [
+  {
+    label: 'Brain: Encephalitis lethargica, 100 years after the epidemic',
+    url: 'https://academic.oup.com/brain/article/140/8/2246/3970828',
+    usage:
+      'Historical timeline, global spread, von Economo and Cruchet context, symptom patterns, post-encephalitic parkinsonism, case estimates, and unresolved cause framing.',
+  },
+  {
+    label: 'Brain Communications / PMC: Encephalitis lethargica clinical features and aetiology',
+    url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC11495101/',
+    usage:
+      'Recent archival case review, 614-record evidence base, weak support for simple infection/toxin explanations, and nuanced autoimmune interpretation.',
+  },
+  {
+    label: 'Journal of NeuroVirology / PMC: Relationship between encephalitis lethargica and influenza',
+    url: 'https://pmc.ncbi.nlm.nih.gov/articles/PMC2778472/',
+    usage:
+      'Critical analysis of the Spanish flu connection, including why influenza remains suggestive but unproven as the cause.',
+  },
+  {
+    label: 'NCBI Bookshelf: Von Economo Encephalitis',
+    url: 'https://www.ncbi.nlm.nih.gov/books/NBK567791/',
+    usage:
+      'Clinical overview, disease names, forms, symptoms, Jean-Rene Cruchet context, and modern diagnostic framing.',
+  },
+  {
+    label: 'PubMed: Dale et al. basal ganglia autoimmunity',
+    url: 'https://pubmed.ncbi.nlm.nih.gov/14570817/',
+    usage:
+      'Modern encephalitis-lethargica-like syndrome cases and autoimmune basal ganglia hypothesis.',
+  },
+  {
+    label: 'Oliver Sacks Foundation: Awakenings',
+    url: 'https://www.oliversacks.com/oliver-sacks-books/awakenings/',
+    usage:
+      'Post-encephalitic survivor context, Beth Abraham patients, and L-DOPA awakening history.',
+  },
+  {
+    label: 'Wikimedia Commons: Constantin von Economo',
+    url: 'https://commons.wikimedia.org/wiki/File:Constantin_von_economo.jpg',
+    usage:
+      'Public-domain portrait of Constantin von Economo optimized into the story as an archival image.',
+  },
+  {
+    label: 'Wikimedia Commons: Walter Reed influenza ward',
+    url: 'https://commons.wikimedia.org/wiki/File:SpanishFluWardWalterReed.jpg',
+    usage:
+      'Public-domain 1918-1919 influenza ward image used to frame the epidemic-era hospital world around the encephalitis outbreak.',
+  },
+  {
+    label: 'Wikimedia Commons: Encephalitis lethargica book front page',
+    url: 'https://commons.wikimedia.org/wiki/File:Encephalitis-livre.png',
+    usage:
+      'Public-domain front page of von Economo\'s 1931 book used as an archival story insert.',
+  },
+]
+
 const schoolFourSources: ShadowMysterySource[] = [
   {
     label: 'The Jaxson',
@@ -167,6 +224,170 @@ const glassThatRememberedUsSources: ShadowMysterySource[] = [
 ]
 
 export const SHADOW_MYSTERY_STORIES: ShadowMysteryStory[] = [
+  {
+    id: 'sleep-that-wouldnt-end',
+    slug: 'sleep-that-wouldnt-end',
+    title: "The Sleep That Wouldn't End",
+    subtitle: 'A Shadow Mystery case file from the forgotten epidemic',
+    locationLabel: 'Vienna to New York, 1916-1930s',
+    publishedAt: '2026-06-11',
+    readTimeMinutes: 13,
+    deck:
+      'A century ago, a sickness made people sleep for days, stare from frozen faces, wake decades later, and leave medicine with a corpse count but no culprit.',
+    coverAsset: SHADOW_MYSTERY_ASSETS.sleepThatWouldntEnd.cover,
+    headerAsset: SHADOW_MYSTERY_ASSETS.sleepThatWouldntEnd.header,
+    chapters: [
+      {
+        id: 'the-ward-that-kept-breathing',
+        title: 'The Ward That Kept Breathing',
+        kicker: 'Winter, 1916',
+        image: {
+          asset: SHADOW_MYSTERY_ASSETS.sleepThatWouldntEnd.sleepingWard,
+          alt: 'Generated art of a quiet 1920s hospital ward with dim beds and a question-shaped shadow.',
+          caption:
+            'The first terror was not that the patients died. It was that some of them seemed reachable, aware, and still impossibly far away.',
+        },
+        body: [
+          `The first strange thing was that they were not dead. The second was that many of them were not exactly sleeping.`,
+          `In the hospital wards of the late 1910s and early 1920s, nurses learned to speak softly around patients who seemed to have slipped behind glass. Some lay still for days. Some could be woken, could answer, could remember what had happened around them, then sank back into a depth no ordinary exhaustion could explain. Others did not sleep at all. They shook, cried out, moved with violent restlessness, or stared from faces that had gone strangely blank.`,
+          `Families arrived with ordinary stories. A sore throat. A fever. A child who had become difficult to wake. A clerk who had stopped finishing sentences. A soldier who could not keep his eyes open and then could not move them correctly when he tried. The doctors wrote meningitis, delirium, multiple sclerosis, hysteria, exhaustion. Then the notes began to look too similar to ignore.`,
+          `The disease was later given several names: epidemic encephalitis, von Economo encephalitis, encephalitis lethargica. The newspapers preferred sleeping sickness, though that name carried its own confusion because another sleeping sickness was already known, carried by tsetse flies in Africa. This one was different. It came through modern cities, wartime hospitals, homes, schools, and institutions. It seemed to strike the brain's command over sleep, movement, eyes, mood, and time itself.`,
+          `By the time the wave had passed, more than one million people may have been affected worldwide. At least five hundred thousand were dead. Those numbers are estimates, because the disease moved before reporting systems caught up, and because no laboratory test existed to say with certainty: this is the one. But even the cautious figures are enough to make the silence around it feel unnatural. The twentieth century remembers the influenza pandemic. It rarely remembers the other shadow moving beside it.`,
+        ],
+      },
+      {
+        id: 'the-man-who-named-the-sleep',
+        title: 'The Man Who Named The Sleep',
+        kicker: 'Vienna',
+        image: {
+          asset: SHADOW_MYSTERY_ASSETS.sleepThatWouldntEnd.realConstantinVonEconomo,
+          alt: 'Public-domain portrait of neurologist Constantin von Economo.',
+          caption:
+            'Constantin von Economo gave the epidemic one of its names after seeing patients in Vienna whose symptoms would not fit any known disease.',
+          sourceLabel: 'Wikimedia Commons',
+          sourceUrl: 'https://commons.wikimedia.org/wiki/File:Constantin_von_economo.jpg',
+          credit: 'Anonymous / National Library of Medicine',
+          license: 'Public domain',
+        },
+        body: [
+          `In late 1916, Constantin von Economo was working in Vienna's Psychiatric-Neurological Clinic when the pattern sharpened in front of him. The patients did not behave like ordinary fever cases, and they did not behave like any one familiar neurological disorder. They were drowsy, delirious, rigid, restless, paralyzed in the eyes, altered in mood, sometimes awake inside a body that no longer took instructions cleanly.`,
+          `Von Economo was not the only doctor seeing it. In France, Jean-Rene Cruchet had treated military patients with strange neuropsychiatric signs and reached a similar conclusion. Their papers appeared within days of each other in 1917. That is how a disease becomes official: not when it begins, but when enough trained eyes admit that the old names are failing.`,
+          `Von Economo divided the acute illness into forms. The most famous was the somnolent-ophthalmoplegic form: overwhelming sleepiness, confusion, feverish beginnings, and trouble moving the eyes. The hyperkinetic form could bring agitation, involuntary movements, vocalizations, hallucinations, and sleep reversed into the wrong hours. The amyostatic-akinetic form was quieter and maybe more frightening: rigidity, slowed movement, bodies held in place while the mind remained present.`,
+          `None of these forms stayed politely in their lanes. The disease shifted hour by hour. One patient might look exhausted, then delirious, then frozen. Another might seem almost psychiatric until the eyes, the sleep, or the movement told a deeper story. Encephalitis lethargica did not attack one visible part of a person. It attacked the systems that made a person seem awake, voluntary, and present.`,
+          `That is why the old case descriptions feel less like charts than encounters with an intruder no one could see. A patient slept too much but could be awakened. A patient could hear what was said in the room but could not answer quickly. A patient froze in a posture as if a hidden hand had pressed pause. Medicine could describe the effects. It could not name the visitor.`,
+        ],
+      },
+      {
+        id: 'a-world-already-sick',
+        title: 'A World Already Sick',
+        kicker: '1918',
+        image: {
+          asset: SHADOW_MYSTERY_ASSETS.sleepThatWouldntEnd.realWalterReedFluWard,
+          alt: 'Public-domain photograph of a Walter Reed Hospital influenza ward during the 1918-1919 pandemic.',
+          caption:
+            'This is influenza-era Walter Reed, not an encephalitis lethargica ward. It shows the hospital world that made the sleeping sickness feel, for a time, like influenza\'s hidden second face.',
+          sourceLabel: 'Wikimedia Commons / Library of Congress',
+          sourceUrl: 'https://commons.wikimedia.org/wiki/File:SpanishFluWardWalterReed.jpg',
+          credit: 'Harris & Ewing / Library of Congress',
+          license: 'Public domain',
+        },
+        body: [
+          `The obvious suspect was already killing the world.`,
+          `Encephalitis lethargica rose in the same era as the influenza pandemic of 1918. Cities were full of masked nurses, military hospitals, crowded wards, grief, rumors, and bodies moving by rail and ship because war had made distance negotiable. Many encephalitis patients began with flu-like symptoms: malaise, sore throat, fever, shivering, headache, dizziness, vomiting. Then came the neurological turn. Sleep swallowed them. Their eyes failed. Their movements changed. Their personalities bent out of shape.`,
+          `It was easy to imagine influenza as the key. The timing lined up too neatly to ignore. The influenza pandemic became a kind of dark weather system over every medical mystery in those years. If a patient had fever first and a damaged brain after, the mind wanted a single sentence: the flu did it.`,
+          `But the disease refused that sentence. Encephalitis lethargica did not peak in perfect lockstep with influenza everywhere. Some regions saw the sleeping sickness without the same influenza pattern. Later researchers looking for influenza in old brain material could not make the evidence hold. The flu might have weakened bodies, triggered immune reactions, changed who was vulnerable, or traveled beside the real cause. It might have been a match thrown near spilled fuel. It does not look like the whole fire.`,
+          `That uncertainty matters because it keeps the case from becoming simple history. If the answer were just Spanish flu, encephalitis lethargica would be a known chapter inside a larger pandemic. Instead it sits beside it, close enough to raise suspicion, far enough away to keep its own outline. Two epidemics in the same haunted room. One remembered by everyone. One still asking who opened the door.`,
+        ],
+      },
+      {
+        id: 'the-book-of-afterward',
+        title: 'The Book Of Afterward',
+        kicker: 'The disease that kept going',
+        image: {
+          asset: SHADOW_MYSTERY_ASSETS.sleepThatWouldntEnd.realEncephalitisFrontPage,
+          alt: 'Public-domain front page of Constantin von Economo\'s 1931 book Encephalitis Lethargica: Its Sequelae and Treatment.',
+          caption:
+            'By 1931, the title itself had become a warning: the disease was not only the acute sleeping sickness, but the years it left behind.',
+          sourceLabel: 'Wikimedia Commons',
+          sourceUrl: 'https://commons.wikimedia.org/wiki/File:Encephalitis-livre.png',
+          credit: 'Constantin von Economo',
+          license: 'Public domain',
+        },
+        body: [
+          `The dead were not the only victims. The survivors carried a second epidemic into the following decades.`,
+          `Some patients appeared to recover from the acute illness, or at least to return enough of themselves to leave the ward. Then months later, or years later, another condition emerged from inside the first. They slowed. Their faces lost expression. Their bodies grew stiff. Their eyes locked upward in crises that could last seconds or hours. Speech became difficult. Movement became rationed. A person who had survived the sleeping sickness could enter a life that looked like wakefulness from the outside and captivity from within.`,
+          `Doctors called it post-encephalitic parkinsonism. It resembled Parkinson's disease, but its timing and texture were different enough to leave a separate scar in neurology. Some patients could be motionless until the right stimulus broke through. Some displayed sudden paradoxical movement, as if a body that had gone silent still kept an emergency door open. Many carried psychiatric symptoms too: mood changes, compulsions, hallucinations, altered personality, strange bursts of humor or distress.`,
+          `Children were not spared. Historical reports describe behavioral changes that frightened families because they seemed moral before they seemed neurological: impulsivity, restlessness, emotional storms, disobedience, cruelty, danger. A child who had been sick could return changed, and the household would have to decide whether it was looking at a bad child, a damaged brain, or a spirit of the age no one had language for yet.`,
+          `The disease therefore did something worse than kill. It made identity unreliable. It made a family ask whether the person in front of them was still the person who had left for bed with a fever. It made hospitals fill not only with bodies, but with arguments about presence. Who is here when the face is blank? Who is awake when the body sleeps? Who is responsible when the brain has become an occupied city?`,
+        ],
+      },
+      {
+        id: 'the-people-who-woke-too-late',
+        title: 'The People Who Woke Too Late',
+        kicker: 'Bronx, 1969',
+        body: [
+          `Decades later, in a Bronx hospital, Oliver Sacks met some of the people the epidemic had not finished with. They had been young when encephalitis lethargica came for them. By the late 1960s, many had spent most of their adult lives in institutions, frozen by post-encephalitic parkinsonism and treated as if the rest of their story had already been written.`,
+          `Then came L-DOPA, a drug used for Parkinson's disease. For a brief and astonishing period, some patients returned with a force no one around them had prepared for. Speech came back. Movement came back. Appetite, anger, desire, jokes, memory, embarrassment, music, grief. The world did not simply wake them. It confronted them. They opened their eyes into rooms where everyone else had aged without them.`,
+          `The story later became known through Sacks's book Awakenings. It is usually remembered as a miracle, and for a moment it was. But the miracle had an edge. The awakenings were unstable. The drug's benefits could fade or turn into new storms of tics, involuntary movements, emotional volatility, and suffering. A door opened, and then the door began to shake on its hinges.`,
+          `That is the part that belongs in a mystery file. L-DOPA proved many of the patients had not been empty. Their minds had survived behind the neurological lock. It proved the old epidemic could reach across half a century and still answer when touched. But it did not identify the original force that had locked them away. It brought witnesses back without giving them the name of the attacker.`,
+          `Imagine waking after decades and finding that the case is still unsolved. The doctors know more chemistry. The machines are better. The world has split the atom, reached the moon, built computers, and learned to replace parts of the body. Still no one can say what first pushed you into the dark.`,
+        ],
+      },
+      {
+        id: 'the-room-of-suspects',
+        title: 'The Room Of Suspects',
+        kicker: 'Theories',
+        image: {
+          asset: SHADOW_MYSTERY_ASSETS.sleepThatWouldntEnd.caseFileLab,
+          alt: 'Generated art of a dark neurology desk with microscope, maps, slides, and unresolved case-file strings.',
+          caption:
+            'Influenza, another virus, bacteria, toxins, autoimmunity, misclassification: every suspect enters the room. None can leave with a confession.',
+        },
+        body: [
+          `The suspect board is crowded.`,
+          `Influenza remains the famous name on it, pinned near the center because the epidemic timing will never stop mattering. But the modern case against influenza is weak as a single explanation. The virus has not been recovered from the brains or cerebrospinal fluid of encephalitis lethargica patients in a way that settles the case. The overlap is real. The confession is missing.`,
+          `Other infectious theories have taken their turn. Researchers have looked toward enteroviruses, possibly relatives of poliovirus. Earlier investigators chased herpes, bacteria, and focal infections. Streptococcal infection became important in modern encephalitis-lethargica-like cases because some patients showed signs pointing toward immune trouble after throat infections. But modern cases are not the epidemic itself, and resemblance is not identity.`,
+          `Environmental and toxic explanations also entered the file. Industrial cities had chemicals, pollution, crowded housing, wartime exposure, and bodies already under stress. Yet recent archival work has not found strong support for occupational toxins as the main driver. Toxins can haunt a theory because they explain why a disease might cluster without behaving like ordinary contagion. They also leave the same problem as the viruses: not enough fingerprints.`,
+          `Autoimmunity may be the most compelling modern suspect. The idea is elegant and frightening. Some infection, perhaps minor, opens the gate. The immune system learns a shape from the intruder and then mistakes parts of the brain for the enemy. The basal ganglia, midbrain, hypothalamus, and related sleep-movement systems become the battlefield. In that model, the true killer is not the first spark but the body's answer to it.`,
+          `But even autoimmunity does not close the file. Known autoimmune encephalitis syndromes explain some modern mysteries, and anti-NMDA receptor encephalitis can look eerily familiar in pieces. Still, the historical epidemic does not fold neatly into one current diagnosis. The latest large archival analysis found that typical historical cases were not simply the same as known NMDA receptor encephalitis. The ghost may be autoimmune, but if so, it wears an old mask we have not fully matched.`,
+          `There is one more suspect, and it is less dramatic but maybe more honest: the name encephalitis lethargica may have covered more than one thing. In an era without a definitive test, doctors had to diagnose by pattern and exclusion. Some cases may have been the epidemic. Some may have been neighboring neurological catastrophes. Some may have been the same final common pathway reached by different doors. The locked room may have had more than one entrance.`,
+        ],
+      },
+      {
+        id: 'why-it-vanished',
+        title: 'Why It Vanished',
+        kicker: 'No second wave',
+        body: [
+          `Then, as if embarrassed by its own fame, the sickness faded.`,
+          `Acute cases became less common through the 1930s. The chronic patients remained, and institutions carried the afterimage for decades, but the great wave did not repeat. There has been no second epidemic of encephalitis lethargica on the scale of the early twentieth century. Sporadic cases and encephalitis-lethargica-like syndromes still appear, enough to keep the name breathing, not enough to recreate the old disaster.`,
+          `That disappearance is part of the mystery. If a virus caused it, why did the virus vanish or change? If influenza unlocked it, why did later flu pandemics not produce the same global sleep? If it was autoimmune, why did the trigger align so brutally with one historical window and then retreat? If toxins were involved, why did industrial modernity not keep producing the same pattern? Every explanation has to account not only for the arrival, but for the exit.`,
+          `The exit may be the cruelest evidence because it removed the chance to study the disease properly. Modern science is powerful, but it cannot easily interrogate a suspect that left before virology, immunology, imaging, and molecular pathology had their present tools. Researchers are left with old tissue, old records, partial descriptions, degraded specimens, and the problem of translating a century of changed medical language.`,
+          `A disease can become unsolved not because no one looked, but because everyone looked with the instruments available at the wrong time. Encephalitis lethargica arrived too late for superstition and too early for the tools that might have caught it cleanly. It is one of medicine's worst kinds of cold case: documented enough to prove the horror, incomplete enough to protect the culprit.`,
+        ],
+      },
+      {
+        id: 'the-name-it-did-not-leave',
+        title: 'The Name It Did Not Leave',
+        kicker: 'Still open',
+        image: {
+          asset: SHADOW_MYSTERY_ASSETS.sleepThatWouldntEnd.header,
+          alt: 'Generated case-file panorama of hospitals, maps, and old neurology notes around the sleeping sickness mystery.',
+          caption:
+            'The epidemic left dates, bodies, books, wards, survivors, and theories. The one thing it refused to leave was a name.',
+        },
+        body: [
+          `A century later, the sleeping sickness remains one of medicine's strangest locked rooms. We know where it struck. We know who named it. We know the forms it took: sleep, agitation, eye paralysis, rigidity, delirium, masked faces, frozen bodies, and years of post-encephalitic parkinsonism. We know it likely touched more than one million lives and killed at least half a million people. We know it changed neurology, sleep medicine, movement-disorder research, and the lives of families who never got their old person back.`,
+          `What we do not know is what came for them.`,
+          `That ignorance should not be softened. The best current science does not support a single clean answer. Influenza remains suspicious but unconvicted. Infection remains plausible but unnamed. Autoimmunity remains powerful but incomplete. Toxins remain weakly supported. Misclassification remains possible. The disease may have been one thing. It may have been several things braided by war, pandemic, crowding, immune vulnerability, and the limits of diagnosis.`,
+          `The mystery is not a ghost story because ghosts walked the wards. It is a ghost story because something real passed through the human brain, changed sleep into a prison, changed movement into a locked door, killed on a massive scale, then disappeared before it could be captured. It left behind case notes, book titles, hospital memories, and patients who woke decades later to discover the world had moved on without solving them.`,
+          `That is the final unease of encephalitis lethargica. The patients were not the only ones suspended between states. The whole case remains there: not closed, not open in the way a living outbreak is open, not forgotten enough to rest, and not understood enough to die.`,
+          `The ward lights dim. The clock holds its hands. The file stays on the desk.`,
+          `Somewhere in the record, the sleeping sickness is still waiting to be named.`,
+        ],
+      },
+    ],
+    sources: sleepThatWouldntEndSources,
+  },
   {
     id: 'glass-that-remembered-us',
     slug: 'glass-that-remembered-us',

@@ -4,7 +4,7 @@
 
 Reviewed during the June 1, 2026 documentation refresh. This file is a QA log or validation checklist. Keep older artifact paths as historical evidence, and add new dated entries after the next browser, mobile, or device validation pass.
 
-Last updated: 2026-05-25
+Last updated: 2026-06-11
 
 ## Purpose
 
@@ -47,6 +47,13 @@ paths, dimensions, file sizes, usage, and attribution.
 | `glass-that-remembered-us-real-fda-lab` | Real story image | FDA Advanced Manufacturing Research Facility, public-domain U.S. government image, distressed | `public/entertainment/shadow-mystery/glass-that-remembered-us/real/fda-lab-relic.webp` | 1280x830 | 57,710 bytes | Real lab image treated as a recovered old-world archive fragment |
 | `glass-that-remembered-us-real-manufacturing-skid` | Real story image | FDA Advanced Manufacturing Research Facility, public-domain U.S. government image, distressed | `public/entertainment/shadow-mystery/glass-that-remembered-us/real/manufacturing-skid-relic.webp` | 1280x820 | 84,814 bytes | Real equipment image treated as an old-world machine relic |
 | `glass-that-remembered-us-real-voyager-recorder` | Real story image | NASA/JPL-Caltech Voyager digital recorder image, public-domain U.S. government image, distressed | `public/entertainment/shadow-mystery/glass-that-remembered-us/real/voyager-recorder-relic.webp` | 900x1125 | 24,984 bytes | Real digital tape recorder image used as a storage-history relic |
+| `sleep-that-wouldnt-end-cover` | Story cover | Generated image `ig_07fac822e6d37b3e016a2b39b20c84819180a2091fa7f582f2.png` | `public/entertainment/shadow-mystery/sleep-that-wouldnt-end/cover.webp` | 900x1125 | 111,914 bytes | Generated encephalitis lethargica hospital-ward cover |
+| `sleep-that-wouldnt-end-header` | Story/app header | Generated image `ig_07fac822e6d37b3e016a2b39f6cd88819188090babbba139b4.png` | `public/entertainment/shadow-mystery/sleep-that-wouldnt-end/header.webp` | 1600x686 | 119,568 bytes | Generated case-file panorama with hospital, map, and notes |
+| `sleep-that-wouldnt-end-sleeping-ward` | Story section image | Generated image `ig_07fac822e6d37b3e016a2b3a3ab1b88191b979c1e15d573ae0.png` | `public/entertainment/shadow-mystery/sleep-that-wouldnt-end/sleeping-ward.webp` | 1280x720 | 55,586 bytes | Generated quiet 1920s ward atmosphere |
+| `sleep-that-wouldnt-end-case-file-lab` | Story section image | Generated image `ig_07fac822e6d37b3e016a2b3a752fa48191814df23e71da0bb0.png` | `public/entertainment/shadow-mystery/sleep-that-wouldnt-end/case-file-lab.webp` | 1280x720 | 99,550 bytes | Generated microscope/case-file suspect board |
+| `sleep-that-wouldnt-end-real-walter-reed-flu-ward` | Real story image | Wikimedia Commons / Library of Congress, Harris & Ewing, public domain | `public/entertainment/shadow-mystery/sleep-that-wouldnt-end/real/walter-reed-flu-ward.webp` | 1280x800 | 147,002 bytes | Real influenza-era hospital image used for epidemic-era context; caption clarifies it is not an encephalitis lethargica ward |
+| `sleep-that-wouldnt-end-real-constantin-von-economo` | Real story image | Wikimedia Commons / National Library of Medicine, anonymous, public domain | `public/entertainment/shadow-mystery/sleep-that-wouldnt-end/real/constantin-von-economo.webp` | 1280x800 | 18,654 bytes | Framed real portrait of Constantin von Economo |
+| `sleep-that-wouldnt-end-real-encephalitis-front-page` | Real story image | Wikimedia Commons, Constantin von Economo 1931 book front page, public domain | `public/entertainment/shadow-mystery/sleep-that-wouldnt-end/real/encephalitis-livre-front-page.webp` | 1280x800 | 31,264 bytes | Framed real front page of Encephalitis Lethargica: Its Sequelae and Treatment |
 
 ## Source And License Links
 
@@ -66,6 +73,24 @@ paths, dimensions, file sizes, usage, and attribution.
   `https://www.fda.gov/drugs/science-and-research-drugs/advanced-manufacturing-research-facility-amrf`
 - NASA Voyager digital recorder real image:
   `https://science.nasa.gov/image-detail/voyager-digital-recorder/`
+- Brain 2017 review of encephalitis lethargica 100 years later:
+  `https://academic.oup.com/brain/article/140/8/2246/3970828`
+- Brain Communications / PMC 2024 clinical features and aetiology review:
+  `https://pmc.ncbi.nlm.nih.gov/articles/PMC11495101/`
+- Journal of NeuroVirology / PMC influenza relationship review:
+  `https://pmc.ncbi.nlm.nih.gov/articles/PMC2778472/`
+- NCBI Bookshelf Von Economo encephalitis overview:
+  `https://www.ncbi.nlm.nih.gov/books/NBK567791/`
+- PubMed Dale et al. basal ganglia autoimmunity study:
+  `https://pubmed.ncbi.nlm.nih.gov/14570817/`
+- Oliver Sacks Foundation Awakenings overview:
+  `https://www.oliversacks.com/oliver-sacks-books/awakenings/`
+- Constantin von Economo portrait, public domain:
+  `https://commons.wikimedia.org/wiki/File:Constantin_von_economo.jpg`
+- Walter Reed influenza ward, public domain:
+  `https://commons.wikimedia.org/wiki/File:SpanishFluWardWalterReed.jpg`
+- Encephalitis lethargica 1931 book front page, public domain:
+  `https://commons.wikimedia.org/wiki/File:Encephalitis-livre.png`
 
 ## Optimization Notes
 
@@ -90,3 +115,12 @@ paths, dimensions, file sizes, usage, and attribution.
   `C:\Users\tayle\.codex\story_runs\glass-that-remembered-us\raw-images`,
   converted to sepia distressed WebP panels with repo-local `sharp`, and
   credited in captions and the source footer.
+- The Encephalitis Lethargica story generated PNGs were copied from
+  `C:\Users\tayle\.codex\generated_images\019eb8ae-6cbc-77e2-bfb2-9d262eb7a31b`
+  and converted to mobile WebP assets with repo-local `sharp`.
+- The Encephalitis Lethargica story real Wikimedia Commons images were
+  downloaded into `output/shadow-mystery/sleep-that-wouldnt-end/raw-images`,
+  converted to WebP with repo-local `sharp`, and credited in captions and the
+  source footer. The modern Commons upload of encephalitis lethargica patients
+  was intentionally not copied because the archival rights chain was less
+  clean than the public-domain book, portrait, and hospital images.

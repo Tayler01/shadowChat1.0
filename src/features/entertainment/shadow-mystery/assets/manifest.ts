@@ -2,6 +2,7 @@ const SHADOW_MYSTERY_ROOT = '/entertainment/shadow-mystery'
 const SCHOOL_FOUR_ROOT = `${SHADOW_MYSTERY_ROOT}/school-four`
 const CAMELOT_GOLF_COURSE_ROOT = `${SHADOW_MYSTERY_ROOT}/camelot-golf-course`
 const GLASS_THAT_REMEMBERED_US_ROOT = `${SHADOW_MYSTERY_ROOT}/glass-that-remembered-us`
+const SLEEP_THAT_WOULDNT_END_ROOT = `${SHADOW_MYSTERY_ROOT}/sleep-that-wouldnt-end`
 
 export const SHADOW_MYSTERY_ASSETS = {
   pickerBanner: `${SHADOW_MYSTERY_ROOT}/picker-banner.webp`,
@@ -33,6 +34,15 @@ export const SHADOW_MYSTERY_ASSETS = {
     realFdaLabRelic: `${GLASS_THAT_REMEMBERED_US_ROOT}/real/fda-lab-relic.webp`,
     realManufacturingSkidRelic: `${GLASS_THAT_REMEMBERED_US_ROOT}/real/manufacturing-skid-relic.webp`,
     realVoyagerRecorderRelic: `${GLASS_THAT_REMEMBERED_US_ROOT}/real/voyager-recorder-relic.webp`,
+  },
+  sleepThatWouldntEnd: {
+    cover: `${SLEEP_THAT_WOULDNT_END_ROOT}/cover.webp`,
+    header: `${SLEEP_THAT_WOULDNT_END_ROOT}/header.webp`,
+    sleepingWard: `${SLEEP_THAT_WOULDNT_END_ROOT}/sleeping-ward.webp`,
+    caseFileLab: `${SLEEP_THAT_WOULDNT_END_ROOT}/case-file-lab.webp`,
+    realWalterReedFluWard: `${SLEEP_THAT_WOULDNT_END_ROOT}/real/walter-reed-flu-ward.webp`,
+    realConstantinVonEconomo: `${SLEEP_THAT_WOULDNT_END_ROOT}/real/constantin-von-economo.webp`,
+    realEncephalitisFrontPage: `${SLEEP_THAT_WOULDNT_END_ROOT}/real/encephalitis-livre-front-page.webp`,
   },
 } as const
 
@@ -120,5 +130,29 @@ export const SHADOW_MYSTERY_ASSET_PROMPTS = [
     output: SHADOW_MYSTERY_ASSETS.glassThatRememberedUs.archiveCaravan,
     prompt:
       'Original atmospheric section art for a future Shadow Mystery story. Archive monks carry transparent glass data plates across salt flats under ruined satellite dishes and distant server towers, post-apocalyptic robes, glass plates strapped in metal frames glowing with faint voxel constellations, old-world map fragments in the dust, obsidian black sky, muted gold starlight, distressed archival grain, no readable text, no logos, no gore, no watermark.',
+  },
+  {
+    id: 'sleep-that-wouldnt-end-cover',
+    output: SHADOW_MYSTERY_ASSETS.sleepThatWouldntEnd.cover,
+    prompt:
+      'Original cinematic portrait cover art for a Shadow Mystery story titled The Sleep That Wouldn\'t End, about the encephalitis lethargica epidemic. A dim 1920s hospital ward at night, rows of iron beds fading into obsidian shadow, a clock stopped near 3:17, a distant doctor silhouette, old neurology case files in the foreground, muted antique gold, deep oxblood, archival film grain, text-safe upper and lower bands, no readable text, no logos, no watermark, no gore.',
+  },
+  {
+    id: 'sleep-that-wouldnt-end-header',
+    output: SHADOW_MYSTERY_ASSETS.sleepThatWouldntEnd.header,
+    prompt:
+      'Original wide Shadow Mystery header art for a story about encephalitis lethargica and its unsolved cause. A horizontal case-file panorama merging a 1920s hospital corridor, old neurology notes, a train-station board implied by blurred lights, and a map from Vienna to London and New York, muted antique gold, sepia paper, deep oxblood traces, black obsidian shadows, no readable text, no logos, no watermark, no gore.',
+  },
+  {
+    id: 'sleep-that-wouldnt-end-sleeping-ward',
+    output: SHADOW_MYSTERY_ASSETS.sleepThatWouldntEnd.sleepingWard,
+    prompt:
+      'Original atmospheric 16:9 section art for a chapter about victims who seemed awake, asleep, and unreachable during the encephalitis lethargica epidemic. A quiet 1920s hospital ward before dawn, iron beds, privacy curtains, frost, lamps, a question-mark-shaped window shadow, tasteful historical mystery tone, no readable text, no logos, no watermark, no gore.',
+  },
+  {
+    id: 'sleep-that-wouldnt-end-case-file-lab',
+    output: SHADOW_MYSTERY_ASSETS.sleepThatWouldntEnd.caseFileLab,
+    prompt:
+      'Original atmospheric 16:9 section art for a chapter about scientists failing to identify the cause of encephalitis lethargica. A dark 1930s neurology laboratory desk after midnight with microscope, glass slides, influenza clipping fragments, brain diagrams, vials, telegram slips, and map thread lines that never meet, muted antique gold, deep oxblood pinheads, black obsidian background, no readable text, no logos, no watermark, no gore.',
   },
 ] as const

@@ -20,6 +20,10 @@ As of 2026-05-25:
 - The third local proof story is `The Glass That Remembered Us`, a 500-years
   post-collapse future mystery built around Microsoft Project Silica and
   borosilicate glass data storage research.
+- The fourth local proof story is `The Sleep That Wouldn't End`, about the
+  encephalitis lethargica epidemic, post-encephalitic parkinsonism, the
+  contested influenza link, autoimmune theories, and the still-unresolved
+  cause.
 - Stories are written as immersive 10-15 minute mystery novellas, with the
   ghost, murderer, cannibal-principal, and devil-worship legends driving the
   School Four mystery while real names, dates, and history are woven into the
@@ -30,9 +34,12 @@ As of 2026-05-25:
 - The Silica story uses science-fiction mystery rather than local folklore:
   relic readers, a fear archive, a hidden answer archive, and real glass
   storage facts woven into the narrative.
+- The Encephalitis Lethargica story leans into medical cold-case atmosphere:
+  sleeping wards, frozen survivors, von Economo's case history, the Spanish flu
+  shadow, Oliver Sacks's awakenings, and the suspect-board of failed causes.
 - The page uses generated picker, cover, header, and section art plus real
-  Wikimedia Commons, National Park Service / National Register, NASA, and FDA
-  images optimized into the repo with attribution.
+  Wikimedia Commons, National Park Service / National Register, Library of
+  Congress, NASA, and FDA images optimized into the repo with attribution.
 
 ## Roadmap
 
