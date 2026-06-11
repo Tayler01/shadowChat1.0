@@ -520,10 +520,10 @@ function ShadowRunnerLevelDetailPopup({
   const primaryLabel = state.completed ? 'Replay' : state.playable ? 'Start' : state.unlocked ? 'In Build' : 'Locked'
   const primaryDisabled = !state.playable || !level.playableLevelId
   const statusClassName = state.completed
-    ? 'border-[#6f5b23]/80 bg-[#f0d381]/90 text-[#171006]'
+    ? 'border-[#6f5b23]/80 bg-[rgba(240,211,129,0.92)] text-[#171006]'
     : state.playable
-      ? 'border-[#744f1d]/80 bg-[#301d0d]/82 text-[#f0d381]'
-      : 'border-[#5a5548]/70 bg-[#111111]/82 text-[#d7c192]'
+      ? 'border-[#744f1d]/80 bg-[rgba(48,29,13,0.9)] text-[#f0d381]'
+      : 'border-[#5a5548]/70 bg-[rgba(17,17,17,0.86)] text-[#d7c192]'
 
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 px-[max(0.65rem,env(safe-area-inset-left))] py-3 backdrop-blur-[1px]">
@@ -539,12 +539,12 @@ function ShadowRunnerLevelDetailPopup({
           type="button"
           aria-label="Close level details"
           onClick={onClose}
-          className="absolute right-[9.2%] top-[9.4%] z-10 inline-flex h-[8.2%] aspect-square items-center justify-center rounded-full border border-[#2b1a08]/70 bg-[#1b1208]/75 text-[#f6e6bb] shadow-[0_8px_18px_rgba(0,0,0,0.42)] transition active:scale-95 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/70"
+          className="absolute right-[17.2%] top-[15.5%] z-10 inline-flex h-[6.2%] aspect-square items-center justify-center rounded-full border border-[#2b1a08]/70 bg-[#1b1208]/78 text-[#f6e6bb] shadow-[0_8px_18px_rgba(0,0,0,0.42)] transition active:scale-95 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/70"
         >
           <X className="h-[52%] w-[52%] stroke-[3]" aria-hidden="true" />
         </button>
 
-        <div className="absolute left-[15%] top-[23%] aspect-square w-[22.4%]">
+        <div className="absolute left-[22.6%] top-[28.2%] aspect-square w-[19%]">
           <div className="absolute inset-[14%] overflow-hidden rounded-[0.58rem] bg-[#0a0e15] shadow-[inset_0_0_26px_rgba(0,0,0,0.64)]">
             <img
               src={level.thumbnail}
@@ -562,22 +562,22 @@ function ShadowRunnerLevelDetailPopup({
           />
         </div>
 
-        <div className="absolute left-[41.5%] top-[21.5%] flex h-[43%] w-[42%] flex-col overflow-hidden text-[#160f07]">
-          <div className="flex items-start justify-between gap-2.5">
+        <div className="absolute left-[44.7%] top-[24.7%] flex h-[39.5%] w-[33.8%] flex-col overflow-hidden text-[#160f07]">
+          <div className="flex items-start gap-2.5">
             <div className="min-w-0">
               <p className="text-[0.48rem] font-black uppercase leading-none tracking-[0.2em] text-[#4c2c10] min-[740px]:text-[0.56rem] min-[930px]:text-[0.64rem]">
                 Level {level.levelNumber}
               </p>
-              <h2 className="mt-1 text-[0.64rem] font-black uppercase leading-[0.98] text-[#130d06] drop-shadow-[0_1px_0_rgba(255,238,178,0.55)] min-[740px]:text-[0.78rem] min-[930px]:text-[0.96rem]">
+              <h2 className="mt-1 text-[0.64rem] font-black uppercase leading-[0.98] text-[#130d06] drop-shadow-[0_1px_0_rgba(255,238,178,0.55)] min-[740px]:text-[0.76rem] min-[930px]:text-[0.92rem]">
                 {level.title}
               </h2>
             </div>
-            <span className={`shrink-0 rounded border px-1.5 py-1 text-[0.42rem] font-black uppercase leading-none tracking-[0.12em] shadow-[0_4px_10px_rgba(0,0,0,0.18)] min-[740px]:px-2 min-[740px]:text-[0.5rem] ${statusClassName}`}>
+            <span className={`mt-0.5 shrink-0 rounded border px-1.5 py-1 text-[0.42rem] font-black uppercase leading-none tracking-[0.12em] shadow-[0_4px_10px_rgba(0,0,0,0.18)] min-[740px]:px-2 min-[740px]:text-[0.5rem] ${statusClassName}`}>
               {state.statusLabel}
             </span>
           </div>
 
-          <div className="mt-2.5 grid gap-1.5 text-[0.5rem] font-black uppercase leading-[1.12] text-[#231608] min-[740px]:text-[0.58rem] min-[930px]:text-[0.68rem]">
+          <div className="mt-2.5 grid gap-1.5 text-[0.5rem] font-black uppercase leading-[1.12] text-[#231608] min-[740px]:text-[0.56rem] min-[930px]:text-[0.64rem]">
             <p>{level.objective}</p>
             <p className="text-[#573614]">{level.routeType} - Tier {level.difficultyTier}/10</p>
             <p className="text-[#573614]">{level.difficultyLabel}</p>
@@ -585,7 +585,7 @@ function ShadowRunnerLevelDetailPopup({
           </div>
         </div>
 
-        <div className="absolute left-[40.5%] top-[69%] flex h-[13.8%] w-[44%] items-center gap-[6%]">
+        <div className="absolute left-[35.5%] top-[69.4%] flex h-[11.6%] w-[37%] items-center gap-[5.6%]">
           <button
             type="button"
             disabled={primaryDisabled}
