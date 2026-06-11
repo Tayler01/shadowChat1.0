@@ -95,21 +95,21 @@
     },
     "clockworkSentry": {
       "id": "clockwork-sentry",
-      "purpose": "First playable enemy guard: patrol, hit, and defeated states",
+      "purpose": "First playable enemy guard: patrol, attack, hit, and defeated states",
       "loop": false,
       "recommendedFps": 5,
       "frameCount": 6,
-      "strip": "/games/shadow-runner/sprites/strips/clockwork-sentry-6f-128.png",
-      "preview": "/games/shadow-runner/sprites/previews/clockwork-sentry-6f-preview.png",
-      "rawSource": "/games/shadow-runner/sprites/raw/clockwork-sentry-6f-source.png",
-      "transparentSource": "/games/shadow-runner/sprites/transparent/clockwork-sentry-6f-strip.png",
+      "strip": "/games/shadow-runner/sprites/strips/clockwork-sentry-v2-6f-128.png",
+      "preview": "/games/shadow-runner/sprites/previews/clockwork-sentry-v2-6f-preview.png",
+      "rawSource": "/games/shadow-runner/sprites/raw/clockwork-sentry-v2-source.png",
+      "transparentSource": "/games/shadow-runner/sprites/transparent/clockwork-sentry-v2-6f-strip.png",
       "frames": [
-        { "index": 1, "label": "idle", "file": "/games/shadow-runner/sprites/frames/clockwork-sentry/01-idle.png" },
-        { "index": 2, "label": "patrol-a", "file": "/games/shadow-runner/sprites/frames/clockwork-sentry/02-patrol-a.png" },
-        { "index": 3, "label": "patrol-b", "file": "/games/shadow-runner/sprites/frames/clockwork-sentry/03-patrol-b.png" },
-        { "index": 4, "label": "spear-thrust", "file": "/games/shadow-runner/sprites/frames/clockwork-sentry/04-spear-thrust.png" },
-        { "index": 5, "label": "hit-stunned", "file": "/games/shadow-runner/sprites/frames/clockwork-sentry/05-hit-stunned.png" },
-        { "index": 6, "label": "defeated", "file": "/games/shadow-runner/sprites/frames/clockwork-sentry/06-defeated.png" }
+        { "index": 1, "label": "idle", "file": "/games/shadow-runner/sprites/frames/clockwork-sentry-v2/01-idle.png" },
+        { "index": 2, "label": "patrol-a", "file": "/games/shadow-runner/sprites/frames/clockwork-sentry-v2/02-patrol-a.png" },
+        { "index": 3, "label": "patrol-b", "file": "/games/shadow-runner/sprites/frames/clockwork-sentry-v2/03-patrol-b.png" },
+        { "index": 4, "label": "spear-thrust", "file": "/games/shadow-runner/sprites/frames/clockwork-sentry-v2/04-spear-thrust.png" },
+        { "index": 5, "label": "hit-stunned", "file": "/games/shadow-runner/sprites/frames/clockwork-sentry-v2/05-hit-stunned.png" },
+        { "index": 6, "label": "defeated", "file": "/games/shadow-runner/sprites/frames/clockwork-sentry-v2/06-defeated.png" }
       ]
     }
   }

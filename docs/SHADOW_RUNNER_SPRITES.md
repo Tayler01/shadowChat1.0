@@ -25,7 +25,7 @@ motion, frame timing, and home-screen composition.
 | run | 6 | yes | Right-facing gameplay run cycle | `public/games/shadow-runner/sprites/strips/shadow-runner-run-6f-128.png` | `public/games/shadow-runner/sprites/previews/shadow-runner-run-6f-preview.png` |
 | jump-air | 6 | no | Takeoff, rise, apex, double jump, fall, land | `public/games/shadow-runner/sprites/strips/shadow-runner-jump-air-6f-128.png` | `public/games/shadow-runner/sprites/previews/shadow-runner-jump-air-6f-preview.png` |
 | sword-attack | 5 | no | Ground sword attack | `public/games/shadow-runner/sprites/strips/shadow-runner-sword-attack-5f-128.png` | `public/games/shadow-runner/sprites/previews/shadow-runner-sword-attack-5f-preview.png` |
-| clockwork-sentry | 6 | partial | First playable enemy: idle, patrol, attack, hit, defeated | `public/games/shadow-runner/sprites/strips/clockwork-sentry-6f-128.png` | `public/games/shadow-runner/sprites/previews/clockwork-sentry-6f-preview.png` |
+| clockwork-sentry | 6 | partial | First playable enemy: idle, patrol, attack, hit, defeated | `public/games/shadow-runner/sprites/strips/clockwork-sentry-v2-6f-128.png` | `public/games/shadow-runner/sprites/previews/clockwork-sentry-v2-6f-preview.png` |
 
 ## Frame Labels
 
@@ -88,9 +88,11 @@ motion, frame timing, and home-screen composition.
   hero partly away from the gameplay-facing direction. This should be corrected
   before final implementation. The prototype currently uses it for attack
   feedback, so treat animation cleanup separately from gameplay tuning.
-- `clockwork-sentry` is now the first runtime enemy strip. The first three
-  frames loop for patrol, frame 5 is used for hit/stun feedback, and frame 6 is
-  kept visible as the defeated state instead of hiding the enemy immediately.
+- `clockwork-sentry` now uses the cleaner v2 runtime strip. The first three
+  frames loop for patrol, frame 4 is reserved for spear thrust, frame 5 is used
+  for hit/stun feedback, and frame 6 is kept visible as the defeated state
+  instead of hiding the enemy immediately. The earlier v1 strip is preserved as
+  source history but is no longer wired into the playable prototype.
 
 ## Current Runtime Wiring
 

@@ -26,11 +26,21 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
   in-game Pause scroll menus; widened the title menu scroll without increasing
   height; lowered the right mission-scroll pedestal; and hardened long-press
   selection/context-menu suppression across the Shadow Runner surface.
+- Latest pass, 2026-06-10: wired the cleaner `clockwork-sentry-v2` runtime
+  strip, kept the sentry on deterministic patrol bounds instead of side-block
+  direction flips, and documented the clean HUD/heart/coin/health assets.
 - Verification: `npm run lint`, `npx tsc --noEmit -p tsconfig.app.json`, and
   `npm run build` passed. Chrome mobile visual smoke passed at `740x390` and
   `932x430` with zero title-button scroll overrun and canceled `selectstart`
   / `contextmenu` events. Evidence:
   `output/playwright/shadow-runner-options-pass/final/`.
+- Prototype verification, 2026-06-10: `npm run lint`,
+  `npx tsc --noEmit -p tsconfig.app.json`, `npm run build`, and Chrome
+  production-preview smoke passed. Evidence includes `932x430` and `740x390`
+  HUD/pause/sentry captures in
+  `output/playwright/shadow-runner-prototype-phase/`, plus foreground Chrome
+  screenshots `19-headed-v2-sentry-a-932x430.png` and
+  `20-headed-v2-sentry-b-932x430.png` showing the sentry moving across patrol.
 - Prototype backlog:
   - Add gameplay HUD assets and DOM overlay: player health, enemy health,
     score/coins, pause, and checkpoint/finish feedback.

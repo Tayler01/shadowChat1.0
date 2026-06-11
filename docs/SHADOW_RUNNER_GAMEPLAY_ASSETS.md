@@ -6,24 +6,31 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
 
 | Asset | Runtime path | Purpose |
 | --- | --- | --- |
-| HUD plaque | `public/games/shadow-runner/gameplay-assets/optimized/hud-plaque.webp` | DOM gameplay HUD backing for health, coins, score, and objective area. |
-| Health bar frame | `public/games/shadow-runner/gameplay-assets/optimized/health-bar-frame.webp` | Phaser overhead health-frame art for hero and enemy health bars. |
-| Coin icon | `public/games/shadow-runner/gameplay-assets/optimized/coin-icon.webp` | Runtime coin/icon reference for HUD and future pickup polish. |
+| HUD status bar | `public/games/shadow-runner/gameplay-assets/optimized/hud-status-bar.webp` | Centered DOM gameplay HUD backing with blank compartments only. |
+| Full heart | `public/games/shadow-runner/gameplay-assets/optimized/heart-full.webp` | Separate player-health icon removed as health drops. |
+| Empty heart | `public/games/shadow-runner/gameplay-assets/optimized/heart-empty.webp` | Separate player-health icon shown for lost health. |
+| Clean coin icon | `public/games/shadow-runner/gameplay-assets/optimized/coin-icon-clean.webp` | Runtime HUD coin icon shown beside collected count only. |
+| Health bar frame | `public/games/shadow-runner/gameplay-assets/optimized/health-bar-frame-clean.webp` | Phaser overhead health-frame art for hero and enemy health bars. |
+| Health fill | `public/games/shadow-runner/gameplay-assets/optimized/health-fill.webp` | Source swatch for the red health fill palette; runtime fill is drawn live so it depletes smoothly. |
 | Level-complete banner | `public/games/shadow-runner/gameplay-assets/optimized/level-complete-banner.webp` | DOM level-complete banner backing. |
 | Hit spark | `public/games/shadow-runner/gameplay-assets/sliced/hit-spark.png` | Phaser hit feedback image used for sword and stomp hits. |
 | Coin sparkle strip | `public/games/shadow-runner/gameplay-assets/sliced/coin-sparkle-strip.png` | Phaser coin pickup sparkle strip. |
-| Clockwork Sentry strip | `public/games/shadow-runner/sprites/strips/clockwork-sentry-6f-128.png` | First playable enemy runtime strip. |
+| Clockwork Sentry strip | `public/games/shadow-runner/sprites/strips/clockwork-sentry-v2-6f-128.png` | First playable enemy runtime strip. |
 
 ## Source Preservation
 
 - HUD source:
   `public/games/shadow-runner/gameplay-assets/generated/shadow-runner-gameplay-hud-sheet-imagegen-source.png`
+- Clean HUD source:
+  `public/games/shadow-runner/gameplay-assets/generated/shadow-runner-gameplay-hud-clean-sheet-imagegen-source.png`
 - Transparent HUD sheet:
   `public/games/shadow-runner/gameplay-assets/transparent/shadow-runner-gameplay-hud-sheet-transparent.png`
+- Clean transparent HUD sheet:
+  `public/games/shadow-runner/gameplay-assets/transparent/shadow-runner-gameplay-hud-clean-sheet-transparent.png`
 - Sentry source:
-  `public/games/shadow-runner/sprites/raw/clockwork-sentry-6f-source.png`
+  `public/games/shadow-runner/sprites/raw/clockwork-sentry-v2-source.png`
 - Sentry transparent strip:
-  `public/games/shadow-runner/sprites/transparent/clockwork-sentry-6f-strip-transparent.png`
+  `public/games/shadow-runner/sprites/transparent/clockwork-sentry-v2-6f-strip.png`
 
 ## Runtime Wiring
 

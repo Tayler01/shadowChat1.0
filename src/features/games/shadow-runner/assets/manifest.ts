@@ -27,7 +27,7 @@ export const SHADOW_RUNNER_ASSETS = {
     swordAttackStrip: `${ASSET_ROOT}/sprites/strips/shadow-runner-sword-attack-5f-128.png`,
   },
   enemies: {
-    clockworkSentryStrip: `${ASSET_ROOT}/sprites/strips/clockwork-sentry-6f-128.png`,
+    clockworkSentryStrip: `${ASSET_ROOT}/sprites/strips/clockwork-sentry-v2-6f-128.png`,
   },
   gameplay: {
     hudPlaque: `${GAMEPLAY_ROOT}/optimized/hud-status-bar.webp`,

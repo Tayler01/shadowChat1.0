@@ -27,6 +27,7 @@ const GAME_HEIGHT = 540
 const HERO_SCALE = 0.78
 const SENTRY_SCALE = 0.68
 const PLAYER_SPEED = 260
+const SENTRY_PATROL_SPEED = 82
 const CROUCH_SPEED = 128
 const JUMP_VELOCITY = -620
 const DOUBLE_JUMP_VELOCITY = -560
@@ -188,7 +189,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.anims.create({
       key: 'sentry-walk',
       frames: this.anims.generateFrameNumbers('clockwork-sentry', { start: 0, end: 2 }),
-      frameRate: 5,
+      frameRate: 4,
       repeat: -1,
     })
     this.anims.create({
@@ -382,17 +383,19 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     if (!enemy || !this.state.enemy.alive) return
 
     const direction = this.state.enemy.direction
-    enemy.setVelocityX(direction * 82)
+    enemy.setVelocityX(direction * SENTRY_PATROL_SPEED)
     enemy.setFlipX(direction > 0)
 
-    const enemyBody = enemy.body as Phaser.Physics.Arcade.Body
-    if (
-      enemy.x < this.state.enemy.patrolLeft
-      || enemy.x > this.state.enemy.patrolRight
-      || enemyBody.blocked.left
-      || enemyBody.blocked.right
-    ) {
-      this.state.enemy.direction = direction === 1 ? -1 : 1
+    if (direction < 0 && enemy.x <= this.state.enemy.patrolLeft) {
+      enemy.setX(this.state.enemy.patrolLeft)
+      this.state.enemy.direction = 1
+      enemy.setVelocityX(SENTRY_PATROL_SPEED)
+      enemy.setFlipX(true)
+    } else if (direction > 0 && enemy.x >= this.state.enemy.patrolRight) {
+      enemy.setX(this.state.enemy.patrolRight)
+      this.state.enemy.direction = -1
+      enemy.setVelocityX(-SENTRY_PATROL_SPEED)
+      enemy.setFlipX(false)
     }
 
     if (time - this.state.enemy.lastDamagedAt < 180) {
