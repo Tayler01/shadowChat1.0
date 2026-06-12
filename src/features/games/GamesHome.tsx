@@ -28,6 +28,66 @@ interface GamesHomeProps {
 
 type SelectedEntertainment = 'shadow-runner' | 'shadow-war' | 'shadow-checkers' | 'shado-tv' | 'shadow-mystery' | 'will-kirk' | null
 
+type ShadowRunnerOrientationLock =
+  | 'any'
+  | 'natural'
+  | 'landscape'
+  | 'portrait'
+  | 'portrait-primary'
+  | 'portrait-secondary'
+  | 'landscape-primary'
+  | 'landscape-secondary'
+
+type LockableScreenOrientation = ScreenOrientation & {
+  lock?: (orientation: ShadowRunnerOrientationLock) => Promise<void>
+  unlock?: () => void
+}
+
+function getLockableScreenOrientation() {
+  if (typeof window === 'undefined') return
+
+  return window.screen.orientation as LockableScreenOrientation | undefined
+}
+
+async function requestShadowRunnerLandscapeMode() {
+  if (typeof window === 'undefined') return
+
+  try {
+    if (!document.fullscreenElement && typeof document.documentElement.requestFullscreen === 'function') {
+      await document.documentElement.requestFullscreen()
+    }
+  } catch {
+    // Fullscreen is a best-effort Android browser assist; installed PWAs can still use orientation lock directly.
+  }
+
+  try {
+    const orientation = getLockableScreenOrientation()
+    if (typeof orientation?.lock !== 'function') return
+
+    await orientation.lock('landscape')
+  } catch {
+    // Unsupported browsers fall back to the in-game rotate gate.
+  }
+}
+
+function releaseShadowRunnerLandscapeMode() {
+  if (typeof window === 'undefined') return
+
+  try {
+    getLockableScreenOrientation()?.unlock?.()
+  } catch {
+    // Unlock is best-effort; the portrait manifest remains the app-wide fallback.
+  }
+
+  try {
+    if (document.fullscreenElement && typeof document.exitFullscreen === 'function') {
+      void document.exitFullscreen().catch(() => undefined)
+    }
+  } catch {
+    // Exiting fullscreen is best-effort.
+  }
+}
+
 export function GamesHome({ currentView, onViewChange, onImmersiveChange }: GamesHomeProps) {
   const [selectedEntertainment, setSelectedEntertainment] = useState<SelectedEntertainment>(null)
   const [musicPlaying, setMusicPlaying] = useState(false)
@@ -93,6 +153,8 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
   }
 
   const enterShadowRunner = () => {
+    void requestShadowRunnerLandscapeMode()
+
     if (readShadowRunnerAudioPreference(SHADOW_RUNNER_MUSIC_ENABLED_STORAGE_KEY, true)) {
       void playMusic(SHADOW_RUNNER_ASSETS.music)
     } else {
@@ -104,6 +166,7 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
   }
 
   const exitShadowRunner = () => {
+    releaseShadowRunnerLandscapeMode()
     pauseMusic()
     setAudioBlocked(false)
     setSelectedEntertainment(null)
