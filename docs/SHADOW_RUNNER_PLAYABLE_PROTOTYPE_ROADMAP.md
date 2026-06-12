@@ -155,3 +155,31 @@ enemy, and reach a finish gate.
 - Latest verification artifacts:
   `output/playwright/shadow-runner-controls-research/` and
   `output/playwright/shadow-runner-foreground/`.
+
+## June 11, 2026 - Audio, Loading, And Baked Control Stabilization
+
+- Replaced pooled `<audio>` SFX playback with a single Web Audio SFX
+  controller. Menu and gameplay sounds preload in staged groups, decoding
+  yields between buffers, and high-frequency events use short cooldowns so
+  sound effects do not compete with the render loop.
+- Generated and wired baked gold circular control assets for movement,
+  sword attack, and jump. The left-side control hit area now covers the full
+  left side of the gameplay screen for left/right/crouch, while jump and sword
+  remain split on the lower-right side.
+- Split loading into title, campaign-map, and route groups. Title no longer
+  waits on campaign-map thumbnails, map art loads behind a branded map
+  interstitial, and playable routes decode needed art/SFX behind a route
+  loading screen before Phaser mounts.
+- Repaired overhead health bars by updating them every frame and drawing the
+  red fill above the frame backing so player/enemy damage is visible again.
+- Added local-preview-only tilt-bridge QA teleport (`Digit4`) and verified:
+  Level 1/tutorial tilt applies real player X movement, Level 3 stronger tilt
+  pushes the player toward the edge, and Level 2 sentries remain grounded with
+  nonzero patrol velocity.
+- Latest verification artifacts:
+  `output/shadow-runner/webkit-title.png`,
+  `output/shadow-runner/chrome-game-sfx-on.png`,
+  `output/shadow-runner/chrome-map.png`,
+  `output/shadow-runner/chrome-map-detail.png`,
+  `output/shadow-runner/chrome-strong-tilt-end.png`, and
+  `output/shadow-runner/chrome-level2-start.png`.

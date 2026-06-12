@@ -203,6 +203,8 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   private wasOnFloor = false
   private finishSparked = false
   private lastHudSignature = ''
+  private activeTiltPlatformId: string | null = null
+  private activeTiltStartedAt = 0
 
   constructor(options: Omit<CreateShadowRunnerGameOptions, 'parent'>) {
     super('ShadowRunnerLevelScene')
@@ -607,6 +609,11 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       } else if (event.code === 'Digit3') {
         const finish = this.level.finish
         this.teleportPlayerForQa(finish.x - 90, finish.y + finish.height)
+      } else if (event.code === 'Digit4') {
+        const tiltPlatform = this.level.tiltPlatforms[0]
+        if (tiltPlatform) {
+          this.teleportPlayerForQa(tiltPlatform.x + tiltPlatform.width / 2, tiltPlatform.y - 2)
+        }
       } else if (event.code === 'KeyH') {
         this.damagePlayerFromHazard(this.time.now)
       } else if (event.code === 'KeyK') {
@@ -794,7 +801,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       player.setOffset(43, 58)
     }
 
-    this.applyTiltPlatformInfluence(left, right, onFloor)
+    this.applyTiltPlatformInfluence(time, left, right, onFloor)
 
     if (jumpPress) {
       this.tryJump(onFloor)
@@ -814,24 +821,44 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.wasOnFloor = onFloor
   }
 
-  private applyTiltPlatformInfluence(left: boolean, right: boolean, onFloor: boolean) {
-    if (!this.player || !onFloor) return
+  private applyTiltPlatformInfluence(time: number, left: boolean, right: boolean, onFloor: boolean) {
+    if (!this.player || !onFloor) {
+      this.activeTiltPlatformId = null
+      this.activeTiltStartedAt = 0
+      return
+    }
 
     const body = this.player.body as Phaser.Physics.Arcade.Body
     const platform = this.getStandingTiltPlatform(body)
-    if (!platform) return
+    if (!platform) {
+      this.activeTiltPlatformId = null
+      this.activeTiltStartedAt = 0
+      return
+    }
 
     const rotation = Number(platform.visual.getData('currentRotation') ?? platform.visual.rotation ?? 0)
     const slideForce = platform.config.slideForce ?? 860
     const maxSlideSpeed = platform.config.maxSlideSpeed ?? 110
-    const dumpPressure = Math.abs(rotation) >= TILT_DUMP_ROTATION
-    const slideMultiplier = dumpPressure && !left && !right ? 1.42 : 1
-    const slideVelocity = Phaser.Math.Clamp(rotation * slideForce * slideMultiplier, -maxSlideSpeed, maxSlideSpeed)
+    const platformId = platform.config.id
+    const strongTilt = Math.abs(rotation) >= TILT_DUMP_ROTATION
+
+    if (this.activeTiltPlatformId !== platformId || !strongTilt) {
+      this.activeTiltPlatformId = platformId
+      this.activeTiltStartedAt = strongTilt ? time : 0
+    }
+
+    const tiltHoldMs = strongTilt && this.activeTiltStartedAt > 0 ? time - this.activeTiltStartedAt : 0
+    const dumpReadiness = Phaser.Math.Clamp((tiltHoldMs - 420) / 920, 0, 1)
+    const waitingOnBridge = !left && !right
+    const slideMultiplier = strongTilt && waitingOnBridge ? 1.24 + dumpReadiness * 1.45 : 1
+    const slideLimit = maxSlideSpeed + (waitingOnBridge ? dumpReadiness * 120 : dumpReadiness * 42)
+    const slideVelocity = Phaser.Math.Clamp(rotation * slideForce * slideMultiplier, -slideLimit, slideLimit)
 
     if (Math.abs(slideVelocity) < 5 || Math.abs(rotation) < TILT_ACTIVE_ROTATION) return
 
-    const inputDamping = left || right ? 0.46 : 1
-    const nextVelocity = Phaser.Math.Clamp(body.velocity.x + slideVelocity * inputDamping, -360, 360)
+    const inputDamping = left || right ? 0.42 : 1
+    const dumpNudge = waitingOnBridge && dumpReadiness > 0.72 ? Math.sign(rotation) * 28 : 0
+    const nextVelocity = Phaser.Math.Clamp(body.velocity.x + slideVelocity * inputDamping + dumpNudge, -430, 430)
     this.player.setVelocityX(nextVelocity)
   }
 
@@ -1157,10 +1184,10 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     frame?.setVisible(true)
     frame?.setPosition(x, y)
     frame?.setDisplaySize(74, 18)
-    frame?.setDepth(35)
+    frame?.setDepth(34)
 
     graphics.clear()
-    graphics.setDepth(34)
+    graphics.setDepth(35)
     graphics.fillStyle(0x170305, 0.95)
     graphics.fillRect(x - width / 2, y - height / 2, width, height)
 

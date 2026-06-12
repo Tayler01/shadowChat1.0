@@ -4,14 +4,15 @@ import { SHADOW_RUNNER_ASSETS } from './assets/manifest'
 import {
   SHADOW_RUNNER_MUSIC_ENABLED_STORAGE_KEY,
   SHADOW_RUNNER_SFX_ENABLED_STORAGE_KEY,
-  SHADOW_RUNNER_SOUND_ASSETS,
-  SHADOW_RUNNER_SOUND_EVENTS,
-  SHADOW_RUNNER_SOUND_VOLUME,
+  createShadowRunnerSfxController,
   readShadowRunnerAudioPreference,
   type ShadowRunnerSoundEvent,
+  type ShadowRunnerSfxController,
+  type ShadowRunnerSfxStatus,
   writeShadowRunnerAudioPreference,
 } from './audio'
 import {
+  getShadowRunnerLevelConfig,
   SHADOW_RUNNER_CAMPAIGN_LEVELS,
   type ShadowRunnerCampaignLevel,
   type ShadowRunnerPlayableLevelId,
@@ -39,7 +40,31 @@ const MENU_BUTTONS = [
 const SHADOW_RUNNER_ACCESS_CODE = '123456'
 const SHADOW_RUNNER_ACCESS_SESSION_KEY = 'shadow-runner-access-unlocked'
 const SHADOW_RUNNER_PROGRESS_KEY = 'shadow-runner-campaign-progress-v1'
-const SHADOW_RUNNER_SFX_POOL_SIZE = 4
+
+const SHADOW_RUNNER_MENU_SOUND_EVENTS: readonly ShadowRunnerSoundEvent[] = [
+  'menu-click',
+  'menu-back',
+  'menu-denied',
+  'level-select',
+  'pause',
+  'resume',
+]
+
+const SHADOW_RUNNER_GAMEPLAY_SOUND_EVENTS: readonly ShadowRunnerSoundEvent[] = [
+  'jump',
+  'double-jump',
+  'land',
+  'sword-swing',
+  'enemy-hit',
+  'stomp',
+  'player-hurt',
+  'life-lost',
+  'respawn',
+  'coin',
+  'enemy-defeat',
+  'level-complete',
+  'route-failed',
+]
 
 const STAR_OVERLAYS = [
   { left: '17.5%', top: '6.5%', size: '1rem', position: '0% 0%', delay: '0s' },
@@ -74,14 +99,13 @@ const SHADOW_RUNNER_MENU_STYLE = {
   height: '22.5%',
 } as React.CSSProperties
 
-const SHADOW_RUNNER_IMAGE_SOURCES = [
+const EMPTY_IMAGE_SOURCES = [] as const
+
+const SHADOW_RUNNER_TITLE_IMAGE_SOURCES = [
   SHADOW_RUNNER_ASSETS.home.background,
   SHADOW_RUNNER_ASSETS.home.titleScroll,
   SHADOW_RUNNER_ASSETS.home.optionsScroll,
   SHADOW_RUNNER_ASSETS.home.optionsMenuButton,
-  SHADOW_RUNNER_ASSETS.home.campaignMap,
-  SHADOW_RUNNER_ASSETS.home.levelMapScrollPanel,
-  SHADOW_RUNNER_ASSETS.home.levelThumbnailSquareFrame,
   SHADOW_RUNNER_ASSETS.home.blankMenuScroll,
   SHADOW_RUNNER_ASSETS.home.blankMenuButton,
   SHADOW_RUNNER_ASSETS.home.missionScrollStand,
@@ -90,8 +114,41 @@ const SHADOW_RUNNER_IMAGE_SOURCES = [
   SHADOW_RUNNER_ASSETS.home.bannerStand,
   SHADOW_RUNNER_ASSETS.home.bannerPennant,
   SHADOW_RUNNER_ASSETS.hero.menuIdleCapeStrip,
+] as const
+
+const SHADOW_RUNNER_MAP_IMAGE_SOURCES = [
+  SHADOW_RUNNER_ASSETS.home.campaignMap,
+  SHADOW_RUNNER_ASSETS.home.levelMapScrollPanel,
+  SHADOW_RUNNER_ASSETS.home.levelThumbnailSquareFrame,
   ...SHADOW_RUNNER_CAMPAIGN_LEVELS.map(level => level.locationButton),
   ...SHADOW_RUNNER_CAMPAIGN_LEVELS.map(level => level.thumbnail),
+] as const
+
+const SHADOW_RUNNER_SHARED_GAMEPLAY_IMAGE_SOURCES = [
+  SHADOW_RUNNER_ASSETS.hero.menuIdleCapeStrip,
+  SHADOW_RUNNER_ASSETS.hero.runStrip,
+  SHADOW_RUNNER_ASSETS.hero.jumpAirStrip,
+  SHADOW_RUNNER_ASSETS.hero.swordAttackStrip,
+  SHADOW_RUNNER_ASSETS.enemies.clockworkSentryStrip,
+  SHADOW_RUNNER_ASSETS.enemies.barrelRollerStrip,
+  SHADOW_RUNNER_ASSETS.gameplay.hudPlaque,
+  SHADOW_RUNNER_ASSETS.gameplay.healthBarFrame,
+  SHADOW_RUNNER_ASSETS.gameplay.heartFull,
+  SHADOW_RUNNER_ASSETS.gameplay.heartEmpty,
+  SHADOW_RUNNER_ASSETS.gameplay.coinIcon,
+  SHADOW_RUNNER_ASSETS.gameplay.levelCompleteBanner,
+  SHADOW_RUNNER_ASSETS.gameplay.dpadControlButton,
+  SHADOW_RUNNER_ASSETS.gameplay.swordControlButton,
+  SHADOW_RUNNER_ASSETS.gameplay.jumpControlButton,
+  SHADOW_RUNNER_ASSETS.gameplay.hitSpark,
+  SHADOW_RUNNER_ASSETS.gameplay.coinSparkleStrip,
+  SHADOW_RUNNER_ASSETS.level.terrainAtlas,
+  SHADOW_RUNNER_ASSETS.level.tiltBridge256,
+  SHADOW_RUNNER_ASSETS.level.coinStrip48,
+  SHADOW_RUNNER_ASSETS.level.spikeRow64,
+  SHADOW_RUNNER_ASSETS.level.eastGate96,
+  SHADOW_RUNNER_ASSETS.level.landingDustStrip,
+  SHADOW_RUNNER_ASSETS.level.swordSlashStrip,
 ] as const
 
 const SHADOW_RUNNER_INLINE_STYLES = `
@@ -204,27 +261,15 @@ function useImagePreload(sources: readonly string[]) {
 
   React.useEffect(() => {
     let cancelled = false
-    let remaining = sources.length
 
-    if (remaining === 0) {
+    if (sources.length === 0) {
       setReady(true)
       return
     }
 
     setReady(false)
-    sources.forEach(source => {
-      const image = new Image()
-      const settle = () => {
-        remaining -= 1
-        if (!cancelled && remaining <= 0) {
-          setReady(true)
-        }
-      }
-
-      image.onload = settle
-      image.onerror = settle
-      image.decoding = 'async'
-      image.src = source
+    void Promise.all(sources.map(preloadShadowRunnerImage)).then(() => {
+      if (!cancelled) setReady(true)
     })
 
     return () => {
@@ -233,6 +278,42 @@ function useImagePreload(sources: readonly string[]) {
   }, [sources])
 
   return ready
+}
+
+function getShadowRunnerRouteImageSources(levelId: ShadowRunnerPlayableLevelId) {
+  const level = getShadowRunnerLevelConfig(levelId)
+  const routeSources = [
+    ...SHADOW_RUNNER_SHARED_GAMEPLAY_IMAGE_SOURCES,
+    level.backgroundAsset,
+    level.id === 'level-2' ? SHADOW_RUNNER_ASSETS.levels.lanternMarketBackground : undefined,
+    level.id === 'level-3' ? SHADOW_RUNNER_ASSETS.levels.ivyViaductTerrainHazards : undefined,
+  ].filter((source): source is string => Boolean(source))
+
+  return Array.from(new Set(routeSources))
+}
+
+function preloadShadowRunnerImage(source: string) {
+  return new Promise<void>(resolve => {
+    const image = new Image()
+    let settled = false
+    function settle() {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timeout)
+      resolve()
+    }
+    const timeout = window.setTimeout(settle, 3600)
+    image.onload = () => {
+      if (typeof image.decode === 'function') {
+        void image.decode().catch(() => undefined).finally(settle)
+        return
+      }
+      settle()
+    }
+    image.onerror = settle
+    image.decoding = 'async'
+    image.src = source
+  })
 }
 
 function useShadowRunnerInteractionLock(rootRef: React.RefObject<HTMLElement>) {
@@ -788,46 +869,45 @@ export function ShadowRunnerScreen({
   const heroFrame = useSpriteFrame(8, 150)
   const torchFrame = useSpriteFrame(8, 105)
   const orientationGateActive = useRotateGate()
-  const [screen, setScreen] = React.useState<'title' | 'levels' | 'play'>('title')
+  const [screen, setScreen] = React.useState<'title' | 'levels' | 'loading' | 'play'>('title')
   const [activeLevelId, setActiveLevelId] = React.useState<ShadowRunnerPlayableLevelId>('tutorial')
+  const [routeLoadProgress, setRouteLoadProgress] = React.useState(0)
+  const [sfxStatus, setSfxStatus] = React.useState<ShadowRunnerSfxStatus | null>(null)
   const [campaignProgress, setCampaignProgress] = React.useState(readShadowRunnerProgress)
   const [accessUnlocked, setAccessUnlocked] = React.useState(getShadowRunnerAccessUnlocked)
   const [titleOptionsOpen, setTitleOptionsOpen] = React.useState(false)
   const [musicEnabled, setMusicEnabled] = React.useState(() => readShadowRunnerAudioPreference(SHADOW_RUNNER_MUSIC_ENABLED_STORAGE_KEY, true))
   const [soundEffectsEnabled, setSoundEffectsEnabled] = React.useState(() => readShadowRunnerAudioPreference(SHADOW_RUNNER_SFX_ENABLED_STORAGE_KEY, true))
-  const sfxPoolsRef = React.useRef<Partial<Record<ShadowRunnerSoundEvent, HTMLAudioElement[]>>>({})
-  const sfxPoolCursorRef = React.useRef<Partial<Record<ShadowRunnerSoundEvent, number>>>({})
-  const assetsReady = useImagePreload(SHADOW_RUNNER_IMAGE_SOURCES)
+  const sfxControllerRef = React.useRef<ShadowRunnerSfxController | null>(null)
+  const assetsReady = useImagePreload(SHADOW_RUNNER_TITLE_IMAGE_SOURCES)
+  const mapAssetsReady = useImagePreload(screen === 'levels' ? SHADOW_RUNNER_MAP_IMAGE_SOURCES : EMPTY_IMAGE_SOURCES)
   const showRotateGate = orientationGateActive
 
   useShadowRunnerInteractionLock(rootRef)
 
   React.useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.Audio === 'undefined') return
+    const controller = createShadowRunnerSfxController()
+    sfxControllerRef.current = controller
+    setSfxStatus(controller.getStatus())
 
-    SHADOW_RUNNER_SOUND_EVENTS.forEach(event => {
-      if (sfxPoolsRef.current[event]) return
-      sfxPoolsRef.current[event] = Array.from({ length: SHADOW_RUNNER_SFX_POOL_SIZE }, () => {
-        const audio = new window.Audio(SHADOW_RUNNER_SOUND_ASSETS[event])
-        audio.preload = 'auto'
-        audio.volume = SHADOW_RUNNER_SOUND_VOLUME[event]
-        return audio
-      })
+    const statusInterval = window.setInterval(() => {
+      setSfxStatus(controller.getStatus())
+    }, 650)
+
+    void controller.preload(SHADOW_RUNNER_MENU_SOUND_EVENTS).then(() => {
+      setSfxStatus(controller.getStatus())
     })
+    const gameplayWarmup = window.setTimeout(() => {
+      void controller.preload(SHADOW_RUNNER_GAMEPLAY_SOUND_EVENTS).then(() => {
+        setSfxStatus(controller.getStatus())
+      })
+    }, 450)
 
     return () => {
-      SHADOW_RUNNER_SOUND_EVENTS.forEach(event => {
-        sfxPoolsRef.current[event]?.forEach(audio => {
-          audio.pause()
-          audio.removeAttribute('src')
-          try {
-            audio.load()
-          } catch {
-            // Some test environments stub media elements incompletely.
-          }
-        })
-      })
-      sfxPoolsRef.current = {}
+      window.clearInterval(statusInterval)
+      window.clearTimeout(gameplayWarmup)
+      controller.dispose()
+      sfxControllerRef.current = null
     }
   }, [])
 
@@ -840,7 +920,7 @@ export function ShadowRunnerScreen({
   }, [soundEffectsEnabled])
 
   React.useEffect(() => {
-    if (screen === 'play') {
+    if (screen === 'play' || screen === 'loading') {
       onPauseMusic?.()
       return
     }
@@ -853,35 +933,8 @@ export function ShadowRunnerScreen({
   }, [musicEnabled, onPauseMusic, onPlayMusic, screen])
 
   const playShadowRunnerSound = React.useCallback((event: ShadowRunnerSoundEvent) => {
-    if (!soundEffectsEnabled) return
-
-    if (typeof window === 'undefined' || typeof window.Audio === 'undefined') return
-
-    let pool = sfxPoolsRef.current[event]
-    if (!pool) {
-      pool = Array.from({ length: SHADOW_RUNNER_SFX_POOL_SIZE }, () => {
-        const audio = new window.Audio(SHADOW_RUNNER_SOUND_ASSETS[event])
-        audio.preload = 'auto'
-        audio.volume = SHADOW_RUNNER_SOUND_VOLUME[event]
-        return audio
-      })
-      sfxPoolsRef.current[event] = pool
-    }
-
-    const cursor = sfxPoolCursorRef.current[event] ?? 0
-    const audio = pool.find(candidate => candidate.paused || candidate.ended) ?? pool[cursor % pool.length]
-    sfxPoolCursorRef.current[event] = cursor + 1
-    audio.volume = SHADOW_RUNNER_SOUND_VOLUME[event]
-
-    try {
-      audio.currentTime = 0
-    } catch {
-      // Browser media can refuse seeking before metadata loads; playback still attempts.
-    }
-
-    void audio.play().catch(() => {
-      // Autoplay can block until a gesture; visual feedback still carries the action.
-    })
+    sfxControllerRef.current?.play(event, soundEffectsEnabled)
+    setSfxStatus(sfxControllerRef.current?.getStatus() ?? null)
   }, [soundEffectsEnabled])
 
   const playButtonChime = React.useCallback(() => {
@@ -905,11 +958,58 @@ export function ShadowRunnerScreen({
     })
   }, [onPauseMusic, onPlayMusic, playButtonChime])
 
+  const startPlayableRoute = React.useCallback((levelId: ShadowRunnerPlayableLevelId) => {
+    playShadowRunnerSound('level-select')
+    setActiveLevelId(levelId)
+    setRouteLoadProgress(0)
+    setScreen('loading')
+  }, [playShadowRunnerSound])
+
+  React.useEffect(() => {
+    if (screen !== 'loading') return
+
+    let cancelled = false
+
+    const run = async () => {
+      const sources = getShadowRunnerRouteImageSources(activeLevelId)
+      const imageWeight = sources.length > 0 ? 0.72 / sources.length : 0.72
+      setRouteLoadProgress(0.06)
+
+      for (let index = 0; index < sources.length; index += 1) {
+        if (cancelled) return
+        await preloadShadowRunnerImage(sources[index])
+        if (!cancelled) {
+          setRouteLoadProgress(Math.min(0.78, 0.06 + (index + 1) * imageWeight))
+        }
+      }
+
+      await sfxControllerRef.current?.preload(SHADOW_RUNNER_GAMEPLAY_SOUND_EVENTS)
+      if (cancelled) return
+      setSfxStatus(sfxControllerRef.current?.getStatus() ?? null)
+      setRouteLoadProgress(0.94)
+
+      await new Promise<void>(resolve => {
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => resolve())
+        })
+      })
+
+      if (!cancelled) {
+        setRouteLoadProgress(1)
+        setScreen('play')
+      }
+    }
+
+    void run()
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeLevelId, screen])
+
   const handleMenuButton = React.useCallback((buttonId: typeof MENU_BUTTONS[number]['id']) => {
     if (buttonId === 'tutorial') {
-      playShadowRunnerSound('level-select')
-      setActiveLevelId('tutorial')
-      setScreen('play')
+      startPlayableRoute('tutorial')
       return
     }
 
@@ -923,13 +1023,11 @@ export function ShadowRunnerScreen({
     if (buttonId === 'options') {
       setTitleOptionsOpen(true)
     }
-  }, [playButtonChime, playShadowRunnerSound])
+  }, [playButtonChime, startPlayableRoute])
 
   const playCampaignLevel = React.useCallback((levelId: ShadowRunnerPlayableLevelId) => {
-    playShadowRunnerSound('level-select')
-    setActiveLevelId(levelId)
-    setScreen('play')
-  }, [playShadowRunnerSound])
+    startPlayableRoute(levelId)
+  }, [startPlayableRoute])
 
   const handleLevelComplete = React.useCallback((levelId: ShadowRunnerPlayableLevelId) => {
     setCampaignProgress(current => markCampaignLevelComplete(current, levelId))
@@ -998,6 +1096,43 @@ export function ShadowRunnerScreen({
             onUnlock={() => setAccessUnlocked(true)}
             onSoundEvent={playShadowRunnerSound}
           />
+        ) : screen === 'loading' ? (
+          <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-[#02040a] px-6 text-center">
+            <img
+              src={SHADOW_RUNNER_ASSETS.home.background}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover opacity-65"
+              draggable={false}
+            />
+            <div className="absolute inset-0 bg-black/58" />
+            <div className="relative z-10 w-[min(58vw,28rem)] text-[#150e07] drop-shadow-[0_22px_60px_rgba(0,0,0,0.75)]">
+              <div className="relative h-24 min-[740px]:h-28">
+                <img
+                  src={SHADOW_RUNNER_ASSETS.home.optionsMenuButton}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-fill"
+                  draggable={false}
+                />
+                <div className="absolute inset-x-[12%] inset-y-[18%] flex flex-col items-center justify-center">
+                  <p className="text-[0.58rem] font-black uppercase tracking-[0.2em] text-[#5a3818] min-[740px]:text-[0.68rem]">
+                    Preparing Route
+                  </p>
+                  <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] min-[740px]:text-sm">
+                    {getShadowRunnerLevelConfig(activeLevelId).title}
+                  </p>
+                  <div className="mt-3 h-2 w-[78%] overflow-hidden rounded-full border border-[#5b3714]/60 bg-[#180d04]/55">
+                    <div
+                      className="h-full rounded-full bg-[#d8a33e] shadow-[0_0_10px_rgba(245,207,105,0.65)] transition-[width] duration-200"
+                      style={{ width: `${Math.round(routeLoadProgress * 100)}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-[0.48rem] font-black uppercase tracking-[0.1em] text-[#5a3818] min-[740px]:text-[0.56rem]">
+                    Assets {Math.round(routeLoadProgress * 100)}% {sfxStatus ? `- SFX ${sfxStatus.loaded}/${sfxStatus.total}` : ''}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
         ) : screen === 'play' ? (
           <ShadowRunnerGame
             levelId={activeLevelId}
@@ -1011,14 +1146,44 @@ export function ShadowRunnerScreen({
             onLevelComplete={handleLevelComplete}
           />
         ) : screen === 'levels' ? (
-          <ShadowRunnerLevelMap
-            progress={campaignProgress}
-            onBack={() => {
-              setScreen('title')
-            }}
-            onPlayLevel={playCampaignLevel}
-            onSoundEvent={playShadowRunnerSound}
-          />
+          !mapAssetsReady ? (
+            <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-[#02040a] px-6 text-center">
+              <img
+                src={SHADOW_RUNNER_ASSETS.home.background}
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover opacity-55"
+                draggable={false}
+              />
+              <div className="absolute inset-0 bg-black/62" />
+              <div className="relative z-10 w-[min(52vw,23rem)] text-[#150e07] drop-shadow-[0_22px_60px_rgba(0,0,0,0.75)]">
+                <div className="relative h-20 min-[740px]:h-24">
+                  <img
+                    src={SHADOW_RUNNER_ASSETS.home.optionsMenuButton}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-fill"
+                    draggable={false}
+                  />
+                  <div className="absolute inset-x-[12%] inset-y-[18%] flex flex-col items-center justify-center">
+                    <p className="text-[0.58rem] font-black uppercase tracking-[0.2em] text-[#5a3818] min-[740px]:text-[0.68rem]">
+                      Charting Routes
+                    </p>
+                    <p className="mt-1 text-xs font-black uppercase tracking-[0.12em] min-[740px]:text-sm">
+                      Campaign Map
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <ShadowRunnerLevelMap
+              progress={campaignProgress}
+              onBack={() => {
+                setScreen('title')
+              }}
+              onPlayLevel={playCampaignLevel}
+              onSoundEvent={playShadowRunnerSound}
+            />
+          )
         ) : (
           <>
             {!assetsReady && (

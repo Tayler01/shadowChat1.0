@@ -1,15 +1,11 @@
 import React from 'react'
 import {
-  ArrowDown,
-  ChevronLeft,
   ChevronRight,
-  ChevronsUp,
   Home,
   Map,
   Pause,
   Play,
   RotateCcw,
-  Sword,
   Volume2,
   VolumeX,
 } from 'lucide-react'
@@ -96,11 +92,6 @@ const SHADOW_RUNNER_GAME_STYLES = `
     --shadow-runner-action-size: var(--shadow-runner-action-large);
   }
 
-  .shadow-runner-touch-button svg {
-    height: 68%;
-    width: 68%;
-  }
-
   .shadow-runner-dpad {
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
@@ -109,11 +100,6 @@ const SHADOW_RUNNER_GAME_STYLES = `
     touch-action: none;
     user-select: none;
     width: var(--shadow-runner-dpad-size);
-  }
-
-  .shadow-runner-dpad svg {
-    height: 40%;
-    width: 40%;
   }
 `
 
@@ -147,7 +133,7 @@ function LifePips({ current, max }: { current: number; max: number }) {
   )
 }
 
-function getDirectionPadAction(
+function getMovementZoneAction(
   element: HTMLElement,
   event: Pick<React.PointerEvent<HTMLElement>, 'clientX' | 'clientY'>,
 ): DirectionPadAction {
@@ -155,7 +141,7 @@ function getDirectionPadAction(
   const x = (event.clientX - rect.left) / rect.width
   const y = (event.clientY - rect.top) / rect.height
 
-  if (y > 0.58 && x > 0.24 && x < 0.76) return 'crouch'
+  if (y > 0.7) return 'crouch'
   return x < 0.5 ? 'left' : 'right'
 }
 
@@ -163,7 +149,7 @@ interface DirectionPadProps {
   onActionChange: (action: ShadowRunnerAction, pressed: boolean) => void
 }
 
-function DirectionPad({ onActionChange }: DirectionPadProps) {
+function MovementTouchZone({ onActionChange }: DirectionPadProps) {
   const activeActionRef = React.useRef<DirectionPadAction | null>(null)
 
   const setActiveAction = React.useCallback((nextAction: DirectionPadAction | null) => {
@@ -188,13 +174,13 @@ function DirectionPad({ onActionChange }: DirectionPadProps) {
     } catch {
       // Some synthetic or browser-generated pointer events have no active pointer to capture.
     }
-    setActiveAction(getDirectionPadAction(event.currentTarget, event))
+    setActiveAction(getMovementZoneAction(event.currentTarget, event))
   }, [setActiveAction])
 
   const move = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     if (!activeActionRef.current) return
     event.preventDefault()
-    setActiveAction(getDirectionPadAction(event.currentTarget, event))
+    setActiveAction(getMovementZoneAction(event.currentTarget, event))
   }, [setActiveAction])
 
   const release = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
@@ -221,18 +207,22 @@ function DirectionPad({ onActionChange }: DirectionPadProps) {
       onPointerCancel={release}
       onLostPointerCapture={() => setActiveAction(null)}
       onContextMenu={event => event.preventDefault()}
-      className="shadow-runner-dpad relative isolate rounded-full text-[#f8eac0] drop-shadow-[0_16px_28px_rgba(0,0,0,0.58)]"
+      className="absolute bottom-0 left-0 top-0 w-[52%]"
     >
-      <img
-        src={SHADOW_RUNNER_ASSETS.gameplay.touchControlButton}
-        alt=""
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-[-8%] z-0 h-[116%] w-[116%] object-contain opacity-95"
-        draggable={false}
-      />
-      <ChevronLeft className="pointer-events-none absolute left-[8%] top-1/2 z-10 -translate-y-1/2 stroke-[3.4] drop-shadow-[0_2px_2px_rgba(0,0,0,0.72)]" aria-hidden="true" />
-      <ChevronRight className="pointer-events-none absolute right-[8%] top-1/2 z-10 -translate-y-1/2 stroke-[3.4] drop-shadow-[0_2px_2px_rgba(0,0,0,0.72)]" aria-hidden="true" />
-      <ArrowDown className="pointer-events-none absolute bottom-[8%] left-1/2 z-10 -translate-x-1/2 stroke-[3.4] drop-shadow-[0_2px_2px_rgba(0,0,0,0.72)]" aria-hidden="true" />
+      <div
+        className="shadow-runner-dpad pointer-events-none absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-[max(0.65rem,env(safe-area-inset-left))] isolate rounded-full text-[#f8eac0] drop-shadow-[0_16px_28px_rgba(0,0,0,0.58)]"
+        style={{
+          '--shadow-runner-dpad-size': 'clamp(6.12rem, 25.5svh, 8.08rem)',
+        } as React.CSSProperties}
+      >
+        <img
+          src={SHADOW_RUNNER_ASSETS.gameplay.dpadControlButton}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-[-8%] z-0 h-[116%] w-[116%] object-contain opacity-[0.86]"
+          draggable={false}
+        />
+      </div>
     </div>
   )
 }
@@ -240,7 +230,7 @@ function DirectionPad({ onActionChange }: DirectionPadProps) {
 interface TouchButtonProps {
   action: ShadowRunnerAction
   ariaLabel: string
-  children: React.ReactNode
+  asset: string
   onActionChange: (action: ShadowRunnerAction, pressed: boolean) => void
   size?: 'regular' | 'large'
 }
@@ -248,7 +238,7 @@ interface TouchButtonProps {
 function TouchButton({
   action,
   ariaLabel,
-  children,
+  asset,
   onActionChange,
   size = 'regular',
 }: TouchButtonProps) {
@@ -287,15 +277,12 @@ function TouchButton({
       className="shadow-runner-touch-button relative isolate inline-flex items-center justify-center rounded-full text-[#f8eac0] drop-shadow-[0_16px_28px_rgba(0,0,0,0.58)] transition active:scale-95"
     >
       <img
-        src={SHADOW_RUNNER_ASSETS.gameplay.touchControlButton}
+        src={asset}
         alt=""
         aria-hidden="true"
-        className="pointer-events-none absolute inset-[-8%] z-0 h-[116%] w-[116%] object-contain opacity-[0.78]"
+        className="pointer-events-none absolute inset-[-8%] z-0 h-[116%] w-[116%] object-contain opacity-[0.86]"
         draggable={false}
       />
-      <span className="pointer-events-none relative z-10 flex items-center justify-center drop-shadow-[0_2px_2px_rgba(0,0,0,0.72)]">
-        {children}
-      </span>
     </button>
   )
 }
@@ -625,32 +612,23 @@ export function ShadowRunnerGame({
         </button>
       </div>
 
-      <div className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-between px-[max(0.65rem,env(safe-area-inset-left))] pb-[max(0.5rem,env(safe-area-inset-bottom))] transition-opacity ${overlayOpen ? 'opacity-35' : 'opacity-100'}`}>
-        <div
-          className="pointer-events-auto"
-          style={{
-            '--shadow-runner-dpad-size': 'clamp(6.12rem, 25.5svh, 8.08rem)',
-          } as React.CSSProperties}
-        >
-          <DirectionPad onActionChange={setAction} />
-        </div>
+      <div className={`absolute inset-0 z-20 transition-opacity ${overlayOpen ? 'pointer-events-none opacity-35' : 'pointer-events-auto opacity-100'}`}>
+        <MovementTouchZone onActionChange={setAction} />
+      </div>
 
+      <div className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-end px-[max(0.65rem,env(safe-area-inset-left))] pb-[max(0.45rem,env(safe-area-inset-bottom))] transition-opacity ${overlayOpen ? 'opacity-35' : 'opacity-100'}`}>
         <div
-          className="pointer-events-auto relative h-[calc(var(--shadow-runner-action-large)*1.34)] w-[calc(var(--shadow-runner-action-large)*1.42)]"
+          className="pointer-events-auto relative h-[calc(var(--shadow-runner-action-large)*1.86)] w-[calc(var(--shadow-runner-action-large)*2.02)]"
           style={{
             '--shadow-runner-action-size': 'clamp(6.12rem, 25.5svh, 8.08rem)',
             '--shadow-runner-action-large': 'clamp(6.12rem, 25.5svh, 8.08rem)',
           } as React.CSSProperties}
         >
           <div className="absolute right-0 top-0">
-            <TouchButton action="attack" ariaLabel="Sword attack" onActionChange={setAction} size="large">
-              <Sword className="stroke-[3]" />
-            </TouchButton>
+            <TouchButton action="attack" ariaLabel="Sword attack" asset={SHADOW_RUNNER_ASSETS.gameplay.swordControlButton} onActionChange={setAction} size="large" />
           </div>
           <div className="absolute bottom-0 left-0">
-            <TouchButton action="jump" ariaLabel="Jump" onActionChange={setAction} size="large">
-              <ChevronsUp className="stroke-[3]" />
-            </TouchButton>
+            <TouchButton action="jump" ariaLabel="Jump" asset={SHADOW_RUNNER_ASSETS.gameplay.jumpControlButton} onActionChange={setAction} size="large" />
           </div>
         </div>
       </div>

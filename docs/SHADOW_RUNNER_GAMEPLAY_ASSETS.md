@@ -13,7 +13,10 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
 | Health bar frame | `public/games/shadow-runner/gameplay-assets/optimized/health-bar-frame-clean.webp` | Phaser overhead health-frame art for hero and enemy health bars. |
 | Health fill | `public/games/shadow-runner/gameplay-assets/optimized/health-fill.webp` | Source swatch for the red health fill palette; runtime fill is drawn live so it depletes smoothly. |
 | Level-complete banner | `public/games/shadow-runner/gameplay-assets/optimized/level-complete-banner.webp` | DOM level-complete banner backing. |
-| Touch control button | `public/games/shadow-runner/gameplay-assets/optimized/touch-control-button.webp` | Generated translucent medieval control-face asset used for the large left D-pad and right-side jump/attack action buttons. |
+| Touch control button | `public/games/shadow-runner/gameplay-assets/optimized/touch-control-button.webp` | Earlier shared translucent medieval control-face asset retained for fallback/reference. |
+| Baked D-pad control | `public/games/shadow-runner/gameplay-assets/optimized/dpad-control-button.webp` | Generated gold circular left control with baked left/right/crouch arrows; runtime uses this as the visible control while the whole left half of the screen acts as the hit area. |
+| Baked sword control | `public/games/shadow-runner/gameplay-assets/optimized/sword-control-button.webp` | Generated gold circular attack control with the sword icon baked into the asset. |
+| Baked jump control | `public/games/shadow-runner/gameplay-assets/optimized/jump-control-button.webp` | Generated gold circular jump control with the double-up arrow icon baked into the asset. |
 | Hit spark | `public/games/shadow-runner/gameplay-assets/sliced/hit-spark.png` | Phaser hit feedback image used for sword and stomp hits. |
 | Coin sparkle strip | `public/games/shadow-runner/gameplay-assets/sliced/coin-sparkle-strip.png` | Phaser coin pickup sparkle strip. |
 | Clockwork Sentry strip | `public/games/shadow-runner/sprites/strips/clockwork-sentry-v2-6f-128.png` | First playable enemy runtime strip. |
@@ -42,6 +45,12 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
   `public/games/shadow-runner/gameplay-assets/transparent/shadow-runner-gameplay-hud-clean-sheet-transparent.png`
 - Touch control button source:
   `public/games/shadow-runner/gameplay-assets/generated/touch-control-button-source.png`
+- Baked touch controls source:
+  `public/games/shadow-runner/gameplay-assets/generated/baked-touch-controls-sheet-imagegen-source.png`
+- Baked transparent control slices:
+  `public/games/shadow-runner/gameplay-assets/generated/dpad-control-button.png`,
+  `public/games/shadow-runner/gameplay-assets/generated/sword-control-button.png`, and
+  `public/games/shadow-runner/gameplay-assets/generated/jump-control-button.png`
 - Sentry source:
   `public/games/shadow-runner/sprites/raw/clockwork-sentry-v2-source.png`
 - Sentry transparent strip:
@@ -54,7 +63,7 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
 - Manifest: `src/features/games/shadow-runner/assets/manifest.ts`
 - DOM HUD and level-complete overlay:
   `src/features/games/shadow-runner/ShadowRunnerGame.tsx`
-- Audio preferences and pooled short-effect playback:
+- Audio preferences and Web Audio short-effect playback:
   `src/features/games/shadow-runner/audio.ts` and
   `src/features/games/shadow-runner/ShadowRunnerScreen.tsx`
 - Phaser preload, sentry animation, overhead health, and pickup/hit effects:
@@ -65,7 +74,14 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
 - Lobby music is enabled by default on title/lobby/map surfaces and is paused
   automatically during gameplay; SFX remain enabled by default in both menus
   and gameplay unless the local Shadow Runner sound preference is disabled.
+  Short effects now decode through one Web Audio controller, preload in staged
+  groups, and use cooldowns for high-frequency events so sound playback does
+  not create pooled `<audio>` churn during gameplay.
 - Mobile gameplay controls now use a researched split-thumb layout: one large
-  bottom-left D-pad region for left/right/crouch and two large bottom-right
-  action buttons for jump/attack. The center of the playfield stays clear while
-  preserving oversized touch targets for phone play.
+  baked bottom-left D-pad visual for left/right/crouch, a full left-side
+  movement hit zone, and two separated baked bottom-right action buttons for
+  jump/attack. The center of the playfield stays clear while preserving
+  oversized touch targets for phone play.
+- Route loading is staged: title art loads first, campaign-map art loads only
+  when opening the map, and gameplay route art/SFX preload behind a branded
+  route loading screen before Phaser mounts.
