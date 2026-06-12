@@ -437,6 +437,12 @@ export function ShadowRunnerGame({
     setPauseOpen(true)
   }, [clearPressedActions, onSoundEvent])
 
+  const handlePausePress = React.useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    openPauseMenu()
+  }, [openPauseMenu])
+
   const closePauseMenu = React.useCallback(() => {
     onSoundEvent?.('resume')
     setConfirmExit(null)
@@ -603,7 +609,7 @@ export function ShadowRunnerGame({
         </div>
       )}
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-[max(0.85rem,env(safe-area-inset-left))] pt-[max(0.7rem,env(safe-area-inset-top))]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-30 px-[max(0.85rem,env(safe-area-inset-left))] pt-[max(0.7rem,env(safe-area-inset-top))]">
         <div className="pointer-events-auto relative mx-auto h-12 w-[min(58vw,31rem)] min-w-[17.5rem] max-w-[calc(100vw-7rem)] text-[#f6e6bb] drop-shadow-[0_12px_32px_rgba(0,0,0,0.55)] min-[740px]:h-14">
           <img
             src={SHADOW_RUNNER_ASSETS.gameplay.hudPlaque}
@@ -638,7 +644,8 @@ export function ShadowRunnerGame({
         <button
           type="button"
           aria-label="Open pause menu"
-          onClick={openPauseMenu}
+          onPointerDown={handlePausePress}
+          onClick={event => event.preventDefault()}
           className="pointer-events-auto absolute right-[max(0.85rem,env(safe-area-inset-right))] top-[max(0.7rem,env(safe-area-inset-top))] inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#e8c46b]/40 bg-black/48 text-[#f3d88d] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-md transition hover:border-[#f0d381]/70 hover:bg-[#2c2110]/75 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
         >
           <Pause className="h-5 w-5" />
