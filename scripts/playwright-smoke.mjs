@@ -71,6 +71,10 @@ try {
   browser = await chromium.launch({
     headless: config.headless,
     slowMo: config.slowMo,
+    args: [
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+    ],
   })
 
   const accounts = buildAccounts(config)
@@ -795,12 +799,12 @@ async function scenarioMobileDmBack(state, sessionA, sessionB, mobileSession) {
   await waitForChatView(mobileSession.page)
   await dismissAppReleaseDialog(mobileSession.page)
 
-  await mobileSession.page.getByRole('button', { name: /^DMs$/ }).click()
+  await mobileNavButton(mobileSession.page, 'DMs').click()
   await waitForDmView(mobileSession.page)
   await openConversationWithUser(mobileSession.page, sessionB.account, state)
   await mobileSession.page.getByRole('button', { name: 'Back to direct messages' }).first().click()
   await waitForDmView(mobileSession.page)
-  await mobileSession.page.getByRole('button', { name: /^Chat$/ }).click()
+  await mobileNavButton(mobileSession.page, 'Chat').click()
   await waitForChatView(mobileSession.page)
   await capture(mobileSession.page, state.artifactDir, 'mobile-dm-back')
 }
@@ -810,7 +814,7 @@ async function scenarioMobileDmRefocus(state, sessionA, sessionB, mobileSession)
   await waitForChatView(mobileSession.page)
   await dismissAppReleaseDialog(mobileSession.page)
 
-  await mobileSession.page.getByRole('button', { name: /^DMs$/ }).click()
+  await mobileNavButton(mobileSession.page, 'DMs').click()
   await waitForDmView(mobileSession.page)
   await openConversationWithUser(mobileSession.page, sessionB.account, state)
   await simulateVisibilityResume(mobileSession.page)
@@ -853,7 +857,7 @@ async function goToDirectMessages(page) {
     return
   }
 
-  const mobileNav = page.getByRole('button', { name: /^DMs(?:\s+\d+)?$/ }).first()
+  const mobileNav = mobileNavButton(page, 'DMs')
   if (await mobileNav.isVisible().catch(() => false)) {
     await mobileNav.click()
   } else {
@@ -866,6 +870,13 @@ async function goToChat(page) {
   await dismissAppReleaseDialog(page)
   await page.getByRole('button', { name: /^Chat$/ }).click()
   await waitForChatView(page)
+}
+
+function mobileNavButton(page, label) {
+  return page
+    .locator('nav.shadowchat-mobile-nav')
+    .getByRole('button', { name: new RegExp(label, 'i') })
+    .first()
 }
 
 async function goToSettings(page) {
@@ -1149,7 +1160,9 @@ async function sendThreadMessage(page, messageText) {
   const composer = page.locator('textarea:visible').last()
   await composer.click()
   await composer.fill(messageText)
-  await page.locator('button[aria-label="Send message"]:visible').last().click()
+  const sendButton = page.getByRole('button', { name: /^Send message(?:\. Hold for Hype .*)?$/ }).last()
+  await sendButton.waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await sendButton.click()
 }
 
 async function sendVisibleMessage(page, messageText) {
@@ -1157,7 +1170,9 @@ async function sendVisibleMessage(page, messageText) {
   const composer = page.locator('textarea:visible').last()
   await composer.click()
   await composer.fill(messageText)
-  await page.locator('button[aria-label="Send message"]:visible').last().click()
+  const sendButton = page.getByRole('button', { name: /^Send message(?:\. Hold for Hype .*)?$/ }).last()
+  await sendButton.waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await sendButton.click()
 }
 
 async function reactToMessage(page, messageText, emoji) {
@@ -1293,6 +1308,76 @@ async function capture(page, baseArtifactDir, label) {
   return filePath
 }
 
+async function captureFailureArtifacts(state, scenarioName) {
+  const sessions = [
+    ['desktop-a', desktopA],
+    ['desktop-b', desktopB],
+    ['mobile-a', mobileA],
+  ]
+
+  await Promise.all(sessions.map(async ([label, session]) => {
+    if (!session?.page || session.page.isClosed()) {
+      return
+    }
+
+    const artifactBase = `${scenarioName}-failure-${label}`
+    const metadataPath = path.join(state.artifactDir, `${slugify(artifactBase)}.json`)
+    const screenshotPath = path.join(state.artifactDir, `${slugify(artifactBase)}.png`)
+
+    try {
+      const metadata = await session.page.evaluate(() => {
+        const visibleText = document.body?.innerText || ''
+        const visibleTextPreview = visibleText.replace(/\s+/gu, ' ').trim().slice(0, 2000)
+        const textareas = Array.from(document.querySelectorAll('textarea')).map(element => {
+          const rect = element.getBoundingClientRect()
+          const style = window.getComputedStyle(element)
+
+          return {
+            name: element.getAttribute('name') || '',
+            placeholder: element.getAttribute('placeholder') || '',
+            disabled: element.disabled,
+            valueLength: element.value.length,
+            visible: rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none',
+          }
+        })
+        const sendButtons = Array.from(document.querySelectorAll('button'))
+          .map(button => {
+            const rect = button.getBoundingClientRect()
+            const style = window.getComputedStyle(button)
+
+            return {
+              label: button.getAttribute('aria-label') || button.textContent?.trim() || '',
+              disabled: button.disabled,
+              visible: rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none',
+            }
+          })
+          .filter(button => /send/i.test(button.label))
+
+        return {
+          url: window.location.href,
+          title: document.title,
+          visibleTextPreview,
+          textareas,
+          sendButtons,
+        }
+      })
+
+      await writeJson(metadataPath, metadata)
+    } catch (error) {
+      await writeJson(metadataPath, { error: serializeError(error) })
+    }
+
+    try {
+      await session.page.screenshot({ path: screenshotPath, fullPage: true })
+    } catch (error) {
+      await writeJson(
+        path.join(state.artifactDir, `${slugify(artifactBase)}-screenshot-error.json`),
+        { error: serializeError(error) }
+      )
+    }
+  }))
+}
+
 function attachDiagnostics(page, logPath, label) {
   page.on('console', async message => {
     if (message.type() === 'error' || message.type() === 'warning') {
@@ -1302,6 +1387,14 @@ function attachDiagnostics(page, logPath, label) {
 
   page.on('pageerror', async error => {
     await appendFile(logPath, `[pageerror:${label}] ${error.message}\n`)
+  })
+
+  page.on('crash', async () => {
+    await appendFile(logPath, `[crash:${label}] page crashed\n`)
+  })
+
+  page.on('close', async () => {
+    await appendFile(logPath, `[close:${label}] page closed\n`)
   })
 
   page.on('requestfailed', async request => {
@@ -1323,6 +1416,7 @@ async function runScenario(state, name, fn) {
     })
     logLine(`Passed scenario: ${name}`)
   } catch (error) {
+    await captureFailureArtifacts(state, name)
     state.summary.scenarios.push({
       name,
       status: 'failed',
