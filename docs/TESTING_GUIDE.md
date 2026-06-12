@@ -2,9 +2,9 @@
 
 This project uses a mix of static checks, Jest coverage, and real browser validation.
 
-## Documentation Status - June 9, 2026
+## Documentation Status - June 11, 2026
 
-This guide reflects the current repo scripts. The June 1 audit confirmed `npm run lint`, `npm run typecheck`, `npm run build`, and the metrics-only chat scroll probe passed on current `main`. The chat-scroll script now also has seeded read-position scenarios for preview/staging runs that can prove the first-unread, deep-link, same-timestamp, realtime anchoring, and media paths. The June 2 auth rollout added invite-only signup, email verification, password reset, and admin invite tests. The June 8 work added Hype, safe-fetch, automation approval queue, DM read-guard, and News realtime-helper coverage. The June 9 work added focused coverage for mobile composer focus during pending sends, Hype-aware chat media frames, and Shadow Runner mobile visual/playable-prototype checks.
+This guide reflects the current repo scripts. The June 1 audit confirmed `npm run lint`, `npm run typecheck`, `npm run build`, and the metrics-only chat scroll probe passed on current `main`. The chat-scroll script now also has seeded read-position scenarios for preview/staging runs that can prove the first-unread, deep-link, same-timestamp, realtime anchoring, and media paths. The June 2 auth rollout added invite-only signup, email verification, password reset, and admin invite tests. The June 8 work added Hype, safe-fetch, automation approval queue, DM read-guard, and News realtime-helper coverage. The June 9 work added focused coverage for mobile composer focus during pending sends, Hype-aware chat media frames, and Shadow Runner mobile visual/playable-prototype checks. The June 11 Shadow Runner passes added audio generation validation, campaign-map/detail smoke, Level 1 through Level 3 route visual checks, and production-preview audio probes.
 
 ## Mobile-First Testing Default
 
@@ -290,11 +290,13 @@ Dedicated current QA scripts also include:
 - `qa:mobile-pwa`: mobile/PWA visual QA script.
 - `qa:themes`: theme visual QA script.
 - `qa:shadow-war`, `qa:shadow-war:core`, `qa:shadow-war:visual`, and `qa:shadow-checkers`: game-specific smoke coverage.
+- `shadow-runner:audio`: regenerates the original Shadow Runner WAV sound
+  effects through `scripts/generate-shadow-runner-audio.mjs`.
 - Shadow Runner does not yet have a package-script smoke alias. Use focused
   one-off Playwright/Chrome mobile checks for now and save artifacts under
-  `output/playwright/<run-name>/`; the latest options-menu pass used `740x390`
-  and `932x430` landscape mobile viewports and checked title-button overrun plus
-  canceled selection/context-menu events.
+  `output/playwright/<run-name>/`; the June 11 passes used `740x390` and
+  `932x430` landscape mobile viewports for title/options, campaign map, level
+  detail, gameplay controls, route completion, and audio behavior.
 - `bridge:tui:test` and `bridge:tui:smoke`: bridge TUI layout and live serial smoke paths.
 
 ### General Chat Scroll Probe

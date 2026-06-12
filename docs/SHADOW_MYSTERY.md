@@ -1,15 +1,15 @@
 # Shadow Mystery
 
-## Documentation Status - June 1, 2026
+## Documentation Status - June 11, 2026
 
-Reviewed during the June 1, 2026 documentation refresh. This feature guide is current for the shipped product surface, with any known hardening or polish follow-ups tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
+Reviewed during the June 11, 2026 documentation refresh after the fourth hardcoded story, `The Sleep That Wouldn't End`, landed on `main`. This feature guide is current for the shipped product surface, with any known hardening or polish follow-ups tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
 
 Shadow Mystery is a hardcoded V1 longform mystery-novella surface inside the
 ShadowChat Entertainment area.
 
 ## Current Status
 
-As of 2026-05-25:
+As of 2026-06-11:
 
 - Shadow Mystery is wired into the Entertainment picker.
 - The story list/detail surface is static and mobile-first.

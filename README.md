@@ -4,9 +4,9 @@ ShadowChat 1.0 is a premium dark realtime chat app built with React, TypeScript,
 
 The project is already wired for hosted Supabase and Netlify deployment. It is designed to behave like a product app, not a demo: realtime messaging, uploads, presence, settings, DMs, and notification flows are all first-class parts of the codebase.
 
-## Documentation Status - June 9, 2026
+## Documentation Status - June 11, 2026
 
-The documentation set has been refreshed against the current `main` branch after the June 9 Shadow Runner playable-prototype work, Shadow Runner title/options polish, mobile composer focus fix, and chat media-frame polish. The freshest planning source is [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1), and the full documentation inventory is [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
+The documentation set has been refreshed against the current `main` branch after the June 11 Shadow Runner campaign-map, Level 3, gameplay asset, and audio work, plus the latest Shadow Mystery story expansion. The freshest planning source is [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1), and the full documentation inventory is [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
 
 Current known follow-up areas are documentation-backed: Supabase policy/RPC hardening, remaining production deployment/smoke for shared URL fetch hardening outside the already-deployed link-preview and ShadowPin video functions, Netlify security headers, provider live-setting verification, frontend polish, and post-deploy auth smoke for the invite-only signup/email-verification rollout.
 
@@ -55,8 +55,9 @@ Current known follow-up areas are documentation-backed: Supabase policy/RPC hard
 - Simple app-reopen loading state with consistent `Loading Shado...` copy
 - Entertainment area with Shadow Runner, Shadow War, Shadow Checkers, Shado TV,
   Shadow Mystery, and Will & Kirk surfaces; Shadow Runner is currently a
-  private, landscape-gated playable prototype with a Phaser level, title menu,
-  title/options scroll menus, touch controls, pause menu, and Castle Bard music
+  private, landscape-gated campaign prototype with a tutorial, a 10-stop
+  campaign map, playable Level 1 through Level 3 routes, generated touch
+  controls, pause/options menus, Castle Bard lobby music, and original SFX
 - Premium obsidian-and-gold design system across desktop and mobile
 
 ## Current Project Shape
@@ -242,8 +243,11 @@ Production is hosted on Netlify, the backend is hosted on Supabase, and the News
 - [docs/ADMIN_ACCESS.md](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1): app-wide admin/sub-admin roles, badges, settings, and RPCs
 - [docs/CHANNEL_BANS.md](C:/repos/chat2.0/docs/CHANNEL_BANS.md:1): profile-popup moderation controls and database-enforced channel bans
 - [docs/ART_BOARD.md](C:/repos/chat2.0/docs/ART_BOARD.md:1): shared Art Board canvas, schema, storage, moderation, and validation
-- [docs/SHADOW_RUNNER_HOME_ASSETS.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_HOME_ASSETS.md:1): Shadow Runner title/menu asset pack, current playable-prototype wiring, and asset follow-ups
-- [docs/SHADOW_RUNNER_SPRITES.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_SPRITES.md:1): Shadow Runner hero sprite strips, gameplay usage, and pending sprite cleanup
+- [docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md:1): active Shadow Runner playable-prototype roadmap, route checkpoints, and verification notes
+- [docs/SHADOW_RUNNER_HOME_ASSETS.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_HOME_ASSETS.md:1): Shadow Runner title/menu/campaign-map asset pack, current playable-prototype wiring, and asset follow-ups
+- [docs/SHADOW_RUNNER_GAMEPLAY_ASSETS.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_GAMEPLAY_ASSETS.md:1): Shadow Runner HUD, controls, SFX, enemy, and route gameplay asset wiring
+- [docs/SHADOW_RUNNER_SPRITES.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_SPRITES.md:1): Shadow Runner hero/enemy sprite strips, gameplay usage, and pending sprite cleanup
+- [docs/SHADOW_RUNNER_STORY_LORE.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_STORY_LORE.md:1): Shadow Runner route, campaign, and lore reference
 - [docs/PRODUCTION_ROLLBACK_AND_MEDIA_FRAME_FIX_2026-06-09.md](C:/repos/chat2.0/docs/PRODUCTION_ROLLBACK_AND_MEDIA_FRAME_FIX_2026-06-09.md:1): June 9 orientation rollback notes and durable chat media-frame fix
 - [docs/WEATHER_WIDGET.md](C:/repos/chat2.0/docs/WEATHER_WIDGET.md:1): General Chat weather widget, private location preferences, and validation
 - [docs/NEWS_TAB_AND_SCRAPER.md](C:/repos/chat2.0/docs/NEWS_TAB_AND_SCRAPER.md:1): Boards-era News Feed backend, scraper lifecycle, Render setup, and troubleshooting
