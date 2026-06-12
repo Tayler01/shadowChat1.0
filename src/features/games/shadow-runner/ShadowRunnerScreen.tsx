@@ -27,14 +27,21 @@ interface ShadowRunnerScreenProps {
   onPauseMusic?: () => void
 }
 
+type OrientationWindow = Window & typeof globalThis & {
+  orientation?: number
+}
+
+type ViewportOrientation = 'landscape' | 'portrait' | 'unknown'
+
+const ORIENTATION_DIMENSION_TOLERANCE_PX = 2
+const ORIENTATION_RECHECK_DELAYS_MS = [80, 180, 360, 700] as const
+
 const MENU_BUTTONS = [
   { id: 'tutorial', label: 'Start Tutorial', labelLines: ['Start', 'Tutorial'], left: '14.4%', width: '18.6%' },
   { id: 'levels', label: 'Select Level', labelLines: ['Select', 'Level'], left: '40.7%', width: '18.6%' },
   { id: 'options', label: 'Options', labelLines: ['Options'], left: '66.9%', width: '18.6%' },
 ] as const
 
-const SHADOW_RUNNER_ACCESS_CODE = '123456'
-const SHADOW_RUNNER_ACCESS_SESSION_KEY = 'shadow-runner-access-unlocked'
 const SHADOW_RUNNER_PROGRESS_KEY = 'shadow-runner-campaign-progress-v1'
 
 const SHADOW_RUNNER_MENU_SOUND_EVENTS: readonly ShadowRunnerSoundEvent[] = [
@@ -195,6 +202,92 @@ const SHADOW_RUNNER_INLINE_STYLES = `
   }
 `
 
+function normalizeOrientationAngle(angle?: number) {
+  if (typeof angle !== 'number' || !Number.isFinite(angle)) return null
+  return ((angle % 360) + 360) % 360
+}
+
+function getDimensionOrientation(width?: number, height?: number): ViewportOrientation {
+  if (
+    typeof width !== 'number'
+    || typeof height !== 'number'
+    || !Number.isFinite(width)
+    || !Number.isFinite(height)
+    || width <= 0
+    || height <= 0
+  ) {
+    return 'unknown'
+  }
+
+  if (width > height + ORIENTATION_DIMENSION_TOLERANCE_PX) return 'landscape'
+  if (height > width + ORIENTATION_DIMENSION_TOLERANCE_PX) return 'portrait'
+  return 'unknown'
+}
+
+function getViewportMediaOrientation(): ViewportOrientation {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return 'unknown'
+
+  const landscape = window.matchMedia('(orientation: landscape)').matches
+  const portrait = window.matchMedia('(orientation: portrait)').matches
+
+  if (landscape && !portrait) return 'landscape'
+  if (portrait && !landscape) return 'portrait'
+  return 'unknown'
+}
+
+function getViewportDimensionOrientation(): ViewportOrientation {
+  if (typeof window === 'undefined') return 'unknown'
+
+  const viewport = window.visualViewport
+  const documentElement = document.documentElement
+  const orientations = [
+    getDimensionOrientation(viewport?.width, viewport?.height),
+    getDimensionOrientation(window.innerWidth, window.innerHeight),
+    getDimensionOrientation(documentElement?.clientWidth, documentElement?.clientHeight),
+  ]
+
+  const landscapeCount = orientations.filter(orientation => orientation === 'landscape').length
+  const portraitCount = orientations.filter(orientation => orientation === 'portrait').length
+
+  if (landscapeCount > portraitCount) return 'landscape'
+  if (portraitCount > landscapeCount) return 'portrait'
+  return 'unknown'
+}
+
+function getScreenOrientationFallback(): ViewportOrientation {
+  if (typeof window === 'undefined') return 'unknown'
+
+  const orientation = window.screen.orientation
+  const orientationType = orientation?.type ?? ''
+  const orientationAngle = normalizeOrientationAngle(orientation?.angle)
+  const legacyOrientation = normalizeOrientationAngle((window as OrientationWindow).orientation)
+
+  if (orientationType.includes('landscape')) return 'landscape'
+  if (orientationType.includes('portrait')) return 'portrait'
+
+  if (orientationAngle === 90 || orientationAngle === 270) return 'landscape'
+  if (orientationAngle === 0 || orientationAngle === 180) return 'portrait'
+
+  if (legacyOrientation === 90 || legacyOrientation === 270) return 'landscape'
+  if (legacyOrientation === 0 || legacyOrientation === 180) return 'portrait'
+
+  return 'unknown'
+}
+
+function getCurrentViewportOrientation(): ViewportOrientation {
+  const dimensionOrientation = getViewportDimensionOrientation()
+  if (dimensionOrientation !== 'unknown') return dimensionOrientation
+
+  const mediaOrientation = getViewportMediaOrientation()
+  if (mediaOrientation !== 'unknown') return mediaOrientation
+
+  return getScreenOrientationFallback()
+}
+
+function isLandscapeViewport() {
+  return getCurrentViewportOrientation() === 'landscape'
+}
+
 function useSpriteFrame(frameCount: number, intervalMs: number) {
   const [frame, setFrame] = React.useState(0)
 
@@ -210,6 +303,117 @@ function useSpriteFrame(frameCount: number, intervalMs: number) {
   }, [frameCount, intervalMs])
 
   return frame
+}
+
+function useRotateGate() {
+  const [showRotateGate, setShowRotateGate] = React.useState(() => {
+    if (typeof window === 'undefined') return false
+    return !isLandscapeViewport()
+  })
+
+  React.useEffect(() => {
+    let animationFrame: number | null = null
+    let settlingAnimationFrame: number | null = null
+    const timeoutIds = new Set<number>()
+    const viewport = window.visualViewport
+    const orientation = window.screen.orientation
+    const orientationQueries = typeof window.matchMedia === 'function'
+      ? [
+          window.matchMedia('(orientation: landscape)'),
+          window.matchMedia('(orientation: portrait)'),
+        ]
+      : []
+
+    const clearDeferredUpdates = () => {
+      if (animationFrame !== null) {
+        window.cancelAnimationFrame(animationFrame)
+        animationFrame = null
+      }
+
+      if (settlingAnimationFrame !== null) {
+        window.cancelAnimationFrame(settlingAnimationFrame)
+        settlingAnimationFrame = null
+      }
+
+      timeoutIds.forEach(timeoutId => window.clearTimeout(timeoutId))
+      timeoutIds.clear()
+    }
+
+    const updateGate = () => {
+      setShowRotateGate(current => {
+        const next = !isLandscapeViewport()
+        return current === next ? current : next
+      })
+    }
+
+    const scheduleGateUpdate = () => {
+      clearDeferredUpdates()
+      updateGate()
+
+      animationFrame = window.requestAnimationFrame(() => {
+        animationFrame = null
+        updateGate()
+
+        settlingAnimationFrame = window.requestAnimationFrame(() => {
+          settlingAnimationFrame = null
+          updateGate()
+        })
+      })
+
+      ORIENTATION_RECHECK_DELAYS_MS.forEach(delay => {
+        const timeoutId = window.setTimeout(() => {
+          timeoutIds.delete(timeoutId)
+          updateGate()
+        }, delay)
+
+        timeoutIds.add(timeoutId)
+      })
+    }
+
+    const handleOrientationSignal = () => scheduleGateUpdate()
+
+    const addMediaQueryListener = (query: MediaQueryList) => {
+      if (typeof query.addEventListener === 'function') {
+        query.addEventListener('change', handleOrientationSignal)
+        return
+      }
+
+      query.addListener?.(handleOrientationSignal)
+    }
+
+    const removeMediaQueryListener = (query: MediaQueryList) => {
+      if (typeof query.removeEventListener === 'function') {
+        query.removeEventListener('change', handleOrientationSignal)
+        return
+      }
+
+      query.removeListener?.(handleOrientationSignal)
+    }
+
+    scheduleGateUpdate()
+    window.addEventListener('resize', handleOrientationSignal)
+    window.addEventListener('orientationchange', handleOrientationSignal)
+    window.addEventListener('pageshow', handleOrientationSignal)
+    document.addEventListener('visibilitychange', handleOrientationSignal)
+    viewport?.addEventListener('resize', handleOrientationSignal)
+    viewport?.addEventListener('scroll', handleOrientationSignal)
+    orientation?.addEventListener('change', handleOrientationSignal)
+    orientationQueries.forEach(addMediaQueryListener)
+
+    return () => {
+      clearDeferredUpdates()
+      window.removeEventListener('resize', handleOrientationSignal)
+      window.removeEventListener('orientationchange', handleOrientationSignal)
+      window.removeEventListener('pageshow', handleOrientationSignal)
+      document.removeEventListener('visibilitychange', handleOrientationSignal)
+      viewport?.removeEventListener('resize', handleOrientationSignal)
+      viewport?.removeEventListener('scroll', handleOrientationSignal)
+      orientation?.removeEventListener('change', handleOrientationSignal)
+      orientationQueries.forEach(removeMediaQueryListener)
+    }
+  }, [])
+
+  return showRotateGate
 }
 
 function useImagePreload(sources: readonly string[]) {
@@ -309,11 +513,6 @@ function useShadowRunnerInteractionLock(rootRef: React.RefObject<HTMLElement>) {
       document.removeEventListener('selectionchange', clearGameSelection)
     }
   }, [rootRef])
-}
-
-function getShadowRunnerAccessUnlocked() {
-  if (typeof window === 'undefined') return false
-  return window.sessionStorage.getItem(SHADOW_RUNNER_ACCESS_SESSION_KEY) === 'true'
 }
 
 interface ShadowRunnerCampaignProgress {
@@ -419,132 +618,6 @@ function MenuButtonIcon({ id }: { id: typeof MENU_BUTTONS[number]['id'] }) {
   if (id === 'tutorial') return <Sword className="h-[34%] w-[34%] stroke-[3]" aria-hidden="true" />
   if (id === 'levels') return <Map className="h-[34%] w-[34%] stroke-[3]" aria-hidden="true" />
   return <Settings className="h-[34%] w-[34%] stroke-[3]" aria-hidden="true" />
-}
-
-interface ShadowRunnerAccessGateProps {
-  onUnlock: () => void
-  onExit?: () => void
-  onSoundEvent?: (event: ShadowRunnerSoundEvent) => void
-}
-
-function ShadowRunnerAccessGate({ onUnlock, onExit, onSoundEvent }: ShadowRunnerAccessGateProps) {
-  const [digits, setDigits] = React.useState(() => Array.from({ length: SHADOW_RUNNER_ACCESS_CODE.length }, () => ''))
-  const [error, setError] = React.useState(false)
-  const digitsRef = React.useRef(digits)
-  const inputRefs = React.useRef<Array<HTMLInputElement | null>>([])
-
-  const submitCode = React.useCallback((nextDigits: string[]) => {
-    const candidate = nextDigits.join('')
-
-    if (candidate.length < SHADOW_RUNNER_ACCESS_CODE.length) return
-
-    if (candidate === SHADOW_RUNNER_ACCESS_CODE) {
-      window.sessionStorage.setItem(SHADOW_RUNNER_ACCESS_SESSION_KEY, 'true')
-      onSoundEvent?.('level-select')
-      onUnlock()
-      return
-    }
-
-    onSoundEvent?.('menu-denied')
-    setError(true)
-    const emptyDigits = Array.from({ length: SHADOW_RUNNER_ACCESS_CODE.length }, () => '')
-    digitsRef.current = emptyDigits
-    setDigits(emptyDigits)
-    window.setTimeout(() => inputRefs.current[0]?.focus(), 30)
-  }, [onSoundEvent, onUnlock])
-
-  const updateDigit = React.useCallback((index: number, value: string) => {
-    const digit = value.replace(/\D/g, '').slice(-1)
-    const next = [...digitsRef.current]
-    next[index] = digit
-    digitsRef.current = next
-
-    setError(false)
-    setDigits(next)
-
-    if (digit && index < SHADOW_RUNNER_ACCESS_CODE.length - 1) {
-      window.setTimeout(() => inputRefs.current[index + 1]?.focus(), 30)
-    }
-
-    submitCode(next)
-  }, [submitCode])
-
-  const handleKeyDown = React.useCallback((index: number, event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Backspace' && !digits[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus()
-    }
-  }, [digits])
-
-  React.useEffect(() => {
-    inputRefs.current[0]?.focus()
-  }, [])
-
-  return (
-    <div className="shadow-runner-no-select absolute inset-0 z-40 flex items-center justify-center bg-[#02040a] px-5 text-center">
-      <img
-        src={SHADOW_RUNNER_ASSETS.home.background}
-        alt=""
-        className="absolute inset-0 h-full w-full object-cover opacity-45"
-        draggable={false}
-      />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_8%,rgba(240,211,129,0.14),transparent_34%),linear-gradient(180deg,rgba(0,0,0,0.66),rgba(0,0,0,0.92))]" />
-
-      <button
-        type="button"
-        aria-label="Back to Entertainment"
-        onClick={() => {
-          onSoundEvent?.('menu-back')
-          onExit?.()
-        }}
-        className="absolute left-[max(1rem,env(safe-area-inset-left))] top-[max(0.85rem,env(safe-area-inset-top))] z-10 inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#e8c46b]/40 bg-black/45 text-[#f3d88d] shadow-[0_12px_32px_rgba(0,0,0,0.45)] backdrop-blur-md transition hover:border-[#f0d381]/70 hover:bg-[#2c2110]/75 focus:outline-none focus:ring-2 focus:ring-[#f0d381]/55"
-      >
-        <ArrowLeft className="h-5 w-5" />
-      </button>
-
-      <div className="relative z-10 flex w-full max-w-[42rem] flex-col items-center px-2">
-        <img
-          src={SHADOW_RUNNER_ASSETS.home.titleScroll}
-          alt="Shadow Runner"
-          className="pointer-events-none mb-[-0.8rem] w-[min(82vw,30rem)] drop-shadow-[0_18px_45px_rgba(0,0,0,0.72)]"
-          draggable={false}
-        />
-
-        <div className="relative mt-[-0.2rem] aspect-[1667/565] w-[min(92vw,39rem)]">
-          <img
-            src={SHADOW_RUNNER_ASSETS.home.blankMenuScroll}
-            alt=""
-            className="pointer-events-none absolute inset-0 h-full w-full object-contain drop-shadow-[0_24px_56px_rgba(0,0,0,0.78)]"
-            draggable={false}
-          />
-          <div className="absolute inset-x-[17%] top-[30%] flex flex-col items-center text-[#130d06]">
-            <p className="text-[0.66rem] font-black uppercase tracking-[0.24em] text-[#120d07] drop-shadow-[0_1px_0_rgba(255,240,184,0.55)] sm:text-xs">Access Code</p>
-            <div className="mt-1.5 flex justify-center gap-1.5 sm:mt-2 sm:gap-2.5">
-              {digits.map((digit, index) => (
-                <input
-                  key={index}
-                  ref={node => {
-                    inputRefs.current[index] = node
-                  }}
-                  aria-label={`Access code digit ${index + 1}`}
-                  value={digit}
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={1}
-                  autoComplete="off"
-                  onChange={event => updateDigit(index, event.target.value)}
-                  onKeyDown={event => handleKeyDown(index, event)}
-                  className="h-8 w-7 rounded border border-[#120d07]/75 bg-[#23190d]/92 text-center text-base font-black text-[#f6e6bb] shadow-[inset_0_2px_8px_rgba(0,0,0,0.55),0_1px_0_rgba(255,240,184,0.35)] outline-none transition focus:border-[#f0d381] focus:ring-2 focus:ring-[#120d07]/35 sm:h-10 sm:w-9 sm:text-lg"
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-        <p className={`mt-[-0.35rem] min-h-4 text-[0.58rem] font-black uppercase tracking-[0.18em] drop-shadow-[0_2px_8px_rgba(0,0,0,0.75)] sm:text-[0.66rem] ${error ? 'text-[#f1a0aa]' : 'text-[#f0d381]'}`}>
-          {error ? 'Try Again' : 'Private Build'}
-        </p>
-      </div>
-    </div>
-  )
 }
 
 interface ShadowRunnerLevelMapProps {
@@ -824,18 +897,19 @@ export function ShadowRunnerScreen({
   const rootRef = React.useRef<HTMLElement | null>(null)
   const heroFrame = useSpriteFrame(8, 150)
   const torchFrame = useSpriteFrame(8, 105)
+  const orientationGateActive = useRotateGate()
   const [screen, setScreen] = React.useState<'title' | 'levels' | 'loading' | 'play'>('title')
   const [activeLevelId, setActiveLevelId] = React.useState<ShadowRunnerPlayableLevelId>('tutorial')
   const [routeLoadProgress, setRouteLoadProgress] = React.useState(0)
   const [sfxStatus, setSfxStatus] = React.useState<ShadowRunnerSfxStatus | null>(null)
   const [campaignProgress, setCampaignProgress] = React.useState(readShadowRunnerProgress)
-  const [accessUnlocked, setAccessUnlocked] = React.useState(getShadowRunnerAccessUnlocked)
   const [titleOptionsOpen, setTitleOptionsOpen] = React.useState(false)
   const [musicEnabled, setMusicEnabled] = React.useState(() => readShadowRunnerAudioPreference(SHADOW_RUNNER_MUSIC_ENABLED_STORAGE_KEY, true))
   const [soundEffectsEnabled, setSoundEffectsEnabled] = React.useState(() => readShadowRunnerAudioPreference(SHADOW_RUNNER_SFX_ENABLED_STORAGE_KEY, true))
   const sfxControllerRef = React.useRef<ShadowRunnerSfxController | null>(null)
   const assetsReady = useImagePreload(SHADOW_RUNNER_TITLE_IMAGE_SOURCES)
   const mapAssetsReady = useImagePreload(screen === 'levels' ? SHADOW_RUNNER_MAP_IMAGE_SOURCES : EMPTY_IMAGE_SOURCES)
+  const showRotateGate = orientationGateActive
 
   useShadowRunnerInteractionLock(rootRef)
 
@@ -1036,14 +1110,15 @@ export function ShadowRunnerScreen({
     >
       <style>{SHADOW_RUNNER_INLINE_STYLES}</style>
 
-      <div className="shadow-runner-landscape-stage absolute inset-0 flex items-center justify-center bg-black">
-        {!accessUnlocked ? (
-          <ShadowRunnerAccessGate
-            onExit={onExit}
-            onUnlock={() => setAccessUnlocked(true)}
-            onSoundEvent={playShadowRunnerSound}
-          />
-        ) : screen === 'loading' ? (
+      <div className={`${showRotateGate ? 'flex' : 'hidden'} shadow-runner-rotate-gate absolute inset-0 z-50 flex-col items-center justify-center bg-black px-8 text-center`}>
+        <p className="text-2xl font-black uppercase tracking-[0.18em] text-[#f0d381]">Rotate Phone</p>
+        <p className="mt-3 max-w-xs text-sm font-semibold uppercase tracking-[0.12em] text-[#d9c79f]">
+          Shadow Runner plays sideways.
+        </p>
+      </div>
+
+      <div className={`${showRotateGate ? 'hidden' : 'flex'} shadow-runner-landscape-stage absolute inset-0 items-center justify-center bg-black`}>
+        {screen === 'loading' ? (
           <div className="relative flex h-full w-full items-center justify-center overflow-hidden bg-[#02040a] px-6 text-center">
             <img
               src={SHADOW_RUNNER_ASSETS.home.background}
