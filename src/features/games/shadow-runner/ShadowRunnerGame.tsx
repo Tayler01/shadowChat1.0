@@ -113,6 +113,12 @@ type ShadowRunnerPhaserGameHandle = {
 
 type DirectionPadAction = 'left' | 'right' | 'crouch'
 
+interface MovementPointerOrigin {
+  pointerId: number
+  x: number
+  y: number
+}
+
 function LifePips({ current, max }: { current: number; max: number }) {
   return (
     <span
@@ -135,14 +141,23 @@ function LifePips({ current, max }: { current: number; max: number }) {
 
 function getMovementZoneAction(
   element: HTMLElement,
+  origin: MovementPointerOrigin,
   event: Pick<React.PointerEvent<HTMLElement>, 'clientX' | 'clientY'>,
-): DirectionPadAction {
+): DirectionPadAction | null {
   const rect = element.getBoundingClientRect()
-  const x = (event.clientX - rect.left) / rect.width
-  const y = (event.clientY - rect.top) / rect.height
+  const dx = event.clientX - origin.x
+  const dy = event.clientY - origin.y
+  const deadZone = clampNumber(Math.min(rect.width, rect.height) * 0.055, 12, 24)
 
-  if (y > 0.7) return 'crouch'
-  return x < 0.5 ? 'left' : 'right'
+  if (Math.abs(dx) < deadZone && Math.abs(dy) < deadZone) return null
+  if (dy > deadZone && dy >= Math.abs(dx) * 0.72) return 'crouch'
+  if (dx < -deadZone) return 'left'
+  if (dx > deadZone) return 'right'
+  return null
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
 }
 
 interface DirectionPadProps {
@@ -151,6 +166,7 @@ interface DirectionPadProps {
 
 function MovementTouchZone({ onActionChange }: DirectionPadProps) {
   const activeActionRef = React.useRef<DirectionPadAction | null>(null)
+  const pointerOriginRef = React.useRef<MovementPointerOrigin | null>(null)
 
   const setActiveAction = React.useCallback((nextAction: DirectionPadAction | null) => {
     const previousAction = activeActionRef.current
@@ -174,13 +190,19 @@ function MovementTouchZone({ onActionChange }: DirectionPadProps) {
     } catch {
       // Some synthetic or browser-generated pointer events have no active pointer to capture.
     }
-    setActiveAction(getMovementZoneAction(event.currentTarget, event))
+    pointerOriginRef.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+    }
+    setActiveAction(null)
   }, [setActiveAction])
 
   const move = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (!activeActionRef.current) return
+    const origin = pointerOriginRef.current
+    if (!origin || origin.pointerId !== event.pointerId) return
     event.preventDefault()
-    setActiveAction(getMovementZoneAction(event.currentTarget, event))
+    setActiveAction(getMovementZoneAction(event.currentTarget, origin, event))
   }, [setActiveAction])
 
   const release = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
@@ -192,10 +214,21 @@ function MovementTouchZone({ onActionChange }: DirectionPadProps) {
     } catch {
       // Keep mobile controls responsive even when capture state is browser-dependent.
     }
+    if (pointerOriginRef.current?.pointerId === event.pointerId) {
+      pointerOriginRef.current = null
+    }
     setActiveAction(null)
   }, [setActiveAction])
 
-  React.useEffect(() => () => setActiveAction(null), [setActiveAction])
+  const loseCapture = React.useCallback(() => {
+    pointerOriginRef.current = null
+    setActiveAction(null)
+  }, [setActiveAction])
+
+  React.useEffect(() => () => {
+    pointerOriginRef.current = null
+    setActiveAction(null)
+  }, [setActiveAction])
 
   return (
     <div
@@ -205,7 +238,7 @@ function MovementTouchZone({ onActionChange }: DirectionPadProps) {
       onPointerMove={move}
       onPointerUp={release}
       onPointerCancel={release}
-      onLostPointerCapture={() => setActiveAction(null)}
+      onLostPointerCapture={loseCapture}
       onContextMenu={event => event.preventDefault()}
       className="absolute bottom-0 left-0 top-0 w-[52%]"
     >
