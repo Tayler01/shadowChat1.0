@@ -12,14 +12,15 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
 ### Shadow Runner Playable Prototype Prep
 
 - Goal: Rebuild the Shadow Runner title/menu surface as clean asset-driven UI,
-  keep the gated phone-first flow stable, preserve current gameplay geometry,
-  and prepare the next Phaser playable-prototype checkpoint.
+  keep the phone-first landscape flow stable, preserve current gameplay
+  geometry, and prepare the next Phaser playable-prototype checkpoint.
 - Started: 2026-06-09
 - Status: active
 - Owner/agent: Codex
 - Branch: `main`
-- Current checkpoint: Start Tutorial / Select Level split, campaign level-map
-  progression, reusable level configs, and first Level 2 prototype route.
+- Current checkpoint: direct Shadow Runner entry without an access-code gate,
+  campaign level-map progression, reusable level configs, Level 1 through
+  Level 3 prototype routes, and mobile landscape/orientation handling.
 - Roadmap: [`docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md`](C:/repos/chat2.0/docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md:1)
 - Latest pass, 2026-06-09: generated dedicated options-scroll and options-row
   button assets; removed title back/sound controls; added title Options and
@@ -68,6 +69,10 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
   snapshots, story-facing mission/completion text, and a researched split-thumb
   mobile control layout with a large D-pad plus right-corner jump/attack
   controls.
+- Latest pass, 2026-06-11: removed the Shadow Runner access-code gate, kept
+  the rotate gate as the unsupported-orientation fallback, and added a
+  picker-level best-effort fullscreen/landscape request that is released on
+  Shadow Runner exit.
 - Verification, 2026-06-11: `npm run lint`,
   `npx tsc --noEmit -p tsconfig.app.json`, and `npm run build` passed.
   WebKit mobile landscape captures verified the revised controls at `932x430`

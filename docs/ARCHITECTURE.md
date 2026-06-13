@@ -2,9 +2,9 @@
 
 This document is a high-signal map of the current ShadowChat codebase.
 
-## Documentation Status - June 11, 2026
+## Documentation Status - June 12, 2026
 
-This architecture map is current for the shipped `main` branch and now includes the June 11 Shadow Runner campaign-map, Level 3, generated gameplay assets, original SFX, and Shadow Mystery story expansion work. Known architecture follow-ups are tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1): remaining Supabase policy/RPC hardening, service-role bypass checks, production deployment/smoke for all shared safe-fetch adopters, frontend polish, and broader realtime/send/scroll helper extraction.
+This architecture map is current for the shipped `main` branch and now includes the June 11 Shadow Runner campaign-map, Level 3, generated gameplay assets, original SFX, mobile control/orientation updates, and Shadow Mystery story expansion work. Known architecture follow-ups are tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1): remaining Supabase policy/RPC hardening, service-role bypass checks, production deployment/smoke for all shared safe-fetch adopters, frontend polish, and broader realtime/send/scroll helper extraction.
 
 ## High-Level System
 
@@ -38,7 +38,7 @@ React UI
 - [`src/components/profile`](C:/repos/chat2.0/src/components/profile): user profile experience, including avatar crop/zoom/position editing before upload
 - [`src/components/settings`](C:/repos/chat2.0/src/components/settings): sectioned settings, notification setup, feedback, admin tools, and weather location
 - [`src/components/layout`](C:/repos/chat2.0/src/components/layout): shell, nav, and responsive structure
-- [`src/features/games`](C:/repos/chat2.0/src/features/games): Entertainment picker and game surfaces. Shadow Runner currently lives under [`src/features/games/shadow-runner`](C:/repos/chat2.0/src/features/games/shadow-runner) with an asset-driven title screen, private access gate, rotate gate, 10-stop campaign map, lazy-loaded Phaser levels, DOM HUD/touch controls, title/options scroll menus, and pause/exit confirmation menus.
+- [`src/features/games`](C:/repos/chat2.0/src/features/games): Entertainment picker and game surfaces. Shadow Runner currently lives under [`src/features/games/shadow-runner`](C:/repos/chat2.0/src/features/games/shadow-runner) with an asset-driven title screen, Shadow Runner-scoped rotate gate, 10-stop campaign map, lazy-loaded Phaser levels, DOM HUD/touch controls, title/options scroll menus, pause/exit confirmation menus, and a best-effort Android fullscreen/landscape request from the picker.
 - [`src/features/entertainment`](C:/repos/chat2.0/src/features/entertainment): non-game Entertainment surfaces such as Shado TV, Shadow Mystery, and Will & Kirk.
 
 ### Hooks
@@ -260,14 +260,14 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 ### Shadow Runner
 
 1. User opens Shadow Runner from the Entertainment picker, which starts the shared Castle Bard lobby audio by default when the browser allows autoplay from that gesture
-2. The game surface enters the app's immersive Entertainment shell without changing global PWA orientation, viewport, fullscreen, manifest, or app-shell settings
-3. A local private-build access gate stores unlock state in session storage
-4. Portrait phones see a Shadow Runner-only rotate gate; landscape viewports render the fixed 16:9 title/playfield stage
+2. The picker makes a best-effort fullscreen plus `screen.orientation.lock('landscape')` request for browsers that support it, then releases fullscreen/orientation on exit
+3. The game surface enters the app's immersive Entertainment shell without changing the global PWA manifest, viewport, or app-shell settings
+4. Portrait phones still see a Shadow Runner-only rotate gate when the browser cannot or does not rotate; landscape viewports render the fixed 16:9 title/playfield stage
 5. The title screen preloads the home/menu assets, animates the menu-idle hero strip, and renders Start Tutorial, Select Level, and Options over blank scroll/button assets
 6. Start mounts the tutorial route, while Select Level opens the generated 10-stop campaign map with mission detail popups before launching playable routes through `ShadowRunnerGame`; movement input stays in a React-owned input ref and the Phaser scene stays responsible for the canvas level
 7. DOM HUD and touch controls sit over the canvas; pause/options scroll menus pause the Phaser scene, clear pressed actions, keep SFX toggles in the React shell, and leave gameplay music off by automatically pausing lobby music while the Phaser level is mounted
-8. Shadow Runner SFX are original generated WAV assets under `public/games/shadow-runner/audio/sfx`; React pools short effects and Phaser emits named gameplay sound events for menu, map, pause, jump, land, attack, hit, coin, defeat, respawn, failure, and completion feedback
-9. The June 9 rollback intentionally removed global orientation/fullscreen behavior because it affected mobile app header, footer, composer, and PWA layout outside Shadow Runner
+8. Shadow Runner SFX are original generated WAV assets under `public/games/shadow-runner/audio/sfx`; a single Web Audio controller preloads staged sound groups, throttles high-frequency effects, and Phaser emits named gameplay sound events for menu, map, pause, jump, land, attack, hit, coin, defeat, respawn, failure, and completion feedback
+9. The June 9 rollback intentionally removed app-wide manifest/viewport/fullscreen/orientation behavior because it affected mobile app header, footer, composer, and PWA layout outside Shadow Runner; the current picker request is Shadow Runner-scoped and best-effort
 
 ### Channel Ban Enforcement
 

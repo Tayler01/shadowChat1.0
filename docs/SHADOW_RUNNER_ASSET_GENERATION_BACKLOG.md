@@ -889,21 +889,16 @@ Concept-sheet items that are not yet production runtime assets.
     menu buttons.
 
 - [ ] **Final Levels screen art**
-  - Current state: the `Levels` title button exists but does not open a level
-    select experience.
-  - Generate: level-select scroll, locked level plate, completed level plate,
-    star/crest completion icons, and tiny level thumbnail frames.
+  - Current state: Select Level opens the generated 10-stop campaign map with
+    mission detail popups, locked/completed states, and square thumbnail frames.
+  - Generate: final map-state variants, completion crest icons, alternate
+    locked/complete treatments, and future route thumbnail frames.
 
 - [ ] **Pixel-art menu icons**
   - Current state: menu controls use Lucide icons.
   - Generate optional pixel-art replacements for start sword, levels castle,
     options gear, music on/off, sound on/off, pause, resume, restart, home, and
     exit.
-
-- [ ] **Private access gate art**
-  - Current state: access gate reuses title background, title scroll, blank menu
-    scroll, and live digit inputs.
-  - Generate optional lock, key, code-slot plaque, and error-shake sparkle art.
 
 - [ ] **Rotate-phone gate art**
   - Current state: rotate gate is text-only over black.
@@ -979,7 +974,7 @@ gameplay-useful next enemies.
 ### Batch 4 - Level Atmosphere And UI Polish
 
 Generate parallax gameplay backgrounds, checkpoint/prop packs, level-select UI,
-button states, rotate/access gate art, and cleaned star/torch atlases.
+button states, rotate-gate art, and cleaned star/torch atlases.
 
 ### Batch 5 - Map 2 Playable Expansion
 

@@ -4,9 +4,9 @@ ShadowChat 1.0 is a premium dark realtime chat app built with React, TypeScript,
 
 The project is already wired for hosted Supabase and Netlify deployment. It is designed to behave like a product app, not a demo: realtime messaging, uploads, presence, settings, DMs, and notification flows are all first-class parts of the codebase.
 
-## Documentation Status - June 11, 2026
+## Documentation Status - June 12, 2026
 
-The documentation set has been refreshed against the current `main` branch after the June 11 Shadow Runner campaign-map, Level 3, gameplay asset, and audio work, plus the latest Shadow Mystery story expansion. The freshest planning source is [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1), and the full documentation inventory is [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
+The documentation set has been refreshed against the current `main` branch after the June 11 Shadow Runner campaign-map, Level 3, gameplay asset, audio, mobile control, orientation, and access-gate removal work, plus the latest Shadow Mystery story expansion. The freshest planning source is [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1), and the full documentation inventory is [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
 
 Current known follow-up areas are documentation-backed: Supabase policy/RPC hardening, remaining production deployment/smoke for shared URL fetch hardening outside the already-deployed link-preview and ShadowPin video functions, Netlify security headers, provider live-setting verification, frontend polish, and post-deploy auth smoke for the invite-only signup/email-verification rollout.
 
@@ -55,9 +55,10 @@ Current known follow-up areas are documentation-backed: Supabase policy/RPC hard
 - Simple app-reopen loading state with consistent `Loading Shado...` copy
 - Entertainment area with Shadow Runner, Shadow War, Shadow Checkers, Shado TV,
   Shadow Mystery, and Will & Kirk surfaces; Shadow Runner is currently a
-  private, landscape-gated campaign prototype with a tutorial, a 10-stop
-  campaign map, playable Level 1 through Level 3 routes, generated touch
-  controls, pause/options menus, Castle Bard lobby music, and original SFX
+  landscape-gated campaign prototype with a tutorial, a 10-stop campaign map,
+  playable Level 1 through Level 3 routes, generated touch controls,
+  pause/options menus, Castle Bard lobby music, original SFX, and a
+  best-effort Android fullscreen/landscape request from the picker
 - Premium obsidian-and-gold design system across desktop and mobile
 
 ## Current Project Shape

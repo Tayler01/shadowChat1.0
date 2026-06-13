@@ -2,9 +2,9 @@
 
 This project uses a mix of static checks, Jest coverage, and real browser validation.
 
-## Documentation Status - June 11, 2026
+## Documentation Status - June 12, 2026
 
-This guide reflects the current repo scripts. The June 1 audit confirmed `npm run lint`, `npm run typecheck`, `npm run build`, and the metrics-only chat scroll probe passed on current `main`. The chat-scroll script now also has seeded read-position scenarios for preview/staging runs that can prove the first-unread, deep-link, same-timestamp, realtime anchoring, and media paths. The June 2 auth rollout added invite-only signup, email verification, password reset, and admin invite tests. The June 8 work added Hype, safe-fetch, automation approval queue, DM read-guard, and News realtime-helper coverage. The June 9 work added focused coverage for mobile composer focus during pending sends, Hype-aware chat media frames, and Shadow Runner mobile visual/playable-prototype checks. The June 11 Shadow Runner passes added audio generation validation, campaign-map/detail smoke, Level 1 through Level 3 route visual checks, and production-preview audio probes.
+This guide reflects the current repo scripts. The June 1 audit confirmed `npm run lint`, `npm run typecheck`, `npm run build`, and the metrics-only chat scroll probe passed on current `main`. The chat-scroll script now also has seeded read-position scenarios for preview/staging runs that can prove the first-unread, deep-link, same-timestamp, realtime anchoring, and media paths. The June 2 auth rollout added invite-only signup, email verification, password reset, and admin invite tests. The June 8 work added Hype, safe-fetch, automation approval queue, DM read-guard, and News realtime-helper coverage. The June 9 work added focused coverage for mobile composer focus during pending sends, Hype-aware chat media frames, and Shadow Runner mobile visual/playable-prototype checks. The June 11 Shadow Runner passes added audio generation validation, campaign-map/detail smoke, Level 1 through Level 3 route visual checks, production-preview audio probes, and Shadow Runner orientation/access-gate follow-up checks.
 
 ## Mobile-First Testing Default
 
@@ -208,6 +208,9 @@ What the smoke runner does by default:
 
 - reuses `http://127.0.0.1:4174` if it is already up
 - otherwise runs `vite build` and starts `vite preview`
+- waits for a reused preview to answer before continuing, and if reuse fails,
+  starts a managed fresh preview instead of continuing against a half-ready
+  server
 - signs in with `PLAYWRIGHT_ACCOUNT_*` credentials if present
 - otherwise creates disposable Supabase users for a clean DM run only when the
   target auth project allows disposable signup or per-account invite codes are
@@ -296,7 +299,8 @@ Dedicated current QA scripts also include:
   one-off Playwright/Chrome mobile checks for now and save artifacts under
   `output/playwright/<run-name>/`; the June 11 passes used `740x390` and
   `932x430` landscape mobile viewports for title/options, campaign map, level
-  detail, gameplay controls, route completion, and audio behavior.
+  detail, gameplay controls, route completion, audio behavior, Android
+  fullscreen/landscape request behavior, and the removed access-code gate.
 - `bridge:tui:test` and `bridge:tui:smoke`: bridge TUI layout and live serial smoke paths.
 
 ### General Chat Scroll Probe

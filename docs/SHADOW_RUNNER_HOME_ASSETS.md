@@ -1,6 +1,6 @@
 # Shadow Runner Home Screen Assets
 
-Status: current title/menu asset pack for the private playable prototype.
+Status: current title/menu asset pack for the playable prototype.
 
 The home-screen asset pack from the Desktop has been copied into:
 
@@ -21,7 +21,7 @@ The Desktop source remains untouched:
 | Runtime title scroll | `public/games/shadow-runner/home-assets/sliced/title-scroll-shadow-runner.png` | Trimmed title scroll used by the live home screen to avoid transparent padding taking layout space. |
 | Bottom menu scroll | `public/games/shadow-runner/home-assets/assets/ui/ui_bottom_menu_scroll.png` | Baked `START`, `LEVELS`, and `OPTIONS` menu. |
 | Runtime bottom menu scroll | `public/games/shadow-runner/home-assets/sliced/bottom-menu-scroll.png` | Trimmed menu strip used by the live home screen for tighter button areas on landscape phones. |
-| Runtime blank menu scroll | `public/games/shadow-runner/home-assets/optimized/blank-menu-scroll.webp` | Blank scroll used by the title menu and private-build access gate so labels and controls can be rendered live. |
+| Runtime blank menu scroll | `public/games/shadow-runner/home-assets/optimized/blank-menu-scroll.webp` | Blank scroll used by the title menu so labels and controls can be rendered live. |
 | Runtime blank menu button | `public/games/shadow-runner/home-assets/optimized/blank-menu-button.webp` | Blank row/button panel used for live Start, Levels, and Options hit targets. |
 | Runtime campaign map | `public/games/shadow-runner/home-assets/optimized/campaign-map.webp` | Generated full-screen parchment world map used by the campaign level-select route screen. |
 | Runtime campaign map location buttons | `public/games/shadow-runner/home-assets/optimized/map-location-buttons/*.webp` | Ten individual generated location-button assets used as tappable map stops. |
@@ -73,15 +73,16 @@ The Desktop source remains untouched:
 ## Current Runtime Wiring
 
 - Picker entry: `src/features/games/GamesHome.tsx`
-- Title/access/rotate gate: `src/features/games/shadow-runner/ShadowRunnerScreen.tsx`
+- Title/rotate gate: `src/features/games/shadow-runner/ShadowRunnerScreen.tsx`
 - Playable level shell: `src/features/games/shadow-runner/ShadowRunnerGame.tsx`
 - Phaser scene factory: `src/features/games/shadow-runner/game/createShadowRunnerPhaserGame.ts`
 - Asset manifest: `src/features/games/shadow-runner/assets/manifest.ts`
 
 The current prototype is intentionally Shadow Runner-scoped: it uses an
-in-surface rotate gate and 16:9 playfield sizing instead of changing the global
-PWA manifest, viewport, fullscreen state, or browser orientation lock. The
-June 9 rollback notes are in
+in-surface rotate gate, 16:9 playfield sizing, and a best-effort
+fullscreen/landscape orientation request from the Entertainment picker instead
+of changing the global PWA manifest, viewport, or app-shell settings. The
+June 9 rollback notes for the removed app-wide approach are in
 [`docs/PRODUCTION_ROLLBACK_AND_MEDIA_FRAME_FIX_2026-06-09.md`](C:/repos/chat2.0/docs/PRODUCTION_ROLLBACK_AND_MEDIA_FRAME_FIX_2026-06-09.md:1).
 
 ## Latest Verification
@@ -90,7 +91,9 @@ The June 11 Shadow Runner phone-gameplay pass recorded `npm run lint`,
 `npx tsc --noEmit -p tsconfig.app.json`, and `npm run build` as passing, then
 captured Chrome-channel mobile checks for landscape `932x430` and `740x390`,
 portrait rotate-gate `390x740`, Level 1 and Level 2 finish flows, and the
-square mission-detail popup. Artifacts live under
+square mission-detail popup. Follow-up commits removed the access-code gate,
+kept the rotate gate as the unsupported-orientation fallback, and added the
+picker-level fullscreen/landscape request. Artifacts live under
 `output/playwright/shadow-runner-goal-20260611-square-frame/`,
 `output/playwright/shadow-runner-goal-20260611-postbuild/`, and
 `output/playwright/shadow-runner-goal-20260611-routes/`.

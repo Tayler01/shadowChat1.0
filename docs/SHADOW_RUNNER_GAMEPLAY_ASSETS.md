@@ -29,7 +29,7 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
 | Asset group | Runtime path | Purpose |
 | --- | --- | --- |
 | Lobby music | `public/games/shadow-runner/audio/castle-bard.mp3` | Shared Castle Bard loop used on the Shadow Runner title/lobby/map surfaces. |
-| Menu SFX | `public/games/shadow-runner/audio/sfx/menu-click.wav`, `menu-back.wav`, `menu-denied.wav`, `level-select.wav`, `pause.wav`, `resume.wav` | Original generated UI feedback for title buttons, access gate, level map/details, and pause menus. |
+| Menu SFX | `public/games/shadow-runner/audio/sfx/menu-click.wav`, `menu-back.wav`, `menu-denied.wav`, `level-select.wav`, `pause.wav`, `resume.wav` | Original generated UI feedback for title buttons, denied/locked actions, level map/details, and pause menus. |
 | Movement/combat SFX | `public/games/shadow-runner/audio/sfx/jump.wav`, `double-jump.wav`, `land.wav`, `sword-swing.wav`, `enemy-hit.wav`, `stomp.wav`, `player-hurt.wav` | Original generated gameplay feedback emitted from the Phaser scene at existing visual-event points. |
 | Route state SFX | `public/games/shadow-runner/audio/sfx/life-lost.wav`, `respawn.wav`, `coin.wav`, `enemy-defeat.wav`, `level-complete.wav`, `route-failed.wav` | Original generated score, progression, defeat, completion, and failure feedback. |
 

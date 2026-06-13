@@ -101,7 +101,9 @@ enemy, and reach a finish gate.
 - `npm run build`
 - Chrome mobile landscape smoke at `740x390` and `932x430`
 - Automated route sanity:
-  - unlock code gate
+  - open Shadow Runner from the Entertainment picker
+  - verify the access-code gate is not present
+  - verify Android/browser landscape request behavior where supported
   - open/start game
   - verify canvas is nonblank
   - verify HUD values render
