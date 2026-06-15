@@ -13,6 +13,7 @@ import { ClientResetProvider } from './hooks/ClientResetContext'
 import { SoundEffectsProvider } from './hooks/useSoundEffects'
 import { LoadingSpinner } from './components/ui/LoadingSpinner'
 import { AppBadgeSync } from './components/notifications/AppBadgeSync'
+import { PushSubscriptionSync } from './components/notifications/PushSubscriptionSync'
 import { PhoneInstallOnboarding } from './components/onboarding/PhoneInstallOnboarding'
 import { AppReleaseGate } from './components/releases/AppReleaseGate'
 import { GoldenEggDiscoveryController } from './components/easter-egg/GoldenEggDiscovery'
@@ -418,6 +419,7 @@ function App() {
                   <BoardBadgesProvider>
                     <WeatherProvider>
                       <AppBadgeSync />
+                      <PushSubscriptionSync />
                       <PhoneInstallOnboarding />
                       <AppReleaseGate />
                       <GoldenEggDiscoveryController />
