@@ -1048,6 +1048,9 @@ function useProvideMessages(): MessagesContextValue {
           message.user.checkers_crown !== nextUser.checkers_crown ||
           message.user.war_sword !== nextUser.war_sword ||
           message.user.shadow_pin_gold_pin !== nextUser.shadow_pin_gold_pin ||
+          message.user.shadow_runner_sprint_medal !== nextUser.shadow_runner_sprint_medal ||
+          message.user.shadow_runner_knight_medal !== nextUser.shadow_runner_knight_medal ||
+          message.user.shadow_runner_knight_level_id !== nextUser.shadow_runner_knight_level_id ||
           message.user.admin_role !== nextUser.admin_role;
 
         if (!badgesChanged) {

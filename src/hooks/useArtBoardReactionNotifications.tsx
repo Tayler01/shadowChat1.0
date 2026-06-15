@@ -89,7 +89,7 @@ export function useArtBoardReactionNotifications() {
                 .maybeSingle(),
               working
                 .from('users')
-                .select('id, username, display_name, avatar_url, color, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, gold_easter_egg, presence_visibility')
+                .select('id, username, display_name, avatar_url, color, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, shadow_runner_sprint_medal, shadow_runner_knight_medal, shadow_runner_knight_level_id, gold_easter_egg, presence_visibility')
                 .eq('id', reactionRow.user_id)
                 .maybeSingle(),
             ])

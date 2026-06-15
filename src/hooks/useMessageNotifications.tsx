@@ -121,7 +121,7 @@ export function useMessageNotifications(onOpenConversation: (id: string) => void
               const { data } = await working
                 .from('dm_messages')
                 .select(
-                  `id, content, conversation_id, sender:users!sender_id(id, display_name, avatar_url, color, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, gold_easter_egg, presence_visibility)`
+                  `id, content, conversation_id, sender:users!sender_id(id, display_name, avatar_url, color, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, shadow_runner_sprint_medal, shadow_runner_knight_medal, shadow_runner_knight_level_id, gold_easter_egg, presence_visibility)`
                 )
                 .eq('id', messageId)
                 .single()

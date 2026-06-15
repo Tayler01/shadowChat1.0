@@ -1,5 +1,7 @@
 import React from 'react'
 import { ArrowLeft, CheckCircle2, Lock, LogOut, Map, Music, Settings, Sword, Volume2, VolumeX, X } from 'lucide-react'
+import { useAuth } from '../../../hooks/useAuth'
+import { recordShadowRunnerLevelCompletion } from '../../../lib/supabase'
 import { SHADOW_RUNNER_ASSETS } from './assets/manifest'
 import {
   SHADOW_RUNNER_MUSIC_ENABLED_STORAGE_KEY,
@@ -14,10 +16,11 @@ import {
 import {
   getShadowRunnerLevelConfig,
   SHADOW_RUNNER_CAMPAIGN_LEVELS,
+  SHADOW_RUNNER_LEVEL_CONFIGS,
   type ShadowRunnerCampaignLevel,
   type ShadowRunnerPlayableLevelId,
 } from './game/levels'
-import { ShadowRunnerGame } from './ShadowRunnerGame'
+import { ShadowRunnerGame, type ShadowRunnerLevelCompletionSummary } from './ShadowRunnerGame'
 import { ShadowRunnerScrollMenu, type ShadowRunnerScrollMenuAction } from './ShadowRunnerScrollMenu'
 
 interface ShadowRunnerScreenProps {
@@ -554,6 +557,22 @@ function isCampaignLevelCompleted(progress: ShadowRunnerCampaignProgress, levelI
   return progress.completedLevels.includes(levelId)
 }
 
+function isShadowRunnerPlayableLevelId(levelId: string): levelId is ShadowRunnerPlayableLevelId {
+  return Object.prototype.hasOwnProperty.call(SHADOW_RUNNER_LEVEL_CONFIGS, levelId)
+}
+
+function getShadowRunnerCompletionSyncLevelIds(progress: ShadowRunnerCampaignProgress) {
+  const levelIds = new Set(
+    progress.completedLevels.filter(isShadowRunnerPlayableLevelId)
+  )
+
+  if ([...levelIds].some(levelId => levelId.startsWith('level-'))) {
+    levelIds.add('tutorial')
+  }
+
+  return [...levelIds]
+}
+
 function isCampaignLevelUnlocked(progress: ShadowRunnerCampaignProgress, level: ShadowRunnerCampaignLevel) {
   if (level.levelNumber === 1) return true
   return isCampaignLevelCompleted(progress, `level-${level.levelNumber - 1}`)
@@ -587,12 +606,19 @@ function markCampaignLevelComplete(
   progress: ShadowRunnerCampaignProgress,
   levelId: ShadowRunnerPlayableLevelId,
 ): ShadowRunnerCampaignProgress {
-  if (!levelId.startsWith('level-') || progress.completedLevels.includes(levelId)) {
+  const completedLevels = new Set(progress.completedLevels)
+  completedLevels.add(levelId)
+
+  if (levelId.startsWith('level-')) {
+    completedLevels.add('tutorial')
+  }
+
+  if (completedLevels.size === progress.completedLevels.length) {
     return progress
   }
 
   const nextProgress = {
-    completedLevels: [...progress.completedLevels, levelId],
+    completedLevels: [...completedLevels],
   }
   writeShadowRunnerProgress(nextProgress)
   return nextProgress
@@ -899,6 +925,7 @@ export function ShadowRunnerScreen({
   onPlayMusic,
   onPauseMusic,
 }: ShadowRunnerScreenProps) {
+  const { user, refreshProfile } = useAuth()
   const rootRef = React.useRef<HTMLElement | null>(null)
   const heroFrame = useSpriteFrame(8, 150)
   const torchFrame = useSpriteFrame(8, 105)
@@ -912,11 +939,16 @@ export function ShadowRunnerScreen({
   const [musicEnabled, setMusicEnabled] = React.useState(() => readShadowRunnerAudioPreference(SHADOW_RUNNER_MUSIC_ENABLED_STORAGE_KEY, true))
   const [soundEffectsEnabled, setSoundEffectsEnabled] = React.useState(() => readShadowRunnerAudioPreference(SHADOW_RUNNER_SFX_ENABLED_STORAGE_KEY, true))
   const sfxControllerRef = React.useRef<ShadowRunnerSfxController | null>(null)
+  const syncedCompletionKeysRef = React.useRef<Set<string>>(new Set())
   const assetsReady = useImagePreload(SHADOW_RUNNER_TITLE_IMAGE_SOURCES)
   const mapAssetsReady = useImagePreload(screen === 'levels' ? SHADOW_RUNNER_MAP_IMAGE_SOURCES : EMPTY_IMAGE_SOURCES)
   const showRotateGate = orientationGateActive
 
   useShadowRunnerInteractionLock(rootRef)
+
+  React.useEffect(() => {
+    syncedCompletionKeysRef.current.clear()
+  }, [user?.id])
 
   React.useEffect(() => {
     const controller = createShadowRunnerSfxController()
@@ -1067,9 +1099,62 @@ export function ShadowRunnerScreen({
     startPlayableRoute(levelId)
   }, [startPlayableRoute])
 
-  const handleLevelComplete = React.useCallback((levelId: ShadowRunnerPlayableLevelId) => {
+  React.useEffect(() => {
+    if (!user?.id) return
+
+    const syncLevelIds = getShadowRunnerCompletionSyncLevelIds(campaignProgress)
+    if (syncLevelIds.length === 0) return
+
+    let cancelled = false
+
+    const syncCompletions = async () => {
+      let recordedAny = false
+
+      for (const levelId of syncLevelIds) {
+        const syncKey = `${user.id}:${levelId}`
+        if (syncedCompletionKeysRef.current.has(syncKey)) continue
+
+        syncedCompletionKeysRef.current.add(syncKey)
+        try {
+          await recordShadowRunnerLevelCompletion({ levelId })
+          recordedAny = true
+        } catch {
+          syncedCompletionKeysRef.current.delete(syncKey)
+        }
+      }
+
+      if (recordedAny && !cancelled) {
+        await refreshProfile().catch(() => undefined)
+      }
+    }
+
+    void syncCompletions()
+
+    return () => {
+      cancelled = true
+    }
+  }, [campaignProgress, refreshProfile, user?.id])
+
+  const handleLevelComplete = React.useCallback((levelId: ShadowRunnerPlayableLevelId, summary: ShadowRunnerLevelCompletionSummary) => {
     setCampaignProgress(current => markCampaignLevelComplete(current, levelId))
-  }, [])
+
+    if (!user?.id) return
+
+    const levelsToRecord: ShadowRunnerPlayableLevelId[] = levelId === 'tutorial'
+      ? ['tutorial']
+      : ['tutorial', levelId]
+
+    void Promise.all(
+      levelsToRecord.map(completedLevelId => recordShadowRunnerLevelCompletion({
+        levelId: completedLevelId,
+        score: completedLevelId === levelId ? summary.score : null,
+        coinsCollected: completedLevelId === levelId ? summary.coinsCollected : null,
+        totalCoins: completedLevelId === levelId ? summary.totalCoins : null,
+      }))
+    )
+      .then(() => refreshProfile())
+      .catch(() => undefined)
+  }, [refreshProfile, user?.id])
 
   const titleMusicLabel = !musicEnabled ? 'Music Off' : musicPlaying ? 'Music On' : 'Start Music'
 

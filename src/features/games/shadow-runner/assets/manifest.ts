@@ -5,6 +5,11 @@ const LEVEL_ROOT = `${ASSET_ROOT}/level-assets`
 
 export const SHADOW_RUNNER_ASSETS = {
   pickerBanner: `${ASSET_ROOT}/shadow-runner-picker-banner.webp`,
+  badges: {
+    mainMedal: `${ASSET_ROOT}/badges/shadow-runner-main-medal.png`,
+    sprint: `${ASSET_ROOT}/badges/shadow-runner-sprint-badge.png`,
+    sprintTransparent: `${ASSET_ROOT}/badges/shadow-runner-sprint-badge-transparent.png`,
+  },
   music: `${ASSET_ROOT}/audio/castle-bard.mp3`,
   sfx: {
     menuClick: `${ASSET_ROOT}/audio/sfx/menu-click.wav`,

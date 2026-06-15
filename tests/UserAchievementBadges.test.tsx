@@ -12,6 +12,8 @@ test('renders rotating medals and the permanent gold egg for a regular user', ()
           checkers_crown: true,
           war_sword: true,
           shadow_pin_gold_pin: true,
+          shadow_runner_sprint_medal: true,
+          shadow_runner_knight_medal: true,
           gold_easter_egg: true,
         }}
       />
@@ -21,6 +23,8 @@ test('renders rotating medals and the permanent gold egg for a regular user', ()
   expect(screen.getByLabelText('Shadow Checkers champion')).toBeInTheDocument()
   expect(screen.getByLabelText('Shadow War champion')).toBeInTheDocument()
   expect(screen.getByLabelText('Shadow Pin top scorer')).toBeInTheDocument()
+  expect(screen.getByLabelText('Shadow Runner runner')).toBeInTheDocument()
+  expect(screen.getByLabelText('Shadow Runner knight')).toBeInTheDocument()
   expect(screen.getByLabelText('Golden egg found')).toBeInTheDocument()
 })
 
@@ -33,6 +37,8 @@ test('hides rotating medals for the primary admin but keeps the permanent gold e
           checkers_crown: true,
           war_sword: true,
           shadow_pin_gold_pin: true,
+          shadow_runner_sprint_medal: true,
+          shadow_runner_knight_medal: true,
           gold_easter_egg: true,
         }}
       />
@@ -42,6 +48,8 @@ test('hides rotating medals for the primary admin but keeps the permanent gold e
   expect(screen.queryByLabelText('Shadow Checkers champion')).not.toBeInTheDocument()
   expect(screen.queryByLabelText('Shadow War champion')).not.toBeInTheDocument()
   expect(screen.queryByLabelText('Shadow Pin top scorer')).not.toBeInTheDocument()
+  expect(screen.getByLabelText('Shadow Runner runner')).toBeInTheDocument()
+  expect(screen.getByLabelText('Shadow Runner knight')).toBeInTheDocument()
   expect(screen.getByLabelText('Golden egg found')).toBeInTheDocument()
 })
 

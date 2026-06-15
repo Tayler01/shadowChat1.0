@@ -107,6 +107,12 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
   into the crouched hitbox lane, raised coin rendering above the archive
   platforms, added collision-only micro-steps for the optional top route, and
   placed six new high/top coins above the two low-clearance archive platforms.
+- Shadow Runner medals, 2026-06-15: added generated runner and knight badge
+  icons to the shared name-badge renderer; added a server-side Shadow Runner
+  level catalog plus per-user completion ledger; seeded Level 4 `Bell Tower
+  Archives` as the current hardest available route; and wired catalog/completion
+  triggers so future harder level releases recalculate and revoke stale knight
+  medals through `public.users` realtime updates.
 - Verification, 2026-06-11: `npm run lint`,
   `npx tsc --noEmit -p tsconfig.app.json`, and `npm run build` passed.
   WebKit mobile landscape captures verified the revised controls at `932x430`

@@ -819,6 +819,9 @@ export interface User {
   checkers_crown?: boolean
   war_sword?: boolean
   shadow_pin_gold_pin?: boolean
+  shadow_runner_sprint_medal?: boolean
+  shadow_runner_knight_medal?: boolean
+  shadow_runner_knight_level_id?: string | null
   gold_easter_egg?: boolean
   dm_discoverable?: boolean
   last_active: string
@@ -1473,8 +1476,17 @@ export interface DMMessage {
 export interface BasicUser
   extends Pick<
     User,
-    'id' | 'username' | 'display_name' | 'avatar_url' | 'avatar_thumbnail_url' | 'color' | 'status' | 'admin_role' | 'checkers_crown' | 'war_sword' | 'shadow_pin_gold_pin' | 'gold_easter_egg' | 'presence_visibility' | 'dm_discoverable'
+    'id' | 'username' | 'display_name' | 'avatar_url' | 'avatar_thumbnail_url' | 'color' | 'status' | 'admin_role' | 'checkers_crown' | 'war_sword' | 'shadow_pin_gold_pin' | 'shadow_runner_sprint_medal' | 'shadow_runner_knight_medal' | 'shadow_runner_knight_level_id' | 'gold_easter_egg' | 'presence_visibility' | 'dm_discoverable'
   > {}
+
+export interface ShadowRunnerLevelCompletionPayload {
+  levelId: string
+  score?: number | null
+  coinsCollected?: number | null
+  totalCoins?: number | null
+  enemiesDefeated?: number | null
+  totalEnemies?: number | null
+}
 
 export interface PresenceSnapshot {
   user_id: string
@@ -1663,12 +1675,12 @@ export const fetchDMConversations = async () => {
   if (missingIds.length) {
     let userQuery = await workingClient
       .from('users')
-      .select('id, username, display_name, avatar_url, avatar_thumbnail_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, gold_easter_egg, presence_visibility')
+      .select('id, username, display_name, avatar_url, avatar_thumbnail_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, shadow_runner_sprint_medal, shadow_runner_knight_medal, shadow_runner_knight_level_id, gold_easter_egg, presence_visibility')
       .in('id', missingIds)
     if (userQuery.error && isMissingColumnError(userQuery.error, 'avatar_thumbnail_url')) {
       userQuery = await workingClient
         .from('users')
-        .select('id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, gold_easter_egg, presence_visibility')
+        .select('id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, shadow_runner_sprint_medal, shadow_runner_knight_medal, shadow_runner_knight_level_id, gold_easter_egg, presence_visibility')
         .in('id', missingIds)
     }
     if (userQuery.error) {
@@ -1769,10 +1781,10 @@ export const fetchAllUsers = async (options?: { signal?: AbortSignal }) => {
     return query
   }
 
-  let query = buildQuery('id, username, display_name, avatar_url, avatar_thumbnail_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, gold_easter_egg, presence_visibility, dm_discoverable')
+  let query = buildQuery('id, username, display_name, avatar_url, avatar_thumbnail_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, shadow_runner_sprint_medal, shadow_runner_knight_medal, shadow_runner_knight_level_id, gold_easter_egg, presence_visibility, dm_discoverable')
   let { data, error } = await query
   if (error && isMissingColumnError(error, 'avatar_thumbnail_url')) {
-    query = buildQuery('id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, gold_easter_egg, presence_visibility, dm_discoverable')
+    query = buildQuery('id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, shadow_runner_sprint_medal, shadow_runner_knight_medal, shadow_runner_knight_level_id, gold_easter_egg, presence_visibility, dm_discoverable')
     const fallback = await query
     data = fallback.data
     error = fallback.error
@@ -1824,6 +1836,27 @@ export const markAdminRoleNotificationSeen = async (notificationId: string) => {
 export const claimGoldEasterEgg = async () => {
   const workingClient = await getWorkingClient()
   const { data, error } = await workingClient.rpc('claim_gold_easter_egg')
+  if (error) throw error
+  return Boolean(data)
+}
+
+export const recordShadowRunnerLevelCompletion = async ({
+  levelId,
+  score = null,
+  coinsCollected = null,
+  totalCoins = null,
+  enemiesDefeated = null,
+  totalEnemies = null,
+}: ShadowRunnerLevelCompletionPayload) => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('record_shadow_runner_level_completion', {
+    completed_level_id: levelId,
+    completion_score: score,
+    completion_coins_collected: coinsCollected,
+    completion_total_coins: totalCoins,
+    completion_enemies_defeated: enemiesDefeated,
+    completion_total_enemies: totalEnemies,
+  })
   if (error) throw error
   return Boolean(data)
 }

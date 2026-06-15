@@ -20,6 +20,12 @@ import {
 import type { ShadowRunnerHudState } from './game/simulation'
 import { ShadowRunnerScrollMenu, type ShadowRunnerScrollMenuAction } from './ShadowRunnerScrollMenu'
 
+export interface ShadowRunnerLevelCompletionSummary {
+  score: number
+  coinsCollected: number
+  totalCoins: number
+}
+
 interface ShadowRunnerGameProps {
   levelId: ShadowRunnerPlayableLevelId
   soundEffectsEnabled?: boolean
@@ -27,7 +33,7 @@ interface ShadowRunnerGameProps {
   onBackToMap?: () => void
   nextLevelId?: ShadowRunnerPlayableLevelId
   onPlayLevel?: (levelId: ShadowRunnerPlayableLevelId) => void
-  onLevelComplete?: (levelId: ShadowRunnerPlayableLevelId) => void
+  onLevelComplete?: (levelId: ShadowRunnerPlayableLevelId, summary: ShadowRunnerLevelCompletionSummary) => void
   onToggleSoundEffects?: () => void
   onSoundEvent?: (event: ShadowRunnerSoundEvent) => void
 }
@@ -461,8 +467,12 @@ export function ShadowRunnerGame({
   React.useEffect(() => {
     if (!hud.defeated || completionReportedRef.current) return
     completionReportedRef.current = true
-    onLevelComplete?.(levelId)
-  }, [hud.defeated, levelId, onLevelComplete])
+    onLevelComplete?.(levelId, {
+      score: hud.score,
+      coinsCollected: hud.coins,
+      totalCoins: hud.totalCoins,
+    })
+  }, [hud.coins, hud.defeated, hud.score, hud.totalCoins, levelId, onLevelComplete])
 
   React.useEffect(() => {
     const game = gameRef.current
