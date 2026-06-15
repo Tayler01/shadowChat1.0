@@ -1,6 +1,7 @@
 import {
+  ensureSession,
+  getSessionWithTimeout,
   getWorkingClient,
-  supabase,
   uploadShadowPinImage,
 } from '../../../lib/supabase'
 import * as tus from 'tus-js-client'
@@ -203,7 +204,13 @@ export async function fetchShadowPinImages(categoryId: string, page = 0) {
 }
 
 async function getSessionAccessToken() {
-  const { data: { session } } = await supabase.auth.getSession()
+  const sessionValid = await ensureSession(true)
+  if (!sessionValid) {
+    throw new Error('Sign in to save images.')
+  }
+
+  const client = await getWorkingClient()
+  const { data: { session } } = await getSessionWithTimeout(client)
   if (!session?.access_token) {
     throw new Error('Sign in to save images.')
   }
@@ -228,7 +235,13 @@ async function callShadowPinMediaFunction<T>(payload: Record<string, unknown>): 
 }
 
 async function callShadowPinVideoFunction<T>(payload: Record<string, unknown>): Promise<T> {
-  const { data, error } = await supabase.functions.invoke('shadow-pin-video', {
+  const sessionValid = await ensureSession(true)
+  if (!sessionValid) {
+    throw new Error('Sign in to save videos.')
+  }
+
+  const client = await getWorkingClient()
+  const { data, error } = await client.functions.invoke('shadow-pin-video', {
     body: payload,
   })
 

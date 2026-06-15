@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { ensureSession, getWorkingClient } from './supabase'
 
 export type LinkTextPart =
   | { type: 'text'; text: string }
@@ -150,17 +150,24 @@ export const fetchLinkPreview = async (url: string): Promise<LinkPreview | null>
   const pending = pendingRequests.get(normalized)
   if (pending) return pending
 
-  const request = (supabase.functions.invoke('link-preview', {
-      body: { url: normalized },
-    }) as Promise<{ data?: { preview?: LinkPreview }; error?: unknown }>)
-    .then(({ data, error }: { data?: { preview?: LinkPreview }; error?: unknown }) => {
-      if (error || !data?.preview) {
-        return null
-      }
+  const request = (async () => {
+    const sessionValid = await ensureSession()
+    if (!sessionValid) {
+      return null
+    }
 
-      writeCachedPreview(normalized, data.preview)
-      return data.preview
-    })
+    const workingClient = await getWorkingClient()
+    const { data, error } = await workingClient.functions.invoke('link-preview', {
+      body: { url: normalized },
+    }) as { data?: { preview?: LinkPreview }; error?: unknown }
+
+    if (error || !data?.preview) {
+      return null
+    }
+
+    writeCachedPreview(normalized, data.preview)
+    return data.preview
+  })()
     .catch(() => null)
     .finally(() => {
       pendingRequests.delete(normalized)

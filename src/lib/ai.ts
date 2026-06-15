@@ -3,8 +3,8 @@ import {
   SUPABASE_ANON_KEY,
   SUPABASE_URL,
   ensureSession,
+  getSessionWithTimeout,
   getWorkingClient,
-  supabase,
 } from './supabase'
 
 interface AIMessage {
@@ -37,17 +37,8 @@ const invokeAI = async (
   }
 
   const workingClient = await getWorkingClient()
-  const [
-    { data: workingSessionData },
-    { data: persistentSessionData },
-  ] = await Promise.all([
-    workingClient.auth.getSession(),
-    supabase.auth.getSession(),
-  ])
-
-  const accessToken =
-    workingSessionData.session?.access_token ||
-    persistentSessionData.session?.access_token
+  const { data: { session } } = await getSessionWithTimeout(workingClient)
+  const accessToken = session?.access_token
 
   if (!accessToken) {
     throw new Error('Authentication required')

@@ -74,10 +74,15 @@ const withTimeout = async <T>(promise: PromiseLike<T>, ms: number, message: stri
   ]) as Promise<T>
 )
 
-const fetchUserProfileWithRetry = async (userId: string): Promise<AppUser | null> => {
+const fetchUserProfileWithRetry = async (
+  userId: string,
+  clientOverride?: any
+): Promise<AppUser | null> => {
+  const client = clientOverride ?? await getWorkingClient()
+
   for (let attempt = 0; attempt < PROFILE_RETRY_ATTEMPTS; attempt += 1) {
     const { data, error } = await withTimeout<{ data: AppUser | null; error: any }>(
-      supabase
+      client
         .from('users')
         .select('*')
         .eq('id', userId)
@@ -256,11 +261,17 @@ export const deleteCurrentAccount = async () => {
 
 export const getCurrentUser = async (): Promise<AppUser | null> => {
   try {
+    const sessionValid = await ensureSession()
+    if (!sessionValid) {
+      return null
+    }
+
+    const workingClient = await getWorkingClient()
     const { data: { user }, error: authError } = await withTimeout<{
       data: { user: SupabaseAuthUser | null }
       error: any
     }>(
-      supabase.auth.getUser() as PromiseLike<{
+      workingClient.auth.getUser() as PromiseLike<{
         data: { user: SupabaseAuthUser | null }
         error: any
       }>,
@@ -277,7 +288,7 @@ export const getCurrentUser = async (): Promise<AppUser | null> => {
       return null
     }
 
-    return await fetchUserProfileWithRetry(user.id)
+    return await fetchUserProfileWithRetry(user.id, workingClient)
   } catch {
     return null
   }
@@ -307,10 +318,14 @@ export const updateUserProfile = async (updates: Partial<{
   banner_thumbnail_url: string | null;
   banner_thumbnail_path: string | null;
 }>): Promise<AppUser> => {
-  const { data: { user } } = await supabase.auth.getUser()
+  const sessionValid = await ensureSession(true)
+  if (!sessionValid) throw new Error('Not authenticated')
+
+  const workingClient = await getWorkingClient()
+  const { data: { user } } = await workingClient.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
-  const { data, error } = await supabase
+  const { data, error } = await workingClient
     .from('users')
     .update(updates)
     .eq('id', user.id)
@@ -322,7 +337,11 @@ export const updateUserProfile = async (updates: Partial<{
 }
 
 export const uploadUserAvatar = async (file: File) => {
-  const { data: { user } } = await supabase.auth.getUser()
+  const sessionValid = await ensureSession(true)
+  if (!sessionValid) throw new Error('Not authenticated')
+
+  const workingClient = await getWorkingClient()
+  const { data: { user } } = await workingClient.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
   const uploadFile = await optimizeImageFile(file, {
@@ -333,14 +352,14 @@ export const uploadUserAvatar = async (file: File) => {
     fileNamePrefix: 'avatar',
   })
   const filePath = `${user.id}/${Date.now()}_${uploadFile.name}`
-  const { error } = await supabase.storage.from(AVATAR_BUCKET).upload(filePath, uploadFile, {
+  const { error } = await workingClient.storage.from(AVATAR_BUCKET).upload(filePath, uploadFile, {
     upsert: true,
     contentType: uploadFile.type,
     cacheControl: '31536000',
   })
   if (error) throw error
 
-  const { data } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(filePath)
+  const { data } = workingClient.storage.from(AVATAR_BUCKET).getPublicUrl(filePath)
   const asset = createStoredImageAsset(filePath, data.publicUrl, 'avatar')
   return updateUserProfile({
     avatar_url: asset.publicUrl,
@@ -350,7 +369,11 @@ export const uploadUserAvatar = async (file: File) => {
 }
 
 export const uploadUserBanner = async (file: File) => {
-  const { data: { user } } = await supabase.auth.getUser()
+  const sessionValid = await ensureSession(true)
+  if (!sessionValid) throw new Error('Not authenticated')
+
+  const workingClient = await getWorkingClient()
+  const { data: { user } } = await workingClient.auth.getUser()
   if (!user) throw new Error('Not authenticated')
 
   const uploadFile = await optimizeImageFile(file, {
@@ -360,14 +383,14 @@ export const uploadUserBanner = async (file: File) => {
     fileNamePrefix: 'banner',
   })
   const filePath = `${user.id}/${Date.now()}_${uploadFile.name}`
-  const { error } = await supabase.storage.from(BANNER_BUCKET).upload(filePath, uploadFile, {
+  const { error } = await workingClient.storage.from(BANNER_BUCKET).upload(filePath, uploadFile, {
     upsert: true,
     contentType: uploadFile.type,
     cacheControl: '31536000',
   })
   if (error) throw error
 
-  const { data } = supabase.storage.from(BANNER_BUCKET).getPublicUrl(filePath)
+  const { data } = workingClient.storage.from(BANNER_BUCKET).getPublicUrl(filePath)
   const asset = createStoredImageAsset(filePath, data.publicUrl, 'banner')
   return updateUserProfile({
     banner_url: asset.publicUrl,

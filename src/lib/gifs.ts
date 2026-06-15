@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { ensureSession, getWorkingClient } from './supabase'
 
 export type GifResult = {
   id: string
@@ -28,7 +28,13 @@ export const searchKlipyGifs = async ({
   limit = 24,
   signal,
 }: GifSearchOptions = {}): Promise<GifSearchResponse> => {
-  const { data, error } = await supabase.functions.invoke('klipy-gifs', {
+  const sessionValid = await ensureSession()
+  if (!sessionValid) {
+    throw new Error('Sign in to search GIFs')
+  }
+
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.functions.invoke('klipy-gifs', {
     body: {
       query: query.trim(),
       page,
