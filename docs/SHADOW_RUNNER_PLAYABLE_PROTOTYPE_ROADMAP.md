@@ -217,6 +217,10 @@ enemy, and reach a finish gate.
   side-view low-clearance platforms built from Bell Tower slabs, stone blocks,
   and archive shelves. The player now crawls under a heavy overhead structure
   instead of appearing to pass through an arch.
+- Lowered crawl-space coins into the crouched hitbox lane, raised coin draw
+  depth above the archive platform art, added tiny collision-only steps to make
+  top access an intentional bonus route, and added high/top coins above both
+  low-clearance archive platforms.
 - Rounded Moonheart boost HUD countdown updates to whole-second boundaries so
   the React HUD does not redraw at frame rate while the Phaser scene is
   running.

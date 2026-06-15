@@ -8,6 +8,7 @@ export interface ShadowRunnerRect {
   height: number
   visualId?: string
   terrainSet?: 'stone' | 'ivy' | 'bell'
+  hidden?: boolean
 }
 
 export interface ShadowRunnerTiltPlatform extends ShadowRunnerRect {
@@ -518,6 +519,7 @@ export const SHADOW_RUNNER_LEVEL_FOUR: ShadowRunnerLevelConfig = {
   platforms: [
     { id: 'bell-start-walkway', visualId: 'bell-long-ledge', x: 0, y: 424, width: 405, height: 72, terrainSet: 'bell' },
     { id: 'bell-crouch-floor-a', visualId: 'bell-long-ledge', x: 430, y: 424, width: 420, height: 72, terrainSet: 'bell' },
+    { id: 'bell-hidden-crouch-step-a', x: 444, y: 348, width: 64, height: 12, hidden: true },
     { id: 'bell-step-a', visualId: 'bell-small-ledge', x: 940, y: 388, width: 220, height: 44, terrainSet: 'bell' },
     { id: 'bell-sentry-run', visualId: 'bell-long-ledge', x: 1440, y: 420, width: 510, height: 72, terrainSet: 'bell' },
     { id: 'bell-risk-shelf-a', visualId: 'bell-scroll-shelf', x: 1682, y: 284, width: 188, height: 38, terrainSet: 'bell' },
@@ -525,6 +527,7 @@ export const SHADOW_RUNNER_LEVEL_FOUR: ShadowRunnerLevelConfig = {
     { id: 'bell-archer-perch-a', visualId: 'bell-small-block', x: 2504, y: 348, width: 238, height: 50, terrainSet: 'bell' },
     { id: 'bell-barrel-lane', visualId: 'bell-long-ledge', x: 2880, y: 424, width: 445, height: 72, terrainSet: 'bell' },
     { id: 'bell-crouch-floor-b', visualId: 'bell-wide-ledge', x: 3360, y: 424, width: 438, height: 72, terrainSet: 'bell' },
+    { id: 'bell-hidden-crouch-step-b', x: 3364, y: 348, width: 64, height: 12, hidden: true },
     { id: 'bell-thief-lane', visualId: 'bell-wood-platform', x: 4040, y: 400, width: 382, height: 58, terrainSet: 'bell' },
     { id: 'bell-archer-perch-b', visualId: 'bell-small-ledge', x: 4560, y: 332, width: 264, height: 46, terrainSet: 'bell' },
     { id: 'bell-gauntlet-floor', visualId: 'bell-long-ledge', x: 4860, y: 420, width: 460, height: 72, terrainSet: 'bell' },
@@ -555,8 +558,8 @@ export const SHADOW_RUNNER_LEVEL_FOUR: ShadowRunnerLevelConfig = {
   ],
   coins: [
     { id: 'coin-1', x: 292, y: 334 },
-    { id: 'coin-2', x: 610, y: 378 },
-    { id: 'coin-3', x: 730, y: 378 },
+    { id: 'coin-2', x: 602, y: 404 },
+    { id: 'coin-3', x: 724, y: 404 },
     { id: 'coin-4', x: 1034, y: 302 },
     { id: 'coin-5', x: 1288, y: 278 },
     { id: 'coin-6', x: 1512, y: 332 },
@@ -567,8 +570,8 @@ export const SHADOW_RUNNER_LEVEL_FOUR: ShadowRunnerLevelConfig = {
     { id: 'coin-11', x: 2572, y: 272 },
     { id: 'coin-12', x: 3010, y: 332 },
     { id: 'coin-13', x: 3208, y: 332 },
-    { id: 'coin-14', x: 3520, y: 378 },
-    { id: 'coin-15', x: 3678, y: 378 },
+    { id: 'coin-14', x: 3520, y: 404 },
+    { id: 'coin-15', x: 3678, y: 404 },
     { id: 'coin-16', x: 3900, y: 276 },
     { id: 'coin-17', x: 4155, y: 314 },
     { id: 'coin-18', x: 4328, y: 314 },
@@ -578,6 +581,12 @@ export const SHADOW_RUNNER_LEVEL_FOUR: ShadowRunnerLevelConfig = {
     { id: 'coin-22', x: 5340, y: 270 },
     { id: 'coin-23', x: 5492, y: 304 },
     { id: 'coin-24', x: 5888, y: 330 },
+    { id: 'coin-25', x: 560, y: 188 },
+    { id: 'coin-26', x: 646, y: 170 },
+    { id: 'coin-27', x: 746, y: 188 },
+    { id: 'coin-28', x: 3468, y: 188 },
+    { id: 'coin-29', x: 3568, y: 170 },
+    { id: 'coin-30', x: 3690, y: 188 },
   ],
   boosts: [
     { id: 'moonheart-crest-high-archive', x: 1768, y: 222, scoreValue: 140, durationMs: 8800, guardCharges: 2 },

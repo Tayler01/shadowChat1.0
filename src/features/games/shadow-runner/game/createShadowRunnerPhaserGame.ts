@@ -77,6 +77,8 @@ interface ShadowRunnerDebugSnapshot {
     crouchInput: boolean
     health: number
     lives: number
+    coins: number
+    score: number
   }
   enemies: Array<{
     id: string
@@ -102,13 +104,14 @@ interface PlatformVisualOptions {
   texture?: string
   frame?: string | number
   useImage?: boolean
+  hidden?: boolean
   displayWidth?: number
   displayHeight?: number
   visualOffsetY?: number
   depth?: number
 }
 
-type PlatformVisual = Phaser.GameObjects.Image | Phaser.GameObjects.TileSprite
+type PlatformVisual = Phaser.GameObjects.Image | Phaser.GameObjects.TileSprite | Phaser.GameObjects.Rectangle
 
 interface TiltPlatformRuntime {
   config: ShadowRunnerTiltPlatform
@@ -172,9 +175,11 @@ function addStaticPlatform(
   const displayWidth = options.displayWidth ?? rect.width
   const displayHeight = options.displayHeight ?? rect.height
   const visualY = centerY + (options.visualOffsetY ?? 0)
-  const visual = options.useImage || options.frame !== undefined
-    ? scene.add.image(centerX, visualY, texture, options.frame)
-    : scene.add.tileSprite(centerX, visualY, rect.width, rect.height, texture)
+  const visual = options.hidden
+    ? scene.add.rectangle(centerX, visualY, rect.width, rect.height, 0x000000, 0)
+    : options.useImage || options.frame !== undefined
+      ? scene.add.image(centerX, visualY, texture, options.frame)
+      : scene.add.tileSprite(centerX, visualY, rect.width, rect.height, texture)
 
   visual.setOrigin(0.5)
   visual.setDepth(options.depth ?? 3)
@@ -557,8 +562,8 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
         && this.textures.get(terrainTexture).has(frameKey)
 
       addStaticPlatform(this, this.platforms!, platform, hasTerrainFrame
-        ? { texture: terrainTexture, frame: frameKey, useImage: true }
-        : { texture: 'shadow-runner-stone' })
+        ? { texture: terrainTexture, frame: frameKey, useImage: true, hidden: platform.hidden }
+        : { texture: 'shadow-runner-stone', hidden: platform.hidden })
     })
 
     this.level.crouchGates?.forEach(gate => {
@@ -627,6 +632,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       coinSprite.setScale(0.74)
       coinSprite.setCircle(16, 8, 8)
       coinSprite.setImmovable(true)
+      coinSprite.setDepth(16)
       coinSprite.setData('collected', false)
       coinSprite.play('coin-spin')
       this.tweens.add({
@@ -880,6 +886,8 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
               crouchInput: this.controls.current.crouch,
               health: this.state.player.health,
               lives: this.state.player.lives,
+              coins: this.state.player.coins,
+              score: this.state.player.score,
             }
           : undefined,
         enemies: this.enemies.map(enemy => {

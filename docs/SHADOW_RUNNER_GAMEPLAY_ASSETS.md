@@ -87,7 +87,9 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
   Sentry and Barrel Roller runtime states.
 - Level 4 registers the generated Bell Tower props/hazards sheet, low-clearance
   overhead platform visuals, Moonheart boost pickup/aura, Scroll Thief
-  animation states, and Tower Archer ranged attacks.
+  animation states, Tower Archer ranged attacks, collision-only micro-steps for
+  optional top-route access, visible crawl-lane coins, and higher bonus coins
+  above the low-clearance archive platforms.
 - Lobby music is enabled by default on title/lobby/map surfaces and is stopped
   automatically during gameplay; SFX remain enabled by default in both menus
   and gameplay unless the local Shadow Runner sound preference is disabled.

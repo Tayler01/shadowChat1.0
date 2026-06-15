@@ -103,6 +103,10 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
   raised the blocker tops so climbing onto the archive platforms is much
   harder, and changed the mobile D-pad crouch action from hold-to-crouch to
   tap-toggle crouch with jump clearing the crouch state.
+- Bell Tower coin-route follow-up, 2026-06-15: lowered the crawl-space coins
+  into the crouched hitbox lane, raised coin rendering above the archive
+  platforms, added collision-only micro-steps for the optional top route, and
+  placed six new high/top coins above the two low-clearance archive platforms.
 - Verification, 2026-06-11: `npm run lint`,
   `npx tsc --noEmit -p tsconfig.app.json`, and `npm run build` passed.
   WebKit mobile landscape captures verified the revised controls at `932x430`
