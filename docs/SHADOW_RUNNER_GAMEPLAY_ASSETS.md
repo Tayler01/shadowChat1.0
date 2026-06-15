@@ -76,9 +76,10 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
 - Manifest: `src/features/games/shadow-runner/assets/manifest.ts`
 - DOM HUD and level-complete overlay:
   `src/features/games/shadow-runner/ShadowRunnerGame.tsx`
-- Audio preferences and Web Audio short-effect playback:
+- Audio preferences and Web Audio playback:
   `src/features/games/shadow-runner/audio.ts` and
-  `src/features/games/shadow-runner/ShadowRunnerScreen.tsx`
+  `src/features/games/shadow-runner/ShadowRunnerScreen.tsx`; shared game
+  soundtrack playback lives in `src/features/games/gameSoundtrack.ts`.
 - Phaser preload, sentry animation, overhead health, and pickup/hit effects:
   `src/features/games/shadow-runner/game/createShadowRunnerPhaserGame.ts`
 - Level 3 now registers a second terrain frame set for the generated Ivy
@@ -87,12 +88,15 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
 - Level 4 registers the generated Bell Tower props/hazards sheet, low-clearance
   overhead platform visuals, Moonheart boost pickup/aura, Scroll Thief
   animation states, and Tower Archer ranged attacks.
-- Lobby music is enabled by default on title/lobby/map surfaces and is paused
+- Lobby music is enabled by default on title/lobby/map surfaces and is stopped
   automatically during gameplay; SFX remain enabled by default in both menus
   and gameplay unless the local Shadow Runner sound preference is disabled.
-  Short effects now decode through one Web Audio controller, preload in staged
-  groups, and use cooldowns for high-frequency events so sound playback does
-  not create pooled `<audio>` churn during gameplay.
+  Game soundtracks and short effects now decode through Web Audio controllers.
+  Soundtracks do not mount persistent hidden `<audio>` elements, and the shared
+  soundtrack controller closes on background/pagehide so iPhone should not
+  surface game loops as lock-screen media. Short effects preload in staged
+  groups and use cooldowns for high-frequency events so gameplay feedback stays
+  lightweight.
 - Mobile gameplay controls now use a researched split-thumb layout: one large
   baked bottom-left D-pad visual for left/right/crouch, a full left-side
   movement hit zone, and two separated baked bottom-right action buttons for

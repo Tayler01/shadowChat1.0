@@ -88,8 +88,11 @@ Manifest:
 The current UI uses the generated banner as the immersive header itself,
 optimized WebP card faces during match play, a dark generated battlefield
 backdrop, and the provided `Chronicles of a Hero` MP3 as the in-game soundtrack.
-The game selector click is the user gesture that starts audio when the browser
-allows it; if playback is blocked, the in-game music button retries playback.
+The game selector click starts the soundtrack through the shared foreground-only
+Web Audio soundtrack controller when the browser allows it; if playback is
+blocked, the in-game music button retries playback. The controller avoids a
+persistent hidden `<audio>` element and closes on background/pagehide so iPhone
+does not treat game music as lock-screen media.
 Code-native labels remain layered over the art for accessibility and reliable
 small-screen readability.
 

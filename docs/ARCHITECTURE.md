@@ -259,15 +259,16 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 
 ### Shadow Runner
 
-1. User opens Shadow Runner from the Entertainment picker, which starts the shared Castle Bard lobby audio by default when the browser allows autoplay from that gesture
+1. User opens Shadow Runner from the Entertainment picker, which starts the shared Castle Bard lobby music through the foreground-only Web Audio soundtrack controller when the browser allows playback from that gesture
 2. The picker makes a best-effort fullscreen plus `screen.orientation.lock('landscape')` request for browsers that support it, then releases fullscreen/orientation on exit
 3. The game surface enters the app's immersive Entertainment shell without changing the global PWA manifest, viewport, or app-shell settings
 4. Portrait phones still see a Shadow Runner-only rotate gate when the browser cannot or does not rotate; landscape viewports render the fixed 16:9 title/playfield stage
 5. The title screen preloads the home/menu assets, animates the menu-idle hero strip, and renders Start Tutorial, Select Level, and Options over blank scroll/button assets
 6. Start mounts the tutorial route, while Select Level opens the generated 10-stop campaign map with mission detail popups before launching playable routes through `ShadowRunnerGame`; movement input stays in a React-owned input ref and the Phaser scene stays responsible for the canvas level
-7. DOM HUD and touch controls sit over the canvas; pause/options scroll menus pause the Phaser scene, clear pressed actions, keep SFX toggles in the React shell, and leave gameplay music off by automatically pausing lobby music while the Phaser level is mounted
+7. DOM HUD and touch controls sit over the canvas; pause/options scroll menus pause the Phaser scene, clear pressed actions, keep SFX toggles in the React shell, and leave gameplay music off by automatically stopping lobby music while the Phaser level is mounted
 8. Shadow Runner SFX are original generated WAV assets under `public/games/shadow-runner/audio/sfx`; a single Web Audio controller preloads staged sound groups, throttles high-frequency effects, and Phaser emits named gameplay sound events for menu, map, pause, jump, land, attack, hit, coin, defeat, respawn, failure, and completion feedback
-9. The June 9 rollback intentionally removed app-wide manifest/viewport/fullscreen/orientation behavior because it affected mobile app header, footer, composer, and PWA layout outside Shadow Runner; the current picker request is Shadow Runner-scoped and best-effort
+9. Game soundtracks no longer mount a persistent hidden `<audio>` element; Shadow War, Shadow Checkers, and Shadow Runner music use a shared Web Audio controller and close the audio context on background/pagehide so iPhone does not treat game loops like lock-screen media
+10. The June 9 rollback intentionally removed app-wide manifest/viewport/fullscreen/orientation behavior because it affected mobile app header, footer, composer, and PWA layout outside Shadow Runner; the current picker request is Shadow Runner-scoped and best-effort
 
 ### Channel Ban Enforcement
 

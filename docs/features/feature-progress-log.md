@@ -92,6 +92,12 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
   `output/playwright/shadow-runner-polish-final-20260615/` covers title, map,
   playable Levels 1-4, Bell Tower low-clearance traversal, boost, enemy,
   completion, and `740x390` phone-landscape checks.
+- Game audio follow-up, 2026-06-15: replaced the shared hidden `<audio>`
+  soundtrack element for Shadow War, Shadow Checkers, and Shadow Runner with a
+  foreground-only Web Audio soundtrack controller, hard-stopped game music on
+  background/pagehide to avoid iPhone lock-screen media cards, and fixed the
+  Shadow Runner title music action so stopped foreground music can restart from
+  a user tap without disabling the saved music preference.
 - Verification, 2026-06-11: `npm run lint`,
   `npx tsc --noEmit -p tsconfig.app.json`, and `npm run build` passed.
   WebKit mobile landscape captures verified the revised controls at `932x430`

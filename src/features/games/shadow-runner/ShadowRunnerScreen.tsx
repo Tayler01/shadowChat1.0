@@ -980,6 +980,11 @@ export function ShadowRunnerScreen({
 
   const toggleMusicPreference = React.useCallback(() => {
     playButtonChime()
+    if (musicEnabled && !musicPlaying) {
+      onPlayMusic?.()
+      return
+    }
+
     setMusicEnabled(current => {
       const next = !current
       if (next) {
@@ -989,7 +994,7 @@ export function ShadowRunnerScreen({
       }
       return next
     })
-  }, [onPauseMusic, onPlayMusic, playButtonChime])
+  }, [musicEnabled, musicPlaying, onPauseMusic, onPlayMusic, playButtonChime])
 
   const startPlayableRoute = React.useCallback((levelId: ShadowRunnerPlayableLevelId) => {
     playShadowRunnerSound('level-select')

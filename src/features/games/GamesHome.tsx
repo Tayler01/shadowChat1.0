@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Film, Gamepad2, Volume2, VolumeX } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { createGameSoundtrackController, type GameSoundtrackController } from './gameSoundtrack'
 import { ShadowWarScreen } from './shadow-war/ShadowWarScreen'
 import { SHADOW_WAR_ASSETS } from './shadow-war/assets/manifest'
 import { ShadowCheckersScreen } from './shadow-checkers/ShadowCheckersScreen'
@@ -92,37 +93,41 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
   const [selectedEntertainment, setSelectedEntertainment] = useState<SelectedEntertainment>(null)
   const [musicPlaying, setMusicPlaying] = useState(false)
   const [audioBlocked, setAudioBlocked] = useState(false)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const soundtrackRef = useRef<GameSoundtrackController | null>(null)
+  const currentMusicSourceRef = useRef<string | null>(null)
 
-  const playMusic = useCallback(async (source?: string) => {
-    const audio = audioRef.current
-    if (!audio) return
-
-    if (source && audio.getAttribute('src') !== source) {
-      audio.pause()
-      audio.setAttribute('src', source)
-      audio.load()
-    }
-
-    audio.volume = 0.42
-    audio.loop = true
-
-    try {
-      await audio.play()
-      setMusicPlaying(true)
-      setAudioBlocked(false)
-    } catch {
-      setMusicPlaying(false)
-      setAudioBlocked(true)
-    }
+  const getSoundtrack = useCallback(() => {
+    soundtrackRef.current ??= createGameSoundtrackController(0.42)
+    return soundtrackRef.current
   }, [])
 
-  const pauseMusic = useCallback(() => {
-    const audio = audioRef.current
-    if (audio) {
-      audio.pause()
+  const playMusic = useCallback(async (source?: string) => {
+    if (!source) return
+
+    currentMusicSourceRef.current = source
+
+    if (typeof document !== 'undefined' && document.hidden) {
+      setMusicPlaying(false)
+      setAudioBlocked(false)
+      return
     }
+
+    const played = await getSoundtrack().play(source)
+    if (currentMusicSourceRef.current !== source) return
+
+    setMusicPlaying(played)
+    setAudioBlocked(!played)
+  }, [getSoundtrack])
+
+  const pauseMusic = useCallback((options: { closeContext?: boolean } = {}) => {
+    soundtrackRef.current?.stop(options)
     setMusicPlaying(false)
+  }, [])
+
+  const stopMusicForBackground = useCallback(() => {
+    soundtrackRef.current?.stop({ closeContext: true })
+    setMusicPlaying(false)
+    setAudioBlocked(false)
   }, [])
 
   const enterShadowWar = () => {
@@ -236,24 +241,33 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
 
   useEffect(() => {
     return () => {
-      pauseMusic()
+      soundtrackRef.current?.dispose()
+      soundtrackRef.current = null
       onImmersiveChange?.(false)
     }
-  }, [onImmersiveChange, pauseMusic])
+  }, [onImmersiveChange])
 
-  const audio = (
-    <audio
-      ref={audioRef}
-      preload="auto"
-      aria-hidden="true"
-    />
-  )
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        stopMusicForBackground()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('pagehide', stopMusicForBackground)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('pagehide', stopMusicForBackground)
+    }
+  }, [stopMusicForBackground])
+
   const pickerCardClass = 'group relative h-[8.25rem] w-full shrink-0 overflow-hidden rounded-[2rem] border border-[rgba(215,170,70,0.42)] bg-[#050403] text-left shadow-[0_24px_60px_rgba(0,0,0,0.48)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[rgba(239,202,114,0.68)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,202,114,0.55)] md:h-[10rem]'
   const pickerCardContentClass = 'relative flex h-full items-center gap-4 px-5 py-4 md:px-8'
 
   return (
     <>
-      {audio}
       {selectedEntertainment === 'shadow-runner' ? (
         <div className="h-full min-h-0 overflow-hidden bg-black">
           <ShadowRunnerScreen
