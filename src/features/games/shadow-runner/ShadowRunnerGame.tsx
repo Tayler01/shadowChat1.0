@@ -122,6 +122,12 @@ interface MovementPointerOrigin {
   y: number
 }
 
+interface MovementPointerState extends MovementPointerOrigin {
+  crouchTapIntent: boolean
+  crouchGesture: boolean
+  maxDistance: number
+}
+
 function LifePips({ current, max }: { current: number; max: number }) {
   return (
     <span
@@ -165,11 +171,32 @@ function clampNumber(value: number, min: number, max: number) {
 
 interface DirectionPadProps {
   onActionChange: (action: ShadowRunnerAction, pressed: boolean) => void
+  onCrouchToggle: () => void
 }
 
-function MovementTouchZone({ onActionChange }: DirectionPadProps) {
+function isCrouchTapTarget(dpad: HTMLElement | null, event: Pick<React.PointerEvent<HTMLElement>, 'clientX' | 'clientY'>) {
+  if (!dpad) return false
+
+  const rect = dpad.getBoundingClientRect()
+  if (
+    event.clientX < rect.left
+    || event.clientX > rect.right
+    || event.clientY < rect.top
+    || event.clientY > rect.bottom
+  ) {
+    return false
+  }
+
+  const relativeX = (event.clientX - rect.left) / rect.width
+  const relativeY = (event.clientY - rect.top) / rect.height
+
+  return relativeY >= 0.54 && relativeX >= 0.22 && relativeX <= 0.78
+}
+
+function MovementTouchZone({ onActionChange, onCrouchToggle }: DirectionPadProps) {
   const activeActionRef = React.useRef<DirectionPadAction | null>(null)
-  const pointerOriginRef = React.useRef<MovementPointerOrigin | null>(null)
+  const pointerOriginRef = React.useRef<MovementPointerState | null>(null)
+  const dpadRef = React.useRef<HTMLDivElement | null>(null)
 
   const setActiveAction = React.useCallback((nextAction: DirectionPadAction | null) => {
     const previousAction = activeActionRef.current
@@ -186,6 +213,17 @@ function MovementTouchZone({ onActionChange }: DirectionPadProps) {
     }
   }, [onActionChange])
 
+  const updatePointerTravel = React.useCallback((event: Pick<React.PointerEvent<HTMLElement>, 'clientX' | 'clientY'>) => {
+    const origin = pointerOriginRef.current
+    if (!origin) return 0
+
+    const dx = event.clientX - origin.x
+    const dy = event.clientY - origin.y
+    const distance = Math.hypot(dx, dy)
+    origin.maxDistance = Math.max(origin.maxDistance, distance)
+    return distance
+  }, [])
+
   const press = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     event.preventDefault()
     try {
@@ -197,6 +235,9 @@ function MovementTouchZone({ onActionChange }: DirectionPadProps) {
       pointerId: event.pointerId,
       x: event.clientX,
       y: event.clientY,
+      crouchTapIntent: isCrouchTapTarget(dpadRef.current, event),
+      crouchGesture: false,
+      maxDistance: 0,
     }
     setActiveAction(null)
   }, [setActiveAction])
@@ -205,10 +246,20 @@ function MovementTouchZone({ onActionChange }: DirectionPadProps) {
     const origin = pointerOriginRef.current
     if (!origin || origin.pointerId !== event.pointerId) return
     event.preventDefault()
-    setActiveAction(getMovementZoneAction(event.currentTarget, origin, event))
-  }, [setActiveAction])
+    updatePointerTravel(event)
+    const nextAction = getMovementZoneAction(event.currentTarget, origin, event)
+
+    if (nextAction === 'crouch') {
+      origin.crouchGesture = true
+      setActiveAction(null)
+      return
+    }
+
+    setActiveAction(nextAction)
+  }, [setActiveAction, updatePointerTravel])
 
   const release = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+    const origin = pointerOriginRef.current
     event.preventDefault()
     try {
       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -217,11 +268,19 @@ function MovementTouchZone({ onActionChange }: DirectionPadProps) {
     } catch {
       // Keep mobile controls responsive even when capture state is browser-dependent.
     }
-    if (pointerOriginRef.current?.pointerId === event.pointerId) {
+
+    if (origin?.pointerId === event.pointerId) {
+      updatePointerTravel(event)
+      const activeAction = activeActionRef.current
+      const tapDistanceLimit = clampNumber(Math.min(event.currentTarget.clientWidth, event.currentTarget.clientHeight) * 0.035, 8, 18)
+      if (origin.crouchGesture || (origin.crouchTapIntent && origin.maxDistance <= tapDistanceLimit && activeAction !== 'left' && activeAction !== 'right')) {
+        onCrouchToggle()
+      }
       pointerOriginRef.current = null
     }
+
     setActiveAction(null)
-  }, [setActiveAction])
+  }, [onCrouchToggle, setActiveAction, updatePointerTravel])
 
   const loseCapture = React.useCallback(() => {
     pointerOriginRef.current = null
@@ -246,6 +305,7 @@ function MovementTouchZone({ onActionChange }: DirectionPadProps) {
       className="absolute bottom-0 left-0 top-0 w-[52%]"
     >
       <div
+        ref={dpadRef}
         className="shadow-runner-dpad pointer-events-none absolute bottom-[max(0.5rem,env(safe-area-inset-bottom))] left-[max(0.65rem,env(safe-area-inset-left))] isolate rounded-full text-[#f8eac0] drop-shadow-[0_16px_28px_rgba(0,0,0,0.58)]"
         style={{
           '--shadow-runner-dpad-size': 'clamp(6.12rem, 25.5svh, 8.08rem)',
@@ -424,6 +484,7 @@ export function ShadowRunnerGame({
 
     if (pressed && !wasPressed) {
       if (action === 'jump') {
+        state.crouch = false
         state.jumpPresses += 1
       } else if (action === 'attack') {
         state.attackPresses += 1
@@ -431,6 +492,13 @@ export function ShadowRunnerGame({
     }
 
     state[action] = pressed
+  }, [overlayOpen])
+
+  const toggleCrouch = React.useCallback(() => {
+    if (overlayOpen) return
+
+    const state = inputRef.current
+    state.crouch = !state.crouch
   }, [overlayOpen])
 
   const openPauseMenu = React.useCallback(() => {
@@ -673,7 +741,7 @@ export function ShadowRunnerGame({
       </div>
 
       <div className={`absolute inset-0 z-20 transition-opacity ${overlayOpen ? 'pointer-events-none opacity-35' : 'pointer-events-auto opacity-100'}`}>
-        <MovementTouchZone onActionChange={setAction} />
+        <MovementTouchZone onActionChange={setAction} onCrouchToggle={toggleCrouch} />
       </div>
 
       <div className={`pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-end px-[max(0.65rem,env(safe-area-inset-left))] pb-[max(0.45rem,env(safe-area-inset-bottom))] transition-opacity ${overlayOpen ? 'opacity-35' : 'opacity-100'}`}>

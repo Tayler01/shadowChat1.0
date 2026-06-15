@@ -71,6 +71,10 @@ interface ShadowRunnerDebugSnapshot {
     y: number
     velocityX: number
     velocityY: number
+    bodyTop: number
+    bodyBottom: number
+    bodyHeight: number
+    crouchInput: boolean
     health: number
     lives: number
   }
@@ -659,26 +663,29 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       && this.textures.get(terrainTexture).has(slabFrame)
       && this.textures.get(terrainTexture).has(blockFrame)
       && this.textures.get(terrainTexture).has(shelfFrame)
+    const undersideY = gate.y + gate.height - 31
+    const supportY = gate.y + gate.height - 92
+    const archiveStackY = gate.y + 46
 
     if (hasBellTerrain) {
-      const slab = this.add.image(visualX, gate.y + gate.height / 2 - 4, terrainTexture, slabFrame)
-      slab.setDisplaySize(gate.width + 34, 58)
+      const slab = this.add.image(visualX, undersideY, terrainTexture, slabFrame)
+      slab.setDisplaySize(gate.width + 34, 64)
       slab.setDepth(7)
 
-      const leftBlock = this.add.image(gate.x + 34, gate.y - 28, terrainTexture, blockFrame)
-      leftBlock.setDisplaySize(64, 112)
+      const leftBlock = this.add.image(gate.x + 34, supportY, terrainTexture, blockFrame)
+      leftBlock.setDisplaySize(70, 146)
       leftBlock.setDepth(6)
 
-      const rightBlock = this.add.image(gate.x + gate.width - 34, gate.y - 28, terrainTexture, blockFrame)
-      rightBlock.setDisplaySize(64, 112)
+      const rightBlock = this.add.image(gate.x + gate.width - 34, supportY, terrainTexture, blockFrame)
+      rightBlock.setDisplaySize(70, 146)
       rightBlock.setDepth(6)
 
-      const archiveStack = this.add.image(visualX, gate.y - 82, terrainTexture, shelfFrame)
-      archiveStack.setDisplaySize(Math.min(148, gate.width * 0.54), 122)
+      const archiveStack = this.add.image(visualX, archiveStackY, terrainTexture, shelfFrame)
+      archiveStack.setDisplaySize(Math.min(168, gate.width * 0.58), 138)
       archiveStack.setDepth(8)
     } else {
-      this.add.rectangle(visualX, gate.y + gate.height / 2 - 4, gate.width + 34, 58, 0x1b2130, 0.74)
-      this.add.rectangle(visualX, gate.y - 76, Math.min(148, gate.width * 0.54), 104, 0x2f261a, 0.82)
+      this.add.rectangle(visualX, undersideY, gate.width + 34, 64, 0x1b2130, 0.74)
+      this.add.rectangle(visualX, archiveStackY, Math.min(168, gate.width * 0.58), 124, 0x2f261a, 0.82)
     }
 
     const blocker = this.add.rectangle(
@@ -867,6 +874,10 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
               y: Math.round(this.player.y),
               velocityX: Math.round(playerBody?.velocity.x ?? 0),
               velocityY: Math.round(playerBody?.velocity.y ?? 0),
+              bodyTop: Math.round(playerBody?.top ?? 0),
+              bodyBottom: Math.round(playerBody?.bottom ?? 0),
+              bodyHeight: Math.round(playerBody?.height ?? 0),
+              crouchInput: this.controls.current.crouch,
               health: this.state.player.health,
               lives: this.state.player.lives,
             }

@@ -98,10 +98,12 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
   groups and use cooldowns for high-frequency events so gameplay feedback stays
   lightweight.
 - Mobile gameplay controls now use a researched split-thumb layout: one large
-  baked bottom-left D-pad visual for left/right/crouch, a full left-side
-  movement hit zone, and two separated baked bottom-right action buttons for
-  jump/attack. The center of the playfield stays clear while preserving
-  oversized touch targets for phone play.
+  baked bottom-left D-pad visual for held left/right movement and tap-toggle
+  crouch, a full left-side movement hit zone, and two separated baked
+  bottom-right action buttons for jump/attack. Jump clears the tap-toggle
+  crouch state so players can recover instantly after crawl sections. The
+  center of the playfield stays clear while preserving oversized touch targets
+  for phone play.
 - Route loading is staged: title art loads first, campaign-map art loads only
   when opening the map, and gameplay route art/SFX preload behind a branded
   route loading screen before Phaser mounts.

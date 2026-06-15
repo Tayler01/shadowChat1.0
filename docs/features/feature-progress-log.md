@@ -98,6 +98,11 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
   background/pagehide to avoid iPhone lock-screen media cards, and fixed the
   Shadow Runner title music action so stopped foreground music can restart from
   a user tap without disabling the saved music preference.
+- Bell Tower crouch-control follow-up, 2026-06-15: lowered the low-clearance
+  blocker bottoms so standing movement collides while crouched movement fits,
+  raised the blocker tops so climbing onto the archive platforms is much
+  harder, and changed the mobile D-pad crouch action from hold-to-crouch to
+  tap-toggle crouch with jump clearing the crouch state.
 - Verification, 2026-06-11: `npm run lint`,
   `npx tsc --noEmit -p tsconfig.app.json`, and `npm run build` passed.
   WebKit mobile landscape captures verified the revised controls at `932x430`

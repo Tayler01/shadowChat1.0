@@ -537,8 +537,8 @@ export const SHADOW_RUNNER_LEVEL_FOUR: ShadowRunnerLevelConfig = {
     { id: 'bell-final-tilt', x: 5280, y: 348, width: 142, height: 28, visualHeight: 50, visualOffsetY: -12, wobbleDurationMs: 610, wobbleRotation: 0.2, slideForce: 1800, maxSlideSpeed: 255 },
   ],
   crouchGates: [
-    { id: 'bell-low-archive-lintel-a', x: 512, y: 318, width: 286, height: 42 },
-    { id: 'bell-low-archive-lintel-b', x: 3432, y: 316, width: 320, height: 44 },
+    { id: 'bell-low-archive-lintel-a', x: 512, y: 232, width: 286, height: 158 },
+    { id: 'bell-low-archive-lintel-b', x: 3432, y: 232, width: 320, height: 158 },
   ],
   spikes: [
     { id: 'bell-start-pit', x: 850, y: 440, width: 104, height: 28 },
