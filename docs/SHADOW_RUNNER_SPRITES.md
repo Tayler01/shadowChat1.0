@@ -32,6 +32,7 @@ motion, frame timing, and home-screen composition.
 | lantern-bandit-scout | 5 | partial | Map 2 enemy: idle, run, lantern-pole jab, hit, defeated | `public/games/shadow-runner/sprites/strips/lantern-bandit-scout-v1-5f-128.png` | `public/games/shadow-runner/sprites/previews/lantern-bandit-scout-v1-5f-preview.png` |
 | barrel-roller | 5 | partial | Map 3 trap-enemy: idle, roll, impact, stunned, broken | `public/games/shadow-runner/sprites/strips/barrel-roller-v1-5f-128.png` | `public/games/shadow-runner/sprites/previews/barrel-roller-v1-5f-preview.png` |
 | scroll-thief | 5 | partial | Map 4 enemy: idle, dash, satchel swipe, hit, defeated | `public/games/shadow-runner/sprites/strips/scroll-thief-v1-5f-128.png` | `public/games/shadow-runner/sprites/previews/scroll-thief-v1-5f-preview.png` |
+| tower-archer | 5 | partial | Map 4 ranged enemy: idle, ready, aim, release, hit/defeated | `public/games/shadow-runner/sprites/strips/tower-archer-v1-5f-128.png` | `public/games/shadow-runner/sprites/previews/tower-archer-v1-5f-preview.png` |
 | candle-jester | 5 | partial | Map 5 enemy: idle, skip, candle trick, hit, defeated | `public/games/shadow-runner/sprites/strips/candle-jester-v1-5f-128.png` | `public/games/shadow-runner/sprites/previews/candle-jester-v1-5f-preview.png` |
 
 ## Frame Labels
@@ -106,6 +107,14 @@ motion, frame timing, and home-screen composition.
 4. hit-stunned
 5. defeated
 
+### tower-archer
+
+1. idle-watch
+2. bow-ready
+3. aim
+4. release
+5. hit-or-defeated
+
 ### candle-jester
 
 1. idle-grin
@@ -141,10 +150,14 @@ motion, frame timing, and home-screen composition.
   It is intentionally non-humanoid, with no hood, cape, satchel, sword, or
   hero-like pose, so it reads as a rolling trap enemy instead of a character
   variant.
-- `scroll-thief` is generated for Map 4, but is not wired into runtime yet.
-  It uses a teal short cape/sash, cream shirt, burgundy trousers, scholar cap,
-  visible face, and scroll/satchel-swipe silhouette so it reads as an archive
-  thief rather than another hooded Shadow Runner.
+- `scroll-thief` is wired into the Level 4 runtime as a faster archive-lane
+  patrol. It uses a teal short cape/sash, cream shirt, burgundy trousers,
+  scholar cap, visible face, and scroll/satchel-swipe silhouette so it reads as
+  an archive thief rather than another hooded Shadow Runner.
+- `tower-archer` is wired into the Level 4 runtime as a stationary ranged
+  enemy. It uses a narrow bell-tower watchman silhouette, bow poses, and warm
+  leather/stone colors so it stays distinct from the Shadow Runner hero while
+  matching the Bell Tower Archives theme.
 - `candle-jester` is generated for Map 5, but is not wired into runtime yet.
   It uses a cream theatrical mask, red-and-gold jester cap, motley tunic,
   curled shoes, candle wand, and fake coin silhouette so it reads as a trickster

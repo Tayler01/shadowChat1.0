@@ -134,6 +134,8 @@ const SHADOW_RUNNER_SHARED_GAMEPLAY_IMAGE_SOURCES = [
   SHADOW_RUNNER_ASSETS.hero.swordAttackStrip,
   SHADOW_RUNNER_ASSETS.enemies.clockworkSentryStrip,
   SHADOW_RUNNER_ASSETS.enemies.barrelRollerStrip,
+  SHADOW_RUNNER_ASSETS.enemies.scrollThiefStrip,
+  SHADOW_RUNNER_ASSETS.enemies.towerArcherStrip,
   SHADOW_RUNNER_ASSETS.gameplay.hudPlaque,
   SHADOW_RUNNER_ASSETS.gameplay.healthBarFrame,
   SHADOW_RUNNER_ASSETS.gameplay.heartFull,
@@ -447,6 +449,9 @@ function getShadowRunnerRouteImageSources(levelId: ShadowRunnerPlayableLevelId) 
     level.backgroundAsset,
     level.id === 'level-2' ? SHADOW_RUNNER_ASSETS.levels.lanternMarketBackground : undefined,
     level.id === 'level-3' ? SHADOW_RUNNER_ASSETS.levels.ivyViaductTerrainHazards : undefined,
+    level.id === 'level-4' ? SHADOW_RUNNER_ASSETS.levels.bellTowerPropsHazards : undefined,
+    level.id === 'level-4' ? SHADOW_RUNNER_ASSETS.levels.moonheartCrestStrip : undefined,
+    level.id === 'level-4' ? SHADOW_RUNNER_ASSETS.levels.boostAuraStrip : undefined,
   ].filter((source): source is string => Boolean(source))
 
   return Array.from(new Set(routeSources))

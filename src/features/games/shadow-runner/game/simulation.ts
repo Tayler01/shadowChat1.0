@@ -1,4 +1,4 @@
-import type { ShadowRunnerEnemyConfig, ShadowRunnerEnemyKind, ShadowRunnerLevelConfig } from './levels'
+import type { ShadowRunnerBoostPickup, ShadowRunnerEnemyConfig, ShadowRunnerEnemyKind, ShadowRunnerLevelConfig } from './levels'
 
 export interface ShadowRunnerHudState {
   lives: number
@@ -14,6 +14,9 @@ export interface ShadowRunnerHudState {
   coins: number
   totalCoins: number
   score: number
+  boostActive: boolean
+  boostRemainingMs: number
+  boostGuardCharges: number
   objective: string
   defeated: boolean
   outOfLives: boolean
@@ -29,6 +32,7 @@ export interface ShadowRunnerEnemyState {
   patrolLeft: number
   patrolRight: number
   patrolSpeed?: number
+  lastShotAt: number
   lastDamagedAt: number
   attackUntil: number
 }
@@ -44,6 +48,8 @@ export interface ShadowRunnerSimulationState {
     facing: 1 | -1
     attackingUntil: number
     attackCooldownUntil: number
+    boostActiveUntil: number
+    boostGuardCharges: number
     lastDamagedAt: number
   }
   enemy: ShadowRunnerEnemyState
@@ -70,6 +76,7 @@ function createEnemyState(enemy: ShadowRunnerEnemyConfig): ShadowRunnerEnemyStat
     patrolLeft: enemy.patrolLeft,
     patrolRight: enemy.patrolRight,
     patrolSpeed: enemy.patrolSpeed,
+    lastShotAt: 0,
     lastDamagedAt: 0,
     attackUntil: 0,
   }
@@ -85,6 +92,7 @@ function createEmptyEnemyState(): ShadowRunnerEnemyState {
     direction: -1,
     patrolLeft: 0,
     patrolRight: 0,
+    lastShotAt: 0,
     lastDamagedAt: 0,
     attackUntil: 0,
   }
@@ -108,6 +116,8 @@ export function createInitialShadowRunnerSimulation(
       facing: 1,
       attackingUntil: 0,
       attackCooldownUntil: 0,
+      boostActiveUntil: 0,
+      boostGuardCharges: 0,
       lastDamagedAt: 0,
     },
     enemy: primaryEnemy,
@@ -127,8 +137,13 @@ export function createInitialShadowRunnerSimulation(
 export function getShadowRunnerHudState(
   state: ShadowRunnerSimulationState,
   totalCoins: number,
+  time = 0,
 ): ShadowRunnerHudState {
   const activeEnemy = state.enemies.find(enemy => enemy.alive) ?? state.enemies[0] ?? state.enemy
+  const rawBoostRemainingMs = Math.max(0, state.player.boostActiveUntil - time)
+  const boostRemainingMs = rawBoostRemainingMs > 0
+    ? Math.ceil(rawBoostRemainingMs / 1000) * 1000
+    : 0
 
   return {
     lives: state.player.lives,
@@ -144,18 +159,31 @@ export function getShadowRunnerHudState(
     coins: state.player.coins,
     totalCoins,
     score: state.player.score,
+    boostActive: boostRemainingMs > 0,
+    boostRemainingMs,
+    boostGuardCharges: state.player.boostGuardCharges,
     objective: state.objective,
     defeated: state.defeated,
     outOfLives: state.outOfLives,
   }
 }
 
+export function isShadowRunnerBoostActive(state: ShadowRunnerSimulationState, time: number) {
+  return state.player.boostActiveUntil > time
+}
+
 export function damageShadowRunnerPlayer(state: ShadowRunnerSimulationState, time: number) {
   if (time - state.player.lastDamagedAt < 820) return false
 
   state.player.lastDamagedAt = time
+  if (isShadowRunnerBoostActive(state, time) && state.player.boostGuardCharges > 0) {
+    state.player.boostGuardCharges -= 1
+    state.player.score = Math.max(0, state.player.score - 5)
+    return true
+  }
+
   state.player.health = Math.max(0, state.player.health - 1)
-  state.player.score = Math.max(0, state.player.score - 15)
+  state.player.score = Math.max(0, state.player.score - (isShadowRunnerBoostActive(state, time) ? 8 : 15))
   return true
 }
 
@@ -205,4 +233,15 @@ export function damageShadowRunnerEnemy(
 export function collectShadowRunnerCoin(state: ShadowRunnerSimulationState) {
   state.player.coins += 1
   state.player.score += 25
+}
+
+export function collectShadowRunnerBoost(
+  state: ShadowRunnerSimulationState,
+  time: number,
+  boost: ShadowRunnerBoostPickup,
+) {
+  state.player.score += boost.scoreValue ?? 125
+  state.player.health = state.player.maxHealth
+  state.player.boostActiveUntil = Math.max(state.player.boostActiveUntil, time) + (boost.durationMs ?? 8000)
+  state.player.boostGuardCharges = Math.max(state.player.boostGuardCharges, boost.guardCharges ?? 2)
 }

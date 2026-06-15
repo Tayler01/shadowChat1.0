@@ -251,6 +251,34 @@ bridge visual. Source and preview files remain cataloged for review.
   - note: teal short cape/sash, cream shirt, burgundy trousers, scholar cap,
     visible face, and scroll/satchel-swipe silhouette keep it distinct from the
     Shadow Runner hero.
+- Tower Archer v1:
+  - source: `public/games/shadow-runner/sprites/raw/tower-archer-v1-source.png`
+  - runtime strip: `public/games/shadow-runner/sprites/strips/tower-archer-v1-5f-128.png`
+  - preview: `public/games/shadow-runner/sprites/previews/tower-archer-v1-5f-preview.png`
+  - note: generated on 2026-06-15 for the harder Bell Tower route as a new
+    ranged enemy with idle, ready, aim, release, and hit/defeated frames.
+- Moonheart Crest boost and Bell Tower traversal assets:
+  - source sheet:
+    `public/games/shadow-runner/level-assets/level-4/generated/bell-tower-boost-and-crouch-assets-v1-source.png`
+  - Moonheart runtime strip:
+    `public/games/shadow-runner/level-assets/level-4/collectibles/moonheart-crest-4f-64.png`
+  - Moonheart preview:
+    `public/games/shadow-runner/level-assets/level-4/collectibles/moonheart-crest-4f-preview.png`
+  - note: generated on 2026-06-15 to make Level 4 feel fresh while keeping the
+    same medieval archive palette. Runtime crouch traversal now uses
+    low-clearance platforms assembled from Bell Tower slabs, shelves, and
+    blocks instead of archway art, so the obstacle reads correctly in 2D. The
+    Moonheart Crest is a high-value pickup that restores health, boosts attack
+    damage, and grants temporary damage resistance.
+- Moonheart boost aura:
+  - source:
+    `public/games/shadow-runner/level-assets/level-4/generated/bell-tower-boost-aura-v1-source.png`
+  - runtime strip:
+    `public/games/shadow-runner/level-assets/level-4/vfx/boost-aura-4f-128.png`
+  - preview:
+    `public/games/shadow-runner/level-assets/level-4/vfx/boost-aura-4f-preview.png`
+  - note: generated separately from the pickup sheet so the in-game aura can
+    wrap the existing hero sprite without baking a second hero into the VFX.
 - Batch contact sheet:
   `public/games/shadow-runner/level-assets/level-4/batch-4-bell-tower-archives-contact-sheet.png`
 

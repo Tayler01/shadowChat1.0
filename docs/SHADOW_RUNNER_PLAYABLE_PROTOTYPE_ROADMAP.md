@@ -84,6 +84,12 @@ enemy, and reach a finish gate.
 - Level 2: longer market-roof route with more vertical movement, three
   sentries, three faster tilt bridges, more coins, and denser spikes around
   timing hazards.
+- Level 3: Ivy Viaduct combines Barrel Rollers, a Clockwork Sentry, stronger
+  tilt bridges, longer jumps, and heavier spike pressure.
+- Level 4: Bell Tower Archives is the first long hard route. It requires
+  low-clearance archive platforms, mixes Clockwork Sentries, Barrel Roller, Scroll Thieves, and
+  Tower Archers, places coins on risky optional lines, and introduces the
+  Moonheart Crest boost for temporary attack and damage-resistance pressure.
 - Each map stop carries a route type, difficulty tier, difficulty label, and
   mechanic preview so future route design can stay ordered from simple to
   complex.
@@ -185,3 +191,37 @@ enemy, and reach a finish gate.
   `output/shadow-runner/chrome-map-detail.png`,
   `output/shadow-runner/chrome-strong-tilt-end.png`, and
   `output/shadow-runner/chrome-level2-start.png`.
+
+## June 15, 2026 - Bell Tower Archives Level 4
+
+- Added Bell Tower Archives as the next playable route and made it longer and
+  harder than the earlier levels without making route completion impossible.
+- Required crouch traversal under low archive platforms, with risky optional
+  coin lines above and around the low-clearance sections for harder
+  perfect-score play.
+- Added Tower Archer runtime behavior with projectile shots, wired Scroll
+  Thieves into the enemy loop, and reused older enemies in a denser mixed
+  gauntlet.
+- Added the Moonheart Crest pickup: it restores health, awards a higher point
+  value, temporarily boosts attack damage, and gives temporary guard charges
+  for damage resistance.
+- Generated and wired fresh Tower Archer, Moonheart Crest, and boost aura
+  assets while reusing Bell Tower slabs, shelves, and archive props for the
+  low-clearance crawl-under platforms.
+- Latest verification artifacts:
+  `output/playwright/shadow-runner-bell-tower-20260615/`.
+
+## June 15, 2026 - Bell Tower Polish And Launch QA
+
+- Reworked the required crouch obstacles from archway-style art into
+  side-view low-clearance platforms built from Bell Tower slabs, stone blocks,
+  and archive shelves. The player now crawls under a heavy overhead structure
+  instead of appearing to pass through an arch.
+- Rounded Moonheart boost HUD countdown updates to whole-second boundaries so
+  the React HUD does not redraw at frame rate while the Phaser scene is
+  running.
+- Production-preview polish sweep covered title, level map, playable Levels 1
+  through 4, completion overlays, Bell Tower low-clearance traversal,
+  Moonheart boost state, first enemy encounter, and `740x390` phone-landscape
+  map/start checks. Evidence:
+  `output/playwright/shadow-runner-polish-final-20260615/`.

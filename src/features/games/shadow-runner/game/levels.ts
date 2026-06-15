@@ -7,7 +7,7 @@ export interface ShadowRunnerRect {
   width: number
   height: number
   visualId?: string
-  terrainSet?: 'stone' | 'ivy'
+  terrainSet?: 'stone' | 'ivy' | 'bell'
 }
 
 export interface ShadowRunnerTiltPlatform extends ShadowRunnerRect {
@@ -25,7 +25,20 @@ export interface ShadowRunnerPoint {
   y: number
 }
 
-export type ShadowRunnerEnemyKind = 'clockwork-sentry' | 'barrel-roller'
+export interface ShadowRunnerBoostPickup extends ShadowRunnerPoint {
+  scoreValue?: number
+  durationMs?: number
+  guardCharges?: number
+}
+
+export interface ShadowRunnerCrouchGate extends ShadowRunnerRect {
+  visualFrame?: number
+  visualWidth?: number
+  visualHeight?: number
+  visualOffsetY?: number
+}
+
+export type ShadowRunnerEnemyKind = 'clockwork-sentry' | 'barrel-roller' | 'scroll-thief' | 'tower-archer'
 
 export interface ShadowRunnerEnemyConfig extends ShadowRunnerPoint {
   kind: ShadowRunnerEnemyKind
@@ -35,9 +48,12 @@ export interface ShadowRunnerEnemyConfig extends ShadowRunnerPoint {
   patrolRight: number
   direction: 1 | -1
   patrolSpeed?: number
+  attackRange?: number
+  attackCooldownMs?: number
+  projectileSpeed?: number
 }
 
-export type ShadowRunnerPlayableLevelId = 'tutorial' | 'level-1' | 'level-2' | 'level-3'
+export type ShadowRunnerPlayableLevelId = 'tutorial' | 'level-1' | 'level-2' | 'level-3' | 'level-4'
 
 export interface ShadowRunnerLevelConfig {
   id: ShadowRunnerPlayableLevelId
@@ -53,8 +69,10 @@ export interface ShadowRunnerLevelConfig {
   playerStart: ShadowRunnerPoint
   platforms: ShadowRunnerRect[]
   tiltPlatforms: ShadowRunnerTiltPlatform[]
+  crouchGates?: ShadowRunnerCrouchGate[]
   spikes: ShadowRunnerRect[]
   coins: ShadowRunnerPoint[]
+  boosts?: ShadowRunnerBoostPickup[]
   enemy?: ShadowRunnerEnemyConfig
   enemies?: ShadowRunnerEnemyConfig[]
   finish: ShadowRunnerRect
@@ -392,6 +410,181 @@ export const SHADOW_RUNNER_LEVEL_THREE: ShadowRunnerLevelConfig = {
   ],
 }
 
+export const SHADOW_RUNNER_LEVEL_FOUR: ShadowRunnerLevelConfig = {
+  id: 'level-4',
+  campaignLevel: 4,
+  title: 'Bell Tower Archives',
+  subtitle: 'Campaign Route 4',
+  objective: 'Find the forged order',
+  introLine: 'Find forged records. Crouch low. Watch arrows.',
+  completionLine: 'Bell Tower cleared. The forged line is in your satchel.',
+  backgroundAsset: SHADOW_RUNNER_ASSETS.levels.bellTowerBackground,
+  worldWidth: 6120,
+  worldHeight: 540,
+  playerStart: { id: 'start', x: 118, y: 398 },
+  enemies: [
+    {
+      id: 'archive-sentry-a',
+      kind: 'clockwork-sentry',
+      x: 1580,
+      y: 386,
+      health: 4,
+      maxHealth: 4,
+      patrolLeft: 1455,
+      patrolRight: 1845,
+      direction: -1,
+      patrolSpeed: 94,
+    },
+    {
+      id: 'archive-tower-archer-a',
+      kind: 'tower-archer',
+      x: 2578,
+      y: 312,
+      health: 3,
+      maxHealth: 3,
+      patrolLeft: 2528,
+      patrolRight: 2628,
+      direction: -1,
+      patrolSpeed: 0,
+      attackRange: 620,
+      attackCooldownMs: 1220,
+      projectileSpeed: 430,
+    },
+    {
+      id: 'archive-barrel-roller',
+      kind: 'barrel-roller',
+      x: 3045,
+      y: 390,
+      health: 3,
+      maxHealth: 3,
+      patrolLeft: 2895,
+      patrolRight: 3280,
+      direction: 1,
+      patrolSpeed: 168,
+    },
+    {
+      id: 'archive-scroll-thief-a',
+      kind: 'scroll-thief',
+      x: 4165,
+      y: 366,
+      health: 2,
+      maxHealth: 2,
+      patrolLeft: 4038,
+      patrolRight: 4405,
+      direction: -1,
+      patrolSpeed: 176,
+    },
+    {
+      id: 'archive-tower-archer-b',
+      kind: 'tower-archer',
+      x: 4630,
+      y: 294,
+      health: 4,
+      maxHealth: 4,
+      patrolLeft: 4575,
+      patrolRight: 4690,
+      direction: -1,
+      patrolSpeed: 0,
+      attackRange: 680,
+      attackCooldownMs: 1080,
+      projectileSpeed: 470,
+    },
+    {
+      id: 'archive-sentry-b',
+      kind: 'clockwork-sentry',
+      x: 5050,
+      y: 386,
+      health: 4,
+      maxHealth: 4,
+      patrolLeft: 4870,
+      patrolRight: 5265,
+      direction: 1,
+      patrolSpeed: 106,
+    },
+    {
+      id: 'archive-scroll-thief-b',
+      kind: 'scroll-thief',
+      x: 5485,
+      y: 346,
+      health: 3,
+      maxHealth: 3,
+      patrolLeft: 5390,
+      patrolRight: 5650,
+      direction: -1,
+      patrolSpeed: 188,
+    },
+  ],
+  finish: { id: 'bell-tower-seal', x: 5968, y: 280, width: 74, height: 150 },
+  platforms: [
+    { id: 'bell-start-walkway', visualId: 'bell-long-ledge', x: 0, y: 424, width: 405, height: 72, terrainSet: 'bell' },
+    { id: 'bell-crouch-floor-a', visualId: 'bell-long-ledge', x: 430, y: 424, width: 420, height: 72, terrainSet: 'bell' },
+    { id: 'bell-step-a', visualId: 'bell-small-ledge', x: 940, y: 388, width: 220, height: 44, terrainSet: 'bell' },
+    { id: 'bell-sentry-run', visualId: 'bell-long-ledge', x: 1440, y: 420, width: 510, height: 72, terrainSet: 'bell' },
+    { id: 'bell-risk-shelf-a', visualId: 'bell-scroll-shelf', x: 1682, y: 284, width: 188, height: 38, terrainSet: 'bell' },
+    { id: 'bell-mid-landing', visualId: 'bell-wide-ledge', x: 2076, y: 390, width: 342, height: 70, terrainSet: 'bell' },
+    { id: 'bell-archer-perch-a', visualId: 'bell-small-block', x: 2504, y: 348, width: 238, height: 50, terrainSet: 'bell' },
+    { id: 'bell-barrel-lane', visualId: 'bell-long-ledge', x: 2880, y: 424, width: 445, height: 72, terrainSet: 'bell' },
+    { id: 'bell-crouch-floor-b', visualId: 'bell-wide-ledge', x: 3360, y: 424, width: 438, height: 72, terrainSet: 'bell' },
+    { id: 'bell-thief-lane', visualId: 'bell-wood-platform', x: 4040, y: 400, width: 382, height: 58, terrainSet: 'bell' },
+    { id: 'bell-archer-perch-b', visualId: 'bell-small-ledge', x: 4560, y: 332, width: 264, height: 46, terrainSet: 'bell' },
+    { id: 'bell-gauntlet-floor', visualId: 'bell-long-ledge', x: 4860, y: 420, width: 460, height: 72, terrainSet: 'bell' },
+    { id: 'bell-final-step', visualId: 'bell-small-block', x: 5400, y: 382, width: 260, height: 48, terrainSet: 'bell' },
+    { id: 'bell-final-walkway', visualId: 'bell-wide-ledge', x: 5708, y: 424, width: 412, height: 72, terrainSet: 'bell' },
+  ],
+  tiltPlatforms: [
+    { id: 'bell-tilt-bridge-a', x: 1216, y: 356, width: 158, height: 28, visualHeight: 52, visualOffsetY: -12, wobbleDurationMs: 720, wobbleRotation: 0.17, slideForce: 1540, maxSlideSpeed: 218 },
+    { id: 'bell-tilt-bridge-b', x: 3824, y: 346, width: 148, height: 28, visualHeight: 50, visualOffsetY: -12, wobbleDurationMs: 650, wobbleRotation: 0.19, slideForce: 1720, maxSlideSpeed: 240 },
+    { id: 'bell-final-tilt', x: 5280, y: 348, width: 142, height: 28, visualHeight: 50, visualOffsetY: -12, wobbleDurationMs: 610, wobbleRotation: 0.2, slideForce: 1800, maxSlideSpeed: 255 },
+  ],
+  crouchGates: [
+    { id: 'bell-low-archive-lintel-a', x: 512, y: 318, width: 286, height: 42 },
+    { id: 'bell-low-archive-lintel-b', x: 3432, y: 316, width: 320, height: 44 },
+  ],
+  spikes: [
+    { id: 'bell-start-pit', x: 850, y: 440, width: 104, height: 28 },
+    { id: 'bell-tilt-pit-a', x: 1168, y: 440, width: 78, height: 28 },
+    { id: 'bell-tilt-pit-b', x: 1368, y: 440, width: 76, height: 28 },
+    { id: 'bell-sentry-spikes', x: 1908, y: 402, width: 48, height: 24 },
+    { id: 'bell-archive-gap-a', x: 2422, y: 440, width: 78, height: 28 },
+    { id: 'bell-barrel-warning', x: 3272, y: 440, width: 78, height: 28 },
+    { id: 'bell-crouch-exit-spikes', x: 3796, y: 440, width: 64, height: 28 },
+    { id: 'bell-thief-lane-spikes', x: 4408, y: 412, width: 54, height: 24 },
+    { id: 'bell-archer-drop-spikes', x: 4818, y: 440, width: 54, height: 28 },
+    { id: 'bell-gauntlet-spikes', x: 5318, y: 438, width: 76, height: 28 },
+    { id: 'bell-final-spikes', x: 5658, y: 438, width: 58, height: 28 },
+  ],
+  coins: [
+    { id: 'coin-1', x: 292, y: 334 },
+    { id: 'coin-2', x: 610, y: 378 },
+    { id: 'coin-3', x: 730, y: 378 },
+    { id: 'coin-4', x: 1034, y: 302 },
+    { id: 'coin-5', x: 1288, y: 278 },
+    { id: 'coin-6', x: 1512, y: 332 },
+    { id: 'coin-7', x: 1745, y: 226 },
+    { id: 'coin-8', x: 1842, y: 226 },
+    { id: 'coin-9', x: 2180, y: 308 },
+    { id: 'coin-10', x: 2360, y: 308 },
+    { id: 'coin-11', x: 2572, y: 272 },
+    { id: 'coin-12', x: 3010, y: 332 },
+    { id: 'coin-13', x: 3208, y: 332 },
+    { id: 'coin-14', x: 3520, y: 378 },
+    { id: 'coin-15', x: 3678, y: 378 },
+    { id: 'coin-16', x: 3900, y: 276 },
+    { id: 'coin-17', x: 4155, y: 314 },
+    { id: 'coin-18', x: 4328, y: 314 },
+    { id: 'coin-19', x: 4616, y: 272 },
+    { id: 'coin-20', x: 4978, y: 330 },
+    { id: 'coin-21', x: 5178, y: 330 },
+    { id: 'coin-22', x: 5340, y: 270 },
+    { id: 'coin-23', x: 5492, y: 304 },
+    { id: 'coin-24', x: 5888, y: 330 },
+  ],
+  boosts: [
+    { id: 'moonheart-crest-high-archive', x: 1768, y: 222, scoreValue: 140, durationMs: 8800, guardCharges: 2 },
+    { id: 'moonheart-crest-archer-perch', x: 4644, y: 272, scoreValue: 140, durationMs: 7600, guardCharges: 2 },
+  ],
+}
+
 export function getShadowRunnerLevelEnemies(level: ShadowRunnerLevelConfig) {
   return level.enemies ?? (level.enemy ? [level.enemy] : [])
 }
@@ -401,6 +594,7 @@ export const SHADOW_RUNNER_LEVEL_CONFIGS: Record<ShadowRunnerPlayableLevelId, Sh
   'level-1': SHADOW_RUNNER_FULL_LEVEL_ONE,
   'level-2': SHADOW_RUNNER_LEVEL_TWO,
   'level-3': SHADOW_RUNNER_LEVEL_THREE,
+  'level-4': SHADOW_RUNNER_LEVEL_FOUR,
 }
 
 export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
@@ -454,10 +648,11 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     difficultyTier: 4,
     difficultyLabel: 'Vertical Climb',
     routeType: 'Tower Route',
-    mechanicPreview: 'Narrow ledges, arrow slits, scroll thieves',
+    mechanicPreview: 'Required low-clearance platforms, Tower Archers, scroll thieves, and hard bonus routes',
     thumbnail: SHADOW_RUNNER_ASSETS.levels.bellTowerThumbnail320,
     locationButton: SHADOW_RUNNER_ASSETS.levels.bellTowerLocationButton,
     mapPosition: { left: 64, top: 49 },
+    playableLevelId: 'level-4',
   },
   {
     id: 'level-5',

@@ -50,6 +50,9 @@ function createDefaultHud(levelId: ShadowRunnerPlayableLevelId): ShadowRunnerHud
     coins: 0,
     totalCoins: level.coins.length,
     score: 0,
+    boostActive: false,
+    boostRemainingMs: 0,
+    boostGuardCharges: 0,
     objective: level.objective,
     defeated: false,
     outOfLives: false,
@@ -589,7 +592,7 @@ export function ShadowRunnerGame({
       )}
 
       {ready && routeIntroVisible && !overlayOpen && (
-        <div className="pointer-events-none absolute left-1/2 top-[17%] z-20 w-[min(58vw,28rem)] -translate-x-1/2 text-center text-[#150e07] drop-shadow-[0_18px_38px_rgba(0,0,0,0.58)]">
+        <div className="pointer-events-none absolute left-1/2 top-[17%] z-20 w-[min(76vw,36rem)] -translate-x-1/2 text-center text-[#150e07] drop-shadow-[0_18px_38px_rgba(0,0,0,0.58)]">
           <div className="relative h-16 min-[740px]:h-[4.6rem]">
             <img
               src={SHADOW_RUNNER_ASSETS.home.optionsMenuButton}
@@ -601,7 +604,7 @@ export function ShadowRunnerGame({
               <p className="text-[0.48rem] font-black uppercase leading-none tracking-[0.18em] text-[#5a3818] min-[740px]:text-[0.58rem]">
                 Mission
               </p>
-              <p className="mt-1 line-clamp-2 text-[0.6rem] font-black uppercase leading-[1.08] tracking-[0.08em] min-[740px]:text-[0.72rem]">
+              <p className="mt-1 line-clamp-2 text-[0.56rem] font-black uppercase leading-[1.08] tracking-[0.06em] min-[740px]:text-[0.6rem] min-[930px]:text-[0.66rem]">
                 {routeIntroLine}
               </p>
             </div>
@@ -640,6 +643,23 @@ export function ShadowRunnerGame({
             {hud.score}
           </div>
         </div>
+
+        {hud.boostActive && (
+          <div
+            aria-label={`Moonheart boost ${Math.ceil(hud.boostRemainingMs / 1000)} seconds remaining`}
+            className="pointer-events-none mx-auto mt-1 flex h-7 w-fit items-center gap-1.5 rounded border border-[#e8c46b]/45 bg-[#130912]/78 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#f0d381] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
+          >
+            <img
+              src={SHADOW_RUNNER_ASSETS.levels.moonheartCrestStrip}
+              alt=""
+              aria-hidden="true"
+              className="h-5 w-5 object-none object-left"
+              draggable={false}
+            />
+            <span>{Math.ceil(hud.boostRemainingMs / 1000)}s</span>
+            {hud.boostGuardCharges > 0 && <span className="text-[#f8e8ad]">Guard {hud.boostGuardCharges}</span>}
+          </div>
+        )}
 
         <button
           type="button"

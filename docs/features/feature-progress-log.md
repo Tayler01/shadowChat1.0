@@ -20,7 +20,7 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
 - Branch: `main`
 - Current checkpoint: direct Shadow Runner entry without an access-code gate,
   campaign level-map progression, reusable level configs, Level 1 through
-  Level 3 prototype routes, and mobile landscape/orientation handling.
+  Level 4 prototype routes, and mobile landscape/orientation handling.
 - Roadmap: [`docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md`](C:/repos/chat2.0/docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md:1)
 - Latest pass, 2026-06-09: generated dedicated options-scroll and options-row
   button assets; removed title back/sound controls; added title Options and
@@ -73,6 +73,25 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
   the rotate gate as the unsupported-orientation fallback, and added a
   picker-level best-effort fullscreen/landscape request that is released on
   Shadow Runner exit.
+- Latest pass, 2026-06-15: added the playable Level 4 `Bell Tower Archives`
+  route with required low-clearance archive platforms, risky optional coin
+  lines, Scroll Thieves, Tower Archers with projectiles, mixed old enemies, and
+  the Moonheart Crest health-restore/attack/damage-resistance boost.
+- Verification, 2026-06-15: `npm run lint`,
+  `npx tsc --noEmit -p tsconfig.app.json`, `npm run build`, and
+  `npx jest --runInBand` passed. Chrome production-preview smoke passed at
+  `932x430` and `740x390`, covering Bell Tower detail/start, required crouch
+  traversal, Moonheart boost HUD, Tower Archer encounter, finish overlay, and a
+  debug snapshot with grounded archers and moving patrol enemies. Evidence in
+  `output/playwright/shadow-runner-bell-tower-20260615/`.
+- Polish follow-up, 2026-06-15: replaced the Bell Tower arch-style crouch
+  obstacle visuals with low-clearance overhead platforms assembled from Bell
+  Tower slabs, blocks, and archive shelves, and rounded Moonheart boost HUD
+  countdown updates to whole seconds for lighter React overlay churn.
+  Production-preview evidence in
+  `output/playwright/shadow-runner-polish-final-20260615/` covers title, map,
+  playable Levels 1-4, Bell Tower low-clearance traversal, boost, enemy,
+  completion, and `740x390` phone-landscape checks.
 - Verification, 2026-06-11: `npm run lint`,
   `npx tsc --noEmit -p tsconfig.app.json`, and `npm run build` passed.
   WebKit mobile landscape captures verified the revised controls at `932x430`

@@ -56,6 +56,8 @@ export const SHADOW_RUNNER_ASSETS = {
   enemies: {
     clockworkSentryStrip: `${ASSET_ROOT}/sprites/strips/clockwork-sentry-v2-6f-128.png`,
     barrelRollerStrip: `${ASSET_ROOT}/sprites/strips/barrel-roller-v1-5f-128.png`,
+    scrollThiefStrip: `${ASSET_ROOT}/sprites/strips/scroll-thief-v1-5f-128.png`,
+    towerArcherStrip: `${ASSET_ROOT}/sprites/strips/tower-archer-v1-5f-128.png`,
     candleJesterStrip: `${ASSET_ROOT}/sprites/strips/candle-jester-v1-5f-128.png`,
   },
   gameplay: {
@@ -94,6 +96,10 @@ export const SHADOW_RUNNER_ASSETS = {
     ivyViaductThumbnail320: `${LEVEL_ROOT}/level-3/ui/ivy-viaduct-thumbnail-320x180.webp`,
     bellTowerThumbnail160: `${LEVEL_ROOT}/level-4/ui/bell-tower-archives-thumbnail-160x90.webp`,
     bellTowerThumbnail320: `${LEVEL_ROOT}/level-4/ui/bell-tower-archives-thumbnail-320x180.webp`,
+    bellTowerBackground: `${LEVEL_ROOT}/level-4/background/bell-tower-archives-background.webp`,
+    bellTowerPropsHazards: `${LEVEL_ROOT}/level-4/props/bell-tower-archives-props-hazards-v1-transparent.png`,
+    moonheartCrestStrip: `${LEVEL_ROOT}/level-4/collectibles/moonheart-crest-4f-64.png`,
+    boostAuraStrip: `${LEVEL_ROOT}/level-4/vfx/boost-aura-4f-128.png`,
     candleFairThumbnail160: `${LEVEL_ROOT}/level-5/ui/candle-fair-ruins-thumbnail-160x90.webp`,
     candleFairThumbnail320: `${LEVEL_ROOT}/level-5/ui/candle-fair-ruins-thumbnail-320x180.webp`,
     candleFairBackground: `${LEVEL_ROOT}/level-5/background/candle-fair-ruins-background.webp`,

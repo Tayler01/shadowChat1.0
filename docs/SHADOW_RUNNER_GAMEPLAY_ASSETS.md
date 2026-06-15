@@ -21,8 +21,15 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
 | Coin sparkle strip | `public/games/shadow-runner/gameplay-assets/sliced/coin-sparkle-strip.png` | Phaser coin pickup sparkle strip. |
 | Clockwork Sentry strip | `public/games/shadow-runner/sprites/strips/clockwork-sentry-v2-6f-128.png` | First playable enemy runtime strip. |
 | Barrel Roller strip | `public/games/shadow-runner/sprites/strips/barrel-roller-v1-5f-128.png` | Level 3 enemy strip with idle, roll, impact, hit, and defeated states. |
+| Scroll Thief strip | `public/games/shadow-runner/sprites/strips/scroll-thief-v1-5f-128.png` | Fast Bell Tower archive enemy with idle, dash, swipe, hit, and defeated states. |
+| Tower Archer strip | `public/games/shadow-runner/sprites/strips/tower-archer-v1-5f-128.png` | New Bell Tower ranged enemy with idle, ready, aim, release, and defeated/hit states. |
 | Ivy Viaduct background | `public/games/shadow-runner/level-assets/level-3/background/ivy-viaduct-background.webp` | Level 3 route backdrop. |
 | Ivy Viaduct terrain/hazards sheet | `public/games/shadow-runner/level-assets/level-3/terrain/ivy-viaduct-terrain-hazards-v1-transparent.png` | Level 3 platform/ruin visual source registered as Phaser terrain frames. |
+| Bell Tower Archives background | `public/games/shadow-runner/level-assets/level-4/background/bell-tower-archives-background.webp` | Level 4 route backdrop. |
+| Bell Tower props/hazards sheet | `public/games/shadow-runner/level-assets/level-4/props/bell-tower-archives-props-hazards-v1-transparent.png` | Level 4 platform, archive, bell, arrow, and prop source registered as Phaser terrain frames. |
+| Moonheart Crest strip | `public/games/shadow-runner/level-assets/level-4/collectibles/moonheart-crest-4f-64.png` | High-value Level 4 boost pickup that restores health, raises attack damage, and grants temporary guard charges. |
+| Moonheart boost aura | `public/games/shadow-runner/level-assets/level-4/vfx/boost-aura-4f-128.png` | Animated aura shown around the hero while the Moonheart boost is active. |
+| Low-clearance archive platforms | `public/games/shadow-runner/level-assets/level-4/props/bell-tower-archives-props-hazards-v1-transparent.png` | Level 4 crawl-under slabs assembled from Bell Tower platform, shelf, and block frames with invisible overhead blockers. |
 
 ## Generated Audio Assets
 
@@ -55,6 +62,12 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
   `public/games/shadow-runner/sprites/raw/clockwork-sentry-v2-source.png`
 - Sentry transparent strip:
   `public/games/shadow-runner/sprites/transparent/clockwork-sentry-v2-6f-strip.png`
+- Tower Archer source:
+  `public/games/shadow-runner/sprites/raw/tower-archer-v1-source.png`
+- Bell Tower generated boost source:
+  `public/games/shadow-runner/level-assets/level-4/generated/bell-tower-boost-and-crouch-assets-v1-source.png`
+  and
+  `public/games/shadow-runner/level-assets/level-4/generated/bell-tower-boost-aura-v1-source.png`
 - Audio generator:
   `scripts/generate-shadow-runner-audio.mjs`
 
@@ -71,6 +84,9 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
 - Level 3 now registers a second terrain frame set for the generated Ivy
   Viaduct sheet and uses kind-aware enemy animation helpers for Clockwork
   Sentry and Barrel Roller runtime states.
+- Level 4 registers the generated Bell Tower props/hazards sheet, low-clearance
+  overhead platform visuals, Moonheart boost pickup/aura, Scroll Thief
+  animation states, and Tower Archer ranged attacks.
 - Lobby music is enabled by default on title/lobby/map surfaces and is paused
   automatically during gameplay; SFX remain enabled by default in both menus
   and gameplay unless the local Shadow Runner sound preference is disabled.
