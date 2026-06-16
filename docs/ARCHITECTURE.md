@@ -2,9 +2,9 @@
 
 This document is a high-signal map of the current ShadowChat codebase.
 
-## Documentation Status - June 12, 2026
+## Documentation Status - June 15, 2026
 
-This architecture map is current for the shipped `main` branch and now includes the June 11 Shadow Runner campaign-map, Level 3, generated gameplay assets, original SFX, mobile control/orientation updates, and Shadow Mystery story expansion work. Known architecture follow-ups are tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1): remaining Supabase policy/RPC hardening, service-role bypass checks, production deployment/smoke for all shared safe-fetch adopters, frontend polish, and broader realtime/send/scroll helper extraction.
+This architecture map is current for the shipped `main` branch and now includes the June 15 Shadow Runner Bell Tower Level 4, Web Audio soundtrack controller, tap-toggle crouch, completion-medal schema, push-subscription foreground repair, and feature auth-refresh hardening work. Known architecture follow-ups are tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1): remaining Supabase policy/RPC hardening, service-role bypass checks, production deployment/smoke for all shared safe-fetch adopters, frontend polish, and broader realtime/send/scroll helper extraction.
 
 ## High-Level System
 
@@ -38,7 +38,7 @@ React UI
 - [`src/components/profile`](C:/repos/chat2.0/src/components/profile): user profile experience, including avatar crop/zoom/position editing before upload
 - [`src/components/settings`](C:/repos/chat2.0/src/components/settings): sectioned settings, notification setup, feedback, admin tools, and weather location
 - [`src/components/layout`](C:/repos/chat2.0/src/components/layout): shell, nav, and responsive structure
-- [`src/features/games`](C:/repos/chat2.0/src/features/games): Entertainment picker and game surfaces. Shadow Runner currently lives under [`src/features/games/shadow-runner`](C:/repos/chat2.0/src/features/games/shadow-runner) with an asset-driven title screen, Shadow Runner-scoped rotate gate, 10-stop campaign map, lazy-loaded Phaser levels, DOM HUD/touch controls, title/options scroll menus, pause/exit confirmation menus, and a best-effort Android fullscreen/landscape request from the picker.
+- [`src/features/games`](C:/repos/chat2.0/src/features/games): Entertainment picker and game surfaces. Shadow Runner currently lives under [`src/features/games/shadow-runner`](C:/repos/chat2.0/src/features/games/shadow-runner) with an asset-driven title screen, Shadow Runner-scoped rotate gate, 10-stop campaign map, lazy-loaded Phaser levels through Level 4, DOM HUD/touch controls, title/options scroll menus, pause/exit confirmation menus, foreground-only Web Audio game soundtracks, and a best-effort Android fullscreen/landscape request from the picker.
 - [`src/features/entertainment`](C:/repos/chat2.0/src/features/entertainment): non-game Entertainment surfaces such as Shado TV, Shadow Mystery, and Will & Kirk.
 
 ### Hooks
@@ -56,6 +56,7 @@ React UI
 - [`useWeatherPreference`](C:/repos/chat2.0/src/hooks/useWeatherPreference.ts:1): private per-user weather location load/save/clear
 - [`useWeatherForecast`](C:/repos/chat2.0/src/hooks/useWeatherForecast.ts:1): Open-Meteo forecast refresh for the header widget after preference changes and on a periodic timer
 - [`usePushNotifications`](C:/repos/chat2.0/src/hooks/usePushNotifications.ts:1): push subscription UX
+- [`PushSubscriptionSync`](C:/repos/chat2.0/src/components/notifications/PushSubscriptionSync.tsx:1): best-effort foreground repair for already-granted push subscriptions
 - [`useTyping`](C:/repos/chat2.0/src/hooks/useTyping.ts:1): typing indicators
 - [`useTheme`](C:/repos/chat2.0/src/hooks/useTheme.tsx:1): design-system theme selection
 
@@ -92,6 +93,7 @@ Important domains:
 - private per-user weather preferences
 - push subscriptions and notification preferences
 - Hype events, per-message Hype summaries, event receipts, daily limits, and bonus-credit grants
+- Shadow Runner level catalog, per-user completion ledger, and public completion-medal badge fields
 - full-admin automation approval packets and append-only packet events
 - ESP bridge control-plane and update-manifest tables
 
@@ -107,11 +109,11 @@ Important domains:
 
 Audit note: several Edge Functions intentionally run with Supabase gateway JWT verification disabled and enforce custom authentication in code. Any change to those functions must preserve custom auth, rate limits, RLS-equivalent checks, and service-role boundaries.
 
-Remote function status checked on June 8, 2026: `link-preview` and
-`shadow-pin-video` had June 8 deployments, while `art-board-import-image`,
-`shadow-pin-import-image`, and `send-push` still reported older deployment
-timestamps. Do not claim production-safe-fetch coverage for those older remote
-functions until they are redeployed and smoked.
+Remote function status checked on June 15, 2026: `send-push` reported a June 15
+deployment, `link-preview` and `shadow-pin-video` reported June 8 deployments,
+and `art-board-import-image` plus `shadow-pin-import-image` still reported older
+deployment timestamps. Do not claim production-safe-fetch coverage for those
+older remote functions until they are redeployed and smoked.
 
 ### Background Workers
 
@@ -184,9 +186,10 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 ### Sign In
 
 1. User signs in through [`src/lib/auth.ts`](C:/repos/chat2.0/src/lib/auth.ts:1)
-2. [`useAuth`](C:/repos/chat2.0/src/hooks/useAuth.tsx:1) loads the profile row
-3. Realtime auth token is updated on the Supabase client
-4. Presence updates start after authentication
+2. Auth helpers call `ensureSession` and the current working Supabase client before protected profile, upload, AI, GIF, link-preview, or ShadowPin media calls
+3. [`useAuth`](C:/repos/chat2.0/src/hooks/useAuth.tsx:1) loads the profile row
+4. Realtime auth token is updated on the Supabase client
+5. Presence updates start after authentication
 
 ### Group Message
 
@@ -264,11 +267,12 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 3. The game surface enters the app's immersive Entertainment shell without changing the global PWA manifest, viewport, or app-shell settings
 4. Portrait phones still see a Shadow Runner-only rotate gate when the browser cannot or does not rotate; landscape viewports render the fixed 16:9 title/playfield stage
 5. The title screen preloads the home/menu assets, animates the menu-idle hero strip, and renders Start Tutorial, Select Level, and Options over blank scroll/button assets
-6. Start mounts the tutorial route, while Select Level opens the generated 10-stop campaign map with mission detail popups before launching playable routes through `ShadowRunnerGame`; movement input stays in a React-owned input ref and the Phaser scene stays responsible for the canvas level
+6. Start mounts the tutorial route, while Select Level opens the generated 10-stop campaign map with mission detail popups before launching playable routes through Level 4 in `ShadowRunnerGame`; movement input stays in a React-owned input ref and the Phaser scene stays responsible for the canvas level
 7. DOM HUD and touch controls sit over the canvas; pause/options scroll menus pause the Phaser scene, clear pressed actions, keep SFX toggles in the React shell, and leave gameplay music off by automatically stopping lobby music while the Phaser level is mounted
 8. Shadow Runner SFX are original generated WAV assets under `public/games/shadow-runner/audio/sfx`; a single Web Audio controller preloads staged sound groups, throttles high-frequency effects, and Phaser emits named gameplay sound events for menu, map, pause, jump, land, attack, hit, coin, defeat, respawn, failure, and completion feedback
 9. Game soundtracks no longer mount a persistent hidden `<audio>` element; Shadow War, Shadow Checkers, and Shadow Runner music use a shared Web Audio controller and close the audio context on background/pagehide so iPhone does not treat game loops like lock-screen media
-10. The June 9 rollback intentionally removed app-wide manifest/viewport/fullscreen/orientation behavior because it affected mobile app header, footer, composer, and PWA layout outside Shadow Runner; the current picker request is Shadow Runner-scoped and best-effort
+10. Level completion records through `record_shadow_runner_level_completion`; the private completion ledger derives public sprint/knight medals on `public.users`, and the catalog can revoke stale knight medals when a harder available level is introduced
+11. The June 9 rollback intentionally removed app-wide manifest/viewport/fullscreen/orientation behavior because it affected mobile app header, footer, composer, and PWA layout outside Shadow Runner; the current picker request is Shadow Runner-scoped and best-effort
 
 ### Channel Ban Enforcement
 
@@ -301,9 +305,10 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 1. Browser registers service worker
 2. User grants permission and creates a subscription
 3. Subscription row is saved in Supabase
-4. Message send path calls the push trigger helper
-5. `send-push` edge function delivers to eligible recipient subscriptions
-6. Notification status rechecks automatically when the app returns to the foreground, so Settings does not expose a manual refresh button
+4. `PushSubscriptionSync` periodically repairs already-granted current-device subscriptions on sign-in, focus, page show, and visible-state resume without prompting users again
+5. Message send path calls the push trigger helper
+6. `send-push` edge function delivers to eligible recipient subscriptions
+7. Notification status rechecks automatically when the app returns to the foreground, so Settings does not expose a manual refresh button
 
 ## UI System
 

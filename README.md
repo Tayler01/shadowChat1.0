@@ -4,9 +4,9 @@ ShadowChat 1.0 is a premium dark realtime chat app built with React, TypeScript,
 
 The project is already wired for hosted Supabase and Netlify deployment. It is designed to behave like a product app, not a demo: realtime messaging, uploads, presence, settings, DMs, and notification flows are all first-class parts of the codebase.
 
-## Documentation Status - June 12, 2026
+## Documentation Status - June 15, 2026
 
-The documentation set has been refreshed against the current `main` branch after the June 11 Shadow Runner campaign-map, Level 3, gameplay asset, audio, mobile control, orientation, and access-gate removal work, plus the latest Shadow Mystery story expansion. The freshest planning source is [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1), and the full documentation inventory is [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
+The documentation set has been refreshed against the current `main` branch after the June 15 Shadow Runner Bell Tower Level 4, tap-toggle crouch, Web Audio soundtrack, completion-medal migration, push-subscription repair, and feature auth-refresh hardening work. The freshest planning source is [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1), and the full documentation inventory is [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
 
 Current known follow-up areas are documentation-backed: Supabase policy/RPC hardening, remaining production deployment/smoke for shared URL fetch hardening outside the already-deployed link-preview and ShadowPin video functions, Netlify security headers, provider live-setting verification, frontend polish, and post-deploy auth smoke for the invite-only signup/email-verification rollout.
 
@@ -48,6 +48,8 @@ Current known follow-up areas are documentation-backed: Supabase policy/RPC hard
 - Admin feedback review for submitted bugs, suggestions, and private attachments
 - Server-side link previews for chat, DMs, and board chat URLs
 - Browser push notifications for DMs and group chat
+- Best-effort app-shell repair for already-granted browser push subscriptions
+  when signed-in users foreground or reopen the app
 - Settings feedback flow for bug reports and feature ideas with private image attachments
 - Per-user Open-Meteo weather location preference and forecast popup
 - PWA/service-worker foundation for installed mobile and desktop web experiences
@@ -56,9 +58,11 @@ Current known follow-up areas are documentation-backed: Supabase policy/RPC hard
 - Entertainment area with Shadow Runner, Shadow War, Shadow Checkers, Shado TV,
   Shadow Mystery, and Will & Kirk surfaces; Shadow Runner is currently a
   landscape-gated campaign prototype with a tutorial, a 10-stop campaign map,
-  playable Level 1 through Level 3 routes, generated touch controls,
-  pause/options menus, Castle Bard lobby music, original SFX, and a
-  best-effort Android fullscreen/landscape request from the picker
+  playable Level 1 through Level 4 routes, generated touch controls,
+  tap-toggle crouch, pause/options menus, Castle Bard lobby music through the
+  shared foreground-only Web Audio soundtrack controller, original SFX, public
+  completion medals backed by a private completion ledger, and a best-effort
+  Android fullscreen/landscape request from the picker
 - Premium obsidian-and-gold design system across desktop and mobile
 
 ## Current Project Shape
@@ -95,9 +99,14 @@ Backend lives under [`supabase`](C:/repos/chat2.0/supabase).
 - Weather locations use private `public.user_weather_preferences` rows scoped by RLS to the owning user.
 - Hype uses `public.hype_events`, `public.message_hypes`,
   `public.hype_event_receipts`, and `public.hype_bonus_grants`; the linked
-  Supabase project was confirmed current through migration `20260608200000`.
+  Supabase migration list was confirmed aligned through migration
+  `20260615183000`.
 - Automation approval review packets use `public.automation_approval_packets`
   and `public.automation_approval_packet_events`.
+- Shadow Runner completion medals use `public.shadow_runner_level_catalog`,
+  `public.shadow_runner_level_completions`, public badge fields on
+  `public.users`, and the authenticated
+  `record_shadow_runner_level_completion` RPC.
 
 Always-on background services live under [`services`](C:/repos/chat2.0/services).
 
@@ -191,6 +200,8 @@ node scripts/playwright-smoke.mjs --scenario=full --run-name=full-smoke-release 
 
 - Realtime depends on the migrations having been pushed to the target Supabase project.
 - Browser push depends on the service worker, VAPID keys, the `send-push` edge function, and at least one active subscription row. Hype notifications use the same function with the `hype_event` event type.
+- Signed-in foreground clients repair already-granted push subscriptions through
+  `PushSubscriptionSync` without prompting users again.
 - AI features depend on the `openai-chat` edge function and configured Supabase AI provider secrets.
 - Active-user dots and the General Chat user-count popup depend on `user_presence`, `users.presence_visibility`, and the `update_user_last_active`, `list_presence_states`, and `get_active_users` RPCs.
 - News Feed realtime depends on the isolated News migrations, the `shado-news-scraper` Render worker, and the source health/cursor fields in `news_sources`.

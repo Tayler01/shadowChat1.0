@@ -279,6 +279,18 @@ bridge visual. Source and preview files remain cataloged for review.
     `public/games/shadow-runner/level-assets/level-4/vfx/boost-aura-4f-preview.png`
   - note: generated separately from the pickup sheet so the in-game aura can
     wrap the existing hero sprite without baking a second hero into the VFX.
+- Shadow Runner completion badge icons:
+  - runner medal source:
+    `public/games/shadow-runner/badges/shadow-runner-sprint-badge.png`
+  - runner medal transparent:
+    `public/games/shadow-runner/badges/shadow-runner-sprint-badge-transparent.png`
+  - knight medal source:
+    `public/games/shadow-runner/badges/shadow-runner-main-medal-source.png`
+  - knight medal runtime:
+    `public/games/shadow-runner/badges/shadow-runner-main-medal.png`
+  - note: generated on 2026-06-15 for public name-badge rendering. These are
+    user achievement badges backed by the server completion ledger, not per-map
+    completion seals.
 - Batch contact sheet:
   `public/games/shadow-runner/level-assets/level-4/batch-4-bell-tower-archives-contact-sheet.png`
 

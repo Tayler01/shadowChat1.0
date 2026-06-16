@@ -2,9 +2,9 @@
 
 This rundown captures the current documentation and agent-file surface in `C:\repos\chat2.0`. It is meant to help future updates start from the right source of truth instead of rediscovering stale or overlapping docs.
 
-## Documentation Status - June 12, 2026
+## Documentation Status - June 15, 2026
 
-This rundown was updated after the June 11 Shadow Runner campaign-map, Level 3, generated gameplay asset, audio, mobile control, orientation, and access-gate removal work, plus the latest Shadow Mystery story expansion. The file remains an inventory and routing guide; the source documents themselves now carry current status notes or current implementation guidance.
+This rundown was updated after the June 15 Shadow Runner Bell Tower Level 4, tap-toggle crouch, Web Audio soundtrack, completion-medal migration, push-subscription foreground repair, and feature auth-refresh hardening work. The file remains an inventory and routing guide; the source documents themselves now carry current status notes or current implementation guidance.
 
 ## Summary
 
@@ -12,7 +12,7 @@ This rundown was updated after the June 11 Shadow Runner campaign-map, Level 3, 
 - [AGENTS.md](C:/repos/chat2.0/AGENTS.md:1) is the canonical agent guide. [AGENT.md](C:/repos/chat2.0/AGENT.md:1) is a short compatibility mirror.
 - Before this refresh, several current product docs had last been updated in May 2026, especially Admin, App Releases, Deployment, Phone Install, ShadowPin, mobile, and iOS planning.
 - Several bridge docs are still useful but date from April 2026 planning. They now carry bridge-specific status notes and should be checked against current firmware/functions before implementation.
-- `README.md` and `docs/ARCHITECTURE.md` have been refreshed for the June 1 audit state, the chat-scroll fix, the June 2 auth rollout, the June 8 Hype/safe-fetch/automation queue updates, and the June 11/12 Shadow Runner/Shadow Mystery updates.
+- `README.md` and `docs/ARCHITECTURE.md` have been refreshed for the June 1 audit state, the chat-scroll fix, the June 2 auth rollout, the June 8 Hype/safe-fetch/automation queue updates, the June 11/12 Shadow Runner/Shadow Mystery updates, and the June 15 Shadow Runner/auth/push follow-ups.
 - `PLAN.md`, `STATUS.md`, and `TASK.md` are now labeled as bridge-specific status artifacts, not global project status.
 - `.agents/` contains local ignored agent skills. They are not tracked or pushed by default because `.gitignore` ignores `.agents/`.
 
@@ -38,7 +38,7 @@ This rundown was updated after the June 11 Shadow Runner campaign-map, Level 3, 
 
 | File | Latest tracked update/status date | Role | Refresh guidance |
 | --- | --- | --- | --- |
-| [README.md](C:/repos/chat2.0/README.md:1) | 2026-06-12 | Human entrypoint, stack, feature list, commands, deployment, documentation map. | Refresh after security, deployment, or major feature work; keep docs map current. |
+| [README.md](C:/repos/chat2.0/README.md:1) | 2026-06-15 | Human entrypoint, stack, feature list, commands, deployment, documentation map. | Refresh after security, deployment, or major feature work; keep docs map current. |
 | [PLAN.md](C:/repos/chat2.0/PLAN.md:1) | 2026-05-02 | ESP bridge update/offline software plan. | Rename or add a top warning that it is bridge-specific, not global product plan. |
 | [STATUS.md](C:/repos/chat2.0/STATUS.md:1) | 2026-05-02 | ESP bridge milestone status log. | Archive under `docs/` or rename to bridge-specific status to avoid stale root-level status confusion. |
 | [TASK.md](C:/repos/chat2.0/TASK.md:1) | 2026-04-25 | ESP bridge task statement. | Archive or rename with bridge prefix if still needed. |
@@ -50,9 +50,9 @@ This rundown was updated after the June 11 Shadow Runner campaign-map, Level 3, 
 
 | File | Latest tracked update/status date | Role | Refresh guidance |
 | --- | --- | --- | --- |
-| [docs/ARCHITECTURE.md](C:/repos/chat2.0/docs/ARCHITECTURE.md:1) | 2026-06-12 | System map and data-flow overview. | Update after Edge Function hardening, safe-fetch helpers, lib module splits, new backend domains, or major Entertainment/game runtime changes. |
+| [docs/ARCHITECTURE.md](C:/repos/chat2.0/docs/ARCHITECTURE.md:1) | 2026-06-15 | System map and data-flow overview. | Update after Edge Function hardening, safe-fetch helpers, lib module splits, new backend domains, or major Entertainment/game runtime changes. |
 | [docs/SETUP_GUIDE.md](C:/repos/chat2.0/docs/SETUP_GUIDE.md:1) | 2026-06-01 | Local and hosted setup. | Update for any new auth config, stable smoke accounts, or new secrets. |
-| [docs/TESTING_GUIDE.md](C:/repos/chat2.0/docs/TESTING_GUIDE.md:1) | 2026-06-12 | Unit, smoke, and browser testing workflow. | Keep auth, chat-scroll, safe-fetch, Hype, media-frame, composer, and game visual coverage expectations current. |
+| [docs/TESTING_GUIDE.md](C:/repos/chat2.0/docs/TESTING_GUIDE.md:1) | 2026-06-15 | Unit, smoke, and browser testing workflow. | Keep auth, chat-scroll, safe-fetch, Hype, media-frame, composer, push, badge, and game visual coverage expectations current. |
 | [docs/DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1) | 2026-05-29 | GitHub, Netlify, Supabase deployment. | Update after Netlify headers, Node version alignment, or Auth config changes. |
 | [docs/GOAL_PLAYBOOKS.md](C:/repos/chat2.0/docs/GOAL_PLAYBOOKS.md:1) | 2026-05-14 | Goal-mode playbooks. | Add audit-backlog playbook if this becomes a repeated workflow. |
 | [docs/DEFERRED_FOLLOWUPS.md](C:/repos/chat2.0/docs/DEFERRED_FOLLOWUPS.md:1) | 2026-06-01 | Small deferred ideas. | Keep small only; larger audit items now live in the dedicated audit next-steps doc. |
@@ -87,10 +87,10 @@ This rundown was updated after the June 11 Shadow Runner campaign-map, Level 3, 
 | [docs/SHADO_TV_STREAMING_RESEARCH.md](C:/repos/chat2.0/docs/SHADO_TV_STREAMING_RESEARCH.md:1) | 2026-05-17 | Streaming research. | Keep as research; verify provider details before implementation. |
 | [docs/SHADOW_CHECKERS.md](C:/repos/chat2.0/docs/SHADOW_CHECKERS.md:1) | 2026-05-17 | Shadow Checkers feature docs. | Current enough unless game work resumes. |
 | [docs/SHADOW_MYSTERY.md](C:/repos/chat2.0/docs/SHADOW_MYSTERY.md:1) | 2026-06-11 | Shadow Mystery feature docs and hardcoded story expansion status. | Update when stories, source attribution, artwork, or the future admin publishing model changes. |
-| [docs/SHADOW_RUNNER_ASSET_GENERATION_BACKLOG.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_ASSET_GENERATION_BACKLOG.md:1) | 2026-06-12 | Shadow Runner generated asset backlog and production notes. | Update after each reviewed generation batch or when generated assets move into runtime. |
-| [docs/SHADOW_RUNNER_GAMEPLAY_ASSETS.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_GAMEPLAY_ASSETS.md:1) | 2026-06-12 | Shadow Runner HUD, controls, SFX, enemy, route, and gameplay asset wiring. | Update after gameplay HUD/control/audio assets or Phaser runtime asset wiring changes. |
+| [docs/SHADOW_RUNNER_ASSET_GENERATION_BACKLOG.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_ASSET_GENERATION_BACKLOG.md:1) | 2026-06-15 | Shadow Runner generated asset backlog and production notes. | Update after each reviewed generation batch or when generated assets move into runtime. |
+| [docs/SHADOW_RUNNER_GAMEPLAY_ASSETS.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_GAMEPLAY_ASSETS.md:1) | 2026-06-15 | Shadow Runner HUD, controls, SFX, enemy, route, and gameplay asset wiring. | Update after gameplay HUD/control/audio assets or Phaser runtime asset wiring changes. |
 | [docs/SHADOW_RUNNER_HOME_ASSETS.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_HOME_ASSETS.md:1) | 2026-06-12 | Shadow Runner title/menu/campaign-map assets, runtime wiring, rotate-gate constraints, picker landscape request, and latest visual verification. | Update after title/menu/campaign-map asset changes, playable-prototype shell changes, or mobile visual QA. |
-| [docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md:1) | 2026-06-12 | Active Shadow Runner playable-prototype roadmap and checkpoint notes. | Keep concise; update after playable-route, control, difficulty, or verification milestones. |
+| [docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md:1) | 2026-06-15 | Active Shadow Runner playable-prototype roadmap and checkpoint notes. | Keep concise; update after playable-route, control, difficulty, or verification milestones. |
 | [docs/SHADOW_RUNNER_SPRITES.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_SPRITES.md:1) | 2026-06-11 | Shadow Runner hero and enemy sprite strips plus current runtime usage. | Update after sprite pipeline changes, animation cleanup, or Phaser animation wiring changes. |
 | [docs/SHADOW_RUNNER_STORY_LORE.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_STORY_LORE.md:1) | 2026-06-11 | Shadow Runner story/lore reference for route and enemy naming. | Update when campaign story, route names, or enemy concepts change. |
 | [docs/SHADOW_PIN.md](C:/repos/chat2.0/docs/SHADOW_PIN.md:1) | 2026-06-08 | ShadowPin feature docs. | Update after image-import function redeploy, video-provider fallback changes, or activity analytics changes. |
@@ -104,7 +104,7 @@ This rundown was updated after the June 11 Shadow Runner campaign-map, Level 3, 
 
 | File | Latest tracked update/status date | Role | Refresh guidance |
 | --- | --- | --- | --- |
-| [docs/features/feature-progress-log.md](C:/repos/chat2.0/docs/features/feature-progress-log.md:1) | 2026-06-12 | Feature progress log. | Keep active Shadow Runner checkpoints concise and tied to verification; add a note when audit backlog implementation starts. |
+| [docs/features/feature-progress-log.md](C:/repos/chat2.0/docs/features/feature-progress-log.md:1) | 2026-06-15 | Feature progress log. | Keep active Shadow Runner checkpoints concise and tied to verification; add a note when audit backlog implementation starts. |
 | [docs/features/refetch-optimization-backlog.md](C:/repos/chat2.0/docs/features/refetch-optimization-backlog.md:1) | 2026-05-18 | Refetch optimization backlog. | Merge with architecture/performance backlog when optimizing realtime/refetch flows. |
 | [docs/qa/mobile-pwa-qa-log.md](C:/repos/chat2.0/docs/qa/mobile-pwa-qa-log.md:1) | 2026-05-17 | Mobile PWA QA log. | Add phone QA after login/chat fixes. |
 | [docs/qa/mobile-viewport-audit.md](C:/repos/chat2.0/docs/qa/mobile-viewport-audit.md:1) | 2026-05-18 | Mobile viewport audit. | Update after mobile header/nav/login polish. |
