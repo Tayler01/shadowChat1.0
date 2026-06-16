@@ -1671,65 +1671,105 @@ html, body, #root {
   inset: 0;
   z-index: 140;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
   overflow: hidden;
-  padding: max(1rem, env(safe-area-inset-top)) 1rem max(1rem, env(safe-area-inset-bottom));
+  isolation: isolate;
+  padding:
+    max(1rem, env(safe-area-inset-top))
+    0.9rem
+    max(2.6rem, calc(env(safe-area-inset-bottom) + 1.4rem));
   color: #fff8d7;
-  background:
-    radial-gradient(circle at 50% 46%, rgba(248, 216, 108, 0.32), transparent 19rem),
-    radial-gradient(circle at 50% 50%, rgba(12, 8, 2, 0.42), rgba(2, 3, 5, 0.88) 64%);
+  background: #020304;
   pointer-events: none;
-  animation: gold-egg-stage 4200ms cubic-bezier(0.2, 0.84, 0.28, 1) both;
+  animation: gold-egg-stage 5600ms cubic-bezier(0.2, 0.84, 0.28, 1) both;
+}
+
+.gold-egg-discovery__scene,
+.gold-egg-discovery__veil {
+  position: absolute;
+  inset: 0;
+}
+
+.gold-egg-discovery__scene {
+  z-index: 0;
+  overflow: hidden;
+  background: #030405;
+}
+
+.gold-egg-discovery__scene img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  user-select: none;
+  transform: scale(1.08);
+  filter: brightness(0.82) contrast(1.05) saturate(1.08);
+  animation: gold-egg-scene 5600ms cubic-bezier(0.2, 0.84, 0.28, 1) both;
+}
+
+.gold-egg-discovery__veil {
+  z-index: 1;
+  background:
+    radial-gradient(circle at 50% 34%, rgba(255, 230, 150, 0.08), transparent 17rem),
+    linear-gradient(180deg, rgba(2, 3, 4, 0.08), rgba(2, 3, 4, 0.24) 36%, rgba(2, 3, 4, 0.82) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.46), transparent 24%, transparent 76%, rgba(0, 0, 0, 0.48));
+  animation: gold-egg-veil 5600ms cubic-bezier(0.2, 0.84, 0.28, 1) both;
 }
 
 .gold-egg-discovery__aurora {
   position: absolute;
+  z-index: 2;
   inset: -20%;
   background:
-    conic-gradient(from 110deg at 50% 50%, transparent 0deg, rgba(248, 216, 108, 0.2) 54deg, transparent 120deg, rgba(255, 246, 188, 0.14) 190deg, transparent 270deg, rgba(248, 216, 108, 0.18) 330deg, transparent 360deg);
-  filter: blur(18px);
-  opacity: 0.85;
-  animation: gold-egg-aurora 4200ms cubic-bezier(0.2, 0.84, 0.28, 1) both;
+    conic-gradient(from 110deg at 50% 44%, transparent 0deg, rgba(248, 216, 108, 0.15) 54deg, transparent 120deg, rgba(255, 246, 188, 0.1) 190deg, transparent 270deg, rgba(248, 216, 108, 0.14) 330deg, transparent 360deg);
+  filter: blur(20px);
+  opacity: 0.7;
+  animation: gold-egg-aurora 5600ms cubic-bezier(0.2, 0.84, 0.28, 1) both;
 }
 
 .gold-egg-discovery__content {
   position: relative;
+  z-index: 4;
   display: flex;
-  width: min(21rem, calc(100vw - 2rem));
-  min-height: 20rem;
+  width: min(28rem, calc(100vw - 1.8rem));
   align-items: center;
   justify-content: center;
   flex-direction: column;
   text-align: center;
   isolation: isolate;
-  animation: gold-egg-content-rise 4200ms cubic-bezier(0.2, 0.84, 0.28, 1) both;
+  animation: gold-egg-content-rise 5600ms cubic-bezier(0.2, 0.84, 0.28, 1) both;
 }
 
-.gold-egg-discovery__egg {
+.gold-egg-discovery__seal {
   position: relative;
   display: inline-flex;
-  height: 8.2rem;
-  width: 8.2rem;
+  height: 4.85rem;
+  width: 4.85rem;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  border: 1px solid rgba(248, 216, 108, 0.48);
+  border: 1px solid rgba(255, 229, 149, 0.5);
   background:
-    radial-gradient(circle at 38% 28%, rgba(255, 255, 255, 0.72), transparent 1.5rem),
-    radial-gradient(circle at 50% 58%, rgba(248, 216, 108, 0.62), rgba(160, 103, 22, 0.32) 65%, rgba(8, 5, 1, 0.26));
+    radial-gradient(circle at 50% 20%, rgba(255, 240, 184, 0.16), transparent 62%),
+    rgba(2, 3, 4, 0.48);
   box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.08) inset,
-    0 0 42px rgba(248, 216, 108, 0.48),
-    0 28px 80px rgba(0, 0, 0, 0.5);
-  color: #fff3b2;
-  animation: gold-egg-core 4200ms cubic-bezier(0.2, 0.84, 0.28, 1) both;
+    0 0 0 1px rgba(255, 255, 255, 0.07) inset,
+    0 0 36px rgba(248, 216, 108, 0.28),
+    0 18px 52px rgba(0, 0, 0, 0.48);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  animation: gold-egg-seal 5600ms cubic-bezier(0.2, 0.84, 0.28, 1) both;
 }
 
-.gold-egg-discovery__egg svg {
-  filter: drop-shadow(0 0 18px rgba(255, 246, 188, 0.7));
-  fill: rgba(242, 198, 79, 0.9);
-  stroke-width: 1.8;
+.gold-egg-discovery__seal img {
+  display: block;
+  width: 90%;
+  height: 90%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 16px rgba(255, 234, 151, 0.5));
+  user-select: none;
 }
 
 .gold-egg-discovery__spark {
@@ -1743,28 +1783,29 @@ html, body, #root {
 }
 
 .gold-egg-discovery__spark--left {
-  left: 2.2rem;
-  top: 5rem;
+  left: 4.2rem;
+  top: 1.35rem;
 }
 
 .gold-egg-discovery__spark--right {
-  right: 2.4rem;
-  top: 4.6rem;
+  right: 4.25rem;
+  top: 1.05rem;
   animation-delay: 260ms;
 }
 
 .gold-egg-discovery__eyebrow {
-  margin-top: 1.25rem;
+  margin-top: 0.95rem;
   font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: rgba(255, 242, 174, 0.72);
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.84);
 }
 
 .gold-egg-discovery__title {
   margin-top: 0.18rem;
-  font-size: 2.7rem;
+  font-size: 2.55rem;
   font-weight: 800;
   line-height: 0.95;
   color: #fff9dc;
@@ -1775,13 +1816,17 @@ html, body, #root {
 
 @media (max-width: 380px) {
   .gold-egg-discovery__title {
-    font-size: 2.35rem;
+    font-size: 2.22rem;
   }
 }
 
 @media (min-width: 640px) {
   .gold-egg-discovery__title {
-    font-size: 3.3rem;
+    font-size: 4.35rem;
+  }
+
+  .gold-egg-discovery {
+    padding-bottom: max(3.5rem, calc(env(safe-area-inset-bottom) + 4vh));
   }
 }
 
@@ -1793,12 +1838,16 @@ html, body, #root {
   gap: 0.5rem;
   border: 1px solid rgba(248, 216, 108, 0.34);
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.34);
+  background:
+    radial-gradient(circle at 22% 0%, rgba(255, 240, 184, 0.14), transparent 54%),
+    rgba(0, 0, 0, 0.42);
   padding: 0.5rem 0.8rem;
   font-size: 1rem;
   font-weight: 700;
   color: #fff4c4;
   box-shadow: 0 0 28px rgba(248, 216, 108, 0.14);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .gold-egg-discovery__handle {
@@ -1811,7 +1860,8 @@ html, body, #root {
 .gold-egg-discovery__particle {
   position: absolute;
   left: 50%;
-  top: 50%;
+  top: 42%;
+  z-index: 3;
   pointer-events: none;
 }
 
@@ -1821,7 +1871,7 @@ html, body, #root {
   border-radius: 999px;
   border: 1px solid rgba(248, 216, 108, 0.48);
   transform: translate(-50%, -50%) scale(0.3);
-  animation: gold-egg-ring 1860ms cubic-bezier(0.16, 0.9, 0.23, 1) both;
+  animation: gold-egg-ring 2460ms cubic-bezier(0.16, 0.9, 0.23, 1) both;
 }
 
 .gold-egg-discovery__ring--two {
@@ -1865,53 +1915,103 @@ html, body, #root {
   0% {
     opacity: 0;
   }
-  9% {
+  8% {
     opacity: 1;
   }
-  82% {
+  88% {
     opacity: 1;
   }
   100% {
     opacity: 0;
+  }
+}
+
+@keyframes gold-egg-scene {
+  0% {
+    opacity: 0;
+    transform: scale(1.16);
+    filter: brightness(0.42) contrast(1.04) saturate(0.96);
+  }
+  10% {
+    opacity: 1;
+  }
+  46% {
+    transform: scale(1.07);
+    filter: brightness(1.02) contrast(1.08) saturate(1.12);
+  }
+  88% {
+    opacity: 1;
+    transform: scale(1.03);
+    filter: brightness(0.92) contrast(1.06) saturate(1.08);
+  }
+  100% {
+    opacity: 0.35;
+    transform: scale(1.06);
+    filter: brightness(0.5) contrast(1.02) saturate(0.96);
+  }
+}
+
+@keyframes gold-egg-veil {
+  0% {
+    opacity: 0.96;
+  }
+  22% {
+    opacity: 0.72;
+  }
+  72% {
+    opacity: 0.84;
+  }
+  100% {
+    opacity: 1;
   }
 }
 
 @keyframes gold-egg-content-rise {
   0% {
     opacity: 0;
-    transform: translateY(1.5rem) scale(0.74);
+    transform: translateY(1.7rem) scale(0.9);
   }
-  20% {
+  18% {
+    opacity: 0;
+    transform: translateY(1.7rem) scale(0.9);
+  }
+  32% {
     opacity: 1;
-    transform: translateY(0) scale(1.04);
+    transform: translateY(0) scale(1.02);
   }
-  40% {
-    transform: translateY(-0.18rem) scale(1);
+  48%,
+  86% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
   100% {
-    opacity: 1;
-    transform: translateY(-0.35rem) scale(0.98);
+    opacity: 0;
+    transform: translateY(-0.85rem) scale(0.98);
   }
 }
 
-@keyframes gold-egg-core {
+@keyframes gold-egg-seal {
   0% {
     opacity: 0;
-    transform: scale(0.22) rotate(-14deg);
+    transform: translateY(0.65rem) scale(0.46) rotate(-12deg);
   }
-  22% {
+  20% {
+    opacity: 0;
+    transform: translateY(0.65rem) scale(0.46) rotate(-12deg);
+  }
+  34% {
     opacity: 1;
-    transform: scale(1.16) rotate(5deg);
+    transform: translateY(0) scale(1.14) rotate(5deg);
   }
-  38% {
-    transform: scale(1) rotate(0deg);
+  48% {
+    transform: translateY(0) scale(1) rotate(0deg);
   }
-  62% {
-    transform: scale(1.04) rotate(-1deg);
+  74% {
+    transform: translateY(-0.08rem) scale(1.04) rotate(-1deg);
   }
   100% {
-    opacity: 1;
-    transform: scale(0.98) rotate(0deg);
+    opacity: 0;
+    transform: translateY(-0.35rem) scale(0.94) rotate(0deg);
   }
 }
 
@@ -1920,11 +2020,14 @@ html, body, #root {
     opacity: 0;
     transform: rotate(-18deg) scale(0.86);
   }
-  18% {
-    opacity: 0.85;
+  22% {
+    opacity: 0.62;
+  }
+  82% {
+    opacity: 0.28;
   }
   100% {
-    opacity: 0.28;
+    opacity: 0;
     transform: rotate(28deg) scale(1.08);
   }
 }
@@ -1939,7 +2042,7 @@ html, body, #root {
   }
   100% {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(2.7);
+    transform: translate(-50%, -50%) scale(3.2);
   }
 }
 
@@ -1951,9 +2054,12 @@ html, body, #root {
   18% {
     opacity: 1;
   }
+  68% {
+    opacity: 0.82;
+  }
   100% {
     opacity: 0;
-    transform: translate(calc(-50% + var(--gold-egg-particle-x)), calc(-50% + var(--gold-egg-particle-y))) scale(0.95);
+    transform: translate(calc(-50% + var(--gold-egg-particle-x)), calc(-50% + var(--gold-egg-particle-y))) scale(0.72);
   }
 }
 
@@ -1984,9 +2090,11 @@ html, body, #root {
   .shadow-pin-action-heart-particle,
   .gold-egg-logo-trigger--holding::after,
   .gold-egg-discovery,
+  .gold-egg-discovery__scene img,
+  .gold-egg-discovery__veil,
   .gold-egg-discovery__aurora,
   .gold-egg-discovery__content,
-  .gold-egg-discovery__egg,
+  .gold-egg-discovery__seal,
   .gold-egg-discovery__spark,
   .gold-egg-discovery__ring,
   .gold-egg-discovery__particle {

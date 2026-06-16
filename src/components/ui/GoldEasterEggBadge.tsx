@@ -1,5 +1,5 @@
-import { Egg } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { GOLD_EASTER_EGG_BADGE_SRC } from '../easter-egg/goldEggAssets'
 
 interface GoldEasterEggBadgeProps {
   active?: boolean | null
@@ -18,7 +18,13 @@ export function GoldEasterEggBadge({ active, className }: GoldEasterEggBadgeProp
       title="Golden egg found"
       aria-label="Golden egg found"
     >
-      <Egg className="h-3.5 w-3.5 fill-[#f2c64f] stroke-[2.45]" />
+      <img
+        src={GOLD_EASTER_EGG_BADGE_SRC}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        className="h-full w-full select-none object-contain"
+      />
     </span>
   )
 }

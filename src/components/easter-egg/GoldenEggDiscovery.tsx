@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Egg, Sparkles } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../hooks/useAuth'
 import { claimGoldEasterEgg, type User } from '../../lib/supabase'
 import { GoldEasterEggBadge } from '../ui/GoldEasterEggBadge'
 import { GOLD_EGG_DISCOVERY_REQUEST_EVENT } from './goldEggEvents'
+import { GOLD_EASTER_EGG_BADGE_SRC, GOLD_EASTER_EGG_BANNER_SRC } from './goldEggAssets'
 
-const CELEBRATION_MS = 4200
+const CELEBRATION_MS = 5600
 
 type CelebrationState = {
   key: number
@@ -38,6 +39,10 @@ function GoldEggDiscoveryOverlay({ celebration }: { celebration: CelebrationStat
 
   return createPortal(
     <div className="gold-egg-discovery" role="status" aria-live="polite" data-testid="gold-egg-discovery-overlay">
+      <div className="gold-egg-discovery__scene" aria-hidden="true">
+        <img src={GOLD_EASTER_EGG_BANNER_SRC} alt="" draggable={false} />
+      </div>
+      <div className="gold-egg-discovery__veil" aria-hidden="true" />
       <div className="gold-egg-discovery__aurora" aria-hidden="true" />
       <div className="gold-egg-discovery__ring gold-egg-discovery__ring--one" aria-hidden="true" />
       <div className="gold-egg-discovery__ring gold-egg-discovery__ring--two" aria-hidden="true" />
@@ -59,8 +64,8 @@ function GoldEggDiscoveryOverlay({ celebration }: { celebration: CelebrationStat
         <div className="gold-egg-discovery__spark gold-egg-discovery__spark--left" aria-hidden="true">
           <Sparkles className="h-full w-full" />
         </div>
-        <div className="gold-egg-discovery__egg" aria-hidden="true">
-          <Egg className="h-16 w-16" />
+        <div className="gold-egg-discovery__seal" aria-hidden="true">
+          <img src={GOLD_EASTER_EGG_BADGE_SRC} alt="" draggable={false} />
         </div>
         <div className="gold-egg-discovery__spark gold-egg-discovery__spark--right" aria-hidden="true">
           <Sparkles className="h-full w-full" />
