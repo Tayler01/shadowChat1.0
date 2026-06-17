@@ -3,6 +3,7 @@ import test from 'node:test'
 import {
   filterXTimelineCandidates,
   selectSnapshotsToStore,
+  shouldScrapeXLiveSearch,
 } from '../services/news-scraper/src/index.mjs'
 
 test('keeps non-pinned X timeline candidates', () => {
@@ -112,4 +113,37 @@ test('stores multiple newer snapshots in chronological insert order', () => {
 
   assert.equal(result.cursorSnapshot.externalId, '300')
   assert.deepEqual(result.toStore.map(item => item.externalId), ['250', '300'])
+})
+
+test('uses X live search fallback when profile extraction is empty or timestampless', () => {
+  assert.equal(shouldScrapeXLiveSearch([]), true)
+  assert.equal(shouldScrapeXLiveSearch([
+    {
+      platform: 'x',
+      externalId: '300',
+      sourceUrl: 'https://x.com/example/status/300',
+    },
+  ]), true)
+})
+
+test('uses X live search fallback when profile latest is older than today', () => {
+  assert.equal(shouldScrapeXLiveSearch([
+    {
+      platform: 'x',
+      externalId: '300',
+      postedAt: '2020-01-01T00:00:00.000Z',
+      sourceUrl: 'https://x.com/example/status/300',
+    },
+  ]), true)
+})
+
+test('skips X live search fallback when profile latest is already on today board', () => {
+  assert.equal(shouldScrapeXLiveSearch([
+    {
+      platform: 'x',
+      externalId: '300',
+      postedAt: new Date().toISOString(),
+      sourceUrl: 'https://x.com/example/status/300',
+    },
+  ]), false)
 })

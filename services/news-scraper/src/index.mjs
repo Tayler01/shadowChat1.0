@@ -215,6 +215,12 @@ export const selectSnapshotsToStore = (source, snapshots) => {
   return { latest, cursorSnapshot, toStore, staleCursor: !cursorSnapshot }
 }
 
+export const shouldScrapeXLiveSearch = candidates => {
+  const latest = uniqueSnapshots(candidates || []).sort(compareSnapshotsDesc)[0]
+  if (!latest?.postedAt) return true
+  return !belongsOnTodayBoard(latest)
+}
+
 const uniqueMedia = media => {
   const seen = new Set()
   return media.filter(item => {
@@ -710,6 +716,100 @@ const scrapeX = async (browser, rawHandle, session = {}) => {
 
   const page = await context.newPage()
 
+  const extractCandidates = async extractionMode =>
+    page.evaluate(({ targetHandle, signedIn, maxCandidates, extractionMode }) => {
+      const target = String(targetHandle || '').toLowerCase()
+      const toAbsolute = value => {
+        try {
+          return new URL(value, location.origin).toString()
+        } catch {
+          return null
+        }
+      }
+      const articles = Array.from(document.querySelectorAll('article'))
+      const candidates = []
+
+      for (const article of articles) {
+        const links = Array.from(article.querySelectorAll('a[href*="/status/"]'))
+          .map(link => link.getAttribute('href') || '')
+          .filter(Boolean)
+
+        const statusHref = links.find(href =>
+          href.toLowerCase().includes(`/${target}/status/`) &&
+          !/\/(analytics|photo|video)\b/i.test(href)
+        ) || links.find(href => !/\/(analytics|photo|video)\b/i.test(href)) || links[0]
+        if (!statusHref) continue
+
+        const match = statusHref.match(/\/([^/]+)\/status\/(\d+)/)
+        if (!match?.[2]) continue
+
+        const authorHandle = match[1]
+        const images = Array.from(article.querySelectorAll('img'))
+          .map(img => img.currentSrc || img.src)
+          .filter(src => src && /pbs\.twimg\.com\/(media|ext_tw_video_thumb|amplify_video_thumb)\//i.test(src))
+          .map(src => ({
+            type: /video_thumb/i.test(src) ? 'video' : 'image',
+            url: src,
+            thumbnail_url: src,
+          }))
+
+        const avatar = Array.from(article.querySelectorAll('img'))
+          .map(img => img.currentSrc || img.src)
+          .find(src => src && /pbs\.twimg\.com\/profile_images\//i.test(src))
+
+        const text = article.innerText || ''
+        const lines = text.split(/\n+/).map(line => line.trim()).filter(Boolean)
+        const isPinned = lines.some(line => /^pinned$/i.test(line))
+        const displayName = lines.find(line =>
+          !line.startsWith('@') &&
+          line !== 'Â·' &&
+          !/^pinned$/i.test(line) &&
+          !/^\d+[smhd]$/i.test(line)
+        ) || authorHandle
+
+        candidates.push({
+          externalId: match[2],
+          authorHandle,
+          authorDisplayName: displayName,
+          authorAvatarUrl: avatar || null,
+          sourceUrl: toAbsolute(statusHref),
+          bodyText: text,
+          media: images,
+          isPinned,
+          postedAt: article.querySelector('time[datetime]')?.getAttribute('datetime') || null,
+          extractedFrom: location.href,
+          extractionMode,
+          signedIn,
+        })
+      }
+
+      if (candidates.length) return candidates.slice(0, maxCandidates)
+
+      const fallback = Array.from(document.querySelectorAll('a[href*="/status/"]'))
+        .map(link => link.getAttribute('href') || '')
+        .find(Boolean)
+      const match = fallback?.match(/\/([^/]+)\/status\/(\d+)/)
+      return match?.[2]
+        ? [{
+            externalId: match[2],
+            authorHandle: match[1],
+            authorDisplayName: match[1],
+            authorAvatarUrl: null,
+            sourceUrl: toAbsolute(fallback),
+            bodyText: `${match[1]} posted on X`,
+            media: [],
+            extractedFrom: location.href,
+            extractionMode: `${extractionMode}-link`,
+            signedIn,
+          }]
+        : []
+    }, {
+      targetHandle: handle,
+      signedIn: Boolean(session.xSignedIn),
+      maxCandidates: Number(process.env.NEWS_X_MAX_CANDIDATES || DEFAULT_X_MAX_CANDIDATES),
+      extractionMode,
+    })
+
   try {
     await page.goto(`https://x.com/${encodeURIComponent(handle)}`, {
       waitUntil: 'domcontentloaded',
@@ -724,7 +824,7 @@ const scrapeX = async (browser, rawHandle, session = {}) => {
       await page.waitForTimeout(scrollSettleMs)
     }
 
-    const raw = await page.evaluate(({ targetHandle, signedIn, maxCandidates }) => {
+    let raw = await page.evaluate(({ targetHandle, signedIn, maxCandidates }) => {
       const target = String(targetHandle || '').toLowerCase()
       const toAbsolute = value => {
         try {
@@ -784,6 +884,7 @@ const scrapeX = async (browser, rawHandle, session = {}) => {
           media: images,
           isPinned,
           postedAt: article.querySelector('time[datetime]')?.getAttribute('datetime') || null,
+          extractedFrom: location.href,
           extractionMode: 'profile-dom',
           signedIn,
         })
@@ -804,6 +905,7 @@ const scrapeX = async (browser, rawHandle, session = {}) => {
             sourceUrl: toAbsolute(fallback),
             bodyText: `${match[1]} posted on X`,
             media: [],
+            extractedFrom: location.href,
             extractionMode: 'profile-link',
             signedIn,
           }]
@@ -813,6 +915,24 @@ const scrapeX = async (browser, rawHandle, session = {}) => {
       signedIn: Boolean(session.xSignedIn),
       maxCandidates: Number(process.env.NEWS_X_MAX_CANDIDATES || DEFAULT_X_MAX_CANDIDATES),
     })
+
+    if (process.env.NEWS_X_LIVE_SEARCH_FALLBACK !== 'false' && shouldScrapeXLiveSearch(raw)) {
+      try {
+        await page.goto(`https://x.com/search?q=${encodeURIComponent(`from:${handle}`)}&src=typed_query&f=live`, {
+          waitUntil: 'domcontentloaded',
+          timeout: 35_000,
+        })
+        await page.waitForTimeout(Number(process.env.NEWS_SCRAPE_SETTLE_MS || DEFAULT_SETTLE_MS))
+        for (let index = 0; index < scrollSteps; index += 1) {
+          await page.mouse.wheel(0, 1600).catch(() => {})
+          await page.waitForTimeout(scrollSettleMs)
+        }
+        const searchRaw = await extractCandidates('search-live-dom')
+        raw = uniqueSnapshots([...searchRaw, ...raw]).sort(compareSnapshotsDesc)
+      } catch (searchError) {
+        console.warn(`X live search fallback failed for @${handle}: ${searchError instanceof Error ? searchError.message : String(searchError)}`)
+      }
+    }
 
     if (!raw?.length) {
       throw new Error(`No X post could be extracted for @${handle}`)
@@ -824,7 +944,7 @@ const scrapeX = async (browser, rawHandle, session = {}) => {
         postKind: 'post',
         ...item,
         raw: {
-          extractedFrom: page.url(),
+          extractedFrom: item.extractedFrom || page.url(),
           handle,
           isPinned: Boolean(item.isPinned),
           signedIn: Boolean(session.xSignedIn),
