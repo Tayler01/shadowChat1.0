@@ -4,9 +4,9 @@ ShadowChat 1.0 is a premium dark realtime chat app built with React, TypeScript,
 
 The project is already wired for hosted Supabase and Netlify deployment. It is designed to behave like a product app, not a demo: realtime messaging, uploads, presence, settings, DMs, and notification flows are all first-class parts of the codebase.
 
-## Documentation Status - June 15, 2026
+## Documentation Status - June 16, 2026
 
-The documentation set has been refreshed against the current `main` branch after the June 15 Shadow Runner Bell Tower Level 4, tap-toggle crouch, Web Audio soundtrack, completion-medal migration, push-subscription repair, and feature auth-refresh hardening work. The freshest planning source is [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1), and the full documentation inventory is [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
+The documentation set has been refreshed against the current `main` branch after the June 16 Golden Egg discovery visual refresh and the June 15 Shadow Runner Bell Tower Level 4, tap-toggle crouch, Web Audio soundtrack, completion-medal migration, push-subscription repair, and feature auth-refresh hardening work. The freshest planning source is [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1), and the full documentation inventory is [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
 
 Current known follow-up areas are documentation-backed: Supabase policy/RPC hardening, remaining production deployment/smoke for shared URL fetch hardening outside the already-deployed link-preview and ShadowPin video functions, Netlify security headers, provider live-setting verification, frontend polish, and post-deploy auth smoke for the invite-only signup/email-verification rollout.
 
@@ -30,7 +30,7 @@ Current known follow-up areas are documentation-backed: Supabase policy/RPC hard
 - Realtime group chat with active-user count and per-user weather in the header
 - Realtime direct messages
 - Unread tracking and in-app DM notifications
-- User profiles with adjustable avatar crop/zoom, banner, status, role badges, presence visibility, theme color, and admin moderation controls
+- User profiles with adjustable avatar crop/zoom, banner, status, role badges, achievement badges, presence visibility, theme color, and admin moderation controls
 - File, image, and voice-message uploads
 - Message reactions, pinning, editing, and deletion
 - Hype bell and message Hype celebrations with daily limits, bonus credits,
@@ -50,6 +50,8 @@ Current known follow-up areas are documentation-backed: Supabase policy/RPC hard
 - Browser push notifications for DMs and group chat
 - Best-effort app-shell repair for already-granted browser push subscriptions
   when signed-in users foreground or reopen the app
+- Mobile Golden Egg Easter egg discovery from the SHADO logo, with a permanent
+  public profile badge and a bundled badge/banner celebration asset set
 - Settings feedback flow for bug reports and feature ideas with private image attachments
 - Per-user Open-Meteo weather location preference and forecast popup
 - PWA/service-worker foundation for installed mobile and desktop web experiences
@@ -101,6 +103,8 @@ Backend lives under [`supabase`](C:/repos/chat2.0/supabase).
   `public.hype_event_receipts`, and `public.hype_bonus_grants`; the linked
   Supabase migration list was confirmed aligned through migration
   `20260615183000`.
+- The Golden Egg Easter egg uses `public.users.gold_easter_egg` and the
+  authenticated `claim_gold_easter_egg` RPC.
 - Automation approval review packets use `public.automation_approval_packets`
   and `public.automation_approval_packet_events`.
 - Shadow Runner completion medals use `public.shadow_runner_level_catalog`,

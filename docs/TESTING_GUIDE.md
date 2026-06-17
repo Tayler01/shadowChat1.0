@@ -2,9 +2,9 @@
 
 This project uses a mix of static checks, Jest coverage, and real browser validation.
 
-## Documentation Status - June 15, 2026
+## Documentation Status - June 16, 2026
 
-This guide reflects the current repo scripts. The June 1 audit confirmed `npm run lint`, `npm run typecheck`, `npm run build`, and the metrics-only chat scroll probe passed on current `main`. The chat-scroll script now also has seeded read-position scenarios for preview/staging runs that can prove the first-unread, deep-link, same-timestamp, realtime anchoring, and media paths. The June 2 auth rollout added invite-only signup, email verification, password reset, and admin invite tests. The June 8 work added Hype, safe-fetch, automation approval queue, DM read-guard, and News realtime-helper coverage. The June 9 work added focused coverage for mobile composer focus during pending sends, Hype-aware chat media frames, and Shadow Runner mobile visual/playable-prototype checks. The June 15 Shadow Runner passes added Bell Tower Level 4 route checks, tap-toggle crouch/coin-route QA, Web Audio soundtrack coverage, and SQL/Jest contracts for Shadow Runner medals plus push-subscription foreground repair.
+This guide reflects the current repo scripts. The June 1 audit confirmed `npm run lint`, `npm run typecheck`, `npm run build`, and the metrics-only chat scroll probe passed on current `main`. The chat-scroll script now also has seeded read-position scenarios for preview/staging runs that can prove the first-unread, deep-link, same-timestamp, realtime anchoring, and media paths. The June 2 auth rollout added invite-only signup, email verification, password reset, and admin invite tests. The June 8 work added Hype, safe-fetch, automation approval queue, DM read-guard, and News realtime-helper coverage. The June 9 work added focused coverage for mobile composer focus during pending sends, Hype-aware chat media frames, and Shadow Runner mobile visual/playable-prototype checks. The June 15 Shadow Runner passes added Bell Tower Level 4 route checks, tap-toggle crouch/coin-route QA, Web Audio soundtrack coverage, and SQL/Jest contracts for Shadow Runner medals plus push-subscription foreground repair. The June 16 Golden Egg visual refresh keeps existing Jest coverage for mobile hold-to-claim behavior and shared achievement badge rendering.
 
 ## Mobile-First Testing Default
 
@@ -61,6 +61,7 @@ Current coverage is strongest around:
 - automation approval queue access and UI behavior
 - shared safe-fetch URL policy for Supabase and Netlify URL fetchers
 - Shadow Runner medal SQL contracts and shared badge rendering
+- Golden Egg mobile hold-to-claim behavior and permanent badge rendering
 - weather widget and location settings
 
 ## When To Add Manual Browser QA
@@ -347,6 +348,7 @@ Push and badge focused Jest coverage currently lives in:
 
 - [tests/PushSubscriptionSync.test.tsx](C:/repos/chat2.0/tests/PushSubscriptionSync.test.tsx:1)
 - [tests/UserAchievementBadges.test.tsx](C:/repos/chat2.0/tests/UserAchievementBadges.test.tsx:1)
+- [tests/GoldenEggDiscovery.test.tsx](C:/repos/chat2.0/tests/GoldenEggDiscovery.test.tsx:1)
 - [tests/shadowRunnerMedalsSql.test.ts](C:/repos/chat2.0/tests/shadowRunnerMedalsSql.test.ts:1)
 
 Admin/weather focused Jest coverage currently lives in:

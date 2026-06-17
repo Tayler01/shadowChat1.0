@@ -2,9 +2,9 @@
 
 This rundown captures the current documentation and agent-file surface in `C:\repos\chat2.0`. It is meant to help future updates start from the right source of truth instead of rediscovering stale or overlapping docs.
 
-## Documentation Status - June 15, 2026
+## Documentation Status - June 16, 2026
 
-This rundown was updated after the June 15 Shadow Runner Bell Tower Level 4, tap-toggle crouch, Web Audio soundtrack, completion-medal migration, push-subscription foreground repair, and feature auth-refresh hardening work. The file remains an inventory and routing guide; the source documents themselves now carry current status notes or current implementation guidance.
+This rundown was updated after the June 16 Golden Egg discovery visual refresh and the June 15 Shadow Runner Bell Tower Level 4, tap-toggle crouch, Web Audio soundtrack, completion-medal migration, push-subscription foreground repair, and feature auth-refresh hardening work. The file remains an inventory and routing guide; the source documents themselves now carry current status notes or current implementation guidance.
 
 ## Summary
 
@@ -12,7 +12,7 @@ This rundown was updated after the June 15 Shadow Runner Bell Tower Level 4, tap
 - [AGENTS.md](C:/repos/chat2.0/AGENTS.md:1) is the canonical agent guide. [AGENT.md](C:/repos/chat2.0/AGENT.md:1) is a short compatibility mirror.
 - Before this refresh, several current product docs had last been updated in May 2026, especially Admin, App Releases, Deployment, Phone Install, ShadowPin, mobile, and iOS planning.
 - Several bridge docs are still useful but date from April 2026 planning. They now carry bridge-specific status notes and should be checked against current firmware/functions before implementation.
-- `README.md` and `docs/ARCHITECTURE.md` have been refreshed for the June 1 audit state, the chat-scroll fix, the June 2 auth rollout, the June 8 Hype/safe-fetch/automation queue updates, the June 11/12 Shadow Runner/Shadow Mystery updates, and the June 15 Shadow Runner/auth/push follow-ups.
+- `README.md` and `docs/ARCHITECTURE.md` have been refreshed for the June 1 audit state, the chat-scroll fix, the June 2 auth rollout, the June 8 Hype/safe-fetch/automation queue updates, the June 11/12 Shadow Runner/Shadow Mystery updates, the June 15 Shadow Runner/auth/push follow-ups, and the June 16 Golden Egg discovery visual refresh.
 - `PLAN.md`, `STATUS.md`, and `TASK.md` are now labeled as bridge-specific status artifacts, not global project status.
 - `.agents/` contains local ignored agent skills. They are not tracked or pushed by default because `.gitignore` ignores `.agents/`.
 
@@ -38,7 +38,7 @@ This rundown was updated after the June 15 Shadow Runner Bell Tower Level 4, tap
 
 | File | Latest tracked update/status date | Role | Refresh guidance |
 | --- | --- | --- | --- |
-| [README.md](C:/repos/chat2.0/README.md:1) | 2026-06-15 | Human entrypoint, stack, feature list, commands, deployment, documentation map. | Refresh after security, deployment, or major feature work; keep docs map current. |
+| [README.md](C:/repos/chat2.0/README.md:1) | 2026-06-16 | Human entrypoint, stack, feature list, commands, deployment, documentation map. | Refresh after security, deployment, or major feature work; keep docs map current. |
 | [PLAN.md](C:/repos/chat2.0/PLAN.md:1) | 2026-05-02 | ESP bridge update/offline software plan. | Rename or add a top warning that it is bridge-specific, not global product plan. |
 | [STATUS.md](C:/repos/chat2.0/STATUS.md:1) | 2026-05-02 | ESP bridge milestone status log. | Archive under `docs/` or rename to bridge-specific status to avoid stale root-level status confusion. |
 | [TASK.md](C:/repos/chat2.0/TASK.md:1) | 2026-04-25 | ESP bridge task statement. | Archive or rename with bridge prefix if still needed. |
@@ -50,9 +50,9 @@ This rundown was updated after the June 15 Shadow Runner Bell Tower Level 4, tap
 
 | File | Latest tracked update/status date | Role | Refresh guidance |
 | --- | --- | --- | --- |
-| [docs/ARCHITECTURE.md](C:/repos/chat2.0/docs/ARCHITECTURE.md:1) | 2026-06-15 | System map and data-flow overview. | Update after Edge Function hardening, safe-fetch helpers, lib module splits, new backend domains, or major Entertainment/game runtime changes. |
+| [docs/ARCHITECTURE.md](C:/repos/chat2.0/docs/ARCHITECTURE.md:1) | 2026-06-16 | System map and data-flow overview. | Update after Edge Function hardening, safe-fetch helpers, lib module splits, new backend domains, or major Entertainment/game runtime changes. |
 | [docs/SETUP_GUIDE.md](C:/repos/chat2.0/docs/SETUP_GUIDE.md:1) | 2026-06-01 | Local and hosted setup. | Update for any new auth config, stable smoke accounts, or new secrets. |
-| [docs/TESTING_GUIDE.md](C:/repos/chat2.0/docs/TESTING_GUIDE.md:1) | 2026-06-15 | Unit, smoke, and browser testing workflow. | Keep auth, chat-scroll, safe-fetch, Hype, media-frame, composer, push, badge, and game visual coverage expectations current. |
+| [docs/TESTING_GUIDE.md](C:/repos/chat2.0/docs/TESTING_GUIDE.md:1) | 2026-06-16 | Unit, smoke, and browser testing workflow. | Keep auth, chat-scroll, safe-fetch, Hype, media-frame, composer, push, badge, Easter egg, and game visual coverage expectations current. |
 | [docs/DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1) | 2026-05-29 | GitHub, Netlify, Supabase deployment. | Update after Netlify headers, Node version alignment, or Auth config changes. |
 | [docs/GOAL_PLAYBOOKS.md](C:/repos/chat2.0/docs/GOAL_PLAYBOOKS.md:1) | 2026-05-14 | Goal-mode playbooks. | Add audit-backlog playbook if this becomes a repeated workflow. |
 | [docs/DEFERRED_FOLLOWUPS.md](C:/repos/chat2.0/docs/DEFERRED_FOLLOWUPS.md:1) | 2026-06-01 | Small deferred ideas. | Keep small only; larger audit items now live in the dedicated audit next-steps doc. |

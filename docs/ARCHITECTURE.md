@@ -2,9 +2,9 @@
 
 This document is a high-signal map of the current ShadowChat codebase.
 
-## Documentation Status - June 15, 2026
+## Documentation Status - June 16, 2026
 
-This architecture map is current for the shipped `main` branch and now includes the June 15 Shadow Runner Bell Tower Level 4, Web Audio soundtrack controller, tap-toggle crouch, completion-medal schema, push-subscription foreground repair, and feature auth-refresh hardening work. Known architecture follow-ups are tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1): remaining Supabase policy/RPC hardening, service-role bypass checks, production deployment/smoke for all shared safe-fetch adopters, frontend polish, and broader realtime/send/scroll helper extraction.
+This architecture map is current for the shipped `main` branch and now includes the June 16 Golden Egg discovery visual refresh, plus the June 15 Shadow Runner Bell Tower Level 4, Web Audio soundtrack controller, tap-toggle crouch, completion-medal schema, push-subscription foreground repair, and feature auth-refresh hardening work. Known architecture follow-ups are tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1): remaining Supabase policy/RPC hardening, service-role bypass checks, production deployment/smoke for all shared safe-fetch adopters, frontend polish, and broader realtime/send/scroll helper extraction.
 
 ## High-Level System
 
@@ -38,6 +38,7 @@ React UI
 - [`src/components/profile`](C:/repos/chat2.0/src/components/profile): user profile experience, including avatar crop/zoom/position editing before upload
 - [`src/components/settings`](C:/repos/chat2.0/src/components/settings): sectioned settings, notification setup, feedback, admin tools, and weather location
 - [`src/components/layout`](C:/repos/chat2.0/src/components/layout): shell, nav, and responsive structure
+- [`src/components/easter-egg`](C:/repos/chat2.0/src/components/easter-egg): mobile SHADO-logo Golden Egg discovery trigger, award overlay, and bundled badge/banner asset references
 - [`src/features/games`](C:/repos/chat2.0/src/features/games): Entertainment picker and game surfaces. Shadow Runner currently lives under [`src/features/games/shadow-runner`](C:/repos/chat2.0/src/features/games/shadow-runner) with an asset-driven title screen, Shadow Runner-scoped rotate gate, 10-stop campaign map, lazy-loaded Phaser levels through Level 4, DOM HUD/touch controls, title/options scroll menus, pause/exit confirmation menus, foreground-only Web Audio game soundtracks, and a best-effort Android fullscreen/landscape request from the picker.
 - [`src/features/entertainment`](C:/repos/chat2.0/src/features/entertainment): non-game Entertainment surfaces such as Shado TV, Shadow Mystery, and Will & Kirk.
 
@@ -93,6 +94,7 @@ Important domains:
 - private per-user weather preferences
 - push subscriptions and notification preferences
 - Hype events, per-message Hype summaries, event receipts, daily limits, and bonus-credit grants
+- permanent Golden Egg Easter egg claims through `users.gold_easter_egg` and `claim_gold_easter_egg`
 - Shadow Runner level catalog, per-user completion ledger, and public completion-medal badge fields
 - full-admin automation approval packets and append-only packet events
 - ESP bridge control-plane and update-manifest tables
@@ -211,6 +213,13 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
    summary.
 5. Clients render the celebration overlay once per event receipt and can trigger
    optional `hype_event` push delivery through `send-push`.
+
+### Golden Egg Discovery
+
+1. On mobile pointers, a hold on the SHADO logo dispatches the Golden Egg discovery request.
+2. `GoldenEggDiscoveryController` calls the authenticated `claim_gold_easter_egg` RPC and refreshes the current profile.
+3. The discovery overlay renders a bundled banner backdrop and badge seal from `public/easter-egg`.
+4. The permanent `users.gold_easter_egg` field feeds shared achievement badges in chat, profile, DM, Art Board, and search surfaces.
 
 ### Direct Message
 
