@@ -46,6 +46,10 @@ import { useRealtimeRecovery } from './useRealtimeRecovery';
 import { useSoundEffects } from './useSoundEffects';
 import { createRealtimeChannelName } from '../lib/realtimeChannelName';
 import {
+  createRealtimeSubscriptionManager,
+  isRecoverableRealtimeStatus,
+} from '../lib/realtimeSubscription';
+import {
   loadLocalOutboxEntries,
   removeLocalOutboxEntry,
   upsertLocalOutboxEntry,
@@ -570,7 +574,10 @@ function useProvideMessages(): MessagesContextValue {
   const { user, profile } = useAuth();
   const { playMessage, playReaction } = useSoundEffects();
   const channelRef = useRef<RealtimeChannel | null>(null);
-  const subscribeRef = useRef<() => Promise<RealtimeChannel>>();
+  const subscriptionRef = useRef<ReturnType<typeof createRealtimeSubscriptionManager> | null>(null);
+  if (!subscriptionRef.current) {
+    subscriptionRef.current = createRealtimeSubscriptionManager({ getFallbackClient: getRealtimeClient });
+  }
   const clientResetRef = useRef<() => Promise<void>>();
   const resetInFlightRef = useRef<Promise<void> | null>(null);
   const fetchRequestIdRef = useRef(0);
@@ -957,32 +964,9 @@ function useProvideMessages(): MessagesContextValue {
 
     resetInFlightRef.current = (async () => {
       try {
-        // Clean up old channel
-        if (channelRef.current) {
-          try {
-            const workingClient = await getWorkingClient();
-            if (workingClient && workingClient.removeChannel && typeof workingClient.removeChannel === 'function') {
-              await workingClient.removeChannel(channelRef.current);
-            }
-          } catch {
-            // Ignore cleanup failures; the next subscribe call uses a fresh topic.
-          }
-          channelRef.current = null;
-        }
-
-        // Refetch messages with new client
         await fetchMessages().catch(() => undefined);
-
-        // Resubscribe to realtime with new client
-        if (subscribeRef.current) {
-          try {
-            const newChannel = await subscribeRef.current();
-            channelRef.current = newChannel;
-          } catch {
-            // The next recovery/focus event will try again.
-          }
-        }
-
+        const newChannel = await subscriptionRef.current?.resubscribe().catch(() => null);
+        channelRef.current = newChannel ?? null;
       } catch {
         await fetchMessages().catch(() => undefined);
       } finally {
@@ -1071,12 +1055,11 @@ function useProvideMessages(): MessagesContextValue {
       return;
     }
 
-    let channel: RealtimeChannel | null = null;
-    let currentClient: any = null;
     let disposed = false;
+    const subscriptionManager = subscriptionRef.current;
 
-    const subscribeToChannel = async (): Promise<RealtimeChannel> => {
-      currentClient = await getWorkingClient().catch(() => getRealtimeClient());
+    const subscribeToChannel = async () => {
+      let currentClient = await getWorkingClient().catch(() => getRealtimeClient());
       currentClient = currentClient || getRealtimeClient();
       
       if (!currentClient?.channel || typeof currentClient.channel !== 'function') {
@@ -1177,6 +1160,10 @@ function useProvideMessages(): MessagesContextValue {
           }
         )
         .subscribe(async (status: string, err: any) => {
+          if (disposed) {
+            return;
+          }
+
           if (err) {
             // Handle specific binding mismatch error
             if (err.message && err.message.includes('mismatch between server and client bindings for postgres changes')) {
@@ -1188,18 +1175,18 @@ function useProvideMessages(): MessagesContextValue {
                   await clientResetRef.current();
                 }
               } catch (resetError) {
-                // Fallback to simple resubscription after delay
                 setTimeout(() => {
-                  void subscribeToChannel().then(newCh => {
-                    channel = newCh;
-                    channelRef.current = newCh;
-                  }).catch(() => undefined);
+                  void subscriptionManager?.resubscribe()
+                    .then(newCh => {
+                      channelRef.current = newCh;
+                    })
+                    .catch(() => undefined);
                 }, 2000);
               }
               return;
             }
           }
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          if (isRecoverableRealtimeStatus(status)) {
             try {
               await runRealtimeRecovery('channel-error');
               
@@ -1208,42 +1195,39 @@ function useProvideMessages(): MessagesContextValue {
                 await clientResetRef.current();
               }
             } catch (resetError) {
-              // Fallback to simple resubscription after delay
               setTimeout(() => {
-                void subscribeToChannel().then(newCh => {
-                  channel = newCh;
-                  channelRef.current = newCh;
-                }).catch(() => undefined);
+                void subscriptionManager?.resubscribe()
+                  .then(newCh => {
+                    channelRef.current = newCh;
+                  })
+                  .catch(() => undefined);
               }, 2000);
             }
           } else if (status === 'CLOSED') {
             setTimeout(() => {
-              void subscribeToChannel().then(newCh => {
-                channel = newCh;
-                channelRef.current = newCh;
-              }).catch(() => undefined);
+              void subscriptionManager?.resubscribe()
+                .then(newCh => {
+                  channelRef.current = newCh;
+                })
+                .catch(() => undefined);
             }, 1000);
           }
         });
 
-      return newChannel;
+      return { channel: newChannel, client: currentClient };
     };
 
-    subscribeToChannel()
+    subscriptionManager?.setSubscribe(subscribeToChannel);
+    subscriptionManager?.start(subscribeToChannel)
       .then(newChannel => {
-        channel = newChannel;
         channelRef.current = newChannel;
       })
       .catch(() => {});
-    subscribeRef.current = subscribeToChannel;
 
     return () => {
       disposed = true;
-      if (channel && currentClient && currentClient.removeChannel && typeof currentClient.removeChannel === 'function') {
-        currentClient.removeChannel(channel);
-      } else if (channel && getRealtimeClient()?.removeChannel) {
-        getRealtimeClient()?.removeChannel(channel);
-      }
+      subscriptionManager?.clearSubscribe(subscribeToChannel);
+      void subscriptionManager?.stop();
       channelRef.current = null;
     };
   }, [addNewMessage, hydrateMessage, playReaction, user]);
