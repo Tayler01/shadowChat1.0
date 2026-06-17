@@ -17,6 +17,9 @@ let mockProfile = {
   display_name: 'Reporter',
   admin_role: null as 'admin' | 'sub_admin' | null,
 }
+let mockAdminAccess = {
+  isOperator: false,
+}
 
 const baseMessage = {
   id: 'message-1',
@@ -76,8 +79,13 @@ jest.mock('../src/hooks/useBoardChat', () => ({
 
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => ({
+    user: { id: mockProfile.id },
     profile: mockProfile,
   }),
+}))
+
+jest.mock('../src/hooks/useAdminAccess', () => ({
+  useAdminAccess: () => mockAdminAccess,
 }))
 
 jest.mock('../src/hooks/useReadCursor', () => ({
@@ -127,6 +135,7 @@ beforeEach(() => {
     display_name: 'Reporter',
     admin_role: null,
   }
+  mockAdminAccess = { isOperator: false }
   mockSendMessage.mockResolvedValue(null)
   mockEditMessage.mockResolvedValue(undefined)
   mockDeleteMessage.mockResolvedValue(undefined)
@@ -364,6 +373,7 @@ test('news chat lets operators delete normal user messages', async () => {
     display_name: 'Mod',
     admin_role: 'sub_admin',
   }
+  mockAdminAccess = { isOperator: true }
   mockUseNewsChat.mockReturnValue(buildNewsChatState([{
     ...baseMessage,
     user_id: 'user-2',
@@ -389,6 +399,7 @@ test('news chat hides operator delete for another operator message', () => {
     display_name: 'Mod',
     admin_role: 'sub_admin',
   }
+  mockAdminAccess = { isOperator: true }
   mockUseNewsChat.mockReturnValue(buildNewsChatState([{
     ...baseMessage,
     user_id: 'user-2',
