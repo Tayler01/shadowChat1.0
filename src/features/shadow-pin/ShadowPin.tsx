@@ -29,6 +29,7 @@ import { Input } from '../../components/ui/Input'
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner'
 import { MobileAppHeader } from '../../components/layout/MobileAppHeader'
 import { UserAchievementBadges } from '../../components/ui/UserAchievementBadges'
+import { ZoomableImageFrame } from '../../components/ui/ZoomableImageFrame'
 import { useAuth } from '../../hooks/useAuth'
 import { useAdminAccess } from '../../hooks/useAdminAccess'
 import { cn } from '../../lib/utils'
@@ -2368,7 +2369,14 @@ function ImageViewerModal({
             )}
           </div>
         ) : (
-          <img src={getPinImageUrl(image, 'medium')} alt={image.title} className="h-full w-full object-contain" />
+          <ZoomableImageFrame resetKey={image.id} className="h-full w-full">
+            <img
+              src={getPinImageUrl(image, 'medium')}
+              alt={image.title}
+              draggable={false}
+              className="h-full w-full object-contain"
+            />
+          </ZoomableImageFrame>
         )}
       </div>
       <div className="mt-3 rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(5,6,8,0.72)] p-3">

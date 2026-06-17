@@ -1,6 +1,7 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
+import { ZoomableImageFrame } from './ZoomableImageFrame'
 
 interface ImageModalProps {
   open: boolean
@@ -45,11 +46,14 @@ export const ImageModal: React.FC<ImageModalProps> = ({ open, src, alt, onClose 
         >
           <X className="w-5 h-5" />
         </button>
-        <img
-          src={src}
-          alt={alt}
-          className="max-h-[calc(var(--shadowchat-visual-viewport-height,100dvh)_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom)_-_1.5rem)] max-w-[calc(100vw_-_1.5rem)] rounded-[var(--radius-lg)] object-contain shadow-[0_22px_70px_rgba(0,0,0,0.58)]"
-        />
+        <ZoomableImageFrame resetKey={src} className="h-full max-h-full w-full max-w-full">
+          <img
+            src={src}
+            alt={alt}
+            draggable={false}
+            className="max-h-[calc(var(--shadowchat-visual-viewport-height,100dvh)_-_env(safe-area-inset-top)_-_env(safe-area-inset-bottom)_-_1.5rem)] max-w-[calc(100vw_-_1.5rem)] rounded-[var(--radius-lg)] object-contain shadow-[0_22px_70px_rgba(0,0,0,0.58)]"
+          />
+        </ZoomableImageFrame>
       </div>
     </div>
   )

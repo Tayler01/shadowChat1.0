@@ -177,6 +177,7 @@ test('opens uploaded images in a top-level mobile-safe viewer', async () => {
 
   const dialog = screen.getByRole('dialog', { name: /uploaded image/i })
   expect(dialog).toHaveClass('fixed', 'inset-0', 'z-[120]')
+  expect(dialog.querySelector('[data-zoomable-image-frame="true"]')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /close image/i })).toBeInTheDocument()
 })
 
