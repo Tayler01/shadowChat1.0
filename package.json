@@ -38,6 +38,7 @@
     "qa:chat-scroll:all": "node scripts/group-chat-scroll-probe.mjs --scenario=all",
     "qa:mobile-pwa": "node scripts/mobile-pwa-visual-qa.mjs",
     "qa:themes": "node scripts/theme-visual-qa.mjs",
+    "automation:submit-daily-scan": "node scripts/submit-daily-scan-approval-packets.mjs",
     "shadow-runner:audio": "node scripts/generate-shadow-runner-audio.mjs",
     "release:publish": "node scripts/publish-app-release.mjs",
     "shadow-pin:backfill-media": "node scripts/shadow-pin-backfill-media.mjs",
