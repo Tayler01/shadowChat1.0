@@ -422,7 +422,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
   const presenceLabel = getPresenceStateLabel(presenceState)
 
   const content = (
-    <div className="mx-auto max-w-5xl p-4 sm:p-6">
+    <div className="mx-auto w-full max-w-5xl min-w-0 p-3 sm:p-6">
       {isDesktop && !embedded && (
         <button
           onClick={onToggleSidebar}
@@ -596,8 +596,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
             ) : (
               <div className="space-y-4">
                 <div>
-                  <h1 className="flex min-w-0 items-center gap-2 text-2xl font-bold text-[var(--text-primary)]">
-                    <span className="truncate">{profile.display_name}</span>
+                  <h1 className="flex min-w-0 flex-wrap items-center gap-2 text-2xl font-bold text-[var(--text-primary)]">
+                    <span className="min-w-0 max-w-full truncate">{profile.display_name}</span>
                     <UserRoleBadge role={profile.admin_role} className="mt-1" />
                     <UserAchievementBadges user={profile} />
                     <UserPresenceBadge userId={profile.id} presenceVisibility={profile.presence_visibility} />
@@ -609,7 +609,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
 
                 {profile.status_message && (
                   <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)] p-4">
-                    <p className="whitespace-pre-wrap text-[var(--text-secondary)]">
+                    <p className="whitespace-pre-wrap break-words text-[var(--text-secondary)]">
                       {profile.status_message}
                     </p>
                   </div>
@@ -678,8 +678,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
                 <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">Display name</div>
-                <div className="mt-2 flex items-center gap-1.5 text-base font-medium text-[var(--text-primary)]">
-                  <span className="truncate">{profile.display_name}</span>
+                <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5 text-base font-medium text-[var(--text-primary)]">
+                  <span className="min-w-0 max-w-full truncate">{profile.display_name}</span>
                   <UserRoleBadge role={profile.admin_role} />
                   <UserAchievementBadges user={profile} />
                   <UserPresenceBadge userId={profile.id} presenceVisibility={profile.presence_visibility} />
@@ -691,7 +691,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
               </div>
               <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 sm:col-span-2">
                 <div className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">Bio</div>
-                <div className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+                <div className="mt-2 break-words text-sm leading-6 text-[var(--text-secondary)]">
                   {profile.status_message?.trim() || 'No bio set yet.'}
                 </div>
               </div>

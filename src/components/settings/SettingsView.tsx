@@ -721,7 +721,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      <div className="glass-panel rounded-[var(--radius-lg)] p-5">
+      <div className="glass-panel min-w-0 rounded-[var(--radius-lg)] p-4 sm:p-5">
         <h2 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">Notification Types</h2>
         <div className="grid gap-3 sm:grid-cols-2">
           {notificationPreferenceSettings.map(setting => (
@@ -859,7 +859,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             {adminAccessError}
           </div>
         ) : (
-          <div className="max-h-[36rem] space-y-2 overflow-y-auto pr-1">
+          <div className="max-h-[min(36rem,calc(var(--shadowchat-visual-viewport-height,100dvh)-15rem))] space-y-2 overflow-y-auto overscroll-contain pr-1">
             {adminFilteredUsers.map(adminUser => {
               const isCurrentFullAdmin = adminUser.admin_role === 'admin'
               const isSubAdmin = adminUser.admin_role === 'sub_admin'
@@ -869,16 +869,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               return (
                 <div
                   key={adminUser.id}
-                  className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-center"
+                  className="grid min-w-0 gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-3 sm:p-4 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-center"
                 >
                   <div className="min-w-0">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <span className="truncate font-medium text-[var(--text-primary)]">{adminUser.display_name}</span>
+                      <span className="min-w-0 max-w-full truncate font-medium text-[var(--text-primary)]">{adminUser.display_name}</span>
                       <UserRoleBadge role={adminUser.admin_role} />
                       <UserPresenceBadge userId={adminUser.id} presenceVisibility={adminUser.presence_visibility} />
-                      <span className="truncate text-sm text-[var(--text-muted)]">@{adminUser.username}</span>
+                      <span className="min-w-0 max-w-full truncate text-sm text-[var(--text-muted)]">@{adminUser.username}</span>
                     </div>
-                    <p className="mt-1 truncate text-sm text-[var(--text-muted)]">{adminUser.email}</p>
+                    <p className="mt-1 break-all text-sm text-[var(--text-muted)]">{adminUser.email}</p>
                     <p className="mt-1 text-xs uppercase tracking-[0.14em] text-[var(--text-muted)]">
                       Joined {new Date(adminUser.created_at).toLocaleDateString()}
                     </p>

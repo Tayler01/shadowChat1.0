@@ -302,7 +302,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   const profilePage = (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[120] flex items-stretch justify-center p-0 sm:items-center sm:px-4 sm:py-6">
+        <div className="fixed inset-0 z-[120] flex h-[var(--shadowchat-visual-viewport-height,100dvh)] items-stretch justify-center p-0 sm:items-center sm:px-4 sm:py-6">
           <motion.button
             type="button"
             aria-label="Dismiss profile"
@@ -322,7 +322,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 18, scale: 0.98 }}
             transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="popup-surface relative flex h-full w-full max-w-none flex-col overflow-y-auto overflow-x-hidden rounded-none sm:h-auto sm:max-h-[min(86vh,760px)] sm:max-w-lg sm:rounded-[var(--radius-xl)]"
+            className="popup-surface relative flex h-full max-h-[var(--shadowchat-visual-viewport-height,100dvh)] w-full max-w-none flex-col overflow-y-auto overflow-x-hidden rounded-none pb-[env(safe-area-inset-bottom)] sm:h-auto sm:max-h-[min(86dvh,760px)] sm:max-w-lg sm:rounded-[var(--radius-xl)] sm:pb-0"
           >
             <div className="relative h-36 shrink-0 overflow-hidden border-b border-[var(--border-panel)]">
               {user.banner_thumbnail_url || user.banner_url ? (
@@ -349,7 +349,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
             </div>
 
             <div className="relative px-5 pb-5 sm:px-6 sm:pb-6">
-              <div className="-mt-12 flex items-end gap-4">
+              <div className="-mt-12 flex min-w-0 items-end gap-4">
                 <Avatar
                   src={user.avatar_thumbnail_url || user.avatar_url}
                   alt={user.display_name || user.username || 'User'}
@@ -360,14 +360,14 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                   showStatus
                   className="rounded-full border-4 border-[var(--bg-panel-strong)] shadow-[var(--shadow-panel-strong)]"
                 />
-                <div className="min-w-0 pb-2">
-                  <h2 id="public-profile-title" className="flex min-w-0 items-center gap-2 text-2xl font-bold text-[var(--text-primary)]">
-                    <span className="truncate">{user.display_name || user.username || 'Unknown User'}</span>
+                <div className="min-w-0 flex-1 pb-2">
+                  <h2 id="public-profile-title" className="flex min-w-0 flex-wrap items-center gap-2 text-2xl font-bold text-[var(--text-primary)]">
+                    <span className="min-w-0 max-w-full truncate">{user.display_name || user.username || 'Unknown User'}</span>
                     <UserRoleBadge role={localAdminRole} className="mt-1" />
                     <UserAchievementBadges user={{ ...user, admin_role: localAdminRole }} />
                     <UserPresenceBadge userId={user.id} presenceVisibility={user.presence_visibility} />
                   </h2>
-                  <p className="truncate text-sm text-[var(--text-muted)]">@{user.username || 'unknown'}</p>
+                  <p className="min-w-0 truncate text-sm text-[var(--text-muted)]">@{user.username || 'unknown'}</p>
                 </div>
               </div>
 
