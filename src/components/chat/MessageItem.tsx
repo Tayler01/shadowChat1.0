@@ -26,6 +26,7 @@ import { UserAchievementBadges } from '../ui/UserAchievementBadges'
 import { formatTime, shouldGroupMessage, cn, getReadableTextColor } from '../../lib/utils'
 import type { Message, User } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
+import { useAdminAccess } from '../../hooks/useAdminAccess'
 import toast from 'react-hot-toast'
 import type { EmojiClickData } from '../../types'
 import { useToneAnalysis } from '../../hooks/useToneAnalysis'
@@ -192,6 +193,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     moderationScope = 'general_chat',
   }) => {
     const { profile } = useAuth()
+    const { isOperator } = useAdminAccess({ includeUsers: false })
     const hype = useOptionalHype()
     const [isEditing, setIsEditing] = useState(false)
     const [editContent, setEditContent] = useState(message.content)
@@ -208,7 +210,6 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
 
     const isGrouped = shouldGroupMessage(message, previousMessage)
     const isOwner = profile?.id === message.user_id
-    const isOperator = profile?.admin_role === 'admin' || profile?.admin_role === 'sub_admin'
     const isAuthorOperator = message.user?.admin_role === 'admin' || message.user?.admin_role === 'sub_admin'
     const isLocalDelivery = message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
     const isFailedLocalMessage = isOwner && message.delivery_status === 'failed'

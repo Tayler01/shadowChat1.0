@@ -30,6 +30,7 @@ import { LoadingSpinner } from '../../components/ui/LoadingSpinner'
 import { MobileAppHeader } from '../../components/layout/MobileAppHeader'
 import { UserAchievementBadges } from '../../components/ui/UserAchievementBadges'
 import { useAuth } from '../../hooks/useAuth'
+import { useAdminAccess } from '../../hooks/useAdminAccess'
 import { cn } from '../../lib/utils'
 import type { AppView } from '../../types/navigation'
 import { useShadowPinCategories } from './hooks/useShadowPinCategories'
@@ -2397,11 +2398,11 @@ function ShadowPinHome({
   tracker: ShadowPinActivityTracker
 }) {
   const { user } = useAuth()
+  const { role: adminRole } = useAdminAccess({ includeUsers: false })
   const categoriesState = useShadowPinCategories()
   const [modal, setModal] = useState<ModalMode>(null)
   const categoryScrollRef = useRef<HTMLElement | null>(null)
 
-  const adminRole = user?.admin_role
   const detailsCategory = modal?.type === 'category-details'
     ? categoriesState.categories.find(category => category.id === modal.category.id) ?? modal.category
     : null
@@ -2558,6 +2559,7 @@ function ShadowPinCategoryScreen({
   tracker: ShadowPinActivityTracker
 }) {
   const { user } = useAuth()
+  const { role: adminRole } = useAdminAccess({ includeUsers: false })
   const imagesState = useShadowPinImages(categoryId)
   const [modal, setModal] = useState<ModalMode>(null)
   const [overlayImageId, setOverlayImageId] = useState<string | null>(null)
@@ -2566,8 +2568,6 @@ function ShadowPinCategoryScreen({
   const [playableVisibleVideoCount, setPlayableVisibleVideoCount] = useState(0)
   const videoVisibilityRef = useRef(new Map<string, VideoVisibilitySnapshot>())
   const skippedVideoIdsRef = useRef(new Set<string>())
-  const adminRole = user?.admin_role
-
   const title = imagesState.category?.title || 'ShadowPin'
   useShadowPinCategoryDwell(imagesState.category, tracker)
 

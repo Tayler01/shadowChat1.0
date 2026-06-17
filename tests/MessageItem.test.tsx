@@ -9,6 +9,9 @@ let mockAuthState = {
   user: { id: 'u1' },
   profile: { id: 'u1', admin_role: null as 'admin' | 'sub_admin' | null },
 }
+let mockAdminAccess = {
+  isOperator: false,
+}
 let mockHypeContext: any = null
 
 jest.mock('../src/config', () => ({
@@ -18,6 +21,10 @@ jest.mock('../src/config', () => ({
 
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => mockAuthState,
+}))
+
+jest.mock('../src/hooks/useAdminAccess', () => ({
+  useAdminAccess: () => mockAdminAccess,
 }))
 
 jest.mock('../src/hooks/useHype', () => ({
@@ -62,6 +69,7 @@ beforeEach(() => {
     user: { id: 'u1' },
     profile: { id: 'u1', admin_role: null },
   }
+  mockAdminAccess = { isOperator: false }
   mockHypeContext = null
   mockedToneEnabled.mockReturnValue({ enabled: true, setEnabled: jest.fn() })
 })
@@ -295,6 +303,7 @@ test('lets an app operator delete a normal user group message', async () => {
     user: { id: 'admin-1' },
     profile: { id: 'admin-1', admin_role: 'sub_admin' },
   }
+  mockAdminAccess = { isOperator: true }
   const onDelete = jest.fn()
   const normalUserMessage = {
     ...baseMessage,
@@ -335,6 +344,7 @@ test('does not let an operator delete another operator group message', async () 
     user: { id: 'admin-1' },
     profile: { id: 'admin-1', admin_role: 'sub_admin' },
   }
+  mockAdminAccess = { isOperator: true }
   const operatorMessage = {
     ...baseMessage,
     user_id: 'u2',

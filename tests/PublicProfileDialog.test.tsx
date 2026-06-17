@@ -4,6 +4,7 @@ import { PublicProfileDialog } from '../src/components/profile/PublicProfileDial
 import type { User } from '../src/lib/supabase'
 
 const mockUseAuth = jest.fn()
+const mockUseAdminAccess = jest.fn()
 const mockUseUserChannelBans = jest.fn()
 const mockSetUserChannelBans = jest.fn()
 const mockSetSubAdminStatus = jest.fn()
@@ -14,6 +15,10 @@ const mockToastError = jest.fn()
 
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => mockUseAuth(),
+}))
+
+jest.mock('../src/hooks/useAdminAccess', () => ({
+  useAdminAccess: () => mockUseAdminAccess(),
 }))
 
 jest.mock('../src/hooks/useUserChannelBans', () => ({
@@ -96,6 +101,7 @@ const adminUser = {
 beforeEach(() => {
   jest.clearAllMocks()
   mockUseAuth.mockReturnValue({ profile: null })
+  mockUseAdminAccess.mockReturnValue({ role: null, isAdmin: false, isOperator: false })
   mockUseUserChannelBans.mockReturnValue({ bans: [], loading: false, refresh: jest.fn() })
   mockSetUserChannelBans.mockResolvedValue([])
   mockSetSubAdminStatus.mockResolvedValue(undefined)
@@ -124,6 +130,7 @@ test('closes with the clear close button', async () => {
 test('lets admins save channel ban selections from the profile dialog', async () => {
   const browserUser = userEvent.setup()
   mockUseAuth.mockReturnValue({ profile: adminUser })
+  mockUseAdminAccess.mockReturnValue({ role: 'admin', isAdmin: true, isOperator: true })
   mockSetUserChannelBans.mockResolvedValue([
     {
       id: 'ban-1',
@@ -163,6 +170,7 @@ test('lets admins save channel ban selections from the profile dialog', async ()
 test('lets the full admin grant sub-admin access from the profile dialog', async () => {
   const browserUser = userEvent.setup()
   mockUseAuth.mockReturnValue({ profile: adminUser })
+  mockUseAdminAccess.mockReturnValue({ role: 'admin', isAdmin: true, isOperator: true })
 
   render(<PublicProfileDialog user={user} open onClose={jest.fn()} />)
 

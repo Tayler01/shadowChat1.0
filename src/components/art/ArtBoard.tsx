@@ -29,6 +29,7 @@ import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { ChatMessageActionsMenu, type ChatMessageAction } from '../chat/ChatMessageActionsMenu'
 import { useArtBoard, type CreateArtBoardItemInput, type UpdateArtBoardItemInput } from '../../hooks/useArtBoard'
 import { useAuth } from '../../hooks/useAuth'
+import { useAdminAccess } from '../../hooks/useAdminAccess'
 import {
   ART_BOARD_FRAME_STYLES,
   ART_BOARD_LINK_LABELS,
@@ -936,6 +937,7 @@ export function ArtBoardAboutDialog({ onClose }: { onClose: () => void }) {
 
 export function ArtBoard() {
   const { profile } = useAuth()
+  const { isOperator } = useAdminAccess({ includeUsers: false })
   const {
     items,
     links,
@@ -977,7 +979,6 @@ export function ArtBoard() {
   const [pendingLinkTargetId, setPendingLinkTargetId] = useState<string | null>(null)
   const [editPanelItem, setEditPanelItem] = useState<ArtBoardItem | null>(null)
   const [localItems, setLocalItems] = useState<ArtBoardItem[]>([])
-  const isOperator = profile?.admin_role === 'admin' || profile?.admin_role === 'sub_admin'
 
   useEffect(() => {
     setLocalItems(items)

@@ -22,10 +22,17 @@ let mockAuthUser = {
   id: 'user-1',
   admin_role: null,
 }
+let mockAdminRole: 'admin' | 'sub_admin' | null = null
 
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => ({
     user: mockAuthUser,
+  }),
+}))
+
+jest.mock('../src/hooks/useAdminAccess', () => ({
+  useAdminAccess: () => ({
+    role: mockAdminRole,
   }),
 }))
 
@@ -136,6 +143,7 @@ beforeEach(() => {
     id: 'user-1',
     admin_role: null,
   }
+  mockAdminRole = null
   mockToggleCategoryHeart.mockReset()
   mockToggleImageHeart.mockReset()
   Object.values(mockShadowPinActivityTracker).forEach(mockFn => mockFn.mockReset())

@@ -19,6 +19,7 @@ import {
   type UserChannelBan,
 } from '../../lib/moderation'
 import { useAuth } from '../../hooks/useAuth'
+import { useAdminAccess } from '../../hooks/useAdminAccess'
 import { getPresenceStateLabel, usePresenceForUser } from '../../hooks/usePresence'
 import { useUserChannelBans } from '../../hooks/useUserChannelBans'
 import { Avatar } from '../ui/Avatar'
@@ -60,6 +61,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
   const { profile: currentProfile } = useAuth()
+  const { role: currentAdminRole, isAdmin: currentIsAdmin, isOperator: currentIsOperator } = useAdminAccess({ includeUsers: false })
   const targetUserId = user?.id ?? null
   const targetUserAdminRole = user?.admin_role ?? null
   const livePresence = usePresenceForUser(user?.id)
@@ -92,16 +94,15 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
     currentProfile &&
     currentProfile.id !== user.id &&
     localAdminRole !== 'admin' &&
-    (
-      currentProfile.admin_role === 'admin' ||
-      (currentProfile.admin_role === 'sub_admin' && localAdminRole !== 'sub_admin')
-    )
+    currentIsOperator &&
+    (currentAdminRole === 'admin' || localAdminRole !== 'sub_admin')
   )
 
   const canManageAdminRole = Boolean(
     open &&
     user &&
-    currentProfile?.admin_role === 'admin' &&
+    currentIsAdmin &&
+    currentProfile &&
     currentProfile.id !== user.id &&
     localAdminRole !== 'admin'
   )

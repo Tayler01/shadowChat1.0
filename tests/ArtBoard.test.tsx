@@ -20,6 +20,12 @@ jest.mock('../src/hooks/useAuth', () => ({
   }),
 }))
 
+jest.mock('../src/hooks/useAdminAccess', () => ({
+  useAdminAccess: () => ({
+    isOperator: false,
+  }),
+}))
+
 jest.mock('../src/hooks/useArtBoard', () => ({
   useArtBoard: () => ({
     items: mockItems,
