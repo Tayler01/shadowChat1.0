@@ -194,8 +194,10 @@ function ChatImageActionFeedback({
       key={`${feedback.action}-${feedback.key}`}
       className={cn('chat-image-action-feedback shadow-pin-action-feedback', `shadow-pin-action-feedback--${feedback.action}`)}
       data-testid={`chat-image-${feedback.action}-feedback`}
+      data-action={feedback.action}
       aria-hidden="true"
     >
+      <span className="chat-image-action-wash" data-testid={`chat-image-${feedback.action}-wash`} />
       <span className="shadow-pin-action-wash" />
       {feedback.action === 'heart' && (
         <span className="shadow-pin-action-heart-burst">

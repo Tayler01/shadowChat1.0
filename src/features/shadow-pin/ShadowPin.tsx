@@ -964,13 +964,38 @@ function useLongPress(action: () => void) {
   const timerRef = useRef<number | null>(null)
   const firedRef = useRef(false)
   const startRef = useRef<{ x: number; y: number } | null>(null)
+  const cleanupRef = useRef<(() => void) | null>(null)
 
-  const clearTimer = () => {
+  const clearTimer = useCallback(() => {
     if (timerRef.current) {
       window.clearTimeout(timerRef.current)
       timerRef.current = null
     }
-  }
+  }, [])
+
+  const cleanupDocumentListeners = useCallback(() => {
+    cleanupRef.current?.()
+    cleanupRef.current = null
+  }, [])
+
+  const clearPress = useCallback(() => {
+    clearTimer()
+    cleanupDocumentListeners()
+    startRef.current = null
+  }, [cleanupDocumentListeners, clearTimer])
+
+  const cancelIfMoved = useCallback((clientX: number, clientY: number) => {
+    const start = startRef.current
+    if (!start || !timerRef.current) return
+
+    const deltaX = finitePointerCoordinate(clientX) - start.x
+    const deltaY = finitePointerCoordinate(clientY) - start.y
+    if (Math.hypot(deltaX, deltaY) > CATEGORY_LONG_PRESS_MOVE_CANCEL_PX) {
+      clearPress()
+    }
+  }, [clearPress])
+
+  useEffect(() => clearPress, [clearPress])
 
   return {
     onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
@@ -978,10 +1003,46 @@ function useLongPress(action: () => void) {
       if (target instanceof Element && target.closest('button,a,input,textarea,select')) {
         return
       }
+      clearPress()
       firedRef.current = false
       startRef.current = {
         x: finitePointerCoordinate(event.clientX),
         y: finitePointerCoordinate(event.clientY),
+      }
+      const pointerId = event.pointerId
+      const listenerOptions: AddEventListenerOptions = { capture: true, passive: true }
+      const removeOptions: EventListenerOptions = { capture: true }
+      const handleDocumentPointerMove = (nativeEvent: PointerEvent) => {
+        if (nativeEvent.pointerId !== pointerId) return
+        cancelIfMoved(nativeEvent.clientX, nativeEvent.clientY)
+      }
+      const handleDocumentPointerEnd = (nativeEvent: PointerEvent) => {
+        if (nativeEvent.pointerId !== pointerId) return
+        clearPress()
+      }
+      const handleTouchMove = (nativeEvent: TouchEvent) => {
+        const touch = nativeEvent.touches[0] ?? nativeEvent.changedTouches[0]
+        if (touch) cancelIfMoved(touch.clientX, touch.clientY)
+      }
+      const handleScroll = () => {
+        clearPress()
+      }
+
+      document.addEventListener('pointermove', handleDocumentPointerMove, listenerOptions)
+      document.addEventListener('pointerup', handleDocumentPointerEnd, listenerOptions)
+      document.addEventListener('pointercancel', handleDocumentPointerEnd, listenerOptions)
+      document.addEventListener('touchmove', handleTouchMove, listenerOptions)
+      document.addEventListener('touchend', clearPress, listenerOptions)
+      document.addEventListener('touchcancel', clearPress, listenerOptions)
+      window.addEventListener('scroll', handleScroll, true)
+      cleanupRef.current = () => {
+        document.removeEventListener('pointermove', handleDocumentPointerMove, removeOptions)
+        document.removeEventListener('pointerup', handleDocumentPointerEnd, removeOptions)
+        document.removeEventListener('pointercancel', handleDocumentPointerEnd, removeOptions)
+        document.removeEventListener('touchmove', handleTouchMove, removeOptions)
+        document.removeEventListener('touchend', clearPress, removeOptions)
+        document.removeEventListener('touchcancel', clearPress, removeOptions)
+        window.removeEventListener('scroll', handleScroll, true)
       }
       timerRef.current = window.setTimeout(() => {
         firedRef.current = true
@@ -993,19 +1054,13 @@ function useLongPress(action: () => void) {
       const start = startRef.current
       if (!start || !timerRef.current) return
 
-      const deltaX = finitePointerCoordinate(event.clientX) - start.x
-      const deltaY = finitePointerCoordinate(event.clientY) - start.y
-      if (Math.hypot(deltaX, deltaY) > CATEGORY_LONG_PRESS_MOVE_CANCEL_PX) {
-        clearTimer()
-      }
+      cancelIfMoved(event.clientX, event.clientY)
     },
     onPointerUp: () => {
-      clearTimer()
-      startRef.current = null
+      clearPress()
     },
     onPointerCancel: () => {
-      clearTimer()
-      startRef.current = null
+      clearPress()
     },
     didLongPress: () => firedRef.current,
   }
@@ -2596,14 +2651,6 @@ function ShadowPinHome({
     if (event.isPrimary === false) return
     if (typeof event.button === 'number' && event.button !== 0) return
 
-    if (typeof event.currentTarget.setPointerCapture === 'function') {
-      try {
-        event.currentTarget.setPointerCapture(event.pointerId)
-      } catch {
-        // Mobile browsers can reject capture if native scrolling has already claimed the gesture.
-      }
-    }
-
     categoryPullRef.current = {
       pointerId: event.pointerId,
       startClientX: finitePointerCoordinate(event.clientX),
@@ -2674,9 +2721,6 @@ function ShadowPinHome({
         blockNextCategoryClick()
       }
       categoryPullRef.current = null
-    }
-    if (typeof event.currentTarget.hasPointerCapture === 'function' && event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId)
     }
     setCategorySearchPullDistance(0)
     if (categorySearchPendingFocusRef.current) {

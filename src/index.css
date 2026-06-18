@@ -2439,19 +2439,55 @@ html, body, #root {
 }
 
 .chat-image-action-feedback {
-  contain: paint;
-  display: block;
   border-radius: inherit;
+  contain: layout paint;
+  display: block;
   inset: 0;
   isolation: isolate;
   overflow: hidden;
+  pointer-events: none;
+  position: absolute;
   transform: translateZ(0);
-  z-index: 60;
+  z-index: 120;
+}
+
+.chat-image-action-wash {
+  position: absolute;
+  inset: -16%;
+  z-index: 1;
+  border-radius: inherit;
+  background:
+    radial-gradient(ellipse at 50% 72%, rgba(255, 255, 255, 0.5), transparent 26%),
+    linear-gradient(112deg, transparent 6%, rgba(var(--theme-accent-strong-rgb), 0.18) 22%, rgba(255, 255, 255, 0.52) 46%, rgba(var(--theme-accent-rgb), 0.42) 68%, transparent 94%);
+  filter: blur(0.2px) saturate(1.22);
+  mix-blend-mode: screen;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-44%) skewX(-10deg);
+  animation: chat-image-action-wash 980ms var(--ease-premium) both;
+}
+
+.chat-image-action-feedback.shadow-pin-action-feedback--heart {
+  background:
+    radial-gradient(circle at 50% 55%, rgba(255, 77, 95, 0.48), transparent 58%),
+    linear-gradient(0deg, rgba(255, 77, 95, 0.32), rgba(245, 207, 116, 0.2) 52%, transparent),
+    rgba(255, 77, 95, 0.18);
+  animation: chat-image-heart-field 1120ms var(--ease-premium) both;
+}
+
+.chat-image-action-feedback.shadow-pin-action-feedback--heart .chat-image-action-wash {
+  background:
+    radial-gradient(ellipse at 48% 92%, rgba(255, 77, 95, 0.92), transparent 42%),
+    radial-gradient(ellipse at 30% 80%, rgba(245, 207, 116, 0.62), transparent 34%),
+    radial-gradient(ellipse at 72% 82%, rgba(255, 255, 255, 0.5), transparent 34%),
+    linear-gradient(0deg, rgba(255, 77, 95, 0.72), rgba(245, 207, 116, 0.36) 44%, rgba(255, 255, 255, 0.18) 62%, transparent 80%);
+  transform: translateY(108%) scaleY(0.36);
+  animation: chat-image-heart-wash 1120ms var(--ease-premium) both;
 }
 
 .chat-image-action-feedback .shadow-pin-action-wash {
-  z-index: 2;
   mix-blend-mode: screen;
+  z-index: 2;
 }
 
 .chat-image-action-feedback .shadow-pin-action-heart-burst {
@@ -2459,7 +2495,58 @@ html, body, #root {
 }
 
 .chat-image-action-feedback .shadow-pin-action-confirm {
-  z-index: 4;
+  z-index: 5;
+}
+
+@keyframes chat-image-action-wash {
+  0% {
+    opacity: 0;
+    transform: translateX(-44%) skewX(-10deg);
+  }
+  24% {
+    opacity: 1;
+  }
+  58% {
+    opacity: 0.78;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(42%) skewX(-10deg);
+  }
+}
+
+@keyframes chat-image-heart-wash {
+  0% {
+    opacity: 0;
+    transform: translateY(108%) scaleY(0.36);
+  }
+  18% {
+    opacity: 1;
+  }
+  62% {
+    opacity: 0.98;
+    transform: translateY(-16%) scaleY(1);
+  }
+  86% {
+    opacity: 0.82;
+    transform: translateY(-86%) scaleY(1.08);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-122%) scaleY(1.12);
+  }
+}
+
+@keyframes chat-image-heart-field {
+  0% {
+    opacity: 0;
+  }
+  22% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 .chat-media-frame .hype-message-chip {

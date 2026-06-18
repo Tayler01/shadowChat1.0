@@ -108,7 +108,7 @@ const image = (id: string, width: number, height: number) => ({
 })
 
 const fireShadowPinPointer = (
-  element: Element,
+  element: Element | Document,
   type: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel',
   options: {
     pointerId: number
@@ -1867,6 +1867,93 @@ test('smooth category pull reveals search instead of opening category edit', asy
     act(() => {
       jest.runOnlyPendingTimers()
     })
+    jest.useRealTimers()
+  }
+})
+
+test('category drag cancels edit even when movement leaves the card', () => {
+  jest.useFakeTimers()
+  mockUseShadowPinCategories.mockReturnValue({
+    categories: [{ ...category, creator_id: 'user-1' }],
+    loading: false,
+    saving: false,
+    error: null,
+    refresh: jest.fn(),
+    createCategory: jest.fn(),
+    updateCategory: jest.fn(),
+    removeCategory: jest.fn(),
+    toggleHeart: mockToggleCategoryHeart,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    const categoryCard = screen.getByText('Fam & Friends').closest('article')
+    expect(categoryCard).not.toBeNull()
+
+    fireShadowPinPointer(categoryCard!, 'pointerdown', {
+      pointerId: 44,
+      button: 0,
+      clientX: 160,
+      clientY: 100,
+    })
+    fireShadowPinPointer(document, 'pointermove', {
+      pointerId: 44,
+      clientX: 160,
+      clientY: 122,
+    })
+
+    act(() => {
+      jest.advanceTimersByTime(760)
+    })
+
+    expect(screen.queryByRole('heading', { name: /edit category/i })).not.toBeInTheDocument()
+    fireShadowPinPointer(document, 'pointerup', {
+      pointerId: 44,
+      clientX: 160,
+      clientY: 122,
+    })
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('category list scroll cancels pending category edit', () => {
+  jest.useFakeTimers()
+  mockUseShadowPinCategories.mockReturnValue({
+    categories: [{ ...category, creator_id: 'user-1' }],
+    loading: false,
+    saving: false,
+    error: null,
+    refresh: jest.fn(),
+    createCategory: jest.fn(),
+    updateCategory: jest.fn(),
+    removeCategory: jest.fn(),
+    toggleHeart: mockToggleCategoryHeart,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    const categoryCard = screen.getByText('Fam & Friends').closest('article')
+    const categoryList = screen.getByRole('main')
+    expect(categoryCard).not.toBeNull()
+
+    fireShadowPinPointer(categoryCard!, 'pointerdown', {
+      pointerId: 45,
+      button: 0,
+      clientX: 160,
+      clientY: 100,
+    })
+    categoryList.scrollTop = 24
+    fireEvent.scroll(categoryList)
+
+    act(() => {
+      jest.advanceTimersByTime(760)
+    })
+
+    expect(screen.queryByRole('heading', { name: /edit category/i })).not.toBeInTheDocument()
+  } finally {
     jest.useRealTimers()
   }
 })
