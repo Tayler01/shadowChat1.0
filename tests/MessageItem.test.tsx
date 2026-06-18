@@ -275,6 +275,7 @@ test('hides quick reactions for image messages and exposes full radial image con
     })
 
     expect(onToggleReaction).toHaveBeenCalledWith(baseMessage.id, '\u2764\uFE0F')
+    expect(screen.getByTestId('chat-image-heart-feedback')).toHaveClass('chat-image-action-feedback')
     expect(document.documentElement.style.userSelect).toBe('')
     expect(document.body.style.userSelect).toBe('')
   } finally {

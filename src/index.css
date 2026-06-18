@@ -2418,6 +2418,25 @@ html, body, #root {
   line-height: 1;
 }
 
+.chat-image-action-feedback {
+  border-radius: inherit;
+  overflow: hidden;
+  z-index: 8;
+}
+
+.chat-image-action-feedback .shadow-pin-action-wash {
+  z-index: 1;
+  mix-blend-mode: screen;
+}
+
+.chat-image-action-feedback .shadow-pin-action-heart-burst {
+  z-index: 3;
+}
+
+.chat-image-action-feedback .shadow-pin-action-confirm {
+  z-index: 4;
+}
+
 .chat-media-frame .hype-message-chip {
   min-height: 1.75rem;
   border-color: rgba(var(--theme-accent-strong-rgb), 0.74);

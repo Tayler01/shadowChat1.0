@@ -612,6 +612,7 @@ const PIN_ACTION_SAFE_MARGIN_PX = 18
 const PIN_ACTION_ICON_RADIUS_PX = 28
 const PIN_ACTION_ARC_RADIUS_PX = 104
 const CATEGORY_SEARCH_PULL_DISTANCE_PX = 48
+const CATEGORY_SEARCH_PULL_MAX_PX = 68
 const CATEGORY_SEARCH_HIDE_SCROLL_TOP_PX = 18
 
 const mirrorPinAction = (action: PinActionConfig): PinActionConfig => ({
@@ -2446,13 +2447,16 @@ function ShadowPinHome({
   const [modal, setModal] = useState<ModalMode>(null)
   const [categorySearchVisible, setCategorySearchVisible] = useState(false)
   const [categorySearchQuery, setCategorySearchQuery] = useState('')
+  const [categorySearchPullDistance, setCategorySearchPullDistance] = useState(0)
   const categoryScrollRef = useRef<HTMLElement | null>(null)
   const categorySearchInputRef = useRef<HTMLInputElement | null>(null)
   const categoryPullRef = useRef<{
     pointerId: number
     startClientX: number
-    startClientY: number
+    lastClientY: number
+    pullDistance: number
   } | null>(null)
+  const categorySearchPendingFocusRef = useRef(false)
 
   const detailsCategory = modal?.type === 'category-details'
     ? categoriesState.categories.find(category => category.id === modal.category.id) ?? modal.category
@@ -2489,21 +2493,33 @@ function ShadowPinHome({
     categoryListScrollMemory.current.scrollTop = Math.max(0, scrollTop ?? categoryScrollRef.current?.scrollTop ?? 0)
   }
 
-  const hideCategorySearch = useCallback(() => {
-    setCategorySearchVisible(false)
-    setCategorySearchQuery('')
-  }, [])
-
-  const revealCategorySearch = useCallback(() => {
-    setCategorySearchVisible(true)
+  const focusCategorySearch = useCallback(() => {
     window.requestAnimationFrame(() => {
       categorySearchInputRef.current?.focus()
     })
   }, [])
 
+  const hideCategorySearch = useCallback(() => {
+    setCategorySearchVisible(false)
+    setCategorySearchQuery('')
+    setCategorySearchPullDistance(0)
+    categorySearchPendingFocusRef.current = false
+  }, [])
+
+  const revealCategorySearch = useCallback((focus: 'now' | 'after-gesture' = 'now') => {
+    setCategorySearchVisible(true)
+    setCategorySearchPullDistance(0)
+    if (focus === 'after-gesture') {
+      categorySearchPendingFocusRef.current = true
+      return
+    }
+    focusCategorySearch()
+  }, [focusCategorySearch])
+
   const handleCategoryScroll = (event: UIEvent<HTMLElement>) => {
     rememberCategoryScroll(event.currentTarget.scrollTop)
     if (event.currentTarget.scrollTop > CATEGORY_SEARCH_HIDE_SCROLL_TOP_PX) {
+      categoryPullRef.current = null
       hideCategorySearch()
     }
   }
@@ -2511,34 +2527,77 @@ function ShadowPinHome({
   const handleCategoryPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
     if (event.isPrimary === false) return
     if (typeof event.button === 'number' && event.button !== 0) return
-    if (event.currentTarget.scrollTop > 2) return
+
+    if (typeof event.currentTarget.setPointerCapture === 'function') {
+      try {
+        event.currentTarget.setPointerCapture(event.pointerId)
+      } catch {
+        // Mobile browsers can reject capture if native scrolling has already claimed the gesture.
+      }
+    }
 
     categoryPullRef.current = {
       pointerId: event.pointerId,
       startClientX: finitePointerCoordinate(event.clientX),
-      startClientY: finitePointerCoordinate(event.clientY),
+      lastClientY: finitePointerCoordinate(event.clientY),
+      pullDistance: 0,
     }
+    if (!categorySearchVisible) setCategorySearchPullDistance(0)
   }
 
   const handleCategoryPointerMove = (event: ReactPointerEvent<HTMLElement>) => {
     const pull = categoryPullRef.current
     if (!pull || pull.pointerId !== event.pointerId) return
+
+    const clientX = finitePointerCoordinate(event.clientX)
+    const clientY = finitePointerCoordinate(event.clientY)
+    const deltaX = clientX - pull.startClientX
+    const stepY = clientY - pull.lastClientY
+    pull.lastClientY = clientY
+
     if (event.currentTarget.scrollTop > 2) {
-      categoryPullRef.current = null
+      pull.pullDistance = 0
+      if (!categorySearchVisible) setCategorySearchPullDistance(0)
       return
     }
 
-    const deltaX = finitePointerCoordinate(event.clientX) - pull.startClientX
-    const deltaY = finitePointerCoordinate(event.clientY) - pull.startClientY
-    if (deltaY > CATEGORY_SEARCH_PULL_DISTANCE_PX && Math.abs(deltaX) < deltaY * 1.15) {
+    if (stepY <= 0) {
+      pull.pullDistance = Math.max(0, pull.pullDistance + stepY)
+      if (!categorySearchVisible) setCategorySearchPullDistance(pull.pullDistance)
+      return
+    }
+
+    const nextPullDistance = Math.min(CATEGORY_SEARCH_PULL_MAX_PX, pull.pullDistance + stepY)
+    if (Math.abs(deltaX) > Math.max(18, nextPullDistance * 1.15)) {
       categoryPullRef.current = null
-      revealCategorySearch()
+      setCategorySearchPullDistance(0)
+      return
+    }
+
+    event.preventDefault()
+    event.stopPropagation()
+    pull.pullDistance = nextPullDistance
+    if (!categorySearchVisible) {
+      setCategorySearchPullDistance(nextPullDistance)
+    }
+
+    if (nextPullDistance >= CATEGORY_SEARCH_PULL_DISTANCE_PX) {
+      categoryPullRef.current = null
+      revealCategorySearch('after-gesture')
     }
   }
 
   const handleCategoryPointerEnd = (event: ReactPointerEvent<HTMLElement>) => {
     if (categoryPullRef.current?.pointerId === event.pointerId) {
       categoryPullRef.current = null
+    }
+    if (typeof event.currentTarget.hasPointerCapture === 'function' && event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+    setCategorySearchPullDistance(0)
+    if (categorySearchPendingFocusRef.current) {
+      categorySearchPendingFocusRef.current = false
+      focusCategorySearch()
     }
   }
 
@@ -2553,6 +2612,23 @@ function ShadowPinHome({
     () => rankShadowPinCategories(categorySearchQuery, categoriesState.categories, 5),
     [categorySearchQuery, categoriesState.categories]
   )
+  const categorySearchRevealProgress = categorySearchVisible
+    ? 1
+    : Math.min(1, categorySearchPullDistance / CATEGORY_SEARCH_PULL_DISTANCE_PX)
+  const shouldRenderCategorySearch =
+    !categoriesState.loading &&
+    categoriesState.categories.length > 0 &&
+    (categorySearchVisible || categorySearchPullDistance > 0)
+  const categorySearchContainerStyle: CSSProperties = {
+    maxHeight: categorySearchVisible
+      ? categorySearchQuery.trim()
+        ? '22rem'
+        : '4.5rem'
+      : `${Math.max(0, Math.round(72 * categorySearchRevealProgress))}px`,
+    opacity: categorySearchRevealProgress,
+    transform: `translate3d(0, ${Math.round((1 - categorySearchRevealProgress) * -10)}px, 0)`,
+    marginBottom: categorySearchRevealProgress > 0 ? undefined : 0,
+  }
 
   useEffect(() => {
     if (categoriesState.loading || !categoryListScrollMemory.current.shouldRestore) return
@@ -2570,7 +2646,7 @@ function ShadowPinHome({
   }, [categoriesState.categories.length, categoriesState.loading, categoryListScrollMemory])
 
   return (
-    <div className="theme-image-surface relative flex h-full min-h-0 flex-col">
+    <div className="theme-image-surface relative flex h-full min-h-0 flex-col overflow-hidden overscroll-contain">
       <MobileAppHeader
         currentView={currentView}
         onViewChange={onViewChange}
@@ -2592,10 +2668,16 @@ function ShadowPinHome({
         onPointerMove={handleCategoryPointerMove}
         onPointerUp={handleCategoryPointerEnd}
         onPointerCancel={handleCategoryPointerEnd}
-        className="min-h-0 flex-1 overflow-y-auto px-3 pb-[calc(env(safe-area-inset-bottom)_+_5.4rem)] pt-16 md:pb-6"
+        className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-3 pb-[calc(env(safe-area-inset-bottom)_+_5.4rem)] pt-16 md:pb-6"
       >
-        {categorySearchVisible && !categoriesState.loading && categoriesState.categories.length > 0 && (
-          <div className="mb-3 w-full" data-testid="shadow-pin-category-search">
+        {shouldRenderCategorySearch && (
+          <div
+            className="mb-3 w-full overflow-hidden transition-[max-height,opacity,transform,margin] duration-200 ease-out will-change-[max-height,opacity,transform]"
+            style={categorySearchContainerStyle}
+            data-testid="shadow-pin-category-search"
+            data-pull-progress={categorySearchRevealProgress.toFixed(2)}
+            aria-hidden={!categorySearchVisible}
+          >
             <div className="flex min-h-12 items-center gap-2 rounded-full border border-[var(--theme-accent-border-soft)] bg-[rgba(5,6,8,0.82)] px-3 shadow-[var(--shadow-panel)] backdrop-blur-md">
               <Search className="h-4 w-4 shrink-0 text-[var(--theme-accent-readable)]" aria-hidden="true" />
               <input
@@ -2607,6 +2689,7 @@ function ShadowPinHome({
                 type="search"
                 autoComplete="off"
                 aria-label="Search ShadowPin categories"
+                tabIndex={categorySearchVisible ? undefined : -1}
               />
               {categorySearchQuery && (
                 <button

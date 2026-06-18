@@ -1745,6 +1745,59 @@ test('restores category list scroll after returning from a category', async () =
   }
 })
 
+test('reveals category search from the category scroller after pulling at the top', async () => {
+  render(<ShadowPin onBack={() => {}} />)
+
+  const categoryList = screen.getByRole('main')
+  categoryList.scrollTop = 220
+  fireEvent.scroll(categoryList)
+
+  fireShadowPinPointer(categoryList, 'pointerdown', {
+    pointerId: 42,
+    button: 0,
+    clientX: 160,
+    clientY: 100,
+  })
+  fireShadowPinPointer(categoryList, 'pointermove', {
+    pointerId: 42,
+    clientX: 160,
+    clientY: 132,
+  })
+
+  expect(screen.queryByTestId('shadow-pin-category-search')).not.toBeInTheDocument()
+
+  categoryList.scrollTop = 0
+  fireEvent.scroll(categoryList)
+
+  fireShadowPinPointer(categoryList, 'pointermove', {
+    pointerId: 42,
+    clientX: 160,
+    clientY: 156,
+  })
+
+  await waitFor(() => {
+    expect(screen.getByTestId('shadow-pin-category-search')).toHaveAttribute('data-pull-progress', '0.50')
+  })
+  expect(screen.getByTestId('shadow-pin-category-search')).toHaveAttribute('aria-hidden', 'true')
+
+  fireShadowPinPointer(categoryList, 'pointermove', {
+    pointerId: 42,
+    clientX: 160,
+    clientY: 184,
+  })
+
+  await waitFor(() => {
+    expect(screen.getByTestId('shadow-pin-category-search')).toHaveAttribute('aria-hidden', 'false')
+  })
+  expect(screen.getByLabelText('Search ShadowPin categories')).toBeInTheDocument()
+
+  fireShadowPinPointer(categoryList, 'pointerup', {
+    pointerId: 42,
+    clientX: 160,
+    clientY: 184,
+  })
+})
+
 test('ShadowPin image single tap reveals a static heart count without direct image-card controls', () => {
   jest.useFakeTimers()
   mockUseShadowPinImages.mockReturnValue({
