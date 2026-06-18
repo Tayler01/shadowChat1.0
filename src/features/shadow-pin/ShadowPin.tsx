@@ -621,7 +621,7 @@ const PIN_ACTION_ARC_RADIUS_PX = 104
 const CATEGORY_SEARCH_PULL_DISTANCE_PX = 22
 const CATEGORY_SEARCH_PULL_MAX_PX = 46
 const CATEGORY_SEARCH_HIDE_SCROLL_TOP_PX = 18
-const CATEGORY_SEARCH_TOP_TOLERANCE_PX = 2
+const CATEGORY_SEARCH_TOP_TOLERANCE_PX = 12
 const CATEGORY_SEARCH_CLICK_BLOCK_PX = 5
 const CATEGORY_LONG_PRESS_MS = 720
 const CATEGORY_LONG_PRESS_MOVE_CANCEL_PX = 12
@@ -2636,8 +2636,18 @@ function ShadowPinHome({
       categorySearchPendingFocusRef.current = true
       return
     }
+    categorySearchInputRef.current?.focus()
     focusCategorySearch()
   }, [focusCategorySearch])
+
+  const showCategorySearchFromTrigger = () => {
+    const scrollNode = categoryScrollRef.current
+    if (scrollNode && scrollNode.scrollTop > 0) {
+      scrollNode.scrollTop = 0
+    }
+    rememberCategoryScroll(0)
+    revealCategorySearch()
+  }
 
   const handleCategoryScroll = (event: UIEvent<HTMLElement>) => {
     rememberCategoryScroll(event.currentTarget.scrollTop)
@@ -2650,6 +2660,11 @@ function ShadowPinHome({
   const handleCategoryPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
     if (event.isPrimary === false) return
     if (typeof event.button === 'number' && event.button !== 0) return
+    try {
+      event.currentTarget.setPointerCapture?.(event.pointerId)
+    } catch {
+      // Pointer capture is best-effort; Android gesture support still works without it.
+    }
 
     categoryPullRef.current = {
       pointerId: event.pointerId,
@@ -2722,6 +2737,11 @@ function ShadowPinHome({
       }
       categoryPullRef.current = null
     }
+    try {
+      event.currentTarget.releasePointerCapture?.(event.pointerId)
+    } catch {
+      // Pointer capture may already be released after cancel/lost-capture.
+    }
     setCategorySearchPullDistance(0)
     if (categorySearchPendingFocusRef.current) {
       categorySearchPendingFocusRef.current = false
@@ -2745,8 +2765,11 @@ function ShadowPinHome({
     : Math.min(1, categorySearchPullDistance / CATEGORY_SEARCH_PULL_DISTANCE_PX)
   const shouldRenderCategorySearch =
     !categoriesState.loading &&
+    categoriesState.categories.length > 0
+  const shouldShowCategorySearchTrigger =
+    !categoriesState.loading &&
     categoriesState.categories.length > 0 &&
-    (categorySearchVisible || categorySearchPullDistance > 0)
+    !categorySearchVisible
   const categorySearchContainerStyle: CSSProperties = {
     maxHeight: categorySearchVisible
       ? categorySearchQuery.trim()
@@ -2795,8 +2818,21 @@ function ShadowPinHome({
       >
         <Plus className="h-5 w-5" />
       </button>
+      {shouldShowCategorySearchTrigger && (
+        <button
+          type="button"
+          onClick={showCategorySearchFromTrigger}
+          className="theme-floating-action absolute left-3 top-[calc(env(safe-area-inset-top)_+_3.85rem)] z-40 inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full px-3 md:left-4"
+          aria-label="Open category search"
+          data-testid="shadow-pin-category-search-trigger"
+        >
+          <Search className="h-5 w-5" aria-hidden="true" />
+          <span className="text-sm font-semibold">Search</span>
+        </button>
+      )}
       <main
         ref={categoryScrollRef}
+        data-testid="shadow-pin-category-list"
         onScroll={handleCategoryScroll}
         onPointerDown={handleCategoryPointerDown}
         onPointerMove={handleCategoryPointerMove}

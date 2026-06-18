@@ -1764,9 +1764,10 @@ test('reveals category search from the category scroller after pulling at the to
     clientY: 132,
   })
 
-  expect(screen.queryByTestId('shadow-pin-category-search')).not.toBeInTheDocument()
+  expect(screen.getByTestId('shadow-pin-category-search')).toHaveAttribute('aria-hidden', 'true')
+  expect(screen.getByTestId('shadow-pin-category-search')).toHaveAttribute('data-pull-progress', '0.00')
 
-  categoryList.scrollTop = 0
+  categoryList.scrollTop = 8
   fireEvent.scroll(categoryList)
 
   fireShadowPinPointer(categoryList, 'pointermove', {
@@ -1775,7 +1776,8 @@ test('reveals category search from the category scroller after pulling at the to
     clientY: 156,
   })
 
-  expect(screen.queryByTestId('shadow-pin-category-search')).not.toBeInTheDocument()
+  expect(screen.getByTestId('shadow-pin-category-search')).toHaveAttribute('aria-hidden', 'true')
+  expect(screen.getByTestId('shadow-pin-category-search')).toHaveAttribute('data-pull-progress', '0.00')
 
   fireShadowPinPointer(categoryList, 'pointermove', {
     pointerId: 42,
@@ -1804,6 +1806,22 @@ test('reveals category search from the category scroller after pulling at the to
     clientX: 160,
     clientY: 190,
   })
+})
+
+test('opens category search from the floating trigger at any category scroll position', async () => {
+  render(<ShadowPin onBack={() => {}} />)
+
+  const categoryList = screen.getByRole('main')
+  categoryList.scrollTop = 360
+  fireEvent.scroll(categoryList)
+
+  fireEvent.click(screen.getByTestId('shadow-pin-category-search-trigger'))
+
+  await waitFor(() => {
+    expect(screen.getByTestId('shadow-pin-category-search')).toHaveAttribute('aria-hidden', 'false')
+  })
+  expect(categoryList.scrollTop).toBe(0)
+  expect(screen.getByLabelText('Search ShadowPin categories')).toBeInTheDocument()
 })
 
 test('smooth category pull reveals search instead of opening category edit', async () => {
