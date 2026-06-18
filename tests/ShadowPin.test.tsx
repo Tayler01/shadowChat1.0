@@ -1784,7 +1784,7 @@ test('reveals category search from the category scroller after pulling at the to
   })
 
   await waitFor(() => {
-    expect(screen.getByTestId('shadow-pin-category-search')).toHaveAttribute('data-pull-progress', '0.50')
+    expect(screen.getByTestId('shadow-pin-category-search')).toHaveAttribute('data-pull-progress', '0.73')
   })
   expect(screen.getByTestId('shadow-pin-category-search')).toHaveAttribute('aria-hidden', 'true')
 
@@ -1844,7 +1844,7 @@ test('smooth category pull reveals search instead of opening category edit', asy
 
     expect(screen.queryByRole('heading', { name: /edit category/i })).not.toBeInTheDocument()
     await waitFor(() => {
-      expect(screen.getByTestId('shadow-pin-category-search')).toHaveAttribute('data-pull-progress', '0.50')
+      expect(screen.getByTestId('shadow-pin-category-search')).toHaveAttribute('data-pull-progress', '0.73')
     })
 
     fireShadowPinPointer(categoryCard!, 'pointermove', {
