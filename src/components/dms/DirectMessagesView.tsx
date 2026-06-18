@@ -433,6 +433,8 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
               disabled={isLocalDelivery}
               tiltSide={isOwn ? 'right' : 'left'}
               onHeart={() => reactToMessage(HEART_REACTION)}
+              onOpen={() => setShowImageModal(true)}
+              onShare={() => setShowShadowPinShare(true)}
             >
               <img
                 src={imageMessageSrc}

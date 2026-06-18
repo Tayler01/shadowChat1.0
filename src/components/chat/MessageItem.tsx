@@ -575,8 +575,10 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                       hearted={currentUserImageHearted}
                       heartCount={imageHeartCount}
                       disabled={isLocalDelivery}
-                      tiltSide={isOwner ? 'right' : 'left'}
+                      tiltSide="left"
                       onHeart={() => handleReaction(HEART_REACTION)}
+                      onOpen={() => setShowImageModal(true)}
+                      onShare={() => setShowShadowPinShare(true)}
                     >
                       <img
                         src={imageMessageSrc}

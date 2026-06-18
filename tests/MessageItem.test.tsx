@@ -212,7 +212,7 @@ test('opens uploaded images in a top-level mobile-safe viewer', async () => {
   expect(screen.getByRole('button', { name: /close image/i })).toBeInTheDocument()
 })
 
-test('hides quick reactions for image messages and hearts through the radial image control', async () => {
+test('hides quick reactions for image messages and exposes full radial image controls', async () => {
   jest.useFakeTimers()
   const onToggleReaction = jest.fn().mockResolvedValue(undefined)
 
@@ -247,25 +247,94 @@ test('hides quick reactions for image messages and hearts through the radial ima
       jest.advanceTimersByTime(440)
     })
     expect(screen.getByTestId('chat-image-radial-menu')).toBeInTheDocument()
+    expect(radialShell).toHaveClass('shadow-pin-action-card--active-left')
+    expect(document.documentElement.style.userSelect).toBe('none')
+    expect(document.body.style.userSelect).toBe('none')
+    expect(screen.getByTestId('chat-image-radial-action-share')).toBeInTheDocument()
+    expect(screen.getByTestId('chat-image-radial-action-heart')).toBeInTheDocument()
+    expect(screen.getByTestId('chat-image-radial-action-open')).toBeInTheDocument()
+
+    const selectStart = new Event('selectstart', { bubbles: true, cancelable: true })
+    document.dispatchEvent(selectStart)
+    expect(selectStart.defaultPrevented).toBe(true)
 
     fireChatImagePointer(radialShell!, 'pointermove', {
       pointerId: 7,
-      clientX: 160,
-      clientY: 228,
+      clientX: 212,
+      clientY: 230,
     })
     expect(screen.getByTestId('chat-image-radial-menu')).toHaveAttribute('data-selected-action', 'heart')
 
     await act(async () => {
       fireChatImagePointer(radialShell!, 'pointerup', {
         pointerId: 7,
-        clientX: 160,
-        clientY: 228,
+        clientX: 212,
+        clientY: 230,
       })
       await Promise.resolve()
     })
 
     expect(onToggleReaction).toHaveBeenCalledWith(baseMessage.id, '\u2764\uFE0F')
+    expect(document.documentElement.style.userSelect).toBe('')
+    expect(document.body.style.userSelect).toBe('')
   } finally {
+    act(() => {
+      jest.runOnlyPendingTimers()
+    })
+    jest.useRealTimers()
+  }
+})
+
+test('opens uploaded images from the radial full screen control', async () => {
+  jest.useFakeTimers()
+
+  try {
+    render(
+      <MessageItem
+        message={baseMessage}
+        onEdit={async () => {}}
+        onDelete={async () => {}}
+        onTogglePin={async () => {}}
+        onToggleReaction={async () => {}}
+        onJumpToMessage={() => {}}
+        containerRef={React.createRef()}
+      />
+    )
+
+    const radialShell = screen.getByAltText(/uploaded image/i).closest('.chat-image-radial-heart-shell')
+    expect(radialShell).not.toBeNull()
+
+    fireChatImagePointer(radialShell!, 'pointerdown', {
+      pointerId: 9,
+      button: 0,
+      clientX: 160,
+      clientY: 320,
+    })
+    act(() => {
+      jest.advanceTimersByTime(440)
+    })
+
+    fireChatImagePointer(radialShell!, 'pointermove', {
+      pointerId: 9,
+      clientX: 255,
+      clientY: 278,
+    })
+    expect(screen.getByTestId('chat-image-radial-menu')).toHaveAttribute('data-selected-action', 'open')
+
+    await act(async () => {
+      fireChatImagePointer(radialShell!, 'pointerup', {
+        pointerId: 9,
+        clientX: 255,
+        clientY: 278,
+      })
+      await Promise.resolve()
+    })
+
+    expect(screen.getByRole('dialog', { name: /uploaded image/i })).toBeInTheDocument()
+  } finally {
+    act(() => {
+      jest.runOnlyPendingTimers()
+    })
     jest.useRealTimers()
   }
 })
