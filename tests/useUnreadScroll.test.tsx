@@ -82,6 +82,109 @@ describe('useUnreadScroll', () => {
     jest.restoreAllMocks()
   })
 
+  it('bottom-pins cached messages during reconnect after cursor state is known', async () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    setScrollMetrics(container, 1000)
+
+    const scrollTo = jest.fn((options?: ScrollToOptions | number) => {
+      const top = typeof options === 'number' ? options : options?.top
+      container.scrollTop = Number(top)
+    })
+    Object.defineProperty(container, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    })
+
+    const onMarkReadToLatest = jest.fn()
+
+    renderHook(() =>
+      useUnreadScroll<TestMessage>({
+        containerRef: { current: container },
+        messages: [makeMessage('m1', 1)],
+        loading: true,
+        cursor: null,
+        cursorLoading: false,
+        enabled: true,
+        surfaceKey: 'general_chat:main',
+        getMessageId: message => message.id,
+        getMessageCreatedAt: message => message.created_at,
+        getElementId: id => `message-${id}`,
+        onMarkReadToLatest,
+      })
+    )
+
+    await waitFor(() => expect(container.scrollTop).toBe(600))
+    expect(scrollTo).toHaveBeenCalledWith({ top: 600, behavior: 'auto' })
+    expect(onMarkReadToLatest).not.toHaveBeenCalled()
+
+    document.body.removeChild(container)
+  })
+
+  it('waits to bottom-pin cached messages while the initial cursor is still loading', () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    setScrollMetrics(container, 1000)
+
+    const scrollTo = jest.fn()
+    Object.defineProperty(container, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    })
+
+    renderHook(() =>
+      useUnreadScroll<TestMessage>({
+        containerRef: { current: container },
+        messages: [makeMessage('m1', 1)],
+        loading: true,
+        cursor: null,
+        cursorLoading: true,
+        enabled: true,
+        surfaceKey: 'general_chat:main',
+        getMessageId: message => message.id,
+        getMessageCreatedAt: message => message.created_at,
+        getElementId: id => `message-${id}`,
+        onMarkReadToLatest: jest.fn(),
+      })
+    )
+
+    expect(scrollTo).not.toHaveBeenCalled()
+
+    document.body.removeChild(container)
+  })
+
+  it('does not bottom-pin cached reconnect content when a first unread target exists', () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    setScrollMetrics(container, 1000)
+
+    const scrollTo = jest.fn()
+    Object.defineProperty(container, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    })
+
+    renderHook(() =>
+      useUnreadScroll<TestMessage>({
+        containerRef: { current: container },
+        messages: [makeMessage('m1', 1), makeMessage('m2', 2)],
+        loading: true,
+        cursor: makeCursor('m1', 1),
+        cursorLoading: false,
+        enabled: true,
+        surfaceKey: 'general_chat:main',
+        getMessageId: message => message.id,
+        getMessageCreatedAt: message => message.created_at,
+        getElementId: id => `message-${id}`,
+        onMarkReadToLatest: jest.fn(),
+      })
+    )
+
+    expect(scrollTo).not.toHaveBeenCalled()
+
+    document.body.removeChild(container)
+  })
+
   it('keeps a live chat pinned to the newest message when messages append', async () => {
     const container = document.createElement('div')
     const content = document.createElement('div')

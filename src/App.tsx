@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
+import React, { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { AuthGuard } from './components/auth/AuthGuard'
 import { Sidebar } from './components/layout/Sidebar'
@@ -126,7 +126,7 @@ function App() {
   const [messageTarget, setMessageTarget] = useState<string | null>(() => getInitialLocationState().message)
   const isDarkMode = mode === 'dark'
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (typeof window === 'undefined' || isDesktop) return
 
     const root = document.documentElement

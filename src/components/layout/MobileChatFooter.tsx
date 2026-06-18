@@ -28,6 +28,7 @@ export function MobileChatFooter({
   collapseNavOnKeyboard = true,
 }: MobileChatFooterProps) {
   const footerRef = useRef<HTMLDivElement>(null)
+  const measuredFooterHeightRef = useRef<number | null>(null)
   const disableAndroidKeyboardLift = avoidAndroidKeyboardLift && !isIOSLikeNavigator()
   const footerStyle = {
     '--shadowchat-mobile-chat-footer-bottom': disableAndroidKeyboardLift
@@ -39,7 +40,12 @@ export function MobileChatFooter({
     const root = document.documentElement
 
     const updateFooterHeight = () => {
-      const height = footerRef.current?.getBoundingClientRect().height ?? 0
+      const height = Math.round(footerRef.current?.getBoundingClientRect().height ?? 0)
+      if (height <= 0 || measuredFooterHeightRef.current === height) {
+        return
+      }
+
+      measuredFooterHeightRef.current = height
       root.style.setProperty('--shadowchat-mobile-chat-footer-height', `${height}px`)
     }
 

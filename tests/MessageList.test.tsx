@@ -211,6 +211,8 @@ describe('MessageList mobile keyboard layout', () => {
     renderMessageList()
 
     expect(screen.getByTestId('message-scroll')).toBeInTheDocument()
+    expect(screen.getByTestId('message-stack')).toHaveAttribute('data-initial-position-pending', 'true')
+    expect(screen.getByTestId('message-stack')).toHaveClass('invisible')
     expect(screen.getByText('A tiny group chat thread')).toBeInTheDocument()
     expect(screen.queryByText('Loading the conversation...')).not.toBeInTheDocument()
   })

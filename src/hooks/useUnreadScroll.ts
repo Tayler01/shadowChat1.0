@@ -592,6 +592,18 @@ export function useUnreadScroll<TMessage>({
 
     if (loading || cursorLoading) {
       setFeedState(messages.length > 0 ? 'reconnectReconciling' : 'resolvingInitial')
+      if (
+        loading &&
+        !cursorLoading &&
+        !initialMessageId &&
+        messages.length > 0 &&
+        !initialUnreadJumpDoneRef.current &&
+        !targetMessageIdRef.current &&
+        !targetSettleTimerRef.current &&
+        !findFirstUnreadMessage()
+      ) {
+        scrollContainerToBottom('auto')
+      }
       return
     }
 
@@ -676,6 +688,7 @@ export function useUnreadScroll<TMessage>({
     loading,
     messages,
     onBeforeInitialJump,
+    scrollContainerToBottom,
     renderSignal,
     scrollToBottom,
     setAutoScroll,

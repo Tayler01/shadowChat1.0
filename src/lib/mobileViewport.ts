@@ -51,7 +51,7 @@ export function computeMobileViewportState({
   const stableAppHeight = !previousStableAppHeight || !isIOS || !viewportCompressed
     ? layoutHeight
     : previousStableAppHeight
-  const appHeight = isIOS && viewportCompressed ? stableAppHeight : visualViewportHeight
+  const appHeight = keyboardOpen && !isIOS ? visualViewportHeight : stableAppHeight
   const toastTopRem = keyboardOpen ? 0.75 : 4.5
 
   return {

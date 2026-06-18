@@ -80,4 +80,36 @@ describe('computeMobileViewportState', () => {
     expect(state.scrollKeyboardInset).toBe(0)
     expect(state.keyboardOpen).toBe(false)
   })
+
+  it('keeps the app shell height stable during closed-keyboard iOS viewport jitter', () => {
+    const state = computeMobileViewportState({
+      layoutHeight: 852,
+      visualViewportHeight: 790,
+      visualViewportOffsetTop: 0,
+      isIOS: true,
+      editableFocused: false,
+      previousStableAppHeight: 852,
+    })
+
+    expect(state.appHeight).toBe(852)
+    expect(state.keyboardInset).toBe(0)
+    expect(state.scrollKeyboardInset).toBe(0)
+    expect(state.keyboardOpen).toBe(false)
+  })
+
+  it('keeps the app shell height stable during closed-keyboard Android viewport jitter', () => {
+    const state = computeMobileViewportState({
+      layoutHeight: 852,
+      visualViewportHeight: 790,
+      visualViewportOffsetTop: 0,
+      isIOS: false,
+      editableFocused: false,
+      previousStableAppHeight: 852,
+    })
+
+    expect(state.appHeight).toBe(852)
+    expect(state.keyboardInset).toBe(0)
+    expect(state.scrollKeyboardInset).toBe(0)
+    expect(state.keyboardOpen).toBe(false)
+  })
 })
