@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { useUnreadScroll } from '../src/hooks/useUnreadScroll'
+import { MOBILE_VIEWPORT_UPDATED_EVENT } from '../src/lib/mobileViewport'
 
 type TestMessage = {
   id: string
@@ -283,19 +284,21 @@ describe('useUnreadScroll', () => {
     act(() => {
       resizeCallback?.([], {} as ResizeObserver)
     })
+    expect(container.scrollTop).toBe(540)
+
     setScrollMetrics(container, 980)
     act(() => {
       resizeCallback?.([], {} as ResizeObserver)
     })
 
-    expect(container.scrollTop).toBe(500)
+    expect(container.scrollTop).toBe(580)
 
     await act(async () => {
       await new Promise(resolve => window.setTimeout(resolve, 170))
     })
 
     expect(container.scrollTop).toBe(580)
-    expect(scrollTo).toHaveBeenCalledTimes(callsAfterInitialPin + 1)
+    expect(scrollTo).toHaveBeenCalledTimes(callsAfterInitialPin + 2)
 
     document.body.removeChild(container)
   })
@@ -363,7 +366,7 @@ describe('useUnreadScroll', () => {
     act(() => {
       listeners.resize?.forEach(listener => listener(new Event('resize')))
     })
-    expect(container.scrollTop).toBe(500)
+    expect(container.scrollTop).toBe(560)
     await act(async () => {
       await new Promise(resolve => window.setTimeout(resolve, 170))
     })
@@ -373,11 +376,17 @@ describe('useUnreadScroll', () => {
     act(() => {
       window.dispatchEvent(new Event('focusin'))
     })
-    expect(container.scrollTop).toBe(560)
+    expect(container.scrollTop).toBe(590)
     await act(async () => {
       await new Promise(resolve => window.setTimeout(resolve, 170))
     })
     expect(container.scrollTop).toBe(590)
+
+    setScrollMetrics(container, 1020)
+    act(() => {
+      window.dispatchEvent(new Event(MOBILE_VIEWPORT_UPDATED_EVENT))
+    })
+    expect(container.scrollTop).toBe(620)
 
     document.body.removeChild(container)
     Object.defineProperty(window, 'visualViewport', {

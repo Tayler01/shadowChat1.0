@@ -1,4 +1,5 @@
 const KEYBOARD_VIEWPORT_THRESHOLD_PX = 60
+export const MOBILE_VIEWPORT_UPDATED_EVENT = 'shadowchat:mobile-viewport-updated'
 
 interface MobileViewportSnapshot {
   layoutHeight: number

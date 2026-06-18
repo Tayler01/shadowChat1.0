@@ -16,12 +16,14 @@ describe('MobileChatFooter', () => {
   afterEach(() => {
     global.ResizeObserver = originalResizeObserver
     jest.restoreAllMocks()
-    document.documentElement.style.removeProperty('--shadowchat-mobile-chat-footer-height')
+    document.documentElement.style.removeProperty('--shadowchat-mobile-chat-footer-compact-height')
+    document.documentElement.style.removeProperty('--shadowchat-mobile-chat-footer-expanded-height')
   })
 
-  it('only updates the measured footer height CSS variable when the rounded height changes', () => {
+  it('exports stable compact and expanded footer reserve heights', () => {
     let resizeCallback: ResizeObserverCallback | null = null
-    let measuredHeight = 162.2
+    let composerHeight = 83.2
+    let navHeight = 78.4
     global.ResizeObserver = class {
       constructor(callback: ResizeObserverCallback) {
         resizeCallback = callback
@@ -32,17 +34,25 @@ describe('MobileChatFooter', () => {
       unobserve = jest.fn()
     } as unknown as typeof ResizeObserver
 
-    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() => ({
+    jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const height = this.dataset.mobileChatFooterContent
+        ? composerHeight
+        : this.dataset.mobileChatFooterNav
+        ? navHeight
+        : composerHeight + navHeight
+
+      return {
       top: 0,
-      bottom: measuredHeight,
+      bottom: height,
       left: 0,
       right: 390,
       width: 390,
-      height: measuredHeight,
+      height,
       x: 0,
       y: 0,
       toJSON: () => {},
-    }))
+      }
+    })
     const setPropertySpy = jest.spyOn(document.documentElement.style, 'setProperty')
 
     render(
@@ -51,19 +61,25 @@ describe('MobileChatFooter', () => {
       </MobileChatFooter>
     )
 
-    expect(setPropertySpy).toHaveBeenCalledWith('--shadowchat-mobile-chat-footer-height', '162px')
+    expect(setPropertySpy).toHaveBeenCalledWith('--shadowchat-mobile-chat-footer-compact-height', '83px')
+    expect(setPropertySpy).toHaveBeenCalledWith('--shadowchat-mobile-chat-footer-expanded-height', '161px')
 
     setPropertySpy.mockClear()
-    measuredHeight = 162.4
+    composerHeight = 83.4
+    navHeight = 78.2
     act(() => {
       resizeCallback?.([], {} as ResizeObserver)
     })
-    expect(setPropertySpy).not.toHaveBeenCalledWith('--shadowchat-mobile-chat-footer-height', expect.any(String))
+    expect(setPropertySpy).not.toHaveBeenCalledWith(
+      expect.stringMatching(/^--shadowchat-mobile-chat-footer-/),
+      expect.any(String)
+    )
 
-    measuredHeight = 165.2
+    composerHeight = 88.2
     act(() => {
       resizeCallback?.([], {} as ResizeObserver)
     })
-    expect(setPropertySpy).toHaveBeenCalledWith('--shadowchat-mobile-chat-footer-height', '165px')
+    expect(setPropertySpy).toHaveBeenCalledWith('--shadowchat-mobile-chat-footer-compact-height', '88px')
+    expect(setPropertySpy).toHaveBeenCalledWith('--shadowchat-mobile-chat-footer-expanded-height', '166px')
   })
 })

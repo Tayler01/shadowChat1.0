@@ -25,7 +25,7 @@ import { useArtBoardReactionNotifications } from './hooks/useArtBoardReactionNot
 import { useTheme } from './hooks/useTheme'
 import { BoardBadgesProvider } from './hooks/useBoardBadges'
 import { WeatherProvider } from './hooks/useWeatherForecast'
-import { computeMobileViewportState } from './lib/mobileViewport'
+import { computeMobileViewportState, MOBILE_VIEWPORT_UPDATED_EVENT } from './lib/mobileViewport'
 import type { AppView as View } from './types/navigation'
 
 const DirectMessagesView = lazy(() =>
@@ -169,6 +169,7 @@ function App() {
       root.style.setProperty('--shadowchat-toast-top', `calc(${viewportOffsetTop}px + env(safe-area-inset-top) + ${viewportState.toastTopRem}rem)`)
       root.style.setProperty('--shadowchat-toast-top-space', `${viewportState.toastTopSpacePx}px`)
       root.dataset.shadowchatKeyboard = viewportState.keyboardOpen ? 'open' : 'closed'
+      window.dispatchEvent(new Event(MOBILE_VIEWPORT_UPDATED_EVENT))
     }
 
     const scheduleMobileViewportUpdate = () => {

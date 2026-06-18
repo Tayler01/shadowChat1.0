@@ -1362,6 +1362,13 @@ html, body, #root {
     --shadowchat-mobile-nav-home-clearance: max(env(safe-area-inset-bottom), 0.75rem);
     --shadowchat-mobile-nav-home-buffer: 0.35rem;
     --shadowchat-mobile-nav-home-spacer-height: calc(var(--shadowchat-mobile-nav-home-clearance) + var(--shadowchat-mobile-nav-home-buffer));
+    --shadowchat-mobile-chat-footer-compact-height: 5.35rem;
+    --shadowchat-mobile-chat-footer-expanded-height: 9.5rem;
+    --shadowchat-mobile-chat-footer-height: var(--shadowchat-mobile-chat-footer-expanded-height);
+  }
+
+  html[data-shadowchat-keyboard='open'] {
+    --shadowchat-mobile-chat-footer-height: var(--shadowchat-mobile-chat-footer-compact-height);
   }
 
   .app-viewport {
@@ -1439,10 +1446,8 @@ html, body, #root {
     opacity: 1;
     transform: translateY(0);
     transition:
-      max-height var(--dur-med) var(--ease-premium),
       opacity var(--dur-fast) var(--ease-premium),
       transform var(--dur-med) var(--ease-premium),
-      padding var(--dur-med) var(--ease-premium),
       border-color var(--dur-med) var(--ease-premium);
   }
 
@@ -1462,7 +1467,6 @@ html, body, #root {
     opacity: 1;
     transform: translateY(0);
     transition:
-      max-height var(--dur-med) var(--ease-premium),
       opacity var(--dur-fast) var(--ease-premium),
       transform var(--dur-med) var(--ease-premium);
   }

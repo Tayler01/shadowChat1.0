@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { MOBILE_VIEWPORT_UPDATED_EVENT } from '../lib/mobileViewport'
 import { isMessageAfterCursor, type UserReadCursor } from '../lib/readCursors'
 
 const READ_SETTLE_MS = 220
@@ -373,6 +374,7 @@ export function useUnreadScroll<TMessage>({
     if (initialUnreadReadHoldRef.current) return
 
     setFeedState('layoutSettling')
+    scrollContainerToBottom('auto')
 
     if (followSettleTimerRef.current !== null) {
       window.clearTimeout(followSettleTimerRef.current)
@@ -383,7 +385,7 @@ export function useUnreadScroll<TMessage>({
     if (followMaxTimerRef.current === null) {
       followMaxTimerRef.current = window.setTimeout(flushFollowLatest, FOLLOW_LATEST_MAX_WAIT_MS)
     }
-  }, [flushFollowLatest, initialMessageId, setFeedState])
+  }, [flushFollowLatest, initialMessageId, scrollContainerToBottom, setFeedState])
 
   const handleScroll = useCallback(() => {
     const container = containerRef.current
@@ -525,6 +527,7 @@ export function useUnreadScroll<TMessage>({
     window.visualViewport?.addEventListener('scroll', followLatest)
     window.addEventListener('resize', followLatest)
     window.addEventListener('focusin', followLatest)
+    window.addEventListener(MOBILE_VIEWPORT_UPDATED_EVENT, followLatest)
 
     return () => {
       observer.disconnect()
@@ -532,6 +535,7 @@ export function useUnreadScroll<TMessage>({
       window.visualViewport?.removeEventListener('scroll', followLatest)
       window.removeEventListener('resize', followLatest)
       window.removeEventListener('focusin', followLatest)
+      window.removeEventListener(MOBILE_VIEWPORT_UPDATED_EVENT, followLatest)
       cancelFollowLatest()
     }
   }, [cancelFollowLatest, containerRef, enabled, followLatest, latestMessageKey, loading])
