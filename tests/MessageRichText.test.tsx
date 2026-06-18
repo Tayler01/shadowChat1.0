@@ -91,3 +91,32 @@ test('allows long text and links to wrap instead of clipping', () => {
   expect(container.firstElementChild).toHaveClass('[overflow-wrap:anywhere]')
   expect(screen.getByRole('link', { name: `https://example.com/${longWord}` })).toHaveClass('[overflow-wrap:anywhere]')
 })
+
+test('renders requester recognition cards from Shado update markers', () => {
+  const marker = encodeURIComponent(JSON.stringify({
+    displayName: 'APOLDER',
+    username: 'abpolder',
+    avatarThumbnailUrl: 'https://images.example/apolder-avatar.webp',
+    bannerThumbnailUrl: 'https://images.example/apolder-banner.webp',
+    profileColor: '#d7aa46',
+    featureTitle: 'ShadowPin search, cross-share, and image controls',
+    submissionTitle: 'Search bar + copy image link',
+  }))
+
+  render(
+    <MessageRichText
+      content={`[[shadowchat-recognition-card:${marker}]]\nShado update: APOLDER's request just shipped.`}
+      showPreview={false}
+    />
+  )
+
+  expect(screen.getByTestId('recognition-message-card')).toBeInTheDocument()
+  expect(screen.getByTestId('recognition-message-banner')).toHaveAttribute('src', 'https://images.example/apolder-banner.webp')
+  expect(screen.getByTestId('recognition-message-avatar')).toHaveAttribute('src', 'https://images.example/apolder-avatar.webp')
+  expect(screen.getByText('APOLDER')).toBeInTheDocument()
+  expect(screen.getByText('@abpolder')).toBeInTheDocument()
+  expect(screen.getByText('ShadowPin search, cross-share, and image controls')).toBeInTheDocument()
+  expect(screen.getByText('Submitted: Search bar + copy image link')).toBeInTheDocument()
+  expect(screen.getByText(/Shado update: APOLDER's request just shipped/i)).toBeInTheDocument()
+  expect(screen.queryByText(/\[\[shadowchat-recognition-card:/i)).not.toBeInTheDocument()
+})

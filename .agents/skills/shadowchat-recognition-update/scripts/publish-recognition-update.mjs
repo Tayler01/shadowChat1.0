@@ -498,6 +498,22 @@ function buildRecognitionRelease(args, user, submission) {
   }
 }
 
+function buildRecognitionPostMarker(user, displayName, featureTitle, submissionTitle) {
+  const card = {
+    displayName,
+    username: user.username || null,
+    avatarUrl: user.avatar_url || null,
+    avatarThumbnailUrl: user.avatar_thumbnail_url || null,
+    bannerUrl: user.banner_url || null,
+    bannerThumbnailUrl: user.banner_thumbnail_url || null,
+    profileColor: user.color || null,
+    featureTitle,
+    submissionTitle,
+  }
+
+  return `[[shadowchat-recognition-card:${encodeURIComponent(JSON.stringify(card))}]]`
+}
+
 function buildPostContent(args, user, submission) {
   const displayName = getDisplayName(user, args.displayName)
   const featureTitle = truncate(
@@ -513,7 +529,8 @@ function buildPostContent(args, user, submission) {
     'This is why feature requests and bug reports matter. Keep sending them in, and we will keep calling out the people who help shape the app.',
   ]
 
-  const content = truncate(args.message || lines.join('\n'), 4000)
+  const marker = buildRecognitionPostMarker(user, displayName, featureTitle, submissionTitle)
+  const content = truncate(`${marker}\n${args.message || lines.join('\n')}`, 4000)
   assertCleanText('Shado post content', content)
   return content
 }

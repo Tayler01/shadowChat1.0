@@ -1083,6 +1083,26 @@ html, body, #root {
   -webkit-user-select: none;
 }
 
+.shadow-pin-category-card {
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+}
+
+.shadow-pin-category-card,
+.shadow-pin-category-card * {
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+}
+
+.shadow-pin-category-card img {
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
 .shadow-pin-action-card--active {
   touch-action: none;
   z-index: 4;
@@ -2419,13 +2439,18 @@ html, body, #root {
 }
 
 .chat-image-action-feedback {
+  contain: paint;
+  display: block;
   border-radius: inherit;
+  inset: 0;
+  isolation: isolate;
   overflow: hidden;
-  z-index: 8;
+  transform: translateZ(0);
+  z-index: 60;
 }
 
 .chat-image-action-feedback .shadow-pin-action-wash {
-  z-index: 1;
+  z-index: 2;
   mix-blend-mode: screen;
 }
 

@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties, FormEvent, MutableRefObject, PointerEvent as ReactPointerEvent, UIEvent } from 'react'
+import type {
+  CSSProperties,
+  FormEvent,
+  MouseEvent as ReactMouseEvent,
+  MutableRefObject,
+  PointerEvent as ReactPointerEvent,
+  UIEvent,
+} from 'react'
 import { createPortal } from 'react-dom'
 import {
   Copy,
@@ -611,9 +618,13 @@ const PIN_ACTION_SELECT_RADIUS_PX = 48
 const PIN_ACTION_SAFE_MARGIN_PX = 18
 const PIN_ACTION_ICON_RADIUS_PX = 28
 const PIN_ACTION_ARC_RADIUS_PX = 104
-const CATEGORY_SEARCH_PULL_DISTANCE_PX = 48
-const CATEGORY_SEARCH_PULL_MAX_PX = 68
+const CATEGORY_SEARCH_PULL_DISTANCE_PX = 32
+const CATEGORY_SEARCH_PULL_MAX_PX = 52
 const CATEGORY_SEARCH_HIDE_SCROLL_TOP_PX = 18
+const CATEGORY_SEARCH_TOP_TOLERANCE_PX = 2
+const CATEGORY_SEARCH_CLICK_BLOCK_PX = 8
+const CATEGORY_LONG_PRESS_MS = 720
+const CATEGORY_LONG_PRESS_MOVE_CANCEL_PX = 12
 
 const mirrorPinAction = (action: PinActionConfig): PinActionConfig => ({
   ...action,
@@ -952,20 +963,49 @@ function ImageLikedBadge({ active }: { active?: boolean }) {
 function useLongPress(action: () => void) {
   const timerRef = useRef<number | null>(null)
   const firedRef = useRef(false)
+  const startRef = useRef<{ x: number; y: number } | null>(null)
+
+  const clearTimer = () => {
+    if (timerRef.current) {
+      window.clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+  }
 
   return {
-    onPointerDown: () => {
+    onPointerDown: (event: ReactPointerEvent<HTMLElement>) => {
+      const target = event.target
+      if (target instanceof Element && target.closest('button,a,input,textarea,select')) {
+        return
+      }
       firedRef.current = false
+      startRef.current = {
+        x: finitePointerCoordinate(event.clientX),
+        y: finitePointerCoordinate(event.clientY),
+      }
       timerRef.current = window.setTimeout(() => {
         firedRef.current = true
+        window.getSelection?.()?.removeAllRanges()
         action()
-      }, 520)
+      }, CATEGORY_LONG_PRESS_MS)
+    },
+    onPointerMove: (event: ReactPointerEvent<HTMLElement>) => {
+      const start = startRef.current
+      if (!start || !timerRef.current) return
+
+      const deltaX = finitePointerCoordinate(event.clientX) - start.x
+      const deltaY = finitePointerCoordinate(event.clientY) - start.y
+      if (Math.hypot(deltaX, deltaY) > CATEGORY_LONG_PRESS_MOVE_CANCEL_PX) {
+        clearTimer()
+      }
     },
     onPointerUp: () => {
-      if (timerRef.current) window.clearTimeout(timerRef.current)
+      clearTimer()
+      startRef.current = null
     },
     onPointerCancel: () => {
-      if (timerRef.current) window.clearTimeout(timerRef.current)
+      clearTimer()
+      startRef.current = null
     },
     didLongPress: () => firedRef.current,
   }
@@ -990,7 +1030,7 @@ function CategoryCard({
 
   return (
     <article
-      className="group overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(5,6,8,0.58)] shadow-[var(--shadow-panel)] backdrop-blur-md transition-transform active:scale-[0.99]"
+      className="shadow-pin-category-card group overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(5,6,8,0.58)] shadow-[var(--shadow-panel)] backdrop-blur-md transition-transform active:scale-[0.99]"
       onClick={() => {
         if (!didLongPress()) onOpen()
       }}
@@ -1014,7 +1054,10 @@ function CategoryCard({
           alt={category.title}
           loading="lazy"
           decoding="async"
+          draggable={false}
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+          onContextMenu={event => event.preventDefault()}
+          onDragStart={event => event.preventDefault()}
         />
         {isProcessingMedia(category.processing_status) && (
           <div className="absolute inset-x-2 bottom-2 inline-flex items-center justify-center gap-2 rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(4,5,6,0.78)] px-3 py-2 text-xs font-semibold text-[var(--text-primary)] backdrop-blur-md">
@@ -2453,10 +2496,12 @@ function ShadowPinHome({
   const categoryPullRef = useRef<{
     pointerId: number
     startClientX: number
-    lastClientY: number
+    topAnchorY: number | null
     pullDistance: number
   } | null>(null)
   const categorySearchPendingFocusRef = useRef(false)
+  const categoryPullClickBlockRef = useRef(false)
+  const categoryPullClickBlockTimerRef = useRef<number | null>(null)
 
   const detailsCategory = modal?.type === 'category-details'
     ? categoriesState.categories.find(category => category.id === modal.category.id) ?? modal.category
@@ -2506,6 +2551,29 @@ function ShadowPinHome({
     categorySearchPendingFocusRef.current = false
   }, [])
 
+  const blockNextCategoryClick = useCallback(() => {
+    categoryPullClickBlockRef.current = true
+    if (categoryPullClickBlockTimerRef.current) {
+      window.clearTimeout(categoryPullClickBlockTimerRef.current)
+    }
+    categoryPullClickBlockTimerRef.current = window.setTimeout(() => {
+      categoryPullClickBlockRef.current = false
+      categoryPullClickBlockTimerRef.current = null
+    }, 320)
+  }, [])
+
+  const handleCategoryClickCapture = (event: ReactMouseEvent<HTMLElement>) => {
+    if (!categoryPullClickBlockRef.current) return
+
+    categoryPullClickBlockRef.current = false
+    if (categoryPullClickBlockTimerRef.current) {
+      window.clearTimeout(categoryPullClickBlockTimerRef.current)
+      categoryPullClickBlockTimerRef.current = null
+    }
+    event.preventDefault()
+    event.stopPropagation()
+  }
+
   const revealCategorySearch = useCallback((focus: 'now' | 'after-gesture' = 'now') => {
     setCategorySearchVisible(true)
     setCategorySearchPullDistance(0)
@@ -2539,7 +2607,9 @@ function ShadowPinHome({
     categoryPullRef.current = {
       pointerId: event.pointerId,
       startClientX: finitePointerCoordinate(event.clientX),
-      lastClientY: finitePointerCoordinate(event.clientY),
+      topAnchorY: event.currentTarget.scrollTop <= CATEGORY_SEARCH_TOP_TOLERANCE_PX
+        ? finitePointerCoordinate(event.clientY)
+        : null,
       pullDistance: 0,
     }
     if (!categorySearchVisible) setCategorySearchPullDistance(0)
@@ -2552,43 +2622,57 @@ function ShadowPinHome({
     const clientX = finitePointerCoordinate(event.clientX)
     const clientY = finitePointerCoordinate(event.clientY)
     const deltaX = clientX - pull.startClientX
-    const stepY = clientY - pull.lastClientY
-    pull.lastClientY = clientY
 
-    if (event.currentTarget.scrollTop > 2) {
+    if (event.currentTarget.scrollTop > CATEGORY_SEARCH_TOP_TOLERANCE_PX) {
+      pull.topAnchorY = null
       pull.pullDistance = 0
       if (!categorySearchVisible) setCategorySearchPullDistance(0)
       return
     }
 
-    if (stepY <= 0) {
-      pull.pullDistance = Math.max(0, pull.pullDistance + stepY)
-      if (!categorySearchVisible) setCategorySearchPullDistance(pull.pullDistance)
-      return
+    if (pull.topAnchorY === null) {
+      pull.topAnchorY = clientY
     }
 
-    const nextPullDistance = Math.min(CATEGORY_SEARCH_PULL_MAX_PX, pull.pullDistance + stepY)
+    const nextPullDistance = Math.min(
+      CATEGORY_SEARCH_PULL_MAX_PX,
+      Math.max(0, clientY - pull.topAnchorY)
+    )
     if (Math.abs(deltaX) > Math.max(18, nextPullDistance * 1.15)) {
       categoryPullRef.current = null
       setCategorySearchPullDistance(0)
       return
     }
 
-    event.preventDefault()
-    event.stopPropagation()
+    if (nextPullDistance <= 0) {
+      pull.pullDistance = 0
+      if (!categorySearchVisible) setCategorySearchPullDistance(0)
+      return
+    }
+
+    if (nextPullDistance >= CATEGORY_SEARCH_CLICK_BLOCK_PX) {
+      blockNextCategoryClick()
+      event.preventDefault()
+      event.stopPropagation()
+    }
     pull.pullDistance = nextPullDistance
     if (!categorySearchVisible) {
       setCategorySearchPullDistance(nextPullDistance)
     }
 
     if (nextPullDistance >= CATEGORY_SEARCH_PULL_DISTANCE_PX) {
+      blockNextCategoryClick()
       categoryPullRef.current = null
       revealCategorySearch('after-gesture')
     }
   }
 
   const handleCategoryPointerEnd = (event: ReactPointerEvent<HTMLElement>) => {
-    if (categoryPullRef.current?.pointerId === event.pointerId) {
+    const pull = categoryPullRef.current
+    if (pull?.pointerId === event.pointerId) {
+      if (pull.pullDistance >= CATEGORY_SEARCH_CLICK_BLOCK_PX) {
+        blockNextCategoryClick()
+      }
       categoryPullRef.current = null
     }
     if (typeof event.currentTarget.hasPointerCapture === 'function' && event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -2645,6 +2729,12 @@ function ShadowPinHome({
     return () => window.cancelAnimationFrame(frameId)
   }, [categoriesState.categories.length, categoriesState.loading, categoryListScrollMemory])
 
+  useEffect(() => () => {
+    if (categoryPullClickBlockTimerRef.current) {
+      window.clearTimeout(categoryPullClickBlockTimerRef.current)
+    }
+  }, [])
+
   return (
     <div className="theme-image-surface relative flex h-full min-h-0 flex-col overflow-hidden overscroll-contain">
       <MobileAppHeader
@@ -2668,6 +2758,7 @@ function ShadowPinHome({
         onPointerMove={handleCategoryPointerMove}
         onPointerUp={handleCategoryPointerEnd}
         onPointerCancel={handleCategoryPointerEnd}
+        onClickCapture={handleCategoryClickCapture}
         className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-3 pb-[calc(env(safe-area-inset-bottom)_+_5.4rem)] pt-16 md:pb-6"
       >
         {shouldRenderCategorySearch && (

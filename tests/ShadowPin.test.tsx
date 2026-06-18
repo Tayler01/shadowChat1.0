@@ -1775,6 +1775,14 @@ test('reveals category search from the category scroller after pulling at the to
     clientY: 156,
   })
 
+  expect(screen.queryByTestId('shadow-pin-category-search')).not.toBeInTheDocument()
+
+  fireShadowPinPointer(categoryList, 'pointermove', {
+    pointerId: 42,
+    clientX: 160,
+    clientY: 172,
+  })
+
   await waitFor(() => {
     expect(screen.getByTestId('shadow-pin-category-search')).toHaveAttribute('data-pull-progress', '0.50')
   })
@@ -1783,7 +1791,7 @@ test('reveals category search from the category scroller after pulling at the to
   fireShadowPinPointer(categoryList, 'pointermove', {
     pointerId: 42,
     clientX: 160,
-    clientY: 184,
+    clientY: 190,
   })
 
   await waitFor(() => {
@@ -1794,8 +1802,73 @@ test('reveals category search from the category scroller after pulling at the to
   fireShadowPinPointer(categoryList, 'pointerup', {
     pointerId: 42,
     clientX: 160,
-    clientY: 184,
+    clientY: 190,
   })
+})
+
+test('smooth category pull reveals search instead of opening category edit', async () => {
+  jest.useFakeTimers()
+  mockUseShadowPinCategories.mockReturnValue({
+    categories: [{ ...category, creator_id: 'user-1' }],
+    loading: false,
+    saving: false,
+    error: null,
+    refresh: jest.fn(),
+    createCategory: jest.fn(),
+    updateCategory: jest.fn(),
+    removeCategory: jest.fn(),
+    toggleHeart: mockToggleCategoryHeart,
+  })
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    const categoryCard = screen.getByText('Fam & Friends').closest('article')
+    expect(categoryCard).not.toBeNull()
+
+    fireShadowPinPointer(categoryCard!, 'pointerdown', {
+      pointerId: 43,
+      button: 0,
+      clientX: 160,
+      clientY: 100,
+    })
+    fireShadowPinPointer(categoryCard!, 'pointermove', {
+      pointerId: 43,
+      clientX: 160,
+      clientY: 116,
+    })
+
+    act(() => {
+      jest.advanceTimersByTime(760)
+    })
+
+    expect(screen.queryByRole('heading', { name: /edit category/i })).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByTestId('shadow-pin-category-search')).toHaveAttribute('data-pull-progress', '0.50')
+    })
+
+    fireShadowPinPointer(categoryCard!, 'pointermove', {
+      pointerId: 43,
+      clientX: 160,
+      clientY: 134,
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('shadow-pin-category-search')).toHaveAttribute('aria-hidden', 'false')
+    })
+    expect(screen.queryByRole('heading', { name: /edit category/i })).not.toBeInTheDocument()
+
+    fireShadowPinPointer(categoryCard!, 'pointerup', {
+      pointerId: 43,
+      clientX: 160,
+      clientY: 134,
+    })
+  } finally {
+    act(() => {
+      jest.runOnlyPendingTimers()
+    })
+    jest.useRealTimers()
+  }
 })
 
 test('ShadowPin image single tap reveals a static heart count without direct image-card controls', () => {
@@ -2499,7 +2572,7 @@ test('ShadowPin edit category makes save and cancel primary while delete is deli
     expect(categoryCard).not.toBeNull()
     fireEvent.pointerDown(categoryCard!)
     act(() => {
-      jest.advanceTimersByTime(520)
+      jest.advanceTimersByTime(720)
     })
     fireEvent.pointerUp(categoryCard!)
 
@@ -2539,7 +2612,7 @@ test('ShadowPin edit category supports URL cover replacement', async () => {
     expect(categoryCard).not.toBeNull()
     fireEvent.pointerDown(categoryCard!)
     act(() => {
-      jest.advanceTimersByTime(520)
+      jest.advanceTimersByTime(720)
     })
     fireEvent.pointerUp(categoryCard!)
 
