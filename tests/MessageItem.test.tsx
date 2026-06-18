@@ -64,6 +64,37 @@ const baseMessage = {
   }
 } as unknown as Message
 
+const fireChatImagePointer = (
+  element: Element,
+  type: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel',
+  options: {
+    pointerId: number
+    clientX: number
+    clientY: number
+    button?: number
+    isPrimary?: boolean
+  }
+) => {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    button: options.button ?? 0,
+    clientX: options.clientX,
+    clientY: options.clientY,
+  })
+
+  Object.defineProperty(event, 'pointerId', {
+    configurable: true,
+    value: options.pointerId,
+  })
+  Object.defineProperty(event, 'isPrimary', {
+    configurable: true,
+    value: options.isPrimary ?? true,
+  })
+
+  fireEvent(element, event)
+}
+
 beforeEach(() => {
   mockAuthState = {
     user: { id: 'u1' },
@@ -126,7 +157,7 @@ test('shrink-wraps hyped image media frames to the rendered image', () => {
     hype_count: 2,
     hype_users: [{ user_id: 'u2', display_name: 'Bob', username: 'bob' }],
     reactions: {
-      '❤️': { count: 3, users: ['u2', 'u3', 'u4'] },
+      '\u2764\uFE0F': { count: 3, users: ['u2', 'u3', 'u4'] },
     },
   } as unknown as Message
 
@@ -153,9 +184,9 @@ test('shrink-wraps hyped image media frames to the rendered image', () => {
   expect(bubbleShell).not.toHaveClass('hype-message-shell')
   expect(img).toHaveClass('block', 'w-40')
   expect(mediaFrame?.querySelector('.chat-media-frame__hype')).toBeInTheDocument()
-  expect(mediaFrame?.querySelector('.chat-media-frame__reactions')).toBeInTheDocument()
+  expect(mediaFrame?.querySelector('.chat-media-frame__reactions')).not.toBeInTheDocument()
   expect(within(mediaFrame as HTMLElement).getByRole('button', { name: /Hyped by Bob/i })).toBeInTheDocument()
-  expect(within(mediaFrame as HTMLElement).getByRole('button', { name: /Reaction ❤️ count 3/i })).toBeInTheDocument()
+  expect(within(mediaFrame as HTMLElement).getByText('3')).toBeInTheDocument()
 })
 
 test('opens uploaded images in a top-level mobile-safe viewer', async () => {
@@ -179,6 +210,64 @@ test('opens uploaded images in a top-level mobile-safe viewer', async () => {
   expect(dialog).toHaveClass('fixed', 'inset-0', 'z-[120]')
   expect(dialog.querySelector('[data-zoomable-image-frame="true"]')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /close image/i })).toBeInTheDocument()
+})
+
+test('hides quick reactions for image messages and hearts through the radial image control', async () => {
+  jest.useFakeTimers()
+  const onToggleReaction = jest.fn().mockResolvedValue(undefined)
+
+  try {
+    render(
+      <MessageItem
+        message={baseMessage}
+        onEdit={async () => {}}
+        onDelete={async () => {}}
+        onTogglePin={async () => {}}
+        onToggleReaction={onToggleReaction}
+        onJumpToMessage={() => {}}
+        containerRef={React.createRef()}
+      />
+    )
+
+    act(() => {
+      fireEvent.mouseEnter(screen.getByTestId('message-bubble-shell'))
+    })
+    expect(screen.queryByRole('button', { name: `React with ${String.fromCodePoint(0x1F44D)}` })).not.toBeInTheDocument()
+
+    const radialShell = screen.getByAltText(/uploaded image/i).closest('.chat-image-radial-heart-shell')
+    expect(radialShell).not.toBeNull()
+
+    fireChatImagePointer(radialShell!, 'pointerdown', {
+      pointerId: 7,
+      button: 0,
+      clientX: 160,
+      clientY: 320,
+    })
+    act(() => {
+      jest.advanceTimersByTime(440)
+    })
+    expect(screen.getByTestId('chat-image-radial-menu')).toBeInTheDocument()
+
+    fireChatImagePointer(radialShell!, 'pointermove', {
+      pointerId: 7,
+      clientX: 160,
+      clientY: 228,
+    })
+    expect(screen.getByTestId('chat-image-radial-menu')).toHaveAttribute('data-selected-action', 'heart')
+
+    await act(async () => {
+      fireChatImagePointer(radialShell!, 'pointerup', {
+        pointerId: 7,
+        clientX: 160,
+        clientY: 228,
+      })
+      await Promise.resolve()
+    })
+
+    expect(onToggleReaction).toHaveBeenCalledWith(baseMessage.id, '\u2764\uFE0F')
+  } finally {
+    jest.useRealTimers()
+  }
 })
 
 test('renders audio message', () => {
@@ -403,9 +492,11 @@ test('renders audio file preview', () => {
 })
 
 test('icon buttons have aria-labels', () => {
+  const textMessage = { ...baseMessage, message_type: 'text', content: 'labels' } as Message
+
   render(
     <MessageItem
-      message={baseMessage}
+      message={textMessage}
       onEdit={async () => {}}
       onDelete={async () => {}}
       onTogglePin={async () => {}}

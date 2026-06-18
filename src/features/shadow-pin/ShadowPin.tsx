@@ -11,9 +11,11 @@ import {
   Link as LinkIcon,
   Loader2,
   Maximize2,
+  MessageSquare,
   Pin,
   Play,
   Plus,
+  Search,
   Share2,
   Trash2,
   Upload,
@@ -32,10 +34,14 @@ import { UserAchievementBadges } from '../../components/ui/UserAchievementBadges
 import { ZoomableImageFrame } from '../../components/ui/ZoomableImageFrame'
 import { useAuth } from '../../hooks/useAuth'
 import { useAdminAccess } from '../../hooks/useAdminAccess'
+import { useOptionalMessages } from '../../hooks/MessagesContext'
+import { getBlockedActionMessage } from '../../lib/moderation'
+import { showActionErrorToast } from '../../lib/toastNotifications'
 import { cn } from '../../lib/utils'
 import type { AppView } from '../../types/navigation'
 import { useShadowPinCategories } from './hooks/useShadowPinCategories'
 import { useShadowPinImages } from './hooks/useShadowPinImages'
+import { rankShadowPinCategories } from './categorySearch'
 import {
   useShadowPinActivityTracker,
   useShadowPinCategoryDwell,
@@ -605,6 +611,8 @@ const PIN_ACTION_SELECT_RADIUS_PX = 48
 const PIN_ACTION_SAFE_MARGIN_PX = 18
 const PIN_ACTION_ICON_RADIUS_PX = 28
 const PIN_ACTION_ARC_RADIUS_PX = 104
+const CATEGORY_SEARCH_PULL_DISTANCE_PX = 48
+const CATEGORY_SEARCH_HIDE_SCROLL_TOP_PX = 18
 
 const mirrorPinAction = (action: PinActionConfig): PinActionConfig => ({
   ...action,
@@ -702,8 +710,13 @@ const getNearestPinAction = (
     : null
 }
 
-const getShareUrl = (image: ShadowPinImage) =>
-  image.source_url || image.video_embed_url || image.video_playback_url || image.image_url || getPinImageUrl(image, 'full')
+const getShareUrl = (image: ShadowPinImage) => {
+  if (isVideoPin(image)) {
+    return image.source_url || image.video_embed_url || image.video_playback_url || getPinImageUrl(image, 'full') || image.image_url
+  }
+
+  return getPinImageUrl(image, 'full') || image.image_url || image.source_url || ''
+}
 
 const finitePointerCoordinate = (value: number) => Number.isFinite(value) ? value : 0
 
@@ -1471,6 +1484,8 @@ function ImageCard({
   onEdit,
   onHeart,
   onShare,
+  onShareToGroupChat,
+  sharingToGroupChat = false,
   onVisible,
 }: {
   image: ShadowPinImage
@@ -1491,6 +1506,8 @@ function ImageCard({
   onEdit: () => void
   onHeart: () => void
   onShare: () => void
+  onShareToGroupChat?: () => void | Promise<void>
+  sharingToGroupChat?: boolean
   onVisible: () => void
 }) {
   const cardRef = useRef<HTMLElement | null>(null)
@@ -1818,6 +1835,7 @@ function ImageCard({
   }
 
   const revealShareSheet = () => {
+    onShare()
     setShareSheet({ open: true, url: shareUrl })
   }
 
@@ -1855,6 +1873,12 @@ function ImageCard({
     }
   }
 
+  const shareCurrentImageToGroupChat = async () => {
+    if (!onShareToGroupChat) return
+    await onShareToGroupChat()
+    closeShareSheet()
+  }
+
   const runQuickAction = async (action: PinQuickAction) => {
     showFeedback(action)
 
@@ -1864,13 +1888,7 @@ function ImageCard({
     }
 
     if (action === 'share') {
-      onShare()
-      try {
-        await copyShadowPinImageLink(shareUrl)
-        closeShareSheet()
-      } catch {
-        revealShareSheet()
-      }
+      revealShareSheet()
       return
     }
 
@@ -2153,6 +2171,8 @@ function ImageCard({
         onClose={closeShareSheet}
         onCopy={() => { void copyCurrentShareLink() }}
         onNativeShare={() => { void nativeShareCurrentLink() }}
+        onShareToGroupChat={onShareToGroupChat ? () => { void shareCurrentImageToGroupChat() } : undefined}
+        sharingToGroupChat={sharingToGroupChat}
       />
     </article>
   )
@@ -2167,6 +2187,8 @@ function PinShareSheet({
   onClose,
   onCopy,
   onNativeShare,
+  onShareToGroupChat,
+  sharingToGroupChat = false,
 }: {
   open: boolean
   url: string
@@ -2176,6 +2198,8 @@ function PinShareSheet({
   onClose: () => void
   onCopy: () => void
   onNativeShare: () => void
+  onShareToGroupChat?: () => void
+  sharingToGroupChat?: boolean
 }) {
   if (!open || typeof document === 'undefined') return null
 
@@ -2216,7 +2240,18 @@ function PinShareSheet({
           className="mt-3 w-full rounded-[var(--radius-md)] border border-[rgba(255,255,255,0.16)] bg-[rgba(255,255,255,0.06)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--theme-accent-readable)]"
           aria-label="Pin share link"
         />
-        <div className={cn('mt-3 grid gap-2', canNativeShare ? 'grid-cols-3' : 'grid-cols-2')}>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {onShareToGroupChat && (
+            <button
+              type="button"
+              onClick={onShareToGroupChat}
+              disabled={sharingToGroupChat}
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[var(--theme-accent-border-soft)] bg-[var(--theme-accent-soft)] px-3 text-sm font-semibold text-[var(--text-primary)] disabled:cursor-wait disabled:opacity-65"
+            >
+              {sharingToGroupChat ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
+              Group Chat
+            </button>
+          )}
           <button
             type="button"
             onClick={onCopy}
@@ -2409,7 +2444,15 @@ function ShadowPinHome({
   const { role: adminRole } = useAdminAccess({ includeUsers: false })
   const categoriesState = useShadowPinCategories()
   const [modal, setModal] = useState<ModalMode>(null)
+  const [categorySearchVisible, setCategorySearchVisible] = useState(false)
+  const [categorySearchQuery, setCategorySearchQuery] = useState('')
   const categoryScrollRef = useRef<HTMLElement | null>(null)
+  const categorySearchInputRef = useRef<HTMLInputElement | null>(null)
+  const categoryPullRef = useRef<{
+    pointerId: number
+    startClientX: number
+    startClientY: number
+  } | null>(null)
 
   const detailsCategory = modal?.type === 'category-details'
     ? categoriesState.categories.find(category => category.id === modal.category.id) ?? modal.category
@@ -2446,15 +2489,70 @@ function ShadowPinHome({
     categoryListScrollMemory.current.scrollTop = Math.max(0, scrollTop ?? categoryScrollRef.current?.scrollTop ?? 0)
   }
 
+  const hideCategorySearch = useCallback(() => {
+    setCategorySearchVisible(false)
+    setCategorySearchQuery('')
+  }, [])
+
+  const revealCategorySearch = useCallback(() => {
+    setCategorySearchVisible(true)
+    window.requestAnimationFrame(() => {
+      categorySearchInputRef.current?.focus()
+    })
+  }, [])
+
   const handleCategoryScroll = (event: UIEvent<HTMLElement>) => {
     rememberCategoryScroll(event.currentTarget.scrollTop)
+    if (event.currentTarget.scrollTop > CATEGORY_SEARCH_HIDE_SCROLL_TOP_PX) {
+      hideCategorySearch()
+    }
+  }
+
+  const handleCategoryPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
+    if (event.isPrimary === false) return
+    if (typeof event.button === 'number' && event.button !== 0) return
+    if (event.currentTarget.scrollTop > 2) return
+
+    categoryPullRef.current = {
+      pointerId: event.pointerId,
+      startClientX: finitePointerCoordinate(event.clientX),
+      startClientY: finitePointerCoordinate(event.clientY),
+    }
+  }
+
+  const handleCategoryPointerMove = (event: ReactPointerEvent<HTMLElement>) => {
+    const pull = categoryPullRef.current
+    if (!pull || pull.pointerId !== event.pointerId) return
+    if (event.currentTarget.scrollTop > 2) {
+      categoryPullRef.current = null
+      return
+    }
+
+    const deltaX = finitePointerCoordinate(event.clientX) - pull.startClientX
+    const deltaY = finitePointerCoordinate(event.clientY) - pull.startClientY
+    if (deltaY > CATEGORY_SEARCH_PULL_DISTANCE_PX && Math.abs(deltaX) < deltaY * 1.15) {
+      categoryPullRef.current = null
+      revealCategorySearch()
+    }
+  }
+
+  const handleCategoryPointerEnd = (event: ReactPointerEvent<HTMLElement>) => {
+    if (categoryPullRef.current?.pointerId === event.pointerId) {
+      categoryPullRef.current = null
+    }
   }
 
   const openCategory = (category: ShadowPinCategory) => {
+    hideCategorySearch()
     rememberCategoryScroll()
     categoryListScrollMemory.current.shouldRestore = true
     onOpenCategory(category)
   }
+
+  const categorySearchResults = useMemo(
+    () => rankShadowPinCategories(categorySearchQuery, categoriesState.categories, 5),
+    [categorySearchQuery, categoriesState.categories]
+  )
 
   useEffect(() => {
     if (categoriesState.loading || !categoryListScrollMemory.current.shouldRestore) return
@@ -2490,8 +2588,81 @@ function ShadowPinHome({
       <main
         ref={categoryScrollRef}
         onScroll={handleCategoryScroll}
+        onPointerDown={handleCategoryPointerDown}
+        onPointerMove={handleCategoryPointerMove}
+        onPointerUp={handleCategoryPointerEnd}
+        onPointerCancel={handleCategoryPointerEnd}
         className="min-h-0 flex-1 overflow-y-auto px-3 pb-[calc(env(safe-area-inset-bottom)_+_5.4rem)] pt-16 md:pb-6"
       >
+        {categorySearchVisible && !categoriesState.loading && categoriesState.categories.length > 0 && (
+          <div className="mb-3 w-full" data-testid="shadow-pin-category-search">
+            <div className="flex min-h-12 items-center gap-2 rounded-full border border-[var(--theme-accent-border-soft)] bg-[rgba(5,6,8,0.82)] px-3 shadow-[var(--shadow-panel)] backdrop-blur-md">
+              <Search className="h-4 w-4 shrink-0 text-[var(--theme-accent-readable)]" aria-hidden="true" />
+              <input
+                ref={categorySearchInputRef}
+                value={categorySearchQuery}
+                onChange={event => setCategorySearchQuery(event.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-base text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] md:text-sm"
+                placeholder="Search categories"
+                type="search"
+                autoComplete="off"
+                aria-label="Search ShadowPin categories"
+              />
+              {categorySearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setCategorySearchQuery('')}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--text-primary)]"
+                  aria-label="Clear category search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            {categorySearchQuery.trim() && (
+              <div
+                className="mt-2 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(8,9,12,0.94)] shadow-[var(--shadow-panel)] backdrop-blur-md"
+                role="listbox"
+                aria-label="Category search results"
+              >
+                {categorySearchResults.length > 0 ? (
+                  categorySearchResults.map(category => {
+                    const categoryImageUrl = getCategoryImageUrl(category)
+                    return (
+                      <button
+                        key={category.id}
+                        type="button"
+                        onClick={() => openCategory(category)}
+                        className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[rgba(255,255,255,0.055)]"
+                        role="option"
+                      >
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)]">
+                          {categoryImageUrl ? (
+                            <img
+                              src={categoryImageUrl}
+                              alt=""
+                              loading="lazy"
+                              decoding="async"
+                              draggable={false}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <Pin className="h-4 w-4 text-[var(--theme-accent-readable)]" aria-hidden="true" />
+                          )}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-[var(--text-primary)]">{category.title}</span>
+                        </span>
+                      </button>
+                    )
+                  })
+                ) : (
+                  <div className="px-3 py-3 text-sm text-[var(--text-muted)]">No matching categories</div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         {categoriesState.loading ? (
           <div className="flex h-full items-center justify-center"><LoadingSpinner /></div>
         ) : categoriesState.error ? (
@@ -2568,8 +2739,10 @@ function ShadowPinCategoryScreen({
 }) {
   const { user } = useAuth()
   const { role: adminRole } = useAdminAccess({ includeUsers: false })
+  const messagesApi = useOptionalMessages()
   const imagesState = useShadowPinImages(categoryId)
   const [modal, setModal] = useState<ModalMode>(null)
+  const [sharingToGroupImageId, setSharingToGroupImageId] = useState<string | null>(null)
   const [overlayImageId, setOverlayImageId] = useState<string | null>(null)
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null)
   const [soundVideoId, setSoundVideoId] = useState<string | null>(null)
@@ -2609,6 +2782,38 @@ function ShadowPinCategoryScreen({
   const openImageViewer = (image: ShadowPinImage) => {
     tracker.recordPinOpened(image, imagesState.category)
     setModal({ type: 'image-viewer', image })
+  }
+
+  const shareImageToGroupChat = async (image: ShadowPinImage) => {
+    if (!messagesApi) {
+      toast.error('Group Chat is not ready yet')
+      return
+    }
+
+    const imageUrl = getPinImageUrl(image, 'full') || image.image_url || image.medium_url || image.thumbnail_url
+    if (!imageUrl) {
+      toast.error('This pin does not have a shareable image yet')
+      return
+    }
+
+    setSharingToGroupImageId(image.id)
+    try {
+      const sent = await messagesApi.sendMessage(
+        '',
+        'image',
+        imageUrl,
+        undefined,
+        image.thumbnail_url || image.medium_url || null
+      )
+      if (sent) {
+        toast.success('Shared to Group Chat')
+      }
+    } catch (error) {
+      const notice = await getBlockedActionMessage('general_chat', error, 'Failed to share to Group Chat')
+      showActionErrorToast(notice)
+    } finally {
+      setSharingToGroupImageId(current => current === image.id ? null : current)
+    }
   }
 
   const syncVideoPlaybackState = useCallback((preferOrderedStart: boolean) => {
@@ -2748,6 +2953,8 @@ function ShadowPinCategoryScreen({
                           onEdit={() => setModal({ type: 'edit-image', image })}
                           onHeart={() => toggleImageHeart(image)}
                           onShare={() => tracker.recordShareTapped(image, imagesState.category)}
+                          onShareToGroupChat={messagesApi ? () => shareImageToGroupChat(image) : undefined}
+                          sharingToGroupChat={sharingToGroupImageId === image.id}
                           onVisible={() => tracker.recordPinViewed(image, imagesState.category)}
                         />
                       </div>

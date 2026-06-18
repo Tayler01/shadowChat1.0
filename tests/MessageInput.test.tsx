@@ -3,6 +3,7 @@ import { createEvent, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import React from 'react'
 import { MessageInput } from '../src/components/chat/MessageInput'
+import { isShadowPinImageShareUrl } from '../src/components/chat/shadowPinShareLinks'
 import toast from 'react-hot-toast'
 
 jest.mock('react-hot-toast', () => {
@@ -227,6 +228,27 @@ test('long pressing the send button rings Hype without sending the draft', async
   } finally {
     jest.useRealTimers()
   }
+})
+
+test('sends a pasted ShadowPin storage image link as an image message', async () => {
+  const onSendMessage = jest.fn().mockResolvedValue({ id: 'm1' })
+  const shadowPinUrl = 'https://project.supabase.co/storage/v1/object/public/shadow-pin/u1/categories/cat-1/pins/123_shadow-pin.webp'
+
+  render(<MessageInput onSendMessage={onSendMessage} />)
+  const textarea = screen.getByRole('textbox')
+  const sendButton = screen.getByRole('button', { name: /send message/i })
+
+  await act(async () => {
+    fireEvent.change(textarea, { target: { value: shadowPinUrl } })
+  })
+
+  await act(async () => {
+    fireEvent.click(sendButton)
+  })
+
+  expect(isShadowPinImageShareUrl(shadowPinUrl)).toBe(true)
+  expect(onSendMessage).toHaveBeenCalledWith('', 'image', shadowPinUrl, undefined)
+  expect(textarea).toHaveValue('')
 })
 
 test('touch tapping the send button sends once and suppresses text selection', async () => {

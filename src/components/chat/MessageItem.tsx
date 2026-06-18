@@ -12,6 +12,7 @@ import {
   RefreshCw,
   XCircle,
   PartyPopper,
+  ImagePlus,
 } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
 import { ImageModal } from '../ui/ImageModal'
@@ -35,9 +36,11 @@ import { getBlockedActionMessage, type ChannelBanScope } from '../../lib/moderat
 import { showActionErrorToast } from '../../lib/toastNotifications'
 import { EmojiPickerOverlay } from './EmojiPickerOverlay'
 import { QuickReactionRail } from './QuickReactionRail'
+import { ChatImageRadialHeart } from './ChatImageRadialHeart'
 import { useOptionalHype } from '../../hooks/useHype'
 import { getHypeTier } from '../../lib/hypePresentation'
 import { MessageHypeBadge } from './MessageHypeBadge'
+import { ShareImageToShadowPinModal } from '../../features/shadow-pin/components/ShareImageToShadowPinModal'
 import {
   CHAT_MEDIA_INTRINSIC_HEIGHT,
   CHAT_MEDIA_INTRINSIC_WIDTH,
@@ -88,6 +91,8 @@ const normalizeEmojiValue = (emoji: string) => {
 
 const shouldCollapseReplyPreview = (content: string) =>
   content.length > 160 || content.split(/\r?\n/).length > 3
+
+const HEART_REACTION = '\u2764\uFE0F'
 
 function ReplyContextPreview({
   parentMessage,
@@ -199,6 +204,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const [editContent, setEditContent] = useState(message.content)
     const [showReactionPicker, setShowReactionPicker] = useState(false)
     const [showImageModal, setShowImageModal] = useState(false)
+    const [showShadowPinShare, setShowShadowPinShare] = useState(false)
     const [retryingFailedMessage, setRetryingFailedMessage] = useState(false)
     const bubbleShellRef = useRef<HTMLDivElement>(null)
     const [showQuickReactions, setShowQuickReactions] = useState(false)
@@ -228,6 +234,9 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const hypeTier = getHypeTier(hypeCount)
     const hypeUsers = message.hype_users ?? []
     const hasCurrentUserHyped = hypeUsers.some(user => user.user_id === profile?.id)
+    const imageHeartReaction = message.reactions?.[HEART_REACTION] || message.reactions?.['\u2764']
+    const imageHeartCount = Number(imageHeartReaction?.count ?? 0)
+    const currentUserImageHearted = Boolean(profile?.id && imageHeartReaction?.users?.includes(profile.id))
     const usesMediaHypeFrame = isFloatingMediaMessage && hypeTier > 0
     const usesBubbleHypeFrame = !isFloatingMediaMessage && hypeTier > 0
     const avatarSrc = isShadoAI
@@ -365,8 +374,15 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         id: 'reaction',
         label: 'Add Reaction',
         icon: Plus,
-        hidden: isLocalDelivery,
+        hidden: isLocalDelivery || isImageMessage,
         onSelect: () => setShowReactionPicker(true),
+      },
+      {
+        id: 'share-shadow-pin',
+        label: 'Add to Shado Pin',
+        icon: ImagePlus,
+        hidden: !isImageMessage || isLocalDelivery || !message.file_url,
+        onSelect: () => setShowShadowPinShare(true),
       },
       {
         id: 'reply',
@@ -549,13 +565,18 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   {message.message_type === 'audio' ? (
                     <audio controls src={message.audio_url ?? undefined} className="mt-1 max-w-full" />
                   ) : isImageMessage ? (
-                    <div
+                    <ChatImageRadialHeart
                       data-chat-media-frame="true"
                       data-hype-tier={usesMediaHypeFrame ? hypeTier : undefined}
                       className={cn(
                         'chat-media-frame relative mt-1 inline-block max-w-full rounded-[var(--radius-md)] align-top',
                         usesMediaHypeFrame && 'hype-message-shell chat-media-frame--hyped'
                       )}
+                      hearted={currentUserImageHearted}
+                      heartCount={imageHeartCount}
+                      disabled={isLocalDelivery}
+                      tiltSide={isOwner ? 'right' : 'left'}
+                      onHeart={() => handleReaction(HEART_REACTION)}
                     >
                       <img
                         src={imageMessageSrc}
@@ -570,6 +591,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                           'block max-h-[42vh] w-40 max-w-full cursor-pointer rounded-[var(--radius-md)] object-cover shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:w-44',
                           getChatMediaAspectClass(imageOrientation)
                         )}
+                        onContextMenu={event => event.preventDefault()}
+                        onDragStart={event => event.preventDefault()}
                         onLoad={event => {
                           const image = event.currentTarget
                           setImageOrientation(getChatMediaOrientation(image.naturalWidth, image.naturalHeight))
@@ -579,12 +602,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                       <div className="chat-media-frame__hype pointer-events-none absolute left-1.5 right-1.5 top-1.5 z-10 flex justify-end">
                         <MessageHypeBadge count={hypeCount} users={hypeUsers} className="pointer-events-auto" />
                       </div>
-                      <MessageReactions
-                        message={message}
-                        onReact={handleReaction}
-                        className="chat-media-frame__reactions pointer-events-auto absolute bottom-1.5 right-1.5 z-10 w-auto max-w-[calc(100%-0.75rem)] justify-end text-[0.65rem]"
-                      />
-                    </div>
+                    </ChatImageRadialHeart>
                   ) : isVideoMessage ? (
                     <div
                       data-chat-media-frame="true"
@@ -628,27 +646,31 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                 />
 
                 {/* Invisible hover area to trigger reactions */}
-                <div 
-                  className="absolute -top-12 -left-2 -right-2 h-16 group-hover/message:block hidden"
-                  onMouseEnter={handleMouseEnterReactions}
-                  onMouseLeave={handleMouseLeaveReactions}
-                  onPointerDown={event => {
-                    if (event.pointerType !== 'mouse') {
-                      handleMouseEnterReactions()
-                    }
-                  }}
-                />
-                <QuickReactionRail
-                  open={showQuickReactions && !showReactionPicker}
-                  anchorRef={bubbleShellRef}
-                  reactions={['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F389}', '\u{1F64F}']}
-                  onReact={handleReaction}
-                  onAddReaction={() => setShowReactionPicker(true)}
-                  onClose={() => setShowQuickReactions(false)}
-                  onPointerEnter={handleMouseEnterReactions}
-                  onPointerLeave={handleMouseLeaveReactions}
-                  normalizeEmoji={normalizeEmojiValue}
-                />
+                {!isImageMessage && (
+                  <>
+                    <div
+                      className="absolute -top-12 -left-2 -right-2 h-16 group-hover/message:block hidden"
+                      onMouseEnter={handleMouseEnterReactions}
+                      onMouseLeave={handleMouseLeaveReactions}
+                      onPointerDown={event => {
+                        if (event.pointerType !== 'mouse') {
+                          handleMouseEnterReactions()
+                        }
+                      }}
+                    />
+                    <QuickReactionRail
+                      open={showQuickReactions && !showReactionPicker}
+                      anchorRef={bubbleShellRef}
+                      reactions={['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F389}', '\u{1F64F}']}
+                      onReact={handleReaction}
+                      onAddReaction={() => setShowReactionPicker(true)}
+                      onClose={() => setShowQuickReactions(false)}
+                      onPointerEnter={handleMouseEnterReactions}
+                      onPointerLeave={handleMouseLeaveReactions}
+                      normalizeEmoji={normalizeEmojiValue}
+                    />
+                  </>
+                )}
                 <EmojiPickerOverlay
                   open={showReactionPicker}
                   title="Add reaction"
@@ -694,6 +716,14 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
           alt="uploaded image"
           onClose={() => setShowImageModal(false)}
         />
+        {showShadowPinShare && (
+          <ShareImageToShadowPinModal
+            open={showShadowPinShare}
+            imageUrl={message.file_url || ''}
+            previewUrl={imageMessageSrc}
+            onClose={() => setShowShadowPinShare(false)}
+          />
+        )}
         {profileUser && (
           <Suspense fallback={null}>
             <PublicProfileDialog

@@ -2144,7 +2144,7 @@ test('ShadowPin image long-press cancels when the finger starts scrolling before
   }
 })
 
-test('ShadowPin radial share falls back to copying the image link', async () => {
+test('ShadowPin radial share opens the share sheet and copy action copies the image link', async () => {
   jest.useFakeTimers()
   const originalClipboard = navigator.clipboard
   const originalShare = navigator.share
@@ -2196,6 +2196,17 @@ test('ShadowPin radial share falls back to copying the image link', async () => 
       await Promise.resolve()
     })
 
+    expect(screen.getByTestId('shadow-pin-share-sheet')).toBeInTheDocument()
+    expect(screen.getByLabelText('Pin share link')).toHaveValue('https://images.example/one.jpg')
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /^copy$/i }))
+      await Promise.resolve()
+    })
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('shadow-pin-share-sheet')).not.toBeInTheDocument()
+    })
     expect(writeText).toHaveBeenCalledWith('https://images.example/one.jpg')
     expect(screen.getByTestId('shadow-pin-action-feedback')).toHaveAttribute('data-action', 'share')
   } finally {
@@ -2215,7 +2226,7 @@ test('ShadowPin radial share falls back to copying the image link', async () => 
   }
 })
 
-test('ShadowPin radial share can copy a second image when platform share is denied', async () => {
+test('ShadowPin share sheet can copy a second image after platform share is denied', async () => {
   jest.useFakeTimers()
   const originalClipboard = navigator.clipboard
   const originalShare = navigator.share
@@ -2240,7 +2251,7 @@ test('ShadowPin radial share can copy a second image when platform share is deni
     value: execCommand,
   })
 
-  const shareViaRadial = async (imageCard: Element, pointerId: number) => {
+  const shareViaRadialAndCopy = async (imageCard: Element, pointerId: number) => {
     fireShadowPinPointer(imageCard, 'pointerdown', {
       pointerId,
       button: 0,
@@ -2267,6 +2278,16 @@ test('ShadowPin radial share can copy a second image when platform share is deni
     act(() => {
       jest.advanceTimersByTime(500)
     })
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /^copy$/i }))
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('shadow-pin-share-sheet')).not.toBeInTheDocument()
+    })
   }
 
   try {
@@ -2279,8 +2300,8 @@ test('ShadowPin radial share can copy a second image when platform share is deni
     expect(firstImageCard).not.toBeNull()
     expect(secondImageCard).not.toBeNull()
 
-    await shareViaRadial(firstImageCard!, 31)
-    await shareViaRadial(secondImageCard!, 32)
+    await shareViaRadialAndCopy(firstImageCard!, 31)
+    await shareViaRadialAndCopy(secondImageCard!, 32)
 
     expect(share).not.toHaveBeenCalled()
     expect(writeText).not.toHaveBeenCalled()
@@ -2309,9 +2330,7 @@ test('ShadowPin radial share opens a selectable fallback sheet when copy is bloc
   const originalShare = navigator.share
   const originalExecCommand = document.execCommand
   const writeText = jest.fn().mockRejectedValue(new Error('clipboard blocked'))
-  const execCommand = jest.fn()
-    .mockReturnValueOnce(false)
-    .mockReturnValueOnce(true)
+  const execCommand = jest.fn().mockReturnValue(false)
 
   Object.defineProperty(navigator, 'clipboard', {
     configurable: true,
@@ -2367,10 +2386,8 @@ test('ShadowPin radial share opens a selectable fallback sheet when copy is bloc
       await Promise.resolve()
     })
 
-    await waitFor(() => {
-      expect(screen.queryByTestId('shadow-pin-share-sheet')).not.toBeInTheDocument()
-    })
-    expect(execCommand).toHaveBeenCalledTimes(2)
+    expect(screen.getByTestId('shadow-pin-share-sheet')).toBeInTheDocument()
+    expect(execCommand).toHaveBeenCalledTimes(1)
   } finally {
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,

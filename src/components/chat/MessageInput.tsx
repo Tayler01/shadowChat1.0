@@ -21,6 +21,7 @@ import { getHypeTier } from '../../lib/hypePresentation'
 import { useOptionalHype } from '../../hooks/useHype'
 import { getBlockedActionMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
+import { isShadowPinImageShareUrl } from './shadowPinShareLinks'
 
 const normalizeComposerValue = (value: string) => (value.trim().length === 0 ? '' : value)
 const HYPE_SEND_LONG_PRESS_MS = 650
@@ -244,6 +245,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       const aiMatch = !processedMessage && currentMessage.toLowerCase().startsWith('@ai')
         ? currentMessage.slice(3).trim()
         : null
+      const shadowPinImageUrl = !processedMessage && isShadowPinImageShareUrl(currentMessage)
+        ? currentMessage
+        : null
 
       clear()
       setMessage('')
@@ -256,9 +260,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       }
 
       const sent = await onSendMessage(
-        finalMessage,
-        'text',
-        undefined,
+        shadowPinImageUrl ? '' : finalMessage,
+        shadowPinImageUrl ? 'image' : 'text',
+        shadowPinImageUrl || undefined,
         replyingTo?.id
       )
       if (sent !== null) {

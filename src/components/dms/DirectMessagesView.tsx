@@ -13,6 +13,7 @@ import {
   Reply,
   RefreshCw,
   XCircle,
+  ImagePlus,
 } from 'lucide-react'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
 import { useAuth } from '../../hooks/useAuth'
@@ -46,6 +47,8 @@ import type { AppView } from '../../types/navigation'
 import { EmojiPickerOverlay } from '../chat/EmojiPickerOverlay'
 import { ImageModal } from '../ui/ImageModal'
 import { QuickReactionRail } from '../chat/QuickReactionRail'
+import { ChatImageRadialHeart } from '../chat/ChatImageRadialHeart'
+import { ShareImageToShadowPinModal } from '../../features/shadow-pin/components/ShareImageToShadowPinModal'
 import {
   getImageMessageDisplaySrc,
   getMessagePreviewText,
@@ -63,6 +66,7 @@ interface DirectMessagesViewProps {
 
 const HISTORY_LOAD_SCROLL_THRESHOLD = 180
 const HISTORY_LOAD_COOLDOWN_MS = 1800
+const HEART_REACTION = '\u2764\uFE0F'
 
 const normalizeEmojiValue = (emoji: string) => {
   const value = emoji.trim()
@@ -116,6 +120,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
   const [showReactionPicker, setShowReactionPicker] = useState(false)
   const [showQuickReactions, setShowQuickReactions] = useState(false)
   const [showImageModal, setShowImageModal] = useState(false)
+  const [showShadowPinShare, setShowShadowPinShare] = useState(false)
   const [retryingFailedMessage, setRetryingFailedMessage] = useState(false)
   const bubbleShellRef = useRef<HTMLDivElement>(null)
   const reactionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -134,6 +139,9 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
   const parentPreviewImageSrc = parentMessage?.message_type === 'image'
     ? getImageMessageDisplaySrc(parentMessage.file_url, parentMessage.thumbnail_url)
     : ''
+  const imageHeartReaction = message.reactions?.[HEART_REACTION] || message.reactions?.['\u2764']
+  const imageHeartCount = Number(imageHeartReaction?.count ?? 0)
+  const currentUserImageHearted = Boolean(currentUserId && imageHeartReaction?.users?.includes(currentUserId))
   const bubbleColor = undefined
   const bubbleStyle = bubbleColor
     ? { backgroundColor: bubbleColor, color: getReadableTextColor(bubbleColor) }
@@ -245,8 +253,15 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
       id: 'reaction',
       label: 'Add Reaction',
       icon: Plus,
-      hidden: isLocalDelivery,
+      hidden: isLocalDelivery || isImageMessage,
       onSelect: () => setShowReactionPicker(true),
+    },
+    {
+      id: 'share-shadow-pin',
+      label: 'Add to Shado Pin',
+      icon: ImagePlus,
+      hidden: !isImageMessage || isLocalDelivery || !message.file_url,
+      onSelect: () => setShowShadowPinShare(true),
     },
     {
       id: 'reply',
@@ -411,15 +426,26 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
           ) : message.message_type === 'audio' ? (
             <audio controls src={message.audio_url} className="mt-1 max-w-full" />
           ) : isImageMessage ? (
-            <img
-              src={imageMessageSrc}
-              alt="uploaded"
-              loading="lazy"
-              decoding="async"
-              draggable={false}
-              className="mt-1 block h-auto max-h-[42vh] max-w-[min(10rem,100%)] cursor-pointer rounded-[var(--radius-md)] object-contain shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:max-w-[11rem]"
-              onClick={() => setShowImageModal(true)}
-            />
+            <ChatImageRadialHeart
+              className="mt-1"
+              hearted={currentUserImageHearted}
+              heartCount={imageHeartCount}
+              disabled={isLocalDelivery}
+              tiltSide={isOwn ? 'right' : 'left'}
+              onHeart={() => reactToMessage(HEART_REACTION)}
+            >
+              <img
+                src={imageMessageSrc}
+                alt="uploaded"
+                loading="lazy"
+                decoding="async"
+                draggable={false}
+                className="block h-auto max-h-[42vh] max-w-[min(10rem,100%)] cursor-pointer rounded-[var(--radius-md)] object-contain shadow-[0_10px_24px_rgba(0,0,0,0.22)] sm:max-w-[11rem]"
+                onContextMenu={event => event.preventDefault()}
+                onDragStart={event => event.preventDefault()}
+                onClick={() => setShowImageModal(true)}
+              />
+            </ChatImageRadialHeart>
           ) : isVideoMessage ? (
             <VideoAttachment url={videoMessageUrl} meta={message.content} />
           ) : message.message_type === 'file' && message.file_url ? (
@@ -430,11 +456,13 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
 
           {!editing && (
             <>
-              <NewsReactionSummaryStrip
-                reactions={message.reactions}
-                onReact={reactToMessage}
-                className="mt-1.5"
-              />
+              {!isImageMessage && (
+                <NewsReactionSummaryStrip
+                  reactions={message.reactions}
+                  onReact={reactToMessage}
+                  className="mt-1.5"
+                />
+              )}
               <p className={`mt-1 text-xs ${isOwn ? 'text-[var(--theme-accent-readable)]/85' : 'text-[var(--text-muted)]'}`}>
                 {formatTime(message.created_at)}
                 {message.edited_at && ' (edited)'}
@@ -473,29 +501,31 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
             </>
           )}
           {!editing && (
-            <>
-              <div
-                className="absolute -top-12 -left-2 -right-2 hidden h-16 group-hover:block"
-                onMouseEnter={handleMouseEnterReactions}
-                onMouseLeave={handleMouseLeaveReactions}
-                onPointerDown={event => {
-                  if (event.pointerType !== 'mouse') {
-                    handleMouseEnterReactions()
-                  }
-                }}
-              />
-              <QuickReactionRail
-                open={showQuickReactions && !showReactionPicker && !isLocalDelivery}
-                anchorRef={bubbleShellRef}
-                reactions={['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F389}', '\u{1F64F}']}
-                onReact={reactToMessage}
-                onAddReaction={() => setShowReactionPicker(true)}
-                onClose={() => setShowQuickReactions(false)}
-                onPointerEnter={handleMouseEnterReactions}
-                onPointerLeave={handleMouseLeaveReactions}
-                normalizeEmoji={normalizeEmojiValue}
-              />
-            </>
+            !isImageMessage && (
+              <>
+                <div
+                  className="absolute -top-12 -left-2 -right-2 hidden h-16 group-hover:block"
+                  onMouseEnter={handleMouseEnterReactions}
+                  onMouseLeave={handleMouseLeaveReactions}
+                  onPointerDown={event => {
+                    if (event.pointerType !== 'mouse') {
+                      handleMouseEnterReactions()
+                    }
+                  }}
+                />
+                <QuickReactionRail
+                  open={showQuickReactions && !showReactionPicker && !isLocalDelivery}
+                  anchorRef={bubbleShellRef}
+                  reactions={['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F389}', '\u{1F64F}']}
+                  onReact={reactToMessage}
+                  onAddReaction={() => setShowReactionPicker(true)}
+                  onClose={() => setShowQuickReactions(false)}
+                  onPointerEnter={handleMouseEnterReactions}
+                  onPointerLeave={handleMouseLeaveReactions}
+                  normalizeEmoji={normalizeEmojiValue}
+                />
+              </>
+            )
           )}
         </div>
 
@@ -514,6 +544,14 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
         alt="uploaded image"
         onClose={() => setShowImageModal(false)}
       />
+      {showShadowPinShare && (
+        <ShareImageToShadowPinModal
+          open={showShadowPinShare}
+          imageUrl={message.file_url || ''}
+          previewUrl={imageMessageSrc}
+          onClose={() => setShowShadowPinShare(false)}
+        />
+      )}
     </div>
   )
 })
