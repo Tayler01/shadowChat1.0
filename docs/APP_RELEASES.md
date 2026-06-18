@@ -41,6 +41,20 @@ different policy is chosen explicitly. The supported restart policies are:
 Use `critical_force_restart` only for changes that can break active old clients,
 such as incompatible schema/API behavior or security-sensitive fixes.
 
+### Recognition Sections
+
+Manual release notes and recognition automation may include a special section
+with `kind: "recognition"`. Recognition sections still need a normal `heading`
+and `items` array so older clients can render them as ordinary release notes.
+Newer clients render the section as a contributor credit card using the user's
+avatar, banner, profile color, username, display name, submission title, and
+shipped feature title from `sections[].recognition`.
+
+The repo-local `shadowchat-recognition-update` skill publishes these rows as
+`notice_only` releases and pairs them with a Shado General Chat post. That skill
+also inserts enough system hypes for the post to reach hype count 5, which
+activates the full featured glow.
+
 ## Deploy Flow
 
 The production GitHub Action stamps the Vite build with:

@@ -1529,9 +1529,29 @@ export type AppReleaseRestartPolicy =
 
 export type AppReleaseSeverity = 'info' | 'feature' | 'maintenance' | 'critical'
 
+export type AppReleaseSectionKind = 'standard' | 'recognition'
+
+export interface AppReleaseRecognition {
+  userId?: string | null
+  username?: string | null
+  displayName: string
+  avatarUrl?: string | null
+  avatarThumbnailUrl?: string | null
+  bannerUrl?: string | null
+  bannerThumbnailUrl?: string | null
+  profileColor?: string | null
+  submissionId?: string | null
+  submissionTitle?: string | null
+  submissionType?: string | null
+  featureTitle?: string | null
+  shippedAt?: string | null
+}
+
 export interface AppReleaseSection {
   heading: string
   items: string[]
+  kind?: AppReleaseSectionKind
+  recognition?: AppReleaseRecognition | null
 }
 
 export interface AppRelease {
@@ -1861,7 +1881,51 @@ export const recordShadowRunnerLevelCompletion = async ({
   return Boolean(data)
 }
 
-const normalizeAppReleaseSections = (value: unknown): AppReleaseSection[] => {
+const normalizeAppReleaseString = (value: unknown, maxLength: number) => {
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const text = value.trim()
+  return text ? text.slice(0, maxLength) : null
+}
+
+const normalizeAppReleaseRecognition = (value: unknown): AppReleaseRecognition | null => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const record = value as Record<string, unknown>
+  const username = normalizeAppReleaseString(record.username, 80)
+  const displayName =
+    normalizeAppReleaseString(record.displayName ?? record.display_name, 120) ||
+    username ||
+    'ShadowChat member'
+
+  return {
+    userId: normalizeAppReleaseString(record.userId ?? record.user_id, 80),
+    username,
+    displayName,
+    avatarUrl: normalizeAppReleaseString(record.avatarUrl ?? record.avatar_url, 600),
+    avatarThumbnailUrl: normalizeAppReleaseString(
+      record.avatarThumbnailUrl ?? record.avatar_thumbnail_url,
+      600
+    ),
+    bannerUrl: normalizeAppReleaseString(record.bannerUrl ?? record.banner_url, 600),
+    bannerThumbnailUrl: normalizeAppReleaseString(
+      record.bannerThumbnailUrl ?? record.banner_thumbnail_url,
+      600
+    ),
+    profileColor: normalizeAppReleaseString(record.profileColor ?? record.profile_color, 40),
+    submissionId: normalizeAppReleaseString(record.submissionId ?? record.submission_id, 80),
+    submissionTitle: normalizeAppReleaseString(record.submissionTitle ?? record.submission_title, 180),
+    submissionType: normalizeAppReleaseString(record.submissionType ?? record.submission_type, 40),
+    featureTitle: normalizeAppReleaseString(record.featureTitle ?? record.feature_title, 180),
+    shippedAt: normalizeAppReleaseString(record.shippedAt ?? record.shipped_at, 80),
+  }
+}
+
+export const normalizeAppReleaseSections = (value: unknown): AppReleaseSection[] => {
   if (!Array.isArray(value)) {
     return []
   }
@@ -1882,10 +1946,19 @@ const normalizeAppReleaseSections = (value: unknown): AppReleaseSection[] => {
         return null
       }
 
-      return {
+      const normalized: AppReleaseSection = {
         heading: heading || 'Changes',
         items: items.map(item => item.trim()),
       }
+
+      const kind = record.kind === 'recognition' ? 'recognition' : undefined
+      const recognition = normalizeAppReleaseRecognition(record.recognition)
+      if (kind === 'recognition' && recognition) {
+        normalized.kind = kind
+        normalized.recognition = recognition
+      }
+
+      return normalized
     })
     .filter((section): section is AppReleaseSection => Boolean(section))
 }

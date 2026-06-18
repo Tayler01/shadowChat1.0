@@ -12,6 +12,7 @@ import {
   fetchVisibleAppReleases,
   getRealtimeClient,
   recordAppReleaseReceipt,
+  type AppReleaseSection,
   type VisibleAppRelease,
 } from '../../lib/supabase'
 import { runRealtimeRecovery } from '../../lib/realtimeRecovery'
@@ -55,6 +56,135 @@ const RELEASE_THEME_PREVIEWS = [
     pattern: /\bsilver halo\b/i,
   },
 ] as const
+
+const PROFILE_COLOR_PATTERN = /^#[0-9a-f]{6}$/i
+
+const getRecognitionAccentColor = (value?: string | null) => {
+  const color = value?.trim() || ''
+  return PROFILE_COLOR_PATTERN.test(color) ? color : '#c9972f'
+}
+
+const getRecognitionName = (section: AppReleaseSection) => (
+  section.recognition?.displayName ||
+  section.recognition?.username ||
+  'ShadowChat member'
+)
+
+const getRecognitionInitial = (section: AppReleaseSection) => {
+  const name = getRecognitionName(section).trim()
+  return name.charAt(0).toUpperCase() || 'S'
+}
+
+const getRecognitionHandle = (section: AppReleaseSection) => {
+  const username = section.recognition?.username?.trim()
+  return username ? `@${username}` : ''
+}
+
+const StandardReleaseSection = ({ section }: { section: AppReleaseSection }) => (
+  <section className="app-release-section rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
+    <h3 className="text-sm font-semibold text-[var(--text-primary)]">{section.heading}</h3>
+    {section.items.length > 0 && (
+      <ul className="mt-3 space-y-2 text-sm leading-5 text-[var(--text-secondary)]">
+        {section.items.map(item => (
+          <li key={item} className="flex gap-2">
+            <CheckCircle2 className="app-release-check mt-0.5 h-4 w-4 flex-shrink-0 text-[var(--text-gold)]" />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    )}
+  </section>
+)
+
+const RecognitionReleaseSection = ({ section }: { section: AppReleaseSection }) => {
+  const recognition = section.recognition
+  if (!recognition) {
+    return <StandardReleaseSection section={section} />
+  }
+
+  const accentColor = getRecognitionAccentColor(recognition.profileColor)
+  const bannerSrc = recognition.bannerThumbnailUrl || recognition.bannerUrl
+  const avatarSrc = recognition.avatarThumbnailUrl || recognition.avatarUrl
+  const handle = getRecognitionHandle(section)
+
+  return (
+    <section className="app-release-section app-release-recognition overflow-hidden rounded-[var(--radius-md)] border border-[rgba(215,170,70,0.2)] bg-[rgba(255,255,255,0.035)]">
+      <div className="relative h-28 overflow-hidden sm:h-36">
+        {bannerSrc ? (
+          <img
+            src={bannerSrc}
+            alt={`${getRecognitionName(section)} banner`}
+            className="h-full w-full object-cover"
+            draggable={false}
+          />
+        ) : (
+          <div
+            className="h-full w-full"
+            style={{
+              background: `linear-gradient(135deg, ${accentColor}66, rgba(255,255,255,0.04))`,
+            }}
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-[rgba(7,8,9,0.92)] via-[rgba(7,8,9,0.28)] to-[rgba(7,8,9,0.08)]" />
+      </div>
+
+      <div className="relative px-4 pb-4 pt-0 sm:px-5 sm:pb-5">
+        <div className="-mt-9 flex min-w-0 items-end gap-3">
+          <div
+            className="flex h-[4.5rem] w-[4.5rem] flex-shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-md)] border border-[rgba(255,255,255,0.28)] bg-[rgba(9,10,11,0.88)] text-2xl font-semibold text-[var(--text-primary)] shadow-[0_12px_28px_rgba(0,0,0,0.35)]"
+            style={{ boxShadow: `0 0 0 1px ${accentColor}66, 0 12px 28px rgba(0,0,0,0.35)` }}
+          >
+            {avatarSrc ? (
+              <img
+                src={avatarSrc}
+                alt={`${getRecognitionName(section)} avatar`}
+                className="h-full w-full object-cover"
+                draggable={false}
+              />
+            ) : (
+              <span>{getRecognitionInitial(section)}</span>
+            )}
+          </div>
+          <div className="min-w-0 pb-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-gold)]">
+              Community request shipped
+            </p>
+            <h3 className="truncate text-lg font-semibold leading-tight text-[var(--text-primary)]">
+              {getRecognitionName(section)}
+            </h3>
+            {handle && (
+              <p className="truncate text-xs text-[var(--text-muted)]">{handle}</p>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          {recognition.featureTitle && (
+            <p className="text-sm font-medium leading-5 text-[var(--text-primary)]">
+              {recognition.featureTitle}
+            </p>
+          )}
+          {section.items.length > 0 && (
+            <ul className="space-y-2 text-sm leading-5 text-[var(--text-secondary)]">
+              {section.items.map(item => (
+                <li key={item} className="flex gap-2">
+                  <Sparkles className="mt-0.5 h-4 w-4 flex-shrink-0 text-[var(--text-gold)]" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+const ReleaseSection = ({ section }: { section: AppReleaseSection }) => (
+  section.kind === 'recognition' && section.recognition
+    ? <RecognitionReleaseSection section={section} />
+    : <StandardReleaseSection section={section} />
+)
 
 const formatReleaseDate = (value: string) => {
   try {
@@ -445,23 +575,11 @@ export function AppReleaseGate() {
 
         <div className="mt-5 flex-1 overflow-y-auto px-5 sm:px-6">
           <div className="space-y-3">
-            {release.sections.length > 0 ? release.sections.map(section => (
-              <section
-                key={section.heading}
-                className="app-release-section rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4"
-              >
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">{section.heading}</h3>
-                {section.items.length > 0 && (
-                  <ul className="mt-3 space-y-2 text-sm leading-5 text-[var(--text-secondary)]">
-                    {section.items.map(item => (
-                      <li key={item} className="flex gap-2">
-                        <CheckCircle2 className="app-release-check mt-0.5 h-4 w-4 flex-shrink-0 text-[var(--text-gold)]" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
+            {release.sections.length > 0 ? release.sections.map((section, index) => (
+              <ReleaseSection
+                key={`${section.kind || 'standard'}-${section.heading}-${index}`}
+                section={section}
+              />
             )) : (
               <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 text-sm leading-6 text-[var(--text-secondary)]">
                 Shadow Chat has been updated.

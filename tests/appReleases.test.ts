@@ -3,7 +3,10 @@ import {
   chooseVisibleAppRelease,
   getAppReleasePresentation,
 } from '../src/lib/appReleases'
-import type { VisibleAppRelease } from '../src/lib/supabase'
+import {
+  normalizeAppReleaseSections,
+  type VisibleAppRelease,
+} from '../src/lib/supabase'
 
 const release = (overrides: Partial<VisibleAppRelease> = {}): VisibleAppRelease => ({
   id: 'release-1',
@@ -148,5 +151,65 @@ describe('app release presentation', () => {
     expect(canAutoRestartRelease('release-1', 1000)).toBe(true)
     expect(canAutoRestartRelease('release-1', 3000)).toBe(false)
     expect(canAutoRestartRelease('release-1', 123000)).toBe(true)
+  })
+})
+
+describe('app release sections', () => {
+  it('preserves requester recognition metadata from release JSON', () => {
+    const sections = normalizeAppReleaseSections([
+      {
+        kind: 'recognition',
+        heading: 'Community credit',
+        items: ['JJ asked for photo zooming and it shipped.'],
+        recognition: {
+          user_id: 'user-1',
+          username: 'jj',
+          display_name: 'JJ',
+          avatar_thumbnail_url: 'https://example.test/avatar.webp',
+          banner_thumbnail_url: 'https://example.test/banner.webp',
+          profile_color: '#c8b08a',
+          submission_id: 'submission-1',
+          submission_title: 'Zoom feature on photos',
+          submission_type: 'bug',
+          feature_title: 'Full-screen photo pinch zoom',
+        },
+      },
+    ])
+
+    expect(sections).toHaveLength(1)
+    expect(sections[0]).toMatchObject({
+      kind: 'recognition',
+      heading: 'Community credit',
+      items: ['JJ asked for photo zooming and it shipped.'],
+      recognition: {
+        userId: 'user-1',
+        username: 'jj',
+        displayName: 'JJ',
+        avatarThumbnailUrl: 'https://example.test/avatar.webp',
+        bannerThumbnailUrl: 'https://example.test/banner.webp',
+        profileColor: '#c8b08a',
+        submissionId: 'submission-1',
+        submissionTitle: 'Zoom feature on photos',
+        submissionType: 'bug',
+        featureTitle: 'Full-screen photo pinch zoom',
+      },
+    })
+  })
+
+  it('treats recognition sections without profile metadata as standard sections', () => {
+    const sections = normalizeAppReleaseSections([
+      {
+        kind: 'recognition',
+        heading: 'Fallback',
+        items: ['Still visible as regular release copy.'],
+      },
+    ])
+
+    expect(sections).toEqual([
+      {
+        heading: 'Fallback',
+        items: ['Still visible as regular release copy.'],
+      },
+    ])
   })
 })

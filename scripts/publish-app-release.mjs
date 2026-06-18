@@ -178,6 +178,44 @@ function normalizeText(value, maxLength, fieldName, required = false) {
   return text
 }
 
+function normalizeOptionalRecognitionText(value, maxLength, fieldName) {
+  if (value === undefined || value === null || value === '') {
+    return null
+  }
+
+  return normalizeText(value, maxLength, fieldName, false) || null
+}
+
+function normalizeRecognition(value, index) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`sections[${index}].recognition must be an object.`)
+  }
+
+  const displayName =
+    normalizeOptionalRecognitionText(value.displayName ?? value.display_name, 120, `sections[${index}].recognition.displayName`) ||
+    normalizeOptionalRecognitionText(value.username, 80, `sections[${index}].recognition.username`)
+
+  if (!displayName) {
+    throw new Error(`sections[${index}].recognition.displayName or username is required.`)
+  }
+
+  return {
+    userId: normalizeOptionalRecognitionText(value.userId ?? value.user_id, 80, `sections[${index}].recognition.userId`),
+    username: normalizeOptionalRecognitionText(value.username, 80, `sections[${index}].recognition.username`),
+    displayName,
+    avatarUrl: normalizeOptionalRecognitionText(value.avatarUrl ?? value.avatar_url, 600, `sections[${index}].recognition.avatarUrl`),
+    avatarThumbnailUrl: normalizeOptionalRecognitionText(value.avatarThumbnailUrl ?? value.avatar_thumbnail_url, 600, `sections[${index}].recognition.avatarThumbnailUrl`),
+    bannerUrl: normalizeOptionalRecognitionText(value.bannerUrl ?? value.banner_url, 600, `sections[${index}].recognition.bannerUrl`),
+    bannerThumbnailUrl: normalizeOptionalRecognitionText(value.bannerThumbnailUrl ?? value.banner_thumbnail_url, 600, `sections[${index}].recognition.bannerThumbnailUrl`),
+    profileColor: normalizeOptionalRecognitionText(value.profileColor ?? value.profile_color, 40, `sections[${index}].recognition.profileColor`),
+    submissionId: normalizeOptionalRecognitionText(value.submissionId ?? value.submission_id, 80, `sections[${index}].recognition.submissionId`),
+    submissionTitle: normalizeOptionalRecognitionText(value.submissionTitle ?? value.submission_title, 180, `sections[${index}].recognition.submissionTitle`),
+    submissionType: normalizeOptionalRecognitionText(value.submissionType ?? value.submission_type, 40, `sections[${index}].recognition.submissionType`),
+    featureTitle: normalizeOptionalRecognitionText(value.featureTitle ?? value.feature_title, 180, `sections[${index}].recognition.featureTitle`),
+    shippedAt: normalizeOptionalRecognitionText(value.shippedAt ?? value.shipped_at, 80, `sections[${index}].recognition.shippedAt`),
+  }
+}
+
 function normalizeSections(value) {
   if (!Array.isArray(value)) {
     return []
@@ -197,6 +235,15 @@ function normalizeSections(value) {
 
     if (items.length === 0) {
       throw new Error(`sections[${index}].items must contain at least one item.`)
+    }
+
+    if (section.kind === 'recognition') {
+      return {
+        heading,
+        items,
+        kind: 'recognition',
+        recognition: normalizeRecognition(section.recognition, index),
+      }
     }
 
     return { heading, items }
