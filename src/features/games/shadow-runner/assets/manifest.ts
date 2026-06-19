@@ -109,6 +109,7 @@ export const SHADOW_RUNNER_ASSETS = {
     candleFairThumbnail320: `${LEVEL_ROOT}/level-5/ui/candle-fair-ruins-thumbnail-320x180.webp`,
     candleFairBackground: `${LEVEL_ROOT}/level-5/background/candle-fair-ruins-background.webp`,
     candleFairPropsHazards: `${LEVEL_ROOT}/level-5/props/candle-fair-props-hazards-v1-transparent.png`,
+    candleFairTerrainReadable: `${LEVEL_ROOT}/level-5/terrain/candle-fair-terrain-v2-transparent.png`,
     eastGateRunLocationButton: `${HOME_ROOT}/optimized/map-location-buttons/level-1-east-gate-run-location-button.webp`,
     lanternMarketLocationButton: `${HOME_ROOT}/optimized/map-location-buttons/level-2-lantern-market-roofs-location-button.webp`,
     ivyViaductLocationButton: `${HOME_ROOT}/optimized/map-location-buttons/level-3-ivy-viaduct-location-button.webp`,

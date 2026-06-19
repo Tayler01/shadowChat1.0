@@ -5,6 +5,7 @@ import type { ShadowRunnerInputRef } from './input'
 import {
   getShadowRunnerLevelConfig,
   getShadowRunnerLevelEnemies,
+  isShadowRunnerFinishOverlap,
   type ShadowRunnerArrowVolley,
   type ShadowRunnerBoostPickup,
   type ShadowRunnerEnemyConfig,
@@ -176,10 +177,23 @@ const CANDLE_TERRAIN_CROPS: Record<string, TextureCrop> = {
   'candle-ward-token': { x: 38, y: 610, width: 86, height: 86 },
 }
 
+const CANDLE_READABLE_TERRAIN_CROPS: Record<string, TextureCrop> = {
+  'candle-wide-stage': { x: 45, y: 55, width: 886, height: 231 },
+  'candle-rubble-floor': { x: 982, y: 86, width: 664, height: 200 },
+  'candle-high-shelf': { x: 887, y: 358, width: 701, height: 196 },
+  'candle-small-plank': { x: 111, y: 364, width: 695, height: 156 },
+  'candle-hanging-shelf': { x: 118, y: 561, width: 719, height: 307 },
+  'candle-lintel': { x: 958, y: 687, width: 586, height: 176 },
+}
+
 const TERRAIN_FRAME_PREFIX = 'terrain-'
 
 function getTerrainFrameKey(platformId: string) {
   return `${TERRAIN_FRAME_PREFIX}${platformId}`
+}
+
+function isCandleTerrainSet(terrainSet?: ShadowRunnerLevelConfig['platforms'][number]['terrainSet']) {
+  return terrainSet === 'candle' || terrainSet === 'candleBright' || terrainSet === 'candleShelf'
 }
 
 function isShadowRunnerLocalQaEnabled() {
@@ -265,6 +279,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   private jumpsUsed = 0
   private wasOnFloor = false
   private finishSparked = false
+  private fallRespawnPending = false
   private lastHudSignature = ''
   private activeTiltPlatformId: string | null = null
   private activeTiltStartedAt = 0
@@ -324,6 +339,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.load.image('shadow-runner-ivy-terrain-atlas', SHADOW_RUNNER_ASSETS.levels.ivyViaductTerrainHazards)
     this.load.image('shadow-runner-bell-terrain-atlas', SHADOW_RUNNER_ASSETS.levels.bellTowerPropsHazards)
     this.load.image('shadow-runner-candle-terrain-atlas', SHADOW_RUNNER_ASSETS.levels.candleFairPropsHazards)
+    this.load.image('shadow-runner-candle-readable-terrain-atlas', SHADOW_RUNNER_ASSETS.levels.candleFairTerrainReadable)
     this.load.image('shadow-runner-tilt-bridge', SHADOW_RUNNER_ASSETS.level.tiltBridge256)
     this.load.spritesheet('shadow-runner-coin', SHADOW_RUNNER_ASSETS.level.coinStrip48, {
       frameWidth: 48,
@@ -368,6 +384,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.airborneStartY = null
     this.airbornePeakY = 0
     this.lastAirborneVelocityY = 0
+    this.fallRespawnPending = false
     this.finishSparked = false
     this.physics.world.setBounds(0, 0, this.level.worldWidth, this.level.worldHeight)
     this.createTextures()
@@ -632,15 +649,23 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
         ? 'shadow-runner-bell-terrain-atlas'
         : platform.terrainSet === 'ivy'
           ? 'shadow-runner-ivy-terrain-atlas'
+          : platform.terrainSet === 'candleBright' || platform.terrainSet === 'candleShelf'
+            ? 'shadow-runner-candle-readable-terrain-atlas'
           : platform.terrainSet === 'candle'
             ? 'shadow-runner-candle-terrain-atlas'
             : 'shadow-runner-terrain-atlas'
       const hasTerrainFrame = this.textures.exists(terrainTexture)
         && this.textures.get(terrainTexture).has(frameKey)
+      const candleFallbackTexture = 'shadow-runner-candle-terrain-atlas'
+      const hasCandleFallbackFrame = isCandleTerrainSet(platform.terrainSet)
+        && this.textures.exists(candleFallbackTexture)
+        && this.textures.get(candleFallbackTexture).has(frameKey)
 
       addStaticPlatform(this, this.platforms!, platform, hasTerrainFrame
         ? { texture: terrainTexture, frame: frameKey, useImage: true, hidden: platform.hidden }
-        : { texture: 'shadow-runner-stone', hidden: platform.hidden })
+        : hasCandleFallbackFrame
+          ? { texture: candleFallbackTexture, frame: frameKey, useImage: true, hidden: platform.hidden }
+          : { texture: 'shadow-runner-stone', hidden: platform.hidden })
     })
 
     this.level.crouchGates?.forEach(gate => {
@@ -772,8 +797,13 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
   private createCrouchGate(gate: NonNullable<ShadowRunnerLevelConfig['crouchGates']>[number]) {
     const visualX = gate.x + gate.width / 2
-    const candleGate = gate.terrainSet === 'candle'
-    const terrainTexture = candleGate ? 'shadow-runner-candle-terrain-atlas' : 'shadow-runner-bell-terrain-atlas'
+    const candleGate = isCandleTerrainSet(gate.terrainSet)
+    const readableCandleGate = gate.terrainSet === 'candleBright' || gate.terrainSet === 'candleShelf'
+    const terrainTexture = candleGate
+      ? readableCandleGate && this.textures.exists('shadow-runner-candle-readable-terrain-atlas')
+        ? 'shadow-runner-candle-readable-terrain-atlas'
+        : 'shadow-runner-candle-terrain-atlas'
+      : 'shadow-runner-bell-terrain-atlas'
     const slabFrame = getTerrainFrameKey(candleGate ? 'candle-lintel' : 'bell-wide-ledge')
     const blockFrame = getTerrainFrameKey(candleGate ? 'candle-small-plank' : 'bell-small-block')
     const shelfFrame = getTerrainFrameKey(candleGate ? 'candle-high-shelf' : 'bell-scroll-shelf')
@@ -828,7 +858,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.player = this.physics.add.sprite(start.x, start.y, 'shadow-runner-idle')
     this.player.setOrigin(0.5, 1)
     this.player.setScale(HERO_SCALE)
-    this.player.setCollideWorldBounds(true)
+    this.player.setCollideWorldBounds(false)
     this.player.setMaxVelocity(360, 940)
     this.player.setDragX(1450)
     this.player.setSize(42, 70)
@@ -984,7 +1014,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
         }
       } else if (event.code === 'Digit3') {
         const finish = this.level.finish
-        this.teleportPlayerForQa(finish.x - 90, finish.y + finish.height)
+        this.teleportPlayerForQa(finish.x + finish.width / 2, finish.y + finish.height)
       } else if (event.code === 'Digit4') {
         const tiltPlatform = this.level.tiltPlatforms[0]
         if (tiltPlatform) {
@@ -1203,6 +1233,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
     this.lastJumpPresses = input.jumpPresses
     this.lastAttackPresses = input.attackPresses
+    this.clampPlayerHorizontalBounds(body)
 
     if (onFloor && body.velocity.y >= 0) {
       this.jumpsUsed = 0
@@ -1256,7 +1287,8 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.resolveAttackHit(time)
 
     if (player.y > this.level.worldHeight + 90) {
-      this.damagePlayerFromHazard(time)
+      this.handlePlayerFellOut()
+      return
     }
 
     this.updateHeroAnimation(time, left || right, onFloor, crouching)
@@ -1473,7 +1505,9 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       ?.projectileSpeed ?? 430
     const dx = Math.abs(player.x - enemy.x)
     const dy = Math.abs(player.y - enemy.y)
-    const canShoot = dx <= range && dy <= 180 && time - enemyState.lastShotAt >= cooldown
+    const camera = this.cameras.main
+    const archerTelegraphed = enemy.x >= camera.scrollX - 140 && enemy.x <= camera.scrollX + camera.width + 140
+    const canShoot = archerTelegraphed && dx <= range && dy <= 180 && time - enemyState.lastShotAt >= cooldown
 
     if (canShoot) {
       enemyState.lastShotAt = time
@@ -1572,7 +1606,10 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
     this.arrowVolleys.forEach(runtime => {
       const volley = runtime.config
-      const active = this.player!.x >= volley.x - 360 && this.player!.x <= volley.x + volley.width + 160
+      const playerBody = this.player!.body as Phaser.Physics.Arcade.Body
+      const horizontallyActive = this.player!.x >= volley.x - 360 && this.player!.x <= volley.x + volley.width + 160
+      const verticallyActive = playerBody.center.y >= volley.y - 92 && playerBody.center.y <= volley.y + volley.height + 92
+      const active = horizontallyActive && verticallyActive
       if (!active) {
         runtime.armed = false
         runtime.nextShotAt = 0
@@ -1820,11 +1857,50 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     })
   }
 
+  private handlePlayerFellOut() {
+    if (!this.player || this.fallRespawnPending || this.state.outOfLives) return
+
+    this.fallRespawnPending = true
+    const hasLivesLeft = spendShadowRunnerLife(this.state)
+    this.emitHud(true)
+
+    this.playSound(hasLivesLeft ? 'life-lost' : 'route-failed')
+    this.player.setVelocity(0, 0)
+    this.player.setTint(0x6d7380)
+    this.addDustPuff(this.player.x, this.level.worldHeight - 20)
+
+    if (!hasLivesLeft) return
+
+    this.time.delayedCall(260, () => {
+      this.fallRespawnPending = false
+      this.respawnPlayer()
+    })
+  }
+
+  private clampPlayerHorizontalBounds(body: Phaser.Physics.Arcade.Body) {
+    if (!this.player) return
+
+    const minX = 24
+    const maxX = this.level.worldWidth - 24
+    if (this.player.x < minX) {
+      this.player.setX(minX)
+      if (body.velocity.x < 0) {
+        this.player.setVelocityX(0)
+      }
+    } else if (this.player.x > maxX) {
+      this.player.setX(maxX)
+      if (body.velocity.x > 0) {
+        this.player.setVelocityX(0)
+      }
+    }
+  }
+
   private respawnPlayer() {
     if (!this.player || this.state.outOfLives) return
 
     restoreShadowRunnerPlayer(this.state)
     this.jumpsUsed = 0
+    this.fallRespawnPending = false
     this.player.setVelocity(0, 0)
     this.player.setPosition(this.level.playerStart.x, this.level.playerStart.y)
     this.player.clearTint()
@@ -2022,10 +2098,13 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   }
 
   private checkFinish() {
-    if (!this.player || this.state.defeated || this.state.outOfLives) return
+    if (!this.player || this.state.defeated || this.state.outOfLives || this.fallRespawnPending) return
 
     const finish = this.level.finish
-    if (this.player.x > finish.x && this.player.y > finish.y - 8) {
+    const body = this.player.body as Phaser.Physics.Arcade.Body
+    const overlapsFinish = isShadowRunnerFinishOverlap(body, finish, { fallRespawnPending: this.fallRespawnPending })
+
+    if (overlapsFinish) {
       this.state.defeated = true
       this.state.objective = this.level.completionLine
       this.state.player.score += 300
@@ -2257,6 +2336,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.registerTerrainFrameSet('shadow-runner-ivy-terrain-atlas', IVY_TERRAIN_CROPS)
     this.registerTerrainFrameSet('shadow-runner-bell-terrain-atlas', BELL_TERRAIN_CROPS)
     this.registerTerrainFrameSet('shadow-runner-candle-terrain-atlas', CANDLE_TERRAIN_CROPS)
+    this.registerTerrainFrameSet('shadow-runner-candle-readable-terrain-atlas', CANDLE_READABLE_TERRAIN_CROPS)
   }
 
   private registerTerrainFrameSet(textureKey: string, crops: Record<string, TextureCrop>) {
