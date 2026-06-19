@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import toast from 'react-hot-toast'
-import { CalendarDays, Clock3, Ghost, LockKeyhole, MessageCircle, Palette, ShieldAlert, ShieldCheck, UserRound, X } from 'lucide-react'
+import { Award, CalendarDays, Clock3, Ghost, LockKeyhole, MessageCircle, Palette, ShieldAlert, ShieldCheck, UserRound, X } from 'lucide-react'
 import type { User } from '../../lib/supabase'
 import { getOrCreateDMConversation, setSubAdminStatus } from '../../lib/supabase'
 import {
@@ -27,6 +27,7 @@ import { Button } from '../ui/Button'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { UserAchievementBadges } from '../ui/UserAchievementBadges'
+import { getUserAchievementMedals } from '../ui/userAchievementMedals'
 
 interface PublicProfileDialogProps {
   user: User | null
@@ -80,6 +81,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   const [localAdminRole, setLocalAdminRole] = useState(user?.admin_role ?? null)
   const [adminRoleSaving, setAdminRoleSaving] = useState(false)
   const [dmStarting, setDmStarting] = useState(false)
+  const [expandedMedalKey, setExpandedMedalKey] = useState<string | null>(null)
 
   const canStartDM = Boolean(
     open &&
@@ -122,6 +124,14 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   const activeBanReasons = useMemo(() => (
     Array.from(new Set(activeBans.map(ban => ban.reason?.trim()).filter(Boolean) as string[]))
   ), [activeBans])
+  const profileBadgeUser = useMemo(
+    () => user ? { ...user, admin_role: localAdminRole } : null,
+    [localAdminRole, user]
+  )
+  const profileMedals = useMemo(
+    () => getUserAchievementMedals(profileBadgeUser),
+    [profileBadgeUser]
+  )
 
   useEffect(() => {
     if (!open) return
@@ -180,6 +190,12 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   useEffect(() => {
     setLocalAdminRole(open && targetUserId ? targetUserAdminRole : null)
   }, [open, targetUserAdminRole, targetUserId])
+
+  useEffect(() => {
+    if (!open || !targetUserId) {
+      setExpandedMedalKey(null)
+    }
+  }, [open, targetUserId])
 
   useEffect(() => {
     if (!open || !user) {
@@ -364,7 +380,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                   <h2 id="public-profile-title" className="flex min-w-0 flex-wrap items-center gap-2 text-2xl font-bold text-[var(--text-primary)]">
                     <span className="min-w-0 max-w-full truncate">{user.display_name || user.username || 'Unknown User'}</span>
                     <UserRoleBadge role={localAdminRole} className="mt-1" />
-                    <UserAchievementBadges user={{ ...user, admin_role: localAdminRole }} />
+                    <UserAchievementBadges user={profileBadgeUser} />
                     <UserPresenceBadge userId={user.id} presenceVisibility={user.presence_visibility} />
                   </h2>
                   <p className="min-w-0 truncate text-sm text-[var(--text-muted)]">@{user.username || 'unknown'}</p>
@@ -432,6 +448,61 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                       <dd className="mt-1 truncate text-[var(--text-primary)]">@{user.username || 'unknown'}</dd>
                     </div>
                   </dl>
+                  <div className="mt-4 border-t border-[var(--border-subtle)] pt-4">
+                    <div className="mb-3 flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">
+                      <Award className="h-3.5 w-3.5 text-[var(--text-gold)]" />
+                      Medals
+                    </div>
+                    {profileMedals.length > 0 ? (
+                      <ul className="grid gap-2" aria-label="User medals">
+                        {profileMedals.map(medal => {
+                          const detailId = `public-profile-medal-${medal.key}`
+                          const medalExpanded = expandedMedalKey === medal.key
+                          return (
+                            <li key={medal.key}>
+                              <div
+                                role="button"
+                                tabIndex={0}
+                                aria-expanded={medalExpanded}
+                                aria-label={`${medal.name}. ${medal.detail} ${medal.earnedText}`}
+                                aria-describedby={detailId}
+                                onClick={() => setExpandedMedalKey(prev => prev === medal.key ? null : medal.key)}
+                                onFocus={() => setExpandedMedalKey(medal.key)}
+                                onKeyDown={event => {
+                                  if (event.key !== 'Enter' && event.key !== ' ') return
+                                  event.preventDefault()
+                                  setExpandedMedalKey(prev => prev === medal.key ? null : medal.key)
+                                }}
+                                className="group/medal rounded-[var(--radius-md)] border border-[rgba(215,170,70,0.18)] bg-[rgba(8,9,10,0.5)] p-3 transition-[border-color,background-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-[rgba(215,170,70,0.44)] hover:bg-[rgba(215,170,70,0.08)] hover:shadow-[0_14px_32px_rgba(0,0,0,0.24)] focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.28)]"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[rgba(215,170,70,0.22)] bg-[rgba(255,255,255,0.045)] shadow-[inset_0_0_18px_rgba(215,170,70,0.08)]">
+                                    {medal.renderIcon('h-9 w-9 [&_svg]:h-8 [&_svg]:w-8')}
+                                  </span>
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block text-sm font-semibold leading-5 text-[var(--text-primary)]">
+                                      {medal.name}
+                                    </span>
+                                    <span className="block text-xs text-[var(--text-muted)]">Medal earned</span>
+                                  </span>
+                                </div>
+                                <div className={`overflow-hidden transition-[max-height,opacity] duration-200 group-hover/medal:max-h-32 group-hover/medal:opacity-100 group-focus/medal:max-h-32 group-focus/medal:opacity-100 group-focus-within/medal:max-h-32 group-focus-within/medal:opacity-100 ${medalExpanded ? 'max-h-32 opacity-100' : 'max-h-0 opacity-0'}`}>
+                                  <div id={detailId}>
+                                    <p className="pt-2 text-xs leading-5 text-[var(--text-secondary)]">{medal.detail}</p>
+                                    <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">How earned: {medal.earnedText}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    ) : (
+                      <p className="rounded-[var(--radius-sm)] border border-dashed border-[var(--border-subtle)] bg-[rgba(255,255,255,0.025)] px-3 py-2 text-sm text-[var(--text-muted)]">
+                        No medals earned yet.
+                      </p>
+                    )}
+                  </div>
                 </section>
 
                 {activeBans.length > 0 && (

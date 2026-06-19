@@ -118,6 +118,34 @@ test('renders public profile details in a dialog', () => {
   expect(screen.queryByText(user.email)).toBeNull()
 })
 
+test('renders earned medals with names and how-earned details in public info', () => {
+  render(
+    <PublicProfileDialog
+      user={{
+        ...user,
+        checkers_crown: true,
+        war_sword: true,
+        shadow_pin_gold_pin: true,
+        shadow_runner_sprint_medal: true,
+        shadow_runner_knight_medal: true,
+        gold_easter_egg: true,
+      } as User}
+      open
+      onClose={jest.fn()}
+    />
+  )
+
+  expect(screen.getByRole('list', { name: /user medals/i })).toBeInTheDocument()
+  expect(screen.getByText('Shadow Checkers Crown')).toBeInTheDocument()
+  expect(screen.getByText('Shadow War Sword')).toBeInTheDocument()
+  expect(screen.getByText('Shadow Pin Gold Pin')).toBeInTheDocument()
+  expect(screen.getByText('Shadow Runner Sprint Medal')).toBeInTheDocument()
+  expect(screen.getByText('Shadow Runner Knight Medal')).toBeInTheDocument()
+  expect(screen.getByText('Golden Egg Medal')).toBeInTheDocument()
+  expect(screen.getByText('How earned: Earned by completing the tutorial route.')).toBeInTheDocument()
+  expect(screen.getByText('How earned: Earned by finding the mobile-only golden egg.')).toBeInTheDocument()
+})
+
 test('closes with the clear close button', async () => {
   const onClose = jest.fn()
   render(<PublicProfileDialog user={user} open onClose={onClose} />)

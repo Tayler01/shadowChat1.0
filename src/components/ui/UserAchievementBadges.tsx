@@ -1,13 +1,5 @@
-import { CheckersCrownBadge } from '../../features/games/shadow-checkers/components/CheckersCrownBadge'
-import { ShadowRunnerKnightBadge } from '../../features/games/shadow-runner/components/ShadowRunnerKnightBadge'
-import { ShadowRunnerSprintBadge } from '../../features/games/shadow-runner/components/ShadowRunnerSprintBadge'
-import { ShadowWarSwordBadge } from '../../features/games/shadow-war/components/ShadowWarSwordBadge'
-import { ShadowPinGoldPinBadge } from '../../features/shadow-pin/components/ShadowPinGoldPinBadge'
-import {
-  shouldShowLegacyAchievementBadges,
-  type AchievementBadgeUser,
-} from '../../lib/achievementBadges'
-import { GoldEasterEggBadge } from './GoldEasterEggBadge'
+import type { AchievementBadgeUser } from '../../lib/achievementBadges'
+import { getUserAchievementMedals } from './userAchievementMedals'
 
 interface UserAchievementBadgesProps {
   user?: AchievementBadgeUser | null
@@ -17,20 +9,15 @@ interface UserAchievementBadgesProps {
 export function UserAchievementBadges({ user, className }: UserAchievementBadgesProps) {
   if (!user) return null
 
-  const showLegacyBadges = shouldShowLegacyAchievementBadges(user)
+  const medals = getUserAchievementMedals(user)
 
   return (
     <>
-      {showLegacyBadges && (
-        <>
-          <CheckersCrownBadge active={user.checkers_crown} className={className} />
-          <ShadowWarSwordBadge active={user.war_sword} className={className} />
-          <ShadowPinGoldPinBadge active={user.shadow_pin_gold_pin} className={className} />
-        </>
-      )}
-      <ShadowRunnerSprintBadge active={user.shadow_runner_sprint_medal} className={className} />
-      <ShadowRunnerKnightBadge active={user.shadow_runner_knight_medal} className={className} />
-      <GoldEasterEggBadge active={user.gold_easter_egg} className={className} />
+      {medals.map(medal => (
+        <span key={medal.key} className="inline-flex">
+          {medal.renderIcon(className)}
+        </span>
+      ))}
     </>
   )
 }
