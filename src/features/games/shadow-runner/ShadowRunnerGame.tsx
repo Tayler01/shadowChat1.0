@@ -24,6 +24,8 @@ export interface ShadowRunnerLevelCompletionSummary {
   score: number
   coinsCollected: number
   totalCoins: number
+  enemiesDefeated: number
+  totalEnemies: number
 }
 
 interface ShadowRunnerGameProps {
@@ -59,6 +61,11 @@ function createDefaultHud(levelId: ShadowRunnerPlayableLevelId): ShadowRunnerHud
     boostActive: false,
     boostRemainingMs: 0,
     boostGuardCharges: 0,
+    shieldActive: false,
+    shieldRemainingMs: 0,
+    shieldGuardCharges: 0,
+    enemiesDefeated: 0,
+    totalEnemies: getShadowRunnerLevelEnemies(level).length,
     objective: level.objective,
     defeated: false,
     outOfLives: false,
@@ -471,8 +478,10 @@ export function ShadowRunnerGame({
       score: hud.score,
       coinsCollected: hud.coins,
       totalCoins: hud.totalCoins,
+      enemiesDefeated: hud.enemiesDefeated,
+      totalEnemies: hud.totalEnemies,
     })
-  }, [hud.coins, hud.defeated, hud.score, hud.totalCoins, levelId, onLevelComplete])
+  }, [hud.coins, hud.defeated, hud.enemiesDefeated, hud.score, hud.totalCoins, hud.totalEnemies, levelId, onLevelComplete])
 
   React.useEffect(() => {
     const game = gameRef.current
@@ -736,6 +745,17 @@ export function ShadowRunnerGame({
             />
             <span>{Math.ceil(hud.boostRemainingMs / 1000)}s</span>
             {hud.boostGuardCharges > 0 && <span className="text-[#f8e8ad]">Guard {hud.boostGuardCharges}</span>}
+          </div>
+        )}
+
+        {hud.shieldActive && (
+          <div
+            aria-label={`Shield ward ${Math.ceil(hud.shieldRemainingMs / 1000)} seconds remaining`}
+            className="pointer-events-none mx-auto mt-1 flex h-7 w-fit items-center gap-1.5 rounded border border-[#8ad7ff]/45 bg-[#07121c]/78 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#bdeaff] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
+          >
+            <span>Shield</span>
+            <span>{Math.ceil(hud.shieldRemainingMs / 1000)}s</span>
+            {hud.shieldGuardCharges > 0 && <span className="text-[#f8e8ad]">Guard {hud.shieldGuardCharges}</span>}
           </div>
         )}
 

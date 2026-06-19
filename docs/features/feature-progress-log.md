@@ -20,7 +20,7 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
 - Branch: `main`
 - Current checkpoint: direct Shadow Runner entry without an access-code gate,
   campaign level-map progression, reusable level configs, Level 1 through
-  Level 4 prototype routes, and mobile landscape/orientation handling.
+  Level 5 prototype routes, and mobile landscape/orientation handling.
 - Roadmap: [`docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md`](C:/repos/chat2.0/docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md:1)
 - Latest pass, 2026-06-09: generated dedicated options-scroll and options-row
   button assets; removed title back/sound controls; added title Options and
@@ -113,6 +113,22 @@ multiple checkpoints. Keep entries concise, factual, and tied to verification.
   Archives` as the current hardest available route; and wired catalog/completion
   triggers so future harder level releases recalculate and revoke stale knight
   medals through `public.users` realtime updates.
+- Latest pass, 2026-06-19: added playable Level 5 `Candle Fair Ruins` as the
+  longest and hardest route so far, using the Candle Fair background/props
+  sheet, Candle Jester enemies with short-range candle throws, multi-lane
+  offscreen archer volley zones, shield pickups, improved tilt-bridge fall-off
+  behavior, high-route fall damage, harder optional coin lines, and completion
+  reporting for enemy clears. Added a forward migration that marks Level 5 as
+  available and recalculates Shadow Runner knight medals against the new
+  hardest route.
+- Verification, 2026-06-19: removed eager `image.decode()` from Shadow Runner
+  preload to stabilize constrained landscape title loads, added direct
+  localhost entertainment preview entry for Shadow Runner QA, and verified
+  Level 5 with `npm run lint`, `npx tsc --noEmit -p tsconfig.app.json`,
+  `npm run build`, `npx jest --runInBand`, and installed-Chrome
+  production-preview smoke at `740x390` plus a `932x430` full flow covering
+  Level 5 start, tilt shortcut, shield pickup HUD, and completion dialog.
+  Evidence in `output/playwright/shadow-runner-level5-20260619/`.
 - Verification, 2026-06-11: `npm run lint`,
   `npx tsc --noEmit -p tsconfig.app.json`, and `npm run build` passed.
   WebKit mobile landscape captures verified the revised controls at `932x430`

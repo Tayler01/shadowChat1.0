@@ -1,4 +1,10 @@
-import type { ShadowRunnerBoostPickup, ShadowRunnerEnemyConfig, ShadowRunnerEnemyKind, ShadowRunnerLevelConfig } from './levels'
+import type {
+  ShadowRunnerBoostPickup,
+  ShadowRunnerEnemyConfig,
+  ShadowRunnerEnemyKind,
+  ShadowRunnerLevelConfig,
+  ShadowRunnerShieldPickup,
+} from './levels'
 
 export interface ShadowRunnerHudState {
   lives: number
@@ -17,6 +23,11 @@ export interface ShadowRunnerHudState {
   boostActive: boolean
   boostRemainingMs: number
   boostGuardCharges: number
+  shieldActive: boolean
+  shieldRemainingMs: number
+  shieldGuardCharges: number
+  enemiesDefeated: number
+  totalEnemies: number
   objective: string
   defeated: boolean
   outOfLives: boolean
@@ -50,6 +61,8 @@ export interface ShadowRunnerSimulationState {
     attackCooldownUntil: number
     boostActiveUntil: number
     boostGuardCharges: number
+    shieldActiveUntil: number
+    shieldGuardCharges: number
     lastDamagedAt: number
   }
   enemy: ShadowRunnerEnemyState
@@ -118,6 +131,8 @@ export function createInitialShadowRunnerSimulation(
       attackCooldownUntil: 0,
       boostActiveUntil: 0,
       boostGuardCharges: 0,
+      shieldActiveUntil: 0,
+      shieldGuardCharges: 0,
       lastDamagedAt: 0,
     },
     enemy: primaryEnemy,
@@ -144,6 +159,12 @@ export function getShadowRunnerHudState(
   const boostRemainingMs = rawBoostRemainingMs > 0
     ? Math.ceil(rawBoostRemainingMs / 1000) * 1000
     : 0
+  const rawShieldRemainingMs = Math.max(0, state.player.shieldActiveUntil - time)
+  const shieldRemainingMs = rawShieldRemainingMs > 0
+    ? Math.ceil(rawShieldRemainingMs / 1000) * 1000
+    : 0
+  const totalEnemies = state.enemies.length
+  const enemiesDefeated = state.enemies.filter(enemy => !enemy.alive).length
 
   return {
     lives: state.player.lives,
@@ -162,6 +183,11 @@ export function getShadowRunnerHudState(
     boostActive: boostRemainingMs > 0,
     boostRemainingMs,
     boostGuardCharges: state.player.boostGuardCharges,
+    shieldActive: shieldRemainingMs > 0,
+    shieldRemainingMs,
+    shieldGuardCharges: state.player.shieldGuardCharges,
+    enemiesDefeated,
+    totalEnemies,
     objective: state.objective,
     defeated: state.defeated,
     outOfLives: state.outOfLives,
@@ -172,7 +198,19 @@ export function isShadowRunnerBoostActive(state: ShadowRunnerSimulationState, ti
   return state.player.boostActiveUntil > time
 }
 
-export function damageShadowRunnerPlayer(state: ShadowRunnerSimulationState, time: number) {
+export function isShadowRunnerShieldActive(state: ShadowRunnerSimulationState, time: number) {
+  return state.player.shieldActiveUntil > time
+}
+
+export function blockShadowRunnerProjectileWithShield(state: ShadowRunnerSimulationState, time: number) {
+  if (!isShadowRunnerShieldActive(state, time) || state.player.shieldGuardCharges <= 0) return false
+
+  state.player.shieldGuardCharges -= 1
+  state.player.score += 10
+  return true
+}
+
+export function damageShadowRunnerPlayer(state: ShadowRunnerSimulationState, time: number, amount = 1) {
   if (time - state.player.lastDamagedAt < 820) return false
 
   state.player.lastDamagedAt = time
@@ -182,8 +220,9 @@ export function damageShadowRunnerPlayer(state: ShadowRunnerSimulationState, tim
     return true
   }
 
-  state.player.health = Math.max(0, state.player.health - 1)
-  state.player.score = Math.max(0, state.player.score - (isShadowRunnerBoostActive(state, time) ? 8 : 15))
+  const damageAmount = Math.max(1, Math.floor(amount))
+  state.player.health = Math.max(0, state.player.health - damageAmount)
+  state.player.score = Math.max(0, state.player.score - (isShadowRunnerBoostActive(state, time) ? 8 : 15) * damageAmount)
   return true
 }
 
@@ -244,4 +283,14 @@ export function collectShadowRunnerBoost(
   state.player.health = state.player.maxHealth
   state.player.boostActiveUntil = Math.max(state.player.boostActiveUntil, time) + (boost.durationMs ?? 8000)
   state.player.boostGuardCharges = Math.max(state.player.boostGuardCharges, boost.guardCharges ?? 2)
+}
+
+export function collectShadowRunnerShield(
+  state: ShadowRunnerSimulationState,
+  time: number,
+  shield: ShadowRunnerShieldPickup,
+) {
+  state.player.score += shield.scoreValue ?? 90
+  state.player.shieldActiveUntil = Math.max(state.player.shieldActiveUntil, time) + (shield.durationMs ?? 9000)
+  state.player.shieldGuardCharges = Math.max(state.player.shieldGuardCharges, shield.guardCharges ?? 4)
 }

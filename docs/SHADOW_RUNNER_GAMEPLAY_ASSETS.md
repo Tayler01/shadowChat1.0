@@ -30,6 +30,9 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
 | Moonheart Crest strip | `public/games/shadow-runner/level-assets/level-4/collectibles/moonheart-crest-4f-64.png` | High-value Level 4 boost pickup that restores health, raises attack damage, and grants temporary guard charges. |
 | Moonheart boost aura | `public/games/shadow-runner/level-assets/level-4/vfx/boost-aura-4f-128.png` | Animated aura shown around the hero while the Moonheart boost is active. |
 | Low-clearance archive platforms | `public/games/shadow-runner/level-assets/level-4/props/bell-tower-archives-props-hazards-v1-transparent.png` | Level 4 crawl-under slabs assembled from Bell Tower platform, shelf, and block frames with invisible overhead blockers. |
+| Candle Jester strip | `public/games/shadow-runner/sprites/strips/candle-jester-v1-5f-128.png` | Level 5 enemy strip with dance, candle-throw, hit, and defeated states. |
+| Candle Fair Ruins background | `public/games/shadow-runner/level-assets/level-5/background/candle-fair-ruins-background.webp` | Level 5 route backdrop. |
+| Candle Fair props/hazards sheet | `public/games/shadow-runner/level-assets/level-5/props/candle-fair-props-hazards-v1-transparent.png` | Level 5 platform, canopy, shelf, ward-token, and fairground prop source registered as Phaser terrain frames. |
 
 ## Generated Audio Assets
 
@@ -90,6 +93,11 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
   animation states, Tower Archer ranged attacks, collision-only micro-steps for
   optional top-route access, visible crawl-lane coins, and higher bonus coins
   above the low-clearance archive platforms.
+- Level 5 registers the generated Candle Fair props/hazards sheet, Candle Jester
+  animation states, short-range candle projectiles with temporary flame hazards,
+  shield pickups with a player aura/HUD guard count, reusable offscreen
+  multi-height archer volleys, fall-damage tracking, and tilt bridges that can
+  drop the player when they linger on the low edge.
 - Lobby music is enabled by default on title/lobby/map surfaces and is stopped
   automatically during gameplay; SFX remain enabled by default in both menus
   and gameplay unless the local Shadow Runner sound preference is disabled.

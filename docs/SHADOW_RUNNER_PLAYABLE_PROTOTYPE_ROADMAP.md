@@ -90,15 +90,22 @@ enemy, and reach a finish gate.
   low-clearance archive platforms, mixes Clockwork Sentries, Barrel Roller, Scroll Thieves, and
   Tower Archers, places coins on risky optional lines, and introduces the
   Moonheart Crest boost for temporary attack and damage-resistance pressure.
+- Level 5: Candle Fair Ruins is the new hardest route. It is significantly
+  longer than Bell Tower, combines old enemies with Candle Jesters, introduces
+  shield pickups for archer-fire gauntlets, uses multi-height offscreen volley
+  lanes, adds smoother tilt bridges that can dump the player, and adds high
+  routes where careless drops cause fall damage. Perfect-score runs require all
+  high/low coin lines plus every enemy clear.
 - Each map stop carries a route type, difficulty tier, difficulty label, and
   mechanic preview so future route design can stay ordered from simple to
   complex.
 - Later maps should add complexity step-by-step: faster moving/tilting
   platforms, pits or spikes around tilt bridges, more enemy variety,
   chase/timing pressure, hidden collectibles, and mixed mechanics.
-- Tilt bridges should eventually tilt far enough to dump the player off if
-  they wait too long or land poorly. That should be tuned as a gameplay pass,
-  not as an automated-test difficulty adjustment.
+- Tilt bridges now support tuned fall-through behavior when the player waits on
+  the low edge too long. Future levels should reuse that behavior and tune
+  bridge timing from playtest evidence rather than weakening route geometry for
+  automation.
 
 ## Verification Gates
 

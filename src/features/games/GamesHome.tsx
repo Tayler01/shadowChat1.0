@@ -50,6 +50,21 @@ function getLockableScreenOrientation() {
   return window.screen.orientation as LockableScreenOrientation | undefined
 }
 
+function readLocalPreviewEntertainment(): SelectedEntertainment {
+  if (typeof window === 'undefined') return null
+
+  const host = window.location.hostname
+  const isLocalHost = host === '127.0.0.1' || host === 'localhost'
+  if (!isLocalHost) return null
+
+  const localPreview = new URLSearchParams(window.location.search).get('localPreview')
+  if (localPreview === 'shadow-runner' || localPreview === 'shado-tv' || localPreview === 'shadow-mystery') {
+    return localPreview
+  }
+
+  return null
+}
+
 async function requestShadowRunnerLandscapeMode() {
   if (typeof window === 'undefined') return
 
@@ -90,7 +105,7 @@ function releaseShadowRunnerLandscapeMode() {
 }
 
 export function GamesHome({ currentView, onViewChange, onImmersiveChange }: GamesHomeProps) {
-  const [selectedEntertainment, setSelectedEntertainment] = useState<SelectedEntertainment>(null)
+  const [selectedEntertainment, setSelectedEntertainment] = useState<SelectedEntertainment>(() => readLocalPreviewEntertainment())
   const [musicPlaying, setMusicPlaying] = useState(false)
   const [audioBlocked, setAudioBlocked] = useState(false)
   const soundtrackRef = useRef<GameSoundtrackController | null>(null)

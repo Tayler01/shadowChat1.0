@@ -7,7 +7,7 @@ export interface ShadowRunnerRect {
   width: number
   height: number
   visualId?: string
-  terrainSet?: 'stone' | 'ivy' | 'bell'
+  terrainSet?: 'stone' | 'ivy' | 'bell' | 'candle'
   hidden?: boolean
 }
 
@@ -32,6 +32,12 @@ export interface ShadowRunnerBoostPickup extends ShadowRunnerPoint {
   guardCharges?: number
 }
 
+export interface ShadowRunnerShieldPickup extends ShadowRunnerPoint {
+  scoreValue?: number
+  durationMs?: number
+  guardCharges?: number
+}
+
 export interface ShadowRunnerCrouchGate extends ShadowRunnerRect {
   visualFrame?: number
   visualWidth?: number
@@ -39,7 +45,17 @@ export interface ShadowRunnerCrouchGate extends ShadowRunnerRect {
   visualOffsetY?: number
 }
 
-export type ShadowRunnerEnemyKind = 'clockwork-sentry' | 'barrel-roller' | 'scroll-thief' | 'tower-archer'
+export interface ShadowRunnerArrowVolley extends ShadowRunnerRect {
+  direction: 1 | -1
+  spawnX: number
+  laneY: number
+  intervalMs?: number
+  delayMs?: number
+  speed?: number
+  lifetimeMs?: number
+}
+
+export type ShadowRunnerEnemyKind = 'clockwork-sentry' | 'barrel-roller' | 'scroll-thief' | 'tower-archer' | 'candle-jester'
 
 export interface ShadowRunnerEnemyConfig extends ShadowRunnerPoint {
   kind: ShadowRunnerEnemyKind
@@ -54,7 +70,7 @@ export interface ShadowRunnerEnemyConfig extends ShadowRunnerPoint {
   projectileSpeed?: number
 }
 
-export type ShadowRunnerPlayableLevelId = 'tutorial' | 'level-1' | 'level-2' | 'level-3' | 'level-4'
+export type ShadowRunnerPlayableLevelId = 'tutorial' | 'level-1' | 'level-2' | 'level-3' | 'level-4' | 'level-5'
 
 export interface ShadowRunnerLevelConfig {
   id: ShadowRunnerPlayableLevelId
@@ -74,6 +90,8 @@ export interface ShadowRunnerLevelConfig {
   spikes: ShadowRunnerRect[]
   coins: ShadowRunnerPoint[]
   boosts?: ShadowRunnerBoostPickup[]
+  shieldPickups?: ShadowRunnerShieldPickup[]
+  arrowVolleys?: ShadowRunnerArrowVolley[]
   enemy?: ShadowRunnerEnemyConfig
   enemies?: ShadowRunnerEnemyConfig[]
   finish: ShadowRunnerRect
@@ -594,6 +612,301 @@ export const SHADOW_RUNNER_LEVEL_FOUR: ShadowRunnerLevelConfig = {
   ],
 }
 
+export const SHADOW_RUNNER_LEVEL_FIVE: ShadowRunnerLevelConfig = {
+  id: 'level-5',
+  campaignLevel: 5,
+  title: 'Candle Fair Ruins',
+  subtitle: 'Campaign Route 5',
+  objective: 'Slip through the fair',
+  introLine: 'Shield up. Stay low. Pick coin risks.',
+  completionLine: 'Candle Fair cleared. The ruined route is yours.',
+  backgroundAsset: SHADOW_RUNNER_ASSETS.levels.candleFairBackground,
+  worldWidth: 8900,
+  worldHeight: 720,
+  playerStart: { id: 'start', x: 118, y: 552 },
+  enemies: [
+    {
+      id: 'fair-start-sentry',
+      kind: 'clockwork-sentry',
+      x: 1160,
+      y: 548,
+      health: 4,
+      maxHealth: 4,
+      patrolLeft: 1058,
+      patrolRight: 1264,
+      direction: -1,
+      patrolSpeed: 98,
+    },
+    {
+      id: 'fair-bridge-barrel',
+      kind: 'barrel-roller',
+      x: 1650,
+      y: 548,
+      health: 3,
+      maxHealth: 3,
+      patrolLeft: 1535,
+      patrolRight: 1855,
+      direction: 1,
+      patrolSpeed: 174,
+    },
+    {
+      id: 'fair-offscreen-archer-a',
+      kind: 'tower-archer',
+      x: 3168,
+      y: 512,
+      health: 4,
+      maxHealth: 4,
+      patrolLeft: 3128,
+      patrolRight: 3210,
+      direction: -1,
+      patrolSpeed: 0,
+      attackRange: 720,
+      attackCooldownMs: 1060,
+      projectileSpeed: 500,
+    },
+    {
+      id: 'fair-candle-jester-a',
+      kind: 'candle-jester',
+      x: 3565,
+      y: 548,
+      health: 3,
+      maxHealth: 3,
+      patrolLeft: 3380,
+      patrolRight: 3738,
+      direction: -1,
+      patrolSpeed: 92,
+      attackRange: 390,
+      attackCooldownMs: 1160,
+      projectileSpeed: 320,
+    },
+    {
+      id: 'fair-scroll-thief-a',
+      kind: 'scroll-thief',
+      x: 3990,
+      y: 548,
+      health: 3,
+      maxHealth: 3,
+      patrolLeft: 3860,
+      patrolRight: 4200,
+      direction: 1,
+      patrolSpeed: 186,
+    },
+    {
+      id: 'fair-candle-jester-b',
+      kind: 'candle-jester',
+      x: 4518,
+      y: 430,
+      health: 3,
+      maxHealth: 3,
+      patrolLeft: 4385,
+      patrolRight: 4668,
+      direction: -1,
+      patrolSpeed: 88,
+      attackRange: 360,
+      attackCooldownMs: 1040,
+      projectileSpeed: 335,
+    },
+    {
+      id: 'fair-high-archer',
+      kind: 'tower-archer',
+      x: 5246,
+      y: 168,
+      health: 4,
+      maxHealth: 4,
+      patrolLeft: 5200,
+      patrolRight: 5300,
+      direction: -1,
+      patrolSpeed: 0,
+      attackRange: 820,
+      attackCooldownMs: 1040,
+      projectileSpeed: 500,
+    },
+    {
+      id: 'fair-low-barrel',
+      kind: 'barrel-roller',
+      x: 5845,
+      y: 560,
+      health: 4,
+      maxHealth: 4,
+      patrolLeft: 5712,
+      patrolRight: 6058,
+      direction: 1,
+      patrolSpeed: 188,
+    },
+    {
+      id: 'fair-candle-jester-c',
+      kind: 'candle-jester',
+      x: 6498,
+      y: 548,
+      health: 4,
+      maxHealth: 4,
+      patrolLeft: 6350,
+      patrolRight: 6718,
+      direction: -1,
+      patrolSpeed: 94,
+      attackRange: 420,
+      attackCooldownMs: 980,
+      projectileSpeed: 350,
+    },
+    {
+      id: 'fair-gauntlet-archer',
+      kind: 'tower-archer',
+      x: 7468,
+      y: 472,
+      health: 4,
+      maxHealth: 4,
+      patrolLeft: 7418,
+      patrolRight: 7522,
+      direction: -1,
+      patrolSpeed: 0,
+      attackRange: 860,
+      attackCooldownMs: 980,
+      projectileSpeed: 530,
+    },
+    {
+      id: 'fair-final-sentry',
+      kind: 'clockwork-sentry',
+      x: 8248,
+      y: 548,
+      health: 5,
+      maxHealth: 5,
+      patrolLeft: 8116,
+      patrolRight: 8378,
+      direction: 1,
+      patrolSpeed: 106,
+    },
+    {
+      id: 'fair-final-thief',
+      kind: 'scroll-thief',
+      x: 8544,
+      y: 548,
+      health: 3,
+      maxHealth: 3,
+      patrolLeft: 8430,
+      patrolRight: 8665,
+      direction: -1,
+      patrolSpeed: 198,
+    },
+  ],
+  finish: { id: 'fair-east-gate', x: 8752, y: 414, width: 74, height: 150 },
+  platforms: [
+    { id: 'fair-start-stage', visualId: 'candle-wide-stage', x: 0, y: 584, width: 518, height: 86, terrainSet: 'candle' },
+    { id: 'fair-first-crouch-floor', visualId: 'candle-wide-stage', x: 560, y: 584, width: 430, height: 86, terrainSet: 'candle' },
+    { id: 'fair-hidden-crouch-step-a', x: 594, y: 512, width: 58, height: 12, hidden: true },
+    { id: 'fair-crouch-top-cache-a', visualId: 'candle-lintel', x: 664, y: 420, width: 244, height: 40, terrainSet: 'candle' },
+    { id: 'fair-sentry-rubble', visualId: 'candle-rubble-floor', x: 1050, y: 584, width: 248, height: 70, terrainSet: 'candle' },
+    { id: 'fair-bridge-entry', visualId: 'candle-small-plank', x: 1540, y: 584, width: 338, height: 70, terrainSet: 'candle' },
+    { id: 'fair-shield-table-a', visualId: 'candle-high-shelf', x: 1908, y: 520, width: 184, height: 42, terrainSet: 'candle' },
+    { id: 'fair-volley-floor-a', visualId: 'candle-wide-stage', x: 2050, y: 584, width: 290, height: 76, terrainSet: 'candle' },
+    { id: 'fair-volley-pocket-low', visualId: 'candle-lintel', x: 2390, y: 584, width: 260, height: 70, terrainSet: 'candle' },
+    { id: 'fair-volley-pocket-high', visualId: 'candle-high-shelf', x: 2598, y: 396, width: 184, height: 42, terrainSet: 'candle' },
+    { id: 'fair-archer-perch-a', visualId: 'candle-hanging-shelf', x: 3084, y: 546, width: 240, height: 54, terrainSet: 'candle' },
+    { id: 'fair-jester-floor-a', visualId: 'candle-wide-stage', x: 3370, y: 584, width: 430, height: 76, terrainSet: 'candle' },
+    { id: 'fair-thief-floor-a', visualId: 'candle-rubble-floor', x: 3845, y: 584, width: 392, height: 70, terrainSet: 'candle' },
+    { id: 'fair-candle-platform-a', visualId: 'candle-high-shelf', x: 4375, y: 466, width: 316, height: 52, terrainSet: 'candle' },
+    { id: 'fair-high-step-a', visualId: 'candle-small-plank', x: 4720, y: 462, width: 172, height: 40, terrainSet: 'candle' },
+    { id: 'fair-high-step-b', visualId: 'candle-small-plank', x: 4948, y: 332, width: 172, height: 40, terrainSet: 'candle' },
+    { id: 'fair-high-archer-perch', visualId: 'candle-hanging-shelf', x: 5178, y: 204, width: 228, height: 44, terrainSet: 'candle' },
+    { id: 'fair-high-step-c', visualId: 'candle-small-plank', x: 5488, y: 314, width: 178, height: 40, terrainSet: 'candle' },
+    { id: 'fair-high-drop-floor', visualId: 'candle-rubble-floor', x: 5700, y: 596, width: 394, height: 72, terrainSet: 'candle' },
+    { id: 'fair-shield-table-b', visualId: 'candle-high-shelf', x: 6190, y: 520, width: 184, height: 42, terrainSet: 'candle' },
+    { id: 'fair-gauntlet-floor-a', visualId: 'candle-wide-stage', x: 6336, y: 584, width: 388, height: 76, terrainSet: 'candle' },
+    { id: 'fair-gauntlet-pocket-low', visualId: 'candle-lintel', x: 6812, y: 584, width: 250, height: 72, terrainSet: 'candle' },
+    { id: 'fair-gauntlet-pocket-high', visualId: 'candle-high-shelf', x: 7040, y: 386, width: 194, height: 42, terrainSet: 'candle' },
+    { id: 'fair-gauntlet-archer-perch', visualId: 'candle-hanging-shelf', x: 7388, y: 508, width: 258, height: 52, terrainSet: 'candle' },
+    { id: 'fair-final-entry', visualId: 'candle-rubble-floor', x: 7860, y: 584, width: 246, height: 72, terrainSet: 'candle' },
+    { id: 'fair-final-floor', visualId: 'candle-wide-stage', x: 8148, y: 584, width: 484, height: 76, terrainSet: 'candle' },
+    { id: 'fair-final-gate-floor', visualId: 'candle-wide-stage', x: 8660, y: 584, width: 240, height: 76, terrainSet: 'candle' },
+  ],
+  tiltPlatforms: [
+    { id: 'fair-tilt-bridge-a', x: 1324, y: 516, width: 162, height: 28, visualHeight: 52, visualOffsetY: -12, wobbleDurationMs: 640, wobbleRotation: 0.21, slideForce: 1900, maxSlideSpeed: 270 },
+    { id: 'fair-high-tilt', x: 5338, y: 276, width: 150, height: 28, visualHeight: 50, visualOffsetY: -12, wobbleDurationMs: 610, wobbleRotation: 0.22, slideForce: 1980, maxSlideSpeed: 292 },
+    { id: 'fair-final-tilt', x: 7688, y: 492, width: 154, height: 28, visualHeight: 50, visualOffsetY: -12, wobbleDurationMs: 580, wobbleRotation: 0.235, slideForce: 2080, maxSlideSpeed: 310 },
+  ],
+  crouchGates: [
+    { id: 'fair-low-canopy-a', x: 642, y: 414, width: 284, height: 116, terrainSet: 'candle' },
+    { id: 'fair-volley-low-cover-a', x: 2436, y: 424, width: 180, height: 106, terrainSet: 'candle' },
+    { id: 'fair-gauntlet-low-cover-a', x: 6856, y: 424, width: 164, height: 106, terrainSet: 'candle' },
+  ],
+  spikes: [
+    { id: 'fair-start-pit', x: 1000, y: 612, width: 72, height: 28 },
+    { id: 'fair-tilt-pit-a', x: 1288, y: 612, width: 72, height: 28 },
+    { id: 'fair-tilt-pit-b', x: 1490, y: 612, width: 58, height: 28 },
+    { id: 'fair-volley-spikes-a', x: 2342, y: 612, width: 46, height: 28 },
+    { id: 'fair-jester-spikes-a', x: 3798, y: 610, width: 48, height: 28 },
+    { id: 'fair-high-drop-spikes-a', x: 5660, y: 628, width: 42, height: 28 },
+    { id: 'fair-gauntlet-spikes-a', x: 6728, y: 610, width: 82, height: 28 },
+    { id: 'fair-gauntlet-spikes-b', x: 7240, y: 610, width: 74, height: 28 },
+    { id: 'fair-final-tilt-spikes-a', x: 7612, y: 612, width: 72, height: 28 },
+    { id: 'fair-final-tilt-spikes-b', x: 7856, y: 612, width: 74, height: 28 },
+    { id: 'fair-final-spikes', x: 8634, y: 610, width: 38, height: 28 },
+  ],
+  coins: [
+    { id: 'coin-1', x: 304, y: 496 },
+    { id: 'coin-2', x: 610, y: 548 },
+    { id: 'coin-3', x: 742, y: 548 },
+    { id: 'coin-4', x: 810, y: 360 },
+    { id: 'coin-5', x: 906, y: 360 },
+    { id: 'coin-6', x: 1136, y: 496 },
+    { id: 'coin-7', x: 1398, y: 440 },
+    { id: 'coin-8', x: 1668, y: 496 },
+    { id: 'coin-9', x: 1928, y: 458 },
+    { id: 'coin-10', x: 2158, y: 500 },
+    { id: 'coin-11', x: 2468, y: 548 },
+    { id: 'coin-12', x: 2688, y: 334 },
+    { id: 'coin-13', x: 2772, y: 334 },
+    { id: 'coin-14', x: 3138, y: 468 },
+    { id: 'coin-15', x: 3470, y: 498 },
+    { id: 'coin-16', x: 3684, y: 498 },
+    { id: 'coin-17', x: 3982, y: 500 },
+    { id: 'coin-18', x: 4194, y: 500 },
+    { id: 'coin-19', x: 4460, y: 404 },
+    { id: 'coin-20', x: 4658, y: 404 },
+    { id: 'coin-21', x: 4808, y: 398 },
+    { id: 'coin-22', x: 5032, y: 268 },
+    { id: 'coin-23', x: 5244, y: 134 },
+    { id: 'coin-24', x: 5386, y: 220 },
+    { id: 'coin-25', x: 5570, y: 252 },
+    { id: 'coin-26', x: 5818, y: 512 },
+    { id: 'coin-27', x: 6036, y: 512 },
+    { id: 'coin-28', x: 6208, y: 458 },
+    { id: 'coin-29', x: 6446, y: 498 },
+    { id: 'coin-30', x: 6672, y: 498 },
+    { id: 'coin-31', x: 6908, y: 548 },
+    { id: 'coin-32', x: 7114, y: 324 },
+    { id: 'coin-33', x: 7212, y: 324 },
+    { id: 'coin-34', x: 7468, y: 430 },
+    { id: 'coin-35', x: 7752, y: 426 },
+    { id: 'coin-36', x: 8024, y: 500 },
+    { id: 'coin-37', x: 8224, y: 500 },
+    { id: 'coin-38', x: 8378, y: 500 },
+    { id: 'coin-39', x: 8560, y: 496 },
+    { id: 'coin-40', x: 8718, y: 496 },
+    { id: 'coin-41', x: 706, y: 300 },
+    { id: 'coin-42', x: 744, y: 270 },
+    { id: 'coin-43', x: 782, y: 300 },
+    { id: 'coin-44', x: 5284, y: 92 },
+  ],
+  boosts: [
+    { id: 'moonheart-crest-high-fair', x: 5286, y: 130, scoreValue: 175, durationMs: 9200, guardCharges: 2 },
+  ],
+  shieldPickups: [
+    { id: 'candle-ward-first-volley', x: 1986, y: 460, scoreValue: 90, durationMs: 9500, guardCharges: 5 },
+    { id: 'candle-ward-gauntlet', x: 6266, y: 460, scoreValue: 95, durationMs: 10200, guardCharges: 6 },
+    { id: 'candle-ward-final-bridge', x: 7918, y: 520, scoreValue: 85, durationMs: 7600, guardCharges: 4 },
+  ],
+  arrowVolleys: [
+    { id: 'fair-volley-a-head', x: 1940, y: 184, width: 1180, height: 392, direction: -1, spawnX: 3240, laneY: 448, intervalMs: 1180, delayMs: 0, speed: 520, lifetimeMs: 3400 },
+    { id: 'fair-volley-a-crouch', x: 1940, y: 184, width: 1180, height: 392, direction: -1, spawnX: 3240, laneY: 514, intervalMs: 1420, delayMs: 420, speed: 500, lifetimeMs: 3400 },
+    { id: 'fair-volley-a-jump', x: 1940, y: 184, width: 1180, height: 392, direction: -1, spawnX: 3240, laneY: 332, intervalMs: 1560, delayMs: 760, speed: 545, lifetimeMs: 3400 },
+    { id: 'fair-volley-a-high', x: 2260, y: 160, width: 760, height: 330, direction: -1, spawnX: 3240, laneY: 270, intervalMs: 1840, delayMs: 1040, speed: 560, lifetimeMs: 3200 },
+    { id: 'fair-volley-b-head', x: 6240, y: 188, width: 1260, height: 396, direction: -1, spawnX: 7580, laneY: 438, intervalMs: 980, delayMs: 180, speed: 560, lifetimeMs: 3600 },
+    { id: 'fair-volley-b-crouch', x: 6240, y: 188, width: 1260, height: 396, direction: -1, spawnX: 7580, laneY: 514, intervalMs: 1240, delayMs: 560, speed: 540, lifetimeMs: 3600 },
+    { id: 'fair-volley-b-jump', x: 6240, y: 188, width: 1260, height: 396, direction: -1, spawnX: 7580, laneY: 316, intervalMs: 1320, delayMs: 900, speed: 585, lifetimeMs: 3600 },
+    { id: 'fair-volley-b-high', x: 6760, y: 150, width: 740, height: 338, direction: -1, spawnX: 7580, laneY: 252, intervalMs: 1540, delayMs: 1220, speed: 600, lifetimeMs: 3400 },
+  ],
+}
+
 export function getShadowRunnerLevelEnemies(level: ShadowRunnerLevelConfig) {
   return level.enemies ?? (level.enemy ? [level.enemy] : [])
 }
@@ -604,6 +917,7 @@ export const SHADOW_RUNNER_LEVEL_CONFIGS: Record<ShadowRunnerPlayableLevelId, Sh
   'level-2': SHADOW_RUNNER_LEVEL_TWO,
   'level-3': SHADOW_RUNNER_LEVEL_THREE,
   'level-4': SHADOW_RUNNER_LEVEL_FOUR,
+  'level-5': SHADOW_RUNNER_LEVEL_FIVE,
 }
 
 export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
@@ -671,10 +985,11 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     difficultyTier: 5,
     difficultyLabel: 'Trick Hazards',
     routeType: 'Fairground Route',
-    mechanicPreview: 'Fake pickups, candle traps, jester tricks',
+    mechanicPreview: 'Shielded archer volleys, Candle Jesters, fall-risk high routes',
     thumbnail: SHADOW_RUNNER_ASSETS.levels.candleFairThumbnail320,
     locationButton: SHADOW_RUNNER_ASSETS.levels.candleFairLocationButton,
     mapPosition: { left: 77, top: 25 },
+    playableLevelId: 'level-5',
   },
   {
     id: 'level-6',
