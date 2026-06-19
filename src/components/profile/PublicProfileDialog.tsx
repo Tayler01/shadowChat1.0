@@ -477,7 +477,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                               >
                                 <div className="flex items-center gap-3">
                                   <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[rgba(215,170,70,0.22)] bg-[rgba(255,255,255,0.045)] shadow-[inset_0_0_18px_rgba(215,170,70,0.08)]">
-                                    {medal.renderIcon('h-9 w-9 [&_svg]:h-8 [&_svg]:w-8')}
+                                    {medal.renderIcon('h-9 w-9', 'detail')}
                                   </span>
                                   <span className="min-w-0 flex-1">
                                     <span className="block text-sm font-semibold leading-5 text-[var(--text-primary)]">

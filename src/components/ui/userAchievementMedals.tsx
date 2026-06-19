@@ -8,6 +8,7 @@ import {
   shouldShowLegacyAchievementBadges,
   type AchievementBadgeUser,
 } from '../../lib/achievementBadges'
+import type { AchievementMedalIconVariant } from '../../lib/achievementMedalAssets'
 import { GoldEasterEggBadge } from './GoldEasterEggBadge'
 
 export interface UserAchievementMedal {
@@ -15,7 +16,7 @@ export interface UserAchievementMedal {
   name: string
   detail: string
   earnedText: string
-  renderIcon: (className?: string) => ReactNode
+  renderIcon: (className?: string, variant?: AchievementMedalIconVariant) => ReactNode
 }
 
 interface UserAchievementMedalDefinition extends UserAchievementMedal {
@@ -31,7 +32,7 @@ const ACHIEVEMENT_MEDAL_DEFINITIONS: UserAchievementMedalDefinition[] = [
     earnedText: 'Earned by holding the top Shadow Checkers champion slot.',
     legacy: true,
     isActive: user => user.checkers_crown,
-    renderIcon: className => <CheckersCrownBadge active className={className} />,
+    renderIcon: (className, variant) => <CheckersCrownBadge active className={className} variant={variant} />,
   },
   {
     key: 'shadow-war-sword',
@@ -40,7 +41,7 @@ const ACHIEVEMENT_MEDAL_DEFINITIONS: UserAchievementMedalDefinition[] = [
     earnedText: 'Earned by holding the top Shadow War champion slot.',
     legacy: true,
     isActive: user => user.war_sword,
-    renderIcon: className => <ShadowWarSwordBadge active className={className} />,
+    renderIcon: (className, variant) => <ShadowWarSwordBadge active className={className} variant={variant} />,
   },
   {
     key: 'shadow-pin-gold-pin',
@@ -49,7 +50,7 @@ const ACHIEVEMENT_MEDAL_DEFINITIONS: UserAchievementMedalDefinition[] = [
     earnedText: 'Earned by leading the hidden ShadowPin activity score.',
     legacy: true,
     isActive: user => user.shadow_pin_gold_pin,
-    renderIcon: className => <ShadowPinGoldPinBadge active className={className} />,
+    renderIcon: (className, variant) => <ShadowPinGoldPinBadge active className={className} variant={variant} />,
   },
   {
     key: 'shadow-runner-sprint',
@@ -57,7 +58,7 @@ const ACHIEVEMENT_MEDAL_DEFINITIONS: UserAchievementMedalDefinition[] = [
     detail: 'Shadow Runner tutorial completion medal.',
     earnedText: 'Earned by completing the tutorial route.',
     isActive: user => user.shadow_runner_sprint_medal,
-    renderIcon: className => <ShadowRunnerSprintBadge active className={className} />,
+    renderIcon: (className, variant) => <ShadowRunnerSprintBadge active className={className} variant={variant} />,
   },
   {
     key: 'shadow-runner-knight',
@@ -65,7 +66,7 @@ const ACHIEVEMENT_MEDAL_DEFINITIONS: UserAchievementMedalDefinition[] = [
     detail: 'Hardest-route Shadow Runner medal.',
     earnedText: 'Earned by completing the currently hardest available campaign route.',
     isActive: user => user.shadow_runner_knight_medal,
-    renderIcon: className => <ShadowRunnerKnightBadge active className={className} />,
+    renderIcon: (className, variant) => <ShadowRunnerKnightBadge active className={className} variant={variant} />,
   },
   {
     key: 'golden-egg',
@@ -73,7 +74,7 @@ const ACHIEVEMENT_MEDAL_DEFINITIONS: UserAchievementMedalDefinition[] = [
     detail: 'Permanent discovery medal.',
     earnedText: 'Earned by finding the mobile-only golden egg.',
     isActive: user => user.gold_easter_egg,
-    renderIcon: className => <GoldEasterEggBadge active className={className} />,
+    renderIcon: (className, variant) => <GoldEasterEggBadge active className={className} variant={variant} />,
   },
 ]
 

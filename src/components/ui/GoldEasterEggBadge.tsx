@@ -1,12 +1,13 @@
 import { cn } from '../../lib/utils'
-import { GOLD_EASTER_EGG_BADGE_SRC } from '../easter-egg/goldEggAssets'
+import { ACHIEVEMENT_MEDAL_ASSETS, type AchievementMedalIconVariant } from '../../lib/achievementMedalAssets'
 
 interface GoldEasterEggBadgeProps {
   active?: boolean | null
   className?: string
+  variant?: AchievementMedalIconVariant
 }
 
-export function GoldEasterEggBadge({ active, className }: GoldEasterEggBadgeProps) {
+export function GoldEasterEggBadge({ active, className, variant = 'inline' }: GoldEasterEggBadgeProps) {
   if (!active) return null
 
   return (
@@ -19,7 +20,7 @@ export function GoldEasterEggBadge({ active, className }: GoldEasterEggBadgeProp
       aria-label="Golden egg found"
     >
       <img
-        src={GOLD_EASTER_EGG_BADGE_SRC}
+        src={ACHIEVEMENT_MEDAL_ASSETS.goldenEgg[variant]}
         alt=""
         aria-hidden="true"
         draggable={false}

@@ -1,12 +1,13 @@
-import { CHECKERS_CROWN_BADGE } from '../assets/manifest'
 import { cn } from '../../../../lib/utils'
+import { ACHIEVEMENT_MEDAL_ASSETS, type AchievementMedalIconVariant } from '../../../../lib/achievementMedalAssets'
 
 interface CheckersCrownBadgeProps {
   active?: boolean | null
   className?: string
+  variant?: AchievementMedalIconVariant
 }
 
-export function CheckersCrownBadge({ active, className }: CheckersCrownBadgeProps) {
+export function CheckersCrownBadge({ active, className, variant = 'inline' }: CheckersCrownBadgeProps) {
   if (!active) return null
 
   return (
@@ -15,7 +16,13 @@ export function CheckersCrownBadge({ active, className }: CheckersCrownBadgeProp
       title="Shadow Checkers champion"
       aria-label="Shadow Checkers champion"
     >
-      <img src={CHECKERS_CROWN_BADGE} alt="" className="h-full w-full" />
+      <img
+        src={ACHIEVEMENT_MEDAL_ASSETS.checkersCrown[variant]}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        className="h-full w-full select-none object-contain"
+      />
     </span>
   )
 }

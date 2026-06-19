@@ -1,12 +1,13 @@
-import { SHADOW_WAR_SWORD_BADGE } from '../assets/manifest'
 import { cn } from '../../../../lib/utils'
+import { ACHIEVEMENT_MEDAL_ASSETS, type AchievementMedalIconVariant } from '../../../../lib/achievementMedalAssets'
 
 interface ShadowWarSwordBadgeProps {
   active?: boolean | null
   className?: string
+  variant?: AchievementMedalIconVariant
 }
 
-export function ShadowWarSwordBadge({ active, className }: ShadowWarSwordBadgeProps) {
+export function ShadowWarSwordBadge({ active, className, variant = 'inline' }: ShadowWarSwordBadgeProps) {
   if (!active) return null
 
   return (
@@ -15,7 +16,13 @@ export function ShadowWarSwordBadge({ active, className }: ShadowWarSwordBadgePr
       title="Shadow War champion"
       aria-label="Shadow War champion"
     >
-      <img src={SHADOW_WAR_SWORD_BADGE} alt="" className="h-full w-full" />
+      <img
+        src={ACHIEVEMENT_MEDAL_ASSETS.shadowWarSword[variant]}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        className="h-full w-full select-none object-contain"
+      />
     </span>
   )
 }

@@ -15,7 +15,7 @@ export function UserAchievementBadges({ user, className }: UserAchievementBadges
     <>
       {medals.map(medal => (
         <span key={medal.key} className="inline-flex">
-          {medal.renderIcon(className)}
+          {medal.renderIcon(className, 'inline')}
         </span>
       ))}
     </>

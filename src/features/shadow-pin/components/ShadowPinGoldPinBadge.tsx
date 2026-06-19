@@ -1,12 +1,13 @@
-import { Pin } from 'lucide-react'
 import { cn } from '../../../lib/utils'
+import { ACHIEVEMENT_MEDAL_ASSETS, type AchievementMedalIconVariant } from '../../../lib/achievementMedalAssets'
 
 interface ShadowPinGoldPinBadgeProps {
   active?: boolean | null
   className?: string
+  variant?: AchievementMedalIconVariant
 }
 
-export function ShadowPinGoldPinBadge({ active, className }: ShadowPinGoldPinBadgeProps) {
+export function ShadowPinGoldPinBadge({ active, className, variant = 'inline' }: ShadowPinGoldPinBadgeProps) {
   if (!active) return null
 
   return (
@@ -18,7 +19,13 @@ export function ShadowPinGoldPinBadge({ active, className }: ShadowPinGoldPinBad
       title="Shadow Pin top scorer"
       aria-label="Shadow Pin top scorer"
     >
-      <Pin className="h-3.5 w-3.5 -rotate-12 fill-[var(--theme-accent)] stroke-[2.4]" />
+      <img
+        src={ACHIEVEMENT_MEDAL_ASSETS.shadowPinGoldPin[variant]}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        className="h-full w-full select-none object-contain"
+      />
     </span>
   )
 }

@@ -1,12 +1,13 @@
-import { SHADOW_RUNNER_ASSETS } from '../assets/manifest'
 import { cn } from '../../../../lib/utils'
+import { ACHIEVEMENT_MEDAL_ASSETS, type AchievementMedalIconVariant } from '../../../../lib/achievementMedalAssets'
 
 interface ShadowRunnerSprintBadgeProps {
   active?: boolean | null
   className?: string
+  variant?: AchievementMedalIconVariant
 }
 
-export function ShadowRunnerSprintBadge({ active, className }: ShadowRunnerSprintBadgeProps) {
+export function ShadowRunnerSprintBadge({ active, className, variant = 'inline' }: ShadowRunnerSprintBadgeProps) {
   if (!active) return null
 
   return (
@@ -15,7 +16,13 @@ export function ShadowRunnerSprintBadge({ active, className }: ShadowRunnerSprin
       title="Shadow Runner runner"
       aria-label="Shadow Runner runner"
     >
-      <img src={SHADOW_RUNNER_ASSETS.badges.sprintTransparent} alt="" className="h-full w-full" />
+      <img
+        src={ACHIEVEMENT_MEDAL_ASSETS.shadowRunnerSprint[variant]}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        className="h-full w-full select-none object-contain"
+      />
     </span>
   )
 }
