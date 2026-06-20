@@ -305,6 +305,10 @@ Dedicated current QA scripts also include:
   canvas is blank or required HUD/touch controls are missing. Pass
   `-- --level=level-5 --profiles=landscape,android` for a multi-phone Level 5
   run.
+- `qa:shadow-runner:level5`: named Level 5 phone smoke. It opens Candle Fair
+  Ruins from the campaign map, verifies the Level 5 detail copy, confirms the
+  active gameplay intro copy, and runs the same canvas/HUD/touch-control checks
+  on both the landscape iPhone-sized and Android-sized phone profiles.
 - `bridge:tui:test` and `bridge:tui:smoke`: bridge TUI layout and live serial smoke paths.
 
 ### General Chat Scroll Probe

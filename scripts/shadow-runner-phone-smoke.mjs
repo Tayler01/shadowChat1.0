@@ -39,6 +39,15 @@ const LEVELS = {
   'level-5': {
     title: 'Candle Fair Ruins',
     completedLevels: ['tutorial', 'level-1', 'level-2', 'level-3', 'level-4'],
+    detailChecks: [
+      /Level 5/i,
+      /Trick Hazards/i,
+      /Shielded archer volleys/i,
+      /Candle Jesters/i,
+    ],
+    gameplayChecks: [
+      /Shield up\. Stay low\. Pick coin risks\./i,
+    ],
   },
 }
 
@@ -122,10 +131,14 @@ try {
   process.exitCode = 1
 } finally {
   if (browser) {
-    await browser.close().catch(() => {})
+    await withTimeout(browser.close(), 5_000, 'Browser cleanup').catch(error => {
+      logLine(error.message)
+    })
   }
   if (previewServer?.cleanup) {
-    await previewServer.cleanup()
+    await withTimeout(previewServer.cleanup(), 5_000, 'Preview cleanup').catch(error => {
+      logLine(error.message)
+    })
   }
 }
 
@@ -169,6 +182,7 @@ async function runLandscapeProfile(browserInstance, profile) {
       await capture(page, `${profile.label}-02-map.png`)
       await page.getByRole('button', { name: new RegExp(`${escapeRegExp(level.title)} details`, 'i') }).click()
       await page.getByText(level.title).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+      await assertLevelDetails(page, level, profile)
       await capture(page, `${profile.label}-03-level-details.png`)
       await page.getByRole('button', { name: /^(Start|Replay)$/i }).click()
     }
@@ -181,6 +195,7 @@ async function runLandscapeProfile(browserInstance, profile) {
     await delay(650)
 
     const gameplayPath = await capture(page, `${profile.label}-04-gameplay.png`)
+    await assertActiveGameplay(page, level, profile)
     await assertCanvasVisible(page, profile)
     await assertHudAndControls(page, profile)
     await assertImageNonBlank(gameplayPath, `${profile.label} gameplay screenshot`)
@@ -192,6 +207,30 @@ async function runLandscapeProfile(browserInstance, profile) {
   } finally {
     await context.close().catch(() => {})
   }
+}
+
+async function assertLevelDetails(page, level, profile) {
+  if (!level.detailChecks?.length) return
+
+  const pageText = await page.locator('body').innerText({ timeout: DEFAULT_TIMEOUT_MS })
+  for (const pattern of level.detailChecks) {
+    assert(pattern.test(pageText), `${profile.label}: missing Level 5 detail text matching ${pattern}`)
+  }
+  record(`${profile.label} ${config.levelId} detail copy visible`, {
+    checks: level.detailChecks.map(pattern => pattern.source),
+  })
+}
+
+async function assertActiveGameplay(page, level, profile) {
+  if (!level.gameplayChecks?.length) return
+
+  const pageText = await page.locator('body').innerText({ timeout: DEFAULT_TIMEOUT_MS })
+  for (const pattern of level.gameplayChecks) {
+    assert(pattern.test(pageText), `${profile.label}: missing Level 5 gameplay text matching ${pattern}`)
+  }
+  record(`${profile.label} ${config.levelId} gameplay copy visible`, {
+    checks: level.gameplayChecks.map(pattern => pattern.source),
+  })
 }
 
 async function assertLandscapeReady(page, profile) {
@@ -371,15 +410,34 @@ async function stopChildProcess(child) {
   if (process.platform === 'win32' && taskKillCommand && child.pid) {
     await new Promise(resolve => {
       const killer = spawn(taskKillCommand, ['/pid', String(child.pid), '/T', '/F'], {
+        shell: false,
         stdio: 'ignore',
       })
-      killer.on('exit', resolve)
-      killer.on('error', resolve)
+      killer.on('exit', () => resolve())
+      killer.on('error', () => resolve())
     })
     return
   }
 
   child.kill('SIGTERM')
+  await new Promise(resolve => {
+    child.on('exit', () => resolve())
+    setTimeout(resolve, 2_000)
+  })
+}
+
+async function withTimeout(promise, timeoutMs, label) {
+  let timer = null
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
 }
 
 function attachDiagnostics(page, logPath, label) {
