@@ -43,6 +43,29 @@ The queue remains the human gate in that loop. It records approval intent and
 review artifacts, but it should not hide failed tests, start builds, push code,
 or mutate production state without an explicit approval step.
 
+## Daily Scan Packet Submitter
+
+The submitter is available through:
+
+```powershell
+npm run automation:submit-daily-scan -- --input output/daily-scan.json --dry-run --json
+npm run automation:submit-daily-scan -- --input output/daily-scan.json --apply
+```
+
+It accepts either the original normalized `winners[]` file or the richer daily
+scan category output. For category output, each category must include exactly one
+panel-decided winner via fields such as `panelDecision.winner`,
+`panelDecidedWinner`, `panelWinnerId`, or `selectedCandidateId`, plus a candidate
+list such as `topFive`, `top5`, `topCandidates`, `candidates`, or
+`rankedCandidates`. The submitter resolves the winner from the category-local
+candidate list and then emits the existing `automation_approval_packets` insert
+shape, including panel arguments and the rejected tempting candidate in metadata
+and review markdown.
+
+Default mode is dry-run. Use `--apply` only from trusted local/server-side
+automation with service-role credentials, and only after the scan has asked
+Tayler to approve the five winners as a batch.
+
 ## Backend Surface
 
 Main tables:

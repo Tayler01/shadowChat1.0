@@ -12,6 +12,8 @@ const usage = `Usage:
   npm run automation:submit-daily-scan -- --input path/to/winners.json --apply
 
 Input shape:
+  Either normalized winners:
+
   {
     "runId": "shadowchat-daily-improvement-scan-2026-06-17",
     "scanDate": "2026-06-17",
@@ -26,6 +28,21 @@ Input shape:
         "proposedScope": "...",
         "verificationPlan": "...",
         "generatedPrompt": "..."
+      }
+    ]
+  }
+
+  Or daily scan category output:
+
+  {
+    "runId": "shadowchat-daily-improvement-scan-2026-06-17",
+    "scanDate": "2026-06-17",
+    "categories": [
+      {
+        "category": "security/auth/RLS/secrets",
+        "topFive": [{ "candidateId": "SEC-001", "title": "..." }],
+        "panelDecision": { "winner": "SEC-001", "arguments": ["..."] },
+        "rejectedTemptingCandidate": { "candidateId": "SEC-003", "title": "..." }
       }
     ]
   }`
@@ -98,6 +115,164 @@ const normalizeEvidence = (value) => {
     .filter(Boolean)
 }
 
+const normalizeTextList = (value) => {
+  if (!Array.isArray(value)) return []
+  return value
+    .map(item => {
+      if (typeof item === 'string') return item.trim()
+      if (item && typeof item === 'object') {
+        const stance = asString(item.stance ?? item.reviewer ?? item.name)
+        const argument = asString(item.argument ?? item.summary ?? item.position ?? item.reason)
+        return [stance, argument].filter(Boolean).join(': ')
+      }
+      return ''
+    })
+    .filter(Boolean)
+}
+
+const normalizeCandidateId = value => asString(value).toLowerCase()
+
+const getCandidateId = value => asString(
+  value?.candidateId ??
+  value?.candidate_id ??
+  value?.id ??
+  value?.candidate ??
+  value?.winnerId ??
+  value?.winner_id,
+)
+
+const getCandidateCollections = category => [
+  category?.topFive,
+  category?.top5,
+  category?.topCandidates,
+  category?.candidates,
+  category?.rankedCandidates,
+  category?.ranked_candidates,
+].find(Array.isArray) ?? []
+
+const getPanelDecision = category => (
+  category?.panelDecision ??
+  category?.panel_decision ??
+  category?.panel ??
+  category?.decision ??
+  {}
+)
+
+const getWinnerReference = (category, decision) => (
+  category?.panelDecidedWinner ??
+  category?.panel_decided_winner ??
+  category?.panelWinner ??
+  category?.panel_winner ??
+  category?.winner ??
+  category?.selectedWinner ??
+  category?.selected_winner ??
+  category?.selectedCandidate ??
+  category?.selected_candidate ??
+  category?.winnerId ??
+  category?.winner_id ??
+  category?.panelWinnerId ??
+  category?.panel_winner_id ??
+  category?.panelDecidedWinnerId ??
+  category?.panel_decided_winner_id ??
+  category?.selectedCandidateId ??
+  category?.selected_candidate_id ??
+  decision?.winner ??
+  decision?.winnerId ??
+  decision?.winner_id ??
+  decision?.candidateId ??
+  decision?.candidate_id ??
+  decision?.candidate
+)
+
+const getPanelArguments = (category, decision) => normalizeTextList(
+  decision?.arguments ??
+  decision?.panelArguments ??
+  decision?.panel_arguments ??
+  category?.panelArguments ??
+  category?.panel_arguments ??
+  category?.panelReview ??
+  category?.panel_review,
+)
+
+const findCandidateByReference = (candidates, reference) => {
+  const referenceId = typeof reference === 'object' ? getCandidateId(reference) : asString(reference)
+  const normalizedReferenceId = normalizeCandidateId(referenceId)
+  if (!normalizedReferenceId) return null
+
+  return candidates.find(candidate => normalizeCandidateId(getCandidateId(candidate)) === normalizedReferenceId) ?? null
+}
+
+const mergeWinnerWithCandidate = (winnerReference, matchedCandidate, categoryName, category, decision) => {
+  const winnerObject = winnerReference && typeof winnerReference === 'object' ? winnerReference : {}
+  const winner = {
+    ...(matchedCandidate ?? {}),
+    ...winnerObject,
+  }
+
+  const candidateId = getCandidateId(winner)
+  if (!candidateId) {
+    throw new Error(`Category ${categoryName} is missing a panel-decided winner candidateId`)
+  }
+
+  return {
+    ...winner,
+    candidateId,
+    category: winner.category ?? categoryName,
+    panelArguments: getPanelArguments(category, decision),
+    panelDecisionSummary: asString(
+      decision?.summary ??
+      decision?.reason ??
+      decision?.rationale ??
+      category?.panelDecisionSummary ??
+      category?.panel_decision_summary,
+    ),
+    rejectedTemptingCandidate: category?.rejectedTemptingCandidate ?? category?.rejected_tempting_candidate ?? category?.temptingReject ?? category?.tempting_reject ?? null,
+    sourceCandidateCount: getCandidateCollections(category).length,
+  }
+}
+
+const getCategoryEntries = input => {
+  const rawCategories = input?.categories ?? input?.categoryResults ?? input?.category_results ?? input?.results
+  if (Array.isArray(rawCategories)) return rawCategories
+  if (rawCategories && typeof rawCategories === 'object') {
+    return Object.entries(rawCategories).map(([category, value]) => ({
+      category,
+      ...(value && typeof value === 'object' ? value : { winner: value }),
+    }))
+  }
+  return []
+}
+
+const buildWinnersFromScanOutput = input => {
+  const categories = getCategoryEntries(input)
+  if (!categories.length) return []
+
+  return categories.map((category, index) => {
+    const categoryName = asString(category?.category ?? category?.name ?? category?.title, `category-${index + 1}`)
+    const candidates = getCandidateCollections(category)
+    const decision = getPanelDecision(category)
+    const winnerReference = getWinnerReference(category, decision)
+    const matchedCandidate = findCandidateByReference(candidates, winnerReference)
+
+    if (!winnerReference) {
+      throw new Error(`Category ${categoryName} is missing a panel-decided winner`)
+    }
+
+    if (typeof winnerReference !== 'object' && !matchedCandidate) {
+      throw new Error(`Category ${categoryName} panel winner ${winnerReference} was not found in the candidate list`)
+    }
+
+    return mergeWinnerWithCandidate(winnerReference, matchedCandidate, categoryName, category, decision)
+  })
+}
+
+const normalizeDailyScanInput = input => ({
+  runId: asString(input?.runId ?? input?.run_id, 'shadowchat-daily-improvement-scan'),
+  scanDate: asString(input?.scanDate ?? input?.scan_date, new Date().toISOString().slice(0, 10)),
+  winners: Array.isArray(input?.winners) ? input.winners : buildWinnersFromScanOutput(input),
+  sourceFormat: Array.isArray(input?.winners) ? 'winners' : 'daily-scan-output',
+})
+
 const makeSourceKey = ({ runId, scanDate, winner, index }) => {
   const raw = [
     'daily-scan',
@@ -109,16 +284,33 @@ const makeSourceKey = ({ runId, scanDate, winner, index }) => {
   return raw.slice(0, MAX_SOURCE_KEY_LENGTH)
 }
 
+const formatMarkdownList = (items, fallback) => {
+  if (!items.length) return fallback
+  return items.map(item => `- ${typeof item === 'string' ? item : JSON.stringify(item)}`).join('\n')
+}
+
 const makeReviewMarkdown = ({ runId, scanDate, winner }) => [
   `# ${asString(winner.title)}`,
   '',
-  `- Candidate: ${asString(winner.candidateId, 'Unspecified')}`,
+  `- Candidate: ${asString(winner.candidateId ?? winner.candidate_id, 'Unspecified')}`,
   `- Category: ${asString(winner.category, 'Unspecified')}`,
   `- Scan date: ${asString(scanDate, 'Unspecified')}`,
   `- Run: ${asString(runId, 'Unspecified')}`,
   '',
   '## Summary',
   asString(winner.summary, 'No summary supplied.'),
+  '',
+  '## Evidence',
+  formatMarkdownList(normalizeEvidence(winner.evidence), 'No evidence supplied.'),
+  '',
+  '## Panel Arguments',
+  formatMarkdownList(normalizeTextList(winner.panelArguments ?? winner.panel_arguments), 'No panel arguments supplied.'),
+  '',
+  '## Rejected Tempting Candidate',
+  winner.rejectedTemptingCandidate ? JSON.stringify(winner.rejectedTemptingCandidate, null, 2) : 'No rejected candidate supplied.',
+  '',
+  '## Risk Notes',
+  asString(winner.riskNotes ?? winner.risk_notes, 'No risk notes supplied.'),
   '',
   '## Proposed Scope',
   asString(winner.proposedScope ?? winner.proposed_scope, 'No proposed scope supplied.'),
@@ -128,9 +320,7 @@ const makeReviewMarkdown = ({ runId, scanDate, winner }) => [
 ].join('\n')
 
 export const buildDailyScanApprovalPackets = (input) => {
-  const runId = asString(input?.runId, 'shadowchat-daily-improvement-scan')
-  const scanDate = asString(input?.scanDate, new Date().toISOString().slice(0, 10))
-  const winners = Array.isArray(input?.winners) ? input.winners : []
+  const { runId, scanDate, winners, sourceFormat } = normalizeDailyScanInput(input)
 
   if (winners.length !== REQUIRED_WINNER_COUNT) {
     throw new Error(`Expected exactly ${REQUIRED_WINNER_COUNT} winners, received ${winners.length}`)
@@ -172,8 +362,13 @@ export const buildDailyScanApprovalPackets = (input) => {
         automationId: 'shadowchat-daily-improvement-scan',
         runId,
         scanDate,
+        sourceFormat,
         winnerIndex: index + 1,
         categoryWinner: true,
+        panelDecisionSummary: truncate(winner?.panelDecisionSummary ?? winner?.panel_decision_summary, 4000),
+        panelArguments: normalizeTextList(winner?.panelArguments ?? winner?.panel_arguments),
+        rejectedTemptingCandidate: winner?.rejectedTemptingCandidate ?? winner?.rejected_tempting_candidate ?? null,
+        sourceCandidateCount: Number.isFinite(winner?.sourceCandidateCount) ? winner.sourceCandidateCount : null,
       },
     }
   })
