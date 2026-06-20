@@ -224,14 +224,39 @@ export type BridgeUserProfile = {
   chat_color?: string | null
   status?: string | null
   status_message?: string | null
+  dm_discoverable?: boolean | null
 }
 
 export const normalizeUserReference = (value: unknown) =>
   normalizeText(value).replace(/^@+/, '').trim()
 
+const userHasBridgeDmConversation = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  requesterUserId: string,
+  targetUserId: string,
+) => {
+  const participants = [requesterUserId, targetUserId].sort()
+  const { data, error } = await supabase
+    .from('dm_conversations')
+    .select('id')
+    .contains('participants', participants)
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    throw error
+  }
+
+  return Boolean(data?.id)
+}
+
 export const resolveBridgeUserReference = async (
   supabase: ReturnType<typeof getSupabaseAdmin>,
   userReference: string,
+  options: {
+    requesterUserId?: string
+    allowExistingConversation?: boolean
+  } = {},
 ) => {
   const normalized = normalizeUserReference(userReference)
 
@@ -241,7 +266,7 @@ export const resolveBridgeUserReference = async (
 
   let query = supabase
     .from('users')
-    .select('id, username, display_name, full_name, avatar_url, color, chat_color, status, status_message')
+    .select('id, username, display_name, full_name, avatar_url, color, chat_color, status, status_message, dm_discoverable')
 
   if (UUID_PATTERN.test(normalized)) {
     query = query.eq('id', normalized)
@@ -265,7 +290,18 @@ export const resolveBridgeUserReference = async (
     return { error: conflict(`User '${userReference}' matched more than one account`) }
   }
 
-  return { user: matches[0] }
+  const user = matches[0]
+  if (user.dm_discoverable === false) {
+    const canUseExistingConversation = options.requesterUserId &&
+      options.allowExistingConversation &&
+      await userHasBridgeDmConversation(supabase, options.requesterUserId, user.id)
+
+    if (!canUseExistingConversation) {
+      return { error: notFound(`User '${userReference}' was not found`) }
+    }
+  }
+
+  return { user }
 }
 
 export const searchBridgeUsers = async (
@@ -282,7 +318,8 @@ export const searchBridgeUsers = async (
   const safeLimit = Math.min(Math.max(limit, 1), 20)
   const { data, error } = await supabase
     .from('users')
-    .select('id, username, display_name, full_name, avatar_url, color, chat_color, status, status_message')
+    .select('id, username, display_name, full_name, avatar_url, color, chat_color, status, status_message, dm_discoverable')
+    .eq('dm_discoverable', true)
     .or(`username.ilike.%${normalized}%,display_name.ilike.%${normalized}%,full_name.ilike.%${normalized}%`)
     .order('username', { ascending: true })
     .limit(safeLimit)

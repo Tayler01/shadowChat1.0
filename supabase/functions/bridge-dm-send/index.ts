@@ -100,7 +100,10 @@ serve(async req => {
     }
 
     const supabase = getSupabaseAdmin()
-    const resolvedRecipient = await resolveBridgeUserReference(supabase, recipientUserReference)
+    const resolvedRecipient = await resolveBridgeUserReference(supabase, recipientUserReference, {
+      requesterUserId: bridgeAuth.auth.userId,
+      allowExistingConversation: true,
+    })
     if ('error' in resolvedRecipient) {
       return resolvedRecipient.error
     }

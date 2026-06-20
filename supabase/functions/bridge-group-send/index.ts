@@ -79,6 +79,18 @@ serve(async req => {
     }
 
     const supabase = getSupabaseAdmin()
+    const { data: banned, error: banError } = await supabase.rpc('is_user_channel_banned', {
+      target_user_id: bridgeAuth.auth.userId,
+      scope: 'general_chat',
+    })
+
+    if (banError) {
+      throw banError
+    }
+
+    if (banned) {
+      return json({ error: 'Bridge user cannot send to General Chat while banned from General Chat.' }, 403)
+    }
 
     const { data: message, error: insertError } = await supabase
       .from('messages')
