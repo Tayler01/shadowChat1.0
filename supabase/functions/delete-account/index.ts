@@ -120,21 +120,19 @@ serve(async req => {
     }
 
     const userId = authData.user.id
-    const { data: profile, error: profileError } = await supabase
-      .from('users')
-      .select('admin_role')
-      .eq('id', userId)
-      .maybeSingle()
+    const { data: isFullAdmin, error: adminRoleError } = await supabase.rpc('is_app_admin', {
+      target_user_id: userId,
+    })
 
-    if (profileError) {
-      throw profileError
+    if (adminRoleError) {
+      throw adminRoleError
     }
 
-    if (profile?.admin_role === 'admin') {
+    if (isFullAdmin) {
       const { count, error: adminCountError } = await supabase
-        .from('users')
-        .select('id', { count: 'exact', head: true })
-        .eq('admin_role', 'admin')
+        .from('user_roles')
+        .select('user_id', { count: 'exact', head: true })
+        .eq('role', 'admin')
 
       if (adminCountError) {
         throw adminCountError
