@@ -25,6 +25,7 @@
     "qa:shadow-war:core": "node scripts/shadow-war-db-smoke.mjs --skip-queue",
     "qa:shadow-war:visual": "node scripts/shadow-war-visual-playtest.mjs",
     "qa:shadow-checkers": "node scripts/shadow-checkers-db-smoke.mjs",
+    "qa:shadow-runner": "node scripts/shadow-runner-phone-smoke.mjs",
     "news:scrape:proof": "node services/news-scraper/src/index.mjs --proof",
     "news:scraper": "node services/news-scraper/src/index.mjs",
     "bridge:tui": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1",

@@ -298,13 +298,13 @@ Dedicated current QA scripts also include:
 - `qa:shadow-war`, `qa:shadow-war:core`, `qa:shadow-war:visual`, and `qa:shadow-checkers`: game-specific smoke coverage.
 - `shadow-runner:audio`: regenerates the original Shadow Runner WAV sound
   effects through `scripts/generate-shadow-runner-audio.mjs`.
-- Shadow Runner does not yet have a package-script smoke alias. Use focused
-  one-off Playwright/Chrome mobile checks for now and save artifacts under
-  `output/playwright/<run-name>/`; the June 15 passes used `740x390` and
-  `932x430` landscape mobile viewports for title/options, campaign map, level
-  detail, playable Levels 1-4, Bell Tower low-clearance traversal, Moonheart
-  boost state, tap-toggle crouch, route completion, audio behavior, Android
-  fullscreen/landscape request behavior, and the removed access-code gate.
+- `qa:shadow-runner`: focused Playwright/Chrome phone smoke for Shadow Runner.
+  The script uses the local Entertainment preview bypass, starts or reuses a
+  preview server, opens a landscape phone viewport, captures title/gameplay
+  artifacts under `output/playwright/<run-name>/`, and fails if the Phaser
+  canvas is blank or required HUD/touch controls are missing. Pass
+  `-- --level=level-5 --profiles=landscape,android` for a multi-phone Level 5
+  run.
 - `bridge:tui:test` and `bridge:tui:smoke`: bridge TUI layout and live serial smoke paths.
 
 ### General Chat Scroll Probe
