@@ -182,6 +182,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   const [windowModeOverride, setWindowModeOverride] = useState<WindowModeOverride | null>(null)
   const [deepLinkStatus, setDeepLinkStatus] = useState<DeepLinkStatus>(initialMessageId ? 'resolving' : 'none')
   const [cursorWindowResolving, setCursorWindowResolving] = useState(false)
+  const [messageStackPresented, setMessageStackPresented] = useState(false)
   const { cursor, loading: cursorLoading, markRead } = useReadCursor(readCursorSurface, readCursorScope, Boolean(profile?.id))
 
   const messageMap = useMemo(() => {
@@ -433,6 +434,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   }, [handleUnreadScroll, hasActiveScrollTarget, requestOlderMessages, revealNewerLoadedMessages])
 
   useEffect(() => {
+    setMessageStackPresented(false)
     initialTargetJumpDoneRef.current = null
     deepLinkInFlightRef.current = null
     deepLinkFetchRef.current = null
@@ -680,12 +682,29 @@ export const MessageList: React.FC<MessageListProps> = ({
       : initialMessageId && deepLinkStatus !== 'none' && deepLinkStatus !== 'settled'
       ? 'targetingDeepLink'
       : feedState)
-  const hideMessageStackForInitialPosition = combinedMessages.length > 0 && (
-    windowMode === 'reconnectReconciling' ||
-    windowMode === 'resolvingInitial' ||
+  const isInitialTargetPositioning = (
+    Boolean(initialMessageId && deepLinkStatus !== 'targetUnavailable' && deepLinkStatus !== 'settled') ||
     windowMode === 'targetingFirstUnread' ||
     windowMode === 'targetingDeepLink'
   )
+  const hideMessageStackForInitialPosition = (
+    combinedMessages.length > 0 &&
+    !messageStackPresented &&
+    isInitialTargetPositioning
+  )
+
+  useEffect(() => {
+    if (combinedMessages.length === 0) {
+      if (messageStackPresented) {
+        setMessageStackPresented(false)
+      }
+      return
+    }
+
+    if (!hideMessageStackForInitialPosition && !messageStackPresented) {
+      setMessageStackPresented(true)
+    }
+  }, [combinedMessages.length, hideMessageStackForInitialPosition, messageStackPresented])
 
   const eagerAvatarMessageIds = useMemo(() => (
     new Set(renderedMessages.slice(-12).map(message => message.id))

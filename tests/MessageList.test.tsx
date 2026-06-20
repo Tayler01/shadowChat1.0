@@ -14,6 +14,7 @@ const mockMarkLatestRead = jest.fn()
 const mockUnreadState = {
   autoScroll: true,
   firstUnreadMessageId: null as string | null,
+  feedState: null as string | null,
 }
 
 jest.mock('framer-motion', () => ({
@@ -48,7 +49,7 @@ jest.mock('../src/hooks/useUnreadScroll', () => ({
 mockUseUnreadScroll.mockImplementation(() => ({
   autoScroll: mockUnreadState.autoScroll,
   firstUnreadMessageId: mockUnreadState.firstUnreadMessageId,
-  feedState: mockUnreadState.autoScroll ? 'bottomPinned' : 'userScrolledUp',
+  feedState: mockUnreadState.feedState ?? (mockUnreadState.autoScroll ? 'bottomPinned' : 'userScrolledUp'),
   targetMessageId: mockUnreadState.firstUnreadMessageId,
   lastObservedMessageId: mockUnreadState.firstUnreadMessageId,
   lastFlushedMessageId: null,
@@ -129,6 +130,7 @@ describe('MessageList mobile keyboard layout', () => {
   beforeEach(() => {
     mockUnreadState.autoScroll = true
     mockUnreadState.firstUnreadMessageId = null
+    mockUnreadState.feedState = null
     mockUseUnreadScroll.mockClear()
     mockScrollToBottom.mockClear()
     mockHandleUnreadScroll.mockClear()
@@ -195,7 +197,7 @@ describe('MessageList mobile keyboard layout', () => {
     expect(screen.getByText('A tiny group chat thread')).toBeInTheDocument()
   })
 
-  it('keeps cached messages mounted inside the scroll container while a refresh is loading', () => {
+  it('keeps cached messages visible inside the scroll container while a refresh is loading', () => {
     mockUseMessages.mockReturnValue({
       messages: [message],
       loading: true,
@@ -211,10 +213,87 @@ describe('MessageList mobile keyboard layout', () => {
     renderMessageList()
 
     expect(screen.getByTestId('message-scroll')).toBeInTheDocument()
-    expect(screen.getByTestId('message-stack')).toHaveAttribute('data-initial-position-pending', 'true')
-    expect(screen.getByTestId('message-stack')).toHaveClass('invisible')
+    expect(screen.getByTestId('message-stack')).toHaveAttribute('data-initial-position-pending', 'false')
+    expect(screen.getByTestId('message-stack')).not.toHaveClass('invisible')
     expect(screen.getByText('A tiny group chat thread')).toBeInTheDocument()
     expect(screen.queryByText('Loading the conversation...')).not.toBeInTheDocument()
+  })
+
+  it('does not blank an already presented feed if unread targeting reappears after a new message', async () => {
+    let currentMessages = [makeMessage(0), makeMessage(1)]
+    const setMessagesMock = () => {
+      mockUseMessages.mockReturnValue({
+        messages: currentMessages,
+        loading: false,
+        editMessage: jest.fn(),
+        deleteMessage: jest.fn(),
+        togglePin: jest.fn(),
+        toggleReaction: jest.fn(),
+        loadOlderMessages: jest.fn(),
+        loadingMore: false,
+        hasMore: false,
+      })
+    }
+
+    setMessagesMock()
+    const { rerender } = renderMessageList()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('message-stack')).toHaveAttribute('data-initial-position-pending', 'false')
+    })
+    expect(screen.getByTestId('message-stack')).not.toHaveClass('invisible')
+
+    mockUnreadState.autoScroll = false
+    mockUnreadState.firstUnreadMessageId = 'm2'
+    mockUnreadState.feedState = 'targetingFirstUnread'
+    currentMessages = [...currentMessages, makeMessage(2)]
+    setMessagesMock()
+    rerender(messageListElement())
+
+    expect(screen.getByText('Message 2')).toBeInTheDocument()
+    expect(screen.getByTestId('message-stack')).toHaveAttribute('data-initial-position-pending', 'false')
+    expect(screen.getByTestId('message-stack')).not.toHaveClass('invisible')
+  })
+
+  it('can still defer the first paint while resolving an initial unread target', () => {
+    mockUnreadState.autoScroll = false
+    mockUnreadState.firstUnreadMessageId = 'm0'
+    mockUnreadState.feedState = 'targetingFirstUnread'
+    mockUseMessages.mockReturnValue({
+      messages: [makeMessage(0), makeMessage(1)],
+      loading: false,
+      editMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      togglePin: jest.fn(),
+      toggleReaction: jest.fn(),
+      loadOlderMessages: jest.fn(),
+      loadingMore: false,
+      hasMore: false,
+    })
+
+    renderMessageList()
+
+    expect(screen.getByTestId('message-stack')).toHaveAttribute('data-initial-position-pending', 'true')
+    expect(screen.getByTestId('message-stack')).toHaveClass('invisible')
+  })
+
+  it('can still defer the first paint while resolving a deep-link target', () => {
+    mockUseMessages.mockReturnValue({
+      messages: [makeMessage(0), makeMessage(1)],
+      loading: true,
+      editMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      togglePin: jest.fn(),
+      toggleReaction: jest.fn(),
+      loadOlderMessages: jest.fn(),
+      loadingMore: false,
+      hasMore: false,
+    })
+
+    renderMessageList({ initialMessageId: 'm0' })
+
+    expect(screen.getByTestId('message-stack')).toHaveAttribute('data-initial-position-pending', 'true')
+    expect(screen.getByTestId('message-stack')).toHaveClass('invisible')
   })
 
   it('delegates scroll state to the unread-scroll hook without loading history from raw scroll math', () => {
