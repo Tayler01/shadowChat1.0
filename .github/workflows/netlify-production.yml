@@ -61,9 +61,6 @@ jobs:
         with:
           version: 2.109.1
 
-      - name: Install dependencies
-        run: npm ci
-
       - name: Verify deploy secrets
         run: |
           test -n "$NETLIFY_AUTH_TOKEN" || { echo "NETLIFY_AUTH_TOKEN is not configured."; exit 1; }
@@ -77,6 +74,15 @@ jobs:
             echo "SUPABASE_ACCESS_TOKEN is not a valid newline-free Supabase personal access token."
             exit 1
           }
+
+      - name: Link production Supabase
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Preview production migrations
+        run: supabase db push --linked --dry-run --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Write app build metadata
         run: |
@@ -106,12 +112,6 @@ jobs:
 
       - name: Verify app build metadata
         run: node scripts/verify-app-build-metadata.mjs
-
-      - name: Link production Supabase
-        run: supabase link --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD"
-
-      - name: Preview production migrations
-        run: supabase db push --linked --dry-run --password "$SUPABASE_DB_PASSWORD"
 
       - name: Apply production migrations
         run: supabase db push --linked --yes --password "$SUPABASE_DB_PASSWORD"
