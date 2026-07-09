@@ -39,8 +39,11 @@ handlers before their error contracts are reviewed.
 - `codeql.yml`: JavaScript/TypeScript CodeQL on PRs, main, and weekly.
 - `security-scans.yml`: full-history redacted gitleaks plus Trivy filesystem and
   configuration scans; high/critical findings fail.
-- `.github/dependabot.yml`: grouped weekly npm, worker, Actions, and Docker
-updates. Dependabot never receives deployment secrets.
+- `.github/dependabot.yml`: the npm, worker, Actions, and Docker update scopes
+  remain documented, but scheduled update PR creation is disabled with
+  `open-pull-requests-limit: 0` to enforce the repository's main-only branch
+  policy. Dependency audits and vulnerability scans remain release gates;
+  reviewed updates are applied directly to `main` in tested batches.
 
 On `main`, the production workflow calls Quality, Security Scans, and CodeQL as
 reusable workflows and cannot enter the credentialed deploy job until every job
@@ -57,6 +60,15 @@ Netlify preview first validates PR code with no secrets. Preview deployment is
 available only for same-repository, non-Dependabot PRs through the protected
 `netlify-preview` GitHub Environment. Configure required reviewers before
 adding Netlify secrets. Never use `pull_request_target` to run PR code.
+
+## Main-only repository policy
+
+Production history lives on `main`. Do not leave feature, automation, or
+dependency-update branches behind after their commits are integrated or
+discarded. The production workflow is the release authority: every push to
+`main` must pass Quality, Security Scans, CodeQL, Supabase parity, and the
+Netlify deploy before it is considered shipped. Re-enable scheduled update PRs
+only if the repository deliberately returns to a review-branch workflow.
 
 ## Supabase staging parity
 

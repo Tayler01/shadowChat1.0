@@ -73,6 +73,10 @@ jobs:
           test -n "$SUPABASE_ACCESS_TOKEN" || { echo "SUPABASE_ACCESS_TOKEN is not configured."; exit 1; }
           test -n "$SUPABASE_DB_PASSWORD" || { echo "SUPABASE_DB_PASSWORD is not configured."; exit 1; }
           test -n "$SUPABASE_PROJECT_ID" || { echo "SUPABASE_PROJECT_ID is not configured."; exit 1; }
+          [[ "$SUPABASE_ACCESS_TOKEN" =~ ^sbp_(oauth_)?[a-f0-9]{40}$ ]] || {
+            echo "SUPABASE_ACCESS_TOKEN is not a valid newline-free Supabase personal access token."
+            exit 1
+          }
 
       - name: Write app build metadata
         run: |

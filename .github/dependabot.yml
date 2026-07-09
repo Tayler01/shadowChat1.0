@@ -1,4 +1,8 @@
 version: 2
+# ShadowChat uses a main-only release policy. Keep Dependabot configuration in
+# place for future reactivation, but do not let scheduled updates create branch
+# and pull-request drift. Dependency audits, Trivy, and CodeQL remain enforced
+# by the main production workflow.
 updates:
   - package-ecosystem: npm
     directory: /
@@ -12,7 +16,7 @@ updates:
       development-minor-patch:
         dependency-type: development
         update-types: [minor, patch]
-    open-pull-requests-limit: 8
+    open-pull-requests-limit: 0
   - package-ecosystem: npm
     directory: /services/news-scraper
     schedule:
@@ -21,7 +25,7 @@ updates:
     groups:
       worker-minor-patch:
         update-types: [minor, patch]
-    open-pull-requests-limit: 4
+    open-pull-requests-limit: 0
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -30,10 +34,10 @@ updates:
     groups:
       actions-minor-patch:
         update-types: [minor, patch]
-    open-pull-requests-limit: 4
+    open-pull-requests-limit: 0
   - package-ecosystem: docker
     directory: /services/news-scraper
     schedule:
       interval: weekly
       day: monday
-    open-pull-requests-limit: 4
+    open-pull-requests-limit: 0
