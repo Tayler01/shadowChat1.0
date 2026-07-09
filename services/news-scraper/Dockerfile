@@ -7,4 +7,7 @@ RUN npm ci --omit=dev
 
 COPY services/news-scraper/src ./src
 
+RUN chown -R pwuser:pwuser /app
+USER pwuser
+
 CMD ["node", "src/index.mjs"]
