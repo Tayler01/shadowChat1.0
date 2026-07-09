@@ -7,6 +7,10 @@ const source = readFileSync(
 )
 
 const compactSource = source.replace(/\s+/g, ' ').toLowerCase()
+const compactConfig = readFileSync(
+  path.join(process.cwd(), 'supabase/config.toml'),
+  'utf8'
+).replace(/\s+/g, ' ').toLowerCase()
 
 describe('openai-chat postToChat policy contract', () => {
   it('checks General Chat bans before privileged Shado message inserts', () => {
@@ -37,5 +41,9 @@ describe('openai-chat postToChat policy contract', () => {
     expect(validationIndex).toBeGreaterThan(-1)
     expect(requestIndex).toBeGreaterThan(-1)
     expect(validationIndex).toBeLessThan(requestIndex)
+  })
+
+  it('declares the manual JWT validation contract in Supabase config', () => {
+    expect(compactConfig).toContain('[functions.openai-chat] verify_jwt = false')
   })
 })

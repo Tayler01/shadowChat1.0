@@ -45,6 +45,12 @@ describe('admin role authority contract', () => {
     expect(authorityCleanupSql).toContain("message_author_role.role in ('admin', 'sub_admin')")
     expect(authorityCleanupSql).not.toContain('select users.admin_role')
     expect(authorityCleanupSql).not.toContain('message_author.admin_role')
+    expect(authorityCleanupSql).toContain(
+      'revoke all on function public.set_user_channel_bans(uuid, text[], integer, text) from public, anon, authenticated'
+    )
+    expect(authorityCleanupSql).toContain(
+      'grant execute on function public.set_user_channel_bans(uuid, text[], integer, text) to authenticated'
+    )
 
     expect(deleteAccountSource).toContain("supabase.rpc('is_app_admin'")
     expect(deleteAccountSource).toContain("from('user_roles')")

@@ -34,6 +34,11 @@ uri = "pg-functions://postgres/public/hook_validate_signup_invite"
 enroll_enabled = true
 verify_enabled = true
 
+# openai-chat validates the caller token itself before any provider or
+# service-role action so postToChat policy checks run in one code path.
+[functions.openai-chat]
+verify_jwt = false
+
 # Bridge functions perform their own endpoint-level authentication:
 # - device bootstrap endpoints use device id, pairing code, and bridge token checks
 # - user approval/revoke endpoints validate the caller's Supabase user token in code

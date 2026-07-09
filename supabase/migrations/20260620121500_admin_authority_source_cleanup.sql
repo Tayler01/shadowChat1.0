@@ -197,6 +197,11 @@ BEGIN
 END;
 $$;
 
+REVOKE ALL ON FUNCTION public.set_user_channel_bans(uuid, text[], integer, text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.set_user_channel_bans(uuid, text[], integer, text)
+  TO authenticated;
+
 DROP POLICY IF EXISTS "Users can delete own or moderate non-admin messages" ON public.messages;
 
 CREATE POLICY "Users can delete own or moderate non-admin messages"
