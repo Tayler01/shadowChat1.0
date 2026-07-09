@@ -132,7 +132,7 @@ jobs:
           supabase functions list --project-ref "$SUPABASE_PROJECT_ID" --output json > output/release-evidence/functions.json
 
       - name: Upload backend release evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: supabase-release-${{ github.sha }}
           path: output/release-evidence
