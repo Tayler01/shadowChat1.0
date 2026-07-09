@@ -74,7 +74,7 @@
     "tus-js-client": "^4.3.1"
   },
   "devDependencies": {
-    "@eslint/js": "^9.9.1",
+    "@eslint/js": "^10.0.1",
     "@remotion/cli": "^4.0.464",
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^14.2.1",
