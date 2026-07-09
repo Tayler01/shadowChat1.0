@@ -7,10 +7,6 @@ jest.mock('../src/hooks/useDirectMessages', () => ({
   useDirectMessages: () => ({ conversations: [] }),
 }))
 
-jest.mock('../src/hooks/useBoardBadges', () => ({
-  useBoardBadges: () => ({ count: 4, refresh: jest.fn(), markFeedSeen: jest.fn(), countsByBoard: {} }),
-}))
-
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => ({
     user: {
@@ -22,23 +18,35 @@ jest.mock('../src/hooks/useAuth', () => ({
   }),
 }))
 
-test('mobile navigation replaces profile with boards', () => {
+test('mobile navigation omits paused boards by default', () => {
   const onViewChange = jest.fn()
   render(<MobileNav currentView="chat" onViewChange={onViewChange} />)
 
-  expect(screen.getByText('Boards')).toBeInTheDocument()
+  expect(screen.queryByText('Boards')).not.toBeInTheDocument()
   expect(screen.getByText('Entertainment')).toBeInTheDocument()
   expect(screen.queryByText('Profile')).toBeNull()
-
-  fireEvent.click(screen.getByText('Boards'))
-  expect(onViewChange).toHaveBeenCalledWith('boards')
-  expect(screen.getByText('4')).toBeInTheDocument()
 
   fireEvent.click(screen.getByText('Entertainment'))
   expect(onViewChange).toHaveBeenCalledWith('games')
 })
 
-test('sidebar navigation replaces profile with boards', () => {
+test('mobile navigation can restore boards with an explicit feature flag', () => {
+  const onViewChange = jest.fn()
+  render(
+    <MobileNav
+      currentView="chat"
+      onViewChange={onViewChange}
+      boardsEnabled
+      boardsBadgeCount={4}
+    />
+  )
+
+  fireEvent.click(screen.getByText('Boards'))
+  expect(onViewChange).toHaveBeenCalledWith('boards')
+  expect(screen.getByText('4')).toBeInTheDocument()
+})
+
+test('sidebar navigation omits paused boards by default', () => {
   const onViewChange = jest.fn()
   render(
     <Sidebar
@@ -51,14 +59,30 @@ test('sidebar navigation replaces profile with boards', () => {
     />
   )
 
-  expect(screen.getByText('Boards')).toBeInTheDocument()
+  expect(screen.queryByText('Boards')).not.toBeInTheDocument()
   expect(screen.getByText('Entertainment')).toBeInTheDocument()
   expect(screen.queryByText('Profile')).toBeNull()
+
+  fireEvent.click(screen.getByText('Entertainment'))
+  expect(onViewChange).toHaveBeenCalledWith('games')
+})
+
+test('sidebar can restore boards with an explicit feature flag', () => {
+  const onViewChange = jest.fn()
+  render(
+    <Sidebar
+      currentView="chat"
+      onViewChange={onViewChange}
+      isDarkMode
+      onToggleDarkMode={jest.fn()}
+      isOpen
+      onClose={jest.fn()}
+      boardsEnabled
+      boardsBadgeCount={4}
+    />
+  )
 
   fireEvent.click(screen.getByText('Boards'))
   expect(onViewChange).toHaveBeenCalledWith('boards')
   expect(screen.getByText('4')).toBeInTheDocument()
-
-  fireEvent.click(screen.getByText('Entertainment'))
-  expect(onViewChange).toHaveBeenCalledWith('games')
 })

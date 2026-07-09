@@ -162,14 +162,18 @@ async function runThemeProfile(profile, theme, accountA, accountB) {
     await auditPage(page, profile, theme, '03-dm-list', { header: false })
     await openConversationWithUser(page, profile, theme, accountB)
 
-    await goToBoards(page)
-    await auditPage(page, profile, theme, '05-boards')
-    await page.getByRole('button', { name: 'Open News Chat' }).click()
-    await page.locator('textarea:visible').first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-    await auditPage(page, profile, theme, '06-board-chat', { composer: true })
-    await focusAndAuditComposer(page, profile, theme, '07-board-chat-composer', {
-      simulateAndroidKeyboardInset: profile.browserName === 'chromium',
-    })
+    if (await isBoardsNavigationAvailable(page)) {
+      await goToBoards(page)
+      await auditPage(page, profile, theme, '05-boards')
+      await page.getByRole('button', { name: 'Open News Chat' }).click()
+      await page.locator('textarea:visible').first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+      await auditPage(page, profile, theme, '06-board-chat', { composer: true })
+      await focusAndAuditComposer(page, profile, theme, '07-board-chat-composer', {
+        simulateAndroidKeyboardInset: profile.browserName === 'chromium',
+      })
+    } else {
+      logLine(`Boards paused for ${profile.label} / ${theme}; board theme flows skipped`)
+    }
 
     await goToSettings(page)
     await auditPage(page, profile, theme, '08-settings', { header: false })
@@ -411,6 +415,10 @@ async function goToBoards(page) {
     await navigateByViewParam(page, 'boards')
   }
   await page.getByRole('heading', { name: 'Boards' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+}
+
+async function isBoardsNavigationAvailable(page) {
+  return page.getByRole('button', { name: /^Boards$/ }).isVisible().catch(() => false)
 }
 
 async function goToSettings(page) {

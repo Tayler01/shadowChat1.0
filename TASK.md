@@ -1,5 +1,8 @@
 # ShadowChat ESP Bridge Update And Offline Software Task
 
+> **On hold July 9, 2026.** Retained for implementation history only. See
+> [docs/PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1).
+
 ## Documentation Status - June 1, 2026
 
 This task file is scoped to the ESP bridge update/offline software track. It is not the current global ShadowChat task list. The current cross-project audit backlog lives in [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).

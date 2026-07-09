@@ -4,6 +4,11 @@
 
 Reviewed during the June 1, 2026 documentation refresh. This doc reflects shipped channel-ban behavior. Pending hardening includes enforcing equivalent ban checks in service-role paths such as bridge group send and AI post-to-chat.
 
+Board scopes remain preserved in schema and moderation history while Boards are
+paused. ESP service-role paths must be disabled server-side as part of the bridge
+hold; frontend hiding is not an authorization control. See
+[PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1).
+
 Channel bans let app operators limit where a user can participate without
 touching DMs or account access. Banned users can still read visible content.
 

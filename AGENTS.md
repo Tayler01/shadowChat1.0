@@ -26,7 +26,14 @@ containers, media loading, and realtime UI smoothness on phone-sized viewports.
 
 ## Current Feature Focus
 
-The shipped News tab and Render News scraper are now a live production surface.
+Boards, News, Art Board, and ESP Bridge are intentionally paused as of July 9,
+2026. Their source, data, migrations, firmware, and tests remain preserved, but
+the default production build must omit their navigation, runtime subscriptions,
+and admin panels. Read
+[docs/PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1) before
+touching or re-enabling any of those domains.
+
+The preserved News tab and Render News scraper are not a live production surface.
 Before changing News behavior, read:
 
 1. [docs/NEWS_TAB_AND_SCRAPER.md](C:/repos/chat2.0/docs/NEWS_TAB_AND_SCRAPER.md:1)
@@ -61,7 +68,8 @@ The current near-term hardening track is the June 1 audit backlog:
 
 When touching any of those areas, keep the work narrowly scoped to the relevant audit item and update the audit next-steps doc if the status changes.
 
-The current major planning and upcoming implementation track is the `ESP bridge` feature for an airgapped Windows PC.
+The `ESP bridge` feature for an airgapped Windows PC is on hold. The following
+planning set remains the source of truth if work is explicitly resumed.
 
 High-level direction:
 

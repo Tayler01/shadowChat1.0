@@ -1,5 +1,8 @@
 # ESP Bridge Update And Offline Software Plan
 
+> **On hold July 9, 2026.** Preserved as bridge-specific planning history. See
+> [docs/PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1).
+
 ## Documentation Status - June 1, 2026
 
 This root-level plan is bridge-specific historical/current context, not the global product plan. The global near-term product backlog is now [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1). Keep this file only for ESP bridge update/offline software work, and refresh it before more bridge release work.

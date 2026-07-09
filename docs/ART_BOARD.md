@@ -1,5 +1,10 @@
 # Art Board
 
+> **Paused July 9, 2026:** Art Board is preserved but unavailable because the
+> parent Boards domain is disabled in the default production build. Its source,
+> Supabase rows, Storage objects, migrations, and direct tests remain intact.
+> See [PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1).
+
 ## Documentation Status - June 8, 2026
 
 Updated after the June 8, 2026 shared safe-fetch hardening. Repo code now routes Art Board URL imports through the shared safe-fetch helper, but the linked Supabase function inventory still showed `art-board-import-image` with an older deployment timestamp during the evening doc-freshness pass. Redeploy and smoke that function before claiming production Art Board import safe-fetch coverage. Broader known hardening or polish follow-ups remain tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).

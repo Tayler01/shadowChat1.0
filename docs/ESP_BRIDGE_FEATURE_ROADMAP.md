@@ -1,5 +1,12 @@
 # ESP Bridge Feature Roadmap
 
+> **On hold July 9, 2026:** ESP Bridge product development and production use
+> are paused. The default web build omits pairing/admin UI; firmware, TUI,
+> migrations, Edge Function source, and planning history remain preserved.
+> Production endpoints and sessions require the server-side hold procedure in
+> [PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1) before the
+> pause is considered complete.
+
 ## Documentation Status - June 1, 2026
 
 Reviewed during the June 1, 2026 documentation refresh. This is bridge-specific guidance; some sections are planning history and some remain active runbook material. Verify against current firmware, Edge Functions, and [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1) before implementing bridge changes.

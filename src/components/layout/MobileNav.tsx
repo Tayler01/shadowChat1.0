@@ -1,7 +1,6 @@
 import React from 'react'
 import { Gamepad2, Images, MessageSquare, Newspaper, Users } from 'lucide-react'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
-import { useBoardBadges } from '../../hooks/useBoardBadges'
 import type { AppView } from '../../types/navigation'
 
 interface MobileNavProps {
@@ -9,11 +8,19 @@ interface MobileNavProps {
   onViewChange: (view: AppView) => void
   className?: string
   embedded?: boolean
+  boardsEnabled?: boolean
+  boardsBadgeCount?: number
 }
 
-export function MobileNav({ currentView, onViewChange, className, embedded = false }: MobileNavProps) {
+export function MobileNav({
+  currentView,
+  onViewChange,
+  className,
+  embedded = false,
+  boardsEnabled = false,
+  boardsBadgeCount = 0,
+}: MobileNavProps) {
   const { conversations } = useDirectMessages()
-  const { count: boardsBadgeCount } = useBoardBadges()
   const totalUnread = conversations.reduce(
     (sum, c) => sum + (c.unread_count || 0),
     0
@@ -27,12 +34,12 @@ export function MobileNav({ currentView, onViewChange, className, embedded = fal
       label: 'DMs',
       badge: totalUnread > 0 ? totalUnread : null,
     },
-    {
+    ...(boardsEnabled ? [{
       id: 'boards' as const,
       icon: Newspaper,
       label: 'Boards',
       badge: boardsBadgeCount > 0 ? boardsBadgeCount : null,
-    },
+    }] : []),
     { id: 'games' as const, icon: Gamepad2, label: 'Entertainment', badge: null },
     { id: 'pins' as const, icon: Images, label: 'Pins', badge: null },
   ]

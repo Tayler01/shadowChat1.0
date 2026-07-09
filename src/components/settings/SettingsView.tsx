@@ -12,10 +12,7 @@ import {
   ListChecks,
   Menu,
   MessageSquarePlus,
-  Newspaper,
   Palette,
-  Plus,
-  Power,
   Search,
   Shield,
   Smartphone,
@@ -31,7 +28,6 @@ import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useSoundEffects } from '../../hooks/useSoundEffects'
 import { usePushNotifications } from '../../hooks/usePushNotifications'
 import { usePwaInstallPrompt } from '../../hooks/usePwaInstallPrompt'
-import { approveBridgePairing } from '../../lib/bridge'
 import { NotificationSetupModal } from './NotificationSetupModal'
 import { PhoneInstallGuide } from '../onboarding/PhoneInstallGuide'
 import { FeedbackSubmissionModal } from './FeedbackSubmissionModal'
@@ -41,16 +37,28 @@ import { AdminInvitesPanel } from './AdminInvitesPanel'
 import { ShadoTvStudio } from './ShadoTvStudio'
 import { WeatherLocationSettings } from './WeatherLocationSettings'
 import { ProfileView } from '../profile/ProfileView'
-import { useNewsAdmin } from '../../hooks/useNewsAdmin'
 import { useAdminAccess } from '../../hooks/useAdminAccess'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { MobileAppHeader } from '../layout/MobileAppHeader'
+import { BOARDS_FEATURE_ENABLED, ESP_ADMIN_FEATURE_ENABLED } from '../../config/featureFlags'
 import type { AppView } from '../../types/navigation'
 
 const ShadowPinActivityAdmin = React.lazy(() =>
   import('./ShadowPinActivityAdmin').then(module => ({ default: module.ShadowPinActivityAdmin }))
 )
+
+const BridgePairingAdminPanel = ESP_ADMIN_FEATURE_ENABLED
+  ? React.lazy(() =>
+      import('./BridgePairingAdminPanel').then(module => ({ default: module.BridgePairingAdminPanel }))
+    )
+  : null
+
+const NewsSourcesAdminPanel = BOARDS_FEATURE_ENABLED
+  ? React.lazy(() =>
+      import('./NewsSourcesAdminPanel').then(module => ({ default: module.NewsSourcesAdminPanel }))
+    )
+  : null
 
 interface SettingsViewProps {
   onToggleSidebar: () => void
@@ -175,12 +183,12 @@ const adminSections: AdminSection[] = [
     icon: ListChecks,
     fullAdminOnly: true,
   },
-  {
-    id: 'bridge-pairing',
+  ...(ESP_ADMIN_FEATURE_ENABLED ? [{
+    id: 'bridge-pairing' as const,
     title: 'ESP Bridge Pairing',
     description: 'Approve bridge pairing codes for operator-owned devices.',
     icon: KeyRound,
-  },
+  }] : []),
   {
     id: 'shado-tv-studio',
     title: 'Shado TV Studio',
@@ -193,12 +201,12 @@ const adminSections: AdminSection[] = [
     description: 'Review user activity, category interest, pin engagement, and drilldown timelines.',
     icon: BarChart3,
   },
-  {
-    id: 'news-sources',
+  ...(BOARDS_FEATURE_ENABLED ? [{
+    id: 'news-sources' as const,
     title: 'News Sources',
     description: 'Manage tracked X and Truth accounts for the Today Board.',
-    icon: Newspaper,
-  },
+    icon: KeyRound,
+  }] : []),
   {
     id: 'feedback-review',
     title: 'Feedback Review',
@@ -206,31 +214,6 @@ const adminSections: AdminSection[] = [
     icon: MessageSquarePlus,
   },
 ]
-
-const normalizeNewsHandleInput = (value: string) =>
-  value
-    .trim()
-    .replace(/^@+\s*/, '@')
-    .trim()
-
-const getNewsSourceHealthClass = (status: string) => {
-  if (status === 'ok') {
-    return 'theme-accent-chip border'
-  }
-
-  if (status === 'blocked') {
-    return 'border-[rgba(224,164,62,0.28)] bg-[rgba(224,164,62,0.1)] text-amber-100'
-  }
-
-  if (status === 'pending') {
-    return 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.035)] text-[var(--text-muted)]'
-  }
-
-  return 'border-[rgba(190,52,85,0.35)] bg-[rgba(87,14,28,0.18)] text-red-100'
-}
-
-const getNewsSourceMessageClass = (status: string) =>
-  status === 'blocked' ? 'text-amber-100/85' : 'text-red-200/80'
 
 function ToggleRow({
   label,
@@ -324,19 +307,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [showNotificationSetup, setShowNotificationSetup] = useState(false)
   const [showPhoneInstallGuide, setShowPhoneInstallGuide] = useState(false)
   const [showFeedbackSubmission, setShowFeedbackSubmission] = useState(false)
-  const [bridgePairingCode, setBridgePairingCode] = useState('')
-  const [bridgePairingLoading, setBridgePairingLoading] = useState(false)
-  const [lastBridgeDeviceId, setLastBridgeDeviceId] = useState('')
-  const [newsPlatform, setNewsPlatform] = useState<'x' | 'truth'>('x')
-  const [newsHandle, setNewsHandle] = useState('')
-  const [newsDisplayName, setNewsDisplayName] = useState('')
-  const [newsProfileUrl, setNewsProfileUrl] = useState('')
   const [adminUserSearch, setAdminUserSearch] = useState('')
   const { scheme, setScheme } = useTheme()
   const isDesktop = useIsDesktop()
   const { signOut, deleteAccount, user: currentUser } = useAuth()
   const shouldLoadAdminUsers = activeSection === 'admin' && activeAdminSection === 'access'
-  const shouldLoadNewsAdmin = activeSection === 'admin' && activeAdminSection === 'news-sources'
   const shouldLoadPushSettings = activeSection === 'notifications-audio'
   const {
     role: adminRole,
@@ -348,16 +323,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     error: adminAccessError,
     updateSubAdmin,
   } = useAdminAccess({ includeUsers: shouldLoadAdminUsers })
-  const {
-    isAdmin: canManageNewsSources,
-    sources: newsSources,
-    loading: newsAdminLoading,
-    saving: newsAdminSaving,
-    error: newsAdminError,
-    upsertSource,
-    setSourceEnabled,
-    deleteSource,
-  } = useNewsAdmin({ enabled: shouldLoadNewsAdmin })
   const { canInstall, promptInstall } = usePwaInstallPrompt()
   const {
     supported,
@@ -559,65 +524,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }
 
     return outcome
-  }
-
-  const handleApproveBridgePairing = async () => {
-    try {
-      setBridgePairingLoading(true)
-      const approval = await approveBridgePairing(bridgePairingCode)
-      setLastBridgeDeviceId(approval.deviceId)
-      setBridgePairingCode('')
-      toast.success('Bridge pairing approved')
-    } catch (err) {
-      console.error(err)
-      toast.error(err instanceof Error ? err.message : 'Failed to approve bridge pairing')
-    } finally {
-      setBridgePairingLoading(false)
-    }
-  }
-
-  const handleAddNewsSource = async () => {
-    const normalizedHandle = normalizeNewsHandleInput(newsHandle)
-    if (!normalizedHandle) return
-
-    try {
-      await upsertSource({
-        platform: newsPlatform,
-        handle: normalizedHandle,
-        displayName: newsDisplayName.trim() || undefined,
-        profileUrl: newsProfileUrl.trim() || undefined,
-      })
-      setNewsHandle('')
-      setNewsDisplayName('')
-      setNewsProfileUrl('')
-      toast.success('News source saved')
-    } catch (err) {
-      console.error(err)
-      toast.error(err instanceof Error ? err.message : 'Failed to save news source')
-    }
-  }
-
-  const handleToggleNewsSource = async (sourceId: string, enabled: boolean) => {
-    try {
-      await setSourceEnabled(sourceId, enabled)
-      toast.success(enabled ? 'News source enabled' : 'News source paused')
-    } catch (err) {
-      console.error(err)
-      toast.error(err instanceof Error ? err.message : 'Failed to update news source')
-    }
-  }
-
-  const handleDeleteNewsSource = async (sourceId: string, label: string) => {
-    const confirmed = window.confirm(`Delete ${label} from the news tracker? Existing feed items will stay, but this account will no longer be tracked.`)
-    if (!confirmed) return
-
-    try {
-      await deleteSource(sourceId)
-      toast.success('News source deleted')
-    } catch (err) {
-      console.error(err)
-      toast.error(err instanceof Error ? err.message : 'Failed to delete news source')
-    }
   }
 
   const handleSubAdminToggle = async (targetUserId: string, enabled: boolean) => {
@@ -927,7 +833,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }
 
     if (sectionId === 'bridge-pairing') {
-      return lastBridgeDeviceId ? 'Recently approved' : 'Pair device'
+      return 'Pair device'
     }
 
     if (sectionId === 'invites') {
@@ -950,11 +856,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       return 'Analytics'
     }
 
-    if (shouldLoadNewsAdmin && newsAdminLoading) {
-      return 'Loading sources'
+    if (sectionId === 'news-sources') {
+      return 'Source tracker'
     }
 
-    return newsSources.length > 0 ? `${newsSources.length} sources` : 'Open to load'
+    return 'Open'
   }
 
   const renderAdminHub = () => {
@@ -1017,197 +923,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   }
 
   const renderBridgePairingPanel = () => (
-      <div className="glass-panel rounded-[var(--radius-lg)] p-5">
-        <div className="mb-4 flex items-center gap-3">
-          <KeyRound className="h-5 w-5 text-[var(--text-muted)]" />
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">ESP Bridge Pairing</h2>
-        </div>
-        <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-            <label className="min-w-0 flex-1">
-              <span className="mb-2 block text-sm font-medium text-[var(--text-primary)]">Pairing code</span>
-              <input
-                value={bridgePairingCode}
-                onChange={(event) => setBridgePairingCode(event.target.value.toUpperCase())}
-                placeholder="ABCDEFGH"
-                autoCapitalize="characters"
-                spellCheck={false}
-                className="w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(0,0,0,0.28)] px-4 py-3 font-mono text-sm uppercase tracking-[0.18em] text-[var(--text-primary)] outline-none transition-colors placeholder:text-[var(--text-muted)] focus:border-[var(--border-glow)]"
-              />
-            </label>
-            <Button
-              onClick={() => void handleApproveBridgePairing()}
-              disabled={bridgePairingLoading || bridgePairingCode.trim().length < 4}
-              variant="secondary"
-              className="w-full justify-center lg:w-auto"
-            >
-              <KeyRound className="mr-3 h-4 w-4" />
-              {bridgePairingLoading ? 'Approving' : 'Approve Bridge'}
-            </Button>
-          </div>
-          <p className="mt-3 text-sm text-[var(--text-muted)]">
-            Enter the code shown by the ESP bridge to approve this account as owner.
-          </p>
-          {lastBridgeDeviceId && (
-            <p className="mt-3 break-all text-xs uppercase tracking-[0.14em] text-[var(--text-gold)]">
-              Approved: {lastBridgeDeviceId}
-            </p>
-          )}
-        </div>
-      </div>
+    BridgePairingAdminPanel ? (
+      <React.Suspense fallback={<SettingsPanelLoading label="Loading bridge pairing..." />}>
+        <BridgePairingAdminPanel />
+      </React.Suspense>
+    ) : null
   )
 
   const renderNewsSourcesPanel = () => (
-      <div className="glass-panel rounded-[var(--radius-lg)] p-5">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <Newspaper className="h-5 w-5 text-[var(--text-muted)]" />
-            <div>
-              <h2 className="text-lg font-semibold text-[var(--text-primary)]">News Sources</h2>
-              <p className="mt-1 text-sm text-[var(--text-muted)]">Tracked X and Truth accounts for the Today Board.</p>
-            </div>
-          </div>
-        </div>
-
-        {newsAdminLoading ? (
-          <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 text-sm text-[var(--text-muted)]">
-            Loading source controls.
-          </div>
-        ) : !canManageNewsSources ? (
-          <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 text-sm leading-6 text-[var(--text-muted)]">
-            News source management is limited to admin-class accounts.
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 lg:grid-cols-[8rem_1fr_1fr_1fr_auto] lg:items-end">
-              <label>
-                <span className="mb-2 block text-sm font-medium text-[var(--text-primary)]">Platform</span>
-                <select
-                  value={newsPlatform}
-                  onChange={event => setNewsPlatform(event.target.value as 'x' | 'truth')}
-                  className="obsidian-input w-full rounded-[var(--radius-md)] px-3.5 py-3 text-sm"
-                >
-                  <option value="x">X</option>
-                  <option value="truth">Truth</option>
-                </select>
-              </label>
-              <label>
-                <span className="mb-2 block text-sm font-medium text-[var(--text-primary)]">Handle</span>
-                <input
-                  value={newsHandle}
-                  onChange={event => setNewsHandle(event.target.value)}
-                  onBlur={() => setNewsHandle(prev => normalizeNewsHandleInput(prev))}
-                  placeholder="@account"
-                  className="obsidian-input w-full rounded-[var(--radius-md)] px-3.5 py-3 text-sm"
-                />
-              </label>
-              <label>
-                <span className="mb-2 block text-sm font-medium text-[var(--text-primary)]">Display</span>
-                <input
-                  value={newsDisplayName}
-                  onChange={event => setNewsDisplayName(event.target.value)}
-                  placeholder="Optional"
-                  className="obsidian-input w-full rounded-[var(--radius-md)] px-3.5 py-3 text-sm"
-                />
-              </label>
-              <label>
-                <span className="mb-2 block text-sm font-medium text-[var(--text-primary)]">Profile URL</span>
-                <input
-                  value={newsProfileUrl}
-                  onChange={event => setNewsProfileUrl(event.target.value)}
-                  placeholder="Optional"
-                  className="obsidian-input w-full rounded-[var(--radius-md)] px-3.5 py-3 text-sm"
-                />
-              </label>
-              <Button
-                type="button"
-                onClick={() => void handleAddNewsSource()}
-                disabled={!normalizeNewsHandleInput(newsHandle) || newsAdminSaving}
-                loading={newsAdminSaving}
-                className="w-full justify-center lg:w-auto"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Save
-              </Button>
-            </div>
-
-            {newsAdminError && (
-              <div className="rounded-[var(--radius-md)] border border-[rgba(190,52,85,0.35)] bg-[rgba(87,14,28,0.18)] p-3 text-sm text-red-100">
-                {newsAdminError}
-              </div>
-            )}
-
-            <div className="space-y-2">
-              {newsSources.length === 0 ? (
-                <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 text-sm text-[var(--text-muted)]">
-                  No sources configured.
-                </div>
-              ) : (
-                newsSources.map(source => (
-                  <div
-                    key={source.id}
-                    className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 lg:grid-cols-[1fr_auto_auto_auto] lg:items-center"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full border border-[rgba(215,170,70,0.18)] bg-[rgba(215,170,70,0.08)] px-2.5 py-1 text-[10px] uppercase tracking-[0.14em] text-[var(--text-gold)]">
-                          {source.platform === 'x' ? 'X' : 'Truth'}
-                        </span>
-                        <h3 className="truncate font-medium text-[var(--text-primary)]">
-                          {source.display_name || source.handle}
-                        </h3>
-                        <span className="text-sm text-[var(--text-muted)]">@{source.normalized_handle || source.handle}</span>
-                      </div>
-                      <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
-                        <span className={`rounded-full border px-2 py-0.5 uppercase tracking-[0.12em] ${getNewsSourceHealthClass(source.health_status)}`}>
-                          {source.health_status}
-                        </span>
-                        {source.last_success_at ? ` / last ok ${new Date(source.last_success_at).toLocaleString()}` : ''}
-                      </p>
-                      {source.last_error && (
-                        <p className={`mt-1 line-clamp-2 text-xs ${getNewsSourceMessageClass(source.health_status)}`}>{source.last_error}</p>
-                      )}
-                    </div>
-                    <span className={`w-fit rounded-full border px-3 py-1 text-xs uppercase tracking-[0.12em] ${
-                      source.enabled
-                        ? 'border-[rgba(215,170,70,0.22)] bg-[rgba(215,170,70,0.08)] text-[var(--text-gold)]'
-                        : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] text-[var(--text-muted)]'
-                    }`}>
-                      {source.enabled ? 'Enabled' : 'Paused'}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => void handleToggleNewsSource(source.id, !source.enabled)}
-                      disabled={newsAdminSaving}
-                      className="w-full justify-center lg:w-auto"
-                    >
-                      <Power className="mr-2 h-4 w-4" />
-                      {source.enabled ? 'Pause' : 'Enable'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="danger"
-                      size="sm"
-                      onClick={() => void handleDeleteNewsSource(
-                        source.id,
-                        source.display_name || `@${source.normalized_handle || source.handle}`
-                      )}
-                      disabled={newsAdminSaving}
-                      className="w-full justify-center lg:w-auto"
-                      aria-label={`Delete ${source.display_name || source.handle} from news tracker`}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </Button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+    NewsSourcesAdminPanel ? (
+      <React.Suspense fallback={<SettingsPanelLoading label="Loading news sources..." />}>
+        <NewsSourcesAdminPanel />
+      </React.Suspense>
+    ) : null
   )
 
   const renderFeedbackReviewPanel = () => (

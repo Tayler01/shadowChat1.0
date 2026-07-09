@@ -186,16 +186,20 @@ async function runProfile(profile, accountA, accountB) {
     await page.getByRole('button', { name: /^Chat$/ }).click()
     await waitForChatView(page)
 
-    await goToBoards(page)
-    await auditPage(page, profile, '11-boards-map')
-    await page.getByRole('button', { name: 'Open News Chat' }).click()
-    await page.locator('textarea:visible').first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-    await auditPage(page, profile, '12-board-chat', { composer: true })
-    await focusAndAuditComposer(page, profile, '13-board-chat-composer', {
-      simulateAndroidKeyboardInset: profile.browserName === 'chromium',
-    })
-    await page.getByRole('button', { name: 'Back to boards' }).click()
-    await auditPage(page, profile, '14-boards-back')
+    if (await isBoardsNavigationAvailable(page)) {
+      await goToBoards(page)
+      await auditPage(page, profile, '11-boards-map')
+      await page.getByRole('button', { name: 'Open News Chat' }).click()
+      await page.locator('textarea:visible').first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+      await auditPage(page, profile, '12-board-chat', { composer: true })
+      await focusAndAuditComposer(page, profile, '13-board-chat-composer', {
+        simulateAndroidKeyboardInset: profile.browserName === 'chromium',
+      })
+      await page.getByRole('button', { name: 'Back to boards' }).click()
+      await auditPage(page, profile, '14-boards-back')
+    } else {
+      logLine(`Boards paused for ${profile.label}; board visual flows skipped`)
+    }
 
     await goToGames(page)
     await auditPage(page, profile, '15-games-home')
@@ -210,7 +214,7 @@ async function runProfile(profile, accountA, accountB) {
     await auditPage(page, profile, '18-feedback-modal', { header: false })
     await page.getByRole('button', { name: 'Close feedback' }).click()
     await page.getByRole('dialog', { name: /Send a bug report or feature idea/i }).waitFor({ state: 'hidden', timeout: DEFAULT_TIMEOUT_MS })
-    await page.getByRole('button', { name: 'Back to settings' }).click()
+    await page.getByRole('button', { name: 'Back', exact: true }).click()
     await openSettingsSection(page, 'Account & Profile')
     await auditPage(page, profile, '19-account-profile', { header: false })
 
@@ -768,6 +772,10 @@ async function goToBoards(page) {
   await page.getByRole('heading', { name: 'Boards' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
+async function isBoardsNavigationAvailable(page) {
+  return page.getByRole('button', { name: /^Boards$/ }).isVisible().catch(() => false)
+}
+
 async function goToGames(page) {
   if (!(await page.getByRole('button', { name: /^Entertainment$/ }).isVisible().catch(() => false))) {
     const back = page.getByRole('button', { name: 'Back' }).first()
@@ -813,7 +821,7 @@ async function navigateByViewParam(page, view) {
 
 async function openSettingsSection(page, sectionName) {
   await page.getByRole('button', { name: sectionName }).click()
-  await page.getByRole('button', { name: 'Back to settings' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByRole('button', { name: 'Back', exact: true }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
 async function openConversationWithUser(page, account) {
@@ -853,7 +861,7 @@ async function sendVisibleMessage(page, messageText) {
   const composer = page.locator('textarea:visible').last()
   await composer.click()
   await composer.fill(messageText)
-  await page.locator('button[aria-label="Send message"]:visible').last().click()
+  await page.getByRole('button', { name: /^Send message(?:\. Hold for Hype .*)?$/ }).last().click()
 }
 
 async function expectVisibleText(page, text, timeoutMs) {

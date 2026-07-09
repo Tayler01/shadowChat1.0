@@ -28,6 +28,12 @@ npx tsc --noEmit -p tsconfig.app.json
 npm run build
 ```
 
+The build now runs `scripts/verify-paused-feature-build.mjs` and fails if the
+default production output leaks Boards/News/Art Board or ESP admin chunks and
+known API/subscription markers. Dormant feature source is still covered by its
+direct Jest suites. An explicit re-enable build is documented in
+[PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1).
+
 ## Unit And Hook Tests
 
 Run the suite:

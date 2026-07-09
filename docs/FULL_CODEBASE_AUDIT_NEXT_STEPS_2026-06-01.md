@@ -6,6 +6,119 @@ This document turns the June 1, 2026 read-only audit into an implementation back
 
 This is the current source of truth for the audit backlog. Update this document when an audit item is implemented, intentionally deferred, or replaced by a narrower feature ticket.
 
+## July 9, 2026 Alignment And Cleanup Program
+
+The July 9 full audit revalidated this backlog against local code, linked
+Supabase, Netlify, Render, GitHub, browser QA, and the production build. Work is
+being completed as separable checkpoints on
+`codex/shadowchat-alignment-20260709`; production writes remain gated on a final
+review packet.
+
+### Product decisions now in force
+
+- **Boards, News, and Art Board are paused.** Their source, migrations, rows,
+  Storage objects, and tests stay intact. The default build omits their nav,
+  routes, providers, realtime subscriptions, and chunks.
+- **ESP Bridge is on hold.** Firmware, TUI, migrations, functions, and planning
+  history stay intact. The default build omits pairing/admin UI; server-side
+  session revocation and endpoint hold are still required.
+- **Render News must remain suspended with automatic deploys off.** Do not
+  restore a paid worker until the News product is explicitly reapproved.
+- Canonical status and re-enable instructions live in
+  [PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1).
+
+### Ranked implementation list
+
+#### P0 - Production alignment and authority
+
+1. **DB-001 - Apply the pending canonical-authority migration.** Validate and
+   deploy `20260620121500_admin_authority_source_cleanup.sql`, capture before
+   state, and run channel-ban, protected-delete, and ShadowPin scoring negatives.
+2. **SEC-001 - Promote current active Edge Function hardening.** Deploy and
+   negatively smoke `openai-chat`, `delete-account`, and
+   `shadow-pin-import-image`. Keep `art-board-import-image` undeployed or paused
+   while Art Board is unavailable. Do not leave stale service-role code active.
+3. **SEC-002 - Enforce the profile write boundary.** Remove table-level
+   authenticated writes to `public.users`, grant only approved profile columns,
+   add `USING` plus `WITH CHECK`, and move Netlify operator authorization to
+   canonical `user_roles`/`is_app_operator`.
+4. **SEC-003 - Lock notification sound configuration.** Prefer bundled/static
+   sound assets, enable RLS, and remove anonymous/authenticated mutation rights.
+5. **SEC-004 - Establish a SECURITY DEFINER ACL contract.** Hotfix confirmed
+   public/anonymous functions, set fixed `search_path`, add caller guards, and
+   add default-privilege protection. Complete the broader allowlist only from
+   live `pg_proc`/ACL evidence.
+6. **SEC-005 - Complete the ESP hold.** Inventory bridge identities, revoke
+   custom and Supabase Auth sessions, disable devices/codes, and remove deployed
+   bridge endpoints or make every endpoint deny by default. Re-enable only with
+   fresh pairing and sessions.
+7. **DB-002 - Add Storage constraints.** Inventory current objects, then add
+   reviewed MIME/size limits for avatars, banners, message media, chat uploads,
+   and voice recordings without changing existing objects.
+8. **PERF-001 - Make backend parity a deployment gate.** CI must prove migration
+   state, active/paused function manifest, JWT configuration, negative smokes,
+   frontend build SHA, and post-deploy health before reporting success.
+
+#### P1 - Reliability, performance, and mobile UX
+
+1. Repair the mobile QA send-button selector and keep paused feature flows
+   optional in the visual harness.
+2. Replace service-worker cache-first handling for stable Shadow Runner paths
+   with content-hashed or revalidating behavior and test installed-PWA upgrades.
+3. Change DM history pagination to stable `(created_at, id)` keysets.
+4. Consolidate duplicate DM subscriptions and bound long-thread rendering.
+5. Roll back optimistic General Chat reactions when the RPC fails.
+6. Remove the catch-all `vendor-ui` chunk, restore route-aware splitting, and
+   enforce measured entry/lazy gzip budgets instead of hiding Vite warnings.
+7. Move nonruntime source/concept/generation assets out of `public`, retain all
+   runtime finals, and enforce a deploy-size budget.
+8. Add Netlify CSP, frame, content-type, referrer, permissions, and other
+   reviewed security headers; serve the manifest with the correct MIME type.
+9. Complete installed-PWA checks on physical iPhone and Android devices and
+   make a deliberate portrait/Shadow Runner landscape decision.
+10. Remove `user-scalable=no`; standardize focus traps, Escape/focus return,
+    keyboard menus, `aria-current`, contrast, and phone touch targets.
+11. Simplify the contextual phone header and prevent transient celebrations
+    from obscuring essential composer/navigation controls.
+12. Add release-correlated client/Edge/worker telemetry with privacy scrubbing.
+
+#### P1 - Repository and dependency cleanliness
+
+1. Add Jest and the two standalone Node suites to required CI.
+2. Eliminate React `act(...)` test warnings instead of suppressing console output.
+3. Remove current unused imports/identifiers, enable TypeScript unused checks,
+   and run ESLint with `--max-warnings=0`.
+4. Resolve current root development dependency advisories. Apply same-major
+   updates first; treat Vite and Expo as dedicated migration packets.
+5. Add a separate `apps/mobile` install/lint/typecheck/audit/Expo-doctor job.
+6. Add docs link/encoding checks and repair known broken links/mojibake.
+7. Validate the final result from a clean clone with deterministic lockfile
+   installs and a clean worktree.
+
+#### P2 - Product improvements after hardening
+
+1. Finish targeted mention/reply/reaction notifications, quiet hours, and
+   conversation mutes so Settings matches backend delivery behavior.
+2. Add an Admin Operations Health Center for frontend SHA, migrations,
+   functions, smokes, News status, push, and bridge health.
+3. Add personal blocking with a security-reviewed visibility/DM/push contract.
+4. Add universal search, saved messages, and personal collections.
+5. Add a Shadow Mystery publishing studio.
+6. Expand ShadowPin tags, full search, comments, and notifications.
+7. Add Shado TV captions, premieres, and watch analytics.
+8. **On hold with News:** read-later, topic following, and digest features.
+9. **On hold with ESP:** the bridge device/session manager.
+
+### Coordinated investigations, not blind migrations
+
+- Moving email out of `public.users` requires refactoring auth/profile/admin and
+  bridge consumers first.
+- Full SECURITY DEFINER allowlisting requires live function/ACL inventory so
+  RLS helpers are not accidentally broken.
+- AI dispatch replay/quota needs an atomic idempotency ledger.
+- URL fetch protection needs pinned DNS or controlled egress to close the
+  DNS-rebinding gap.
+
 ## Audit Scope
 
 The audit covered:

@@ -1,5 +1,11 @@
 # Boards News Feed And Scraper Runbook
 
+> **Paused July 9, 2026:** Boards and News are intentionally absent from the
+> default production build, and the Render scraper must remain suspended with
+> automatic deploys off. Source, Supabase data, and this runbook are preserved.
+> See [PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1) for the
+> exact build flags, remote-service status, and re-enable checklist.
+
 ## Documentation Status - June 1, 2026
 
 Reviewed during the June 1, 2026 documentation refresh. This doc reflects the shipped News tab and Render scraper architecture. Live Render dashboard settings still need verification when scraper deployment is next touched.

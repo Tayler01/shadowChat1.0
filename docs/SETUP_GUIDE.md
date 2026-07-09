@@ -77,7 +77,13 @@ VITE_PRESENCE_INTERVAL_MS=30000
 VITE_MESSAGE_FETCH_LIMIT=50
 VITE_DEBUG_LOGS=true
 VITE_WEB_PUSH_PUBLIC_KEY=YOUR_WEB_PUSH_PUBLIC_KEY
+VITE_FEATURE_BOARDS=false
+VITE_FEATURE_ESP_ADMIN=false
 ```
+
+Boards/News/Art Board and ESP admin are intentionally compile-time off. See
+[PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1) before changing
+either flag; re-enabling the UI alone does not restore or secure remote services.
 
 ## 3. Create Or Link A Supabase Project
 

@@ -6,6 +6,11 @@ This rundown captures the current documentation and agent-file surface in `C:\re
 
 This rundown was updated after the June 16 Golden Egg discovery visual refresh and the June 15 Shadow Runner Bell Tower Level 4, tap-toggle crouch, Web Audio soundtrack, completion-medal migration, push-subscription foreground repair, and feature auth-refresh hardening work. The file remains an inventory and routing guide; the source documents themselves now carry current status notes or current implementation guidance.
 
+July 9, 2026 adds
+[PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1) as the canonical
+status and re-enable contract for Boards, News, Art Board, and ESP Bridge. The
+June audit tracker remains the single ranked implementation backlog.
+
 ## Summary
 
 - The repo has a strong documentation base, but it has grown by feature area rather than through a single current index.
@@ -56,6 +61,7 @@ This rundown was updated after the June 16 Golden Egg discovery visual refresh a
 | [docs/DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1) | 2026-05-29 | GitHub, Netlify, Supabase deployment. | Update after Netlify headers, Node version alignment, or Auth config changes. |
 | [docs/GOAL_PLAYBOOKS.md](C:/repos/chat2.0/docs/GOAL_PLAYBOOKS.md:1) | 2026-05-14 | Goal-mode playbooks. | Add audit-backlog playbook if this becomes a repeated workflow. |
 | [docs/DEFERRED_FOLLOWUPS.md](C:/repos/chat2.0/docs/DEFERRED_FOLLOWUPS.md:1) | 2026-06-01 | Small deferred ideas. | Keep small only; larger audit items now live in the dedicated audit next-steps doc. |
+| [docs/PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1) | 2026-07-09 | Canonical paused-domain status, build flags, remote requirements, and re-enable checklist. | Update before any Boards, News, Art Board, or ESP reactivation. |
 | [docs/PRODUCTION_SMOKE_TESTING.md](C:/repos/chat2.0/docs/PRODUCTION_SMOKE_TESTING.md:1) | 2026-05-19 | Production smoke strategy. | Keep stable email-confirmed smoke-account setup current. |
 
 ## Current Product And Feature Docs

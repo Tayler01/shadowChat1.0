@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
 import { SettingsView } from '../src/components/settings/SettingsView'
+import { BridgePairingAdminPanel } from '../src/components/settings/BridgePairingAdminPanel'
+import { NewsSourcesAdminPanel } from '../src/components/settings/NewsSourcesAdminPanel'
 
 const mockUpsertSource = jest.fn()
 const mockSetSourceEnabled = jest.fn()
@@ -9,6 +11,7 @@ const mockRefreshNewsAdmin = jest.fn()
 const mockUpdateSubAdmin = jest.fn()
 const mockUpdatePreference = jest.fn()
 const mockDeleteAccount = jest.fn()
+const mockApproveBridgePairing = jest.fn()
 const mockUseAdminAccess = jest.fn()
 const mockUseNewsAdmin = jest.fn(() => ({
   isAdmin: true,
@@ -166,7 +169,7 @@ const buildAdminAccessState = () => ({
 })
 
 jest.mock('../src/lib/bridge', () => ({
-  approveBridgePairing: jest.fn(),
+  approveBridgePairing: (...args: unknown[]) => mockApproveBridgePairing(...args),
 }))
 
 jest.mock('../src/components/profile/ProfileView', () => ({
@@ -282,7 +285,7 @@ test('settings opens account profile from requested weather settings section', (
   expect(window.sessionStorage.getItem('shadowchat:settings-section')).toBeNull()
 })
 
-test('settings admin panel manages news sources', async () => {
+test('settings admin panel hides paused News and ESP tools while preserving active admin tools', () => {
   render(<SettingsView onToggleSidebar={jest.fn()} />)
 
   fireEvent.click(screen.getByRole('button', { name: /admin/i }))
@@ -291,9 +294,9 @@ test('settings admin panel manages news sources', async () => {
   expect(screen.getByRole('button', { name: /admin access/i })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /invites/i })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /automation approvals/i })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: /esp bridge pairing/i })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /esp bridge pairing/i })).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: /shadow pin activity/i })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: /news sources/i })).toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: /news sources/i })).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: /feedback review/i })).toBeInTheDocument()
   expect(screen.queryByText('shadow@example.com')).not.toBeInTheDocument()
 
@@ -303,7 +306,11 @@ test('settings admin panel manages news sources', async () => {
   expect(screen.getByText('shadow@example.com')).toBeInTheDocument()
 
   fireEvent.click(screen.getByRole('button', { name: /back to admin sections/i }))
-  fireEvent.click(screen.getByRole('button', { name: /news sources/i }))
+  expect(screen.getByRole('heading', { name: 'Admin Sections' })).toBeInTheDocument()
+})
+
+test('preserved News Sources panel can manage tracker accounts when re-enabled', async () => {
+  render(<NewsSourcesAdminPanel />)
 
   expect(screen.getByRole('heading', { name: 'News Sources' })).toBeInTheDocument()
   expect(screen.getByText('@openai')).toBeInTheDocument()
@@ -321,20 +328,31 @@ test('settings admin panel manages news sources', async () => {
   })
 })
 
-test('settings admin panel deletes news tracker accounts after confirmation', async () => {
+test('preserved News Sources panel deletes tracker accounts after confirmation', async () => {
   jest.spyOn(window, 'confirm').mockReturnValueOnce(true)
   mockDeleteSource.mockResolvedValueOnce(undefined)
 
-  render(<SettingsView onToggleSidebar={jest.fn()} />)
-
-  fireEvent.click(screen.getByRole('button', { name: /admin/i }))
-  fireEvent.click(screen.getByRole('button', { name: /news sources/i }))
+  render(<NewsSourcesAdminPanel />)
   fireEvent.click(screen.getByRole('button', { name: /delete openai from news tracker/i }))
 
   expect(window.confirm).toHaveBeenCalledWith(expect.stringContaining('Delete OpenAI from the news tracker'))
   await waitFor(() => {
     expect(mockDeleteSource).toHaveBeenCalledWith('source-1')
   })
+})
+
+test('preserved ESP pairing panel approves a code when re-enabled', async () => {
+  mockApproveBridgePairing.mockResolvedValueOnce({ deviceId: 'bridge-device-1' })
+
+  render(<BridgePairingAdminPanel />)
+
+  fireEvent.change(screen.getByPlaceholderText('ABCDEFGH'), { target: { value: 'abcd1234' } })
+  fireEvent.click(screen.getByRole('button', { name: /approve bridge/i }))
+
+  await waitFor(() => {
+    expect(mockApproveBridgePairing).toHaveBeenCalledWith('ABCD1234')
+  })
+  expect(screen.getByText(/bridge-device-1/i)).toBeInTheDocument()
 })
 
 test('settings admin panel opens feedback review', () => {

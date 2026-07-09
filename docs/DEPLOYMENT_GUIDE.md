@@ -284,10 +284,17 @@ Netlify needs the frontend equivalents of:
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_WEB_PUSH_PUBLIC_KEY` when push subscriptions are enabled in the UI
 - `VITE_MESSAGE_FETCH_LIMIT` only when deliberately changing chat/DM fetch windows
+- `VITE_FEATURE_BOARDS=false` while Boards/News/Art Board remain paused
+- `VITE_FEATURE_ESP_ADMIN=false` while ESP Bridge remains on hold
 
 Check [`.env.example`](C:/repos/chat2.0/.env.example:1) for the expected names.
 
 Do not place Supabase service-role keys, provider API tokens, Render scraper credentials, Bunny keys, or Meta/OpenRouter secrets in `VITE_*` variables.
+
+The two feature variables are browser-safe compile-time booleans. Only literal
+`true` enables them. Follow
+[PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1) for remote-state
+and reactivation requirements.
 
 ## Invite-Only Signup And Email Verification Rollout Checklist
 

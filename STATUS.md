@@ -1,5 +1,8 @@
 # ESP Bridge Update And Offline Software Status
 
+> **On hold July 9, 2026.** No active bridge milestone is authorized. See
+> [docs/PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1).
+
 ## Documentation Status - June 1, 2026
 
 This root-level status file is retained as the ESP bridge update/offline software status log. It is not a global project status page. Current project-wide hardening and polish next steps live in [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1), and the documentation inventory lives in [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).

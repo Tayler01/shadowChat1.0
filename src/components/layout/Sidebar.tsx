@@ -6,7 +6,6 @@ import { UserPresenceBadge } from '../ui/UserPresenceBadge';
 import { UserAchievementBadges } from '../ui/UserAchievementBadges';
 import { useAuth } from '../../hooks/useAuth';
 import { useDirectMessages } from '../../hooks/useDirectMessages';
-import { useBoardBadges } from '../../hooks/useBoardBadges';
 import { getPresenceStateLabel, usePresenceForUser } from '../../hooks/usePresence';
 import type { AppView } from '../../types/navigation';
 
@@ -18,6 +17,8 @@ interface SidebarProps {
   onNewDM?: () => void;
   isOpen: boolean;
   onClose: () => void;
+  boardsEnabled?: boolean;
+  boardsBadgeCount?: number;
 }
 
 export function Sidebar({
@@ -28,11 +29,12 @@ export function Sidebar({
   onNewDM,
   isOpen,
   onClose,
+  boardsEnabled = false,
+  boardsBadgeCount = 0,
 }: SidebarProps) {
   const { user } = useAuth();
   const myPresence = usePresenceForUser(user?.id);
   const { conversations } = useDirectMessages();
-  const { count: boardsBadgeCount } = useBoardBadges();
   const myPresenceState =
     myPresence?.presence_state ||
     (user?.presence_visibility === 'invisible' ? 'invisible' : 'offline');
@@ -52,12 +54,12 @@ export function Sidebar({
       icon: Users,
       badge: totalUnread > 0 ? totalUnread : null,
     },
-    {
+    ...(boardsEnabled ? [{
       id: 'boards' as const,
       label: 'Boards',
       icon: Newspaper,
       badge: boardsBadgeCount > 0 ? boardsBadgeCount : null,
-    },
+    }] : []),
     {
       id: 'games' as const,
       label: 'Entertainment',

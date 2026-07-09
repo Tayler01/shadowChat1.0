@@ -6,6 +6,11 @@ This document is a high-signal map of the current ShadowChat codebase.
 
 This architecture map is current for the shipped `main` branch and now includes the June 19 Shadow Runner Candle Fair Level 5 route, June 16 Golden Egg discovery visual refresh, plus the June 15 Shadow Runner Bell Tower Level 4, Web Audio soundtrack controller, tap-toggle crouch, completion-medal schema, push-subscription foreground repair, and feature auth-refresh hardening work. Known architecture follow-ups are tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1): remaining Supabase policy/RPC hardening, service-role bypass checks, production deployment/smoke for all shared safe-fetch adopters, frontend polish, and broader realtime/send/scroll helper extraction.
 
+Boards, News, Art Board, and ESP Bridge are preserved but compile-time paused
+in the default production frontend as of July 9, 2026. Their modules and backend
+domains remain documented below as dormant architecture. See
+[PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1).
+
 ## High-Level System
 
 ```text

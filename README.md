@@ -1,6 +1,6 @@
 # ShadowChat 1.0
 
-ShadowChat 1.0 is a premium dark realtime chat app built with React, TypeScript, Vite, and Supabase. It combines a public group chat, private direct messages, a realtime Boards surface, admin tools, profile customization, AI-assisted chat utilities, browser push notifications, and a per-user weather widget behind a polished black-and-gold interface.
+ShadowChat 1.0 is a premium dark realtime chat app built with React, TypeScript, Vite, and Supabase. Its active production surface combines public group chat, private direct messages, Entertainment, ShadowPin, admin tools, profile customization, AI-assisted chat utilities, browser push notifications, and a per-user weather widget behind a polished black-and-gold interface. Boards, News, Art Board, and ESP Bridge are preserved but intentionally paused; see [docs/PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1).
 
 The project is already wired for hosted Supabase and Netlify deployment. It is designed to behave like a product app, not a demo: realtime messaging, uploads, presence, settings, DMs, and notification flows are all first-class parts of the codebase.
 
@@ -20,7 +20,7 @@ Current known follow-up areas are documentation-backed: Supabase policy/RPC hard
 - Phaser for the Shadow Runner playable prototype
 - Supabase Auth, Postgres, Realtime, Storage, and Edge Functions
 - Netlify for static hosting
-- Render worker service for the always-on News scraper
+- Preserved Render worker definition for the currently paused News scraper
 - Playwright browser automation for News ingestion and QA
 - Jest + Testing Library for unit and hook coverage
 - Playwright for headed browser debugging and smoke validation
@@ -40,7 +40,7 @@ Current known follow-up areas are documentation-backed: Supabase policy/RPC hard
   shrink-wrapped media cards without changing text/file/audio bubbles
 - Slash commands and reply/thread affordances
 - AI reply and summary hooks through a secured Supabase Edge Function
-- Boards tab with a low-friction draggable board map, feed pills, chat circles, static board squares, collision sparkle/sound feedback, the existing News Feed, News Chat, Investing Chat, Learning Chat, Crypto Chat, and a shared Art Board mood canvas
+- Preserved, default-off Boards domain with its draggable map, News Feed, board chats, and Art Board mood canvas
 - App-wide admin/sub-admin access controls with role badges and operator-only tools
 - Operator-managed bans for General Chat, individual chat boards, and all app interaction
 - Server-confirmed operator message deletion for normal-user General Chat and board-chat messages

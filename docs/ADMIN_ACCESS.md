@@ -4,6 +4,11 @@
 
 Updated after the June 8, 2026 automation approval queue rollout. This doc reflects the shipped admin model, Settings > Admin > Invites, and Settings > Admin > Automation Approvals surfaces. Pending hardening includes treating `users.admin_role` as display-only and using `user_roles`/operator RPCs for server-side authority everywhere.
 
+Settings > Admin > News Sources and ESP Bridge Pairing are intentionally absent
+from the default build while those product domains are paused. Their panel source
+and tests remain available for a reviewed re-enable; see
+[PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1).
+
 ShadowChat now uses one app-wide admin model instead of a News-only operator
 role.
 

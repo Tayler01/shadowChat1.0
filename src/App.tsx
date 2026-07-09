@@ -21,11 +21,11 @@ import { HypeCelebrationController } from './components/hype/HypeCelebrationCont
 import { useSessionResumeRecovery } from './hooks/useSessionResumeRecovery'
 import { useAdminRoleNotifications } from './hooks/useAdminRoleNotifications'
 import { useChannelBanExpirySweep } from './hooks/useChannelBanExpirySweep'
-import { useArtBoardReactionNotifications } from './hooks/useArtBoardReactionNotifications'
 import { useTheme } from './hooks/useTheme'
-import { BoardBadgesProvider } from './hooks/useBoardBadges'
 import { WeatherProvider } from './hooks/useWeatherForecast'
 import { computeMobileViewportState, MOBILE_VIEWPORT_UPDATED_EVENT } from './lib/mobileViewport'
+import { BOARDS_FEATURE_ENABLED } from './config/featureFlags'
+import { getLocationStateFromUrl, type AppLocationState as LocationState } from './lib/appRouting'
 import type { AppView as View } from './types/navigation'
 
 const DirectMessagesView = lazy(() =>
@@ -40,11 +40,21 @@ const SettingsView = lazy(() =>
   }))
 )
 
-const BoardsView = lazy(() =>
-  import('./components/boards/BoardsView').then(module => ({
-    default: module.BoardsView,
-  }))
-)
+const BoardsView = BOARDS_FEATURE_ENABLED
+  ? lazy(() =>
+      import('./components/boards/BoardsView').then(module => ({
+        default: module.BoardsView,
+      }))
+    )
+  : null
+
+const BoardsRuntime = BOARDS_FEATURE_ENABLED
+  ? lazy(() =>
+      import('./components/boards/BoardsRuntime').then(module => ({
+        default: module.BoardsRuntime,
+      }))
+    )
+  : null
 
 const GamesHome = lazy(() =>
   import('./features/games/GamesHome').then(module => ({
@@ -57,36 +67,6 @@ const ShadowPin = lazy(() =>
     default: module.ShadowPin,
   }))
 )
-
-type LocationState = {
-  view: View
-  conversation: string | null
-  message: string | null
-}
-
-const isView = (value: string | null): value is View => (
-  value === 'chat' || value === 'dms' || value === 'boards' || value === 'games' || value === 'pins' || value === 'settings'
-)
-
-const normalizeViewParam = (value: string | null): View | null => {
-  if (value === 'news') return 'boards'
-  if (isView(value)) return value
-  return null
-}
-
-const getLocationStateFromUrl = (url: URL): LocationState => {
-  const params = new URLSearchParams(url.search)
-  const nextView = params.get('view')
-  const view = nextView === 'profile'
-    ? 'settings'
-    : normalizeViewParam(nextView) ?? ('chat' as View)
-
-  return {
-    view,
-    conversation: view === 'dms' ? params.get('conversation') : null,
-    message: view === 'dms' || view === 'chat' ? params.get('message') : null,
-  }
-}
 
 const getInitialLocationState = (): LocationState => {
   if (typeof window === 'undefined') {
@@ -113,7 +93,6 @@ function App() {
   useSessionResumeRecovery()
   useAdminRoleNotifications()
   useChannelBanExpirySweep()
-  useArtBoardReactionNotifications()
   const { scheme, setScheme, mode } = useTheme()
   const [currentView, setCurrentView] = useState<View>(() => getInitialLocationState().view)
   const [boardsResetKey, setBoardsResetKey] = useState(0)
@@ -286,17 +265,19 @@ function App() {
   const closeSidebar = () => setSidebarOpen(false)
 
   const handleViewChange = (view: View) => {
-    if (view === 'boards') {
+    const availableView = view === 'boards' && !BOARDS_FEATURE_ENABLED ? 'chat' : view
+
+    if (availableView === 'boards') {
       setBoardsResetKey(value => value + 1)
     }
-    if (view !== 'games') {
+    if (availableView !== 'games') {
       setGameImmersive(false)
     }
-    setCurrentView(view)
-    if (view !== 'dms') {
+    setCurrentView(availableView)
+    if (availableView !== 'dms') {
       setDmTarget(null)
     }
-    if (view !== currentView) {
+    if (availableView !== currentView) {
       setMessageTarget(null)
     }
   }
@@ -367,12 +348,18 @@ function App() {
           />
         )
       case 'boards':
-        return (
+        return BOARDS_FEATURE_ENABLED && BoardsView ? (
           <BoardsView
             resetKey={boardsResetKey}
             currentView={currentView}
             onViewChange={handleViewChange}
             onMobileChatActiveChange={setBoardsChatFooterActive}
+          />
+        ) : (
+          <ChatView
+            currentView="chat"
+            onViewChange={handleViewChange}
+            initialMessageId={messageTarget || undefined}
           />
         )
       case 'games':
@@ -409,6 +396,54 @@ function App() {
     }
   }
 
+  const renderAppShell = (boardsBadgeCount: number) => (
+    <WeatherProvider>
+      <AppBadgeSync />
+      <PushSubscriptionSync />
+      <PhoneInstallOnboarding />
+      <AppReleaseGate />
+      <GoldenEggDiscoveryController />
+      <HypeCelebrationController />
+      <div className={`app-viewport flex flex-col overflow-hidden md:flex-row ${hideAppChrome ? 'bg-black' : ''}`}>
+      {isDesktop && !hideAppChrome && (
+        <Sidebar
+          currentView={currentView}
+          onViewChange={handleViewChange}
+          isDarkMode={isDarkMode}
+          onToggleDarkMode={toggleDarkMode}
+          isOpen={sidebarOpen}
+          onClose={closeSidebar}
+          boardsEnabled={BOARDS_FEATURE_ENABLED}
+          boardsBadgeCount={boardsBadgeCount}
+        />
+      )}
+
+      {isDesktop && !hideAppChrome && sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-[var(--bg-overlay)] md:hidden"
+          onClick={closeSidebar}
+        />
+      )}
+
+      <main className="flex-1 flex min-h-0 flex-col min-w-0 overflow-hidden">
+        <Suspense fallback={<ViewLoadingState />}>
+          {renderCurrentView()}
+        </Suspense>
+      </main>
+
+      {/* Mobile bottom navigation */}
+      {!hideAppChrome && currentView !== 'chat' && currentView !== 'dms' && !(currentView === 'boards' && boardsChatFooterActive) && (
+        <MobileNav
+          currentView={currentView}
+          onViewChange={handleViewChange}
+          boardsEnabled={BOARDS_FEATURE_ENABLED}
+          boardsBadgeCount={boardsBadgeCount}
+        />
+      )}
+      </div>
+    </WeatherProvider>
+  )
+
   return (
     <>
       <AuthGuard>
@@ -417,46 +452,11 @@ function App() {
             <MessagesProvider>
               <HypeProvider>
                 <DirectMessagesProvider>
-                  <BoardBadgesProvider>
-                    <WeatherProvider>
-                      <AppBadgeSync />
-                      <PushSubscriptionSync />
-                      <PhoneInstallOnboarding />
-                      <AppReleaseGate />
-                      <GoldenEggDiscoveryController />
-                      <HypeCelebrationController />
-                      <div className={`app-viewport flex flex-col overflow-hidden md:flex-row ${hideAppChrome ? 'bg-black' : ''}`}>
-                      {isDesktop && !hideAppChrome && (
-                        <Sidebar
-                          currentView={currentView}
-                          onViewChange={handleViewChange}
-                          isDarkMode={isDarkMode}
-                          onToggleDarkMode={toggleDarkMode}
-                          isOpen={sidebarOpen}
-                          onClose={closeSidebar}
-                        />
-                      )}
-
-                      {isDesktop && !hideAppChrome && sidebarOpen && (
-                        <div
-                          className="fixed inset-0 bg-[var(--bg-overlay)] md:hidden"
-                          onClick={closeSidebar}
-                        />
-                      )}
-
-                      <main className="flex-1 flex min-h-0 flex-col min-w-0 overflow-hidden">
-                        <Suspense fallback={<ViewLoadingState />}>
-                          {renderCurrentView()}
-                        </Suspense>
-                      </main>
-
-                      {/* Mobile bottom navigation */}
-                      {!hideAppChrome && currentView !== 'chat' && currentView !== 'dms' && !(currentView === 'boards' && boardsChatFooterActive) && (
-                        <MobileNav currentView={currentView} onViewChange={handleViewChange} />
-                      )}
-                      </div>
-                    </WeatherProvider>
-                  </BoardBadgesProvider>
+                  {BOARDS_FEATURE_ENABLED && BoardsRuntime ? (
+                    <Suspense fallback={<ViewLoadingState />}>
+                      <BoardsRuntime>{renderAppShell}</BoardsRuntime>
+                    </Suspense>
+                  ) : renderAppShell(0)}
                 </DirectMessagesProvider>
               </HypeProvider>
             </MessagesProvider>

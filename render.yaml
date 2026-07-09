@@ -3,6 +3,9 @@ services:
     name: shado-news-scraper
     runtime: docker
     plan: standard
+    # Intentionally paused as of 2026-07-09. Keep automatic deploys off until
+    # the News/Boards product domain is explicitly approved for reactivation.
+    autoDeployTrigger: off
     dockerfilePath: ./services/news-scraper/Dockerfile
     dockerContext: .
     envVars:
