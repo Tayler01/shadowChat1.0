@@ -1,4 +1,3 @@
-import React from 'react'
 import { Copy, ExternalLink, Play, Share2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Button } from '../ui/Button'

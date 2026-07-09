@@ -1,4 +1,3 @@
-import React from 'react'
 import { render, screen } from '@testing-library/react'
 import { ShadowWarBattleCinematic } from '../src/features/games/shadow-war/components/ShadowWarBattleCinematic'
 import { createCardInstance } from '../src/features/games/shadow-war/engine/cards'

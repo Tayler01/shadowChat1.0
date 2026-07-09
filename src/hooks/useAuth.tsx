@@ -95,14 +95,6 @@ function useProvideAuth() {
     setPasswordRecovery(nextPasswordRecovery);
   };
 
-  const updateUserState = (updater: (current: User | null) => User | null) => {
-    setUser(prev => {
-      const nextUser = updater(prev);
-      userRef.current = nextUser;
-      return nextUser;
-    });
-  };
-
   useEffect(() => {
     mountedRef.current = true;
 

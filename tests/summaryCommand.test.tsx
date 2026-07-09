@@ -1,5 +1,4 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import React from 'react'
 import { MessageInput } from '../src/components/chat/MessageInput'
 import { summarizeConversation } from '../src/lib/ai'
 

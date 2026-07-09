@@ -63,6 +63,9 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit -p tsconfig.app.json
 
+      - name: Node tests
+        run: npm run test:node
+
       - name: Build with Netlify preview environment
         run: npx --yes netlify@$NETLIFY_CLI_VERSION build --context deploy-preview
 

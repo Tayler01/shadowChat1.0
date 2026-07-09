@@ -1,4 +1,3 @@
-import React from 'react'
 import { BellRing } from 'lucide-react'
 import { Button } from '../ui/Button'
 import { useOptionalHype } from '../../hooks/useHype'

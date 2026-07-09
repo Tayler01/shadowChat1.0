@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { AuthGuard } from './components/auth/AuthGuard'
 import { Sidebar } from './components/layout/Sidebar'

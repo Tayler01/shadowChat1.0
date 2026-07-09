@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { Satellite } from 'lucide-react'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { NewsFeedItem } from './NewsFeedItem'

@@ -10,9 +10,6 @@ import type {
 
 export const SHADOW_WAR_LANES: readonly ShadowWarLane[] = ['left', 'center', 'right'] as const
 
-const otherSlot = (slot: ShadowWarPlayerSlot): ShadowWarPlayerSlot =>
-  slot === 'player_one' ? 'player_two' : 'player_one'
-
 const getLaneIndex = (lane: ShadowWarLane) => SHADOW_WAR_LANES.indexOf(lane)
 
 const getAdjacentLanes = (lane: ShadowWarLane) => {

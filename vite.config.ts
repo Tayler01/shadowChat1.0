@@ -16,6 +16,11 @@ export default defineConfig(({ mode }) => {
       exclude: ['lucide-react'],
     },
     build: {
+      manifest: true,
+      // Phaser is loaded only after the user enters Shadow Runner. The build
+      // budget verifier below applies a tighter, explicit lazy-chunk exception
+      // while keeping the initial route and every other chunk below 525 kB.
+      chunkSizeWarningLimit: 1550,
       rollupOptions: {
         output: {
           manualChunks(id) {
@@ -45,7 +50,7 @@ export default defineConfig(({ mode }) => {
               return 'vendor-phaser'
             }
 
-            return 'vendor-ui'
+            return undefined
           },
         },
       },

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MoreHorizontal, Plus } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useAuth } from '../../hooks/useAuth'

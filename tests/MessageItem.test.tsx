@@ -965,8 +965,13 @@ test('offers Hype for another user message and calls the Hype action', async () 
     />
   )
 
-  await userEvent.click(screen.getByRole('button', { name: /message actions/i }))
-  await userEvent.click(await screen.findByRole('menuitem', { name: /hype/i }))
+  act(() => {
+    fireEvent.click(screen.getByRole('button', { name: /message actions/i }))
+  })
+  const hypeAction = await screen.findByRole('menuitem', { name: /hype/i })
+  act(() => {
+    fireEvent.click(hypeAction)
+  })
 
   expect(hypeMessage).toHaveBeenCalledWith('m1')
 })
@@ -995,7 +1000,9 @@ test('shows Hype count and tap list on celebrated messages', async () => {
   const chip = screen.getByRole('button', { name: /hyped by bob, maya/i })
   expect(chip).toHaveTextContent('3')
 
-  await userEvent.click(chip)
+  act(() => {
+    fireEvent.click(chip)
+  })
 
   expect(screen.getByText('Hyped by')).toBeInTheDocument()
   expect(screen.getByText('Bob')).toBeInTheDocument()

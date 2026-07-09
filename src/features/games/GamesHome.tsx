@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Film, Gamepad2, Volume2, VolumeX } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { createGameSoundtrackController, type GameSoundtrackController } from './gameSoundtrack'

@@ -1,5 +1,4 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import React from 'react'
 import { SettingsView } from '../src/components/settings/SettingsView'
 import { BridgePairingAdminPanel } from '../src/components/settings/BridgePairingAdminPanel'
 import { NewsSourcesAdminPanel } from '../src/components/settings/NewsSourcesAdminPanel'

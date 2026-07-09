@@ -1,5 +1,4 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import React from 'react'
 import { AdminInvitesPanel } from '../src/components/settings/AdminInvitesPanel'
 
 const mockRefresh = jest.fn()

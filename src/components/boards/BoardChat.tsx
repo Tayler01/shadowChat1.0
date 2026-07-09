@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { MessageList } from '../chat/MessageList'
 import { MessageInput } from '../chat/MessageInput'
 import { MobileChatFooter } from '../layout/MobileChatFooter'

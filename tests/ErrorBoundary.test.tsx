@@ -1,5 +1,4 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import React from 'react';
 import ErrorBoundary from '../src/components/ErrorBoundary';
 
 test('displays fallback when child throws', () => {

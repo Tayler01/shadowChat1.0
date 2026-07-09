@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react'
-import React from 'react'
 import { PhoneInstallGuide } from '../src/components/onboarding/PhoneInstallGuide'
 
 const defaultProps = {

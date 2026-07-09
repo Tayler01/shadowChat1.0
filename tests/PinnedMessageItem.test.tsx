@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react'
-import React from 'react'
 import { PinnedMessageItem } from '../src/components/chat/PinnedMessageItem'
 import type { Message } from '../src/lib/supabase'
 

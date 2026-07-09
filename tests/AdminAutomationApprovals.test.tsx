@@ -1,5 +1,4 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import React from 'react'
 import { AdminAutomationApprovals } from '../src/components/settings/AdminAutomationApprovals'
 
 const mockRefresh = jest.fn()

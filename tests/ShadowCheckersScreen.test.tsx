@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react'
-import React from 'react'
 import { ShadowCheckersScreen } from '../src/features/games/shadow-checkers/ShadowCheckersScreen'
 import { createInitialBoard, serializeBoard } from '../src/features/games/shadow-checkers/engine/checkers'
 import type { BasicUser, ShadowCheckersMatch } from '../src/lib/supabase'

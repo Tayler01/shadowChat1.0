@@ -1,4 +1,3 @@
-import React from 'react'
 import { Play } from 'lucide-react'
 import { NewsReactionBar, NewsReactionSummaryStrip } from './NewsReactionBar'
 import { NewsMediaImage } from './NewsMediaImage'

@@ -1,5 +1,4 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import React from 'react'
 import { ArtBoard } from '../src/components/art/ArtBoard'
 
 const mockCreateItem = jest.fn()

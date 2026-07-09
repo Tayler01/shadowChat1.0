@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Check, CloudSun, Loader2, MapPin, Search, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useWeatherPreference } from '../../hooks/useWeatherPreference'

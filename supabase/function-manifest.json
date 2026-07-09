@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "active": [
+    { "name": "delete-account", "verifyJwt": false },
+    { "name": "klipy-gifs", "verifyJwt": true },
+    { "name": "link-preview", "verifyJwt": false },
+    { "name": "openai-chat", "verifyJwt": false },
+    { "name": "send-push", "verifyJwt": false },
+    { "name": "shado-tv-bunny-upload", "verifyJwt": true },
+    { "name": "shadow-pin-import-image", "verifyJwt": true },
+    { "name": "shadow-pin-video", "verifyJwt": false }
+  ],
+  "pausedDeny": [
+    { "name": "bridge-dm-poll", "verifyJwt": false },
+    { "name": "bridge-dm-send", "verifyJwt": false },
+    { "name": "bridge-group-poll", "verifyJwt": false },
+    { "name": "bridge-group-send", "verifyJwt": false },
+    { "name": "bridge-heartbeat", "verifyJwt": false },
+    { "name": "bridge-pairing-approve", "verifyJwt": false },
+    { "name": "bridge-pairing-begin", "verifyJwt": false },
+    { "name": "bridge-pairing-revoke", "verifyJwt": false },
+    { "name": "bridge-pairing-status", "verifyJwt": false },
+    { "name": "bridge-register", "verifyJwt": false },
+    { "name": "bridge-session-exchange", "verifyJwt": false },
+    { "name": "bridge-session-refresh", "verifyJwt": false },
+    { "name": "bridge-update-check", "verifyJwt": false },
+    { "name": "bridge-user-profile", "verifyJwt": false },
+    { "name": "bridge-user-search", "verifyJwt": false }
+  ],
+  "pausedRemove": [
+    { "name": "art-board-import-image", "verifyJwt": true }
+  ]
+}

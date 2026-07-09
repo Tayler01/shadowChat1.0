@@ -1,4 +1,3 @@
-import React from 'react'
 import { Ghost } from 'lucide-react'
 import { usePresenceForUser } from '../../hooks/usePresence'
 import type { PresenceVisibility } from '../../types'

@@ -1,4 +1,3 @@
-import React from 'react'
 import { act, render } from '@testing-library/react'
 import { MobileChatFooter } from '../src/components/layout/MobileChatFooter'
 

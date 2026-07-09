@@ -1,4 +1,3 @@
-import React from 'react'
 import { Gamepad2, Images, MessageSquare, Newspaper, Users } from 'lucide-react'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
 import type { AppView } from '../../types/navigation'

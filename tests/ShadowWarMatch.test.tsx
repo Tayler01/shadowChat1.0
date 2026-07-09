@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react'
-import React from 'react'
 import { ShadowWarMatch } from '../src/features/games/shadow-war/components/ShadowWarMatch'
 import type {
   GameSession,

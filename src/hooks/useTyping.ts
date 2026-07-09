@@ -133,7 +133,7 @@ export const useTyping = (channelName: string = 'general') => {
         clearTimeout(typingTimeoutRef.current)
         typingTimeoutRef.current = undefined
       }
-    } catch (err) {
+    } catch {
     }
   }, [user])
 
@@ -172,7 +172,7 @@ export const useTyping = (channelName: string = 'general') => {
         }
       })
 
-    } catch (err) {
+    } catch {
     }
   }, [user, stopTyping])
 

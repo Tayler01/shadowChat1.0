@@ -1,5 +1,4 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import React from 'react'
 import { WeatherLocationSettings } from '../src/components/settings/WeatherLocationSettings'
 import { searchWeatherLocations } from '../src/lib/weather'
 

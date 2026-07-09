@@ -1,5 +1,4 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import React from 'react'
 import { MobileNav } from '../src/components/layout/MobileNav'
 import { Sidebar } from '../src/components/layout/Sidebar'
 

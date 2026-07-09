@@ -143,7 +143,7 @@ test('loads older board chat messages with a stable created_at and id cursor', a
       createMessage(`00000000-0000-0000-0000-0000000001${String(index).padStart(2, '0')}`, index + 3)
     ),
   ]
-  const { messagesQuery: initialQuery } = queueBoardWindow(initialMessages)
+  queueBoardWindow(initialMessages)
   const { messagesQuery: olderQuery } = queueBoardWindow([
     createMessage('00000000-0000-0000-0000-000000000090', 1),
   ])

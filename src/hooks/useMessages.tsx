@@ -1174,7 +1174,7 @@ function useProvideMessages(): MessagesContextValue {
                 if (clientResetRef.current) {
                   await clientResetRef.current();
                 }
-              } catch (resetError) {
+              } catch {
                 setTimeout(() => {
                   void subscriptionManager?.resubscribe()
                     .then(newCh => {
@@ -1194,7 +1194,7 @@ function useProvideMessages(): MessagesContextValue {
               if (clientResetRef.current) {
                 await clientResetRef.current();
               }
-            } catch (resetError) {
+            } catch {
               setTimeout(() => {
                 void subscriptionManager?.resubscribe()
                   .then(newCh => {

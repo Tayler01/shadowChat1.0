@@ -1,5 +1,4 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import React from 'react'
 import { AdminFeedbackReview } from '../src/components/settings/AdminFeedbackReview'
 
 const mockRefresh = jest.fn()

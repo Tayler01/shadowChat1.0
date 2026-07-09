@@ -1,5 +1,4 @@
 import { act, render } from '@testing-library/react'
-import React from 'react'
 import { VideoAttachment } from '../src/components/chat/VideoAttachment'
 
 const originalIntersectionObserver = globalThis.IntersectionObserver

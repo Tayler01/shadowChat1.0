@@ -1,7 +1,6 @@
 import { act, render, screen } from '@testing-library/react'
 import { createEvent, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import React from 'react'
 import { MessageInput } from '../src/components/chat/MessageInput'
 import { isShadowPinImageShareUrl } from '../src/components/chat/shadowPinShareLinks'
 import toast from 'react-hot-toast'

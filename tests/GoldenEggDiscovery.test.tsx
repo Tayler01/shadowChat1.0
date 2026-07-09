@@ -1,5 +1,4 @@
 import { act, createEvent, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import React from 'react'
 import { GoldenEggDiscoveryController } from '../src/components/easter-egg/GoldenEggDiscovery'
 import { GoldenEggDiscoveryLogo } from '../src/components/easter-egg/GoldenEggDiscoveryLogo'
 import { claimGoldEasterEgg } from '../src/lib/supabase'

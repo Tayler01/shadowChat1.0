@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ArrowLeft, Settings } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { ActiveUsersButton } from '../chat/ActiveUsersButton'

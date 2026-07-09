@@ -1,4 +1,3 @@
-import React from 'react';
 import { Gamepad2, Images, MessageSquare, Users, Newspaper, Settings, Moon, Sun, X } from 'lucide-react';
 import { Avatar } from '../ui/Avatar';
 import { UserRoleBadge } from '../ui/UserRoleBadge';
@@ -14,7 +13,6 @@ interface SidebarProps {
   onViewChange: (view: AppView) => void;
   isDarkMode: boolean;
   onToggleDarkMode: () => void;
-  onNewDM?: () => void;
   isOpen: boolean;
   onClose: () => void;
   boardsEnabled?: boolean;
@@ -26,7 +24,6 @@ export function Sidebar({
   onViewChange,
   isDarkMode,
   onToggleDarkMode,
-  onNewDM,
   isOpen,
   onClose,
   boardsEnabled = false,

@@ -1,5 +1,4 @@
 import { act, createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import React from 'react'
 import { ShadowPin } from '../src/features/shadow-pin/ShadowPin'
 import { ShadowPinGoldPinBadge } from '../src/features/shadow-pin/components/ShadowPinGoldPinBadge'
 

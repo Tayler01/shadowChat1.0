@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Archive, ArrowLeft, Camera, ChevronRight, Clock, MapPin } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { SHADOW_MYSTERY_ASSETS } from './assets/manifest'
