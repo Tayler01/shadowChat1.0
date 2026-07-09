@@ -3,6 +3,12 @@ import type { User as SupabaseAuthUser } from '@supabase/supabase-js'
 import type { User as AppUser } from './supabase'
 import { optimizeImageFile } from './imageOptimization'
 import { createStoredImageAsset } from './mediaAssets'
+import {
+  AVATAR_UPLOAD_RULE,
+  BANNER_UPLOAD_RULE,
+  sanitizeUploadFileName,
+  validateUpload,
+} from './uploadLimits'
 
 const AVATAR_BUCKET = 'avatars'
 const BANNER_BUCKET = 'banners'
@@ -337,6 +343,8 @@ export const updateUserProfile = async (updates: Partial<{
 }
 
 export const uploadUserAvatar = async (file: File) => {
+  validateUpload(file, AVATAR_UPLOAD_RULE)
+
   const sessionValid = await ensureSession(true)
   if (!sessionValid) throw new Error('Not authenticated')
 
@@ -351,10 +359,12 @@ export const uploadUserAvatar = async (file: File) => {
     quality: 0.84,
     fileNamePrefix: 'avatar',
   })
-  const filePath = `${user.id}/${Date.now()}_${uploadFile.name}`
+  const contentType = validateUpload(uploadFile, AVATAR_UPLOAD_RULE)
+  const safeName = sanitizeUploadFileName(uploadFile.name, 'avatar')
+  const filePath = `${user.id}/${Date.now()}_${safeName}`
   const { error } = await workingClient.storage.from(AVATAR_BUCKET).upload(filePath, uploadFile, {
     upsert: true,
-    contentType: uploadFile.type,
+    contentType,
     cacheControl: '31536000',
   })
   if (error) throw error
@@ -369,6 +379,8 @@ export const uploadUserAvatar = async (file: File) => {
 }
 
 export const uploadUserBanner = async (file: File) => {
+  validateUpload(file, BANNER_UPLOAD_RULE)
+
   const sessionValid = await ensureSession(true)
   if (!sessionValid) throw new Error('Not authenticated')
 
@@ -382,10 +394,12 @@ export const uploadUserBanner = async (file: File) => {
     quality: 0.82,
     fileNamePrefix: 'banner',
   })
-  const filePath = `${user.id}/${Date.now()}_${uploadFile.name}`
+  const contentType = validateUpload(uploadFile, BANNER_UPLOAD_RULE)
+  const safeName = sanitizeUploadFileName(uploadFile.name, 'banner')
+  const filePath = `${user.id}/${Date.now()}_${safeName}`
   const { error } = await workingClient.storage.from(BANNER_BUCKET).upload(filePath, uploadFile, {
     upsert: true,
-    contentType: uploadFile.type,
+    contentType,
     cacheControl: '31536000',
   })
   if (error) throw error

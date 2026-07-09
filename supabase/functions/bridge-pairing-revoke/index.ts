@@ -9,6 +9,7 @@ import {
   normalizeText,
   notFound,
   readJson,
+  requireBridgeApiEnabled,
 } from '../_shared/bridge.ts'
 
 type PairingRevokePayload = {
@@ -20,6 +21,11 @@ type PairingRevokePayload = {
 serve(async req => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
+  }
+
+  const featurePauseResponse = requireBridgeApiEnabled()
+  if (featurePauseResponse) {
+    return featurePauseResponse
   }
 
   if (req.method !== 'POST') {

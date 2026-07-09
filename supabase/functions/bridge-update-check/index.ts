@@ -7,6 +7,7 @@ import {
   json,
   normalizeText,
   readJson,
+  requireBridgeApiEnabled,
 } from '../_shared/bridge.ts'
 
 type UpdateTarget = 'firmware' | 'windows_bundle' | 'bootstrap'
@@ -158,6 +159,11 @@ const toManifestResponse = (manifest: BridgeUpdateManifest) => ({
 serve(async req => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
+  }
+
+  const featurePauseResponse = requireBridgeApiEnabled()
+  if (featurePauseResponse) {
+    return featurePauseResponse
   }
 
   if (req.method !== 'POST') {

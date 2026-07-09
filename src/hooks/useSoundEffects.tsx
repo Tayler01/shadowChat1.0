@@ -7,7 +7,6 @@ import React, {
   useCallback,
   useRef,
 } from 'react'
-import { getWorkingClient } from '../lib/supabase'
 
 interface SoundEffectsContextValue {
   enabled: boolean
@@ -22,15 +21,45 @@ interface SoundEffectsContextValue {
 
 const SoundEffectsContext = createContext<SoundEffectsContextValue | undefined>(undefined)
 
-const defaultUrls = {
-  message: '/sounds/message.mp3',
-  reaction: '/sounds/reaction.mp3',
+type ToneVariant = 'message' | 'reaction' | 'hype-bell' | 'hype-message'
+
+type ToneDefinition = {
+  frequencies: readonly number[]
+  interval: number
+  duration: number
+  oscillator: OscillatorType
+  peakGain: number
 }
 
-const isUsableSoundUrl = (value: unknown): value is string => {
-  if (typeof value !== 'string' || !value.trim()) return false
-  if (value.includes('example.com')) return false
-  return value.startsWith('/') || /^https?:\/\//i.test(value)
+const toneDefinitions: Record<ToneVariant, ToneDefinition> = {
+  message: {
+    frequencies: [523.25, 783.99],
+    interval: 0.075,
+    duration: 0.3,
+    oscillator: 'sine',
+    peakGain: 0.08,
+  },
+  reaction: {
+    frequencies: [659.25, 1046.5],
+    interval: 0.055,
+    duration: 0.22,
+    oscillator: 'triangle',
+    peakGain: 0.065,
+  },
+  'hype-bell': {
+    frequencies: [784, 988, 1175, 1568],
+    interval: 0.085,
+    duration: 0.52,
+    oscillator: 'triangle',
+    peakGain: 0.16,
+  },
+  'hype-message': {
+    frequencies: [523, 659, 880, 1319],
+    interval: 0.085,
+    duration: 0.52,
+    oscillator: 'sine',
+    peakGain: 0.16,
+  },
 }
 
 function useProvideSoundEffects(): SoundEffectsContextValue {
@@ -52,23 +81,24 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
     return true
   })
 
-  const [urls, setUrls] = useState(() => {
-    if (typeof localStorage !== 'undefined') {
-      try {
-        const raw = localStorage.getItem('notificationSoundUrls')
-        if (raw) {
-          const parsed = JSON.parse(raw) as Record<string, string>
-          return { ...defaultUrls, ...parsed }
-        }
-      } catch {
-        // ignore parse errors
-      }
-    }
-    return defaultUrls
-  })
+  const audioContextRef = useRef<AudioContext | null>(null)
 
-  const messageAudioRef = useRef<HTMLAudioElement | null>(null)
-  const reactionAudioRef = useRef<HTMLAudioElement | null>(null)
+  const ensureAudioContext = useCallback(() => {
+    if (typeof window === 'undefined') return null
+
+    const existing = audioContextRef.current
+    if (existing && existing.state !== 'closed') return existing
+
+    const audioWindow = window as typeof window & {
+      webkitAudioContext?: typeof AudioContext
+    }
+    const AudioContextCtor = window.AudioContext ?? audioWindow.webkitAudioContext
+    if (!AudioContextCtor) return null
+
+    const context = new AudioContextCtor()
+    audioContextRef.current = context
+    return context
+  }, [])
 
   useEffect(() => {
     try {
@@ -87,124 +117,88 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
   }, [hypeEnabled])
 
   useEffect(() => {
-    ;(async () => {
-      try {
-        const client = await getWorkingClient()
-        const { data, error } = await client
-          .from('notification_sounds')
-          .select('name, url')
-        if (!error && data) {
-          const map = { ...defaultUrls }
-          ;(data as Array<{ name?: unknown; url?: unknown }>).forEach(row => {
-            if (row.name === 'message' && isUsableSoundUrl(row.url)) map.message = row.url
-            if (row.name === 'reaction' && isUsableSoundUrl(row.url)) map.reaction = row.url
-          })
-          setUrls(map)
-          try {
-            localStorage.setItem('notificationSoundUrls', JSON.stringify(map))
-          } catch {
-            // ignore storage errors
-          }
-        }
-      } catch {
-        // ignore fetch errors
-      }
-    })()
-  }, [])
-
-  useEffect(() => {
-    const message = new Audio(urls.message)
-    message.crossOrigin = 'anonymous'
-    message.volume = 0.5
-    message.load()
-    messageAudioRef.current = message
-
-    const reaction = new Audio(urls.reaction)
-    reaction.crossOrigin = 'anonymous'
-    reaction.volume = 0.5
-    reaction.load()
-    reactionAudioRef.current = reaction
-
-    // Unlock audio playback on first user interaction (required on mobile)
-    const unlock = () => {
-      ;[messageAudioRef.current, reactionAudioRef.current].forEach(a => {
-        if (!a) return
-        try {
-          a.play().catch(() => {})
-          a.pause()
-          a.currentTime = 0
-        } catch {
-          // ignore errors
-        }
-      })
-      document.removeEventListener('touchstart', unlock)
-      document.removeEventListener('click', unlock)
-    }
-    document.addEventListener('touchstart', unlock, { once: true })
-    document.addEventListener('click', unlock, { once: true })
-    return () => {
-      document.removeEventListener('touchstart', unlock)
-      document.removeEventListener('click', unlock)
-    }
-  }, [urls])
-
-  const play = useCallback(
-    (audio: HTMLAudioElement | null | undefined) => {
-      if (!enabled || !audio) return
-      try {
-        audio.currentTime = 0
-        audio.play().catch(() => {})
-      } catch {
-        // ignore playback errors
-      }
-    },
-    [enabled]
-  )
-
-  const playMessage = useCallback(() => play(messageAudioRef.current), [play])
-  const playReaction = useCallback(() => play(reactionAudioRef.current), [play])
-
-  const playHypeTone = useCallback((variant: 'bell' | 'message') => {
-    if (!hypeEnabled || typeof window === 'undefined') return
-
-    const audioWindow = window as typeof window & { webkitAudioContext?: typeof AudioContext }
-    const AudioContextCtor = window.AudioContext ?? audioWindow.webkitAudioContext
-    if (!AudioContextCtor) return
-
     try {
-      const context = new AudioContextCtor()
+      localStorage.removeItem('notificationSoundUrls')
+    } catch {
+      // Ignore storage errors while retiring the old remote-sound cache.
+    }
+
+    // Create and resume the shared context from a user gesture for mobile browsers.
+    const unlock = () => {
+      try {
+        const context = ensureAudioContext()
+        if (context?.state === 'suspended') {
+          context.resume().catch(() => {})
+        }
+      } catch {
+        // Visual feedback still runs if browser audio is unavailable.
+      }
+    }
+    document.addEventListener('pointerdown', unlock, { once: true })
+    document.addEventListener('keydown', unlock, { once: true })
+
+    return () => {
+      document.removeEventListener('pointerdown', unlock)
+      document.removeEventListener('keydown', unlock)
+
+      const context = audioContextRef.current
+      audioContextRef.current = null
+      if (context && context.state !== 'closed') {
+        context.close().catch(() => {})
+      }
+    }
+  }, [ensureAudioContext])
+
+  const playTone = useCallback((variant: ToneVariant) => {
+    try {
+      const context = ensureAudioContext()
+      if (!context) return
+      if (context.state === 'suspended') {
+        context.resume().catch(() => {})
+      }
+
+      const definition = toneDefinitions[variant]
+      const startTime = context.currentTime
       const master = context.createGain()
-      master.gain.setValueAtTime(0.0001, context.currentTime)
-      master.gain.exponentialRampToValueAtTime(0.16, context.currentTime + 0.018)
-      master.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 1.05)
+      const finishTime = startTime
+        + definition.interval * (definition.frequencies.length - 1)
+        + definition.duration
+      master.gain.setValueAtTime(0.0001, startTime)
+      master.gain.exponentialRampToValueAtTime(definition.peakGain, startTime + 0.015)
+      master.gain.exponentialRampToValueAtTime(0.0001, finishTime)
       master.connect(context.destination)
 
-      const notes = variant === 'bell'
-        ? [784, 988, 1175, 1568]
-        : [523, 659, 880, 1319]
-
-      notes.forEach((frequency, index) => {
-        const start = context.currentTime + index * 0.085
+      definition.frequencies.forEach((frequency, index) => {
+        const start = startTime + index * definition.interval
         const oscillator = context.createOscillator()
         const gain = context.createGain()
-        oscillator.type = variant === 'bell' ? 'triangle' : 'sine'
+        oscillator.type = definition.oscillator
         oscillator.frequency.setValueAtTime(frequency, start)
         gain.gain.setValueAtTime(0.0001, start)
-        gain.gain.exponentialRampToValueAtTime(index === 0 ? 0.22 : 0.13, start + 0.018)
-        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.48)
+        gain.gain.exponentialRampToValueAtTime(index === 0 ? 0.2 : 0.12, start + 0.012)
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + definition.duration)
         oscillator.connect(gain)
         gain.connect(master)
         oscillator.start(start)
-        oscillator.stop(start + 0.52)
+        oscillator.stop(start + definition.duration)
       })
-
-      window.setTimeout(() => {
-        context.close().catch(() => {})
-      }, 1300)
     } catch {
       // Visual feedback still runs if browser audio is blocked.
     }
-  }, [hypeEnabled])
+  }, [ensureAudioContext])
+
+  const playMessage = useCallback(() => {
+    if (enabled) playTone('message')
+  }, [enabled, playTone])
+
+  const playReaction = useCallback(() => {
+    if (enabled) playTone('reaction')
+  }, [enabled, playTone])
+
+  const playHypeTone = useCallback((variant: 'bell' | 'message') => {
+    if (!hypeEnabled) return
+    playTone(variant === 'bell' ? 'hype-bell' : 'hype-message')
+  }, [hypeEnabled, playTone])
 
   const playHypeBell = useCallback(() => playHypeTone('bell'), [playHypeTone])
   const playHypeMessage = useCallback(() => playHypeTone('message'), [playHypeTone])

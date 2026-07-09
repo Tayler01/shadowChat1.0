@@ -7,6 +7,7 @@ import {
   json,
   normalizeText,
   readJson,
+  requireBridgeApiEnabled,
   resolveBridgeUserReference,
   triggerPushDispatch,
 } from '../_shared/bridge.ts'
@@ -77,6 +78,11 @@ const getOrCreateConversation = async (supabase: ReturnType<typeof getSupabaseAd
 serve(async req => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
+  }
+
+  const featurePauseResponse = requireBridgeApiEnabled()
+  if (featurePauseResponse) {
+    return featurePauseResponse
   }
 
   if (req.method !== 'POST') {

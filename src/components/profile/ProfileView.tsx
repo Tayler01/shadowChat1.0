@@ -14,6 +14,7 @@ import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { UserAchievementBadges } from '../ui/UserAchievementBadges'
 import toast from 'react-hot-toast'
 import type { PresenceVisibility } from '../../types'
+import { getUploadErrorMessage } from '../../lib/uploadLimits'
 
 interface ProfileViewProps {
   onToggleSidebar: () => void
@@ -63,7 +64,6 @@ const getOffsetBounds = (imageSize: { width: number; height: number }, zoom: num
 
 const createAdjustedAvatarFile = async (
   sourceUrl: string,
-  originalFile: File,
   imageSize: { width: number; height: number },
   zoom: number,
   offset: { x: number; y: number }
@@ -190,7 +190,7 @@ function AvatarCropDialog({ state, saving, onCancel, onSave }: AvatarCropDialogP
 
   const handleSave = async () => {
     try {
-      const adjusted = await createAdjustedAvatarFile(state.url, state.file, imageSize, zoom, clampOffset(offset))
+      const adjusted = await createAdjustedAvatarFile(state.url, imageSize, zoom, clampOffset(offset))
       await onSave(adjusted)
     } catch (error) {
       console.error(error)
@@ -361,7 +361,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
       closeAvatarEditor()
     } catch (err) {
       console.error(err)
-      toast.error('Failed to upload avatar')
+      toast.error(getUploadErrorMessage(err, 'Failed to upload avatar'))
     } finally {
       setUploadingAvatar(false)
     }
@@ -376,7 +376,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
       toast.success('Banner updated!')
     } catch (err) {
       console.error(err)
-      toast.error('Failed to upload banner')
+      toast.error(getUploadErrorMessage(err, 'Failed to upload banner'))
     } finally {
       setUploadingBanner(false)
       e.target.value = ''

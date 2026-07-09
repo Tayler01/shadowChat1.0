@@ -18,6 +18,17 @@ export const forbidden = (message: string) => json({ error: message }, 403)
 export const notFound = (message: string) => json({ error: message }, 404)
 export const conflict = (message: string) => json({ error: message }, 409)
 
+export const requireBridgeApiEnabled = () => {
+  if (Deno.env.get('BRIDGE_API_ENABLED') === 'true') {
+    return null
+  }
+
+  return json({
+    error: 'ESP Bridge is temporarily paused',
+    code: 'feature_paused',
+  }, 503)
+}
+
 const getEnv = () => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')

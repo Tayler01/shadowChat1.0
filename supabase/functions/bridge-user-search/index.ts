@@ -7,6 +7,7 @@ import {
   json,
   normalizeText,
   readJson,
+  requireBridgeApiEnabled,
   searchBridgeUsers,
 } from '../_shared/bridge.ts'
 
@@ -19,6 +20,11 @@ type BridgeUserSearchPayload = {
 serve(async req => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
+  }
+
+  const featurePauseResponse = requireBridgeApiEnabled()
+  if (featurePauseResponse) {
+    return featurePauseResponse
   }
 
   if (req.method !== 'POST') {

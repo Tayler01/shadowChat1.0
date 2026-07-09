@@ -278,12 +278,14 @@ function derivativePaths(targetType, id) {
 
 async function isOperator(admin, userId) {
   const { data, error } = await admin
-    .from('users')
-    .select('admin_role')
-    .eq('id', userId)
+    .from('user_roles')
+    .select('role')
+    .eq('user_id', userId)
+    .in('role', ['admin', 'sub_admin'])
+    .limit(1)
     .maybeSingle()
   if (error) throw error
-  return data?.admin_role === 'admin' || data?.admin_role === 'sub_admin'
+  return data?.role === 'admin' || data?.role === 'sub_admin'
 }
 
 async function assertCanMutate(admin, row, userId, requireOwnership) {

@@ -5,6 +5,13 @@ import {
 } from './env'
 import { optimizeImageFile } from './imageOptimization'
 import { createStoredImageAsset, type MediaThumbnailProfile } from './mediaAssets'
+import {
+  CHAT_FILE_UPLOAD_RULE,
+  CHAT_IMAGE_UPLOAD_RULE,
+  sanitizeUploadFileName,
+  validateUpload,
+  VOICE_UPLOAD_RULE,
+} from './uploadLimits'
 
 type AnySupabaseClient = any
 type SessionResponse = {
@@ -292,26 +299,8 @@ const destroyClient = async (client: AnySupabaseClient | null) => {
     if (client.realtime && typeof client.realtime.disconnect === 'function') {
       await client.realtime.disconnect()
     }
-  } catch (e) {
+  } catch {
   }
-}
-
-// Recreate client using stored token (mimics page reload)
-const recreateClientWithStoredToken = async (): Promise<AnySupabaseClient> => {
-  
-  // Destroy old fallback client if it exists
-  if (fallbackClient) {
-    await destroyClient(fallbackClient)
-    fallbackClient = null
-  }
-  
-  // Create new client with unique storage key
-  const newClient = createFreshSupabaseClient()
-  
-  // Attempt to restore session from localStorage
-  await restoreSessionIfNeeded(newClient)
-  
-  return newClient
 }
 
 // Centralized getWorkingClient that tracks and rotates clients
@@ -525,12 +514,10 @@ export const refreshSessionLocked = async () => {
 
     let workingClient = await getWorkingClient()
     let session: any = null
-    let error: any = null
 
     try {
       const sessionResult = await getSessionWithTimeout(workingClient)
       session = sessionResult.data.session
-      error = sessionResult.error
     } catch (sessionError) {
       const recovered = await recoverSessionAfterResume()
       if (!recovered) {
@@ -540,7 +527,6 @@ export const refreshSessionLocked = async () => {
       workingClient = await getWorkingClient()
       const sessionResult = await getSessionWithTimeout(workingClient)
       session = sessionResult.data.session
-      error = sessionResult.error
     }
 
     const storedToken = getStoredRefreshToken()
@@ -560,7 +546,7 @@ export const refreshSessionLocked = async () => {
           // Reconnect websocket in case it was closed on token expiry
           try {
             workingClient.realtime.connect()
-          } catch (err) {
+          } catch {
           }
         }
         return res
@@ -608,10 +594,10 @@ export const resetRealtimeConnection = async () => {
         if (currentClient.removeChannel && typeof currentClient.removeChannel === 'function') {
           currentClient.removeChannel(ch)
         }
-      } catch (removeErr) {
+      } catch {
       }
     })
-  } catch (err) {
+  } catch {
   }
   
   // Disconnect current realtime connection
@@ -619,7 +605,7 @@ export const resetRealtimeConnection = async () => {
     if (currentClient.realtime && typeof currentClient.realtime.disconnect === 'function') {
       currentClient.realtime.disconnect()
     }
-  } catch (err) {
+  } catch {
   }
   
   // Set auth token on realtime
@@ -632,7 +618,7 @@ export const resetRealtimeConnection = async () => {
     if (currentClient.realtime && typeof currentClient.realtime.connect === 'function') {
       currentClient.realtime.connect()
     }
-  } catch (err) {
+  } catch {
   }
 }
 
@@ -661,18 +647,29 @@ const SHADO_TV_ARTWORK_UPLOAD_CONFIG: Record<ShadoTvArtworkTarget, {
 }
 
 export const uploadVoiceMessage = async (blob: Blob, mimeType = 'audio/webm') => {
+  const contentType = validateUpload(
+    { size: blob.size, type: mimeType },
+    VOICE_UPLOAD_RULE
+  )
   const workingClient = await getWorkingClient()
   const { data: { user } } = await workingClient.auth.getUser()
   if (!user) throw new Error('Not authenticated')
-  const ext = mimeType.split('/')[1]?.split(';')[0] || 'webm'
+  const ext = contentType === 'audio/mpeg'
+    ? 'mp3'
+    : contentType.split('/')[1] || 'webm'
   const filePath = `${user.id}/${Date.now()}.${ext}`
-  const { error } = await workingClient.storage.from(VOICE_BUCKET).upload(filePath, blob)
+  const { error } = await workingClient.storage.from(VOICE_BUCKET).upload(filePath, blob, {
+    contentType,
+    cacheControl: '31536000',
+  })
   if (error) throw error
   const { data } = workingClient.storage.from(VOICE_BUCKET).getPublicUrl(filePath)
   return data.publicUrl
 }
 
 export const uploadChatFile = async (file: File) => {
+  validateUpload(file, CHAT_FILE_UPLOAD_RULE)
+
   const workingClient = await getWorkingClient()
   const { data: { user } } = await workingClient.auth.getUser()
   if (!user) throw new Error('Not authenticated')
@@ -684,9 +681,11 @@ export const uploadChatFile = async (file: File) => {
       fileNamePrefix: 'chat-image',
     })
     : file
-  const filePath = `${user.id}/${Date.now()}_${uploadFile.name}`
+  const contentType = validateUpload(uploadFile, CHAT_FILE_UPLOAD_RULE)
+  const safeName = sanitizeUploadFileName(uploadFile.name)
+  const filePath = `${user.id}/${Date.now()}_${safeName}`
   const { error } = await workingClient.storage.from(UPLOADS_BUCKET).upload(filePath, uploadFile, {
-    contentType: uploadFile.type,
+    contentType,
     cacheControl: '31536000',
   })
   if (error) throw error
@@ -698,6 +697,8 @@ export const uploadChatImageAsset = async (
   file: File,
   thumbnailProfile: MediaThumbnailProfile = 'chat'
 ) => {
+  validateUpload(file, CHAT_IMAGE_UPLOAD_RULE)
+
   const workingClient = await getWorkingClient()
   const { data: { user } } = await workingClient.auth.getUser()
   if (!user) throw new Error('Not authenticated')
@@ -707,10 +708,11 @@ export const uploadChatImageAsset = async (
     quality: 0.82,
     fileNamePrefix: thumbnailProfile === 'weather' ? 'weather-share' : 'chat-image',
   })
-  const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]+/g, '-').slice(-120) || 'chat-image'
+  const contentType = validateUpload(uploadFile, CHAT_IMAGE_UPLOAD_RULE)
+  const safeName = sanitizeUploadFileName(uploadFile.name, 'chat-image')
   const filePath = `${user.id}/${Date.now()}_${safeName}`
   const { error } = await workingClient.storage.from(UPLOADS_BUCKET).upload(filePath, uploadFile, {
-    contentType: uploadFile.type,
+    contentType,
     cacheControl: '31536000',
   })
   if (error) throw error
@@ -1615,7 +1617,7 @@ export const updateUserPresence = async () => {
       return
     }
     
-    const { error } = await workingClient.rpc('update_user_last_active')
+    await workingClient.rpc('update_user_last_active')
   } catch {
   }
 }

@@ -8,6 +8,7 @@ import {
   json,
   normalizeText,
   readJson,
+  requireBridgeApiEnabled,
 } from '../_shared/bridge.ts'
 
 type BridgeHeartbeatPayload = {
@@ -25,6 +26,11 @@ type BridgeHeartbeatPayload = {
 serve(async req => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
+  }
+
+  const featurePauseResponse = requireBridgeApiEnabled()
+  if (featurePauseResponse) {
+    return featurePauseResponse
   }
 
   if (req.method !== 'POST') {

@@ -22,6 +22,11 @@ import { useOptionalHype } from '../../hooks/useHype'
 import { getBlockedActionMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
 import { isShadowPinImageShareUrl } from './shadowPinShareLinks'
+import {
+  getUploadErrorMessage,
+  MESSAGE_MEDIA_UPLOAD_MAX_BYTES,
+  VOICE_RECORDING_MAX_SECONDS,
+} from '../../lib/uploadLimits'
 
 const normalizeComposerValue = (value: string) => (value.trim().length === 0 ? '' : value)
 const HYPE_SEND_LONG_PRESS_MS = 650
@@ -73,6 +78,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [recordingDuration, setRecordingDuration] = useState(0)
   const [hypePressing, setHypePressing] = useState(false)
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const recordingLimitTimeoutRef = useRef<number | null>(null)
   const hypeLongPressTimerRef = useRef<number | null>(null)
   const hypeLongPressTriggeredRef = useRef(false)
   const { startTyping, stopTyping } = useTyping(typingChannel)
@@ -86,6 +92,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
+  const recordedAudioBytesRef = useRef(0)
+  const discardRecordingRef = useRef(false)
   const suppressNextSendClickRef = useRef(false)
 
   useEffect(() => {
@@ -453,7 +461,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           onCancelReply?.()
         } catch (err) {
           console.error(err)
-          toast.error('Failed to send image')
+          toast.error(getUploadErrorMessage(err, 'Failed to send image'))
         } finally {
           onUploadStatusChange(false)
         }
@@ -478,7 +486,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           onCancelReply?.()
         } catch (err) {
           console.error(err)
-          toast.error('Failed to send video')
+          toast.error(getUploadErrorMessage(err, 'Failed to send video'))
         } finally {
           onUploadStatusChange(false)
         }
@@ -517,7 +525,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           onCancelReply?.()
         } catch (err) {
           console.error(err)
-          toast.error('Failed to send attachment')
+          toast.error(getUploadErrorMessage(err, 'Failed to send attachment'))
         } finally {
           onUploadStatusChange(false)
         }
@@ -525,16 +533,68 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
   }
 
+  const clearRecordingLimitTimeout = useCallback(() => {
+    if (recordingLimitTimeoutRef.current !== null) {
+      window.clearTimeout(recordingLimitTimeoutRef.current)
+      recordingLimitTimeoutRef.current = null
+    }
+  }, [])
+
+  const releaseRecordingStream = useCallback(() => {
+    mediaStreamRef.current?.getTracks().forEach(track => track.stop())
+    mediaStreamRef.current = null
+  }, [])
+
+  const stopRecording = useCallback(() => {
+    clearRecordingLimitTimeout()
+    const recorder = mediaRecorderRef.current
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.stop()
+    }
+    releaseRecordingStream()
+    setRecording(false)
+  }, [clearRecordingLimitTimeout, releaseRecordingStream])
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       mediaStreamRef.current = stream
       const recorder = new MediaRecorder(stream)
       audioChunksRef.current = []
-      recorder.ondataavailable = e => audioChunksRef.current.push(e.data)
+      recordedAudioBytesRef.current = 0
+      discardRecordingRef.current = false
+      recorder.ondataavailable = e => {
+        if (!e.data?.size) return
+
+        const nextSize = recordedAudioBytesRef.current + e.data.size
+        if (nextSize > MESSAGE_MEDIA_UPLOAD_MAX_BYTES) {
+          discardRecordingRef.current = true
+          audioChunksRef.current = []
+          recordedAudioBytesRef.current = 0
+          toast.error('Voice message is too large. The recording was not sent.')
+          stopRecording()
+          return
+        }
+
+        recordedAudioBytesRef.current = nextSize
+        audioChunksRef.current.push(e.data)
+      }
       recorder.onstop = async () => {
+        clearRecordingLimitTimeout()
+        releaseRecordingStream()
+        setRecording(false)
+
         const mimeType = recorder.mimeType || 'audio/webm'
         const blob = new Blob(audioChunksRef.current, { type: mimeType })
+        audioChunksRef.current = []
+        recordedAudioBytesRef.current = 0
+
+        if (discardRecordingRef.current) {
+          discardRecordingRef.current = false
+          mediaRecorderRef.current = null
+          return
+        }
+
         try {
           onUploadStatusChange(true)
           const url = await uploadVoiceMessage(blob, mimeType)
@@ -546,29 +606,48 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           onCancelReply?.()
         } catch (err) {
           console.error(err)
-          toast.error('Failed to send voice message')
+          toast.error(getUploadErrorMessage(err, 'Failed to send voice message'))
         } finally {
           onUploadStatusChange(false)
-          mediaStreamRef.current = null
           mediaRecorderRef.current = null
         }
       }
-      recorder.start()
       mediaRecorderRef.current = recorder
+      recorder.start(1000)
       setRecording(true)
+      recordingLimitTimeoutRef.current = window.setTimeout(() => {
+        toast(`Voice message reached the ${VOICE_RECORDING_MAX_SECONDS / 60}-minute limit and was sent.`)
+        stopRecording()
+      }, VOICE_RECORDING_MAX_SECONDS * 1000)
     } catch (err) {
       console.error(err)
+      clearRecordingLimitTimeout()
+      releaseRecordingStream()
+      mediaRecorderRef.current = null
       toast.error('Microphone access was denied')
       setRecording(false)
     }
   }
 
-  const stopRecording = () => {
-    mediaRecorderRef.current?.stop()
-    mediaStreamRef.current?.getTracks().forEach(track => track.stop())
-    mediaStreamRef.current = null
-    setRecording(false)
-  }
+  useEffect(() => () => {
+    clearRecordingLimitTimeout()
+    if (recordingIntervalRef.current) {
+      clearInterval(recordingIntervalRef.current)
+      recordingIntervalRef.current = null
+    }
+
+    const recorder = mediaRecorderRef.current
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.ondataavailable = null
+      recorder.onstop = null
+      recorder.stop()
+    }
+    releaseRecordingStream()
+    mediaRecorderRef.current = null
+    audioChunksRef.current = []
+    recordedAudioBytesRef.current = 0
+    discardRecordingRef.current = false
+  }, [clearRecordingLimitTimeout, releaseRecordingStream])
 
   const handleRecordClick = async () => {
     if (recording) {

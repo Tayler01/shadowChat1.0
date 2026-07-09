@@ -15,6 +15,7 @@ import {
   json,
   normalizeText,
   readJson,
+  requireBridgeApiEnabled,
   triggerPushDispatch,
 } from '../_shared/bridge.ts'
 
@@ -56,6 +57,11 @@ const MESSAGE_SELECT = `
 serve(async req => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
+  }
+
+  const featurePauseResponse = requireBridgeApiEnabled()
+  if (featurePauseResponse) {
+    return featurePauseResponse
   }
 
   if (req.method !== 'POST') {

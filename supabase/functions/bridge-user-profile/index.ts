@@ -6,6 +6,7 @@ import {
   json,
   normalizeText,
   readJson,
+  requireBridgeApiEnabled,
 } from '../_shared/bridge.ts'
 
 type BridgeUserProfilePayload = {
@@ -18,6 +19,11 @@ const UNIQUE_USER_LIMIT = 20
 serve(async req => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
+  }
+
+  const featurePauseResponse = requireBridgeApiEnabled()
+  if (featurePauseResponse) {
+    return featurePauseResponse
   }
 
   if (req.method !== 'POST') {

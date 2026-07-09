@@ -11,6 +11,7 @@ import {
   json,
   normalizeText,
   readJson,
+  requireBridgeApiEnabled,
 } from '../_shared/bridge.ts'
 
 type SessionRefreshPayload = {
@@ -21,6 +22,11 @@ type SessionRefreshPayload = {
 serve(async req => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
+  }
+
+  const featurePauseResponse = requireBridgeApiEnabled()
+  if (featurePauseResponse) {
+    return featurePauseResponse
   }
 
   if (req.method !== 'POST') {
@@ -56,8 +62,6 @@ serve(async req => {
     }
 
     if (isExpiredIso(session.expires_at)) {
-      const timestamp = new Date().toISOString()
-
       await supabase
         .from('bridge_device_sessions')
         .update({
