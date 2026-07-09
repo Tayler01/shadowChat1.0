@@ -8,6 +8,7 @@
     "start": "node src/index.mjs"
   },
   "dependencies": {
+    "@sentry/node": "10.64.0",
     "@supabase/supabase-js": "^2.39.0",
     "playwright": "^1.59.1"
   }

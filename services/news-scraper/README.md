@@ -4,6 +4,11 @@
 
 Reviewed during the June 1, 2026 documentation refresh. This worker guide reflects the current Render scraper surface and should be refreshed after any live Render settings or source-auth changes.
 
+The worker supports optional privacy-scrubbed Sentry telemetry through a
+server-only `SENTRY_DSN`. It is disabled when unset and does not intentionally
+send source handles, posts, cookies, auth state, provider HTML, or raw URLs. See
+[docs/ENGINEERING_SAFEGUARDS.md](C:/repos/chat2.0/docs/ENGINEERING_SAFEGUARDS.md:1).
+
 Always-on browser worker for the News Feed. It polls enabled rows from `news_sources`, extracts the latest tracked X or Truth Social post, and writes normalized snapshots to `news_feed_items` with Supabase service-role credentials.
 
 The worker is intentionally outside Supabase Edge Functions. Browser scraping is

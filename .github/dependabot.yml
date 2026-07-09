@@ -1,0 +1,39 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      production-minor-patch:
+        dependency-type: production
+        update-types: [minor, patch]
+      development-minor-patch:
+        dependency-type: development
+        update-types: [minor, patch]
+    open-pull-requests-limit: 8
+  - package-ecosystem: npm
+    directory: /services/news-scraper
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      worker-minor-patch:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 4
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions-minor-patch:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 4
+  - package-ecosystem: docker
+    directory: /services/news-scraper
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 4

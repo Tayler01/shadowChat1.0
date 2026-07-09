@@ -1,0 +1,33 @@
+name: Supabase Staging Parity
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.STAGING_SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+      STAGING_PROJECT_REF: ${{ vars.STAGING_SUPABASE_PROJECT_REF }}
+      PRODUCTION_PROJECT_REF: ${{ vars.PRODUCTION_SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.109.1
+      - name: Fail closed on missing or reused environment configuration
+        run: |
+          test -n "$SUPABASE_ACCESS_TOKEN" || { echo 'Missing STAGING_SUPABASE_ACCESS_TOKEN.'; exit 1; }
+          test -n "$SUPABASE_DB_PASSWORD" || { echo 'Missing STAGING_SUPABASE_DB_PASSWORD.'; exit 1; }
+          test -n "$STAGING_PROJECT_REF" || { echo 'Missing STAGING_SUPABASE_PROJECT_REF.'; exit 1; }
+          test -n "$PRODUCTION_PROJECT_REF" || { echo 'Missing PRODUCTION_SUPABASE_PROJECT_REF.'; exit 1; }
+          test "$STAGING_PROJECT_REF" != "$PRODUCTION_PROJECT_REF" || { echo 'Staging and production project refs must differ.'; exit 1; }
+      - run: supabase link --project-ref "$STAGING_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+      - run: supabase migration list --linked
+      - run: supabase db push --linked --dry-run
+      - run: supabase functions list

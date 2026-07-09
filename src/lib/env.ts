@@ -6,3 +6,5 @@ export const VITE_APP_BUILD_ID = import.meta.env.VITE_APP_BUILD_ID
 export const VITE_APP_COMMIT_SHA = import.meta.env.VITE_APP_COMMIT_SHA
 export const VITE_APP_DEPLOY_CONTEXT = import.meta.env.VITE_APP_DEPLOY_CONTEXT
 export const VITE_APP_IS_PROD = import.meta.env.PROD
+export const VITE_APP_MODE = import.meta.env.MODE
+export const VITE_SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN

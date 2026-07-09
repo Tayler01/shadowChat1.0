@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 import { chromium } from 'playwright'
 import { pathToFileURL } from 'node:url'
+import { captureWorkerException, initializeWorkerTelemetry } from './telemetry.mjs'
+
+initializeWorkerTelemetry()
 import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
@@ -1389,6 +1392,7 @@ const runWorker = async () => {
     try {
       await runCycle(supabase)
     } catch (error) {
+      captureWorkerException(error, 'news_scrape_cycle')
       console.error(error instanceof Error ? error.stack || error.message : error)
     }
 
@@ -1428,11 +1432,13 @@ const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv
 
 if (isMain && process.argv.includes('--proof')) {
   runProof().catch(error => {
+    captureWorkerException(error, 'news_scrape_proof')
     console.error(error instanceof Error ? error.stack || error.message : error)
     process.exitCode = 1
   })
 } else if (isMain) {
   runWorker().catch(error => {
+    captureWorkerException(error, 'news_worker_fatal')
     console.error(error instanceof Error ? error.stack || error.message : error)
     process.exitCode = 1
   })

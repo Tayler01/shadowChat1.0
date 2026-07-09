@@ -51,3 +51,7 @@ services:
         sync: false
       - key: NEWS_TRUTH_AUTH_STATE_PATH
         value: "/opt/render/project/src/.news-scraper/truth-auth-state.json"
+      - key: SENTRY_DSN
+        sync: false
+      - key: APP_ENVIRONMENT
+        value: production

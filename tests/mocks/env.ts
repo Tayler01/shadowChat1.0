@@ -6,3 +6,5 @@ export const VITE_APP_BUILD_ID = 'test-build'
 export const VITE_APP_COMMIT_SHA = 'test-commit'
 export const VITE_APP_DEPLOY_CONTEXT = 'production'
 export const VITE_APP_IS_PROD = true
+export const VITE_APP_MODE = 'test'
+export const VITE_SENTRY_DSN = ''

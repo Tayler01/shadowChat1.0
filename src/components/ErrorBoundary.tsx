@@ -1,5 +1,6 @@
 import { Component, ReactNode } from 'react';
 import { Button } from './ui/Button';
+import { captureFrontendException } from '../lib/telemetry';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -14,6 +15,10 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   static getDerivedStateFromError(): ErrorBoundaryState {
     return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    captureFrontendException(error, 'react_error_boundary');
   }
 
   private handleReset = () => {
