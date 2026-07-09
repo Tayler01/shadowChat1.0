@@ -7,6 +7,9 @@ import { AuthProvider } from './hooks/useAuth';
 import { ThemeProvider } from './hooks/useTheme';
 import { PresenceRoot } from './PresenceRoot';
 import { registerPushServiceWorker } from './lib/push';
+import { initializeTelemetry } from './lib/telemetry';
+
+initializeTelemetry();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

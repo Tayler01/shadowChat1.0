@@ -2,6 +2,10 @@
 
 ShadowChat deploys as a static frontend on Netlify with Supabase as the hosted backend. The News Feed scraper is a separate always-on Render worker.
 
+Engineering security gates, staging parity, privacy-safe telemetry, real-device
+release validation, and production monitoring are defined in
+[ENGINEERING_SAFEGUARDS.md](C:/repos/chat2.0/docs/ENGINEERING_SAFEGUARDS.md:1).
+
 ## Documentation Status - June 2, 2026
 
 This guide reflects the current GitHub Actions, Netlify, Supabase, Render, app-release, invite-only signup/email-verification rollout, and production-smoke flow. Known deployment hardening that is still pending: Netlify security headers/CSP, live Netlify dashboard verification, Render live-secret/log verification, and a review of all `verify_jwt = false` Edge Functions against their in-function auth contracts.
