@@ -21,7 +21,7 @@ jobs:
           fetch-depth: 0
       - name: Scan complete Git history
         run: |
-          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.28.0 \
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks@sha256:cdbb7c955abce02001a9f6c9f602fb195b7fadc1e812065883f695d1eeaba854 \
             detect --source=/repo --no-banner --redact --exit-code=1
 
   trivy:
@@ -29,7 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Filesystem vulnerabilities
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -37,7 +37,7 @@ jobs:
           ignore-unfixed: true
           exit-code: '1'
       - name: Configuration vulnerabilities
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: config
           scan-ref: .

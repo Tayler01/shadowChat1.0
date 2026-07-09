@@ -36,7 +36,14 @@ handlers before their error contracts are reviewed.
 - `security-scans.yml`: full-history redacted gitleaks plus Trivy filesystem and
   configuration scans; high/critical findings fail.
 - `.github/dependabot.yml`: grouped weekly npm, worker, Actions, and Docker
-  updates. Dependabot never receives deployment secrets.
+updates. Dependabot never receives deployment secrets.
+
+`.gitleaksignore` contains five exact historical fingerprints only: three
+Firebase web-client identifiers from removed files and two README examples.
+Firebase browser API keys are not server secrets, but the retired
+`shadowchat-99822` project key should still be disabled or API/referrer-
+restricted in Google Cloud if that legacy project remains active. Do not add
+rule-wide or path-wide allowlists; investigate each new fingerprint.
 
 Netlify preview first validates PR code with no secrets. Preview deployment is
 available only for same-repository, non-Dependabot PRs through the protected
