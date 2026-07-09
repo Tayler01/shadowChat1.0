@@ -5,9 +5,13 @@
 > Supabase rows, Storage objects, migrations, and direct tests remain intact.
 > See [PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1).
 
-## Documentation Status - June 8, 2026
+## Documentation Status - July 9, 2026
 
-Updated after the June 8, 2026 shared safe-fetch hardening. Repo code now routes Art Board URL imports through the shared safe-fetch helper, but the linked Supabase function inventory still showed `art-board-import-image` with an older deployment timestamp during the evening doc-freshness pass. Redeploy and smoke that function before claiming production Art Board import safe-fetch coverage. Broader known hardening or polish follow-ups remain tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
+Art Board source and data remain preserved, but its import function is classified
+for removal from the deployed Edge Function inventory while the domain is
+paused. Do not redeploy it independently. A future reactivation must restore it
+through `supabase/function-manifest.json`, rerun safe-fetch/security review, and
+complete the checklist in [PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1).
 
 Art Board is the shared visual mood-board surface under Boards. It is a
 separate backend domain from News Feed, board chats, DMs, and General Chat.

@@ -2,9 +2,12 @@
 
 This document is a high-signal map of the current ShadowChat codebase.
 
-## Documentation Status - June 16, 2026
+## Documentation Status - July 9, 2026
 
-This architecture map is current for the shipped `main` branch and now includes the June 19 Shadow Runner Candle Fair Level 5 route, June 16 Golden Egg discovery visual refresh, plus the June 15 Shadow Runner Bell Tower Level 4, Web Audio soundtrack controller, tap-toggle crouch, completion-medal schema, push-subscription foreground repair, and feature auth-refresh hardening work. Known architecture follow-ups are tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1): remaining Supabase policy/RPC hardening, service-role bypass checks, production deployment/smoke for all shared safe-fetch adopters, frontend polish, and broader realtime/send/scroll helper extraction.
+This architecture map includes the July 9 product pause, profile/role authority
+boundaries, Storage constraints, classified Edge Function release inventory,
+ESP server-side hold, strict release gates, and suspended News worker. Remaining
+work is ranked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
 
 Boards, News, Art Board, and ESP Bridge are preserved but compile-time paused
 in the default production frontend as of July 9, 2026. Their modules and backend
@@ -19,7 +22,7 @@ React UI
   -> lib helpers
   -> Supabase Auth / Postgres / Realtime / Storage / Edge Functions
   -> Netlify-hosted frontend shell
-  -> Render-hosted News scraper worker
+  -> preserved, currently suspended Render News scraper worker
 ```
 
 ## Frontend Layers
@@ -74,6 +77,8 @@ React UI
 - [`ai.ts`](C:/repos/chat2.0/src/lib/ai.ts:1): authenticated AI function calls
 - [`weather.ts`](C:/repos/chat2.0/src/lib/weather.ts:1): Open-Meteo geocoding/forecast mapping and private weather preference helpers
 - [`moderation.ts`](C:/repos/chat2.0/src/lib/moderation.ts:1): channel-ban scopes, durations, and moderation RPC wrappers
+- [`uploadLimits.ts`](C:/repos/chat2.0/src/lib/uploadLimits.ts:1): shared client
+  MIME, size, filename, and voice-recording limits aligned with Storage buckets
 - [`realtimeSubscription.ts`](C:/repos/chat2.0/src/lib/realtimeSubscription.ts:1): pilot shared Supabase realtime lifecycle helper currently used by News Feed and News Chat
 - [`utils.ts`](C:/repos/chat2.0/src/lib/utils.ts:1): shared formatting and UI helpers
 
@@ -104,6 +109,10 @@ Important domains:
 - full-admin automation approval packets and append-only packet events
 - ESP bridge control-plane and update-manifest tables
 
+Storage bucket metadata enforces reviewed limits and MIME allowlists for
+avatars, banners, message media, and chat uploads. The browser applies the same
+limits before upload, but server-side bucket configuration is authoritative.
+
 ### Edge Functions
 
 - [`openai-chat`](C:/repos/chat2.0/supabase/functions/openai-chat/index.ts:1): validates caller session, proxies allowed AI requests to OpenRouter by default, and can post group-chat AI answers as the dedicated `Shado` assistant profile
@@ -111,30 +120,29 @@ Important domains:
 - [`link-preview`](C:/repos/chat2.0/supabase/functions/link-preview/index.ts:1): validates a signed-in bearer token, rejects unsafe targets through the shared safe-fetch helper, and fetches Open Graph/oEmbed metadata for chat, DM, and board-chat link cards
 - [`delete-account`](C:/repos/chat2.0/supabase/functions/delete-account/index.ts:1): validates caller session in code, removes owned storage objects, and deletes the auth user through service-role access
 - [`shadow-pin-video`](C:/repos/chat2.0/supabase/functions/shadow-pin-video/index.ts:1): validates user tokens in code for Bunny upload session creation, processing sync, and external-video import support
-- [`art-board-import-image`](C:/repos/chat2.0/supabase/functions/art-board-import-image/index.ts:1) and [`shadow-pin-import-image`](C:/repos/chat2.0/supabase/functions/shadow-pin-import-image/index.ts:1): authenticated server-side import helpers for public image URLs using the shared safe-fetch contract in repo code
-- [`bridge-*`](C:/repos/chat2.0/supabase/functions): bridge pairing, session lifecycle, profile/search, group/DM polling and sending, heartbeat, and update-check functions
+- [`shadow-pin-import-image`](C:/repos/chat2.0/supabase/functions/shadow-pin-import-image/index.ts:1): active authenticated public-image import helper using the shared safe-fetch contract
+- [`art-board-import-image`](C:/repos/chat2.0/supabase/functions/art-board-import-image/index.ts:1): preserved source classified for remote removal while Art Board is paused
+- [`bridge-*`](C:/repos/chat2.0/supabase/functions): preserved bridge functions that all call the shared default-deny hold before request parsing, authentication, or database work
+- [`supabase/function-manifest.json`](C:/repos/chat2.0/supabase/function-manifest.json:1): canonical active, deny-paused, and remove classification used by CI/deployment
 
 Audit note: several Edge Functions intentionally run with Supabase gateway JWT verification disabled and enforce custom authentication in code. Any change to those functions must preserve custom auth, rate limits, RLS-equivalent checks, and service-role boundaries.
 
-Remote function status checked on June 15, 2026: `send-push` reported a June 15
-deployment, `link-preview` and `shadow-pin-video` reported June 8 deployments,
-and `art-board-import-image` plus `shadow-pin-import-image` still reported older
-deployment timestamps. Do not claim production-safe-fetch coverage for those
-older remote functions until they are redeployed and smoked.
+Remote state must be verified against the manifest after every production
+release. A green frontend build alone is not backend parity evidence.
 
 ### Background Workers
 
-- [`services/news-scraper`](C:/repos/chat2.0/services/news-scraper): Render Docker worker that polls enabled `news_sources`, scrapes X/Truth Social snapshots with Playwright browser automation, and writes normalized `news_feed_items` using Supabase service-role credentials
-- [`render.yaml`](C:/repos/chat2.0/render.yaml:1): Render blueprint for the `shado-news-scraper` worker and its required secrets
+- [`services/news-scraper`](C:/repos/chat2.0/services/news-scraper): preserved Render Docker worker source; production is suspended while News is paused
+- [`render.yaml`](C:/repos/chat2.0/render.yaml:1): preserved `shado-news-scraper` blueprint with automatic deploys disabled
 
 ## External Systems
 
 ### News Scraper
 
-The News Feed is populated outside the browser. Admins add sources in Settings,
-the worker polls those sources, and Supabase realtime fans new feed rows out to
-signed-in clients. The scraper intentionally avoids the paid X API and uses
-browser extraction plus optional read-only platform credentials.
+When re-enabled, the News Feed is populated outside the browser: operators add
+sources, the worker polls them, and Supabase realtime fans new rows out to
+signed-in clients. The default frontend does not mount these hooks or panels,
+and the production worker is suspended.
 
 Truth Social can block hosted worker IPs. The production escape hatch is to
 connect the worker to a trusted remote browser through `PINCHTAB_CDP_URL` or
@@ -146,8 +154,8 @@ Full runbook: [docs/NEWS_TAB_AND_SCRAPER.md](C:/repos/chat2.0/docs/NEWS_TAB_AND_
 
 Admin access is an app-wide role domain. The single full `admin` can grant or
 revoke `sub_admin` access from Settings > Admin > Admin Access or from a user's
-public profile popup. Sub-admins can use operator tools, including News Sources
-and Feedback Review, but cannot manage roles.
+public profile popup. Sub-admins can use active operator tools such as Feedback
+Review but cannot manage roles; News Sources remains absent while News is paused.
 
 Role badges are intentionally public identity metadata. Full admins render with
 a gold shield and sub-admins render with a silver shield in chat/profile
@@ -182,7 +190,10 @@ Full runbook: [docs/WEATHER_WIDGET.md](C:/repos/chat2.0/docs/WEATHER_WIDGET.md:1
 
 The ESP bridge track supports an airgapped Windows PC through an ESP32-S3 data
 link, USB CDC serial, a chat-first PowerShell TUI, a separate admin shell, and
-backend pairing/session lifecycle functions.
+backend pairing/session lifecycle functions. It is currently on hold: the UI is
+omitted, bridge devices/codes/custom sessions are revoked or disabled by
+migration, dedicated Auth sessions are removed by release automation, and every
+deployed endpoint defaults to `feature_paused`.
 
 The source-of-truth planning and runbook set starts at
 [docs/ESP_BRIDGE_FEATURE_ROADMAP.md](C:/repos/chat2.0/docs/ESP_BRIDGE_FEATURE_ROADMAP.md:1)

@@ -169,42 +169,21 @@ supabase secrets set WEB_PUSH_SUBJECT=https://your-app.example.com
 ## 5. Deploy Edge Functions
 
 ```powershell
-supabase functions deploy openai-chat --no-verify-jwt
-supabase functions deploy send-push --no-verify-jwt
-supabase functions deploy link-preview --no-verify-jwt
-supabase functions deploy art-board-import-image
-supabase functions deploy shadow-pin-import-image
-supabase functions deploy shadow-pin-video --no-verify-jwt
-supabase functions deploy delete-account --no-verify-jwt
+npm run supabase:functions:verify
+npm run supabase:functions:deploy
 ```
 
-`art-board-import-image` is required for Art Board URL imports. It rejects
-private/local URLs and remote images above the `art-board` bucket's 10 MB
-limit. Runtime Art Board delivery uses backend image transformations so users
-do not need to resize normal imported images by hand.
+`supabase/function-manifest.json` is the canonical inventory. The deploy command
+publishes active functions, publishes every ESP Bridge endpoint with its shared
+default-deny hold, removes the paused `art-board-import-image` endpoint, and
+verifies remote names and JWT settings. It requires `SUPABASE_PROJECT_ID` and
+`SUPABASE_ACCESS_TOKEN` in the shell.
 
 `shadow-pin-video`, `send-push`, `link-preview`, and `delete-account` validate their mixed auth contracts inside the function. Keep their `--no-verify-jwt` deployment mode aligned with [supabase/config.toml](C:/repos/chat2.0/supabase/config.toml:1), and do not remove in-function auth checks.
 
-Deploy bridge functions too when working on the ESP bridge or when a fresh
-Supabase project needs full feature parity:
-
-```powershell
-supabase functions deploy bridge-register --no-verify-jwt
-supabase functions deploy bridge-pairing-begin --no-verify-jwt
-supabase functions deploy bridge-pairing-status --no-verify-jwt
-supabase functions deploy bridge-session-exchange --no-verify-jwt
-supabase functions deploy bridge-session-refresh --no-verify-jwt
-supabase functions deploy bridge-heartbeat --no-verify-jwt
-supabase functions deploy bridge-pairing-approve --no-verify-jwt
-supabase functions deploy bridge-pairing-revoke --no-verify-jwt
-supabase functions deploy bridge-group-send --no-verify-jwt
-supabase functions deploy bridge-group-poll --no-verify-jwt
-supabase functions deploy bridge-dm-send --no-verify-jwt
-supabase functions deploy bridge-dm-poll --no-verify-jwt
-supabase functions deploy bridge-update-check --no-verify-jwt
-supabase functions deploy bridge-user-profile --no-verify-jwt
-supabase functions deploy bridge-user-search --no-verify-jwt
-```
+Do not deploy bridge or Art Board functions by hand. Reactivation must first
+change the reviewed manifest classification and complete the checklist in
+[PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1).
 
 `link-preview` validates the signed-in user's bearer token inside the function
 while keeping gateway JWT verification disabled for deployment compatibility.
@@ -221,8 +200,8 @@ Default Vite URL:
 
 ## 7. Optional News Scraper Setup
 
-The app can run locally without the News scraper, but News Feed ingestion needs
-the worker.
+News is paused. This section is retained for local proof and a future reviewed
+reactivation; normal setup does not start or deploy the worker.
 
 Proof mode does not require Supabase credentials:
 
@@ -238,15 +217,17 @@ $env:SUPABASE_SERVICE_ROLE_KEY="YOUR_SERVICE_ROLE_KEY"
 node services/news-scraper/src/index.mjs --once
 ```
 
-Production uses [render.yaml](C:/repos/chat2.0/render.yaml:1). Required Render
+The preserved production blueprint is [render.yaml](C:/repos/chat2.0/render.yaml:1)
+with automatic deploys off. A future reactivation requires these Render
 secrets are `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`; optional source
 credentials include `X_USERNAME`, `X_EMAIL`, `X_SECONDARY_IDENTIFIER`,
 `X_PASSWORD`, `X_AUTH_TOKEN`, `X_CT0`, `NEWS_X_COOKIE_HEADER`,
 `TRUTH_USERNAME`, `TRUTH_EMAIL`, `TRUTH_PASSWORD`, and
 `NEWS_TRUTH_COOKIE_HEADER`.
 
-Admins and sub-admins manage tracked sources from Settings > Admin > News
-Sources. The admin class is stored in `public.user_roles` as `admin` or
+When News is re-enabled, admins and sub-admins manage tracked sources from
+Settings > Admin > News Sources. That panel is absent from the default build.
+The admin class is stored in `public.user_roles` as `admin` or
 `sub_admin`; full admins can manage sub-admin access from Settings > Admin >
 Admin Access or from a user's profile popup. Operators can also open another
 user's public profile popup to manage channel bans for General Chat, individual
@@ -278,11 +259,11 @@ After setup, verify:
 6. Profile updates persist
 7. Push settings screen renders
 8. Phone setup tutorial opens once after first mobile post-login launch and remains available in Settings > App Setup & User Guide
-9. Boards tab loads the low-friction map, feed pills/chat circles/static squares render correctly, labels stay contained, collision feedback works, and the map resets when Boards is reopened
-10. News Chat, Investing Chat, Learning Chat, Crypto Chat, Vibe Coding, AI News, and Projects Chat send and receive messages without duplicate subheaders
+9. Boards is absent from desktop/mobile navigation and legacy Boards/News URLs return to Chat
+10. Settings omits News Sources and ESP Bridge Pairing while those domains are paused
 11. An `admin` or `sub_admin` user can generate, revoke, and review signup invites from Settings > Admin > Invites
-12. An `admin` or `sub_admin` user can add, pause, enable, and delete a News source in Settings > Admin > News Sources
-13. If the scraper is configured, `news_sources.last_checked_at` updates after a worker cycle
+12. The production function inventory matches `supabase/function-manifest.json`; bridge endpoints are deny-paused and `art-board-import-image` is absent
+13. The Render News worker remains suspended with automatic deploys off
 14. A full `admin` user can grant or remove sub-admin access from Settings > Admin > Admin Access and from a profile popup
 15. Settings > Account & Profile can save and clear a weather location
 16. General Chat shows the weather widget and active-user count without overlapping on mobile

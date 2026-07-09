@@ -1,15 +1,20 @@
 # Shado News Scraper
 
-## Documentation Status - June 1, 2026
+## Documentation Status - July 9, 2026
 
-Reviewed during the June 1, 2026 documentation refresh. This worker guide reflects the current Render scraper surface and should be refreshed after any live Render settings or source-auth changes.
+This worker is intentionally suspended while News is paused. Its source,
+lockfile, proof mode, blueprint, and operating notes remain for a future reviewed
+reactivation. `render.yaml` disables automatic deploys.
 
 The worker supports optional privacy-scrubbed Sentry telemetry through a
 server-only `SENTRY_DSN`. It is disabled when unset and does not intentionally
 send source handles, posts, cookies, auth state, provider HTML, or raw URLs. See
 [docs/ENGINEERING_SAFEGUARDS.md](C:/repos/chat2.0/docs/ENGINEERING_SAFEGUARDS.md:1).
 
-Always-on browser worker for the News Feed. It polls enabled rows from `news_sources`, extracts the latest tracked X or Truth Social post, and writes normalized snapshots to `news_feed_items` with Supabase service-role credentials.
+When enabled, this browser worker polls `news_sources`, extracts the latest
+tracked X or Truth Social post, and writes normalized snapshots to
+`news_feed_items` with Supabase service-role credentials. It is not currently an
+always-on production service.
 
 The worker is intentionally outside Supabase Edge Functions. Browser scraping is
 long-running and stateful enough that a Render Docker worker is a better fit
@@ -88,9 +93,10 @@ a source cursor when the newest recovered post is newer than the stored cursor.
 Production is defined in [../../render.yaml](C:/repos/chat2.0/render.yaml:1) as
 the `shado-news-scraper` worker. Browser scraping needs more than the 512 MB
 starter memory limit once signed-in X sessions are enabled, so the blueprint uses
-the `standard` plan.
+the `standard` plan. The worker must remain suspended with automatic deploys off
+until News is explicitly reapproved.
 
-Deploy checklist:
+Reactivation checklist:
 
 1. Push the current commit.
 2. Confirm Render builds the worker image.

@@ -1,8 +1,11 @@
 # Channel Ban Moderation
 
-## Documentation Status - June 1, 2026
+## Documentation Status - July 9, 2026
 
-Reviewed during the June 1, 2026 documentation refresh. This doc reflects shipped channel-ban behavior. Pending hardening includes enforcing equivalent ban checks in service-role paths such as bridge group send and AI post-to-chat.
+This doc reflects shipped channel-ban behavior and the July 9 service-role
+hardening. AI post-to-chat preserves the canonical ban/authority checks. Bridge
+service-role paths are additionally protected by the shared server-side
+default-deny pause before request work begins.
 
 Board scopes remain preserved in schema and moderation history while Boards are
 paused. ESP service-role paths must be disabled server-side as part of the bridge

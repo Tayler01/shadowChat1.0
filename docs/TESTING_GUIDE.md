@@ -2,9 +2,12 @@
 
 This project uses a mix of static checks, Jest coverage, and real browser validation.
 
-## Documentation Status - June 16, 2026
+## Documentation Status - July 9, 2026
 
-This guide reflects the current repo scripts. The June 1 audit confirmed `npm run lint`, `npm run typecheck`, `npm run build`, and the metrics-only chat scroll probe passed on current `main`. The chat-scroll script now also has seeded read-position scenarios for preview/staging runs that can prove the first-unread, deep-link, same-timestamp, realtime anchoring, and media paths. The June 2 auth rollout added invite-only signup, email verification, password reset, and admin invite tests. The June 8 work added Hype, safe-fetch, automation approval queue, DM read-guard, and News realtime-helper coverage. The June 9 work added focused coverage for mobile composer focus during pending sends, Hype-aware chat media frames, and Shadow Runner mobile visual/playable-prototype checks. The June 15 Shadow Runner passes added Bell Tower Level 4 route checks, tap-toggle crouch/coin-route QA, Web Audio soundtrack coverage, and SQL/Jest contracts for Shadow Runner medals plus push-subscription foreground repair. The June 16 Golden Egg visual refresh keeps existing Jest coverage for mobile hold-to-claim behavior and shared achievement badge rendering.
+This guide reflects the current repo scripts and the July 9 release-quality
+baseline. CI now treats warnings, documentation drift, dependency advisories,
+Supabase migration/lint/advisor drift, Edge Function inventory drift, build
+budget regressions, the complete Jest suite, and Expo health as release gates.
 
 ## Mobile-First Testing Default
 
@@ -24,8 +27,13 @@ Run these for almost every change:
 
 ```powershell
 npm run lint
-npx tsc --noEmit -p tsconfig.app.json
+npm run typecheck
+npm run test:node
+npm run supabase:functions:verify
+npm run docs:verify
 npm run build
+npx jest --runInBand
+npm audit --audit-level=low
 ```
 
 The build now runs `scripts/verify-paused-feature-build.mjs` and fails if the
@@ -33,6 +41,14 @@ default production output leaks Boards/News/Art Board or ESP admin chunks and
 known API/subscription markers. Dormant feature source is still covered by its
 direct Jest suites. An explicit re-enable build is documented in
 [PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1).
+
+The same build runs `scripts/verify-build-budgets.mjs` against Vite's manifest
+and fails on eager-entry, individual eager/lazy chunk, lazy Phaser, or total
+deploy-size regression. Update a budget only with measured before/after evidence.
+
+The `quality.yml` workflow also runs a clean News-worker install/audit, a
+separate Expo install/audit/lint/typecheck/Doctor job, and a fresh local
+Supabase database start/reset/lint/security-advisor job.
 
 ## Unit And Hook Tests
 
@@ -402,7 +418,8 @@ Latest full release smoke recorded for the feedback submission release:
 
 For link preview changes, verify a local preview build with a signed-in account and send a message containing a public `https://` URL. The message should keep the link clickable immediately, then load one preview card without rerendering the whole chat thread. Test at least one generic Open Graph link and one `x.com`/`twitter.com` link because X metadata can arrive through the oEmbed fallback.
 
-For Boards changes, verify both desktop and mobile:
+The following Boards/News checks are reactivation-only while those domains are
+paused. For a reviewed reactivation, verify both desktop and mobile:
 
 - Boards nav label opens the bubble map, and old `view=news` URLs route to Boards
 - Art Board opens from its square board tile, the `+` menu is clickable, sticky-note formatting works, and canvas overlay controls are not swallowed by pan/drag pointer capture

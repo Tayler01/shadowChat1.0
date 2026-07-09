@@ -1,8 +1,10 @@
 # Admin Access
 
-## Documentation Status - June 8, 2026
+## Documentation Status - July 9, 2026
 
-Updated after the June 8, 2026 automation approval queue rollout. This doc reflects the shipped admin model, Settings > Admin > Invites, and Settings > Admin > Automation Approvals surfaces. Pending hardening includes treating `users.admin_role` as display-only and using `user_roles`/operator RPCs for server-side authority everywhere.
+This doc reflects the app-wide admin model and July 9 authority cleanup.
+`public.user_roles` and operator helpers are the authorization source;
+`users.admin_role` is display-only public badge metadata.
 
 Settings > Admin > News Sources and ESP Bridge Pairing are intentionally absent
 from the default build while those product domains are paused. Their panel source
@@ -43,13 +45,13 @@ Admin settings are split into subpages under Settings > Admin:
 - Automation Approvals: full-admin-only review queue for scan, build,
   documentation, and batch packets. Approval records intent only; it does not
   push, merge, deploy, or start a runner.
-- ESP Bridge Pairing: operator bridge approval controls.
+- ESP Bridge Pairing: preserved operator controls, absent while ESP is paused.
 - Shado TV Studio: operator episode, trailer, cover, cast, update, visibility,
   and Bunny-upload controls.
 - Shadow Pin Activity: operator analytics for Shadow Pin visits, active time,
   users, categories, pins, and raw activity drilldown.
-- News Sources: operator add, pause, enable, and delete controls for tracked
-  X/Truth Social accounts.
+- News Sources: preserved operator controls for tracked X/Truth Social accounts,
+  absent while News is paused.
 - Feedback Review: operator review and deletion for submitted bugs and
   suggestions.
 - Public Profile Admin Access: full admins can grant or remove sub-admin access

@@ -11,8 +11,8 @@ This is the current source of truth for the audit backlog. Update this document 
 The July 9 full audit revalidated this backlog against local code, linked
 Supabase, Netlify, Render, GitHub, browser QA, and the production build. Work is
 being completed as separable checkpoints on
-`codex/shadowchat-alignment-20260709`; production writes remain gated on a final
-review packet.
+`codex/shadowchat-alignment-20260709`; production rollout is authorized for a
+direct, quality-gated update to `main` and will be recorded here after live proof.
 
 ### Product decisions now in force
 
@@ -21,13 +21,39 @@ review packet.
   routes, providers, realtime subscriptions, and chunks.
 - **ESP Bridge is on hold.** Firmware, TUI, migrations, functions, and planning
   history stay intact. The default build omits pairing/admin UI; server-side
-  session revocation and endpoint hold are still required.
+  session revocation and endpoint hold are implemented locally and await the
+  production release gate.
 - **Render News must remain suspended with automatic deploys off.** Do not
   restore a paid worker until the News product is explicitly reapproved.
 - Canonical status and re-enable instructions live in
   [PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1).
 
 ### Ranked implementation list
+
+### July 9 implementation checkpoint (production pending)
+
+- All eight P0 alignment items below are implemented in the release branch:
+  canonical authority, profile writes, static notification sounds, SECURITY
+  DEFINER ACLs/search paths, Storage constraints, the ESP data/Auth/function
+  hold, and backend-first deployment parity.
+- Default and explicit re-enable builds pass. The paused default emits no
+  Boards/News/Art/ESP UI chunks or realtime subscriptions; four phone profiles
+  passed 84 pause assertions with verified cleanup.
+- CI now requires zero-warning lint, TypeScript, Node contracts, documentation
+  integrity, build budgets, all Jest suites, zero-vulnerability audits, Expo
+  lint/typecheck/Doctor, and a clean local Supabase reset/lint/advisor pass.
+  Production calls this reusable Quality workflow and cannot deploy unless all
+  jobs plus gitleaks, Trivy, and CodeQL pass.
+- The catch-all `vendor-ui` chunk is removed, deterministic eager/lazy/deploy
+  budgets are enforced, and privacy-scrubbed opt-in telemetry plus CodeQL,
+  gitleaks, Trivy, Dependabot, staging parity, and uptime monitoring are present.
+- Netlify Git builds are stopped so only the backend-first GitHub Actions release
+  can publish production. News freshness monitoring is explicitly disabled while
+  the Render worker is suspended; app uptime monitoring remains active.
+- Safe same-major dependency updates and lockfiles are current with zero known
+  vulnerabilities. Remaining install-time deprecation notices come from Expo 54,
+  Jest 29/jsdom, and Remotion transitive packages; removing them requires
+  dedicated framework/test-runner migrations rather than unsafe overrides.
 
 #### P0 - Production alignment and authority
 
@@ -68,8 +94,8 @@ review packet.
 3. Change DM history pagination to stable `(created_at, id)` keysets.
 4. Consolidate duplicate DM subscriptions and bound long-thread rendering.
 5. Roll back optimistic General Chat reactions when the RPC fails.
-6. Remove the catch-all `vendor-ui` chunk, restore route-aware splitting, and
-   enforce measured entry/lazy gzip budgets instead of hiding Vite warnings.
+6. **Completed locally:** remove the catch-all `vendor-ui` chunk, restore
+   route-aware splitting, and enforce measured entry/lazy/deploy budgets.
 7. Move nonruntime source/concept/generation assets out of `public`, retain all
    runtime finals, and enforce a deploy-size budget.
 8. Add Netlify CSP, frame, content-type, referrer, permissions, and other
@@ -80,20 +106,21 @@ review packet.
     keyboard menus, `aria-current`, contrast, and phone touch targets.
 11. Simplify the contextual phone header and prevent transient celebrations
     from obscuring essential composer/navigation controls.
-12. Add release-correlated client/Edge/worker telemetry with privacy scrubbing.
+12. **Completed locally:** add opt-in release-correlated client/worker telemetry
+    with privacy scrubbing and an Edge helper for reviewed per-function adoption.
 
 #### P1 - Repository and dependency cleanliness
 
-1. Add Jest and the two standalone Node suites to required CI.
-2. Eliminate React `act(...)` test warnings instead of suppressing console output.
-3. Remove current unused imports/identifiers, enable TypeScript unused checks,
-   and run ESLint with `--max-warnings=0`.
-4. Resolve current root development dependency advisories. Apply same-major
-   updates first; treat Vite and Expo as dedicated migration packets.
-5. Add a separate `apps/mobile` install/lint/typecheck/audit/Expo-doctor job.
-6. Add docs link/encoding checks and repair known broken links/mojibake.
-7. Validate the final result from a clean clone with deterministic lockfile
-   installs and a clean worktree.
+1. **Completed locally:** require all Jest and standalone Node suites in CI.
+2. **Completed locally:** eliminate React `act(...)` test warnings.
+3. **Completed locally:** remove unused code, enable TypeScript unused checks,
+   and enforce ESLint `--max-warnings=0`.
+4. **Completed locally:** resolve advisories and apply safe same-major updates;
+   keep framework/test-runner major migrations as reviewed packets.
+5. **Completed locally:** add a separate Expo install/audit/lint/typecheck/Doctor job.
+6. **Completed locally:** add documentation link/encoding checks and repair known drift.
+7. **Release gate:** validate deterministic clean installs, the complete Quality
+   workflow, and a clean worktree before production completion.
 
 #### P2 - Product improvements after hardening
 
@@ -253,7 +280,7 @@ Observed risk:
 - `mark_dm_messages_read` needs a participant authorization guard.
 - Supabase advisors flagged mutable function search paths, authenticated-callable SECURITY DEFINER functions, public-table RLS gaps, and storage policy concerns.
 
-Implementation status on June 8, 2026:
+Implementation status through July 9, 2026:
 
 - Added and remotely applied
   [20260608132000_harden_dm_read_participant_guard.sql](C:/repos/chat2.0/supabase/migrations/20260608132000_harden_dm_read_participant_guard.sql:1),
@@ -261,21 +288,26 @@ Implementation status on June 8, 2026:
   conversation. The linked Supabase migration list and `supabase db push
   --dry-run` both showed the remote database current through
   `20260608200000`.
-- The broader `public.users`, role-authority, storage, and advisor cleanup
-  items remain open.
+- The July 9 hardening migrations restrict profile writes to approved columns,
+  make `users.admin_role` display-only, lock static notification-sound config,
+  constrain Storage MIME/size metadata, fix SECURITY DEFINER search paths and
+  ACLs, and clear local warning-level lint/security-advisor output. Production
+  application remains part of the backend-first release gate.
 
-Next steps:
+Status and remaining coordinated follow-up:
 
 1. Move email and other private identity fields out of `public.users` into a private/admin-only table or safe RPC/view.
-2. Revoke broad table-level `UPDATE` on `public.users` from `anon` and `authenticated`.
-3. Grant update only for approved public profile columns.
-4. Treat `users.admin_role` as display-only. Use `user_roles` and operator RPCs for all server-side authority checks.
-5. Add a participant guard to `mark_dm_messages_read`, using the bridge DM read helper as a pattern.
-6. Add fixed `search_path` to SECURITY DEFINER functions.
-7. Revoke generic `EXECUTE` on internal SECURITY DEFINER helpers and grant only an explicit allowlist.
-8. Enable RLS or static-config treatment for `notification_sounds`.
-9. Add bucket file size and MIME-type limits for avatars, banners, chat uploads, and message media.
-10. Sanitize upload filenames server-side or in shared helpers before storage writes.
+2. **Completed locally:** revoke broad profile-table writes and grant only
+   approved public profile columns with `USING` and `WITH CHECK` enforcement.
+3. **Completed locally:** make `users.admin_role` display-only and use
+   `user_roles`/operator helpers for authority.
+4. **Completed June 8:** enforce the `mark_dm_messages_read` participant guard.
+5. **Completed locally:** fix SECURITY DEFINER search paths, caller guards,
+   explicit ACLs, and future default privileges.
+6. **Completed locally:** replace mutable notification-sound data with bundled
+   WebAudio behavior and lock the legacy table.
+7. **Completed locally:** add bucket MIME/size constraints and shared client
+   filename/type/size validation, including a bounded voice-recording path.
 
 Validation target:
 
@@ -303,14 +335,14 @@ Observed risk:
 
 Next steps:
 
-1. Add an `is_user_channel_banned(userId, 'general_chat')` check to `bridge-group-send` before message insert and AI side effects.
-2. Add bridge function tests for banned bridge users.
-3. Enforce `dm_discoverable IS TRUE` in bridge user search and recipient resolution unless the conversation already exists.
-4. Gate `postToChat` on caller eligibility and General Chat ban status.
-5. Add per-user AI quotas/rate limits before provider calls.
-6. Separate "get an AI answer" from "post the AI answer to chat" permissions.
-7. Add rate limits, bootstrap secrets, or recovery-token checks to bridge register/pairing begin flows.
-8. Reduce returned identifiers from bridge bootstrap endpoints where they are not needed by the client.
+1. Keep every bridge endpoint default-deny while ESP is paused; the shared hold
+   now runs before authentication, parsing, or service-role work.
+2. Before bridge reactivation, re-audit channel bans, `dm_discoverable`,
+   bootstrap/rate limits, returned identifiers, and banned-user tests.
+3. Keep AI `postToChat` caller eligibility and General Chat bans covered by
+   negative tests when changing that active endpoint.
+4. Add an atomic per-user AI quota/idempotency ledger before expanding provider
+   use or separating answer and post permissions.
 
 Validation target:
 
@@ -354,9 +386,8 @@ Implementation status on June 8, 2026:
 
 Next steps:
 
-1. Redeploy and smoke `art-board-import-image`, `shadow-pin-import-image`, and
-   `send-push` before treating shared safe-fetch coverage as fully live in
-   production.
+1. Deploy and smoke active `shadow-pin-import-image` and `send-push`; remove
+   remote `art-board-import-image` while Art Board is paused.
 2. Run deployed function smoke with known safe public URLs and blocked private
    URL cases.
 3. Keep adding provider-specific allow/deny tests as URL import and preview
@@ -380,7 +411,8 @@ Primary files:
 Observed risk:
 
 - `netlify.toml` does not define security headers.
-- Live Netlify settings were not verified during the audit because the CLI status command failed locally.
+- Live Netlify project settings were verified on July 9; automatic Git builds
+  were then stopped so the GitHub backend-first workflow is the only publisher.
 - Render config keeps sensitive values unsynced, which is good, but live dashboard secrets/logging were not verified.
 - No Vercel project config was found.
 - Several Supabase functions intentionally use `verify_jwt = false` and must rely on complete custom auth/rate limiting.
@@ -389,10 +421,11 @@ Next steps:
 
 1. Add staged Netlify headers for `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, frame protection, and CSP.
 2. Build CSP in report-only mode first so Supabase, Bunny, Meta/oEmbed, media, and provider calls can be observed safely.
-3. Verify live Netlify site settings, environment variables, deploy hooks, domain redirects, and production headers.
+3. Verify production headers after the staged header/CSP packet; project,
+   deploy-hook, domain, and publisher settings were verified July 9.
 4. Verify Render worker env vars are scoped to server-side secrets and log output does not expose provider credentials.
 5. Confirm all `verify_jwt = false` Supabase functions have custom auth, abuse limits, and tests.
-6. Align local and CI Node version strategy. Current local Node is newer than the GitHub workflow build runtime.
+6. **Completed:** local, Netlify config, and GitHub workflows use Node 24.
 
 Validation target:
 
@@ -467,8 +500,9 @@ Implementation status on June 8, 2026:
   and is now used by News Feed and News Chat with focused Jest coverage. This
   starts the extraction track but does not yet cover General Chat, DMs, boards,
   or presence.
-- The Vite large-chunk warning remains open and is tracked in
-  [docs/DEFERRED_FOLLOWUPS.md](C:/repos/chat2.0/docs/DEFERRED_FOLLOWUPS.md:1).
+- The July 9 build removed the broad `vendor-ui` chunk and added deterministic
+  eager, lazy Phaser, single-chunk, and total-deploy budgets. The large lazy
+  Phaser payload remains intentional and separately budgeted.
 
 Validation target:
 

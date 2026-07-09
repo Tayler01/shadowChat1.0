@@ -17,7 +17,7 @@ jobs:
       PRODUCTION_PROJECT_REF: ${{ vars.PRODUCTION_SUPABASE_PROJECT_REF }}
     steps:
       - uses: actions/checkout@v5
-      - uses: supabase/setup-cli@v1
+      - uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf
         with:
           version: 2.109.1
       - name: Fail closed on missing or reused environment configuration
@@ -31,3 +31,4 @@ jobs:
       - run: supabase migration list --linked
       - run: supabase db push --linked --dry-run
       - run: supabase functions list
+      - run: npm run supabase:functions:verify

@@ -31,12 +31,20 @@ handlers before their error contracts are reviewed.
 
 ## CI security gates
 
-- `quality.yml`: secretless lint, typecheck, build, Jest, and worker lockfile.
+- `quality.yml`: secretless lint, typecheck, Node contract tests, classified
+  Supabase Function manifest validation, documentation integrity, production
+  build budgets, the full Jest suite, and zero-tolerance npm audits. Separate
+  jobs validate the Expo app (`npm ci`, audit, lint, TypeScript, Expo Doctor)
+  and rebuild/lint the complete local Supabase migration chain from scratch.
 - `codeql.yml`: JavaScript/TypeScript CodeQL on PRs, main, and weekly.
 - `security-scans.yml`: full-history redacted gitleaks plus Trivy filesystem and
   configuration scans; high/critical findings fail.
 - `.github/dependabot.yml`: grouped weekly npm, worker, Actions, and Docker
 updates. Dependabot never receives deployment secrets.
+
+On `main`, the production workflow calls Quality, Security Scans, and CodeQL as
+reusable workflows and cannot enter the credentialed deploy job until every job
+passes. Pull requests and weekly schedules still run those safeguards directly.
 
 `.gitleaksignore` contains five exact historical fingerprints only: three
 Firebase web-client identifiers from removed files and two README examples.
@@ -72,21 +80,29 @@ refuses staging equal to production, then lists migrations, performs
 Supabase preview branches can replace long-lived staging on a paid plan; a
 separate CLI-managed staging project works without that feature.
 
-## Production uptime and News freshness
+## Production uptime and optional News freshness
 
-The scheduled workflow checks the public app and uses server-only credentials
-to assess enabled `news_sources` by last success and bounded health state. It
-prints counts only, never handles, posts, or `last_error`. Configure protected
+The scheduled workflow always checks the public app. News freshness is
+feature-controlled so suspending the News product does not create a false
+production incident. Keep repository variable `NEWS_MONITOR_ENABLED=false`
+while News and its Render worker are paused. When News is explicitly restored,
+set it to `true`; the workflow then uses server-only credentials to assess
+enabled `news_sources` by last success and bounded health state. It prints
+counts only, never handles, posts, or `last_error`. Configure protected
 environment `production-monitoring` with:
 
 - variable `PRODUCTION_APP_URL`
+- variable `NEWS_MONITOR_ENABLED` (`false` while News is paused)
 - variable `NEWS_MAX_AGE_MINUTES` (start at 10; keep above several cycles)
-- secrets `MONITOR_SUPABASE_URL` and `MONITOR_SUPABASE_SERVICE_ROLE_KEY`
+- secrets `MONITOR_SUPABASE_URL` and `MONITOR_SUPABASE_SERVICE_ROLE_KEY` when
+  News monitoring is enabled
 - optional secret `SLACK_WEBHOOK_URL`
 
-The workflow fails when News credentials are absent, so green means uptime and
-freshness were both checked. Slack receives only the workflow URL and status.
-Replace the service role with a least-privilege health endpoint when available.
+When News monitoring is enabled, missing credentials fail closed, so green
+means uptime and freshness were both checked. While it is disabled, green means
+the app uptime check passed and the log records `newsMonitoring: paused`. Slack
+receives only the workflow URL and status. Replace the service role with a
+least-privilege health endpoint when available.
 
 GitHub Actions is not an independent uptime provider. Also configure an
 external HTTPS monitor (Better Stack, UptimeRobot, or equivalent) for the root

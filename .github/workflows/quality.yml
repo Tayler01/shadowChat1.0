@@ -1,9 +1,8 @@
 name: Quality
 
 on:
+  workflow_call:
   pull_request:
-    branches: [main]
-  push:
     branches: [main]
 
 permissions:
@@ -21,7 +20,43 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm run test:node
+      - run: npm run supabase:functions:verify
+      - run: npm run docs:verify
       - run: npm run build
       - run: npx jest --runInBand
+      - run: npm audit --audit-level=low
       - name: Verify News worker lockfile
         run: npm ci --prefix services/news-scraper
+      - name: Audit News worker
+        run: npm audit --prefix services/news-scraper --audit-level=low
+
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - run: npm ci
+      - run: npm audit --audit-level=low
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm run doctor
+
+  database:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf
+        with:
+          version: 2.109.1
+      - run: supabase db start
+      - run: supabase db reset --local --no-seed --yes
+      - run: supabase db lint --local --level warning --fail-on warning
+      - run: supabase db advisors --local --type security --fail-on warn

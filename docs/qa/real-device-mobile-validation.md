@@ -65,7 +65,7 @@ Minimum real-device pass:
 | RD-010 | Both | Public profile | Tap a user/avatar from chat or DMs. | Profile modal opens, scrolls internally, closes cleanly. | not run | | |
 | RD-011 | Both | DM list | Open Direct Messages. | Header, list, new conversation button, and nav controls remain inside viewport. | not run | | |
 | RD-012 | Both | DM thread | Open a DM thread, focus composer, send a message, go back. | Composer works; back navigation returns to DM list without clipping or horizontal slide artifacts. | not run | | |
-| RD-013 | Both | Boards | Open Boards and News Chat. | Board map, labels, chat composer, and nav controls fit and remain usable. | not run | | |
+| RD-013 | Both | Paused navigation | Inspect the bottom navigation and open a legacy Boards/News URL. | Boards is absent and the legacy URL safely returns to Chat. | not run | | |
 | RD-014 | Both | Settings | Open Settings and Account/Profile. | Sections fit; controls are tappable; no footer/nav overlap. | not run | | |
 | RD-015 | Both | Feedback modal | Open Settings > Feedback > Send Feedback. | Modal fits screen, scrolls internally, keyboard does not trap submit/close controls. | not run | | |
 | RD-016 | Both | Background/refocus | Send or view a thread, background app for 30 seconds, reopen. | App resumes without stale blank state; realtime/session state recovers. | not run | | |

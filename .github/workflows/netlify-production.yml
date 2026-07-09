@@ -8,14 +8,26 @@ on:
 
 permissions:
   contents: read
+  packages: read
+  security-events: write
 
 concurrency:
   group: netlify-production-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  quality:
+    uses: ./.github/workflows/quality.yml
+
+  security:
+    uses: ./.github/workflows/security-scans.yml
+
+  codeql:
+    uses: ./.github/workflows/codeql.yml
+
   deploy:
     name: Build and deploy
+    needs: [quality, security, codeql]
     runs-on: ubuntu-latest
     env:
       NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
@@ -41,7 +53,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Set up Supabase CLI
@@ -86,7 +98,7 @@ jobs:
         run: npm run supabase:functions:verify
 
       - name: Build with Netlify environment
-        run: npx --yes netlify@$NETLIFY_CLI_VERSION build
+        run: npx --yes "netlify@$NETLIFY_CLI_VERSION" build
 
       - name: Verify app build metadata
         run: node scripts/verify-app-build-metadata.mjs
@@ -129,7 +141,7 @@ jobs:
 
       - name: Deploy to Netlify production
         run: |
-          npx --yes netlify@$NETLIFY_CLI_VERSION deploy \
+          npx --yes "netlify@$NETLIFY_CLI_VERSION" deploy \
             --auth "$NETLIFY_AUTH_TOKEN" \
             --site "$NETLIFY_SITE_ID" \
             --prod \

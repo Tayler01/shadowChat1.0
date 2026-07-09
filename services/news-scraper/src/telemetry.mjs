@@ -1,6 +1,5 @@
-import * as Sentry from '@sentry/node'
-
 const sensitive = /authorization|cookie|token|password|secret|session|message|content|body|email|username|handle|device|auth.*state/i
+let sentry = null
 
 export const scrubWorkerEvent = (value, key = '', depth = 0) => {
   if (depth > 5 || sensitive.test(key)) return '[redacted]'
@@ -12,10 +11,11 @@ export const scrubWorkerEvent = (value, key = '', depth = 0) => {
   return value
 }
 
-export const initializeWorkerTelemetry = () => {
+export const initializeWorkerTelemetry = async () => {
   const dsn = process.env.SENTRY_DSN?.trim()
   if (!dsn) return false
-  Sentry.init({
+  sentry = await import('@sentry/node')
+  sentry.init({
     dsn,
     environment: process.env.APP_ENVIRONMENT || 'production',
     release: process.env.RENDER_GIT_COMMIT || undefined,
@@ -28,9 +28,9 @@ export const initializeWorkerTelemetry = () => {
 }
 
 export const captureWorkerException = (error, operation) => {
-  if (!process.env.SENTRY_DSN?.trim()) return
-  Sentry.withScope(scope => {
+  if (!sentry) return
+  sentry.withScope(scope => {
     scope.setTag('operation', operation)
-    Sentry.captureException(error instanceof Error ? new Error(error.name) : new Error('Unknown worker error'))
+    sentry.captureException(error instanceof Error ? new Error(error.name) : new Error('Unknown worker error'))
   })
 }

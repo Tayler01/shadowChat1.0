@@ -16,6 +16,7 @@ jobs:
       PRODUCTION_APP_URL: ${{ vars.PRODUCTION_APP_URL }}
       MONITOR_SUPABASE_URL: ${{ secrets.MONITOR_SUPABASE_URL }}
       MONITOR_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.MONITOR_SUPABASE_SERVICE_ROLE_KEY }}
+      NEWS_MONITOR_ENABLED: ${{ vars.NEWS_MONITOR_ENABLED }}
       NEWS_MAX_AGE_MINUTES: ${{ vars.NEWS_MAX_AGE_MINUTES }}
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
     steps:
@@ -23,7 +24,7 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-      - name: Check app uptime and News freshness
+      - name: Check app uptime and optional News freshness
         run: node scripts/check-production-health.mjs
       - name: Route sanitized failure to Slack when configured
         if: failure() && env.SLACK_WEBHOOK_URL != ''

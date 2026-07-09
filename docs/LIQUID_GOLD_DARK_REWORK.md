@@ -223,7 +223,7 @@ Applies to emoji picker, notifications, upload menus, reaction menus.
 - use darker overlays
 - use glass panels with stronger blur
 - use thin gold separators or selected states
-- keep content panels readable, not decorative for decorationâ€™s sake
+- keep content panels readable, not decorative for decoration’s sake
 
 ## Page Treatments
 
@@ -419,7 +419,7 @@ Files:
 - [src/components/chat/MessageInput.tsx](/C:/repos/chat2.0/src/components/chat/MessageItem.tsx:1)
 - [src/components/chat/MessageItem.tsx](/C:/repos/chat2.0/src/components/chat/MessageItem.tsx:1)
 - [src/components/chat/MessageList.tsx](/C:/repos/chat2.0/src/components/chat/MessageList.tsx:1)
-- [src/components/chat/PinnedMessagesBar.tsx](/C:/repos/chat2.0/src/components/chat/PinnedMessagesBar.tsx:1)
+- [src/components/chat/PinnedMessagesButton.tsx](/C:/repos/chat2.0/src/components/chat/PinnedMessagesButton.tsx:1)
 - [src/components/chat/PinnedMessageItem.tsx](/C:/repos/chat2.0/src/components/chat/PinnedMessageItem.tsx:1)
 
 Tasks:

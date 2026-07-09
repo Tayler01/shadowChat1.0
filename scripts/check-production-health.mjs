@@ -1,6 +1,7 @@
 const appUrl = process.env.PRODUCTION_APP_URL || 'https://shadochat.online'
 const supabaseUrl = process.env.MONITOR_SUPABASE_URL?.replace(/\/$/, '')
 const serviceKey = process.env.MONITOR_SUPABASE_SERVICE_ROLE_KEY
+const newsMonitoringEnabled = process.env.NEWS_MONITOR_ENABLED?.trim().toLowerCase() === 'true'
 const maxAgeMinutes = Number(process.env.NEWS_MAX_AGE_MINUTES || 10)
 
 const fail = message => {
@@ -17,7 +18,9 @@ try {
   fail('app request failed')
 }
 
-if (!supabaseUrl || !serviceKey) {
+if (!newsMonitoringEnabled) {
+  console.log(JSON.stringify({ app: appStatus, newsMonitoring: 'paused' }))
+} else if (!supabaseUrl || !serviceKey) {
   fail('MONITOR_SUPABASE_URL and MONITOR_SUPABASE_SERVICE_ROLE_KEY are required for News freshness coverage')
 } else {
   const response = await fetch(`${supabaseUrl}/rest/v1/news_sources?select=health_status,last_checked_at,last_success_at&enabled=eq.true`, {

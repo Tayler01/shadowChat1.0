@@ -1,14 +1,30 @@
 # Deployment Guide
 
-ShadowChat deploys as a static frontend on Netlify with Supabase as the hosted backend. The News Feed scraper is a separate always-on Render worker.
+ShadowChat deploys as a static frontend on Netlify with Supabase as the hosted
+backend. The preserved News Feed scraper is a separate Render worker that is
+currently suspended with automatic deploys disabled.
 
 Engineering security gates, staging parity, privacy-safe telemetry, real-device
 release validation, and production monitoring are defined in
 [ENGINEERING_SAFEGUARDS.md](C:/repos/chat2.0/docs/ENGINEERING_SAFEGUARDS.md:1).
 
-## Documentation Status - June 2, 2026
+## Documentation Status - July 9, 2026
 
-This guide reflects the current GitHub Actions, Netlify, Supabase, Render, app-release, invite-only signup/email-verification rollout, and production-smoke flow. Known deployment hardening that is still pending: Netlify security headers/CSP, live Netlify dashboard verification, Render live-secret/log verification, and a review of all `verify_jwt = false` Edge Functions against their in-function auth contracts.
+This guide reflects the current GitHub Actions, Netlify, Supabase, Render,
+app-release, invite-only signup/email-verification rollout, and production-smoke
+flow. Production deployment now validates and applies migrations, pushes
+Supabase configuration, aligns the classified Edge Function inventory, enforces
+the ESP Bridge hold, captures backend evidence, and only then publishes the
+frontend. Known deployment hardening that is still pending is ranked in the
+audit backlog, including Netlify security headers/CSP and physical-device PWA
+validation.
+
+Netlify Git builds are intentionally stopped for this project. The backend-first
+GitHub Actions workflow is the only production publisher; it uploads the already
+validated build with the Netlify CLI after Supabase alignment succeeds. This
+prevents an automatic Netlify build from publishing a schema-dependent frontend
+early. GitHub Actions PR previews remain explicit CLI deploys from the protected
+preview job.
 
 ## Production Pieces
 
@@ -24,8 +40,13 @@ Run:
 
 ```powershell
 npm run lint
-npx tsc --noEmit -p tsconfig.app.json
+npm run typecheck
+npm run test:node
+npm run supabase:functions:verify
+npm run docs:verify
 npm run build
+npx jest --runInBand
+npm audit --audit-level=low
 ```
 
 If the change affects realtime or UI behavior, also run a headed browser smoke before shipping.
@@ -73,20 +94,27 @@ git push origin main
 
 Pushing `main` automatically starts the GitHub Actions workflow in
 [.github/workflows/netlify-production.yml](C:/repos/chat2.0/.github/workflows/netlify-production.yml:1).
-That workflow runs install, lint, typecheck, Netlify build, and Netlify
-production deploy.
+That workflow runs the release checks, applies pending Supabase migrations and
+configuration, deploys the exact active/default-deny Function manifest, revokes
+dedicated ESP Bridge Auth sessions, stores backend parity evidence, builds with
+Netlify, deploys production, and publishes the in-app release record.
+
+The credentialed deploy job depends on reusable Quality, Security Scans, and
+CodeQL workflows. No Supabase or Netlify release step starts until all of their
+jobs pass.
 
 Opening or updating a pull request against `main` starts the GitHub Actions
 workflow in
 [.github/workflows/netlify-preview.yml](C:/repos/chat2.0/.github/workflows/netlify-preview.yml:1).
-That workflow runs install, lint, typecheck, a Netlify deploy-preview build, and
-then publishes an alias preview at `pr-<pull-request-number>`. It also writes a
-sticky PR comment containing the preview URL so Feedback Builds and human review
-have a stable place to find the test build before merge.
+That workflow first validates untrusted PR code without secrets. For eligible
+same-repository, non-Dependabot PRs, a protected `netlify-preview` environment
+then authorizes the alias preview at `pr-<pull-request-number>` and publishes a
+sticky PR comment with the preview URL.
 
 ## Netlify PR Preview Deploys
 
-PR previews require the same GitHub Actions repository secrets as production:
+The secretless validation job needs no deployment credentials. The protected
+preview job requires:
 
 - `NETLIFY_AUTH_TOKEN`
 - `NETLIFY_SITE_ID`
@@ -95,6 +123,12 @@ Production app-release publishing also requires:
 
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
+
+Backend alignment in the production workflow also requires:
+
+- `SUPABASE_ACCESS_TOKEN`
+- `SUPABASE_DB_PASSWORD`
+- repository variable `SUPABASE_PROJECT_ID`
 
 The preview workflow intentionally does not deploy to production. It publishes
 the built `dist` directory with:
@@ -183,34 +217,24 @@ Recent app-surface migrations to confirm in fresh projects:
 
 ### Edge Functions
 
+Do not maintain a second hand-written deployment list. Validate and deploy the
+canonical classification in `supabase/function-manifest.json`:
+
 ```powershell
-supabase functions deploy openai-chat --no-verify-jwt
-supabase functions deploy send-push --no-verify-jwt
-supabase functions deploy bridge-register --no-verify-jwt
-supabase functions deploy bridge-pairing-begin --no-verify-jwt
-supabase functions deploy bridge-pairing-status --no-verify-jwt
-supabase functions deploy bridge-session-exchange --no-verify-jwt
-supabase functions deploy bridge-session-refresh --no-verify-jwt
-supabase functions deploy bridge-heartbeat --no-verify-jwt
-supabase functions deploy bridge-pairing-approve --no-verify-jwt
-supabase functions deploy bridge-pairing-revoke --no-verify-jwt
-supabase functions deploy bridge-group-send --no-verify-jwt
-supabase functions deploy bridge-group-poll --no-verify-jwt
-supabase functions deploy bridge-dm-send --no-verify-jwt
-supabase functions deploy bridge-dm-poll --no-verify-jwt
-supabase functions deploy bridge-update-check --no-verify-jwt
-supabase functions deploy bridge-user-profile --no-verify-jwt
-supabase functions deploy bridge-user-search --no-verify-jwt
-supabase functions deploy link-preview --no-verify-jwt
-supabase functions deploy art-board-import-image
-supabase functions deploy shadow-pin-import-image
-supabase functions deploy shadow-pin-video --no-verify-jwt
-supabase functions deploy delete-account --no-verify-jwt
+npm run supabase:functions:verify
+npm run supabase:functions:deploy
 ```
 
-The bridge functions keep JWT verification disabled at the Supabase function gateway because the firmware bootstrap calls do not carry a browser user token. User-sensitive bridge operations validate the caller's Supabase session inside the function, while device-sensitive operations validate pairing codes or bridge control-plane tokens.
+The deploy command aligns the active functions, deploys every paused ESP Bridge
+endpoint with its shared default-deny gate, removes the paused Art Board import
+endpoint, verifies the remote inventory and JWT flags, and unsets any accidental
+`BRIDGE_API_ENABLED` override. It requires `SUPABASE_PROJECT_ID` and
+`SUPABASE_ACCESS_TOKEN` in the process environment.
 
-Audit note: any function deployed with `--no-verify-jwt` must keep equivalent endpoint-level auth, authorization, rate limiting, and service-role boundary checks. The June 1 audit specifically calls out follow-ups for bridge group send, bridge discoverability, AI `postToChat`, and URL fetch hardening.
+Any function whose gateway JWT check is disabled must keep equivalent
+endpoint-level authentication, authorization, rate limiting, and service-role
+boundaries. A paused bridge endpoint must return the server-side hold before it
+does authentication, parsing, or database work.
 
 ### Secrets
 
@@ -243,7 +267,10 @@ Do not put provider preview tokens in frontend `VITE_*` env vars.
 
 ## Render News Scraper Deployment
 
-The News scraper deploys from [render.yaml](C:/repos/chat2.0/render.yaml:1) as the `shado-news-scraper` Docker worker.
+The News scraper is preserved in [render.yaml](C:/repos/chat2.0/render.yaml:1)
+as the `shado-news-scraper` Docker worker. It is currently suspended and
+`autoDeployTrigger` is `off`; do not resume or redeploy it until News is
+explicitly reapproved under the paused-feature checklist.
 
 Required Render secrets:
 
@@ -271,7 +298,7 @@ Optional Render secrets:
 - `TRUTH_PASSWORD`
 - `NEWS_TRUTH_COOKIE_HEADER`
 
-Deploy notes:
+Reactivation notes (not part of a normal release):
 
 1. Push the commit to the branch Render watches.
 2. Confirm the Render worker build finishes and the service is running.

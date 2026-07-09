@@ -4,11 +4,20 @@ ShadowChat 1.0 is a premium dark realtime chat app built with React, TypeScript,
 
 The project is already wired for hosted Supabase and Netlify deployment. It is designed to behave like a product app, not a demo: realtime messaging, uploads, presence, settings, DMs, and notification flows are all first-class parts of the codebase.
 
-## Documentation Status - June 16, 2026
+## Documentation Status - July 9, 2026
 
-The documentation set has been refreshed against the current `main` branch after the June 16 Golden Egg discovery visual refresh and the June 15 Shadow Runner Bell Tower Level 4, tap-toggle crouch, Web Audio soundtrack, completion-medal migration, push-subscription repair, and feature auth-refresh hardening work. The freshest planning source is [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1), and the full documentation inventory is [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
+The documentation set has been refreshed for the July 9 alignment program:
+paused product domains, Supabase authority/security hardening, deterministic
+backend deployment, strict CI, dependency cleanup, build budgets, and
+engineering safeguards. The ranked source of truth is
+[docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1),
+and the full inventory is
+[docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
 
-Current known follow-up areas are documentation-backed: Supabase policy/RPC hardening, remaining production deployment/smoke for shared URL fetch hardening outside the already-deployed link-preview and ShadowPin video functions, Netlify security headers, provider live-setting verification, frontend polish, and post-deploy auth smoke for the invite-only signup/email-verification rollout.
+Current follow-ups remain ranked in that audit: service-worker update behavior,
+DM pagination/subscription/rendering, reaction rollback, runtime-asset cleanup,
+Netlify security headers, accessibility/mobile polish, physical-device PWA
+validation, and the deliberately deferred product improvements.
 
 ## Stack
 
@@ -94,15 +103,18 @@ Backend lives under [`supabase`](C:/repos/chat2.0/supabase).
 - [`supabase/functions/link-preview`](C:/repos/chat2.0/supabase/functions/link-preview/index.ts) fetches server-side metadata for chat, DM, and board-chat link cards.
 - News data lives in isolated `news_*` tables and RPCs from [`supabase/migrations/20260430041621_news_tab_foundation.sql`](C:/repos/chat2.0/supabase/migrations/20260430041621_news_tab_foundation.sql:1).
 - Boards use `public.board_catalog`, `public.board_chat_messages`, `public.board_chat_reactions`, and per-board `user_read_cursors`.
-- Art Board uses `public.art_board_items`, `public.art_board_links`, `public.art_board_reactions`, the public `art-board` Storage bucket, and the `art-board-import-image` Edge Function.
+- Art Board data uses `public.art_board_items`, `public.art_board_links`,
+  `public.art_board_reactions`, and the public `art-board` Storage bucket. Its
+  import Function source is preserved but classified for remote removal while
+  the domain is paused.
 - Feedback submissions use `public.feedback_submissions` plus the private `feedback-attachments` Storage bucket.
 - Admin roles use `public.user_roles`, `public.admin_role_audit`, `public.admin_role_notifications`, and the synced public `users.admin_role` badge field.
 - Channel bans use `public.user_channel_bans` plus RLS/RPC enforcement for General Chat, individual board chats, and all interaction.
 - Weather locations use private `public.user_weather_preferences` rows scoped by RLS to the owning user.
 - Hype uses `public.hype_events`, `public.message_hypes`,
-  `public.hype_event_receipts`, and `public.hype_bonus_grants`; the linked
-  Supabase migration list was confirmed aligned through migration
-  `20260615183000`.
+  `public.hype_event_receipts`, and `public.hype_bonus_grants`.
+- [`supabase/function-manifest.json`](C:/repos/chat2.0/supabase/function-manifest.json:1)
+  classifies every Edge Function as active, deny-paused, or removed.
 - The Golden Egg Easter egg uses `public.users.gold_easter_egg` and the
   authenticated `claim_gold_easter_egg` RPC.
 - Automation approval review packets use `public.automation_approval_packets`
@@ -112,10 +124,10 @@ Backend lives under [`supabase`](C:/repos/chat2.0/supabase).
   `public.users`, and the authenticated
   `record_shadow_runner_level_completion` RPC.
 
-Always-on background services live under [`services`](C:/repos/chat2.0/services).
+Preserved background-service source lives under [`services`](C:/repos/chat2.0/services).
 
-- [`services/news-scraper`](C:/repos/chat2.0/services/news-scraper) is a Render Docker worker that polls admin-enabled X and Truth Social sources and writes normalized snapshots to Supabase with service-role credentials.
-- [`render.yaml`](C:/repos/chat2.0/render.yaml:1) defines the `shado-news-scraper` worker service and its required secrets.
+- [`services/news-scraper`](C:/repos/chat2.0/services/news-scraper) is the paused Render Docker worker source for polling admin-enabled X and Truth Social sources.
+- [`render.yaml`](C:/repos/chat2.0/render.yaml:1) preserves the `shado-news-scraper` definition with automatic deploys disabled.
 
 Tests live under [`tests`](C:/repos/chat2.0/tests).
 
@@ -219,6 +231,8 @@ node scripts/playwright-smoke.mjs --scenario=full --run-name=full-smoke-release 
 
 ## News Scraper Notes
 
+- News is paused, the Render worker is suspended, and automatic worker deploys
+  are disabled. These notes are reactivation guidance, not a normal release step.
 - The News scraper does not use the paid X API. It uses browser extraction, optional read-only X credentials, and per-source browser isolation.
 - The feed board stores only current Eastern-day posts. Source cursors persist across the daily board clear so older posts do not reappear.
 - Truth Social may block hosted worker IPs even when credentials are configured. If `news_sources.health_status` stays `blocked`, move the browser session to PinchTab or another trusted browser/IP path instead of exposing credentials to the client.
@@ -232,20 +246,29 @@ The minimum quality gates for normal code changes are:
 
 ```powershell
 npm run lint
-npx tsc --noEmit -p tsconfig.app.json
+npm run typecheck
+npm run test:node
+npm run supabase:functions:verify
+npm run docs:verify
 npm run build
+npx jest --runInBand
+npm audit --audit-level=low
 ```
 
 For deeper testing guidance, including headed Playwright debugging, use [docs/TESTING_GUIDE.md](C:/repos/chat2.0/docs/TESTING_GUIDE.md:1).
 
 ## Deployment
 
-Production is hosted on Netlify, the backend is hosted on Supabase, and the News scraper runs as a Render worker. Pushing to `main` triggers the GitHub Actions Netlify production deploy workflow.
+Production is hosted on Netlify and Supabase. Pushing to `main` triggers the
+backend-first GitHub Actions release: all Quality jobs must pass, then migrations,
+configuration, classified Functions, and the bridge hold align before the
+frontend is published. The preserved Render News worker remains suspended.
 
 - Netlify config: [netlify.toml](C:/repos/chat2.0/netlify.toml:1)
 - Netlify workflow: [.github/workflows/netlify-production.yml](C:/repos/chat2.0/.github/workflows/netlify-production.yml:1)
 - Render worker config: [render.yaml](C:/repos/chat2.0/render.yaml:1)
 - Deployment guide: [docs/DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1)
+- Engineering safeguards: [docs/ENGINEERING_SAFEGUARDS.md](C:/repos/chat2.0/docs/ENGINEERING_SAFEGUARDS.md:1)
 
 ## Documentation Map
 

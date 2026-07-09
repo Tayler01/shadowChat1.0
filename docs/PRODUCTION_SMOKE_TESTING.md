@@ -161,8 +161,10 @@ Common failure meanings:
 2. Confirm local `.env.testing.local` or CI has both stable smoke accounts.
 3. Run `npm run qa:smoke:prod`.
 4. Use `npm run qa:smoke:prod:headless` only for unattended environments where headless Chromium is stable.
-5. Open the Boards tab with a stable account and confirm the low-friction board map, contained labels, non-overlapping objects, News Feed, and chat boards render.
-6. If the deploy touched News or Boards, verify Render worker health in `news_sources`, send one board-chat link to confirm previews, and confirm opened boards do not show duplicate secondary headers or manual refresh controls.
+5. Confirm Boards is absent from desktop/mobile navigation and legacy
+   `?view=boards` / `?view=news` URLs return to Chat.
+6. Confirm Settings omits News Sources and ESP Bridge Pairing; verify the Render
+   worker is still suspended only when the release touches paused-domain controls.
 7. Open General Chat and confirm active-user count plus weather widget render without header overlap.
 8. Open Settings > Account & Profile and confirm Weather Location renders.
 9. If the deploy touched admin tools, verify Settings > Admin subpages with an operator account.

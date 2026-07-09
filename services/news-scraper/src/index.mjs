@@ -3,7 +3,7 @@ import { chromium } from 'playwright'
 import { pathToFileURL } from 'node:url'
 import { captureWorkerException, initializeWorkerTelemetry } from './telemetry.mjs'
 
-initializeWorkerTelemetry()
+await initializeWorkerTelemetry()
 import { existsSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
