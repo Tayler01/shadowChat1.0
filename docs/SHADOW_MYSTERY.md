@@ -1,18 +1,32 @@
 # Shadow Mystery
 
-## Documentation Status - June 11, 2026
+## Documentation Status - July 10, 2026
 
-Reviewed during the June 11, 2026 documentation refresh after the fourth hardcoded story, `The Sleep That Wouldn't End`, landed on `main`. This feature guide is current for the shipped product surface, with any known hardening or polish follow-ups tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
+Updated for the Shadow Mystery publishing-studio release. This feature guide is
+current for the hybrid bundled-plus-Supabase reader, the operator studio, and
+the private artwork contract. Remaining cross-product work is tracked in
+[FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
 
-Shadow Mystery is a hardcoded V1 longform mystery-novella surface inside the
-ShadowChat Entertainment area.
+Shadow Mystery is a longform mystery-novella surface inside the ShadowChat
+Entertainment area. Four bundled V1 stories remain permanent reader fallbacks,
+while newly published stories can now come from an isolated Supabase domain.
 
 ## Current Status
 
-As of 2026-06-11:
+As of 2026-07-10:
 
 - Shadow Mystery is wired into the Entertainment picker.
-- The story list/detail surface is static and mobile-first.
+- The story list/detail surface is mobile-first and starts instantly from the
+  bundled archive while published Supabase stories load.
+- Database stories replace a bundled story only when their slug or explicit
+  `legacy_story_id` matches it. Otherwise all four bundled cases remain visible.
+- Admins and sub-admins have a mobile-friendly publishing studio for story
+  metadata, ordered chapters, chapter art, source credits, drafts, publishing,
+  and deletion.
+- Publication is rejected by the database unless the story has a publish date,
+  at least one chapter, cover and header art, and at least one source credit.
+- Artwork is stored in the private `shadow-mystery` bucket and delivered with
+  six-hour signed transformation URLs sized for cover, header, and chapter use.
 - The launch story is `The Devil's School`, about Public
   School Number Four / Annie Lytle School in Jacksonville, Florida.
 - The second local proof story is `The Last Tee Time At Camelot`, about Camelot
@@ -52,16 +66,14 @@ As of 2026-06-11:
 2. Story expansion.
    - Add more hardcoded stories using the `shadow-mystery-story` Codex skill.
    - Keep every story shaped as app-ready data for future migration.
-3. Admin publishing.
-   - Add a dedicated Supabase domain for mystery stories, story sections, story
-     images, and source credits.
-   - Keep Shadow Mystery isolated from News, Shado TV, chat messages, and DMs.
-   - Add admin/sub-admin story creation, editing, draft/published state, and
-     artwork upload.
-4. Media pipeline.
-   - Store generated and uploaded story assets in a private bucket.
-   - Serve signed transformed images sized for phone reading.
-   - Preserve attribution and license notes on every copied real image.
+3. Admin publishing: complete.
+   - Dedicated story, chapter, image, and source-credit tables.
+   - Isolated from News, Shado TV, chat messages, and DMs.
+   - Admin/sub-admin creation, editing, draft/published state, and deletion.
+4. Media pipeline: complete for still artwork.
+   - Generated and uploaded story assets stay in a constrained private bucket.
+   - Signed transformed images are sized for phone reading.
+   - Caption, source, credit, and license fields travel with every image record.
 
 ## V1 Data Contract
 
@@ -75,6 +87,47 @@ The current shape is intentionally close to a future database model:
 - per-chapter body paragraphs
 - optional per-chapter image, caption, source, credit, and license
 - source list for quiet footer attribution
+
+The database API maps the normalized tables back into this same
+`ShadowMysteryStory` reader shape. Published database stories are merged with,
+not substituted wholesale for, `SHADOW_MYSTERY_STORIES`.
+
+## Supabase Domain
+
+The canonical migration is
+[`20260710041539_shadow_mystery_publishing_studio.sql`](C:/repos/chat2.0/supabase/migrations/20260710041539_shadow_mystery_publishing_studio.sql:1).
+
+Tables:
+
+- `public.shadow_mystery_stories`
+- `public.shadow_mystery_chapters`
+- `public.shadow_mystery_images`
+- `public.shadow_mystery_sources`
+
+All four tables have RLS enabled. Signed-in members can select published story
+trees only. Existing `is_app_operator` authority allows admins and sub-admins
+to read drafts and perform CRUD. Anonymous table privileges are revoked, and
+authenticated table privileges are explicit. The publication trigger is a
+database backstop rather than a UI-only checklist.
+
+The `shadow-mystery` Storage bucket is private, limited to 15 MB per object,
+and accepts JPG, PNG, and WebP images. Operator uploads must live under the
+operator's user-id folder. A regular member can sign only an object whose exact
+path is referenced by an image record belonging to a published story.
+
+## Publishing Studio
+
+The studio component lives at
+[`src/components/settings/ShadowMysteryStudio.tsx`](C:/repos/chat2.0/src/components/settings/ShadowMysteryStudio.tsx:1)
+and is exposed under Settings > Admin > Shadow Mystery Studio. It intentionally
+uses the app-wide operator model: full admins and sub-admins can publish, while
+ordinary members cannot see or mutate draft content.
+
+The frontend data boundary lives at
+[`src/features/entertainment/shadow-mystery/api.ts`](C:/repos/chat2.0/src/features/entertainment/shadow-mystery/api.ts:1).
+It validates lengths, HTTPS source URLs, paragraph arrays, file types and sizes,
+and artwork placement before sending writes. Those checks complement rather
+than replace database constraints and RLS.
 
 ## Asset Strategy
 
@@ -92,6 +145,23 @@ Real images are used only where licensing is clear enough for local optimized
 copies and attribution. The existing stories use Wikimedia Commons, National
 Park Service / National Register, NASA, and FDA images credited in the UI and
 source footer.
+
+New studio artwork is not written into `public/`. It stays in private Supabase
+Storage and is hydrated into signed transformed URLs when the reader or studio
+loads it.
+
+## Validation
+
+Focused checks for this domain:
+
+```powershell
+npx jest --runInBand tests/shadowMysteryPublishing.test.ts tests/ShadowMysteryScreen.test.tsx tests/ShadowMysteryStudio.test.tsx
+npx eslint src/features/entertainment/shadow-mystery/api.ts src/features/entertainment/shadow-mystery/ShadowMysteryScreen.tsx src/components/settings/ShadowMysteryStudio.tsx --max-warnings=0
+npx tsc --noEmit -p tsconfig.app.json
+supabase db lint --local --level warning
+supabase db advisors --local --type security --level warn --fail-on warn
+supabase db advisors --local --type performance --level warn --fail-on warn
+```
 
 ## Writing Standard
 

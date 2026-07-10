@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Archive, ArrowLeft, Camera, ChevronRight, Clock, MapPin } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { SHADOW_MYSTERY_ASSETS } from './assets/manifest'
+import { fetchShadowMysteryCatalog } from './api'
 import { getShadowMysteryStories, getShadowMysteryStory, type ShadowMysteryImage, type ShadowMysteryStory } from './data'
 
 interface ShadowMysteryScreenProps {
@@ -274,9 +275,27 @@ function StoryView({ story }: { story: ShadowMysteryStory }) {
 
 export function ShadowMysteryScreen({ onExit }: ShadowMysteryScreenProps) {
   const [view, setView] = useState<ShadowMysteryView>({ type: 'home' })
-  const stories = useMemo(() => getShadowMysteryStories(), [])
-  const story = view.type === 'story' ? getShadowMysteryStory(view.storyId) : undefined
+  const fallbackStories = useMemo(() => getShadowMysteryStories(), [])
+  const [stories, setStories] = useState<ShadowMysteryStory[]>(fallbackStories)
+  const story = view.type === 'story'
+    ? stories.find(candidate => candidate.id === view.storyId || candidate.slug === view.storyId)
+      ?? getShadowMysteryStory(view.storyId)
+    : undefined
   const backgroundAsset = story?.headerAsset ?? SHADOW_MYSTERY_ASSETS.pickerBanner
+
+  useEffect(() => {
+    let active = true
+    void fetchShadowMysteryCatalog()
+      .then(catalog => {
+        if (active) setStories(catalog.stories)
+      })
+      .catch(() => {
+        // The bundled case archive remains a complete offline/deployment fallback.
+      })
+    return () => {
+      active = false
+    }
+  }, [])
 
   const goBack = () => {
     if (view.type === 'home') {
