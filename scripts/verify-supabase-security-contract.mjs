@@ -22,6 +22,7 @@ const expectedAuthenticated = contract.domains
   .flatMap(domain => domain.signatures)
   .sort()
 const expectedAnon = [...contract.anon_signatures].sort()
+const expectedInternal = [...contract.internal_signatures].sort()
 
 const authenticatedRows = query(`
   select p.oid::regprocedure::text as signature
@@ -39,6 +40,16 @@ const anonRows = query(`
   where n.nspname = 'public'
     and p.prosecdef
     and has_function_privilege('anon', p.oid, 'execute')
+  order by 1
+`)
+const internalRows = query(`
+  select p.oid::regprocedure::text as signature
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public'
+    and p.prosecdef
+    and not has_function_privilege('authenticated', p.oid, 'execute')
+    and not has_function_privilege('anon', p.oid, 'execute')
   order by 1
 `)
 const [definerSummary] = query(`
@@ -71,14 +82,19 @@ const pausedGrantRows = query(`
 `)
 
 assert.deepEqual(
-  authenticatedRows.map(row => row.signature),
+  authenticatedRows.map(row => row.signature).sort(),
   expectedAuthenticated,
   'authenticated SECURITY DEFINER surface drifted from the reviewed allowlist',
 )
 assert.deepEqual(
-  anonRows.map(row => row.signature),
+  anonRows.map(row => row.signature).sort(),
   expectedAnon,
   'anonymous SECURITY DEFINER surface drifted from the reviewed allowlist',
+)
+assert.deepEqual(
+  internalRows.map(row => row.signature).sort(),
+  expectedInternal,
+  'internal/service-role SECURITY DEFINER surface drifted from the reviewed allowlist',
 )
 assert.equal(
   Number(definerSummary?.total),
@@ -92,6 +108,7 @@ console.log(JSON.stringify({
   scope: scope.slice(2),
   authenticatedSecurityDefiners: expectedAuthenticated.length,
   anonSecurityDefiners: expectedAnon.length,
+  internalSecurityDefiners: expectedInternal.length,
   totalSecurityDefiners: Number(definerSummary.total),
   pausedBrowserTableGrants: pausedGrantRows.length,
 }))

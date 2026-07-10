@@ -9,8 +9,11 @@ const contract = JSON.parse(readFileSync(
 
 test('SECURITY DEFINER allowlist is explicit, categorized, and duplicate-free', () => {
   assert.match(contract.reviewed_on, /^\d{4}-\d{2}-\d{2}$/)
-  assert.equal(contract.expected_total_security_definers, 99)
+  assert.equal(contract.expected_total_security_definers, 104)
   assert.deepEqual(contract.anon_signatures, ['is_username_available(text)'])
+  assert.equal(contract.internal_signatures.length, 33)
+  assert.equal(new Set(contract.internal_signatures).size, contract.internal_signatures.length)
+  assert.ok(contract.internal_signatures.every(signature => /^[a-z0-9_]+\(.*\)$/.test(signature)))
 
   const signatures = []
   for (const domain of contract.domains) {
@@ -23,6 +26,7 @@ test('SECURITY DEFINER allowlist is explicit, categorized, and duplicate-free', 
   assert.equal(signatures.length, 71)
   assert.equal(new Set(signatures).size, signatures.length)
   assert.ok(signatures.every(signature => /^[a-z0-9_]+\(.*\)$/.test(signature)))
+  assert.equal(new Set([...signatures, ...contract.internal_signatures]).size, contract.expected_total_security_definers)
 
   for (const pausedPrefix of ['bridge_', 'create_art_board_', 'delete_art_board_', 'toggle_board_', 'toggle_news_']) {
     assert.equal(
