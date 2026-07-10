@@ -88,6 +88,37 @@ const compareMessageKeys = (a: GeneralChatMessageKey, b: GeneralChatMessageKey) 
 const sortMessagesByStableKey = (items: Message[]) =>
   [...items].sort(compareMessageKeys)
 
+export const toggleMessageReactionForUser = (
+  items: Message[],
+  messageId: string,
+  emoji: string,
+  userId: string
+) => {
+  const index = items.findIndex(message => message.id === messageId)
+  if (index === -1) return items
+
+  const message = items[index]
+  const reactions = { ...(message.reactions || {}) } as Record<string, { count: number; users: string[] }>
+  const current = reactions[emoji] || { count: 0, users: [] as string[] }
+  const reacted = current.users.includes(userId)
+
+  if (reacted) {
+    const users = current.users.filter(id => id !== userId)
+    if (users.length === 0) {
+      delete reactions[emoji]
+    } else {
+      reactions[emoji] = { count: users.length, users }
+    }
+  } else {
+    const users = [...current.users, userId]
+    reactions[emoji] = { count: users.length, users }
+  }
+
+  const next = [...items]
+  next[index] = { ...message, reactions } as Message
+  return next
+}
+
 const isLocalPendingMessage = (message: Message) =>
   message.optimistic ||
   message.delivery_status === 'sending' ||
@@ -1489,38 +1520,7 @@ function useProvideMessages(): MessagesContextValue {
     if (!user) return;
 
     // Optimistically update local state so the reaction appears immediately
-    setMessages(prev => {
-      const idx = prev.findIndex(m => m.id === messageId);
-      if (idx === -1) return prev;
-
-      const message = prev[idx];
-      const reactions = { ...(message.reactions || {}) } as Record<string, { count: number; users: string[] }>;
-      let data = reactions[emoji] || { count: 0, users: [] as string[] };
-      const reacted = data.users.includes(user.id);
-
-      if (reacted) {
-        data = {
-          count: data.count - 1,
-          users: data.users.filter(u => u !== user.id),
-        };
-        if (data.count <= 0) {
-          delete reactions[emoji];
-        } else {
-          reactions[emoji] = data;
-        }
-      } else {
-        data = {
-          count: data.count + 1,
-          users: [...data.users, user.id],
-        };
-        reactions[emoji] = data;
-      }
-
-      const updated = { ...message, reactions };
-      const newMessages = [...prev];
-      newMessages[idx] = updated as Message;
-      return newMessages;
-    });
+    setMessages(prev => toggleMessageReactionForUser(prev, messageId, emoji, user.id));
 
     try {
       const workingClient = await getWorkingClient();
@@ -1536,6 +1536,9 @@ function useProvideMessages(): MessagesContextValue {
       }
       
     } catch (error) {
+      // Apply the same user-scoped toggle again to invert only this optimistic
+      // mutation while preserving any realtime reactions from other users.
+      setMessages(prev => toggleMessageReactionForUser(prev, messageId, emoji, user.id));
       throw error;
     }
   }, [user]);

@@ -1,6 +1,7 @@
-const STATIC_ASSET_CACHE = 'shadowchat-static-assets-v2'
+const STATIC_ASSET_CACHE = 'shadowchat-static-assets-v3'
 const STATIC_ASSET_CACHE_PREFIX = 'shadowchat-static-assets-'
 const CACHEABLE_STATIC_ASSET_EXTENSIONS = /\.(?:avif|css|gif|jpe?g|js|json|mp3|png|svg|webp|woff2?)$/i
+const HASHED_BUILD_ASSET_PATH = /^\/assets\/.+-[a-z0-9_-]{8,}\.[^/]+$/i
 
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting())
@@ -46,6 +47,47 @@ const isCacheableStaticAssetRequest = (request) => {
   }
 }
 
+const cacheFirst = async (request) => {
+  const cache = await caches.open(STATIC_ASSET_CACHE)
+  const cached = await cache.match(request)
+  if (cached) {
+    return cached
+  }
+
+  const response = await fetch(request)
+  if (response && response.ok) {
+    await cache.put(request, response.clone())
+  }
+  return response
+}
+
+const revalidateFirst = async (request) => {
+  const cache = await caches.open(STATIC_ASSET_CACHE)
+
+  try {
+    const response = await fetch(request, { cache: 'no-cache' })
+    if (response && response.ok) {
+      await cache.put(request, response.clone())
+    } else if (response?.status === 404) {
+      await cache.delete(request)
+    }
+    return response
+  } catch (error) {
+    const cached = await cache.match(request)
+    if (cached) {
+      return cached
+    }
+    throw error
+  }
+}
+
+const getStaticAssetResponse = (request) => {
+  const url = new URL(request.url)
+  return HASHED_BUILD_ASSET_PATH.test(url.pathname)
+    ? cacheFirst(request)
+    : revalidateFirst(request)
+}
+
 self.addEventListener('fetch', (event) => {
   if (
     !event.respondWith ||
@@ -57,18 +99,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   event.respondWith(
-    caches.open(STATIC_ASSET_CACHE).then(async (cache) => {
-      const cached = await cache.match(event.request)
-      if (cached) {
-        return cached
-      }
-
-      const response = await fetch(event.request)
-      if (response && response.ok) {
-        await cache.put(event.request, response.clone())
-      }
-      return response
-    })
+    getStaticAssetResponse(event.request)
   )
 })
 

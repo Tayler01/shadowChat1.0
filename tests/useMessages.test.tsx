@@ -5,6 +5,7 @@ import {
   prepareMessageData,
   insertMessage,
   refreshSessionAndRetry,
+  toggleMessageReactionForUser,
 } from '../src/hooks/useMessages';
 import * as messagesModule from '../src/hooks/useMessages';
 import { useAuth } from '../src/hooks/useAuth';
@@ -164,6 +165,23 @@ beforeEach(() => {
 });
 
 describe('helper functions', () => {
+  it('inverts only the current user reaction when an optimistic toggle is rolled back', () => {
+    const original = makeDbMessage('m1', '2026-05-03T12:00:00.000Z')
+    const optimistic = toggleMessageReactionForUser([original], 'm1', '😀', 'user1')
+    const withConcurrentReaction = [{
+      ...optimistic[0],
+      reactions: {
+        '😀': { count: 2, users: ['user1', 'user2'] },
+      },
+    }] as Message[]
+
+    const rolledBack = toggleMessageReactionForUser(withConcurrentReaction, 'm1', '😀', 'user1')
+
+    expect(rolledBack[0].reactions).toEqual({
+      '😀': { count: 1, users: ['user2'] },
+    })
+  })
+
   it('prepareMessageData trims content', () => {
     const result = prepareMessageData('u1', ' hi ', 'text');
     expect(result).toEqual({ user_id: 'u1', content: 'hi', message_type: 'text' });
