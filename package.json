@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "test": "jest",
-    "test:node": "node --test tests/buildBudgets.node.test.mjs tests/netlifySafeFetch.node.test.mjs tests/netlifySecurityHeaders.node.test.mjs tests/newsScraperSelection.node.test.mjs tests/productionHealth.node.test.mjs tests/serviceWorkerCaching.node.test.mjs tests/supabaseFunctionManifest.node.test.mjs",
+    "test:node": "node --test tests/buildBudgets.node.test.mjs tests/netlifySafeFetch.node.test.mjs tests/netlifySecurityHeaders.node.test.mjs tests/newsScraperSelection.node.test.mjs tests/productionHealth.node.test.mjs tests/serviceWorkerCaching.node.test.mjs tests/shadowRunnerRuntimeAssets.node.test.mjs tests/supabaseFunctionManifest.node.test.mjs",
     "supabase:functions:verify": "node scripts/deploy-supabase-functions.mjs",
     "supabase:functions:deploy": "node scripts/deploy-supabase-functions.mjs --deploy",
     "supabase:bridge-auth:pause": "node scripts/pause-bridge-auth-users.mjs --apply",

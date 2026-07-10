@@ -19,9 +19,9 @@ export const DEFAULT_BUILD_BUDGETS = Object.freeze({
   phaserRawBytes: 1_550_000,
   phaserGzipBytes: 365_000,
 
-  // The existing media-heavy public/ tree is copied into dist. This is a
-  // no-growth guard; media relocation/optimization is tracked separately.
-  deployRawBytes: 240_000_000,
+  // Runtime-only public assets keep the deploy near 75 MiB. Preserve source
+  // material outside public/ and keep enough headroom for intentional releases.
+  deployRawBytes: 100_000_000,
 })
 
 const PHASER_CHUNK_PATTERN = /^vendor-phaser-[A-Za-z0-9_-]+\.js$/

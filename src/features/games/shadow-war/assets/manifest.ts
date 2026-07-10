@@ -3,7 +3,6 @@ function svgDataUrl(svg: string) {
 }
 
 export const SHADOW_WAR_ASSETS = {
-  assetSheet: '/games/shadow-war/shadow-war-asset-sheet.png',
   battlefield: '/games/shadow-war/battlefield-table.webp',
   pickerBattlefield: '/games/shadow-war/battlefield-picker.webp',
   cardBack: '/games/shadow-war/card-back.webp',
@@ -48,7 +47,7 @@ export const SHADOW_WAR_SWORD_BADGE = svgDataUrl(`
 export const SHADOW_WAR_ASSET_PROMPTS = [
   {
     id: 'shadow-war-asset-sheet',
-    output: SHADOW_WAR_ASSETS.assetSheet,
+    output: 'source-assets/shadow-war/shadow-war-asset-sheet.png',
     prompt:
       'Single cohesive Shadow War asset sheet with 10 original medieval fantasy unit card faces, one card back, and one compact Shadow War banner/logo. No playing card suits, no tarot, no copyrighted characters.',
   },
