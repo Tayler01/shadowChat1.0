@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { useRef } from 'react'
 import { Bell, Copy, ExternalLink, Info, Smartphone } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Button } from '../ui/Button'
 import { type NotificationGuidance } from '../../lib/push'
+import { useDialogAccessibility } from '../../hooks/useDialogAccessibility'
 
 interface NotificationSetupModalProps {
   open: boolean
@@ -25,6 +26,13 @@ export const NotificationSetupModal: React.FC<NotificationSetupModalProps> = ({
   onEnable,
   onInstall,
 }) => {
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+  const dialogRef = useDialogAccessibility({
+    open,
+    onClose,
+    initialFocusRef: closeButtonRef,
+  })
+
   if (!open) return null
 
   const handleCopy = async () => {
@@ -39,6 +47,7 @@ export const NotificationSetupModal: React.FC<NotificationSetupModalProps> = ({
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--bg-overlay)] px-4 backdrop-blur-md">
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="notification-setup-title"
@@ -58,8 +67,10 @@ export const NotificationSetupModal: React.FC<NotificationSetupModalProps> = ({
           </div>
 
           <button
+            ref={closeButtonRef}
             type="button"
             onClick={onClose}
+            aria-label="Close notification setup"
             className="popup-close rounded-[var(--radius-sm)] px-3 py-2 text-sm text-[var(--text-muted)]"
           >
             Close

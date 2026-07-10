@@ -18,6 +18,7 @@ import {
   submitFeedback,
   type FeedbackSubmissionType,
 } from '../../lib/feedback'
+import { useDialogAccessibility } from '../../hooks/useDialogAccessibility'
 
 interface FeedbackSubmissionModalProps {
   open: boolean
@@ -68,6 +69,7 @@ export const FeedbackSubmissionModal: React.FC<FeedbackSubmissionModalProps> = (
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
 
   const remainingSlots = MAX_FEEDBACK_ATTACHMENTS - attachments.length
   const canContinueFromDetails = title.trim().length >= 3 && description.trim().length >= 10
@@ -85,6 +87,13 @@ export const FeedbackSubmissionModal: React.FC<FeedbackSubmissionModalProps> = (
     setAttachments([])
     onClose()
   }
+
+  const dialogRef = useDialogAccessibility({
+    open,
+    onClose: resetAndClose,
+    dismissible: !submitting,
+    initialFocusRef: closeButtonRef,
+  })
 
   const handleFiles = (files: FileList | null) => {
     if (!files) return
@@ -165,6 +174,7 @@ export const FeedbackSubmissionModal: React.FC<FeedbackSubmissionModalProps> = (
           />
 
           <motion.div
+            ref={dialogRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="feedback-modal-title"
@@ -190,6 +200,7 @@ export const FeedbackSubmissionModal: React.FC<FeedbackSubmissionModalProps> = (
                 </div>
 
                 <button
+                  ref={closeButtonRef}
                   type="button"
                   onClick={resetAndClose}
                   disabled={submitting}

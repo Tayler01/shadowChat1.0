@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MobileNav } from '../src/components/layout/MobileNav'
 import { Sidebar } from '../src/components/layout/Sidebar'
+import { MobileAppHeader } from '../src/components/layout/MobileAppHeader'
 
 jest.mock('../src/hooks/useDirectMessages', () => ({
   useDirectMessages: () => ({ conversations: [] }),
@@ -109,4 +110,47 @@ test('sidebar can restore boards with an explicit feature flag', () => {
   fireEvent.click(screen.getByText('Boards'))
   expect(onViewChange).toHaveBeenCalledWith('boards')
   expect(screen.getByText('4')).toBeInTheDocument()
+})
+
+test('mobile headers expose only contextual actions and an accessible settings target', () => {
+  const onViewChange = jest.fn()
+  render(
+    <MobileAppHeader
+      currentView="dms"
+      onViewChange={onViewChange}
+      title="Direct messages"
+      actions={<button type="button">DM action</button>}
+    />
+  )
+
+  expect(screen.getByRole('button', { name: 'DM action' })).toBeInTheDocument()
+  expect(screen.queryByLabelText(/active users/i)).not.toBeInTheDocument()
+  expect(screen.queryByLabelText(/weather/i)).not.toBeInTheDocument()
+
+  const settings = screen.getByRole('button', { name: 'Open app preferences' })
+  expect(settings).toHaveClass('h-11', 'w-11')
+  fireEvent.click(settings)
+  expect(onViewChange).toHaveBeenCalledWith('settings')
+})
+
+test('settings header identifies the current destination and can hide duplicate settings actions', () => {
+  const { rerender } = render(
+    <MobileAppHeader
+      currentView="settings"
+      onViewChange={jest.fn()}
+      title="Settings"
+    />
+  )
+
+  expect(screen.getByRole('button', { name: 'Open app preferences' })).toHaveAttribute('aria-current', 'page')
+
+  rerender(
+    <MobileAppHeader
+      currentView="settings"
+      onViewChange={jest.fn()}
+      title="Settings"
+      showSettings={false}
+    />
+  )
+  expect(screen.queryByRole('button', { name: 'Open app preferences' })).not.toBeInTheDocument()
 })

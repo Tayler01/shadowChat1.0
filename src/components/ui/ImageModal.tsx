@@ -2,6 +2,7 @@ import React from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { ZoomableImageFrame } from './ZoomableImageFrame'
+import { useDialogAccessibility } from '../../hooks/useDialogAccessibility'
 
 interface ImageModalProps {
   open: boolean
@@ -11,22 +12,17 @@ interface ImageModalProps {
 }
 
 export const ImageModal: React.FC<ImageModalProps> = ({ open, src, alt, onClose }) => {
-  React.useEffect(() => {
-    if (!open) return
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose()
-      }
-    }
-
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onClose, open])
+  const closeButtonRef = React.useRef<HTMLButtonElement>(null)
+  const dialogRef = useDialogAccessibility({
+    open,
+    onClose,
+    initialFocusRef: closeButtonRef,
+  })
 
   if (!open) return null
   const modal = (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(0,0,0,0.84)] px-3 pb-[calc(env(safe-area-inset-bottom)_+_0.75rem)] pt-[calc(env(safe-area-inset-top)_+_0.75rem)] backdrop-blur-md"
       role="dialog"
       aria-modal="true"
@@ -39,6 +35,7 @@ export const ImageModal: React.FC<ImageModalProps> = ({ open, src, alt, onClose 
     >
       <div className="relative flex h-full max-h-full w-full max-w-full items-center justify-center">
         <button
+          ref={closeButtonRef}
           className="popup-close absolute right-2 top-2 z-10 rounded-full p-2 shadow-[0_12px_26px_rgba(0,0,0,0.35)]"
           onClick={onClose}
           aria-label="Close image"

@@ -15,6 +15,7 @@ import type { ChatMessageType } from '../../lib/supabase'
 import type { AppView } from '../../types/navigation'
 import type { Message } from '../../lib/supabase'
 import { messageToReplyTarget, type ReplyTarget } from './messageDisplay'
+import { GeneralChatRoomTools } from './GeneralChatRoomTools'
 
 interface ChatViewProps {
   currentView: AppView
@@ -87,6 +88,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
         srTitle="General Chat"
         logo
         collapseOnKeyboard
+        actions={<GeneralChatRoomTools onViewChange={onViewChange} />}
       />
 
       {/* Messages */}

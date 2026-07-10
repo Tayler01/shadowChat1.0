@@ -10,6 +10,7 @@ import {
   Smartphone,
 } from 'lucide-react'
 import { Button } from '../ui/Button'
+import { useDialogAccessibility } from '../../hooks/useDialogAccessibility'
 
 type PhonePlatform = 'ios' | 'android'
 
@@ -72,6 +73,7 @@ export function PhoneInstallGuide({
   const [platform, setPlatform] = useState<PhonePlatform>(() => getDefaultPlatform())
   const [videoUnavailable, setVideoUnavailable] = useState(false)
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const dialogRef = useDialogAccessibility({ open, onClose })
   const androidCanPrompt = platform === 'android' && canInstall
   const tutorial = tutorialVideos[platform]
 
@@ -161,6 +163,7 @@ export function PhoneInstallGuide({
   return (
     <div className="fixed inset-0 z-[80] flex items-stretch justify-center bg-[rgba(4,5,6,0.72)] p-0 backdrop-blur-md sm:items-center sm:p-6">
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="phone-install-guide-title"

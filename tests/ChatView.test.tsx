@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import React from 'react'
 import { ChatView } from '../src/components/chat/ChatView'
 
@@ -111,10 +111,14 @@ beforeEach(() => {
   mockMessagesState = createMessagesState()
 })
 
-test('renders pinned messages as a header button instead of a feed bar', () => {
+test('keeps room-specific controls behind the contextual header tool button', () => {
   render(<ChatView currentView="chat" onViewChange={() => {}} />)
 
+  expect(screen.queryByTestId('pinned-messages-button')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Open General Chat room tools' }))
+
   expect(screen.getByTestId('pinned-messages-button')).toHaveTextContent('1')
+  expect(screen.getByTestId('weather-widget')).toBeInTheDocument()
   expect(screen.getByTestId('message-list')).toBeInTheDocument()
 })
 

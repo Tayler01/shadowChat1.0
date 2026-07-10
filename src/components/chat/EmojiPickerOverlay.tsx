@@ -4,6 +4,7 @@ import { X } from 'lucide-react'
 import type { EmojiClickData } from '../../types'
 import { useEmojiPicker } from '../../hooks/useEmojiPicker'
 import { Button } from '../ui/Button'
+import { useDialogAccessibility } from '../../hooks/useDialogAccessibility'
 
 type EmojiPickerOverlayProps = {
   open: boolean
@@ -68,13 +69,20 @@ export function EmojiPickerOverlay({
   const EmojiPicker = useEmojiPicker(open)
   const phoneViewport = usePhoneViewport()
   const rootRef = useRef<HTMLDivElement>(null)
+  useDialogAccessibility({
+    open: open && phoneViewport && Boolean(EmojiPicker),
+    onClose,
+    dialogRef: rootRef,
+  })
 
   useEffect(() => {
     if (!open) return
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onClose()
+        if (!phoneViewport) {
+          onClose()
+        }
       }
     }
 

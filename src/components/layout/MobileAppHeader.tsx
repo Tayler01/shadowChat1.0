@@ -1,14 +1,7 @@
-import { useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { ArrowLeft, Settings } from 'lucide-react'
-import toast from 'react-hot-toast'
-import { ActiveUsersButton } from '../chat/ActiveUsersButton'
-import { PinnedMessagesButton } from '../chat/PinnedMessagesButton'
-import { WeatherWidget } from '../chat/WeatherWidget'
 import { GoldenEggDiscoveryLogo } from '../easter-egg/GoldenEggDiscoveryLogo'
 import { Avatar } from '../ui/Avatar'
-import { useOptionalClientReset } from '../../hooks/ClientResetContext'
-import { useOptionalMessages } from '../../hooks/MessagesContext'
-import { uploadChatImageAsset } from '../../lib/supabase'
 import { cn } from '../../lib/utils'
 import type { PresenceVisibility } from '../../types'
 import type { AppView } from '../../types/navigation'
@@ -38,6 +31,8 @@ interface MobileAppHeaderProps {
   titleElement?: 'h1' | 'p'
   className?: string
   maxWidthClassName?: string
+  actions?: ReactNode
+  showSettings?: boolean
 }
 
 export function MobileAppHeader({
@@ -54,41 +49,17 @@ export function MobileAppHeader({
   titleElement,
   className,
   maxWidthClassName = 'max-w-6xl',
+  actions,
+  showSettings = true,
 }: MobileAppHeaderProps) {
-  const messagesContext = useOptionalMessages()
-  const { status: resetStatus } = useOptionalClientReset()
-  const [sharingWeather, setSharingWeather] = useState(false)
   const TitleElement = titleElement ?? (srTitle ? 'p' : 'h1')
-  const pinnedMessages = useMemo(
-    () => (messagesContext?.messages || []).filter(message => message.pinned),
-    [messagesContext?.messages]
-  )
 
-  const openSettings = (section?: 'weather') => {
-    if (typeof window !== 'undefined' && section !== 'weather') {
+  const openSettings = () => {
+    if (typeof window !== 'undefined') {
       window.sessionStorage.removeItem(SETTINGS_SECTION_STORAGE_KEY)
       window.dispatchEvent(new CustomEvent(SETTINGS_MAIN_EVENT))
     }
     onViewChange('settings')
-  }
-
-  const handleShareWeather = async (file: File) => {
-    setSharingWeather(true)
-    try {
-      if (!messagesContext) {
-        throw new Error('General Chat is still loading.')
-      }
-      const asset = await uploadChatImageAsset(file, 'weather')
-      const sent = await messagesContext.sendMessage('Weather share', 'image', asset.publicUrl, undefined, asset.thumbnailUrl)
-      if (sent) {
-        toast.success('Weather shared')
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to share weather'
-      toast.error(message)
-    } finally {
-      setSharingWeather(false)
-    }
   }
 
   return (
@@ -105,7 +76,7 @@ export function MobileAppHeader({
             <button
               type="button"
               onClick={onBack}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center text-[var(--text-primary)] transition-colors hover:text-[var(--theme-accent-readable)]"
+              className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--text-primary)] transition-colors hover:bg-[rgba(215,170,70,0.08)] hover:text-[var(--theme-accent-readable)]"
               aria-label={backLabel}
             >
               <ArrowLeft className="h-4 w-4" />
@@ -151,29 +122,23 @@ export function MobileAppHeader({
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          <WeatherWidget
-            onOpenSettings={() => openSettings('weather')}
-            onShareWeather={sharingWeather ? undefined : handleShareWeather}
-          />
-          <ActiveUsersButton resetStatus={resetStatus} />
-          <PinnedMessagesButton
-            messages={pinnedMessages}
-            onUnpin={messagesContext?.togglePin ?? (async () => {})}
-            onToggleReaction={messagesContext?.toggleReaction ?? (async () => {})}
-          />
-          <button
-            type="button"
-            onClick={() => openSettings()}
-            className={cn(
-              'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-[var(--text-secondary)] transition-colors hover:text-[var(--theme-accent-readable)]',
-              currentView === 'settings'
-                ? 'border-[var(--border-glow)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-readable)]'
-                : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] hover:border-[rgba(215,170,70,0.28)] hover:bg-[rgba(215,170,70,0.08)]'
-            )}
-            aria-label="Open app preferences"
-          >
-            <Settings className="h-4 w-4" />
-          </button>
+          {actions}
+          {showSettings && (
+            <button
+              type="button"
+              onClick={openSettings}
+              className={cn(
+                'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border text-[var(--text-secondary)] transition-colors hover:text-[var(--theme-accent-readable)]',
+                currentView === 'settings'
+                  ? 'border-[var(--border-glow)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-readable)]'
+                  : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] hover:border-[rgba(215,170,70,0.28)] hover:bg-[rgba(215,170,70,0.08)]'
+              )}
+              aria-label="Open app preferences"
+              aria-current={currentView === 'settings' ? 'page' : undefined}
+            >
+              <Settings className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
     </header>
