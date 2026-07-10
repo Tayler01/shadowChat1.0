@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { parseSupabaseQueryRows } from './supabase-query-output.mjs'
 
 const contract = JSON.parse(readFileSync(
   new URL('../supabase/security-definer-allowlist.json', import.meta.url),
@@ -15,7 +16,7 @@ function query(sql) {
     ['db', 'query', scope, '--output-format', 'json', sql],
     { cwd: new URL('..', import.meta.url), encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] },
   )
-  return JSON.parse(raw).rows ?? []
+  return parseSupabaseQueryRows(raw)
 }
 
 const expectedAuthenticated = contract.domains

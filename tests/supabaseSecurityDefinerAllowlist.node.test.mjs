@@ -1,11 +1,27 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { parseSupabaseQueryRows } from '../scripts/supabase-query-output.mjs'
 
 const contract = JSON.parse(readFileSync(
   new URL('../supabase/security-definer-allowlist.json', import.meta.url),
   'utf8',
 ))
+
+test('Supabase query rows support both CI and agent-safe JSON output', () => {
+  const rows = [{ signature: 'example()' }]
+
+  assert.deepEqual(parseSupabaseQueryRows(JSON.stringify(rows)), rows)
+  assert.deepEqual(parseSupabaseQueryRows(JSON.stringify({
+    boundary: 'test-boundary',
+    rows,
+    warning: 'untrusted database output',
+  })), rows)
+  assert.throws(
+    () => parseSupabaseQueryRows(JSON.stringify({ result: rows })),
+    /did not contain a row array/,
+  )
+})
 
 test('SECURITY DEFINER allowlist is explicit, categorized, and duplicate-free', () => {
   assert.match(contract.reviewed_on, /^\d{4}-\d{2}-\d{2}$/)
