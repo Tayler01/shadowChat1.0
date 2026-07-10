@@ -68,6 +68,10 @@ describe('push subscription renewal', () => {
 
     await enablePushForCurrentDevice('user-1')
 
+    expect(register).toHaveBeenCalledWith('/sw.js', {
+      scope: '/',
+      updateViaCache: 'none',
+    })
     expect(existing.unsubscribe).not.toHaveBeenCalled()
     expect(subscribe).not.toHaveBeenCalled()
   })

@@ -23,6 +23,11 @@ for = "/manifest.webmanifest"
 [headers.values]
   Content-Type = "application/manifest+json; charset=utf-8"
 
+[[headers]]
+for = "/sw.js"
+[headers.values]
+  Cache-Control = "no-cache"
+
 [[redirects]]
 from = "/api/shadow-pin/media"
 to = "/.netlify/functions/shadow-pin-media"

@@ -59,6 +59,14 @@ test('Netlify serves the web app manifest with its registered MIME type', () => 
   assert.match(block, /Content-Type\s*=\s*"application\/manifest\+json; charset=utf-8"/)
 })
 
+test('Netlify requires service-worker update checks to revalidate sw.js', () => {
+  const config = read('netlify.toml')
+  const block = getHeaderBlock(config, '/sw.js')
+
+  assert.ok(block, 'expected a service-worker-specific Netlify headers block')
+  assert.match(block, /Cache-Control\s*=\s*"no-cache"/)
+})
+
 test('mobile metadata permits zoom and does not force portrait orientation', () => {
   const html = read('index.html')
   const manifest = JSON.parse(read('public/manifest.webmanifest'))

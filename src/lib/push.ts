@@ -116,7 +116,7 @@ export const registerPushServiceWorker = async () => {
 
   if (!serviceWorkerRegistrationPromise) {
     serviceWorkerRegistrationPromise = navigator.serviceWorker
-      .register(SW_PATH, { scope: '/' })
+      .register(SW_PATH, { scope: '/', updateViaCache: 'none' })
       .catch(error => {
         serviceWorkerRegistrationPromise = null
         throw error

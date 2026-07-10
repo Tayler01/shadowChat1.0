@@ -8,10 +8,11 @@ const serviceWorkerSource = await readFile(
   'utf8'
 )
 
-const createHarness = ({ cachedResponse = null, fetchImpl }) => {
+const createHarness = ({ cachedResponse = null, cacheNames = [], fetchImpl }) => {
   const listeners = new Map()
   const putCalls = []
   const deleteCalls = []
+  const deletedCacheNames = []
   const cache = {
     match: async () => cachedResponse,
     put: async (request, response) => {
@@ -32,8 +33,11 @@ const createHarness = ({ cachedResponse = null, fetchImpl }) => {
     fetch: fetchImpl,
     caches: {
       open: async () => cache,
-      keys: async () => [],
-      delete: async () => true,
+      keys: async () => cacheNames,
+      delete: async (cacheName) => {
+        deletedCacheNames.push(cacheName)
+        return true
+      },
     },
     self: {
       location: { origin: 'https://shadochat.online' },
@@ -58,8 +62,33 @@ const createHarness = ({ cachedResponse = null, fetchImpl }) => {
     return responsePromise ? responsePromise : null
   }
 
-  return { deleteCalls, dispatchFetch, putCalls }
+  const dispatchActivate = async () => {
+    let activationPromise = null
+    listeners.get('activate')({
+      waitUntil: promise => {
+        activationPromise = Promise.resolve(promise)
+      },
+    })
+    await activationPromise
+  }
+
+  return { deletedCacheNames, deleteCalls, dispatchActivate, dispatchFetch, putCalls }
 }
+
+test('activation deletes the previous v2 static-asset cache without touching v3', async () => {
+  const harness = createHarness({
+    cacheNames: [
+      'shadowchat-static-assets-v2',
+      'shadowchat-static-assets-v3',
+      'unrelated-cache',
+    ],
+    fetchImpl: async () => new Response('unused'),
+  })
+
+  await harness.dispatchActivate()
+
+  assert.deepEqual(harness.deletedCacheNames, ['shadowchat-static-assets-v2'])
+})
 
 test('keeps content-hashed Vite assets cache-first', async () => {
   const cached = new Response('cached build')

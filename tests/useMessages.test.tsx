@@ -5,6 +5,7 @@ import {
   prepareMessageData,
   insertMessage,
   refreshSessionAndRetry,
+  setMessageReactionMembership,
   toggleMessageReactionForUser,
 } from '../src/hooks/useMessages';
 import * as messagesModule from '../src/hooks/useMessages';
@@ -165,17 +166,23 @@ beforeEach(() => {
 });
 
 describe('helper functions', () => {
-  it('inverts only the current user reaction when an optimistic toggle is rolled back', () => {
+  it('restores only the current user membership after a concurrent authoritative reaction update', () => {
     const original = makeDbMessage('m1', '2026-05-03T12:00:00.000Z')
     const optimistic = toggleMessageReactionForUser([original], 'm1', '😀', 'user1')
     const withConcurrentReaction = [{
       ...optimistic[0],
       reactions: {
-        '😀': { count: 2, users: ['user1', 'user2'] },
+        '😀': { count: 1, users: ['user2'] },
       },
     }] as Message[]
 
-    const rolledBack = toggleMessageReactionForUser(withConcurrentReaction, 'm1', '😀', 'user1')
+    const rolledBack = setMessageReactionMembership(
+      withConcurrentReaction,
+      'm1',
+      '😀',
+      'user1',
+      false
+    )
 
     expect(rolledBack[0].reactions).toEqual({
       '😀': { count: 1, users: ['user2'] },
@@ -642,6 +649,67 @@ describe('message actions', () => {
     });
 
     expect(rpcFn).toHaveBeenCalledWith('toggle_message_reaction', { message_id: 'm1', emoji: '😀', is_dm: false });
+  });
+
+  it('restores pre-optimistic membership when realtime updates before the reaction RPC fails', async () => {
+    const emoji = '😀';
+    const original = makeDbMessage('m1', '2026-05-03T12:00:00.000Z');
+    let updateHandler: ((payload: { new: Partial<Message> }) => void) | undefined;
+    const channel: any = {
+      on: jest.fn((event: string, filter: { event?: string }, handler: typeof updateHandler) => {
+        if (event === 'postgres_changes' && filter?.event === 'UPDATE') {
+          updateHandler = handler;
+        }
+        return channel;
+      }),
+      subscribe: jest.fn(() => channel),
+      send: jest.fn(),
+      state: 'joined',
+    };
+    workingClient.channel.mockReturnValue(channel);
+
+    const pinnedQuery = createThenableQuery({ data: [], error: null });
+    const latestQuery = createThenableQuery({ data: [original], error: null });
+    workingClient.from
+      .mockReturnValueOnce(pinnedQuery as any)
+      .mockReturnValueOnce(latestQuery as any);
+
+    const { result } = renderHook(() => useMessages(), { wrapper: MessagesProvider });
+    await waitFor(() => expect(result.current.messages).toHaveLength(1));
+    await waitFor(() => expect(updateHandler).toBeDefined());
+
+    let settleRpc!: (result: { data: null; error: Error }) => void;
+    workingClient.rpc.mockReturnValueOnce(new Promise(resolve => {
+      settleRpc = resolve;
+    }));
+
+    let reactionResult!: Promise<unknown>;
+    act(() => {
+      reactionResult = result.current.toggleReaction(original.id, emoji).catch(error => error);
+    });
+
+    await waitFor(() => expect(result.current.messages[0].reactions[emoji]?.users).toEqual(['user1']));
+
+    act(() => {
+      updateHandler?.({
+        new: {
+          ...original,
+          reactions: { [emoji]: { count: 1, users: ['user2'] } },
+        },
+      });
+    });
+    await waitFor(() => expect(result.current.messages[0].reactions[emoji]?.users).toEqual(['user2']));
+
+    let failure: unknown;
+    await act(async () => {
+      settleRpc({ data: null, error: new Error('reaction failed') });
+      failure = await reactionResult;
+    });
+
+    expect(failure).toEqual(expect.objectContaining({ message: 'reaction failed' }));
+    expect(result.current.messages[0].reactions).toEqual({
+      [emoji]: { count: 1, users: ['user2'] },
+    });
   });
 
   it('toggles pin state', async () => {

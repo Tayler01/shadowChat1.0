@@ -94,6 +94,18 @@ export const toggleMessageReactionForUser = (
   emoji: string,
   userId: string
 ) => {
+  const message = items.find(item => item.id === messageId)
+  const currentUsers = message?.reactions?.[emoji]?.users || []
+  return setMessageReactionMembership(items, messageId, emoji, userId, !currentUsers.includes(userId))
+}
+
+export const setMessageReactionMembership = (
+  items: Message[],
+  messageId: string,
+  emoji: string,
+  userId: string,
+  shouldReact: boolean
+) => {
   const index = items.findIndex(message => message.id === messageId)
   if (index === -1) return items
 
@@ -102,7 +114,11 @@ export const toggleMessageReactionForUser = (
   const current = reactions[emoji] || { count: 0, users: [] as string[] }
   const reacted = current.users.includes(userId)
 
-  if (reacted) {
+  if (reacted === shouldReact) {
+    return items
+  }
+
+  if (!shouldReact) {
     const users = current.users.filter(id => id !== userId)
     if (users.length === 0) {
       delete reactions[emoji]
@@ -1519,8 +1535,20 @@ function useProvideMessages(): MessagesContextValue {
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!user) return;
 
+    const previousMembership = Boolean(
+      latestMessagesRef.current
+        .find(message => message.id === messageId)
+        ?.reactions?.[emoji]?.users.includes(user.id)
+    );
+
     // Optimistically update local state so the reaction appears immediately
-    setMessages(prev => toggleMessageReactionForUser(prev, messageId, emoji, user.id));
+    setMessages(prev => setMessageReactionMembership(
+      prev,
+      messageId,
+      emoji,
+      user.id,
+      !previousMembership
+    ));
 
     try {
       const workingClient = await getWorkingClient();
@@ -1536,9 +1564,15 @@ function useProvideMessages(): MessagesContextValue {
       }
       
     } catch (error) {
-      // Apply the same user-scoped toggle again to invert only this optimistic
-      // mutation while preserving any realtime reactions from other users.
-      setMessages(prev => toggleMessageReactionForUser(prev, messageId, emoji, user.id));
+      // Restore the exact pre-optimistic membership. This is idempotent even if
+      // realtime has already delivered an authoritative reaction update.
+      setMessages(prev => setMessageReactionMembership(
+        prev,
+        messageId,
+        emoji,
+        user.id,
+        previousMembership
+      ));
       throw error;
     }
   }, [user]);
