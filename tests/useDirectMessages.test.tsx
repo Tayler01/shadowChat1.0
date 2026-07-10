@@ -18,12 +18,14 @@ import { runRealtimeRecovery } from '../src/lib/realtimeRecovery';
 import { DirectMessagesView } from '../src/components/dms/DirectMessagesView';
 import { triggerDMPushNotification } from '../src/lib/push';
 
+const mockPlayMessage = jest.fn();
+
 jest.mock('../src/hooks/useAuth');
 jest.mock('../src/hooks/useRealtimeRecovery', () => ({
   useRealtimeRecovery: jest.fn(),
 }));
 jest.mock('../src/hooks/useSoundEffects', () => ({
-  useSoundEffects: () => ({ playMessage: jest.fn() }),
+  useSoundEffects: () => ({ playMessage: mockPlayMessage }),
 }));
 jest.mock('../src/hooks/useTyping', () => ({
   useTyping: () => ({ typingUsers: [], startTyping: jest.fn(), stopTyping: jest.fn() }),
@@ -292,6 +294,80 @@ test('keeps existing conversations when a resume refresh fails', async () => {
   expect(topics.every(topic => /^dm_messages:u1:/.test(topic))).toBe(true);
   expect(new Set(topics).size).toBe(topics.length);
   expect(result.current.conversations).toEqual([conversation]);
+});
+
+test('uses one DM realtime channel and hydrates an active-thread insert once', async () => {
+  const conversation = {
+    id: 'conv1',
+    other_user: {
+      id: 'u2',
+      username: 'bob',
+      display_name: 'Bob',
+      avatar_url: '',
+      color: 'red',
+      status: 'online',
+    },
+    last_message: null,
+    unread_count: 0,
+  };
+  const incoming = {
+    id: 'message-live-1',
+    conversation_id: 'conv1',
+    sender_id: 'u2',
+    content: 'live hello',
+    message_type: 'text',
+    created_at: '2026-04-21T12:30:00.000Z',
+    updated_at: '2026-04-21T12:30:00.000Z',
+    reactions: {},
+  };
+  const hydrated = {
+    ...incoming,
+    sender: conversation.other_user,
+  };
+  const handlers = new Map<string, (payload: { new: typeof incoming }) => void>();
+  const channel = {
+    on: jest.fn(function (
+      _kind: string,
+      config: { event: string },
+      handler: (payload: { new: typeof incoming }) => void
+    ) {
+      handlers.set(config.event, handler);
+      return this;
+    }),
+    subscribe: jest.fn().mockReturnThis(),
+    send: jest.fn(),
+    state: 'joined',
+  };
+  const hydrateQuery = createQuery({
+    limit: jest.fn().mockResolvedValue({ data: [], error: null }),
+    maybeSingle: jest.fn().mockResolvedValue({ data: hydrated, error: null }),
+  });
+
+  (fetchDMConversations as jest.Mock).mockResolvedValue([conversation]);
+  workingClient.channel.mockReturnValue(channel as any);
+  workingClient.from.mockImplementation(() => hydrateQuery as any);
+
+  const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider });
+
+  await waitFor(() => expect(result.current.conversations).toEqual([conversation]));
+  await waitFor(() => expect(workingClient.channel).toHaveBeenCalledTimes(1));
+  act(() => {
+    result.current.setCurrentConversation('conv1');
+  });
+  await waitFor(() => expect(result.current.messagesLoading).toBe(false));
+
+  expect(workingClient.channel).toHaveBeenCalledTimes(1);
+  expect(handlers.get('INSERT')).toBeDefined();
+  act(() => {
+    handlers.get('INSERT')?.({ new: incoming });
+  });
+
+  await waitFor(() => expect(result.current.messages).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: incoming.id, sender: conversation.other_user }),
+  ])));
+  expect(hydrateQuery.maybeSingle).toHaveBeenCalledTimes(1);
+  expect(mockPlayMessage).toHaveBeenCalledTimes(1);
+  expect(workingClient.channel).toHaveBeenCalledTimes(1);
 });
 
 test('defers unread message marking until the view records the read position', async () => {

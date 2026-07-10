@@ -102,4 +102,49 @@ describe('realtime subscription helper', () => {
     expect(client.removeChannel).toHaveBeenCalledTimes(1)
     expect(manager.getActiveChannel()).toBeNull()
   })
+
+  it('deduplicates scheduled resubscribe attempts', async () => {
+    jest.useFakeTimers()
+    const client = { removeChannel: jest.fn() }
+    const firstChannel = makeChannel('first-channel')
+    const secondChannel = makeChannel('second-channel')
+    const subscribe = jest.fn()
+      .mockResolvedValueOnce({ channel: firstChannel, client })
+      .mockResolvedValueOnce({ channel: secondChannel, client })
+    const manager = createRealtimeSubscriptionManager()
+
+    manager.setSubscribe(subscribe)
+    await manager.start()
+
+    expect(manager.scheduleResubscribe(1000)).toBe(true)
+    expect(manager.scheduleResubscribe(1000)).toBe(false)
+    await jest.advanceTimersByTimeAsync(1000)
+
+    expect(subscribe).toHaveBeenCalledTimes(2)
+    expect(client.removeChannel).toHaveBeenCalledWith(firstChannel)
+    expect(manager.getActiveChannel()).toBe(secondChannel)
+    jest.useRealTimers()
+  })
+
+  it('does not resurrect a stopped scheduled subscription', async () => {
+    jest.useFakeTimers()
+    const client = { removeChannel: jest.fn() }
+    const channel = makeChannel('active-channel')
+    const subscribe = jest.fn().mockResolvedValue({ channel, client })
+    const manager = createRealtimeSubscriptionManager()
+
+    manager.setSubscribe(subscribe)
+    await manager.start()
+    expect(manager.scheduleResubscribe(1000)).toBe(true)
+
+    await manager.stop()
+    jest.advanceTimersByTime(1000)
+    await Promise.resolve()
+
+    expect(subscribe).toHaveBeenCalledTimes(1)
+    expect(manager.getActiveChannel()).toBeNull()
+    await expect(manager.resubscribe()).resolves.toBeNull()
+    expect(subscribe).toHaveBeenCalledTimes(1)
+    jest.useRealTimers()
+  })
 })

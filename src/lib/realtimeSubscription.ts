@@ -64,6 +64,8 @@ export function createRealtimeSubscriptionManager(
   let subscribeFactory: RealtimeSubscribeFactory | null = null
   let stopped = true
   let generation = 0
+  let scheduledResubscribe: ReturnType<typeof setTimeout> | null = null
+  let resubscribePromise: Promise<RealtimeChannel | null> | null = null
 
   const getFallbackClient = () => options.getFallbackClient?.() ?? null
 
@@ -73,6 +75,13 @@ export function createRealtimeSubscriptionManager(
     activeChannel = null
     activeClient = null
     return removeRealtimeChannel(client, channel)
+  }
+
+  const cancelScheduledResubscribe = () => {
+    if (scheduledResubscribe === null) return false
+    clearTimeout(scheduledResubscribe)
+    scheduledResubscribe = null
+    return true
   }
 
   const start = async (
@@ -98,15 +107,39 @@ export function createRealtimeSubscriptionManager(
     return activeChannel
   }
 
-  const resubscribe = async () => {
+  const resubscribe = async (): Promise<RealtimeChannel | null> => {
+    if (stopped || !subscribeFactory) return null
+    if (resubscribePromise) return resubscribePromise
+
+    cancelScheduledResubscribe()
     const currentSubscribeFactory = subscribeFactory
-    await removeActiveChannel()
-    return start(currentSubscribeFactory)
+    resubscribePromise = (async () => {
+      await removeActiveChannel()
+      if (stopped) return null
+      return start(currentSubscribeFactory)
+    })().finally(() => {
+      resubscribePromise = null
+    })
+
+    return resubscribePromise
+  }
+
+  const scheduleResubscribe = (delayMs: number) => {
+    if (stopped || !subscribeFactory || scheduledResubscribe !== null) return false
+
+    scheduledResubscribe = setTimeout(() => {
+      scheduledResubscribe = null
+      if (stopped) return
+      void resubscribe()
+    }, Math.max(0, delayMs))
+
+    return true
   }
 
   const stop = async () => {
     stopped = true
     generation += 1
+    cancelScheduledResubscribe()
     return removeActiveChannel()
   }
 
@@ -123,6 +156,8 @@ export function createRealtimeSubscriptionManager(
     clearSubscribe,
     start,
     resubscribe,
+    scheduleResubscribe,
+    cancelScheduledResubscribe,
     stop,
     getActiveChannel: () => activeChannel,
   }
