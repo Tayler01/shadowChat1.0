@@ -96,6 +96,8 @@ const createQuery = (overrides: Record<string, unknown> = {}) => {
     is: jest.fn(() => query),
     insert: jest.fn(() => query),
     contains: jest.fn(() => query),
+    or: jest.fn(() => query),
+    lt: jest.fn(() => query),
   };
 
   Object.assign(query, overrides);
@@ -392,6 +394,81 @@ test('ignores stale message fetches after switching conversations', async () => 
   });
 
   expect(result.current.messages.map(message => message.id)).toEqual(['m2']);
+});
+
+test('loads DM history with a stable created_at and id cursor while preserving local failures', async () => {
+  const boundaryCreatedAt = '2026-04-21T10:00:00.000Z';
+  const boundaryId = '00000000-0000-0000-0000-000000000100';
+  const newerBoundaryId = '00000000-0000-0000-0000-000000000200';
+  const olderBoundaryId = '00000000-0000-0000-0000-000000000050';
+  const makeMessage = (id: string, createdAt: string) => ({
+    id,
+    conversation_id: 'conv1',
+    sender_id: 'u2',
+    content: id,
+    message_type: 'text',
+    created_at: createdAt,
+    updated_at: createdAt,
+    reactions: {},
+  });
+  const initialMessages = [
+    ...Array.from({ length: 38 }, (_, index) => makeMessage(
+      `00000000-0000-0000-0000-${String(1000 - index).padStart(12, '0')}`,
+      new Date(Date.UTC(2026, 3, 21, 11, 0, 38 - index)).toISOString()
+    )),
+    makeMessage(newerBoundaryId, boundaryCreatedAt),
+    makeMessage(boundaryId, boundaryCreatedAt),
+  ];
+  const initialQuery = createQuery({
+    limit: jest.fn().mockResolvedValue({ data: initialMessages, error: null }),
+  });
+  const olderQuery = createQuery({
+    limit: jest.fn().mockResolvedValue({
+      data: [
+        makeMessage(boundaryId, boundaryCreatedAt),
+        makeMessage(olderBoundaryId, boundaryCreatedAt),
+      ],
+      error: null,
+    }),
+  });
+
+  window.localStorage.setItem('shadowchat:outbox:dm:conv1', JSON.stringify([{
+    id: 'failed-local',
+    clientMessageId: 'failed-local',
+    senderId: 'u1',
+    content: 'offline draft',
+    messageType: 'text',
+    createdAt: '2026-04-20T09:00:00.000Z',
+    failedAt: '2026-04-20T09:01:00.000Z',
+  }]));
+  workingClient.from.mockImplementationOnce(() => initialQuery as any);
+
+  const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider });
+
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  act(() => {
+    result.current.setCurrentConversation('conv1');
+  });
+  await waitFor(() => expect(result.current.messages.some(message => message.id === boundaryId)).toBe(true));
+  await waitFor(() => expect(result.current.messages.some(message => message.id === 'failed-local')).toBe(true));
+
+  expect(initialQuery.order).toHaveBeenNthCalledWith(1, 'created_at', { ascending: false });
+  expect(initialQuery.order).toHaveBeenNthCalledWith(2, 'id', { ascending: false });
+
+  workingClient.from.mockImplementationOnce(() => olderQuery as any);
+  await act(async () => {
+    await result.current.loadOlderMessages();
+  });
+
+  expect(olderQuery.or).toHaveBeenCalledWith(
+    `created_at.lt.${boundaryCreatedAt},and(created_at.eq.${boundaryCreatedAt},id.lt.${boundaryId})`
+  );
+  expect(olderQuery.order).toHaveBeenNthCalledWith(1, 'created_at', { ascending: false });
+  expect(olderQuery.order).toHaveBeenNthCalledWith(2, 'id', { ascending: false });
+  expect(olderQuery.lt).not.toHaveBeenCalled();
+  expect(result.current.messages.filter(message => message.id === boundaryId)).toHaveLength(1);
+  expect(result.current.messages.some(message => message.id === olderBoundaryId)).toBe(true);
+  expect(result.current.messages.some(message => message.id === 'failed-local')).toBe(true);
 });
 
 describe('DirectMessagesView user search', () => {

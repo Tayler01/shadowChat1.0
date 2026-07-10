@@ -38,6 +38,7 @@ import { useAuth } from './useAuth';
 import { useRealtimeRecovery } from './useRealtimeRecovery';
 import { useSoundEffects } from './useSoundEffects';
 import { clearDMNotifications } from '../lib/appBadge';
+import { compareMessageKey } from '../lib/readCursors';
 import {
   loadLocalOutboxEntries,
   removeLocalOutboxEntry,
@@ -79,7 +80,25 @@ const SEND_OPERATION_TIMEOUT_MS = 12000;
 const getDMOutboxScope = (conversationId: string) => `dm:${conversationId}`;
 
 const sortDMMessagesByCreatedAt = (items: DMMessage[]) =>
-  [...items].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  [...items].sort((a, b) => compareMessageKey(a, b));
+
+const isServerDMCursorMessage = (message: DMMessage) => (
+  Boolean(message.id && message.created_at) &&
+  !message.optimistic &&
+  message.delivery_status !== 'sending' &&
+  message.delivery_status !== 'failed'
+);
+
+const getOldestServerDMCursor = (items: DMMessage[]) => (
+  sortDMMessagesByCreatedAt(items.filter(isServerDMCursorMessage))[0] ?? null
+);
+
+const buildOlderDMKeysetFilter = (anchor: Pick<DMMessage, 'created_at' | 'id'>) =>
+  `created_at.lt.${anchor.created_at},and(created_at.eq.${anchor.created_at},id.lt.${anchor.id})`;
+
+const mergeDMMessagesByStableKey = (items: DMMessage[]) => sortDMMessagesByCreatedAt(
+  items.reduce<DMMessage[]>((acc, message) => upsertMessageIntoState(acc, message), [])
+);
 
 const localOutboxEntryToDMMessage = (
   entry: LocalMessageOutboxEntry,
@@ -752,6 +771,7 @@ export function useConversationMessages(conversationId: string | null) {
           `)
           .eq('conversation_id', conversationId)
           .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
           .limit(MESSAGE_FETCH_LIMIT);
 
         if (disposed || requestId !== fetchRequestIdRef.current) {
@@ -848,7 +868,7 @@ export function useConversationMessages(conversationId: string | null) {
 
   const loadOlderMessages = useCallback(async () => {
     if (loadingMore || !hasMore || !conversationId) return;
-    const oldest = messages[0]?.created_at;
+    const oldest = getOldestServerDMCursor(messages);
     if (!oldest) return;
     setLoadingMore(true);
     try {
@@ -861,8 +881,9 @@ export function useConversationMessages(conversationId: string | null) {
           sender:users!sender_id(*)
         `)
         .eq('conversation_id', conversationId)
-        .lt('created_at', oldest)
+        .or(buildOlderDMKeysetFilter(oldest))
         .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
         .limit(MESSAGE_FETCH_LIMIT);
 
       if (error) throw error;
@@ -873,7 +894,7 @@ export function useConversationMessages(conversationId: string | null) {
 
       if (data && data.length > 0) {
         const newMessages = (data as unknown as DMMessage[]).reverse();
-        setMessages(prev => [...newMessages, ...prev]);
+        setMessages(prev => mergeDMMessagesByStableKey([...newMessages, ...prev]));
         setHasMore(data.length === MESSAGE_FETCH_LIMIT);
       } else {
         setHasMore(false);
