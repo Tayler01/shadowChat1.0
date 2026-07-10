@@ -26,12 +26,19 @@ test('bridge Auth hold verification requires zero remaining sessions', () => {
   assert.doesNotThrow(() => verifyBridgeAuthHoldQueryResult({
     rows: [{ active_sessions: 0 }],
   }))
+  assert.doesNotThrow(() => verifyBridgeAuthHoldQueryResult([
+    { active_sessions: 0 },
+  ]))
   assert.throws(
     () => verifyBridgeAuthHoldQueryResult({ rows: [{ active_sessions: 1 }] }),
     /hold incomplete/
   )
   assert.throws(
     () => verifyBridgeAuthHoldQueryResult({ rows: [] }),
+    /invalid result/
+  )
+  assert.throws(
+    () => verifyBridgeAuthHoldQueryResult([]),
     /invalid result/
   )
 })

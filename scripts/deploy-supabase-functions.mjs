@@ -111,7 +111,8 @@ export const verifyRemoteFunctionInventory = (manifest, remoteFunctions) => {
 }
 
 export const verifyBridgeAuthHoldQueryResult = result => {
-  const activeSessions = Number(result?.rows?.[0]?.active_sessions)
+  const rows = Array.isArray(result) ? result : result?.rows
+  const activeSessions = Number(rows?.[0]?.active_sessions)
   if (!Number.isInteger(activeSessions)) {
     throw new Error('Bridge Auth session verification returned an invalid result')
   }
