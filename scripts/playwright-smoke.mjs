@@ -764,6 +764,8 @@ async function scenarioDM(state, sessionA, sessionB) {
 async function scenarioResumeSend(state, sessionA, sessionB) {
   await goToChat(sessionA.page)
   await goToChat(sessionB.page)
+  await jumpChatToLatest(sessionA.page)
+  await jumpChatToLatest(sessionB.page)
 
   await simulateVisibilityResume(sessionA.page)
 
@@ -870,6 +872,38 @@ async function goToChat(page) {
   await dismissAppReleaseDialog(page)
   await page.getByRole('button', { name: /^Chat$/ }).click()
   await waitForChatView(page)
+}
+
+async function jumpChatToLatest(page) {
+  const messageScroll = page.getByTestId('message-scroll')
+  const jumpButton = page.getByRole('button', { name: 'Jump to latest' }).first()
+  const isAtLatest = async () => messageScroll.evaluate(element => {
+    const hiddenAfter = Number(element.dataset.hiddenAfterCount || '0')
+    const hasNewer = element.dataset.hasNewer === 'true'
+    const bottomGap = element.scrollHeight - element.clientHeight - element.scrollTop
+    return hiddenAfter === 0 && !hasNewer && bottomGap <= 36
+  }).catch(() => false)
+
+  await messageScroll.waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  const ready = await waitForEither([
+    isAtLatest,
+    async () => jumpButton.isVisible().catch(() => false),
+  ], DEFAULT_TIMEOUT_MS)
+
+  if (!ready) {
+    throw new Error('General Chat did not expose a latest-message state')
+  }
+
+  if (await isAtLatest()) {
+    return
+  }
+
+  await jumpButton.click()
+  const settled = await waitForEither([isAtLatest], DEFAULT_TIMEOUT_MS)
+
+  if (!settled) {
+    throw new Error('General Chat did not settle at the latest message window')
+  }
 }
 
 function mobileNavButton(page, label) {
