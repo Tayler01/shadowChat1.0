@@ -69,4 +69,3 @@ describe('personal blocking database contract', () => {
     expect(sql).toMatch(/function public\.get_active_users\(\)[\s\S]*not private\.users_have_block\(caller_user_id, users\.id\)/i)
   })
 })
-

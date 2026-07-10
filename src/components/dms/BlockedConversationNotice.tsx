@@ -15,4 +15,3 @@ export function BlockedConversationNotice({ blockedByMe }: { blockedByMe?: boole
     </div>
   )
 }
-

@@ -33,7 +33,6 @@ beforeEach(() => {
   unblockUser.mockResolvedValue(undefined)
   isBlockedByMe.mockReturnValue(false)
 })
-
 test('requires confirmation before blocking', async () => {
   const browserUser = userEvent.setup()
   render(<BlockUserControl user={target} />)
@@ -56,4 +55,3 @@ test('offers an explicit unblock action', async () => {
   await waitFor(() => expect(unblockUser).toHaveBeenCalledWith(target.id))
   expect(toastSuccess).toHaveBeenCalledWith('Target User unblocked')
 })
-

@@ -40,7 +40,6 @@ beforeEach(() => {
   ;(persistBlockUser as jest.Mock).mockResolvedValue(true)
   ;(persistUnblockUser as jest.Mock).mockResolvedValue(true)
 })
-
 test('loads only the caller-owned block list', async () => {
   const { result } = renderHook(() => useBlockedUsers(), { wrapper })
 
@@ -84,4 +83,3 @@ test('unblock is explicit and removes the user from the local list', async () =>
   expect(result.current.isBlockedByMe('blocked-1')).toBe(false)
   expect(result.current.entries).toEqual([])
 })
-

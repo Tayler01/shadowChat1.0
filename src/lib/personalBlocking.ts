@@ -6,7 +6,6 @@ export type BlockedUserEntry = {
   user: User
   blockedAt: string
 }
-
 export const fetchMyBlockedUsers = async (): Promise<BlockedUserEntry[]> => {
   const client = await getWorkingClient()
   const { data, error } = await client.rpc('get_my_blocked_users')
@@ -50,4 +49,3 @@ export const isBlockedRelationshipError = (error: unknown) => {
 
   return candidate.code === '42501' && /messaging is unavailable/i.test(message)
 }
-
