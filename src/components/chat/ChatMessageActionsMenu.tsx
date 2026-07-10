@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { MoreHorizontal } from 'lucide-react'
@@ -12,6 +12,7 @@ export type ChatMessageAction = {
   onSelect: () => void | Promise<void>
   tone?: 'default' | 'danger'
   hidden?: boolean
+  disabled?: boolean
 }
 
 type ChatMessageActionsMenuProps = {
@@ -82,8 +83,17 @@ export function ChatMessageActionsMenu({
   const visibleActions = actions.filter(action => !action.hidden)
   const [open, setOpen] = useState(false)
   const [placement, setPlacement] = useState<MenuPlacement | null>(null)
+  const menuId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  const getOpener = useCallback(() => (
+    rootRef.current?.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]') ?? null
+  ), [])
+
+  const getEnabledMenuItems = useCallback(() => (
+    Array.from(menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)') ?? [])
+  ), [])
 
   const setMenuOpen = useCallback((nextOpen: boolean | ((current: boolean) => boolean)) => {
     setOpen(current => {
@@ -107,6 +117,72 @@ export function ChatMessageActionsMenu({
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [open, setMenuOpen])
+
+  useLayoutEffect(() => {
+    if (!open) return
+
+    const firstEnabledItem = getEnabledMenuItems()[0]
+    if (firstEnabledItem) {
+      firstEnabledItem.focus()
+    } else {
+      menuRef.current?.focus()
+    }
+  }, [getEnabledMenuItems, open, visibleActions.length])
+
+  const closeAndFocus = useCallback((target: HTMLElement | null) => {
+    setMenuOpen(false)
+    target?.focus()
+  }, [setMenuOpen])
+
+  const handleMenuKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    const menuItems = getEnabledMenuItems()
+    const activeIndex = menuItems.indexOf(document.activeElement as HTMLButtonElement)
+
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      closeAndFocus(getOpener())
+      return
+    }
+
+    if (event.key === 'Tab') {
+      event.preventDefault()
+
+      const opener = getOpener()
+      const candidates = Array.from(document.querySelectorAll<HTMLElement>(
+        'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])'
+      )).filter(element => !menuRef.current?.contains(element) && element.getAttribute('aria-hidden') !== 'true')
+      const openerIndex = opener ? candidates.indexOf(opener) : -1
+      const nextIndex = event.shiftKey ? openerIndex - 1 : openerIndex + 1
+      const target = openerIndex >= 0 ? candidates[nextIndex] : null
+
+      closeAndFocus(target ?? opener)
+      return
+    }
+
+    if (!menuItems.length) return
+
+    let nextIndex: number | null = null
+    switch (event.key) {
+      case 'ArrowDown':
+        nextIndex = activeIndex < 0 ? 0 : (activeIndex + 1) % menuItems.length
+        break
+      case 'ArrowUp':
+        nextIndex = activeIndex < 0 ? menuItems.length - 1 : (activeIndex - 1 + menuItems.length) % menuItems.length
+        break
+      case 'Home':
+        nextIndex = 0
+        break
+      case 'End':
+        nextIndex = menuItems.length - 1
+        break
+      default:
+        return
+    }
+
+    event.preventDefault()
+    menuItems[nextIndex].focus()
+  }, [closeAndFocus, getEnabledMenuItems, getOpener])
 
   const updatePlacement = useCallback(() => {
     if (!open) return
@@ -238,6 +314,7 @@ export function ChatMessageActionsMenu({
         aria-label={buttonLabel}
         aria-expanded={open}
         aria-haspopup="menu"
+        aria-controls={open ? menuId : undefined}
         type="button"
       >
         <MoreHorizontal className="h-4 w-4" />
@@ -252,8 +329,11 @@ export function ChatMessageActionsMenu({
                 !placement && 'pointer-events-none invisible'
               )}
               ref={menuRef}
+              id={menuId}
               role="menu"
               aria-label={menuLabel}
+              tabIndex={-1}
+              onKeyDown={handleMenuKeyDown}
               data-testid="message-actions-menu"
               style={{
                 top: placement?.top ?? 0,
@@ -273,6 +353,7 @@ export function ChatMessageActionsMenu({
                     <button
                       key={action.id}
                       onClick={() => {
+                        if (action.disabled) return
                         void action.onSelect()
                         setMenuOpen(false)
                       }}
@@ -284,6 +365,8 @@ export function ChatMessageActionsMenu({
                       )}
                       type="button"
                       role="menuitem"
+                      disabled={action.disabled}
+                      tabIndex={-1}
                     >
                       <Icon className="h-4 w-4" />
                       <span>{action.label}</span>

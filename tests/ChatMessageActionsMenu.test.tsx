@@ -1,6 +1,6 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import React from 'react'
-import { Copy } from 'lucide-react'
+import { Copy, Reply, Trash2 } from 'lucide-react'
 import { ChatMessageActionsMenu } from '../src/components/chat/ChatMessageActionsMenu'
 
 const rect = (top: number, bottom: number, left = 0, right = 0) => ({
@@ -153,5 +153,82 @@ describe('ChatMessageActionsMenu', () => {
     expect(menuTop).toBeCloseTo(228, 0)
     expect(menuBottom).toBeLessThanOrEqual(500)
     expect(menuBottom).toBeLessThan(512)
+  })
+
+  it('focuses the first enabled action and supports menu arrow, Home, End, and Escape keys', async () => {
+    render(
+      <ChatMessageActionsMenu
+        actions={[
+          { id: 'disabled', label: 'Unavailable', icon: Copy, disabled: true, onSelect: jest.fn() },
+          { id: 'copy', label: 'Copy', icon: Copy, onSelect: jest.fn() },
+          { id: 'reply', label: 'Reply', icon: Reply, onSelect: jest.fn() },
+          { id: 'delete', label: 'Delete', icon: Trash2, onSelect: jest.fn() },
+        ]}
+      />
+    )
+
+    const opener = screen.getByRole('button', { name: 'Message actions' })
+    fireEvent.click(opener)
+
+    const copy = screen.getByRole('menuitem', { name: 'Copy' })
+    const reply = screen.getByRole('menuitem', { name: 'Reply' })
+    const deleteAction = screen.getByRole('menuitem', { name: 'Delete' })
+
+    expect(copy).toHaveFocus()
+    fireEvent.keyDown(copy, { key: 'ArrowDown' })
+    expect(reply).toHaveFocus()
+    fireEvent.keyDown(reply, { key: 'End' })
+    expect(deleteAction).toHaveFocus()
+    fireEvent.keyDown(deleteAction, { key: 'ArrowDown' })
+    expect(copy).toHaveFocus()
+    fireEvent.keyDown(copy, { key: 'ArrowUp' })
+    expect(deleteAction).toHaveFocus()
+    fireEvent.keyDown(deleteAction, { key: 'Home' })
+    expect(copy).toHaveFocus()
+
+    fireEvent.keyDown(copy, { key: 'Escape' })
+
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
+    expect(opener).toHaveFocus()
+  })
+
+  it('closes on Tab and moves focus relative to the opener without leaking into the portal', async () => {
+    render(
+      <>
+        <button type="button">Before menu</button>
+        <ChatMessageActionsMenu
+          actions={[{ id: 'copy', label: 'Copy', icon: Copy, onSelect: jest.fn() }]}
+        />
+        <button type="button">After menu</button>
+      </>
+    )
+
+    const opener = screen.getByRole('button', { name: 'Message actions' })
+    fireEvent.click(opener)
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Copy' }), { key: 'Tab' })
+
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'After menu' })).toHaveFocus()
+
+    fireEvent.click(opener)
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Copy' }), { key: 'Tab', shiftKey: true })
+
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Before menu' })).toHaveFocus()
+  })
+
+  it('preserves pointer selection and closes after invoking the action', async () => {
+    const onSelect = jest.fn()
+    render(
+      <ChatMessageActionsMenu
+        actions={[{ id: 'copy', label: 'Copy', icon: Copy, onSelect }]}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Message actions' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy' }))
+
+    expect(onSelect).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
   })
 })

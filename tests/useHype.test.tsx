@@ -145,6 +145,16 @@ test('stores a local receipt before showing a new pending Hype event after start
   await flushAsync()
 
   expect(result.current.activeCelebration?.latestEvent.id).toBe(event.id)
+
+  act(() => {
+    jest.advanceTimersByTime(2_999)
+  })
+  expect(result.current.activeCelebration?.latestEvent.id).toBe(event.id)
+
+  act(() => {
+    jest.advanceTimersByTime(1)
+  })
+  expect(result.current.activeCelebration).toBeNull()
 })
 
 test('queues live realtime Hype events until startup settles', async () => {

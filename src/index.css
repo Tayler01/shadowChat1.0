@@ -2150,7 +2150,45 @@ html, body, #root {
     radial-gradient(circle at 50% 42%, rgba(var(--theme-accent-strong-rgb), 0.28), transparent 34%),
     radial-gradient(circle at 50% 100%, rgba(var(--theme-accent-rgb), 0.2), transparent 48%),
     rgba(5, 5, 8, 0.5);
-  animation: hype-stage 6400ms cubic-bezier(0.2, 0.85, 0.2, 1) both;
+  animation: hype-stage var(--hype-display-duration, 4600ms) cubic-bezier(0.2, 0.85, 0.2, 1) both;
+}
+
+.hype-celebration--compact {
+  inset: calc(env(safe-area-inset-top) + 1rem) 0.75rem auto;
+  z-index: 90;
+  display: flex;
+  justify-content: center;
+  overflow: visible;
+  background: none;
+  animation: hype-compact-stage var(--hype-display-duration, 3000ms) cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.hype-celebration__compact-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  width: min(100%, 28rem);
+  min-height: 3.75rem;
+  padding: 0.65rem 0.55rem 0.65rem 0.85rem;
+  border: 1px solid rgba(var(--theme-accent-strong-rgb), 0.34);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(var(--theme-accent-strong-rgb), 0.16), transparent 42%),
+    rgba(8, 8, 12, 0.9);
+  box-shadow:
+    0 14px 38px rgba(0, 0, 0, 0.34),
+    0 0 28px rgba(var(--theme-accent-rgb), 0.12);
+  pointer-events: none;
+  backdrop-filter: blur(18px);
+}
+
+.hype-celebration__compact-icon {
+  width: 1.35rem;
+  height: 1.35rem;
+  color: var(--theme-accent-readable);
+  filter: drop-shadow(0 0 10px rgba(var(--theme-accent-rgb), 0.38));
 }
 
 .hype-celebration__wash,
@@ -2166,7 +2204,7 @@ html, body, #root {
   background:
     conic-gradient(from 20deg at 50% 50%, transparent, rgba(var(--theme-accent-rgb), 0.2), transparent 24%, rgba(var(--theme-accent-strong-rgb), 0.22), transparent 48%, rgba(255, 255, 255, 0.08), transparent 70%);
   opacity: calc(0.28 + (var(--hype-intensity, 1) * 0.04));
-  animation: hype-wash 6400ms linear both;
+  animation: hype-wash var(--hype-display-duration, 4600ms) linear both;
 }
 
 .hype-celebration__rays {
@@ -2175,7 +2213,7 @@ html, body, #root {
     repeating-conic-gradient(from -16deg at 50% 50%, rgba(var(--theme-accent-strong-rgb), 0.2) 0deg 5deg, transparent 5deg 16deg);
   mix-blend-mode: screen;
   opacity: 0.32;
-  animation: hype-rays 6400ms ease-out both;
+  animation: hype-rays var(--hype-display-duration, 4600ms) ease-out both;
 }
 
 .hype-celebration__burst {
@@ -2230,7 +2268,7 @@ html, body, #root {
   text-align: center;
   color: var(--text-primary);
   text-shadow: 0 2px 22px rgba(0, 0, 0, 0.36);
-  animation: hype-content 6400ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: hype-content var(--hype-display-duration, 4600ms) cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .hype-celebration__nameplate {
@@ -2259,6 +2297,32 @@ html, body, #root {
   align-content: center;
   min-width: 0;
   pointer-events: none;
+}
+
+.hype-celebration__copy--compact {
+  position: static;
+  inset: auto;
+  display: block;
+  min-width: 0;
+  text-align: left;
+}
+
+.hype-celebration__copy--compact .hype-celebration__eyebrow {
+  font-size: 0.62rem;
+}
+
+.hype-celebration__copy--compact .hype-celebration__title {
+  max-width: none;
+  margin-top: 0.08rem;
+  font-size: 0.96rem;
+  line-height: 1.15;
+}
+
+.hype-celebration__copy--compact .hype-celebration__subtitle {
+  max-width: none;
+  margin-top: 0.12rem;
+  font-size: 0.72rem;
+  line-height: 1.2;
 }
 
 .hype-celebration__eyebrow {
@@ -2299,7 +2363,7 @@ html, body, #root {
   z-index: 3;
   display: grid;
   place-items: center;
-  width: 2.35rem;
+  width: 2.75rem;
   aspect-ratio: 1;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
@@ -2308,6 +2372,13 @@ html, body, #root {
   pointer-events: auto;
   backdrop-filter: blur(14px);
   transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.hype-celebration__dismiss--compact {
+  position: static;
+  width: 2.75rem;
+  flex: none;
+  background: rgba(255, 255, 255, 0.035);
 }
 
 .hype-celebration__dismiss:hover {
@@ -2686,6 +2757,22 @@ html, body, #root {
   font-weight: 700;
 }
 
+@keyframes hype-compact-stage {
+  0% {
+    opacity: 0;
+    transform: translateY(-0.75rem) scale(0.98);
+  }
+  12%,
+  82% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-0.35rem) scale(0.99);
+  }
+}
+
 @keyframes hype-stage {
   0% {
     opacity: 0;
@@ -2789,6 +2876,25 @@ html, body, #root {
   }
   100% {
     transform: translateX(65%) rotate(8deg);
+  }
+}
+
+@media (max-width: 767px) {
+  .hype-celebration--fullscreen {
+    z-index: 45;
+  }
+
+  .hype-celebration--compact {
+    top: calc(env(safe-area-inset-top) + 4.75rem);
+  }
+
+  .hype-celebration--fullscreen .hype-celebration__content {
+    width: min(88vw, 30rem);
+  }
+
+  .hype-celebration--fullscreen .hype-celebration__dismiss {
+    top: calc(env(safe-area-inset-top) + 4.75rem);
+    right: 0.75rem;
   }
 }
 
