@@ -707,6 +707,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     loadOlderMessages,
     loadingMore,
     hasMore,
+    hasNewer,
+    loadLatestMessages,
     loading: conversationsLoading,
   } = useDirectMessages()
   const [showNewConversation, setShowNewConversation] = useState(false)
@@ -874,6 +876,16 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     getUnreadMessages: getUnreadDMMessages,
     onMarkReadToLatest: markDMReadToLatest,
   })
+
+  const handleJumpToLatest = useCallback(async () => {
+    if (hasNewer) {
+      await loadLatestMessages()
+    }
+
+    requestAnimationFrame(() => {
+      scrollToBottom()
+    })
+  }, [hasNewer, loadLatestMessages, scrollToBottom])
 
   const clearHistoryRetry = useCallback(() => {
     if (historyRetryTimerRef.current !== null) {
@@ -1245,6 +1257,9 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
               ref={messagesRef}
               onScroll={handleScroll}
               data-testid="dm-message-scroll"
+              data-loaded-count={messages.length}
+              data-rendered-count={messages.length}
+              data-has-newer={String(hasNewer)}
               className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] pt-4 md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
             >
               <div data-testid="dm-message-stack" className="mx-auto flex min-h-full w-full max-w-4xl flex-col justify-end space-y-3">
@@ -1337,11 +1352,11 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 )}
               </AnimatePresence>
 
-              {!autoScroll && (
+              {(!autoScroll || hasNewer) && (
                 <button
                   type="button"
-                  onClick={() => scrollToBottom()}
-                  aria-label="Jump to latest"
+                  onClick={() => void handleJumpToLatest()}
+                  aria-label={hasNewer ? 'Load latest messages' : 'Jump to latest'}
                   className="theme-floating-action fixed right-4 bottom-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-keyboard-inset,0px)_+_0.5rem)] z-50 rounded-full p-2 transition-transform hover:-translate-y-0.5 md:bottom-32"
                 >
                   <ArrowDown className="w-5 h-5" />

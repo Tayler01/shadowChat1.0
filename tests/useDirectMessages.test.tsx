@@ -547,6 +547,85 @@ test('loads DM history with a stable created_at and id cursor while preserving l
   expect(result.current.messages.some(message => message.id === 'failed-local')).toBe(true);
 });
 
+test('bounds long DM history, protects unseen newer messages, and restores the latest window', async () => {
+  const makePage = (pageIndex: number) => Array.from({ length: 40 }, (_, index) => {
+    const sequence = pageIndex * 40 + index;
+    const createdAt = new Date(Date.UTC(2026, 3, 22, 12, 0, 0) - sequence * 1000).toISOString();
+    return {
+      id: `00000000-0000-0000-0000-${String(999999999999 - sequence).padStart(12, '0')}`,
+      conversation_id: 'conv1',
+      sender_id: 'u2',
+      content: `message ${sequence}`,
+      message_type: 'text',
+      created_at: createdAt,
+      updated_at: createdAt,
+      reactions: {},
+    };
+  });
+  const latestPage = makePage(0);
+
+  window.localStorage.setItem('shadowchat:outbox:dm:conv1', JSON.stringify([{
+    id: 'failed-window-local',
+    clientMessageId: 'failed-window-local',
+    senderId: 'u1',
+    content: 'keep this failed send',
+    messageType: 'text',
+    createdAt: '2026-04-20T09:00:00.000Z',
+    failedAt: '2026-04-20T09:01:00.000Z',
+  }]));
+  workingClient.from.mockImplementationOnce(() => createQuery({
+    limit: jest.fn().mockResolvedValue({ data: latestPage, error: null }),
+  }) as any);
+
+  const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider });
+
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  act(() => {
+    result.current.setCurrentConversation('conv1');
+  });
+  await waitFor(() => expect(result.current.messages.filter(message => !message.optimistic).length).toBe(40));
+  await waitFor(() => expect(result.current.messages.some(message => message.id === 'failed-window-local')).toBe(true));
+
+  for (let pageIndex = 1; pageIndex <= 5; pageIndex += 1) {
+    workingClient.from.mockImplementationOnce(() => createQuery({
+      limit: jest.fn().mockResolvedValue({ data: makePage(pageIndex), error: null }),
+    }) as any);
+    await act(async () => {
+      await result.current.loadOlderMessages();
+    });
+  }
+
+  const serverMessages = result.current.messages.filter(message => (
+    !message.optimistic &&
+    message.delivery_status !== 'sending' &&
+    message.delivery_status !== 'failed'
+  ));
+  expect(serverMessages).toHaveLength(200);
+  expect(result.current.messages.some(message => message.id === 'failed-window-local')).toBe(true);
+  expect(result.current.hasNewer).toBe(true);
+
+  await act(async () => {
+    await result.current.markAsRead('conv1');
+  });
+  expect(markDMMessagesRead).not.toHaveBeenCalled();
+
+  workingClient.from.mockImplementationOnce(() => createQuery({
+    limit: jest.fn().mockResolvedValue({ data: latestPage, error: null }),
+  }) as any);
+  await act(async () => {
+    await result.current.loadLatestMessages();
+  });
+
+  expect(result.current.hasNewer).toBe(false);
+  expect(result.current.messages.filter(message => (
+    !message.optimistic &&
+    message.delivery_status !== 'sending' &&
+    message.delivery_status !== 'failed'
+  ))).toHaveLength(40);
+  expect(result.current.messages.some(message => message.id === latestPage[0].id)).toBe(true);
+  expect(result.current.messages.some(message => message.id === 'failed-window-local')).toBe(true);
+});
+
 describe('DirectMessagesView user search', () => {
   let dmSpy: jest.SpyInstance;
   let searchSpy: jest.SpyInstance;

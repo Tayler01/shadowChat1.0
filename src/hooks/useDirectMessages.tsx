@@ -61,6 +61,7 @@ interface DirectMessagesContextValue {
   sending: boolean;
   loadingMore: boolean;
   hasMore: boolean;
+  hasNewer: boolean;
   startConversation: (username: string) => Promise<string | null>;
   sendMessage: (
     content: string,
@@ -76,6 +77,7 @@ interface DirectMessagesContextValue {
   toggleReaction: (messageId: string, emoji: string) => Promise<void>;
   markAsRead: (conversationId: string) => Promise<void>;
   loadOlderMessages: () => Promise<void>;
+  loadLatestMessages: () => Promise<void>;
 }
 
 const DirectMessagesContext = createContext<DirectMessagesContextValue | undefined>(undefined);
@@ -103,6 +105,26 @@ const buildOlderDMKeysetFilter = (anchor: Pick<DMMessage, 'created_at' | 'id'>) 
 const mergeDMMessagesByStableKey = (items: DMMessage[]) => sortDMMessagesByCreatedAt(
   items.reduce<DMMessage[]>((acc, message) => upsertMessageIntoState(acc, message), [])
 );
+
+export const MAX_DM_SERVER_MESSAGE_WINDOW = 200;
+
+export const boundDMMessagesForWindow = (
+  items: DMMessage[],
+  retain: 'oldest' | 'latest'
+) => {
+  const merged = mergeDMMessagesByStableKey(items);
+  const localMessages = merged.filter(message => !isServerDMCursorMessage(message));
+  const serverMessages = merged.filter(isServerDMCursorMessage);
+  const trimmed = serverMessages.length > MAX_DM_SERVER_MESSAGE_WINDOW;
+  const boundedServerMessages = retain === 'oldest'
+    ? serverMessages.slice(0, MAX_DM_SERVER_MESSAGE_WINDOW)
+    : serverMessages.slice(-MAX_DM_SERVER_MESSAGE_WINDOW);
+
+  return {
+    messages: mergeDMMessagesByStableKey([...boundedServerMessages, ...localMessages]),
+    trimmed,
+  };
+};
 
 const localOutboxEntryToDMMessage = (
   entry: LocalMessageOutboxEntry,
@@ -167,7 +189,9 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     toggleReaction,
     loadingMore,
     hasMore,
+    hasNewer,
     loadOlderMessages,
+    loadLatestMessages,
     handleRealtimeInsert,
     handleRealtimeUpdate,
     refreshVisibleMessages,
@@ -390,11 +414,14 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     ) => {
       const message = await sendConversationMessage(content, messageType, fileUrl, replyTo, thumbnailUrl);
       if (message) {
+        if (hasNewer) {
+          await loadLatestMessages();
+        }
         refreshConversationsDebounced();
       }
       return message;
     },
-    [refreshConversationsDebounced, sendConversationMessage]
+    [hasNewer, loadLatestMessages, refreshConversationsDebounced, sendConversationMessage]
   );
 
   const retryFailedMessage = useCallback(async (messageId: string) => {
@@ -436,6 +463,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
   }, [user]);
 
   const markAsRead = useCallback(async (conversationId: string) => {
+    if (hasNewer) return;
     await markDMMessagesRead(conversationId);
     void clearDMNotifications(conversationId);
     setConversations(prev =>
@@ -444,7 +472,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
       )
     );
     refreshConversationsDebounced();
-  }, [refreshConversationsDebounced]);
+  }, [hasNewer, refreshConversationsDebounced]);
 
   return {
     conversations,
@@ -457,6 +485,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     sending,
     loadingMore,
     hasMore,
+    hasNewer,
     startConversation,
     sendMessage,
     retryFailedMessage,
@@ -466,6 +495,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     toggleReaction,
     markAsRead,
     loadOlderMessages,
+    loadLatestMessages,
   };
 }
 
@@ -476,13 +506,20 @@ export function useConversationMessages(conversationId: string | null) {
   const [sending, setSending] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [hasNewer, setHasNewerState] = useState(false);
   const { user, profile } = useAuth();
   const clientResetRef = useRef<() => Promise<void>>();
   const activeConversationIdRef = useRef<string | null>(conversationId);
+  const hasNewerRef = useRef(false);
   const fetchRequestIdRef = useRef(0);
   const sendingRef = useRef(false);
   const latestMessagesRef = useRef<DMMessage[]>([]);
   const hydrationFetchesRef = useRef<Map<string, Promise<DMMessage | null>>>(new Map());
+
+  const updateHasNewer = useCallback((value: boolean) => {
+    hasNewerRef.current = value;
+    setHasNewerState(value);
+  }, []);
 
   useEffect(() => {
     activeConversationIdRef.current = conversationId;
@@ -693,7 +730,12 @@ export function useConversationMessages(conversationId: string | null) {
     return request;
   }, [conversationId]);
 
+  const loadLatestMessages = useCallback(async () => {
+    await clientResetRef.current?.();
+  }, []);
+
   const refreshVisibleMessages = useCallback(async () => {
+    if (hasNewerRef.current) return;
     await clientResetRef.current?.();
   }, []);
 
@@ -705,6 +747,7 @@ export function useConversationMessages(conversationId: string | null) {
       setMessages([]);
       setLoadedConversationId(null);
       setHasMore(true);
+      updateHasNewer(false);
       setLoading(false);
       return;
     }
@@ -747,14 +790,16 @@ export function useConversationMessages(conversationId: string | null) {
         } else {
           const fetchedMessages = ((data || []) as unknown as DMMessage[]).reverse()
           setHasMore((data?.length || 0) === MESSAGE_FETCH_LIMIT);
+          updateHasNewer(false);
           setMessages(prev => {
             const pendingLocalMessages = prev.filter(
               message => message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
             );
-            return sortDMMessagesByCreatedAt(fetchedMessages.reduce<DMMessage[]>(
+            const mergedMessages = fetchedMessages.reduce<DMMessage[]>(
               (acc, message) => upsertMessageIntoState(acc, { ...message, optimistic: false, delivery_status: 'sent' }),
               pendingLocalMessages
-            ));
+            );
+            return boundDMMessagesForWindow(mergedMessages, 'latest').messages;
           });
         }
       } catch {
@@ -784,6 +829,7 @@ export function useConversationMessages(conversationId: string | null) {
     setMessages([]);
     setLoadedConversationId(null);
     setHasMore(true);
+    updateHasNewer(false);
     void fetchMessages();
 
     return () => {
@@ -793,7 +839,7 @@ export function useConversationMessages(conversationId: string | null) {
         clientResetRef.current = undefined;
       }
     };
-  }, [conversationId, user]);
+  }, [conversationId, updateHasNewer, user]);
 
   useEffect(() => {
     hydrateLocalOutboxMessages();
@@ -827,7 +873,14 @@ export function useConversationMessages(conversationId: string | null) {
 
       if (data && data.length > 0) {
         const newMessages = (data as unknown as DMMessage[]).reverse();
-        setMessages(prev => mergeDMMessagesByStableKey([...newMessages, ...prev]));
+        const boundedWindow = boundDMMessagesForWindow(
+          [...newMessages, ...latestMessagesRef.current],
+          'oldest'
+        );
+        setMessages(boundedWindow.messages);
+        if (boundedWindow.trimmed) {
+          updateHasNewer(true);
+        }
         setHasMore(data.length === MESSAGE_FETCH_LIMIT);
       } else {
         setHasMore(false);
@@ -835,7 +888,7 @@ export function useConversationMessages(conversationId: string | null) {
     } finally {
       setLoadingMore(false);
     }
-  }, [loadingMore, hasMore, conversationId, messages]);
+  }, [loadingMore, hasMore, conversationId, messages, updateHasNewer]);
 
   const handleRealtimeInsert = useCallback(async (incoming: Partial<DMMessage>) => {
     const activeConversationId = activeConversationIdRef.current;
@@ -848,12 +901,16 @@ export function useConversationMessages(conversationId: string | null) {
 
     const message = await hydrateConversationMessage(incoming.id);
     if (!message || activeConversationIdRef.current !== incoming.conversation_id) return;
+    if (hasNewerRef.current) return;
 
-    setMessages(prev => upsertMessageIntoState(prev, {
-      ...message,
-      optimistic: false,
-      delivery_status: 'sent',
-    }));
+    setMessages(prev => boundDMMessagesForWindow([
+      ...prev,
+      {
+        ...message,
+        optimistic: false,
+        delivery_status: 'sent',
+      },
+    ], 'latest').messages);
   }, [hydrateConversationMessage]);
 
   const handleRealtimeUpdate = useCallback((incoming: Partial<DMMessage>) => {
@@ -1105,6 +1162,7 @@ export function useConversationMessages(conversationId: string | null) {
     sending,
     loadingMore,
     hasMore,
+    hasNewer,
     sendMessage,
     retryFailedMessage,
     discardFailedMessage,
@@ -1112,6 +1170,7 @@ export function useConversationMessages(conversationId: string | null) {
     deleteMessage,
     toggleReaction,
     loadOlderMessages,
+    loadLatestMessages,
     handleRealtimeInsert,
     handleRealtimeUpdate,
     refreshVisibleMessages,
