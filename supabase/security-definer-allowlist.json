@@ -1,0 +1,122 @@
+{
+  "reviewed_on": "2026-07-09",
+  "expected_total_security_definers": 99,
+  "anon_signatures": [
+    "is_username_available(text)"
+  ],
+  "domains": [
+    {
+      "domain": "release_receipts",
+      "justification": "Records the signed-in user's release acknowledgement through a guarded cross-table write.",
+      "signatures": [
+        "record_app_release_receipt(uuid,text,text,text)"
+      ]
+    },
+    {
+      "domain": "automation_and_feedback",
+      "justification": "Full-admin workflow transitions and audit writes require guarded access across private automation tables.",
+      "signatures": [
+        "approve_automation_approval_packet(uuid)",
+        "approve_feedback_build_merge(uuid)",
+        "archive_automation_approval_packet(uuid)",
+        "archive_feedback_build_run(uuid)",
+        "create_feedback_build_run(uuid,text,jsonb,boolean)",
+        "reject_automation_approval_packet(uuid,text)",
+        "retry_feedback_build_run(uuid,text,jsonb,boolean)"
+      ]
+    },
+    {
+      "domain": "admin_access_and_moderation",
+      "justification": "Invite, role, and channel-ban operations enforce full-admin or operator checks before privileged reads and writes.",
+      "signatures": [
+        "create_signup_invite(text)",
+        "expire_user_channel_bans()",
+        "list_admin_access_users()",
+        "list_public_user_channel_bans(uuid[])",
+        "list_signup_invites()",
+        "list_user_channel_bans(uuid)",
+        "mark_admin_role_notification_seen(uuid)",
+        "revoke_signup_invite(uuid,text)",
+        "set_sub_admin_status(uuid,boolean)",
+        "set_user_channel_bans(uuid,text[],integer,text)"
+      ]
+    },
+    {
+      "domain": "identity_presence_and_direct_messages",
+      "justification": "Authenticated profile discovery, presence visibility, DM membership, unread, and aggregate reads span rows protected from direct table access.",
+      "signatures": [
+        "count_reactions_to_user_dm_messages_v2(uuid)",
+        "count_reactions_to_user_messages_v2(uuid)",
+        "count_unread_dm_messages(uuid)",
+        "count_user_reactions(uuid)",
+        "get_active_users()",
+        "get_dm_conversations()",
+        "get_or_create_dm_conversation(uuid)",
+        "is_username_available(text)",
+        "list_presence_states()",
+        "mark_dm_messages_read(uuid)",
+        "search_users(text)",
+        "set_presence_visibility(text)",
+        "update_user_last_active()"
+      ]
+    },
+    {
+      "domain": "engagement_shadowpin_and_runner",
+      "justification": "Atomic reaction, Hype, achievement, and ShadowPin activity mutations validate the caller and maintain server-owned aggregates.",
+      "signatures": [
+        "claim_gold_easter_egg()",
+        "delete_shadow_pin_category(uuid)",
+        "delete_shadow_pin_image(uuid)",
+        "finish_shadow_pin_activity_session(uuid,integer)",
+        "get_shadow_pin_activity_category_summary(timestamp with time zone,timestamp with time zone,timestamp with time zone,timestamp with time zone,uuid,uuid)",
+        "get_shadow_pin_activity_pin_summary(timestamp with time zone,timestamp with time zone,timestamp with time zone,timestamp with time zone,uuid,uuid)",
+        "get_shadow_pin_activity_timeline(timestamp with time zone,timestamp with time zone,uuid,uuid,uuid,text,integer,integer)",
+        "get_shadow_pin_activity_user_summary(timestamp with time zone,timestamp with time zone,timestamp with time zone,timestamp with time zone,uuid,uuid)",
+        "hype_message(uuid)",
+        "mark_hype_events_played(uuid[])",
+        "record_shadow_pin_activity_event(uuid,text,uuid,uuid,integer,jsonb)",
+        "record_shadow_runner_level_completion(text,integer,integer,integer,integer,integer)",
+        "ring_hype_bell()",
+        "start_shadow_pin_activity_session()",
+        "toggle_message_pin(uuid)",
+        "toggle_message_reaction_v2(uuid,text,boolean)",
+        "toggle_shadow_pin_category_heart(uuid)",
+        "toggle_shadow_pin_image_heart(uuid)"
+      ]
+    },
+    {
+      "domain": "shadow_checkers",
+      "justification": "Authoritative matchmaking, turn validation, chat, resign, rematch, and queue transitions must remain atomic across game rows.",
+      "signatures": [
+        "cancel_shadow_checkers_match(uuid)",
+        "create_shadow_checkers_match(text,text)",
+        "join_shadow_checkers_match(uuid,text)",
+        "leave_shadow_checkers_queue(uuid)",
+        "post_shadow_checkers_chat_message(uuid,text)",
+        "queue_shadow_checkers_match(uuid,text)",
+        "rematch_shadow_checkers_match(uuid)",
+        "resign_shadow_checkers_match(uuid)",
+        "start_shadow_checkers_next_challenger(uuid)",
+        "submit_shadow_checkers_move(uuid,text,jsonb)"
+      ]
+    },
+    {
+      "domain": "shadow_war",
+      "justification": "Authoritative matchmaking, hidden-card placement, round resolution, rematch, queue, and presence transitions span protected game state.",
+      "signatures": [
+        "cleanup_shadow_war_empty_sessions()",
+        "create_shadow_war_session()",
+        "join_shadow_war_session(uuid)",
+        "leave_shadow_war_queue(uuid)",
+        "leave_shadow_war_session_presence(uuid)",
+        "queue_shadow_war_session(uuid)",
+        "rematch_shadow_war_session(uuid)",
+        "resolve_shadow_war_round(uuid)",
+        "start_shadow_war_next_challenger(uuid)",
+        "submit_shadow_war_placement(uuid,text,text,text)",
+        "submit_shadow_war_sudden_war_card(uuid,text)",
+        "touch_shadow_war_session_presence(uuid)"
+      ]
+    }
+  ]
+}

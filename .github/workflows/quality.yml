@@ -60,3 +60,5 @@ jobs:
       - run: supabase db reset --local --no-seed --yes
       - run: supabase db lint --local --level warning --fail-on warning
       - run: supabase db advisors --local --type security --fail-on warn
+      - run: supabase db advisors --local --type performance --fail-on warn
+      - run: npm run supabase:security-contract:local
