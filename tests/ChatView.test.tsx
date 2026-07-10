@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import React from 'react'
 import { ChatView } from '../src/components/chat/ChatView'
 
@@ -93,6 +93,10 @@ jest.mock('../src/components/chat/PinnedMessagesButton', () => ({
   ),
 }))
 
+jest.mock('../src/components/chat/ActiveUsersButton', () => ({
+  ActiveUsersButton: () => <button type="button" data-testid="active-users-button">Active</button>,
+}))
+
 jest.mock('../src/components/chat/WeatherWidget', () => ({
   WeatherWidget: () => <div data-testid="weather-widget" />,
 }))
@@ -128,16 +132,24 @@ beforeEach(() => {
   mockMessagesState = createMessagesState()
 })
 
-test('keeps room-specific controls behind the contextual header tool button', async () => {
+test('expands room-specific controls inline in the header without a selector popup', async () => {
   await act(async () => {
     render(<ChatView currentView="chat" onViewChange={() => {}} />)
   })
 
   expect(screen.queryByTestId('pinned-messages-button')).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Open General Chat room tools' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Expand General Chat tools' }))
 
-  expect(screen.getByTestId('pinned-messages-button')).toHaveTextContent('1')
-  expect(screen.getByTestId('weather-widget')).toBeInTheDocument()
+  const tools = screen.getByRole('group', { name: 'General Chat tools' })
+  expect(within(tools).getByTestId('pinned-messages-button')).toHaveTextContent('1')
+  expect(within(tools).getByTestId('weather-widget')).toBeInTheDocument()
+  expect(within(tools).getByTestId('active-users-button')).toBeInTheDocument()
+  expect(screen.queryByRole('dialog', { name: 'General Chat room tools' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Collapse General Chat tools' })).toHaveAttribute('aria-expanded', 'true')
+
+  fireEvent.click(screen.getByRole('button', { name: 'Collapse General Chat tools' }))
+  expect(screen.queryByRole('group', { name: 'General Chat tools' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Expand General Chat tools' })).toHaveAttribute('aria-expanded', 'false')
   expect(screen.getByTestId('message-list')).toBeInTheDocument()
 })
 

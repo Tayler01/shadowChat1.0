@@ -4,12 +4,17 @@
 
 Reviewed during the June 1, 2026 documentation refresh. This doc remains current and is the model for keeping private user preferences out of public profile rows.
 
-The General Chat header includes a small per-user weather widget beside the
-active-user count control.
+The General Chat header keeps room-specific controls behind a small left-facing
+chevron. Expanding it slides an inline rail left of the fixed Search and
+Settings controls with the weather widget, active-user count, and pinned
+messages control. The rail is part of the header and is not a selector popup.
 
 ## Product Behavior
 
-- The compact header pill shows only a weather icon and the current temperature.
+- The compact weather pill shows only a weather icon and the current temperature
+  after the General Chat tool rail is expanded.
+- Clicking the right-facing chevron collapses the rail; opening the mobile
+  keyboard also collapses it automatically.
 - Clicking it opens a popup with current conditions and a short forecast.
 - The popup has no manual refresh button; forecasts refresh after preference
   changes and every ten minutes while the widget has a saved location.
@@ -94,10 +99,12 @@ For UI changes, run a preview build and verify:
 1. Desktop General Chat header shows the compact weather pill.
 2. Weather popup opens and fits inside the viewport.
 3. Weather popup shows no refresh icon/button.
-4. Mobile General Chat header keeps the weather and active-user pills visible.
-5. Account & Profile shows the Weather Location card.
-6. Clearing a location returns the header popup to the settings prompt.
-7. Sharing weather sends a themed PNG image message and does not include the
+4. Mobile General Chat header expands the weather, active-user, and pinned
+   controls leftward without opening a selector popup or moving Search/Settings.
+5. The rail collapses from its right-facing chevron and when the keyboard opens.
+6. Account & Profile shows the Weather Location card.
+7. Clearing a location returns the header popup to the settings prompt.
+8. Sharing weather sends a themed PNG image message and does not include the
    popup controls inside the captured card.
-8. The shared chat thumbnail shows the full card at lower resolution, and
+9. The shared chat thumbnail shows the full card at lower resolution, and
    tapping it opens the full weather image without side cropping.

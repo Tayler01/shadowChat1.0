@@ -8,27 +8,25 @@ const roomTools = readFileSync(
   'utf8',
 )
 
-test('General Chat room tools escape header clipping and stay inside the viewport', () => {
+test('General Chat tools expand inline to the left without a selector popup', () => {
+  assert.doesNotMatch(roomTools, /createPortal\(/)
+  assert.doesNotMatch(roomTools, /popup-surface/)
+  assert.match(roomTools, /ChevronLeft, ChevronRight/)
+  assert.match(roomTools, /role="group"/)
+  assert.match(roomTools, /right-\[calc\(100%\+0\.2rem\)\]/)
+  assert.match(roomTools, /'Collapse General Chat tools' : 'Expand General Chat tools'/)
   assert.match(
     roomTools,
-    /createPortal\(/,
+    /dataset\.shadowchatKeyboard === 'open'[\s\S]*setExpanded\(false\)/,
   )
   assert.match(
-    roomTools,
-    /Math\.max\(triggerRect\.right - width, viewportLeft \+ ROOM_TOOLS_EDGE_PADDING\)/,
-  )
-  assert.match(
-    roomTools,
-    /popup-surface fixed z-\[100\]/,
-  )
-  assert.match(
-    roomTools,
-    /dataset\.shadowchatKeyboard === 'open'[\s\S]*setOpen\(false\)/,
+    css,
+    /\.room-tools-inline-rail\s*\{[^}]*animation:\s*room-tools-inline-enter/s,
   )
 })
 
 test('General Chat room tools use the themed focus ring instead of the browser outline', () => {
-  assert.equal(roomTools.match(/room-tools-control/g)?.length, 2)
+  assert.equal(roomTools.match(/room-tools-control/g)?.length, 1)
   assert.match(
     css,
     /--theme-focus-ring:\s*rgb\(var\(--theme-accent-rgb\) \/ 0\.24\);/,

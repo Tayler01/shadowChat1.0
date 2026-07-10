@@ -3174,6 +3174,11 @@ html, body, #root {
     box-shadow: 0 0 0 2px var(--theme-focus-ring);
   }
 
+  .room-tools-inline-rail {
+    animation: room-tools-inline-enter var(--dur-med) var(--ease-premium) both;
+    will-change: opacity, transform;
+  }
+
   .obsidian-input {
     background: var(--bg-input);
     border: 1px solid var(--border-subtle);
@@ -3195,5 +3200,17 @@ html, body, #root {
       0 0 0 1px rgba(var(--theme-accent-rgb), 0.18),
       0 0 0 4px rgba(var(--theme-accent-rgb), 0.08);
     outline: none;
+  }
+}
+
+@keyframes room-tools-inline-enter {
+  from {
+    opacity: 0;
+    transform: translate(0.65rem, -50%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(0, -50%);
   }
 }
