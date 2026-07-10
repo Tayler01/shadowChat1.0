@@ -11,15 +11,16 @@ This document keeps small deferred ideas from being lost when stale branches are
 
 ## Private Identity Release B Hold - July 10, 2026
 
-The July 10 local candidate is Release A only. Its migrations establish an
+The July 10 deployment is Release A only. Its migrations establish an
 API-safe public-profile contract, cut database/Edge consumers away from private
 identity, and keep `public.users.email` plus `public.users.full_name` as nullable
 compatibility columns for a production interval.
 
 Release B is deliberately deferred. Do not create or apply the destructive
-column-drop migration until Release A's final SHA is deployed and production-
-proven, stable-account auth/chat/DM/admin smoke passes, the linked post-push dry
-run is empty, and repository/runtime checks show no remaining consumer. The
+column-drop migration until the forward historical-grant correction is deployed,
+stable-account auth/chat/DM/admin smoke passes, linked migration/security checks
+are clean, the health manifest matches the latest `main` SHA, and repository/
+runtime checks show no remaining consumer. The
 independent `apps/mobile` package is part of that gate; its public-profile and
 message selectors/types must not depend on either legacy column.
 
@@ -29,8 +30,8 @@ The unshipped native workspace was upgraded locally to Expo `~57.0.4`, React
 Native `0.86.0`, React `19.2.3`, and TypeScript `~6.0.3`. Clean install, audit,
 lint, TypeScript, Expo Doctor `20/20`, and static web export passed locally.
 
-This closes the stale Expo dependency/toolchain follow-up for the local
-candidate, but not native product parity. Development-build, physical iPhone,
+This closes the stale Expo dependency/toolchain follow-up in Release A, but not
+native product parity. Development-build, physical iPhone,
 EAS/TestFlight, native push, DMs, media, and broader feature parity remain
 deferred until native work resumes. The production web/PWA path is unchanged by
 this toolchain milestone.
@@ -68,7 +69,7 @@ Near-future priorities from the full codebase audit, after the P0 fixes:
 10. Update stale bridge architecture/testing/signature docs so instructions match the current implementation.
 11. Split or lazy-load large frontend chunks, especially emoji picker and lower-frequency panels.
 12. Add CI jobs for lint, typecheck, build, Jest, bridge TUI layout, and bridge function contract checks.
-13. Partially completed in the July 10 local candidate: root Jest/jsdom and the
+13. Partially completed in July 10 Release A: root Jest/jsdom and the
     Expo 57 native toolchain were modernized with clean audits. Continue staging
     unrelated Supabase/Vite/ESLint/Testing Library upgrades only as measured,
     independently verified batches.

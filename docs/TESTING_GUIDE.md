@@ -4,13 +4,13 @@ This project uses a mix of static checks, Jest coverage, and real browser valida
 
 ## Documentation Status - July 10, 2026
 
-This guide reflects the current repo scripts and the July 10 local release
-candidate. CI treats warnings, documentation drift, dependency advisories,
+This guide reflects the current repo scripts and deployed July 10 Release A.
+CI treats warnings, documentation drift, dependency advisories,
 Supabase migration/lint/advisor drift, Edge Function inventory drift, build
 budget regressions, the complete Jest suite, and Expo health as release gates.
-Passing local gates does not make the candidate production-proven; hosted
-migration/function parity, the final Netlify SHA, production smoke, and physical
-device checks remain separate evidence.
+Passing local gates never proves a release by itself; hosted migration/function
+parity, the Netlify health-manifest SHA, production smoke, and physical-device
+checks remain separate evidence.
 
 ## Mobile-First Testing Default
 

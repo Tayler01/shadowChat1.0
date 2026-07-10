@@ -2,26 +2,26 @@
 
 ## Documentation Status - July 10, 2026
 
-Older artifact paths remain historical evidence. The July 10 work below is a
-local release candidate until a fresh mobile-PWA artifact, production SHA, and
-physical-device pass are recorded.
+Older artifact paths remain historical evidence. The July 10 web Release A is
+deployed, but its mobile/PWA-sensitive behavior still needs a fresh harness
+artifact and physical-device pass.
 
 Last updated: 2026-07-10
 
-## July 10 Local Release Candidate
+## July 10 Release A Mobile QA Checkpoint
 
-Candidate scope includes service-worker update behavior, accessible mobile
+Release scope includes service-worker update behavior, accessible mobile
 dialogs/message menus, bounded DM history, notification quiet hours and mutes,
 personal blocking, global search/saved collections, and ShadowPin search,
 comments, replies, and notification preferences.
 
 - No new `qa:mobile-pwa` artifact is claimed by this documentation pass. The May
   artifacts below remain the latest recorded browser proof until the final
-  candidate is run with `--no-reuse-server`.
+  release is run with `--no-reuse-server`.
 - The separate Expo 57 / React Native 0.86 workspace passed local clean install,
   audit, lint, TypeScript, Expo Doctor `20/20`, and static web export. That is
   native toolchain evidence, not installed-PWA or production proof.
-- Required candidate follow-up: fresh iPhone/WebKit and Android/Chromium harness
+- Required release follow-up: fresh iPhone/WebKit and Android/Chromium harness
   coverage, then one installed iPhone and one installed Android pass after the
   production deploy.
 - Do not publish a production ShadowPin post merely for smoke. A new pin fans

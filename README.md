@@ -7,7 +7,7 @@ The project is already wired for hosted Supabase and Netlify deployment. It is d
 ## Documentation Status - July 10, 2026
 
 The documentation set has been refreshed for the July 9-10 alignment program
-and the current local release candidate: paused product domains, Supabase
+and deployed Release A: paused product domains, Supabase
 authority/security hardening, deterministic backend deployment, strict CI,
 dependency cleanup, build budgets, notification delivery parity, personal
 privacy controls, message discovery, and the active Entertainment/ShadowPin
@@ -16,22 +16,20 @@ feature work. The ranked source of truth is
 and the full inventory is
 [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
 
-The latest verified implementation release at this documentation cut is commit
-`8e4e275`, released by GitHub Actions run `29061308774`. The linked Supabase
-project is migration-aligned through `20260710002000`, the classified Function
-inventory is aligned, the Render News worker is suspended, and Netlify serves
-the matching build from `main`. A July 10 live headless smoke passed stable-user
-auth plus General Chat and DM resume-send; both generated rows were deleted and
-follow-up production counts were zero.
+The backend-first `main` workflow has shipped the July 10 Release A frontend,
+schema, and classified Edge Function batch to Supabase and Netlify. Linked
+verification then found two historical active-table grants outside the reviewed
+contract; a forward revocation and follow-up release are the remaining closeout
+step. The latest successful `main` workflow plus the public health manifest are
+the authority for the live SHA and deployment state.
 
-The local release candidate closes the code-side service-worker, DM pagination
+Release A closes the code-side service-worker, DM pagination
 and subscription, reaction rollback, runtime-asset, report-only CSP, dialog,
 mobile-header, notification, blocking, message-library, ShadowPin social,
-Shado TV, and Shadow Mystery work described below. Production evidence is not
-claimed until the backend-first `main` workflow aligns Supabase and publishes
-the matching Netlify build. Remaining follow-ups include the staged private-
-identity column removal, physical-device PWA validation, production header and
-advisor verification, and domain-by-domain reduction of the guarded
+Shado TV, and Shadow Mystery work described below. Remaining follow-ups include
+the forward grant revocation and final linked/live proof, staged private-identity
+column removal only after that proof, physical-device PWA validation, production
+header/advisor verification, and domain-by-domain reduction of the guarded
 `SECURITY DEFINER` surface.
 
 ## Stack

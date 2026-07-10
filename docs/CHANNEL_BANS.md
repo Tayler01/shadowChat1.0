@@ -17,9 +17,9 @@ The July 10 hosted cleanup revokes browser execution of paused Boards, News, and
 Art mutation RPCs while retaining their source and migration history. Active
 General Chat moderation remains available through explicitly reviewed grants.
 
-The current local release candidate also adds member-controlled personal
-blocking. That is a separate privacy contract and is not described as
-production-shipped until its migration and app build are deployed.
+Release A also ships member-controlled personal blocking. That remains a
+separate privacy contract from operator channel bans; see
+[PERSONAL_BLOCKING.md](C:/repos/chat2.0/docs/PERSONAL_BLOCKING.md:1).
 
 Channel bans let app operators limit where a user can participate without
 touching DMs or account access. Banned users can still read visible content.

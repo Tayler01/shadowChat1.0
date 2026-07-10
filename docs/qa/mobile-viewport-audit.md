@@ -2,19 +2,18 @@
 
 ## Documentation Status - July 10, 2026
 
-This audit separates the previously verified mobile artifacts from the July 10
-local release candidate. Keep older artifact paths as historical evidence; do
-not treat candidate code or Expo checks as production/physical-device proof.
+This audit separates previously verified mobile artifacts from the deployed
+July 10 Release A. Keep older artifact paths as historical evidence; deployment
+and Expo checks do not replace fresh viewport/physical-device proof.
 
 Last updated: 2026-07-10
 
-## July 10 Local Candidate Checkpoint
+## July 10 Release A Checkpoint
 
-The candidate includes service-worker update handling, accessible dialogs and
+Release A includes service-worker update handling, accessible dialogs and
 message actions, bounded DM history, notification controls, personal blocking,
 global search, and ShadowPin social surfaces. Those changes still require a
-fresh `qa:mobile-pwa` artifact plus installed iPhone and Android validation after
-the final production deploy.
+fresh `qa:mobile-pwa` artifact plus installed iPhone and Android validation.
 
 The independent native workspace now targets Expo 57 / React Native 0.86 and
 passed its local clean-install, audit, lint, TypeScript, Expo Doctor, and static-

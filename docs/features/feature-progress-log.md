@@ -2,17 +2,18 @@
 
 ## Documentation Status - July 10, 2026
 
-Refreshed for the July 10 local release candidate. Historical feature entries
+Refreshed for the July 10 Release A deployment. Historical feature entries
 remain below; current shipped-versus-candidate status and follow-ups are tracked
 in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
 
 Use this log for long-running `/goal` work and feature implementations that span
 multiple checkpoints. Keep entries concise, factual, and tied to verification.
 
-## Current Release Candidate - Audit Hardening And Social Foundations
+## Current Release - Audit Hardening And Social Foundations
 
-Status: implemented locally; backend-first `main` release and production proof
-pending.
+Status: shipped through the backend-first `main` workflow. Release closeout is
+applying a forward revocation for two historical extra active-table grants and
+must finish linked, health-manifest, and live-smoke proof before Release B.
 
 The July 10 candidate includes service-worker and DM lifecycle work,
 private-identity Release A consumer cutover (including Expo 57 selectors),

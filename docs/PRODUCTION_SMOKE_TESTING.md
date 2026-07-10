@@ -9,8 +9,9 @@ The runner now establishes a complete General Chat latest-window precondition
 before the resume scenario so an old persisted read position cannot hide a new
 realtime message. Production smoke continues to use stable email-confirmed
 accounts instead of disposable signup. The later July 10 identity,
-notification, ShadowPin, search, PWA, and dependency work remains a local
-release candidate until its own deploy and smoke evidence is recorded here.
+notification, ShadowPin, search, PWA, and dependency Release A is deployed and
+has its own auth/resume-send proof below. Release B remains deferred until the
+forward historical-grant closeout and final linked/live proof complete.
 
 ## Why Stable Accounts Are Required
 
@@ -189,30 +190,21 @@ Common failure meanings:
 
 ## Latest Passing Production Proof - July 10, 2026
 
-The headless stable-account smoke passed against `https://shadochat.online`
-from `2026-07-10T00:58:09.221Z` through `2026-07-10T00:58:22.463Z`:
+The headless stable-account smoke passed against `https://shadochat.online` at
+`2026-07-10T14:15Z` after the Release A backend-first deployment:
 
 - `auth`: passed for both canonical production smoke accounts.
 - `resume-send`: passed for General Chat and DM after simulated background and
   foreground recovery.
-- Artifact summary:
-  `output/playwright/prod-postdeploy-headless/summary.json`.
-- The deployed app baseline under test was commit `8e69fe4`, published by the
-  successful production workflow run `29060359268`.
-
-A later backend-first production workflow, run `29062308434` for commit
-`2790eff`, completed successfully, but it does not replace the browser artifact
-above. The subsequent July 10 local candidate needs its own post-deploy smoke
-record before this section is advanced.
+- The latest successful `main` workflow and public health manifest are the
+  authority for the deployed SHA; this runbook does not pin an older run id.
 
 Cleanup was verified against linked production, not inferred from the browser:
 
-- General Chat row `Resume chat 20260710005817`
-  (`fbeae672-001d-4bd9-9786-b87e1ca3f252`) deleted exactly one row.
-- DM row `Resume dm 20260710005821`
-  (`9a99225d-4186-4ef6-bc9f-ea487d07578c`) deleted exactly one row.
-- Follow-up 30-minute-prefix queries returned `0` General Chat rows and `0` DM
-  rows. Earlier preliminary-run rows were also deleted exactly once each.
+- Cleanup deleted exactly one generated General Chat row and one generated DM
+  row.
+- Follow-up production queries returned `0` matching General Chat rows and `0`
+  matching DM rows.
 - This scenario creates text rows only; it did not upload Storage objects.
 
 ## Post-Deploy Checklist

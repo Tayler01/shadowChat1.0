@@ -63,30 +63,29 @@ now contain only `main`, and GitHub has zero open pull requests.
 - Follow-up workflow `29061308774` also passed every gate and published smoke-
   harness commit `8e4e2757efe6555b90c6a566b0684c41da0e2b10` as Netlify deploy
   `6a5045191fe53dd504fc4131`; the live entry bundle carries that exact SHA.
-- Linked Supabase migrations are current through
-  `20260710002000_remote_security_advisor_cleanup.sql`. The remote Function
-  inventory is exact: 8 active product Functions plus 15 deny-paused Bridge
-  Functions; `art-board-import-image` is absent.
+- Release A applied linked Supabase migrations through
+  `20260710044600_personal_blocking_engagement_hardening.sql`. The remote
+  Function inventory is exact: 8 active product Functions plus 15 deny-paused
+  Bridge Functions; `art-board-import-image` is absent. A forward revocation of
+  two historical extra active-table grants is the remaining linked closeout.
 - Remote database lint is clean. Hosted security-advisor warnings fell from 169
   to 72: 71 guarded authenticated SECURITY DEFINER APIs and the intentional
   anonymous `is_username_available(text)` pre-signup check. Broad public-bucket
   listing and leaked-password warnings are zero, and Supabase Auth leaked-
   password protection is enabled.
-- The verified production baseline remains on the dependency state from that
-  release. The current local candidate has since completed the reviewed
-  framework/test migration: Expo 57, React Native 0.86, React 19.2, TypeScript
+- Release A completed the reviewed framework/test migration in production CI:
+  Expo 57, React Native 0.86, React 19.2, TypeScript
   6 in the mobile package, Jest 30 in the root package, and narrow transitive
   overrides for the remaining Remotion/jsdom/glob warnings. Clean root/mobile
-  installs report no deprecation warnings and zero known vulnerabilities
-  locally; production CI proof is still pending.
+  installs report no deprecation warnings and zero known vulnerabilities.
 
-### July 10 local release-candidate checkpoint
+### July 10 Release A deployment and closeout
 
-The commits after the verified production baseline implement the following
-locally. These items must remain labeled release-candidate work until the
-backend-first `main` workflow applies the migrations, deploys the classified
-Functions, publishes the matching Netlify artifact, and completes post-deploy
-verification:
+The backend-first `main` workflow applied and published the following Release A
+batch. Post-release linked verification then found two historical active-table
+grants outside the reviewed contract. A forward revocation and follow-up
+workflow are the remaining closeout work; use the latest successful workflow,
+linked checks, and public health manifest as authority rather than an older SHA:
 
 - service-worker cache v3 with cache-first content-hashed assets,
   revalidate-first stable assets, offline fallback, and stale-cache cleanup
@@ -163,33 +162,33 @@ verification:
    helpers where that reduces privilege without breaking RLS-backed behavior.
 2. Keep the production resume/send harness stable across restored read positions
    and require verified cleanup of every test General Chat and DM row.
-3. **Implemented locally; physical-device proof pending:** stable assets now
+3. **Shipped in Release A; physical-device proof pending:** stable assets now
    revalidate before cache fallback, content-hashed assets remain cache-first,
    and old worker caches are removed. Validate an installed-PWA upgrade on real
    iPhone and Android devices after deployment.
-4. **Implemented locally:** DM history uses stable `(created_at, id)` keysets.
-5. **Implemented locally:** DM realtime subscriptions are consolidated and
+4. **Shipped in Release A:** DM history uses stable `(created_at, id)` keysets.
+5. **Shipped in Release A:** DM realtime subscriptions are consolidated and
    thread rendering is bounded to the latest 200 loaded messages.
-6. **Implemented locally:** optimistic General Chat reactions roll back when
+6. **Shipped in Release A:** optimistic General Chat reactions roll back when
    the RPC fails.
 7. **Completed:** remove the catch-all `vendor-ui` chunk, restore
    route-aware splitting, and enforce measured entry/lazy/deploy budgets.
-8. **Implemented locally:** nonruntime source/concept/generation assets live in
+8. **Shipped in Release A:** nonruntime source/concept/generation assets live in
    `source-assets`; runtime finals remain in `public`; the build enforces a
    100 MB deploy-size budget.
-9. **Implemented locally; production header proof pending:** Netlify defines a
+9. **Shipped in Release A; latest-header proof pending:** Netlify defines a
    report-only CSP plus frame, content-type, referrer, permissions, manifest
    MIME, and worker cache headers.
 10. Complete installed-PWA checks on physical iPhone and Android devices and
    make a deliberate portrait/Shadow Runner landscape decision.
-11. **Implemented locally:** removed `user-scalable=no`; standardized the
+11. **Shipped in Release A:** removed `user-scalable=no`; standardized the
     touched focus traps, Escape/focus return, keyboard menus, `aria-current`,
     and phone touch targets. Physical-device accessibility review remains.
-12. **Implemented locally:** the phone header is contextual and Hype
+12. **Shipped in Release A:** the phone header is contextual and Hype
     celebrations avoid essential composer/navigation controls.
 13. **Completed:** add opt-in release-correlated client/worker telemetry
    with privacy scrubbing and an Edge helper for reviewed per-function adoption.
-14. **Implemented locally:** personal-block changes immediately refresh loaded
+14. **Shipped in Release A:** personal-block changes immediately refresh loaded
    DM state, while trigger/RPC guards cover known-id engagement paths and stale
    pair notifications. Production two-account proof is still pending.
 
@@ -199,11 +198,10 @@ verification:
 2. **Completed in production:** eliminate React `act(...)` test warnings.
 3. **Completed in production:** remove unused code, enable TypeScript unused checks,
    and enforce ESLint `--max-warnings=0`.
-4. **Completed in production for the earlier baseline; modernized locally for
-   the next release:** safe dependency updates remain gated, while the current
-   candidate moves Jest to 30 and Expo to 57 with warning-free clean installs.
+4. **Completed in production:** safe dependency updates remain gated, while
+   Release A moves Jest to 30 and Expo to 57 with warning-free clean installs.
 5. **Completed in production:** add a separate Expo
-   install/audit/lint/typecheck/Doctor job. The candidate now runs that job
+   install/audit/lint/typecheck/Doctor job. Release A runs that job
    against Expo 57.
 6. **Completed in production:** add documentation link/encoding checks and repair known drift.
 7. **Completed in production:** deterministic clean installs, the complete
@@ -212,41 +210,43 @@ verification:
 
 #### P2 - Product improvements after hardening
 
-1. **Implemented locally:** targeted mention/reply/reaction delivery, master
+1. **Shipped in Release A:** targeted mention/reply/reaction delivery, master
    and per-type preferences, timezone-aware quiet hours, temporary snooze,
    General Chat mute, and per-DM conversation mutes now share one backend
    delivery contract. Normal-device push verification remains.
-2. **Implemented in the local release candidate:** Admin Operations Health now
+2. **Shipped in Release A:** Admin Operations Health now
    reports the running/deployed frontend SHA, migration and exact Function
    manifest parity, latest production monitor result, release-time push
    readiness, and explicit paused News/ESP state from an operator-only,
-   sanitized snapshot. Production evidence becomes authoritative when this
-   batch completes the backend-first GitHub release.
-3. **Implemented locally:** reciprocal personal blocking covers discovery,
+   sanitized snapshot. The live health manifest and latest workflow are the
+   release-state authority.
+3. **Shipped in Release A:** reciprocal personal blocking covers discovery,
    General Chat, presence, reactions, Hype, message pinning, DMs, ShadowPin
    visibility/comments/hearts/activity, aggregate helpers, and notification
    delivery while preserving DM history for unblock restoration. Loaded DM
    state refreshes immediately after a block change.
-4. **Implemented locally:** universal caller-visible General Chat/DM search,
+4. **Shipped in Release A:** universal caller-visible General Chat/DM search,
    private saved messages, and personal collections.
-5. **Implemented locally:** Shadow Mystery operator publishing studio and
+5. **Shipped in Release A:** Shadow Mystery operator publishing studio and
    private artwork domain.
-6. **Implemented locally:** normalized ShadowPin tags, indexed search,
+6. **Shipped in Release A:** normalized ShadowPin tags, indexed search,
    root comments plus one-level replies, bounded post/activity writes, and
    ready-state new-post/comment/reply notifications. Recipient events are now
    included in the Realtime publication under RLS.
-7. **Implemented locally:** Shado TV WebVTT captions, synchronized premieres,
+7. **Shipped in Release A:** Shado TV WebVTT captions, synchronized premieres,
    watch events, and operator aggregates.
 8. **On hold with News:** read-later, topic following, and digest features.
 9. **On hold with ESP:** the bridge device/session manager.
 
 ### Coordinated investigations, not blind migrations
 
-- Private-identity Release A and its consumer cutover are implemented locally,
-  including the Expo selector/type cleanup. Release B must not drop the legacy
-  `public.users.email` and `full_name` columns until Release A has deployed and
-  its active consumers are verified in production.
-- The local exact SECURITY DEFINER and privilege contracts are implemented;
+- Private-identity Release A and its consumer cutover are deployed, including
+  the Expo selector/type cleanup. Release B must not drop the legacy
+  `public.users.email` and `full_name` columns until the forward grant-revocation
+  release and its linked/live proof are final.
+- The exact SECURITY DEFINER and privilege contracts are implemented; the two
+  historical extra active-table grants found after Release A are being removed
+  by a forward migration. After that closeout,
   architectural reduction of the authenticated surface still requires
   domain-by-domain review rather than blind ACL removal.
 - AI dispatch replay/quota now uses an atomic private idempotency/rate ledger;
@@ -403,16 +403,18 @@ Implementation status through July 10, 2026:
   make `users.admin_role` display-only, lock static notification-sound config,
   constrain Storage MIME/size metadata, fix SECURITY DEFINER search paths and
   ACLs, revoke paused-domain browser access, and remove broad public-bucket list
-  policies. The linked database is current through
-  [20260710002000_remote_security_advisor_cleanup.sql](C:/repos/chat2.0/supabase/migrations/20260710002000_remote_security_advisor_cleanup.sql:1),
-  and `supabase db push --linked --dry-run` reports no pending migrations.
+  policies. Release A brought the linked database through
+  [20260710044600_personal_blocking_engagement_hardening.sql](C:/repos/chat2.0/supabase/migrations/20260710044600_personal_blocking_engagement_hardening.sql:1).
+  The forward closeout migration
+  `20260710141315_revoke_unreviewed_active_table_grants.sql` is the only pending
+  linked change until its backend-first `main` workflow completes.
 - Local reset/lint/security advisors and remote database lint are clean. The
   hosted security advisor now reports 72 documented warnings: 71 guarded
   authenticated SECURITY DEFINER APIs and the sole intentional anonymous
   `is_username_available(text)` check. Supabase Auth leaked-password protection
   is enabled; stronger minimum-length/complexity rules remain a separate auth UX
   rollout so existing sign-in behavior is not changed accidentally.
-- The current local Release A migrations add one explicit public-profile JSON
+- The deployed Release A migrations add one explicit public-profile JSON
   projection for General Chat/DM and Edge consumers, remove email/full-name
   copying from profile writers, and source the guarded admin email list from
   `auth.users`. The legacy public columns remain nullable and deprecated for a
@@ -424,9 +426,9 @@ Implementation status through July 10, 2026:
 
 Status and remaining coordinated follow-up:
 
-1. Deploy and prove Release A, then apply the separately reviewed Release B
-   migration that drops legacy `public.users.email` and `full_name`. Do not
-   mark this complete while the compatibility columns remain queryable.
+1. Finish Release A linked-grant closeout, then apply the separately reviewed
+   Release B migration that drops legacy `public.users.email` and `full_name`.
+   Do not mark this complete while the compatibility columns remain queryable.
 2. Review authenticated SECURITY DEFINER APIs domain by domain and replace them
    with private implementations or SECURITY INVOKER wrappers when the privilege
    boundary can be narrowed without breaking RLS-backed behavior.
@@ -473,9 +475,9 @@ Next steps:
 2. Before bridge reactivation, re-audit channel bans, `dm_discoverable`,
    bootstrap/rate limits, returned identifiers, and banned-user tests.
 3. Keep AI `postToChat` caller eligibility and General Chat bans covered by
-   negative tests when changing that active endpoint. The local candidate also
+   negative tests when changing that active endpoint. Release A also
    applies the shared Edge request guard.
-4. **Implemented locally:** atomic per-user AI quota/idempotency claims and
+4. **Shipped in Release A:** atomic per-user AI quota/idempotency claims and
    durable bounded responses live in the private Edge request ledger. Verify
    deployed 429/replay behavior before expanding provider use.
 
@@ -541,11 +543,11 @@ Primary files:
 - [.github/workflows/netlify-preview.yml](C:/repos/chat2.0/.github/workflows/netlify-preview.yml:1)
 - [supabase/config.toml](C:/repos/chat2.0/supabase/config.toml:1)
 
-Observed risk and candidate status:
+Observed risk and release status:
 
-- The current local `netlify.toml` defines the reviewed header packet, with
-  CSP intentionally report-only for staged compatibility review. The earlier
-  production baseline did not include this packet; live header proof remains.
+- The deployed `netlify.toml` defines the reviewed header packet, with CSP
+  intentionally report-only for staged compatibility review. Verify the latest
+  follow-up deploy headers rather than relying on an older release.
 - Live Netlify project settings were verified on July 9; automatic Git builds
   were then stopped so the GitHub backend-first workflow is the only publisher.
 - Render service `srv-d7pjc49j2pic73bq5m80` was verified as a suspended
@@ -557,10 +559,10 @@ Observed risk and candidate status:
 
 Next steps:
 
-1. **Implemented locally:** staged `X-Content-Type-Options`,
+1. **Shipped in Release A:** staged `X-Content-Type-Options`,
    `Referrer-Policy`, `Permissions-Policy`, frame protection, manifest MIME,
    worker caching, and CSP headers.
-2. **Implemented locally:** CSP is report-only so Supabase, Bunny,
+2. **Shipped in Release A:** CSP is report-only so Supabase, Bunny,
    Meta/oEmbed, media, and provider calls can be observed safely.
 3. Verify production headers after the staged header/CSP packet; project,
    deploy-hook, domain, and publisher settings were verified July 9.
@@ -590,13 +592,13 @@ Primary files and surfaces:
 Next steps:
 
 1. Simplify login to a normal app sign-in surface.
-2. **Implemented locally:** mobile header actions are contextual so Weather,
+2. **Shipped in Release A:** mobile header actions are contextual so Weather,
    Active Users, Pinned, global search, and other controls do not crowd every
    surface.
 3. Tighten mobile nav labels and badge caps.
 4. Separate DM loading, empty, and selected-thread states so "Say hello" does not flash incorrectly.
 5. **On hold with News:** remove admin/setup hints from user-facing News empty states unless the current user is an operator.
-6. **Implemented locally for the touched surfaces:** shared dialog focus traps,
+6. **Shipped in Release A for the touched surfaces:** shared dialog focus traps,
    Escape/focus return, and viewport-bounded modal layout cover profile,
    settings, feedback, notification setup, image, emoji, ShadowPin comment,
    search/library, and studio dialogs. Physical-device review remains.
@@ -650,7 +652,7 @@ Implementation status on June 8, 2026:
 - The July 9 build removed the broad `vendor-ui` chunk and added deterministic
   eager, lazy Phaser, single-chunk, and total-deploy budgets. The large lazy
   Phaser payload remains intentional and separately budgeted.
-- The current local candidate extends the shared realtime lifecycle into the
+- Release A extends the shared realtime lifecycle into the
   DM domain, replaces duplicate conversation/thread channels with one
   consolidated subscription path, and bounds long-thread state.
 - `20260710034032_rls_performance_cleanup.sql` addresses the reviewed RLS

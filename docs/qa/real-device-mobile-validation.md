@@ -2,7 +2,7 @@
 
 ## Documentation Status - July 10, 2026
 
-The checklist now includes the July 10 local candidate's PWA update,
+The checklist now includes the deployed July 10 Release A PWA update,
 notification, blocking, ShadowPin, and private-identity risks. No new physical-
 device pass is claimed; every device row remains pending until recorded below.
 

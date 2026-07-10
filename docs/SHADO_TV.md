@@ -2,11 +2,10 @@
 
 ## Documentation Status - July 10, 2026
 
-Updated for the current local Shado TV release candidate. Bunny Stream is the
-implemented native provider, and the candidate adds WebVTT caption management,
+Updated for Shado TV Release A. Bunny Stream is the implemented native provider,
+and the deployed release adds WebVTT caption management,
 synchronized premiere playback, privacy-bounded watch events, and operator
-analytics. Production migration, Function, media, and device proof remains
-pending.
+analytics. Media and physical-device proof remains pending.
 
 Shado TV is the immersive streaming application inside the ShadowChat
 Entertainment area. It is not a game. It should feel like a full mobile-first
@@ -17,7 +16,7 @@ Planning baseline date: 2026-05-17. Current implementation update: 2026-07-10.
 
 ## Current Status
 
-Verified earlier production behavior plus the July 10 local candidate:
+Verified production behavior through July 10 Release A:
 
 - The Cinema Marquee first-pass asset suite is approved.
 - Twenty optimized WebP assets are committed under
@@ -109,7 +108,7 @@ Verified earlier production behavior plus the July 10 local candidate:
 - Background playback can be supported best-effort where mobile browsers allow
   it, but it is not a hard guarantee.
 - WebVTT captions and privacy-bounded watch analytics are implemented in the
-  local candidate. User comments/social premiere chat and push reminders remain
+  Release A. User comments/social premiere chat and push reminders remain
   out of scope.
 
 ### Premieres And Release States
@@ -321,7 +320,7 @@ mobile QA checkpoints where useful.
    - compare familiar-stack options, such as Render/Supabase Storage, with
      managed video services
    - present recommendation and costs before any new service setup
-6. Video processing and playback: implemented, with local candidate additions
+6. Video processing and playback: implemented, with Release A additions
    pending production proof.
    - Bunny native upload/processing and external embed fallback
    - release states, synchronized premieres, and watch progress

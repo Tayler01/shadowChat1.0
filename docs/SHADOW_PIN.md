@@ -2,12 +2,12 @@
 
 ## Documentation Status - July 10, 2026
 
-Updated for the current local ShadowPin social/discovery release candidate.
-The repo now includes normalized tags, indexed cross-entity search, threaded
+Updated for the ShadowPin social/discovery work shipped in Release A. The
+production surface includes normalized tags, indexed cross-entity search,
+threaded
 comments, reciprocal personal-block enforcement, and recipient-owned in-app
-plus Web Push notification paths. These additions are not described as
-production-shipped until the migrations and current Functions are deployed and
-verified through the backend-first release workflow.
+plus Web Push notification paths. Use the latest successful `main` workflow and
+health manifest for live build identity while grant-revocation closeout finishes.
 
 ShadowPin is a logged-in public pin board exposed as `Pins` in the mobile
 bottom menu and desktop sidebar. Boards stays its own menu item; Pins opens the

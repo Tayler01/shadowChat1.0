@@ -8,12 +8,13 @@ remain dormant until their protected environment is configured.
 Current release policy is main-only. The local and remote repository currently
 contain only `main`, with zero open pull requests. Netlify native Git builds are
 stopped; GitHub Actions owns backend-first production publication through a
-Netlify CLI upload. Workflow run `29062308434` completed successfully for commit
-`2790efff528d31ac61a383a787d4883e9d7d8932`; Netlify deploy
-`6a504b0eaa7a29b30706a2cf` reached `ready`. The later July 10 privacy,
-notification, search, ShadowPin, operations, PWA, and dependency work remains a
-local release candidate until the final SHA has its own workflow and production
-proof.
+Netlify CLI upload. The July 10 privacy, notification, search, ShadowPin,
+operations, PWA, and dependency Release A completed that backend-first
+workflow. Post-release linked verification found two historical active-table
+grants outside the reviewed contract, so a forward revocation and follow-up
+release are required for closeout. The latest successful `main` workflow and
+public health manifest are authoritative for the live SHA; do not copy an older
+run/deploy id forward as current proof.
 
 ## Privacy-scrubbed telemetry
 
@@ -100,29 +101,25 @@ project database password remains a separate `SUPABASE_DB_PASSWORD`; swapping
 the two or injecting newline/BOM data fails before dependency installation.
 Never expose either value through `VITE_*` variables.
 
-Confirmed production Supabase parity is:
+The July 10 Release A deployment established:
 
-- migrations aligned through `20260710002000`, with linked dry run reporting no
-  pending migrations;
+- Release A migrations through
+  `20260710044600_personal_blocking_engagement_hardening.sql` applied;
 - remote database lint at zero warnings;
 - 23 classified functions: eight active plus 15 ESP Bridge endpoints in
   deny-paused mode, with `art-board-import-image` absent and no manifest/JWT
   drift;
-- hosted advisor residuals explicitly documented as 71 guarded authenticated
-  `SECURITY DEFINER` APIs plus the single intentional anonymous pre-signup
-  username check;
 - leaked-password protection enabled with `password_hibp_enabled=true`.
 
-Each production run must capture migration and function evidence for its own
-SHA. A prior green artifact does not prove a newer commit. The latest verified
-implementation release is workflow `29062308434` for commit `2790eff`, with
-backend evidence artifact
-`supabase-release-2790efff528d31ac61a383a787d4883e9d7d8932`.
+The subsequent linked contract check exposed two historical extra active-table
+grants. Closeout therefore requires the forward revocation migration, an empty
+linked dry run, a clean linked security contract/advisor review, and a matching
+health manifest from the follow-up `main` workflow.
 
-The July 10 local release candidate intentionally has migrations after
-`20260710002000`; its linked dry run is not expected to be empty until the
-backend-first workflow applies them. Local reset/lint/test evidence is candidate
-evidence only, not hosted parity.
+Each production run must capture migration and function evidence for its own
+SHA. A prior green artifact does not prove a newer commit. Read the latest
+successful `netlify-production.yml` run, its backend evidence artifact, linked
+migration/security output, and `/.well-known/shadowchat-health.json` together.
 
 Boards, News, Art Board, and ESP Bridge checks are reactivation-only. Routine
 release smoke verifies that their compiled surfaces stay absent/default-deny;
@@ -138,7 +135,7 @@ controlled production post has explicit approval.
 
 ## Two-stage private identity safeguard
 
-Release A is a compatibility release. The local candidate introduces an API-safe
+Release A is a compatibility release. The deployed batch introduces an API-safe
 public-profile serializer, moves General Chat/DM consumers away from private
 identity, stops database/Edge writers from mirroring identity, and keeps guarded
 admin email sourced from `auth.users`. The nullable
@@ -148,8 +145,8 @@ deployment interval.
 Release B is destructive and must not share Release A's production push. Drop
 the compatibility columns only after all of these are true:
 
-- Release A's final SHA has a successful backend-first workflow and an empty
-  post-push linked dry run.
+- the forward historical-grant revocation has a successful backend-first
+  workflow and an empty post-push linked dry run;
 - Stable-account production auth, General Chat, DM, resume-send, profile, and
   full-admin access smoke passes.
 - Public payload inspection confirms authentication email and `full_name` are

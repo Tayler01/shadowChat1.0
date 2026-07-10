@@ -7,10 +7,12 @@ This document is a high-signal map of the current ShadowChat codebase.
 This architecture map includes the July 9-10 product pause, profile/role
 authority boundaries, Storage constraints, classified Edge Function release
 inventory, ESP server-side hold, hosted Auth/security posture, backend-first
-release, strict release gates, suspended News worker, and the subsequent local
-candidate for private identity, personal blocking, message search/saves,
+release, strict release gates, suspended News worker, and deployed Release A
+for private identity, personal blocking, message search/saves,
 ShadowPin social notifications, bounded DM state, and resilient push dispatch.
-Candidate behavior is not production-proven until its own release completes.
+Release closeout is applying a forward revocation for two historical extra
+active-table grants; use linked checks and the live health manifest for final
+state, and keep Release B deferred until that proof completes.
 Remaining work is ranked in
 [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
 
@@ -128,7 +130,7 @@ Storage bucket metadata enforces reviewed limits and MIME allowlists for
 avatars, banners, message media, and chat uploads. The browser applies the same
 limits before upload, but server-side bucket configuration is authoritative.
 
-The verified production schema is aligned through
+The pre-Release A hosted baseline was aligned through
 `20260710002000_remote_security_advisor_cleanup.sql`. That migration removes
 broad paused-domain browser grants and bucket-list policies, tightens internal
 and trigger Functions, and preserves only reviewed active RPC access. Hosted
@@ -137,10 +139,11 @@ hosted security-advisor set is 71 guarded authenticated definer APIs plus the
 intentional anonymous username-availability check; reducing that surface is a
 ranked architecture refactor, not a blind grant-revocation exercise.
 
-Later migrations through
-`20260710044600_personal_blocking_engagement_hardening.sql` are part of the
-current local release candidate. They must be applied and verified by the
-backend-first `main` workflow before this document treats them as hosted state.
+Release A migrations through
+`20260710044600_personal_blocking_engagement_hardening.sql` are hosted. Linked
+verification found two historical extra active-table grants, so
+`20260710141315_revoke_unreviewed_active_table_grants.sql` and its follow-up
+workflow are the remaining parity closeout.
 
 ### Edge Functions
 

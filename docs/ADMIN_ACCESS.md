@@ -6,10 +6,10 @@ This doc reflects the app-wide admin model and July 9 authority cleanup.
 `public.user_roles` and operator helpers are the authorization source;
 `users.admin_role` is display-only public badge metadata.
 
-The current local release candidate adds Operations Health evidence, the
+Release A adds Operations Health evidence, the
 Shadow Mystery publishing studio, and Shado TV caption/premiere/analytics
-controls. Those additions remain candidate status until the matching backend
-and frontend release is verified.
+controls. Use the latest successful `main` workflow and health manifest for the
+live release identity while grant-revocation closeout finishes.
 
 Settings > Admin > News Sources and ESP Bridge Pairing are intentionally absent
 from the default build while those product domains are paused. Their panel source

@@ -4,15 +4,16 @@ This file is the working handbook for agentic contributors operating inside this
 
 ## Documentation Status - July 10, 2026
 
-This handbook is current through the July 10 production-alignment pass and the
-subsequent local release candidate: the paused-domain contract, Supabase
+This handbook is current through the July 10 production-alignment and Release A
+deployment: the paused-domain contract, Supabase
 authority and Storage hardening, backend-first GitHub release, Node 24
 baseline, main-only branch policy, private-identity consumer cutover, personal
 blocking, message library, ShadowPin social notifications, DM lifecycle work,
-and Expo 57 baseline have all been incorporated. Candidate behavior remains
-unproven in production until its own backend-first `main` workflow and smoke
-complete. For the remaining ranked security, reliability, performance, UX, and
-feature work, read
+and Expo 57 baseline have all been incorporated. The backend-first workflow
+shipped Release A; release closeout is applying a forward revocation for two
+historical extra table grants and must finish linked, health-manifest, and live
+smoke proof before Release B. For the remaining ranked security, reliability,
+performance, UX, and feature work, read
 [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1)
 before editing. For the complete documentation inventory and freshness notes,
 read
@@ -79,8 +80,8 @@ changing that surface.
 
 The July 9-10 alignment closed the immediate schema drift, broad paused-domain
 grants, Storage limits, leaked-password screening, release credential, backend
-parity, bundle-budget, and live smoke gaps. The later local candidate also
-implements service-worker update behavior, DM keyset pagination and bounded
+parity, bundle-budget, and live smoke gaps. Release A also shipped
+service-worker update behavior, DM keyset pagination and bounded
 rendering, reaction rollback, accessibility work, private identity Release A,
 personal blocking, and ShadowPin engagement hardening. The remaining near-term
 track is:
@@ -88,9 +89,10 @@ track is:
 - reduce the remaining intentionally guarded authenticated
   `SECURITY DEFINER` surface through a reviewed private-definer/public-invoker
   architecture pass
-- deploy and prove the current candidate, then complete physical-device PWA,
-  accessibility, and phone UX validation
-- keep private-identity Release B separate until Release A has production proof
+- finish the forward historical-grant revocation and verify the latest `main`
+  workflow, linked dry run, health manifest, and live smoke
+- complete physical-device PWA, accessibility, and phone UX validation
+- keep private-identity Release B separate until Release A closeout proof is final
 - move report-only CSP toward an enforced policy after violation review
 - continue runtime-asset cleanup and mobile polish
 - targeted performance-advisor work without blindly removing quiet indexes

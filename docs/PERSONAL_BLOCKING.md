@@ -2,11 +2,11 @@
 
 ## Documentation Status - July 10, 2026
 
-This document describes the reciprocal personal-block contract in the current
-local release candidate. The database migrations, web UI, notification service,
-and regression coverage are implemented locally; production status becomes
-authoritative only after the backend-first `main` release applies the migrations
-and post-deploy verification passes.
+This document describes the reciprocal personal-block contract shipped in the
+July 10 Release A backend-first deployment. Final release-closeout authority is
+the latest successful `main` workflow, clean linked checks, and matching public
+health manifest; a forward correction for two unrelated historical table grants
+must complete before private-identity Release B proceeds.
 
 ## Product Behavior
 

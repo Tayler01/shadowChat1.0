@@ -2,11 +2,12 @@
 
 ## Documentation Status - July 10, 2026
 
-Universal message search, private saves, and personal collections are
-implemented in the current local release candidate. They are not described as
-production-shipped until the backend-first `main` workflow applies
-`20260710043132_universal_search_saved_collections.sql` and post-deploy checks
-pass.
+Universal message search, private saves, and personal collections shipped in
+the July 10 Release A backend-first deployment, including
+`20260710043132_universal_search_saved_collections.sql`. The latest successful
+`main` workflow, linked checks, and public health manifest are the authority for
+the current live build while release closeout finishes its forward historical-
+grant correction.
 
 ## Product Behavior
 

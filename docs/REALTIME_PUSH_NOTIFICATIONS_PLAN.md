@@ -2,13 +2,13 @@
 
 ## Documentation Status - July 10, 2026
 
-This file now documents the implemented local notification architecture rather
-than only the original plan. The current release candidate includes targeted
+This file documents the notification architecture shipped in Release A rather
+than only the original plan. The deployed release includes targeted
 General Chat/DM delivery, ShadowPin events, master and type controls, daily
 quiet hours, temporary snooze, General Chat mute, private DM conversation
 mutes, personal-block suppression, service-worker routing, and recipient-owned
-in-app ShadowPin events. Production and normal-device delivery proof remains
-pending.
+in-app ShadowPin events. Normal-device delivery proof remains pending; use the
+latest workflow and health manifest for release identity.
 
 ## Goal
 
@@ -83,7 +83,7 @@ Relevant existing pieces:
 - [supabase/functions/send-push/index.ts](/C:/repos/chat2.0/supabase/functions/send-push/index.ts:1) delivers Web Push with VAPID
 - [src/components/notifications/AppBadgeSync.tsx](/C:/repos/chat2.0/src/components/notifications/AppBadgeSync.tsx:1) mirrors unread DM count to the installed app icon when supported
 
-Implemented locally in the current candidate:
+Shipped in Release A:
 
 - privacy-safe aggregate delivery results (`deliveredCount`,
   `removedSubscriptions`, `attemptedCount`, and `retryableFailures`)
@@ -489,28 +489,28 @@ The public key is also exposed to the client as:
 - deliver through the `send-push` Edge Function
 - deliver DM notifications end to end
 
-### Milestone 4: Mentions and replies - implemented locally
+### Milestone 4: Mentions and replies - shipped in Release A
 
 - detect mentions in group chat
 - add reply notification generation
 - add preference checks
 
-### Milestone 5: Reactions and delivery controls - implemented locally
+### Milestone 5: Reactions and delivery controls - shipped in Release A
 
 - add reaction notifications
 - add quiet hours
 - add dedupe tuning
 - add notification history UI if desired
 
-### Milestone 6: ShadowPin and conversation controls - implemented locally
+### Milestone 6: ShadowPin and conversation controls - shipped in Release A
 
 - new-post, comment, and reply events
 - recipient-owned Realtime in-app delivery
 - global, General Chat, and per-DM-thread mutes
 - reciprocal personal-block suppression
-- normal-device and production proof still pending
+- normal-device delivery proof still pending
 
-### Milestone 7: Delivery privacy and bounded retry - implemented locally
+### Milestone 7: Delivery privacy and bounded retry - shipped in Release A
 
 - privacy-safe aggregate delivery responses
 - permanent invalid-subscription pruning

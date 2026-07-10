@@ -7,6 +7,10 @@ const contract = JSON.parse(readFileSync(
   new URL('../supabase/security-definer-allowlist.json', import.meta.url),
   'utf8',
 ))
+const linkedGrantCleanupSql = readFileSync(
+  new URL('../supabase/migrations/20260710141315_revoke_unreviewed_active_table_grants.sql', import.meta.url),
+  'utf8',
+)
 
 test('Supabase query rows support both CI and agent-safe JSON output', () => {
   const rows = [{ signature: 'example()' }]
@@ -21,6 +25,18 @@ test('Supabase query rows support both CI and agent-safe JSON output', () => {
     () => parseSupabaseQueryRows(JSON.stringify({ result: rows })),
     /did not contain a row array/,
   )
+})
+
+test('linked active-table grant cleanup removes only reviewed historical extras', () => {
+  assert.match(
+    linkedGrantCleanupSql,
+    /revoke delete on table public\.dm_conversations from authenticated/i,
+  )
+  assert.match(
+    linkedGrantCleanupSql,
+    /revoke delete on table public\.notification_preferences from authenticated/i,
+  )
+  assert.doesNotMatch(linkedGrantCleanupSql, /revoke\s+(select|insert|update)/i)
 })
 
 test('SECURITY DEFINER allowlist is explicit, categorized, and duplicate-free', () => {

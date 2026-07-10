@@ -10,9 +10,11 @@ cleanup, build budgets, production smoke, main-only branch state, and engineerin
 safeguards. It remains an inventory and routing guide; the audit tracker is the
 ranked implementation source of truth.
 
-The subsequent local release candidate adds canonical documentation for
+The deployed Release A adds canonical documentation for
 personal blocking and the Message Library, and refreshes the architecture,
 ShadowPin, notifications, private-identity, Expo 57, and source-asset paths.
+Its remaining closeout is the forward removal of two historical extra active-
+table grants plus fresh linked/health/live proof; Release B stays deferred.
 
 July 9, 2026 added
 [PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1) as the canonical
@@ -28,8 +30,8 @@ implementation backlog.
 - Before this refresh, several current product docs had last been updated in May 2026, especially Admin, App Releases, Deployment, Phone Install, ShadowPin, mobile, and iOS planning.
 - Several bridge docs are still useful but date from April 2026 planning. They now carry bridge-specific status notes and should be checked against current firmware/functions before implementation.
 - `README.md` and `docs/ARCHITECTURE.md` are current through the July 10
-  production alignment while preserving the dated June feature and incident
-  history.
+  production alignment and Release A deployment while preserving the dated
+  June feature and incident history.
 - `PLAN.md`, `STATUS.md`, and `TASK.md` are now labeled as bridge-specific status artifacts, not global project status.
 - `.agents/` contains local ignored agent skills. They are not tracked or pushed by default because `.gitignore` ignores `.agents/`.
 

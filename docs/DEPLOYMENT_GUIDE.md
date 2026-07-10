@@ -12,13 +12,12 @@ release validation, and production monitoring are defined in
 
 This guide reflects the current GitHub Actions, Netlify, Supabase, Render,
 app-release, invite-only signup/email-verification rollout, and production-smoke
-flow, plus the July 10 local release candidate. Production deployment validates
+flow, including the July 10 Release A deployment. Production deployment validates
 and applies migrations, pushes Supabase configuration, aligns the classified
 Edge Function inventory, enforces the ESP Bridge hold, captures backend evidence,
-and only then publishes the frontend. Candidate-only behavior is not described
-as shipped until the workflow for the final commit, linked Supabase evidence,
-Netlify build manifest, production smoke, and any required physical-device
-checks all pass.
+and only then publishes the frontend. The latest successful `main` workflow,
+linked Supabase evidence, Netlify health manifest, production smoke, and any
+required physical-device checks together define current release proof.
 
 Netlify native Git builds are intentionally stopped for this project. The
 backend-first GitHub Actions workflow is the only production publisher; it
@@ -29,28 +28,26 @@ deliberately approved review branch, not part of the normal main-only release
 flow.
 
 The repository is currently main-only: local and remote release history live on
-`main`, and there are zero open pull requests. Production workflow run
-`29062308434` completed successfully for commit
-`2790efff528d31ac61a383a787d4883e9d7d8932`. Netlify deploy
-`6a504b0eaa7a29b30706a2cf` reached `ready`. This is the verified production
-baseline; the later July 10 commits and migrations remain a local release
-candidate until their own workflow and post-deploy proof complete.
+`main`, and there are zero open pull requests. Release A completed the
+backend-first workflow; the forward historical-grant correction is the active
+closeout release. Read the latest successful workflow and public health manifest
+for current SHA/deploy identity instead of retaining a stale run id here.
 
-### July 10 local release candidate
+### July 10 Release A deployment and closeout
 
-The candidate contains schema, Edge Function, notification, privacy, search,
+Release A shipped schema, Edge Function, notification, privacy, search,
 ShadowPin, operations-health, Shado TV, Shadow Mystery, PWA, and dependency
-changes after the verified `20260710002000` production migration. A linked
-`supabase db push --linked --dry-run` is therefore expected to remain nonempty
-before the candidate is pushed. At this documentation checkpoint it listed
-candidate migrations through
-`20260710044600_personal_blocking_engagement_hardening.sql`.
+changes through
+`20260710044600_personal_blocking_engagement_hardening.sql` via the
+backend-first `main` workflow. Post-release linked verification found two
+historical active-table grants outside the reviewed contract. The forward
+`20260710141315_revoke_unreviewed_active_table_grants.sql` migration and its
+follow-up workflow are the remaining closeout step.
 
-Do not use the verified production baseline as proof for the candidate. The
-candidate becomes production-proven only when the final `main` SHA completes the
-backend-first workflow, its post-push migration dry run is empty, the classified
-Function inventory is aligned, the Netlify health manifest reports that SHA,
-and the applicable production/mobile smoke checks pass.
+Do not use an older successful run as proof for closeout. Require an empty
+post-push linked dry run, clean linked security contract/advisor review, exact
+Function inventory, a Netlify health manifest matching the latest `main` SHA,
+and applicable production/mobile smoke.
 
 ## Production Pieces
 
@@ -331,19 +328,16 @@ Recent app-surface migrations to confirm in fresh projects:
 - `20260710044600_personal_blocking_engagement_hardening.sql`: known-id
   engagement guards, ShadowPin write bounds, one-level replies, stale-event
   cleanup, and ready-state new-post fanout.
+- `20260710141315_revoke_unreviewed_active_table_grants.sql`: forward-only
+  removal of the two historical active-table grants found by linked Release A
+  verification.
 
-The linked production database has been verified current through
-`20260710002000`; the linked dry run reports no pending migrations and remote
-database lint reports no warnings. Hosted security-advisor parity is documented,
-not hidden: the remaining findings are 71 intentional guarded authenticated
-`SECURITY DEFINER` APIs plus the one intentional anonymous pre-signup username
-availability check. Supabase Auth leaked-password protection is enabled with
-`password_hibp_enabled=true`. Recheck these proofs in the release artifact for
-the final commit rather than assuming an earlier successful run covers it.
-
-The July 10 migrations after `20260710002000` are local release-candidate work,
-not confirmed production state. Their pending dry-run output is expected until
-the backend-first workflow applies them.
+The July 10 Release A migrations are deployed through `20260710044600`, remote
+database lint passed, and Supabase Auth leaked-password protection remains
+enabled. The follow-up `20260710141315` grant-revocation migration is release
+closeout until its own backend-first workflow produces an empty linked dry run,
+clean linked security/advisor evidence, and matching health manifest. Do not
+reuse the earlier hosted-advisor count as final closeout proof.
 
 ### Edge Functions
 
@@ -480,10 +474,10 @@ mirroring those values, and sources full-admin email from guarded `auth.users`.
 The legacy `public.users.email` and `public.users.full_name` columns remain
 nullable during this interval.
 
-Release A is currently a local release candidate. Before calling it
-production-proven:
+Release A is deployed. Before authorizing Release B, finish its closeout:
 
-1. Complete the final `main` workflow and confirm the linked dry run is empty.
+1. Complete the forward grant-revocation `main` workflow and confirm the linked
+   dry run and linked security contract are clean.
 2. Run stable-account production auth, General Chat, DM, resume-send, and
    Settings/Admin Access checks.
 3. Confirm public profile, message-window, search, and realtime payloads do not
