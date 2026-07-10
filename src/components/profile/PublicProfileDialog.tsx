@@ -28,6 +28,8 @@ import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { UserAchievementBadges } from '../ui/UserAchievementBadges'
 import { getUserAchievementMedals } from '../ui/userAchievementMedals'
+import { BlockUserControl } from './BlockUserControl'
+import { useBlockedUsers } from '../../hooks/useBlockedUsers'
 
 interface PublicProfileDialogProps {
   user: User | null
@@ -62,6 +64,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   const closeButtonRef = useRef<HTMLButtonElement>(null)
   const previousFocusRef = useRef<HTMLElement | null>(null)
   const { profile: currentProfile } = useAuth()
+  const { isBlockedByMe } = useBlockedUsers()
   const { role: currentAdminRole, isAdmin: currentIsAdmin, isOperator: currentIsOperator } = useAdminAccess({ includeUsers: false })
   const targetUserId = user?.id ?? null
   const targetUserAdminRole = user?.admin_role ?? null
@@ -82,12 +85,18 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   const [adminRoleSaving, setAdminRoleSaving] = useState(false)
   const [dmStarting, setDmStarting] = useState(false)
   const [expandedMedalKey, setExpandedMedalKey] = useState<string | null>(null)
+  const blockedByMe = isBlockedByMe(targetUserId)
 
-  const canStartDM = Boolean(
+  const canManagePersonalBlock = Boolean(
     open &&
     user &&
     currentProfile &&
     currentProfile.id !== user.id
+  )
+
+  const canStartDM = Boolean(
+    canManagePersonalBlock &&
+    !blockedByMe
   )
 
   const canModerate = Boolean(
@@ -406,19 +415,22 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                 </span>
               </div>
 
-              {canStartDM && (
+              {canManagePersonalBlock && (
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    loading={dmStarting}
-                    onClick={() => void startDirectMessage()}
-                    className="w-full sm:w-auto"
-                  >
-                    <MessageCircle className="mr-2 h-4 w-4" />
-                    Message
-                  </Button>
+                  {canStartDM && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      loading={dmStarting}
+                      onClick={() => void startDirectMessage()}
+                      className="min-h-11 w-full sm:w-auto"
+                    >
+                      <MessageCircle className="mr-2 h-4 w-4" />
+                      Message
+                    </Button>
+                  )}
+                  <BlockUserControl user={user} />
                 </div>
               )}
 

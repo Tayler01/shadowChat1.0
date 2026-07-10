@@ -155,14 +155,14 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
     }
   }, [enabled, refreshState, user])
 
-  const updatePreference = useCallback(
-    async (key: keyof Omit<NotificationPreferences, 'user_id'>, value: NotificationPreferences[typeof key]) => {
+  const updatePreferences = useCallback(
+    async (updates: Partial<Omit<NotificationPreferences, 'user_id'>>) => {
       if (!user) return
       setSaving(true)
       setError(null)
 
       try {
-        const next = await upsertNotificationPreferences(user.id, { [key]: value })
+        const next = await upsertNotificationPreferences(user.id, updates)
         setPreferences(next)
         updateCachedPushState(user.id, { preferences: next })
       } catch (err) {
@@ -173,6 +173,14 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
       }
     },
     [user]
+  )
+
+  const updatePreference = useCallback(
+    async <K extends keyof Omit<NotificationPreferences, 'user_id'>>(
+      key: K,
+      value: NotificationPreferences[K]
+    ) => updatePreferences({ [key]: value } as Pick<NotificationPreferences, K>),
+    [updatePreferences]
   )
 
   const enablePush = useCallback(async () => {
@@ -242,6 +250,7 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
     enablePush,
     disablePush,
     updatePreference,
+    updatePreferences,
     refreshState,
   }
 }

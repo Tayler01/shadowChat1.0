@@ -21,6 +21,7 @@ import {
 } from '../src/lib/supabase';
 import type { Message } from '../src/lib/supabase';
 import { runRealtimeRecovery } from '../src/lib/realtimeRecovery';
+import { triggerReactionPushNotification } from '../src/lib/push';
 
 jest.mock('../src/hooks/useAuth');
 jest.mock('../src/hooks/useRealtimeRecovery', () => ({
@@ -31,6 +32,7 @@ jest.mock('../src/hooks/useSoundEffects', () => ({
 }));
 jest.mock('../src/lib/push', () => ({
   triggerGroupPushNotification: jest.fn().mockResolvedValue(undefined),
+  triggerReactionPushNotification: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock('../src/lib/realtimeRecovery', () => ({
   runRealtimeRecovery: jest.fn().mockResolvedValue({ ok: true, skipped: false, reason: 'channel-error' }),
@@ -649,6 +651,7 @@ describe('message actions', () => {
     });
 
     expect(rpcFn).toHaveBeenCalledWith('toggle_message_reaction', { message_id: 'm1', emoji: '😀', is_dm: false });
+    expect(triggerReactionPushNotification).toHaveBeenCalledWith('m1', '😀', false);
   });
 
   it('restores pre-optimistic membership when realtime updates before the reaction RPC fails', async () => {

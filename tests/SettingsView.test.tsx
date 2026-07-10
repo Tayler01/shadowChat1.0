@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { SettingsView } from '../src/components/settings/SettingsView'
 import { BridgePairingAdminPanel } from '../src/components/settings/BridgePairingAdminPanel'
 import { NewsSourcesAdminPanel } from '../src/components/settings/NewsSourcesAdminPanel'
@@ -9,6 +9,7 @@ const mockDeleteSource = jest.fn()
 const mockRefreshNewsAdmin = jest.fn()
 const mockUpdateSubAdmin = jest.fn()
 const mockUpdatePreference = jest.fn()
+const mockUpdatePreferences = jest.fn()
 const mockDeleteAccount = jest.fn()
 const mockApproveBridgePairing = jest.fn()
 const mockUseAdminAccess = jest.fn()
@@ -83,12 +84,21 @@ jest.mock('../src/hooks/usePushNotifications', () => ({
     guidance: 'supported',
     guidanceText: '',
     preferences: {
+      notifications_enabled: true,
       dm_enabled: true,
       mention_enabled: true,
       reply_enabled: true,
       reaction_enabled: false,
       group_enabled: true,
       hype_enabled: true,
+      shadow_pin_new_post_enabled: true,
+      shadow_pin_comment_enabled: true,
+      shadow_pin_reply_enabled: true,
+      general_chat_muted: false,
+      quiet_hours_start: null,
+      quiet_hours_end: null,
+      quiet_hours_timezone: 'America/New_York',
+      mute_until: null,
     },
     subscribed: true,
     loading: false,
@@ -97,6 +107,7 @@ jest.mock('../src/hooks/usePushNotifications', () => ({
     enablePush: jest.fn(),
     disablePush: jest.fn(),
     updatePreference: mockUpdatePreference,
+    updatePreferences: mockUpdatePreferences,
     refreshState: jest.fn(),
   }),
 }))
@@ -201,6 +212,10 @@ jest.mock('../src/components/settings/ShadowPinActivityAdmin', () => ({
   ShadowPinActivityAdmin: () => <div data-testid="shadow-pin-activity-admin">Shadow Pin activity panel</div>,
 }))
 
+jest.mock('../src/components/settings/ShadowMysteryStudio', () => ({
+  ShadowMysteryStudio: () => <div data-testid="shadow-mystery-studio">Shadow Mystery studio</div>,
+}))
+
 jest.mock('../src/components/settings/WeatherLocationSettings', () => ({
   WeatherLocationSettings: () => <div data-testid="weather-location-settings">Weather location settings</div>,
 }))
@@ -227,8 +242,11 @@ afterEach(() => {
   jest.restoreAllMocks()
 })
 
-test('settings renders section hub and opens account profile detail', () => {
-  render(<SettingsView onToggleSidebar={jest.fn()} />)
+test('settings renders section hub and opens account profile detail', async () => {
+  await act(async () => {
+    render(<SettingsView onToggleSidebar={jest.fn()} />)
+    await Promise.resolve()
+  })
 
   expect(screen.getByRole('button', { name: /notifications & audio/i })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /app setup & user guide/i })).toBeInTheDocument()
@@ -255,6 +273,31 @@ test('settings notification toggles save independently', () => {
 
   expect(mockUpdatePreference).toHaveBeenCalledWith('reaction_enabled', true)
   expect(mockUpdatePreference).toHaveBeenCalledWith('group_enabled', false)
+})
+
+test('settings exposes server-enforced global and General Chat mutes', () => {
+  render(<SettingsView onToggleSidebar={jest.fn()} />)
+
+  fireEvent.click(screen.getByRole('button', { name: /notifications & audio/i }))
+  fireEvent.click(screen.getByRole('switch', { name: /toggle mute all notifications/i }))
+  fireEvent.click(screen.getByRole('switch', { name: /toggle mute general chat/i }))
+
+  expect(mockUpdatePreference).toHaveBeenCalledWith('notifications_enabled', false)
+  expect(mockUpdatePreference).toHaveBeenCalledWith('general_chat_muted', true)
+  expect(screen.getByText(/enforced by the push service/i)).toBeInTheDocument()
+})
+
+test('settings enables quiet hours as one valid preference update', () => {
+  render(<SettingsView onToggleSidebar={jest.fn()} />)
+
+  fireEvent.click(screen.getByRole('button', { name: /notifications & audio/i }))
+  fireEvent.click(screen.getByRole('switch', { name: /toggle quiet hours/i }))
+
+  expect(mockUpdatePreferences).toHaveBeenCalledWith(expect.objectContaining({
+    quiet_hours_start: '22:00',
+    quiet_hours_end: '07:00',
+    quiet_hours_timezone: expect.any(String),
+  }))
 })
 
 test('settings protects account deletion behind typed confirmation', async () => {
@@ -406,4 +449,13 @@ test('settings admin panel opens Shadow Pin activity', async () => {
   fireEvent.click(screen.getByRole('button', { name: /shadow pin activity/i }))
 
   expect(await screen.findByTestId('shadow-pin-activity-admin')).toBeInTheDocument()
+})
+
+test('settings admin panel opens Shadow Mystery publishing studio', async () => {
+  render(<SettingsView onToggleSidebar={jest.fn()} />)
+
+  fireEvent.click(screen.getByRole('button', { name: /admin/i }))
+  fireEvent.click(screen.getByRole('button', { name: /shadow mystery studio/i }))
+
+  expect(await screen.findByTestId('shadow-mystery-studio')).toBeInTheDocument()
 })

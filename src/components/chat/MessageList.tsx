@@ -19,6 +19,7 @@ import { useReadCursor } from '../../hooks/useReadCursor'
 import { useUnreadScroll, type UnreadScrollFeedState } from '../../hooks/useUnreadScroll'
 import { UnreadDivider } from './UnreadDivider'
 import { compareMessageKey, isMessageAfterCursor, type ReadSurface } from '../../lib/readCursors'
+import { useBlockedUsers } from '../../hooks/useBlockedUsers'
 
 interface MessageListProps {
   messagesApi?: MessagesContextValue
@@ -157,6 +158,11 @@ export const MessageList: React.FC<MessageListProps> = ({
   const hasMore = dataHasOlder || legacyHasMore
   const { typingUsers } = useTyping(typingChannel)
   const { profile } = useAuth()
+  const { blockedUserIds } = useBlockedUsers()
+  const visibleTypingUsers = useMemo(
+    () => typingUsers.filter(typingUser => !blockedUserIds.has(typingUser.id)),
+    [blockedUserIds, typingUsers]
+  )
   const containerRef = useRef<HTMLDivElement>(null)
   const topSentinelRef = useRef<HTMLDivElement>(null)
   const pendingAnchorRef = useRef<VisibleMessageAnchor | null>(null)
@@ -187,15 +193,19 @@ export const MessageList: React.FC<MessageListProps> = ({
 
   const messageMap = useMemo(() => {
     const msgMap = new Map<string, Message>()
-    messages.forEach(m => {
-      msgMap.set(m.id, m)
-    })
+    messages
+      .filter(message => message.user_id === profile?.id || !blockedUserIds.has(message.user_id))
+      .forEach(message => {
+        msgMap.set(message.id, message)
+      })
     return msgMap
-  }, [messages])
+  }, [blockedUserIds, messages, profile?.id])
 
   const combinedMessages = useMemo(() => {
-    return [...messages].sort(compareMessagesByStableKey)
-  }, [messages])
+    return messages
+      .filter(message => message.user_id === profile?.id || !blockedUserIds.has(message.user_id))
+      .sort(compareMessagesByStableKey)
+  }, [blockedUserIds, messages, profile?.id])
 
   const readCursorMessages = useMemo(
     () => combinedMessages.filter(isReadCursorMessage),
@@ -579,10 +589,10 @@ export const MessageList: React.FC<MessageListProps> = ({
   }, [clearDeepLinkSettleTimer, clearHistoryRetry, clearWindowModeTimer])
 
   useEffect(() => {
-    if (autoScroll && typingUsers.length > 0) {
+    if (autoScroll && visibleTypingUsers.length > 0) {
       scrollToBottom('auto')
     }
-  }, [autoScroll, scrollToBottom, typingUsers.length])
+  }, [autoScroll, scrollToBottom, visibleTypingUsers.length])
 
   useLayoutEffect(() => {
     if (combinedMessages.length === 0) {
@@ -1054,7 +1064,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       )}
 
       <AnimatePresence>
-        {typingUsers.length > 0 && (
+        {visibleTypingUsers.length > 0 && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1073,7 +1083,7 @@ export const MessageList: React.FC<MessageListProps> = ({
               />
             </div>
             <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
-              {typingUsers.map((typingUser, index) => (
+              {visibleTypingUsers.map((typingUser, index) => (
                 <React.Fragment key={typingUser.id}>
                   {index > 0 && <span>,</span>}
                   <span className="inline-flex items-center gap-1">
@@ -1083,7 +1093,7 @@ export const MessageList: React.FC<MessageListProps> = ({
                   </span>
                 </React.Fragment>
               ))}
-              <span>{typingUsers.length === 1 ? 'is' : 'are'} typing...</span>
+              <span>{visibleTypingUsers.length === 1 ? 'is' : 'are'} typing...</span>
             </span>
           </motion.div>
         )}

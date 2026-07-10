@@ -39,6 +39,10 @@ jest.mock('../src/components/chat/WeatherWidget', () => ({
   WeatherWidget: () => <div data-testid="weather-widget" />,
 }))
 
+jest.mock('../src/components/search/GlobalSearchButton', () => ({
+  GlobalSearchButton: () => <button type="button" aria-label="Open search and saved messages" />,
+}))
+
 jest.mock('../src/features/shadow-pin/hooks/useShadowPinCategories', () => ({
   useShadowPinCategories: () => mockUseShadowPinCategories(),
 }))
@@ -182,8 +186,11 @@ beforeEach(() => {
   })
 })
 
-test('shows an exploding heart burst when liking a ShadowPin category', () => {
-  render(<ShadowPin onBack={() => {}} />)
+test('shows an exploding heart burst when liking a ShadowPin category', async () => {
+  await act(async () => {
+    render(<ShadowPin onBack={() => {}} />)
+    await Promise.resolve()
+  })
 
   fireEvent.click(screen.getByRole('button', { name: /like shadowpin item/i }))
 
@@ -1798,7 +1805,7 @@ test('reveals category search from the category scroller after pulling at the to
   await waitFor(() => {
     expect(screen.getByTestId('shadow-pin-category-search')).toHaveAttribute('aria-hidden', 'false')
   })
-  expect(screen.getByLabelText('Search ShadowPin categories')).toBeInTheDocument()
+  expect(screen.getByLabelText('Search all of ShadowPin')).toBeInTheDocument()
 
   fireShadowPinPointer(categoryList, 'pointerup', {
     pointerId: 42,
@@ -1820,7 +1827,7 @@ test('opens category search from the floating trigger at any category scroll pos
     expect(screen.getByTestId('shadow-pin-category-search')).toHaveAttribute('aria-hidden', 'false')
   })
   expect(categoryList.scrollTop).toBe(0)
-  expect(screen.getByLabelText('Search ShadowPin categories')).toBeInTheDocument()
+  expect(screen.getByLabelText('Search all of ShadowPin')).toBeInTheDocument()
 })
 
 test('smooth category pull reveals search instead of opening category edit', async () => {

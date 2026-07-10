@@ -74,11 +74,31 @@ export interface ShadowPinImage {
   duration_seconds?: number | null
   video_size_bytes?: number | null
   heart_count: number
+  comment_count?: number
+  tags?: string[]
   deleted_at?: string | null
   created_at: string
   updated_at: string
   creator?: User | null
+  category?: Pick<ShadowPinCategory, 'id' | 'title'> | null
   viewer_has_hearted?: boolean
+}
+
+export interface ShadowPinComment {
+  id: string
+  image_id: string
+  author_id: string
+  parent_comment_id?: string | null
+  body: string
+  created_at: string
+  updated_at: string
+  author?: User | null
+}
+
+export interface ShadowPinNotificationPreferences {
+  shadow_pin_new_post_enabled: boolean
+  shadow_pin_comment_enabled: boolean
+  shadow_pin_reply_enabled: boolean
 }
 
 export interface ShadowPinCategoryFormValues {
@@ -93,4 +113,5 @@ export interface ShadowPinImageFormValues {
   description: string
   file?: File | null
   url?: string
+  tags?: string[]
 }

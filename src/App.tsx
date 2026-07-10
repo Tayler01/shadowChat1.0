@@ -27,6 +27,7 @@ import { computeMobileViewportState, MOBILE_VIEWPORT_UPDATED_EVENT } from './lib
 import { BOARDS_FEATURE_ENABLED } from './config/featureFlags'
 import { getLocationStateFromUrl, type AppLocationState as LocationState } from './lib/appRouting'
 import type { AppView as View } from './types/navigation'
+import { useShadowPinCommentNotifications } from './features/shadow-pin/hooks/useShadowPinCommentNotifications'
 
 const DirectMessagesView = lazy(() =>
   import('./components/dms/DirectMessagesView').then(module => ({
@@ -92,6 +93,7 @@ function ViewLoadingState() {
 function App() {
   useSessionResumeRecovery()
   useAdminRoleNotifications()
+  useShadowPinCommentNotifications()
   useChannelBanExpirySweep()
   const { scheme, setScheme, mode } = useTheme()
   const [currentView, setCurrentView] = useState<View>(() => getInitialLocationState().view)

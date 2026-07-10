@@ -165,8 +165,10 @@ const notificationMatchesClearRequest = (notification, request) => {
   if (request.notificationType === 'dm_message') {
     const isDM =
       notificationType === 'dm_message' ||
+      (notificationType === 'reaction' && data.isDm === true) ||
       tag.startsWith('dm:') ||
-      tag.startsWith('bridge-dm:')
+      tag.startsWith('bridge-dm:') ||
+      tag.startsWith('reaction:dm:')
 
     if (!isDM) {
       return false
@@ -174,8 +176,12 @@ const notificationMatchesClearRequest = (notification, request) => {
   } else if (request.notificationType === 'group_message') {
     const isGroup =
       notificationType === 'group_message' ||
+      notificationType === 'mention' ||
+      notificationType === 'reply' ||
+      (notificationType === 'reaction' && data.isDm !== true) ||
       tag.startsWith('group:') ||
-      tag.startsWith('bridge-group:')
+      tag.startsWith('bridge-group:') ||
+      tag.startsWith('reaction:group:')
 
     if (!isGroup) {
       return false
@@ -270,8 +276,15 @@ self.addEventListener('notificationclick', (event) => {
   let targetUrl = data.url || data.route || '/'
   if (data.type === 'dm_message' && data.conversationId && data.messageId) {
     targetUrl = `/?view=dms&conversation=${encodeURIComponent(data.conversationId)}&message=${encodeURIComponent(data.messageId)}`
-  } else if (data.type === 'group_message' && data.messageId) {
+  } else if (
+    (data.type === 'group_message' || data.type === 'mention' || data.type === 'reply') &&
+    data.messageId
+  ) {
     targetUrl = `/?view=chat&message=${encodeURIComponent(data.messageId)}`
+  } else if (data.type === 'reaction' && data.messageId) {
+    targetUrl = data.isDm && data.conversationId
+      ? `/?view=dms&conversation=${encodeURIComponent(data.conversationId)}&message=${encodeURIComponent(data.messageId)}`
+      : `/?view=chat&message=${encodeURIComponent(data.messageId)}`
   } else if (data.type === 'hype_event') {
     targetUrl = data.messageId
       ? `/?view=chat&message=${encodeURIComponent(data.messageId)}`

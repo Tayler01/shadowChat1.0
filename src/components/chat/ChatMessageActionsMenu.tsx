@@ -86,6 +86,7 @@ export function ChatMessageActionsMenu({
   const menuId = useId()
   const rootRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const openRef = useRef(false)
 
   const getOpener = useCallback(() => (
     rootRef.current?.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]') ?? null
@@ -98,6 +99,7 @@ export function ChatMessageActionsMenu({
   const setMenuOpen = useCallback((nextOpen: boolean | ((current: boolean) => boolean)) => {
     setOpen(current => {
       const resolved = typeof nextOpen === 'function' ? nextOpen(current) : nextOpen
+      openRef.current = resolved
       onOpenChange?.(resolved)
       return resolved
     })
@@ -185,7 +187,7 @@ export function ChatMessageActionsMenu({
   }, [closeAndFocus, getEnabledMenuItems, getOpener])
 
   const updatePlacement = useCallback(() => {
-    if (!open) return
+    if (!openRef.current) return
 
     const btnRect = rootRef.current?.getBoundingClientRect()
     const containerRect = containerRef?.current?.getBoundingClientRect()

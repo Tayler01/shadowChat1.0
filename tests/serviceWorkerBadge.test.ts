@@ -249,6 +249,37 @@ describe('service worker app badge handling', () => {
     expect(closeUnknown).not.toHaveBeenCalled()
   })
 
+  it('classifies targeted and reaction notifications by their active chat surface', async () => {
+    const { listeners, notifications } = loadServiceWorker()
+    const closeMention = jest.fn()
+    const closeReply = jest.fn()
+    const closeGroupReaction = jest.fn()
+    const closeDmReaction = jest.fn()
+    const pending: Promise<unknown>[] = []
+
+    notifications.push(
+      { close: closeMention, data: { type: 'mention', messageId: 'm1' }, tag: 'group:m1' },
+      { close: closeReply, data: { type: 'reply', messageId: 'm2' }, tag: 'group:m2' },
+      { close: closeGroupReaction, data: { type: 'reaction', isDm: false, messageId: 'm3' }, tag: 'reaction:group:m3' },
+      { close: closeDmReaction, data: { type: 'reaction', isDm: true, conversationId: 'c1', messageId: 'm4' }, tag: 'reaction:dm:m4' }
+    )
+
+    listeners.message({
+      data: {
+        notificationType: 'group_message',
+        type: 'SHADOWCHAT_NOTIFICATIONS_CLEAR',
+      },
+      waitUntil: (task: Promise<unknown>) => pending.push(task),
+    })
+
+    await Promise.allSettled(pending)
+
+    expect(closeMention).toHaveBeenCalledTimes(1)
+    expect(closeReply).toHaveBeenCalledTimes(1)
+    expect(closeGroupReaction).toHaveBeenCalledTimes(1)
+    expect(closeDmReaction).not.toHaveBeenCalled()
+  })
+
   it('cleans up old static asset caches on activation', async () => {
     const caches = {
       delete: jest.fn().mockResolvedValue(true),

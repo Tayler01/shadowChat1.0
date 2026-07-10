@@ -14,6 +14,7 @@ import {
   RefreshCw,
   XCircle,
   ImagePlus,
+  Bookmark,
 } from 'lucide-react'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
 import { useAuth } from '../../hooks/useAuth'
@@ -44,10 +45,14 @@ import type { BasicUser, ChatMessageType, DMMessage, User } from '../../lib/supa
 import { UnreadDivider } from '../chat/UnreadDivider'
 import type { EmojiClickData } from '../../types'
 import type { AppView } from '../../types/navigation'
+import { saveMessageToLibrary } from '../../lib/messageLibrary'
 import { EmojiPickerOverlay } from '../chat/EmojiPickerOverlay'
 import { ImageModal } from '../ui/ImageModal'
 import { QuickReactionRail } from '../chat/QuickReactionRail'
 import { ChatImageRadialHeart } from '../chat/ChatImageRadialHeart'
+import { ConversationNotificationMuteButton } from '../notifications/ConversationNotificationMuteButton'
+import { BlockUserControl } from '../profile/BlockUserControl'
+import { BlockedConversationNotice } from './BlockedConversationNotice'
 import { ShareImageToShadowPinModal } from '../../features/shadow-pin/components/ShareImageToShadowPinModal'
 import {
   getImageMessageDisplaySrc,
@@ -227,6 +232,15 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
     onDiscardFailed?.(message.id)
   }
 
+  const saveMessage = async () => {
+    try {
+      await saveMessageToLibrary({ source: 'dm', messageId: message.id })
+      toast.success('Message saved')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to save message')
+    }
+  }
+
   const actions: ChatMessageAction[] = [
     {
       id: 'retry',
@@ -248,6 +262,13 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
       label: 'Copy',
       icon: Copy,
       onSelect: copyMessage,
+    },
+    {
+      id: 'save',
+      label: 'Save',
+      icon: Bookmark,
+      hidden: isLocalDelivery,
+      onSelect: () => void saveMessage(),
     },
     {
       id: 'reaction',
@@ -719,7 +740,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const showInboxEmpty = !conversationsLoading && conversations.length === 0
   const selectedThreadLoaded = Boolean(currentConversation && messagesConversationId === currentConversation)
   const showThreadInitialLoading = (!selectedThreadLoaded || messagesLoading) && messages.length === 0
-  const showThreadEmpty = selectedThreadLoaded && !messagesLoading && messages.length === 0 && !loadingMore
+  const showThreadEmpty = selectedThreadLoaded && !messagesLoading && messages.length === 0 && !loadingMore && !currentConv?.is_blocked
 
   const [searchUsername, setSearchUsername] = useState('')
   const [startingUsername, setStartingUsername] = useState<string | null>(null)
@@ -1201,6 +1222,11 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                             <span className="truncate text-xs text-[var(--text-muted)]">
                               @{conversation.other_user?.username}
                             </span>
+                            {conversation.is_blocked && (
+                              <span className="ml-2 rounded-full border border-[rgba(215,170,70,0.24)] bg-[rgba(215,170,70,0.08)] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[var(--text-gold)]">
+                                Blocked
+                              </span>
+                            )}
                           </div>
 
                           {conversation.last_message && (
@@ -1251,6 +1277,21 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
               backLabel="Back to direct messages"
               collapseOnKeyboard
               maxWidthClassName="max-w-4xl"
+              actions={(
+                <>
+                  <ConversationNotificationMuteButton
+                    conversationId={currentConversation}
+                    conversationLabel={currentConv.other_user?.display_name || 'this conversation'}
+                  />
+                  {currentConv.other_user && (
+                    <BlockUserControl
+                      user={currentConv.other_user}
+                      blockedByMe={currentConv.blocked_by_me}
+                      compact
+                    />
+                  )}
+                </>
+              )}
             />
 
             <div
@@ -1323,7 +1364,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
               )}
 
               <AnimatePresence>
-                {typingUsers.length > 0 && (
+                {!currentConv.is_blocked && typingUsers.length > 0 && (
                   <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -1367,10 +1408,37 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
 
             <div className="hidden md:block">
               <div className="mx-auto w-full max-w-4xl">
+                {currentConv.is_blocked ? (
+                  <BlockedConversationNotice blockedByMe={currentConv.blocked_by_me} />
+                ) : (
+                  <MessageInput
+                    onSendMessage={handleSendMessage}
+                    placeholder="Message..."
+                    disabled={sending || uploading}
+                    cacheKey={`dm-${currentConversation}`}
+                    onUploadStatusChange={setUploading}
+                    messages={messages}
+                    replyingTo={replyTo || undefined}
+                    onCancelReply={() => setReplyTo(null)}
+                    typingChannel={`dm-${currentConversation}`}
+                    enableGifPicker
+                  />
+                )}
+              </div>
+            </div>
+
+            <MobileChatFooter
+              currentView={currentView}
+              onViewChange={onViewChange}
+            >
+              {currentConv.is_blocked ? (
+                <BlockedConversationNotice blockedByMe={currentConv.blocked_by_me} />
+              ) : (
                 <MessageInput
                   onSendMessage={handleSendMessage}
                   placeholder="Message..."
-                  disabled={sending || uploading}
+                  disabled={uploading}
+                  className="border-t border-[var(--border-panel)]"
                   cacheKey={`dm-${currentConversation}`}
                   onUploadStatusChange={setUploading}
                   messages={messages}
@@ -1379,26 +1447,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   typingChannel={`dm-${currentConversation}`}
                   enableGifPicker
                 />
-              </div>
-            </div>
-
-            <MobileChatFooter
-              currentView={currentView}
-              onViewChange={onViewChange}
-            >
-              <MessageInput
-                onSendMessage={handleSendMessage}
-                placeholder="Message..."
-                disabled={uploading}
-                className="border-t border-[var(--border-panel)]"
-                cacheKey={`dm-${currentConversation}`}
-                onUploadStatusChange={setUploading}
-                messages={messages}
-                replyingTo={replyTo || undefined}
-                onCancelReply={() => setReplyTo(null)}
-                typingChannel={`dm-${currentConversation}`}
-                enableGifPicker
-              />
+              )}
             </MobileChatFooter>
           </>
         ) : currentConversation ? (

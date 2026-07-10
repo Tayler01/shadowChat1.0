@@ -23,7 +23,7 @@ import {
   type GeneralChatMessageWindowStatus,
 } from '../lib/supabase';
 import { runRealtimeRecovery } from '../lib/realtimeRecovery';
-import { triggerGroupPushNotification } from '../lib/push';
+import { triggerGroupPushNotification, triggerReactionPushNotification } from '../lib/push';
 import {
   createClientMessageId,
   findMatchingMessageIndex,
@@ -1547,6 +1547,12 @@ function useProvideMessages(): MessagesContextValue {
 
       if (error) {
         throw error;
+      }
+
+      if (!previousMembership) {
+        void Promise.resolve(triggerReactionPushNotification(messageId, emoji, false)).catch(() => {
+          // The reaction is authoritative even when optional push delivery fails.
+        });
       }
       
     } catch (error) {

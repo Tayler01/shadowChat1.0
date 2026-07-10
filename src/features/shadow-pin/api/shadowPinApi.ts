@@ -8,19 +8,26 @@ import * as tus from 'tus-js-client'
 import type {
   ShadowPinCategory,
   ShadowPinCategoryFormValues,
+  ShadowPinComment,
   ShadowPinImage,
   ShadowPinImageFormValues,
 } from '../types'
 import { embedPublicProfile } from '../../../../supabase/functions/_shared/public-profile'
+import {
+  triggerShadowPinCommentPushNotification,
+  triggerShadowPinPostPushNotification,
+} from '../../../lib/push'
 
 const CATEGORY_SELECT = `
   *,
   ${embedPublicProfile('creator', 'users!creator_id')}
 `
 
-const IMAGE_SELECT = `
+export const SHADOW_PIN_IMAGE_SELECT = `
   *,
-  ${embedPublicProfile('creator', 'users!creator_id')}
+  ${embedPublicProfile('creator', 'users!creator_id')},
+  category:shadow_pin_categories!category_id(id, title),
+  tag_links:shadow_pin_image_tags(tag:shadow_pin_tags(slug))
 `
 
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
@@ -32,6 +39,31 @@ const VIDEO_PROVIDER_HOST_PATTERN = /(^|\.)((youtube\.com)|(youtu\.be)|(x\.com)|
 const DIRECT_VIDEO_PATH_PATTERN = /\.(mp4|m4v|mov|webm)(?:$|\?)/i
 
 export const SHADOW_PIN_PAGE_SIZE = 30
+
+type ShadowPinImageRecord = ShadowPinImage & {
+  tag_links?: Array<{ tag?: { slug?: string | null } | null }> | null
+}
+
+export function normalizeShadowPinTags(tags: string[]) {
+  const normalized = tags
+    .map(tag => tag.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''))
+    .filter(Boolean)
+  return Array.from(new Set(normalized)).slice(0, 8)
+}
+
+export function normalizeShadowPinImageRecord(record: ShadowPinImageRecord): ShadowPinImage {
+  const tags = record.tag_links
+    ?.map(link => link.tag?.slug?.trim() ?? '')
+    .filter(Boolean) ?? record.tags ?? []
+  const { tag_links: _tagLinks, ...image } = record
+
+  return {
+    ...image,
+    heart_count: Number(image.heart_count ?? 0),
+    comment_count: Number(image.comment_count ?? 0),
+    tags: normalizeShadowPinTags(tags),
+  }
+}
 
 export function isShadowPinVideoFile(file: File) {
   return ALLOWED_VIDEO_TYPES.has(file.type) || file.type.startsWith('video/')
@@ -110,11 +142,13 @@ function attachCategoryHearts(categories: ShadowPinCategory[], heartRows: Array<
 
 function attachImageHearts(images: ShadowPinImage[], heartRows: Array<{ image_id: string }> = []) {
   const hearted = new Set(heartRows.map(row => row.image_id))
-  return images.map(image => ({
-    ...image,
-    heart_count: Number(image.heart_count ?? 0),
-    viewer_has_hearted: hearted.has(image.id),
-  }))
+  return images.map(imageRecord => {
+    const image = normalizeShadowPinImageRecord(imageRecord as ShadowPinImageRecord)
+    return {
+      ...image,
+      viewer_has_hearted: hearted.has(image.id),
+    }
+  })
 }
 
 export async function fetchShadowPinCategories() {
@@ -179,7 +213,7 @@ export async function fetchShadowPinImages(categoryId: string, page = 0) {
   const to = from + SHADOW_PIN_PAGE_SIZE - 1
   const { data, error } = await client
     .from('shadow_pin_images')
-    .select(IMAGE_SELECT)
+    .select(SHADOW_PIN_IMAGE_SELECT)
     .eq('category_id', categoryId)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
@@ -529,23 +563,45 @@ async function attachViewerCategoryHeart(category: ShadowPinCategory) {
 }
 
 async function attachViewerImageHeart(image: ShadowPinImage) {
+  const normalizedImage = normalizeShadowPinImageRecord(image as ShadowPinImageRecord)
   const client = await getWorkingClient()
   const { data: { user } } = await client.auth.getUser()
-  if (!user) return { ...image, viewer_has_hearted: Boolean(image.viewer_has_hearted) }
+  if (!user) return { ...normalizedImage, viewer_has_hearted: Boolean(normalizedImage.viewer_has_hearted) }
 
   const { data: heart, error } = await client
     .from('shadow_pin_image_hearts')
     .select('image_id')
     .eq('user_id', user.id)
-    .eq('image_id', image.id)
+    .eq('image_id', normalizedImage.id)
     .maybeSingle()
 
   if (error) throw error
   return {
-    ...image,
-    heart_count: Number(image.heart_count ?? 0),
+    ...normalizedImage,
     viewer_has_hearted: Boolean(heart),
   }
+}
+
+export async function setShadowPinImageTags(image: ShadowPinImage, tags?: string[]) {
+  if (tags === undefined) return normalizeShadowPinImageRecord(image as ShadowPinImageRecord)
+
+  const client = await getWorkingClient()
+  const normalizedTags = normalizeShadowPinTags(tags)
+  const { data, error } = await client.rpc('set_shadow_pin_image_tags', {
+    target_image_id: image.id,
+    requested_tags: normalizedTags,
+  })
+  if (error) throw error
+  return {
+    ...normalizeShadowPinImageRecord(image as ShadowPinImageRecord),
+    tags: normalizeShadowPinTags((data ?? normalizedTags) as string[]),
+  }
+}
+
+async function finalizeCreatedShadowPinImage(image: ShadowPinImage, tags?: string[]) {
+  const taggedImage = await setShadowPinImageTags(image, tags)
+  void triggerShadowPinPostPushNotification(taggedImage.id).catch(() => undefined)
+  return taggedImage
 }
 
 async function importShadowPinUrl(payload: {
@@ -720,23 +776,27 @@ export async function createShadowPinImage(categoryId: string, values: ShadowPin
   const description = normalizeShadowPinText(values.description, 500, 'Description', false)
 
   if (values.url?.trim()) {
+    let createdImage: ShadowPinImage
     if (isLikelyVideoUrl(values.url)) {
-      return createShadowPinExternalVideo(categoryId, title, description, values.url.trim())
+      createdImage = await createShadowPinExternalVideo(categoryId, title, description, values.url.trim())
+    } else {
+      const data = await importShadowPinUrl({
+        targetType: 'image',
+        title,
+        description,
+        url: values.url.trim(),
+        categoryId,
+      })
+      createdImage = data.image as ShadowPinImage
     }
-    const data = await importShadowPinUrl({
-      targetType: 'image',
-      title,
-      description,
-      url: values.url.trim(),
-      categoryId,
-    })
-    return data.image as ShadowPinImage
+    return finalizeCreatedShadowPinImage(createdImage, values.tags)
   }
 
   const file = values.file
   if (!file) throw new Error('Choose a pin source.')
   if (isShadowPinVideoFile(file)) {
-    return createShadowPinVideoUpload(categoryId, title, description, file)
+    const createdVideo = await createShadowPinVideoUpload(categoryId, title, description, file)
+    return finalizeCreatedShadowPinImage(createdVideo, values.tags)
   }
   validateShadowPinFile(file)
 
@@ -759,16 +819,17 @@ export async function createShadowPinImage(categoryId: string, values: ShadowPin
       processing_status: 'processing',
       processing_error: null,
     })
-    .select(IMAGE_SELECT)
+    .select(SHADOW_PIN_IMAGE_SELECT)
     .single()
 
   if (error) throw error
-  return processShadowPinMedia<ShadowPinImage>('image', (data as { id: string }).id)
+  const createdImage = await processShadowPinMedia<ShadowPinImage>('image', (data as { id: string }).id)
+  return finalizeCreatedShadowPinImage(createdImage, values.tags)
 }
 
 export async function updateShadowPinImage(
   imageId: string,
-  values: Pick<ShadowPinImageFormValues, 'title' | 'description' | 'url'> & { file?: File | null; categoryId?: string | null }
+  values: Pick<ShadowPinImageFormValues, 'title' | 'description' | 'url' | 'tags'> & { file?: File | null; categoryId?: string | null }
 ) {
   const title = normalizeShadowPinText(values.title, 80, 'Title', true)
   const description = normalizeShadowPinText(values.description, 500, 'Description', false)
@@ -782,7 +843,8 @@ export async function updateShadowPinImage(
     if (!categoryId) throw new Error('Category is required.')
     if (values.file) {
       if (isShadowPinVideoFile(values.file)) {
-        return createShadowPinVideoUpload(categoryId, title, description, values.file, imageId)
+        const updatedVideo = await createShadowPinVideoUpload(categoryId, title, description, values.file, imageId)
+        return setShadowPinImageTags(updatedVideo, values.tags)
       }
       validateShadowPinImageFile(values.file)
       const { path, publicUrl } = await uploadShadowPinImage(values.file, 'image', categoryId)
@@ -820,23 +882,26 @@ export async function updateShadowPinImage(
           video_size_bytes: null,
         })
         .eq('id', imageId)
-        .select(IMAGE_SELECT)
+        .select(SHADOW_PIN_IMAGE_SELECT)
         .single()
 
       if (error) throw error
-      return processShadowPinMedia<ShadowPinImage>('image', (data as { id: string }).id)
+      const updatedImage = await processShadowPinMedia<ShadowPinImage>('image', (data as { id: string }).id)
+      return setShadowPinImageTags(updatedImage, values.tags)
     }
 
     if (url) {
       if (isLikelyVideoUrl(url)) {
-        return createShadowPinExternalVideo(categoryId, title, description, url, imageId)
+        const updatedVideo = await createShadowPinExternalVideo(categoryId, title, description, url, imageId)
+        return setShadowPinImageTags(updatedVideo, values.tags)
       }
-      return replaceShadowPinImageFromUrl({
+      const updatedImage = await replaceShadowPinImageFromUrl({
         imageId,
         title,
         description,
         url,
       })
+      return setShadowPinImageTags(updatedImage, values.tags)
     }
   }
 
@@ -848,11 +913,11 @@ export async function updateShadowPinImage(
       description: description || null,
     })
     .eq('id', imageId)
-    .select(IMAGE_SELECT)
+    .select(SHADOW_PIN_IMAGE_SELECT)
     .single()
 
   if (error) throw error
-  return data as unknown as ShadowPinImage
+  return setShadowPinImageTags(data as unknown as ShadowPinImage, values.tags)
 }
 
 export async function syncShadowPinVideoStatus(imageId: string) {
@@ -897,4 +962,134 @@ export async function toggleShadowPinImageHeart(imageId: string) {
   })
   if (error) throw error
   return attachViewerImageHeart(data as ShadowPinImage)
+}
+
+export async function searchShadowPinImages(searchQuery: string, limit = 30) {
+  const query = searchQuery.trim()
+  if (!query) return []
+
+  const client = await getWorkingClient()
+  const { data: rankedRows, error: searchError } = await client.rpc('search_shadow_pin_images', {
+    search_query: query,
+    result_limit: Math.max(1, Math.min(limit, 60)),
+  })
+  if (searchError) throw searchError
+
+  const imageIds = ((rankedRows ?? []) as Array<{ image_id: string }>).map(row => row.image_id)
+  if (imageIds.length === 0) return []
+
+  const { data, error } = await client
+    .from('shadow_pin_images')
+    .select(SHADOW_PIN_IMAGE_SELECT)
+    .in('id', imageIds)
+    .is('deleted_at', null)
+  if (error) throw error
+
+  const normalizedById = new Map(
+    ((data ?? []) as unknown as ShadowPinImageRecord[])
+      .map(record => normalizeShadowPinImageRecord(record))
+      .map(image => [image.id, image])
+  )
+  const ordered = imageIds
+    .map(imageId => normalizedById.get(imageId))
+    .filter((image): image is ShadowPinImage => Boolean(image))
+
+  const { data: { user } } = await client.auth.getUser()
+  if (!user || ordered.length === 0) return ordered
+
+  const { data: hearts, error: heartsError } = await client
+    .from('shadow_pin_image_hearts')
+    .select('image_id')
+    .eq('user_id', user.id)
+    .in('image_id', ordered.map(image => image.id))
+  if (heartsError) throw heartsError
+
+  return attachImageHearts(ordered, hearts ?? [])
+}
+
+export async function fetchShadowPinComments(imageId: string) {
+  const client = await getWorkingClient()
+  const { data, error } = await client
+    .from('shadow_pin_comments')
+    .select(`
+      id,
+      image_id,
+      author_id,
+      parent_comment_id,
+      body,
+      created_at,
+      updated_at,
+      ${embedPublicProfile('author', 'users!author_id')}
+    `)
+    .eq('image_id', imageId)
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
+  if (error) throw error
+  return (data ?? []) as unknown as ShadowPinComment[]
+}
+
+export async function createShadowPinComment(
+  imageId: string,
+  body: string,
+  parentCommentId?: string | null
+) {
+  const normalizedBody = normalizeShadowPinText(body, 1000, 'Comment', true)
+  const client = await getWorkingClient()
+  const { data: { user } } = await client.auth.getUser()
+  if (!user) throw new Error('Sign in to comment.')
+
+  const { data, error } = await client
+    .from('shadow_pin_comments')
+    .insert({
+      image_id: imageId,
+      author_id: user.id,
+      parent_comment_id: parentCommentId || null,
+      body: normalizedBody,
+    })
+    .select(`
+      id,
+      image_id,
+      author_id,
+      parent_comment_id,
+      body,
+      created_at,
+      updated_at,
+      ${embedPublicProfile('author', 'users!author_id')}
+    `)
+    .single()
+  if (error) throw error
+  const comment = data as unknown as ShadowPinComment
+  void triggerShadowPinCommentPushNotification(comment.id).catch(() => undefined)
+  return comment
+}
+
+export async function updateShadowPinComment(commentId: string, body: string) {
+  const normalizedBody = normalizeShadowPinText(body, 1000, 'Comment', true)
+  const client = await getWorkingClient()
+  const { data, error } = await client
+    .from('shadow_pin_comments')
+    .update({ body: normalizedBody })
+    .eq('id', commentId)
+    .select(`
+      id,
+      image_id,
+      author_id,
+      parent_comment_id,
+      body,
+      created_at,
+      updated_at,
+      ${embedPublicProfile('author', 'users!author_id')}
+    `)
+    .single()
+  if (error) throw error
+  return data as unknown as ShadowPinComment
+}
+
+export async function deleteShadowPinComment(commentId: string) {
+  const client = await getWorkingClient()
+  const { error } = await client
+    .from('shadow_pin_comments')
+    .delete()
+    .eq('id', commentId)
+  if (error) throw error
 }

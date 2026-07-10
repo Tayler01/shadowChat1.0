@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import React from 'react'
 import { ChatView } from '../src/components/chat/ChatView'
 
@@ -30,6 +30,19 @@ jest.mock('../src/hooks/useMessages', () => ({
   useMessages: () => mockMessagesState,
 }))
 
+jest.mock('../src/hooks/useBlockedUsers', () => ({
+  useBlockedUsers: () => ({
+    entries: [],
+    blockedUserIds: new Set(),
+    loading: false,
+    savingUserIds: new Set(),
+    isBlockedByMe: () => false,
+    blockUser: jest.fn(),
+    unblockUser: jest.fn(),
+    refresh: jest.fn(),
+  }),
+}))
+
 jest.mock('../src/hooks/MessagesContext', () => ({
   useOptionalMessages: () => ({
     messages: [
@@ -52,6 +65,10 @@ jest.mock('../src/hooks/MessagesContext', () => ({
 
 jest.mock('../src/components/chat/MessageList', () => ({
   MessageList: () => <div data-testid="message-list" />,
+}))
+
+jest.mock('../src/components/search/GlobalSearchButton', () => ({
+  GlobalSearchButton: () => <button type="button" aria-label="Open search and saved messages" />,
 }))
 
 jest.mock('../src/components/chat/MessageInput', () => ({
@@ -111,8 +128,10 @@ beforeEach(() => {
   mockMessagesState = createMessagesState()
 })
 
-test('keeps room-specific controls behind the contextual header tool button', () => {
-  render(<ChatView currentView="chat" onViewChange={() => {}} />)
+test('keeps room-specific controls behind the contextual header tool button', async () => {
+  await act(async () => {
+    render(<ChatView currentView="chat" onViewChange={() => {}} />)
+  })
 
   expect(screen.queryByTestId('pinned-messages-button')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Open General Chat room tools' }))
@@ -122,13 +141,15 @@ test('keeps room-specific controls behind the contextual header tool button', ()
   expect(screen.getByTestId('message-list')).toBeInTheDocument()
 })
 
-test('keeps the mobile composer enabled while a send is pending so iOS preserves keyboard focus', () => {
+test('keeps the mobile composer enabled while a send is pending so iOS preserves keyboard focus', async () => {
   mockMessagesState = {
     ...createMessagesState(),
     sending: true,
   }
 
-  render(<ChatView currentView="chat" onViewChange={() => {}} />)
+  await act(async () => {
+    render(<ChatView currentView="chat" onViewChange={() => {}} />)
+  })
 
   const composers = screen.getAllByTestId('message-input')
   const desktopComposer = composers.find(composer => composer.getAttribute('data-class-name') === '')

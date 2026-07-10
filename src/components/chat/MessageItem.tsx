@@ -13,6 +13,7 @@ import {
   XCircle,
   PartyPopper,
   ImagePlus,
+  Bookmark,
 } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
 import { ImageModal } from '../ui/ImageModal'
@@ -39,6 +40,7 @@ import { QuickReactionRail } from './QuickReactionRail'
 import { ChatImageRadialHeart } from './ChatImageRadialHeart'
 import { useOptionalHype } from '../../hooks/useHype'
 import { getHypeTier } from '../../lib/hypePresentation'
+import { saveMessageToLibrary } from '../../lib/messageLibrary'
 import { MessageHypeBadge } from './MessageHypeBadge'
 import { ShareImageToShadowPinModal } from '../../features/shadow-pin/components/ShareImageToShadowPinModal'
 import {
@@ -348,6 +350,15 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
       onDiscardFailed?.(message.id)
     }
 
+    const handleSaveMessage = async () => {
+      try {
+        await saveMessageToLibrary({ source: 'general', messageId: message.id })
+        toast.success('Message saved')
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Unable to save message')
+      }
+    }
+
     const messageActions: ChatMessageAction[] = [
       {
         id: 'retry',
@@ -369,6 +380,13 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         label: 'Copy',
         icon: Copy,
         onSelect: handleCopyMessage,
+      },
+      {
+        id: 'save',
+        label: 'Save',
+        icon: Bookmark,
+        hidden: isLocalDelivery,
+        onSelect: () => void handleSaveMessage(),
       },
       {
         id: 'reaction',

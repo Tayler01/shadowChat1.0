@@ -23,18 +23,32 @@ import {
   waitForEdgeRequestClaim,
 } from '../_shared/edge-guard.ts'
 import { embedPublicProfile } from '../_shared/public-profile.ts'
+import {
+  extractMentionUsernames,
+  getNotificationSuppressionReason,
+  selectGroupNotificationKind,
+  type GroupNotificationKind,
+} from '../_shared/notification-delivery.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-type PushEventType = 'dm_message' | 'group_message' | 'hype_event'
+type PushEventType =
+  | 'dm_message'
+  | 'group_message'
+  | 'hype_event'
+  | 'reaction'
+  | 'shadow_pin_post'
+  | 'shadow_pin_comment'
 
 type SendPushRequestBody = {
   type?: PushEventType
   messageId?: string
   eventId?: string
+  emoji?: string
+  isDm?: boolean
   senderUserId?: string
   origin?: 'app' | 'bridge'
   bridgeDeviceId?: string
@@ -42,9 +56,20 @@ type SendPushRequestBody = {
 
 type NotificationPrefs = {
   user_id: string
+  notifications_enabled: boolean
   dm_enabled?: boolean
+  mention_enabled?: boolean
+  reply_enabled?: boolean
+  reaction_enabled?: boolean
   group_enabled?: boolean
   hype_enabled?: boolean
+  shadow_pin_new_post_enabled?: boolean
+  shadow_pin_comment_enabled?: boolean
+  shadow_pin_reply_enabled?: boolean
+  general_chat_muted: boolean
+  quiet_hours_start: string | null
+  quiet_hours_end: string | null
+  quiet_hours_timezone: string
   mute_until: string | null
 }
 
@@ -75,6 +100,7 @@ type DmMessageRecord = {
   content: string | null
   message_type: string | null
   created_at: string
+  reply_to: string | null
   sender:
     | {
         id: string
@@ -95,6 +121,7 @@ type GroupMessageRecord = {
   content: string | null
   message_type: string | null
   created_at: string
+  reply_to: string | null
   user:
     | {
         id: string
@@ -117,6 +144,33 @@ type HypeEventRecord = {
   message_author_id: string | null
   metadata: Record<string, unknown> | null
   created_at: string
+}
+
+type ShadowPinPostRecord = {
+  id: string
+  category_id: string | null
+  creator_id: string | null
+  title: string
+  image_url: string | null
+  thumbnail_url: string | null
+  medium_url: string | null
+  deleted_at: string | null
+  creator:
+    | { id: string; username: string | null; display_name: string | null }
+    | Array<{ id: string; username: string | null; display_name: string | null }>
+    | null
+}
+
+type ShadowPinCommentPushRecord = {
+  id: string
+  image_id: string
+  author_id: string
+  parent_comment_id: string | null
+  body: string
+  author:
+    | { id: string; username: string | null; display_name: string | null }
+    | Array<{ id: string; username: string | null; display_name: string | null }>
+    | null
 }
 
 const unauthorized = (message: string) =>
@@ -162,10 +216,24 @@ const getActorLabel = (actor: { username: string | null; display_name: string | 
 const getPushOrigin = (body: SendPushRequestBody) =>
   body.origin === 'bridge' ? 'bridge' : 'app'
 
-const isMuted = (prefs: { mute_until: string | null }) => {
-  if (!prefs.mute_until) return false
-  return new Date(prefs.mute_until).getTime() > Date.now()
-}
+const NOTIFICATION_PREFERENCE_SELECT = [
+  'user_id',
+  'notifications_enabled',
+  'dm_enabled',
+  'mention_enabled',
+  'reply_enabled',
+  'reaction_enabled',
+  'group_enabled',
+  'hype_enabled',
+  'shadow_pin_new_post_enabled',
+  'shadow_pin_comment_enabled',
+  'shadow_pin_reply_enabled',
+  'general_chat_muted',
+  'quiet_hours_start',
+  'quiet_hours_end',
+  'quiet_hours_timezone',
+  'mute_until',
+].join(', ')
 
 const authenticateRequest = async (req: Request, body: SendPushRequestBody) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -203,6 +271,23 @@ const authenticateRequest = async (req: Request, body: SendPushRequestBody) => {
     }
     throw error
   }
+}
+
+type ReactionRecord = {
+  id: string
+  user_id: string
+  emoji: string
+  message_id: string | null
+  dm_message_id: string | null
+}
+
+type ReactionTargetRecord = {
+  id: string
+  user_id?: string
+  sender_id?: string
+  conversation_id?: string
+  content: string | null
+  message_type: string | null
 }
 
 const resolvePushRequestsPerMinute = () => {
@@ -277,6 +362,64 @@ const getActiveSubscriptions = async (
   }
 
   return (data ?? []) as StoredSubscription[]
+}
+
+const getNotificationPreferences = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  userId: string
+) => {
+  const { data, error } = await supabase
+    .from('notification_preferences')
+    .select(NOTIFICATION_PREFERENCE_SELECT)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (error) throw error
+  return data as NotificationPrefs | null
+}
+
+const getDeliverySuppressionReason = (
+  preferences: NotificationPrefs | null | undefined,
+  options: { generalChat?: boolean } = {}
+) => {
+  const reason = getNotificationSuppressionReason(preferences)
+  if (reason) return reason
+  if (options.generalChat && preferences?.general_chat_muted) return 'General Chat is muted'
+  return null
+}
+
+const isConversationMuted = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  userId: string,
+  conversationId: string
+) => {
+  const { data, error } = await supabase
+    .from('notification_conversation_mutes')
+    .select('muted_until')
+    .eq('user_id', userId)
+    .eq('conversation_id', conversationId)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) return false
+  if (!data.muted_until) return true
+  return new Date(data.muted_until).getTime() > Date.now()
+}
+
+const getBlockedCounterpartIds = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  userId: string
+) => {
+  const { data, error } = await supabase
+    .from('user_blocks')
+    .select('blocker_id, blocked_id')
+    .or(`blocker_id.eq.${userId},blocked_id.eq.${userId}`)
+
+  if (error) throw error
+
+  return new Set((data ?? []).map(row => (
+    row.blocker_id === userId ? row.blocked_id : row.blocker_id
+  )).filter((value): value is string => typeof value === 'string'))
 }
 
 const getUnreadBadgeCount = async (
@@ -412,6 +555,7 @@ const sendDmPush = async (
         content,
         message_type,
         created_at,
+        reply_to,
         ${embedPublicProfile('sender', 'users!sender_id')}
       `
     )
@@ -452,14 +596,24 @@ const sendDmPush = async (
   const route = `/?view=dms&conversation=${dmMessage.conversation_id}&message=${dmMessage.id}`
   let delivery: Record<string, unknown>
 
-  const { data: preferences } = await supabase
-    .from('notification_preferences')
-    .select('user_id, dm_enabled, mute_until')
-    .eq('user_id', recipientId)
-    .maybeSingle()
+  const preferences = await getNotificationPreferences(supabase, recipientId)
+  const suppressionReason = getDeliverySuppressionReason(preferences)
+  const blockedRelationship = (await getBlockedCounterpartIds(supabase, authUserId)).has(recipientId)
+  const conversationMuted = await isConversationMuted(
+    supabase,
+    recipientId,
+    dmMessage.conversation_id
+  )
 
-  if (!preferences?.dm_enabled || isMuted(preferences)) {
-    delivery = { skipped: true, reason: 'Recipient preferences disable DM push' }
+  if (blockedRelationship || !preferences?.dm_enabled || suppressionReason || conversationMuted) {
+    delivery = {
+      skipped: true,
+      reason: blockedRelationship
+        ? 'Blocked relationship suppresses notification'
+        : !preferences?.dm_enabled
+        ? 'Recipient disabled direct message notifications'
+        : suppressionReason || 'Recipient muted this conversation',
+    }
   } else {
     const subscriptions = await getActiveSubscriptions(supabase, recipientId)
     if (!subscriptions.length) {
@@ -526,16 +680,21 @@ const sendDmPush = async (
     return json(delivery)
   }
 
-  const { data: senderPreferences } = await supabase
-    .from('notification_preferences')
-    .select('user_id, dm_enabled, mute_until')
-    .eq('user_id', authUserId)
-    .maybeSingle()
+  const senderPreferences = await getNotificationPreferences(supabase, authUserId)
+  const senderSuppressionReason = getDeliverySuppressionReason(senderPreferences)
+  const senderConversationMuted = await isConversationMuted(
+    supabase,
+    authUserId,
+    dmMessage.conversation_id
+  )
 
-  if (senderPreferences && isMuted(senderPreferences)) {
+  if (senderSuppressionReason || senderConversationMuted) {
     return json({
       ...delivery,
-      bridgeSender: { skipped: true, reason: 'Sender notifications are muted' },
+      bridgeSender: {
+        skipped: true,
+        reason: senderSuppressionReason || 'Sender muted this conversation',
+      },
     })
   }
 
@@ -619,6 +778,208 @@ const sendDmPush = async (
   })
 }
 
+const resolveMentionedUserIds = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  content: string | null
+) => {
+  const usernames = extractMentionUsernames(content)
+  if (!usernames.length) return new Set<string>()
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, username')
+    .in('username', usernames)
+
+  if (error) throw error
+  const normalized = new Set(usernames)
+  return new Set((data ?? [])
+    .filter(user => user.username && normalized.has(user.username.toLowerCase()))
+    .map(user => user.id as string))
+}
+
+const resolveReplyAuthorId = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  replyTo: string | null
+) => {
+  if (!replyTo) return null
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select('user_id')
+    .eq('id', replyTo)
+    .maybeSingle()
+
+  if (error) throw error
+  return typeof data?.user_id === 'string' ? data.user_id : null
+}
+
+const getGroupNotificationCopy = (
+  kind: GroupNotificationKind,
+  senderLabel: string,
+  preview: string
+) => {
+  if (kind === 'mention') {
+    return { title: `${senderLabel} mentioned you`, body: preview }
+  }
+  if (kind === 'reply') {
+    return { title: `${senderLabel} replied to you`, body: preview }
+  }
+  return { title: `${senderLabel} in General Chat`, body: preview }
+}
+
+const getCurrentReaction = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  actorId: string,
+  messageId: string,
+  emoji: string,
+  isDm: boolean
+) => {
+  let query = supabase
+    .from('message_reactions')
+    .select('id, user_id, emoji, message_id, dm_message_id')
+    .eq('user_id', actorId)
+    .eq('emoji', emoji)
+
+  query = isDm
+    ? query.eq('dm_message_id', messageId)
+    : query.eq('message_id', messageId)
+
+  const { data, error } = await query.maybeSingle()
+  if (error) throw error
+  return data as ReactionRecord | null
+}
+
+const sendReactionPush = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  vapid: VapidKeys,
+  authUserId: string,
+  reaction: ReactionRecord,
+  isDm: boolean
+) => {
+  const targetMessageId = isDm ? reaction.dm_message_id : reaction.message_id
+  if (!targetMessageId) {
+    return json({ skipped: true, reason: 'Reaction target is unavailable' })
+  }
+
+  const targetQuery = isDm
+    ? supabase
+        .from('dm_messages')
+        .select('id, sender_id, conversation_id, content, message_type')
+        .eq('id', targetMessageId)
+    : supabase
+        .from('messages')
+        .select('id, user_id, content, message_type')
+        .eq('id', targetMessageId)
+
+  const { data: targetMessage, error: targetError } = await targetQuery.maybeSingle()
+  if (targetError) throw targetError
+  if (!targetMessage) return json({ skipped: true, reason: 'Reaction target is unavailable' })
+
+  const reactionTarget = targetMessage as unknown as ReactionTargetRecord
+  const recipientId = isDm
+    ? reactionTarget.sender_id
+    : reactionTarget.user_id
+  if (!recipientId || recipientId === authUserId) {
+    return json({ skipped: true, reason: 'Self reactions do not send notifications' })
+  }
+
+  if ((await getBlockedCounterpartIds(supabase, authUserId)).has(recipientId)) {
+    return json({ skipped: true, reason: 'Blocked relationship suppresses notification' })
+  }
+
+  const preferences = await getNotificationPreferences(supabase, recipientId)
+  const suppressionReason = getDeliverySuppressionReason(preferences, { generalChat: !isDm })
+  const conversationId = isDm
+    ? reactionTarget.conversation_id || null
+    : null
+  const conversationMuted = conversationId
+    ? await isConversationMuted(supabase, recipientId, conversationId)
+    : false
+
+  if (!preferences?.reaction_enabled || suppressionReason || conversationMuted) {
+    return json({
+      skipped: true,
+      reason: !preferences?.reaction_enabled
+        ? 'Recipient disabled reaction notifications'
+        : suppressionReason || 'Recipient muted this conversation',
+    })
+  }
+
+  const subscriptions = await getActiveSubscriptions(supabase, recipientId)
+  if (!subscriptions.length) {
+    return json({ skipped: true, reason: 'Recipient has no active push subscriptions' })
+  }
+
+  const { data: actor, error: actorError } = await supabase
+    .from('users')
+    .select('username, display_name')
+    .eq('id', authUserId)
+    .maybeSingle()
+  if (actorError) throw actorError
+
+  const actorLabel = getActorLabel(actor)
+  const preview = getMessagePreview(reactionTarget)
+  const title = `${actorLabel} reacted ${reaction.emoji}`
+  const body = `To your ${isDm ? 'direct ' : ''}message: ${preview}`
+  const route = isDm
+    ? `/?view=dms&conversation=${conversationId}&message=${targetMessageId}`
+    : `/?view=chat&message=${targetMessageId}`
+  const dedupeKey = `reaction:${reaction.id}:${recipientId}`
+
+  const eventRecord = await upsertNotificationEvent(supabase, {
+    user_id: recipientId,
+    type: 'reaction',
+    entity_id: reaction.id,
+    conversation_id: conversationId,
+    message_id: isDm ? null : targetMessageId,
+    dm_message_id: isDm ? targetMessageId : null,
+    payload: {
+      title,
+      body,
+      route,
+      sender_id: authUserId,
+      emoji: reaction.emoji,
+      is_dm: isDm,
+    },
+  }, dedupeKey)
+
+  if (eventRecord.sent_at) {
+    return json({ skipped: true, reason: 'Notification already sent' })
+  }
+
+  const pushMessage: PushMessage = {
+    data: JSON.stringify({
+      title,
+      body,
+      tag: `reaction:${isDm ? 'dm' : 'group'}:${targetMessageId}`,
+      data: {
+        url: route,
+        route,
+        type: 'reaction',
+        messageId: targetMessageId,
+        conversationId,
+        senderId: authUserId,
+        emoji: reaction.emoji,
+        isDm,
+      },
+    }),
+    options: {
+      ttl: 300,
+      urgency: 'normal',
+    },
+  }
+
+  const delivery = await deliverPushToSubscriptions(supabase, vapid, subscriptions, pushMessage)
+  if (delivery.deliveredCount > 0) {
+    await supabase
+      .from('notification_events')
+      .update({ sent_at: new Date().toISOString() })
+      .eq('id', eventRecord.id)
+  }
+
+  return json(delivery)
+}
+
 const sendGroupPush = async (
   supabase: ReturnType<typeof getSupabaseAdmin>,
   vapid: VapidKeys,
@@ -636,6 +997,7 @@ const sendGroupPush = async (
         content,
         message_type,
         created_at,
+        reply_to,
         ${embedPublicProfile('user', 'users!user_id')}
       `
     )
@@ -654,36 +1016,48 @@ const sendGroupPush = async (
 
   const { data: recipientPreferences, error: prefsError } = await supabase
     .from('notification_preferences')
-    .select('user_id, group_enabled, mute_until')
-    .eq('group_enabled', true)
+    .select(NOTIFICATION_PREFERENCE_SELECT)
     .neq('user_id', authUserId)
 
   if (prefsError) {
     throw prefsError
   }
 
-  const eligibleRecipients = ((recipientPreferences ?? []) as NotificationPrefs[]).filter(
-    (prefs) => !isMuted(prefs)
-  )
+  const [mentionedUserIds, replyAuthorId, blockedUserIds] = await Promise.all([
+    resolveMentionedUserIds(supabase, groupMessage.content),
+    resolveReplyAuthorId(supabase, groupMessage.reply_to),
+    getBlockedCounterpartIds(supabase, authUserId),
+  ])
+
+  const eligibleRecipients = ((recipientPreferences ?? []) as unknown as NotificationPrefs[])
+    .map(preferences => ({
+      preferences,
+      kind: selectGroupNotificationKind({
+        isMentioned: mentionedUserIds.has(preferences.user_id),
+        isReplyTarget: replyAuthorId === preferences.user_id,
+        mentionEnabled: Boolean(preferences.mention_enabled),
+        replyEnabled: Boolean(preferences.reply_enabled),
+        groupEnabled: Boolean(preferences.group_enabled),
+      }),
+    }))
+    .filter((recipient): recipient is { preferences: NotificationPrefs; kind: GroupNotificationKind } => (
+      recipient.kind !== null &&
+      !blockedUserIds.has(recipient.preferences.user_id) &&
+      !getDeliverySuppressionReason(recipient.preferences, { generalChat: true })
+    ))
 
   if (origin === 'bridge') {
-    const { data: senderPreferences } = await supabase
-      .from('notification_preferences')
-      .select('user_id, group_enabled, mute_until')
-      .eq('user_id', authUserId)
-      .maybeSingle()
-
-    if (!senderPreferences || !isMuted(senderPreferences)) {
+    const senderPreferences = await getNotificationPreferences(supabase, authUserId)
+    if (senderPreferences && !getDeliverySuppressionReason(senderPreferences, { generalChat: true })) {
       eligibleRecipients.push({
-        user_id: authUserId,
-        group_enabled: true,
-        mute_until: senderPreferences?.mute_until ?? null,
+        preferences: senderPreferences,
+        kind: 'group_message',
       })
     }
   }
 
   if (!eligibleRecipients.length) {
-    return json({ skipped: true, reason: 'No recipients have group push enabled' })
+    return json({ skipped: true, reason: 'No recipients are eligible for this General Chat notification' })
   }
 
   const sender = getActor(groupMessage.user)
@@ -692,7 +1066,7 @@ const sendGroupPush = async (
   const route = `/?view=chat&message=${groupMessage.id}`
 
   const perRecipientResults = await Promise.all(
-    eligibleRecipients.map(async (prefs) => {
+    eligibleRecipients.map(async ({ preferences: prefs, kind }) => {
       const isBridgeSenderRecipient = origin === 'bridge' && prefs.user_id === authUserId
       const subscriptions = await getActiveSubscriptions(supabase, prefs.user_id)
       if (!subscriptions.length) {
@@ -707,13 +1081,14 @@ const sendGroupPush = async (
       }
 
       const dedupeKey = `group:${groupMessage.id}:${prefs.user_id}`
-      const title = isBridgeSenderRecipient ? 'ShadowChat Bridge' : `${senderLabel} in General Chat`
-      const body = isBridgeSenderRecipient ? `Sent to General Chat: ${preview}` : preview
+      const copy = getGroupNotificationCopy(kind, senderLabel, preview)
+      const title = isBridgeSenderRecipient ? 'ShadowChat Bridge' : copy.title
+      const body = isBridgeSenderRecipient ? `Sent to General Chat: ${preview}` : copy.body
       const eventRecord = await upsertNotificationEvent(
         supabase,
         {
           user_id: prefs.user_id,
-          type: 'group_message',
+          type: kind,
           entity_id: groupMessage.id,
           message_id: groupMessage.id,
           payload: {
@@ -721,6 +1096,7 @@ const sendGroupPush = async (
             body,
             route,
             sender_id: authUserId,
+            notification_kind: kind,
             origin: isBridgeSenderRecipient ? 'bridge' : undefined,
             bridge_device_id: isBridgeSenderRecipient ? bridgeDeviceId : undefined,
           },
@@ -747,9 +1123,10 @@ const sendGroupPush = async (
           data: {
             url: route,
             route,
-            type: 'group_message',
+            type: kind,
             messageId: groupMessage.id,
             senderId: authUserId,
+            notificationKind: kind,
             origin: isBridgeSenderRecipient ? 'bridge' : undefined,
             bridgeDeviceId: isBridgeSenderRecipient ? bridgeDeviceId : undefined,
           },
@@ -798,6 +1175,273 @@ const sendGroupPush = async (
   })
 }
 
+const sendShadowPinPostPush = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  vapid: VapidKeys,
+  authUserId: string,
+  imageId: string
+) => {
+  const { data, error } = await supabase
+    .from('shadow_pin_images')
+    .select(`
+      id,
+      category_id,
+      creator_id,
+      title,
+      image_url,
+      thumbnail_url,
+      medium_url,
+      deleted_at,
+      ${embedPublicProfile('creator', 'users!creator_id')}
+    `)
+    .eq('id', imageId)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) return json({ error: 'ShadowPin post not found' }, 404)
+
+  const image = data as unknown as ShadowPinPostRecord
+  if (image.deleted_at) return json({ error: 'ShadowPin post not found' }, 404)
+  if (image.creator_id !== authUserId) {
+    return unauthorized('You can only send notifications for your own ShadowPin posts')
+  }
+
+  const { data: recipientPreferences, error: preferencesError } = await supabase
+    .from('notification_preferences')
+    .select(NOTIFICATION_PREFERENCE_SELECT)
+    .neq('user_id', authUserId)
+  if (preferencesError) throw preferencesError
+
+  const blockedUserIds = await getBlockedCounterpartIds(supabase, authUserId)
+  const recipients = ((recipientPreferences ?? []) as unknown as NotificationPrefs[])
+    .filter(preferences => (
+      preferences.shadow_pin_new_post_enabled !== false &&
+      !blockedUserIds.has(preferences.user_id) &&
+      !getDeliverySuppressionReason(preferences)
+    ))
+
+  if (!recipients.length) {
+    return json({ skipped: true, reason: 'No recipients are eligible for this ShadowPin notification' })
+  }
+
+  const creatorLabel = getActorLabel(getActor(image.creator))
+  const title = 'New ShadowPin'
+  const body = `${creatorLabel} posted ${truncate(image.title, 80)}`
+  const route = '/?view=pins'
+  const thumbnailUrl = image.thumbnail_url || image.medium_url || image.image_url
+
+  const results = await Promise.all(recipients.map(async preferences => {
+    const subscriptions = await getActiveSubscriptions(supabase, preferences.user_id)
+    if (!subscriptions.length) {
+      return {
+        userId: preferences.user_id,
+        skipped: true,
+        reason: 'No active push subscriptions',
+        deliveredCount: 0,
+        removedSubscriptions: 0,
+        results: [],
+      }
+    }
+
+    const eventRecord = await upsertNotificationEvent(
+      supabase,
+      {
+        user_id: preferences.user_id,
+        type: 'shadow_pin_post',
+        entity_id: image.id,
+        payload: {
+          image_id: image.id,
+          category_id: image.category_id,
+          image_title: image.title,
+          thumbnail_url: thumbnailUrl,
+          actor: image.creator,
+          title,
+          body,
+          url: route,
+        },
+      },
+      `shadow_pin_post:${image.id}:${preferences.user_id}`
+    )
+
+    if (eventRecord.sent_at) {
+      return {
+        userId: preferences.user_id,
+        skipped: true,
+        reason: 'Notification already sent',
+        deliveredCount: 0,
+        removedSubscriptions: 0,
+        results: [],
+      }
+    }
+
+    const pushMessage: PushMessage = {
+      data: JSON.stringify({
+        title,
+        body,
+        icon: thumbnailUrl || undefined,
+        image: thumbnailUrl || undefined,
+        tag: `shadow-pin-post:${image.id}`,
+        data: {
+          url: route,
+          route,
+          type: 'shadow_pin_post',
+          imageId: image.id,
+          categoryId: image.category_id,
+          senderId: authUserId,
+        },
+      }),
+      options: {
+        ttl: 1800,
+        urgency: 'normal',
+      },
+    }
+
+    const delivery = await deliverPushToSubscriptions(supabase, vapid, subscriptions, pushMessage)
+    if (delivery.deliveredCount > 0) {
+      await supabase
+        .from('notification_events')
+        .update({ sent_at: new Date().toISOString() })
+        .eq('id', eventRecord.id)
+    }
+
+    return { userId: preferences.user_id, skipped: false, ...delivery }
+  }))
+
+  return json({
+    deliveredRecipients: results.filter(result => result.deliveredCount > 0).length,
+    deliveredSubscriptions: results.reduce((sum, result) => sum + result.deliveredCount, 0),
+    removedSubscriptions: results.reduce((sum, result) => sum + result.removedSubscriptions, 0),
+    results,
+  })
+}
+
+const sendShadowPinCommentPush = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  vapid: VapidKeys,
+  authUserId: string,
+  commentId: string
+) => {
+  const { data, error } = await supabase
+    .from('shadow_pin_comments')
+    .select(`
+      id,
+      image_id,
+      author_id,
+      parent_comment_id,
+      body,
+      ${embedPublicProfile('author', 'users!author_id')}
+    `)
+    .eq('id', commentId)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) return json({ error: 'ShadowPin comment not found' }, 404)
+
+  const comment = data as unknown as ShadowPinCommentPushRecord
+  if (comment.author_id !== authUserId) {
+    return unauthorized('You can only send notifications for your own ShadowPin comments')
+  }
+
+  const { data: image, error: imageError } = await supabase
+    .from('shadow_pin_images')
+    .select('id, creator_id, title, deleted_at')
+    .eq('id', comment.image_id)
+    .maybeSingle()
+  if (imageError) throw imageError
+  if (!image || image.deleted_at) return json({ error: 'ShadowPin post not found' }, 404)
+
+  let recipientId = image.creator_id as string | null
+  let notificationType: 'shadow_pin_comment' | 'shadow_pin_reply' = 'shadow_pin_comment'
+  if (comment.parent_comment_id) {
+    const { data: parentComment, error: parentError } = await supabase
+      .from('shadow_pin_comments')
+      .select('author_id')
+      .eq('id', comment.parent_comment_id)
+      .maybeSingle()
+    if (parentError) throw parentError
+    recipientId = parentComment?.author_id ?? null
+    notificationType = 'shadow_pin_reply'
+  }
+
+  if (!recipientId || recipientId === authUserId) {
+    return json({ skipped: true, reason: 'Self comments do not send notifications' })
+  }
+  if ((await getBlockedCounterpartIds(supabase, authUserId)).has(recipientId)) {
+    return json({ skipped: true, reason: 'Blocked relationship suppresses notification' })
+  }
+
+  const preferences = await getNotificationPreferences(supabase, recipientId)
+  const preferenceEnabled = notificationType === 'shadow_pin_reply'
+    ? preferences?.shadow_pin_reply_enabled
+    : preferences?.shadow_pin_comment_enabled
+  const suppressionReason = getDeliverySuppressionReason(preferences)
+  if (preferenceEnabled === false || suppressionReason) {
+    return json({
+      skipped: true,
+      reason: preferenceEnabled === false ? 'Recipient disabled ShadowPin notifications' : suppressionReason,
+    })
+  }
+
+  const actorLabel = getActorLabel(getActor(comment.author))
+  const title = notificationType === 'shadow_pin_reply'
+    ? `${actorLabel} replied to you`
+    : `${actorLabel} commented on your ShadowPin`
+  const body = truncate(comment.body.trim() || `Open ${image.title}`, 120)
+  const route = '/?view=pins'
+  const subscriptions = await getActiveSubscriptions(supabase, recipientId)
+  if (!subscriptions.length) {
+    return json({ skipped: true, reason: 'No active push subscriptions' })
+  }
+
+  const eventRecord = await upsertNotificationEvent(
+    supabase,
+    {
+      user_id: recipientId,
+      type: notificationType,
+      entity_id: comment.id,
+      payload: {
+        image_id: comment.image_id,
+        comment_id: comment.id,
+        parent_comment_id: comment.parent_comment_id,
+        image_title: image.title,
+        body_preview: body,
+        actor: comment.author,
+        title,
+        body,
+        url: route,
+      },
+    },
+    `${notificationType}:${comment.id}:${recipientId}`
+  )
+  if (eventRecord.sent_at) {
+    return json({ skipped: true, reason: 'Notification already sent' })
+  }
+
+  const delivery = await deliverPushToSubscriptions(supabase, vapid, subscriptions, {
+    data: JSON.stringify({
+      title,
+      body,
+      tag: `${notificationType}:${comment.id}`,
+      data: {
+        url: route,
+        route,
+        type: notificationType,
+        imageId: comment.image_id,
+        commentId: comment.id,
+        senderId: authUserId,
+      },
+    }),
+    options: { ttl: 900, urgency: 'normal' },
+  })
+  if (delivery.deliveredCount > 0) {
+    await supabase
+      .from('notification_events')
+      .update({ sent_at: new Date().toISOString() })
+      .eq('id', eventRecord.id)
+  }
+
+  return json(delivery)
+}
+
 const getTextValue = (value: unknown) => (
   typeof value === 'string' && value.trim() ? value.trim() : ''
 )
@@ -838,7 +1482,7 @@ const sendHypePush = async (
 
   const { data: recipientPreferences, error: prefsError } = await supabase
     .from('notification_preferences')
-    .select('user_id, hype_enabled, mute_until')
+    .select(NOTIFICATION_PREFERENCE_SELECT)
     .eq('hype_enabled', true)
     .neq('user_id', authUserId)
 
@@ -846,8 +1490,12 @@ const sendHypePush = async (
     throw prefsError
   }
 
-  const eligibleRecipients = ((recipientPreferences ?? []) as NotificationPrefs[]).filter(
-    (prefs) => !isMuted(prefs)
+  const blockedUserIds = await getBlockedCounterpartIds(supabase, authUserId)
+  const eligibleRecipients = ((recipientPreferences ?? []) as unknown as NotificationPrefs[]).filter(
+    (prefs) => (
+      !blockedUserIds.has(prefs.user_id) &&
+      !getDeliverySuppressionReason(prefs, { generalChat: true })
+    )
   )
 
   if (!eligibleRecipients.length) {
@@ -982,19 +1630,35 @@ serve(async (req): Promise<Response> => {
     const type = body?.type as PushEventType | undefined
     const messageId = typeof body?.messageId === 'string' ? body.messageId : ''
     const eventId = typeof body?.eventId === 'string' ? body.eventId : ''
+    const emoji = typeof body?.emoji === 'string' ? body.emoji.trim() : ''
     const origin = getPushOrigin(body)
     const bridgeDeviceId = typeof body?.bridgeDeviceId === 'string' ? body.bridgeDeviceId : undefined
 
     if (
       (type !== 'hype_event' && !messageId) ||
       (type === 'hype_event' && !eventId) ||
-      (type !== 'dm_message' && type !== 'group_message' && type !== 'hype_event')
+      (type === 'reaction' && (!emoji || emoji.length > 32 || typeof body?.isDm !== 'boolean')) ||
+      (
+        type !== 'dm_message' &&
+        type !== 'group_message' &&
+        type !== 'hype_event' &&
+        type !== 'reaction' &&
+        type !== 'shadow_pin_post' &&
+        type !== 'shadow_pin_comment'
+      )
     ) {
       return json({ error: 'Unsupported notification payload' }, 400)
     }
 
     const supabase = getSupabaseAdmin()
-    const entityId = type === 'hype_event' ? eventId : messageId
+    const reaction = type === 'reaction'
+      ? await getCurrentReaction(supabase, auth.userId, messageId, emoji, body.isDm === true)
+      : null
+    if (type === 'reaction' && !reaction) {
+      return json({ skipped: true, reason: 'Reaction is no longer active' })
+    }
+
+    const entityId = type === 'hype_event' ? eventId : reaction?.id || messageId
     const requestKey = `${type}:${entityId}`
     const claim = await claimEdgeRequest(supabase, {
       userId: auth.userId,
@@ -1053,6 +1717,12 @@ serve(async (req): Promise<Response> => {
       response = ensureResponse(await sendDmPush(supabase, vapid, auth.userId, messageId, origin, bridgeDeviceId))
     } else if (type === 'hype_event') {
       response = ensureResponse(await sendHypePush(supabase, vapid, auth.userId, eventId))
+    } else if (type === 'reaction' && reaction) {
+      response = ensureResponse(await sendReactionPush(supabase, vapid, auth.userId, reaction, body.isDm === true))
+    } else if (type === 'shadow_pin_post') {
+      response = ensureResponse(await sendShadowPinPostPush(supabase, vapid, auth.userId, messageId))
+    } else if (type === 'shadow_pin_comment') {
+      response = ensureResponse(await sendShadowPinCommentPush(supabase, vapid, auth.userId, messageId))
     } else {
       response = ensureResponse(await sendGroupPush(supabase, vapid, auth.userId, messageId, origin, bridgeDeviceId))
     }

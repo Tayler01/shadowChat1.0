@@ -47,6 +47,9 @@ jest.mock('../src/hooks/useIsDesktop', () => ({
 }));
 jest.mock('../src/lib/push', () => ({
   triggerDMPushNotification: jest.fn().mockResolvedValue(undefined),
+  triggerReactionPushNotification: jest.fn().mockResolvedValue(undefined),
+  fetchConversationNotificationMute: jest.fn().mockResolvedValue(false),
+  setConversationNotificationMute: jest.fn().mockResolvedValue(true),
 }));
 jest.mock('../src/lib/realtimeRecovery', () => ({
   runRealtimeRecovery: jest.fn().mockResolvedValue({ ok: true, skipped: false, reason: 'channel-error' }),

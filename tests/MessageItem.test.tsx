@@ -13,6 +13,7 @@ let mockAdminAccess = {
   isOperator: false,
 }
 let mockHypeContext: any = null
+const mockSaveMessageToLibrary = jest.fn()
 
 jest.mock('../src/config', () => ({
   PRESENCE_INTERVAL_MS: 30000,
@@ -32,6 +33,9 @@ jest.mock('../src/hooks/useHype', () => ({
 }))
 
 jest.mock('../src/hooks/useToneAnalysisEnabled')
+jest.mock('../src/lib/messageLibrary', () => ({
+  saveMessageToLibrary: (...args: unknown[]) => mockSaveMessageToLibrary(...args),
+}))
 jest.mock('../src/lib/linkPreview', () => ({
   tokenizeMessageText: jest.requireActual('../src/lib/linkPreview').tokenizeMessageText,
   extractFirstMessageUrl: jest.requireActual('../src/lib/linkPreview').extractFirstMessageUrl,
@@ -102,6 +106,8 @@ beforeEach(() => {
   }
   mockAdminAccess = { isOperator: false }
   mockHypeContext = null
+  mockSaveMessageToLibrary.mockReset()
+  mockSaveMessageToLibrary.mockResolvedValue({})
   mockedToneEnabled.mockReturnValue({ enabled: true, setEnabled: jest.fn() })
 })
 
@@ -498,6 +504,10 @@ test('lets an app operator delete a normal user group message', async () => {
     await userEvent.click(screen.getByRole('menuitem', { name: /^delete$/i }))
   })
 
+  await waitFor(() => {
+    expect(screen.queryByRole('menu', { name: /message options/i })).not.toBeInTheDocument()
+  })
+
   expect(onDelete).toHaveBeenCalledWith('m1')
 })
 
@@ -536,6 +546,40 @@ test('does not let an operator delete another operator group message', async () 
   })
 
   expect(screen.queryByRole('menuitem', { name: /^delete$/i })).not.toBeInTheDocument()
+  fireEvent.keyDown(document, { key: 'Escape' })
+})
+
+test('saves a delivered General Chat message from its actions menu', async () => {
+  jest.useFakeTimers()
+  const deliveredMessage = {
+    ...baseMessage,
+    message_type: 'text',
+    content: 'Keep this one',
+  } as Message
+
+  try {
+    render(
+      <MessageItem
+        message={deliveredMessage}
+        onEdit={async () => {}}
+        onDelete={async () => {}}
+        onTogglePin={async () => {}}
+        onToggleReaction={async () => {}}
+        onJumpToMessage={() => {}}
+        containerRef={React.createRef()}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: /message actions/i }))
+    act(() => { jest.advanceTimersByTime(400) })
+    fireEvent.click(screen.getByRole('menuitem', { name: /^save$/i }))
+    await act(async () => { await Promise.resolve() })
+
+    expect(mockSaveMessageToLibrary).toHaveBeenCalledWith({ source: 'general', messageId: 'm1' })
+  } finally {
+    act(() => { jest.runOnlyPendingTimers() })
+    jest.useRealTimers()
+  }
 })
 
 test('renders audio file preview', () => {
@@ -1235,6 +1279,7 @@ test('opens the message actions menu upward near the mobile viewport bottom', as
       expect(Number.parseFloat(menu.style.top)).toBeLessThan(522)
       expect(Number.parseFloat(menu.style.left)).toBeCloseTo(180, 0)
     })
+    act(() => { fireEvent.keyDown(document, { key: 'Escape' }) })
   } finally {
     rectSpy.mockRestore()
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalInnerWidth })
@@ -1363,6 +1408,7 @@ test('keeps the mobile message actions menu above the fixed composer footer', as
       expect(Number.parseFloat(menu.style.top)).toBeLessThan(568)
       expect(Number.parseFloat(menu.style.left)).toBeCloseTo(180, 0)
     })
+    act(() => { fireEvent.keyDown(document, { key: 'Escape' }) })
   } finally {
     footer.remove()
     rectSpy.mockRestore()

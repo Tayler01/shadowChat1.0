@@ -164,6 +164,17 @@ export function PresenceProvider({
     return refreshInFlightRef.current
   }, [store, userId])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const handleBlocksChanged = () => {
+      void refresh()
+    }
+    window.addEventListener('shadowchat:personal-blocks-changed', handleBlocksChanged)
+    return () => {
+      window.removeEventListener('shadowchat:personal-blocks-changed', handleBlocksChanged)
+    }
+  }, [refresh])
+
   const refreshSoon = useCallback(() => {
     if (!getVisibleDocument()) {
       return

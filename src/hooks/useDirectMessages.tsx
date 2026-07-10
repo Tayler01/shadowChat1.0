@@ -23,7 +23,7 @@ import {
 } from '../lib/supabase';
 import { runRealtimeRecovery } from '../lib/realtimeRecovery';
 import { createRealtimeChannelName } from '../lib/realtimeChannelName';
-import { triggerDMPushNotification } from '../lib/push';
+import { triggerDMPushNotification, triggerReactionPushNotification } from '../lib/push';
 import {
   createClientMessageId,
   isClientMessageIdSchemaError,
@@ -255,6 +255,19 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     if (!user) return;
 
     void refreshConversations();
+  }, [refreshConversations, user]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !user) return;
+
+    const handlePersonalBlocksChanged = () => {
+      void refreshConversations();
+    };
+
+    window.addEventListener('shadowchat:personal-blocks-changed', handlePersonalBlocksChanged);
+    return () => {
+      window.removeEventListener('shadowchat:personal-blocks-changed', handlePersonalBlocksChanged);
+    };
   }, [refreshConversations, user]);
 
   // One inbox-wide channel owns both conversation summaries and the active thread.
@@ -1114,6 +1127,12 @@ export function useConversationMessages(conversationId: string | null) {
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!user || !conversationId) return;
 
+    const previousMembership = Boolean(
+      latestMessagesRef.current
+        .find(message => message.id === messageId)
+        ?.reactions?.[emoji]?.users.includes(user.id)
+    );
+
     const workingClient = await getWorkingClient();
     const { error } = await workingClient.rpc('toggle_message_reaction', {
       message_id: messageId,
@@ -1122,6 +1141,12 @@ export function useConversationMessages(conversationId: string | null) {
     });
 
     if (error) throw error;
+
+    if (!previousMembership) {
+      void Promise.resolve(triggerReactionPushNotification(messageId, emoji, true)).catch(() => {
+        // The reaction is authoritative even when optional push delivery fails.
+      });
+    }
 
     const message = await fetchConversationMessage(messageId);
     if (message && activeConversationIdRef.current === conversationId) {

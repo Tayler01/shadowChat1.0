@@ -3,14 +3,20 @@ import { getWorkingClient } from './supabase'
 
 export interface NotificationPreferences {
   user_id: string
+  notifications_enabled: boolean
   dm_enabled: boolean
   mention_enabled: boolean
   reply_enabled: boolean
   reaction_enabled: boolean
   group_enabled: boolean
   hype_enabled: boolean
+  shadow_pin_new_post_enabled: boolean
+  shadow_pin_comment_enabled: boolean
+  shadow_pin_reply_enabled: boolean
+  general_chat_muted: boolean
   quiet_hours_start: string | null
   quiet_hours_end: string | null
+  quiet_hours_timezone: string
   mute_until: string | null
 }
 
@@ -36,16 +42,41 @@ export interface NotificationGuidance {
 }
 
 const DEFAULT_PREFERENCES = {
+  notifications_enabled: true,
   dm_enabled: true,
   mention_enabled: true,
   reply_enabled: true,
   reaction_enabled: false,
   group_enabled: false,
   hype_enabled: true,
+  shadow_pin_new_post_enabled: true,
+  shadow_pin_comment_enabled: true,
+  shadow_pin_reply_enabled: true,
+  general_chat_muted: false,
   quiet_hours_start: null,
   quiet_hours_end: null,
+  quiet_hours_timezone: 'UTC',
   mute_until: null,
 }
+
+const NOTIFICATION_PREFERENCE_SELECT = [
+  'user_id',
+  'notifications_enabled',
+  'dm_enabled',
+  'mention_enabled',
+  'reply_enabled',
+  'reaction_enabled',
+  'group_enabled',
+  'hype_enabled',
+  'shadow_pin_new_post_enabled',
+  'shadow_pin_comment_enabled',
+  'shadow_pin_reply_enabled',
+  'general_chat_muted',
+  'quiet_hours_start',
+  'quiet_hours_end',
+  'quiet_hours_timezone',
+  'mute_until',
+].join(', ')
 
 const SW_PATH = '/sw.js'
 let serviceWorkerRegistrationPromise: Promise<ServiceWorkerRegistration | null> | null = null
@@ -56,6 +87,14 @@ export const getDefaultNotificationPreferences = (
   user_id: userId,
   ...DEFAULT_PREFERENCES,
 })
+
+export const getBrowserTimeZone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  } catch {
+    return 'UTC'
+  }
+}
 
 export const getNotificationPermission = (): NotificationPermission | 'unsupported' => {
   if (typeof window === 'undefined' || !('Notification' in window)) {
@@ -340,9 +379,7 @@ export const fetchNotificationPreferences = async (userId: string) => {
   const workingClient = await getWorkingClient()
   const { data, error } = await workingClient
     .from('notification_preferences')
-    .select(
-      'user_id, dm_enabled, mention_enabled, reply_enabled, reaction_enabled, group_enabled, hype_enabled, quiet_hours_start, quiet_hours_end, mute_until'
-    )
+    .select(NOTIFICATION_PREFERENCE_SELECT)
     .eq('user_id', userId)
     .maybeSingle()
 
@@ -370,9 +407,7 @@ export const upsertNotificationPreferences = async (
   const { data, error } = await workingClient
     .from('notification_preferences')
     .upsert(payload, { onConflict: 'user_id' })
-    .select(
-      'user_id, dm_enabled, mention_enabled, reply_enabled, reaction_enabled, group_enabled, hype_enabled, quiet_hours_start, quiet_hours_end, mute_until'
-    )
+    .select(NOTIFICATION_PREFERENCE_SELECT)
     .single()
 
   if (error) {
@@ -380,6 +415,58 @@ export const upsertNotificationPreferences = async (
   }
 
   return data as NotificationPreferences
+}
+
+export const fetchConversationNotificationMute = async (
+  userId: string,
+  conversationId: string
+) => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient
+    .from('notification_conversation_mutes')
+    .select('muted_until')
+    .eq('user_id', userId)
+    .eq('conversation_id', conversationId)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) return false
+  if (!data.muted_until) return true
+
+  return new Date(data.muted_until).getTime() > Date.now()
+}
+
+export const setConversationNotificationMute = async (
+  userId: string,
+  conversationId: string,
+  muted: boolean
+) => {
+  const workingClient = await getWorkingClient()
+
+  if (!muted) {
+    const { error } = await workingClient
+      .from('notification_conversation_mutes')
+      .delete()
+      .eq('user_id', userId)
+      .eq('conversation_id', conversationId)
+
+    if (error) throw error
+    return false
+  }
+
+  const { error } = await workingClient
+    .from('notification_conversation_mutes')
+    .upsert(
+      {
+        user_id: userId,
+        conversation_id: conversationId,
+        muted_until: null,
+      },
+      { onConflict: 'user_id,conversation_id' }
+    )
+
+  if (error) throw error
+  return true
 }
 
 export const getCurrentPushSubscription = async () => {
@@ -553,5 +640,50 @@ export const triggerHypePushNotification = async (eventId: string) => {
     throw error
   }
 
+  return data
+}
+
+export const triggerReactionPushNotification = async (
+  messageId: string,
+  emoji: string,
+  isDm: boolean
+) => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.functions.invoke('send-push', {
+    body: {
+      type: 'reaction',
+      messageId,
+      emoji,
+      isDm,
+    },
+  })
+
+  if (error) throw error
+  return data
+}
+
+export const triggerShadowPinPostPushNotification = async (imageId: string) => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.functions.invoke('send-push', {
+    body: {
+      type: 'shadow_pin_post',
+      messageId: imageId,
+    },
+  })
+
+  if (error) throw error
+  return data
+}
+
+export const triggerShadowPinCommentPushNotification = async (commentId: string) => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.functions.invoke('send-push', {
+    body: {
+      type: 'shadow_pin_comment',
+      messageId: commentId,
+    },
+  })
+
+  if (error) throw error
   return data
 }

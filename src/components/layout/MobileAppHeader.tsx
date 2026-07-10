@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { ArrowLeft, Settings } from 'lucide-react'
 import { GoldenEggDiscoveryLogo } from '../easter-egg/GoldenEggDiscoveryLogo'
 import { Avatar } from '../ui/Avatar'
@@ -8,6 +8,9 @@ import type { AppView } from '../../types/navigation'
 
 const SETTINGS_SECTION_STORAGE_KEY = 'shadowchat:settings-section'
 const SETTINGS_MAIN_EVENT = 'shadowchat:settings-main'
+const LazyGlobalSearchButton = lazy(() => import('../search/GlobalSearchButton').then(module => ({
+  default: module.GlobalSearchButton,
+})))
 
 type HeaderAvatar = {
   src?: string | null
@@ -33,6 +36,7 @@ interface MobileAppHeaderProps {
   maxWidthClassName?: string
   actions?: ReactNode
   showSettings?: boolean
+  showSearch?: boolean
 }
 
 export function MobileAppHeader({
@@ -51,6 +55,7 @@ export function MobileAppHeader({
   maxWidthClassName = 'max-w-6xl',
   actions,
   showSettings = true,
+  showSearch = true,
 }: MobileAppHeaderProps) {
   const TitleElement = titleElement ?? (srTitle ? 'p' : 'h1')
 
@@ -123,6 +128,11 @@ export function MobileAppHeader({
 
         <div className="flex shrink-0 items-center gap-1">
           {actions}
+          {showSearch && (
+            <Suspense fallback={<span className="h-11 w-11" aria-hidden="true" />}>
+              <LazyGlobalSearchButton />
+            </Suspense>
+          )}
           {showSettings && (
             <button
               type="button"

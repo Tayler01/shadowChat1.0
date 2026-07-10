@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import {
   Activity,
   Bell,
+  Clock3,
   BookOpen,
   ChevronRight,
   Check,
@@ -37,6 +38,7 @@ import { AdminFeedbackReview } from './AdminFeedbackReview'
 import { AdminInvitesPanel } from './AdminInvitesPanel'
 import { ShadoTvStudio } from './ShadoTvStudio'
 import { WeatherLocationSettings } from './WeatherLocationSettings'
+import { BlockedUsersSettings } from './BlockedUsersSettings'
 import { ProfileView } from '../profile/ProfileView'
 import { useAdminAccess } from '../../hooks/useAdminAccess'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
@@ -44,6 +46,7 @@ import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { MobileAppHeader } from '../layout/MobileAppHeader'
 import { BOARDS_FEATURE_ENABLED, ESP_ADMIN_FEATURE_ENABLED } from '../../config/featureFlags'
 import type { AppView } from '../../types/navigation'
+import { getBrowserTimeZone } from '../../lib/push'
 
 const ShadowPinActivityAdmin = React.lazy(() =>
   import('./ShadowPinActivityAdmin').then(module => ({ default: module.ShadowPinActivityAdmin }))
@@ -51,6 +54,10 @@ const ShadowPinActivityAdmin = React.lazy(() =>
 
 const OperationsHealthCenter = React.lazy(() =>
   import('./OperationsHealthCenter').then(module => ({ default: module.OperationsHealthCenter }))
+)
+
+const ShadowMysteryStudio = React.lazy(() =>
+  import('./ShadowMysteryStudio').then(module => ({ default: module.ShadowMysteryStudio }))
 )
 
 const BridgePairingAdminPanel = ESP_ADMIN_FEATURE_ENABLED
@@ -93,6 +100,7 @@ type AdminSectionId =
   | 'automation-approvals'
   | 'bridge-pairing'
   | 'shado-tv-studio'
+  | 'shadow-mystery-studio'
   | 'shadow-pin-activity'
   | 'news-sources'
   | 'feedback-review'
@@ -206,6 +214,12 @@ const adminSections: AdminSection[] = [
     title: 'Shado TV Studio',
     description: 'Manage Crimp & Shrimp episodes, trailers, cast, updates, dates, visibility, and covers.',
     icon: Film,
+  },
+  {
+    id: 'shadow-mystery-studio',
+    title: 'Shadow Mystery Studio',
+    description: 'Draft, source, illustrate, validate, and publish long-form mystery stories.',
+    icon: BookOpen,
   },
   {
     id: 'shadow-pin-activity',
@@ -351,9 +365,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     enablePush,
     disablePush,
     updatePreference,
+    updatePreferences,
   } = usePushNotifications({ enabled: shouldLoadPushSettings })
 
   const devicePushEnabled = subscribed
+  const quietHoursEnabled = Boolean(preferences?.quiet_hours_start && preferences?.quiet_hours_end)
+  const snoozedUntil = preferences?.mute_until && new Date(preferences.mute_until).getTime() > Date.now()
+    ? new Date(preferences.mute_until)
+    : null
   const visibleSections = useMemo(
     () => sections.filter(section => section.id !== 'admin' || isAdminOperator),
     [isAdminOperator]
@@ -389,25 +408,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             },
             {
               label: 'Mentions',
-              description: 'Notify when someone mentions you in chat.',
+              description: 'Notify when someone @mentions you in General Chat.',
               enabled: preferences.mention_enabled,
               onChange: (enabled: boolean) => updatePreference('mention_enabled', enabled),
             },
             {
               label: 'Replies',
-              description: 'Notify when someone replies to your message.',
+              description: 'Notify when someone replies to your General Chat message.',
               enabled: preferences.reply_enabled,
               onChange: (enabled: boolean) => updatePreference('reply_enabled', enabled),
             },
             {
               label: 'Reactions',
-              description: 'Notify when someone reacts to your messages.',
+              description: 'Notify when someone reacts to your General Chat or DM messages.',
               enabled: preferences.reaction_enabled,
               onChange: (enabled: boolean) => updatePreference('reaction_enabled', enabled),
             },
             {
               label: 'Group Chat',
-              description: 'Notify when new messages arrive in the main group chat.',
+              description: 'Notify for every General Chat message, not only targeted activity.',
               enabled: preferences.group_enabled,
               onChange: (enabled: boolean) => updatePreference('group_enabled', enabled),
             },
@@ -416,6 +435,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               description: 'Notify when the room starts celebrating.',
               enabled: preferences.hype_enabled,
               onChange: (enabled: boolean) => updatePreference('hype_enabled', enabled),
+            },
+            {
+              label: 'New ShadowPin Posts',
+              description: 'Notify when another member publishes a new pin.',
+              enabled: preferences.shadow_pin_new_post_enabled,
+              onChange: (enabled: boolean) => updatePreference('shadow_pin_new_post_enabled', enabled),
+            },
+            {
+              label: 'ShadowPin Comments',
+              description: 'Notify when someone comments on one of your pins.',
+              enabled: preferences.shadow_pin_comment_enabled,
+              onChange: (enabled: boolean) => updatePreference('shadow_pin_comment_enabled', enabled),
+            },
+            {
+              label: 'ShadowPin Replies',
+              description: 'Notify when someone replies to your ShadowPin comment.',
+              enabled: preferences.shadow_pin_reply_enabled,
+              onChange: (enabled: boolean) => updatePreference('shadow_pin_reply_enabled', enabled),
             },
           ]
         : []
@@ -514,6 +551,56 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     } catch (err) {
       console.error(err)
       toast.error(err instanceof Error ? err.message : 'Failed to enable push notifications')
+    }
+  }
+
+  const handleQuietHoursToggle = async (enabled: boolean) => {
+    try {
+      await updatePreferences(enabled
+        ? {
+            quiet_hours_start: '22:00',
+            quiet_hours_end: '07:00',
+            quiet_hours_timezone: getBrowserTimeZone(),
+          }
+        : {
+            quiet_hours_start: null,
+            quiet_hours_end: null,
+          })
+      toast.success(enabled ? 'Quiet hours enabled' : 'Quiet hours disabled')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update quiet hours')
+    }
+  }
+
+  const handleNotificationSnooze = async (hours: number | null) => {
+    try {
+      await updatePreference(
+        'mute_until',
+        hours === null ? null : new Date(Date.now() + (hours * 60 * 60 * 1000)).toISOString()
+      )
+      toast.success(hours === null ? 'Notification snooze cleared' : `Notifications snoozed for ${hours} hour${hours === 1 ? '' : 's'}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update notification snooze')
+    }
+  }
+
+  const handleQuietHoursTimeChange = async (
+    key: 'quiet_hours_start' | 'quiet_hours_end',
+    value: string
+  ) => {
+    if (!value || !preferences) return
+    const otherValue = key === 'quiet_hours_start'
+      ? preferences.quiet_hours_end
+      : preferences.quiet_hours_start
+    if (value === otherValue?.slice(0, 5)) {
+      toast.error('Quiet hours start and end must be different')
+      return
+    }
+
+    try {
+      await updatePreference(key, value)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update quiet hours')
     }
   }
 
@@ -654,6 +741,90 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           ))}
         </div>
       </div>
+
+      {preferences && (
+        <div className="glass-panel min-w-0 rounded-[var(--radius-lg)] p-4 sm:p-5">
+          <div className="mb-4 flex items-center gap-3">
+            <Clock3 className="h-5 w-5 text-[var(--text-muted)]" />
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">Delivery Schedule & Mutes</h2>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">These controls are enforced by the push service for every active notification type.</p>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ToggleRow
+              label="Mute All Notifications"
+              description="Stop every push alert across ShadowChat until you turn this off."
+              enabled={!preferences.notifications_enabled}
+              disabled={pushSaving}
+              onChange={muted => updatePreference('notifications_enabled', !muted)}
+            />
+            <ToggleRow
+              label="Mute General Chat"
+              description="Suppress General Chat messages, mentions, replies, reactions, and Hype."
+              enabled={preferences.general_chat_muted}
+              disabled={pushSaving}
+              onChange={muted => updatePreference('general_chat_muted', muted)}
+            />
+            <ToggleRow
+              label="Quiet Hours"
+              description="Hold every push alert during a daily window in your local time zone."
+              enabled={quietHoursEnabled}
+              disabled={pushSaving}
+              onChange={handleQuietHoursToggle}
+            />
+          </div>
+
+          {quietHoursEnabled && (
+            <div className="mt-4 grid gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 sm:grid-cols-2">
+              <label className="text-sm text-[var(--text-secondary)]">
+                Quiet hours start
+                <input
+                  type="time"
+                  value={preferences.quiet_hours_start?.slice(0, 5) || ''}
+                  disabled={pushSaving}
+                  onChange={event => void handleQuietHoursTimeChange('quiet_hours_start', event.target.value)}
+                  className="mt-2 min-h-11 w-full rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[rgba(0,0,0,0.2)] px-3 text-base text-[var(--text-primary)] outline-none focus:border-[var(--border-glow)]"
+                />
+              </label>
+              <label className="text-sm text-[var(--text-secondary)]">
+                Quiet hours end
+                <input
+                  type="time"
+                  value={preferences.quiet_hours_end?.slice(0, 5) || ''}
+                  disabled={pushSaving}
+                  onChange={event => void handleQuietHoursTimeChange('quiet_hours_end', event.target.value)}
+                  className="mt-2 min-h-11 w-full rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[rgba(0,0,0,0.2)] px-3 text-base text-[var(--text-primary)] outline-none focus:border-[var(--border-glow)]"
+                />
+              </label>
+              <p className="text-xs text-[var(--text-muted)] sm:col-span-2">
+                Time zone: {preferences.quiet_hours_timezone}. Disable and re-enable Quiet Hours to refresh it from this device.
+              </p>
+            </div>
+          )}
+
+          <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
+            <p className="text-sm font-medium text-[var(--text-primary)]">
+              {snoozedUntil ? `Snoozed until ${snoozedUntil.toLocaleString()}` : 'Temporary snooze is off'}
+            </p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">A snooze pauses every push alert without changing your notification type choices.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button type="button" size="sm" variant="secondary" disabled={pushSaving} onClick={() => void handleNotificationSnooze(1)}>
+                Snooze 1 hour
+              </Button>
+              <Button type="button" size="sm" variant="secondary" disabled={pushSaving} onClick={() => void handleNotificationSnooze(8)}>
+                Snooze 8 hours
+              </Button>
+              {snoozedUntil && (
+                <Button type="button" size="sm" disabled={pushSaving} onClick={() => void handleNotificationSnooze(null)}>
+                  Resume now
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 
@@ -868,6 +1039,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       return 'Episodes'
     }
 
+    if (sectionId === 'shadow-mystery-studio') {
+      return 'Stories'
+    }
+
     if (sectionId === 'shadow-pin-activity') {
       return 'Analytics'
     }
@@ -974,6 +1149,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     </React.Suspense>
   )
 
+  const renderShadowMysteryStudioPanel = () => (
+    <React.Suspense fallback={<SettingsPanelLoading label="Loading Shadow Mystery studio..." />}>
+      <ShadowMysteryStudio />
+    </React.Suspense>
+  )
+
   const renderAdmin = () => {
     if (!activeAdminSection) {
       return renderAdminHub()
@@ -990,6 +1171,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       'automation-approvals': renderAutomationApprovalsPanel,
       'bridge-pairing': renderBridgePairingPanel,
       'shado-tv-studio': () => <ShadoTvStudio />,
+      'shadow-mystery-studio': renderShadowMysteryStudioPanel,
       'shadow-pin-activity': renderShadowPinActivityPanel,
       'news-sources': renderNewsSourcesPanel,
       'feedback-review': renderFeedbackReviewPanel,
@@ -1059,6 +1241,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     <div className="space-y-5">
       <ProfileView onToggleSidebar={onToggleSidebar} embedded />
       <WeatherLocationSettings />
+      <BlockedUsersSettings />
       <div className="glass-panel rounded-[var(--radius-lg)] p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>

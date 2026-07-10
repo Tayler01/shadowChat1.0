@@ -1449,6 +1449,8 @@ export interface DMConversation {
   other_user?: User
   unread_count?: number
   last_message?: DMMessage
+  is_blocked?: boolean
+  blocked_by_me?: boolean
 }
 
 export interface DMMessage {
@@ -1742,6 +1744,8 @@ export const fetchDMConversations = async () => {
       other_user: otherUser,
       unread_count: row.unread_count,
       last_message: lastMsg,
+      is_blocked: row.is_blocked === true,
+      blocked_by_me: row.blocked_by_me === true,
     } as DMConversation
   })
 }
@@ -1752,6 +1756,9 @@ export const getOrCreateDMConversation = async (otherUserId: string) => {
     other_user_id: otherUserId
   })
   if (error) {
+    if (error.code === '42501' && /messaging is unavailable/i.test(error.message ?? '')) {
+      throw new Error('Messaging is unavailable for this user')
+    }
     return null
   }
   if (typeof data === 'string') {

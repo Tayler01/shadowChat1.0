@@ -7,6 +7,10 @@ jest.mock('../src/hooks/useDirectMessages', () => ({
   useDirectMessages: () => ({ conversations: [] }),
 }))
 
+jest.mock('../src/components/search/GlobalSearchButton', () => ({
+  GlobalSearchButton: () => <button type="button" aria-label="Open search and saved messages" />,
+}))
+
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => ({
     user: {
@@ -120,6 +124,7 @@ test('mobile headers expose only contextual actions and an accessible settings t
       onViewChange={onViewChange}
       title="Direct messages"
       actions={<button type="button">DM action</button>}
+      showSearch={false}
     />
   )
 
@@ -139,6 +144,7 @@ test('settings header identifies the current destination and can hide duplicate 
       currentView="settings"
       onViewChange={jest.fn()}
       title="Settings"
+      showSearch={false}
     />
   )
 
@@ -150,6 +156,7 @@ test('settings header identifies the current destination and can hide duplicate 
       onViewChange={jest.fn()}
       title="Settings"
       showSettings={false}
+      showSearch={false}
     />
   )
   expect(screen.queryByRole('button', { name: 'Open app preferences' })).not.toBeInTheDocument()

@@ -8,19 +8,22 @@ import { ThemeProvider } from './hooks/useTheme';
 import { PresenceRoot } from './PresenceRoot';
 import { registerPushServiceWorker } from './lib/push';
 import { initializeTelemetry } from './lib/telemetry';
+import { BlockedUsersProvider } from './hooks/useBlockedUsers';
 
 initializeTelemetry();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
-      <PresenceRoot>
-        <ThemeProvider>
-          <ErrorBoundary>
-            <App />
-          </ErrorBoundary>
-        </ThemeProvider>
-      </PresenceRoot>
+      <BlockedUsersProvider>
+        <PresenceRoot>
+          <ThemeProvider>
+            <ErrorBoundary>
+              <App />
+            </ErrorBoundary>
+          </ThemeProvider>
+        </PresenceRoot>
+      </BlockedUsersProvider>
     </AuthProvider>
   </StrictMode>
 );

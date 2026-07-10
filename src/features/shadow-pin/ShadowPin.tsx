@@ -48,6 +48,8 @@ import { cn } from '../../lib/utils'
 import type { AppView } from '../../types/navigation'
 import { useShadowPinCategories } from './hooks/useShadowPinCategories'
 import { useShadowPinImages } from './hooks/useShadowPinImages'
+import { searchShadowPinImages } from './api/shadowPinApi'
+import { ShadowPinCommentsDialog } from './components/ShadowPinCommentsDialog'
 import { rankShadowPinCategories } from './categorySearch'
 import {
   useShadowPinActivityTracker,
@@ -1327,6 +1329,7 @@ function ImageFormModal({
 }) {
   const [title, setTitle] = useState(image?.title ?? '')
   const [description, setDescription] = useState(image?.description ?? '')
+  const [tags, setTags] = useState(image?.tags?.join(', ') ?? '')
   const [sourceMode, setSourceMode] = useState<'file' | 'url'>('file')
   const [file, setFile] = useState<File | null>(null)
   const [url, setUrl] = useState('')
@@ -1341,6 +1344,7 @@ function ImageFormModal({
         description,
         file: sourceMode === 'file' ? file : null,
         url: sourceMode === 'url' ? url : '',
+        tags: tags.split(',').map(tag => tag.trim()).filter(Boolean),
       })
       onClose()
     } catch (err) {
@@ -1370,6 +1374,17 @@ function ImageFormModal({
               onChange={event => setDescription(event.target.value)}
               className="obsidian-input min-h-28 w-full resize-none rounded-[var(--radius-sm)] px-3.5 py-2.5 text-sm"
             />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-sm font-medium text-[var(--text-secondary)]">Tags</span>
+            <Input
+              value={tags}
+              maxLength={255}
+              onChange={event => setTags(event.target.value)}
+              placeholder="cinema, folklore, behind-the-scenes"
+              aria-describedby="shadow-pin-tags-help"
+            />
+            <span id="shadow-pin-tags-help" className="block text-xs text-[var(--text-muted)]">Up to 8 comma-separated tags. Tags power ShadowPin discovery.</span>
           </label>
           <SourceInput
             sourceMode={sourceMode}
@@ -1582,6 +1597,7 @@ function ImageCard({
   onViewer,
   onEdit,
   onHeart,
+  onComments,
   onShare,
   onShareToGroupChat,
   sharingToGroupChat = false,
@@ -1604,6 +1620,7 @@ function ImageCard({
   onViewer: () => void
   onEdit: () => void
   onHeart: () => void
+  onComments: () => void
   onShare: () => void
   onShareToGroupChat?: () => void | Promise<void>
   sharingToGroupChat?: boolean
@@ -2233,6 +2250,18 @@ function ImageCard({
             <div className="flex items-start justify-between gap-2">
               <h3 className="min-w-0 text-sm font-semibold leading-tight">{image.title}</h3>
               <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={event => {
+                    event.stopPropagation()
+                    onComments()
+                  }}
+                  className="inline-flex min-h-8 items-center gap-1 rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(4,5,6,0.62)] px-2 text-xs text-[var(--text-primary)] backdrop-blur-md"
+                  aria-label={`${image.comment_count ?? 0} comments. Open comments.`}
+                >
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  {formatCount(image.comment_count ?? 0)}
+                </button>
                 {videoPin && (nativeVideoSrc || isIframeVideoPin(image)) && (
                   <button
                     type="button"
@@ -2390,10 +2419,12 @@ function ImageViewerModal({
   image,
   onClose,
   onHeart,
+  onComments,
 }: {
   image: ShadowPinImage
   onClose: () => void
   onHeart: () => void
+  onComments: () => void
 }) {
   const [muted, setMuted] = useState(true)
   const [nativeVideoFailed, setNativeVideoFailed] = useState(false)
@@ -2423,6 +2454,15 @@ function ImageViewerModal({
           <X className="h-5 w-5" />
         </button>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onComments}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-[var(--border-panel)] bg-[rgba(255,255,255,0.06)] px-3 text-sm text-[var(--text-primary)]"
+            aria-label={`${image.comment_count ?? 0} comments. Open comments.`}
+          >
+            <MessageSquare className="h-4 w-4" />
+            {formatCount(image.comment_count ?? 0)}
+          </button>
           {canControlViewerAudio && (
             <button
               type="button"
@@ -2523,6 +2563,13 @@ function ImageViewerModal({
           </span>
         </div>
         {image.description && <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-[var(--text-secondary)]">{image.description}</p>}
+        {Boolean(image.tags?.length) && (
+          <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Pin tags">
+            {image.tags?.map(tag => (
+              <span key={tag} className="rounded-full border border-[var(--border-subtle)] bg-[rgba(215,170,70,0.07)] px-2.5 py-1 text-xs text-[var(--theme-accent-readable)]">#{tag}</span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -2545,6 +2592,9 @@ function ShadowPinHome({
   const [modal, setModal] = useState<ModalMode>(null)
   const [categorySearchVisible, setCategorySearchVisible] = useState(false)
   const [categorySearchQuery, setCategorySearchQuery] = useState('')
+  const [pinSearchResults, setPinSearchResults] = useState<ShadowPinImage[]>([])
+  const [pinSearchLoading, setPinSearchLoading] = useState(false)
+  const [pinSearchError, setPinSearchError] = useState<string | null>(null)
   const [categorySearchPullDistance, setCategorySearchPullDistance] = useState(0)
   const categoryScrollRef = useRef<HTMLElement | null>(null)
   const categorySearchInputRef = useRef<HTMLInputElement | null>(null)
@@ -2760,6 +2810,37 @@ function ShadowPinHome({
     () => rankShadowPinCategories(categorySearchQuery, categoriesState.categories, 5),
     [categorySearchQuery, categoriesState.categories]
   )
+
+  useEffect(() => {
+    const query = categorySearchQuery.trim()
+    if (!categorySearchVisible || !query) {
+      setPinSearchResults([])
+      setPinSearchLoading(false)
+      setPinSearchError(null)
+      return
+    }
+
+    let cancelled = false
+    const timerId = window.setTimeout(() => {
+      setPinSearchLoading(true)
+      setPinSearchError(null)
+      void searchShadowPinImages(query, 8)
+        .then(results => {
+          if (!cancelled) setPinSearchResults(results)
+        })
+        .catch(error => {
+          if (!cancelled) setPinSearchError(error instanceof Error ? error.message : 'Unable to search pins')
+        })
+        .finally(() => {
+          if (!cancelled) setPinSearchLoading(false)
+        })
+    }, 250)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timerId)
+    }
+  }, [categorySearchQuery, categorySearchVisible])
   const categorySearchRevealProgress = categorySearchVisible
     ? 1
     : Math.min(1, categorySearchPullDistance / CATEGORY_SEARCH_PULL_DISTANCE_PX)
@@ -2856,10 +2937,10 @@ function ShadowPinHome({
                 value={categorySearchQuery}
                 onChange={event => setCategorySearchQuery(event.target.value)}
                 className="min-w-0 flex-1 bg-transparent text-base text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] md:text-sm"
-                placeholder="Search categories"
+                placeholder="Search pins, tags, people, and categories"
                 type="search"
                 autoComplete="off"
-                aria-label="Search ShadowPin categories"
+                aria-label="Search all of ShadowPin"
                 tabIndex={categorySearchVisible ? undefined : -1}
               />
               {categorySearchQuery && (
@@ -2877,10 +2958,12 @@ function ShadowPinHome({
               <div
                 className="mt-2 overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(8,9,12,0.94)] shadow-[var(--shadow-panel)] backdrop-blur-md"
                 role="listbox"
-                aria-label="Category search results"
+                aria-label="ShadowPin search results"
               >
-                {categorySearchResults.length > 0 ? (
-                  categorySearchResults.map(category => {
+                {categorySearchResults.length > 0 && (
+                  <div className="border-b border-[var(--border-subtle)] py-1">
+                    <p className="px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">Categories</p>
+                    {categorySearchResults.map(category => {
                     const categoryImageUrl = getCategoryImageUrl(category)
                     return (
                       <button
@@ -2909,10 +2992,43 @@ function ShadowPinHome({
                         </span>
                       </button>
                     )
-                  })
-                ) : (
-                  <div className="px-3 py-3 text-sm text-[var(--text-muted)]">No matching categories</div>
+                    })}
+                  </div>
                 )}
+                <div className="max-h-72 overflow-y-auto py-1">
+                  <p className="px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">Pins</p>
+                  {pinSearchLoading ? (
+                    <div className="flex items-center gap-2 px-3 py-3 text-sm text-[var(--text-muted)]"><Loader2 className="h-4 w-4 animate-spin" /> Searching</div>
+                  ) : pinSearchError ? (
+                    <div className="px-3 py-3 text-sm text-red-200">{pinSearchError}</div>
+                  ) : pinSearchResults.length > 0 ? (
+                    pinSearchResults.map(image => {
+                      const category = categoriesState.categories.find(candidate => candidate.id === image.category_id)
+                      return (
+                        <button
+                          key={image.id}
+                          type="button"
+                          disabled={!category}
+                          onClick={() => category && openCategory(category)}
+                          className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[rgba(255,255,255,0.055)] disabled:opacity-55"
+                          role="option"
+                        >
+                          <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-sm)] border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)]">
+                            <img src={getPinImageUrl(image, 'thumb')} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-semibold text-[var(--text-primary)]">{image.title}</span>
+                            <span className="block truncate text-xs text-[var(--text-muted)]">
+                              {image.tags?.length ? image.tags.map(tag => `#${tag}`).join(' ') : image.category?.title || 'ShadowPin'}
+                            </span>
+                          </span>
+                        </button>
+                      )
+                    })
+                  ) : (
+                    <div className="px-3 py-3 text-sm text-[var(--text-muted)]">No matching pins</div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -2996,6 +3112,7 @@ function ShadowPinCategoryScreen({
   const messagesApi = useOptionalMessages()
   const imagesState = useShadowPinImages(categoryId)
   const [modal, setModal] = useState<ModalMode>(null)
+  const [commentsImage, setCommentsImage] = useState<ShadowPinImage | null>(null)
   const [sharingToGroupImageId, setSharingToGroupImageId] = useState<string | null>(null)
   const [overlayImageId, setOverlayImageId] = useState<string | null>(null)
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null)
@@ -3206,6 +3323,7 @@ function ShadowPinCategoryScreen({
                           onViewer={() => openImageViewer(image)}
                           onEdit={() => setModal({ type: 'edit-image', image })}
                           onHeart={() => toggleImageHeart(image)}
+                          onComments={() => setCommentsImage(image)}
                           onShare={() => tracker.recordShareTapped(image, imagesState.category)}
                           onShareToGroupChat={messagesApi ? () => shareImageToGroupChat(image) : undefined}
                           sharingToGroupChat={sharingToGroupImageId === image.id}
@@ -3248,6 +3366,17 @@ function ShadowPinCategoryScreen({
           image={viewerImage}
           onClose={() => setModal(null)}
           onHeart={() => toggleImageHeart(viewerImage)}
+          onComments={() => setCommentsImage(viewerImage)}
+        />
+      )}
+      {commentsImage && (
+        <ShadowPinCommentsDialog
+          image={commentsImage}
+          open
+          onClose={() => {
+            setCommentsImage(null)
+            void imagesState.refresh()
+          }}
         />
       )}
     </div>
