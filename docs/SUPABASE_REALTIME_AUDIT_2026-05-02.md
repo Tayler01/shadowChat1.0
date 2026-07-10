@@ -1,8 +1,12 @@
 # Supabase Realtime Audit - 2026-05-02
 
-## Documentation Status - June 1, 2026
+## Documentation Status - July 10, 2026
 
-Reviewed during the June 1, 2026 documentation refresh. This feature guide is current for the shipped product surface, with any known hardening or polish follow-ups tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
+Updated for the local ShadowPin notification candidate. Migration
+`20260710044500_publish_notification_events_realtime.sql` adds the existing
+recipient-owned `notification_events` table to the publication so live in-app
+new-post/comment/reply alerts can work. This is a local source-of-truth change;
+remote publication proof remains part of the production release.
 
 This audit reviews public Supabase tables, their product purpose, and whether
 they should be included in the `supabase_realtime` publication.
@@ -22,6 +26,7 @@ security-sensitive or high-churn operational data.
 | `dm_conversations` | DM conversation records and participant membership. | Keep published. Needed for DM inbox/unread refresh. |
 | `dm_messages` | Direct message rows, read state, reactions, and attachments. | Keep published. Needed for live DMs and unread counts. |
 | `messages` | General group chat messages. | Keep published. Needed for live group chat. |
+| `notification_events` | Recipient-owned notification event/delivery/read tracking. | Keep published. ShadowPin subscribes for live in-app post/comment/reply alerts; RLS restricts every event to its recipient. |
 | `news_chat_messages` | Legacy News channel chat messages. | Keep published for compatibility until legacy clients/imports age out. |
 | `news_feed_items` | Scraped News Feed items. | Keep published. Needed for live feed and badge refresh. |
 | `news_sources` | Admin-managed tracked News accounts and scraper health. | Keep published. Needed for admin source controls and scraper visibility. |
@@ -48,7 +53,6 @@ security-sensitive or high-churn operational data.
 | `message_reactions` | Normalized group-message reaction rows. | Do not publish. RPCs aggregate reactions back onto `messages`, which is published. |
 | `news_chat_reactions` | Normalized News Chat reaction rows. | Do not publish. RPCs aggregate reactions back onto `news_chat_messages`, which is published. |
 | `news_feed_reactions` | Normalized News Feed reaction rows. | Do not publish. RPCs aggregate reactions back onto `news_feed_items`, which is published. |
-| `notification_events` | Push notification event/delivery/read tracking. | Do not publish. No live notification center currently subscribes to it. |
 | `notification_preferences` | Per-user push notification settings. | Do not publish. Settings are user-driven and rechecked by the client on foreground/visibility events. |
 | `notification_sounds` | Static notification sound catalog. | Do not publish. Static lookup table. |
 | `push_subscriptions` | Browser push endpoints and keys. | Do not publish. Sensitive endpoint material. |

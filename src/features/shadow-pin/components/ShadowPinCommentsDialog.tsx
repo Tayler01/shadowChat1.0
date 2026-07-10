@@ -27,14 +27,16 @@ const formatCommentDate = (value: string) => {
 function CommentCard({
   comment,
   reply,
-  canManage,
+  canEdit,
+  canDelete,
   onReply,
   onEdit,
   onDelete,
 }: {
   comment: ShadowPinComment
   reply?: boolean
-  canManage: boolean
+  canEdit: boolean
+  canDelete: boolean
   onReply: () => void
   onEdit: () => void
   onDelete: () => void
@@ -60,22 +62,26 @@ function CommentCard({
               >
                 <Reply className="h-3.5 w-3.5" /> Reply
               </button>
-              {canManage && (
+              {(canEdit || canDelete) && (
                 <>
-                  <button
-                    type="button"
-                    onClick={onEdit}
-                    className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-[var(--text-muted)] hover:bg-[rgba(255,255,255,0.055)] hover:text-[var(--text-primary)]"
-                  >
-                    <Edit3 className="h-3.5 w-3.5" /> Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onDelete}
-                    className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-red-300/80 hover:bg-red-950/30 hover:text-red-200"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" /> Delete
-                  </button>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={onEdit}
+                      className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-[var(--text-muted)] hover:bg-[rgba(255,255,255,0.055)] hover:text-[var(--text-primary)]"
+                    >
+                      <Edit3 className="h-3.5 w-3.5" /> Edit
+                    </button>
+                  )}
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={onDelete}
+                      className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-red-300/80 hover:bg-red-950/30 hover:text-red-200"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Delete
+                    </button>
+                  )}
                 </>
               )}
             </div>
@@ -193,7 +199,11 @@ export function ShadowPinCommentsDialog({
     setSaving(true)
     try {
       await deleteShadowPinComment(comment.id)
-      const nextComments = comments.filter(candidate => candidate.id !== comment.id)
+      const nextComments = comments
+        .filter(candidate => candidate.id !== comment.id)
+        .map(candidate => candidate.parent_comment_id === comment.id
+          ? { ...candidate, parent_comment_id: null }
+          : candidate)
       setComments(nextComments)
       onCountChange?.(nextComments.length)
       if (replyTo?.id === comment.id || editing?.id === comment.id) {
@@ -256,7 +266,8 @@ export function ShadowPinCommentsDialog({
                 <div key={comment.id} className="space-y-2">
                   <CommentCard
                     comment={comment}
-                    canManage={comment.author_id === user?.id || role === 'admin' || role === 'sub_admin'}
+                    canEdit={comment.author_id === user?.id}
+                    canDelete={comment.author_id === user?.id || role === 'admin' || role === 'sub_admin'}
                     onReply={() => startReply(comment)}
                     onEdit={() => startEdit(comment)}
                     onDelete={() => void removeComment(comment)}
@@ -266,7 +277,8 @@ export function ShadowPinCommentsDialog({
                       key={reply.id}
                       comment={reply}
                       reply
-                      canManage={reply.author_id === user?.id || role === 'admin' || role === 'sub_admin'}
+                      canEdit={reply.author_id === user?.id}
+                      canDelete={reply.author_id === user?.id || role === 'admin' || role === 'sub_admin'}
                       onReply={() => startReply(comment)}
                       onEdit={() => startEdit(reply)}
                       onDelete={() => void removeComment(reply)}

@@ -1,19 +1,23 @@
 # Shado TV
 
-## Documentation Status - June 1, 2026
+## Documentation Status - July 10, 2026
 
-Reviewed during the June 1, 2026 documentation refresh. This feature guide is current for the shipped product surface, with any known hardening or polish follow-ups tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
+Updated for the current local Shado TV release candidate. Bunny Stream is the
+implemented native provider, and the candidate adds WebVTT caption management,
+synchronized premiere playback, privacy-bounded watch events, and operator
+analytics. Production migration, Function, media, and device proof remains
+pending.
 
-Shado TV is the planned immersive streaming application inside the ShadowChat
+Shado TV is the immersive streaming application inside the ShadowChat
 Entertainment area. It is not a game. It should feel like a full mobile-first
 retro cinema app with its own visual system, admin-managed channels, native
 video uploads, external embeds, and smooth authenticated playback.
 
-Planning baseline date: 2026-05-17.
+Planning baseline date: 2026-05-17. Current implementation update: 2026-07-10.
 
 ## Current Status
 
-As of 2026-05-18:
+Verified earlier production behavior plus the July 10 local candidate:
 
 - The Cinema Marquee first-pass asset suite is approved.
 - Twenty optimized WebP assets are committed under
@@ -43,10 +47,13 @@ As of 2026-05-18:
 - Supabase advisor follow-up: the initial Shado TV migration was followed by
   `20260517230544_shado_tv_rls_policy_consolidation.sql`; after that, the
   performance advisor returned no `shado_tv` findings.
-- The next gated implementation decision is the native video provider. The
-  current recommendation is Mux Video Basic plus Supabase, but no
-  provider-specific secrets or paid service setup should be added until that is
-  approved.
+- Bunny Stream is the selected and implemented native upload/transcode/playback
+  provider. `shado-tv-bunny-upload` creates upload sessions, completes uploads,
+  and synchronizes WebVTT caption tracks through the provider API.
+- The local player adds direct-video and Bunny-frame premiere synchronization,
+  late-join offsets, periodic drift correction, caption tracks, and watch-event
+  recording. The studio shows plays, unique viewers, completions, premiere
+  joins, average watch seconds, and last watched time.
 
 ## Product Direction
 
@@ -101,7 +108,9 @@ As of 2026-05-18:
 - Fullscreen playback is required. Native browser fullscreen controls are fine.
 - Background playback can be supported best-effort where mobile browsers allow
   it, but it is not a hard guarantee.
-- Captions and analytics are out of scope for V1.
+- WebVTT captions and privacy-bounded watch analytics are implemented in the
+  local candidate. User comments/social premiere chat and push reminders remain
+  out of scope.
 
 ### Premieres And Release States
 
@@ -133,16 +142,23 @@ The app shell now has a provider-neutral playback boundary:
   embeddable URL is available.
 - External videos also expose an `Open` fallback for providers or URLs that do
   not allow iframe playback.
-- `native_upload` videos intentionally do not fake playback before a provider is
-  approved. They display the release/processing state and wait for the future
-  playback descriptor.
+- `native_upload` videos use Bunny Stream playback descriptors after processing
+  and fall back to the themed locked/processing state until a playable asset is
+  ready.
 - Watch progress is stored in `public.shado_tv_watch_progress` by signed-in
   user and video. The home screen can render a Continue Watching rail when
   progress exists.
 - Progress writes are allowed only for released, published videos by RLS.
-- The future native HLS implementation should plug into the current video page
-  by saving real `<video>` `currentTime` updates through the existing
-  `saveShadoTvWatchProgress` API helper.
+- Direct/native playback saves real `<video>` `currentTime` updates through the
+  existing `saveShadoTvWatchProgress` helper. Fully released on-demand videos
+  can resume; live premiere mode does not use personal resume position.
+- During a native premiere, late joiners start at the elapsed premiere offset,
+  direct-video and Bunny players are periodically corrected when drift exceeds
+  the allowed threshold, and seek/scrub behavior cannot move the viewer away
+  from the shared timeline.
+- Published caption rows are hydrated into short-lived signed Storage URLs for
+  direct video. Bunny uploads also receive the same WebVTT source through the
+  provider API. One track per video may be marked default.
 
 ### Home Page Featuring
 
@@ -150,6 +166,21 @@ The app shell now has a provider-neutral playback boundary:
 - Admins control the videos shown in the Featured row below channels.
 - Featured/prime settings are home-page-level only, not per-channel.
 - Channel videos still sort newest-first inside their own channel page.
+
+### Captions And Watch Analytics
+
+- Operators upload WebVTT (`.vtt`) files up to 2 MB from Shado TV Studio with
+  an 80-character label and a valid language code such as `en` or `en-US`.
+- Caption objects stay in the private `shado-tv` bucket. Direct-video playback
+  receives signed URLs; Bunny-native episodes receive the same WebVTT track
+  through `shado-tv-bunny-upload`.
+- Signed-in viewers can insert only their own `play`, `pause`, `progress`,
+  `complete`, and `premiere_join` events for published videos.
+- Operators read aggregate results through the SECURITY INVOKER
+  `get_shado_tv_watch_analytics()` RPC. Anonymous clients receive no table or
+  function access.
+- The event table is intentionally not a public activity feed and should not be
+  published to Realtime.
 
 ## Asset Strategy
 
@@ -239,10 +270,9 @@ Required pipeline capabilities:
 - soft-delete first, hide immediately, async storage cleanup later
 - admin restore for soft-deleted channels/videos while assets remain
 
-## Candidate Data Model
+## Data Model
 
-The implementation should inspect existing admin/sub-admin helpers before final
-SQL, but Shado TV likely needs a dedicated domain:
+Shado TV uses a dedicated Supabase domain:
 
 - `shado_tv_channels`
 - `shado_tv_videos`
@@ -251,6 +281,13 @@ SQL, but Shado TV likely needs a dedicated domain:
 - `shado_tv_processing_jobs`
 - `shado_tv_home_features`
 - `shado_tv_watch_progress`
+- `shado_tv_captions`
+- `shado_tv_watch_events`
+- `shado_tv_content_blocks`
+
+Migration `20260710040032_shado_tv_captions_premieres_analytics.sql` adds the
+caption and watch-event contract plus the operator aggregate RPC. It also
+extends the private bucket MIME allowlist for caption files.
 
 All tables in the public exposed schema need RLS. Normal users can read
 published/available content only. Admin/sub-admin users can manage draft,
@@ -280,14 +317,16 @@ mobile QA checkpoints where useful.
    - store custom artwork paths on channels/videos
    - deliver signed mobile-sized transformed images
    - wire admin upload controls for channel and video artwork
-5. Streaming pipeline research and approval: research drafted, approval pending.
+5. Streaming pipeline research and approval: completed; Bunny Stream selected.
    - compare familiar-stack options, such as Render/Supabase Storage, with
      managed video services
    - present recommendation and costs before any new service setup
-6. Video processing and playback:
-   - implement approved native upload/processing path
-   - support external embed-first playback with fallback
-   - implement release states, premieres, and watch progress
+6. Video processing and playback: implemented, with local candidate additions
+   pending production proof.
+   - Bunny native upload/processing and external embed fallback
+   - release states, synchronized premieres, and watch progress
+   - WebVTT caption management and provider synchronization
+   - privacy-bounded watch events and operator aggregates
 7. Verification and shipping:
    - run lint/typecheck/build
    - run targeted Jest
@@ -295,10 +334,21 @@ mobile QA checkpoints where useful.
    - clean all generated test data/posts
    - update docs and push to `main`
 
+Focused candidate checks:
+
+```powershell
+npx jest --runInBand tests/shadoTvPlayback.test.ts tests/SettingsView.test.tsx
+npx tsc --noEmit -p tsconfig.app.json
+npm run build
+supabase db lint --local --level warning --fail-on warning
+```
+
+Production verification must include one direct/Bunny playback check, caption
+selection, a premiere late-join/drift check, operator aggregate visibility, and
+cleanup of any uploaded caption/video objects or test watch rows.
+
 ## Out Of Scope For V1
 
 - user comments/social features around premieres
-- captions/subtitles
-- analytics dashboards
 - push reminders for upcoming premieres
 - public unauthenticated viewing

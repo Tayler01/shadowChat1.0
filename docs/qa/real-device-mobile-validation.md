@@ -1,8 +1,10 @@
 # Real-Device Mobile Validation
 
-## Documentation Status - June 1, 2026
+## Documentation Status - July 10, 2026
 
-Reviewed during the June 1, 2026 documentation refresh. This file is a QA log or validation checklist. Keep older artifact paths as historical evidence, and add new dated entries after the next browser, mobile, or device validation pass.
+The checklist now includes the July 10 local candidate's PWA update,
+notification, blocking, ShadowPin, and private-identity risks. No new physical-
+device pass is claimed; every device row remains pending until recorded below.
 
 Use this checklist after `npm run qa:mobile-pwa` passes and before treating a
 mobile/PWA-sensitive release as fully proven. Playwright catches most layout and
@@ -13,6 +15,16 @@ comfort.
 ShadowChat is phone-first by default. Unless a task explicitly states another
 target, real-device validation should cover both an iPhone path and an Android
 phone path before a user-facing change is considered fully proven.
+
+The Expo 57 / React Native 0.86 workspace is a separate, unshipped native
+prototype. Its Doctor/export checks do not satisfy this installed-PWA checklist,
+and this checklist does not prove a future native development build.
+
+Do not create a production ShadowPin post merely for device smoke. New pins fan
+out in-app notifications and web push to eligible members; deleting the pin
+cannot retract delivered notifications. Test creation in local/staging, or use
+existing production content. A controlled production post requires explicit
+approval and a real content/audience plan.
 
 Related docs:
 
@@ -76,6 +88,11 @@ Minimum real-device pass:
 | RD-021 | Both | Theme/dark mode | If device/app theme changes are relevant, toggle or inspect theme state. | Premium dark UI remains consistent; no unreadable contrast. | not run | | |
 | RD-022 | Both | Notifications | If push changed, send a notification and tap it. | Notification displays, badge behavior is sane, tap routes to the right place. | not run | | |
 | RD-023 | Both | General Chat read position | After seeded/staging browser scroll QA passes, reopen General Chat with older unread messages and a message deep link. | First unread/deep-link target is visible, Jump to latest reaches the newest message, and realtime incoming messages do not pull an anchored reader to the bottom. | not run | | |
+| RD-024 | Both | PWA update | Install the prior production build, deploy the candidate, background/reopen, and accept or observe the update path. | The app updates without a stale shell, reload loop, blank feed, or lost authenticated session. | not run | | |
+| RD-025 | Both | Notification controls | Exercise global, General Chat, DM-conversation, quiet-hours, and ShadowPin notification toggles with controlled test traffic. | Muted/quiet notifications stay suppressed; allowed notifications show once and route correctly. | not run | | Use staging or targeted existing-account traffic; do not create a test pin in production. |
+| RD-026 | Both | Personal blocking | Block a second test account, resume/reconnect, inspect presence/chat/search/DM surfaces, then unblock. | Blocked users/content remain hidden as designed and blocked DM creation/sending fails server-side; unblocking restores allowed behavior. | not run | | |
+| RD-027 | Both | Private identity Release A | Sign in with stable users, open profiles, General Chat, DMs, search, and full-admin access where authorized. | Public surfaces omit Auth email and legacy `full_name`; guarded full-admin email remains available; no profile/bootstrap regression appears. | not run | | Required before considering the later Release B column drop. |
+| RD-028 | Both | ShadowPin social UI | Use an existing or staged pin to open search, tags, comments, replies, moderation, and notification settings. | Controls fit the safe area/keyboard, thread state updates once, and no unintended production-wide notification fan-out occurs. | not run | | Production pin creation requires explicit approval. |
 
 ## Known Emulator Gaps
 
@@ -86,6 +103,8 @@ Minimum real-device pass:
 - Lock/unlock and background timer behavior.
 - Notification delivery and OS badge behavior.
 - Real finger tap comfort for dense secondary controls.
+- Service-worker activation/update timing after a real production version change.
+- OS quiet-hours/badge interaction with app-level notification preferences.
 
 ## Bug Report Template For Codex
 

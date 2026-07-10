@@ -2,7 +2,6 @@ export type ChatMessageType = 'text' | 'command' | 'audio' | 'image' | 'video' |
 
 export type ShadowUser = {
   id: string;
-  email?: string | null;
   username?: string | null;
   display_name?: string | null;
   avatar_url?: string | null;

@@ -1,10 +1,33 @@
 # Mobile PWA QA Log
 
-## Documentation Status - June 1, 2026
+## Documentation Status - July 10, 2026
 
-Reviewed during the June 1, 2026 documentation refresh. This file is a QA log or validation checklist. Keep older artifact paths as historical evidence, and add new dated entries after the next browser, mobile, or device validation pass.
+Older artifact paths remain historical evidence. The July 10 work below is a
+local release candidate until a fresh mobile-PWA artifact, production SHA, and
+physical-device pass are recorded.
 
-Last updated: 2026-05-17
+Last updated: 2026-07-10
+
+## July 10 Local Release Candidate
+
+Candidate scope includes service-worker update behavior, accessible mobile
+dialogs/message menus, bounded DM history, notification quiet hours and mutes,
+personal blocking, global search/saved collections, and ShadowPin search,
+comments, replies, and notification preferences.
+
+- No new `qa:mobile-pwa` artifact is claimed by this documentation pass. The May
+  artifacts below remain the latest recorded browser proof until the final
+  candidate is run with `--no-reuse-server`.
+- The separate Expo 57 / React Native 0.86 workspace passed local clean install,
+  audit, lint, TypeScript, Expo Doctor `20/20`, and static web export. That is
+  native toolchain evidence, not installed-PWA or production proof.
+- Required candidate follow-up: fresh iPhone/WebKit and Android/Chromium harness
+  coverage, then one installed iPhone and one installed Android pass after the
+  production deploy.
+- Do not publish a production ShadowPin post merely for smoke. A new pin fans
+  notification events and web push to eligible members, and deleting it cannot
+  recall delivered notifications. Use existing/staged content unless a real,
+  controlled post is explicitly approved.
 
 ## Summary
 
@@ -42,6 +65,10 @@ Latest focused pass: `node scripts/mobile-pwa-visual-qa.mjs --run-name=mobile-he
 | MPWA-015 | verified | iPhone WebKit, Android Chromium | standardized header/menu, DMs, Boards, Entertainment, Settings, Pins, keyboard-compressed chat surfaces | Run the headed mobile PWA harness after the standardized mobile shell and media-derivative work. | `output/playwright/mobile-header-media-pins-headed-20260517c/summary.json` | Header/menu controls moved to a shared mobile shell, Settings moved to the header, Pins moved into bottom nav, and keyboard focus intentionally hides chat chrome. The harness had to be updated to expect hidden keyboard chrome, display-name-only DM headers, and immediate QA post cleanup. | `src/components/layout/MobileAppHeader.tsx`; `src/components/layout/MobileNav.tsx`; `src/components/layout/MobileChatFooter.tsx`; `src/components/dms/DirectMessagesView.tsx`; `src/components/boards/BoardsView.tsx`; `src/features/shadow-pin/ShadowPin.tsx`; `src/components/settings/SettingsView.tsx`; `src/features/games/GamesHome.tsx`; `scripts/mobile-pwa-visual-qa.mjs`; `scripts/playwright-smoke.mjs`; docs | headed mobile PWA harness; headed smoke; lint; typecheck; build; Jest | 100/100 headed mobile checks passed. Smoke passed auth, DM realtime, and mobile DM back navigation. |
 | MPWA-016 | verified | Android/Chromium-style landscape and portrait Chrome-channel probes | Entertainment > Shadow Runner | Open Shadow Runner from the Entertainment picker, verify portrait rotate gate, open level map/detail popup, start Level 3, and QA-finish Level 1/2/3 with normal finish movement after teleport. | `output/playwright/shadow-runner-goal-20260611-square-frame/932x430-level3-popup-square-frame.png`; `output/playwright/shadow-runner-goal-20260611-postbuild/932x430-level3-complete.png`; `output/playwright/shadow-runner-goal-20260611-routes/portrait-390x740-rotate-gate.png` | Shadow Runner needed the next phone-gameplay validation pass after adding Level 3, square mission frames, and kind-aware enemy runtime state. | `src/features/games/shadow-runner/ShadowRunnerScreen.tsx`; `src/features/games/shadow-runner/assets/manifest.ts`; `src/features/games/shadow-runner/game/createShadowRunnerPhaserGame.ts`; `src/features/games/shadow-runner/game/levels.ts`; `src/features/games/shadow-runner/game/simulation.ts`; Shadow Runner docs | `npm run lint`; `npx tsc --noEmit -p tsconfig.app.json`; `npm run build`; custom Chrome-channel Playwright probes | Landscape gate remained open at `932x430` and `740x390`; portrait gate blocked play at `390x740`; true square popup frame measured `ratio: 1`; Level 1/2/3 completion overlays rendered. Real-device iOS/Android touch feel still needs follow-up after push. |
 
-## Final Summary
+## Historical May Summary
 
 The automated mobile PWA visual loop passed across the core installed-home-screen simulations. Final required checks also passed: lint, typecheck, build, Jest, existing mobile smoke, full smoke, and the focused mobile PWA harness. Remaining mobile-specific risk is limited to real-device behavior that Playwright cannot fully reproduce: native keyboard animation, iOS standalone status bar behavior, home indicator safe-area behavior on physical devices, and touch comfort for dense secondary controls.
+
+That statement applies to the recorded May artifact set, not the July 10 local
+candidate. Use the candidate checkpoint above until new browser and device
+evidence is recorded.

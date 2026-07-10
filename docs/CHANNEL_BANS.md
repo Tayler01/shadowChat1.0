@@ -17,8 +17,29 @@ The July 10 hosted cleanup revokes browser execution of paused Boards, News, and
 Art mutation RPCs while retaining their source and migration history. Active
 General Chat moderation remains available through explicitly reviewed grants.
 
+The current local release candidate also adds member-controlled personal
+blocking. That is a separate privacy contract and is not described as
+production-shipped until its migration and app build are deployed.
+
 Channel bans let app operators limit where a user can participate without
 touching DMs or account access. Banned users can still read visible content.
+
+## Personal Blocking Is Different
+
+Operator channel bans and personal blocks must not be conflated:
+
+- channel bans are operator-managed participation restrictions and leave DMs,
+  profile discovery, presence, and account access intact
+- personal blocks are private, self-managed rows visible only to the blocker
+- personal-block enforcement is reciprocal for profile/user discovery,
+  General Chat visibility, presence, Hype, DMs, ShadowPin, and push delivery
+- existing DM rows are preserved while the pair is blocked; the unavailable
+  thread state prevents new sends/reactions, and unblocking restores history
+- server-side DM triggers keep the same rule for trusted writes that bypass RLS
+
+The personal-block source of truth is
+`20260710042701_personal_blocking_privacy_contract.sql`, with UI controls in
+public profiles and Settings > Account & Profile > Blocked users.
 
 ## Admin Surface
 

@@ -1,11 +1,34 @@
 # Feature Progress Log
 
-## Documentation Status - June 1, 2026
+## Documentation Status - July 10, 2026
 
-Reviewed during the June 1, 2026 documentation refresh. This feature guide is current for the shipped product surface, with any known hardening or polish follow-ups tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
+Refreshed for the July 10 local release candidate. Historical feature entries
+remain below; current shipped-versus-candidate status and follow-ups are tracked
+in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
 
 Use this log for long-running `/goal` work and feature implementations that span
 multiple checkpoints. Keep entries concise, factual, and tied to verification.
+
+## Current Release Candidate - Audit Hardening And Social Foundations
+
+Status: implemented locally; backend-first `main` release and production proof
+pending.
+
+The July 10 candidate includes service-worker and DM lifecycle work,
+private-identity Release A consumer cutover (including Expo 57 selectors),
+recipient-owned Realtime notification events, privacy-safe bounded push retry,
+reciprocal personal blocking, the General Chat/DM Message Library, ShadowPin
+tags/search/one-level comments and ready-state notifications, Shadow Mystery
+publishing, and Shado TV captions/premieres/analytics.
+
+Canonical detail and release gates live in:
+
+- [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1)
+- [PERSONAL_BLOCKING.md](C:/repos/chat2.0/docs/PERSONAL_BLOCKING.md:1)
+- [MESSAGE_LIBRARY.md](C:/repos/chat2.0/docs/MESSAGE_LIBRARY.md:1)
+- [SHADOW_PIN.md](C:/repos/chat2.0/docs/SHADOW_PIN.md:1)
+- [REALTIME_PUSH_NOTIFICATIONS_PLAN.md](C:/repos/chat2.0/docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md:1)
+- [DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1)
 
 ## Current Goal
 

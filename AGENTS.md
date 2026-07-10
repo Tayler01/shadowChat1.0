@@ -4,11 +4,15 @@ This file is the working handbook for agentic contributors operating inside this
 
 ## Documentation Status - July 10, 2026
 
-This handbook is current through the July 10 production-alignment pass: the
-paused-domain release contract, Supabase authority and Storage hardening,
-backend-first GitHub release, Node 24 baseline, main-only branch policy, and
-live auth/resume-send smoke have all been incorporated. For the remaining
-ranked security, reliability, performance, UX, and feature work, read
+This handbook is current through the July 10 production-alignment pass and the
+subsequent local release candidate: the paused-domain contract, Supabase
+authority and Storage hardening, backend-first GitHub release, Node 24
+baseline, main-only branch policy, private-identity consumer cutover, personal
+blocking, message library, ShadowPin social notifications, DM lifecycle work,
+and Expo 57 baseline have all been incorporated. Candidate behavior remains
+unproven in production until its own backend-first `main` workflow and smoke
+complete. For the remaining ranked security, reliability, performance, UX, and
+feature work, read
 [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1)
 before editing. For the complete documentation inventory and freshness notes,
 read
@@ -64,17 +68,31 @@ The General Chat weather widget stores location preferences privately in
 [docs/WEATHER_WIDGET.md](C:/repos/chat2.0/docs/WEATHER_WIDGET.md:1). Do not
 put weather location data on public profile rows.
 
+Personal blocking is reciprocal across discovery, chat, DMs, Hype, ShadowPin,
+and notification delivery while the block-list row remains private to its
+owner. Read
+[docs/PERSONAL_BLOCKING.md](C:/repos/chat2.0/docs/PERSONAL_BLOCKING.md:1)
+before changing visibility or known-id engagement paths. Message search, saves,
+and collections are caller-private and inherit existing RLS visibility; read
+[docs/MESSAGE_LIBRARY.md](C:/repos/chat2.0/docs/MESSAGE_LIBRARY.md:1) before
+changing that surface.
+
 The July 9-10 alignment closed the immediate schema drift, broad paused-domain
 grants, Storage limits, leaked-password screening, release credential, backend
-parity, bundle-budget, and live smoke gaps. The remaining near-term hardening
-track is the ranked June audit backlog:
+parity, bundle-budget, and live smoke gaps. The later local candidate also
+implements service-worker update behavior, DM keyset pagination and bounded
+rendering, reaction rollback, accessibility work, private identity Release A,
+personal blocking, and ShadowPin engagement hardening. The remaining near-term
+track is:
 
 - reduce the remaining intentionally guarded authenticated
   `SECURITY DEFINER` surface through a reviewed private-definer/public-invoker
   architecture pass
-- service-worker update behavior and physical-device PWA validation
-- DM pagination, subscription lifecycle, rendering, and reaction rollback
-- runtime-asset cleanup, CSP tightening, accessibility, and mobile polish
+- deploy and prove the current candidate, then complete physical-device PWA,
+  accessibility, and phone UX validation
+- keep private-identity Release B separate until Release A has production proof
+- move report-only CSP toward an enforced policy after violation review
+- continue runtime-asset cleanup and mobile polish
 - targeted performance-advisor work without blindly removing quiet indexes
 
 When touching any of those areas, keep the work narrowly scoped to the relevant audit item and update the audit next-steps doc if the status changes.
@@ -152,6 +170,7 @@ npx jest --runInBand
 - [`src/hooks/useWeatherPreference.ts`](C:/repos/chat2.0/src/hooks/useWeatherPreference.ts:1): private weather location preference state
 - [`src/hooks/useWeatherForecast.ts`](C:/repos/chat2.0/src/hooks/useWeatherForecast.ts:1): weather forecast loading and refresh
 - [`src/hooks/usePushNotifications.ts`](C:/repos/chat2.0/src/hooks/usePushNotifications.ts:1): browser push setup and preference state
+- [`src/hooks/useBlockedUsers.tsx`](C:/repos/chat2.0/src/hooks/useBlockedUsers.tsx:1): private block list, mutations, and app-wide refresh signal
 - [`src/hooks/useTheme.tsx`](C:/repos/chat2.0/src/hooks/useTheme.tsx:1): product theme selection and persistence
 - [`src/hooks/useTyping.ts`](C:/repos/chat2.0/src/hooks/useTyping.ts:1): typing indicators
 
@@ -163,6 +182,8 @@ npx jest --runInBand
 - [`src/lib/ai.ts`](C:/repos/chat2.0/src/lib/ai.ts:1): AI function calls
 - [`src/lib/weather.ts`](C:/repos/chat2.0/src/lib/weather.ts:1): weather provider mapping and private preference helpers
 - [`src/lib/moderation.ts`](C:/repos/chat2.0/src/lib/moderation.ts:1): channel-ban scope and RPC helpers
+- [`src/lib/personalBlocking.ts`](C:/repos/chat2.0/src/lib/personalBlocking.ts:1): personal block RPC helpers and blocked-relationship error detection
+- [`src/lib/messageLibrary.ts`](C:/repos/chat2.0/src/lib/messageLibrary.ts:1): caller-visible search, private saves, and collections
 
 ### Views
 
@@ -172,6 +193,7 @@ npx jest --runInBand
 - [`src/components/profile`](C:/repos/chat2.0/src/components/profile): profile editing and presentation
 - [`src/components/settings`](C:/repos/chat2.0/src/components/settings): sectioned settings, admin tools, feedback, weather location, push setup, theme settings
 - [`src/components/layout`](C:/repos/chat2.0/src/components/layout): sidebar, mobile nav, shell controls
+- [`src/components/search`](C:/repos/chat2.0/src/components/search): global message search and private saved-message library
 
 ### Backend Schema And Functions
 
@@ -191,6 +213,9 @@ npx jest --runInBand
 - Channel bans live in `public.user_channel_bans`; General Chat, News Chat, and News Feed restrictions are enforced by RLS and reaction RPCs.
 - Presence visibility and the General Chat active-user list use `public.user_presence`, `users.presence_visibility`, and the `update_user_last_active`, `list_presence_states`, and `get_active_users` RPCs.
 - Weather preferences live in private `public.user_weather_preferences` rows and should not be added to public user profile data.
+- Personal blocks live in private owner-managed `public.user_blocks` rows; reciprocal visibility and engagement enforcement is defined by `20260710042701_personal_blocking_privacy_contract.sql` and `20260710044600_personal_blocking_engagement_hardening.sql`.
+- Message collections and saves live in owner-private `public.message_collections` and `public.saved_messages`; search runs as the caller through `search_my_messages` so existing General Chat/DM RLS remains authoritative.
+- Recipient-owned `public.notification_events` is included in the Supabase Realtime publication by `20260710044500_publish_notification_events_realtime.sql`.
 
 ### ESP Bridge Firmware
 

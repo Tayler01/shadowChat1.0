@@ -72,10 +72,62 @@ now contain only `main`, and GitHub has zero open pull requests.
   anonymous `is_username_available(text)` pre-signup check. Broad public-bucket
   listing and leaked-password warnings are zero, and Supabase Auth leaked-
   password protection is enabled.
-- Safe same-major dependency updates and lockfiles are current with zero known
-  vulnerabilities. Remaining install-time deprecation notices come from Expo 54,
-  Jest 29/jsdom, and Remotion transitive packages; removing them requires
-  dedicated framework/test-runner migrations rather than unsafe overrides.
+- The verified production baseline remains on the dependency state from that
+  release. The current local candidate has since completed the reviewed
+  framework/test migration: Expo 57, React Native 0.86, React 19.2, TypeScript
+  6 in the mobile package, Jest 30 in the root package, and narrow transitive
+  overrides for the remaining Remotion/jsdom/glob warnings. Clean root/mobile
+  installs report no deprecation warnings and zero known vulnerabilities
+  locally; production CI proof is still pending.
+
+### July 10 local release-candidate checkpoint
+
+The commits after the verified production baseline implement the following
+locally. These items must remain labeled release-candidate work until the
+backend-first `main` workflow applies the migrations, deploys the classified
+Functions, publishes the matching Netlify artifact, and completes post-deploy
+verification:
+
+- service-worker cache v3 with cache-first content-hashed assets,
+  revalidate-first stable assets, offline fallback, and stale-cache cleanup
+- stable DM `(created_at, id)` keyset pagination, one consolidated realtime
+  lifecycle per signed-in user, a bounded 200-message thread window, and a
+  `Load latest` recovery action
+- deterministic optimistic General Chat reaction rollback
+- nonruntime source/generation assets moved from `public` to `source-assets`,
+  with a 100 MB deploy budget
+- report-only CSP plus frame, content-type, referrer, permissions, manifest
+  MIME, and service-worker cache headers
+- accessible dialogs, focus return, keyboard message menus, scalable viewport,
+  contextual phone headers, and less-obstructive Hype presentation
+- atomic Edge request buckets and idempotency claims, including the AI request
+  ledger, plus shared endpoint guards and operator Operations Health evidence
+- explicit active Data API grants, RLS performance cleanup, and an exact local
+  security contract covering public/private definer inventories, active-table
+  privileges, paused-domain grants, and profile update columns
+- private-identity Release A plus consumer cutover: API projections exclude
+  `email`/`full_name`, profile writers no longer copy them, and full-admin email
+  lookup reads `auth.users`; web and Expo selectors/types are independent of
+  both legacy fields, while the nullable compatibility columns intentionally
+  remain until a separately verified Release B drop
+- notification delivery parity for General Chat/DM targeted events, global and
+  type controls, timezone-aware quiet hours, snooze, General Chat mute, and
+  per-DM conversation mute
+- reciprocal personal blocking, caller-visible message search, private saved
+  messages/collections, Shadow Mystery publishing, ShadowPin social/search and
+  notifications, and Shado TV captions/premieres/analytics
+- `notification_events` published through
+  `20260710044500_publish_notification_events_realtime.sql` so recipient-owned
+  ShadowPin events can drive live in-app alerts under RLS
+- `20260710044600_personal_blocking_engagement_hardening.sql` closes known-id
+  engagement bypasses for reactions, Hype, message pinning, ShadowPin hearts,
+  comments, activity, and aggregate helpers; bounds ShadowPin post/activity/tag
+  writes; creates new-post events only when a pin first becomes ready; and
+  clears stale unread pair notifications when a block is created
+- `send-push` now returns privacy-safe aggregate delivery counts, removes only
+  permanently invalid subscriptions, reports transient provider failures as
+  retryable `503` responses, and releases failed idempotency claims; the client
+  retries only network, `409`, and `5xx` failures with two bounded delays
 
 #### P0 - Production alignment and authority
 
@@ -111,25 +163,35 @@ now contain only `main`, and GitHub has zero open pull requests.
    helpers where that reduces privilege without breaking RLS-backed behavior.
 2. Keep the production resume/send harness stable across restored read positions
    and require verified cleanup of every test General Chat and DM row.
-3. Replace service-worker cache-first handling for stable Shadow Runner paths
-   with content-hashed or revalidating behavior and test installed-PWA upgrades.
-4. Change DM history pagination to stable `(created_at, id)` keysets.
-5. Consolidate duplicate DM subscriptions and bound long-thread rendering.
-6. Roll back optimistic General Chat reactions when the RPC fails.
+3. **Implemented locally; physical-device proof pending:** stable assets now
+   revalidate before cache fallback, content-hashed assets remain cache-first,
+   and old worker caches are removed. Validate an installed-PWA upgrade on real
+   iPhone and Android devices after deployment.
+4. **Implemented locally:** DM history uses stable `(created_at, id)` keysets.
+5. **Implemented locally:** DM realtime subscriptions are consolidated and
+   thread rendering is bounded to the latest 200 loaded messages.
+6. **Implemented locally:** optimistic General Chat reactions roll back when
+   the RPC fails.
 7. **Completed:** remove the catch-all `vendor-ui` chunk, restore
    route-aware splitting, and enforce measured entry/lazy/deploy budgets.
-8. Move nonruntime source/concept/generation assets out of `public`, retain all
-   runtime finals, and enforce a deploy-size budget.
-9. Add Netlify CSP, frame, content-type, referrer, permissions, and other
-   reviewed security headers; serve the manifest with the correct MIME type.
+8. **Implemented locally:** nonruntime source/concept/generation assets live in
+   `source-assets`; runtime finals remain in `public`; the build enforces a
+   100 MB deploy-size budget.
+9. **Implemented locally; production header proof pending:** Netlify defines a
+   report-only CSP plus frame, content-type, referrer, permissions, manifest
+   MIME, and worker cache headers.
 10. Complete installed-PWA checks on physical iPhone and Android devices and
    make a deliberate portrait/Shadow Runner landscape decision.
-11. Remove `user-scalable=no`; standardize focus traps, Escape/focus return,
-    keyboard menus, `aria-current`, contrast, and phone touch targets.
-12. Simplify the contextual phone header and prevent transient celebrations
-    from obscuring essential composer/navigation controls.
+11. **Implemented locally:** removed `user-scalable=no`; standardized the
+    touched focus traps, Escape/focus return, keyboard menus, `aria-current`,
+    and phone touch targets. Physical-device accessibility review remains.
+12. **Implemented locally:** the phone header is contextual and Hype
+    celebrations avoid essential composer/navigation controls.
 13. **Completed:** add opt-in release-correlated client/worker telemetry
-    with privacy scrubbing and an Edge helper for reviewed per-function adoption.
+   with privacy scrubbing and an Edge helper for reviewed per-function adoption.
+14. **Implemented locally:** personal-block changes immediately refresh loaded
+   DM state, while trigger/RPC guards cover known-id engagement paths and stale
+   pair notifications. Production two-account proof is still pending.
 
 #### P1 - Repository and dependency cleanliness
 
@@ -137,9 +199,12 @@ now contain only `main`, and GitHub has zero open pull requests.
 2. **Completed in production:** eliminate React `act(...)` test warnings.
 3. **Completed in production:** remove unused code, enable TypeScript unused checks,
    and enforce ESLint `--max-warnings=0`.
-4. **Completed in production:** resolve advisories and apply safe same-major updates;
-   keep framework/test-runner major migrations as reviewed packets.
-5. **Completed in production:** add a separate Expo install/audit/lint/typecheck/Doctor job.
+4. **Completed in production for the earlier baseline; modernized locally for
+   the next release:** safe dependency updates remain gated, while the current
+   candidate moves Jest to 30 and Expo to 57 with warning-free clean installs.
+5. **Completed in production:** add a separate Expo
+   install/audit/lint/typecheck/Doctor job. The candidate now runs that job
+   against Expo 57.
 6. **Completed in production:** add documentation link/encoding checks and repair known drift.
 7. **Completed in production:** deterministic clean installs, the complete
    Quality workflow, security scans, CodeQL, and the credentialed backend-first
@@ -147,29 +212,45 @@ now contain only `main`, and GitHub has zero open pull requests.
 
 #### P2 - Product improvements after hardening
 
-1. Finish targeted mention/reply/reaction notifications, quiet hours, and
-   conversation mutes so Settings matches backend delivery behavior.
-2. **Implemented in the current release batch:** Admin Operations Health now
+1. **Implemented locally:** targeted mention/reply/reaction delivery, master
+   and per-type preferences, timezone-aware quiet hours, temporary snooze,
+   General Chat mute, and per-DM conversation mutes now share one backend
+   delivery contract. Normal-device push verification remains.
+2. **Implemented in the local release candidate:** Admin Operations Health now
    reports the running/deployed frontend SHA, migration and exact Function
    manifest parity, latest production monitor result, release-time push
    readiness, and explicit paused News/ESP state from an operator-only,
    sanitized snapshot. Production evidence becomes authoritative when this
    batch completes the backend-first GitHub release.
-3. Add personal blocking with a security-reviewed visibility/DM/push contract.
-4. Add universal search, saved messages, and personal collections.
-5. Add a Shadow Mystery publishing studio.
-6. Expand ShadowPin tags, full search, comments, and notifications.
-7. Add Shado TV captions, premieres, and watch analytics.
+3. **Implemented locally:** reciprocal personal blocking covers discovery,
+   General Chat, presence, reactions, Hype, message pinning, DMs, ShadowPin
+   visibility/comments/hearts/activity, aggregate helpers, and notification
+   delivery while preserving DM history for unblock restoration. Loaded DM
+   state refreshes immediately after a block change.
+4. **Implemented locally:** universal caller-visible General Chat/DM search,
+   private saved messages, and personal collections.
+5. **Implemented locally:** Shadow Mystery operator publishing studio and
+   private artwork domain.
+6. **Implemented locally:** normalized ShadowPin tags, indexed search,
+   root comments plus one-level replies, bounded post/activity writes, and
+   ready-state new-post/comment/reply notifications. Recipient events are now
+   included in the Realtime publication under RLS.
+7. **Implemented locally:** Shado TV WebVTT captions, synchronized premieres,
+   watch events, and operator aggregates.
 8. **On hold with News:** read-later, topic following, and digest features.
 9. **On hold with ESP:** the bridge device/session manager.
 
 ### Coordinated investigations, not blind migrations
 
-- Moving email out of `public.users` requires refactoring auth/profile/admin and
-  bridge consumers first.
-- Full SECURITY DEFINER allowlisting requires live function/ACL inventory so
-  RLS helpers are not accidentally broken.
-- AI dispatch replay/quota needs an atomic idempotency ledger.
+- Private-identity Release A and its consumer cutover are implemented locally,
+  including the Expo selector/type cleanup. Release B must not drop the legacy
+  `public.users.email` and `full_name` columns until Release A has deployed and
+  its active consumers are verified in production.
+- The local exact SECURITY DEFINER and privilege contracts are implemented;
+  architectural reduction of the authenticated surface still requires
+  domain-by-domain review rather than blind ACL removal.
+- AI dispatch replay/quota now uses an atomic private idempotency/rate ledger;
+  production behavior still needs release evidence.
 - URL fetch protection needs pinned DNS or controlled egress to close the
   DNS-rebinding gap.
 
@@ -331,10 +412,21 @@ Implementation status through July 10, 2026:
   `is_username_available(text)` check. Supabase Auth leaked-password protection
   is enabled; stronger minimum-length/complexity rules remain a separate auth UX
   rollout so existing sign-in behavior is not changed accidentally.
+- The current local Release A migrations add one explicit public-profile JSON
+  projection for General Chat/DM and Edge consumers, remove email/full-name
+  copying from profile writers, and source the guarded admin email list from
+  `auth.users`. The legacy public columns remain nullable and deprecated for a
+  deployment interval; Release B is the actual column-removal step.
+- The local security contract now gates the exact public authenticated,
+  anonymous, internal, and private SECURITY DEFINER inventories; active core
+  table privileges; paused-domain browser grants; dangerous grants; and the 11
+  allowed authenticated `users` update columns.
 
 Status and remaining coordinated follow-up:
 
-1. Move email and other private identity fields out of `public.users` into a private/admin-only table or safe RPC/view.
+1. Deploy and prove Release A, then apply the separately reviewed Release B
+   migration that drops legacy `public.users.email` and `full_name`. Do not
+   mark this complete while the compatibility columns remain queryable.
 2. Review authenticated SECURITY DEFINER APIs domain by domain and replace them
    with private implementations or SECURITY INVOKER wrappers when the privilege
    boundary can be narrowed without breaking RLS-backed behavior.
@@ -381,9 +473,11 @@ Next steps:
 2. Before bridge reactivation, re-audit channel bans, `dm_discoverable`,
    bootstrap/rate limits, returned identifiers, and banned-user tests.
 3. Keep AI `postToChat` caller eligibility and General Chat bans covered by
-   negative tests when changing that active endpoint.
-4. Add an atomic per-user AI quota/idempotency ledger before expanding provider
-   use or separating answer and post permissions.
+   negative tests when changing that active endpoint. The local candidate also
+   applies the shared Edge request guard.
+4. **Implemented locally:** atomic per-user AI quota/idempotency claims and
+   durable bounded responses live in the private Edge request ledger. Verify
+   deployed 429/replay behavior before expanding provider use.
 
 Validation target:
 
@@ -447,9 +541,11 @@ Primary files:
 - [.github/workflows/netlify-preview.yml](C:/repos/chat2.0/.github/workflows/netlify-preview.yml:1)
 - [supabase/config.toml](C:/repos/chat2.0/supabase/config.toml:1)
 
-Observed risk:
+Observed risk and candidate status:
 
-- `netlify.toml` does not define security headers.
+- The current local `netlify.toml` defines the reviewed header packet, with
+  CSP intentionally report-only for staged compatibility review. The earlier
+  production baseline did not include this packet; live header proof remains.
 - Live Netlify project settings were verified on July 9; automatic Git builds
   were then stopped so the GitHub backend-first workflow is the only publisher.
 - Render service `srv-d7pjc49j2pic73bq5m80` was verified as a suspended
@@ -461,8 +557,11 @@ Observed risk:
 
 Next steps:
 
-1. Add staged Netlify headers for `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, frame protection, and CSP.
-2. Build CSP in report-only mode first so Supabase, Bunny, Meta/oEmbed, media, and provider calls can be observed safely.
+1. **Implemented locally:** staged `X-Content-Type-Options`,
+   `Referrer-Policy`, `Permissions-Policy`, frame protection, manifest MIME,
+   worker caching, and CSP headers.
+2. **Implemented locally:** CSP is report-only so Supabase, Bunny,
+   Meta/oEmbed, media, and provider calls can be observed safely.
 3. Verify production headers after the staged header/CSP packet; project,
    deploy-hook, domain, and publisher settings were verified July 9.
 4. Verify Render worker env vars are scoped to server-side secrets and log output does not expose provider credentials.
@@ -491,11 +590,16 @@ Primary files and surfaces:
 Next steps:
 
 1. Simplify login to a normal app sign-in surface.
-2. Make mobile header actions view-specific so Weather, Active Users, Pinned, and other controls do not crowd every surface.
+2. **Implemented locally:** mobile header actions are contextual so Weather,
+   Active Users, Pinned, global search, and other controls do not crowd every
+   surface.
 3. Tighten mobile nav labels and badge caps.
 4. Separate DM loading, empty, and selected-thread states so "Say hello" does not flash incorrectly.
 5. **On hold with News:** remove admin/setup hints from user-facing News empty states unless the current user is an operator.
-6. Review profile/settings modal overflow on small screens.
+6. **Implemented locally for the touched surfaces:** shared dialog focus traps,
+   Escape/focus return, and viewport-bounded modal layout cover profile,
+   settings, feedback, notification setup, image, emoji, ShadowPin comment,
+   search/library, and studio dialogs. Physical-device review remains.
 7. Disable expensive fixed backgrounds on mobile if browser traces show scroll smoothness cost.
 
 Implementation status on June 8, 2026:
@@ -546,6 +650,12 @@ Implementation status on June 8, 2026:
 - The July 9 build removed the broad `vendor-ui` chunk and added deterministic
   eager, lazy Phaser, single-chunk, and total-deploy budgets. The large lazy
   Phaser payload remains intentional and separately budgeted.
+- The current local candidate extends the shared realtime lifecycle into the
+  DM domain, replaces duplicate conversation/thread channels with one
+  consolidated subscription path, and bounds long-thread state.
+- `20260710034032_rls_performance_cleanup.sql` addresses the reviewed RLS
+  initplan/policy duplication set locally. Compare hosted performance advisors
+  after deployment; do not drop quiet indexes solely from unused-index output.
 
 Validation target:
 
@@ -559,16 +669,16 @@ Validation target:
 1. Review and narrow the remaining authenticated SECURITY DEFINER API surface.
 2. Finish General Chat read-position and production resume/send regression
    coverage, including verified test-data cleanup.
-3. Replace stale service-worker cache behavior and validate installed-PWA
-   upgrades on physical iPhone and Android devices.
-4. Move private identity fields out of `public.users` through a coordinated
-   consumer migration.
-5. Stabilize DM pagination, subscriptions, and long-thread rendering.
-6. Add optimistic General Chat reaction rollback.
-7. Stage Netlify security headers/CSP and verify them in production.
-8. Move nonruntime source assets out of the deploy and complete accessibility,
-   header, and mobile polish.
-9. Continue domain-scoped realtime/send/scroll extraction and performance-
+3. Validate the implemented service-worker upgrade behavior on installed
+   physical iPhone and Android PWAs.
+4. Deploy/prove private-identity Release A, then apply and verify Release B.
+5. Verify the implemented DM pagination/subscription/thread-bound work in the
+   production browser flow.
+6. Verify the implemented report-only Netlify header packet in production and
+   review CSP reports before enforcement.
+7. Complete physical-device accessibility, orientation, notification, and
+   mobile-polish review for the implemented UI changes.
+8. Continue domain-scoped realtime/send/scroll extraction and performance-
    advisor work without broad rewrites.
 
 ## Release Checklist For Each Work Packet
@@ -599,6 +709,8 @@ For Supabase changes:
 
 - Inspect the relevant migration before describing behavior.
 - Apply migrations in a staging or linked environment before claiming readiness.
+- Run `npm run supabase:security-contract:local`; after deployment run the
+  linked contract and compare the exact Function/migration evidence.
 - Re-run Supabase advisors.
 - Verify RLS, grants, and function auth with negative tests.
 

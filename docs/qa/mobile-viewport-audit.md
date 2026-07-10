@@ -1,10 +1,29 @@
 # Mobile Viewport Audit
 
-## Documentation Status - June 1, 2026
+## Documentation Status - July 10, 2026
 
-Reviewed during the June 1, 2026 documentation refresh. This file is a QA log or validation checklist. Keep older artifact paths as historical evidence, and add new dated entries after the next browser, mobile, or device validation pass.
+This audit separates the previously verified mobile artifacts from the July 10
+local release candidate. Keep older artifact paths as historical evidence; do
+not treat candidate code or Expo checks as production/physical-device proof.
 
-Last updated: 2026-05-19
+Last updated: 2026-07-10
+
+## July 10 Local Candidate Checkpoint
+
+The candidate includes service-worker update handling, accessible dialogs and
+message actions, bounded DM history, notification controls, personal blocking,
+global search, and ShadowPin social surfaces. Those changes still require a
+fresh `qa:mobile-pwa` artifact plus installed iPhone and Android validation after
+the final production deploy.
+
+The independent native workspace now targets Expo 57 / React Native 0.86 and
+passed its local clean-install, audit, lint, TypeScript, Expo Doctor, and static-
+export checks. That evidence does not validate this web/PWA viewport contract.
+
+Historical Boards/News/Art Board rows and screenshots below describe earlier QA
+coverage. Those surfaces are currently paused and omitted from the default
+production build; routine mobile smoke should verify their absence rather than
+re-enable them.
 
 ShadowChat defaults to phone-first design and testing. Unless a task explicitly
 states otherwise, viewport decisions should be judged against iPhone/WebKit and
@@ -12,16 +31,18 @@ Android/Chromium phone profiles before desktop convenience.
 
 ## Viewport Meta Status
 
-- `index.html` sets `width=device-width, initial-scale=1.0, user-scalable=no`.
+- `index.html` sets `width=device-width, initial-scale=1.0` and does not disable
+  user zoom.
 - iOS Home Screen meta tags are present:
   - `apple-mobile-web-app-capable=yes`
   - `apple-mobile-web-app-status-bar-style=black-translucent`
   - `apple-mobile-web-app-title=ShadowChat`
-- The app disables pinch zoom to preserve the native-like installed PWA feel.
+- Pinch zoom remains available for accessibility.
 
 ## Manifest And Service Worker Status
 
-- `public/manifest.webmanifest` uses `display: standalone`, `orientation: portrait-primary`, `start_url: /`, and app icons.
+- `public/manifest.webmanifest` uses `display: standalone`, `start_url: /`, and
+  app icons without forcing an orientation lock.
 - `src/main.tsx` registers the push service worker through `registerPushServiceWorker`.
 - `public/sw.js` handles static asset caching, notifications, app badges, and notification click routing.
 
@@ -91,3 +112,6 @@ Android/Chromium phone profiles before desktop convenience.
 - The mobile QA harness uses viewport compression after composer focus as the closest repeatable keyboard simulation.
 - Dense secondary controls, especially reaction chips and reply links, are documented as warnings and should be comfort-checked by hand.
 - Final production confidence still needs at least one real iPhone Home Screen install and one Android Home Screen install.
+- Do not create a production ShadowPin post merely for mobile smoke. New pins
+  fan out notifications and web push to eligible members; use staged/existing
+  content unless a controlled real post is explicitly approved.

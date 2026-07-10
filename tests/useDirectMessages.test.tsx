@@ -1049,6 +1049,71 @@ describe('DirectMessagesView user search', () => {
     expect(document.getElementById('dm-message-m1')).not.toHaveClass('[content-visibility:auto]');
   });
 
+  test('does not render preserved message history while a conversation is blocked', () => {
+    const { useIsDesktop } = jest.requireMock('../src/hooks/useIsDesktop') as {
+      useIsDesktop: jest.Mock
+    };
+    useIsDesktop.mockReturnValue(true);
+
+    dmSpy.mockReturnValue({
+      conversations: [{
+        id: 'c1',
+        other_user: {
+          id: 'u2',
+          username: 'bob',
+          display_name: 'Bob',
+          avatar_url: '',
+          color: 'red',
+          status: 'online',
+        },
+        last_message: null,
+        unread_count: 0,
+        is_blocked: true,
+        blocked_by_me: true,
+      }],
+      currentConversation: 'c1',
+      messages: [{
+        id: 'blocked-message',
+        conversation_id: 'c1',
+        sender_id: 'u2',
+        recipient_id: 'u1',
+        content: 'private history must stay hidden',
+        message_type: 'text',
+        reactions: {},
+        read_by: ['u2'],
+        created_at: '2026-07-10T12:00:00.000Z',
+        updated_at: '2026-07-10T12:00:00.000Z',
+        sender: { id: 'u2', username: 'bob', display_name: 'Bob' },
+      }],
+      messagesConversationId: 'c1',
+      loading: false,
+      messagesLoading: false,
+      loadingMore: false,
+      hasMore: false,
+      sending: false,
+      uploading: false,
+      setCurrentConversation: setCurrentConversationMock,
+      startConversation: startConversationMock,
+      sendMessage: jest.fn(),
+      editMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      toggleReaction: jest.fn(),
+      markAsRead: jest.fn(),
+      loadOlderMessages: jest.fn(),
+    } as any);
+
+    render(
+      <DirectMessagesView
+        onToggleSidebar={() => {}}
+        currentView="dms"
+        onViewChange={() => {}}
+      />
+    );
+
+    expect(screen.queryByText('private history must stay hidden')).not.toBeInTheDocument();
+    expect(screen.getAllByText(/you blocked this user/i).length).toBeGreaterThan(0);
+  });
+
   test('keeps the mobile DM composer enabled while a send is pending so iOS preserves keyboard focus', () => {
     const { useIsDesktop } = jest.requireMock('../src/hooks/useIsDesktop') as {
       useIsDesktop: jest.Mock

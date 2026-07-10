@@ -8,6 +8,15 @@ const migrationPath = path.join(
   '20260710042701_personal_blocking_privacy_contract.sql'
 )
 const sql = fs.readFileSync(migrationPath, 'utf8')
+const hardeningSql = fs.readFileSync(
+  path.join(
+    process.cwd(),
+    'supabase',
+    'migrations',
+    '20260710044600_personal_blocking_engagement_hardening.sql'
+  ),
+  'utf8'
+)
 
 describe('personal blocking database contract', () => {
   test('stores private self-owned block rows with least-privilege grants', () => {
@@ -49,7 +58,7 @@ describe('personal blocking database contract', () => {
   test('blocks trusted DM inserts and reactions while preserving existing rows', () => {
     expect(sql).toMatch(/before insert on public\.dm_conversations[\s\S]*private\.enforce_dm_conversation_not_blocked/i)
     expect(sql).toMatch(/before insert on public\.dm_messages[\s\S]*private\.enforce_dm_message_not_blocked/i)
-    expect(sql).toMatch(/before insert on public\.message_reactions[\s\S]*private\.enforce_dm_reaction_not_blocked/i)
+    expect(`${sql}\n${hardeningSql}`).toMatch(/before insert or delete on public\.message_reactions[\s\S]*private\.enforce_dm_reaction_not_blocked/i)
     expect(sql).not.toMatch(/delete from public\.dm_(?:messages|conversations)/i)
   })
 
@@ -67,5 +76,29 @@ describe('personal blocking database contract', () => {
     expect(sql).toMatch(/function public\.search_users\(term text\)[\s\S]*not private\.users_have_block\(caller_user_id, users\.id\)/i)
     expect(sql).toMatch(/function public\.list_presence_states\(\)[\s\S]*not private\.users_have_block\(caller_user_id, users\.id\)/i)
     expect(sql).toMatch(/function public\.get_active_users\(\)[\s\S]*not private\.users_have_block\(caller_user_id, users\.id\)/i)
+  })
+
+  test('closes SECURITY DEFINER and table-level engagement bypasses', () => {
+    expect(hardeningSql).toMatch(/before insert on public\.message_hypes[\s\S]*private\.enforce_dm_reaction_not_blocked/i)
+    expect(hardeningSql).toMatch(/before insert or delete on public\.shadow_pin_category_hearts/i)
+    expect(hardeningSql).toMatch(/before insert or delete on public\.shadow_pin_image_hearts/i)
+    expect(hardeningSql).toMatch(/function public\.toggle_message_pin[\s\S]*private\.users_have_block\(actor_user_id, message_author_id\)/i)
+    expect(hardeningSql.match(/private\.users_have_block\(auth\.uid\(\), target_user_id\)/gi)).toHaveLength(3)
+  })
+
+  test('filters both Hype actors and message authors from rows and push recipients', () => {
+    expect(hardeningSql).toMatch(/policy "Blocked users are hidden from Hype events"[\s\S]*message_author_id/i)
+    expect(hardeningSql).toMatch(/policy "Blocked users are hidden from message Hype"[\s\S]*message_author_id/i)
+  })
+
+  test('bounds ShadowPin activity, post, tag, notification, and reply surfaces', () => {
+    expect(hardeningSql).toMatch(/octet_length\(new\.metadata::text\) > 4096/i)
+    expect(hardeningSql).toMatch(/recent_count >= 120[\s\S]*Too many ShadowPin activity events/i)
+    expect(hardeningSql).toMatch(/recent_count >= 12[\s\S]*Too many ShadowPin posts/i)
+    expect(hardeningSql).toMatch(/constraint trigger require_shadow_pin_tag_link/i)
+    expect(hardeningSql).toMatch(/clear_blocked_shadow_pin_notifications[\s\S]*after insert on public\.user_blocks/i)
+    expect(hardeningSql).toMatch(/ShadowPin replies must target a root comment/i)
+    expect(hardeningSql).toMatch(/new\.processing_status <> 'ready'/i)
+    expect(hardeningSql).toMatch(/after insert or update of processing_status, deleted_at/i)
   })
 })

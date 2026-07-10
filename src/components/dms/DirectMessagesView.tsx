@@ -739,7 +739,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const showInboxLoading = conversationsLoading && conversations.length === 0
   const showInboxEmpty = !conversationsLoading && conversations.length === 0
   const selectedThreadLoaded = Boolean(currentConversation && messagesConversationId === currentConversation)
-  const showThreadInitialLoading = (!selectedThreadLoaded || messagesLoading) && messages.length === 0
+  const showThreadInitialLoading = !currentConv?.is_blocked && (!selectedThreadLoaded || messagesLoading) && messages.length === 0
   const showThreadEmpty = selectedThreadLoaded && !messagesLoading && messages.length === 0 && !loadingMore && !currentConv?.is_blocked
 
   const [searchUsername, setSearchUsername] = useState('')
@@ -1331,7 +1331,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 </div>
               )}
 
-              {messages.map((message, index) => (
+              {!currentConv.is_blocked && messages.map((message, index) => (
                 <React.Fragment key={message.id}>
                   {firstUnreadDMMessageId === message.id && (
                     <UnreadDivider />

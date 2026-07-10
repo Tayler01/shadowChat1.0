@@ -6,10 +6,12 @@ The project is already wired for hosted Supabase and Netlify deployment. It is d
 
 ## Documentation Status - July 10, 2026
 
-The documentation set has been refreshed for the July 9-10 alignment program:
-paused product domains, Supabase authority/security hardening, deterministic
-backend deployment, strict CI, dependency cleanup, build budgets, and
-engineering safeguards. The ranked source of truth is
+The documentation set has been refreshed for the July 9-10 alignment program
+and the current local release candidate: paused product domains, Supabase
+authority/security hardening, deterministic backend deployment, strict CI,
+dependency cleanup, build budgets, notification delivery parity, personal
+privacy controls, message discovery, and the active Entertainment/ShadowPin
+feature work. The ranked source of truth is
 [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1),
 and the full inventory is
 [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
@@ -22,11 +24,15 @@ the matching build from `main`. A July 10 live headless smoke passed stable-user
 auth plus General Chat and DM resume-send; both generated rows were deleted and
 follow-up production counts were zero.
 
-Current follow-ups remain ranked in that audit: reducing the remaining guarded
-authenticated `SECURITY DEFINER` surface, service-worker update behavior, DM
-pagination/subscription/rendering, reaction rollback, runtime-asset cleanup,
-CSP and accessibility/mobile polish, physical-device PWA validation, and the
-deliberately deferred product improvements.
+The local release candidate closes the code-side service-worker, DM pagination
+and subscription, reaction rollback, runtime-asset, report-only CSP, dialog,
+mobile-header, notification, blocking, message-library, ShadowPin social,
+Shado TV, and Shadow Mystery work described below. Production evidence is not
+claimed until the backend-first `main` workflow aligns Supabase and publishes
+the matching Netlify build. Remaining follow-ups include the staged private-
+identity column removal, physical-device PWA validation, production header and
+advisor verification, and domain-by-domain reduction of the guarded
+`SECURITY DEFINER` surface.
 
 ## Stack
 
@@ -57,6 +63,11 @@ deliberately deferred product improvements.
 - Hype-aware image/video media frames that keep badges and reactions inside
   shrink-wrapped media cards without changing text/file/audio bubbles
 - Slash commands and reply/thread affordances
+- Universal authenticated search across visible General Chat messages and the
+  signed-in user's DMs, with private saved messages and personal collections
+- Reciprocal personal blocking across profile discovery, General Chat,
+  presence, DMs, ShadowPin, Hype, and push delivery while preserving DM history
+  for restoration after unblock
 - AI reply and summary hooks through a secured Supabase Edge Function
 - Preserved, default-off Boards domain with its draggable map, News Feed, board chats, and Art Board mood canvas
 - App-wide admin/sub-admin access controls with role badges and operator-only tools
@@ -65,7 +76,9 @@ deliberately deferred product improvements.
 - Admin-managed X/Truth Social source tracking from Settings
 - Admin feedback review for submitted bugs, suggestions, and private attachments
 - Server-side link previews for chat, DMs, and board chat URLs
-- Browser push notifications for DMs and group chat
+- Browser push notifications for DMs, General Chat messages, mentions,
+  replies, reactions, Hype, and ShadowPin activity, with master/type controls,
+  daily quiet hours, temporary snooze, General Chat mute, and per-DM-thread mute
 - Best-effort app-shell repair for already-granted browser push subscriptions
   when signed-in users foreground or reopen the app
 - Mobile Golden Egg Easter egg discovery from the SHADO logo, with a permanent
@@ -83,6 +96,15 @@ deliberately deferred product improvements.
   shared foreground-only Web Audio soundtrack controller, original SFX, public
   completion medals backed by a private completion ledger, and a best-effort
   Android fullscreen/landscape request from the picker
+- ShadowPin discovery with normalized tags, indexed pin search, threaded
+  comments/replies, and in-app plus background notifications for eligible new
+  posts, comments, and replies
+- Shado TV Bunny playback with WebVTT captions, synchronized premieres,
+  Continue Watching, and privacy-bounded operator watch analytics
+- Shadow Mystery hybrid bundled/database reader with an operator publishing
+  studio, ordered chapters, source credits, and private transformed artwork
+- Operator Operations Health showing sanitized release, migration, Function,
+  monitor, push-readiness, and paused-domain evidence
 - Premium obsidian-and-gold design system across desktop and mobile
 
 ## Current Project Shape
@@ -98,10 +120,18 @@ Frontend lives under [`src`](C:/repos/chat2.0/src).
 - [`src/components/news`](C:/repos/chat2.0/src/components/news) contains the News Feed, feed item, reaction, modal UI, and compatibility wrappers for older imports.
 - [`src/features/games`](C:/repos/chat2.0/src/features/games) contains the Entertainment picker and game surfaces, including the Shadow Runner Phaser prototype under [`src/features/games/shadow-runner`](C:/repos/chat2.0/src/features/games/shadow-runner).
 - [`src/features/entertainment`](C:/repos/chat2.0/src/features/entertainment) contains non-game Entertainment surfaces such as Shado TV and Shadow Mystery.
+- [`src/components/search`](C:/repos/chat2.0/src/components/search) contains the
+  global message search, saved-message, and personal-collection surface.
+- [`source-assets`](C:/repos/chat2.0/source-assets) preserves nonruntime source,
+  generation, contact-sheet, and preview assets outside the Netlify deploy;
+  only runtime-ready finals belong under [`public`](C:/repos/chat2.0/public).
 - [`src/components/chat/WeatherWidget.tsx`](C:/repos/chat2.0/src/components/chat/WeatherWidget.tsx:1) contains the General Chat weather pill and forecast popup.
 - [`src/components/settings/WeatherLocationSettings.tsx`](C:/repos/chat2.0/src/components/settings/WeatherLocationSettings.tsx:1) contains the per-user weather location picker.
 - [`src/hooks/useBoardChat.tsx`](C:/repos/chat2.0/src/hooks/useBoardChat.tsx), [`src/hooks/useBoardBadges.ts`](C:/repos/chat2.0/src/hooks/useBoardBadges.ts), [`src/hooks/useNewsFeed.tsx`](C:/repos/chat2.0/src/hooks/useNewsFeed.tsx), and [`src/hooks/useNewsAdmin.ts`](C:/repos/chat2.0/src/hooks/useNewsAdmin.ts) own the Boards and News client behavior.
 - [`src/hooks/useAdminAccess.ts`](C:/repos/chat2.0/src/hooks/useAdminAccess.ts:1) owns admin/sub-admin access state.
+- [`src/hooks/useBlockedUsers.tsx`](C:/repos/chat2.0/src/hooks/useBlockedUsers.tsx:1) owns private block-list state and reciprocal UI enforcement.
+- [`src/lib/messageLibrary.ts`](C:/repos/chat2.0/src/lib/messageLibrary.ts:1) owns message search, saves, and collections.
+- [`src/lib/personalBlocking.ts`](C:/repos/chat2.0/src/lib/personalBlocking.ts:1) owns personal-block RPC helpers and blocked-action messaging.
 - [`src/hooks/useWeatherPreference.ts`](C:/repos/chat2.0/src/hooks/useWeatherPreference.ts:1), [`src/hooks/useWeatherForecast.ts`](C:/repos/chat2.0/src/hooks/useWeatherForecast.ts:1), and [`src/lib/weather.ts`](C:/repos/chat2.0/src/lib/weather.ts:1) own weather preference and forecast behavior.
 
 Backend lives under [`supabase`](C:/repos/chat2.0/supabase).
@@ -122,6 +152,20 @@ Backend lives under [`supabase`](C:/repos/chat2.0/supabase).
 - Weather locations use private `public.user_weather_preferences` rows scoped by RLS to the owning user.
 - Hype uses `public.hype_events`, `public.message_hypes`,
   `public.hype_event_receipts`, and `public.hype_bonus_grants`.
+- Notification delivery uses `public.notification_preferences`, private
+  per-user rows in `public.notification_conversation_mutes`, recipient-owned
+  `public.notification_events`, and `public.push_subscriptions`.
+- Personal blocking uses private owner-visible `public.user_blocks` rows plus
+  reciprocal RLS, guarded RPCs, and server-side DM enforcement triggers.
+- Message search and saves use `public.message_collections`,
+  `public.saved_messages`, and caller-scoped SECURITY INVOKER search/list RPCs.
+- ShadowPin social data uses `public.shadow_pin_tags`,
+  `public.shadow_pin_image_tags`, and `public.shadow_pin_comments`.
+- Shadow Mystery publishing uses isolated story, chapter, image, and source
+  tables plus the private `shadow-mystery` Storage bucket.
+- Shado TV captions and analytics use `public.shado_tv_captions`,
+  `public.shado_tv_watch_events`, existing per-user watch progress, and an
+  operator-only aggregate RPC.
 - [`supabase/function-manifest.json`](C:/repos/chat2.0/supabase/function-manifest.json:1)
   classifies every Edge Function as active, deny-paused, or removed.
 - The Golden Egg Easter egg uses `public.users.gold_easter_egg` and the
@@ -225,6 +269,10 @@ node scripts/playwright-smoke.mjs --scenario=full --run-name=full-smoke-release 
 
 - Realtime depends on the migrations having been pushed to the target Supabase project.
 - Browser push depends on the service worker, VAPID keys, the `send-push` edge function, and at least one active subscription row. Hype notifications use the same function with the `hype_event` event type.
+- ShadowPin foreground alerts depend on recipient-owned `notification_events`
+  being in the Supabase Realtime publication. Migration
+  `20260710044500_publish_notification_events_realtime.sql` adds that
+  publication while RLS keeps each event visible only to its recipient.
 - Signed-in foreground clients repair already-granted push subscriptions through
   `PushSubscriptionSync` without prompting users again.
 - AI features depend on the `openai-chat` edge function and configured Supabase AI provider secrets.
@@ -292,6 +340,9 @@ preserved Render News worker remains suspended.
 - [docs/ARCHITECTURE.md](C:/repos/chat2.0/docs/ARCHITECTURE.md:1): codebase map and key data flows
 - [docs/ADMIN_ACCESS.md](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1): app-wide admin/sub-admin roles, badges, settings, and RPCs
 - [docs/CHANNEL_BANS.md](C:/repos/chat2.0/docs/CHANNEL_BANS.md:1): profile-popup moderation controls and database-enforced channel bans
+- [docs/PERSONAL_BLOCKING.md](C:/repos/chat2.0/docs/PERSONAL_BLOCKING.md:1): reciprocal private blocks across discovery, chat, DMs, ShadowPin, and notifications
+- [docs/MESSAGE_LIBRARY.md](C:/repos/chat2.0/docs/MESSAGE_LIBRARY.md:1): caller-visible message search, private saves, and collections
+- [docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md](C:/repos/chat2.0/docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md:1): current in-app/Web Push delivery, preferences, privacy, retries, and device QA
 - [docs/ART_BOARD.md](C:/repos/chat2.0/docs/ART_BOARD.md:1): shared Art Board canvas, schema, storage, moderation, and validation
 - [docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md:1): active Shadow Runner playable-prototype roadmap, route checkpoints, and verification notes
 - [docs/SHADOW_RUNNER_HOME_ASSETS.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_HOME_ASSETS.md:1): Shadow Runner title/menu/campaign-map asset pack, current playable-prototype wiring, and asset follow-ups
@@ -306,6 +357,9 @@ preserved Render News worker remains suspended.
 - [docs/FEEDBACK_SUBMISSIONS.md](C:/repos/chat2.0/docs/FEEDBACK_SUBMISSIONS.md:1): Settings feedback flow, Supabase storage model, and validation notes
 - [docs/APP_RELEASES.md](C:/repos/chat2.0/docs/APP_RELEASES.md:1): production app-release popup behavior
 - [docs/PHONE_INSTALL_ONBOARDING.md](C:/repos/chat2.0/docs/PHONE_INSTALL_ONBOARDING.md:1): phone install tutorial and notification onboarding
+- [docs/SHADOW_PIN.md](C:/repos/chat2.0/docs/SHADOW_PIN.md:1): ShadowPin media, discovery, comments, notifications, permissions, and validation
+- [docs/SHADO_TV.md](C:/repos/chat2.0/docs/SHADO_TV.md:1): Shado TV catalog, Bunny playback, captions, premieres, progress, and analytics
+- [docs/SHADOW_MYSTERY.md](C:/repos/chat2.0/docs/SHADOW_MYSTERY.md:1): bundled/database story reader and operator publishing studio
 - [docs/SUPABASE_REALTIME_AUDIT_2026-05-02.md](C:/repos/chat2.0/docs/SUPABASE_REALTIME_AUDIT_2026-05-02.md:1): table-by-table realtime publication decisions
 - [docs/DEFERRED_FOLLOWUPS.md](C:/repos/chat2.0/docs/DEFERRED_FOLLOWUPS.md:1): small follow-up ideas preserved after pruning stale branches
 - [docs/ESP_BRIDGE_FEATURE_ROADMAP.md](C:/repos/chat2.0/docs/ESP_BRIDGE_FEATURE_ROADMAP.md:1): planning baseline and phased roadmap for the airgapped ESP bridge feature
@@ -325,7 +379,7 @@ preserved Render News worker remains suspended.
 - [firmware/esp-bridge/README.md](C:/repos/chat2.0/firmware/esp-bridge/README.md:1): ESP-IDF firmware workspace and admin-shell bring-up path for the bridge spike
 - [docs/STABILITY_AND_QA_UPDATES_2026-04.md](C:/repos/chat2.0/docs/STABILITY_AND_QA_UPDATES_2026-04.md:1): stabilization work, QA improvements, and mobile resume fixes completed before the next feature phase
 - [docs/LIQUID_GOLD_DARK_REWORK.md](C:/repos/chat2.0/docs/LIQUID_GOLD_DARK_REWORK.md:1): design-direction history
-- [docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md](C:/repos/chat2.0/docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md:1): notification planning notes
+- [docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md](C:/repos/chat2.0/docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md:1): implemented notification architecture, settings, suppression, and remaining device QA
 
 ## Status
 

@@ -2,12 +2,15 @@
 
 This project uses a mix of static checks, Jest coverage, and real browser validation.
 
-## Documentation Status - July 9, 2026
+## Documentation Status - July 10, 2026
 
-This guide reflects the current repo scripts and the July 9 release-quality
-baseline. CI now treats warnings, documentation drift, dependency advisories,
+This guide reflects the current repo scripts and the July 10 local release
+candidate. CI treats warnings, documentation drift, dependency advisories,
 Supabase migration/lint/advisor drift, Edge Function inventory drift, build
 budget regressions, the complete Jest suite, and Expo health as release gates.
+Passing local gates does not make the candidate production-proven; hosted
+migration/function parity, the final Netlify SHA, production smoke, and physical
+device checks remain separate evidence.
 
 ## Mobile-First Testing Default
 
@@ -49,6 +52,28 @@ deploy-size regression. Update a budget only with measured before/after evidence
 The `quality.yml` workflow also runs a clean News-worker install/audit, a
 separate Expo install/audit/lint/typecheck/Doctor job, and a fresh local
 Supabase database start/reset/lint/security-advisor job.
+
+### Expo 57 Native Workspace Gate
+
+`apps/mobile` is currently aligned to Expo `~57.0.4`, React Native `0.86.0`,
+React `19.2.3`, and TypeScript `~6.0.3`. When native files or the mobile lockfile
+change, run the independent package checks from that directory:
+
+```powershell
+Push-Location apps/mobile
+npm ci
+npm audit --audit-level=low
+npm run lint
+npx tsc --noEmit
+npm run doctor
+npx expo export --platform web --output-dir output/expo57-web
+Pop-Location
+```
+
+The July 10 upgrade candidate passed those checks locally, including Expo Doctor
+`20/20` and a static web export. Remove generated export output after review.
+This proves dependency/configuration health only; it does not ship the native
+app and does not replace iPhone/Android PWA or future development-build testing.
 
 ## Unit And Hook Tests
 
@@ -124,6 +149,13 @@ test messages/posts plus every uploaded Storage object or derived media object
 the test created: images, videos, audio or voice clips, thumbnails, and generic
 file attachments. Do not leave QA/weather/media smoke data behind for a later
 cleanup batch; if cleanup cannot be verified, report it as residual risk.
+
+ShadowPin is an exception to generic production-post smoke. Do not create a new
+production pin merely to verify submission: the insert fans out notification
+events and can send web push to eligible members, while later cleanup cannot
+recall delivered notifications. Prove posting locally/staging or in a rolled-back
+database transaction. Use existing production content for read/search/comment UI
+checks unless a real, controlled post has explicit approval.
 
 ## Recommended Local Browser Loop
 
@@ -298,6 +330,41 @@ post-deploy smoke must continue to use stable email-confirmed
 `PLAYWRIGHT_ACCOUNT_*` users.
 
 Auth/session persistence checks and rollback notes live in [`docs/SESSION_PERSISTENCE_RUNBOOK.md`](C:/repos/chat2.0/docs/SESSION_PERSISTENCE_RUNBOOK.md:1). Use that runbook whenever a change touches saved sessions, mobile resume, auth restore, or realtime reconnect behavior.
+
+### Private Identity Two-Stage QA
+
+Treat identity hardening as two releases, not one destructive migration.
+
+Release A local/database coverage must prove:
+
+- `user_public_profile_json`, General Chat windows, DM conversations, search,
+  and realtime payloads omit authentication `email` and legacy `full_name`;
+- profile bootstrap and AI/Bridge upserts do not write those compatibility
+  columns;
+- full-admin email is read from guarded `auth.users`, not a public profile row;
+- stable users still sign in, load profiles, chat, DM, resume, and use the
+  appropriate admin surface;
+- repository searches and contract tests include the independent
+  `apps/mobile` package, not only root `src` and Edge Functions. The native
+  selectors/types are cut over locally; keep `tests/privateIdentityReleaseB.test.ts`
+  and the Expo 57 gate in the release proof.
+
+Release B may add a separate drop migration only after Release A is deployed and
+production-proven. Before that migration, re-run the full schema reset, database
+lint/security contracts, focused identity tests, stable-account browser smoke,
+and Expo/native selector checks. Any remaining read of
+`public.users.email` or `public.users.full_name` blocks Release B.
+
+For the July 10 social/notification hardening candidate, also run:
+
+```powershell
+npx jest --runInBand tests/personalBlockingSql.test.ts tests/useDirectMessages.test.tsx tests/ShadowPinCommentsDialog.test.tsx tests/shadowPinSocialSql.test.ts tests/pushDeliveryRetry.test.ts tests/edgeFunctionAbuseGuards.test.ts
+```
+
+The database proof must show `notification_events` in `supabase_realtime`,
+ready-state-only ShadowPin new-post fanout, blocked known-id engagement
+rejection, one-level comment replies, and no endpoint/recipient identifiers in
+push responses.
 
 Current smoke scenarios:
 
@@ -622,6 +689,11 @@ Examples:
 - settings scroll and action button layout
 - profile cards and stats layout
 - toast placement above nav/composer
+- service-worker update/reload behavior in an installed PWA
+- notification quiet hours, global/channel/conversation mutes, and tap routing
+- blocked-user visibility and DM prevention across resume/reconnect
+- ShadowPin search/comments using existing or staged content, without a routine
+  production pin post
 
 ## Known Testing Realities
 
@@ -629,6 +701,8 @@ Examples:
 - Real notification delivery still needs at least one normal browser/device validation.
 - Preview mode is more stable than hot-reload mode for visual and realtime verification.
 - Browser automation is a strong regression signal for resume issues, but final confidence for iPhone Home Screen behavior still comes from one real-device validation pass.
+- Expo 57 Doctor/export success is not evidence for installed PWA behavior, and
+  PWA browser success is not evidence for a future native development build.
 
 ## Useful Files While Testing
 

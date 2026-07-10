@@ -10,6 +10,10 @@ const clientApi = readFileSync(
   path.join(process.cwd(), 'src/features/shadow-pin/api/shadowPinApi.ts'),
   'utf8'
 ).replace(/\s+/g, ' ').toLowerCase()
+const realtimeSql = readFileSync(
+  path.join(process.cwd(), 'supabase/migrations/20260710044500_publish_notification_events_realtime.sql'),
+  'utf8'
+).replace(/\s+/g, ' ').toLowerCase()
 
 describe('ShadowPin social and discovery contract', () => {
   test('normalizes and bounds client tags consistently', () => {
@@ -65,5 +69,10 @@ describe('ShadowPin social and discovery contract', () => {
     expect(sql).not.toContain("'full_name'")
     expect(clientApi).toContain('triggershadowpinpostpushnotification(taggedimage.id)')
     expect(clientApi).toContain('triggershadowpincommentpushnotification(comment.id)')
+  })
+
+  test('publishes recipient-owned notification events for live in-app delivery', () => {
+    expect(realtimeSql).toContain('alter publication supabase_realtime add table public.notification_events')
+    expect(realtimeSql).toContain("tablename = 'notification_events'")
   })
 })

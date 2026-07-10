@@ -1,8 +1,14 @@
 # Realtime Push Notifications Plan
 
-## Documentation Status - June 1, 2026
+## Documentation Status - July 10, 2026
 
-Reviewed during the June 1, 2026 documentation refresh. This feature guide is current for the shipped product surface, with any known hardening or polish follow-ups tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
+This file now documents the implemented local notification architecture rather
+than only the original plan. The current release candidate includes targeted
+General Chat/DM delivery, ShadowPin events, master and type controls, daily
+quiet hours, temporary snooze, General Chat mute, private DM conversation
+mutes, personal-block suppression, service-worker routing, and recipient-owned
+in-app ShadowPin events. Production and normal-device delivery proof remains
+pending.
 
 ## Goal
 
@@ -60,15 +66,10 @@ This covers the Windows requirement without introducing a native Windows app.
 
 ## Product Scope
 
-Ship notifications in this order:
-
-1. Direct messages
-2. Mentions in group chat
-3. Replies to your messages
-4. Reactions to your messages
-5. Group message summaries or optional group-chat alerts
-
-Do not start with all group-message notifications. It will feel noisy immediately.
+The active product supports independently controlled delivery for direct
+messages, mentions, replies, reactions, every General Chat message, Hype, new
+ShadowPin posts, ShadowPin comments, and ShadowPin replies. Every-message group
+delivery remains off by default so targeted activity does not become noisy.
 
 ## Current State In This Repo
 
@@ -82,10 +83,20 @@ Relevant existing pieces:
 - [supabase/functions/send-push/index.ts](/C:/repos/chat2.0/supabase/functions/send-push/index.ts:1) delivers Web Push with VAPID
 - [src/components/notifications/AppBadgeSync.tsx](/C:/repos/chat2.0/src/components/notifications/AppBadgeSync.tsx:1) mirrors unread DM count to the installed app icon when supported
 
+Implemented locally in the current candidate:
+
+- privacy-safe aggregate delivery results (`deliveredCount`,
+  `removedSubscriptions`, `attemptedCount`, and `retryableFailures`)
+- permanent invalid-subscription cleanup without returning endpoint, database
+  id, recipient id, or per-subscription results to the caller
+- retryable `503` responses for transient provider failures and failed-claim
+  release so a later request can reacquire the idempotency key
+- two bounded client retries for network, `409`, and `5xx` Function failures;
+  permanent `4xx` responses are not retried
+
 Still open:
 
-- richer retry/diagnostic reporting for failed push endpoints
-- mention/reply/reaction notification event types
+- richer operator-only diagnostics that preserve subscription/recipient privacy
 - group unread tracking if group chat badge counts become product scope
 - production mobile QA on iOS Home Screen, Android install, and Windows PWA
 
@@ -119,7 +130,7 @@ Flow:
 
 ## PWA Requirements
 
-Add:
+Current required pieces:
 
 - `manifest.webmanifest`
 - service worker file
@@ -175,20 +186,44 @@ Columns:
 
 - `user_id uuid primary key references auth.users(id) on delete cascade`
 - `push_enabled boolean not null default false`
+- `notifications_enabled boolean not null default true`
 - `dm_enabled boolean not null default true`
 - `mention_enabled boolean not null default true`
 - `reply_enabled boolean not null default true`
 - `reaction_enabled boolean not null default false`
 - `group_enabled boolean not null default false`
+- `hype_enabled boolean not null default true`
+- `shadow_pin_new_post_enabled boolean not null default true`
+- `shadow_pin_comment_enabled boolean not null default true`
+- `shadow_pin_reply_enabled boolean not null default true`
+- `general_chat_muted boolean not null default false`
 - `quiet_hours_start time null`
 - `quiet_hours_end time null`
+- `quiet_hours_timezone text not null default 'UTC'`
 - `mute_until timestamptz null`
 - `created_at timestamptz not null default now()`
 - `updated_at timestamptz not null default now()`
 
 RLS:
 
-- users can read/update their own row
+- users can read/insert/update their own row
+
+### `notification_conversation_mutes`
+
+Purpose:
+
+- store private per-user DM conversation push mutes
+- preserve the conversation and message history while delivery is muted
+
+Columns:
+
+- `user_id uuid references public.users(id)`
+- `conversation_id uuid references public.dm_conversations(id)`
+- `muted_until timestamptz null`; null means muted until the user removes the row
+- timestamps
+
+RLS allows only the owning participant to read or mutate their mute row. The
+current UI exposes an indefinite mute toggle in the DM header.
 
 ### `notification_events`
 
@@ -214,14 +249,23 @@ Constraints:
 
 - unique on `dedupe_key`
 
+`notification_events` is in the Supabase Realtime publication as of
+`20260710044500_publish_notification_events_realtime.sql`. RLS continues to
+limit SELECT and live INSERT delivery to the event recipient.
+
 ## Event Types
 
-Support these event types first:
+Current event types include:
 
 - `dm_message`
+- `group_message`
 - `mention`
 - `reply`
 - `reaction`
+- `hype_event`
+- `shadow_pin_post`
+- `shadow_pin_comment`
+- `shadow_pin_reply`
 
 Payload should include enough data for rendering without another blocking fetch:
 
@@ -252,59 +296,46 @@ Example payload:
 
 ## Backend Strategy
 
-### Use Supabase Edge Functions
+### Supabase `send-push` Edge Function
 
-Create:
+Implementation:
 
-- `supabase/functions/send-web-push`
+- `supabase/functions/send-push/index.ts`
+- `supabase/functions/_shared/notification-delivery.ts`
 
 Responsibilities:
 
-- validate internal caller identity or signed request source
+- validate the signed-in caller and load the referenced source entity instead
+  of trusting recipient/title/body data from the browser
 - fetch matching subscriptions for the target user
-- respect user notification preferences
+- enforce type preferences, master mute, temporary snooze, timezone-aware quiet
+  hours, General Chat mute, DM conversation mute, self-suppression, and personal
+  blocking
 - send Web Push with VAPID
-- prune dead subscriptions on `410 Gone` or equivalent failures
-- record delivery outcome in `notification_events`
+- prune permanently invalid subscriptions; keep transient provider failures for
+  retry
+- create/update deterministic `notification_events` delivery evidence
+- return only aggregate delivery counts, never subscription endpoints/ids,
+  recipient ids, or raw provider result arrays
+- return `503` when any provider failure is retryable and release the Edge
+  idempotency claim instead of recording a false completion
 
 ### Trigger Source
 
-There are two good options.
-
-#### Option A: Database Trigger -> Edge Function
-
-Pros:
-
-- low latency
-- close to the source of truth
-
-Cons:
-
-- trigger-to-http logic is more operationally sensitive
-
-#### Option B: Edge Function Poller / queue processor
-
-Pros:
-
-- easier retries and dedupe
-- safer operational model
-
-Cons:
-
-- slightly more moving parts
-
-Recommended for this repo:
-
-- write notification candidate rows into `notification_events`
-- process them from an Edge Function runner path
-
-That gives cleaner retries, dedupe, and future expandability.
+The active chat/DM/ShadowPin client sends a best-effort `send-push` request only
+after the source mutation succeeds. The Function re-reads the message,
+reaction, Hype event, pin, or comment and resolves eligible recipients on the
+server. ShadowPin database triggers also create recipient-owned in-app events;
+deterministic dedupe keys prevent duplicate event rows when background delivery
+processes the same source entity. A new-post event is created only when a pin
+first reaches its visible `processing_status = 'ready'` state, not when a raw
+processing row is inserted.
 
 ## Client-Side Responsibilities
 
-### New Hook: `usePushNotifications`
+### `usePushNotifications`
 
-Add a client hook that handles:
+The current client hook handles:
 
 - feature detection
 - permission state
@@ -336,23 +367,25 @@ At startup:
 
 ### Settings UX
 
-Upgrade the current `Push Notifications` toggle in:
+The current notification settings surface in:
 
 - [src/components/settings/SettingsView.tsx](/C:/repos/chat2.0/src/components/settings/SettingsView.tsx:1)
 
-into a real settings surface with:
+includes:
 
-- master push toggle
-- DM toggle
-- mention toggle
-- reply toggle
-- reaction toggle
-- optional quiet hours
+- device-specific push subscription toggle and setup guidance
+- master delivery toggle
+- DM, mention, reply, reaction, every-message General Chat, Hype, and three
+  ShadowPin type toggles
+- General Chat mute
+- timezone-aware daily quiet hours
+- one-hour/eight-hour temporary snooze and immediate resume
+- per-DM conversation mute in the thread header
 - install guidance on iPhone if push is unsupported in the current mode
 
 ## Service Worker Responsibilities
 
-Create a service worker that:
+The service worker:
 
 - handles `push`
 - handles `notificationclick`
@@ -380,8 +413,11 @@ Do not send push when:
 
 - the sender is the same as the recipient
 - the recipient disabled that notification type
-- the relevant conversation is already active on the same device and the app is visible
-- the event is inside quiet hours and the type is not high-priority
+- the recipient disabled all notifications or has an active temporary snooze
+- the event falls inside the configured daily quiet-hours window
+- a General Chat event is covered by the General Chat mute
+- a DM event is covered by that recipient's conversation mute
+- either user has personally blocked the other
 
 ### Dedupe
 
@@ -391,6 +427,9 @@ Use deterministic `dedupe_key` values like:
 - `mention:<message_id>:<user_id>`
 - `reply:<message_id>:<user_id>`
 - `reaction:<message_id>:<emoji>:<user_id>`
+- `shadow_pin_post:<image_id>:<user_id>`
+- `shadow_pin_comment:<comment_id>:<user_id>`
+- `shadow_pin_reply:<comment_id>:<user_id>`
 
 ### Expired subscriptions
 
@@ -398,20 +437,30 @@ When push delivery reports a dead subscription:
 
 - disable or delete the subscription row
 
+### Retry
+
+The client invocation helper retries only transport failures, `409`, and `5xx`
+responses after 250 ms and 1,000 ms. The Function classifies provider `408`,
+`429`, `5xx`, and network exceptions as retryable; invalid endpoints or
+subscriptions and provider `400`, `401`, `403`, `404`, or `410` responses are
+removed and are not retried.
+
 ## Security
 
 - never send push directly from the browser using private VAPID keys
 - keep VAPID private key only in Supabase secrets
 - validate all `user_id` writes for subscriptions via RLS
 - do not trust raw client payloads for notification events
+- do not expose push endpoints, subscription ids, recipient ids, or raw
+  provider responses in Function results
 
 ## Secrets
 
 Add Supabase secrets for:
 
-- `WEB_PUSH_VAPID_PUBLIC_KEY`
-- `WEB_PUSH_VAPID_PRIVATE_KEY`
-- `WEB_PUSH_CONTACT_EMAIL`
+- `WEB_PUSH_PUBLIC_KEY`
+- `WEB_PUSH_PRIVATE_KEY`
+- `WEB_PUSH_SUBJECT`
 
 The public key is also exposed to the client as:
 
@@ -419,39 +468,55 @@ The public key is also exposed to the client as:
 
 ## Milestones
 
-### Milestone 1: PWA foundation
+### Milestone 1: PWA foundation - implemented
 
 - add manifest
 - add service worker
 - add registration code
 - add icon assets
 
-### Milestone 2: Subscription plumbing
+### Milestone 2: Subscription plumbing - implemented
 
 - add `push_subscriptions`
 - add `notification_preferences`
 - implement `usePushNotifications`
 - wire settings toggle to real backend state
 
-### Milestone 3: DM push MVP
+### Milestone 3: DM push MVP - implemented
 
 - add `notification_events`
 - create event creation path for incoming DMs
-- create `send-web-push` Edge Function
+- deliver through the `send-push` Edge Function
 - deliver DM notifications end to end
 
-### Milestone 4: Mentions and replies
+### Milestone 4: Mentions and replies - implemented locally
 
 - detect mentions in group chat
 - add reply notification generation
 - add preference checks
 
-### Milestone 5: Reactions and polish
+### Milestone 5: Reactions and delivery controls - implemented locally
 
 - add reaction notifications
 - add quiet hours
 - add dedupe tuning
 - add notification history UI if desired
+
+### Milestone 6: ShadowPin and conversation controls - implemented locally
+
+- new-post, comment, and reply events
+- recipient-owned Realtime in-app delivery
+- global, General Chat, and per-DM-thread mutes
+- reciprocal personal-block suppression
+- normal-device and production proof still pending
+
+### Milestone 7: Delivery privacy and bounded retry - implemented locally
+
+- privacy-safe aggregate delivery responses
+- permanent invalid-subscription pruning
+- transient provider `503` status and idempotency-claim release
+- bounded client retry for transport, conflict, and server failures
+- focused retry/privacy contract tests
 
 ## Testing Matrix
 
@@ -461,6 +526,10 @@ The public key is also exposed to the client as:
 - DM push while app is backgrounded
 - no push when viewing active DM
 - mention push from group chat
+- reply and General Chat/DM reaction push
+- new ShadowPin post, pin comment, and pin reply in-app event plus push
+- master mute, General Chat mute, DM conversation mute, quiet hours, and snooze
+- reciprocal block suppresses every matching event
 - push click routes correctly
 - disable push and verify no delivery
 
@@ -477,15 +546,16 @@ The public key is also exposed to the client as:
 - expired subscription
 - duplicate subscription rows
 - multiple devices for same user
-- offline delivery retry path
+- offline/transient provider retry path without duplicate event rows
+- permanent `4xx` failure does not loop
+- Function response contains no endpoint, subscription, or recipient identifiers
 
-## Repo-Level Implementation Order
-
-Suggested file areas:
+## Repo-Level Source Map
 
 1. Schema and function work
    - `supabase/migrations/...`
-   - `supabase/functions/send-web-push/...`
+   - `supabase/functions/send-push/...`
+   - `supabase/functions/_shared/notification-delivery.ts`
 
 2. Client platform plumbing
    - `src/lib/push.ts`
@@ -501,13 +571,11 @@ Suggested file areas:
    - DM/message hooks
    - auth/user presence helpers
 
-## Recommendation
+## Remaining Recommendation
 
-Build the first production-worthy version as:
-
-- PWA + Web Push
-- DM notifications first
-- Supabase-managed event pipeline
-- service worker click-through routing
-
-This gives the app real cross-device notifications now, keeps the stack aligned with the current architecture, and leaves room for a later native-mobile push layer without throwing away the backend model.
+Keep Web Push and recipient-owned Supabase events as the web/PWA contract. Run
+the full preference/block/mute matrix on a preview or staging backend, then
+verify one installed iPhone Home Screen app, one Android PWA, and one desktop
+browser after production deployment. A later native APNs/FCM layer should reuse
+the server-side event eligibility and preference contract rather than creating
+an independent notification policy.

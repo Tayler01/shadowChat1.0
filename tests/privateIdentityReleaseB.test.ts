@@ -46,3 +46,13 @@ test('AI and preserved Bridge profile upserts no longer mirror private identity'
   expect(bridgeUpsert).not.toMatch(/\bemail\s*:/)
   expect(bridgeUpsert).not.toMatch(/\bfull_name\s*:/)
 })
+
+test('native public-profile selectors no longer request private identity columns', () => {
+  const nativeApi = read('apps/mobile/src/lib/shadow-chat-api.ts')
+  const nativeTypes = read('apps/mobile/src/types/shadow-chat.ts')
+
+  expect(nativeApi).not.toMatch(/^\s*email,?\s*$/m)
+  expect(nativeApi).not.toMatch(/^\s*full_name,?\s*$/m)
+  expect(nativeTypes).not.toMatch(/^\s*email\??:/m)
+  expect(nativeTypes).not.toMatch(/^\s*full_name\??:/m)
+})

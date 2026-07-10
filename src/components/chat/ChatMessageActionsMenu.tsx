@@ -253,7 +253,7 @@ export function ChatMessageActionsMenu({
     )
 
     setPlacement({ top, left, maxHeight })
-  }, [containerRef, open, visibleActions.length])
+  }, [containerRef, visibleActions.length])
 
   useLayoutEffect(() => {
     if (!open) {

@@ -79,7 +79,7 @@ const firstString = (...values: unknown[]) => {
   return undefined
 }
 
-const isGifUrl = (value?: string) => {
+const isGifUrl = (value?: string): value is string => {
   if (!value) return false
   try {
     const parsed = new URL(value)

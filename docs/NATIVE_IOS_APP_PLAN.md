@@ -1,8 +1,10 @@
 # Native iOS App Plan
 
-## Documentation Status - June 1, 2026
+## Documentation Status - July 10, 2026
 
-Reviewed during the June 1, 2026 documentation refresh. This feature guide is current for the shipped product surface, with any known hardening or polish follow-ups tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
+The native workspace has been modernized locally to Expo `~57.0.4`, React Native
+`0.86.0`, React `19.2.3`, and TypeScript `~6.0.3`. It remains an unshipped
+parity prototype; the web/PWA is still the production client.
 
 This plan tracks the iOS-first native ShadowChat client while the current web/PWA
 app remains the production client.
@@ -11,9 +13,12 @@ app remains the production client.
 
 - Native messaging must interoperate with the production web app.
 - Existing web app accounts must sign in to the native app.
-- The native app must use the same Supabase project, Auth users, `public.users`
-  profile rows, `messages` table, and realtime behavior for the first General
-  Chat milestone.
+- The native app must use the same Supabase project, Auth users, API-safe
+  `public.users` presentation rows, `messages` table, and realtime behavior for
+  the first General Chat milestone.
+- Authentication email must come from the Auth session, never from
+  `public.users`. Native profile/message selectors must not depend on the legacy
+  `public.users.email` or `public.users.full_name` compatibility columns.
 - The first native milestone should avoid schema changes unless a blocking
   compatibility issue is found.
 - The web app remains the production source of truth until native parity is
@@ -36,6 +41,11 @@ web app build, lockfile, and deploy path stable.
 ## Build Strategy
 
 Use a fresh Expo app shell and port behavior selectively from the web app.
+
+The current local baseline uses Expo 57. Run `npm ci`, audit, Expo lint,
+TypeScript, Expo Doctor, and a static web export after SDK/configuration changes.
+Doctor/export success is toolchain evidence only; native parity still needs a
+development build and physical iPhone proof before TestFlight work.
 
 Reuse or mirror:
 
@@ -77,6 +87,24 @@ Acceptance:
 - Message identity resolves through the same `public.users` profile data.
 - No MVP schema migration is required.
 
+## Private Identity Release Gate
+
+The hosted identity cleanup is intentionally split into two releases:
+
+1. Release A moves public payloads and writers away from authentication email
+   and legacy `full_name`, but leaves nullable compatibility columns for a
+   production interval.
+2. Release B later drops those columns after Release A has production proof and
+   every deployed consumer is independent of them.
+
+The native package is part of that gate even though it is not shipped. Its
+public-profile/message selectors and `ShadowUser` type have been cut over
+locally and sign-in identity comes only from Supabase Auth. Before Release B,
+rerun the Expo 57 clean-install, audit, lint, TypeScript, Doctor, and export
+checks after Release A has production proof. Do not use the unshipped status of
+this client as a reason to leave a schema-incompatible consumer in the
+repository.
+
 ## Deferred Milestones
 
 - DMs: inbox, thread, send, unread counts, realtime lifecycle.
@@ -89,6 +117,7 @@ Acceptance:
 
 ## Setup Notes
 
+- Use Node 24 so local checks match GitHub Actions and the web release baseline.
 - Local `node`, `npm`, and `npx` resolve through FNM.
 - Expo CLI does not need a global install for development; use project-local
   `npx expo`.

@@ -1,14 +1,17 @@
 # Shado TV Streaming Pipeline Research
 
-## Documentation Status - June 1, 2026
+## Documentation Status - July 10, 2026
 
-Reviewed during the June 1, 2026 documentation refresh. This document is historical context or planning evidence, not the current implementation checklist. Check [README.md](C:/repos/chat2.0/README.md:1), [AGENTS.md](C:/repos/chat2.0/AGENTS.md:1), and the audit backlog before using it for new work.
+Historical provider-comparison evidence only. The original Mux recommendation
+below is superseded: Bunny Stream was selected and is implemented for Shado TV
+and ShadowPin native uploads. Provider pricing and capabilities in this dated
+research must be rechecked before any future migration. Use
+[SHADO_TV.md](C:/repos/chat2.0/docs/SHADO_TV.md:1) for the current contract.
 
 Last updated: 2026-05-17
 
-This document compares Shado TV V1 video processing and playback options. It is
-an approval gate: do not set up a new paid provider or wire production secrets
-until the recommendation is approved.
+This document compares the options considered before approval. It no longer
+authorizes provider setup or secret changes.
 
 ## V1 Requirements Recap
 
@@ -182,6 +185,10 @@ Cons:
   segment request must be authorized.
 
 ## Recommendation For V1
+
+> Historical decision record: this Mux recommendation was not the final
+> implementation choice. Bunny Stream is the current provider; see
+> [SHADO_TV.md](C:/repos/chat2.0/docs/SHADO_TV.md:1).
 
 Use **Mux Video Basic plus Supabase** for V1 native uploads.
 

@@ -595,52 +595,56 @@ export const syncCurrentDeviceSubscription = async (userId: string) => {
   return true
 }
 
-export const triggerDMPushNotification = async (messageId: string) => {
-  const workingClient = await getWorkingClient()
-  const { data, error } = await workingClient.functions.invoke('send-push', {
-    body: {
-      type: 'dm_message',
-      messageId,
-    },
-  })
+const PUSH_DELIVERY_RETRY_DELAYS_MS = [250, 1000]
 
-  if (error) {
-    throw error
+const getPushInvokeStatus = (error: unknown) => {
+  if (!error || typeof error !== 'object') return null
+  const candidate = error as { status?: unknown; context?: { status?: unknown } }
+  const value = candidate.context?.status ?? candidate.status
+  const status = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(status) ? status : null
+}
+
+const shouldRetryPushInvoke = (error: unknown) => {
+  const status = getPushInvokeStatus(error)
+  return status === null || status === 409 || status >= 500
+}
+
+const invokePushWithRetry = async (body: Record<string, unknown>) => {
+  const workingClient = await getWorkingClient()
+
+  for (let attempt = 0; attempt <= PUSH_DELIVERY_RETRY_DELAYS_MS.length; attempt += 1) {
+    const { data, error } = await workingClient.functions.invoke('send-push', { body })
+    if (!error) return data
+    if (!shouldRetryPushInvoke(error) || attempt === PUSH_DELIVERY_RETRY_DELAYS_MS.length) {
+      throw error
+    }
+
+    await new Promise(resolve => setTimeout(resolve, PUSH_DELIVERY_RETRY_DELAYS_MS[attempt]))
   }
 
-  return data
+  return null
+}
+
+export const triggerDMPushNotification = async (messageId: string) => {
+  return invokePushWithRetry({
+    type: 'dm_message',
+    messageId,
+  })
 }
 
 export const triggerGroupPushNotification = async (messageId: string) => {
-  const workingClient = await getWorkingClient()
-  const { data, error } = await workingClient.functions.invoke('send-push', {
-    body: {
-      type: 'group_message',
-      messageId,
-    },
+  return invokePushWithRetry({
+    type: 'group_message',
+    messageId,
   })
-
-  if (error) {
-    throw error
-  }
-
-  return data
 }
 
 export const triggerHypePushNotification = async (eventId: string) => {
-  const workingClient = await getWorkingClient()
-  const { data, error } = await workingClient.functions.invoke('send-push', {
-    body: {
-      type: 'hype_event',
-      eventId,
-    },
+  return invokePushWithRetry({
+    type: 'hype_event',
+    eventId,
   })
-
-  if (error) {
-    throw error
-  }
-
-  return data
 }
 
 export const triggerReactionPushNotification = async (
@@ -648,42 +652,24 @@ export const triggerReactionPushNotification = async (
   emoji: string,
   isDm: boolean
 ) => {
-  const workingClient = await getWorkingClient()
-  const { data, error } = await workingClient.functions.invoke('send-push', {
-    body: {
-      type: 'reaction',
-      messageId,
-      emoji,
-      isDm,
-    },
+  return invokePushWithRetry({
+    type: 'reaction',
+    messageId,
+    emoji,
+    isDm,
   })
-
-  if (error) throw error
-  return data
 }
 
 export const triggerShadowPinPostPushNotification = async (imageId: string) => {
-  const workingClient = await getWorkingClient()
-  const { data, error } = await workingClient.functions.invoke('send-push', {
-    body: {
-      type: 'shadow_pin_post',
-      messageId: imageId,
-    },
+  return invokePushWithRetry({
+    type: 'shadow_pin_post',
+    messageId: imageId,
   })
-
-  if (error) throw error
-  return data
 }
 
 export const triggerShadowPinCommentPushNotification = async (commentId: string) => {
-  const workingClient = await getWorkingClient()
-  const { data, error } = await workingClient.functions.invoke('send-push', {
-    body: {
-      type: 'shadow_pin_comment',
-      messageId: commentId,
-    },
+  return invokePushWithRetry({
+    type: 'shadow_pin_comment',
+    messageId: commentId,
   })
-
-  if (error) throw error
-  return data
 }

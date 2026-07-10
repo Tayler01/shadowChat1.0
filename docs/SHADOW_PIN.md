@@ -1,8 +1,13 @@
 # ShadowPin
 
-## Documentation Status - June 8, 2026
+## Documentation Status - July 10, 2026
 
-Updated after the June 8, 2026 shared safe-fetch and Instagram preview hardening. Repo code now uses the shared safe-fetch contract for ShadowPin image/video URL ingestion paths. Remote function inventory during the evening doc-freshness pass showed `shadow-pin-video` deployed on June 8, while `shadow-pin-import-image` still showed an older deployment timestamp; redeploy and smoke the image import function before claiming production image-import safe-fetch coverage.
+Updated for the current local ShadowPin social/discovery release candidate.
+The repo now includes normalized tags, indexed cross-entity search, threaded
+comments, reciprocal personal-block enforcement, and recipient-owned in-app
+plus Web Push notification paths. These additions are not described as
+production-shipped until the migrations and current Functions are deployed and
+verified through the backend-first release workflow.
 
 ShadowPin is a logged-in public pin board exposed as `Pins` in the mobile
 bottom menu and desktop sidebar. Boards stays its own menu item; Pins opens the
@@ -23,12 +28,19 @@ Short video planning and rollout details live in
 - Hidden score ledger for the public gold push-pin identity badge.
 - Admin-only activity analytics for visits, category dwell, pin visibility,
   opens, hearts, shares, creation, edits, and deletes.
-- No realtime, notifications, comments, tags, search, or filters.
+- Up to eight normalized tags per pin and indexed search across pin text, tags,
+  creator display identity, and category metadata.
+- Threaded member comments/replies with creator/operator moderation.
+- Recipient-owned in-app notifications and background push for eligible new
+  posts, comments, and replies.
 
 ## Data Model
 
 Migration: `supabase/migrations/20260512203054_shadow_pin_domain.sql`
 Score migration: `supabase/migrations/20260519020527_shadow_pin_hidden_score_gold_pin.sql`
+Social/search migration: `supabase/migrations/20260710044050_shadow_pin_social_search.sql`
+Notification Realtime publication: `supabase/migrations/20260710044500_publish_notification_events_realtime.sql`
+Engagement hardening: `supabase/migrations/20260710044600_personal_blocking_engagement_hardening.sql`
 
 - `shadow_pin_categories`: category metadata, cover asset, soft delete fields,
   heart count, and `latest_image_created_at` for mobile category ordering.
@@ -45,6 +57,16 @@ Score migration: `supabase/migrations/20260519020527_shadow_pin_hidden_score_gol
   visit state and active visible duration.
 - `shadow_pin_activity_events`: raw append-only activity events with
   privacy-minimal snapshots for admin analytics.
+- `shadow_pin_tags`: normalized unique tag slugs, limited to 30 characters.
+- `shadow_pin_image_tags`: pin/tag join rows; creators and operators can manage
+  a pin's tags through `set_shadow_pin_image_tags`.
+- `shadow_pin_comments`: comment and parent-reply rows with 1-1000 character
+  bodies, author edit rights, author/operator delete rights, and same-pin parent
+  validation.
+- `shadow_pin_images.comment_count`: trigger-maintained comment count.
+- `notification_preferences.shadow_pin_new_post_enabled`,
+  `shadow_pin_comment_enabled`, and `shadow_pin_reply_enabled`: independent
+  delivery controls, defaulting to enabled.
 
 The base migration creates the public Supabase Storage bucket `shadow-pin` with
 a 15MB image limit and JPEG, PNG, WebP, and GIF MIME allow-list. Storage paths
@@ -72,10 +94,21 @@ count, most recent scored activity, then user id for deterministic results.
 
 ShadowPin uses the existing app admin model. `is_app_operator()` is used for admin-class actions, matching nearby operator tooling. Regular users can create categories/images and heart any visible item. Creators can edit their own content and delete their own images. Creators can delete a category only when it has no visible images. Operators can delete populated categories; child images are preserved and uncategorized by setting `category_id` to `NULL`.
 
+Personal blocking is separate from operator moderation. A block is reciprocal
+for ShadowPin visibility: blocked pairs cannot discover each other's categories
+or pins, read or create comments across the pair, reply to each other, or
+receive each other's ShadowPin notifications. The blocker alone can read and
+manage their private block row.
+
 Activity analytics are visible only to app operators in Settings > Admin >
 Shadow Pin Activity. Normal users can record their own activity through a
 guarded RPC but cannot read raw or aggregated analytics rows. The analytics
 surface shows display names and usernames, not email addresses.
+
+Known-id writes are guarded at the database boundary. Reciprocal blocks reject
+category/image hearts, comment replies, and activity targets even if a caller
+already knows the row id. Authenticated creators are limited to 12 posts per
+minute and 100 per day.
 
 ## Activity Analytics
 
@@ -88,6 +121,55 @@ The admin dashboard defaults to the last 7 days with today, 7-day, 30-day, and
 90-day presets. It includes user, category, and pin chart tabs; spreadsheet-like
 tables; range comparison deltas; and a filtered event timeline. The weighted
 activity score is admin-only and separate from the public gold push-pin score.
+
+Live telemetry is bounded to 120 activity events per minute and 120 sessions
+per hour per user. Event metadata must be a JSON object no larger than 4 KB with
+at most 24 keys, and creator/operator actions are checked against the target.
+
+## Tags, Search, And Comments
+
+`set_shadow_pin_image_tags` lowercases and normalizes requested text into
+hyphenated slugs, removes duplicates while preserving first-seen order, and
+enforces eight tags per pin with a 30-character maximum. Only the pin creator
+or an app operator can change its tags.
+
+`search_shadow_pin_images` runs as the signed-in caller and ranks matches from
+pin title/description, tags, creator username/display name, and category
+title/description. Existing ShadowPin, profile, and personal-block RLS remains
+the visibility authority. The mobile search surface presents category and pin
+results without exposing private profile fields.
+
+Comments render as root discussions with one level of parent-linked replies.
+Authors can edit their own comment; authors and app operators can delete.
+Database checks keep replies on the same pin, reject replies to replies and
+blocked reply targets, and maintain the pin's comment count after
+insert/delete. Deleting a root leaves its replies on the pin as roots through
+`ON DELETE SET NULL`; the dialog mirrors that promotion immediately.
+
+Tags must finish a transaction attached to a pin. Deleting the last pin/tag
+link removes the orphan tag, preventing direct tag-table spam.
+
+## Notifications
+
+When a pin first reaches `processing_status = 'ready'`, it creates one
+`shadow_pin_post` event for every other eligible member. A processing insert
+does not notify, and updating an already-ready pin does not fan out again.
+Recipients who disabled new-post notifications or have a personal block with
+the creator are excluded. A root comment creates a
+`shadow_pin_comment` event for the pin creator; a reply creates a
+`shadow_pin_reply` event for the parent author. Self-notifications are skipped.
+
+`notification_events` is recipient-owned under RLS and is included in the
+Supabase Realtime publication by
+`20260710044500_publish_notification_events_realtime.sql`, allowing the signed-
+in app to show live in-app toasts. After a successful client mutation, the
+current `send-push` Function is invoked best-effort for background delivery.
+The service enforces the recipient's master switch, temporary snooze, daily
+quiet hours/timezone, matching ShadowPin type toggle, and reciprocal block
+contract before contacting a push endpoint. Notification clicks route to
+`/?view=pins`. Delivery responses expose aggregate counts only; transient
+provider failures return retryable status and the client performs two bounded
+retries, while permanently invalid subscriptions are removed.
 
 ## URL Imports
 
@@ -146,6 +228,8 @@ npm run typecheck
 npm run build
 npx jest --runInBand tests/BoardBubbleMap.test.tsx
 npx jest --runInBand tests/safeFetch.test.ts tests/safeFetchIntegrationContract.test.ts
+npx jest --runInBand tests/ShadowPin.test.tsx tests/ShadowPinCommentsDialog.test.tsx tests/shadowPinSocialSql.test.ts tests/personalBlockingSql.test.ts tests/notificationDelivery.test.ts tests/pushDeliveryRetry.test.ts
+npm run supabase:security-contract:local
 ```
 
 For remote use, apply the migration and deploy the Edge Function:
@@ -162,6 +246,9 @@ npm run shadow-pin:backfill-media -- --apply
 - If derivative processing fails, ShadowPin keeps the uploaded/imported original available and marks the row as failed so the user can still see the cover or pin.
 - Stored assets are preserved after soft deletes. A future cleanup job can archive old unused objects.
 - Pull-to-refresh is not custom-built; views refetch on open/return and after mutations.
+- Background delivery is best-effort and still needs normal-device iPhone,
+  Android, and desktop PWA proof after deployment. Do not create a production
+  test pin casually: a new pin targets every eligible other member.
 
 ## Future UX Todo
 

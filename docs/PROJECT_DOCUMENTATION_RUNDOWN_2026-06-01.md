@@ -10,6 +10,10 @@ cleanup, build budgets, production smoke, main-only branch state, and engineerin
 safeguards. It remains an inventory and routing guide; the audit tracker is the
 ranked implementation source of truth.
 
+The subsequent local release candidate adds canonical documentation for
+personal blocking and the Message Library, and refreshes the architecture,
+ShadowPin, notifications, private-identity, Expo 57, and source-asset paths.
+
 July 9, 2026 added
 [PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1) as the canonical
 status and re-enable contract for Boards, News, Art Board, and ESP Bridge. The
@@ -55,7 +59,7 @@ implementation backlog.
 | [PLAN.md](C:/repos/chat2.0/PLAN.md:1) | 2026-05-02 | ESP bridge update/offline software plan. | Rename or add a top warning that it is bridge-specific, not global product plan. |
 | [STATUS.md](C:/repos/chat2.0/STATUS.md:1) | 2026-05-02 | ESP bridge milestone status log. | Archive under `docs/` or rename to bridge-specific status to avoid stale root-level status confusion. |
 | [TASK.md](C:/repos/chat2.0/TASK.md:1) | 2026-04-25 | ESP bridge task statement. | Archive or rename with bridge prefix if still needed. |
-| [apps/mobile/README.md](C:/repos/chat2.0/apps/mobile/README.md:1) | 2026-05-28 | Mobile app workspace note. | Review when native mobile work resumes. |
+| [apps/mobile/README.md](C:/repos/chat2.0/apps/mobile/README.md:1) | 2026-07-10 | Expo 57 mobile workspace, verification gate, and private-identity selector contract. | Review after native dependency, selector, or milestone changes. |
 | [firmware/esp-bridge/README.md](C:/repos/chat2.0/firmware/esp-bridge/README.md:1) | 2026-04-28 | ESP-IDF firmware workspace instructions. | Refresh before firmware changes; current status may lag later bridge releases. |
 | [services/news-scraper/README.md](C:/repos/chat2.0/services/news-scraper/README.md:1) | 2026-07-09 | Paused Render News worker proof, environment, and reactivation guidance. | Refresh before any worker reactivation or scraper change. |
 
@@ -84,9 +88,11 @@ implementation backlog.
 | [docs/FEEDBACK_SUBMISSIONS.md](C:/repos/chat2.0/docs/FEEDBACK_SUBMISSIONS.md:1) | 2026-05-07 | Feedback flow and storage. | Review after storage policy hardening. |
 | [docs/LINK_PREVIEWS.md](C:/repos/chat2.0/docs/LINK_PREVIEWS.md:1) | 2026-06-08 | Link preview architecture. | Keep current with provider-specific fallback behavior and safe-fetch deployment status. |
 | [docs/NEWS_TAB_AND_SCRAPER.md](C:/repos/chat2.0/docs/NEWS_TAB_AND_SCRAPER.md:1) | 2026-07-10 | Preserved News architecture, verified suspended Render state, and reactivation runbook. | Update before News reactivation or after worker changes. |
-| [docs/NATIVE_IOS_APP_PLAN.md](C:/repos/chat2.0/docs/NATIVE_IOS_APP_PLAN.md:1) | 2026-05-28 | Native iOS planning. | Current enough until native work resumes. |
+| [docs/MESSAGE_LIBRARY.md](C:/repos/chat2.0/docs/MESSAGE_LIBRARY.md:1) | 2026-07-10 | Caller-visible General Chat/DM search, private saves, and collections. | Refresh after search scope, deep links, collection UX, or visibility rules change. |
+| [docs/NATIVE_IOS_APP_PLAN.md](C:/repos/chat2.0/docs/NATIVE_IOS_APP_PLAN.md:1) | 2026-07-10 | Expo 57 native iOS plan and two-stage private-identity release gate. | Refresh after native parity or schema-consumer changes. |
+| [docs/PERSONAL_BLOCKING.md](C:/repos/chat2.0/docs/PERSONAL_BLOCKING.md:1) | 2026-07-10 | Canonical reciprocal personal-block behavior, enforcement, and QA. | Refresh after any discovery, engagement, DM, ShadowPin, or notification visibility change. |
 | [docs/PHONE_INSTALL_ONBOARDING.md](C:/repos/chat2.0/docs/PHONE_INSTALL_ONBOARDING.md:1) | 2026-06-01 | Phone install onboarding. | Current after auth/login redesign. |
-| [docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md](C:/repos/chat2.0/docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md:1) | 2026-04-23 | Push planning notes. | Refresh against current implementation before more push work. |
+| [docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md](C:/repos/chat2.0/docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md:1) | 2026-07-10 | Current Web Push, recipient-event, preference, privacy, retry, and device-QA contract. | Refresh after event types, delivery suppression, retry, or device support changes. |
 | [docs/SESSION_PERSISTENCE_RUNBOOK.md](C:/repos/chat2.0/docs/SESSION_PERSISTENCE_RUNBOOK.md:1) | 2026-05-02 | Session/mobile resume runbook. | Current for session persistence; refresh after future auth-session changes. |
 | [docs/WEATHER_WIDGET.md](C:/repos/chat2.0/docs/WEATHER_WIDGET.md:1) | 2026-05-17 | Weather widget and private preferences. | Current; privacy pattern is a good model for profile data separation. |
 
@@ -108,7 +114,7 @@ implementation backlog.
 | [docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md:1) | 2026-06-15 | Active Shadow Runner playable-prototype roadmap and checkpoint notes. | Keep concise; update after playable-route, control, difficulty, or verification milestones. |
 | [docs/SHADOW_RUNNER_SPRITES.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_SPRITES.md:1) | 2026-06-11 | Shadow Runner hero and enemy sprite strips plus current runtime usage. | Update after sprite pipeline changes, animation cleanup, or Phaser animation wiring changes. |
 | [docs/SHADOW_RUNNER_STORY_LORE.md](C:/repos/chat2.0/docs/SHADOW_RUNNER_STORY_LORE.md:1) | 2026-06-11 | Shadow Runner story/lore reference for route and enemy naming. | Update when campaign story, route names, or enemy concepts change. |
-| [docs/SHADOW_PIN.md](C:/repos/chat2.0/docs/SHADOW_PIN.md:1) | 2026-06-08 | ShadowPin feature docs. | Update after image-import function redeploy, video-provider fallback changes, or activity analytics changes. |
+| [docs/SHADOW_PIN.md](C:/repos/chat2.0/docs/SHADOW_PIN.md:1) | 2026-07-10 | ShadowPin media, tags/search/comments, ready-state notifications, blocking, and activity bounds. | Update after media, social, notification, or analytics changes. |
 | [docs/SHADOW_PIN_ACTIVITY_ANALYTICS_PLAN.md](C:/repos/chat2.0/docs/SHADOW_PIN_ACTIVITY_ANALYTICS_PLAN.md:1) | 2026-05-28 | ShadowPin analytics plan. | Review alongside RLS/no-policy advisor warnings for activity tables. |
 | [docs/SHADOW_PIN_SHORT_VIDEO_ROADMAP.md](C:/repos/chat2.0/docs/SHADOW_PIN_SHORT_VIDEO_ROADMAP.md:1) | 2026-05-29 | ShadowPin video roadmap. | Current. Recheck Bunny/provider assumptions before changes. |
 | [docs/SHADOW_WAR.md](C:/repos/chat2.0/docs/SHADOW_WAR.md:1) | 2026-05-17 | Shadow War feature docs. | Current enough unless game work resumes. |
@@ -119,7 +125,7 @@ implementation backlog.
 
 | File | Latest tracked update/status date | Role | Refresh guidance |
 | --- | --- | --- | --- |
-| [docs/features/feature-progress-log.md](C:/repos/chat2.0/docs/features/feature-progress-log.md:1) | 2026-06-15 | Feature progress log. | Keep active Shadow Runner checkpoints concise and tied to verification; add a note when audit backlog implementation starts. |
+| [docs/features/feature-progress-log.md](C:/repos/chat2.0/docs/features/feature-progress-log.md:1) | 2026-07-10 | Historical feature log plus current audit release-candidate checkpoint. | Add concise verified checkpoints; keep historical feature sections intact. |
 | [docs/features/refetch-optimization-backlog.md](C:/repos/chat2.0/docs/features/refetch-optimization-backlog.md:1) | 2026-05-18 | Refetch optimization backlog. | Merge with architecture/performance backlog when optimizing realtime/refetch flows. |
 | [docs/qa/mobile-pwa-qa-log.md](C:/repos/chat2.0/docs/qa/mobile-pwa-qa-log.md:1) | 2026-05-17 | Mobile PWA QA log. | Add phone QA after login/chat fixes. |
 | [docs/qa/mobile-viewport-audit.md](C:/repos/chat2.0/docs/qa/mobile-viewport-audit.md:1) | 2026-05-18 | Mobile viewport audit. | Update after mobile header/nav/login polish. |

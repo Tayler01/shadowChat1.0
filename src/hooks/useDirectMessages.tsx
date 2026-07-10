@@ -261,14 +261,17 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     if (typeof window === 'undefined' || !user) return;
 
     const handlePersonalBlocksChanged = () => {
-      void refreshConversations();
+      void Promise.allSettled([
+        refreshConversations(),
+        refreshVisibleMessages(),
+      ]);
     };
 
     window.addEventListener('shadowchat:personal-blocks-changed', handlePersonalBlocksChanged);
     return () => {
       window.removeEventListener('shadowchat:personal-blocks-changed', handlePersonalBlocksChanged);
     };
-  }, [refreshConversations, user]);
+  }, [refreshConversations, refreshVisibleMessages, user]);
 
   // One inbox-wide channel owns both conversation summaries and the active thread.
   useEffect(() => {

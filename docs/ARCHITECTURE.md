@@ -4,10 +4,14 @@ This document is a high-signal map of the current ShadowChat codebase.
 
 ## Documentation Status - July 10, 2026
 
-This architecture map includes the July 9-10 product pause, profile/role authority
-boundaries, Storage constraints, classified Edge Function release inventory,
-ESP server-side hold, hosted Auth/security posture, backend-first release,
-strict release gates, and suspended News worker. Remaining work is ranked in
+This architecture map includes the July 9-10 product pause, profile/role
+authority boundaries, Storage constraints, classified Edge Function release
+inventory, ESP server-side hold, hosted Auth/security posture, backend-first
+release, strict release gates, suspended News worker, and the subsequent local
+candidate for private identity, personal blocking, message search/saves,
+ShadowPin social notifications, bounded DM state, and resilient push dispatch.
+Candidate behavior is not production-proven until its own release completes.
+Remaining work is ranked in
 [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
 
 Boards, News, Art Board, and ESP Bridge are preserved but compile-time paused
@@ -48,7 +52,9 @@ React UI
 - [`src/components/profile`](C:/repos/chat2.0/src/components/profile): user profile experience, including avatar crop/zoom/position editing before upload
 - [`src/components/settings`](C:/repos/chat2.0/src/components/settings): sectioned settings, notification setup, feedback, admin tools, and weather location
 - [`src/components/layout`](C:/repos/chat2.0/src/components/layout): shell, nav, and responsive structure
+- [`src/components/search`](C:/repos/chat2.0/src/components/search): caller-visible General Chat/DM search and the private saved-message library
 - [`src/components/easter-egg`](C:/repos/chat2.0/src/components/easter-egg): mobile SHADO-logo Golden Egg discovery trigger, award overlay, and bundled badge/banner asset references
+- [`src/features/shadow-pin`](C:/repos/chat2.0/src/features/shadow-pin): public Pins feed, tags/search, one-level comments/replies, hearts, media, and notification integration
 - [`src/features/games`](C:/repos/chat2.0/src/features/games): Entertainment picker and game surfaces. Shadow Runner currently lives under [`src/features/games/shadow-runner`](C:/repos/chat2.0/src/features/games/shadow-runner) with an asset-driven title screen, Shadow Runner-scoped rotate gate, 10-stop campaign map, lazy-loaded Phaser levels through Level 5, DOM HUD/touch controls, title/options scroll menus, pause/exit confirmation menus, foreground-only Web Audio game soundtracks, and a best-effort Android fullscreen/landscape request from the picker.
 - [`src/features/entertainment`](C:/repos/chat2.0/src/features/entertainment): non-game Entertainment surfaces such as Shado TV, Shadow Mystery, and Will & Kirk.
 
@@ -56,7 +62,7 @@ React UI
 
 - [`useAuth`](C:/repos/chat2.0/src/hooks/useAuth.tsx:1): session + profile state
 - [`useMessages`](C:/repos/chat2.0/src/hooks/useMessages.tsx:1): group chat state, 50-message initial windows, older-message lazy loading, and realtime
-- [`useDirectMessages`](C:/repos/chat2.0/src/hooks/useDirectMessages.tsx:1): DM state, 50-message thread windows, older-message lazy loading, and realtime
+- [`useDirectMessages`](C:/repos/chat2.0/src/hooks/useDirectMessages.tsx:1): stable `(created_at, id)` DM pagination, one signed-in realtime lifecycle, a bounded 200-message loaded window, unread state, and personal-block refresh
 - [`useNewsFeed`](C:/repos/chat2.0/src/hooks/useNewsFeed.tsx:1): News Feed fetch, realtime, reactions, modal data, and seen state
 - [`useBoardChat`](C:/repos/chat2.0/src/hooks/useBoardChat.tsx:1): group-chat-compatible board-chat windows, older/newer loading, realtime, optimistic send/retry, media/replies/pins, edit/delete, and reactions
 - [`useBoardBadges`](C:/repos/chat2.0/src/hooks/useBoardBadges.ts:1): per-board unread counts and combined Boards nav badge
@@ -67,6 +73,7 @@ React UI
 - [`useWeatherPreference`](C:/repos/chat2.0/src/hooks/useWeatherPreference.ts:1): private per-user weather location load/save/clear
 - [`useWeatherForecast`](C:/repos/chat2.0/src/hooks/useWeatherForecast.ts:1): Open-Meteo forecast refresh for the header widget after preference changes and on a periodic timer
 - [`usePushNotifications`](C:/repos/chat2.0/src/hooks/usePushNotifications.ts:1): push subscription UX
+- [`useBlockedUsers`](C:/repos/chat2.0/src/hooks/useBlockedUsers.tsx:1): private block-list state, mutations, and app-wide block-change signaling
 - [`PushSubscriptionSync`](C:/repos/chat2.0/src/components/notifications/PushSubscriptionSync.tsx:1): best-effort foreground repair for already-granted push subscriptions
 - [`useTyping`](C:/repos/chat2.0/src/hooks/useTyping.ts:1): typing indicators
 - [`useTheme`](C:/repos/chat2.0/src/hooks/useTheme.tsx:1): design-system theme selection
@@ -75,7 +82,9 @@ React UI
 
 - [`supabase.ts`](C:/repos/chat2.0/src/lib/supabase.ts:1): all Supabase client orchestration
 - [`auth.ts`](C:/repos/chat2.0/src/lib/auth.ts:1): auth API wrappers and profile bootstrap
-- [`push.ts`](C:/repos/chat2.0/src/lib/push.ts:1): browser push storage and dispatch wiring
+- [`push.ts`](C:/repos/chat2.0/src/lib/push.ts:1): browser push storage and dispatch wiring with bounded retry for network, conflict, and server failures
+- [`personalBlocking.ts`](C:/repos/chat2.0/src/lib/personalBlocking.ts:1): block-list RPCs and blocked-relationship error detection
+- [`messageLibrary.ts`](C:/repos/chat2.0/src/lib/messageLibrary.ts:1): caller-visible full-text search, private saves, and collections
 - [`ai.ts`](C:/repos/chat2.0/src/lib/ai.ts:1): authenticated AI function calls
 - [`weather.ts`](C:/repos/chat2.0/src/lib/weather.ts:1): Open-Meteo geocoding/forecast mapping and private weather preference helpers
 - [`moderation.ts`](C:/repos/chat2.0/src/lib/moderation.ts:1): channel-ban scopes, durations, and moderation RPC wrappers
@@ -105,6 +114,10 @@ Important domains:
 - foreground presence visibility and active-user state
 - private per-user weather preferences
 - push subscriptions and notification preferences
+- recipient-owned notification events published through Supabase Realtime
+- private personal blocks with reciprocal RLS/RPC/trigger enforcement
+- owner-private message collections and saved General Chat/DM references
+- normalized ShadowPin tags, one-level comments/replies, and bounded activity
 - Hype events, per-message Hype summaries, event receipts, daily limits, and bonus-credit grants
 - permanent Golden Egg Easter egg claims through `users.gold_easter_egg` and `claim_gold_easter_egg`
 - Shadow Runner level catalog, per-user completion ledger, and public completion-medal badge fields
@@ -115,7 +128,7 @@ Storage bucket metadata enforces reviewed limits and MIME allowlists for
 avatars, banners, message media, and chat uploads. The browser applies the same
 limits before upload, but server-side bucket configuration is authoritative.
 
-The hosted schema is aligned through
+The verified production schema is aligned through
 `20260710002000_remote_security_advisor_cleanup.sql`. That migration removes
 broad paused-domain browser grants and bucket-list policies, tightens internal
 and trigger Functions, and preserves only reviewed active RPC access. Hosted
@@ -124,10 +137,15 @@ hosted security-advisor set is 71 guarded authenticated definer APIs plus the
 intentional anonymous username-availability check; reducing that surface is a
 ranked architecture refactor, not a blind grant-revocation exercise.
 
+Later migrations through
+`20260710044600_personal_blocking_engagement_hardening.sql` are part of the
+current local release candidate. They must be applied and verified by the
+backend-first `main` workflow before this document treats them as hosted state.
+
 ### Edge Functions
 
 - [`openai-chat`](C:/repos/chat2.0/supabase/functions/openai-chat/index.ts:1): validates caller session, proxies allowed AI requests to OpenRouter by default, and can post group-chat AI answers as the dedicated `Shado` assistant profile
-- [`send-push`](C:/repos/chat2.0/supabase/functions/send-push/index.ts:1): validates caller session, looks up recipients, enforces notification preferences, and sends web push payloads
+- [`send-push`](C:/repos/chat2.0/supabase/functions/send-push/index.ts:1): validates caller session, resolves eligible recipients, enforces preferences/personal blocks, sends VAPID payloads, prunes invalid subscriptions, exposes privacy-safe aggregate results, and returns retryable provider failure state without leaking endpoint or recipient identifiers
 - [`link-preview`](C:/repos/chat2.0/supabase/functions/link-preview/index.ts:1): validates a signed-in bearer token, rejects unsafe targets through the shared safe-fetch helper, and fetches Open Graph/oEmbed metadata for chat, DM, and board-chat link cards
 - [`delete-account`](C:/repos/chat2.0/supabase/functions/delete-account/index.ts:1): validates caller session in code, removes owned storage objects, and deletes the auth user through service-role access
 - [`shadow-pin-video`](C:/repos/chat2.0/supabase/functions/shadow-pin-video/index.ts:1): validates user tokens in code for Bunny upload session creation, processing sync, and external-video import support
@@ -253,11 +271,52 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 
 ### Direct Message
 
-1. UI resolves or creates conversation
-2. Send path inserts into `dm_messages`
-3. Active thread hook updates messages list
-4. Conversations list hook reorders thread and updates unread counts
-5. Optional push fan-out triggers through the `send-push` edge function
+1. UI resolves or creates a conversation through the reciprocal block-aware RPC.
+2. Send path inserts into `dm_messages`; RLS and a trigger reject blocked pairs.
+3. The active thread loads stable `(created_at, id)` pages and keeps only the
+   newest 200 loaded messages in memory/rendering.
+4. One user-scoped realtime lifecycle reconciles thread and inbox state.
+5. A personal-block change refreshes conversations and loaded messages; the
+   preserved thread shows an unavailable state until unblock.
+6. Optional push fan-out triggers through the `send-push` Edge Function.
+
+### Personal Block
+
+1. A member confirms Block from a public profile or DM, or Unblock from that
+   surface/Settings.
+2. `block_user` or `unblock_user` mutates the caller-owned `user_blocks` row.
+3. App-wide block state refreshes immediately.
+4. Reciprocal RLS, RPC checks, and triggers enforce discovery, chat, DM, Hype,
+   ShadowPin, known-id engagement, aggregate, and notification boundaries.
+5. On block creation, unread pair notifications are marked read. Existing DM
+   rows remain stored and return after unblock.
+
+Full contract: [docs/PERSONAL_BLOCKING.md](C:/repos/chat2.0/docs/PERSONAL_BLOCKING.md:1).
+
+### Message Library
+
+1. The app-header control opens Search or Saved.
+2. `search_my_messages` runs as the authenticated caller; existing General
+   Chat, DM, profile, and block RLS filters every result.
+3. `save_message_to_library` creates or updates one private save per source
+   message, optionally in an owner-private collection.
+4. Opening a result routes to General Chat or the relevant DM/message deep link.
+5. Deleting a collection leaves its saved messages unfiled rather than deleting
+   the source or save.
+
+Full contract: [docs/MESSAGE_LIBRARY.md](C:/repos/chat2.0/docs/MESSAGE_LIBRARY.md:1).
+
+### ShadowPin Social Notification
+
+1. A creator inserts/uploads a pin, which may begin in a processing state.
+2. The database creates new-post events only when the pin first becomes
+   visible with `processing_status = 'ready'`.
+3. Eligible members receive one recipient-owned `notification_events` row;
+   preference, self, dedupe, and reciprocal-block rules apply.
+4. The Realtime publication delivers the row to the signed-in recipient while
+   `send-push` performs best-effort background delivery.
+5. Root comments notify the pin creator; one-level replies notify the root
+   comment author.
 
 ### Dormant News Feed Flow
 
@@ -345,9 +404,13 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 2. User grants permission and creates a subscription
 3. Subscription row is saved in Supabase
 4. `PushSubscriptionSync` periodically repairs already-granted current-device subscriptions on sign-in, focus, page show, and visible-state resume without prompting users again
-5. Message send path calls the push trigger helper
-6. `send-push` edge function delivers to eligible recipient subscriptions
-7. Notification status rechecks automatically when the app returns to the foreground, so Settings does not expose a manual refresh button
+5. Source mutation calls the push trigger helper; network, `409`, and `5xx`
+   invocation failures receive two bounded client retries.
+6. `send-push` delivers to eligible subscriptions, removes permanently invalid
+   endpoints, and returns only aggregate counts.
+7. Retryable provider failures return `503` and release the idempotency claim so
+   a later attempt can safely reacquire it.
+8. Notification status rechecks automatically when the app returns to the foreground, so Settings does not expose a manual refresh button
 
 ## UI System
 

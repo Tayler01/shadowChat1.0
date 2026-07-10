@@ -24,16 +24,16 @@ motion, frame timing, and home-screen composition.
 
 | Animation | Frames | Loop | Purpose | Runtime Strip | Preview |
 | --- | ---: | --- | --- | --- | --- |
-| menu-idle-cape | 8 | yes | Home screen cape wind loop | `public/games/shadow-runner/sprites/strips/shadow-runner-menu-idle-cape-8f-128.png` | `public/games/shadow-runner/sprites/previews/shadow-runner-menu-idle-cape-8f-preview.png` |
-| run | 6 | yes | Right-facing gameplay run cycle | `public/games/shadow-runner/sprites/strips/shadow-runner-run-6f-128.png` | `public/games/shadow-runner/sprites/previews/shadow-runner-run-6f-preview.png` |
-| jump-air | 6 | no | Takeoff, rise, apex, double jump, fall, land | `public/games/shadow-runner/sprites/strips/shadow-runner-jump-air-6f-128.png` | `public/games/shadow-runner/sprites/previews/shadow-runner-jump-air-6f-preview.png` |
-| sword-attack | 5 | no | Ground sword attack | `public/games/shadow-runner/sprites/strips/shadow-runner-sword-attack-5f-128.png` | `public/games/shadow-runner/sprites/previews/shadow-runner-sword-attack-5f-preview.png` |
-| clockwork-sentry | 6 | partial | First playable enemy: idle, patrol, attack, hit, defeated | `public/games/shadow-runner/sprites/strips/clockwork-sentry-v2-6f-128.png` | `public/games/shadow-runner/sprites/previews/clockwork-sentry-v2-6f-preview.png` |
-| lantern-bandit-scout | 5 | partial | Map 2 enemy: idle, run, lantern-pole jab, hit, defeated | `public/games/shadow-runner/sprites/strips/lantern-bandit-scout-v1-5f-128.png` | `public/games/shadow-runner/sprites/previews/lantern-bandit-scout-v1-5f-preview.png` |
-| barrel-roller | 5 | partial | Map 3 trap-enemy: idle, roll, impact, stunned, broken | `public/games/shadow-runner/sprites/strips/barrel-roller-v1-5f-128.png` | `public/games/shadow-runner/sprites/previews/barrel-roller-v1-5f-preview.png` |
-| scroll-thief | 5 | partial | Map 4 enemy: idle, dash, satchel swipe, hit, defeated | `public/games/shadow-runner/sprites/strips/scroll-thief-v1-5f-128.png` | `public/games/shadow-runner/sprites/previews/scroll-thief-v1-5f-preview.png` |
-| tower-archer | 5 | partial | Map 4 ranged enemy: idle, ready, aim, release, hit/defeated | `public/games/shadow-runner/sprites/strips/tower-archer-v1-5f-128.png` | `public/games/shadow-runner/sprites/previews/tower-archer-v1-5f-preview.png` |
-| candle-jester | 5 | partial | Map 5 enemy: idle, skip, candle trick, hit, defeated | `public/games/shadow-runner/sprites/strips/candle-jester-v1-5f-128.png` | `public/games/shadow-runner/sprites/previews/candle-jester-v1-5f-preview.png` |
+| menu-idle-cape | 8 | yes | Home screen cape wind loop | `public/games/shadow-runner/sprites/strips/shadow-runner-menu-idle-cape-8f-128.png` | `source-assets/shadow-runner/sprites/previews/shadow-runner-menu-idle-cape-8f-preview.png` |
+| run | 6 | yes | Right-facing gameplay run cycle | `public/games/shadow-runner/sprites/strips/shadow-runner-run-6f-128.png` | `source-assets/shadow-runner/sprites/previews/shadow-runner-run-6f-preview.png` |
+| jump-air | 6 | no | Takeoff, rise, apex, double jump, fall, land | `public/games/shadow-runner/sprites/strips/shadow-runner-jump-air-6f-128.png` | `source-assets/shadow-runner/sprites/previews/shadow-runner-jump-air-6f-preview.png` |
+| sword-attack | 5 | no | Ground sword attack | `public/games/shadow-runner/sprites/strips/shadow-runner-sword-attack-5f-128.png` | `source-assets/shadow-runner/sprites/previews/shadow-runner-sword-attack-5f-preview.png` |
+| clockwork-sentry | 6 | partial | First playable enemy: idle, patrol, attack, hit, defeated | `public/games/shadow-runner/sprites/strips/clockwork-sentry-v2-6f-128.png` | `source-assets/shadow-runner/sprites/previews/clockwork-sentry-v2-6f-preview.png` |
+| lantern-bandit-scout | 5 | partial | Map 2 enemy: idle, run, lantern-pole jab, hit, defeated | `source-assets/shadow-runner/sprites/strips/lantern-bandit-scout-v1-5f-128.png` | `source-assets/shadow-runner/sprites/previews/lantern-bandit-scout-v1-5f-preview.png` |
+| barrel-roller | 5 | partial | Map 3 trap-enemy: idle, roll, impact, stunned, broken | `public/games/shadow-runner/sprites/strips/barrel-roller-v1-5f-128.png` | `source-assets/shadow-runner/sprites/previews/barrel-roller-v1-5f-preview.png` |
+| scroll-thief | 5 | partial | Map 4 enemy: idle, dash, satchel swipe, hit, defeated | `public/games/shadow-runner/sprites/strips/scroll-thief-v1-5f-128.png` | `source-assets/shadow-runner/sprites/previews/scroll-thief-v1-5f-preview.png` |
+| tower-archer | 5 | partial | Map 4 ranged enemy: idle, ready, aim, release, hit/defeated | `public/games/shadow-runner/sprites/strips/tower-archer-v1-5f-128.png` | `source-assets/shadow-runner/sprites/previews/tower-archer-v1-5f-preview.png` |
+| candle-jester | 5 | partial | Map 5 enemy: idle, skip, candle trick, hit, defeated | `public/games/shadow-runner/sprites/strips/candle-jester-v1-5f-128.png` | `source-assets/shadow-runner/sprites/previews/candle-jester-v1-5f-preview.png` |
 
 ## Frame Labels
 
@@ -179,4 +179,4 @@ fixed in the asset pipeline, not by changing the simulation rules to hide them.
 
 The machine-readable manifest is:
 
-`public/games/shadow-runner/sprites/sprite-manifest.json`
+`source-assets/shadow-runner/sprites/sprite-manifest.json`

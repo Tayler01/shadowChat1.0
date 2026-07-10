@@ -499,31 +499,58 @@ const deliverPushToSubscriptions = async (
         },
       }
 
+      let endpoint: URL
       try {
-        const endpoint = await normalizePushEndpoint(subscriptionRow.endpoint)
-        const payload = await buildPushPayload(message, subscription, vapid)
-        const response = await safeFetch(endpoint, toPushRequestInit(payload), SAFE_PUSH_ENDPOINT_OPTIONS)
-
+        endpoint = await normalizePushEndpoint(subscriptionRow.endpoint)
+      } catch (error) {
         return {
           id: subscriptionRow.id,
-          endpoint: subscriptionRow.endpoint,
+          status: 400,
+          ok: false,
+          invalid: true,
+          retryable: false,
+          error: error instanceof Error ? error.message : 'Invalid push endpoint',
+        }
+      }
+
+      let payload: Awaited<ReturnType<typeof buildPushPayload>>
+      try {
+        payload = await buildPushPayload(message, subscription, vapid)
+      } catch (error) {
+        return {
+          id: subscriptionRow.id,
+          status: 400,
+          ok: false,
+          invalid: true,
+          retryable: false,
+          error: error instanceof Error ? error.message : 'Invalid push subscription',
+        }
+      }
+
+      try {
+        const response = await safeFetch(endpoint, toPushRequestInit(payload), SAFE_PUSH_ENDPOINT_OPTIONS)
+        return {
+          id: subscriptionRow.id,
           status: response.status,
           ok: response.ok,
+          invalid: [400, 401, 403, 404, 410].includes(response.status),
+          retryable: response.status === 408 || response.status === 429 || response.status >= 500,
         }
       } catch (error) {
         return {
           id: subscriptionRow.id,
-          endpoint: subscriptionRow.endpoint,
-          status: 400,
+          status: 503,
           ok: false,
-          error: error instanceof Error ? error.message : 'Invalid push endpoint',
+          invalid: false,
+          retryable: true,
+          error: error instanceof Error ? error.message : 'Push provider request failed',
         }
       }
     })
   )
 
   const invalidSubscriptionIds = results
-    .filter((result) => [400, 401, 403, 404, 410].includes(result.status))
+    .filter((result) => result.invalid)
     .map((result) => result.id)
 
   if (invalidSubscriptionIds.length) {
@@ -533,9 +560,16 @@ const deliverPushToSubscriptions = async (
   return {
     deliveredCount: results.filter((result) => result.ok).length,
     removedSubscriptions: invalidSubscriptionIds.length,
-    results,
+    attemptedCount: results.length,
+    retryableFailures: results.filter((result) => result.retryable).length,
   }
 }
+
+const getRetryableFailureCount = (delivery: Record<string, unknown>) =>
+  Number(delivery.retryableFailures ?? 0)
+
+const deliveryResponse = (delivery: Record<string, unknown>) =>
+  json(delivery, getRetryableFailureCount(delivery) > 0 ? 503 : 200)
 
 const sendDmPush = async (
   supabase: ReturnType<typeof getSupabaseAdmin>,
@@ -677,7 +711,7 @@ const sendDmPush = async (
   }
 
   if (origin !== 'bridge') {
-    return json(delivery)
+    return deliveryResponse(delivery)
   }
 
   const senderPreferences = await getNotificationPreferences(supabase, authUserId)
@@ -689,7 +723,7 @@ const sendDmPush = async (
   )
 
   if (senderSuppressionReason || senderConversationMuted) {
-    return json({
+    return deliveryResponse({
       ...delivery,
       bridgeSender: {
         skipped: true,
@@ -700,7 +734,7 @@ const sendDmPush = async (
 
   const senderSubscriptions = await getActiveSubscriptions(supabase, authUserId)
   if (!senderSubscriptions.length) {
-    return json({
+    return deliveryResponse({
       ...delivery,
       bridgeSender: { skipped: true, reason: 'Sender has no active push subscriptions' },
     })
@@ -726,7 +760,7 @@ const sendDmPush = async (
   }, bridgeSenderDedupeKey)
 
   if (bridgeSenderEvent.sent_at) {
-    return json({
+    return deliveryResponse({
       ...delivery,
       bridgeSender: { skipped: true, reason: 'Notification already sent' },
     })
@@ -772,10 +806,13 @@ const sendDmPush = async (
       .eq('id', bridgeSenderEvent.id)
   }
 
-  return json({
+  const combinedDelivery = {
     ...delivery,
     bridgeSender: bridgeSenderDelivery,
-  })
+    retryableFailures:
+      getRetryableFailureCount(delivery) + bridgeSenderDelivery.retryableFailures,
+  }
+  return deliveryResponse(combinedDelivery)
 }
 
 const resolveMentionedUserIds = async (
@@ -977,7 +1014,7 @@ const sendReactionPush = async (
       .eq('id', eventRecord.id)
   }
 
-  return json(delivery)
+  return deliveryResponse(delivery)
 }
 
 const sendGroupPush = async (
@@ -1076,7 +1113,8 @@ const sendGroupPush = async (
           reason: 'No active push subscriptions',
           delivered: 0,
           removedSubscriptions: 0,
-          results: [],
+          attemptedCount: 0,
+          retryableFailures: 0,
         }
       }
 
@@ -1111,7 +1149,8 @@ const sendGroupPush = async (
           reason: 'Notification already sent',
           delivered: 0,
           removedSubscriptions: 0,
-          results: [],
+          attemptedCount: 0,
+          retryableFailures: 0,
         }
       }
 
@@ -1166,13 +1205,17 @@ const sendGroupPush = async (
     (sum, result) => sum + Number(result.removedSubscriptions ?? 0),
     0
   )
+  const retryableFailures = perRecipientResults.reduce(
+    (sum, result) => sum + Number(result.retryableFailures ?? 0),
+    0
+  )
 
   return json({
     deliveredRecipients,
     deliveredSubscriptions,
     removedSubscriptions,
-    results: perRecipientResults,
-  })
+    retryableFailures,
+  }, retryableFailures > 0 ? 503 : 200)
 }
 
 const sendShadowPinPostPush = async (
@@ -1239,7 +1282,8 @@ const sendShadowPinPostPush = async (
         reason: 'No active push subscriptions',
         deliveredCount: 0,
         removedSubscriptions: 0,
-        results: [],
+        attemptedCount: 0,
+        retryableFailures: 0,
       }
     }
 
@@ -1270,7 +1314,8 @@ const sendShadowPinPostPush = async (
         reason: 'Notification already sent',
         deliveredCount: 0,
         removedSubscriptions: 0,
-        results: [],
+        attemptedCount: 0,
+        retryableFailures: 0,
       }
     }
 
@@ -1307,12 +1352,16 @@ const sendShadowPinPostPush = async (
     return { userId: preferences.user_id, skipped: false, ...delivery }
   }))
 
+  const retryableFailures = results.reduce(
+    (sum, result) => sum + Number(result.retryableFailures ?? 0),
+    0
+  )
   return json({
     deliveredRecipients: results.filter(result => result.deliveredCount > 0).length,
     deliveredSubscriptions: results.reduce((sum, result) => sum + result.deliveredCount, 0),
     removedSubscriptions: results.reduce((sum, result) => sum + result.removedSubscriptions, 0),
-    results,
-  })
+    retryableFailures,
+  }, retryableFailures > 0 ? 503 : 200)
 }
 
 const sendShadowPinCommentPush = async (
@@ -1439,7 +1488,7 @@ const sendShadowPinCommentPush = async (
       .eq('id', eventRecord.id)
   }
 
-  return json(delivery)
+  return deliveryResponse(delivery)
 }
 
 const getTextValue = (value: unknown) => (
@@ -1490,10 +1539,16 @@ const sendHypePush = async (
     throw prefsError
   }
 
-  const blockedUserIds = await getBlockedCounterpartIds(supabase, authUserId)
+  const [blockedUserIds, blockedMessageAuthorIds] = await Promise.all([
+    getBlockedCounterpartIds(supabase, authUserId),
+    hypeEvent.message_author_id
+      ? getBlockedCounterpartIds(supabase, hypeEvent.message_author_id)
+      : Promise.resolve(new Set<string>()),
+  ])
   const eligibleRecipients = ((recipientPreferences ?? []) as unknown as NotificationPrefs[]).filter(
     (prefs) => (
       !blockedUserIds.has(prefs.user_id) &&
+      !blockedMessageAuthorIds.has(prefs.user_id) &&
       !getDeliverySuppressionReason(prefs, { generalChat: true })
     )
   )
@@ -1517,7 +1572,8 @@ const sendHypePush = async (
           reason: 'No active push subscriptions',
           delivered: 0,
           removedSubscriptions: 0,
-          results: [],
+          attemptedCount: 0,
+          retryableFailures: 0,
         }
       }
 
@@ -1548,7 +1604,8 @@ const sendHypePush = async (
           reason: 'Collapsed into recent Hype notification',
           delivered: 0,
           removedSubscriptions: 0,
-          results: [],
+          attemptedCount: 0,
+          retryableFailures: 0,
         }
       }
 
@@ -1594,6 +1651,10 @@ const sendHypePush = async (
   const getDeliveredCount = (result: Record<string, unknown>) =>
     Number(result.deliveredCount ?? result.delivered ?? 0)
 
+  const retryableFailures = perRecipientResults.reduce(
+    (sum, result) => sum + Number(result.retryableFailures ?? 0),
+    0
+  )
   return json({
     deliveredRecipients: perRecipientResults.filter((result) => getDeliveredCount(result) > 0).length,
     deliveredSubscriptions: perRecipientResults.reduce(
@@ -1604,8 +1665,8 @@ const sendHypePush = async (
       (sum, result) => sum + Number(result.removedSubscriptions ?? 0),
       0
     ),
-    results: perRecipientResults,
-  })
+    retryableFailures,
+  }, retryableFailures > 0 ? 503 : 200)
 }
 
 serve(async (req): Promise<Response> => {
@@ -1725,6 +1786,18 @@ serve(async (req): Promise<Response> => {
       response = ensureResponse(await sendShadowPinCommentPush(supabase, vapid, auth.userId, messageId))
     } else {
       response = ensureResponse(await sendGroupPush(supabase, vapid, auth.userId, messageId, origin, bridgeDeviceId))
+    }
+
+    if (response.status >= 500) {
+      await failEdgeRequestClaim(supabase, {
+        userId: auth.userId,
+        scope: PUSH_CLAIM_SCOPE,
+        key: requestKey,
+        claimToken: claim.claim_token,
+        errorMessage: 'Push provider delivery can be retried',
+      })
+      claimContext = null
+      return response
     }
 
     await completeEdgeRequestClaim(supabase, {

@@ -8,10 +8,12 @@ remain dormant until their protected environment is configured.
 Current release policy is main-only. The local and remote repository currently
 contain only `main`, with zero open pull requests. Netlify native Git builds are
 stopped; GitHub Actions owns backend-first production publication through a
-Netlify CLI upload. Workflow run `29061308774` completed successfully for commit
-`8e4e2757efe6555b90c6a566b0684c41da0e2b10`; Netlify deploy
-`6a5045191fe53dd504fc4131` reached `ready`, and the live entry bundle exposes
-the same SHA.
+Netlify CLI upload. Workflow run `29062308434` completed successfully for commit
+`2790efff528d31ac61a383a787d4883e9d7d8932`; Netlify deploy
+`6a504b0eaa7a29b30706a2cf` reached `ready`. The later July 10 privacy,
+notification, search, ShadowPin, operations, PWA, and dependency work remains a
+local release candidate until the final SHA has its own workflow and production
+proof.
 
 ## Privacy-scrubbed telemetry
 
@@ -42,8 +44,9 @@ handlers before their error contracts are reviewed.
 - `quality.yml`: secretless lint, typecheck, Node contract tests, classified
   Supabase Function manifest validation, documentation integrity, production
   build budgets, the full Jest suite, and zero-tolerance npm audits. Separate
-  jobs validate the Expo app (`npm ci`, audit, lint, TypeScript, Expo Doctor)
-  and rebuild/lint the complete local Supabase migration chain from scratch.
+  jobs validate the Expo 57 / React Native 0.86 app (`npm ci`, audit, lint,
+  TypeScript, Expo Doctor) and rebuild/lint the complete local Supabase migration
+  chain from scratch.
 - `codeql.yml`: JavaScript/TypeScript CodeQL on PRs, main, and weekly.
 - `security-scans.yml`: full-history redacted gitleaks plus Trivy filesystem and
   configuration scans; high/critical findings fail.
@@ -112,15 +115,50 @@ Confirmed production Supabase parity is:
 
 Each production run must capture migration and function evidence for its own
 SHA. A prior green artifact does not prove a newer commit. The latest verified
-implementation release is workflow `29061308774` for commit `8e4e275`, with
+implementation release is workflow `29062308434` for commit `2790eff`, with
 backend evidence artifact
-`supabase-release-8e4e2757efe6555b90c6a566b0684c41da0e2b10`.
+`supabase-release-2790efff528d31ac61a383a787d4883e9d7d8932`.
+
+The July 10 local release candidate intentionally has migrations after
+`20260710002000`; its linked dry run is not expected to be empty until the
+backend-first workflow applies them. Local reset/lint/test evidence is candidate
+evidence only, not hosted parity.
 
 Boards, News, Art Board, and ESP Bridge checks are reactivation-only. Routine
 release smoke verifies that their compiled surfaces stay absent/default-deny;
 it must not resume providers or exercise dormant mutation paths. The live Render
 `shado-news-scraper` worker is suspended, and both live and committed automatic
 deploy controls are off.
+
+Routine production smoke must also avoid creating a ShadowPin post just to prove
+the submit path. A new pin fans out notification rows and web push to eligible
+members; row cleanup cannot recall already delivered notifications. Use
+local/staging transactional proof or existing production content unless a real,
+controlled production post has explicit approval.
+
+## Two-stage private identity safeguard
+
+Release A is a compatibility release. The local candidate introduces an API-safe
+public-profile serializer, moves General Chat/DM consumers away from private
+identity, stops database/Edge writers from mirroring identity, and keeps guarded
+admin email sourced from `auth.users`. The nullable
+`public.users.email` and `public.users.full_name` columns remain during the
+deployment interval.
+
+Release B is destructive and must not share Release A's production push. Drop
+the compatibility columns only after all of these are true:
+
+- Release A's final SHA has a successful backend-first workflow and an empty
+  post-push linked dry run.
+- Stable-account production auth, General Chat, DM, resume-send, profile, and
+  full-admin access smoke passes.
+- Public payload inspection confirms authentication email and `full_name` are
+  absent outside the guarded admin contract.
+- Repository/runtime searches and contract tests show no remaining web, Edge,
+  script, or Expo/native selector that reads either compatibility column.
+
+If any consumer remains, hold Release B and repair Release A. Local schema reset
+or unit coverage alone is not authorization for the column drop.
 
 ## Supabase staging parity
 
@@ -185,3 +223,8 @@ If cloud devices are purchased, keep credentials in a protected `device-cloud`
 environment and run only against preview/staging with synthetic accounts. An
 explicit cloud run must fail when credentials are missing rather than silently
 fall back to emulation.
+
+The Expo 57 native workspace has its own clean-install, audit, lint, TypeScript,
+Expo Doctor, and static-export checks. Those local checks establish toolchain
+health only; they do not substitute for the installed iPhone/Android PWA gate or
+prove a native App Store/TestFlight release.

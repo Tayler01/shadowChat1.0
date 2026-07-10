@@ -46,31 +46,31 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
 ## Source Preservation
 
 - HUD source:
-  `public/games/shadow-runner/gameplay-assets/generated/shadow-runner-gameplay-hud-sheet-imagegen-source.png`
+  `source-assets/shadow-runner/gameplay-assets/generated/shadow-runner-gameplay-hud-sheet-imagegen-source.png`
 - Clean HUD source:
-  `public/games/shadow-runner/gameplay-assets/generated/shadow-runner-gameplay-hud-clean-sheet-imagegen-source.png`
+  `source-assets/shadow-runner/gameplay-assets/generated/shadow-runner-gameplay-hud-clean-sheet-imagegen-source.png`
 - Transparent HUD sheet:
-  `public/games/shadow-runner/gameplay-assets/transparent/shadow-runner-gameplay-hud-sheet-transparent.png`
+  `source-assets/shadow-runner/gameplay-assets/transparent/shadow-runner-gameplay-hud-sheet-transparent.png`
 - Clean transparent HUD sheet:
-  `public/games/shadow-runner/gameplay-assets/transparent/shadow-runner-gameplay-hud-clean-sheet-transparent.png`
+  `source-assets/shadow-runner/gameplay-assets/transparent/shadow-runner-gameplay-hud-clean-sheet-transparent.png`
 - Touch control button source:
-  `public/games/shadow-runner/gameplay-assets/generated/touch-control-button-source.png`
+  `source-assets/shadow-runner/gameplay-assets/generated/touch-control-button-source.png`
 - Baked touch controls source:
-  `public/games/shadow-runner/gameplay-assets/generated/baked-touch-controls-sheet-imagegen-source.png`
+  `source-assets/shadow-runner/gameplay-assets/generated/baked-touch-controls-sheet-imagegen-source.png`
 - Baked transparent control slices:
-  `public/games/shadow-runner/gameplay-assets/generated/dpad-control-button.png`,
-  `public/games/shadow-runner/gameplay-assets/generated/sword-control-button.png`, and
-  `public/games/shadow-runner/gameplay-assets/generated/jump-control-button.png`
+  `source-assets/shadow-runner/gameplay-assets/generated/dpad-control-button.png`,
+  `source-assets/shadow-runner/gameplay-assets/generated/sword-control-button.png`, and
+  `source-assets/shadow-runner/gameplay-assets/generated/jump-control-button.png`
 - Sentry source:
-  `public/games/shadow-runner/sprites/raw/clockwork-sentry-v2-source.png`
+  `source-assets/shadow-runner/sprites/raw/clockwork-sentry-v2-source.png`
 - Sentry transparent strip:
-  `public/games/shadow-runner/sprites/transparent/clockwork-sentry-v2-6f-strip.png`
+  `source-assets/shadow-runner/sprites/transparent/clockwork-sentry-v2-6f-strip.png`
 - Tower Archer source:
-  `public/games/shadow-runner/sprites/raw/tower-archer-v1-source.png`
+  `source-assets/shadow-runner/sprites/raw/tower-archer-v1-source.png`
 - Bell Tower generated boost source:
-  `public/games/shadow-runner/level-assets/level-4/generated/bell-tower-boost-and-crouch-assets-v1-source.png`
+  `source-assets/shadow-runner/level-assets/level-4/generated/bell-tower-boost-and-crouch-assets-v1-source.png`
   and
-  `public/games/shadow-runner/level-assets/level-4/generated/bell-tower-boost-aura-v1-source.png`
+  `source-assets/shadow-runner/level-assets/level-4/generated/bell-tower-boost-aura-v1-source.png`
 - Audio generator:
   `scripts/generate-shadow-runner-audio.mjs`
 

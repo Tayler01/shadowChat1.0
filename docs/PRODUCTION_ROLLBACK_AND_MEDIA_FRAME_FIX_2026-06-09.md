@@ -79,7 +79,7 @@ Kept assets and asset references:
 - `public/games/shadow-runner/home-assets/optimized/mission-scroll-stand.webp`
 - `public/games/shadow-runner/home-assets/optimized/star-twinkle-sheet.webp`
 - `public/games/shadow-runner/home-assets/optimized/title-scroll-shadow-runner.webp`
-- `public/games/shadow-runner/home-assets/home-assets-manifest.json`
+- `source-assets/shadow-runner/home-assets/home-assets-manifest.json`
 - `src/features/games/shadow-runner/assets/manifest.ts`
 
 Reason kept: these are Shadow Runner home/title-screen assets and asset wiring, separate from the global orientation/fullscreen change.
@@ -88,10 +88,10 @@ Reason kept: these are Shadow Runner home/title-screen assets and asset wiring, 
 
 Kept concept/reference sheets:
 
-- `public/games/shadow-runner/concept-art/enemy-character-sheet-2026-06-09.png`
-- `public/games/shadow-runner/concept-art/game-asset-sheet-2026-06-09.png`
-- `public/games/shadow-runner/concept-art/villain-pose-sheet-2026-06-09.png`
-- `public/games/shadow-runner/concept-art/README.md`
+- `source-assets/shadow-runner/concept-art/enemy-character-sheet-2026-06-09.png`
+- `source-assets/shadow-runner/concept-art/game-asset-sheet-2026-06-09.png`
+- `source-assets/shadow-runner/concept-art/villain-pose-sheet-2026-06-09.png`
+- `source-assets/shadow-runner/concept-art/README.md`
 
 Reason kept: these are planning/reference assets only. They do not modify global app layout.
 
@@ -104,4 +104,3 @@ The replacement chat patch keeps media layout local to chat messages:
 - badges/reactions no longer participate in the measured media width
 - text/file/audio message bubbles keep the existing Hype bubble behavior
 - no global viewport, manifest, fullscreen, orientation, app-shell, or Supabase changes are involved
-

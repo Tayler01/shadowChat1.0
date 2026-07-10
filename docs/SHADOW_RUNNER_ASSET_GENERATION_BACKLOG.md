@@ -19,8 +19,8 @@ gameplay tuning are out of scope unless they affect image requirements.
 - `src/features/games/shadow-runner/ShadowRunnerGame.tsx`
 - `src/features/games/shadow-runner/game/createShadowRunnerPhaserGame.ts`
 - `src/features/games/shadow-runner/game/levelOne.ts`
-- `public/games/shadow-runner/home-assets/home-assets-manifest.json`
-- `public/games/shadow-runner/sprites/sprite-manifest.json`
+- `source-assets/shadow-runner/home-assets/home-assets-manifest.json`
+- `source-assets/shadow-runner/sprites/sprite-manifest.json`
 - `public/games/shadow-runner/concept-art/*`
 
 ## Already Generated And Wired
@@ -78,7 +78,7 @@ These assets exist in the repo and are referenced by current runtime code.
     clean v2 recreation. Browser gameplay QA is still needed before treating it
     as final.
 - Legacy Clockwork Sentry strip:
-  `public/games/shadow-runner/sprites/strips/clockwork-sentry-6f-128.png`
+  `source-assets/shadow-runner/sprites/strips/clockwork-sentry-6f-128.png`
   - Quality status: damaged first-pass art with white gaps and missing parts.
     Keep as reference only; do not use as a final production asset.
 
@@ -122,117 +122,117 @@ for gameplay VFX. The generated tilt bridge asset is wired as the moving
 bridge visual. Source and preview files remain cataloged for review.
 
 - Clockwork Sentry v2:
-  - source: `public/games/shadow-runner/sprites/raw/clockwork-sentry-v2-source.png`
-  - transparent strip: `public/games/shadow-runner/sprites/transparent/clockwork-sentry-v2-6f-strip.png`
+  - source: `source-assets/shadow-runner/sprites/raw/clockwork-sentry-v2-source.png`
+  - transparent strip: `source-assets/shadow-runner/sprites/transparent/clockwork-sentry-v2-6f-strip.png`
   - runtime strip: `public/games/shadow-runner/sprites/strips/clockwork-sentry-v2-6f-128.png`
-  - preview: `public/games/shadow-runner/sprites/previews/clockwork-sentry-v2-6f-preview.png`
+  - preview: `source-assets/shadow-runner/sprites/previews/clockwork-sentry-v2-6f-preview.png`
   - note: generated as a clean replacement for the damaged first sentry strip;
     content-aware extraction was needed so the spear-thrust frame was not
     clipped. Current working tree manifests now point at this v2 strip, but it
     still needs browser gameplay QA before final sign-off.
 - Stone ruins terrain/platform sheet:
-  - source: `public/games/shadow-runner/level-assets/terrain/stone-ruins-terrain-v1-source.png`
+  - source: `source-assets/shadow-runner/level-assets/terrain/stone-ruins-terrain-v1-source.png`
   - transparent sheet: `public/games/shadow-runner/level-assets/terrain/stone-ruins-terrain-v1.png`
-  - preview: `public/games/shadow-runner/level-assets/terrain/stone-ruins-terrain-v1-preview.png`
+  - preview: `source-assets/shadow-runner/level-assets/terrain/stone-ruins-terrain-v1-preview.png`
   - note: wired as registered Phaser texture-frame platform visuals. This is a
     platform/chunk sheet, not a strict 32 x 32 tile atlas.
 - Tilt bridge:
-  - source: `public/games/shadow-runner/level-assets/terrain/tilt-bridge-v1-source.png`
-  - transparent source: `public/games/shadow-runner/level-assets/terrain/tilt-bridge-v1-transparent.png`
+  - source: `source-assets/shadow-runner/level-assets/terrain/tilt-bridge-v1-source.png`
+  - transparent source: `source-assets/shadow-runner/level-assets/terrain/tilt-bridge-v1-transparent.png`
   - runtime asset: `public/games/shadow-runner/level-assets/terrain/tilt-bridge-v1-256x80.png`
   - note: wired as the animated moving bridge visual in Level 1.
 - Gold coin pickup:
-  - source: `public/games/shadow-runner/level-assets/collectibles/gold-coin-v1-source.png`
-  - transparent strip: `public/games/shadow-runner/level-assets/collectibles/gold-coin-v1-transparent-strip.png`
-  - runtime strips: `public/games/shadow-runner/level-assets/collectibles/gold-coin-8f-32.png` and `public/games/shadow-runner/level-assets/collectibles/gold-coin-8f-48.png`
-  - preview: `public/games/shadow-runner/level-assets/collectibles/gold-coin-v1-preview.png`
+  - source: `source-assets/shadow-runner/level-assets/collectibles/gold-coin-v1-source.png`
+  - transparent strip: `source-assets/shadow-runner/level-assets/collectibles/gold-coin-v1-transparent-strip.png`
+  - runtime strips: `source-assets/shadow-runner/level-assets/collectibles/gold-coin-8f-32.png` and `public/games/shadow-runner/level-assets/collectibles/gold-coin-8f-48.png`
+  - preview: `source-assets/shadow-runner/level-assets/collectibles/gold-coin-v1-preview.png`
   - note: wired with the 48 px strip for readable in-world pickups.
 - Floor spikes:
-  - source: `public/games/shadow-runner/level-assets/hazards/floor-spikes-v1-source.png`
-  - transparent source: `public/games/shadow-runner/level-assets/hazards/floor-spikes-v1-transparent.png`
-  - runtime options: `public/games/shadow-runner/level-assets/hazards/floor-spikes-64x28.png` and `public/games/shadow-runner/level-assets/hazards/floor-spikes-128x56.png`
-  - preview: `public/games/shadow-runner/level-assets/hazards/floor-spikes-v1-preview.png`
+  - source: `source-assets/shadow-runner/level-assets/hazards/floor-spikes-v1-source.png`
+  - transparent source: `source-assets/shadow-runner/level-assets/hazards/floor-spikes-v1-transparent.png`
+  - runtime options: `public/games/shadow-runner/level-assets/hazards/floor-spikes-64x28.png` and `source-assets/shadow-runner/level-assets/hazards/floor-spikes-128x56.png`
+  - preview: `source-assets/shadow-runner/level-assets/hazards/floor-spikes-v1-preview.png`
   - note: wired with the 64 x 28 runtime texture.
 - East gate finish marker:
-  - source: `public/games/shadow-runner/level-assets/props/east-gate-v1-source.png`
-  - transparent source: `public/games/shadow-runner/level-assets/props/east-gate-v1-transparent.png`
-  - runtime options: `public/games/shadow-runner/level-assets/props/east-gate-96x180.png` and `public/games/shadow-runner/level-assets/props/east-gate-128x240.png`
-  - preview: `public/games/shadow-runner/level-assets/props/east-gate-v1-preview.png`
+  - source: `source-assets/shadow-runner/level-assets/props/east-gate-v1-source.png`
+  - transparent source: `source-assets/shadow-runner/level-assets/props/east-gate-v1-transparent.png`
+  - runtime options: `public/games/shadow-runner/level-assets/props/east-gate-96x180.png` and `source-assets/shadow-runner/level-assets/props/east-gate-128x240.png`
+  - preview: `source-assets/shadow-runner/level-assets/props/east-gate-v1-preview.png`
   - note: wired with the 96 x 180 runtime finish marker.
 - Landing dust:
-  - source: `public/games/shadow-runner/level-assets/vfx/landing-dust-v1-source.png`
-  - transparent strip: `public/games/shadow-runner/level-assets/vfx/landing-dust-v1-transparent-strip.png`
+  - source: `source-assets/shadow-runner/level-assets/vfx/landing-dust-v1-source.png`
+  - transparent strip: `source-assets/shadow-runner/level-assets/vfx/landing-dust-v1-transparent-strip.png`
   - runtime strip: `public/games/shadow-runner/level-assets/vfx/landing-dust-6f-64.png`
-  - preview: `public/games/shadow-runner/level-assets/vfx/landing-dust-v1-preview.png`
+  - preview: `source-assets/shadow-runner/level-assets/vfx/landing-dust-v1-preview.png`
   - note: wired for double-jump, respawn, and defeat dust puffs.
 - Sword slash:
-  - source: `public/games/shadow-runner/level-assets/vfx/sword-slash-v1-source.png`
-  - transparent strip: `public/games/shadow-runner/level-assets/vfx/sword-slash-v1-transparent-strip.png`
+  - source: `source-assets/shadow-runner/level-assets/vfx/sword-slash-v1-source.png`
+  - transparent strip: `source-assets/shadow-runner/level-assets/vfx/sword-slash-v1-transparent-strip.png`
   - runtime strip: `public/games/shadow-runner/level-assets/vfx/sword-slash-6f-96.png`
-  - preview: `public/games/shadow-runner/level-assets/vfx/sword-slash-v1-preview.png`
+  - preview: `source-assets/shadow-runner/level-assets/vfx/sword-slash-v1-preview.png`
   - note: wired as the attack VFX. The old Phaser-drawn slash arc remains only
     as a fallback.
 
 ### 2026-06-10 Batch 2 Lantern Market Roofs
 
 - Lantern Market gameplay background:
-  - source: `public/games/shadow-runner/level-assets/level-2/background/lantern-market-roofs-background-source.png`
+  - source: `source-assets/shadow-runner/level-assets/level-2/background/lantern-market-roofs-background-source.png`
   - optimized background: `public/games/shadow-runner/level-assets/level-2/background/lantern-market-roofs-background.webp`
 - Lantern Market props and terrain source sheet:
-  - source: `public/games/shadow-runner/level-assets/level-2/props/lantern-market-props-v1-source.png`
-  - transparent sheet: `public/games/shadow-runner/level-assets/level-2/props/lantern-market-props-v1-transparent.png`
+  - source: `source-assets/shadow-runner/level-assets/level-2/props/lantern-market-props-v1-source.png`
+  - transparent sheet: `source-assets/shadow-runner/level-assets/level-2/props/lantern-market-props-v1-transparent.png`
   - includes roof chunks, ledge pieces, chimney, hanging lantern states, torch
     brazier, purple banner, stall awning, sealed-letter crate, route-token
     table, signpost, rope line, and rubble.
 - Lantern Market level-select thumbnail:
-  - source: `public/games/shadow-runner/level-assets/level-2/ui/lantern-market-roofs-thumbnail-source.png`
+  - source: `source-assets/shadow-runner/level-assets/level-2/ui/lantern-market-roofs-thumbnail-source.png`
   - runtime options: `public/games/shadow-runner/level-assets/level-2/ui/lantern-market-roofs-thumbnail-320x180.webp` and `public/games/shadow-runner/level-assets/level-2/ui/lantern-market-roofs-thumbnail-160x90.webp`
 - Lantern Bandit Scout v1:
-  - source: `public/games/shadow-runner/sprites/raw/lantern-bandit-scout-v1-source.png`
-  - transparent strip: `public/games/shadow-runner/sprites/transparent/lantern-bandit-scout-v1-5f-strip.png`
-  - runtime strips: `public/games/shadow-runner/sprites/strips/lantern-bandit-scout-v1-5f-128.png` and `public/games/shadow-runner/sprites/strips/lantern-bandit-scout-v1-5f-192.png`
+  - source: `source-assets/shadow-runner/sprites/raw/lantern-bandit-scout-v1-source.png`
+  - transparent strip: `source-assets/shadow-runner/sprites/transparent/lantern-bandit-scout-v1-5f-strip.png`
+  - runtime strips: `source-assets/shadow-runner/sprites/strips/lantern-bandit-scout-v1-5f-128.png` and `source-assets/shadow-runner/sprites/strips/lantern-bandit-scout-v1-5f-192.png`
   - frames: `public/games/shadow-runner/sprites/frames/lantern-bandit-scout-v1/*.png`
-  - preview: `public/games/shadow-runner/sprites/previews/lantern-bandit-scout-v1-5f-preview.png`
+  - preview: `source-assets/shadow-runner/sprites/previews/lantern-bandit-scout-v1-5f-preview.png`
   - note: a first hooded bandit source was rejected because it looked too much
     like the player. Saved v1 uses a burgundy cap, rust-orange scarf/cape, tan
     vest, visible face, and lantern-pole silhouette so it reads as a different
     faction.
 - Batch contact sheet:
-  `public/games/shadow-runner/level-assets/level-2/batch-2-lantern-market-contact-sheet.png`
+  `source-assets/shadow-runner/level-assets/level-2/batch-2-lantern-market-contact-sheet.png`
 
 ### 2026-06-11 Batch 3 Ivy Viaduct
 
 - Ivy Viaduct gameplay background:
-  - source: `public/games/shadow-runner/level-assets/level-3/background/ivy-viaduct-background-source.png`
+  - source: `source-assets/shadow-runner/level-assets/level-3/background/ivy-viaduct-background-source.png`
   - optimized background: `public/games/shadow-runner/level-assets/level-3/background/ivy-viaduct-background.webp`
 - Ivy Viaduct terrain and hazard source sheet:
-  - source: `public/games/shadow-runner/level-assets/level-3/terrain/ivy-viaduct-terrain-hazards-v1-source.png`
+  - source: `source-assets/shadow-runner/level-assets/level-3/terrain/ivy-viaduct-terrain-hazards-v1-source.png`
   - transparent sheet: `public/games/shadow-runner/level-assets/level-3/terrain/ivy-viaduct-terrain-hazards-v1-transparent.png`
   - includes mossy viaduct blocks, arch underside pieces, ledge caps, vine
     overlays, wet ledges, crumbling bridge planks, falling-stone pieces,
     shallow pit warning marker, spike-pit dressing, broken banner, runner route
     marks, dust puffs, and stone chunks.
 - Ivy Viaduct level-select thumbnail:
-  - source: `public/games/shadow-runner/level-assets/level-3/ui/ivy-viaduct-thumbnail-source.png`
+  - source: `source-assets/shadow-runner/level-assets/level-3/ui/ivy-viaduct-thumbnail-source.png`
   - runtime options: `public/games/shadow-runner/level-assets/level-3/ui/ivy-viaduct-thumbnail-320x180.webp` and `public/games/shadow-runner/level-assets/level-3/ui/ivy-viaduct-thumbnail-160x90.webp`
 - Barrel Roller v1:
-  - source: `public/games/shadow-runner/sprites/raw/barrel-roller-v1-source.png`
-  - transparent strip: `public/games/shadow-runner/sprites/transparent/barrel-roller-v1-5f-strip.png`
-  - runtime strips: `public/games/shadow-runner/sprites/strips/barrel-roller-v1-5f-128.png` and `public/games/shadow-runner/sprites/strips/barrel-roller-v1-5f-192.png`
+  - source: `source-assets/shadow-runner/sprites/raw/barrel-roller-v1-source.png`
+  - transparent strip: `source-assets/shadow-runner/sprites/transparent/barrel-roller-v1-5f-strip.png`
+  - runtime strips: `public/games/shadow-runner/sprites/strips/barrel-roller-v1-5f-128.png` and `source-assets/shadow-runner/sprites/strips/barrel-roller-v1-5f-192.png`
   - frames: `public/games/shadow-runner/sprites/frames/barrel-roller-v1/*.png`
-  - preview: `public/games/shadow-runner/sprites/previews/barrel-roller-v1-5f-preview.png`
+  - preview: `source-assets/shadow-runner/sprites/previews/barrel-roller-v1-5f-preview.png`
   - note: generated as a non-humanoid object/trap enemy so it cannot read as
     the Shadow Runner hero.
 - Batch contact sheet:
-  `public/games/shadow-runner/level-assets/level-3/batch-3-ivy-viaduct-contact-sheet.png`
+  `source-assets/shadow-runner/level-assets/level-3/batch-3-ivy-viaduct-contact-sheet.png`
 
 ### 2026-06-11 Batch 4 Bell Tower Archives
 
 - Bell Tower Archives gameplay background:
-  - source: `public/games/shadow-runner/level-assets/level-4/background/bell-tower-archives-background-source.png`
+  - source: `source-assets/shadow-runner/level-assets/level-4/background/bell-tower-archives-background-source.png`
   - optimized background: `public/games/shadow-runner/level-assets/level-4/background/bell-tower-archives-background.webp`
 - Bell Tower Archives props and hazard source sheet:
-  - source: `public/games/shadow-runner/level-assets/level-4/props/bell-tower-archives-props-hazards-v1-source.png`
+  - source: `source-assets/shadow-runner/level-assets/level-4/props/bell-tower-archives-props-hazards-v1-source.png`
   - transparent sheet: `public/games/shadow-runner/level-assets/level-4/props/bell-tower-archives-props-hazards-v1-transparent.png`
   - includes tower ledges, narrow wall platforms, bell platform, ladders,
     chains, archive shelves, scroll piles, sealed-letter and message pedestals,
@@ -240,30 +240,30 @@ bridge visual. Source and preview files remain cataloged for review.
     impact sparks, candle stand, bell rope, window slit, purple archive banner,
     and wood supports.
 - Bell Tower Archives level-select thumbnail:
-  - source: `public/games/shadow-runner/level-assets/level-4/ui/bell-tower-archives-thumbnail-source.png`
+  - source: `source-assets/shadow-runner/level-assets/level-4/ui/bell-tower-archives-thumbnail-source.png`
   - runtime options: `public/games/shadow-runner/level-assets/level-4/ui/bell-tower-archives-thumbnail-320x180.webp` and `public/games/shadow-runner/level-assets/level-4/ui/bell-tower-archives-thumbnail-160x90.webp`
 - Scroll Thief v1:
-  - source: `public/games/shadow-runner/sprites/raw/scroll-thief-v1-source.png`
-  - transparent strip: `public/games/shadow-runner/sprites/transparent/scroll-thief-v1-5f-strip.png`
-  - runtime strips: `public/games/shadow-runner/sprites/strips/scroll-thief-v1-5f-128.png` and `public/games/shadow-runner/sprites/strips/scroll-thief-v1-5f-192.png`
+  - source: `source-assets/shadow-runner/sprites/raw/scroll-thief-v1-source.png`
+  - transparent strip: `source-assets/shadow-runner/sprites/transparent/scroll-thief-v1-5f-strip.png`
+  - runtime strips: `public/games/shadow-runner/sprites/strips/scroll-thief-v1-5f-128.png` and `source-assets/shadow-runner/sprites/strips/scroll-thief-v1-5f-192.png`
   - frames: `public/games/shadow-runner/sprites/frames/scroll-thief-v1/*.png`
-  - preview: `public/games/shadow-runner/sprites/previews/scroll-thief-v1-5f-preview.png`
+  - preview: `source-assets/shadow-runner/sprites/previews/scroll-thief-v1-5f-preview.png`
   - note: teal short cape/sash, cream shirt, burgundy trousers, scholar cap,
     visible face, and scroll/satchel-swipe silhouette keep it distinct from the
     Shadow Runner hero.
 - Tower Archer v1:
-  - source: `public/games/shadow-runner/sprites/raw/tower-archer-v1-source.png`
+  - source: `source-assets/shadow-runner/sprites/raw/tower-archer-v1-source.png`
   - runtime strip: `public/games/shadow-runner/sprites/strips/tower-archer-v1-5f-128.png`
-  - preview: `public/games/shadow-runner/sprites/previews/tower-archer-v1-5f-preview.png`
+  - preview: `source-assets/shadow-runner/sprites/previews/tower-archer-v1-5f-preview.png`
   - note: generated on 2026-06-15 for the harder Bell Tower route as a new
     ranged enemy with idle, ready, aim, release, and hit/defeated frames.
 - Moonheart Crest boost and Bell Tower traversal assets:
   - source sheet:
-    `public/games/shadow-runner/level-assets/level-4/generated/bell-tower-boost-and-crouch-assets-v1-source.png`
+    `source-assets/shadow-runner/level-assets/level-4/generated/bell-tower-boost-and-crouch-assets-v1-source.png`
   - Moonheart runtime strip:
     `public/games/shadow-runner/level-assets/level-4/collectibles/moonheart-crest-4f-64.png`
   - Moonheart preview:
-    `public/games/shadow-runner/level-assets/level-4/collectibles/moonheart-crest-4f-preview.png`
+    `source-assets/shadow-runner/level-assets/level-4/collectibles/moonheart-crest-4f-preview.png`
   - note: generated on 2026-06-15 to make Level 4 feel fresh while keeping the
     same medieval archive palette. Runtime crouch traversal now uses
     low-clearance platforms assembled from Bell Tower slabs, shelves, and
@@ -272,11 +272,11 @@ bridge visual. Source and preview files remain cataloged for review.
     damage, and grants temporary damage resistance.
 - Moonheart boost aura:
   - source:
-    `public/games/shadow-runner/level-assets/level-4/generated/bell-tower-boost-aura-v1-source.png`
+    `source-assets/shadow-runner/level-assets/level-4/generated/bell-tower-boost-aura-v1-source.png`
   - runtime strip:
     `public/games/shadow-runner/level-assets/level-4/vfx/boost-aura-4f-128.png`
   - preview:
-    `public/games/shadow-runner/level-assets/level-4/vfx/boost-aura-4f-preview.png`
+    `source-assets/shadow-runner/level-assets/level-4/vfx/boost-aura-4f-preview.png`
   - note: generated separately from the pickup sheet so the in-game aura can
     wrap the existing hero sprite without baking a second hero into the VFX.
 - Shadow Runner completion badge icons:
@@ -285,22 +285,22 @@ bridge visual. Source and preview files remain cataloged for review.
   - runner medal transparent:
     `public/games/shadow-runner/badges/shadow-runner-sprint-badge-transparent.png`
   - knight medal source:
-    `public/games/shadow-runner/badges/shadow-runner-main-medal-source.png`
+    `source-assets/shadow-runner/badges/shadow-runner-main-medal-source.png`
   - knight medal runtime:
     `public/games/shadow-runner/badges/shadow-runner-main-medal.png`
   - note: generated on 2026-06-15 for public name-badge rendering. These are
     user achievement badges backed by the server completion ledger, not per-map
     completion seals.
 - Batch contact sheet:
-  `public/games/shadow-runner/level-assets/level-4/batch-4-bell-tower-archives-contact-sheet.png`
+  `source-assets/shadow-runner/level-assets/level-4/batch-4-bell-tower-archives-contact-sheet.png`
 
 ### 2026-06-11 Batch 5 Candle Fair Ruins
 
 - Candle Fair Ruins gameplay background:
-  - source: `public/games/shadow-runner/level-assets/level-5/background/candle-fair-ruins-background-source.png`
+  - source: `source-assets/shadow-runner/level-assets/level-5/background/candle-fair-ruins-background-source.png`
   - optimized background: `public/games/shadow-runner/level-assets/level-5/background/candle-fair-ruins-background.webp`
 - Candle Fair Ruins props and hazard source sheet:
-  - source: `public/games/shadow-runner/level-assets/level-5/props/candle-fair-props-hazards-v1-source.png`
+  - source: `source-assets/shadow-runner/level-assets/level-5/props/candle-fair-props-hazards-v1-source.png`
   - transparent sheet: `public/games/shadow-runner/level-assets/level-5/props/candle-fair-props-hazards-v1-transparent.png`
   - includes fair booth platforms, tattered tent pieces, burned planks, candle
     clusters, torch ember strips, swinging lantern positions, lantern chain,
@@ -308,19 +308,19 @@ bridge visual. Source and preview files remain cataloged for review.
     scrolls, false-route signs, jester mask icon, fair banner scraps, wax
     puddle, and rubble.
 - Candle Fair Ruins level-select thumbnail:
-  - source: `public/games/shadow-runner/level-assets/level-5/ui/candle-fair-ruins-thumbnail-source.png`
+  - source: `source-assets/shadow-runner/level-assets/level-5/ui/candle-fair-ruins-thumbnail-source.png`
   - runtime options: `public/games/shadow-runner/level-assets/level-5/ui/candle-fair-ruins-thumbnail-320x180.webp` and `public/games/shadow-runner/level-assets/level-5/ui/candle-fair-ruins-thumbnail-160x90.webp`
 - Candle Jester v1:
-  - source: `public/games/shadow-runner/sprites/raw/candle-jester-v1-source.png`
-  - transparent strip: `public/games/shadow-runner/sprites/transparent/candle-jester-v1-5f-strip.png`
-  - runtime strips: `public/games/shadow-runner/sprites/strips/candle-jester-v1-5f-128.png` and `public/games/shadow-runner/sprites/strips/candle-jester-v1-5f-192.png`
+  - source: `source-assets/shadow-runner/sprites/raw/candle-jester-v1-source.png`
+  - transparent strip: `source-assets/shadow-runner/sprites/transparent/candle-jester-v1-5f-strip.png`
+  - runtime strips: `public/games/shadow-runner/sprites/strips/candle-jester-v1-5f-128.png` and `source-assets/shadow-runner/sprites/strips/candle-jester-v1-5f-192.png`
   - frames: `public/games/shadow-runner/sprites/frames/candle-jester-v1/*.png`
-  - preview: `public/games/shadow-runner/sprites/previews/candle-jester-v1-5f-preview.png`
+  - preview: `source-assets/shadow-runner/sprites/previews/candle-jester-v1-5f-preview.png`
   - note: cream mask, red-and-gold jester cap, red/gold motley tunic, curled
     shoes, candle wand, and fake coin silhouette keep it distinct from the
     Shadow Runner hero.
 - Batch contact sheet:
-  `public/games/shadow-runner/level-assets/level-5/batch-5-candle-fair-ruins-contact-sheet.png`
+  `source-assets/shadow-runner/level-assets/level-5/batch-5-candle-fair-ruins-contact-sheet.png`
 
 ## Lore-Driven Missing Assets By Map
 
@@ -637,10 +637,10 @@ draws them with Phaser graphics or reuses title art.
     labels, no white matte gaps, consistent scale, readable spear/shield
     silhouette, matching Shadow Runner hero style.
   - Suggested files:
-    - `public/games/shadow-runner/sprites/raw/clockwork-sentry-v2-source.png`
-    - `public/games/shadow-runner/sprites/transparent/clockwork-sentry-v2-6f-strip.png`
+    - `source-assets/shadow-runner/sprites/raw/clockwork-sentry-v2-source.png`
+    - `source-assets/shadow-runner/sprites/transparent/clockwork-sentry-v2-6f-strip.png`
     - `public/games/shadow-runner/sprites/strips/clockwork-sentry-v2-6f-128.png`
-    - `public/games/shadow-runner/sprites/previews/clockwork-sentry-v2-6f-preview.png`
+    - `source-assets/shadow-runner/sprites/previews/clockwork-sentry-v2-6f-preview.png`
 
 - [ ] **Level 1 gameplay background and parallax set**
   - Current state: `createBackground()` reuses the title background as a fixed
@@ -707,7 +707,7 @@ draws them with Phaser graphics or reuses title art.
   - Generate: 6 to 8 frame spinning gold coin strip, transparent, readable at
     roughly 28 x 28 to 36 x 36 runtime size.
   - Suggested files:
-    - `public/games/shadow-runner/level-assets/collectibles/gold-coin-8f-32.png`
+    - `source-assets/shadow-runner/level-assets/collectibles/gold-coin-8f-32.png`
     - `public/games/shadow-runner/level-assets/collectibles/gold-coin-preview.png`
 
 - [x] **East gate / finish marker**
@@ -807,7 +807,7 @@ transparent sprite strips.
 
 - [x] **Clockwork Sentry implementation swap**
   - Current state: `src/features/games/shadow-runner/assets/manifest.ts` and
-    `public/games/shadow-runner/sprites/sprite-manifest.json` point at the v2
+    `source-assets/shadow-runner/sprites/sprite-manifest.json` point at the v2
     strip in the current working tree.
   - Remaining: run browser gameplay QA and keep the damaged first-pass strip as
     source/reference only.

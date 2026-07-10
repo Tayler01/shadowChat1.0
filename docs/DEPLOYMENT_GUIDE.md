@@ -8,16 +8,17 @@ Engineering security gates, staging parity, privacy-safe telemetry, real-device
 release validation, and production monitoring are defined in
 [ENGINEERING_SAFEGUARDS.md](C:/repos/chat2.0/docs/ENGINEERING_SAFEGUARDS.md:1).
 
-## Documentation Status - July 9, 2026
+## Documentation Status - July 10, 2026
 
 This guide reflects the current GitHub Actions, Netlify, Supabase, Render,
 app-release, invite-only signup/email-verification rollout, and production-smoke
-flow. Production deployment now validates and applies migrations, pushes
-Supabase configuration, aligns the classified Edge Function inventory, enforces
-the ESP Bridge hold, captures backend evidence, and only then publishes the
-frontend. Known deployment hardening that is still pending is ranked in the
-audit backlog, including Netlify security headers/CSP and physical-device PWA
-validation.
+flow, plus the July 10 local release candidate. Production deployment validates
+and applies migrations, pushes Supabase configuration, aligns the classified
+Edge Function inventory, enforces the ESP Bridge hold, captures backend evidence,
+and only then publishes the frontend. Candidate-only behavior is not described
+as shipped until the workflow for the final commit, linked Supabase evidence,
+Netlify build manifest, production smoke, and any required physical-device
+checks all pass.
 
 Netlify native Git builds are intentionally stopped for this project. The
 backend-first GitHub Actions workflow is the only production publisher; it
@@ -29,10 +30,27 @@ flow.
 
 The repository is currently main-only: local and remote release history live on
 `main`, and there are zero open pull requests. Production workflow run
-`29061308774` completed successfully for commit
-`8e4e2757efe6555b90c6a566b0684c41da0e2b10`. Netlify deploy
-`6a5045191fe53dd504fc4131` reached `ready`, and the live entry bundle exposes
-that exact SHA.
+`29062308434` completed successfully for commit
+`2790efff528d31ac61a383a787d4883e9d7d8932`. Netlify deploy
+`6a504b0eaa7a29b30706a2cf` reached `ready`. This is the verified production
+baseline; the later July 10 commits and migrations remain a local release
+candidate until their own workflow and post-deploy proof complete.
+
+### July 10 local release candidate
+
+The candidate contains schema, Edge Function, notification, privacy, search,
+ShadowPin, operations-health, Shado TV, Shadow Mystery, PWA, and dependency
+changes after the verified `20260710002000` production migration. A linked
+`supabase db push --linked --dry-run` is therefore expected to remain nonempty
+before the candidate is pushed. At this documentation checkpoint it listed
+candidate migrations through
+`20260710044600_personal_blocking_engagement_hardening.sql`.
+
+Do not use the verified production baseline as proof for the candidate. The
+candidate becomes production-proven only when the final `main` SHA completes the
+backend-first workflow, its post-push migration dry run is empty, the classified
+Function inventory is aligned, the Netlify health manifest reports that SHA,
+and the applicable production/mobile smoke checks pass.
 
 ## Production Pieces
 
@@ -56,6 +74,22 @@ npm run build
 npx jest --runInBand
 npm audit --audit-level=low
 ```
+
+When `apps/mobile` changes, validate the independent Expo 57 workspace too:
+
+```powershell
+Push-Location apps/mobile
+npm ci
+npm audit --audit-level=low
+npm run lint
+npx tsc --noEmit
+npm run doctor
+Pop-Location
+```
+
+Expo 57, React Native 0.86, and React 19.2 are the local native-client baseline.
+Those checks do not deploy the native client and do not replace installed PWA
+or production browser smoke.
 
 If the change affects realtime or UI behavior, also run a headed browser smoke before shipping.
 
@@ -277,6 +311,26 @@ Recent app-surface migrations to confirm in fresh projects:
   constraints for active upload buckets.
 - `20260710002000_remote_security_advisor_cleanup.sql`: hosted ACL/default-
   privilege cleanup, paused-domain RPC lockdown, and guarded reaction/ban APIs.
+- `20260710035027_private_identity_release_a.sql`: API-safe public-profile JSON
+  and General Chat/DM payloads that exclude authentication email and legacy
+  `full_name`.
+- `20260710042228_notification_delivery_parity.sql`: master/type preferences,
+  quiet-hours timezone, General Chat mute, and owner-private DM mutes.
+- `20260710042548_private_identity_release_a_consumers.sql`: cuts profile writers
+  and guarded admin email reads over to public presentation fields and
+  `auth.users`, while retaining nullable compatibility columns for a deployment
+  interval.
+- `20260710042701_personal_blocking_privacy_contract.sql`: private block rows and
+  reciprocal discovery/chat/DM/Hype/notification enforcement.
+- `20260710043132_universal_search_saved_collections.sql`: caller-visible
+  General Chat/DM search plus private saves and collections.
+- `20260710044050_shadow_pin_social_search.sql`: normalized tags, indexed
+  ShadowPin search, comments/replies, and ShadowPin notification types.
+- `20260710044500_publish_notification_events_realtime.sql`: recipient-owned
+  notification event delivery through Supabase Realtime.
+- `20260710044600_personal_blocking_engagement_hardening.sql`: known-id
+  engagement guards, ShadowPin write bounds, one-level replies, stale-event
+  cleanup, and ready-state new-post fanout.
 
 The linked production database has been verified current through
 `20260710002000`; the linked dry run reports no pending migrations and remote
@@ -286,6 +340,10 @@ not hidden: the remaining findings are 71 intentional guarded authenticated
 availability check. Supabase Auth leaked-password protection is enabled with
 `password_hibp_enabled=true`. Recheck these proofs in the release artifact for
 the final commit rather than assuming an earlier successful run covers it.
+
+The July 10 migrations after `20260710002000` are local release-candidate work,
+not confirmed production state. Their pending dry-run output is expected until
+the backend-first workflow applies them.
 
 ### Edge Functions
 
@@ -406,6 +464,44 @@ The two feature variables are browser-safe compile-time booleans. Only literal
 [PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1) for remote-state
 and reactivation requirements.
 
+## Two-Stage Private Identity Rollout
+
+Private identity hardening is deliberately split across two production releases
+so a column drop cannot race an older browser, Edge Function, or native client.
+
+### Release A: consumer cutover and compatibility interval
+
+Release A consists of
+`20260710035027_private_identity_release_a.sql` and
+`20260710042548_private_identity_release_a_consumers.sql`. It introduces the
+API-safe public-profile contract, removes `email` and `full_name` from General
+Chat and DM profile payloads, stops profile bootstrap and AI/Bridge upserts from
+mirroring those values, and sources full-admin email from guarded `auth.users`.
+The legacy `public.users.email` and `public.users.full_name` columns remain
+nullable during this interval.
+
+Release A is currently a local release candidate. Before calling it
+production-proven:
+
+1. Complete the final `main` workflow and confirm the linked dry run is empty.
+2. Run stable-account production auth, General Chat, DM, resume-send, and
+   Settings/Admin Access checks.
+3. Confirm public profile, message-window, search, and realtime payloads do not
+   expose authentication email or legacy `full_name`.
+4. Verify every frontend, Edge Function, script, and `apps/mobile` selector is
+   independent of the compatibility columns. The Expo selectors/types are
+   already cut over locally; their Expo 57 checks still need release evidence.
+
+### Release B: destructive column removal
+
+Release B must be a later, separate migration that drops
+`public.users.email` and `public.users.full_name`. Do not create or apply that
+migration merely because local tests pass. First require a successful Release A
+production interval, current production smoke, no linked/runtime consumer
+references, and an updated Expo/native selector contract. If any deployed
+consumer still reads either column, fix and re-prove Release A instead of
+advancing to Release B.
+
 ## Invite-Only Signup And Email Verification Rollout Checklist
 
 Invite-only signup and required email verification are implemented. Use this
@@ -507,6 +603,18 @@ After deploy, verify:
 14. An app operator can open another user's profile popup and see Channel bans
 15. A General Chat-banned user is blocked from participating while DMs and read access still work
 16. An app operator can delete a normal-user General Chat message, and it disappears for other signed-in users without refresh
+
+For private-identity Release A, also verify that normal profile/message payloads
+omit `email` and `full_name`, while the full-admin access screen can still show
+the guarded Auth email. Release B needs a later smoke window after its separate
+column-drop migration.
+
+Do not create a production ShadowPin post merely to smoke-test posting. A new
+pin fans out notification events to eligible members and can immediately send
+web push; deleting the pin does not retract notifications already delivered.
+Use local/staging transactional proof or existing production content for routine
+checks. A controlled production post requires explicit approval, a real content
+purpose, an audience/notification plan, and verified cleanup.
 
 Paused-domain checks are reactivation-only and are not part of routine
 production smoke. When Boards, News, Art Board, or ESP Bridge is explicitly

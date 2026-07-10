@@ -1,10 +1,15 @@
 # Admin Access
 
-## Documentation Status - July 9, 2026
+## Documentation Status - July 10, 2026
 
 This doc reflects the app-wide admin model and July 9 authority cleanup.
 `public.user_roles` and operator helpers are the authorization source;
 `users.admin_role` is display-only public badge metadata.
+
+The current local release candidate adds Operations Health evidence, the
+Shadow Mystery publishing studio, and Shado TV caption/premiere/analytics
+controls. Those additions remain candidate status until the matching backend
+and frontend release is verified.
 
 Settings > Admin > News Sources and ESP Bridge Pairing are intentionally absent
 from the default build while those product domains are paused. Their panel source
@@ -51,7 +56,10 @@ Admin settings are split into subpages under Settings > Admin:
   push, merge, deploy, or start a runner.
 - ESP Bridge Pairing: preserved operator controls, absent while ESP is paused.
 - Shado TV Studio: operator episode, trailer, cover, cast, update, visibility,
-  and Bunny-upload controls.
+  Bunny-upload, WebVTT caption, premiere-schedule, and aggregate watch-analytics
+  controls.
+- Shadow Mystery Studio: operator story metadata, ordered chapters, cover/header
+  and chapter artwork, source credits, draft/publish state, and deletion.
 - Shadow Pin Activity: operator analytics for Shadow Pin visits, active time,
   users, categories, pins, and raw activity drilldown.
 - News Sources: preserved operator controls for tracked X/Truth Social accounts,
@@ -112,6 +120,12 @@ Main tables:
 - `public.operations_health_snapshot`: one sanitized production release and
   monitor snapshot. The service role writes it; RLS allows `SELECT` only for
   current app operators and gives authenticated clients no write privileges.
+- `public.shado_tv_captions` and `public.shado_tv_watch_events`: operator-managed
+  caption metadata and privacy-bounded watch evidence. Operators read aggregate
+  analytics through `get_shado_tv_watch_analytics()`.
+- `public.shadow_mystery_stories`, `shadow_mystery_chapters`,
+  `shadow_mystery_images`, and `shadow_mystery_sources`: isolated publishing
+  domain managed by app operators; regular members read published story trees.
 
 Main RPCs:
 
@@ -136,6 +150,12 @@ Only full admins can call the role-management RPCs that list users or grant and
 revoke sub-admin access. Automation approval RPCs are also full-admin-only.
 App operators can use admin-class product tools guarded by `is_app_operator`.
 
+Private-identity Release A keeps email out of public profile payloads. The
+full-admin-only `list_admin_access_users()` RPC sources its email field from
+`auth.users`, not `public.users`. The legacy public email/full-name columns
+remain only for the staged compatibility interval and are removed by the later
+Release B migration after Release A production proof.
+
 For the automation queue model, see
 [docs/AUTOMATION_APPROVAL_QUEUE.md](C:/repos/chat2.0/docs/AUTOMATION_APPROVAL_QUEUE.md:1).
 
@@ -157,6 +177,7 @@ npm run lint
 npx tsc --noEmit -p tsconfig.app.json
 npm run build
 npx jest --runInBand tests/SettingsView.test.tsx
+npx jest --runInBand tests/OperationsHealthCenter.test.tsx tests/ShadowMysteryStudio.test.tsx tests/shadoTvPlayback.test.ts
 ```
 
 For UI changes, also run a headed browser check against a preview build and

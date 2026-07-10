@@ -117,6 +117,21 @@ describe('Edge Function abuse and idempotency boundaries', () => {
     expect(handler).toContain('waitforedgerequestclaim')
   })
 
+  it('keeps push subscription identifiers private and retries provider failures', () => {
+    const source = compact(read('supabase/functions/send-push/index.ts'))
+    const delivery = source.slice(
+      source.indexOf('const deliverpushtosubscriptions'),
+      source.indexOf('const senddmpush')
+    )
+
+    expect(delivery).not.toContain('endpoint: subscriptionrow.endpoint, status: response.status')
+    expect(delivery).toContain('retryablefailures: results.filter')
+    expect(delivery).not.toContain('results, }')
+    expect(source).not.toContain('results: perrecipientresults')
+    expect(source).toContain("errormessage: 'push provider delivery can be retried'")
+    expect(source).toContain('blockedmessageauthorids')
+  })
+
   it('leaves account deletion exempt from request-ledger retention', () => {
     const source = compact(read('supabase/functions/delete-account/index.ts'))
     const config = compact(read('supabase/config.toml'))

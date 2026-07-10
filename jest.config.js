@@ -17,5 +17,6 @@ export default {
     '^(\\.{1,2}/.*)\\.js$': '$1',
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy'
   },
+  testPathIgnorePatterns: ['\\.node\\.test\\.mjs$'],
   setupFilesAfterEnv: ['<rootDir>/tests/setupTests.ts']
 };

@@ -16,11 +16,11 @@ The Desktop source remains untouched:
 | --- | --- | --- |
 | Picker banner | `public/games/shadow-runner/shadow-runner-picker-banner.webp` | Entertainment picker card image generated to match the home screen branding. |
 | Music | `public/games/shadow-runner/audio/castle-bard.mp3` | Background music started from the Entertainment picker click. |
-| Background plate | `public/games/shadow-runner/home-assets/assets/background/bg_title_castle_night_clean.png` | Strong moonlit castle layout with room for title, hero, and menu. |
-| Title scroll | `public/games/shadow-runner/home-assets/assets/ui/ui_title_scroll_shadow_runner.png` | Baked `SHADOW RUNNER` title, readable and correctly spelled. |
-| Runtime title scroll | `public/games/shadow-runner/home-assets/sliced/title-scroll-shadow-runner.png` | Trimmed title scroll used by the live home screen to avoid transparent padding taking layout space. |
-| Bottom menu scroll | `public/games/shadow-runner/home-assets/assets/ui/ui_bottom_menu_scroll.png` | Baked `START`, `LEVELS`, and `OPTIONS` menu. |
-| Runtime bottom menu scroll | `public/games/shadow-runner/home-assets/sliced/bottom-menu-scroll.png` | Trimmed menu strip used by the live home screen for tighter button areas on landscape phones. |
+| Background plate | `source-assets/shadow-runner/home-assets/assets/background/bg_title_castle_night_clean.png` | Strong moonlit castle layout with room for title, hero, and menu. |
+| Title scroll | `source-assets/shadow-runner/home-assets/assets/ui/ui_title_scroll_shadow_runner.png` | Baked `SHADOW RUNNER` title, readable and correctly spelled. |
+| Runtime title scroll | `source-assets/shadow-runner/home-assets/sliced/title-scroll-shadow-runner.png` | Trimmed title scroll used by the live home screen to avoid transparent padding taking layout space. |
+| Bottom menu scroll | `source-assets/shadow-runner/home-assets/assets/ui/ui_bottom_menu_scroll.png` | Baked `START`, `LEVELS`, and `OPTIONS` menu. |
+| Runtime bottom menu scroll | `source-assets/shadow-runner/home-assets/sliced/bottom-menu-scroll.png` | Trimmed menu strip used by the live home screen for tighter button areas on landscape phones. |
 | Runtime blank menu scroll | `public/games/shadow-runner/home-assets/optimized/blank-menu-scroll.webp` | Blank scroll used by the title menu so labels and controls can be rendered live. |
 | Runtime blank menu button | `public/games/shadow-runner/home-assets/optimized/blank-menu-button.webp` | Blank row/button panel used for live Start, Levels, and Options hit targets. |
 | Runtime campaign map | `public/games/shadow-runner/home-assets/optimized/campaign-map.webp` | Generated full-screen parchment world map used by the campaign level-select route screen. |
@@ -30,13 +30,13 @@ The Desktop source remains untouched:
 | Runtime square thumbnail frame | `public/games/shadow-runner/home-assets/optimized/level-thumbnail-square-frame.webp` | Generated square frame used for mission detail popup thumbnails. |
 | Options scroll panel | `public/games/shadow-runner/home-assets/optimized/options-scroll-panel.webp` | Scroll panel used by title Options and in-game Pause menus. |
 | Options row button | `public/games/shadow-runner/home-assets/optimized/options-menu-row-button.webp` | Dedicated row-button asset for scroll-menu actions. |
-| Mission scroll stand | `public/games/shadow-runner/home-assets/assets/ui/prop_mission_scroll_stand.png` | Blank foreground prop for mission text or decorative menu staging. |
-| Torch strip | `public/games/shadow-runner/home-assets/assets/effects/fx_torch_flame_strip.png` | Intended 8-frame strip, but needs reviewed slicing because the width is not evenly divisible by 8. |
+| Mission scroll stand | `source-assets/shadow-runner/home-assets/assets/ui/prop_mission_scroll_stand.png` | Blank foreground prop for mission text or decorative menu staging. |
+| Torch strip | `source-assets/shadow-runner/home-assets/assets/effects/fx_torch_flame_strip.png` | Intended 8-frame strip, but needs reviewed slicing because the width is not evenly divisible by 8. |
 | Runtime torch strip | `public/games/shadow-runner/home-assets/sliced/torch-flame-8f-192.png` | Normalized 8-frame `192 x 192` strip used by the first home screen. |
-| Star sheet | `public/games/shadow-runner/home-assets/assets/effects/fx_star_twinkle_sheet.png` | Intended 12-sprite sparkle atlas, but needs explicit atlas regions or cleanup slicing. |
-| Purple banners | `public/games/shadow-runner/home-assets/assets/props/prop_purple_banners_sheet.png` | Three decorative banner props. |
+| Star sheet | `source-assets/shadow-runner/home-assets/assets/effects/fx_star_twinkle_sheet.png` | Intended 12-sprite sparkle atlas, but needs explicit atlas regions or cleanup slicing. |
+| Purple banners | `source-assets/shadow-runner/home-assets/assets/props/prop_purple_banners_sheet.png` | Three decorative banner props. |
 | Runtime banner props | `public/games/shadow-runner/home-assets/sliced/banner-*.png` | Automatically sliced banner stand, hanging banner, and pennant. |
-| Contact sheet | `public/games/shadow-runner/home-assets/previews/contact_sheet.png` | Fast visual reference for the bundle. |
+| Contact sheet | `source-assets/shadow-runner/home-assets/previews/contact_sheet.png` | Fast visual reference for the bundle. |
 
 ## Suggested Layer Order
 
@@ -102,4 +102,4 @@ picker-level fullscreen/landscape request. Artifacts live under
 
 Machine-readable details live at:
 
-`public/games/shadow-runner/home-assets/home-assets-manifest.json`
+`source-assets/shadow-runner/home-assets/home-assets-manifest.json`

@@ -20,7 +20,6 @@ const GENERAL_MESSAGE_SELECT = `
   updated_at,
   user:users!user_id(
     id,
-    email,
     username,
     display_name,
     avatar_url,
@@ -32,7 +31,6 @@ const GENERAL_MESSAGE_SELECT = `
 
 const PROFILE_SELECT = `
   id,
-  email,
   username,
   display_name,
   avatar_url,

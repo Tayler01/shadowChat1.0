@@ -8,7 +8,9 @@ This runbook is current through the July 10 production auth/resume-send proof.
 The runner now establishes a complete General Chat latest-window precondition
 before the resume scenario so an old persisted read position cannot hide a new
 realtime message. Production smoke continues to use stable email-confirmed
-accounts instead of disposable signup.
+accounts instead of disposable signup. The later July 10 identity,
+notification, ShadowPin, search, PWA, and dependency work remains a local
+release candidate until its own deploy and smoke evidence is recorded here.
 
 ## Why Stable Accounts Are Required
 
@@ -35,6 +37,28 @@ If a production signup proof is explicitly approved, use one dedicated test
 invite, confirm the email, verify first login, then disable or expire the
 invite and document any profile cleanup in the deploy notes.
 
+## Private Identity Release A And Release B Gate
+
+Private identity hardening is a two-stage rollout:
+
+- Release A cuts public payloads and writers away from
+  `public.users.email`/`full_name` while leaving the nullable columns available
+  for one compatibility interval.
+- Release B is a later migration that drops those columns only after Release A
+  is production-proven and every web, Edge, script, and Expo/native consumer is
+  independent of them.
+
+After Release A deploys, the stable-account smoke must cover sign-in, General
+Chat, DMs, resume-send, public profiles, global search, and full-admin access.
+Inspect representative public payloads to confirm they omit authentication email
+and legacy `full_name`; separately confirm the guarded full-admin user list can
+still obtain email from Auth. Do not combine the column drop with this proof.
+
+Before Release B, rerun the same flows against the proven Release A deployment,
+verify the linked dry run and operations evidence, and confirm contract searches
+include `apps/mobile`. If any deployed consumer still reads either column,
+Release B remains blocked.
+
 ## Production Test Data Cleanup
 
 Production smoke must leave the live app clean. Any scenario that creates real
@@ -43,6 +67,13 @@ objects before the run is considered complete. This includes test images,
 videos, audio or voice clips, thumbnails or derived media, and generic file
 attachments. If cleanup cannot be verified, keep the payload minimal and record
 the remaining rows or object paths in the deploy notes as residual risk.
+
+Do not create a production ShadowPin post merely to smoke-test the submit path.
+Each new pin can fan out in-app notification events and web push to eligible
+members, and deleting the row cannot retract notifications already delivered.
+Use local/staging transactional coverage or existing production pins for routine
+checks. A production post is allowed only with explicit approval, a real content
+purpose, a notification/audience plan, and verified cleanup.
 
 For General Chat scroll timing on production, use the metrics-only probe:
 `npm run qa:chat-scroll:metrics -- --base-url=https://shadochat.online --skip-build`.
@@ -92,7 +123,7 @@ Use the two dedicated smoke users above. Do not reuse a personal admin account a
 6. Save the credentials to local `.env.testing.local` or the deployment secret store.
 7. Verify password sign-in before running the smoke.
 
-If the accounts are created through normal production signup, finish the email-confirmation step before using them in Playwright. If the accounts are created through an admin path, set the metadata keys `username`, `display_name`, and `full_name` so the `public.users` trigger can bootstrap readable profiles.
+If the accounts are created through normal production signup, finish the email-confirmation step before using them in Playwright. If the accounts are created through an admin path, set the Auth metadata keys `username` and `display_name`; legacy `full_name` may be retained only as an Auth-metadata fallback for display-name bootstrap. Do not require or repopulate `public.users.email` or `public.users.full_name` during Release A.
 
 Prefer repairing these canonical users through Supabase Auth Admin instead of
 consuming normal product invites. Use a real invite for smoke only when the
@@ -169,6 +200,11 @@ from `2026-07-10T00:58:09.221Z` through `2026-07-10T00:58:22.463Z`:
 - The deployed app baseline under test was commit `8e69fe4`, published by the
   successful production workflow run `29060359268`.
 
+A later backend-first production workflow, run `29062308434` for commit
+`2790eff`, completed successfully, but it does not replace the browser artifact
+above. The subsequent July 10 local candidate needs its own post-deploy smoke
+record before this section is advanced.
+
 Cleanup was verified against linked production, not inferred from the browser:
 
 - General Chat row `Resume chat 20260710005817`
@@ -195,10 +231,15 @@ Cleanup was verified against linked production, not inferred from the browser:
 10. If the deploy touched moderation, verify an operator can open another
     user's profile popup and see Channel bans without using a personal admin
     account for routine smoke traffic.
-11. Delete every generated production row/object, query production to prove the
+11. If the deploy is private-identity Release A, inspect public profile/message
+    payloads for absence of `email`/`full_name` and verify full-admin email still
+    works through the guarded admin list.
+12. Do not create a new ShadowPin post for routine smoke; use existing content or
+    local/staging proof so members do not receive test notifications.
+13. Delete every generated production row/object, query production to prove the
     expected rows and prefixes are absent, and keep that evidence with the
     deploy notes.
-12. Keep the latest passing artifact path with the deploy notes.
+14. Keep the latest passing artifact path with the deploy notes.
 
 ## Historical June 1 Documentation Refresh Deploy
 
