@@ -10,6 +10,7 @@ import {
   requireBridgeApiEnabled,
   resolveBridgeUserReference,
 } from '../_shared/bridge.ts'
+import { embedPublicProfile } from '../_shared/public-profile.ts'
 
 type BridgeDmPollPayload = {
   deviceId?: string
@@ -34,15 +35,11 @@ const DM_MESSAGE_SELECT = `
   sender_id,
   content,
   created_at,
-  sender:users!sender_id(
-    display_name,
-    full_name,
-    username
-  )
+  ${embedPublicProfile('sender', 'users!sender_id')}
 `
 
 const getProfileLabel = (profile: any, fallbackId: string) =>
-  profile?.display_name || profile?.full_name || profile?.username || fallbackId
+  profile?.display_name || profile?.username || fallbackId
 
 const toBridgeMessage = (message: any) => {
   const senderLabel = getProfileLabel(message.sender, message.sender_id)

@@ -154,6 +154,27 @@ dry run before dependency installation. A missing, malformed, newline-polluted,
 or swapped credential therefore fails early before any backend or frontend
 publication step.
 
+### Operations health evidence
+
+Every production build writes a public, no-store manifest at
+`/.well-known/shadowchat-health.json`. It contains only the build id, commit
+SHA, deploy context, and whether a valid browser push public key was compiled;
+it never contains Supabase keys or provider credentials.
+
+After migrations and the classified Edge Function manifest are aligned, the
+production workflow records a sanitized row in
+`public.operations_health_snapshot`. It includes the latest migration version,
+function-manifest digest and counts, push requirement names, Netlify deploy
+identity, and GitHub workflow link. The service role is the only writer; RLS
+limits reads to app operators. The immediate post-deploy check and the
+15-minute Production Health workflow then update the smoke status and deployed
+frontend SHA. Operators can review the result in Settings > Admin > Operations
+Health without receiving management tokens or raw logs.
+
+The Supabase secret inventory used for push readiness stays in the temporary
+GitHub runner directory and is not uploaded with the backend evidence artifact.
+Only missing configuration names, never values or hashes, reach the snapshot.
+
 The preview workflow intentionally does not deploy to production. It publishes
 the built `dist` directory with:
 
@@ -537,6 +558,12 @@ The frontend deploy can be healthy while push still fails if:
 - VAPID keys are missing
 - `send-push` is not deployed
 - devices are not actually subscribed
+
+Settings > Admin > Operations Health distinguishes release-time push
+configuration readiness from device-specific subscription problems. A ready
+status proves the frontend public key, the three server-side Web Push secret
+names, and the deployed `send-push` Function were present; it does not prove a
+particular phone granted permission or retained a valid subscription.
 
 ### Realtime Looks Stale
 

@@ -1,6 +1,12 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4'
 import {
+  authenticateEdgeUser,
+  consumeEdgeRateLimit,
+  EdgeAuthenticationError,
+  EdgeRateLimitError,
+} from '../_shared/edge-guard.ts'
+import {
   assertPublicUrl,
   normalizePublicHttpUrl,
   readLimitedArrayBuffer,
@@ -14,6 +20,8 @@ const corsHeaders = {
 
 const MAX_VIDEO_BYTES = 150 * 1024 * 1024
 const MAX_VIDEO_SECONDS = 60
+const DEFAULT_SHADOW_PIN_PROVIDER_REQUESTS_PER_MINUTE = 30
+const DEFAULT_SHADOW_PIN_MUTATIONS_PER_MINUTE = 12
 const SHADOW_PIN_BUCKET = 'shadow-pin'
 const MAX_PREVIEW_IMAGE_BYTES = 15 * 1024 * 1024
 const DAILY_NATIVE_UPLOAD_LIMIT = 5
@@ -168,29 +176,56 @@ const readJson = async <T>(req: Request): Promise<T> => {
 }
 
 const authenticate = async (req: Request) => {
-  const authorization = req.headers.get('Authorization') ?? ''
-  if (!authorization.startsWith('Bearer ')) {
-    return { error: unauthorized('Authentication required.') }
+  try {
+    const user = await authenticateEdgeUser(req)
+    return { userId: user.id, supabase: getSupabaseAdmin() }
+  } catch (error) {
+    if (error instanceof EdgeAuthenticationError) {
+      return { error: unauthorized(`${error.message}.`) }
+    }
+    throw error
   }
+}
 
-  const { supabaseUrl, anonKey } = getSupabaseEnv()
-  const authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: {
-      Authorization: authorization,
-      apikey: anonKey,
-    },
+const resolvePositiveLimit = (name: string, fallback: number, maximum: number) => {
+  const configured = Number(Deno.env.get(name) ?? '')
+  if (!Number.isFinite(configured) || configured <= 0) return fallback
+  return Math.min(Math.floor(configured), maximum)
+}
+
+const enforceProviderRequestLimit = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  userId: string,
+  action: VideoAction,
+) => {
+  await consumeEdgeRateLimit(supabase, {
+    userId,
+    scope: 'shadow-pin-video:provider-minute',
+    windowSeconds: 60,
+    limit: resolvePositiveLimit(
+      'SHADOW_PIN_PROVIDER_REQUESTS_PER_MINUTE',
+      DEFAULT_SHADOW_PIN_PROVIDER_REQUESTS_PER_MINUTE,
+      120,
+    ),
+    message: 'Too many ShadowPin video requests. Please wait a moment and try again.',
   })
 
-  if (!authResponse.ok) {
-    return { error: unauthorized('Invalid or expired session.') }
-  }
-
-  const user = await authResponse.json()
-  if (!user?.id) {
-    return { error: unauthorized('Invalid or expired session.') }
-  }
-
-  return { userId: user.id as string, supabase: getSupabaseAdmin() }
+  const isPolling = action === 'sync-status'
+  await consumeEdgeRateLimit(supabase, {
+    userId,
+    scope: `shadow-pin-video:${action}:minute`,
+    windowSeconds: 60,
+    limit: isPolling
+      ? resolvePositiveLimit('SHADOW_PIN_SYNC_REQUESTS_PER_MINUTE', 30, 120)
+      : resolvePositiveLimit(
+        'SHADOW_PIN_MUTATIONS_PER_MINUTE',
+        DEFAULT_SHADOW_PIN_MUTATIONS_PER_MINUTE,
+        60,
+      ),
+    message: isPolling
+      ? 'ShadowPin video status is being checked too often. Please wait a moment.'
+      : 'Too many ShadowPin video changes. Please wait a moment and try again.',
+  })
 }
 
 const normalizeUuid = (value: unknown) =>
@@ -1260,6 +1295,7 @@ const handleCreateUpload = async (req: Request, body: VideoPayload) => {
   validateNativeUpload(body)
   await ensureCategory(auth.supabase, categoryId)
   await enforceDailyNativeUploadLimit(auth.supabase, auth.userId)
+  await enforceProviderRequestLimit(auth.supabase, auth.userId, 'create-upload')
 
   const { libraryId, apiKey, pullZoneUrl } = getBunnyEnv()
   const bunnyVideo = await createBunnyVideo(libraryId, apiKey, title)
@@ -1288,6 +1324,7 @@ const handleReplaceUpload = async (req: Request, body: VideoPayload) => {
   const pin = await getEditablePin(auth.supabase, auth.userId, imageId)
   if (!pin) return notFound('Pin not found.')
   await enforceDailyNativeUploadLimit(auth.supabase, auth.userId, imageId)
+  await enforceProviderRequestLimit(auth.supabase, auth.userId, 'replace-upload')
 
   const { libraryId, apiKey, pullZoneUrl } = getBunnyEnv()
   const bunnyVideo = await createBunnyVideo(libraryId, apiKey, title)
@@ -1386,6 +1423,7 @@ const handleSyncStatus = async (req: Request, body: VideoPayload) => {
   const pin = await getVisiblePin(auth.supabase, auth.userId, imageId)
   if (!pin) return notFound('Pin not found.')
   if (!pin.provider_asset_id) return badRequest('Pin does not have a Bunny Stream video id.')
+  await enforceProviderRequestLimit(auth.supabase, auth.userId, 'sync-status')
 
   const { libraryId, apiKey, pullZoneUrl } = getBunnyEnv()
   const bunnyStatus = await getBunnyVideo(libraryId, apiKey, pin.provider_asset_id)
@@ -1463,7 +1501,7 @@ const buildExternalRecord = async (
   titleInput: string,
   descriptionInput: string | null,
   sourceUrl: URL,
-  imageId = crypto.randomUUID()
+  imageId: string = crypto.randomUUID()
 ) => {
   const provider = detectProvider(sourceUrl)
   const [openGraph, oembed, providerVideo] = await Promise.all([
@@ -1585,6 +1623,7 @@ const handleCreateExternal = async (req: Request, body: VideoPayload) => {
   const sourceUrl = normalizeUrl(body.sourceUrl)
   await assertPublicHost(sourceUrl)
   await ensureCategory(auth.supabase, categoryId)
+  await enforceProviderRequestLimit(auth.supabase, auth.userId, 'create-external')
 
   const record = await buildExternalRecord(auth.supabase, auth.userId, categoryId, title, description, sourceUrl)
   const { data, error } = await auth.supabase
@@ -1611,6 +1650,7 @@ const handleReplaceExternal = async (req: Request, body: VideoPayload) => {
   if (!pin) return notFound('Pin not found.')
   const sourceUrl = normalizeUrl(body.sourceUrl)
   await assertPublicHost(sourceUrl)
+  await enforceProviderRequestLimit(auth.supabase, auth.userId, 'replace-external')
 
   const record = await buildExternalRecord(auth.supabase, pin.creator_id, pin.category_id, title || pin.title, description ?? pin.description, sourceUrl, imageId)
   const providerPayload = mergeProviderPayload(pin.provider_payload, {
@@ -1653,6 +1693,7 @@ const handleDeleteVideoAsset = async (req: Request, body: VideoPayload) => {
   if (!pin.deleted_at && pin.processing_status !== 'failed') {
     return forbidden('Video assets can only be cleaned up after a pin is deleted or failed.')
   }
+  await enforceProviderRequestLimit(auth.supabase, auth.userId, 'delete-video-asset')
 
   const { libraryId, apiKey } = getBunnyEnv()
   const bunnyDelete = await deleteBunnyVideo(libraryId, apiKey, pin.provider_asset_id)
@@ -1715,6 +1756,16 @@ serve(async (req): Promise<Response> => {
         return badRequest('Unsupported Shadow Pin video action.')
     }
   } catch (error) {
+    if (error instanceof EdgeRateLimitError) {
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 429,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+          'Retry-After': String(error.retryAfterSeconds),
+        },
+      })
+    }
     const message = error instanceof Error ? error.message : 'Unknown Shadow Pin video error.'
     return json({ error: message }, 400)
   }

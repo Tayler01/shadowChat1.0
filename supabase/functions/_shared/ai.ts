@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4'
+import { embedPublicProfile } from './public-profile.ts'
 
 const DEFAULT_OPENROUTER_MODEL = 'mistralai/mistral-nemo'
 const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini'
@@ -10,7 +11,14 @@ const MAX_CONTENT_LENGTH = 8_000
 const AI_REQUEST_TIMEOUT_MS = 9_000
 
 type AIProvider = 'openrouter' | 'openai'
-type SupabaseAdminClient = ReturnType<typeof createClient>
+type SupabaseAdminClient = ReturnType<typeof createAdminClient>
+
+type AIConfig = {
+  apiKey: string
+  label: string
+  url: string
+  headers: Record<string, string>
+}
 
 export type AIMessage = {
   role: 'system' | 'user'
@@ -81,7 +89,7 @@ const resolveAllowedModels = (defaultModel: string, provider: AIProvider) => {
   ])
 }
 
-const resolveAIConfig = (provider: AIProvider) => {
+const resolveAIConfig = (provider: AIProvider): AIConfig => {
   if (provider === 'openrouter') {
     const apiKey = Deno.env.get('OPENROUTER_API_KEY')
     if (!apiKey) {
@@ -206,7 +214,7 @@ export const ensureShadoAIProfile = async (supabase: SupabaseAdminClient) => {
   const { data: existingProfiles, error: existingProfileError } = await supabase
     .from('users')
     .select('id')
-    .or(`email.eq.${SHADO_AI_EMAIL},username.eq.${SHADO_AI_USERNAME}`)
+    .eq('username', SHADO_AI_USERNAME)
     .limit(1)
 
   if (existingProfileError) {
@@ -283,10 +291,7 @@ export const insertShadoAIMessage = async (
       content,
       message_type: 'command',
     })
-    .select(`
-      *,
-      user:users!user_id(*)
-    `)
+    .select(`*, ${embedPublicProfile('user', 'users!user_id')}`)
     .single()
 
   if (error) {

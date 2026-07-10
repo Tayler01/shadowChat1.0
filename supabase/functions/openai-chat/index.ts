@@ -6,6 +6,17 @@ import {
   insertShadoAIMessage,
   requestAICompletion,
 } from '../_shared/ai.ts'
+import {
+  authenticateEdgeUser,
+  claimEdgeRequest,
+  completeEdgeRequestClaim,
+  consumeEdgeRateLimit,
+  deterministicRequestKey,
+  EdgeAuthenticationError,
+  EdgeRateLimitError,
+  failEdgeRequestClaim,
+  waitForEdgeRequestClaim,
+} from '../_shared/edge-guard.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -14,6 +25,8 @@ const corsHeaders = {
 
 const POST_TO_CHAT_RECENT_COMMAND_WINDOW_MS = 2 * 60 * 1000
 const DEFAULT_POST_TO_CHAT_HOURLY_LIMIT = 10
+const DEFAULT_AI_REQUESTS_PER_MINUTE = 20
+const AI_CLAIM_SCOPE = 'openai-chat'
 
 const unauthorized = (message: string) =>
   new Response(JSON.stringify({ error: message }), {
@@ -27,22 +40,18 @@ const forbidden = (message: string) =>
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 
-const tooManyRequests = (message: string) =>
-  new Response(JSON.stringify({ error: message }), {
-    status: 429,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  })
-
-const getSupabaseEnv = () => {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Supabase environment variables are not configured')
-  }
-
-  return { supabaseUrl, supabaseAnonKey }
-}
+const json = (
+  body: unknown,
+  status = 200,
+  extraHeaders: Record<string, string> = {},
+) => new Response(JSON.stringify(body), {
+  status,
+  headers: {
+    ...corsHeaders,
+    'Content-Type': 'application/json',
+    ...extraHeaders,
+  },
+})
 
 const normalizeQuestion = (value: string) =>
   value.trim().replace(/\s+/g, ' ').toLowerCase()
@@ -78,11 +87,20 @@ const resolvePostToChatHourlyLimit = () => {
   return Math.min(Math.floor(configured), 100)
 }
 
+const resolveAIRequestsPerMinute = () => {
+  const configured = Number(Deno.env.get('AI_REQUESTS_PER_MINUTE') ?? '')
+  if (!Number.isFinite(configured) || configured <= 0) {
+    return DEFAULT_AI_REQUESTS_PER_MINUTE
+  }
+
+  return Math.min(Math.floor(configured), 120)
+}
+
 const validatePostToChat = async (
   supabase: ReturnType<typeof createAdminClient>,
   userId: string,
   messages: unknown,
-) => {
+): Promise<{ response: Response } | { sourceMessageId: string }> => {
   const { data: banned, error: banError } = await supabase.rpc('is_user_channel_banned', {
     target_user_id: userId,
     scope: 'general_chat',
@@ -93,12 +111,12 @@ const validatePostToChat = async (
   }
 
   if (banned) {
-    return forbidden('You cannot post AI replies to General Chat while banned from General Chat.')
+    return { response: forbidden('You cannot post AI replies to General Chat while banned from General Chat.') }
   }
 
   const requestedQuestion = extractLatestUserQuestion(messages)
   if (!requestedQuestion) {
-    return forbidden('Posting AI replies to chat requires a user question.')
+    return { response: forbidden('Posting AI replies to chat requires a user question.') }
   }
 
   const recentSince = new Date(Date.now() - POST_TO_CHAT_RECENT_COMMAND_WINDOW_MS).toISOString()
@@ -108,6 +126,7 @@ const validatePostToChat = async (
     .eq('user_id', userId)
     .gte('created_at', recentSince)
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
     .limit(10)
 
   if (recentCommandError) {
@@ -115,34 +134,26 @@ const validatePostToChat = async (
   }
 
   const normalizedRequestedQuestion = normalizeQuestion(requestedQuestion)
-  const hasMatchingRecentCommand = (recentCommands ?? []).some(row => {
+  const matchingRecentCommand = (recentCommands ?? []).find(row => {
     const commandQuestion = extractAiCommandQuestion((row as { content?: unknown }).content)
     return commandQuestion && normalizeQuestion(commandQuestion) === normalizedRequestedQuestion
   })
 
-  if (!hasMatchingRecentCommand) {
-    return forbidden('Posting AI replies to chat requires a recent @ai message from the requester.')
+  if (!matchingRecentCommand) {
+    return { response: forbidden('Posting AI replies to chat requires a recent @ai message from the requester.') }
   }
 
-  const hourlyLimit = resolvePostToChatHourlyLimit()
-  const quotaSince = new Date(Date.now() - 60 * 60 * 1000).toISOString()
-  const { count, error: quotaError } = await supabase
-    .from('messages')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .gte('created_at', quotaSince)
-    .or('content.ilike.@ai%,content.ilike.@shado%,content.ilike.@shado_ai%')
-
-  if (quotaError) {
-    throw quotaError
-  }
-
-  if ((count ?? 0) > hourlyLimit) {
-    return tooManyRequests(`You can ask Shado to post ${hourlyLimit} replies per hour for now.`)
-  }
-
-  return null
+  return { sourceMessageId: String((matchingRecentCommand as { id: unknown }).id) }
 }
+
+const replayClaimResponse = (claim: {
+  response_status: number | null
+  response_body: unknown
+}) => json(
+  claim.response_body,
+  claim.response_status ?? 200,
+  { 'X-Idempotent-Replay': 'true' },
+)
 
 serve(async req => {
   if (req.method === 'OPTIONS') {
@@ -150,62 +161,132 @@ serve(async req => {
   }
 
   try {
-    const authorization = req.headers.get('Authorization') ?? ''
-    if (!authorization.startsWith('Bearer ')) {
-      return unauthorized('Authentication required')
-    }
-
-    const { supabaseUrl, supabaseAnonKey } = getSupabaseEnv()
-    const token = authorization.replace(/^Bearer\s+/i, '')
-    const authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        apikey: supabaseAnonKey,
-      },
-    })
-
-    if (!authResponse.ok) {
-      return unauthorized('Invalid or expired session')
-    }
-
-    const { id } = await authResponse.json()
-    if (!id) {
-      return unauthorized('Invalid or expired session')
-    }
-
+    const user = await authenticateEdgeUser(req)
     const { messages, model, post_to_chat: postToChatSnake, postToChat } = await req.json()
     const shouldPostToChat = Boolean(postToChatSnake ?? postToChat)
-    const supabase = shouldPostToChat ? createAdminClient() : null
-    if (supabase) {
-      const validationResponse = await validatePostToChat(supabase, id, messages)
-      if (validationResponse) {
-        return validationResponse
+    const supabase = createAdminClient()
+    let sourceMessageId: string | null = null
+
+    if (shouldPostToChat) {
+      const validation = await validatePostToChat(supabase, user.id, messages)
+      if ('response' in validation) {
+        return validation.response
       }
+      sourceMessageId = validation.sourceMessageId
     }
 
-    const data = await requestAICompletion(messages, model)
-    const answer = getAIAnswer(data)
+    const requestKey = sourceMessageId
+      ? `chat-message:${sourceMessageId}`
+      : `request:${await deterministicRequestKey({ messages, model: model ?? null })}`
+    const claim = await claimEdgeRequest(supabase, {
+      userId: user.id,
+      scope: AI_CLAIM_SCOPE,
+      key: requestKey,
+      leaseSeconds: 120,
+      retentionSeconds: 24 * 60 * 60,
+    })
 
-    if (supabase && answer) {
-      const shadoProfile = await ensureShadoAIProfile(supabase)
-      const insertedMessage = await insertShadoAIMessage(supabase, shadoProfile.id, answer)
+    if (!claim.acquired) {
+      if (claim.status === 'completed') return replayClaimResponse(claim)
+      const completedClaim = await waitForEdgeRequestClaim(supabase, {
+        userId: user.id,
+        scope: AI_CLAIM_SCOPE,
+        key: requestKey,
+        timeoutMs: 15_000,
+      })
+      if (completedClaim?.status === 'completed') {
+        return replayClaimResponse(completedClaim)
+      }
+      return json(
+        { error: 'This AI request is already processing. Retry shortly.' },
+        409,
+        { 'Retry-After': '2' },
+      )
+    }
 
-      return new Response(JSON.stringify({
-        ...data,
-        shado_message: insertedMessage,
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    const claimToken = claim.claim_token
+    if (!claimToken) throw new Error('AI request claim did not return an owner token')
+
+    try {
+      await consumeEdgeRateLimit(supabase, {
+        userId: user.id,
+        scope: 'openai-chat:minute',
+        windowSeconds: 60,
+        limit: resolveAIRequestsPerMinute(),
+        message: 'Too many AI requests. Please wait a moment and try again.',
+      })
+
+      if (shouldPostToChat) {
+        const hourlyLimit = resolvePostToChatHourlyLimit()
+        await consumeEdgeRateLimit(supabase, {
+          userId: user.id,
+          scope: 'openai-chat:post-hour',
+          windowSeconds: 60 * 60,
+          limit: hourlyLimit,
+          message: `You can ask Shado to post ${hourlyLimit} replies per hour for now.`,
+        })
+      }
+
+      const data = await requestAICompletion(messages, model)
+      const answer = getAIAnswer(data)
+      let responseBody: unknown = data
+
+      if (shouldPostToChat && answer) {
+        const shadoProfile = await ensureShadoAIProfile(supabase)
+        const insertedMessage = await insertShadoAIMessage(supabase, shadoProfile.id, answer)
+        responseBody = {
+          ...(data as Record<string, unknown>),
+          shado_message: insertedMessage,
+        }
+      }
+
+      await completeEdgeRequestClaim(supabase, {
+        userId: user.id,
+        scope: AI_CLAIM_SCOPE,
+        key: requestKey,
+        claimToken,
+        responseStatus: 200,
+        responseBody,
+      })
+      return json(responseBody)
+    } catch (error) {
+      if (error instanceof EdgeRateLimitError) {
+        await failEdgeRequestClaim(supabase, {
+          userId: user.id,
+          scope: AI_CLAIM_SCOPE,
+          key: requestKey,
+          claimToken,
+          errorMessage: error.message,
+        }).catch(() => undefined)
+        return json({ error: error.message }, 429, {
+          'Retry-After': String(error.retryAfterSeconds),
+        })
+      }
+
+      await failEdgeRequestClaim(supabase, {
+        userId: user.id,
+        scope: AI_CLAIM_SCOPE,
+        key: requestKey,
+        claimToken,
+        errorMessage: error instanceof Error ? error.message : 'AI request failed',
+      }).catch(() => undefined)
+      throw error
+    }
+  } catch (error) {
+    if (error instanceof EdgeAuthenticationError) {
+      return unauthorized(error.message)
+    }
+    if (error instanceof EdgeRateLimitError) {
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 429,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+          'Retry-After': String(error.retryAfterSeconds),
+        },
       })
     }
-
-    return new Response(JSON.stringify(data), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-  } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return json({ error: message }, 500)
   }
 })

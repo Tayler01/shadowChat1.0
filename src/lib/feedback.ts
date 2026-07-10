@@ -1,4 +1,5 @@
 import { getWorkingClient, type User } from './supabase'
+import { PUBLIC_PROFILE_SELECT } from '../../supabase/functions/_shared/public-profile'
 
 export const FEEDBACK_ATTACHMENTS_BUCKET = 'feedback-attachments'
 export const MAX_FEEDBACK_ATTACHMENTS = 5
@@ -278,7 +279,7 @@ export const fetchAdminFeedbackSubmissions = async (): Promise<AdminFeedbackSubm
   if (submitterIds.length > 0) {
     const { data: submitters, error: submittersError } = await workingClient
       .from('users')
-      .select('id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, shadow_runner_sprint_medal, shadow_runner_knight_medal, shadow_runner_knight_level_id, gold_easter_egg, presence_visibility')
+      .select(PUBLIC_PROFILE_SELECT)
       .in('id', submitterIds)
 
     if (submittersError) {

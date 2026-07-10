@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4'
+import { PUBLIC_PROFILE_SELECT } from './public-profile.ts'
 
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -229,7 +230,6 @@ export type BridgeUserProfile = {
   id: string
   username: string | null
   display_name: string | null
-  full_name?: string | null
   avatar_url?: string | null
   color?: string | null
   chat_color?: string | null
@@ -237,6 +237,10 @@ export type BridgeUserProfile = {
   status_message?: string | null
   dm_discoverable?: boolean | null
 }
+
+type ResolveBridgeUserResult =
+  | { error: Response }
+  | { user: BridgeUserProfile }
 
 export const normalizeUserReference = (value: unknown) =>
   normalizeText(value).replace(/^@+/, '').trim()
@@ -268,7 +272,7 @@ export const resolveBridgeUserReference = async (
     requesterUserId?: string
     allowExistingConversation?: boolean
   } = {},
-) => {
+): Promise<ResolveBridgeUserResult> => {
   const normalized = normalizeUserReference(userReference)
 
   if (!normalized) {
@@ -277,7 +281,7 @@ export const resolveBridgeUserReference = async (
 
   let query = supabase
     .from('users')
-    .select('id, username, display_name, full_name, avatar_url, color, chat_color, status, status_message, dm_discoverable')
+    .select(PUBLIC_PROFILE_SELECT)
 
   if (UUID_PATTERN.test(normalized)) {
     query = query.eq('id', normalized)
@@ -291,7 +295,7 @@ export const resolveBridgeUserReference = async (
     throw error
   }
 
-  const matches = (data ?? []) as BridgeUserProfile[]
+  const matches = (data ?? []) as unknown as BridgeUserProfile[]
 
   if (!matches.length) {
     return { error: notFound(`User '${userReference}' was not found`) }
@@ -329,9 +333,9 @@ export const searchBridgeUsers = async (
   const safeLimit = Math.min(Math.max(limit, 1), 20)
   const { data, error } = await supabase
     .from('users')
-    .select('id, username, display_name, full_name, avatar_url, color, chat_color, status, status_message, dm_discoverable')
+    .select(PUBLIC_PROFILE_SELECT)
     .eq('dm_discoverable', true)
-    .or(`username.ilike.%${normalized}%,display_name.ilike.%${normalized}%,full_name.ilike.%${normalized}%`)
+    .or(`username.ilike.%${normalized}%,display_name.ilike.%${normalized}%`)
     .order('username', { ascending: true })
     .limit(safeLimit)
 
@@ -339,7 +343,7 @@ export const searchBridgeUsers = async (
     throw error
   }
 
-  return (data ?? []) as BridgeUserProfile[]
+  return (data ?? []) as unknown as BridgeUserProfile[]
 }
 
 export type BridgeSessionAuth = {
@@ -348,6 +352,10 @@ export type BridgeSessionAuth = {
   userId: string
   ownerUserId: string | null
 }
+
+type BridgeAccessTokenResult =
+  | { error: Response }
+  | { auth: BridgeSessionAuth }
 
 type BridgeDeviceIdentity = {
   id: string
@@ -384,17 +392,20 @@ export const ensureBridgeUserForDevice = async (
   let bridgeUserId = device.bridge_user_id ?? null
 
   if (!bridgeUserId) {
-    const { data: existingProfile, error: existingProfileError } = await supabase
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle()
+    for (let page = 1; page <= 20 && !bridgeUserId; page += 1) {
+      const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 })
+      if (error) {
+        throw error
+      }
 
-    if (existingProfileError) {
-      throw existingProfileError
+      bridgeUserId = data.users.find(user =>
+        user.email?.toLowerCase() === email.toLowerCase()
+      )?.id ?? null
+
+      if (data.users.length < 1000) {
+        break
+      }
     }
-
-    bridgeUserId = existingProfile?.id ?? null
   }
 
   if (!bridgeUserId) {
@@ -500,7 +511,7 @@ export const issueBridgeSupabaseSession = async (
 export const authenticateBridgeAccessToken = async (
   deviceId: string,
   accessToken: string,
-) => {
+): Promise<BridgeAccessTokenResult> => {
   if (!deviceId || !accessToken) {
     return { error: badRequest('deviceId and accessToken are required') }
   }

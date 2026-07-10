@@ -88,7 +88,7 @@ const user = {
   last_active: '2026-04-28T00:00:00.000Z',
   created_at: '2026-04-01T00:00:00.000Z',
   updated_at: '2026-04-28T00:00:00.000Z',
-} as User
+} as User & { email: string }
 
 const adminUser = {
   ...user,

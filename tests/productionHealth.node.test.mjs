@@ -64,3 +64,55 @@ test('production health fails closed when News monitoring is enabled without cre
   assert.equal(result.code, 1)
   assert.match(result.stderr, /required for News freshness coverage/)
 })
+
+test('production health records a sanitized monitor snapshot with deployed build evidence', async t => {
+  let recordedSnapshot = null
+  const server = createServer(async (request, response) => {
+    if (request.url === '/.well-known/shadowchat-health.json') {
+      response.writeHead(200, { 'content-type': 'application/json' })
+      response.end(JSON.stringify({
+        schemaVersion: 1,
+        buildId: 'release-sha',
+        commitSha: 'release-sha',
+        deployContext: 'production',
+        pushPublicKeyConfigured: true,
+      }))
+      return
+    }
+
+    if (request.url?.startsWith('/rest/v1/operations_health_snapshot')) {
+      let body = ''
+      for await (const chunk of request) body += chunk
+      recordedSnapshot = JSON.parse(body)
+      response.writeHead(204)
+      response.end()
+      return
+    }
+
+    response.writeHead(200, { 'content-type': 'text/plain' })
+    response.end('ok')
+  })
+  server.listen(0, '127.0.0.1')
+  await once(server, 'listening')
+  t.after(() => server.close())
+
+  const address = server.address()
+  const baseUrl = `http://127.0.0.1:${address.port}`
+  const result = await runHealthCheck({
+    PRODUCTION_APP_URL: baseUrl,
+    MONITOR_SUPABASE_URL: baseUrl,
+    MONITOR_SUPABASE_SERVICE_ROLE_KEY: 'eyJ.test-service-role',
+    NEWS_MONITOR_ENABLED: 'false',
+    OPERATIONS_HEALTH_COMMIT_SHA: 'release-sha',
+  })
+
+  assert.equal(result.code, 0, result.stderr)
+  assert.equal(recordedSnapshot.environment, 'production')
+  assert.equal(recordedSnapshot.frontend_sha, 'release-sha')
+  assert.equal(recordedSnapshot.frontend_build_id, 'release-sha')
+  assert.equal(recordedSnapshot.smoke_status, 'passed')
+  assert.equal(recordedSnapshot.app_http_status, 200)
+  assert.equal(recordedSnapshot.news_state, 'paused')
+  assert.equal(recordedSnapshot.bridge_state, 'paused')
+  assert.equal('service_key' in recordedSnapshot, false)
+})

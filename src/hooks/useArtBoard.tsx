@@ -17,10 +17,11 @@ import { runRealtimeRecovery } from '../lib/realtimeRecovery'
 import { createRealtimeChannelName } from '../lib/realtimeChannelName'
 import { useAuth } from './useAuth'
 import { useRealtimeRecovery } from './useRealtimeRecovery'
+import { embedPublicProfile } from '../../supabase/functions/_shared/public-profile'
 
 const ART_BOARD_ITEM_SELECT = `
   *,
-  user:users!user_id(id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, shadow_runner_sprint_medal, shadow_runner_knight_medal, shadow_runner_knight_level_id, gold_easter_egg, presence_visibility, created_at, updated_at)
+  ${embedPublicProfile('user', 'users!user_id')}
 `
 const ART_BOARD_CACHE_MS = 60 * 1000
 

@@ -12,6 +12,10 @@ import {
   validateUpload,
   VOICE_UPLOAD_RULE,
 } from './uploadLimits'
+import {
+  pickPublicProfile,
+  PUBLIC_PROFILE_SELECT,
+} from '../../supabase/functions/_shared/public-profile'
 
 type AnySupabaseClient = any
 type SessionResponse = {
@@ -29,11 +33,6 @@ const loggingFetch: typeof fetch = async (input, init) => {
 
 const shouldUseRealtimeWorker =
   typeof window !== 'undefined' && typeof Worker !== 'undefined'
-
-const isMissingColumnError = (error: any, column: string) => {
-  const haystack = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''} ${error?.code || ''}`
-  return haystack.includes(column)
-}
 
 export const SUPABASE_URL = VITE_SUPABASE_URL
 export const SUPABASE_ANON_KEY = VITE_SUPABASE_ANON_KEY
@@ -804,7 +803,6 @@ export type AdminRole = 'admin' | 'sub_admin'
 
 export interface User {
   id: string
-  email: string
   username: string
   display_name: string
   avatar_url?: string
@@ -817,6 +815,7 @@ export interface User {
   status_message: string
   presence_visibility?: PresenceVisibility
   color: string
+  chat_color?: string | null
   admin_role?: AdminRole | null
   checkers_crown?: boolean
   war_sword?: boolean
@@ -829,6 +828,10 @@ export interface User {
   last_active: string
   created_at: string
   updated_at: string
+}
+
+export interface AuthenticatedUser extends User {
+  email: string
 }
 
 export type ChatMessageType = 'text' | 'command' | 'audio' | 'image' | 'video' | 'file' | 'hype'
@@ -1512,6 +1515,7 @@ export interface ActiveUserSnapshot {
 }
 
 export interface AdminAccessUser extends User {
+  email: string | null
   role_created_at?: string | null
   role_created_by?: string | null
 }
@@ -1695,20 +1699,17 @@ export const fetchDMConversations = async () => {
 
   let usersMap: Record<string, User> = {}
   if (missingIds.length) {
-    let userQuery = await workingClient
+    const userQuery = await workingClient
       .from('users')
-      .select('id, username, display_name, avatar_url, avatar_thumbnail_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, shadow_runner_sprint_medal, shadow_runner_knight_medal, shadow_runner_knight_level_id, gold_easter_egg, presence_visibility')
+      .select(PUBLIC_PROFILE_SELECT)
       .in('id', missingIds)
-    if (userQuery.error && isMissingColumnError(userQuery.error, 'avatar_thumbnail_url')) {
-      userQuery = await workingClient
-        .from('users')
-        .select('id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, shadow_runner_sprint_medal, shadow_runner_knight_medal, shadow_runner_knight_level_id, gold_easter_egg, presence_visibility')
-        .in('id', missingIds)
-    }
     if (userQuery.error) {
     } else {
       usersMap = Object.fromEntries(
-        (userQuery.data ?? []).map((u: any) => [u.id, u as User])
+        (userQuery.data ?? []).map((u: any) => [
+          u.id,
+          pickPublicProfile(u as Record<string, unknown>) as unknown as User,
+        ])
       )
     }
   }
@@ -1723,7 +1724,9 @@ export const fetchDMConversations = async () => {
         created_at: row.last_message_created_at,
       })
 
-    const otherUser = row.other_user ||
+    const otherUser = (row.other_user
+      ? pickPublicProfile(row.other_user as Record<string, unknown>) as unknown as User
+      : null) ||
       usersMap[row.other_user_id] ||
       (row.other_user_id && {
         id: row.other_user_id,
@@ -1786,15 +1789,17 @@ export const searchUsers = async (
   if (error) {
     return [] as BasicUser[]
   }
-  return (data ?? []) as BasicUser[]
+  return (data ?? []).map((user: any) =>
+    pickPublicProfile(user as Record<string, unknown>) as unknown as BasicUser
+  )
 }
 
 export const fetchAllUsers = async (options?: { signal?: AbortSignal }) => {
   const workingClient = await getWorkingClient()
-  const buildQuery = (selectColumns: string) => {
+  const buildQuery = () => {
     let query = workingClient
       .from('users')
-      .select(selectColumns)
+      .select(PUBLIC_PROFILE_SELECT)
       .eq('dm_discoverable', true)
       .order('display_name', { ascending: true })
     if (options?.signal && typeof query.abortSignal === 'function') {
@@ -1803,18 +1808,14 @@ export const fetchAllUsers = async (options?: { signal?: AbortSignal }) => {
     return query
   }
 
-  let query = buildQuery('id, username, display_name, avatar_url, avatar_thumbnail_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, shadow_runner_sprint_medal, shadow_runner_knight_medal, shadow_runner_knight_level_id, gold_easter_egg, presence_visibility, dm_discoverable')
-  let { data, error } = await query
-  if (error && isMissingColumnError(error, 'avatar_thumbnail_url')) {
-    query = buildQuery('id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, shadow_runner_sprint_medal, shadow_runner_knight_medal, shadow_runner_knight_level_id, gold_easter_egg, presence_visibility, dm_discoverable')
-    const fallback = await query
-    data = fallback.data
-    error = fallback.error
-  }
+  const query = buildQuery()
+  const { data, error } = await query
   if (error) {
     return [] as BasicUser[]
   }
-  return (data ?? []) as BasicUser[]
+  return (data ?? []).map((user: any) =>
+    pickPublicProfile(user as Record<string, unknown>) as unknown as BasicUser
+  )
 }
 
 export const getMyAdminRole = async () => {

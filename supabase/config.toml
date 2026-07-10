@@ -104,6 +104,9 @@ verify_jwt = false
 
 # Account deletion validates the caller's Supabase user token in code, then
 # uses the service role to remove owned storage objects before deleting auth.
+# It is deliberately exempt from the shared Edge request ledger: deletion is
+# self-scoped, terminal, and must remain retryable without retaining a durable
+# per-user idempotency or rate-bucket record after the account is removed.
 [functions.delete-account]
 verify_jwt = false
 

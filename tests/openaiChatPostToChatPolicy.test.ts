@@ -27,15 +27,15 @@ describe('openai-chat postToChat policy contract', () => {
     expect(compactSource).toContain('requires a recent @ai message from the requester')
   })
 
-  it('enforces an hourly postToChat quota before provider calls', () => {
+  it('enforces an atomic hourly postToChat quota before provider calls', () => {
     expect(compactSource).toContain('ai_post_to_chat_hourly_limit')
-    expect(compactSource).toContain("select('id', { count: 'exact', head: true })")
-    expect(compactSource).toContain("content.ilike.@ai%,content.ilike.@shado%,content.ilike.@shado_ai%")
-    expect(compactSource).toContain('toomanyrequests')
+    expect(compactSource).toContain("scope: 'openai-chat:post-hour'")
+    expect(compactSource).toContain('consumeedgeratelimit(supabase')
+    expect(compactSource).toContain('edgeratelimiterror')
   })
 
   it('validates postToChat before requesting an AI completion', () => {
-    const validationIndex = compactSource.indexOf('validateposttochat(supabase, id, messages)')
+    const validationIndex = compactSource.indexOf('validateposttochat(supabase, user.id, messages)')
     const requestIndex = compactSource.indexOf('requestaicompletion(messages, model)')
 
     expect(validationIndex).toBeGreaterThan(-1)

@@ -39,6 +39,7 @@ import {
   type LocalMessageOutboxEntry,
 } from '../lib/localMessageOutbox'
 import type { EnsureMessageWindowOptions, MessagesContextValue } from './MessagesContext'
+import { embedPublicProfile } from '../../supabase/functions/_shared/public-profile'
 
 type FetchMessagesOptions = {
   silent?: boolean
@@ -86,7 +87,7 @@ const BOARD_CHAT_CACHE_MS = 60 * 1000
 const SEND_OPERATION_TIMEOUT_MS = 12000
 const BOARD_CHAT_WITH_USER_SELECT = `
   *,
-  user:users!user_id(*)
+  ${embedPublicProfile('user', 'users!user_id')}
 `
 
 let boardChatCacheByKey = new Map<string, BoardChatCacheEntry>()

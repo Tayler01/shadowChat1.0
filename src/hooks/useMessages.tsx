@@ -55,6 +55,7 @@ import {
   upsertLocalOutboxEntry,
   type LocalMessageOutboxEntry,
 } from '../lib/localMessageOutbox';
+import { embedPublicProfile } from '../../supabase/functions/_shared/public-profile';
 
 export { useMessages, useOptionalMessages };
 
@@ -62,7 +63,7 @@ const SEND_OPERATION_TIMEOUT_MS = 12000;
 const GROUP_OUTBOX_SCOPE = 'general';
 const MESSAGE_WITH_USER_SELECT = `
   *,
-  user:users!user_id(*)
+  ${embedPublicProfile('user', 'users!user_id')}
 `;
 
 const dedupeMessagesById = (items: Message[]) =>
@@ -489,10 +490,7 @@ export const insertMessage = async (messageData: {
   const insertPromise = workingClient
     .from('messages')
     .insert(messageData)
-    .select(`
-      *,
-      user:users!user_id(*)
-    `)
+    .select(MESSAGE_WITH_USER_SELECT)
     .single();
 
   const timeout = new Promise((_, reject) =>
@@ -513,10 +511,7 @@ export const insertMessage = async (messageData: {
     const legacyMediaInsertPromise = workingClient
       .from('messages')
       .insert(legacyMediaMessageData)
-      .select(`
-        *,
-        user:users!user_id(*)
-      `)
+      .select(MESSAGE_WITH_USER_SELECT)
       .single();
 
     result = (await Promise.race([legacyMediaInsertPromise, timeout])) as any;
@@ -532,10 +527,7 @@ export const insertMessage = async (messageData: {
     const legacyInsertPromise = workingClient
       .from('messages')
       .insert(legacyMessageData)
-      .select(`
-        *,
-        user:users!user_id(*)
-      `)
+      .select(MESSAGE_WITH_USER_SELECT)
       .single();
 
     result = (await Promise.race([legacyInsertPromise, timeout])) as any;
@@ -548,10 +540,7 @@ export const insertMessage = async (messageData: {
   ) {
     result = await workingClient
       .from('messages')
-      .select(`
-        *,
-        user:users!user_id(*)
-      `)
+      .select(MESSAGE_WITH_USER_SELECT)
       .eq('user_id', messageData.user_id)
       .eq('client_message_id', messageData.client_message_id)
       .maybeSingle();
@@ -812,10 +801,7 @@ function useProvideMessages(): MessagesContextValue {
       .then(workingClient =>
         workingClient
           .from('messages')
-          .select(`
-            *,
-            user:users!user_id(*)
-          `)
+          .select(MESSAGE_WITH_USER_SELECT)
           .eq('id', messageId)
           .maybeSingle()
       )

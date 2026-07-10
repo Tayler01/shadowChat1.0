@@ -5,6 +5,7 @@ import { getRealtimeClient, getWorkingClient, type ArtBoardReaction, type User }
 import { runRealtimeRecovery } from '../lib/realtimeRecovery'
 import { createRealtimeChannelName } from '../lib/realtimeChannelName'
 import { useAuth } from './useAuth'
+import { PUBLIC_PROFILE_SELECT } from '../../supabase/functions/_shared/public-profile'
 import { useRealtimeRecovery } from './useRealtimeRecovery'
 import { ArtReactionNotification } from '../components/notifications/ArtReactionNotification'
 
@@ -89,7 +90,7 @@ export function useArtBoardReactionNotifications() {
                 .maybeSingle(),
               working
                 .from('users')
-                .select('id, username, display_name, avatar_url, color, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, shadow_runner_sprint_medal, shadow_runner_knight_medal, shadow_runner_knight_level_id, gold_easter_egg, presence_visibility')
+                .select(PUBLIC_PROFILE_SELECT)
                 .eq('id', reactionRow.user_id)
                 .maybeSingle(),
             ])

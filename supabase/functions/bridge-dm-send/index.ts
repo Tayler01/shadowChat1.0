@@ -11,6 +11,7 @@ import {
   resolveBridgeUserReference,
   triggerPushDispatch,
 } from '../_shared/bridge.ts'
+import { embedPublicProfile } from '../_shared/public-profile.ts'
 
 type BridgeDmSendPayload = {
   deviceId?: string
@@ -31,17 +32,7 @@ const DM_MESSAGE_SELECT = `
   audio_url,
   audio_duration,
   file_url,
-  sender:users!sender_id(
-    id,
-    username,
-    display_name,
-    full_name,
-    avatar_url,
-    color,
-    chat_color,
-    status,
-    status_message
-  )
+  ${embedPublicProfile('sender', 'users!sender_id')}
 `
 
 const getOrCreateConversation = async (supabase: ReturnType<typeof getSupabaseAdmin>, userId: string, recipientUserId: string) => {
@@ -137,6 +128,8 @@ serve(async req => {
       throw insertError
     }
 
+    const insertedMessage = message as unknown as { id: string } & Record<string, unknown>
+
     await supabase
       .from('bridge_audit_events')
       .insert({
@@ -146,12 +139,12 @@ serve(async req => {
         event_payload: {
           bridge_session_id: bridgeAuth.auth.bridgeSessionId,
           conversation_id: conversationId,
-          message_id: message.id,
+          message_id: insertedMessage.id,
           recipient_user_id: recipientUserId,
         },
       })
 
-    const pushDispatch = await triggerPushDispatch('dm_message', message.id as string, bridgeAuth.auth.userId, {
+    const pushDispatch = await triggerPushDispatch('dm_message', insertedMessage.id, bridgeAuth.auth.userId, {
       origin: 'bridge',
       bridgeDeviceId: deviceId,
     })
@@ -161,7 +154,7 @@ serve(async req => {
       deviceId,
       conversationId,
       recipient: resolvedRecipient.user,
-      message,
+      message: insertedMessage,
       pushDispatch,
     })
   } catch (error) {

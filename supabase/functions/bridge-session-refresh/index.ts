@@ -116,23 +116,22 @@ serve(async req => {
     const nextAccessToken = generateOpaqueToken('bacc')
     const nextAccessTokenHash = await hashToken(nextAccessToken)
 
-    const { data: bridgeProfile, error: bridgeProfileError } = await supabase
-      .from('users')
-      .select('id, email')
-      .eq('id', session.user_id)
-      .maybeSingle()
+    const {
+      data: { user: bridgeAuthUser },
+      error: bridgeProfileError,
+    } = await supabase.auth.admin.getUserById(session.user_id)
 
     if (bridgeProfileError) {
       throw bridgeProfileError
     }
 
-    if (!bridgeProfile?.email) {
-      return json({ error: 'Bridge user profile is missing auth email' }, 409)
+    if (!bridgeAuthUser?.email) {
+      return json({ error: 'Bridge auth user is missing email' }, 409)
     }
 
     const supabaseAuth = await issueBridgeSupabaseSession(supabase, {
       bridgeUserId: session.user_id,
-      email: bridgeProfile.email,
+      email: bridgeAuthUser.email,
     })
 
     const { error: updateError } = await supabase

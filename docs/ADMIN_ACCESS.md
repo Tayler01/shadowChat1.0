@@ -42,6 +42,10 @@ Admin settings are split into subpages under Settings > Admin:
   list.
 - Invites: operator invite-code generation, optional email locks, revocation,
   and redemption review for invite-only signup rollout.
+- Operations Health: operator-visible frontend SHA, migration and Edge Function
+  parity, latest production monitor result, push configuration readiness, and
+  explicit News/ESP pause state. The panel contains sanitized evidence only;
+  credentials, raw logs, and user data are never stored in its snapshot.
 - Automation Approvals: full-admin-only review queue for scan, build,
   documentation, and batch packets. Approval records intent only; it does not
   push, merge, deploy, or start a runner.
@@ -105,6 +109,9 @@ Main tables:
 - `public.automation_approval_packets`: full-admin-only review packets for
   improvement automation candidates and batch handoffs.
 - `public.automation_approval_packet_events`: append-only queue audit events.
+- `public.operations_health_snapshot`: one sanitized production release and
+  monitor snapshot. The service role writes it; RLS allows `SELECT` only for
+  current app operators and gives authenticated clients no write privileges.
 
 Main RPCs:
 

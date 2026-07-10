@@ -1,5 +1,11 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4'
+import {
+  authenticateEdgeUser,
+  createEdgeAdminClient,
+  consumeEdgeRateLimit,
+  EdgeAuthenticationError,
+  EdgeRateLimitError,
+} from '../_shared/edge-guard.ts'
 import {
   assertPublicUrl,
   normalizePublicHttpUrl,
@@ -13,6 +19,7 @@ const corsHeaders = {
 }
 const LINK_PREVIEW_IMAGE_BUCKET = 'message-media'
 const MAX_PREVIEW_IMAGE_BYTES = 4 * 1024 * 1024
+const DEFAULT_LINK_PREVIEWS_PER_MINUTE = 30
 const ALLOWED_PREVIEW_IMAGE_TYPES = new Map([
   ['image/jpeg', 'jpg'],
   ['image/png', 'png'],
@@ -59,46 +66,14 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 
-const getSupabaseEnv = () => {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')
-  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+const getSupabaseAdmin = () => createEdgeAdminClient()
 
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error('Supabase environment variables are not configured')
+const resolveLinkPreviewsPerMinute = () => {
+  const configured = Number(Deno.env.get('LINK_PREVIEWS_PER_MINUTE') ?? '')
+  if (!Number.isFinite(configured) || configured <= 0) {
+    return DEFAULT_LINK_PREVIEWS_PER_MINUTE
   }
-
-  return { supabaseUrl, supabaseAnonKey, serviceRoleKey }
-}
-
-const getSupabaseAdmin = () => {
-  const { supabaseUrl, serviceRoleKey } = getSupabaseEnv()
-  if (!serviceRoleKey) return null
-
-  return createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-}
-
-const authenticate = async (authorization: string) => {
-  if (!authorization.startsWith('Bearer ')) {
-    return false
-  }
-
-  const { supabaseUrl, supabaseAnonKey } = getSupabaseEnv()
-  const authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: {
-      Authorization: authorization,
-      apikey: supabaseAnonKey,
-    },
-  })
-
-  if (!authResponse.ok) {
-    return false
-  }
-
-  const user = await authResponse.json()
-  return Boolean(user?.id)
+  return Math.min(Math.floor(configured), 120)
 }
 
 const normalizeUrl = (value: string) => {
@@ -324,7 +299,6 @@ const shouldStorePreviewImage = (sourceUrl: URL, preview: LinkPreview) =>
 const storePreviewImage = async (preview: LinkPreview): Promise<string | null> => {
   if (!preview.image) return null
   const admin = getSupabaseAdmin()
-  if (!admin) return null
 
   try {
     const sourceUrl = normalizePublicHttpUrl(preview.image, SAFE_PREVIEW_IMAGE_URL_OPTIONS)
@@ -518,10 +492,7 @@ serve(async req => {
   }
 
   try {
-    const authorized = await authenticate(req.headers.get('Authorization') ?? '')
-    if (!authorized) {
-      return unauthorized('Authentication required')
-    }
+    const user = await authenticateEdgeUser(req)
 
     const body = await req.json() as LinkPreviewPayload
     if (!body?.url || body.url.length > 2048) {
@@ -530,6 +501,14 @@ serve(async req => {
 
     const url = normalizeUrl(body.url)
     await assertPublicHost(url)
+
+    await consumeEdgeRateLimit(getSupabaseAdmin(), {
+      userId: user.id,
+      scope: 'link-preview:minute',
+      windowSeconds: 60,
+      limit: resolveLinkPreviewsPerMinute(),
+      message: 'Too many link previews. Please wait a moment and try again.',
+    })
 
     const [openGraphPreview, oEmbedPreview] = await Promise.all([
       fetchOpenGraphPreview(url).catch(() => null),
@@ -551,6 +530,19 @@ serve(async req => {
       },
     })
   } catch (error) {
+    if (error instanceof EdgeAuthenticationError) {
+      return unauthorized(error.message)
+    }
+    if (error instanceof EdgeRateLimitError) {
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 429,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+          'Retry-After': String(error.retryAfterSeconds),
+        },
+      })
+    }
     const message = error instanceof Error ? error.message : 'Unable to load link preview.'
     return json({ error: message }, 400)
   }

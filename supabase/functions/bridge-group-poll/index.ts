@@ -9,6 +9,7 @@ import {
   readJson,
   requireBridgeApiEnabled,
 } from '../_shared/bridge.ts'
+import { embedPublicProfile } from '../_shared/public-profile.ts'
 
 type BridgeGroupPollPayload = {
   deviceId?: string
@@ -29,15 +30,11 @@ const MESSAGE_SELECT = `
   user_id,
   content,
   created_at,
-  user:users!user_id(
-    display_name,
-    full_name,
-    username
-  )
+  ${embedPublicProfile('user', 'users!user_id')}
 `
 
 const getProfileLabel = (profile: any, fallbackId: string) =>
-  profile?.display_name || profile?.full_name || profile?.username || fallbackId
+  profile?.display_name || profile?.username || fallbackId
 
 const toBridgeMessage = (message: any) => {
   const senderLabel = getProfileLabel(message.user, message.user_id)

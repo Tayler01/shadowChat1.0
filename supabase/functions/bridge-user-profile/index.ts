@@ -8,6 +8,7 @@ import {
   readJson,
   requireBridgeApiEnabled,
 } from '../_shared/bridge.ts'
+import { PUBLIC_PROFILE_SELECT } from '../_shared/public-profile.ts'
 
 type BridgeUserProfilePayload = {
   deviceId?: string
@@ -50,7 +51,7 @@ serve(async req => {
     const supabase = getSupabaseAdmin()
     const { data, error } = await supabase
       .from('users')
-      .select('id, username, display_name, full_name, avatar_url, color, chat_color, status, status_message')
+      .select(PUBLIC_PROFILE_SELECT)
       .in('id', userIds)
 
     if (error) {

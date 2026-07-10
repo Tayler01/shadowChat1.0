@@ -5,6 +5,7 @@ import { getRealtimeClient, getWorkingClient } from '../lib/supabase'
 import { runRealtimeRecovery } from '../lib/realtimeRecovery'
 import { createRealtimeChannelName } from '../lib/realtimeChannelName'
 import { useAuth } from './useAuth'
+import { embedPublicProfile } from '../../supabase/functions/_shared/public-profile'
 import { useIsDesktop } from './useIsDesktop'
 import { useRealtimeRecovery } from './useRealtimeRecovery'
 import { MessageNotification } from '../components/notifications/MessageNotification'
@@ -121,7 +122,7 @@ export function useMessageNotifications(onOpenConversation: (id: string) => void
               const { data } = await working
                 .from('dm_messages')
                 .select(
-                  `id, content, conversation_id, sender:users!sender_id(id, display_name, avatar_url, color, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, shadow_runner_sprint_medal, shadow_runner_knight_medal, shadow_runner_knight_level_id, gold_easter_egg, presence_visibility)`
+                  `id, content, conversation_id, ${embedPublicProfile('sender', 'users!sender_id')}`
                 )
                 .eq('id', messageId)
                 .single()

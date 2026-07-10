@@ -149,8 +149,12 @@ now contain only `main`, and GitHub has zero open pull requests.
 
 1. Finish targeted mention/reply/reaction notifications, quiet hours, and
    conversation mutes so Settings matches backend delivery behavior.
-2. Add an Admin Operations Health Center for frontend SHA, migrations,
-   functions, smokes, News status, push, and bridge health.
+2. **Implemented in the current release batch:** Admin Operations Health now
+   reports the running/deployed frontend SHA, migration and exact Function
+   manifest parity, latest production monitor result, release-time push
+   readiness, and explicit paused News/ESP state from an operator-only,
+   sanitized snapshot. Production evidence becomes authoritative when this
+   batch completes the backend-first GitHub release.
 3. Add personal blocking with a security-reviewed visibility/DM/push contract.
 4. Add universal search, saved messages, and personal collections.
 5. Add a Shadow Mystery publishing studio.

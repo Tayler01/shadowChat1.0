@@ -13,9 +13,14 @@ import {
 } from '../lib/realtimeSubscription'
 import { useAuth } from './useAuth'
 import { useRealtimeRecovery } from './useRealtimeRecovery'
+import { embedPublicProfile } from '../../supabase/functions/_shared/public-profile'
 
 const CHAT_LIMIT = 120
 const NEWS_CHAT_CACHE_MS = 60 * 1000
+const NEWS_CHAT_WITH_USER_SELECT = `
+  *,
+  ${embedPublicProfile('user', 'users!user_id')}
+`
 
 type NewsChatCacheEntry = {
   messages: NewsChatMessage[]
@@ -86,10 +91,7 @@ export function useNewsChat() {
       const workingClient = await getWorkingClient()
       const { data, error: fetchError } = await workingClient
         .from('news_chat_messages')
-        .select(`
-          *,
-          user:users!user_id(*)
-        `)
+        .select(NEWS_CHAT_WITH_USER_SELECT)
         .order('created_at', { ascending: false })
         .limit(CHAT_LIMIT)
 
@@ -107,10 +109,7 @@ export function useNewsChat() {
     const workingClient = await getWorkingClient()
     const { data, error: fetchError } = await workingClient
       .from('news_chat_messages')
-      .select(`
-        *,
-        user:users!user_id(*)
-      `)
+      .select(NEWS_CHAT_WITH_USER_SELECT)
       .eq('id', id)
       .maybeSingle()
 
@@ -204,10 +203,7 @@ export function useNewsChat() {
           user_id: user.id,
           content: content.trim(),
         })
-        .select(`
-          *,
-          user:users!user_id(*)
-        `)
+        .select(NEWS_CHAT_WITH_USER_SELECT)
         .single()
 
       if (insertError) throw insertError

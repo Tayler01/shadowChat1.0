@@ -292,6 +292,7 @@ test('settings admin panel hides paused News and ESP tools while preserving acti
   expect(screen.getByRole('heading', { name: 'Admin Sections' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /admin access/i })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /invites/i })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /operations health/i })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /automation approvals/i })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /esp bridge pairing/i })).not.toBeInTheDocument()
   expect(screen.getByRole('button', { name: /shadow pin activity/i })).toBeInTheDocument()
@@ -385,6 +386,7 @@ test('settings hides automation approvals from sub-admins', () => {
   fireEvent.click(screen.getByRole('button', { name: /admin/i }))
 
   expect(screen.getByRole('button', { name: /invites/i })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /operations health/i })).toBeInTheDocument()
   expect(screen.queryByRole('button', { name: /automation approvals/i })).not.toBeInTheDocument()
 })
 

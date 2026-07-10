@@ -11,15 +11,16 @@ import type {
   ShadowPinImage,
   ShadowPinImageFormValues,
 } from '../types'
+import { embedPublicProfile } from '../../../../supabase/functions/_shared/public-profile'
 
 const CATEGORY_SELECT = `
   *,
-  creator:users!creator_id(id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, shadow_runner_sprint_medal, shadow_runner_knight_medal, shadow_runner_knight_level_id, gold_easter_egg, presence_visibility, created_at, updated_at)
+  ${embedPublicProfile('creator', 'users!creator_id')}
 `
 
 const IMAGE_SELECT = `
   *,
-  creator:users!creator_id(id, username, display_name, avatar_url, color, status, admin_role, checkers_crown, war_sword, shadow_pin_gold_pin, shadow_runner_sprint_medal, shadow_runner_knight_medal, shadow_runner_knight_level_id, gold_easter_egg, presence_visibility, created_at, updated_at)
+  ${embedPublicProfile('creator', 'users!creator_id')}
 `
 
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])

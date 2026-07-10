@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
   supabase,
+  AuthenticatedUser,
   User,
   updateUserPresence,
   getWorkingClient,
@@ -28,8 +29,8 @@ import { markPhoneInstallOnboardingPending } from '../lib/phoneInstallOnboarding
 import { clearLocalOutboxScopes } from '../lib/localMessageOutbox';
 
 interface AuthContextValue {
-  user: User | null;
-  profile: User | null;
+  user: AuthenticatedUser | null;
+  profile: AuthenticatedUser | null;
   loading: boolean;
   error: string | null;
   signIn: (email: string, password: string) => Promise<void>;
@@ -44,8 +45,8 @@ interface AuthContextValue {
   passwordRecovery: boolean;
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
-  updateProfile: (updates: Partial<User>) => Promise<User | void>;
-  refreshProfile: () => Promise<User | null>;
+  updateProfile: (updates: Partial<User>) => Promise<AuthenticatedUser | void>;
+  refreshProfile: () => Promise<AuthenticatedUser | null>;
   uploadAvatar: (file: File) => Promise<string | void>;
   uploadBanner: (file: File) => Promise<string | void>;
 }
@@ -72,11 +73,11 @@ const wait = (ms: number) =>
   new Promise(resolve => window.setTimeout(resolve, ms));
 
 function useProvideAuth() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthenticatedUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [passwordRecovery, setPasswordRecovery] = useState(isPasswordRecoveryRoute);
-  const userRef = useRef<User | null>(null);
+  const userRef = useRef<AuthenticatedUser | null>(null);
   const passwordRecoveryRef = useRef(passwordRecovery);
   const initialLoadRef = useRef(false);
   const mountedRef = useRef(true);
@@ -85,7 +86,7 @@ function useProvideAuth() {
   const authChangeRecoveryRef = useRef<Promise<boolean> | null>(null);
   const restoreRetryTimeoutRef = useRef<number | null>(null);
 
-  const applyUser = (nextUser: User | null) => {
+  const applyUser = (nextUser: AuthenticatedUser | null) => {
     userRef.current = nextUser;
     setUser(nextUser);
   };

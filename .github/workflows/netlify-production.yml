@@ -134,6 +134,7 @@ jobs:
           supabase migration list --linked --password "$SUPABASE_DB_PASSWORD" > output/release-evidence/migrations.txt
           supabase db push --linked --dry-run --password "$SUPABASE_DB_PASSWORD" > output/release-evidence/migration-dry-run.txt
           supabase functions list --project-ref "$SUPABASE_PROJECT_ID" --output json > output/release-evidence/functions.json
+          supabase secrets list --project-ref "$SUPABASE_PROJECT_ID" --output json > "$RUNNER_TEMP/supabase-secrets.json"
 
       - name: Upload backend release evidence
         uses: actions/upload-artifact@v6
@@ -157,3 +158,23 @@ jobs:
 
       - name: Publish in-app release
         run: node scripts/publish-app-release.mjs --netlify-json netlify-production.json
+
+      - name: Record sanitized operations release evidence
+        env:
+          OPERATIONS_MIGRATIONS_CURRENT: "true"
+          OPERATIONS_HEALTH_COMMIT_SHA: ${{ github.sha }}
+        run: |
+          node scripts/record-operations-health.mjs \
+            --functions output/release-evidence/functions.json \
+            --secrets "$RUNNER_TEMP/supabase-secrets.json" \
+            --netlify netlify-production.json \
+            --build dist/.well-known/shadowchat-health.json
+
+      - name: Verify and record production health
+        env:
+          PRODUCTION_APP_URL: ${{ vars.PRODUCTION_APP_URL }}
+          MONITOR_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          MONITOR_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEWS_MONITOR_ENABLED: "false"
+          OPERATIONS_HEALTH_COMMIT_SHA: ${{ github.sha }}
+        run: node scripts/check-production-health.mjs

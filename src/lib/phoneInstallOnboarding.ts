@@ -1,9 +1,9 @@
-import type { User } from './supabase'
+import type { AuthenticatedUser } from './supabase'
 
 const STORAGE_PREFIX = 'shadowchat:phone-install-onboarding'
 export const PHONE_INSTALL_ONBOARDING_VERSION = 'v2'
 
-type PhoneInstallProfile = Pick<User, 'id' | 'email'>
+type PhoneInstallProfile = Pick<AuthenticatedUser, 'id' | 'email'>
 
 const normalizeEmail = (email?: string | null) => email?.trim().toLowerCase() || ''
 

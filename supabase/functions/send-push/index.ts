@@ -11,6 +11,18 @@ import {
   normalizePublicHttpUrl,
   safeFetch,
 } from '../_shared/safe-fetch.ts'
+import {
+  authenticateEdgeUser,
+  claimEdgeRequest,
+  completeEdgeRequestClaim,
+  consumeEdgeRateLimit,
+  EdgeAuthenticationError,
+  EdgeRateLimitError,
+  failEdgeRequestClaim,
+  getBearerToken,
+  waitForEdgeRequestClaim,
+} from '../_shared/edge-guard.ts'
+import { embedPublicProfile } from '../_shared/public-profile.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -47,6 +59,8 @@ type NotificationEventRow = {
   id: string
   sent_at: string | null
 }
+const DEFAULT_PUSH_REQUESTS_PER_MINUTE = 120
+const PUSH_CLAIM_SCOPE = 'send-push'
 const SAFE_PUSH_ENDPOINT_OPTIONS = {
   credentialMessage: 'Push endpoint credentials are not allowed.',
   invalidSchemeMessage: 'Only https push endpoints are supported.',
@@ -154,11 +168,6 @@ const isMuted = (prefs: { mute_until: string | null }) => {
 }
 
 const authenticateRequest = async (req: Request, body: SendPushRequestBody) => {
-  const authorization = req.headers.get('Authorization') ?? ''
-  if (!authorization.startsWith('Bearer ')) {
-    return { error: unauthorized('Authentication required') }
-  }
-
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -166,7 +175,16 @@ const authenticateRequest = async (req: Request, body: SendPushRequestBody) => {
     throw new Error('Supabase environment variables are not configured')
   }
 
-  const token = authorization.replace(/^Bearer\s+/i, '')
+  let token: string
+  try {
+    token = getBearerToken(req)
+  } catch (error) {
+    if (error instanceof EdgeAuthenticationError) {
+      return { error: unauthorized(error.message) }
+    }
+    throw error
+  }
+
   if (serviceRoleKey && token === serviceRoleKey) {
     const senderUserId = typeof body?.senderUserId === 'string' ? body.senderUserId : ''
     if (!senderUserId) {
@@ -176,24 +194,44 @@ const authenticateRequest = async (req: Request, body: SendPushRequestBody) => {
     return { userId: senderUserId }
   }
 
-  const authResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      apikey: supabaseAnonKey,
-    },
-  })
-
-  if (!authResponse.ok) {
-    return { error: unauthorized('Invalid or expired session') }
+  try {
+    const user = await authenticateEdgeUser(req)
+    return { userId: user.id }
+  } catch (error) {
+    if (error instanceof EdgeAuthenticationError) {
+      return { error: unauthorized(error.message) }
+    }
+    throw error
   }
-
-  const user = await authResponse.json()
-  if (!user?.id) {
-    return { error: unauthorized('Invalid or expired session') }
-  }
-
-  return { userId: user.id as string }
 }
+
+const resolvePushRequestsPerMinute = () => {
+  const configured = Number(Deno.env.get('PUSH_REQUESTS_PER_MINUTE') ?? '')
+  if (!Number.isFinite(configured) || configured <= 0) {
+    return DEFAULT_PUSH_REQUESTS_PER_MINUTE
+  }
+  return Math.min(Math.floor(configured), 600)
+}
+
+const responseBodyForClaim = async (response: Response) => {
+  try {
+    return await response.clone().json()
+  } catch {
+    return { error: 'Push action returned a non-JSON response.' }
+  }
+}
+
+const replayClaimResponse = (claim: {
+  response_status: number | null
+  response_body: unknown
+}) => new Response(JSON.stringify(claim.response_body), {
+  status: claim.response_status ?? 200,
+  headers: {
+    ...corsHeaders,
+    'Content-Type': 'application/json',
+    'X-Idempotent-Replay': 'true',
+  },
+})
 
 const getSupabaseAdmin = () => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -374,11 +412,7 @@ const sendDmPush = async (
         content,
         message_type,
         created_at,
-        sender:users!sender_id(
-          id,
-          username,
-          display_name
-        )
+        ${embedPublicProfile('sender', 'users!sender_id')}
       `
     )
     .eq('id', messageId)
@@ -602,11 +636,7 @@ const sendGroupPush = async (
         content,
         message_type,
         created_at,
-        user:users!user_id(
-          id,
-          username,
-          display_name
-        )
+        ${embedPublicProfile('user', 'users!user_id')}
       `
     )
     .eq('id', messageId)
@@ -935,6 +965,13 @@ serve(async (req): Promise<Response> => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  let claimContext: {
+    supabase: ReturnType<typeof getSupabaseAdmin>
+    userId: string
+    key: string
+    token: string
+  } | null = null
+
   try {
     const body = await req.json() as SendPushRequestBody
     const auth = await authenticateRequest(req, body)
@@ -957,18 +994,99 @@ serve(async (req): Promise<Response> => {
     }
 
     const supabase = getSupabaseAdmin()
+    const entityId = type === 'hype_event' ? eventId : messageId
+    const requestKey = `${type}:${entityId}`
+    const claim = await claimEdgeRequest(supabase, {
+      userId: auth.userId,
+      scope: PUSH_CLAIM_SCOPE,
+      key: requestKey,
+      leaseSeconds: 300,
+      retentionSeconds: 7 * 24 * 60 * 60,
+    })
+
+    if (!claim.acquired) {
+      if (claim.status === 'completed') return replayClaimResponse(claim)
+      const completedClaim = await waitForEdgeRequestClaim(supabase, {
+        userId: auth.userId,
+        scope: PUSH_CLAIM_SCOPE,
+        key: requestKey,
+        timeoutMs: 20_000,
+        pollMs: 200,
+      })
+      if (completedClaim?.status === 'completed') {
+        return replayClaimResponse(completedClaim)
+      }
+      return new Response(JSON.stringify({
+        error: 'This notification delivery is already processing. Retry shortly.',
+      }), {
+        status: 409,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+          'Retry-After': '2',
+        },
+      })
+    }
+
+    if (!claim.claim_token) {
+      throw new Error('Push delivery claim did not return an owner token')
+    }
+    claimContext = {
+      supabase,
+      userId: auth.userId,
+      key: requestKey,
+      token: claim.claim_token,
+    }
+
+    await consumeEdgeRateLimit(supabase, {
+      userId: auth.userId,
+      scope: 'send-push:minute',
+      windowSeconds: 60,
+      limit: resolvePushRequestsPerMinute(),
+      message: 'Too many notification requests. Please wait a moment and try again.',
+    })
+
     const vapid = getVapidKeys()
+    let response: Response
 
     if (type === 'dm_message') {
-      return ensureResponse(await sendDmPush(supabase, vapid, auth.userId, messageId, origin, bridgeDeviceId))
+      response = ensureResponse(await sendDmPush(supabase, vapid, auth.userId, messageId, origin, bridgeDeviceId))
+    } else if (type === 'hype_event') {
+      response = ensureResponse(await sendHypePush(supabase, vapid, auth.userId, eventId))
+    } else {
+      response = ensureResponse(await sendGroupPush(supabase, vapid, auth.userId, messageId, origin, bridgeDeviceId))
     }
 
-    if (type === 'hype_event') {
-      return ensureResponse(await sendHypePush(supabase, vapid, auth.userId, eventId))
-    }
-
-    return ensureResponse(await sendGroupPush(supabase, vapid, auth.userId, messageId, origin, bridgeDeviceId))
+    await completeEdgeRequestClaim(supabase, {
+      userId: auth.userId,
+      scope: PUSH_CLAIM_SCOPE,
+      key: requestKey,
+      claimToken: claim.claim_token,
+      responseStatus: response.status,
+      responseBody: await responseBodyForClaim(response),
+    })
+    claimContext = null
+    return response
   } catch (error) {
+    if (claimContext) {
+      await failEdgeRequestClaim(claimContext.supabase, {
+        userId: claimContext.userId,
+        scope: PUSH_CLAIM_SCOPE,
+        key: claimContext.key,
+        claimToken: claimContext.token,
+        errorMessage: error instanceof Error ? error.message : 'Push request failed',
+      }).catch(() => undefined)
+    }
+    if (error instanceof EdgeRateLimitError) {
+      return new Response(JSON.stringify({ error: error.message }), {
+        status: 429,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+          'Retry-After': String(error.retryAfterSeconds),
+        },
+      })
+    }
     const message = error instanceof Error ? error.message : 'Unknown error'
     return json({ error: message }, 500)
   }

@@ -18,6 +18,7 @@ import {
   requireBridgeApiEnabled,
   triggerPushDispatch,
 } from '../_shared/bridge.ts'
+import { embedPublicProfile } from '../_shared/public-profile.ts'
 
 type BridgeGroupSendPayload = {
   deviceId?: string
@@ -41,17 +42,7 @@ const MESSAGE_SELECT = `
   audio_url,
   audio_duration,
   file_url,
-  user:users!user_id(
-    id,
-    username,
-    display_name,
-    full_name,
-    avatar_url,
-    color,
-    chat_color,
-    status,
-    status_message
-  )
+  ${embedPublicProfile('user', 'users!user_id')}
 `
 
 serve(async req => {
@@ -112,6 +103,8 @@ serve(async req => {
       throw insertError
     }
 
+    const insertedMessage = message as unknown as { id: string } & Record<string, unknown>
+
     await supabase
       .from('bridge_audit_events')
       .insert({
@@ -120,11 +113,11 @@ serve(async req => {
         event_type: 'group_message_sent',
         event_payload: {
           bridge_session_id: bridgeAuth.auth.bridgeSessionId,
-          message_id: message.id,
+          message_id: insertedMessage.id,
         },
       })
 
-    const pushDispatch = await triggerPushDispatch('group_message', message.id as string, bridgeAuth.auth.userId, {
+    const pushDispatch = await triggerPushDispatch('group_message', insertedMessage.id, bridgeAuth.auth.userId, {
       origin: 'bridge',
       bridgeDeviceId: deviceId,
     })
@@ -156,7 +149,7 @@ serve(async req => {
         const errorMessage = error instanceof Error ? error.message : 'Unknown AI error'
         console.error('Bridge @ai dispatch failed', {
           deviceId,
-          messageId: message.id,
+          messageId: insertedMessage.id,
           error: errorMessage,
         })
         aiDispatch = {
@@ -169,7 +162,7 @@ serve(async req => {
     return json({
       ok: true,
       deviceId,
-      message,
+      message: insertedMessage,
       pushDispatch,
       aiDispatch,
     })

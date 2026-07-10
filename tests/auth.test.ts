@@ -25,7 +25,8 @@ import {
   signUp,
   updatePasswordAfterRecovery,
 } from '../src/lib/auth'
-import { supabase } from '../src/lib/supabase'
+import { getWorkingClient, supabase } from '../src/lib/supabase'
+import { PUBLIC_PROFILE_SELECT } from '../supabase/functions/_shared/public-profile'
 
 const supabaseMock = supabase as any
 
@@ -72,6 +73,46 @@ test('signUp passes normalized invite metadata and redirect URL to Supabase Auth
     profile: null,
     session: null,
   })
+})
+
+test('auto-confirmed signup combines the public profile with email from Auth', async () => {
+  const maybeSingle = jest.fn().mockResolvedValue({
+    data: {
+      id: 'user-1',
+      username: 'newuser',
+      display_name: 'New User',
+      email: 'stale-public@example.com',
+      full_name: 'Private Legacy Name',
+    },
+    error: null,
+  })
+  const eq = jest.fn().mockReturnValue({ maybeSingle })
+  const select = jest.fn().mockReturnValue({ eq })
+  const from = jest.fn().mockReturnValue({ select })
+  ;(getWorkingClient as jest.Mock).mockResolvedValue({ from })
+  supabaseMock.auth.signUp.mockResolvedValue({
+    data: {
+      user: { id: 'user-1', email: 'auth-source@example.com' },
+      session: { access_token: 'confirmed' },
+    },
+    error: null,
+  })
+
+  const result = await signUp({
+    email: 'Auth-Source@Example.com',
+    password: 'Secret!123',
+    username: 'newuser',
+    inviteCode: 'SHADO-123',
+  })
+
+  expect(from).toHaveBeenCalledWith('users')
+  expect(select).toHaveBeenCalledWith(PUBLIC_PROFILE_SELECT)
+  expect(result.profile).toMatchObject({
+    id: 'user-1',
+    username: 'newuser',
+    email: 'auth-source@example.com',
+  })
+  expect(result.profile).not.toHaveProperty('full_name')
 })
 
 test('signUp rejects missing invite code before creating an auth user', async () => {

@@ -43,6 +43,12 @@ import {
   createRealtimeSubscriptionManager,
   isRecoverableRealtimeStatus,
 } from '../lib/realtimeSubscription';
+import { embedPublicProfile } from '../../supabase/functions/_shared/public-profile';
+
+const DM_MESSAGE_WITH_SENDER_SELECT = `
+  *,
+  ${embedPublicProfile('sender', 'users!sender_id')}
+`;
 import {
   loadLocalOutboxEntries,
   removeLocalOutboxEntry,
@@ -562,10 +568,7 @@ export function useConversationMessages(conversationId: string | null) {
       const insertPromise = workingClient
         .from('dm_messages')
         .insert(payload)
-        .select(`
-            *,
-            sender:users!sender_id(*)
-          `)
+        .select(DM_MESSAGE_WITH_SENDER_SELECT)
         .single();
 
       const timeoutPromise = new Promise((_, reject) =>
@@ -589,10 +592,7 @@ export function useConversationMessages(conversationId: string | null) {
         const legacyMediaInsertPromise = workingClient
           .from('dm_messages')
           .insert(legacyMediaPayload)
-          .select(`
-            *,
-            sender:users!sender_id(*)
-          `)
+          .select(DM_MESSAGE_WITH_SENDER_SELECT)
           .single();
 
         result = (await Promise.race([legacyMediaInsertPromise, timeoutPromise])) as {
@@ -609,10 +609,7 @@ export function useConversationMessages(conversationId: string | null) {
         const legacyReplyInsertPromise = workingClient
           .from('dm_messages')
           .insert(legacyReplyPayload)
-          .select(`
-            *,
-            sender:users!sender_id(*)
-          `)
+          .select(DM_MESSAGE_WITH_SENDER_SELECT)
           .single();
 
         result = (await Promise.race([legacyReplyInsertPromise, timeoutPromise])) as {
@@ -631,10 +628,7 @@ export function useConversationMessages(conversationId: string | null) {
         const legacyInsertPromise = workingClient
           .from('dm_messages')
           .insert(legacyPayload)
-          .select(`
-            *,
-            sender:users!sender_id(*)
-          `)
+          .select(DM_MESSAGE_WITH_SENDER_SELECT)
           .single();
 
         result = (await Promise.race([legacyInsertPromise, timeoutPromise])) as {
@@ -651,10 +645,7 @@ export function useConversationMessages(conversationId: string | null) {
         const legacyReplyInsertPromise = workingClient
           .from('dm_messages')
           .insert(legacyReplyPayload)
-          .select(`
-            *,
-            sender:users!sender_id(*)
-          `)
+          .select(DM_MESSAGE_WITH_SENDER_SELECT)
           .single();
 
         result = (await Promise.race([legacyReplyInsertPromise, timeoutPromise])) as {
@@ -670,10 +661,7 @@ export function useConversationMessages(conversationId: string | null) {
       ) {
         result = await workingClient
           .from('dm_messages')
-          .select(`
-            *,
-            sender:users!sender_id(*)
-          `)
+          .select(DM_MESSAGE_WITH_SENDER_SELECT)
           .eq('sender_id', payload.sender_id)
           .eq('client_message_id', payload.client_message_id)
           .maybeSingle();
@@ -690,10 +678,7 @@ export function useConversationMessages(conversationId: string | null) {
     const workingClient = await getWorkingClient();
     const { data, error } = await workingClient
       .from('dm_messages')
-      .select(`
-        *,
-        sender:users!sender_id(*)
-      `)
+      .select(DM_MESSAGE_WITH_SENDER_SELECT)
       .eq('id', messageId)
       .eq('conversation_id', conversationId)
       .maybeSingle();
@@ -712,10 +697,7 @@ export function useConversationMessages(conversationId: string | null) {
       .then(workingClient =>
         workingClient
           .from('dm_messages')
-          .select(`
-            *,
-            sender:users!sender_id(*)
-          `)
+          .select(DM_MESSAGE_WITH_SENDER_SELECT)
           .eq('id', messageId)
           .eq('conversation_id', conversationId)
           .maybeSingle()
@@ -766,11 +748,7 @@ export function useConversationMessages(conversationId: string | null) {
         const workingClient = await getWorkingClient();
         const { data, error } = await workingClient
           .from('dm_messages')
-          .select(
-            `
-            *,
-            sender:users!sender_id(*)
-          `)
+          .select(DM_MESSAGE_WITH_SENDER_SELECT)
           .eq('conversation_id', conversationId)
           .order('created_at', { ascending: false })
           .order('id', { ascending: false })
@@ -854,11 +832,7 @@ export function useConversationMessages(conversationId: string | null) {
       const workingClient = await getWorkingClient();
       const { data, error } = await workingClient
         .from('dm_messages')
-        .select(
-          `
-          *,
-          sender:users!sender_id(*)
-        `)
+        .select(DM_MESSAGE_WITH_SENDER_SELECT)
         .eq('conversation_id', conversationId)
         .or(buildOlderDMKeysetFilter(oldest))
         .order('created_at', { ascending: false })

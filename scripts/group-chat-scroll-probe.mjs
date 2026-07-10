@@ -747,21 +747,6 @@ function getProductionSeedBlockReasons(targetBaseUrl, supabaseUrl, values) {
 }
 
 async function resolveSeedAccount(client, account) {
-  const directProfile = await client
-    .from('users')
-    .select('id, email, username, display_name')
-    .eq('email', account.email)
-    .maybeSingle()
-
-  if (directProfile.data?.id) {
-    return {
-      ...account,
-      userId: directProfile.data.id,
-      username: directProfile.data.username,
-      displayName: directProfile.data.display_name,
-    }
-  }
-
   let authUser = null
   for (let page = 1; page <= 20 && !authUser; page += 1) {
     const { data, error } = await client.auth.admin.listUsers({ page, perPage: 100 })

@@ -28,6 +28,12 @@ for = "/sw.js"
 [headers.values]
   Cache-Control = "no-cache"
 
+[[headers]]
+for = "/.well-known/shadowchat-health.json"
+[headers.values]
+  Cache-Control = "no-store, max-age=0"
+  Content-Type = "application/json; charset=utf-8"
+
 [[redirects]]
 from = "/api/shadow-pin/media"
 to = "/.netlify/functions/shadow-pin-media"

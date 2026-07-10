@@ -1,6 +1,10 @@
 import { ensureSession, getWorkingClient, supabase } from './supabase'
 import type { User as SupabaseAuthUser } from '@supabase/supabase-js'
-import type { User as AppUser } from './supabase'
+import type { AuthenticatedUser, User as PublicUser } from './supabase'
+import {
+  pickPublicProfile,
+  PUBLIC_PROFILE_SELECT,
+} from '../../supabase/functions/_shared/public-profile'
 import { optimizeImageFile } from './imageOptimization'
 import { createStoredImageAsset } from './mediaAssets'
 import {
@@ -40,7 +44,7 @@ export interface SignInData {
 
 export interface SignUpResult {
   user: SupabaseAuthUser | null
-  profile: AppUser | null
+  profile: AuthenticatedUser | null
   session: unknown | null
 }
 
@@ -82,23 +86,27 @@ const withTimeout = async <T>(promise: PromiseLike<T>, ms: number, message: stri
 
 const fetchUserProfileWithRetry = async (
   userId: string,
+  authEmail: string,
   clientOverride?: any
-): Promise<AppUser | null> => {
+): Promise<AuthenticatedUser | null> => {
   const client = clientOverride ?? await getWorkingClient()
 
   for (let attempt = 0; attempt < PROFILE_RETRY_ATTEMPTS; attempt += 1) {
-    const { data, error } = await withTimeout<{ data: AppUser | null; error: any }>(
+    const { data, error } = await withTimeout<{ data: PublicUser | null; error: any }>(
       client
         .from('users')
-        .select('*')
+        .select(PUBLIC_PROFILE_SELECT)
         .eq('id', userId)
-        .maybeSingle() as PromiseLike<{ data: AppUser | null; error: any }>,
+        .maybeSingle() as PromiseLike<{ data: PublicUser | null; error: any }>,
       PROFILE_LOOKUP_TIMEOUT_MS,
       `Profile lookup timeout after ${PROFILE_LOOKUP_TIMEOUT_MS}ms`
     )
 
     if (data) {
-      return data as unknown as AppUser
+      return {
+        ...pickPublicProfile(data as unknown as Record<string, unknown>),
+        email: authEmail,
+      } as unknown as AuthenticatedUser
     }
 
     if (error && error.code !== 'PGRST116') {
@@ -158,7 +166,7 @@ export const signUp = async ({
   }
 
   if (data.session) {
-    const profile = await fetchUserProfileWithRetry(data.user.id)
+    const profile = await fetchUserProfileWithRetry(data.user.id, data.user.email || email)
     if (!profile) {
       throw new Error('Account created, but profile setup did not complete. Please try signing in again.')
     }
@@ -265,7 +273,7 @@ export const deleteCurrentAccount = async () => {
   await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined)
 }
 
-export const getCurrentUser = async (): Promise<AppUser | null> => {
+export const getCurrentUser = async (): Promise<AuthenticatedUser | null> => {
   try {
     const sessionValid = await ensureSession()
     if (!sessionValid) {
@@ -294,21 +302,27 @@ export const getCurrentUser = async (): Promise<AppUser | null> => {
       return null
     }
 
-    return await fetchUserProfileWithRetry(user.id, workingClient)
+    if (!user.email) {
+      return null
+    }
+
+    return await fetchUserProfileWithRetry(user.id, user.email, workingClient)
   } catch {
     return null
   }
 }
 
-export const getUserProfile = async (userId: string): Promise<AppUser | null> => {
+export const getUserProfile = async (userId: string): Promise<PublicUser | null> => {
   const { data, error } = await supabase
     .from('users')
-    .select('*')
+    .select(PUBLIC_PROFILE_SELECT)
     .eq('id', userId)
     .maybeSingle()
 
   if (error) throw error
-  return data as unknown as AppUser | null
+  return data
+    ? pickPublicProfile(data as Record<string, unknown>) as unknown as PublicUser
+    : null
 }
 
 export const updateUserProfile = async (updates: Partial<{
@@ -323,23 +337,26 @@ export const updateUserProfile = async (updates: Partial<{
   banner_url: string;
   banner_thumbnail_url: string | null;
   banner_thumbnail_path: string | null;
-}>): Promise<AppUser> => {
+}>): Promise<AuthenticatedUser> => {
   const sessionValid = await ensureSession(true)
   if (!sessionValid) throw new Error('Not authenticated')
 
   const workingClient = await getWorkingClient()
   const { data: { user } } = await workingClient.auth.getUser()
-  if (!user) throw new Error('Not authenticated')
+  if (!user?.email) throw new Error('Not authenticated')
 
   const { data, error } = await workingClient
     .from('users')
     .update(updates)
     .eq('id', user.id)
-    .select()
+    .select(PUBLIC_PROFILE_SELECT)
     .single()
 
   if (error) throw error
-  return data as unknown as AppUser
+  return {
+    ...pickPublicProfile(data as unknown as Record<string, unknown>),
+    email: user.email,
+  } as unknown as AuthenticatedUser
 }
 
 export const uploadUserAvatar = async (file: File) => {

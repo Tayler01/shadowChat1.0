@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
+  Activity,
   Bell,
   BookOpen,
   ChevronRight,
@@ -48,6 +49,10 @@ const ShadowPinActivityAdmin = React.lazy(() =>
   import('./ShadowPinActivityAdmin').then(module => ({ default: module.ShadowPinActivityAdmin }))
 )
 
+const OperationsHealthCenter = React.lazy(() =>
+  import('./OperationsHealthCenter').then(module => ({ default: module.OperationsHealthCenter }))
+)
+
 const BridgePairingAdminPanel = ESP_ADMIN_FEATURE_ENABLED
   ? React.lazy(() =>
       import('./BridgePairingAdminPanel').then(module => ({ default: module.BridgePairingAdminPanel }))
@@ -84,6 +89,7 @@ type SettingsSection = {
 type AdminSectionId =
   | 'access'
   | 'invites'
+  | 'operations-health'
   | 'automation-approvals'
   | 'bridge-pairing'
   | 'shado-tv-studio'
@@ -121,7 +127,7 @@ const sections: SettingsSection[] = [
   {
     id: 'admin',
     title: 'Admin',
-    description: 'Bridge approval and operator-only tools.',
+    description: 'Production health and operator-only tools.',
     icon: KeyRound,
   },
   {
@@ -175,6 +181,12 @@ const adminSections: AdminSection[] = [
     title: 'Invites',
     description: 'Generate, email-lock, revoke, and review signup invites.',
     icon: Ticket,
+  },
+  {
+    id: 'operations-health',
+    title: 'Operations Health',
+    description: 'Review frontend, backend, smoke, push, and paused-domain release evidence.',
+    icon: Activity,
   },
   {
     id: 'automation-approvals',
@@ -844,6 +856,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       return 'Review queue'
     }
 
+    if (sectionId === 'operations-health') {
+      return 'Release status'
+    }
+
     if (sectionId === 'feedback-review') {
       return 'Bugs & ideas'
     }
@@ -946,6 +962,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     <AdminAutomationApprovals />
   )
 
+  const renderOperationsHealthPanel = () => (
+    <React.Suspense fallback={<SettingsPanelLoading label="Loading operations health..." />}>
+      <OperationsHealthCenter />
+    </React.Suspense>
+  )
+
   const renderShadowPinActivityPanel = () => (
     <React.Suspense fallback={<SettingsPanelLoading label="Loading Shadow Pin activity..." />}>
       <ShadowPinActivityAdmin />
@@ -964,6 +986,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     const content = {
       access: renderAdminAccessPanel,
       invites: () => <AdminInvitesPanel />,
+      'operations-health': renderOperationsHealthPanel,
       'automation-approvals': renderAutomationApprovalsPanel,
       'bridge-pairing': renderBridgePairingPanel,
       'shado-tv-studio': () => <ShadoTvStudio />,
