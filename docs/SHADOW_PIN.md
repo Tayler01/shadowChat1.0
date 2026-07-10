@@ -7,11 +7,12 @@ production surface includes normalized tags, indexed cross-entity search,
 threaded
 comments, reciprocal personal-block enforcement, and recipient-owned in-app
 plus Web Push notification paths. Use the latest successful `main` workflow and
-health manifest for live build identity while grant-revocation closeout finishes.
+health manifest for live build identity. Release A grant-revocation closeout is
+deployed and the linked database contract is clean.
 
 ShadowPin is a logged-in public pin board exposed as `Pins` in the mobile
-bottom menu and desktop sidebar. Boards stays its own menu item; Pins opens the
-same ShadowPin surface directly.
+bottom menu and desktop sidebar. The separate Boards domain is paused and
+omitted from the production navigation; Pins opens ShadowPin directly.
 
 Short video planning and rollout details live in
 [`docs/SHADOW_PIN_SHORT_VIDEO_ROADMAP.md`](C:/repos/chat2.0/docs/SHADOW_PIN_SHORT_VIDEO_ROADMAP.md:1).
@@ -31,6 +32,8 @@ Short video planning and rollout details live in
 - Up to eight normalized tags per pin and indexed search across pin text, tags,
   creator display identity, and category metadata.
 - Threaded member comments/replies with creator/operator moderation.
+- A mobile-first long-press radial menu with Share, Heart, Comment, and Open;
+  pin creators and operators also receive Edit.
 - Recipient-owned in-app notifications and background push for eligible new
   posts, comments, and replies.
 
@@ -164,6 +167,9 @@ Supabase Realtime publication by
 `20260710044500_publish_notification_events_realtime.sql`, allowing the signed-
 in app to show live in-app toasts. After a successful client mutation, the
 current `send-push` Function is invoked best-effort for background delivery.
+ShadowPin in-app toasts inherit the normal four-second app timer and hide as
+soon as their visible lifecycle ends, rather than remaining painted during the
+toast removal delay.
 The service enforces the recipient's master switch, temporary snooze, daily
 quiet hours/timezone, matching ShadowPin type toggle, and reciprocal block
 contract before contacting a push endpoint. Notification clicks route to
@@ -228,7 +234,7 @@ npm run typecheck
 npm run build
 npx jest --runInBand tests/BoardBubbleMap.test.tsx
 npx jest --runInBand tests/safeFetch.test.ts tests/safeFetchIntegrationContract.test.ts
-npx jest --runInBand tests/ShadowPin.test.tsx tests/ShadowPinCommentsDialog.test.tsx tests/shadowPinSocialSql.test.ts tests/personalBlockingSql.test.ts tests/notificationDelivery.test.ts tests/pushDeliveryRetry.test.ts
+npx jest --runInBand tests/ShadowPin.test.tsx tests/ShadowPinCommentsDialog.test.tsx tests/useShadowPinCommentNotifications.test.tsx tests/shadowPinSocialSql.test.ts tests/personalBlockingSql.test.ts tests/notificationDelivery.test.ts tests/pushDeliveryRetry.test.ts
 npm run supabase:security-contract:local
 ```
 
@@ -250,13 +256,11 @@ npm run shadow-pin:backfill-media -- --apply
   Android, and desktop PWA proof after deployment. Do not create a production
   test pin casually: a new pin targets every eligible other member.
 
-## Future UX Todo
+## Radial Controls
 
-- Explore a Pinterest-style mobile long-press action menu for image pins.
-  Desired behavior: press and hold a pin image, tilt/lift the image, show a
-  thumb-friendly radial action menu with heart, share, open/save-style actions,
-  allow slide-to-select, then confirm the selected action with premium feedback
-  such as a heart burst and subtle color wash over the image. Keep this
-  mobile-first and verify on iPhone/WebKit and Android/Chromium so the gesture
-  does not fight normal masonry scrolling, native image context menus, or
-  existing tap-to-open behavior.
+Press and hold a pin to lift it and open the thumb-friendly radial menu. Slide
+to Share, Heart, Comment, or Open and release to select; creators and operators
+also see Edit. Comment opens the same responsive ShadowPin conversation dialog
+used by the visible comment-count control. The menu mirrors for the opposite
+masonry column, clamps to the viewport, locks gesture scrolling only while
+active, and confirms actions with the existing premium feedback treatment.

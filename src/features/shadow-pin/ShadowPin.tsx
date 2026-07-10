@@ -603,7 +603,7 @@ const getImageAspectRatio = (item: { image_width?: number | null; image_height?:
 
 const isProcessingMedia = (status?: string | null) => status === 'pending' || status === 'processing'
 
-type PinQuickAction = 'heart' | 'share' | 'open' | 'edit'
+type PinQuickAction = 'heart' | 'share' | 'comment' | 'open' | 'edit'
 type PinActionSide = 'left' | 'right'
 type PinColumnSide = 'left' | 'right'
 type PinActionConfig = {
@@ -654,15 +654,17 @@ const pinArcAction = (
 }
 
 const BASE_PIN_ACTIONS_RIGHT: PinActionConfig[] = [
-  pinArcAction('share', 'Share', -96, Share2),
-  pinArcAction('heart', 'Heart', -60, Heart),
-  pinArcAction('open', 'Open', -24, Maximize2),
-]
-const BASE_MANAGE_PIN_ACTIONS_RIGHT: PinActionConfig[] = [
   pinArcAction('share', 'Share', -102, Share2),
   pinArcAction('heart', 'Heart', -66, Heart),
-  pinArcAction('open', 'Open', -30, Maximize2),
-  pinArcAction('edit', 'Edit', 6, Edit3),
+  pinArcAction('comment', 'Comment', -30, MessageSquare),
+  pinArcAction('open', 'Open', 6, Maximize2),
+]
+const BASE_MANAGE_PIN_ACTIONS_RIGHT: PinActionConfig[] = [
+  pinArcAction('share', 'Share', -120, Share2),
+  pinArcAction('heart', 'Heart', -84, Heart),
+  pinArcAction('comment', 'Comment', -48, MessageSquare),
+  pinArcAction('open', 'Open', -12, Maximize2),
+  pinArcAction('edit', 'Edit', 24, Edit3),
 ]
 const PIN_ACTIONS: Record<PinActionSide, PinActionConfig[]> = {
   left: makePinActions(BASE_PIN_ACTIONS_RIGHT, 'left'),
@@ -1545,6 +1547,8 @@ function PinActionFeedback({ feedback }: { feedback: PinActionFeedbackState | nu
     ? Share2
     : feedback.action === 'open'
       ? Maximize2
+      : feedback.action === 'comment'
+        ? MessageSquare
       : feedback.action === 'edit'
         ? Edit3
         : Heart
@@ -2005,6 +2009,11 @@ function ImageCard({
 
     if (action === 'share') {
       revealShareSheet()
+      return
+    }
+
+    if (action === 'comment') {
+      window.setTimeout(onComments, 90)
       return
     }
 

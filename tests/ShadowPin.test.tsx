@@ -43,6 +43,14 @@ jest.mock('../src/components/search/GlobalSearchButton', () => ({
   GlobalSearchButton: () => <button type="button" aria-label="Open search and saved messages" />,
 }))
 
+jest.mock('../src/features/shadow-pin/components/ShadowPinCommentsDialog', () => ({
+  ShadowPinCommentsDialog: ({ image }: { image: { title: string } }) => (
+    <div role="dialog" aria-label={image.title}>
+      <textarea aria-label="Add a ShadowPin comment" />
+    </div>
+  ),
+}))
+
 jest.mock('../src/features/shadow-pin/hooks/useShadowPinCategories', () => ({
   useShadowPinCategories: () => mockUseShadowPinCategories(),
 }))
@@ -2148,6 +2156,7 @@ test('ShadowPin image long-press opens a radial thumb menu and slide-heart trigg
     expect(Array.from(menu.querySelectorAll('[data-action]')).map(element => element.getAttribute('data-action'))).toEqual([
       'share',
       'heart',
+      'comment',
       'open',
     ])
 
@@ -2169,6 +2178,53 @@ test('ShadowPin image long-press opens a radial thumb menu and slide-heart trigg
     expect(screen.queryByTestId('shadow-pin-radial-menu')).not.toBeInTheDocument()
     expect(screen.getByTestId('shadow-pin-action-feedback')).toHaveAttribute('data-action', 'heart')
     expect(screen.getByTestId('shadow-pin-action-heart-burst')).toBeInTheDocument()
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('ShadowPin radial comment opens the existing comments conversation', () => {
+  jest.useFakeTimers()
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+
+    const imageCard = screen.getByAltText('Pin one').closest('article')
+    expect(imageCard).not.toBeNull()
+
+    fireShadowPinPointer(imageCard!, 'pointerdown', {
+      pointerId: 13,
+      button: 0,
+      clientX: 160,
+      clientY: 320,
+    })
+    act(() => {
+      jest.advanceTimersByTime(440)
+    })
+
+    expect(screen.getByTestId('shadow-pin-radial-action-comment')).toBeInTheDocument()
+
+    fireShadowPinPointer(imageCard!, 'pointermove', {
+      pointerId: 13,
+      clientX: 250,
+      clientY: 268,
+    })
+    expect(screen.getByTestId('shadow-pin-radial-menu')).toHaveAttribute('data-selected-action', 'comment')
+
+    fireShadowPinPointer(imageCard!, 'pointerup', {
+      pointerId: 13,
+      clientX: 250,
+      clientY: 268,
+    })
+    act(() => {
+      jest.advanceTimersByTime(90)
+    })
+
+    expect(screen.getByRole('dialog', { name: 'Pin one' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Add a ShadowPin comment')).toBeInTheDocument()
+    expect(screen.getByTestId('shadow-pin-action-feedback')).toHaveAttribute('data-action', 'comment')
   } finally {
     jest.useRealTimers()
   }
@@ -2215,19 +2271,26 @@ test('ShadowPin radial menu offers edit as a foreground action for image owners'
     expect(screen.getByTestId('shadow-pin-radial-layer').parentElement).toBe(document.body)
     expect(screen.getByTestId('shadow-pin-radial-menu')).toHaveAttribute('data-control-side', 'right')
     expect(imageCard).toHaveClass('shadow-pin-action-card--active-left')
+    expect(Array.from(screen.getByTestId('shadow-pin-radial-menu').querySelectorAll('[data-action]')).map(element => element.getAttribute('data-action'))).toEqual([
+      'share',
+      'heart',
+      'comment',
+      'open',
+      'edit',
+    ])
 
     fireShadowPinPointer(imageCard!, 'pointermove', {
       pointerId: 10,
-      clientX: 263,
-      clientY: 331,
+      clientX: 255,
+      clientY: 362,
     })
 
     expect(screen.getByTestId('shadow-pin-radial-menu')).toHaveAttribute('data-selected-action', 'edit')
 
     fireShadowPinPointer(imageCard!, 'pointerup', {
       pointerId: 10,
-      clientX: 263,
-      clientY: 331,
+      clientX: 255,
+      clientY: 362,
     })
     act(() => {
       jest.advanceTimersByTime(90)

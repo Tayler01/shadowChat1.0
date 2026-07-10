@@ -31,7 +31,7 @@
     --theme-accent-soft: rgba(var(--theme-accent-rgb), 0.13);
     --theme-accent-softer: rgba(var(--theme-accent-rgb), 0.07);
     --theme-accent-border-soft: rgba(var(--theme-accent-rgb), 0.2);
-    --theme-focus-ring: rgba(var(--theme-accent-rgb), 0.24);
+    --theme-focus-ring: rgb(var(--theme-accent-rgb) / 0.24);
     --theme-surface-hover: rgba(255, 255, 255, 0.06);
     --theme-logo-filter: drop-shadow(0 0 18px rgba(var(--theme-accent-rgb), 0.22));
     --theme-backdrop-image: none;
@@ -1273,6 +1273,7 @@ html, body, #root {
 }
 
 .shadow-pin-action-feedback--share .shadow-pin-action-wash,
+.shadow-pin-action-feedback--comment .shadow-pin-action-wash,
 .shadow-pin-action-feedback--open .shadow-pin-action-wash {
   background:
     radial-gradient(circle at 50% 48%, rgba(var(--theme-accent-strong-rgb), 0.28), transparent 58%),
@@ -1284,6 +1285,8 @@ html, body, #root {
 
 .shadow-pin-action-feedback--share .shadow-pin-action-wash::before,
 .shadow-pin-action-feedback--share .shadow-pin-action-wash::after,
+.shadow-pin-action-feedback--comment .shadow-pin-action-wash::before,
+.shadow-pin-action-feedback--comment .shadow-pin-action-wash::after,
 .shadow-pin-action-feedback--open .shadow-pin-action-wash::before,
 .shadow-pin-action-feedback--open .shadow-pin-action-wash::after {
   display: none;
@@ -3164,6 +3167,11 @@ html, body, #root {
     border-color: var(--border-glow);
     color: var(--theme-accent-readable);
     transform: translateY(-1px);
+  }
+
+  .room-tools-control:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--theme-focus-ring);
   }
 
   .obsidian-input {

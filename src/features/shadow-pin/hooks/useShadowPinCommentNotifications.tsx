@@ -49,7 +49,11 @@ export function useShadowPinCommentNotifications() {
           openShadowPin()
           toast.dismiss(t.id)
         }}
-        className="popup-surface flex max-w-sm items-start gap-3 rounded-[var(--radius-lg)] border border-[var(--border-panel)] p-3 text-left shadow-[var(--shadow-panel)]"
+        className={`popup-surface flex max-w-sm items-start gap-3 rounded-[var(--radius-lg)] border border-[var(--border-panel)] p-3 text-left shadow-[var(--shadow-panel)] transition-[opacity,transform] duration-200 ${
+          t.visible
+            ? 'pointer-events-auto translate-y-0 opacity-100'
+            : 'pointer-events-none -translate-y-2 opacity-0'
+        }`}
         aria-label={`${title}. Open ShadowPin.`}
       >
         <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[rgba(215,170,70,0.12)] text-[var(--text-gold)]">
@@ -64,7 +68,7 @@ export function useShadowPinCommentNotifications() {
           )}
         </span>
       </button>
-    ), { duration: 7000, position: 'top-center' })
+    ), { position: 'top-center' })
 
     const client = await getWorkingClient()
     await client
