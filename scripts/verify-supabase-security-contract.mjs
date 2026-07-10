@@ -23,6 +23,10 @@ const expectedAuthenticated = contract.domains
   .sort()
 const expectedAnon = [...contract.anon_signatures].sort()
 const expectedInternal = [...contract.internal_signatures].sort()
+const expectedActiveTablePrivileges = [...contract.required_active_table_privileges].sort()
+const expectedUsersUpdateColumns = [...contract.authenticated_users_update_columns].sort()
+const activeGrantTables = [...new Set(expectedActiveTablePrivileges.map(entry => entry.split(':')[1]))]
+const sqlStringList = values => values.map(value => `'${value.replaceAll("'", "''")}'`).join(', ')
 
 const authenticatedRows = query(`
   select p.oid::regprocedure::text as signature
@@ -80,6 +84,37 @@ const pausedGrantRows = query(`
     )
   order by table_name, grantee, privilege_type
 `)
+const activeGrantRows = query(`
+  select grantee || ':' || table_name || ':' || privilege_type as grant_entry
+  from information_schema.role_table_grants
+  where table_schema = 'public'
+    and grantee in ('authenticated', 'service_role')
+    and privilege_type in ('SELECT', 'INSERT', 'UPDATE', 'DELETE')
+    and table_name in (${sqlStringList(activeGrantTables)})
+  order by 1
+`)
+const dangerousBrowserGrantRows = query(`
+  select grantee, table_name, privilege_type
+  from information_schema.role_table_grants
+  where table_schema = 'public'
+    and (
+      grantee = 'anon'
+      or (
+        grantee = 'authenticated'
+        and privilege_type in ('TRUNCATE', 'TRIGGER', 'REFERENCES')
+      )
+    )
+  order by grantee, table_name, privilege_type
+`)
+const usersUpdateColumnRows = query(`
+  select column_name
+  from information_schema.column_privileges
+  where table_schema = 'public'
+    and table_name = 'users'
+    and grantee = 'authenticated'
+    and privilege_type = 'UPDATE'
+  order by column_name
+`)
 
 assert.deepEqual(
   authenticatedRows.map(row => row.signature).sort(),
@@ -103,6 +138,21 @@ assert.equal(
 )
 assert.equal(Number(definerSummary?.missing_search_path), 0, 'every SECURITY DEFINER must pin search_path')
 assert.deepEqual(pausedGrantRows, [], 'paused domains must expose no table privileges to browser roles')
+assert.deepEqual(
+  activeGrantRows.map(row => row.grant_entry).sort(),
+  expectedActiveTablePrivileges,
+  'active core Data API table privileges drifted from the reviewed contract',
+)
+assert.deepEqual(
+  dangerousBrowserGrantRows,
+  [],
+  'anonymous grants and authenticated TRUNCATE/TRIGGER/REFERENCES grants are forbidden',
+)
+assert.deepEqual(
+  usersUpdateColumnRows.map(row => row.column_name).sort(),
+  expectedUsersUpdateColumns,
+  'authenticated public.users UPDATE columns drifted from the reviewed allowlist',
+)
 
 console.log(JSON.stringify({
   scope: scope.slice(2),
@@ -111,4 +161,6 @@ console.log(JSON.stringify({
   internalSecurityDefiners: expectedInternal.length,
   totalSecurityDefiners: Number(definerSummary.total),
   pausedBrowserTableGrants: pausedGrantRows.length,
+  activeTablePrivileges: expectedActiveTablePrivileges.length,
+  usersUpdateColumns: expectedUsersUpdateColumns.length,
 }))
