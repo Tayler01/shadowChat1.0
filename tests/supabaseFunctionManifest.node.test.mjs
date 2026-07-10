@@ -2,11 +2,18 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  createBridgeAuthHoldQueryArgs,
   loadFunctionManifest,
   validateFunctionManifest,
   verifyBridgeAuthHoldQueryResult,
   verifyRemoteFunctionInventory,
 } from '../scripts/deploy-supabase-functions.mjs'
+
+test('bridge Auth hold query requests machine-readable Supabase output', () => {
+  assert.deepEqual(createBridgeAuthHoldQueryArgs('select 1;'), [
+    'db', 'query', '--linked', '--output', 'json', 'select 1;',
+  ])
+})
 
 test('every local Edge Function has one explicit production disposition', () => {
   const manifest = validateFunctionManifest(loadFunctionManifest())

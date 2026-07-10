@@ -120,6 +120,10 @@ export const verifyBridgeAuthHoldQueryResult = result => {
   }
 }
 
+export const createBridgeAuthHoldQueryArgs = query => [
+  'db', 'query', '--linked', '--output', 'json', query,
+]
+
 const deploy = manifest => {
   const projectRef = process.env.SUPABASE_PROJECT_ID?.trim()
   if (!projectRef) throw new Error('SUPABASE_PROJECT_ID is required')
@@ -175,7 +179,7 @@ const verifyBridgeAuthHold = () => {
     'where devices.bridge_user_id is not null',
     ');',
   ].join(' ')
-  const result = parseJsonCommand(['db', 'query', '--linked', query])
+  const result = parseJsonCommand(createBridgeAuthHoldQueryArgs(query))
   verifyBridgeAuthHoldQueryResult(result)
   console.log('Bridge Auth hold verified: no dedicated bridge sessions remain.')
 }
