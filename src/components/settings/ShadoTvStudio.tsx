@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Clapperboard, Eye, EyeOff, Film, Image, Plus, RotateCcw, Save, Trash2, Upload, Video } from 'lucide-react'
+import { BarChart3, Captions, Clapperboard, Eye, EyeOff, Film, Image, Plus, RotateCcw, Save, Trash2, Upload, Video } from 'lucide-react'
 import { Button } from '../ui/Button'
 import {
   createShadoTvContentItem,
   createShadoTvChannel,
   createShadoTvVideo,
+  deleteShadoTvCaption,
   fetchShadoTvAdminCatalog,
+  fetchShadoTvWatchAnalytics,
   restoreShadoTvContentItem,
   restoreShadoTvChannel,
   restoreShadoTvVideo,
@@ -17,13 +19,14 @@ import {
   updateShadoTvVideoArtwork,
   updateShadoTvVideoDetails,
   updateShadoTvVideoVisibility,
+  uploadShadoTvCaption,
   uploadShadoTvVideoToBunny,
   type ShadoTvBunnyUploadKind,
   type ShadoTvContentItemUpdateValues,
   type ShadoTvVideoArtworkKind,
   type ShadoTvVideoUpdateValues,
 } from '../../features/entertainment/shado-tv/api'
-import type { ShadoTvChannel, ShadoTvContentItem, ShadoTvContentSection, ShadoTvVideo } from '../../features/entertainment/shado-tv/data'
+import type { ShadoTvChannel, ShadoTvContentItem, ShadoTvContentSection, ShadoTvVideo, ShadoTvWatchAnalytics } from '../../features/entertainment/shado-tv/data'
 
 type StudioTab = 'episodes' | ShadoTvContentSection
 
@@ -79,6 +82,9 @@ export function ShadoTvStudio() {
   const [saving, setSaving] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [analytics, setAnalytics] = useState<ShadoTvWatchAnalytics[]>([])
+  const [captionLabel, setCaptionLabel] = useState('English')
+  const [captionLanguage, setCaptionLanguage] = useState('en')
   const [uploadProgress, setUploadProgress] = useState<{
     videoId: string
     kind: ShadoTvBunnyUploadKind
@@ -90,6 +96,7 @@ export function ShadoTvStudio() {
     () => videos.find(video => video.id === selectedVideoId) ?? null,
     [selectedVideoId, videos]
   )
+  const selectedAnalytics = analytics.find(item => item.videoId === selectedVideoId)
   const seriesChannel = channels.find(channel => !channel.deletedAt) ?? channels[0] ?? null
   const activeContentSection = activeTab === 'cast' || activeTab === 'updates' ? activeTab : null
   const contentItemsForTab = useMemo(
@@ -109,10 +116,14 @@ export function ShadoTvStudio() {
     setLoading(true)
     setError(null)
     try {
-      const catalog = await fetchShadoTvAdminCatalog()
+      const [catalog, nextAnalytics] = await Promise.all([
+        fetchShadoTvAdminCatalog(),
+        fetchShadoTvWatchAnalytics(),
+      ])
       setChannels(catalog.channels)
       setVideos(catalog.videos)
       setContentItems(catalog.contentItems)
+      setAnalytics(nextAnalytics)
       setSelectedVideoId(previous => {
         if (previous && catalog.videos.some(video => video.id === previous)) return previous
         return catalog.videos[0]?.id ?? ''
@@ -277,6 +288,20 @@ export function ShadoTvStudio() {
         }
       },
       `${label} uploaded to Bunny and queued for processing.`
+    )
+  }
+
+  const uploadCaption = (videoId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    void runAction(
+      `caption-${videoId}`,
+      () => uploadShadoTvCaption(videoId, file, {
+        label: captionLabel,
+        languageCode: captionLanguage,
+      }),
+      'Caption track uploaded and linked to playback.'
     )
   }
 
@@ -585,6 +610,27 @@ export function ShadoTvStudio() {
                   </label>
                 </div>
 
+                <div className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 sm:grid-cols-2 lg:grid-cols-5">
+                  <div className="sm:col-span-2 lg:col-span-1">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+                      <BarChart3 className="h-4 w-4 text-[var(--text-gold)]" />
+                      Watch analytics
+                    </div>
+                    <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Aggregate operator view. Viewer identities stay out of this panel.</p>
+                  </div>
+                  {[
+                    ['Plays', selectedAnalytics?.plays ?? 0],
+                    ['Viewers', selectedAnalytics?.uniqueViewers ?? 0],
+                    ['Completed', selectedAnalytics?.completions ?? 0],
+                    ['Premiere joins', selectedAnalytics?.premiereJoins ?? 0],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-black/15 p-3">
+                      <span className="block text-[0.65rem] uppercase tracking-[0.14em] text-[var(--text-muted)]">{label}</span>
+                      <strong className="mt-1 block text-xl text-[var(--text-primary)]">{value}</strong>
+                    </div>
+                  ))}
+                </div>
+
                 <div className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 md:grid-cols-[1fr_auto] md:items-center">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-[var(--text-primary)]">Bunny video pipeline</p>
@@ -633,6 +679,79 @@ export function ShadoTvStudio() {
                       Trailer Video
                       <input type="file" accept="video/mp4,video/webm,video/quicktime,video/*" className="sr-only" disabled={Boolean(saving) || Boolean(selectedVideo.deletedAt)} onChange={event => uploadBunnyVideo(selectedVideo.id, 'trailer', event)} />
                     </label>
+                  </div>
+                </div>
+
+                <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
+                  <div className="flex items-start gap-3">
+                    <Captions className="mt-0.5 h-5 w-5 text-[var(--text-gold)]" />
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">Caption tracks</p>
+                      <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                        Upload WebVTT. Bunny episodes receive the same track through the provider API; direct video uses the private signed copy.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_7rem_auto] sm:items-end">
+                    <label>
+                      <span className="mb-2 block text-xs font-medium text-[var(--text-secondary)]">Track label</span>
+                      <input
+                        value={captionLabel}
+                        onChange={event => setCaptionLabel(event.target.value)}
+                        className="obsidian-input min-h-11 w-full rounded-[var(--radius-md)] px-3.5 py-2 text-sm"
+                        placeholder="English"
+                      />
+                    </label>
+                    <label>
+                      <span className="mb-2 block text-xs font-medium text-[var(--text-secondary)]">Language</span>
+                      <input
+                        value={captionLanguage}
+                        onChange={event => setCaptionLanguage(event.target.value)}
+                        className="obsidian-input min-h-11 w-full rounded-[var(--radius-md)] px-3.5 py-2 text-sm"
+                        placeholder="en"
+                        maxLength={12}
+                      />
+                    </label>
+                    <label className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-4 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--border-glow)] hover:text-[var(--text-gold)]">
+                      <Upload className="mr-2 h-4 w-4" />
+                      Upload VTT
+                      <input
+                        type="file"
+                        accept=".vtt,text/vtt"
+                        className="sr-only"
+                        disabled={Boolean(saving) || Boolean(selectedVideo.deletedAt) || !captionLabel.trim() || !captionLanguage.trim()}
+                        onChange={event => uploadCaption(selectedVideo.id, event)}
+                      />
+                    </label>
+                  </div>
+
+                  <div className="mt-4 grid gap-2">
+                    {(selectedVideo.captionTracks ?? []).map(track => (
+                      <div key={track.id} className="flex min-h-11 items-center justify-between gap-3 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-black/15 px-3 py-2">
+                        <span className="min-w-0 text-sm text-[var(--text-primary)]">
+                          <span className="font-semibold">{track.label}</span>
+                          <span className="ml-2 text-xs uppercase text-[var(--text-muted)]">{track.languageCode}</span>
+                          {track.isDefault && <span className="ml-2 text-xs text-[var(--text-gold)]">Default</span>}
+                        </span>
+                        <button
+                          type="button"
+                          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-red-100 transition hover:bg-red-950/30"
+                          aria-label={`Delete ${track.label} captions`}
+                          disabled={Boolean(saving)}
+                          onClick={() => void runAction(
+                            `delete-caption-${track.id}`,
+                            () => deleteShadoTvCaption(selectedVideo.id, track),
+                            'Caption track deleted.'
+                          )}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                    {(selectedVideo.captionTracks ?? []).length === 0 && (
+                      <p className="text-sm text-[var(--text-muted)]">No caption tracks uploaded yet.</p>
+                    )}
                   </div>
                 </div>
 

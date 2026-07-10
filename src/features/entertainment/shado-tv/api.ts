@@ -10,6 +10,7 @@ import {
   SHADO_TV_CHANNELS,
   SHADO_TV_CONTENT_ITEMS,
   SHADO_TV_VIDEOS,
+  type ShadoTvCaptionTrack,
   type ShadoTvChannel,
   type ShadoTvContentItem,
   type ShadoTvContentSection,
@@ -17,8 +18,11 @@ import {
   type ShadoTvUploadStatus,
   type ShadoTvVideo,
   type ShadoTvVideoStatus,
+  type ShadoTvWatchAnalytics,
+  type ShadoTvWatchEventType,
   type ShadoTvWatchProgress,
 } from './data'
+import { createShadoTvPlaybackId } from './playback'
 import * as tus from 'tus-js-client'
 
 type ChannelVisibility = 'draft' | 'published' | 'hidden'
@@ -104,6 +108,26 @@ interface ShadoTvWatchProgressRow {
   duration_seconds?: number | null
   completed_at?: string | null
   updated_at: string
+}
+
+interface ShadoTvCaptionRow {
+  id: string
+  video_id: string
+  label: string
+  language_code: string
+  kind: 'captions' | 'subtitles'
+  storage_path: string
+  is_default: boolean
+}
+
+interface ShadoTvWatchAnalyticsRow {
+  video_id: string
+  plays: number | string | null
+  unique_viewers: number | string | null
+  completions: number | string | null
+  premiere_joins: number | string | null
+  average_watch_seconds: number | string | null
+  last_watched_at?: string | null
 }
 
 export interface ShadoTvCatalog {
@@ -332,6 +356,35 @@ async function createSignedArtworkUrl(
   }
 }
 
+async function hydrateCaptionTracks(client: WorkingClient, rows: ShadoTvCaptionRow[]) {
+  const tracksByVideo = new Map<string, ShadoTvCaptionTrack[]>()
+
+  await Promise.all(rows.map(async row => {
+    const { data, error } = await client.storage
+      .from(SHADO_TV_BUCKET)
+      .createSignedUrl(row.storage_path, SIGNED_ARTWORK_TTL_SECONDS)
+    if (error || !data?.signedUrl) return
+
+    const track: ShadoTvCaptionTrack = {
+      id: row.id,
+      label: row.label,
+      languageCode: row.language_code,
+      kind: row.kind,
+      storagePath: row.storage_path,
+      sourceUrl: data.signedUrl,
+      isDefault: row.is_default,
+    }
+    const existing = tracksByVideo.get(row.video_id) ?? []
+    existing.push(track)
+    tracksByVideo.set(row.video_id, existing)
+  }))
+
+  tracksByVideo.forEach(tracks => {
+    tracks.sort((left, right) => Number(right.isDefault) - Number(left.isDefault) || left.label.localeCompare(right.label))
+  })
+  return tracksByVideo
+}
+
 async function hydrateArtworkAssets(
   client: WorkingClient,
   channels: ShadoTvChannel[],
@@ -385,7 +438,11 @@ function mapChannel(row: ShadoTvChannelRow): ShadoTvChannel {
   }
 }
 
-function mapVideo(row: ShadoTvVideoRow, featuresByVideo: Map<string, Set<'prime' | 'featured'>>): ShadoTvVideo {
+function mapVideo(
+  row: ShadoTvVideoRow,
+  featuresByVideo: Map<string, Set<'prime' | 'featured'>>,
+  captionTracks: ShadoTvCaptionTrack[] = []
+): ShadoTvVideo {
   const features = featuresByVideo.get(row.id)
   const status = normalizeStatus(row.release_status)
 
@@ -422,6 +479,7 @@ function mapVideo(row: ShadoTvVideoRow, featuresByVideo: Map<string, Set<'prime'
     featured: features?.has('featured') ?? false,
     prime: features?.has('prime') ?? false,
     trailerAvailable: Boolean(row.trailer_asset_url),
+    captionTracks,
   }
 }
 
@@ -477,6 +535,14 @@ async function fetchCatalogRows(admin = false) {
 
   if (featureError) throw featureError
 
+  const { data: captionRows, error: captionError } = await client
+    .from('shado_tv_captions')
+    .select('id, video_id, label, language_code, kind, storage_path, is_default')
+    .order('is_default', { ascending: false })
+    .order('label', { ascending: true })
+
+  if (captionError) throw captionError
+
   let contentQuery = client
     .from('shado_tv_content_blocks')
     .select('id, channel_id, section, slug, title, subtitle, body, date_label, visibility_status, sort_order, deleted_at, updated_at, created_at')
@@ -496,6 +562,7 @@ async function fetchCatalogRows(admin = false) {
     channelRows: (channelRows ?? []) as ShadoTvChannelRow[],
     videoRows: (videoRows ?? []) as ShadoTvVideoRow[],
     featureRows: (featureRows ?? []) as ShadoTvFeatureRow[],
+    captionRows: (captionRows ?? []) as ShadoTvCaptionRow[],
     contentRows: (contentRows ?? []) as ShadoTvContentBlockRow[],
   }
 }
@@ -513,9 +580,10 @@ export async function fetchShadoTvCatalog(): Promise<ShadoTvCatalog> {
     existing.add(feature.feature_type)
     featuresByVideo.set(feature.video_id, existing)
   })
+  const captionsByVideo = await hydrateCaptionTracks(rows.client, rows.captionRows)
 
   const mappedVideos = rows.videoRows
-    .map(row => mapVideo(row, featuresByVideo))
+    .map(row => mapVideo(row, featuresByVideo, captionsByVideo.get(row.id)))
     .filter(video => mappedChannels.some(channel => channel.id === video.channelId))
   const mappedContentItems = rows.contentRows
     .map(mapContentItem)
@@ -542,7 +610,8 @@ export async function fetchShadoTvAdminCatalog(): Promise<ShadoTvCatalog> {
     existing.add(feature.feature_type)
     featuresByVideo.set(feature.video_id, existing)
   })
-  const mappedVideos = rows.videoRows.map(row => mapVideo(row, featuresByVideo))
+  const captionsByVideo = await hydrateCaptionTracks(rows.client, rows.captionRows)
+  const mappedVideos = rows.videoRows.map(row => mapVideo(row, featuresByVideo, captionsByVideo.get(row.id)))
   const mappedContentItems = rows.contentRows.map(mapContentItem)
   const { channels, videos } = await hydrateArtworkAssets(rows.client, mappedChannels, mappedVideos)
 
@@ -1037,6 +1106,159 @@ export async function saveShadoTvWatchProgress(
     }, { onConflict: 'user_id,video_id' })
 
   if (error) throw error
+}
+
+export async function uploadShadoTvCaption(
+  videoId: string,
+  file: File,
+  options: { label: string; languageCode: string; kind?: 'captions' | 'subtitles' }
+) {
+  if (!file.name.toLowerCase().endsWith('.vtt')) {
+    throw new Error('Caption uploads must be WebVTT (.vtt) files.')
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    throw new Error('Caption files must be 2 MB or smaller.')
+  }
+
+  const source = await file.text()
+  if (!/^WEBVTT(?:\s|$)/.test(source.replace(/^\uFEFF/, ''))) {
+    throw new Error('Caption file is missing the WEBVTT header.')
+  }
+
+  const label = normalizeText(options.label, 80, 'Caption label', true)
+  const languageCode = options.languageCode.trim()
+  if (!/^[A-Za-z]{2,3}(?:[_-][A-Za-z0-9]{2,8})?$/.test(languageCode)) {
+    throw new Error('Use a valid caption language code, such as en or en-US.')
+  }
+
+  const { client, userId } = await getCurrentUserId('upload Shado TV captions')
+  const { data: existing, error: existingError } = await client
+    .from('shado_tv_captions')
+    .select('id')
+    .eq('video_id', videoId)
+    .limit(1)
+  if (existingError) throw existingError
+
+  const captionId = createShadoTvPlaybackId()
+  const storagePath = `${userId}/captions/${videoId}/${captionId}.vtt`
+  const { error: uploadError } = await client.storage
+    .from(SHADO_TV_BUCKET)
+    .upload(storagePath, file, {
+      cacheControl: '3600',
+      contentType: 'text/vtt; charset=utf-8',
+      upsert: false,
+    })
+  if (uploadError) throw uploadError
+
+  const { error: insertError } = await client
+    .from('shado_tv_captions')
+    .insert({
+      video_id: videoId,
+      label,
+      language_code: languageCode,
+      kind: options.kind ?? 'captions',
+      storage_path: storagePath,
+      is_default: !existing?.length,
+      created_by: userId,
+    })
+
+  if (insertError) {
+    await client.storage.from(SHADO_TV_BUCKET).remove([storagePath]).catch(() => undefined)
+    throw insertError
+  }
+
+  const { error: providerError } = await client.functions.invoke('shado-tv-bunny-upload', {
+    body: {
+      action: 'upload-caption',
+      videoId,
+      languageCode,
+      label,
+      captionsText: source,
+    },
+  })
+  if (providerError) {
+    await client.from('shado_tv_captions').delete().eq('storage_path', storagePath)
+    await client.storage.from(SHADO_TV_BUCKET).remove([storagePath]).catch(() => undefined)
+    throw providerError
+  }
+}
+
+export async function deleteShadoTvCaption(
+  videoId: string,
+  caption: Pick<ShadoTvCaptionTrack, 'id' | 'storagePath' | 'languageCode' | 'isDefault'>
+) {
+  const { client } = await getCurrentUserId('delete Shado TV captions')
+  const { error: providerError } = await client.functions.invoke('shado-tv-bunny-upload', {
+    body: {
+      action: 'delete-caption',
+      videoId,
+      languageCode: caption.languageCode,
+    },
+  })
+  if (providerError) throw providerError
+
+  const { error } = await client
+    .from('shado_tv_captions')
+    .delete()
+    .eq('id', caption.id)
+  if (error) throw error
+
+  if (caption.isDefault) {
+    const { data: replacement, error: replacementError } = await client
+      .from('shado_tv_captions')
+      .select('id')
+      .eq('video_id', videoId)
+      .order('created_at', { ascending: true })
+      .limit(1)
+    if (replacementError) throw replacementError
+    if (replacement?.[0]?.id) {
+      const { error: defaultError } = await client
+        .from('shado_tv_captions')
+        .update({ is_default: true })
+        .eq('id', replacement[0].id)
+      if (defaultError) throw defaultError
+    }
+  }
+
+  await client.storage.from(SHADO_TV_BUCKET).remove([caption.storagePath]).catch(() => undefined)
+}
+
+export async function recordShadoTvWatchEvent(
+  videoId: string,
+  sessionId: string,
+  eventType: ShadoTvWatchEventType,
+  positionSeconds: number,
+  durationSeconds?: number | null
+) {
+  const { client, userId } = await getCurrentUserId('record Shado TV playback')
+  const { error } = await client
+    .from('shado_tv_watch_events')
+    .insert({
+      client_event_id: createShadoTvPlaybackId(),
+      user_id: userId,
+      video_id: videoId,
+      session_id: sessionId,
+      event_type: eventType,
+      position_seconds: Math.max(0, Math.floor(positionSeconds)),
+      duration_seconds: durationSeconds == null ? null : Math.max(0, Math.floor(durationSeconds)),
+    })
+  if (error) throw error
+}
+
+export async function fetchShadoTvWatchAnalytics(): Promise<ShadoTvWatchAnalytics[]> {
+  const client = await getWorkingClient()
+  const { data, error } = await client.rpc('get_shado_tv_watch_analytics')
+  if (error) throw error
+
+  return ((data ?? []) as ShadoTvWatchAnalyticsRow[]).map(row => ({
+    videoId: row.video_id,
+    plays: Number(row.plays ?? 0),
+    uniqueViewers: Number(row.unique_viewers ?? 0),
+    completions: Number(row.completions ?? 0),
+    premiereJoins: Number(row.premiere_joins ?? 0),
+    averageWatchSeconds: Number(row.average_watch_seconds ?? 0),
+    lastWatchedAt: row.last_watched_at ?? null,
+  }))
 }
 
 export { fallbackCatalog as SHADO_TV_FALLBACK_CATALOG }

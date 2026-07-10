@@ -24,11 +24,20 @@ type CompleteUploadPayload = {
   bunnyVideoId?: string
 }
 
+type CaptionPayload = {
+  action?: 'upload-caption' | 'delete-caption'
+  videoId?: string
+  languageCode?: string
+  label?: string
+  captionsText?: string
+}
+
 type BunnyVideoRow = {
   id: string
   title: string
   subtitle: string | null
   provider_payload: Record<string, unknown> | null
+  provider_asset_id: string | null
   deleted_at: string | null
 }
 
@@ -72,7 +81,11 @@ const getSupabaseAdmin = () => {
   })
 }
 
-const authenticateOperator = async (req: Request) => {
+type OperatorAuthResult =
+  | { error: Response }
+  | { userId: string; supabase: ReturnType<typeof getSupabaseAdmin> }
+
+const authenticateOperator = async (req: Request): Promise<OperatorAuthResult> => {
   const authorization = req.headers.get('Authorization') ?? ''
   if (!authorization.startsWith('Bearer ')) {
     return { error: unauthorized('Authentication required.') }
@@ -127,7 +140,7 @@ const normalizeUuid = (value: unknown) =>
 const getVideo = async (supabase: ReturnType<typeof getSupabaseAdmin>, videoId: string) => {
   const { data, error } = await supabase
     .from('shado_tv_videos')
-    .select('id, title, subtitle, provider_payload, deleted_at')
+    .select('id, title, subtitle, provider_payload, provider_asset_id, deleted_at')
     .eq('id', videoId)
     .single()
 
@@ -330,6 +343,70 @@ const handleCompleteUpload = async (
   return json({ ok: true, action: 'complete-upload' })
 }
 
+const encodeBase64 = (value: string) => {
+  const bytes = new TextEncoder().encode(value)
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize))
+  }
+  return btoa(binary)
+}
+
+const handleCaption = async (req: Request, body: CaptionPayload): Promise<Response> => {
+  const auth = await authenticateOperator(req)
+  if ('error' in auth) return auth.error
+
+  const videoId = normalizeUuid(body.videoId)
+  const languageCode = typeof body.languageCode === 'string' ? body.languageCode.trim().toLowerCase() : ''
+  if (!videoId) return badRequest('videoId is required.')
+  if (!/^[a-z]{2}$/.test(languageCode)) {
+    return badRequest('Bunny captions require a two-letter ISO 639-1 language code.')
+  }
+
+  const appVideo = await getVideo(auth.supabase, videoId)
+  if (!appVideo.provider_asset_id) {
+    return json({ ok: true, action: body.action, skipped: 'no_bunny_video' })
+  }
+
+  const { libraryId, apiKey } = getBunnyEnv()
+  const endpoint = `https://video.bunnycdn.com/library/${encodeURIComponent(libraryId)}/videos/${encodeURIComponent(appVideo.provider_asset_id)}/captions/${encodeURIComponent(languageCode)}`
+  const isDelete = body.action === 'delete-caption'
+  const label = typeof body.label === 'string' ? body.label.trim().slice(0, 80) : ''
+  const captionsText = typeof body.captionsText === 'string' ? body.captionsText : ''
+
+  if (!isDelete) {
+    if (!label) return badRequest('Caption label is required.')
+    if (!/^WEBVTT(?:\s|$)/.test(captionsText.replace(/^\uFEFF/, ''))) {
+      return badRequest('Caption content must be valid WebVTT.')
+    }
+    if (new TextEncoder().encode(captionsText).byteLength > 2 * 1024 * 1024) {
+      return badRequest('Caption content must be 2 MB or smaller.')
+    }
+  }
+
+  const response = await fetch(endpoint, {
+    method: isDelete ? 'DELETE' : 'POST',
+    headers: {
+      AccessKey: apiKey,
+      ...(isDelete ? {} : { 'Content-Type': 'application/json' }),
+    },
+    body: isDelete ? undefined : JSON.stringify({
+      srclang: languageCode,
+      label,
+      captionsFile: encodeBase64(captionsText),
+    }),
+  })
+  const responseBody = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(typeof responseBody?.message === 'string'
+      ? responseBody.message
+      : `Bunny caption ${isDelete ? 'delete' : 'upload'} failed.`)
+  }
+
+  return json({ ok: true, action: body.action, languageCode })
+}
+
 serve(async req => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -340,12 +417,15 @@ serve(async req => {
   }
 
   try {
-    const body = await readJson<CreateUploadPayload | CompleteUploadPayload>(req)
+    const body = await readJson<CreateUploadPayload | CompleteUploadPayload | CaptionPayload>(req)
     if (body.action === 'create-upload') {
       return await handleCreateUpload(req, body)
     }
     if (body.action === 'complete-upload') {
       return await handleCompleteUpload(req, body)
+    }
+    if (body.action === 'upload-caption' || body.action === 'delete-caption') {
+      return await handleCaption(req, body)
     }
     return badRequest('Unsupported upload action.')
   } catch (error) {

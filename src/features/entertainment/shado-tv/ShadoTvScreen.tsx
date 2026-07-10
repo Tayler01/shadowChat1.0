@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, ExternalLink, Lock, Newspaper, Play, Radio, Users, Video } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { SHADO_TV_ASSETS } from './assets/manifest'
@@ -6,6 +6,7 @@ import {
   SHADO_TV_FALLBACK_CATALOG,
   fetchShadoTvCatalog,
   fetchShadoTvWatchProgress,
+  recordShadoTvWatchEvent,
   saveShadoTvWatchProgress,
 } from './api'
 import {
@@ -13,6 +14,8 @@ import {
   type ShadoTvVideo,
   type ShadoTvWatchProgress,
 } from './data'
+import { createShadoTvPlaybackId } from './playback'
+import { ShadoTvStreamFrame, type ShadoTvPlaybackEvent } from './ShadoTvStreamFrame'
 
 interface ShadoTvScreenProps {
   onExit: () => void
@@ -126,36 +129,6 @@ function getTrailerLabel(video: ShadoTvVideo) {
     return `Unlocks ${formatDateTime(video.trailerReleaseAt)}`
   }
   return 'Pending'
-}
-
-function isDirectVideoUrl(value?: string | null) {
-  return /\.(mp4|webm|mov|m4v)(?:$|[?#])/i.test(value ?? '')
-}
-
-function StreamFrame({ src, title }: { src: string; title: string }) {
-  if (isDirectVideoUrl(src)) {
-    return (
-      <video
-        src={src}
-        title={title}
-        className="absolute inset-0 h-full w-full bg-black object-contain"
-        controls
-        playsInline
-        preload="metadata"
-      />
-    )
-  }
-
-  return (
-    <iframe
-      src={src}
-      title={title}
-      className="absolute inset-0 h-full w-full border-0 bg-black"
-      allow="accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-      allowFullScreen
-      referrerPolicy="strict-origin-when-cross-origin"
-    />
-  )
 }
 
 function getPrimaryEpisode(videos: ShadoTvVideo[]) {
@@ -444,28 +417,49 @@ function EpisodeView({
   onProgressSaved: () => Promise<void>
 }) {
   const [message, setMessage] = useState<string | null>(null)
+  const playbackSessionId = useRef(createShadoTvPlaybackId())
   const status = getHubStatus(video)
   const target = getCountdownTarget(video)
   const canPlayVideo = (status === 'airing-now' || status === 'now-streaming') && Boolean(video.embedUrl)
   const trailerReady = isTrailerReleased(video)
 
-  const saveProgress = async () => {
-    if (status !== 'now-streaming') return
-    try {
-      await saveShadoTvWatchProgress(video.id, Math.max(1, progress?.positionSeconds ?? 0), video.durationSeconds ?? null)
-      await onProgressSaved()
-      setMessage('Resume point saved.')
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Unable to save resume point.')
-    }
-  }
+  const handlePlaybackEvent = useCallback((event: ShadoTvPlaybackEvent) => {
+    void (async () => {
+      const analytics = recordShadoTvWatchEvent(
+        video.id,
+        playbackSessionId.current,
+        event.type,
+        event.positionSeconds,
+        event.durationSeconds
+      )
+      const shouldSaveProgress = status === 'now-streaming'
+        && (event.type === 'progress' || event.type === 'pause' || event.type === 'complete')
+      const progressSave = shouldSaveProgress
+        ? saveShadoTvWatchProgress(video.id, event.positionSeconds, event.durationSeconds)
+        : Promise.resolve()
+
+      const results = await Promise.allSettled([analytics, progressSave])
+      if (results[1]?.status === 'rejected') {
+        setMessage('Playback continues, but the resume point could not be saved.')
+      } else if (shouldSaveProgress && (event.type === 'pause' || event.type === 'complete')) {
+        await onProgressSaved()
+      }
+    })()
+  }, [onProgressSaved, status, video.id])
 
   return (
     <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)_+_1.25rem)] pt-4">
       <section className="overflow-hidden rounded-lg border border-[#9a6a43]/30 bg-[#080806] shadow-[0_24px_62px_rgba(0,0,0,0.52)]">
         <div className="relative aspect-video bg-black">
           {canPlayVideo && video.embedUrl ? (
-            <StreamFrame src={video.embedUrl} title={video.title} />
+            <ShadoTvStreamFrame
+              src={video.embedUrl}
+              title={video.title}
+              video={video}
+              captions={video.captionTracks}
+              resumeAt={status === 'now-streaming' ? progress?.positionSeconds : 0}
+              onPlaybackEvent={handlePlaybackEvent}
+            />
           ) : (
             <>
               <img
@@ -493,14 +487,10 @@ function EpisodeView({
         <div className="border-t border-[#9a6a43]/30 bg-black/34 p-4">
           <div className="flex flex-wrap gap-2">
             {canPlayVideo ? (
-              <button
-                type="button"
-                onClick={() => void saveProgress()}
-                className="inline-flex h-10 items-center gap-2 rounded-full border border-[#9a6a43]/30 px-4 text-xs font-black uppercase tracking-[0.14em] text-[#f1dbc0] transition hover:border-[#9a6a43]/55"
-              >
+              <span className="inline-flex min-h-10 items-center gap-2 rounded-full border border-[#9a6a43]/30 px-4 text-xs font-black uppercase tracking-[0.14em] text-[#f1dbc0]">
                 <Play className="h-4 w-4 fill-current" />
-                {progress?.positionSeconds ? 'Resume' : 'Start'}
-              </button>
+                {status === 'airing-now' ? 'Live synchronized' : progress?.positionSeconds ? 'Resume enabled' : 'Ready to watch'}
+              </span>
             ) : (
               <span className="inline-flex min-h-10 items-center rounded-full border border-[#9a6a43]/30 bg-black/24 px-4 text-xs font-black uppercase tracking-[0.14em] text-[#dac5a3]/82">
                 {status === 'airing-now' ? 'Premiere mode ready' : status === 'now-streaming' ? 'Upload stream from Studio' : 'Countdown active'}
@@ -542,7 +532,7 @@ function EpisodeView({
           </div>
           <div className="relative aspect-video bg-black">
             {trailerReady && video.trailerAssetUrl ? (
-              <StreamFrame src={video.trailerAssetUrl} title={`${video.title} trailer`} />
+              <ShadoTvStreamFrame src={video.trailerAssetUrl} title={`${video.title} trailer`} />
             ) : (
               <>
                 <img src={SHADO_TV_ASSETS.crimpShrimp.statusComingSoon} alt="" className="h-full w-full object-cover opacity-90" loading="lazy" decoding="async" />
@@ -603,7 +593,7 @@ function TrailersView({ videos, onOpenEpisode }: { videos: ShadoTvVideo[]; onOpe
             </button>
             {isTrailerReleased(video) && video.trailerAssetUrl ? (
               <div className="relative aspect-video border-t border-[#9a6a43]/30 bg-black">
-                <StreamFrame src={video.trailerAssetUrl} title={`${video.title} trailer`} />
+                <ShadoTvStreamFrame src={video.trailerAssetUrl} title={`${video.title} trailer`} />
               </div>
             ) : null}
           </article>

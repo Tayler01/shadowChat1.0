@@ -8,6 +8,16 @@ export type ShadoTvOrientation = 'horizontal' | 'vertical'
 export type ShadoTvUploadStatus = 'none' | 'uploaded' | 'queued' | 'processing' | 'ready' | 'failed'
 export type ShadoTvContentSection = 'cast' | 'updates'
 
+export interface ShadoTvCaptionTrack {
+  id: string
+  label: string
+  languageCode: string
+  kind: 'captions' | 'subtitles'
+  storagePath: string
+  sourceUrl: string
+  isDefault: boolean
+}
+
 export interface ShadoTvChannel {
   id: string
   slug?: string
@@ -58,6 +68,19 @@ export interface ShadoTvVideo {
   featured?: boolean
   prime?: boolean
   trailerAvailable?: boolean
+  captionTracks?: ShadoTvCaptionTrack[]
+}
+
+export type ShadoTvWatchEventType = 'play' | 'pause' | 'progress' | 'complete' | 'premiere_join'
+
+export interface ShadoTvWatchAnalytics {
+  videoId: string
+  plays: number
+  uniqueViewers: number
+  completions: number
+  premiereJoins: number
+  averageWatchSeconds: number
+  lastWatchedAt?: string | null
 }
 
 export interface ShadoTvWatchProgress {
