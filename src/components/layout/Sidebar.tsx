@@ -108,6 +108,7 @@ export function Sidebar({
           <button
             key={item.id}
             onClick={() => onViewChange(item.id)}
+            aria-current={currentView === item.id ? 'page' : undefined}
             className={`
               flex w-full items-center space-x-3 rounded-[var(--radius-md)] px-3 py-3
               border transition-[background-color,border-color,box-shadow,color] duration-[var(--dur-med)]

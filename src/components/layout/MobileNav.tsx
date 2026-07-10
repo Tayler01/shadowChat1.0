@@ -56,6 +56,7 @@ export function MobileNav({
           <li key={item.id} className="relative flex-1">
             <button
               onClick={() => onViewChange(item.id)}
+              aria-current={currentView === item.id ? 'page' : undefined}
               className={`flex h-full w-full flex-col items-center justify-center rounded-[var(--radius-md)] px-0.5 py-1.5 text-[10px] transition-[background-color,box-shadow,color] duration-[var(--dur-med)] focus:outline-none ${
                 currentView === item.id
                   ? 'bg-[var(--nav-active-bg)] text-[var(--theme-accent-readable)] shadow-[var(--shadow-accent-soft)]'

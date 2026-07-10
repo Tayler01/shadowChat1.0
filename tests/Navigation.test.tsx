@@ -29,6 +29,14 @@ test('mobile navigation omits paused boards by default', () => {
   expect(onViewChange).toHaveBeenCalledWith('games')
 })
 
+test('mobile navigation exposes only the active destination as the current page', () => {
+  render(<MobileNav currentView="dms" onViewChange={jest.fn()} />)
+
+  expect(screen.getByRole('button', { name: 'DMs' })).toHaveAttribute('aria-current', 'page')
+  expect(screen.getByRole('button', { name: 'Chat' })).not.toHaveAttribute('aria-current')
+  expect(screen.getAllByRole('button').filter(button => button.hasAttribute('aria-current'))).toHaveLength(1)
+})
+
 test('mobile navigation can restore boards with an explicit feature flag', () => {
   const onViewChange = jest.fn()
   render(
@@ -64,6 +72,23 @@ test('sidebar navigation omits paused boards by default', () => {
 
   fireEvent.click(screen.getByText('Entertainment'))
   expect(onViewChange).toHaveBeenCalledWith('games')
+})
+
+test('sidebar exposes only the active destination as the current page', () => {
+  render(
+    <Sidebar
+      currentView="settings"
+      onViewChange={jest.fn()}
+      isDarkMode
+      onToggleDarkMode={jest.fn()}
+      isOpen
+      onClose={jest.fn()}
+    />
+  )
+
+  expect(screen.getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-current', 'page')
+  expect(screen.getByRole('button', { name: 'Chat' })).not.toHaveAttribute('aria-current')
+  expect(screen.getAllByRole('button').filter(button => button.hasAttribute('aria-current'))).toHaveLength(1)
 })
 
 test('sidebar can restore boards with an explicit feature flag', () => {
