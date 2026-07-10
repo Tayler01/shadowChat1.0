@@ -107,14 +107,20 @@ try {
   logLine(`Profiles: ${config.profiles.map(profile => profile.label).join(', ')}`)
 
   previewServer = await ensurePreviewServer()
-  browser = await chromium.launch({
-    headless: config.headless,
-    slowMo: config.slowMo,
-    args: ['--disable-dev-shm-usage'],
-  })
-
   for (const profile of config.profiles) {
-    await runLandscapeProfile(browser, profile)
+    browser = await chromium.launch({
+      headless: config.headless,
+      slowMo: config.slowMo,
+      args: ['--disable-dev-shm-usage'],
+    })
+    try {
+      await runLandscapeProfile(browser, profile)
+    } finally {
+      await withTimeout(browser.close(), 5_000, `${profile.label} browser cleanup`).catch(error => {
+        logLine(error.message)
+      })
+      browser = null
+    }
   }
 
   summary.finishedAt = new Date().toISOString()
@@ -149,7 +155,7 @@ async function runLandscapeProfile(browserInstance, profile) {
     userAgent: profile.userAgent,
     isMobile: profile.isMobile,
     hasTouch: profile.hasTouch,
-    serviceWorkers: 'block',
+    serviceWorkers: 'allow',
   })
 
   const page = await context.newPage()
@@ -172,7 +178,14 @@ async function runLandscapeProfile(browserInstance, profile) {
     })
     await page.locator('.shadow-runner-landscape-stage').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
     await assertLandscapeReady(page, profile)
-    await capture(page, `${profile.label}-01-title.png`)
+    await page.getByRole('button', { name: /Select Level/i }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+    await page.waitForFunction(() => {
+      const playfield = document.querySelector('.shadow-runner-playfield')
+      return Boolean(playfield && Number.parseFloat(getComputedStyle(playfield).opacity) >= 0.99)
+    }, null, { timeout: DEFAULT_TIMEOUT_MS })
+    await delay(120)
+    const titlePath = await capture(page, `${profile.label}-01-title.png`)
+    await assertImageNonBlank(titlePath, `${profile.label} title screenshot`)
 
     if (config.levelId === 'tutorial') {
       await page.getByRole('button', { name: LEVELS.tutorial.titleButton }).click()
@@ -181,24 +194,25 @@ async function runLandscapeProfile(browserInstance, profile) {
       await page.getByText('Level Map').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
       await capture(page, `${profile.label}-02-map.png`)
       await page.getByRole('button', { name: new RegExp(`${escapeRegExp(level.title)} details`, 'i') }).click()
-      await page.getByText(level.title).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+      await page.getByText(level.title, { exact: true }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
       await assertLevelDetails(page, level, profile)
       await capture(page, `${profile.label}-03-level-details.png`)
       await page.getByRole('button', { name: /^(Start|Replay)$/i }).click()
     }
 
-    await page.getByText(level.title).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+    await page.getByText(level.title, { exact: true }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
     await page.locator('.shadow-runner-game-stage canvas').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
     await page.waitForFunction(() => !document.body.innerText.includes('Loading Level'), null, {
       timeout: DEFAULT_TIMEOUT_MS,
     })
-    await delay(650)
+    await assertActiveGameplay(page, level, profile)
+    await delay(3000)
 
     const gameplayPath = await capture(page, `${profile.label}-04-gameplay.png`)
-    await assertActiveGameplay(page, level, profile)
     await assertCanvasVisible(page, profile)
     await assertHudAndControls(page, profile)
     await assertImageNonBlank(gameplayPath, `${profile.label} gameplay screenshot`)
+    await exerciseGameplayControls(page, level, profile)
 
     record(`${profile.label} ${config.levelId} phone smoke`, {
       viewport: profile.viewport,
@@ -224,9 +238,10 @@ async function assertLevelDetails(page, level, profile) {
 async function assertActiveGameplay(page, level, profile) {
   if (!level.gameplayChecks?.length) return
 
-  const pageText = await page.locator('body').innerText({ timeout: DEFAULT_TIMEOUT_MS })
   for (const pattern of level.gameplayChecks) {
-    assert(pattern.test(pageText), `${profile.label}: missing Level 5 gameplay text matching ${pattern}`)
+    await page.getByText(pattern).waitFor({ timeout: 4000 }).catch(() => {
+      throw new Error(`${profile.label}: missing Level 5 gameplay text matching ${pattern}`)
+    })
   }
   record(`${profile.label} ${config.levelId} gameplay copy visible`, {
     checks: level.gameplayChecks.map(pattern => pattern.source),
@@ -276,6 +291,7 @@ async function assertHudAndControls(page, profile) {
       pause: '[aria-label="Open pause menu"]',
       coins: '[aria-label^="Coins collected"]',
       score: '[aria-label^="Score"]',
+      health: '[aria-label^="Health"]',
     }
 
     const entries = Object.entries(selectors).map(([name, selector]) => {
@@ -312,6 +328,155 @@ async function assertHudAndControls(page, profile) {
   assert(attack.top > state.height * 0.34, `${profile.label}: attack control is too high for a phone layout`)
   assert(movement.width >= state.width * 0.3, `${profile.label}: movement zone is too narrow`)
   record(`${profile.label} HUD and controls visible`, state.boxes)
+}
+
+async function exerciseGameplayControls(page, level, profile) {
+  await page.waitForFunction(() => typeof window.__shadowRunnerDebug === 'function', null, {
+    timeout: DEFAULT_TIMEOUT_MS,
+  })
+
+  const before = await readShadowRunnerDebug(page)
+  assert(before?.player, `${profile.label}: missing Shadow Runner player debug state`)
+
+  await page.keyboard.down('KeyD')
+  await delay(260)
+  await page.keyboard.up('KeyD')
+  const afterRun = await readShadowRunnerDebug(page)
+  assert(
+    (afterRun?.player?.x ?? 0) >= (before.player.x ?? 0) + 30,
+    `${profile.label}: keyboard/touch movement bridge did not move the player`,
+  )
+
+  await page.keyboard.down('KeyS')
+  await delay(120)
+  const crouching = await readShadowRunnerDebug(page)
+  await page.keyboard.up('KeyS')
+  assert(
+    (crouching?.player?.bodyHeight ?? 99) < (afterRun?.player?.bodyHeight ?? 0),
+    `${profile.label}: crouch did not reduce the player hitbox`,
+  )
+
+  await delay(80)
+  await page.getByRole('button', { name: 'Jump' }).click()
+  await delay(120)
+  const jumping = await readShadowRunnerDebug(page)
+  assert(
+    (jumping?.player?.velocityY ?? 0) < 0,
+    `${profile.label}: jump did not produce upward velocity`,
+  )
+  await page.getByRole('button', { name: 'Sword attack' }).click()
+
+  await page.getByRole('button', { name: 'Open pause menu' }).click()
+  await page.getByText('Pause', { exact: true }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByRole('button', { name: /Resume/i }).click()
+
+  if (config.levelId === 'level-5') {
+    await assertLevelFiveCheckpointAndPools(page, profile)
+  }
+
+  await page.keyboard.press('Digit3')
+  await page.getByRole('dialog', { name: 'Level Complete' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await capture(page, `${profile.label}-07-complete.png`)
+  record(`${profile.label} ${config.levelId} gameplay controls and completion`, {
+    startX: before.player.x,
+    runX: afterRun?.player?.x,
+    jumpVelocityY: jumping?.player?.velocityY,
+    level: level.title,
+  })
+}
+
+async function assertLevelFiveCheckpointAndPools(page, profile) {
+  const checkpoints = [
+    { x: 2164, y: 584, id: 'fair-first-volley' },
+    { x: 4430, y: 614, id: 'fair-high-route' },
+    { x: 6234, y: 520, id: 'fair-gauntlet' },
+    { x: 8060, y: 584, id: 'fair-final-entry' },
+  ]
+
+  for (const checkpoint of checkpoints) {
+    await page.evaluate(({ x, y }) => window.__shadowRunnerQa?.teleport(x, y), checkpoint)
+    await page.waitForFunction(
+      expected => window.__shadowRunnerDebug?.().checkpointId === expected,
+      checkpoint.id,
+      { timeout: DEFAULT_TIMEOUT_MS },
+    )
+    if (checkpoint.id === 'fair-high-route' || checkpoint.id === 'fair-gauntlet') {
+      await delay(160)
+      await capture(page, `${profile.label}-05-${checkpoint.id}.png`)
+    }
+  }
+
+  await assertLevelFiveRouteSegments(page, profile)
+
+  await page.evaluate(() => window.__shadowRunnerQa?.teleport(6460, 584))
+  await delay(3200)
+  const snapshot = await readShadowRunnerDebug(page)
+  assert((snapshot?.pools?.projectiles.total ?? 99) <= 48, `${profile.label}: projectile pool exceeded its cap`)
+  assert((snapshot?.pools?.candleHazards.total ?? 99) <= 24, `${profile.label}: candle hazard pool exceeded its cap`)
+  record(`${profile.label} level-5 checkpoints and pools`, {
+    checkpointId: snapshot?.checkpointId,
+    pools: snapshot?.pools,
+  })
+}
+
+async function assertLevelFiveRouteSegments(page, profile) {
+  const crouchSegments = [
+    { label: 'first low cover', x: 2518, y: 584, targetX: 2708 },
+    { label: 'gauntlet low cover', x: 6888, y: 584, targetX: 7074 },
+  ]
+
+  for (const segment of crouchSegments) {
+    await page.evaluate(({ x, y }) => {
+      window.__shadowRunnerQa?.restore()
+      window.__shadowRunnerQa?.teleport(x, y)
+    }, segment)
+    await delay(100)
+    await page.keyboard.down('KeyS')
+    await page.keyboard.down('KeyD')
+    await delay(2600)
+    await page.keyboard.up('KeyD')
+    await page.keyboard.up('KeyS')
+    const snapshot = await readShadowRunnerDebug(page)
+    assert(
+      (snapshot?.player?.x ?? 0) >= segment.targetX,
+      `${profile.label}: Level 5 ${segment.label} stopped at x=${snapshot?.player?.x ?? 'missing'} before x=${segment.targetX}`,
+    )
+  }
+
+  await page.evaluate(() => {
+    window.__shadowRunnerQa?.restore()
+    window.__shadowRunnerQa?.teleport(4648, 614)
+  })
+  await delay(100)
+  await page.keyboard.down('KeyD')
+  await page.getByRole('button', { name: 'Jump' }).click()
+  await delay(700)
+  await page.keyboard.up('KeyD')
+  let snapshot = await readShadowRunnerDebug(page)
+  assert((snapshot?.player?.x ?? 0) >= 4780, `${profile.label}: Level 5 recovery platforms are not navigable`)
+
+  await page.evaluate(() => {
+    window.__shadowRunnerQa?.restore()
+    window.__shadowRunnerQa?.teleport(7770, 492)
+  })
+  await delay(100)
+  await page.keyboard.down('KeyD')
+  await page.getByRole('button', { name: 'Jump' }).click()
+  await delay(300)
+  await page.getByRole('button', { name: 'Jump' }).click()
+  await delay(700)
+  await page.keyboard.up('KeyD')
+  snapshot = await readShadowRunnerDebug(page)
+  assert((snapshot?.player?.x ?? 0) >= 8008, `${profile.label}: Level 5 final bridge is not navigable`)
+  await capture(page, `${profile.label}-06-route-segments.png`)
+
+  record(`${profile.label} level-5 route segments navigable`, {
+    finalBridgeX: snapshot?.player?.x,
+  })
+}
+
+async function readShadowRunnerDebug(page) {
+  return page.evaluate(() => window.__shadowRunnerDebug?.())
 }
 
 async function assertImageNonBlank(imagePath, label) {

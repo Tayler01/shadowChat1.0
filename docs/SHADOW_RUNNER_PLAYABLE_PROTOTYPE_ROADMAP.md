@@ -236,3 +236,38 @@ enemy, and reach a finish gate.
   Moonheart boost state, first enemy encounter, and `740x390` phone-landscape
   map/start checks. Evidence:
   `output/playwright/shadow-runner-polish-final-20260615/`.
+
+## July 10, 2026 - Production Gameplay Audit And Level 5 Recovery Pass
+
+- Audited all six playable routes (tutorial plus Campaign Levels 1-5) against
+  production builds with real run, crouch, jump, attack, pause/resume, and
+  completion input on phone-landscape viewports.
+- Added safe health-restoring checkpoints to every long campaign route so a
+  late fall no longer erases the full run. Respawns retain earned coins and
+  defeated enemies and include the existing damage grace window.
+- Rebalanced Candle Fair Ruins without flattening its identity: reduced the
+  overlapping volley lanes and enemy pileup, lowered elite health, fixed
+  off-platform patrol bounds, created real landing space before both crouch
+  corridors, and added a visible lower recovery chain beneath the high route.
+- Kept the final tilt bridge meaningful while proving its double-jump landing,
+  both crouch corridors, and the recovery chain with repeatable real-input
+  route-segment checks on iPhone-sized and Android-sized Chromium profiles.
+- Changed the HUD hearts to represent current health and added a separate
+  remaining-lives count. The previous HUD only showed lives and hid damage
+  until a life was lost.
+- Pooled and capped arrow/candle projectile and impact-hazard objects to prevent
+  unbounded growth during long waits in volley zones.
+- Removed service-worker fetch interception and worker-side Badging API calls
+  that could crash Android-sized Chromium during Shadow Runner startup. Push
+  notification delivery, notification cleanup, and foreground badge updates
+  remain intact; hashed assets use the browser/CDN cache.
+- Strengthened `scripts/shadow-runner-phone-smoke.mjs` so it waits for rendered
+  title assets, checks nonblank screenshots, enables the real service worker,
+  exercises controls and completion, verifies Level 5 checkpoints and pool
+  caps, and captures key route states for visual review.
+- Final evidence: `output/playwright/shadow-runner-audit-tutorial/`,
+  `output/playwright/shadow-runner-audit-level-1/`,
+  `output/playwright/shadow-runner-audit-level-2/`,
+  `output/playwright/shadow-runner-audit-level-3-final/`,
+  `output/playwright/shadow-runner-audit-level-4-final/`, and
+  `output/playwright/shadow-runner-audit-level-5-production/`.

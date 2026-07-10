@@ -53,7 +53,9 @@ const createHarness = ({ cachedResponse = null, cacheNames = [], fetchImpl }) =>
 
   const dispatchFetch = async (url) => {
     let responsePromise = null
-    listeners.get('fetch')({
+    const listener = listeners.get('fetch')
+    if (!listener) return null
+    listener({
       request: new Request(url),
       respondWith: promise => {
         responsePromise = Promise.resolve(promise)
@@ -75,11 +77,13 @@ const createHarness = ({ cachedResponse = null, cacheNames = [], fetchImpl }) =>
   return { deletedCacheNames, deleteCalls, dispatchActivate, dispatchFetch, putCalls }
 }
 
-test('activation deletes the previous v2 static-asset cache without touching v3', async () => {
+test('activation deletes previous static-asset caches without touching v5', async () => {
   const harness = createHarness({
     cacheNames: [
       'shadowchat-static-assets-v2',
       'shadowchat-static-assets-v3',
+      'shadowchat-static-assets-v4',
+      'shadowchat-static-assets-v5',
       'unrelated-cache',
     ],
     fetchImpl: async () => new Response('unused'),
@@ -87,74 +91,32 @@ test('activation deletes the previous v2 static-asset cache without touching v3'
 
   await harness.dispatchActivate()
 
-  assert.deepEqual(harness.deletedCacheNames, ['shadowchat-static-assets-v2'])
+  assert.deepEqual(harness.deletedCacheNames, [
+    'shadowchat-static-assets-v2',
+    'shadowchat-static-assets-v3',
+    'shadowchat-static-assets-v4',
+  ])
 })
 
-test('keeps content-hashed Vite assets cache-first', async () => {
-  const cached = new Response('cached build')
-  let fetchCalls = 0
-  const harness = createHarness({
-    cachedResponse: cached,
-    fetchImpl: async () => {
-      fetchCalls += 1
-      return new Response('network build')
-    },
-  })
-
-  const response = await harness.dispatchFetch(
-    'https://shadochat.online/assets/index-BeHIqrUR.js'
-  )
-
-  assert.equal(await response.text(), 'cached build')
-  assert.equal(fetchCalls, 0)
-})
-
-test('revalidates stable Shadow Runner assets before using cache', async () => {
+test('leaves build and game assets to the browser HTTP cache', async () => {
   const fetchCalls = []
   const harness = createHarness({
-    cachedResponse: new Response('stale game asset'),
     fetchImpl: async (request, init) => {
       fetchCalls.push({ request, init })
-      return new Response('fresh game asset', { status: 200 })
+      return new Response('network asset')
     },
   })
 
-  const response = await harness.dispatchFetch(
+  const buildResponse = await harness.dispatchFetch(
+    'https://shadochat.online/assets/index-BeHIqrUR.js'
+  )
+  const gameResponse = await harness.dispatchFetch(
     'https://shadochat.online/games/shadow-runner/audio/castle-bard.mp3'
   )
 
-  assert.equal(await response.text(), 'fresh game asset')
-  assert.equal(fetchCalls.length, 1)
-  assert.equal(fetchCalls[0].init.cache, 'no-cache')
-  assert.equal(harness.putCalls.length, 1)
-})
-
-test('uses the cached game asset only when revalidation cannot reach the network', async () => {
-  const harness = createHarness({
-    cachedResponse: new Response('offline game asset'),
-    fetchImpl: async () => {
-      throw new Error('offline')
-    },
-  })
-
-  const response = await harness.dispatchFetch(
-    'https://shadochat.online/games/shadow-runner/level-assets/level-1/background.webp'
-  )
-
-  assert.equal(await response.text(), 'offline game asset')
+  assert.equal(buildResponse, null)
+  assert.equal(gameResponse, null)
+  assert.equal(fetchCalls.length, 0)
   assert.equal(harness.putCalls.length, 0)
-})
-
-test('evicts a stable cached asset when the origin confirms it no longer exists', async () => {
-  const harness = createHarness({
-    cachedResponse: new Response('removed game asset'),
-    fetchImpl: async () => new Response('missing', { status: 404 }),
-  })
-
-  const response = await harness.dispatchFetch(
-    'https://shadochat.online/games/shadow-runner/removed.png'
-  )
-
-  assert.equal(response.status, 404)
-  assert.equal(harness.deleteCalls.length, 1)
+  assert.equal(harness.deleteCalls.length, 0)
 })

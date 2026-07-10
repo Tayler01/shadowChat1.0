@@ -23,8 +23,8 @@ describe('Shadow Runner level configuration contract', () => {
     expect(levelFive.crouchGates?.length).toBeGreaterThanOrEqual(3)
     expect(levelFive.tiltPlatforms.length).toBeGreaterThanOrEqual(levelFour.tiltPlatforms.length)
     expect(levelFive.shieldPickups?.length).toBeGreaterThanOrEqual(3)
-    expect(levelFive.arrowVolleys?.length).toBeGreaterThanOrEqual(8)
-    expect(levelFiveEnemies).toHaveLength(12)
+    expect(levelFive.arrowVolleys?.length).toBe(6)
+    expect(levelFiveEnemies).toHaveLength(10)
     expect([...enemyKinds]).toEqual(expect.arrayContaining([
       'clockwork-sentry',
       'barrel-roller',
@@ -35,6 +35,63 @@ describe('Shadow Runner level configuration contract', () => {
     expect(levelFiveEnemies.filter(enemy => enemy.kind === 'candle-jester')).toHaveLength(3)
     expect(campaignLevelFive?.playableLevelId).toBe('level-5')
     expect(campaignLevelFive?.mechanicPreview).toContain('Shielded archer volleys')
+  })
+
+  it('adds safe recovery checkpoints to every long campaign route', () => {
+    const expectedMinimums = new Map([
+      ['level-1', 1],
+      ['level-2', 1],
+      ['level-3', 2],
+      ['level-4', 3],
+      ['level-5', 4],
+    ])
+
+    expectedMinimums.forEach((minimum, levelId) => {
+      const level = SHADOW_RUNNER_LEVEL_CONFIGS[levelId as keyof typeof SHADOW_RUNNER_LEVEL_CONFIGS]
+      expect(level.checkpoints?.length).toBeGreaterThanOrEqual(minimum)
+      level.checkpoints?.forEach(checkpoint => {
+        const supportingPlatform = level.platforms.find(platform => (
+          checkpoint.x >= platform.x + 20
+          && checkpoint.x <= platform.x + platform.width - 20
+          && Math.abs(checkpoint.y - platform.y) <= 2
+        ))
+        expect(supportingPlatform?.id).toBeTruthy()
+      })
+    })
+  })
+
+  it('keeps Level 5 patrol routes on their supporting platforms', () => {
+    const levelFive = SHADOW_RUNNER_LEVEL_CONFIGS['level-5']
+    const movingEnemies = getShadowRunnerLevelEnemies(levelFive)
+      .filter(enemy => (enemy.patrolSpeed ?? 1) > 0)
+
+    movingEnemies.forEach(enemy => {
+      const supportingPlatform = levelFive.platforms.find(platform => (
+        enemy.x >= platform.x
+        && enemy.x <= platform.x + platform.width
+        && Math.abs(enemy.y - platform.y) <= 80
+      ))
+
+      expect(supportingPlatform?.id).toBeTruthy()
+      expect(enemy.patrolLeft).toBeGreaterThanOrEqual((supportingPlatform?.x ?? 0) + 20)
+      expect(enemy.patrolRight).toBeLessThanOrEqual(
+        (supportingPlatform?.x ?? 0) + (supportingPlatform?.width ?? 0) - 20,
+      )
+    })
+  })
+
+  it('provides landing room before Level 5 low-clearance cover', () => {
+    const levelFive = SHADOW_RUNNER_LEVEL_CONFIGS['level-5']
+    const platformById = new Map(levelFive.platforms.map(platform => [platform.id, platform]))
+    const gateById = new Map(levelFive.crouchGates?.map(gate => [gate.id, gate]))
+
+    const firstPocket = platformById.get('fair-volley-pocket-low')!
+    const firstCover = gateById.get('fair-volley-low-cover-a')!
+    const secondPocket = platformById.get('fair-gauntlet-pocket-low')!
+    const secondCover = gateById.get('fair-gauntlet-low-cover-a')!
+
+    expect(firstCover.x - firstPocket.x).toBeGreaterThanOrEqual(90)
+    expect(secondCover.x - secondPocket.x).toBeGreaterThanOrEqual(90)
   })
 
   it('uses a dedicated readable Candle Fair terrain treatment for Level 5 platforms', () => {

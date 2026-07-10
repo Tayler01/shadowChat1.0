@@ -90,7 +90,7 @@ function createEnemyState(enemy: ShadowRunnerEnemyConfig): ShadowRunnerEnemyStat
     patrolRight: enemy.patrolRight,
     patrolSpeed: enemy.patrolSpeed,
     lastShotAt: 0,
-    lastDamagedAt: 0,
+    lastDamagedAt: Number.NEGATIVE_INFINITY,
     attackUntil: 0,
   }
 }
@@ -106,7 +106,7 @@ function createEmptyEnemyState(): ShadowRunnerEnemyState {
     patrolLeft: 0,
     patrolRight: 0,
     lastShotAt: 0,
-    lastDamagedAt: 0,
+    lastDamagedAt: Number.NEGATIVE_INFINITY,
     attackUntil: 0,
   }
 }
@@ -133,7 +133,7 @@ export function createInitialShadowRunnerSimulation(
       boostGuardCharges: 0,
       shieldActiveUntil: 0,
       shieldGuardCharges: 0,
-      lastDamagedAt: 0,
+      lastDamagedAt: Number.NEGATIVE_INFINITY,
     },
     enemy: primaryEnemy,
     enemies: enemyStates,

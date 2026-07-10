@@ -70,7 +70,7 @@ describe('service worker app badge handling', () => {
     jest.useRealTimers()
   })
 
-  it('does not repaint a stale Android launcher badge after the app clears unread DMs', async () => {
+  it('leaves launcher badge painting to the foreground page', async () => {
     const { clearAppBadge, listeners, setAppBadge } = loadServiceWorker()
     const pending: Promise<unknown>[] = []
 
@@ -87,8 +87,7 @@ describe('service worker app badge handling', () => {
     })
 
     await flushPromises()
-    expect(setAppBadge).toHaveBeenCalledTimes(1)
-    expect(setAppBadge).toHaveBeenLastCalledWith(1)
+    expect(setAppBadge).not.toHaveBeenCalled()
 
     listeners.message({
       data: {
@@ -99,16 +98,16 @@ describe('service worker app badge handling', () => {
     })
 
     await flushPromises()
-    expect(clearAppBadge).toHaveBeenCalledTimes(1)
+    expect(clearAppBadge).not.toHaveBeenCalled()
 
     await jest.advanceTimersByTimeAsync(3000)
     await Promise.allSettled(pending)
 
-    expect(setAppBadge).toHaveBeenCalledTimes(1)
-    expect(clearAppBadge).toHaveBeenCalledTimes(1)
+    expect(setAppBadge).not.toHaveBeenCalled()
+    expect(clearAppBadge).not.toHaveBeenCalled()
   })
 
-  it('lets a newer push supersede older delayed badge retries', async () => {
+  it('does not invoke worker badge APIs during repeated pushes', async () => {
     const { listeners, setAppBadge } = loadServiceWorker()
     const pending: Promise<unknown>[] = []
 
@@ -134,10 +133,7 @@ describe('service worker app badge handling', () => {
     await jest.advanceTimersByTimeAsync(3000)
     await Promise.allSettled(pending)
 
-    expect(setAppBadge).toHaveBeenCalledWith(1)
-    expect(setAppBadge).toHaveBeenCalledWith(2)
-    expect(setAppBadge.mock.calls.filter(([count]) => count === 1)).toHaveLength(1)
-    expect(setAppBadge.mock.calls.filter(([count]) => count === 2)).toHaveLength(3)
+    expect(setAppBadge).not.toHaveBeenCalled()
   })
 
   it('closes only DM notifications for the conversation that was read', async () => {

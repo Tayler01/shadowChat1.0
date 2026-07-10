@@ -141,22 +141,25 @@ interface MovementPointerState extends MovementPointerOrigin {
   maxDistance: number
 }
 
-function LifePips({ current, max }: { current: number; max: number }) {
+function HealthAndLives({ health, maxHealth, lives }: { health: number; maxHealth: number; lives: number }) {
   return (
     <span
-      aria-label={`Lives ${current} of ${max}`}
+      aria-label={`Health ${health} of ${maxHealth}, lives ${lives}`}
       className="flex items-center justify-center gap-1"
     >
-      {Array.from({ length: max }, (_item, index) => (
+      {Array.from({ length: maxHealth }, (_item, index) => (
         <img
           key={index}
-          src={index < current ? SHADOW_RUNNER_ASSETS.gameplay.heartFull : SHADOW_RUNNER_ASSETS.gameplay.heartEmpty}
+          src={index < health ? SHADOW_RUNNER_ASSETS.gameplay.heartFull : SHADOW_RUNNER_ASSETS.gameplay.heartEmpty}
           alt=""
           aria-hidden="true"
           className="h-[clamp(1rem,3vw,1.55rem)] w-auto object-contain drop-shadow-[0_2px_0_rgba(0,0,0,0.42)]"
           draggable={false}
         />
       ))}
+      <span className="ml-0.5 text-[0.5rem] font-black uppercase tracking-[0.04em] text-[#f0d381] min-[740px]:text-[0.58rem]">
+        x{lives}
+      </span>
     </span>
   )
 }
@@ -708,7 +711,7 @@ export function ShadowRunnerGame({
             draggable={false}
           />
           <div className="absolute inset-y-[21%] left-[14.5%] flex w-[30%] items-center justify-center">
-            <LifePips current={hud.lives} max={hud.maxLives} />
+            <HealthAndLives health={hud.health} maxHealth={hud.maxHealth} lives={hud.lives} />
           </div>
           <div
             aria-label={`Coins collected ${hud.coins}`}

@@ -1,7 +1,5 @@
-const STATIC_ASSET_CACHE = 'shadowchat-static-assets-v3'
+const STATIC_ASSET_CACHE = 'shadowchat-static-assets-v5'
 const STATIC_ASSET_CACHE_PREFIX = 'shadowchat-static-assets-'
-const CACHEABLE_STATIC_ASSET_EXTENSIONS = /\.(?:avif|css|gif|jpe?g|js|json|mp3|png|svg|webp|woff2?)$/i
-const HASHED_BUILD_ASSET_PATH = /^\/assets\/.+-[a-z0-9_-]{8,}\.[^/]+$/i
 
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting())
@@ -28,79 +26,6 @@ self.addEventListener('activate', (event) => {
     self.clients.claim(),
     cleanupOldStaticAssetCaches(),
   ]))
-})
-
-const isCacheableStaticAssetRequest = (request) => {
-  if (!request || request.method !== 'GET') {
-    return false
-  }
-
-  try {
-    const url = new URL(request.url)
-    if (url.origin !== self.location.origin || !CACHEABLE_STATIC_ASSET_EXTENSIONS.test(url.pathname)) {
-      return false
-    }
-
-    return url.pathname.startsWith('/assets/') || url.pathname.startsWith('/games/shadow-runner/')
-  } catch {
-    return false
-  }
-}
-
-const cacheFirst = async (request) => {
-  const cache = await caches.open(STATIC_ASSET_CACHE)
-  const cached = await cache.match(request)
-  if (cached) {
-    return cached
-  }
-
-  const response = await fetch(request)
-  if (response && response.ok) {
-    await cache.put(request, response.clone())
-  }
-  return response
-}
-
-const revalidateFirst = async (request) => {
-  const cache = await caches.open(STATIC_ASSET_CACHE)
-
-  try {
-    const response = await fetch(request, { cache: 'no-cache' })
-    if (response && response.ok) {
-      await cache.put(request, response.clone())
-    } else if (response?.status === 404) {
-      await cache.delete(request)
-    }
-    return response
-  } catch (error) {
-    const cached = await cache.match(request)
-    if (cached) {
-      return cached
-    }
-    throw error
-  }
-}
-
-const getStaticAssetResponse = (request) => {
-  const url = new URL(request.url)
-  return HASHED_BUILD_ASSET_PATH.test(url.pathname)
-    ? cacheFirst(request)
-    : revalidateFirst(request)
-}
-
-self.addEventListener('fetch', (event) => {
-  if (
-    !event.respondWith ||
-    typeof caches === 'undefined' ||
-    typeof fetch === 'undefined' ||
-    !isCacheableStaticAssetRequest(event.request)
-  ) {
-    return
-  }
-
-  event.respondWith(
-    getStaticAssetResponse(event.request)
-  )
 })
 
 const normalizeBadgeCount = (value) => {
@@ -130,26 +55,9 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 let badgeUpdateVersion = 0
 
-const applyAppBadge = async (count) => {
-  const badgeNavigator =
-    self.navigator ||
-    (typeof navigator !== 'undefined' ? navigator : null)
-
-  if (!badgeNavigator) {
-    return
-  }
-
-  const normalizedCount = normalizeBadgeCount(count)
-
-  try {
-    if (normalizedCount > 0 && 'setAppBadge' in badgeNavigator) {
-      await badgeNavigator.setAppBadge(normalizedCount)
-    } else if (normalizedCount === 0 && 'clearAppBadge' in badgeNavigator) {
-      await badgeNavigator.clearAppBadge()
-    }
-  } catch {
-    // Badging is best-effort; notification delivery should continue.
-  }
+const applyAppBadge = async () => {
+  // Foreground pages own the Badging API. Invoking it from the worker crashes
+  // some Chromium mobile runtimes while the game shell is starting.
 }
 
 const updateAppBadge = async (count) => {

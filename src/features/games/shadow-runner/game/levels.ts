@@ -26,6 +26,10 @@ export interface ShadowRunnerPoint {
   y: number
 }
 
+export interface ShadowRunnerCheckpoint extends ShadowRunnerPoint {
+  label: string
+}
+
 export interface ShadowRunnerBodyBounds {
   left: number
   right: number
@@ -91,6 +95,7 @@ export interface ShadowRunnerLevelConfig {
   worldWidth: number
   worldHeight: number
   playerStart: ShadowRunnerPoint
+  checkpoints?: ShadowRunnerCheckpoint[]
   platforms: ShadowRunnerRect[]
   tiltPlatforms: ShadowRunnerTiltPlatform[]
   crouchGates?: ShadowRunnerCrouchGate[]
@@ -168,6 +173,9 @@ export const SHADOW_RUNNER_FULL_LEVEL_ONE: ShadowRunnerLevelConfig = {
   worldWidth: 2920,
   worldHeight: 540,
   playerStart: { id: 'start', x: 112, y: 404 },
+  checkpoints: [
+    { id: 'east-gate-midpoint', label: 'Courtyard', x: 1950, y: 404 },
+  ],
   enemies: [
     {
       id: 'gate-clockwork-sentry',
@@ -237,6 +245,9 @@ export const SHADOW_RUNNER_LEVEL_TWO: ShadowRunnerLevelConfig = {
   worldWidth: 3420,
   worldHeight: 540,
   playerStart: { id: 'start', x: 120, y: 396 },
+  checkpoints: [
+    { id: 'market-midpoint', label: 'Upper Market', x: 2268, y: 390 },
+  ],
   enemies: [
     {
       id: 'market-roof-sentry-a',
@@ -323,11 +334,15 @@ export const SHADOW_RUNNER_LEVEL_THREE: ShadowRunnerLevelConfig = {
   worldWidth: 4720,
   worldHeight: 540,
   playerStart: { id: 'start', x: 118, y: 400 },
+  checkpoints: [
+    { id: 'viaduct-midpoint', label: 'Center Arch', x: 2424, y: 412 },
+    { id: 'viaduct-final-run', label: 'East Viaduct', x: 3618, y: 404 },
+  ],
   enemies: [
     {
       id: 'viaduct-barrel-a',
       kind: 'barrel-roller',
-      x: 870,
+      x: 930,
       y: 370,
       health: 2,
       maxHealth: 2,
@@ -448,6 +463,11 @@ export const SHADOW_RUNNER_LEVEL_FOUR: ShadowRunnerLevelConfig = {
   worldWidth: 6120,
   worldHeight: 540,
   playerStart: { id: 'start', x: 118, y: 398 },
+  checkpoints: [
+    { id: 'archive-mid-landing', label: 'Archive Landing', x: 2110, y: 390 },
+    { id: 'archive-thief-lane', label: 'Record Hall', x: 4080, y: 400 },
+    { id: 'archive-gauntlet', label: 'Upper Archive', x: 4900, y: 420 },
+  ],
   enemies: [
     {
       id: 'archive-sentry-a',
@@ -631,6 +651,12 @@ export const SHADOW_RUNNER_LEVEL_FIVE: ShadowRunnerLevelConfig = {
   worldWidth: 8900,
   worldHeight: 720,
   playerStart: { id: 'start', x: 118, y: 552 },
+  checkpoints: [
+    { id: 'fair-first-volley', label: 'Fair Entrance', x: 2158, y: 584 },
+    { id: 'fair-high-route', label: 'Candle Walk', x: 4420, y: 614 },
+    { id: 'fair-gauntlet', label: 'Ruined Gauntlet', x: 6226, y: 520 },
+    { id: 'fair-final-entry', label: 'East Gate Approach', x: 8050, y: 584 },
+  ],
   enemies: [
     {
       id: 'fair-start-sentry',
@@ -639,8 +665,8 @@ export const SHADOW_RUNNER_LEVEL_FIVE: ShadowRunnerLevelConfig = {
       y: 548,
       health: 3,
       maxHealth: 3,
-      patrolLeft: 1058,
-      patrolRight: 1264,
+      patrolLeft: 1080,
+      patrolRight: 1268,
       direction: -1,
       patrolSpeed: 98,
     },
@@ -651,25 +677,10 @@ export const SHADOW_RUNNER_LEVEL_FIVE: ShadowRunnerLevelConfig = {
       y: 548,
       health: 3,
       maxHealth: 3,
-      patrolLeft: 1718,
-      patrolRight: 1906,
+      patrolLeft: 1744,
+      patrolRight: 1904,
       direction: 1,
       patrolSpeed: 158,
-    },
-    {
-      id: 'fair-offscreen-archer-a',
-      kind: 'tower-archer',
-      x: 3168,
-      y: 512,
-      health: 4,
-      maxHealth: 4,
-      patrolLeft: 3128,
-      patrolRight: 3210,
-      direction: -1,
-      patrolSpeed: 0,
-      attackRange: 620,
-      attackCooldownMs: 1240,
-      projectileSpeed: 470,
     },
     {
       id: 'fair-candle-jester-a',
@@ -678,8 +689,8 @@ export const SHADOW_RUNNER_LEVEL_FIVE: ShadowRunnerLevelConfig = {
       y: 548,
       health: 3,
       maxHealth: 3,
-      patrolLeft: 3380,
-      patrolRight: 3738,
+      patrolLeft: 3404,
+      patrolRight: 3744,
       direction: -1,
       patrolSpeed: 92,
       attackRange: 350,
@@ -693,8 +704,8 @@ export const SHADOW_RUNNER_LEVEL_FIVE: ShadowRunnerLevelConfig = {
       y: 548,
       health: 3,
       maxHealth: 3,
-      patrolLeft: 3860,
-      patrolRight: 4200,
+      patrolLeft: 3914,
+      patrolRight: 4212,
       direction: 1,
       patrolSpeed: 172,
     },
@@ -705,8 +716,8 @@ export const SHADOW_RUNNER_LEVEL_FIVE: ShadowRunnerLevelConfig = {
       y: 430,
       health: 3,
       maxHealth: 3,
-      patrolLeft: 4385,
-      patrolRight: 4668,
+      patrolLeft: 4410,
+      patrolRight: 4654,
       direction: -1,
       patrolSpeed: 88,
       attackRange: 338,
@@ -718,8 +729,8 @@ export const SHADOW_RUNNER_LEVEL_FIVE: ShadowRunnerLevelConfig = {
       kind: 'tower-archer',
       x: 5246,
       y: 168,
-      health: 4,
-      maxHealth: 4,
+      health: 3,
+      maxHealth: 3,
       patrolLeft: 5200,
       patrolRight: 5300,
       direction: -1,
@@ -735,8 +746,8 @@ export const SHADOW_RUNNER_LEVEL_FIVE: ShadowRunnerLevelConfig = {
       y: 560,
       health: 3,
       maxHealth: 3,
-      patrolLeft: 5712,
-      patrolRight: 6058,
+      patrolLeft: 5768,
+      patrolRight: 6054,
       direction: 1,
       patrolSpeed: 168,
     },
@@ -747,8 +758,8 @@ export const SHADOW_RUNNER_LEVEL_FIVE: ShadowRunnerLevelConfig = {
       y: 548,
       health: 3,
       maxHealth: 3,
-      patrolLeft: 6350,
-      patrolRight: 6718,
+      patrolLeft: 6398,
+      patrolRight: 6684,
       direction: -1,
       patrolSpeed: 94,
       attackRange: 370,
@@ -760,8 +771,8 @@ export const SHADOW_RUNNER_LEVEL_FIVE: ShadowRunnerLevelConfig = {
       kind: 'tower-archer',
       x: 7468,
       y: 472,
-      health: 4,
-      maxHealth: 4,
+      health: 3,
+      maxHealth: 3,
       patrolLeft: 7418,
       patrolRight: 7522,
       direction: -1,
@@ -775,24 +786,12 @@ export const SHADOW_RUNNER_LEVEL_FIVE: ShadowRunnerLevelConfig = {
       kind: 'clockwork-sentry',
       x: 8350,
       y: 548,
-      health: 4,
-      maxHealth: 4,
-      patrolLeft: 8268,
-      patrolRight: 8508,
-      direction: 1,
-      patrolSpeed: 96,
-    },
-    {
-      id: 'fair-final-thief',
-      kind: 'scroll-thief',
-      x: 8588,
-      y: 548,
       health: 3,
       maxHealth: 3,
-      patrolLeft: 8468,
-      patrolRight: 8682,
-      direction: -1,
-      patrolSpeed: 176,
+      patrolLeft: 8290,
+      patrolRight: 8604,
+      direction: 1,
+      patrolSpeed: 96,
     },
   ],
   finish: { id: 'fair-east-gate', x: 8752, y: 414, width: 74, height: 150 },
@@ -806,7 +805,7 @@ export const SHADOW_RUNNER_LEVEL_FIVE: ShadowRunnerLevelConfig = {
     { id: 'fair-bridge-entry', visualId: 'candle-small-plank', x: 1716, y: 584, width: 216, height: 70, terrainSet: 'candleBright' },
     { id: 'fair-shield-table-a', visualId: 'candle-high-shelf', x: 1948, y: 520, width: 184, height: 42, terrainSet: 'candleShelf' },
     { id: 'fair-volley-floor-a', visualId: 'candle-wide-stage', x: 2126, y: 584, width: 224, height: 76, terrainSet: 'candleBright' },
-    { id: 'fair-volley-pocket-low', visualId: 'candle-lintel', x: 2474, y: 584, width: 204, height: 70, terrainSet: 'candleBright' },
+    { id: 'fair-volley-pocket-low', visualId: 'candle-lintel', x: 2440, y: 584, width: 300, height: 70, terrainSet: 'candleBright' },
     { id: 'fair-volley-pocket-high', visualId: 'candle-high-shelf', x: 2608, y: 396, width: 194, height: 42, terrainSet: 'candleShelf' },
     { id: 'fair-archer-perch-a', visualId: 'candle-hanging-shelf', x: 3096, y: 546, width: 236, height: 54, terrainSet: 'candleShelf' },
     { id: 'fair-jester-floor-a', visualId: 'candle-wide-stage', x: 3376, y: 584, width: 396, height: 76, terrainSet: 'candleBright' },
@@ -816,10 +815,13 @@ export const SHADOW_RUNNER_LEVEL_FIVE: ShadowRunnerLevelConfig = {
     { id: 'fair-high-step-b', visualId: 'candle-small-plank', x: 4948, y: 332, width: 172, height: 40, terrainSet: 'candleShelf' },
     { id: 'fair-high-archer-perch', visualId: 'candle-hanging-shelf', x: 5178, y: 204, width: 228, height: 44, terrainSet: 'candleShelf' },
     { id: 'fair-high-step-c', visualId: 'candle-small-plank', x: 5488, y: 314, width: 178, height: 40, terrainSet: 'candleShelf' },
+    { id: 'fair-high-recovery-a', visualId: 'candle-rubble-floor', x: 4390, y: 614, width: 300, height: 58, terrainSet: 'candleBright' },
+    { id: 'fair-high-recovery-b', visualId: 'candle-wide-stage', x: 4740, y: 614, width: 350, height: 58, terrainSet: 'candleBright' },
+    { id: 'fair-high-recovery-c', visualId: 'candle-rubble-floor', x: 5140, y: 614, width: 430, height: 58, terrainSet: 'candleBright' },
     { id: 'fair-high-drop-floor', visualId: 'candle-rubble-floor', x: 5740, y: 596, width: 342, height: 72, terrainSet: 'candleBright' },
     { id: 'fair-shield-table-b', visualId: 'candle-high-shelf', x: 6202, y: 520, width: 184, height: 42, terrainSet: 'candleShelf' },
     { id: 'fair-gauntlet-floor-a', visualId: 'candle-wide-stage', x: 6370, y: 584, width: 342, height: 76, terrainSet: 'candleBright' },
-    { id: 'fair-gauntlet-pocket-low', visualId: 'candle-lintel', x: 6824, y: 584, width: 238, height: 72, terrainSet: 'candleBright' },
+    { id: 'fair-gauntlet-pocket-low', visualId: 'candle-lintel', x: 6796, y: 584, width: 310, height: 72, terrainSet: 'candleBright' },
     { id: 'fair-gauntlet-pocket-high', visualId: 'candle-high-shelf', x: 7048, y: 386, width: 198, height: 42, terrainSet: 'candleShelf' },
     { id: 'fair-gauntlet-archer-perch', visualId: 'candle-hanging-shelf', x: 7394, y: 508, width: 250, height: 52, terrainSet: 'candleShelf' },
     { id: 'fair-final-entry', visualId: 'candle-rubble-floor', x: 8016, y: 584, width: 214, height: 72, terrainSet: 'candleBright' },
@@ -833,18 +835,18 @@ export const SHADOW_RUNNER_LEVEL_FIVE: ShadowRunnerLevelConfig = {
   ],
   crouchGates: [
     { id: 'fair-low-canopy-a', x: 642, y: 414, width: 284, height: 116, terrainSet: 'candleBright' },
-    { id: 'fair-volley-low-cover-a', x: 2436, y: 424, width: 180, height: 106, terrainSet: 'candleBright' },
-    { id: 'fair-gauntlet-low-cover-a', x: 6856, y: 424, width: 164, height: 106, terrainSet: 'candleBright' },
+    { id: 'fair-volley-low-cover-a', x: 2534, y: 424, width: 176, height: 106, terrainSet: 'candleBright' },
+    { id: 'fair-gauntlet-low-cover-a', x: 6906, y: 424, width: 170, height: 106, terrainSet: 'candleBright' },
   ],
   spikes: [
     { id: 'fair-start-pit', x: 1000, y: 612, width: 72, height: 28 },
     { id: 'fair-tilt-pit-a', x: 1288, y: 612, width: 72, height: 28 },
     { id: 'fair-tilt-pit-b', x: 1490, y: 612, width: 86, height: 28 },
     { id: 'fair-bridge-skip-spikes', x: 1636, y: 612, width: 72, height: 28 },
-    { id: 'fair-volley-spikes-a', x: 2358, y: 612, width: 110, height: 28 },
+    { id: 'fair-volley-spikes-a', x: 2358, y: 612, width: 74, height: 28 },
     { id: 'fair-jester-spikes-a', x: 3778, y: 610, width: 108, height: 28 },
     { id: 'fair-high-drop-spikes-a', x: 5660, y: 628, width: 78, height: 28 },
-    { id: 'fair-gauntlet-spikes-a', x: 6718, y: 610, width: 98, height: 28 },
+    { id: 'fair-gauntlet-spikes-a', x: 6718, y: 610, width: 72, height: 28 },
     { id: 'fair-gauntlet-spikes-b', x: 7252, y: 610, width: 86, height: 28 },
     { id: 'fair-final-tilt-spikes-a', x: 7608, y: 612, width: 76, height: 28 },
     { id: 'fair-final-tilt-spikes-b', x: 7854, y: 612, width: 152, height: 28 },
@@ -905,14 +907,12 @@ export const SHADOW_RUNNER_LEVEL_FIVE: ShadowRunnerLevelConfig = {
     { id: 'candle-ward-final-bridge', x: 8054, y: 520, scoreValue: 85, durationMs: 8600, guardCharges: 5 },
   ],
   arrowVolleys: [
-    { id: 'fair-volley-a-head', x: 1940, y: 184, width: 1180, height: 392, direction: -1, spawnX: 3240, laneY: 448, intervalMs: 1380, delayMs: 160, speed: 470, lifetimeMs: 3600 },
-    { id: 'fair-volley-a-crouch', x: 1940, y: 184, width: 1180, height: 392, direction: -1, spawnX: 3240, laneY: 514, intervalMs: 1640, delayMs: 560, speed: 455, lifetimeMs: 3600 },
-    { id: 'fair-volley-a-jump', x: 1940, y: 184, width: 1180, height: 392, direction: -1, spawnX: 3240, laneY: 332, intervalMs: 1780, delayMs: 940, speed: 500, lifetimeMs: 3500 },
-    { id: 'fair-volley-a-high', x: 2260, y: 160, width: 760, height: 330, direction: -1, spawnX: 3240, laneY: 270, intervalMs: 2060, delayMs: 1260, speed: 510, lifetimeMs: 3400 },
-    { id: 'fair-volley-b-head', x: 6240, y: 188, width: 1260, height: 396, direction: -1, spawnX: 7580, laneY: 438, intervalMs: 1280, delayMs: 260, speed: 500, lifetimeMs: 3800 },
-    { id: 'fair-volley-b-crouch', x: 6240, y: 188, width: 1260, height: 396, direction: -1, spawnX: 7580, laneY: 514, intervalMs: 1540, delayMs: 680, speed: 485, lifetimeMs: 3800 },
-    { id: 'fair-volley-b-jump', x: 6240, y: 188, width: 1260, height: 396, direction: -1, spawnX: 7580, laneY: 316, intervalMs: 1620, delayMs: 1060, speed: 520, lifetimeMs: 3700 },
-    { id: 'fair-volley-b-high', x: 6760, y: 150, width: 740, height: 338, direction: -1, spawnX: 7580, laneY: 252, intervalMs: 1840, delayMs: 1380, speed: 540, lifetimeMs: 3600 },
+    { id: 'fair-volley-a-head', x: 1940, y: 184, width: 1180, height: 392, direction: -1, spawnX: 3240, laneY: 448, intervalMs: 1640, delayMs: 260, speed: 440, lifetimeMs: 3700 },
+    { id: 'fair-volley-a-crouch', x: 1940, y: 184, width: 1180, height: 392, direction: -1, spawnX: 3240, laneY: 514, intervalMs: 1880, delayMs: 780, speed: 425, lifetimeMs: 3700 },
+    { id: 'fair-volley-a-jump', x: 1940, y: 184, width: 1180, height: 392, direction: -1, spawnX: 3240, laneY: 332, intervalMs: 2040, delayMs: 1320, speed: 460, lifetimeMs: 3600 },
+    { id: 'fair-volley-b-head', x: 6240, y: 188, width: 1260, height: 396, direction: -1, spawnX: 7580, laneY: 438, intervalMs: 1580, delayMs: 320, speed: 455, lifetimeMs: 3900 },
+    { id: 'fair-volley-b-crouch', x: 6240, y: 188, width: 1260, height: 396, direction: -1, spawnX: 7580, laneY: 514, intervalMs: 1840, delayMs: 860, speed: 440, lifetimeMs: 3900 },
+    { id: 'fair-volley-b-jump', x: 6240, y: 188, width: 1260, height: 396, direction: -1, spawnX: 7580, laneY: 316, intervalMs: 1980, delayMs: 1420, speed: 475, lifetimeMs: 3800 },
   ],
 }
 

@@ -35,6 +35,11 @@ describe('Shadow Runner phone smoke script', () => {
     expect(compactScript).toContain('shield up')
     expect(compactScript).toContain('assertleveldetails')
     expect(compactScript).toContain('assertactivegameplay')
+    expect(compactScript).toContain('exercisegameplaycontrols')
+    expect(compactScript).toContain('__shadowrunnerdebug')
+    expect(compactScript).toContain('fair-final-entry')
+    expect(compactScript).toContain('route segments navigable')
+    expect(compactScript).toContain('projectile pool exceeded its cap')
   })
 
   it('bounds browser and preview cleanup so passed runs can exit', () => {
