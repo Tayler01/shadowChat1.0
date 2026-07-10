@@ -417,7 +417,6 @@ export const ensureBridgeUserForDevice = async (
       user_metadata: {
         username,
         display_name: displayName,
-        full_name: displayName,
         account_type: 'esp_bridge',
         bridge_device_id: device.id,
       },
@@ -438,10 +437,8 @@ export const ensureBridgeUserForDevice = async (
     .from('users')
     .upsert({
       id: bridgeUserId,
-      email,
       username,
       display_name: displayName,
-      full_name: displayName,
       color: '#D4AF37',
       chat_color: '#D4AF37',
       status: 'online',

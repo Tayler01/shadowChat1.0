@@ -237,7 +237,6 @@ export const ensureShadoAIProfile = async (supabase: SupabaseAdminClient) => {
         user_metadata: {
           username: SHADO_AI_USERNAME,
           display_name: SHADO_AI_DISPLAY_NAME,
-          full_name: SHADO_AI_DISPLAY_NAME,
           account_type: 'ai_assistant',
         },
       })
@@ -257,10 +256,8 @@ export const ensureShadoAIProfile = async (supabase: SupabaseAdminClient) => {
     .from('users')
     .upsert({
       id: shadoUserId,
-      email: SHADO_AI_EMAIL,
       username: SHADO_AI_USERNAME,
       display_name: SHADO_AI_DISPLAY_NAME,
-      full_name: SHADO_AI_DISPLAY_NAME,
       avatar_url: null,
       color: '#D4AF37',
       chat_color: '#D4AF37',
