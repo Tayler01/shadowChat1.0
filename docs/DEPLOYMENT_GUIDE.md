@@ -19,12 +19,20 @@ frontend. Known deployment hardening that is still pending is ranked in the
 audit backlog, including Netlify security headers/CSP and physical-device PWA
 validation.
 
-Netlify Git builds are intentionally stopped for this project. The backend-first
-GitHub Actions workflow is the only production publisher; it uploads the already
-validated build with the Netlify CLI after Supabase alignment succeeds. This
-prevents an automatic Netlify build from publishing a schema-dependent frontend
-early. GitHub Actions PR previews remain explicit CLI deploys from the protected
-preview job.
+Netlify native Git builds are intentionally stopped for this project. The
+backend-first GitHub Actions workflow is the only production publisher; it
+uploads the already validated build with the Netlify CLI after Supabase
+alignment succeeds. This prevents an automatic Netlify build from publishing a
+schema-dependent frontend early. PR previews are an exception-only path for a
+deliberately approved review branch, not part of the normal main-only release
+flow.
+
+The repository is currently main-only: local and remote release history live on
+`main`, and there are zero open pull requests. Production workflow run
+`29061308774` completed successfully for commit
+`8e4e2757efe6555b90c6a566b0684c41da0e2b10`. Netlify deploy
+`6a5045191fe53dd504fc4131` reached `ready`, and the live entry bundle exposes
+that exact SHA.
 
 ## Production Pieces
 
@@ -71,7 +79,9 @@ The GitHub workflow also verifies that the compiled app bundle contains the
 release build id and deploy context before it deploys, because the popup gate
 depends on that metadata to know whether users need a restart.
 
-If the change affects News scraping, run:
+The following News checks are reactivation-only. Do not run them during a normal
+release while News and the Render worker are paused. If News has been explicitly
+approved for reactivation, run:
 
 ```powershell
 npm run news:scrape:proof
@@ -103,17 +113,22 @@ The credentialed deploy job depends on reusable Quality, Security Scans, and
 CodeQL workflows. No Supabase or Netlify release step starts until all of their
 jobs pass.
 
-Opening or updating a pull request against `main` starts the GitHub Actions
-workflow in
+The repository currently has no open pull requests and does not use PRs for the
+normal release path. As an explicit review-branch exception, opening or updating
+a same-repository pull request against `main` starts the GitHub Actions workflow
+in
 [.github/workflows/netlify-preview.yml](C:/repos/chat2.0/.github/workflows/netlify-preview.yml:1).
 That workflow first validates untrusted PR code without secrets. For eligible
 same-repository, non-Dependabot PRs, a protected `netlify-preview` environment
 then authorizes the alias preview at `pr-<pull-request-number>` and publishes a
 sticky PR comment with the preview URL.
 
-## Netlify PR Preview Deploys
+## Netlify PR Preview Deploys (Exception Only)
 
-The secretless validation job needs no deployment credentials. The protected
+This path is dormant during normal main-only operation. Use it only when a
+specific change has been approved for review on a temporary same-repository
+branch, then remove that branch after it is integrated or discarded. The
+secretless validation job needs no deployment credentials. The protected
 preview job requires:
 
 - `NETLIFY_AUTH_TOKEN`
@@ -126,9 +141,18 @@ Production app-release publishing also requires:
 
 Backend alignment in the production workflow also requires:
 
-- `SUPABASE_ACCESS_TOKEN`
-- `SUPABASE_DB_PASSWORD`
+- `SUPABASE_ACCESS_TOKEN`: a newline-free Supabase personal access token matching
+  `sbp_` plus 40 lowercase hexadecimal characters, with the optional
+  `oauth_` marker accepted by the workflow.
+- `SUPABASE_DB_PASSWORD`: the linked production project's database password; it
+  is not interchangeable with the personal access token.
 - repository variable `SUPABASE_PROJECT_ID`
+
+The production workflow validates all required Netlify and Supabase values,
+validates the access-token shape, links the exact project, and runs a migration
+dry run before dependency installation. A missing, malformed, newline-polluted,
+or swapped credential therefore fails early before any backend or frontend
+publication step.
 
 The preview workflow intentionally does not deploy to production. It publishes
 the built `dist` directory with:
@@ -142,8 +166,10 @@ the preview URL during admin verification.
 
 ## Netlify Production Deploy
 
-Manual CLI deploy is now a fallback path, not the normal production path. From
-the repo root:
+The normal publisher is the Netlify CLI invocation inside the protected GitHub
+Actions production workflow. Netlify's native Git build service remains stopped.
+A human-run CLI deploy is a break-glass fallback only and must preserve the same
+backend-first checks. From the repo root:
 
 ```powershell
 npx netlify deploy --prod
@@ -214,6 +240,31 @@ Recent app-surface migrations to confirm in fresh projects:
 - `20260601182251_lock_general_chat_read_rpc_acl.sql`: read-position RPC ACL hardening.
 - `20260602012149_invite_only_signup_auth.sql`: private invite ledger, invite validation hook, and auth metadata cleanup.
 - `20260602013640_lock_signup_invite_rpc_acl.sql`: invite RPC and hook execute-grant hardening.
+- `20260620121500_admin_authority_source_cleanup.sql`: canonical
+  `user_roles`/operator authority and display-only public role badges.
+- `20260709215208_notification_sound_static_lockdown.sql`: static notification
+  sound configuration and mutation lockdown.
+- `20260709215314_user_profile_write_boundary.sql`: approved profile-column
+  writes with protected identity and authority fields.
+- `20260709215321_security_definer_and_database_lint_cleanup.sql`: explicit
+  function ACLs, caller guards, and fixed search paths.
+- `20260709215718_bridge_hold_and_session_revocation.sql`: paused ESP Bridge
+  data/session hold and device disablement.
+- `20260709215933_database_function_lint_cleanup.sql`: remaining function lint
+  and search-path cleanup.
+- `20260709220428_storage_bucket_constraints.sql`: reviewed MIME and file-size
+  constraints for active upload buckets.
+- `20260710002000_remote_security_advisor_cleanup.sql`: hosted ACL/default-
+  privilege cleanup, paused-domain RPC lockdown, and guarded reaction/ban APIs.
+
+The linked production database has been verified current through
+`20260710002000`; the linked dry run reports no pending migrations and remote
+database lint reports no warnings. Hosted security-advisor parity is documented,
+not hidden: the remaining findings are 71 intentional guarded authenticated
+`SECURITY DEFINER` APIs plus the one intentional anonymous pre-signup username
+availability check. Supabase Auth leaked-password protection is enabled with
+`password_hibp_enabled=true`. Recheck these proofs in the release artifact for
+the final commit rather than assuming an earlier successful run covers it.
 
 ### Edge Functions
 
@@ -230,6 +281,12 @@ endpoint with its shared default-deny gate, removes the paused Art Board import
 endpoint, verifies the remote inventory and JWT flags, and unsets any accidental
 `BRIDGE_API_ENABLED` override. It requires `SUPABASE_PROJECT_ID` and
 `SUPABASE_ACCESS_TOKEN` in the process environment.
+
+The confirmed production inventory is 23 functions: eight active functions and
+15 ESP Bridge endpoints deployed in deny-paused mode. The paused
+`art-board-import-image` function is absent, and the manifest verification found
+no unexpected, missing, or JWT-mode drift. This is the required target state for
+each production release.
 
 Any function whose gateway JWT check is disabled must keep equivalent
 endpoint-level authentication, authorization, rate limiting, and service-role
@@ -268,8 +325,9 @@ Do not put provider preview tokens in frontend `VITE_*` env vars.
 ## Render News Scraper Deployment
 
 The News scraper is preserved in [render.yaml](C:/repos/chat2.0/render.yaml:1)
-as the `shado-news-scraper` Docker worker. It is currently suspended and
-`autoDeployTrigger` is `off`; do not resume or redeploy it until News is
+as the `shado-news-scraper` Docker worker. Its live Render state was verified as
+suspended, and both the live automatic-deploy setting and committed
+`autoDeployTrigger` are `off`. Do not resume or redeploy it until News is
 explicitly reapproved under the paused-feature checklist.
 
 Required Render secrets:
@@ -422,17 +480,21 @@ After deploy, verify:
 8. Settings page renders cleanly on mobile and desktop
 9. A message containing an `https://` or `www.` link renders as a clickable link and loads a compact preview card
 10. Settings feedback can submit a bug or feature report with an image attachment after feedback schema changes
-11. Boards tab loads the low-friction board map, keeps labels inside board objects, avoids visual overlap after collisions, and opens News Feed plus each chat board
-12. Art Board opens from Boards, settles without a stuck loader, exposes header About and floating Add controls, supports pinch zoom on mobile, and keeps item reactions in the three-dot menu with compact count badges
-13. News Chat, Investing Chat, Learning Chat, Crypto Chat, Vibe Coding, AI News, and Projects Chat send, edit, delete, react, render link previews, and avoid duplicate subheaders/manual refresh rows
-14. Settings > Admin > News Sources shows source health for an `admin` or `sub_admin` account
-15. Render worker has checked enabled sources since deploy and today's feed rows match current Eastern-day posts
-16. General Chat header shows active-user count, active-user popup, and weather widget without mobile overlap
-17. Settings > Account & Profile can save or clear a weather location
-18. Settings > Admin > Feedback Review lists submitted feedback for an app operator
-19. An app operator can open another user's profile popup and see Channel bans
-20. A channel-banned user is blocked from the selected channel, board, Art Board, or all interaction while DMs and read access still work
-21. An app operator can delete a normal-user General Chat message and board-chat message, and both disappear for other signed-in users without refresh
+11. General Chat header shows active-user count, active-user popup, and weather widget without mobile overlap
+12. Settings > Account & Profile can save or clear a weather location
+13. Settings > Admin > Feedback Review lists submitted feedback for an app operator
+14. An app operator can open another user's profile popup and see Channel bans
+15. A General Chat-banned user is blocked from participating while DMs and read access still work
+16. An app operator can delete a normal-user General Chat message, and it disappears for other signed-in users without refresh
+
+Paused-domain checks are reactivation-only and are not part of routine
+production smoke. When Boards, News, Art Board, or ESP Bridge is explicitly
+approved to return, additionally verify its navigation/runtime chunks, realtime
+flows, moderation behavior, admin surfaces, provider worker, server-side hold
+removal, and test-data cleanup according to
+[PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1). Do not resume the
+Render worker, expose Bridge endpoints, or enable a compile-time flag merely to
+make a routine release smoke exercise dormant code.
 
 Recommended production smoke for local post-deploy validation:
 

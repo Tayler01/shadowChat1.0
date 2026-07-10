@@ -2,12 +2,13 @@
 
 This document is a high-signal map of the current ShadowChat codebase.
 
-## Documentation Status - July 9, 2026
+## Documentation Status - July 10, 2026
 
-This architecture map includes the July 9 product pause, profile/role authority
+This architecture map includes the July 9-10 product pause, profile/role authority
 boundaries, Storage constraints, classified Edge Function release inventory,
-ESP server-side hold, strict release gates, and suspended News worker. Remaining
-work is ranked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
+ESP server-side hold, hosted Auth/security posture, backend-first release,
+strict release gates, and suspended News worker. Remaining work is ranked in
+[FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
 
 Boards, News, Art Board, and ESP Bridge are preserved but compile-time paused
 in the default production frontend as of July 9, 2026. Their modules and backend
@@ -21,7 +22,8 @@ React UI
   -> hooks
   -> lib helpers
   -> Supabase Auth / Postgres / Realtime / Storage / Edge Functions
-  -> Netlify-hosted frontend shell
+  -> GitHub Actions backend-first release from main
+  -> Netlify CLI-published frontend shell (cloud/Git builds stopped)
   -> preserved, currently suspended Render News scraper worker
 ```
 
@@ -113,6 +115,15 @@ Storage bucket metadata enforces reviewed limits and MIME allowlists for
 avatars, banners, message media, and chat uploads. The browser applies the same
 limits before upload, but server-side bucket configuration is authoritative.
 
+The hosted schema is aligned through
+`20260710002000_remote_security_advisor_cleanup.sql`. That migration removes
+broad paused-domain browser grants and bucket-list policies, tightens internal
+and trigger Functions, and preserves only reviewed active RPC access. Hosted
+database lint is clean and leaked-password screening is enabled. The remaining
+hosted security-advisor set is 71 guarded authenticated definer APIs plus the
+intentional anonymous username-availability check; reducing that surface is a
+ranked architecture refactor, not a blind grant-revocation exercise.
+
 ### Edge Functions
 
 - [`openai-chat`](C:/repos/chat2.0/supabase/functions/openai-chat/index.ts:1): validates caller session, proxies allowed AI requests to OpenRouter by default, and can post group-chat AI answers as the dedicated `Shado` assistant profile
@@ -129,6 +140,9 @@ Audit note: several Edge Functions intentionally run with Supabase gateway JWT v
 
 Remote state must be verified against the manifest after every production
 release. A green frontend build alone is not backend parity evidence.
+The July 10 proof matched all 23 expected deployed Functions: 8 active and 15
+ESP Bridge endpoints in the shared deny-paused state; the removed Art Board
+import Function was absent.
 
 ### Background Workers
 
@@ -245,7 +259,7 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 4. Conversations list hook reorders thread and updates unread counts
 5. Optional push fan-out triggers through the `send-push` edge function
 
-### News Feed
+### Dormant News Feed Flow
 
 1. App operator adds or enables a source in Settings > Admin > News Sources
 2. Render worker reads enabled `news_sources`
@@ -254,7 +268,7 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 5. `useNewsFeed` receives realtime inserts/updates and refreshes the board
 6. Reactions are toggled through `toggle_news_feed_reaction`
 
-### Board Chat
+### Dormant Board Chat Flow
 
 1. Signed-in user opens a chat board such as News Chat, Investing Chat, Learning Chat, Crypto Chat, Vibe Coding, AI News, or Projects Chat from the low-friction Boards bubble map
 2. Insert hits `board_chat_messages` with the selected `board_slug`
@@ -265,7 +279,7 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 7. `user_read_cursors` tracks last read by `surface = 'board_chat'` and board slug
 8. The board content renders directly under the primary Boards header/back control with no duplicate subheader or manual refresh row
 
-### Boards Landing
+### Dormant Boards Landing
 
 1. User opens Boards from the main navigation
 2. `BoardBubbleMap` lays out feed boards as pills, chat boards as circles, and static boards as squares
@@ -275,7 +289,7 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 6. Selecting a board routes into its feed, chat, or static placeholder view
 7. Reopening Boards restores the default layout instead of persisting an old ad-hoc arrangement
 
-### Art Board
+### Dormant Art Board Flow
 
 1. User opens the square Art Board tile from Boards
 2. The client lazy-loads `art_board_items` by generated chunk coordinates and fetches related `art_board_links`
@@ -349,8 +363,11 @@ Global tokens live in [`src/index.css`](C:/repos/chat2.0/src/index.css:1).
 
 ## Testing Layers
 
-- static gates: lint, typecheck, build
+- Node 24 static gates: zero-warning lint, typecheck, docs integrity, classified
+  Function verification, and budgeted production build
 - Jest: hook/component behavior
+- local Supabase reset, migration lint, and security advisors
+- dependency audits, gitleaks, Trivy, and CodeQL
 - headed browser checks: realtime, mobile layout, and regression validation
 - scraper proof and one-cycle checks before scraper deployments
 

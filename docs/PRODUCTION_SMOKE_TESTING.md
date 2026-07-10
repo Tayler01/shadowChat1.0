@@ -2,12 +2,13 @@
 
 Use this workflow after a Netlify production deploy or whenever production auth, session resume, or realtime send behavior needs a browser-level check.
 
-## Documentation Status - June 2, 2026
+## Documentation Status - July 10, 2026
 
-This runbook is current for the shipped production smoke flow and now records
-the invite-only signup/email-verification rollout implications. The auth
-rollout is implemented; production smoke should continue to use stable
-email-confirmed accounts instead of disposable signup.
+This runbook is current through the July 10 production auth/resume-send proof.
+The runner now establishes a complete General Chat latest-window precondition
+before the resume scenario so an old persisted read position cannot hide a new
+realtime message. Production smoke continues to use stable email-confirmed
+accounts instead of disposable signup.
 
 ## Why Stable Accounts Are Required
 
@@ -155,6 +156,29 @@ Common failure meanings:
 - Auth requests returning HTTP `402` with `exceed_cached_egress_quota` or `exceed_egress_quota`: Supabase has restricted the project for usage quota. This is not a password or app-code failure. Restore Supabase service from the dashboard or contact Supabase support, then rerun the production smoke. The login screen should show a backend-quota message while the restriction is active.
 - Timeout or browser crash after sign-in: rerun `npm run qa:smoke:prod` or `npm run qa:smoke:prod:headed` to observe the visible browser. On Windows, headed mode is the preferred debug path for local Chromium instability.
 
+## Latest Passing Production Proof - July 10, 2026
+
+The headless stable-account smoke passed against `https://shadochat.online`
+from `2026-07-10T00:58:09.221Z` through `2026-07-10T00:58:22.463Z`:
+
+- `auth`: passed for both canonical production smoke accounts.
+- `resume-send`: passed for General Chat and DM after simulated background and
+  foreground recovery.
+- Artifact summary:
+  `output/playwright/prod-postdeploy-headless/summary.json`.
+- The deployed app baseline under test was commit `8e69fe4`, published by the
+  successful production workflow run `29060359268`.
+
+Cleanup was verified against linked production, not inferred from the browser:
+
+- General Chat row `Resume chat 20260710005817`
+  (`fbeae672-001d-4bd9-9786-b87e1ca3f252`) deleted exactly one row.
+- DM row `Resume dm 20260710005821`
+  (`9a99225d-4186-4ef6-bc9f-ea487d07578c`) deleted exactly one row.
+- Follow-up 30-minute-prefix queries returned `0` General Chat rows and `0` DM
+  rows. Earlier preliminary-run rows were also deleted exactly once each.
+- This scenario creates text rows only; it did not upload Storage objects.
+
 ## Post-Deploy Checklist
 
 1. Confirm Netlify production deploy completed.
@@ -171,9 +195,12 @@ Common failure meanings:
 10. If the deploy touched moderation, verify an operator can open another
     user's profile popup and see Channel bans without using a personal admin
     account for routine smoke traffic.
-11. Keep the latest passing artifact path with the deploy notes.
+11. Delete every generated production row/object, query production to prove the
+    expected rows and prefixes are absent, and keep that evidence with the
+    deploy notes.
+12. Keep the latest passing artifact path with the deploy notes.
 
-## Latest Documentation Refresh Deploy
+## Historical June 1 Documentation Refresh Deploy
 
 June 1, 2026 documentation refresh:
 

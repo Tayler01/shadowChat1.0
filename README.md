@@ -4,9 +4,9 @@ ShadowChat 1.0 is a premium dark realtime chat app built with React, TypeScript,
 
 The project is already wired for hosted Supabase and Netlify deployment. It is designed to behave like a product app, not a demo: realtime messaging, uploads, presence, settings, DMs, and notification flows are all first-class parts of the codebase.
 
-## Documentation Status - July 9, 2026
+## Documentation Status - July 10, 2026
 
-The documentation set has been refreshed for the July 9 alignment program:
+The documentation set has been refreshed for the July 9-10 alignment program:
 paused product domains, Supabase authority/security hardening, deterministic
 backend deployment, strict CI, dependency cleanup, build budgets, and
 engineering safeguards. The ranked source of truth is
@@ -14,10 +14,19 @@ engineering safeguards. The ranked source of truth is
 and the full inventory is
 [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
 
-Current follow-ups remain ranked in that audit: service-worker update behavior,
-DM pagination/subscription/rendering, reaction rollback, runtime-asset cleanup,
-Netlify security headers, accessibility/mobile polish, physical-device PWA
-validation, and the deliberately deferred product improvements.
+The latest verified implementation release at this documentation cut is commit
+`8e4e275`, released by GitHub Actions run `29061308774`. The linked Supabase
+project is migration-aligned through `20260710002000`, the classified Function
+inventory is aligned, the Render News worker is suspended, and Netlify serves
+the matching build from `main`. A July 10 live headless smoke passed stable-user
+auth plus General Chat and DM resume-send; both generated rows were deleted and
+follow-up production counts were zero.
+
+Current follow-ups remain ranked in that audit: reducing the remaining guarded
+authenticated `SECURITY DEFINER` surface, service-worker update behavior, DM
+pagination/subscription/rendering, reaction rollback, runtime-asset cleanup,
+CSP and accessibility/mobile polish, physical-device PWA validation, and the
+deliberately deferred product improvements.
 
 ## Stack
 
@@ -262,7 +271,9 @@ For deeper testing guidance, including headed Playwright debugging, use [docs/TE
 Production is hosted on Netlify and Supabase. Pushing to `main` triggers the
 backend-first GitHub Actions release: all Quality jobs must pass, then migrations,
 configuration, classified Functions, and the bridge hold align before the
-frontend is published. The preserved Render News worker remains suspended.
+workflow publishes the built artifact through the Netlify CLI. Netlify cloud/Git
+builds are stopped so this single workflow owns production publication. The
+preserved Render News worker remains suspended.
 
 - Netlify config: [netlify.toml](C:/repos/chat2.0/netlify.toml:1)
 - Netlify workflow: [.github/workflows/netlify-production.yml](C:/repos/chat2.0/.github/workflows/netlify-production.yml:1)

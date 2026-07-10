@@ -2,9 +2,17 @@
 
 This file is the working handbook for agentic contributors operating inside this repository.
 
-## Documentation Status - June 2, 2026
+## Documentation Status - July 10, 2026
 
-This handbook has been refreshed against current `main` after the June 1 full codebase audit and June 2 invite/email auth hardening. For planned security, auth, chat-scroll, frontend polish, deployment, and architecture work, read [docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1) before editing. For the complete documentation inventory and freshness notes, read [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
+This handbook is current through the July 10 production-alignment pass: the
+paused-domain release contract, Supabase authority and Storage hardening,
+backend-first GitHub release, Node 24 baseline, main-only branch policy, and
+live auth/resume-send smoke have all been incorporated. For the remaining
+ranked security, reliability, performance, UX, and feature work, read
+[docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1)
+before editing. For the complete documentation inventory and freshness notes,
+read
+[docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
 
 ## Mission
 
@@ -56,15 +64,18 @@ The General Chat weather widget stores location preferences privately in
 [docs/WEATHER_WIDGET.md](C:/repos/chat2.0/docs/WEATHER_WIDGET.md:1). Do not
 put weather location data on public profile rows.
 
-The current near-term hardening track is the June 1 audit backlog:
+The July 9-10 alignment closed the immediate schema drift, broad paused-domain
+grants, Storage limits, leaked-password screening, release credential, backend
+parity, bundle-budget, and live smoke gaps. The remaining near-term hardening
+track is the ranked June audit backlog:
 
-- General Chat read-position and loading stability
-- invite-only signup/email-verification production smoke and follow-up polish
-- Supabase `public.users`, RPC, RLS, storage, and SECURITY DEFINER hardening
-- service-role bypass checks in bridge and AI post-to-chat paths
-- URL fetch/SSRF hardening across link preview, import, and media proxy flows
-- Netlify security headers and live deploy/provider setting verification
-- frontend mobile polish after scroll/auth risks are stable
+- reduce the remaining intentionally guarded authenticated
+  `SECURITY DEFINER` surface through a reviewed private-definer/public-invoker
+  architecture pass
+- service-worker update behavior and physical-device PWA validation
+- DM pagination, subscription lifecycle, rendering, and reaction rollback
+- runtime-asset cleanup, CSP tightening, accessibility, and mobile polish
+- targeted performance-advisor work without blindly removing quiet indexes
 
 When touching any of those areas, keep the work narrowly scoped to the relevant audit item and update the audit next-steps doc if the status changes.
 
@@ -427,7 +438,8 @@ For a clean working environment, see:
 - [docs/DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1)
 - bridge planning and implementation docs listed in `Current Feature Focus`
 
-Before using `npx` in Codex desktop shells, confirm `Get-Command node,npm,npx`
+Use Node.js 24 for local work so it matches GitHub Actions and Netlify. Before
+using `npx` in Codex desktop shells, confirm `Get-Command node,npm,npx`
 resolves all three commands. This workstation uses shims in
 `C:\Users\tayle\AppData\Local\pnpm` that forward to the FNM Node install; if
 `npx` is missing, repair that setup instead of switching QA into reuse mode.

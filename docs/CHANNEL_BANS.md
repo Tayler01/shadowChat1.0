@@ -1,16 +1,21 @@
 # Channel Ban Moderation
 
-## Documentation Status - July 9, 2026
+## Documentation Status - July 10, 2026
 
-This doc reflects shipped channel-ban behavior and the July 9 service-role
-hardening. AI post-to-chat preserves the canonical ban/authority checks. Bridge
+This doc reflects shipped channel-ban behavior and the July 9-10 service-role
+and RPC hardening. AI post-to-chat preserves the canonical ban/authority checks. Bridge
 service-role paths are additionally protected by the shared server-side
 default-deny pause before request work begins.
 
 Board scopes remain preserved in schema and moderation history while Boards are
-paused. ESP service-role paths must be disabled server-side as part of the bridge
-hold; frontend hiding is not an authorization control. See
+paused. ESP service-role paths are disabled by the shared server hold and
+release verification and must remain so; frontend hiding is not an
+authorization control. See
 [PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1).
+
+The July 10 hosted cleanup revokes browser execution of paused Boards, News, and
+Art mutation RPCs while retaining their source and migration history. Active
+General Chat moderation remains available through explicitly reviewed grants.
 
 Channel bans let app operators limit where a user can participate without
 touching DMs or account access. Banned users can still read visible content.
@@ -71,6 +76,8 @@ enabled by
 [`20260503191532_admin_delete_non_admin_chat_messages.sql`](C:/repos/chat2.0/supabase/migrations/20260503191532_admin_delete_non_admin_chat_messages.sql:1).
 Art Board scope, item policies, and soft-delete RPCs live in
 [`20260504012117_art_board_domain.sql`](C:/repos/chat2.0/supabase/migrations/20260504012117_art_board_domain.sql:1).
+The current hosted execution boundary and paused-domain revocations live in
+[`20260710002000_remote_security_advisor_cleanup.sql`](C:/repos/chat2.0/supabase/migrations/20260710002000_remote_security_advisor_cleanup.sql:1).
 
 Main table:
 
@@ -110,12 +117,13 @@ are swept by `expire_user_channel_bans()` and announced the same way.
 ## Deployment Check
 
 Before trusting moderation deletes in production, confirm the linked Supabase
-project includes `20260503191532_admin_delete_non_admin_chat_messages.sql`:
+project includes both `20260503191532_admin_delete_non_admin_chat_messages.sql`
+and `20260710002000_remote_security_advisor_cleanup.sql`:
 
 ```powershell
 supabase migration list --linked
 ```
 
-If that migration is missing, admins may see delete failures. The current
-client deliberately does not remove the message locally unless Supabase returns
-the deleted row.
+If either migration is missing, admins may see delete failures or a stale RPC
+authority boundary. The current client deliberately does not remove the message
+locally unless Supabase returns the deleted row.

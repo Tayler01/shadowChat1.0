@@ -2,18 +2,23 @@
 
 This guide covers the recommended local and hosted setup flow for ShadowChat 1.0.
 
-## Documentation Status - June 2, 2026
+## Documentation Status - July 10, 2026
 
-This setup guide has been refreshed against the current repo shape and the June 2 invite-only signup/email-verification rollout. Use [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1) before changing auth setup.
+This setup guide matches the Node 24 GitHub/Netlify runtime, the backend-first
+release, the July Supabase credential and security cleanup, and the intentional
+Boards/News/Art/ESP pause. Use
+[FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1)
+before changing auth or hosted security setup.
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 24+
 - npm 10+
 - A Supabase account and project
 - Supabase CLI
 - Netlify CLI only if you plan to deploy from the terminal
-- Render account only if you plan to run the production News scraper
+- Render account only if a reviewed News reactivation or isolated worker proof
+  requires it
 
 Useful checks:
 
@@ -96,6 +101,12 @@ supabase login
 supabase link --project-ref YOUR_PROJECT_REF
 ```
 
+`SUPABASE_ACCESS_TOKEN` is a Supabase personal access token with an `sbp_`
+prefix; it is not the database password. Keep the linked project's database
+password in a separate `SUPABASE_DB_PASSWORD` secret. If the CLI rejects the
+token format, rerun `supabase login`, verify the PAT, and update the PAT secret
+without a trailing newline rather than substituting the database password.
+
 Then push the schema:
 
 ```powershell
@@ -116,6 +127,12 @@ and verify Auth config:
 ```powershell
 supabase config push --project-ref YOUR_PROJECT_REF --yes
 ```
+
+Hosted production currently has leaked-password screening enabled. New hosted
+projects should enable the equivalent Auth setting before launch. Raising
+minimum password length or complexity is a separate sign-in UX decision because
+it can affect existing users; do not silently change those requirements during
+environment setup.
 
 The Shado-branded confirmation and recovery email subject/body templates live
 under [supabase/templates](C:/repos/chat2.0/supabase/templates). If inboxes show
@@ -184,6 +201,10 @@ verifies remote names and JWT settings. It requires `SUPABASE_PROJECT_ID` and
 Do not deploy bridge or Art Board functions by hand. Reactivation must first
 change the reviewed manifest classification and complete the checklist in
 [PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1).
+
+The July 10 production proof matched 23 deployed Functions: 8 active Functions
+and 15 ESP Bridge endpoints that deny with the shared pause response;
+`art-board-import-image` was absent as required.
 
 `link-preview` validates the signed-in user's bearer token inside the function
 while keeping gateway JWT verification disabled for deployment compatibility.
@@ -315,6 +336,9 @@ For implementation and QA details, see [docs/PHONE_INSTALL_ONBOARDING.md](C:/rep
 - browser/device has no active subscription row
 
 ### News Feed Is Empty
+
+This is expected in the default production build while News is paused. If News
+is explicitly reactivated and still empty, check:
 
 - no `news_sources` rows are enabled
 - the Render worker is stopped or missing `SUPABASE_SERVICE_ROLE_KEY`

@@ -1,8 +1,11 @@
 # Deferred Follow-Ups
 
-## Documentation Status - June 1, 2026
+## Documentation Status - July 10, 2026
 
-Reviewed during the June 1, 2026 documentation refresh. This feature guide is current for the shipped product surface, with any known hardening or polish follow-ups tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
+Reviewed during the July 10 production-alignment refresh. This file preserves
+dated small ideas and completed history; current hardening and polish work is
+ranked in
+[FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
 
 This document keeps small deferred ideas from being lost when stale branches are deleted.
 
@@ -10,10 +13,16 @@ This document keeps small deferred ideas from being lost when stale branches are
 
 - On 2026-04-24, the stale remote branch `cursor/optimize-codebase-for-performance-16ed` was deleted instead of merged.
 - Current `main` already has the useful lazy-view loading pattern in [src/App.tsx](C:/repos/chat2.0/src/App.tsx:17), while that branch's `App.tsx` was missing newer notification deep-link, app badge, mobile toast, and shell styling work.
-- The only idea worth revisiting is a fresh, current-main implementation of `build.rollupOptions.output.manualChunks` in [vite.config.ts](C:/repos/chat2.0/vite.config.ts:1).
+- Completed July 9, 2026: current `main` implements route-aware
+  `build.rollupOptions.output.manualChunks` in
+  [vite.config.ts](C:/repos/chat2.0/vite.config.ts:1), removes the broad
+  catch-all vendor chunk, and enforces eager, lazy, Phaser, and total-deploy
+  budgets with `scripts/verify-build-budgets.mjs`.
 - Do not blindly restore `sourcemap: true` for production unless production source maps are intentionally desired.
 - When revisiting this, run `npm run build` before and after the change and compare the emitted chunk sizes.
-- On 2026-06-08, `npm run build` still passed with the existing Vite large-chunk warning. Keep this as the tail-end fix after the current approved security/database/UX/feature/performance batch unless Tayler reprioritizes it.
+- Historical note: on 2026-06-08, `npm run build` still passed with a Vite
+  large-chunk warning. The July budgeted split supersedes that status; the
+  intentionally large lazy Phaser payload has its own measured budget.
 
 ## Audit Improvements - 2026-04-26
 
@@ -40,4 +49,5 @@ Near-future priorities from the full codebase audit, after the P0 fixes:
 17. Implement per-conversation notification preferences shared across web, push, and bridge clients.
 18. Revisit the paused mood emoji / tone indicator feature with better UX, user control, and accuracy before exposing it again in Settings.
 19. Add an explicit Fahrenheit/Celsius toggle for the weather widget if users need unit control beyond the stored `temperature_unit` field.
-20. Completed 2026-05-07: Netlify GitHub Actions now opt JS actions into the Node 24 runner runtime. The app build still uses Node 20 until dependency upgrades are intentionally staged.
+20. Completed 2026-07-09: local setup, Netlify (`NODE_VERSION = "24"`), and
+    every current GitHub build/quality workflow use Node 24.

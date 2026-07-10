@@ -2,17 +2,22 @@
 
 This document turns the June 1, 2026 read-only audit into an implementation backlog and records status updates as fixes land.
 
-## Documentation Status - June 1, 2026
+## Documentation Status - July 10, 2026
 
-This is the current source of truth for the audit backlog. Update this document when an audit item is implemented, intentionally deferred, or replaced by a narrower feature ticket.
+This is the current source of truth for the audit backlog. It preserves the
+original June findings, records the July production-alignment evidence, and
+ranks the work that remains. Update it when an item is implemented,
+intentionally deferred, or replaced by a narrower feature ticket.
 
 ## July 9, 2026 Alignment And Cleanup Program
 
 The July 9 full audit revalidated this backlog against local code, linked
-Supabase, Netlify, Render, GitHub, browser QA, and the production build. Work is
-being completed as separable checkpoints on
-`codex/shadowchat-alignment-20260709`; production rollout is authorized for a
-direct, quality-gated update to `main` and will be recorded here after live proof.
+Supabase, Netlify, Render, GitHub, browser QA, and the production build. The
+alignment work shipped directly through `main`. Commit
+`8e69fe498827efa19e211ad0cb9ca9ec506c96ae` passed the complete backend-first
+production workflow in GitHub Actions run `29060359268`, aligned Supabase, and
+published the verified frontend to Netlify. Local and remote branch inventories
+now contain only `main`, and GitHub has zero open pull requests.
 
 ### Product decisions now in force
 
@@ -21,8 +26,9 @@ direct, quality-gated update to `main` and will be recorded here after live proo
   routes, providers, realtime subscriptions, and chunks.
 - **ESP Bridge is on hold.** Firmware, TUI, migrations, functions, and planning
   history stay intact. The default build omits pairing/admin UI; server-side
-  session revocation and endpoint hold are implemented locally and await the
-  production release gate.
+  session revocation is deployed, dedicated Auth sessions are removed by the
+  release workflow, and all deployed Bridge endpoints deny with
+  `feature_paused` before request processing.
 - **Render News must remain suspended with automatic deploys off.** Do not
   restore a paid worker until the News product is explicitly reapproved.
 - Canonical status and re-enable instructions live in
@@ -30,9 +36,9 @@ direct, quality-gated update to `main` and will be recorded here after live proo
 
 ### Ranked implementation list
 
-### July 9 implementation checkpoint (production pending)
+### July 10 implementation checkpoint (production aligned)
 
-- All eight P0 alignment items below are implemented in the release branch:
+- All eight P0 alignment items below are implemented on `main` and deployed:
   canonical authority, profile writes, static notification sounds, SECURITY
   DEFINER ACLs/search paths, Storage constraints, the ESP data/Auth/function
   hold, and backend-first deployment parity.
@@ -50,6 +56,22 @@ direct, quality-gated update to `main` and will be recorded here after live proo
 - Netlify Git builds are stopped so only the backend-first GitHub Actions release
   can publish production. News freshness monitoring is explicitly disabled while
   the Render worker is suspended; app uptime monitoring remains active.
+- Netlify deploy `6a503fb9aa7a29932306a381` reached `ready` for the alignment
+  commit at `https://shadochat.online`; the public root returned 200, the health
+  workflow reported `newsMonitoring: paused`, and the live entry bundle carried
+  the expected release SHA.
+- Follow-up workflow `29061308774` also passed every gate and published smoke-
+  harness commit `8e4e2757efe6555b90c6a566b0684c41da0e2b10` as Netlify deploy
+  `6a5045191fe53dd504fc4131`; the live entry bundle carries that exact SHA.
+- Linked Supabase migrations are current through
+  `20260710002000_remote_security_advisor_cleanup.sql`. The remote Function
+  inventory is exact: 8 active product Functions plus 15 deny-paused Bridge
+  Functions; `art-board-import-image` is absent.
+- Remote database lint is clean. Hosted security-advisor warnings fell from 169
+  to 72: 71 guarded authenticated SECURITY DEFINER APIs and the intentional
+  anonymous `is_username_available(text)` pre-signup check. Broad public-bucket
+  listing and leaked-password warnings are zero, and Supabase Auth leaked-
+  password protection is enabled.
 - Safe same-major dependency updates and lockfiles are current with zero known
   vulnerabilities. Remaining install-time deprecation notices come from Expo 54,
   Jest 29/jsdom, and Remotion transitive packages; removing them requires
@@ -57,70 +79,71 @@ direct, quality-gated update to `main` and will be recorded here after live proo
 
 #### P0 - Production alignment and authority
 
-1. **DB-001 - Apply the pending canonical-authority migration.** Validate and
-   deploy `20260620121500_admin_authority_source_cleanup.sql`, capture before
-   state, and run channel-ban, protected-delete, and ShadowPin scoring negatives.
-2. **SEC-001 - Promote current active Edge Function hardening.** Deploy and
-   negatively smoke `openai-chat`, `delete-account`, and
-   `shadow-pin-import-image`. Keep `art-board-import-image` undeployed or paused
-   while Art Board is unavailable. Do not leave stale service-role code active.
-3. **SEC-002 - Enforce the profile write boundary.** Remove table-level
-   authenticated writes to `public.users`, grant only approved profile columns,
-   add `USING` plus `WITH CHECK`, and move Netlify operator authorization to
-   canonical `user_roles`/`is_app_operator`.
-4. **SEC-003 - Lock notification sound configuration.** Prefer bundled/static
-   sound assets, enable RLS, and remove anonymous/authenticated mutation rights.
-5. **SEC-004 - Establish a SECURITY DEFINER ACL contract.** Hotfix confirmed
-   public/anonymous functions, set fixed `search_path`, add caller guards, and
-   add default-privilege protection. Complete the broader allowlist only from
-   live `pg_proc`/ACL evidence.
-6. **SEC-005 - Complete the ESP hold.** Inventory bridge identities, revoke
-   custom and Supabase Auth sessions, disable devices/codes, and remove deployed
-   bridge endpoints or make every endpoint deny by default. Re-enable only with
-   fresh pairing and sessions.
-7. **DB-002 - Add Storage constraints.** Inventory current objects, then add
-   reviewed MIME/size limits for avatars, banners, message media, chat uploads,
-   and voice recordings without changing existing objects.
-8. **PERF-001 - Make backend parity a deployment gate.** CI must prove migration
-   state, active/paused function manifest, JWT configuration, negative smokes,
-   frontend build SHA, and post-deploy health before reporting success.
+1. **DB-001 - Completed July 10:** deployed
+   `20260620121500_admin_authority_source_cleanup.sql` and retained the
+   channel-ban, protected-delete, and ShadowPin authority checks.
+2. **SEC-001 - Completed July 10:** deployed the current active Function set,
+   aligned JWT settings to the manifest, deployed Bridge endpoints only with the
+   shared deny-first hold, and removed remote `art-board-import-image`.
+3. **SEC-002 - Completed July 10:** removed broad authenticated profile writes,
+   granted only approved public-profile columns, and made
+   `user_roles`/`is_app_operator` the authority source.
+4. **SEC-003 - Completed July 10:** replaced mutable notification-sound data
+   with bundled/static behavior and removed browser mutation rights.
+5. **SEC-004 - Completed July 10 for the immediate exposure boundary:** fixed
+   search paths, caller guards, historical/default EXECUTE grants, internal
+   helper exposure, and paused-domain RPC exposure. The remaining authenticated
+   SECURITY DEFINER architecture review is ranked first in P1 below.
+6. **SEC-005 - Completed July 10:** revoked Bridge custom/Auth sessions,
+   disabled devices and pending codes, and deployed all 15 Bridge endpoints with
+   the shared default-deny hold. Reactivation requires fresh pairing/sessions.
+7. **DB-002 - Completed July 10:** added reviewed MIME/size constraints for
+   avatars, banners, message media, chat uploads, and voice recordings without
+   deleting existing objects.
+8. **PERF-001 - Completed July 10:** production CI now proves migration state,
+   exact Function classification/JWT settings, Bridge hold state, frontend build
+   identity, backend evidence, and post-deploy health before success.
 
 #### P1 - Reliability, performance, and mobile UX
 
-1. Repair the mobile QA send-button selector and keep paused feature flows
-   optional in the visual harness.
-2. Replace service-worker cache-first handling for stable Shadow Runner paths
+1. Review the 71 intentional authenticated SECURITY DEFINER APIs one domain at
+   a time. Prefer public SECURITY INVOKER wrappers or private implementation
+   helpers where that reduces privilege without breaking RLS-backed behavior.
+2. Keep the production resume/send harness stable across restored read positions
+   and require verified cleanup of every test General Chat and DM row.
+3. Replace service-worker cache-first handling for stable Shadow Runner paths
    with content-hashed or revalidating behavior and test installed-PWA upgrades.
-3. Change DM history pagination to stable `(created_at, id)` keysets.
-4. Consolidate duplicate DM subscriptions and bound long-thread rendering.
-5. Roll back optimistic General Chat reactions when the RPC fails.
-6. **Completed locally:** remove the catch-all `vendor-ui` chunk, restore
+4. Change DM history pagination to stable `(created_at, id)` keysets.
+5. Consolidate duplicate DM subscriptions and bound long-thread rendering.
+6. Roll back optimistic General Chat reactions when the RPC fails.
+7. **Completed:** remove the catch-all `vendor-ui` chunk, restore
    route-aware splitting, and enforce measured entry/lazy/deploy budgets.
-7. Move nonruntime source/concept/generation assets out of `public`, retain all
+8. Move nonruntime source/concept/generation assets out of `public`, retain all
    runtime finals, and enforce a deploy-size budget.
-8. Add Netlify CSP, frame, content-type, referrer, permissions, and other
+9. Add Netlify CSP, frame, content-type, referrer, permissions, and other
    reviewed security headers; serve the manifest with the correct MIME type.
-9. Complete installed-PWA checks on physical iPhone and Android devices and
+10. Complete installed-PWA checks on physical iPhone and Android devices and
    make a deliberate portrait/Shadow Runner landscape decision.
-10. Remove `user-scalable=no`; standardize focus traps, Escape/focus return,
+11. Remove `user-scalable=no`; standardize focus traps, Escape/focus return,
     keyboard menus, `aria-current`, contrast, and phone touch targets.
-11. Simplify the contextual phone header and prevent transient celebrations
+12. Simplify the contextual phone header and prevent transient celebrations
     from obscuring essential composer/navigation controls.
-12. **Completed locally:** add opt-in release-correlated client/worker telemetry
+13. **Completed:** add opt-in release-correlated client/worker telemetry
     with privacy scrubbing and an Edge helper for reviewed per-function adoption.
 
 #### P1 - Repository and dependency cleanliness
 
-1. **Completed locally:** require all Jest and standalone Node suites in CI.
-2. **Completed locally:** eliminate React `act(...)` test warnings.
-3. **Completed locally:** remove unused code, enable TypeScript unused checks,
+1. **Completed in production:** require all Jest and standalone Node suites in CI.
+2. **Completed in production:** eliminate React `act(...)` test warnings.
+3. **Completed in production:** remove unused code, enable TypeScript unused checks,
    and enforce ESLint `--max-warnings=0`.
-4. **Completed locally:** resolve advisories and apply safe same-major updates;
+4. **Completed in production:** resolve advisories and apply safe same-major updates;
    keep framework/test-runner major migrations as reviewed packets.
-5. **Completed locally:** add a separate Expo install/audit/lint/typecheck/Doctor job.
-6. **Completed locally:** add documentation link/encoding checks and repair known drift.
-7. **Release gate:** validate deterministic clean installs, the complete Quality
-   workflow, and a clean worktree before production completion.
+5. **Completed in production:** add a separate Expo install/audit/lint/typecheck/Doctor job.
+6. **Completed in production:** add documentation link/encoding checks and repair known drift.
+7. **Completed in production:** deterministic clean installs, the complete
+   Quality workflow, security scans, CodeQL, and the credentialed backend-first
+   release all passed before publication.
 
 #### P2 - Product improvements after hardening
 
@@ -157,15 +180,20 @@ The audit covered:
 - Codebase architecture, repeated realtime/send/scroll patterns, and optimization opportunities.
 - Project documentation and agent-facing guidance.
 
-Coordinator validation during the audit:
+Coordinator validation during the original June audit:
 
 - `npm audit --omit=dev --json` passed with zero production vulnerabilities.
 - `npm run lint` passed.
 - `npm run typecheck` passed.
 - `npm run build` passed.
-- Initial `npm run qa:chat-scroll -- --cycles=4 --clean-artifacts` passed during the audit; the implementation branch now adds seeded read-position scenarios behind `npm run qa:chat-scroll:all`.
+- Initial `npm run qa:chat-scroll -- --cycles=4 --clean-artifacts` passed during
+  the audit; later work added seeded read-position scenarios behind
+  `npm run qa:chat-scroll:all`.
 - Supabase project `shsqqouecvdoifzufkqm` was checked through read-only connector/advisor queries.
-- Netlify local config was checked. Live Netlify dashboard settings were not verified because `netlify status` timed out locally.
+- Netlify local config was checked. Live Netlify dashboard settings were not
+  verified in that original pass because `netlify status` timed out locally;
+  the July alignment subsequently verified the live project, stopped native Git
+  builds, unlocked publishing, and proved the GitHub-owned CLI release path.
 
 ## P0 - General Chat Read Position And Loading Stability
 
@@ -280,33 +308,42 @@ Observed risk:
 - `mark_dm_messages_read` needs a participant authorization guard.
 - Supabase advisors flagged mutable function search paths, authenticated-callable SECURITY DEFINER functions, public-table RLS gaps, and storage policy concerns.
 
-Implementation status through July 9, 2026:
+Implementation status through July 10, 2026:
 
 - Added and remotely applied
   [20260608132000_harden_dm_read_participant_guard.sql](C:/repos/chat2.0/supabase/migrations/20260608132000_harden_dm_read_participant_guard.sql:1),
   which blocks `mark_dm_messages_read` unless the caller participates in the
-  conversation. The linked Supabase migration list and `supabase db push
-  --dry-run` both showed the remote database current through
-  `20260608200000`.
-- The July 9 hardening migrations restrict profile writes to approved columns,
+  conversation.
+- The July hardening migrations restrict profile writes to approved columns,
   make `users.admin_role` display-only, lock static notification-sound config,
   constrain Storage MIME/size metadata, fix SECURITY DEFINER search paths and
-  ACLs, and clear local warning-level lint/security-advisor output. Production
-  application remains part of the backend-first release gate.
+  ACLs, revoke paused-domain browser access, and remove broad public-bucket list
+  policies. The linked database is current through
+  [20260710002000_remote_security_advisor_cleanup.sql](C:/repos/chat2.0/supabase/migrations/20260710002000_remote_security_advisor_cleanup.sql:1),
+  and `supabase db push --linked --dry-run` reports no pending migrations.
+- Local reset/lint/security advisors and remote database lint are clean. The
+  hosted security advisor now reports 72 documented warnings: 71 guarded
+  authenticated SECURITY DEFINER APIs and the sole intentional anonymous
+  `is_username_available(text)` check. Supabase Auth leaked-password protection
+  is enabled; stronger minimum-length/complexity rules remain a separate auth UX
+  rollout so existing sign-in behavior is not changed accidentally.
 
 Status and remaining coordinated follow-up:
 
 1. Move email and other private identity fields out of `public.users` into a private/admin-only table or safe RPC/view.
-2. **Completed locally:** revoke broad profile-table writes and grant only
+2. Review authenticated SECURITY DEFINER APIs domain by domain and replace them
+   with private implementations or SECURITY INVOKER wrappers when the privilege
+   boundary can be narrowed without breaking RLS-backed behavior.
+3. **Completed in production:** revoke broad profile-table writes and grant only
    approved public profile columns with `USING` and `WITH CHECK` enforcement.
-3. **Completed locally:** make `users.admin_role` display-only and use
+4. **Completed in production:** make `users.admin_role` display-only and use
    `user_roles`/operator helpers for authority.
-4. **Completed June 8:** enforce the `mark_dm_messages_read` participant guard.
-5. **Completed locally:** fix SECURITY DEFINER search paths, caller guards,
+5. **Completed June 8:** enforce the `mark_dm_messages_read` participant guard.
+6. **Completed in production:** fix SECURITY DEFINER search paths, caller guards,
    explicit ACLs, and future default privileges.
-6. **Completed locally:** replace mutable notification-sound data with bundled
+7. **Completed in production:** replace mutable notification-sound data with bundled
    WebAudio behavior and lock the legacy table.
-7. **Completed locally:** add bucket MIME/size constraints and shared client
+8. **Completed in production:** add bucket MIME/size constraints and shared client
    filename/type/size validation, including a bounded voice-recording path.
 
 Validation target:
@@ -379,18 +416,16 @@ Implementation status on June 8, 2026:
 - Added focused unit/contract coverage in `tests/safeFetch.test.ts`,
   `tests/safeFetchIntegrationContract.test.ts`, and
   `tests/netlifySafeFetch.node.test.mjs`.
-- Remote function inventory showed June 8 deployments for `link-preview` and
-  `shadow-pin-video`. `art-board-import-image`, `shadow-pin-import-image`, and
-  `send-push` still reported older deployment timestamps, so production
-  coverage for those adopters remains an open deployment/smoke item.
+- The July production release aligned the exact remote manifest: 8 active
+  product Functions, 15 deny-paused Bridge Functions, and no deployed
+  `art-board-import-image`. Active `shadow-pin-import-image`, `send-push`,
+  `link-preview`, and `shadow-pin-video` now use the current source.
 
 Next steps:
 
-1. Deploy and smoke active `shadow-pin-import-image` and `send-push`; remove
-   remote `art-board-import-image` while Art Board is paused.
-2. Run deployed function smoke with known safe public URLs and blocked private
+1. Run deployed function smoke with known safe public URLs and blocked private
    URL cases.
-3. Keep adding provider-specific allow/deny tests as URL import and preview
+2. Keep adding provider-specific allow/deny tests as URL import and preview
    behavior expands.
 
 Validation target:
@@ -413,7 +448,10 @@ Observed risk:
 - `netlify.toml` does not define security headers.
 - Live Netlify project settings were verified on July 9; automatic Git builds
   were then stopped so the GitHub backend-first workflow is the only publisher.
-- Render config keeps sensitive values unsynced, which is good, but live dashboard secrets/logging were not verified.
+- Render service `srv-d7pjc49j2pic73bq5m80` was verified as a suspended
+  `background_worker` on `main` with `AutoDeploy=no` and
+  `autoDeployTrigger=off`. Secret values and log redaction were not inspected
+  while the worker was suspended.
 - No Vercel project config was found.
 - Several Supabase functions intentionally use `verify_jwt = false` and must rely on complete custom auth/rate limiting.
 
@@ -452,7 +490,7 @@ Next steps:
 2. Make mobile header actions view-specific so Weather, Active Users, Pinned, and other controls do not crowd every surface.
 3. Tighten mobile nav labels and badge caps.
 4. Separate DM loading, empty, and selected-thread states so "Say hello" does not flash incorrectly.
-5. Remove admin/setup hints from user-facing News empty states unless the current user is an operator.
+5. **On hold with News:** remove admin/setup hints from user-facing News empty states unless the current user is an operator.
 6. Review profile/settings modal overflow on small screens.
 7. Disable expensive fixed backgrounds on mobile if browser traces show scroll smoothness cost.
 
@@ -469,7 +507,8 @@ Implementation status on June 8, 2026:
 Validation target:
 
 - Preview build visual pass on iPhone-sized and Android-sized Chromium viewports.
-- Browser smoke for login, chat, DMs, settings, and News.
+- Browser smoke for login, chat, DMs, and settings. Treat News as
+  reactivation-only while the domain is paused.
 - Screenshots saved only if needed, then cleaned up unless a QA doc needs them.
 
 ## P2 - Architecture And Performance Backlog
@@ -513,15 +552,20 @@ Validation target:
 
 ## Suggested Implementation Order
 
-1. Chat read-position tests and fix.
-2. Invite-only signup, email verification, and login cleanup.
-3. `public.users` privilege/privacy migration and server-side admin authority cleanup.
-4. Bridge and AI service-role bypass checks.
-5. SSRF safe-fetch helper.
-6. Netlify headers and live deployment settings verification.
-7. Mobile/header/DM/frontend polish.
-8. Realtime/send/scroll shared helpers and bundle optimization.
-9. Documentation refresh after the security/auth/chat changes are merged.
+1. Review and narrow the remaining authenticated SECURITY DEFINER API surface.
+2. Finish General Chat read-position and production resume/send regression
+   coverage, including verified test-data cleanup.
+3. Replace stale service-worker cache behavior and validate installed-PWA
+   upgrades on physical iPhone and Android devices.
+4. Move private identity fields out of `public.users` through a coordinated
+   consumer migration.
+5. Stabilize DM pagination, subscriptions, and long-thread rendering.
+6. Add optimistic General Chat reaction rollback.
+7. Stage Netlify security headers/CSP and verify them in production.
+8. Move nonruntime source assets out of the deploy and complete accessibility,
+   header, and mobile polish.
+9. Continue domain-scoped realtime/send/scroll extraction and performance-
+   advisor work without broad rewrites.
 
 ## Release Checklist For Each Work Packet
 

@@ -6,12 +6,19 @@
 > See [PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1) for the
 > exact build flags, remote-service status, and re-enable checklist.
 
-## Documentation Status - June 1, 2026
+## Documentation Status - July 10, 2026
 
-Reviewed during the June 1, 2026 documentation refresh. This doc reflects the shipped News tab and Render scraper architecture. Live Render dashboard settings still need verification when scraper deployment is next touched.
+This is preserved architecture and reactivation guidance, not a description of
+an active production surface. The live Render service
+`srv-d7pjc49j2pic73bq5m80` (`shado-news-scraper`) was verified during the July
+production alignment as a suspended `background_worker` on branch `main` with
+`AutoDeploy=no` and `autoDeployTrigger=off`. Supabase News data remains intact,
+and repository variable `NEWS_MONITOR_ENABLED=false` keeps freshness monitoring
+paused while public app uptime monitoring continues.
 
-This document describes the shipped News Feed board, its Supabase backend, and
-the Render-hosted scraper that keeps the feed current.
+The sections below describe the preserved News Feed board, its Supabase backend,
+and the Render-hosted scraper that can keep the feed current after an explicit
+reactivation review.
 
 ## Product Shape
 
@@ -145,7 +152,9 @@ Rules:
 ## Scraper Service
 
 The worker lives in [services/news-scraper](C:/repos/chat2.0/services/news-scraper).
-Production uses the Render blueprint in [render.yaml](C:/repos/chat2.0/render.yaml:1).
+When reactivated, it uses the Render blueprint in
+[render.yaml](C:/repos/chat2.0/render.yaml:1). The live worker must remain
+suspended and must not auto-deploy while News is paused.
 
 Required Render secrets:
 
@@ -231,7 +240,11 @@ Run the continuous worker locally:
 npm run news:scraper
 ```
 
-## Production Verification
+## Reactivation Verification
+
+Run these checks only as part of an approved News reactivation or a bounded
+read-only investigation. A normal production release should verify that the
+worker remains suspended instead of expecting fresh feed rows.
 
 Check source health:
 

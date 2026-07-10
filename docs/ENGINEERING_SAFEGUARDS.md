@@ -5,6 +5,14 @@ staging parity, device validation, and production monitoring. Integrations are
 safe to merge without vendor credentials; credentialed jobs fail closed or
 remain dormant until their protected environment is configured.
 
+Current release policy is main-only. The local and remote repository currently
+contain only `main`, with zero open pull requests. Netlify native Git builds are
+stopped; GitHub Actions owns backend-first production publication through a
+Netlify CLI upload. Workflow run `29061308774` completed successfully for commit
+`8e4e2757efe6555b90c6a566b0684c41da0e2b10`; Netlify deploy
+`6a5045191fe53dd504fc4131` reached `ready`, and the live entry bundle exposes
+the same SHA.
+
 ## Privacy-scrubbed telemetry
 
 Frontend and News-worker Sentry reporting is disabled unless the appropriate
@@ -47,7 +55,9 @@ handlers before their error contracts are reviewed.
 
 On `main`, the production workflow calls Quality, Security Scans, and CodeQL as
 reusable workflows and cannot enter the credentialed deploy job until every job
-passes. Pull requests and weekly schedules still run those safeguards directly.
+passes. Pull-request execution remains available only for an explicitly approved
+temporary review-branch exception; weekly schedules still run the relevant
+safeguards directly.
 
 `.gitleaksignore` contains five exact historical fingerprints only: three
 Firebase web-client identifiers from removed files and two README examples.
@@ -56,10 +66,13 @@ Firebase browser API keys are not server secrets, but the retired
 restricted in Google Cloud if that legacy project remains active. Do not add
 rule-wide or path-wide allowlists; investigate each new fingerprint.
 
-Netlify preview first validates PR code with no secrets. Preview deployment is
+The Netlify preview workflow is an exception-only facility and is dormant during
+normal main-only operation. If a temporary review branch is explicitly approved,
+the workflow first validates PR code with no secrets; preview deployment is then
 available only for same-repository, non-Dependabot PRs through the protected
-`netlify-preview` GitHub Environment. Configure required reviewers before
-adding Netlify secrets. Never use `pull_request_target` to run PR code.
+`netlify-preview` GitHub Environment. Configure required reviewers before adding
+Netlify secrets. Never use `pull_request_target` to run PR code, and remove the
+temporary branch after integration or rejection.
 
 ## Main-only repository policy
 
@@ -69,6 +82,45 @@ discarded. The production workflow is the release authority: every push to
 `main` must pass Quality, Security Scans, CodeQL, Supabase parity, and the
 Netlify deploy before it is considered shipped. Re-enable scheduled update PRs
 only if the repository deliberately returns to a review-branch workflow.
+
+## Production release authority and remote parity
+
+Netlify's native Git build service is stopped so it cannot publish a frontend
+before its backend. The protected `netlify-production.yml` workflow is the only
+normal publisher. It validates the repository, links and aligns Supabase,
+captures backend evidence, then uploads the already validated `dist` and
+functions directories with the pinned Netlify CLI.
+
+The credential gate requires nonempty Netlify and Supabase values and validates
+that `SUPABASE_ACCESS_TOKEN` is a newline-free `sbp_` personal access token. The
+project database password remains a separate `SUPABASE_DB_PASSWORD`; swapping
+the two or injecting newline/BOM data fails before dependency installation.
+Never expose either value through `VITE_*` variables.
+
+Confirmed production Supabase parity is:
+
+- migrations aligned through `20260710002000`, with linked dry run reporting no
+  pending migrations;
+- remote database lint at zero warnings;
+- 23 classified functions: eight active plus 15 ESP Bridge endpoints in
+  deny-paused mode, with `art-board-import-image` absent and no manifest/JWT
+  drift;
+- hosted advisor residuals explicitly documented as 71 guarded authenticated
+  `SECURITY DEFINER` APIs plus the single intentional anonymous pre-signup
+  username check;
+- leaked-password protection enabled with `password_hibp_enabled=true`.
+
+Each production run must capture migration and function evidence for its own
+SHA. A prior green artifact does not prove a newer commit. The latest verified
+implementation release is workflow `29061308774` for commit `8e4e275`, with
+backend evidence artifact
+`supabase-release-8e4e2757efe6555b90c6a566b0684c41da0e2b10`.
+
+Boards, News, Art Board, and ESP Bridge checks are reactivation-only. Routine
+release smoke verifies that their compiled surfaces stay absent/default-deny;
+it must not resume providers or exercise dormant mutation paths. The live Render
+`shado-news-scraper` worker is suspended, and both live and committed automatic
+deploy controls are off.
 
 ## Supabase staging parity
 

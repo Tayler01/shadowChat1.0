@@ -1,6 +1,6 @@
 # Paused Product Domains
 
-## Status - July 9, 2026
+## Status - July 10, 2026
 
 Boards, News, Art Board, and the ESP Bridge product surfaces are intentionally
 paused. Their implementation history, source, migrations, stored data, and
@@ -42,14 +42,23 @@ default build.
 
 ## Remote Services
 
+The production-alignment release at
+`8e69fe498827efa19e211ad0cb9ca9ec506c96ae` verified the following remote
+state. A frontend flag is still not sufficient on its own; the backend and
+provider controls below are part of the pause contract.
+
 ### News
 
-- The Render `shado-news-scraper` worker is suspended and should remain so.
-- `render.yaml` sets `autoDeployTrigger: off` to prevent code pushes from
-  automatically deploying the worker.
+- Live Render service `srv-d7pjc49j2pic73bq5m80` (`shado-news-scraper`) is a
+  suspended `background_worker` on branch `main`.
+- The live service reports `AutoDeploy=no` and `autoDeployTrigger=off`;
+  [render.yaml](C:/repos/chat2.0/render.yaml:1) preserves that setting so code
+  pushes do not automatically deploy the worker.
 - Supabase News tables, sources, history, and policies remain preserved.
-- A Render billing-plan cancellation or continued suspension is an operator
-  action; a frontend flag alone cannot stop a paid worker.
+- Repository variable `NEWS_MONITOR_ENABLED=false` keeps the production-health
+  workflow pause-aware while the worker is suspended.
+- Resuming or changing the Render billing plan is an operator action. Do not do
+  either until News is explicitly reapproved.
 
 ### Boards And Art Board
 
@@ -57,15 +66,25 @@ default build.
 - No client provider, badge query, or Board/Art realtime channel runs in the
   default build.
 - Existing direct component and hook tests remain active to prevent source rot.
+- The remote `art-board-import-image` Function is absent. Migration
+  [20260710002000_remote_security_advisor_cleanup.sql](C:/repos/chat2.0/supabase/migrations/20260710002000_remote_security_advisor_cleanup.sql:1)
+  revokes browser access to paused Art/Boards/News operations and removes broad
+  public bucket-list policies without deleting rows or Storage objects. Known
+  public object URLs remain available; broad anonymous browsing does not.
 
 ### ESP Bridge
 
 - The Settings pairing UI is absent from the default build.
 - Firmware, TUI, bootstrap tools, migrations, and Edge Function source remain.
-- Frontend hiding does not stop a powered bridge from calling deployed Edge
-  Functions. The production security-alignment rollout must revoke existing
-  bridge sessions and either remove the deployed `bridge-*` endpoints or
-  deploy a shared deny-by-default server hold before the pause is complete.
+- All 15 deployed `bridge-*` endpoints run the shared hold before request
+  parsing, authentication, or database work and return HTTP 503 with
+  `code: feature_paused`.
+- The release migration and automation verified 0 dedicated Auth sessions, 0
+  custom sessions, 0 pending pairing codes, 0 enabled devices, and 1 preserved
+  disabled device. This state must be re-verified on every production release.
+- Browser table privileges on the six paused Bridge tables are revoked. A
+  future reactivation requires deliberate grants plus fresh pairing and
+  sessions; it must not revive preserved credentials.
 
 ## Re-enable Checklist
 
@@ -73,7 +92,9 @@ Do not re-enable a flag by itself. A reviewed reactivation must:
 
 1. Confirm product ownership, expected usage, and provider cost.
 2. Re-run Supabase migration and Edge Function parity checks.
-3. Review current RLS, function ACLs, storage limits, and service-role paths.
+3. Review current RLS, function/table ACLs, Storage policies and limits, and
+   service-role paths. Restore only the grants and list/read behaviors required
+   by the approved product design.
 4. Restore or create the required Render/provider service deliberately.
 5. Build with the relevant flag set to `true` and confirm feature chunks return.
 6. Run dormant unit tests plus phone-sized browser and real-device QA.
