@@ -159,3 +159,24 @@ test('keeps image heart active when the RPC row omits viewer heart state', async
     viewer_has_hearted: true,
   })
 })
+
+test('hearts a cold exact Pin even when it is outside the loaded category page', async () => {
+  const coldImage = { ...image, id: 'cold-exact-pin', title: 'Cold exact Pin' }
+  mockToggleShadowPinImageHeart.mockResolvedValue({
+    ...coldImage,
+    heart_count: 1,
+    viewer_has_hearted: true,
+  })
+
+  const { result } = renderHook(() => useShadowPinImages(category.id))
+  await waitFor(() => expect(result.current.loading).toBe(false))
+
+  let updated: any
+  await act(async () => {
+    updated = await result.current.toggleHeart(coldImage.id, coldImage)
+  })
+
+  expect(mockToggleShadowPinImageHeart).toHaveBeenCalledWith(coldImage.id)
+  expect(updated).toMatchObject({ id: coldImage.id, heart_count: 1, viewer_has_hearted: true })
+  expect(result.current.images).toEqual([expect.objectContaining({ id: image.id })])
+})

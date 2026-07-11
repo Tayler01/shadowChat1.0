@@ -24,7 +24,37 @@ const CATEGORY_SELECT = `
 `
 
 export const SHADOW_PIN_IMAGE_SELECT = `
-  *,
+  id,
+  category_id,
+  creator_id,
+  title,
+  description,
+  image_url,
+  image_content_type,
+  image_size_bytes,
+  thumbnail_url,
+  medium_url,
+  image_width,
+  image_height,
+  processing_status,
+  processed_at,
+  media_type,
+  source_type,
+  source_url,
+  provider,
+  provider_asset_id,
+  provider_playback_id,
+  provider_payload,
+  video_preview_url,
+  video_playback_url,
+  video_hls_url,
+  video_embed_url,
+  duration_seconds,
+  video_size_bytes,
+  heart_count,
+  comment_count,
+  created_at,
+  updated_at,
   ${embedPublicProfile('creator', 'users!creator_id')},
   category:shadow_pin_categories!category_id(id, title),
   tag_links:shadow_pin_image_tags(tag:shadow_pin_tags(slug))
@@ -217,6 +247,7 @@ export async function fetchShadowPinImages(categoryId: string, page = 0) {
     .eq('category_id', categoryId)
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
     .range(from, to)
 
   if (error) throw error
@@ -250,6 +281,39 @@ export async function fetchShadowPinImage(imageId: string) {
   if (error) throw error
   if (!data) return null
   return attachViewerImageHeart(normalizeShadowPinImageRecord(data as unknown as ShadowPinImageRecord))
+}
+
+export async function fetchShadowPinImageNeighbors(image: ShadowPinImage) {
+  if (!image.category_id) return { previous: null, next: null }
+  const client = await getWorkingClient()
+  const cursorTime = image.created_at
+
+  const fetchNeighbor = async (direction: 'previous' | 'next') => {
+    const newer = direction === 'previous'
+    const tupleFilter = newer
+      ? `created_at.gt.${cursorTime},and(created_at.eq.${cursorTime},id.gt.${image.id})`
+      : `created_at.lt.${cursorTime},and(created_at.eq.${cursorTime},id.lt.${image.id})`
+    const { data, error } = await client
+      .from('shadow_pin_images')
+      .select(SHADOW_PIN_IMAGE_SELECT)
+      .eq('category_id', image.category_id!)
+      .is('deleted_at', null)
+      .or(tupleFilter)
+      .order('created_at', { ascending: newer })
+      .order('id', { ascending: newer })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) throw error
+    if (!data) return null
+    return attachViewerImageHeart(normalizeShadowPinImageRecord(data as unknown as ShadowPinImageRecord))
+  }
+
+  const [previous, next] = await Promise.all([
+    fetchNeighbor('previous'),
+    fetchNeighbor('next'),
+  ])
+  return { previous, next }
 }
 
 async function getSessionAccessToken() {
@@ -1021,25 +1085,97 @@ export async function searchShadowPinImages(searchQuery: string, limit = 30) {
   return attachImageHearts(ordered, hearts ?? [])
 }
 
-export async function fetchShadowPinComments(imageId: string) {
+const SHADOW_PIN_COMMENT_SELECT = `
+  id,
+  image_id,
+  author_id,
+  parent_comment_id,
+  body,
+  created_at,
+  updated_at,
+  ${embedPublicProfile('author', 'users!author_id')}
+`
+
+export const SHADOW_PIN_COMMENT_PAGE_SIZE = 40
+
+export type ShadowPinCommentCursor = {
+  createdAt: string
+  id: string
+}
+
+export type ShadowPinCommentPage = {
+  comments: ShadowPinComment[]
+  hasMore: boolean
+  nextCursor: ShadowPinCommentCursor | null
+}
+
+const compareShadowPinComments = (first: ShadowPinComment, second: ShadowPinComment) => {
+  const timeDifference = new Date(first.created_at).getTime() - new Date(second.created_at).getTime()
+  if (timeDifference !== 0) return timeDifference
+  return first.id.localeCompare(second.id)
+}
+
+export async function fetchShadowPinComments(
+  imageId: string,
+  cursor?: ShadowPinCommentCursor | null,
+  targetCommentId?: string
+): Promise<ShadowPinCommentPage> {
   const client = await getWorkingClient()
-  const { data, error } = await client
+  let query = client
     .from('shadow_pin_comments')
-    .select(`
-      id,
-      image_id,
-      author_id,
-      parent_comment_id,
-      body,
-      created_at,
-      updated_at,
-      ${embedPublicProfile('author', 'users!author_id')}
-    `)
+    .select(SHADOW_PIN_COMMENT_SELECT)
     .eq('image_id', imageId)
-    .order('created_at', { ascending: true })
-    .order('id', { ascending: true })
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(SHADOW_PIN_COMMENT_PAGE_SIZE + 1)
+
+  if (cursor) {
+    query = query.or(`created_at.lt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id})`)
+  }
+
+  const { data, error } = await query
   if (error) throw error
-  return (data ?? []) as unknown as ShadowPinComment[]
+  const pageRows = (data ?? []) as unknown as ShadowPinComment[]
+  const hasMore = pageRows.length > SHADOW_PIN_COMMENT_PAGE_SIZE
+  const visibleRows = pageRows.slice(0, SHADOW_PIN_COMMENT_PAGE_SIZE)
+  const supplementalRows: ShadowPinComment[] = []
+
+  if (targetCommentId && !visibleRows.some(comment => comment.id === targetCommentId)) {
+    const { data: target, error: targetError } = await client
+      .from('shadow_pin_comments')
+      .select(SHADOW_PIN_COMMENT_SELECT)
+      .eq('image_id', imageId)
+      .eq('id', targetCommentId)
+      .maybeSingle()
+    if (targetError) throw targetError
+    if (target) supplementalRows.push(target as unknown as ShadowPinComment)
+  }
+
+  const currentRows = [...visibleRows, ...supplementalRows]
+  const currentIds = new Set(currentRows.map(comment => comment.id))
+  const missingParentIds = Array.from(new Set(
+    currentRows
+      .map(comment => comment.parent_comment_id)
+      .filter((id): id is string => Boolean(id && !currentIds.has(id)))
+  ))
+  if (missingParentIds.length > 0) {
+    const { data: parents, error: parentError } = await client
+      .from('shadow_pin_comments')
+      .select(SHADOW_PIN_COMMENT_SELECT)
+      .eq('image_id', imageId)
+      .in('id', missingParentIds)
+    if (parentError) throw parentError
+    supplementalRows.push(...((parents ?? []) as unknown as ShadowPinComment[]))
+  }
+
+  const byId = new Map<string, ShadowPinComment>()
+  ;[...visibleRows, ...supplementalRows].forEach(comment => byId.set(comment.id, comment))
+  const boundary = visibleRows[visibleRows.length - 1]
+  return {
+    comments: Array.from(byId.values()).sort(compareShadowPinComments),
+    hasMore,
+    nextCursor: hasMore && boundary ? { createdAt: boundary.created_at, id: boundary.id } : null,
+  }
 }
 
 export async function createShadowPinComment(

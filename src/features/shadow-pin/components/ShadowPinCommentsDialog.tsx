@@ -13,6 +13,7 @@ import {
   fetchShadowPinComments,
   updateShadowPinComment,
 } from '../api/shadowPinApi'
+import type { ShadowPinCommentCursor } from '../api/shadowPinApi'
 import type { ShadowPinComment, ShadowPinImage } from '../types'
 
 const authorLabel = (comment: ShadowPinComment) =>
@@ -22,6 +23,15 @@ const formatCommentDate = (value: string) => {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
   return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
+const mergeComments = (...groups: ShadowPinComment[][]) => {
+  const byId = new Map<string, ShadowPinComment>()
+  groups.flat().forEach(comment => byId.set(comment.id, comment))
+  return Array.from(byId.values()).sort((first, second) => {
+    const timeDifference = new Date(first.created_at).getTime() - new Date(second.created_at).getTime()
+    return timeDifference || first.id.localeCompare(second.id)
+  })
 }
 
 function CommentCard({
@@ -64,7 +74,7 @@ function CommentCard({
               <button
                 type="button"
                 onClick={onReply}
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-[var(--text-muted)] hover:bg-[rgba(255,255,255,0.055)] hover:text-[var(--text-primary)]"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-[var(--text-muted)] hover:bg-[rgba(255,255,255,0.055)] hover:text-[var(--text-primary)]"
               >
                 <Reply className="h-3.5 w-3.5" /> Reply
               </button>
@@ -74,7 +84,7 @@ function CommentCard({
                     <button
                       type="button"
                       onClick={onEdit}
-                      className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-[var(--text-muted)] hover:bg-[rgba(255,255,255,0.055)] hover:text-[var(--text-primary)]"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-[var(--text-muted)] hover:bg-[rgba(255,255,255,0.055)] hover:text-[var(--text-primary)]"
                     >
                       <Edit3 className="h-3.5 w-3.5" /> Edit
                     </button>
@@ -83,7 +93,7 @@ function CommentCard({
                     <button
                       type="button"
                       onClick={onDelete}
-                      className="inline-flex min-h-9 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium text-red-300/80 hover:bg-red-950/30 hover:text-red-200"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-red-300/80 hover:bg-red-950/30 hover:text-red-200"
                     >
                       <Trash2 className="h-3.5 w-3.5" /> Delete
                     </button>
@@ -118,25 +128,50 @@ export function ShadowPinCommentsDialog({
   const [replyTo, setReplyTo] = useState<ShadowPinComment | null>(null)
   const [editing, setEditing] = useState<ShadowPinComment | null>(null)
   const [loading, setLoading] = useState(false)
+  const [loadingOlder, setLoadingOlder] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [olderCursor, setOlderCursor] = useState<ShadowPinCommentCursor | null>(null)
+  const [hasOlder, setHasOlder] = useState(false)
   const closeRef = useRef<HTMLButtonElement>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
+  const canonicalCountRef = useRef(Math.max(0, image.comment_count ?? 0))
   const dialogRef = useDialogAccessibility({ open, onClose, initialFocusRef: closeRef })
+
+  useEffect(() => {
+    canonicalCountRef.current = Math.max(0, image.comment_count ?? 0)
+  }, [image.comment_count, image.id])
 
   const refresh = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const nextComments = await fetchShadowPinComments(image.id)
-      setComments(nextComments)
-      onCountChange?.(nextComments.length)
+      const page = await fetchShadowPinComments(image.id, null, initialCommentId)
+      setComments(page.comments)
+      setOlderCursor(page.nextCursor)
+      setHasOlder(page.hasMore)
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Unable to load comments.')
     } finally {
       setLoading(false)
     }
-  }, [image.id, onCountChange])
+  }, [image.id, initialCommentId])
+
+  const loadOlder = async () => {
+    if (!olderCursor || loadingOlder) return
+    setLoadingOlder(true)
+    setError(null)
+    try {
+      const page = await fetchShadowPinComments(image.id, olderCursor)
+      setComments(current => mergeComments(page.comments, current))
+      setOlderCursor(page.nextCursor)
+      setHasOlder(page.hasMore)
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Unable to load earlier comments.')
+    } finally {
+      setLoadingOlder(false)
+    }
+  }
 
   useEffect(() => {
     if (!open) return
@@ -199,7 +234,8 @@ export function ShadowPinCommentsDialog({
       } else {
         const created = await createShadowPinComment(image.id, body, replyTo?.id)
         setComments(previous => [...previous, created])
-        onCountChange?.(comments.length + 1)
+        canonicalCountRef.current += 1
+        onCountChange?.(canonicalCountRef.current)
         toast.success(replyTo ? 'Reply posted' : 'Comment posted')
       }
       setBody('')
@@ -223,7 +259,8 @@ export function ShadowPinCommentsDialog({
           ? { ...candidate, parent_comment_id: null }
           : candidate)
       setComments(nextComments)
-      onCountChange?.(nextComments.length)
+      canonicalCountRef.current = Math.max(0, canonicalCountRef.current - 1)
+      onCountChange?.(canonicalCountRef.current)
       if (replyTo?.id === comment.id || editing?.id === comment.id) {
         setReplyTo(null)
         setEditing(null)
@@ -239,19 +276,30 @@ export function ShadowPinCommentsDialog({
 
   if (!open) return null
 
+  const pinPreviewUrl = image.thumbnail_url || image.medium_url || image.image_url
+  const pinCreator = image.creator?.display_name || image.creator?.username || 'ShadowChat member'
+
   return createPortal(
-    <div className="fixed inset-0 z-[110] flex items-end justify-center bg-[var(--bg-overlay)] backdrop-blur-md sm:items-center sm:p-4">
+    <div className="fixed inset-x-0 top-0 z-[110] flex h-[var(--shadowchat-visual-viewport-height,100dvh)] items-end justify-center bg-black/48 backdrop-blur-[2px] sm:items-center sm:p-4">
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="shadow-pin-comments-title"
-        className="popup-surface flex h-[min(90dvh,48rem)] w-full flex-col rounded-t-[var(--radius-xl)] border border-[var(--border-panel)] sm:max-w-2xl sm:rounded-[var(--radius-xl)]"
+        className="popup-surface flex h-[min(calc(var(--shadowchat-visual-viewport-height,100dvh)-env(safe-area-inset-top)-0.5rem),48rem)] w-full flex-col rounded-t-[var(--radius-xl)] border border-[var(--border-panel)] sm:max-w-2xl sm:rounded-[var(--radius-xl)]"
       >
         <div className="flex items-start justify-between gap-3 border-b border-[var(--border-subtle)] p-4">
-          <div className="min-w-0">
-            <p className="text-[0.68rem] uppercase tracking-[0.18em] text-[var(--text-muted)]">ShadowPin conversation</p>
-            <h2 id="shadow-pin-comments-title" className="mt-1 truncate text-xl font-semibold text-[var(--text-primary)]">{image.title}</h2>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <img
+              src={pinPreviewUrl}
+              alt=""
+              className="h-12 w-12 shrink-0 rounded-[var(--radius-md)] border border-[var(--border-subtle)] object-cover"
+            />
+            <div className="min-w-0">
+              <p className="text-[0.68rem] uppercase tracking-[0.18em] text-[var(--text-muted)]">ShadowPin conversation</p>
+              <h2 id="shadow-pin-comments-title" className="mt-1 truncate text-xl font-semibold text-[var(--text-primary)]">{image.title}</h2>
+              <p className="truncate text-xs text-[var(--text-muted)]">{pinCreator} · {image.comment_count ?? comments.length} comments</p>
+            </div>
           </div>
           <button
             ref={closeRef}
@@ -266,9 +314,9 @@ export function ShadowPinCommentsDialog({
 
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
           {loading ? (
-            <div className="flex min-h-40 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-[var(--text-gold)]" /></div>
+            <div className="flex min-h-40 items-center justify-center gap-2" role="status" aria-label="Loading ShadowPin comments"><Loader2 className="h-6 w-6 animate-spin text-[var(--text-gold)]" /><span className="sr-only">Loading comments</span></div>
           ) : error && comments.length === 0 ? (
-            <div className="rounded-[var(--radius-md)] border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100">
+            <div className="rounded-[var(--radius-md)] border border-red-400/30 bg-red-500/10 p-4 text-sm text-red-100" role="alert">
               {error}
               <Button type="button" variant="secondary" className="mt-3 w-full" onClick={() => void refresh()}>Try again</Button>
             </div>
@@ -280,6 +328,17 @@ export function ShadowPinCommentsDialog({
             </div>
           ) : (
             <div className="space-y-3">
+              {hasOlder && (
+                <button
+                  type="button"
+                  onClick={() => void loadOlder()}
+                  disabled={loadingOlder}
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-[var(--border-subtle)] px-4 text-sm font-semibold text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.05)] disabled:opacity-55"
+                >
+                  {loadingOlder && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {loadingOlder ? 'Loading earlier comments' : 'Load earlier comments'}
+                </button>
+              )}
               {rootComments.map(comment => (
                 <div key={comment.id} className="space-y-2">
                   <CommentCard
@@ -314,17 +373,17 @@ export function ShadowPinCommentsDialog({
           {(replyTo || editing) && (
             <div className="mb-2 flex items-center justify-between gap-2 rounded-[var(--radius-sm)] bg-[rgba(255,255,255,0.04)] px-3 py-2 text-xs text-[var(--text-muted)]">
               <span className="truncate">{editing ? 'Editing your comment' : `Replying to ${authorLabel(replyTo!)}`}</span>
-              <button type="button" onClick={() => { setReplyTo(null); setEditing(null); setBody('') }} className="min-h-8 px-2 text-[var(--text-gold)]">Cancel</button>
+              <button type="button" onClick={() => { setReplyTo(null); setEditing(null); setBody('') }} className="min-h-11 rounded-full px-3 text-[var(--text-gold)]">Cancel</button>
             </div>
           )}
-          {error && comments.length > 0 && <p className="mb-2 text-sm text-red-200">{error}</p>}
+          {error && comments.length > 0 && <p className="mb-2 text-sm text-red-200" role="alert" aria-live="assertive">{error}</p>}
           <div className="flex items-end gap-2">
             <textarea
               ref={composerRef}
               value={body}
               onChange={event => setBody(event.target.value)}
               onKeyDown={event => {
-                if (event.key === 'Enter' && !event.shiftKey) {
+                if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
                   event.preventDefault()
                   void submit()
                 }
@@ -334,17 +393,20 @@ export function ShadowPinCommentsDialog({
               className="obsidian-input min-h-11 flex-1 resize-none rounded-[var(--radius-md)] px-3 py-2.5 text-base"
               placeholder={replyTo ? 'Write a reply…' : 'Add a comment…'}
               aria-label={replyTo ? `Reply to ${authorLabel(replyTo)}` : 'Add a ShadowPin comment'}
+              aria-describedby="shadow-pin-comment-composer-help"
             />
             <button
               type="button"
               onClick={() => void submit()}
               disabled={!body.trim() || saving}
-              className="theme-floating-action inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full disabled:cursor-not-allowed disabled:opacity-45"
+              className="theme-floating-action inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full disabled:cursor-not-allowed disabled:opacity-45"
               aria-label={editing ? 'Save edited comment' : replyTo ? 'Post reply' : 'Post comment'}
+              aria-busy={saving}
             >
               {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
             </button>
           </div>
+          <p id="shadow-pin-comment-composer-help" className="sr-only">Press Enter to post. Press Shift and Enter for a new line.</p>
         </div>
       </div>
     </div>,

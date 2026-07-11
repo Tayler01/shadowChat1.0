@@ -48,7 +48,7 @@ export interface ShadowPinImage {
   title: string
   description?: string | null
   image_url: string
-  image_path: string
+  image_path?: string
   image_content_type?: string | null
   image_size_bytes?: number | null
   thumbnail_url?: string | null

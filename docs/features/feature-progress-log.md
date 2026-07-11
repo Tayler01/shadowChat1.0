@@ -39,7 +39,7 @@ Canonical detail and release gates live in:
   `codex/shadowchat-2.0` branch, preserve the production frontend and shared
   Supabase contract, then publish a separate installable Netlify test site.
 - Started: 2026-07-11
-- Status: active; Candidate 1 of 5 verified locally.
+- Status: active; Candidates 1 and 2 of 5 verified locally.
 - Candidate 1: Unified Activity HQ with an authoritative recipient ledger,
   realtime/recovery, exact Chat/DM/Pin routes, five-item phone navigation,
   accessible unread handling, and hard-bounded foreground toast lifetime.
@@ -51,6 +51,15 @@ Canonical detail and release gates live in:
   increment, keyboard/focus review, and no final console errors.
 - Roadmap: [SHADOWCHAT_2_0_WAVE_ONE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_ONE.md:1)
 - Feature contract: [ACTIVITY_HQ.md](C:/repos/chat2.0/docs/ACTIVITY_HQ.md:1)
+- Candidate 2: ShadowPin Theater with one-tap immersive viewing, bounded cold
+  exact links, horizontal paging and layered history, media lifecycle and
+  third-party consent, zoom/swipe arbitration, visual-viewport Comments, and
+  keyset comment pages.
+- Candidate 2 proof: 84 focused tests plus 151-suite/752-test full regression;
+  authenticated two-page PostgREST cursor proof; Android Chromium and actual
+  WebKit phone acceptance with 48px control, history, comments, zoom,
+  safe-area, and consent verification.
+- Candidate 2 contract: [SHADOW_PIN_THEATER.md](C:/repos/chat2.0/docs/SHADOW_PIN_THEATER.md:1)
 
 ### Shadow Runner Playable Prototype Prep
 

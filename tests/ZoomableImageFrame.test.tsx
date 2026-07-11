@@ -17,9 +17,9 @@ const setFrameGeometry = (frame: HTMLElement) => {
   }))
 }
 
-const renderZoomableImage = () => {
+const renderZoomableImage = (onZoomChange?: (zoomed: boolean) => void) => {
   const { container } = render(
-    <ZoomableImageFrame>
+    <ZoomableImageFrame onZoomChange={onZoomChange}>
       <img src="https://example.com/photo.jpg" alt="Zoom target" />
     </ZoomableImageFrame>
   )
@@ -62,6 +62,17 @@ test('double click zooms an opened image and exposes reset', () => {
   expect(content.style.transform).toContain('scale(1)')
 })
 
+test('keyboard and switch users can zoom with 48px controls', () => {
+  const { content } = renderZoomableImage()
+  const zoomIn = screen.getByRole('button', { name: /zoom in/i })
+  expect(zoomIn).toHaveClass('h-12', 'w-12')
+
+  fireEvent.click(zoomIn)
+  expect(content.style.transform).toContain('scale(1.8)')
+  expect(screen.getByRole('button', { name: /zoom out/i })).toHaveClass('h-12', 'w-12')
+  expect(screen.getByRole('button', { name: /reset image zoom/i })).toHaveClass('h-12', 'w-12')
+})
+
 test('pinch gesture scales an opened image', () => {
   const { frame, content } = renderZoomableImage()
 
@@ -70,4 +81,36 @@ test('pinch gesture scales an opened image', () => {
   firePointer(frame, 'pointermove', { pointerId: 2, pointerType: 'touch', clientX: 300, clientY: 100 })
 
   expect(content.style.transform).toContain('scale(2)')
+})
+
+test('reports zoom state so Theater can arbitrate paging gestures', () => {
+  const onZoomChange = jest.fn()
+  const { frame } = renderZoomableImage(onZoomChange)
+
+  fireEvent.doubleClick(frame, { clientX: 200, clientY: 200 })
+  expect(onZoomChange).toHaveBeenLastCalledWith(true)
+
+  fireEvent.click(screen.getByRole('button', { name: /reset image zoom/i }))
+  expect(onZoomChange).toHaveBeenLastCalledWith(false)
+})
+
+test('does not reset zoom when a parent supplies a new callback identity', () => {
+  const firstCallback = jest.fn()
+  const view = render(
+    <ZoomableImageFrame onZoomChange={firstCallback}>
+      <img src="https://example.com/photo.jpg" alt="Zoom target" />
+    </ZoomableImageFrame>
+  )
+  const frame = view.container.querySelector('[data-zoomable-image-frame="true"]') as HTMLElement
+  const content = view.container.querySelector('[data-zoomable-image-content="true"]') as HTMLElement
+  setFrameGeometry(frame)
+  fireEvent.click(screen.getByRole('button', { name: /zoom in/i }))
+  expect(content.style.transform).toContain('scale(1.8)')
+
+  view.rerender(
+    <ZoomableImageFrame onZoomChange={() => undefined}>
+      <img src="https://example.com/photo.jpg" alt="Zoom target" />
+    </ZoomableImageFrame>
+  )
+  expect(content.style.transform).toContain('scale(1.8)')
 })

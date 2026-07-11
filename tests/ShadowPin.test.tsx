@@ -149,6 +149,10 @@ const fireShadowPinPointer = (
   fireEvent(element, event)
 }
 
+const openPinFromCard = (card: Element) => {
+  fireEvent.click(within(card as HTMLElement).getByRole('button', { name: /^Open “/ }))
+}
+
 beforeEach(() => {
   mockAuthUser = {
     id: 'user-1',
@@ -160,7 +164,11 @@ beforeEach(() => {
   Object.values(mockShadowPinActivityTracker).forEach(mockFn => mockFn.mockReset())
   mockUseShadowPinCategoryDwell.mockReset()
   mockToggleCategoryHeart.mockResolvedValue(undefined)
-  mockToggleImageHeart.mockResolvedValue(undefined)
+  mockToggleImageHeart.mockImplementation(async (_imageId, fallback) => fallback ? {
+    ...fallback,
+    heart_count: Math.max(0, fallback.heart_count + (fallback.viewer_has_hearted ? -1 : 1)),
+    viewer_has_hearted: !fallback.viewer_has_hearted,
+  } : undefined)
 
   mockUseShadowPinCategories.mockReturnValue({
     categories: [category],
@@ -279,12 +287,8 @@ test('hides the video label in the feed until pin details are active', () => {
     expect(videoCard).not.toBeNull()
     expect(screen.queryByText('Video')).not.toBeInTheDocument()
 
-    fireEvent.click(videoCard!)
-    act(() => {
-      jest.advanceTimersByTime(240)
-    })
-
-    expect(screen.getByText('Video')).toBeInTheDocument()
+    openPinFromCard(videoCard!)
+    expect(screen.getByRole('dialog', { name: 'Pin clip' })).toBeInTheDocument()
   } finally {
     HTMLMediaElement.prototype.play = originalPlay
     jest.useRealTimers()
@@ -476,10 +480,7 @@ test('keeps uploaded Bunny feed videos on native playback when sound is enabled'
       expect(container.querySelector('video')).toHaveAttribute('src', 'https://vz.example/video-guid/play_480p.mp4')
     })
 
-    fireEvent.click(videoCard!)
-    act(() => {
-      jest.advanceTimersByTime(240)
-    })
+    fireEvent.click(within(videoCard!).getByRole('button', { name: 'Show actions for Pin bunny-feed' }))
     fireEvent.click(screen.getByLabelText('Unmute video'))
 
     await waitFor(() => {
@@ -1268,17 +1269,16 @@ test('opens Bunny embed videos in the fullscreen viewer when direct renditions a
     const videoCard = screen.getByAltText('Pin bunny').closest('article')
     expect(videoCard).not.toBeNull()
 
-    fireEvent.click(videoCard!)
-    fireEvent.click(videoCard!)
+    openPinFromCard(videoCard!)
 
     const viewerFrame = screen.getByTitle('Pin bunny')
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('player.mediadelivery.net'))
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('autoplay=true'))
     expect(viewerFrame).toHaveAttribute('src', expect.not.stringContaining('controls=false'))
     const srcBeforeUnmute = viewerFrame.getAttribute('src')
-    fireEvent.click(screen.getByLabelText('Unmute video'))
+    fireEvent.click(screen.getByLabelText('Unmute viewer media'))
     expect(viewerFrame).toHaveAttribute('src', srcBeforeUnmute)
-    expect(screen.getByLabelText('Mute video')).toBeInTheDocument()
+    expect(screen.getByLabelText('Mute viewer media')).toBeInTheDocument()
   } finally {
     jest.useRealTimers()
   }
@@ -1312,19 +1312,18 @@ test('opens uploaded Bunny videos with native renditions in the fullscreen viewe
   })
 
   try {
-    const { container } = render(<ShadowPin onBack={() => {}} />)
+    render(<ShadowPin onBack={() => {}} />)
 
     fireEvent.click(screen.getByText('Fam & Friends'))
     const videoCard = screen.getByAltText('Pin bunny-native').closest('article')
     expect(videoCard).not.toBeNull()
 
-    fireEvent.click(videoCard!)
-    fireEvent.click(videoCard!)
+    openPinFromCard(videoCard!)
 
-    expect(container.querySelector('video')).toHaveAttribute('src', 'https://vz.example/video-guid/play_1080p.mp4')
-    expect(container.querySelector('iframe')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByLabelText('Unmute video'))
-    expect(screen.getByLabelText('Mute video')).toBeInTheDocument()
+    expect(document.body.querySelector('[data-viewer-active-media] video')).toHaveAttribute('src', 'https://vz.example/video-guid/play_1080p.mp4')
+    expect(document.body.querySelector('[data-viewer-active-media] iframe')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByLabelText('Unmute viewer media'))
+    expect(screen.getByLabelText('Mute viewer media')).toBeInTheDocument()
   } finally {
     jest.useRealTimers()
   }
@@ -1376,14 +1375,13 @@ test('unmutes Bunny fullscreen players after the iframe player is ready', async 
     const videoCard = screen.getByAltText('Pin bunny-audio').closest('article')
     expect(videoCard).not.toBeNull()
 
-    fireEvent.click(videoCard!)
-    fireEvent.click(videoCard!)
+    openPinFromCard(videoCard!)
 
     const viewerFrame = screen.getByTitle('Pin bunny-audio')
     fireEvent.load(viewerFrame)
     await waitFor(() => expect(mute).toHaveBeenCalled())
 
-    fireEvent.click(screen.getByLabelText('Unmute video'))
+    fireEvent.click(screen.getByLabelText('Unmute viewer media'))
     await waitFor(() => expect(unmute).toHaveBeenCalled())
 
     act(() => {
@@ -1431,13 +1429,10 @@ test('shows iframe video sound controls in pin details without reloading the pla
     const videoCard = screen.getByAltText('Pin youtube-detail').closest('article')
     expect(videoCard).not.toBeNull()
 
-    fireEvent.click(videoCard!)
-    act(() => {
-      jest.advanceTimersByTime(240)
-    })
-
-    fireEvent.click(screen.getByLabelText('Unmute video'))
-    expect(screen.getByLabelText('Mute video')).toBeInTheDocument()
+    openPinFromCard(videoCard!)
+    fireEvent.click(screen.getByRole('button', { name: 'Load YouTube' }))
+    fireEvent.click(screen.getByLabelText('Unmute viewer media'))
+    expect(screen.getByLabelText('Mute viewer media')).toBeInTheDocument()
   } finally {
     jest.useRealTimers()
   }
@@ -1476,8 +1471,8 @@ test('opens legacy Pinterest video pins with the Pinterest oEmbed iframe', () =>
     const videoCard = screen.getByAltText('Pin pinterest').closest('article')
     expect(videoCard).not.toBeNull()
 
-    fireEvent.click(videoCard!)
-    fireEvent.click(videoCard!)
+    openPinFromCard(videoCard!)
+    fireEvent.click(screen.getByRole('button', { name: 'Load Pinterest' }))
 
     const viewerFrame = screen.getByTitle('Pin pinterest')
     expect(viewerFrame).toHaveAttribute('src', 'https://assets.pinterest.com/ext/embed.html?id=342906959154248010&src=shado-pin')
@@ -1525,8 +1520,8 @@ test('opens X pins with the official rich embed renderer', () => {
     const videoCard = screen.getByAltText('Pin x-rich').closest('article')
     expect(videoCard).not.toBeNull()
 
-    fireEvent.click(videoCard!)
-    fireEvent.click(videoCard!)
+    openPinFromCard(videoCard!)
+    fireEvent.click(screen.getByRole('button', { name: 'Load X' }))
 
     const viewerFrame = screen.getByTitle('Pin x-rich')
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('platform.twitter.com/embed/Tweet.html'))
@@ -1578,8 +1573,9 @@ test('prefers direct X video playback over the post embed when media is availabl
     const videoCard = screen.getByAltText('Pin x-direct').closest('article')
     expect(videoCard).not.toBeNull()
 
-    fireEvent.click(videoCard!)
-    fireEvent.click(videoCard!)
+    openPinFromCard(videoCard!)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load X' }))
 
     const viewerVideo = document.body.querySelector('video')
     expect(viewerVideo).toHaveAttribute('src', 'https://video.twimg.com/ext_tw_video/123/pu/vid/720x1280/direct.mp4')
@@ -1621,8 +1617,8 @@ test('opens Instagram pins with a fallback rich embed when oEmbed metadata is un
     const videoCard = screen.getByAltText('Pin instagram-rich').closest('article')
     expect(videoCard).not.toBeNull()
 
-    fireEvent.click(videoCard!)
-    fireEvent.click(videoCard!)
+    openPinFromCard(videoCard!)
+    fireEvent.click(screen.getByRole('button', { name: 'Load Instagram' }))
 
     const viewerFrame = screen.getByTitle('Pin instagram-rich')
     expect(viewerFrame).toHaveAttribute('src', 'https://www.instagram.com/reel/thumbOnly/embed')
@@ -1712,8 +1708,8 @@ test('opens YouTube video pins with fullscreen player controls', () => {
     const videoCard = screen.getByAltText('Pin youtube').closest('article')
     expect(videoCard).not.toBeNull()
 
-    fireEvent.click(videoCard!)
-    fireEvent.click(videoCard!)
+    openPinFromCard(videoCard!)
+    fireEvent.click(screen.getByRole('button', { name: 'Load YouTube' }))
 
     const viewerFrame = screen.getByTitle('Pin youtube')
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('www.youtube.com/embed/Czrv1RX19G0'))
@@ -1721,9 +1717,9 @@ test('opens YouTube video pins with fullscreen player controls', () => {
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('mute=1'))
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('controls=1'))
     const srcBeforeUnmute = viewerFrame.getAttribute('src')
-    fireEvent.click(screen.getByLabelText('Unmute video'))
+    fireEvent.click(screen.getByLabelText('Unmute viewer media'))
     expect(viewerFrame).toHaveAttribute('src', srcBeforeUnmute)
-    expect(screen.getByLabelText('Mute video')).toBeInTheDocument()
+    expect(screen.getByLabelText('Mute viewer media')).toBeInTheDocument()
   } finally {
     jest.useRealTimers()
   }
@@ -1990,7 +1986,7 @@ test('category list scroll cancels pending category edit', () => {
   }
 })
 
-test('ShadowPin image single tap reveals a static heart count without direct image-card controls', () => {
+test('ShadowPin image single tap opens Theater with accessible engagement controls', () => {
   jest.useFakeTimers()
   mockUseShadowPinImages.mockReturnValue({
     category,
@@ -2021,29 +2017,34 @@ test('ShadowPin image single tap reveals a static heart count without direct ima
 
     const likedImageCard = screen.getByAltText('Pin one').closest('article')
     expect(likedImageCard).not.toBeNull()
-    fireEvent.click(likedImageCard!)
+    openPinFromCard(likedImageCard!)
     act(() => {
       jest.advanceTimersByTime(230)
     })
 
-    expect(screen.getByTestId('shadow-pin-image-like-count')).toHaveTextContent('4')
-    expect(screen.queryByRole('button', { name: /like shadowpin item/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /edit image/i })).not.toBeInTheDocument()
+    const theater = screen.getByTestId('shadow-pin-theater')
+    expect(theater).toHaveAttribute('role', 'dialog')
+    expect(within(theater).getByRole('button', { name: /heart pin one, 4 hearts/i })).toHaveAttribute('aria-pressed', 'false')
+    const nextPin = within(theater).getByLabelText('Next Pin')
+    fireEvent.click(within(theater).getByRole('button', { name: /zoom in/i }))
+    expect(nextPin).toBeDisabled()
+    fireEvent.click(within(theater).getByRole('button', { name: /reset image zoom/i }))
+    fireEvent.click(within(theater).getByLabelText('Close ShadowPin Theater'))
 
     const emptyImageCard = screen.getByAltText('Pin two').closest('article')
     expect(emptyImageCard).not.toBeNull()
-    fireEvent.click(emptyImageCard!)
+    openPinFromCard(emptyImageCard!)
     act(() => {
       jest.advanceTimersByTime(230)
     })
 
-    expect(screen.queryByTestId('shadow-pin-image-like-count')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('shadow-pin-theater')).getByRole('button', { name: /heart pin two, 0 hearts/i })).toHaveAttribute('aria-pressed', 'false')
   } finally {
     jest.useRealTimers()
   }
 })
 
-test('ShadowPin image double tap opens the fullscreen detail viewer', () => {
+test('ShadowPin image opener launches the fullscreen Theater immediately', () => {
   jest.useFakeTimers()
 
   try {
@@ -2065,7 +2066,7 @@ test('ShadowPin image double tap opens the fullscreen detail viewer', () => {
       clientX: 160,
       clientY: 320,
     })
-    fireEvent.click(imageCard!)
+    openPinFromCard(imageCard!)
 
     act(() => {
       jest.advanceTimersByTime(120)
@@ -2084,7 +2085,7 @@ test('ShadowPin image double tap opens the fullscreen detail viewer', () => {
     })
     fireEvent.click(imageCard!)
 
-    expect(screen.getByRole('heading', { name: 'Pin one' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Pin one' })).toBeInTheDocument()
   } finally {
     jest.useRealTimers()
   }
@@ -2174,7 +2175,7 @@ test('ShadowPin image long-press opens a radial thumb menu and slide-heart trigg
       clientY: 230,
     })
 
-    expect(mockToggleImageHeart).toHaveBeenCalledWith('one')
+    expect(mockToggleImageHeart).toHaveBeenCalledWith('one', expect.objectContaining({ id: 'one' }))
     expect(screen.queryByTestId('shadow-pin-radial-menu')).not.toBeInTheDocument()
     expect(screen.getByTestId('shadow-pin-action-feedback')).toHaveAttribute('data-action', 'heart')
     expect(screen.getByTestId('shadow-pin-action-heart-burst')).toBeInTheDocument()
@@ -2222,7 +2223,7 @@ test('ShadowPin radial comment opens the existing comments conversation', () => 
       jest.advanceTimersByTime(90)
     })
 
-    expect(screen.getByRole('dialog', { name: 'Pin one' })).toBeInTheDocument()
+    expect(screen.getByTestId('shadow-pin-theater')).toBeInTheDocument()
     expect(screen.getByLabelText('Add a ShadowPin comment')).toBeInTheDocument()
     expect(screen.getByTestId('shadow-pin-action-feedback')).toHaveAttribute('data-action', 'comment')
   } finally {
@@ -2497,7 +2498,7 @@ test('ShadowPin radial share opens the share sheet and copy action copies the im
     })
 
     expect(screen.getByTestId('shadow-pin-share-sheet')).toBeInTheDocument()
-    expect(screen.getByLabelText('Pin share link')).toHaveValue('https://images.example/one.jpg')
+    expect(screen.getByLabelText('Pin share link')).toHaveValue('http://localhost/?view=pins&pin=one')
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /^copy$/i }))
@@ -2507,7 +2508,7 @@ test('ShadowPin radial share opens the share sheet and copy action copies the im
     await waitFor(() => {
       expect(screen.queryByTestId('shadow-pin-share-sheet')).not.toBeInTheDocument()
     })
-    expect(writeText).toHaveBeenCalledWith('https://images.example/one.jpg')
+    expect(writeText).toHaveBeenCalledWith('http://localhost/?view=pins&pin=one')
     expect(screen.getByTestId('shadow-pin-action-feedback')).toHaveAttribute('data-action', 'share')
   } finally {
     Object.defineProperty(navigator, 'clipboard', {
@@ -2679,7 +2680,7 @@ test('ShadowPin radial share opens a selectable fallback sheet when copy is bloc
     })
 
     expect(screen.getByTestId('shadow-pin-share-sheet')).toBeInTheDocument()
-    expect(screen.getByLabelText('Pin share link')).toHaveValue('https://images.example/one.jpg')
+    expect(screen.getByLabelText('Pin share link')).toHaveValue('http://localhost/?view=pins&pin=one')
 
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /^copy$/i }))

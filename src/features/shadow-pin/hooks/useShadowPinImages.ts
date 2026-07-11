@@ -143,7 +143,7 @@ export function useShadowPinImages(categoryId: string | null) {
   const [error, setError] = useState<string | null>(null)
 
   const loadPage = useCallback(async (targetPage: number, append = false, force = false) => {
-    if (!categoryId) return
+    if (!categoryId) throw new Error('Category is required.')
 
     const nextCacheKey = getImageCacheKey(cacheUserId, categoryId)
     const freshCache = getFreshImageCache(nextCacheKey)
@@ -176,7 +176,10 @@ export function useShadowPinImages(categoryId: string | null) {
       setPage(targetPage)
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load images')
+      const hasLoadedImages = (imageCacheByCategoryId.get(nextCacheKey)?.images.length ?? 0) > 0
+      if (!append || !hasLoadedImages) {
+        setError(err instanceof Error ? err.message : 'Unable to load images')
+      }
     } finally {
       setLoading(false)
     }
@@ -316,14 +319,14 @@ export function useShadowPinImages(categoryId: string | null) {
     }
   }, [cacheUserId, categoryId])
 
-  const toggleHeart = useCallback(async (imageId: string) => {
-    if (!categoryId) return
+  const toggleHeart = useCallback(async (imageId: string, fallbackImage?: ShadowPinImage) => {
+    if (!categoryId) throw new Error('Category is required.')
     const currentCacheKey = getImageCacheKey(cacheUserId, categoryId)
     const currentImage = (images.find(image => image.id === imageId)
       ? images
       : imageCacheByCategoryId.get(currentCacheKey)?.images ?? images)
-      .find(image => image.id === imageId)
-    if (!currentImage) return
+      .find(image => image.id === imageId) ?? fallbackImage
+    if (!currentImage) throw new Error('Pin is not available.')
 
     let previousImages: ShadowPinImage[] = []
     const nextViewerHasHearted = !currentImage.viewer_has_hearted
@@ -355,6 +358,7 @@ export function useShadowPinImages(categoryId: string | null) {
           : existing),
       }))
       if (nextEntry) setImages(nextEntry.images)
+      return { ...currentImage, ...image, viewer_has_hearted: resolvedViewerHasHearted }
     } catch (err) {
       setImages(previousImages)
       updateImageCache(currentCacheKey, current => ({
@@ -364,6 +368,22 @@ export function useShadowPinImages(categoryId: string | null) {
       throw err
     }
   }, [cacheUserId, categoryId, images])
+
+  const setCommentCount = useCallback((imageId: string, count: number) => {
+    if (!categoryId) return
+    const nextCount = Math.max(0, Math.trunc(Number(count) || 0))
+    setImages(current => current.map(image => image.id === imageId
+      ? { ...image, comment_count: nextCount }
+      : image
+    ))
+    updateImageCache(getImageCacheKey(cacheUserId, categoryId), current => ({
+      ...current,
+      images: current.images.map(image => image.id === imageId
+        ? { ...image, comment_count: nextCount }
+        : image
+      ),
+    }))
+  }, [cacheUserId, categoryId])
 
   return useMemo(() => ({
     category,
@@ -378,5 +398,6 @@ export function useShadowPinImages(categoryId: string | null) {
     updateImage,
     removeImage,
     toggleHeart,
-  }), [category, createImage, error, hasMore, images, loadMore, loading, refresh, removeImage, saving, toggleHeart, updateImage])
+    setCommentCount,
+  }), [category, createImage, error, hasMore, images, loadMore, loading, refresh, removeImage, saving, setCommentCount, toggleHeart, updateImage])
 }

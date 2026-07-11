@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { RotateCcw } from 'lucide-react'
+import { RotateCcw, ZoomIn, ZoomOut } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
 const MIN_SCALE = 1
@@ -42,6 +42,8 @@ interface ZoomableImageFrameProps {
   contentClassName?: string
   resetKey?: string | number
   resetLabel?: string
+  controlsPosition?: 'top' | 'bottom'
+  onZoomChange?: (zoomed: boolean) => void
 }
 
 const initialTransform: Transform = { scale: 1, x: 0, y: 0 }
@@ -63,12 +65,17 @@ export const ZoomableImageFrame: React.FC<ZoomableImageFrameProps> = ({
   contentClassName,
   resetKey,
   resetLabel = 'Reset image zoom',
+  controlsPosition = 'bottom',
+  onZoomChange,
 }) => {
   const frameRef = useRef<HTMLDivElement | null>(null)
   const pointersRef = useRef<Map<number, StoredPointer>>(new Map())
   const gestureRef = useRef<GestureState | null>(null)
   const transformRef = useRef<Transform>(initialTransform)
   const [transform, setTransform] = useState<Transform>(initialTransform)
+  const zoomedRef = useRef(false)
+  const onZoomChangeRef = useRef(onZoomChange)
+  onZoomChangeRef.current = onZoomChange
 
   const setClampedTransform = useCallback((next: Transform) => {
     const frame = frameRef.current
@@ -85,6 +92,11 @@ export const ZoomableImageFrame: React.FC<ZoomableImageFrameProps> = ({
 
     transformRef.current = clamped
     setTransform(clamped)
+    const nextZoomed = clamped.scale > MIN_SCALE + 0.01
+    if (nextZoomed !== zoomedRef.current) {
+      zoomedRef.current = nextZoomed
+      onZoomChangeRef.current?.(nextZoomed)
+    }
   }, [])
 
   const reset = useCallback(() => {
@@ -96,6 +108,10 @@ export const ZoomableImageFrame: React.FC<ZoomableImageFrameProps> = ({
   useEffect(() => {
     reset()
   }, [reset, resetKey])
+
+  useEffect(() => () => {
+    if (zoomedRef.current) onZoomChangeRef.current?.(false)
+  }, [])
 
   const getLocalPoint = useCallback((clientX: number, clientY: number): Point => {
     const rect = frameRef.current?.getBoundingClientRect()
@@ -138,6 +154,8 @@ export const ZoomableImageFrame: React.FC<ZoomableImageFrameProps> = ({
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return
+    const target = event.target instanceof Element ? event.target : null
+    if (target?.closest('button,a,input,textarea,select,[data-viewer-no-swipe]')) return
 
     const point = getLocalPoint(event.clientX, event.clientY)
     const pointer = { pointerId: event.pointerId, ...point }
@@ -228,6 +246,11 @@ export const ZoomableImageFrame: React.FC<ZoomableImageFrameProps> = ({
     zoomAtPoint(getLocalPoint(event.clientX, event.clientY), transformRef.current.scale * delta)
   }
 
+  const zoomFromCenter = (factor: number) => {
+    const frame = frameRef.current
+    zoomAtPoint({ x: (frame?.clientWidth ?? 0) / 2, y: (frame?.clientHeight ?? 0) / 2 }, transformRef.current.scale * factor)
+  }
+
   return (
     <div
       ref={frameRef}
@@ -254,14 +277,18 @@ export const ZoomableImageFrame: React.FC<ZoomableImageFrameProps> = ({
       >
         {children}
       </div>
-      {transform.scale > MIN_SCALE && (
-        <button
-          type="button"
-          onClick={reset}
-          className="absolute bottom-3 right-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(5,6,8,0.78)] text-[var(--text-primary)] shadow-[0_12px_26px_rgba(0,0,0,0.35)] backdrop-blur-md transition-colors hover:bg-[rgba(255,255,255,0.12)]"
-          aria-label={resetLabel}
-        >
-          <RotateCcw className="h-4 w-4" />
+      {transform.scale > MIN_SCALE ? (
+        <div className={cn('absolute right-3 z-10 flex gap-2', controlsPosition === 'top' ? 'top-24' : 'bottom-3')} data-viewer-no-swipe="true">
+          <button type="button" onClick={() => zoomFromCenter(0.8)} className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(5,6,8,0.78)] text-[var(--text-primary)] shadow-[0_12px_26px_rgba(0,0,0,0.35)] backdrop-blur-md transition-colors hover:bg-[rgba(255,255,255,0.12)]" aria-label="Zoom out">
+            <ZoomOut className="h-4 w-4" />
+          </button>
+          <button type="button" onClick={reset} className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(5,6,8,0.78)] text-[var(--text-primary)] shadow-[0_12px_26px_rgba(0,0,0,0.35)] backdrop-blur-md transition-colors hover:bg-[rgba(255,255,255,0.12)]" aria-label={resetLabel}>
+            <RotateCcw className="h-4 w-4" />
+          </button>
+        </div>
+      ) : (
+        <button type="button" onClick={() => zoomFromCenter(1.8)} className={cn('absolute right-3 z-10 inline-flex h-12 w-12 items-center justify-center rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(5,6,8,0.78)] text-[var(--text-primary)] shadow-[0_12px_26px_rgba(0,0,0,0.35)] backdrop-blur-md transition-colors hover:bg-[rgba(255,255,255,0.12)]', controlsPosition === 'top' ? 'top-24' : 'bottom-3')} aria-label="Zoom in" data-viewer-no-swipe="true">
+          <ZoomIn className="h-4 w-4" />
         </button>
       )}
     </div>

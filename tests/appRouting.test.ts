@@ -1,4 +1,4 @@
-import { getLocationStateFromUrl, normalizeViewParam } from '../src/lib/appRouting'
+import { getLocationStateFromUrl, normalizeViewParam, resolvePinRouteMutation } from '../src/lib/appRouting'
 
 test('paused board and legacy news routes fall back to chat', () => {
   expect(normalizeViewParam('boards')).toBe('chat')
@@ -10,6 +10,7 @@ test('paused board and legacy news routes fall back to chat', () => {
     message: null,
     pin: null,
     comment: null,
+    pinPanel: null,
   })
 
   expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=news'))).toEqual({
@@ -18,6 +19,7 @@ test('paused board and legacy news routes fall back to chat', () => {
     message: null,
     pin: null,
     comment: null,
+    pinPanel: null,
   })
 })
 
@@ -28,6 +30,7 @@ test('active routes and message targets keep their expected shape', () => {
     message: 'message-2',
     pin: null,
     comment: null,
+    pinPanel: null,
   })
 
   expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=profile'))).toEqual({
@@ -36,6 +39,7 @@ test('active routes and message targets keep their expected shape', () => {
     message: null,
     pin: null,
     comment: null,
+    pinPanel: null,
   })
 })
 
@@ -46,6 +50,7 @@ test('Activity and exact ShadowPin routes retain only their typed targets', () =
     message: null,
     pin: null,
     comment: null,
+    pinPanel: null,
   })
 
   expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=pins&pin=pin-1&comment=comment-2&message=ignored'))).toEqual({
@@ -54,5 +59,90 @@ test('Activity and exact ShadowPin routes retain only their typed targets', () =
     message: null,
     pin: 'pin-1',
     comment: 'comment-2',
+    pinPanel: 'comments',
   })
+})
+
+test('ShadowPin viewer and comments layers are recovered from typed URL state', () => {
+  expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=pins&pin=pin-1'))).toMatchObject({
+    pin: 'pin-1',
+    comment: null,
+    pinPanel: 'viewer',
+  })
+  expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=pins&pin=pin-1&panel=comments'))).toMatchObject({
+    pin: 'pin-1',
+    comment: null,
+    pinPanel: 'comments',
+  })
+})
+
+test('ShadowPin history mutations push layers, replace slides, and unwind with Back', () => {
+  const viewer = resolvePinRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=pins'),
+    currentLayer: null,
+    action: 'push-viewer',
+    imageId: 'pin-1',
+  })
+  expect(viewer).toMatchObject({ method: 'push', layer: 'pin-viewer' })
+  expect(viewer && viewer.method !== 'back' ? viewer.url.search : '').toBe('?view=pins&pin=pin-1')
+
+  const nextPin = resolvePinRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=pins&pin=pin-1'),
+    currentLayer: 'pin-viewer',
+    action: 'replace-viewer',
+    imageId: 'pin-2',
+  })
+  expect(nextPin).toMatchObject({ method: 'replace', layer: 'pin-viewer' })
+  expect(nextPin && nextPin.method !== 'back' ? nextPin.url.searchParams.get('pin') : '').toBe('pin-2')
+
+  const comments = resolvePinRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=pins&pin=pin-2'),
+    currentLayer: 'pin-viewer',
+    action: 'push-comments',
+    imageId: 'pin-2',
+    commentId: 'comment-3',
+  })
+  expect(comments).toMatchObject({ method: 'push', layer: 'pin-comments' })
+  expect(comments && comments.method !== 'back' ? comments.url.search : '').toBe('?view=pins&pin=pin-2&panel=comments&comment=comment-3')
+
+  expect(resolvePinRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=pins&pin=pin-2&panel=comments'),
+    currentLayer: 'pin-comments',
+    action: 'close-comments',
+    imageId: 'pin-2',
+  })).toEqual({ method: 'back' })
+  expect(resolvePinRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=pins&pin=pin-2'),
+    currentLayer: 'pin-viewer',
+    action: 'close-viewer',
+    imageId: 'pin-2',
+  })).toEqual({ method: 'back' })
+})
+
+test('direct ShadowPin links close by replacement when no layer marker exists', () => {
+  const swipedViewer = resolvePinRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=pins&pin=pin-1'),
+    currentLayer: null,
+    action: 'replace-viewer',
+    imageId: 'pin-2',
+  })
+  expect(swipedViewer).toMatchObject({ method: 'replace', layer: null })
+
+  const closeComments = resolvePinRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=pins&pin=pin-1&comment=comment-2'),
+    currentLayer: null,
+    action: 'close-comments',
+    imageId: 'pin-1',
+  })
+  expect(closeComments).toMatchObject({ method: 'replace', layer: null })
+  expect(closeComments && closeComments.method !== 'back' ? closeComments.url.search : '').toBe('?view=pins&pin=pin-1')
+
+  const closeViewer = resolvePinRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=pins&pin=pin-1'),
+    currentLayer: null,
+    action: 'close-viewer',
+    imageId: 'pin-1',
+  })
+  expect(closeViewer).toMatchObject({ method: 'replace', layer: null })
+  expect(closeViewer && closeViewer.method !== 'back' ? closeViewer.url.search : '').toBe('?view=pins')
 })

@@ -19,6 +19,7 @@ import {
   Loader2,
   Maximize2,
   MessageSquare,
+  MoreHorizontal,
   Pin,
   Play,
   Plus,
@@ -46,10 +47,13 @@ import { getBlockedActionMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
 import { cn } from '../../lib/utils'
 import type { AppView } from '../../types/navigation'
+import type { PinRouteAction } from '../../lib/appRouting'
 import { useShadowPinCategories } from './hooks/useShadowPinCategories'
 import { useShadowPinImages } from './hooks/useShadowPinImages'
-import { fetchShadowPinImage, searchShadowPinImages } from './api/shadowPinApi'
+import { fetchShadowPinImage, fetchShadowPinImageNeighbors, searchShadowPinImages } from './api/shadowPinApi'
 import { ShadowPinCommentsDialog } from './components/ShadowPinCommentsDialog'
+import { ShadowPinImmersiveViewer } from './components/ShadowPinImmersiveViewer'
+import { buildViewerSequence, createShadowPinPermalink } from './immersiveViewerModel'
 import { rankShadowPinCategories } from './categorySearch'
 import {
   useShadowPinActivityTracker,
@@ -69,6 +73,8 @@ type ShadowPinProps = {
   onBack?: () => void
   initialImageId?: string
   initialCommentId?: string
+  initialPanel?: 'viewer' | 'comments'
+  onPinRoute?: (action: PinRouteAction, imageId?: string, commentId?: string) => void
 }
 
 type ModalMode =
@@ -203,6 +209,18 @@ const getVideoPreviewUrl = (image: ShadowPinImage) =>
 
 const getVideoPlaybackUrl = (image: ShadowPinImage) =>
   image.video_playback_url || image.video_preview_url || null
+
+const getPinSourceUrl = (image: ShadowPinImage) =>
+  image.source_url || image.video_embed_url || null
+
+const getPinProviderLabel = (image: ShadowPinImage) => {
+  if (image.provider === 'youtube') return 'YouTube'
+  if (image.provider === 'x') return 'X'
+  if (image.provider === 'instagram') return 'Instagram'
+  if (image.provider === 'pinterest') return 'Pinterest'
+  if (image.provider === 'bunny_stream') return 'Shado video'
+  return 'the external provider'
+}
 
 const isExternalNativeVideoPin = (image: ShadowPinImage) =>
   image.media_type === 'external_video' && Boolean(getVideoPreviewUrl(image))
@@ -451,6 +469,15 @@ const getVideoIframeUrl = (image: ShadowPinImage, mode: VideoIframeMode = 'feed'
 }
 
 const isIframeVideoPin = (image: ShadowPinImage) => Boolean(getVideoIframeUrl(image))
+
+const requiresViewerExternalConsent = (image: ShadowPinImage) => {
+  if (!['youtube', 'x', 'instagram', 'pinterest'].includes(image.provider || '')) return false
+  return Boolean(
+    getVideoIframeUrl(image, 'viewer') ||
+    getExternalRichEmbedFrameUrl(image) ||
+    getExternalRichEmbedSrcDoc(image)
+  )
+}
 
 const getOrderedVisibleVideos = (
   videos: Iterable<VideoVisibilitySnapshot>,
@@ -729,11 +756,7 @@ const getNearestPinAction = (
 }
 
 const getShareUrl = (image: ShadowPinImage) => {
-  if (isVideoPin(image)) {
-    return image.source_url || image.video_embed_url || image.video_playback_url || getPinImageUrl(image, 'full') || image.image_url
-  }
-
-  return getPinImageUrl(image, 'full') || image.image_url || image.source_url || ''
+  return createShadowPinPermalink(image.id)
 }
 
 const finitePointerCoordinate = (value: number) => Number.isFinite(value) ? value : 0
@@ -2032,7 +2055,11 @@ function ImageCard({
     if (typeof event.button === 'number' && event.button !== 0) return
 
     const target = event.target
-    if (target instanceof Element && target.closest('button, a, input, textarea, select, [role="button"]')) {
+    if (
+      target instanceof Element &&
+      target.closest('button, a, input, textarea, select, [role="button"]') &&
+      !target.closest('[data-shadow-pin-media-opener]')
+    ) {
       return
     }
 
@@ -2149,16 +2176,7 @@ function ImageCard({
       return
     }
 
-    if (clickTimer.current) {
-      window.clearTimeout(clickTimer.current)
-      clickTimer.current = null
-      onViewer()
-      return
-    }
-    clickTimer.current = window.setTimeout(() => {
-      clickTimer.current = null
-      onToggleOverlay()
-    }, 230)
+    onViewer()
   }
 
   return (
@@ -2171,7 +2189,6 @@ function ImageCard({
         radialState.open && columnSide === 'right' ? 'shadow-pin-action-card--active-right' : '',
       ].filter(Boolean).join(' ')}
       data-column-side={columnSide}
-      onClick={handleClick}
       onContextMenu={event => event.preventDefault()}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -2179,6 +2196,13 @@ function ImageCard({
       onPointerCancel={handlePointerCancel}
     >
       <div className="relative overflow-hidden" style={{ aspectRatio }}>
+        <button
+          type="button"
+          data-shadow-pin-media-opener="true"
+          onClick={handleClick}
+          className="absolute inset-0 z-10 h-full w-full cursor-pointer rounded-[var(--radius-lg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-accent)]"
+          aria-label={`Open “${image.title}” by ${getDisplayName(image)}, ${videoPin ? 'video' : 'image'}, ${image.heart_count} hearts, ${image.comment_count ?? 0} comments`}
+        />
         {shouldRenderIframeVideo ? (
           <iframe
             ref={iframeRef}
@@ -2243,6 +2267,18 @@ function ImageCard({
           </span>
         )}
         <ImageLikedBadge active={image.viewer_has_hearted} />
+        <button
+          type="button"
+          onClick={event => {
+            event.stopPropagation()
+            onToggleOverlay()
+          }}
+          className="absolute left-2 top-2 z-20 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white shadow-lg backdrop-blur-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]"
+          aria-label={`Show actions for ${image.title}`}
+          aria-expanded={overlayOpen}
+        >
+          <MoreHorizontal className="h-5 w-5" />
+        </button>
         <PinActionFeedback feedback={feedback} />
         <PinActionRadialMenu state={radialState} hearted={image.viewer_has_hearted} />
         {isProcessingMedia(image.processing_status) && (
@@ -2257,7 +2293,7 @@ function ImageCard({
           </div>
         )}
         {overlayOpen && (
-          <div className="absolute inset-x-0 bottom-0 space-y-2 bg-[linear-gradient(180deg,rgba(4,5,6,0),rgba(4,5,6,0.9)_20%,rgba(4,5,6,0.96))] p-3 text-[var(--text-primary)]">
+          <div className="absolute inset-x-0 bottom-0 z-20 space-y-2 bg-[linear-gradient(180deg,rgba(4,5,6,0),rgba(4,5,6,0.9)_20%,rgba(4,5,6,0.96))] p-3 text-[var(--text-primary)]">
             <div className="flex items-start justify-between gap-2">
               <h3 className="min-w-0 text-sm font-semibold leading-tight">{image.title}</h3>
               <div className="flex shrink-0 items-center gap-1.5">
@@ -2426,20 +2462,26 @@ function PinShareSheet({
   )
 }
 
-function ImageViewerModal({
+function ImageViewerMedia({
   image,
-  onClose,
-  onHeart,
-  onComments,
+  muted,
+  reducedMotion,
+  onMutedChange,
+  onZoomChange,
 }: {
   image: ShadowPinImage
-  onClose: () => void
-  onHeart: () => void
-  onComments: () => void
+  muted: boolean
+  reducedMotion: boolean
+  onMutedChange: (muted: boolean) => void
+  onZoomChange: (zoomed: boolean) => void
 }) {
-  const [muted, setMuted] = useState(true)
   const [nativeVideoFailed, setNativeVideoFailed] = useState(false)
+  const imageSources = useMemo(() => getPinImageSources(image, 'full'), [image])
+  const imageSourcesKey = imageSources.join('\n')
+  const [imageSourceIndex, setImageSourceIndex] = useState(0)
+  const [imageFailed, setImageFailed] = useState(imageSources.length === 0)
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
   const videoPin = isVideoPin(image)
   const nativeVideoSrc = getVideoPlaybackUrl(image)
   const iframeSrc = getVideoIframeUrl(image, 'viewer')
@@ -2447,60 +2489,48 @@ function ImageViewerModal({
   const richEmbedSrcDoc = richEmbedFrameUrl ? '' : getExternalRichEmbedSrcDoc(image)
   const sourceUrl = image.source_url || image.video_embed_url
   const shouldRenderNativeVideo = videoPin && Boolean(nativeVideoSrc) && !nativeVideoFailed
-  const canControlViewerAudio = videoPin && (shouldRenderNativeVideo || Boolean(iframeSrc))
 
   useEffect(() => {
     setNativeVideoFailed(false)
-  }, [image.id, nativeVideoSrc])
+    setImageSourceIndex(0)
+    setImageFailed(imageSources.length === 0)
+  }, [image.id, imageSources.length, imageSourcesKey, nativeVideoSrc])
 
   useEffect(() => {
     if (!iframeSrc) return
     syncIframeAudio(iframeRef.current, image.provider, muted)
   }, [iframeSrc, image.provider, muted])
 
+  useEffect(() => () => {
+    const video = videoRef.current
+    if (!video) return
+    video.pause()
+    video.removeAttribute('src')
+    try {
+      video.load()
+    } catch {
+      // Releasing the decoder is best-effort across browser media engines.
+    }
+  }, [image.id])
+
   return (
-    <div className="fixed inset-0 z-[98] flex flex-col bg-[rgba(2,3,5,0.94)] p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-sm">
-      <div className="mb-3 flex items-center justify-between">
-        <button type="button" onClick={onClose} className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border-panel)] bg-[rgba(255,255,255,0.06)] text-[var(--text-primary)]">
-          <X className="h-5 w-5" />
-        </button>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onComments}
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-[var(--border-panel)] bg-[rgba(255,255,255,0.06)] px-3 text-sm text-[var(--text-primary)]"
-            aria-label={`${image.comment_count ?? 0} comments. Open comments.`}
-          >
-            <MessageSquare className="h-4 w-4" />
-            {formatCount(image.comment_count ?? 0)}
-          </button>
-          {canControlViewerAudio && (
-            <button
-              type="button"
-              onClick={() => setMuted(value => !value)}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border-panel)] bg-[rgba(255,255,255,0.06)] text-[var(--text-primary)]"
-              aria-pressed={!muted}
-              aria-label={muted ? 'Unmute video' : 'Mute video'}
-            >
-              {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
-            </button>
-          )}
-          <HeartButton active={image.viewer_has_hearted} count={image.heart_count} onClick={onHeart} />
-        </div>
-      </div>
-      <div className="min-h-0 flex-1 overflow-hidden rounded-[var(--radius-lg)] bg-black/40">
+    <div className="h-full w-full overflow-hidden bg-black/40" data-viewer-active-media="true">
         {shouldRenderNativeVideo && nativeVideoSrc ? (
           <video
+            ref={videoRef}
             src={nativeVideoSrc}
             poster={getPinImageUrl(image, 'medium')}
             className="h-full w-full object-contain"
             controls
-            autoPlay
-            loop
+            autoPlay={!reducedMotion}
+            loop={!reducedMotion}
             playsInline
             muted={muted}
+            aria-label={`Video: ${image.title}`}
+            data-viewer-no-swipe="true"
+            onVolumeChange={event => onMutedChange(event.currentTarget.muted)}
             onError={() => {
-              if (richEmbedFrameUrl || richEmbedSrcDoc) setNativeVideoFailed(true)
+              setNativeVideoFailed(true)
             }}
           />
         ) : videoPin && iframeSrc ? (
@@ -2512,6 +2542,7 @@ function ImageViewerModal({
             allow="autoplay; encrypted-media; picture-in-picture; web-share"
             loading="eager"
             onLoad={() => syncIframeAudio(iframeRef.current, image.provider, muted)}
+            data-viewer-no-swipe="true"
             allowFullScreen
           />
         ) : richEmbedFrameUrl ? (
@@ -2524,6 +2555,7 @@ function ImageViewerModal({
             loading="eager"
             referrerPolicy="strict-origin-when-cross-origin"
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
+            data-viewer-no-swipe="true"
             allowFullScreen
           />
         ) : richEmbedSrcDoc ? (
@@ -2536,11 +2568,23 @@ function ImageViewerModal({
             loading="eager"
             referrerPolicy="strict-origin-when-cross-origin"
             sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-presentation"
+            data-viewer-no-swipe="true"
             allowFullScreen
           />
         ) : videoPin ? (
           <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
-            <img src={getPinImageUrl(image, 'medium')} alt={image.title} className="max-h-[58vh] max-w-full rounded-[var(--radius-lg)] object-contain" />
+            {!imageFailed && <img
+              src={imageSources[imageSourceIndex] || getPinImageUrl(image, 'medium')}
+              alt={image.title}
+              className="max-h-[58vh] max-w-full rounded-[var(--radius-lg)] object-contain"
+              onError={() => setImageSourceIndex(index => {
+                const nextIndex = index + 1
+                if (nextIndex < imageSources.length) return nextIndex
+                setImageFailed(true)
+                return index
+              })}
+            />}
+            {imageFailed && <div className="rounded-[var(--radius-xl)] border border-white/10 bg-white/5 p-6 text-sm text-white/65">Video preview unavailable</div>}
             {sourceUrl && (
               <a
                 href={sourceUrl}
@@ -2554,34 +2598,29 @@ function ImageViewerModal({
             )}
           </div>
         ) : (
-          <ZoomableImageFrame resetKey={image.id} className="h-full w-full">
-            <img
-              src={getPinImageUrl(image, 'medium')}
-              alt={image.title}
-              draggable={false}
-              className="h-full w-full object-contain"
-            />
-          </ZoomableImageFrame>
+          imageFailed ? (
+            <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center text-white/65">
+              <ImageIcon className="h-9 w-9 text-[var(--theme-accent-readable)]" />
+              <p className="font-semibold text-white">Image unavailable</p>
+              <button type="button" onClick={() => { setImageSourceIndex(0); setImageFailed(false) }} className="min-h-11 rounded-full border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white">Retry</button>
+            </div>
+          ) : (
+            <ZoomableImageFrame resetKey={image.id} className="h-full w-full" controlsPosition="top" onZoomChange={onZoomChange}>
+              <img
+                src={imageSources[imageSourceIndex] || getPinImageUrl(image, 'medium')}
+                alt={image.title}
+                draggable={false}
+                className="h-full w-full object-contain"
+                onError={() => setImageSourceIndex(index => {
+                  const nextIndex = index + 1
+                  if (nextIndex < imageSources.length) return nextIndex
+                  setImageFailed(true)
+                  return index
+                })}
+              />
+            </ZoomableImageFrame>
+          )
         )}
-      </div>
-      <div className="mt-3 rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(5,6,8,0.72)] p-3">
-        <h2 className="text-lg font-semibold text-[var(--text-primary)]">{image.title}</h2>
-        <div className="mt-2 flex items-center gap-2 text-sm text-[var(--text-muted)]">
-          <Avatar src={image.creator?.avatar_url} alt={getDisplayName(image)} size="sm" />
-          <span className="inline-flex min-w-0 items-center gap-1.5">
-            <span className="truncate">{getDisplayName(image)}</span>
-            <UserAchievementBadges user={image.creator} />
-          </span>
-        </div>
-        {image.description && <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-[var(--text-secondary)]">{image.description}</p>}
-        {Boolean(image.tags?.length) && (
-          <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Pin tags">
-            {image.tags?.map(tag => (
-              <span key={tag} className="rounded-full border border-[var(--border-subtle)] bg-[rgba(215,170,70,0.07)] px-2.5 py-1 text-xs text-[var(--theme-accent-readable)]">#{tag}</span>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   )
 }
@@ -2590,10 +2629,12 @@ function ShadowPinHome({
   currentView,
   onViewChange,
   onOpenCategory,
+  onOpenPin,
   categoryListScrollMemory,
   tracker,
 }: Required<Pick<ShadowPinProps, 'currentView' | 'onViewChange'>> & {
   onOpenCategory: (category: ShadowPinCategory) => void
+  onOpenPin: (image: ShadowPinImage) => void
   categoryListScrollMemory: MutableRefObject<CategoryListScrollMemory>
   tracker: ShadowPinActivityTracker
 }) {
@@ -3020,7 +3061,7 @@ function ShadowPinHome({
                           key={image.id}
                           type="button"
                           disabled={!category}
-                          onClick={() => category && openCategory(category)}
+                          onClick={() => category && onOpenPin(image)}
                           className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-[rgba(255,255,255,0.055)] disabled:opacity-55"
                           role="option"
                         >
@@ -3112,7 +3153,10 @@ function ShadowPinCategoryScreen({
   onBack,
   tracker,
   initialImage,
+  initialNeighbors,
   initialCommentId,
+  initialPanel,
+  onPinRoute,
 }: {
   currentView: AppView
   onViewChange: (view: AppView) => void
@@ -3120,7 +3164,10 @@ function ShadowPinCategoryScreen({
   onBack: () => void
   tracker: ShadowPinActivityTracker
   initialImage?: ShadowPinImage | null
+  initialNeighbors?: ShadowPinImage[]
   initialCommentId?: string
+  initialPanel?: 'viewer' | 'comments'
+  onPinRoute: (action: PinRouteAction, imageId?: string, commentId?: string) => void
 }) {
   const { user } = useAuth()
   const { role: adminRole } = useAdminAccess({ includeUsers: false })
@@ -3128,6 +3175,7 @@ function ShadowPinCategoryScreen({
   const imagesState = useShadowPinImages(categoryId)
   const [modal, setModal] = useState<ModalMode>(null)
   const [commentsImage, setCommentsImage] = useState<ShadowPinImage | null>(null)
+  const [viewerSessionImages, setViewerSessionImages] = useState<ShadowPinImage[]>([])
   const [sharingToGroupImageId, setSharingToGroupImageId] = useState<string | null>(null)
   const [overlayImageId, setOverlayImageId] = useState<string | null>(null)
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null)
@@ -3161,14 +3209,75 @@ function ShadowPinCategoryScreen({
 
   const toggleImageHeart = (image: ShadowPinImage) => {
     const added = !image.viewer_has_hearted
-    imagesState.toggleHeart(image.id)
-      .then(() => tracker.recordPinHeart(image, added, imagesState.category))
-      .catch(err => toast.error(err instanceof Error ? err.message : 'Heart failed'))
+    const optimisticImage = {
+      ...image,
+      viewer_has_hearted: added,
+      heart_count: Math.max(0, image.heart_count + (added ? 1 : -1)),
+    }
+    setModal(current => current?.type === 'image-viewer' && current.image.id === image.id
+      ? { type: 'image-viewer', image: optimisticImage }
+      : current)
+    setCommentsImage(current => current?.id === image.id ? optimisticImage : current)
+    setViewerSessionImages(current => current.map(item => item.id === image.id ? optimisticImage : item))
+    imagesState.toggleHeart(image.id, image)
+      .then(updatedImage => {
+        setModal(current => current?.type === 'image-viewer' && current.image.id === image.id
+          ? { type: 'image-viewer', image: updatedImage }
+          : current)
+        setCommentsImage(current => current?.id === image.id ? updatedImage : current)
+        setViewerSessionImages(current => current.map(item => item.id === image.id ? updatedImage : item))
+        tracker.recordPinHeart(image, added, imagesState.category)
+      })
+      .catch(err => {
+        setModal(current => current?.type === 'image-viewer' && current.image.id === image.id
+          ? { type: 'image-viewer', image }
+          : current)
+        setCommentsImage(current => current?.id === image.id ? image : current)
+        setViewerSessionImages(current => current.map(item => item.id === image.id ? image : item))
+        toast.error(err instanceof Error ? err.message : 'Heart failed')
+      })
   }
 
-  const openImageViewer = (image: ShadowPinImage) => {
-    tracker.recordPinOpened(image, imagesState.category)
+  const openImageViewer = (image: ShadowPinImage, pushRoute = true) => {
+    setCommentsImage(null)
+    setViewerSessionImages([image])
     setModal({ type: 'image-viewer', image })
+    if (pushRoute) onPinRoute('push-viewer', image.id)
+  }
+
+  const openImageComments = (image: ShadowPinImage, viewerAlreadyOpen = false) => {
+    if (!viewerAlreadyOpen) {
+      setViewerSessionImages([image])
+      setModal({ type: 'image-viewer', image })
+      onPinRoute('push-viewer', image.id)
+    }
+    setCommentsImage(image)
+    onPinRoute('push-comments', image.id)
+  }
+
+  const closeImageViewer = () => {
+    setCommentsImage(null)
+    setModal(null)
+    setViewerSessionImages([])
+    onPinRoute('close-viewer', viewerImage?.id)
+  }
+
+  const shareViewerImage = async (image: ShadowPinImage) => {
+    tracker.recordShareTapped(image, imagesState.category)
+    const url = createShadowPinPermalink(image.id)
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({
+          title: image.title,
+          text: image.description || 'ShadowPin Pin',
+          url,
+        })
+        return
+      } catch {
+        // A cancelled or unavailable native sheet falls back to a copy action.
+      }
+    }
+    await copyShadowPinImageLink(url)
   }
 
   const shareImageToGroupChat = async (image: ShadowPinImage) => {
@@ -3266,18 +3375,40 @@ function ShadowPinCategoryScreen({
   const viewerImage = modal?.type === 'image-viewer'
     ? imagesState.images.find(image => image.id === modal.image.id) ?? modal.image
     : null
+  const coldExactViewer = Boolean(initialImage && !imagesState.images.some(image => image.id === initialImage.id))
+  const viewerImages = useMemo(
+    () => buildViewerSequence(
+      coldExactViewer
+        ? [...(initialNeighbors ?? []), ...viewerSessionImages]
+        : [...imagesState.images, ...(initialNeighbors ?? []), ...viewerSessionImages],
+      viewerImage ?? initialImage
+    ),
+    [coldExactViewer, imagesState.images, initialImage, initialNeighbors, viewerImage, viewerSessionImages]
+  )
 
   useEffect(() => {
-    if (!initialImage || openedInitialTargetRef.current === initialImage.id) return
-    openedInitialTargetRef.current = initialImage.id
+    if (!initialImage) {
+      if (openedInitialTargetRef.current) {
+        openedInitialTargetRef.current = null
+        setCommentsImage(null)
+        setModal(current => current?.type === 'image-viewer' ? null : current)
+      }
+      return
+    }
+    const targetKey = `${initialImage.id}:${initialPanel || (initialCommentId ? 'comments' : 'viewer')}:${initialCommentId || ''}`
+    if (openedInitialTargetRef.current === targetKey) return
+    openedInitialTargetRef.current = targetKey
     const currentImage = imagesState.images.find(image => image.id === initialImage.id) ?? initialImage
-    tracker.recordPinOpened(currentImage, imagesState.category)
-    if (initialCommentId) {
+    setViewerSessionImages(current => current.some(image => image.id === currentImage.id)
+      ? current.map(image => image.id === currentImage.id ? currentImage : image)
+      : [...current, currentImage])
+    setModal({ type: 'image-viewer', image: currentImage })
+    if (initialPanel === 'comments' || initialCommentId) {
       setCommentsImage(currentImage)
     } else {
-      setModal({ type: 'image-viewer', image: currentImage })
+      setCommentsImage(null)
     }
-  }, [imagesState.category, imagesState.images, initialCommentId, initialImage, tracker])
+  }, [imagesState.images, initialCommentId, initialImage, initialPanel])
 
   return (
     <div className="theme-image-surface relative flex h-full min-h-0 flex-col">
@@ -3351,7 +3482,7 @@ function ShadowPinCategoryScreen({
                           onViewer={() => openImageViewer(image)}
                           onEdit={() => setModal({ type: 'edit-image', image })}
                           onHeart={() => toggleImageHeart(image)}
-                          onComments={() => setCommentsImage(image)}
+                          onComments={() => openImageComments(image)}
                           onShare={() => tracker.recordShareTapped(image, imagesState.category)}
                           onShareToGroupChat={messagesApi ? () => shareImageToGroupChat(image) : undefined}
                           sharingToGroupChat={sharingToGroupImageId === image.id}
@@ -3390,11 +3521,44 @@ function ShadowPinCategoryScreen({
         />
       )}
       {viewerImage && (
-        <ImageViewerModal
-          image={viewerImage}
-          onClose={() => setModal(null)}
-          onHeart={() => toggleImageHeart(viewerImage)}
-          onComments={() => setCommentsImage(viewerImage)}
+        <ShadowPinImmersiveViewer
+          images={viewerImages}
+          activeImageId={viewerImage.id}
+          categoryTitle={title}
+          hasMore={!coldExactViewer && imagesState.hasMore}
+          loadingMore={imagesState.loading}
+          commentsOpen={Boolean(commentsImage)}
+          canManageImage={image => canManage(image, user?.id, adminRole)}
+          getPosterUrl={image => getPinImageUrl(image, 'medium')}
+          getSourceUrl={getPinSourceUrl}
+          getProviderLabel={getPinProviderLabel}
+          requiresExternalConsent={requiresViewerExternalConsent}
+          renderActiveMedia={(image, controls) => (
+            <ImageViewerMedia
+              image={image}
+              muted={controls.muted}
+              reducedMotion={controls.reducedMotion}
+              onMutedChange={controls.onMutedChange}
+              onZoomChange={controls.onZoomChange}
+            />
+          )}
+          onActiveImageChange={image => {
+            setViewerSessionImages(current => current.some(item => item.id === image.id)
+              ? current.map(item => item.id === image.id ? image : item)
+              : [...current, image])
+            setModal({ type: 'image-viewer', image })
+            onPinRoute('replace-viewer', image.id)
+          }}
+          onLoadMore={imagesState.loadMore}
+          onSettled={image => tracker.recordPinOpened(image, imagesState.category)}
+          onHeart={toggleImageHeart}
+          onComments={image => openImageComments(image, true)}
+          onShare={image => { void shareViewerImage(image) }}
+          onEdit={image => {
+            onPinRoute('close-viewer', image.id)
+            setModal({ type: 'edit-image', image })
+          }}
+          onClose={closeImageViewer}
         />
       )}
       {commentsImage && (
@@ -3404,7 +3568,18 @@ function ShadowPinCategoryScreen({
           open
           onClose={() => {
             setCommentsImage(null)
-            void imagesState.refresh()
+            onPinRoute('close-comments', viewerImage?.id || commentsImage.id)
+          }}
+          onCountChange={count => {
+            imagesState.setCommentCount(commentsImage.id, count)
+            setCommentsImage(current => current?.id === commentsImage.id
+              ? { ...current, comment_count: count }
+              : current
+            )
+            setModal(current => current?.type === 'image-viewer' && current.image.id === commentsImage.id
+              ? { ...current, image: { ...current.image, comment_count: count } }
+              : current
+            )
           }}
         />
       )}
@@ -3417,9 +3592,13 @@ export function ShadowPin({
   onViewChange = () => {},
   initialImageId,
   initialCommentId,
+  initialPanel,
+  onPinRoute = () => {},
 }: ShadowPinProps) {
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
   const [initialImage, setInitialImage] = useState<ShadowPinImage | null>(null)
+  const [initialNeighbors, setInitialNeighbors] = useState<ShadowPinImage[]>([])
+  const [initialImageStatus, setInitialImageStatus] = useState<'idle' | 'loading' | 'unavailable'>('idle')
   const categoryListScrollMemory = useRef<CategoryListScrollMemory>({
     scrollTop: 0,
     shouldRestore: false,
@@ -3430,21 +3609,71 @@ export function ShadowPin({
     let cancelled = false
     if (!initialImageId) {
       setInitialImage(null)
+      setInitialNeighbors([])
+      setInitialImageStatus('idle')
       return
     }
 
+    setInitialImageStatus('loading')
+
     void fetchShadowPinImage(initialImageId)
       .then(image => {
-        if (cancelled || !image) return
+        if (cancelled) return
+        if (!image || !image.category_id) {
+          setInitialImage(null)
+          setInitialImageStatus('unavailable')
+          return
+        }
         setInitialImage(image)
-        setActiveCategoryId(image.category_id ?? null)
+        setInitialImageStatus('idle')
+        setActiveCategoryId(image.category_id)
+        void fetchShadowPinImageNeighbors(image)
+          .then(neighbors => {
+            if (cancelled) return
+            setInitialNeighbors([neighbors.previous, neighbors.next].filter(Boolean) as ShadowPinImage[])
+          })
+          .catch(() => {
+            if (!cancelled) setInitialNeighbors([])
+          })
       })
-      .catch(() => undefined)
+      .catch(() => {
+        if (!cancelled) setInitialImageStatus('unavailable')
+      })
 
     return () => {
       cancelled = true
     }
   }, [initialImageId])
+
+  if (initialImageId && !activeCategoryId && initialImageStatus !== 'idle') {
+    return (
+      <div className="theme-image-surface h-full min-h-0">
+        <ShadowPinImmersiveViewer
+          images={[]}
+          activeImageId={initialImageId}
+          targetLoading={initialImageStatus === 'loading'}
+          categoryTitle="ShadowPin"
+          hasMore={false}
+          loadingMore={false}
+          commentsOpen={false}
+          canManageImage={() => false}
+          getPosterUrl={() => ''}
+          getSourceUrl={() => null}
+          getProviderLabel={() => 'the external provider'}
+          requiresExternalConsent={() => false}
+          renderActiveMedia={() => null}
+          onActiveImageChange={() => {}}
+          onLoadMore={() => {}}
+          onSettled={() => {}}
+          onHeart={() => {}}
+          onComments={() => {}}
+          onShare={() => {}}
+          onEdit={() => {}}
+          onClose={() => onPinRoute('close-viewer', initialImageId)}
+        />
+      </div>
+    )
+  }
 
   if (activeCategoryId) {
     return (
@@ -3455,7 +3684,10 @@ export function ShadowPin({
         onBack={() => setActiveCategoryId(null)}
         tracker={tracker}
         initialImage={initialImage}
+        initialNeighbors={initialNeighbors}
         initialCommentId={initialCommentId}
+        initialPanel={initialPanel}
+        onPinRoute={onPinRoute}
       />
     )
   }
@@ -3465,6 +3697,13 @@ export function ShadowPin({
       currentView={currentView}
       onViewChange={onViewChange}
       onOpenCategory={category => setActiveCategoryId(category.id)}
+      onOpenPin={image => {
+        if (!image.category_id) return
+        setInitialImage(image)
+        setInitialNeighbors([])
+        setActiveCategoryId(image.category_id)
+        onPinRoute('push-viewer', image.id)
+      }}
       categoryListScrollMemory={categoryListScrollMemory}
       tracker={tracker}
     />

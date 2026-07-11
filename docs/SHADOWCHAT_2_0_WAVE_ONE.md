@@ -14,7 +14,8 @@ URL for phone testing.
 
 1. **Unified Activity HQ** - implemented locally and fully verified. See
    [ACTIVITY_HQ.md](C:/repos/chat2.0/docs/ACTIVITY_HQ.md:1).
-2. **Immersive ShadowPin viewer** - pending implementation checkpoint.
+2. **ShadowPin Theater (immersive viewer)** - implemented and locally verified. See
+   [SHADOW_PIN_THEATER.md](C:/repos/chat2.0/docs/SHADOW_PIN_THEATER.md:1).
 3. **DM Conversation Hub** - pending implementation checkpoint.
 4. **Member reporting and operator case center** - pending implementation
    checkpoint.

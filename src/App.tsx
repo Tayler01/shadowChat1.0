@@ -25,7 +25,13 @@ import { useTheme } from './hooks/useTheme'
 import { WeatherProvider } from './hooks/useWeatherForecast'
 import { computeMobileViewportState, MOBILE_VIEWPORT_UPDATED_EVENT } from './lib/mobileViewport'
 import { BOARDS_FEATURE_ENABLED } from './config/featureFlags'
-import { getLocationStateFromUrl, type AppLocationState as LocationState } from './lib/appRouting'
+import {
+  getLocationStateFromUrl,
+  resolvePinRouteMutation,
+  type AppLocationState as LocationState,
+  type PinHistoryLayer,
+  type PinRouteAction,
+} from './lib/appRouting'
 import type { AppView as View } from './types/navigation'
 import { useShadowPinCommentNotifications } from './features/shadow-pin/hooks/useShadowPinCommentNotifications'
 import { ActivityProvider } from './features/activity/ActivityProvider'
@@ -79,7 +85,7 @@ const ActivityView = lazy(() =>
 
 const getInitialLocationState = (): LocationState => {
   if (typeof window === 'undefined') {
-    return { view: 'chat', conversation: null, message: null, pin: null, comment: null }
+    return { view: 'chat', conversation: null, message: null, pin: null, comment: null, pinPanel: null }
   }
 
   return getLocationStateFromUrl(new URL(window.location.href))
@@ -115,6 +121,7 @@ function App() {
   const [messageTarget, setMessageTarget] = useState<string | null>(() => getInitialLocationState().message)
   const [pinTarget, setPinTarget] = useState<string | null>(() => getInitialLocationState().pin)
   const [commentTarget, setCommentTarget] = useState<string | null>(() => getInitialLocationState().comment)
+  const [pinPanel, setPinPanel] = useState<'viewer' | 'comments' | null>(() => getInitialLocationState().pinPanel)
   const isDarkMode = mode === 'dark'
 
   useLayoutEffect(() => {
@@ -231,6 +238,7 @@ function App() {
     setMessageTarget(locationState.message)
     setPinTarget(locationState.pin)
     setCommentTarget(locationState.comment)
+    setPinPanel(locationState.pinPanel)
   }, [])
 
   useEffect(() => {
@@ -284,6 +292,45 @@ function App() {
     setMessageTarget(target.message)
     setPinTarget(target.pin)
     setCommentTarget(target.comment)
+    setPinPanel(target.view === 'pins' && target.pin
+      ? target.comment ? 'comments' : 'viewer'
+      : null)
+  }
+
+  const handlePinRoute = (
+    action: PinRouteAction,
+    imageId?: string,
+    commentId?: string
+  ) => {
+    if (typeof window === 'undefined') return
+
+    const storedLayer = window.history.state?.shadowchatLayer
+    const currentLayer: PinHistoryLayer = storedLayer === 'pin-viewer' || storedLayer === 'pin-comments'
+      ? storedLayer
+      : null
+    const mutation = resolvePinRouteMutation({
+      currentUrl: new URL(window.location.href),
+      currentLayer,
+      action,
+      imageId,
+      commentId,
+    })
+    if (!mutation) return
+    if (mutation.method === 'back') {
+      window.history.back()
+      return
+    }
+
+    const nextState = {
+      ...(window.history.state ?? {}),
+      shadowchatLayer: mutation.layer,
+    }
+    if (mutation.method === 'push') {
+      window.history.pushState(nextState, '', mutation.url)
+    } else {
+      window.history.replaceState(nextState, '', mutation.url)
+    }
+    applyLocationState(getLocationStateFromUrl(mutation.url))
   }
 
   const handleViewChange = (view: View) => {
@@ -302,6 +349,7 @@ function App() {
     if (availableView !== 'pins') {
       setPinTarget(null)
       setCommentTarget(null)
+      setPinPanel(null)
     }
     if (availableView !== currentView) {
       setMessageTarget(null)
@@ -324,6 +372,7 @@ function App() {
       url.searchParams.delete('conversation')
       url.searchParams.delete('pin')
       url.searchParams.delete('comment')
+      url.searchParams.delete('panel')
     } else {
       url.searchParams.set('view', currentView)
       if (currentView === 'dms' && dmTarget) {
@@ -346,10 +395,15 @@ function App() {
       } else {
         url.searchParams.delete('comment')
       }
+      if (currentView === 'pins' && pinPanel === 'comments' && pinTarget) {
+        url.searchParams.set('panel', 'comments')
+      } else {
+        url.searchParams.delete('panel')
+      }
     }
 
-    window.history.replaceState({}, '', url)
-  }, [currentView, dmTarget, messageTarget, pinTarget, commentTarget])
+    window.history.replaceState(window.history.state ?? {}, '', url)
+  }, [currentView, dmTarget, messageTarget, pinTarget, commentTarget, pinPanel])
 
   useEffect(() => {
     if (currentView !== 'boards') {
@@ -423,6 +477,8 @@ function App() {
             onViewChange={handleViewChange}
             initialImageId={pinTarget || undefined}
             initialCommentId={commentTarget || undefined}
+            initialPanel={pinPanel || undefined}
+            onPinRoute={handlePinRoute}
           />
         )
       case 'settings':

@@ -26,6 +26,7 @@ jest.mock('../src/hooks/useDialogAccessibility', () => ({
 const image = {
   id: 'pin-1',
   title: 'Moonlit station',
+  comment_count: 7,
 } as any
 
 const rootComment = {
@@ -43,7 +44,11 @@ beforeEach(() => {
   jest.clearAllMocks()
   ;(useAuth as jest.Mock).mockReturnValue({ user: { id: 'viewer-1' } })
   ;(useAdminAccess as jest.Mock).mockReturnValue({ role: null })
-  ;(fetchShadowPinComments as jest.Mock).mockResolvedValue([rootComment])
+  ;(fetchShadowPinComments as jest.Mock).mockResolvedValue({
+    comments: [rootComment],
+    hasMore: false,
+    nextCursor: null,
+  })
   ;(deleteShadowPinComment as jest.Mock).mockResolvedValue(undefined)
 })
 
@@ -77,7 +82,11 @@ test('deleting a root promotes its database-preserved replies in local state', a
     author: { id: 'viewer-1', username: 'viewer', display_name: 'Viewer' },
   }
   ;(useAuth as jest.Mock).mockReturnValue({ user: { id: rootComment.author_id } })
-  ;(fetchShadowPinComments as jest.Mock).mockResolvedValue([rootComment, reply])
+  ;(fetchShadowPinComments as jest.Mock).mockResolvedValue({
+    comments: [rootComment, reply],
+    hasMore: false,
+    nextCursor: null,
+  })
   jest.spyOn(window, 'confirm').mockReturnValue(true)
 
   render(
@@ -95,4 +104,41 @@ test('deleting a root promotes its database-preserved replies in local state', a
 
   await waitFor(() => expect(screen.queryByText('Root comment')).not.toBeInTheDocument())
   expect(screen.getByText('Preserved reply').closest('article')).not.toHaveClass('ml-8')
+})
+
+test('loading a caller-visible comment subset does not overwrite the canonical count', async () => {
+  const onCountChange = jest.fn()
+  render(
+    <ShadowPinCommentsDialog
+      image={image}
+      open
+      onClose={() => undefined}
+      onCountChange={onCountChange}
+    />
+  )
+
+  expect(await screen.findByText('Root comment')).toBeInTheDocument()
+  expect(onCountChange).not.toHaveBeenCalled()
+  expect(screen.getByText(/7 comments/i)).toBeInTheDocument()
+})
+
+test('loads older comments through a bounded cursor page', async () => {
+  const olderComment = { ...rootComment, id: 'older-root', body: 'Older comment' }
+  ;(fetchShadowPinComments as jest.Mock)
+    .mockResolvedValueOnce({
+      comments: [rootComment],
+      hasMore: true,
+      nextCursor: { createdAt: rootComment.created_at, id: rootComment.id },
+    })
+    .mockResolvedValueOnce({ comments: [olderComment], hasMore: false, nextCursor: null })
+
+  render(<ShadowPinCommentsDialog image={image} open onClose={() => undefined} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Load earlier comments' }))
+
+  expect(await screen.findByText('Older comment')).toBeInTheDocument()
+  expect(fetchShadowPinComments).toHaveBeenLastCalledWith(
+    image.id,
+    { createdAt: rootComment.created_at, id: rootComment.id }
+  )
+  expect(screen.queryByRole('button', { name: 'Load earlier comments' })).not.toBeInTheDocument()
 })

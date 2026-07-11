@@ -226,6 +226,40 @@ previous CSS-column version collapsed to a single visible column on Android. Do
 not replace it with a row-locked grid either, because small images beside tall
 images leave the gaps that the masonry layout is meant to avoid.
 
+## ShadowPin Theater
+
+ShadowPin Theater is the phone-first primary viewer for a Pin. A single card
+tap opens an edge-to-edge, safe-area-aware dialog with horizontal paging,
+visible Previous and Next controls, keyboard equivalents, accessible Heart,
+Comment, Share, Details, and operator Edit actions, and exact
+`/?view=pins&pin=<id>` history.
+
+The viewer keeps category ordering deterministic by `(created_at DESC, id
+DESC)`. Normal category sessions can request the next existing 30-Pin page near
+the loaded boundary. Cold exact/search links are intentionally isolated from
+offset pagination: they load only the target and one RLS-visible neighbor in
+each direction, retain every visited Pin for reverse navigation, and never
+sweep all intervening category pages.
+
+Browser history has three deliberate layers. Opening Theater pushes a viewer
+entry, paging replaces its Pin, and opening Comments pushes a comments entry.
+Back therefore closes Comments, then Theater, then returns to the category.
+Markerless cold links preserve their markerless state during paging and close
+by URL replacement so Close cannot navigate out of ShadowChat.
+
+Only active media mounts. Opening Comments replaces active video or an iframe
+with its poster, and hidden-tab cleanup pauses native video. Third-party
+interactive providers require consent for the current Theater session before
+their iframe can mount. Image zoom has visible 48px controls; while zoomed,
+horizontal Pin paging is disabled. A second touch cancels pending paging before
+pinch zoom begins.
+
+Comments render as a visual-viewport-aware bottom sheet. Reads use bounded
+40-item `(created_at, id)` keyset pages. Exact comment links fetch the target
+and missing parent without loading the full thread. Local mutation deltas patch
+the trigger-maintained `comment_count`; a caller-visible RLS subset never
+overwrites the canonical count.
+
 ## Local Testing
 
 ```powershell
