@@ -1,6 +1,8 @@
 import {
   SHADOW_RUNNER_CAMPAIGN_LEVELS,
   SHADOW_RUNNER_LEVEL_CONFIGS,
+  getShadowRunnerEnemyContactDamage,
+  getShadowRunnerEnemyProjectileDamage,
   getShadowRunnerLevelEnemies,
   isShadowRunnerFinishOverlap,
 } from '../src/features/games/shadow-runner/game/levels'
@@ -37,6 +39,34 @@ describe('Shadow Runner level configuration contract', () => {
     expect(campaignLevelFive?.mechanicPreview).toContain('Shielded archer volleys')
   })
 
+  it('ships Clockmaker Yard as a longer, slightly harder playable Level 6 route', () => {
+    const levelFive = SHADOW_RUNNER_LEVEL_CONFIGS['level-5']
+    const levelSix = SHADOW_RUNNER_LEVEL_CONFIGS['level-6']
+    const levelSixEnemies = getShadowRunnerLevelEnemies(levelSix)
+    const campaignLevelSix = SHADOW_RUNNER_CAMPAIGN_LEVELS.find(level => level.id === 'level-6')
+
+    expect(levelSix.title).toBe('Clockmaker Yard')
+    expect(levelSix.campaignLevel).toBe(6)
+    expect(levelSix.worldWidth).toBeGreaterThan(levelFive.worldWidth)
+    expect(levelSix.worldWidth).toBeLessThan(levelFive.worldWidth * 1.25)
+    expect(levelSix.coins.length).toBeGreaterThan(levelFive.coins.length)
+    expect(levelSix.tiltPlatforms.length).toBeGreaterThan(levelFive.tiltPlatforms.length)
+    expect(levelSix.checkpoints).toHaveLength(5)
+    expect(levelSix.chronoPickups).toHaveLength(3)
+    expect(levelSixEnemies).toHaveLength(12)
+    expect(levelSixEnemies.filter(enemy => enemy.kind === 'lantern-bandit-scout')).toHaveLength(4)
+    expect(new Set(levelSixEnemies.map(getShadowRunnerEnemyContactDamage)).size).toBeGreaterThan(1)
+    expect(levelSixEnemies.filter(enemy => enemy.projectileSpeed).map(getShadowRunnerEnemyProjectileDamage))
+      .toEqual(expect.arrayContaining([2, 3]))
+    expect(levelSix.platforms.filter(platform => platform.terrainSet === 'clock').length)
+      .toBeGreaterThanOrEqual(20)
+    expect(campaignLevelSix?.playableLevelId).toBe('level-6')
+    expect(campaignLevelSix?.mechanicPreview).toContain('Chrono Lantern')
+    expect(SHADOW_RUNNER_ASSETS.levels.clockmakerYardBackground).toContain('clockmaker-yard-background.webp')
+    expect(SHADOW_RUNNER_ASSETS.levels.clockmakerYardProps).toContain('clockmaker-yard-props-v1-transparent.png')
+    expect(SHADOW_RUNNER_ASSETS.levels.chronoLanternStrip).toContain('chrono-lantern-4f-64.png')
+  })
+
   it('adds safe recovery checkpoints to every long campaign route', () => {
     const expectedMinimums = new Map([
       ['level-1', 1],
@@ -44,6 +74,7 @@ describe('Shadow Runner level configuration contract', () => {
       ['level-3', 2],
       ['level-4', 3],
       ['level-5', 4],
+      ['level-6', 5],
     ])
 
     expectedMinimums.forEach((minimum, levelId) => {
@@ -60,23 +91,25 @@ describe('Shadow Runner level configuration contract', () => {
     })
   })
 
-  it('keeps Level 5 patrol routes on their supporting platforms', () => {
-    const levelFive = SHADOW_RUNNER_LEVEL_CONFIGS['level-5']
-    const movingEnemies = getShadowRunnerLevelEnemies(levelFive)
-      .filter(enemy => (enemy.patrolSpeed ?? 1) > 0)
+  it('keeps Level 5 and Level 6 patrol routes on their supporting platforms', () => {
+    ;(['level-5', 'level-6'] as const).forEach(levelId => {
+      const level = SHADOW_RUNNER_LEVEL_CONFIGS[levelId]
+      const movingEnemies = getShadowRunnerLevelEnemies(level)
+        .filter(enemy => (enemy.patrolSpeed ?? 1) > 0)
 
-    movingEnemies.forEach(enemy => {
-      const supportingPlatform = levelFive.platforms.find(platform => (
-        enemy.x >= platform.x
-        && enemy.x <= platform.x + platform.width
-        && Math.abs(enemy.y - platform.y) <= 80
-      ))
+      movingEnemies.forEach(enemy => {
+        const supportingPlatform = level.platforms.find(platform => (
+          enemy.x >= platform.x
+          && enemy.x <= platform.x + platform.width
+          && Math.abs(enemy.y - platform.y) <= 80
+        ))
 
-      expect(supportingPlatform?.id).toBeTruthy()
-      expect(enemy.patrolLeft).toBeGreaterThanOrEqual((supportingPlatform?.x ?? 0) + 20)
-      expect(enemy.patrolRight).toBeLessThanOrEqual(
-        (supportingPlatform?.x ?? 0) + (supportingPlatform?.width ?? 0) - 20,
-      )
+        expect(supportingPlatform?.id).toBeTruthy()
+        expect(enemy.patrolLeft).toBeGreaterThanOrEqual((supportingPlatform?.x ?? 0) + 20)
+        expect(enemy.patrolRight).toBeLessThanOrEqual(
+          (supportingPlatform?.x ?? 0) + (supportingPlatform?.width ?? 0) - 20,
+        )
+      })
     })
   })
 

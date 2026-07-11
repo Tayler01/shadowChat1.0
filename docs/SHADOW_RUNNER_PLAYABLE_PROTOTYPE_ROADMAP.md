@@ -96,6 +96,12 @@ enemy, and reach a finish gate.
   lanes, adds smoother tilt bridges that can dump the player, and adds high
   routes where careless drops cause fall damage. Perfect-score runs require all
   high/low coin lines plus every enemy clear.
+- Level 6: Clockmaker Yard is roughly 15 percent longer than Candle Fair and
+  increases pressure without becoming a punishment route. It adds four fast
+  Lantern Bandit Scouts, stronger mixed patrols, four faster tilt bridges,
+  five recovery checkpoints, three low-clearance gear gates, and the Chrono
+  Lantern power-up for readable time-control windows through machine
+  gauntlets.
 - Each map stop carries a route type, difficulty tier, difficulty label, and
   mechanic preview so future route design can stay ordered from simple to
   complex.
@@ -271,3 +277,34 @@ enemy, and reach a finish gate.
   `output/playwright/shadow-runner-audit-level-3-final/`,
   `output/playwright/shadow-runner-audit-level-4-final/`, and
   `output/playwright/shadow-runner-audit-level-5-production/`.
+
+## July 10, 2026 - Clockmaker Yard Level 6 And Health Redesign
+
+- Added playable Campaign Level 6, `Clockmaker Yard`, at 10,260 world units
+  versus Candle Fair's 8,900. The route uses five recovery checkpoints, four
+  tilt bridges, three required crawl gates, a multi-step high route, two
+  ranged-pressure zones, 48 coins, and 12 enemies.
+- Generated a new clockwork-yard background, transparent terrain/prop atlas,
+  level thumbnail, and four-frame Chrono Lantern strip. Promoted the reviewed
+  but previously unused Lantern Bandit Scout strip as the new fast melee
+  enemy.
+- Added the Chrono Lantern power-up: it restores a bounded amount of health
+  and temporarily slows patrol movement, ranged attack cadence, projectiles,
+  and tilt-bridge dump pressure instead of duplicating Moonheart or shield
+  behavior.
+- Reworked player durability from three health points to a 12-point scale.
+  The HUD's three hearts now represent lives only and empty one at a time when
+  a life is spent; a separate proportional `current/max` health bar reflects
+  ordinary damage.
+- Differentiated damage by source: light contact and flame damage remain low,
+  sentries/bandits/jesters deal moderate damage, arrows and spikes deal more,
+  Barrel Rollers and heavy falls deal the most, and the existing 820ms damage
+  grace prevents rapid multi-hit drain.
+- Added Level 6 catalog availability migration, asset-manifest coverage,
+  level geometry/patrol/damage tests, simulation tests, life-heart assertions,
+  Chrono assertions, and route-segment smoke checks.
+- Production-preview phone evidence:
+  `output/playwright/shadow-runner-level6-final/`. Regression playthroughs for
+  tutorial and Levels 1-5 are under
+  `output/playwright/shadow-runner-health-regression-*/`, with Android Level 5
+  proof in `output/playwright/shadow-runner-level5-android-health-regression/`.

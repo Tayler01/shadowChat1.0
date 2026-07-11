@@ -1,5 +1,6 @@
 import type {
   ShadowRunnerBoostPickup,
+  ShadowRunnerChronoPickup,
   ShadowRunnerEnemyConfig,
   ShadowRunnerEnemyKind,
   ShadowRunnerLevelConfig,
@@ -26,6 +27,9 @@ export interface ShadowRunnerHudState {
   shieldActive: boolean
   shieldRemainingMs: number
   shieldGuardCharges: number
+  chronoActive: boolean
+  chronoRemainingMs: number
+  chronoTimeScale: number
   enemiesDefeated: number
   totalEnemies: number
   objective: string
@@ -63,6 +67,8 @@ export interface ShadowRunnerSimulationState {
     boostGuardCharges: number
     shieldActiveUntil: number
     shieldGuardCharges: number
+    chronoActiveUntil: number
+    chronoTimeScale: number
     lastDamagedAt: number
   }
   enemy: ShadowRunnerEnemyState
@@ -77,6 +83,8 @@ export interface ShadowRunnerSimulationState {
   defeated: boolean
   outOfLives: boolean
 }
+
+export const SHADOW_RUNNER_MAX_HEALTH = 12
 
 function createEnemyState(enemy: ShadowRunnerEnemyConfig): ShadowRunnerEnemyState {
   return {
@@ -122,8 +130,8 @@ export function createInitialShadowRunnerSimulation(
     player: {
       lives: 3,
       maxLives: 3,
-      health: 3,
-      maxHealth: 3,
+      health: SHADOW_RUNNER_MAX_HEALTH,
+      maxHealth: SHADOW_RUNNER_MAX_HEALTH,
       coins: 0,
       score: 0,
       facing: 1,
@@ -133,6 +141,8 @@ export function createInitialShadowRunnerSimulation(
       boostGuardCharges: 0,
       shieldActiveUntil: 0,
       shieldGuardCharges: 0,
+      chronoActiveUntil: 0,
+      chronoTimeScale: 1,
       lastDamagedAt: Number.NEGATIVE_INFINITY,
     },
     enemy: primaryEnemy,
@@ -163,6 +173,10 @@ export function getShadowRunnerHudState(
   const shieldRemainingMs = rawShieldRemainingMs > 0
     ? Math.ceil(rawShieldRemainingMs / 1000) * 1000
     : 0
+  const rawChronoRemainingMs = Math.max(0, state.player.chronoActiveUntil - time)
+  const chronoRemainingMs = rawChronoRemainingMs > 0
+    ? Math.ceil(rawChronoRemainingMs / 1000) * 1000
+    : 0
   const totalEnemies = state.enemies.length
   const enemiesDefeated = state.enemies.filter(enemy => !enemy.alive).length
 
@@ -186,6 +200,9 @@ export function getShadowRunnerHudState(
     shieldActive: shieldRemainingMs > 0,
     shieldRemainingMs,
     shieldGuardCharges: state.player.shieldGuardCharges,
+    chronoActive: chronoRemainingMs > 0,
+    chronoRemainingMs,
+    chronoTimeScale: chronoRemainingMs > 0 ? state.player.chronoTimeScale : 1,
     enemiesDefeated,
     totalEnemies,
     objective: state.objective,
@@ -200,6 +217,16 @@ export function isShadowRunnerBoostActive(state: ShadowRunnerSimulationState, ti
 
 export function isShadowRunnerShieldActive(state: ShadowRunnerSimulationState, time: number) {
   return state.player.shieldActiveUntil > time
+}
+
+export function isShadowRunnerChronoActive(state: ShadowRunnerSimulationState, time: number) {
+  return state.player.chronoActiveUntil > time
+}
+
+export function getShadowRunnerChronoTimeScale(state: ShadowRunnerSimulationState, time: number) {
+  return isShadowRunnerChronoActive(state, time)
+    ? Math.min(1, Math.max(0.35, state.player.chronoTimeScale))
+    : 1
 }
 
 export function blockShadowRunnerProjectileWithShield(state: ShadowRunnerSimulationState, time: number) {
@@ -293,4 +320,21 @@ export function collectShadowRunnerShield(
   state.player.score += shield.scoreValue ?? 90
   state.player.shieldActiveUntil = Math.max(state.player.shieldActiveUntil, time) + (shield.durationMs ?? 9000)
   state.player.shieldGuardCharges = Math.max(state.player.shieldGuardCharges, shield.guardCharges ?? 4)
+}
+
+export function collectShadowRunnerChrono(
+  state: ShadowRunnerSimulationState,
+  time: number,
+  chrono: ShadowRunnerChronoPickup,
+) {
+  const alreadyActive = isShadowRunnerChronoActive(state, time)
+  state.player.score += chrono.scoreValue ?? 150
+  state.player.health = Math.min(
+    state.player.maxHealth,
+    state.player.health + (chrono.healthRestore ?? 3),
+  )
+  state.player.chronoActiveUntil = Math.max(state.player.chronoActiveUntil, time) + (chrono.durationMs ?? 9000)
+  state.player.chronoTimeScale = alreadyActive
+    ? Math.min(state.player.chronoTimeScale, chrono.timeScale ?? 0.58)
+    : chrono.timeScale ?? 0.58
 }

@@ -33,6 +33,10 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
 | Candle Jester strip | `public/games/shadow-runner/sprites/strips/candle-jester-v1-5f-128.png` | Level 5 enemy strip with dance, candle-throw, hit, and defeated states. |
 | Candle Fair Ruins background | `public/games/shadow-runner/level-assets/level-5/background/candle-fair-ruins-background.webp` | Level 5 route backdrop. |
 | Candle Fair props/hazards sheet | `public/games/shadow-runner/level-assets/level-5/props/candle-fair-props-hazards-v1-transparent.png` | Level 5 platform, canopy, shelf, ward-token, and fairground prop source registered as Phaser terrain frames. |
+| Lantern Bandit Scout strip | `public/games/shadow-runner/sprites/strips/lantern-bandit-scout-v1-5f-128.png` | Level 6 fast melee enemy with idle/run, lantern-pole jab, hit, and defeated states. |
+| Clockmaker Yard background | `public/games/shadow-runner/level-assets/level-6/background/clockmaker-yard-background.webp` | Level 6 moonlit clockwork workshop backdrop. |
+| Clockmaker Yard props sheet | `public/games/shadow-runner/level-assets/level-6/props/clockmaker-yard-props-v1-transparent.png` | Level 6 brass-and-stone floors, ledges, bridges, overhangs, rubble, switch, gear, and counterweight art registered as Phaser terrain frames. |
+| Chrono Lantern strip | `public/games/shadow-runner/level-assets/level-6/collectibles/chrono-lantern-4f-64.png` | Four-frame Level 6 power-up that restores health and temporarily slows patrols, projectiles, attack cadence, and tilt-bridge pressure. |
 
 ## Generated Audio Assets
 
@@ -67,12 +71,19 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
   `source-assets/shadow-runner/sprites/transparent/clockwork-sentry-v2-6f-strip.png`
 - Tower Archer source:
   `source-assets/shadow-runner/sprites/raw/tower-archer-v1-source.png`
+- Lantern Bandit Scout source and normalized runtime strip:
+  `source-assets/shadow-runner/sprites/raw/lantern-bandit-scout-v1-source.png`
+  and `source-assets/shadow-runner/sprites/strips/lantern-bandit-scout-v1-5f-128.png`
 - Bell Tower generated boost source:
   `source-assets/shadow-runner/level-assets/level-4/generated/bell-tower-boost-and-crouch-assets-v1-source.png`
   and
   `source-assets/shadow-runner/level-assets/level-4/generated/bell-tower-boost-aura-v1-source.png`
 - Audio generator:
   `scripts/generate-shadow-runner-audio.mjs`
+- Clockmaker Yard generated sources:
+  `source-assets/shadow-runner/level-assets/level-6/background/clockmaker-yard-background-source.png`,
+  `source-assets/shadow-runner/level-assets/level-6/props/clockmaker-yard-props-v1-source.png`,
+  and `source-assets/shadow-runner/level-assets/level-6/collectibles/chrono-lantern-4f-source.png`.
 
 ## Runtime Wiring
 
@@ -98,6 +109,13 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
   shield pickups with a player aura/HUD guard count, reusable offscreen
   multi-height archer volleys, fall-damage tracking, and tilt bridges that can
   drop the player when they linger on the low edge.
+- Level 6 registers the generated Clockmaker Yard atlas, promotes the reviewed
+  Lantern Bandit Scout into gameplay, and adds the Chrono Lantern time field.
+  Clock terrain has dedicated crop frames; three Chrono pickups heal without
+  exceeding the 12-point maximum and temporarily slow enemies, projectiles,
+  attack cadence, and tilt-bridge dump pressure.
+- The top HUD now separates three life hearts from a smooth 12-point health
+  bar. Losing a life empties one heart; ordinary damage changes only the bar.
 - Lobby music is enabled by default on title/lobby/map surfaces and is stopped
   automatically during gameplay; SFX remain enabled by default in both menus
   and gameplay unless the local Shadow Runner sound preference is disabled.

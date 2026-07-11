@@ -7,8 +7,9 @@ export interface ShadowRunnerRect {
   width: number
   height: number
   visualId?: string
-  terrainSet?: 'stone' | 'ivy' | 'bell' | 'candle' | 'candleBright' | 'candleShelf'
+  terrainSet?: 'stone' | 'ivy' | 'bell' | 'candle' | 'candleBright' | 'candleShelf' | 'clock'
   hidden?: boolean
+  damage?: number
 }
 
 export interface ShadowRunnerTiltPlatform extends ShadowRunnerRect {
@@ -49,6 +50,13 @@ export interface ShadowRunnerShieldPickup extends ShadowRunnerPoint {
   guardCharges?: number
 }
 
+export interface ShadowRunnerChronoPickup extends ShadowRunnerPoint {
+  scoreValue?: number
+  durationMs?: number
+  healthRestore?: number
+  timeScale?: number
+}
+
 export interface ShadowRunnerCrouchGate extends ShadowRunnerRect {
   visualFrame?: number
   visualWidth?: number
@@ -64,9 +72,10 @@ export interface ShadowRunnerArrowVolley extends ShadowRunnerRect {
   delayMs?: number
   speed?: number
   lifetimeMs?: number
+  damage?: number
 }
 
-export type ShadowRunnerEnemyKind = 'clockwork-sentry' | 'barrel-roller' | 'scroll-thief' | 'tower-archer' | 'candle-jester'
+export type ShadowRunnerEnemyKind = 'clockwork-sentry' | 'lantern-bandit-scout' | 'barrel-roller' | 'scroll-thief' | 'tower-archer' | 'candle-jester'
 
 export interface ShadowRunnerEnemyConfig extends ShadowRunnerPoint {
   kind: ShadowRunnerEnemyKind
@@ -79,9 +88,11 @@ export interface ShadowRunnerEnemyConfig extends ShadowRunnerPoint {
   attackRange?: number
   attackCooldownMs?: number
   projectileSpeed?: number
+  contactDamage?: number
+  projectileDamage?: number
 }
 
-export type ShadowRunnerPlayableLevelId = 'tutorial' | 'level-1' | 'level-2' | 'level-3' | 'level-4' | 'level-5'
+export type ShadowRunnerPlayableLevelId = 'tutorial' | 'level-1' | 'level-2' | 'level-3' | 'level-4' | 'level-5' | 'level-6'
 
 export interface ShadowRunnerLevelConfig {
   id: ShadowRunnerPlayableLevelId
@@ -103,6 +114,7 @@ export interface ShadowRunnerLevelConfig {
   coins: ShadowRunnerPoint[]
   boosts?: ShadowRunnerBoostPickup[]
   shieldPickups?: ShadowRunnerShieldPickup[]
+  chronoPickups?: ShadowRunnerChronoPickup[]
   arrowVolleys?: ShadowRunnerArrowVolley[]
   enemy?: ShadowRunnerEnemyConfig
   enemies?: ShadowRunnerEnemyConfig[]
@@ -916,8 +928,218 @@ export const SHADOW_RUNNER_LEVEL_FIVE: ShadowRunnerLevelConfig = {
   ],
 }
 
+export const SHADOW_RUNNER_LEVEL_SIX: ShadowRunnerLevelConfig = {
+  id: 'level-6',
+  campaignLevel: 6,
+  title: 'Clockmaker Yard',
+  subtitle: 'Campaign Route 6',
+  objective: 'Break the gear lock',
+  introLine: 'Catch the clock. Slow the yard. Break the gear lock.',
+  completionLine: 'Clockmaker Yard cleared. The machine road stands still.',
+  backgroundAsset: SHADOW_RUNNER_ASSETS.levels.clockmakerYardBackground,
+  worldWidth: 10260,
+  worldHeight: 720,
+  playerStart: { id: 'start', x: 118, y: 552 },
+  checkpoints: [
+    { id: 'yard-first-lock', label: 'First Gear Lock', x: 2360, y: 584 },
+    { id: 'yard-high-route', label: 'Counterweight Walk', x: 4060, y: 614 },
+    { id: 'yard-gear-run', label: 'Gear Run', x: 6610, y: 584 },
+    { id: 'yard-gauntlet', label: 'Machine Gauntlet', x: 8460, y: 614 },
+    { id: 'yard-final-approach', label: 'Clock Gate Approach', x: 9360, y: 584 },
+  ],
+  enemies: [
+    {
+      id: 'yard-bandit-scout-a', kind: 'lantern-bandit-scout', x: 820, y: 548,
+      health: 4, maxHealth: 4, patrolLeft: 680, patrolRight: 1000, direction: -1,
+      patrolSpeed: 178, contactDamage: 2,
+    },
+    {
+      id: 'yard-sentry-a', kind: 'clockwork-sentry', x: 1260, y: 548,
+      health: 4, maxHealth: 4, patrolLeft: 1190, patrolRight: 1395, direction: 1,
+      patrolSpeed: 104, contactDamage: 2,
+    },
+    {
+      id: 'yard-barrel-a', kind: 'barrel-roller', x: 1910, y: 548,
+      health: 4, maxHealth: 4, patrolLeft: 1790, patrolRight: 2150, direction: -1,
+      patrolSpeed: 174, contactDamage: 4,
+    },
+    {
+      id: 'yard-bandit-scout-b', kind: 'lantern-bandit-scout', x: 2490, y: 548,
+      health: 4, maxHealth: 4, patrolLeft: 2330, patrolRight: 2690, direction: 1,
+      patrolSpeed: 186, contactDamage: 2,
+    },
+    {
+      id: 'yard-scroll-thief', kind: 'scroll-thief', x: 3560, y: 548,
+      health: 4, maxHealth: 4, patrolLeft: 3410, patrolRight: 3870, direction: -1,
+      patrolSpeed: 182, contactDamage: 2,
+    },
+    {
+      id: 'yard-high-archer', kind: 'tower-archer', x: 4810, y: 224,
+      health: 4, maxHealth: 4, patrolLeft: 4760, patrolRight: 4920, direction: -1,
+      patrolSpeed: 0, attackRange: 720, attackCooldownMs: 1180, projectileSpeed: 500,
+      contactDamage: 1, projectileDamage: 3,
+    },
+    {
+      id: 'yard-jester', kind: 'candle-jester', x: 5600, y: 548,
+      health: 4, maxHealth: 4, patrolLeft: 5440, patrolRight: 5840, direction: 1,
+      patrolSpeed: 98, attackRange: 390, attackCooldownMs: 1200, projectileSpeed: 332,
+      contactDamage: 2, projectileDamage: 2,
+    },
+    {
+      id: 'yard-bandit-scout-c', kind: 'lantern-bandit-scout', x: 7470, y: 548,
+      health: 4, maxHealth: 4, patrolLeft: 7410, patrolRight: 7620, direction: -1,
+      patrolSpeed: 190, contactDamage: 2,
+    },
+    {
+      id: 'yard-barrel-b', kind: 'barrel-roller', x: 6740, y: 548,
+      health: 4, maxHealth: 4, patrolLeft: 6570, patrolRight: 7010, direction: 1,
+      patrolSpeed: 180, contactDamage: 4,
+    },
+    {
+      id: 'yard-perch-archer', kind: 'tower-archer', x: 6850, y: 344,
+      health: 4, maxHealth: 4, patrolLeft: 6790, patrolRight: 6970, direction: -1,
+      patrolSpeed: 0, attackRange: 740, attackCooldownMs: 1140, projectileSpeed: 520,
+      contactDamage: 1, projectileDamage: 3,
+    },
+    {
+      id: 'yard-bandit-scout-d', kind: 'lantern-bandit-scout', x: 8720, y: 578,
+      health: 4, maxHealth: 4, patrolLeft: 8500, patrolRight: 9000, direction: 1,
+      patrolSpeed: 194, contactDamage: 2,
+    },
+    {
+      id: 'yard-final-sentry', kind: 'clockwork-sentry', x: 10070, y: 548,
+      health: 5, maxHealth: 5, patrolLeft: 9950, patrolRight: 10220, direction: -1,
+      patrolSpeed: 112, contactDamage: 3,
+    },
+  ],
+  finish: {
+    id: 'yard-gear-lock', visualId: 'clock-switch', x: 10126, y: 414, width: 78, height: 150,
+  },
+  platforms: [
+    { id: 'yard-start-floor', visualId: 'clock-wide-floor', x: 0, y: 584, width: 500, height: 86, terrainSet: 'clock' },
+    { id: 'yard-first-floor', visualId: 'clock-wide-floor', x: 620, y: 584, width: 420, height: 86, terrainSet: 'clock' },
+    { id: 'yard-sentry-step', visualId: 'clock-rubble-floor', x: 1160, y: 584, width: 260, height: 78, terrainSet: 'clock' },
+    { id: 'yard-first-landing', visualId: 'clock-wide-floor', x: 1760, y: 584, width: 420, height: 86, terrainSet: 'clock' },
+    { id: 'yard-switch-floor', visualId: 'clock-medium-ledge', x: 2300, y: 584, width: 420, height: 78, terrainSet: 'clock' },
+    { id: 'yard-first-crawl-floor', visualId: 'clock-wide-floor', x: 2810, y: 584, width: 470, height: 86, terrainSet: 'clock' },
+    { id: 'yard-scout-floor', visualId: 'clock-wide-floor', x: 3380, y: 584, width: 520, height: 86, terrainSet: 'clock' },
+    { id: 'yard-high-recovery', visualId: 'clock-rubble-floor', x: 4010, y: 614, width: 1260, height: 58, terrainSet: 'clock' },
+    { id: 'yard-high-step-a', visualId: 'clock-medium-ledge', x: 4100, y: 500, width: 250, height: 46, terrainSet: 'clock' },
+    { id: 'yard-high-step-b', visualId: 'clock-gear-bridge', x: 4420, y: 380, width: 240, height: 40, terrainSet: 'clock' },
+    { id: 'yard-high-step-c', visualId: 'clock-medium-ledge', x: 4730, y: 260, width: 240, height: 42, terrainSet: 'clock' },
+    { id: 'yard-high-step-d', visualId: 'clock-gear-bridge', x: 5070, y: 390, width: 250, height: 40, terrainSet: 'clock' },
+    { id: 'yard-mid-floor', visualId: 'clock-wide-floor', x: 5410, y: 584, width: 460, height: 86, terrainSet: 'clock' },
+    { id: 'yard-second-crawl-floor', visualId: 'clock-wide-floor', x: 5990, y: 584, width: 430, height: 86, terrainSet: 'clock' },
+    { id: 'yard-gear-floor', visualId: 'clock-wide-floor', x: 6540, y: 584, width: 500, height: 86, terrainSet: 'clock' },
+    { id: 'yard-archer-perch', visualId: 'clock-medium-ledge', x: 6760, y: 380, width: 240, height: 44, terrainSet: 'clock' },
+    { id: 'yard-bridge-landing', visualId: 'clock-wide-floor', x: 7380, y: 584, width: 480, height: 86, terrainSet: 'clock' },
+    { id: 'yard-gauntlet-floor', visualId: 'clock-wide-floor', x: 7980, y: 584, width: 420, height: 86, terrainSet: 'clock' },
+    { id: 'yard-gauntlet-upper', visualId: 'clock-gear-bridge', x: 8240, y: 450, width: 220, height: 40, terrainSet: 'clock' },
+    { id: 'yard-gauntlet-recovery', visualId: 'clock-rubble-floor', x: 8440, y: 614, width: 760, height: 58, terrainSet: 'clock' },
+    { id: 'yard-gauntlet-bridge', visualId: 'clock-gear-bridge', x: 8460, y: 430, width: 240, height: 40, terrainSet: 'clock' },
+    { id: 'yard-final-approach', visualId: 'clock-wide-floor', x: 9300, y: 584, width: 400, height: 86, terrainSet: 'clock' },
+    { id: 'yard-final-floor', visualId: 'clock-wide-floor', x: 9920, y: 584, width: 340, height: 86, terrainSet: 'clock' },
+  ],
+  tiltPlatforms: [
+    { id: 'yard-first-tilt', x: 1460, y: 520, width: 170, height: 28, visualHeight: 52, visualOffsetY: -12, wobbleDurationMs: 620, wobbleRotation: 0.205, slideForce: 1880, maxSlideSpeed: 282 },
+    { id: 'yard-high-tilt', x: 4985, y: 325, width: 142, height: 28, visualHeight: 50, visualOffsetY: -12, wobbleDurationMs: 600, wobbleRotation: 0.215, slideForce: 1940, maxSlideSpeed: 294 },
+    { id: 'yard-gauntlet-tilt', x: 7080, y: 520, width: 180, height: 28, visualHeight: 52, visualOffsetY: -12, wobbleDurationMs: 590, wobbleRotation: 0.22, slideForce: 1980, maxSlideSpeed: 304 },
+    { id: 'yard-final-tilt', x: 9740, y: 520, width: 150, height: 28, visualHeight: 50, visualOffsetY: -12, wobbleDurationMs: 570, wobbleRotation: 0.225, slideForce: 2040, maxSlideSpeed: 312 },
+  ],
+  crouchGates: [
+    { id: 'yard-crawl-gate-a', visualId: 'clock-overhang', x: 2900, y: 414, width: 270, height: 116, terrainSet: 'clock' },
+    { id: 'yard-crawl-gate-b', visualId: 'clock-overhang', x: 6090, y: 414, width: 250, height: 116, terrainSet: 'clock' },
+    { id: 'yard-crawl-gate-c', visualId: 'clock-overhang', x: 8080, y: 414, width: 250, height: 116, terrainSet: 'clock' },
+  ],
+  spikes: [
+    { id: 'yard-gap-a', x: 502, y: 612, width: 116, height: 28, damage: 3 },
+    { id: 'yard-gap-b', x: 1042, y: 612, width: 116, height: 28, damage: 3 },
+    { id: 'yard-first-tilt-pit-a', x: 1422, y: 612, width: 82, height: 28, damage: 3 },
+    { id: 'yard-first-tilt-pit-b', x: 1632, y: 612, width: 126, height: 28, damage: 3 },
+    { id: 'yard-gap-c', x: 2182, y: 612, width: 116, height: 28, damage: 3 },
+    { id: 'yard-gap-d', x: 2722, y: 612, width: 86, height: 28, damage: 3 },
+    { id: 'yard-gap-e', x: 3282, y: 612, width: 96, height: 28, damage: 3 },
+    { id: 'yard-gap-f', x: 3902, y: 632, width: 106, height: 28, damage: 3 },
+    { id: 'yard-gap-g', x: 5272, y: 632, width: 136, height: 28, damage: 3 },
+    { id: 'yard-gap-h', x: 5872, y: 612, width: 116, height: 28, damage: 3 },
+    { id: 'yard-gap-i', x: 6422, y: 612, width: 116, height: 28, damage: 3 },
+    { id: 'yard-gauntlet-pit-a', x: 7042, y: 612, width: 88, height: 28, damage: 3 },
+    { id: 'yard-gauntlet-pit-b', x: 7262, y: 612, width: 116, height: 28, damage: 3 },
+    { id: 'yard-gap-j', x: 7862, y: 612, width: 116, height: 28, damage: 3 },
+    { id: 'yard-gap-k', x: 9202, y: 632, width: 96, height: 28, damage: 3 },
+    { id: 'yard-final-pit-a', x: 9702, y: 612, width: 74, height: 28, damage: 3 },
+    { id: 'yard-final-pit-b', x: 9892, y: 612, width: 26, height: 28, damage: 3 },
+  ],
+  coins: [
+    { id: 'coin-1', x: 270, y: 496 }, { id: 'coin-2', x: 680, y: 500 },
+    { id: 'coin-3', x: 850, y: 500 }, { id: 'coin-4', x: 1220, y: 500 },
+    { id: 'coin-5', x: 1508, y: 448 }, { id: 'coin-6', x: 1810, y: 500 },
+    { id: 'coin-7', x: 2070, y: 500 }, { id: 'coin-8', x: 2350, y: 500 },
+    { id: 'coin-9', x: 2630, y: 500 }, { id: 'coin-10', x: 2860, y: 548 },
+    { id: 'coin-11', x: 3080, y: 548 }, { id: 'coin-12', x: 3440, y: 500 },
+    { id: 'coin-13', x: 3700, y: 500 }, { id: 'coin-14', x: 4070, y: 548 },
+    { id: 'coin-15', x: 4180, y: 438 }, { id: 'coin-16', x: 4490, y: 318 },
+    { id: 'coin-17', x: 4800, y: 198 }, { id: 'coin-18', x: 5040, y: 260 },
+    { id: 'coin-19', x: 5140, y: 328 }, { id: 'coin-20', x: 5260, y: 548 },
+    { id: 'coin-21', x: 5470, y: 500 }, { id: 'coin-22', x: 5790, y: 500 },
+    { id: 'coin-23', x: 6050, y: 548 }, { id: 'coin-24', x: 6280, y: 548 },
+    { id: 'coin-25', x: 6600, y: 500 }, { id: 'coin-26', x: 6870, y: 318 },
+    { id: 'coin-27', x: 7125, y: 448 }, { id: 'coin-28', x: 7430, y: 500 },
+    { id: 'coin-29', x: 7740, y: 500 }, { id: 'coin-30', x: 8030, y: 548 },
+    { id: 'coin-31', x: 8280, y: 388 }, { id: 'coin-32', x: 8490, y: 368 },
+    { id: 'coin-33', x: 8690, y: 548 }, { id: 'coin-34', x: 8940, y: 548 },
+    { id: 'coin-35', x: 9320, y: 500 }, { id: 'coin-36', x: 9560, y: 500 },
+    { id: 'coin-37', x: 9785, y: 448 }, { id: 'coin-38', x: 9970, y: 500 },
+    { id: 'coin-39', x: 10130, y: 500 }, { id: 'coin-40', x: 2960, y: 352 },
+    { id: 'coin-41', x: 3040, y: 330 }, { id: 'coin-42', x: 3120, y: 352 },
+    { id: 'coin-43', x: 4340, y: 438 }, { id: 'coin-44', x: 4610, y: 318 },
+    { id: 'coin-45', x: 4920, y: 198 }, { id: 'coin-46', x: 6180, y: 352 },
+    { id: 'coin-47', x: 8160, y: 352 }, { id: 'coin-48', x: 8580, y: 368 },
+  ],
+  boosts: [
+    { id: 'moonheart-yard-high-route', x: 4800, y: 174, scoreValue: 180, durationMs: 9000, guardCharges: 2 },
+  ],
+  shieldPickups: [
+    { id: 'yard-shield-high-archer', x: 4050, y: 550, scoreValue: 100, durationMs: 9800, guardCharges: 5 },
+    { id: 'yard-shield-gauntlet', x: 8448, y: 550, scoreValue: 105, durationMs: 10000, guardCharges: 5 },
+  ],
+  chronoPickups: [
+    { id: 'chrono-lantern-first-lock', x: 2380, y: 506, scoreValue: 150, durationMs: 9000, healthRestore: 4, timeScale: 0.58 },
+    { id: 'chrono-lantern-gear-run', x: 6600, y: 506, scoreValue: 160, durationMs: 9400, healthRestore: 3, timeScale: 0.55 },
+    { id: 'chrono-lantern-final', x: 9350, y: 506, scoreValue: 170, durationMs: 8800, healthRestore: 3, timeScale: 0.52 },
+  ],
+  arrowVolleys: [
+    { id: 'yard-volley-a-head', x: 3920, y: 170, width: 1480, height: 430, direction: -1, spawnX: 5480, laneY: 446, intervalMs: 1520, delayMs: 280, speed: 490, lifetimeMs: 3900, damage: 3 },
+    { id: 'yard-volley-a-crouch', x: 3920, y: 170, width: 1480, height: 430, direction: -1, spawnX: 5480, laneY: 514, intervalMs: 1810, delayMs: 900, speed: 470, lifetimeMs: 3900, damage: 2 },
+    { id: 'yard-volley-b-head', x: 7860, y: 180, width: 1420, height: 420, direction: -1, spawnX: 9360, laneY: 438, intervalMs: 1460, delayMs: 320, speed: 510, lifetimeMs: 4000, damage: 3 },
+    { id: 'yard-volley-b-crouch', x: 7860, y: 180, width: 1420, height: 420, direction: -1, spawnX: 9360, laneY: 514, intervalMs: 1760, delayMs: 980, speed: 490, lifetimeMs: 4000, damage: 2 },
+  ],
+}
+
 export function getShadowRunnerLevelEnemies(level: ShadowRunnerLevelConfig) {
   return level.enemies ?? (level.enemy ? [level.enemy] : [])
+}
+
+const DEFAULT_ENEMY_CONTACT_DAMAGE: Record<ShadowRunnerEnemyKind, number> = {
+  'clockwork-sentry': 2,
+  'lantern-bandit-scout': 2,
+  'barrel-roller': 4,
+  'scroll-thief': 2,
+  'tower-archer': 1,
+  'candle-jester': 2,
+}
+
+const DEFAULT_ENEMY_PROJECTILE_DAMAGE: Partial<Record<ShadowRunnerEnemyKind, number>> = {
+  'tower-archer': 3,
+  'candle-jester': 2,
+}
+
+export function getShadowRunnerEnemyContactDamage(enemy: ShadowRunnerEnemyConfig) {
+  return enemy.contactDamage ?? DEFAULT_ENEMY_CONTACT_DAMAGE[enemy.kind]
+}
+
+export function getShadowRunnerEnemyProjectileDamage(enemy: ShadowRunnerEnemyConfig) {
+  return enemy.projectileDamage ?? DEFAULT_ENEMY_PROJECTILE_DAMAGE[enemy.kind] ?? 1
 }
 
 export function isShadowRunnerFinishOverlap(
@@ -942,6 +1164,7 @@ export const SHADOW_RUNNER_LEVEL_CONFIGS: Record<ShadowRunnerPlayableLevelId, Sh
   'level-3': SHADOW_RUNNER_LEVEL_THREE,
   'level-4': SHADOW_RUNNER_LEVEL_FOUR,
   'level-5': SHADOW_RUNNER_LEVEL_FIVE,
+  'level-6': SHADOW_RUNNER_LEVEL_SIX,
 }
 
 export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
@@ -1023,10 +1246,11 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     difficultyTier: 6,
     difficultyLabel: 'Clockwork Pace',
     routeType: 'Machine Route',
-    mechanicPreview: 'Faster platforms, gears, guarded switches',
-    thumbnail: SHADOW_RUNNER_ASSETS.home.background,
+    mechanicPreview: 'Chrono Lantern time fields, Lantern Bandit Scouts, gear gauntlets',
+    thumbnail: SHADOW_RUNNER_ASSETS.levels.clockmakerYardThumbnail320,
     locationButton: SHADOW_RUNNER_ASSETS.levels.clockmakerYardLocationButton,
     mapPosition: { left: 56, top: 31 },
+    playableLevelId: 'level-6',
   },
   {
     id: 'level-7',

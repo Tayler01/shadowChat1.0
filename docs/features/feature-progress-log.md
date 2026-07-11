@@ -44,8 +44,26 @@ Canonical detail and release gates live in:
 - Branch: `main`
 - Current checkpoint: direct Shadow Runner entry without an access-code gate,
   campaign level-map progression, reusable level configs, Level 1 through
-  Level 5 prototype routes, and mobile landscape/orientation handling.
+  Level 6 production routes, and mobile landscape/orientation handling.
 - Roadmap: [`docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md`](C:/repos/chat2.0/docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md:1)
+- Latest pass, 2026-07-10: shipped playable Level 6 `Clockmaker Yard`, a
+  generated background/terrain/Chrono asset set, the new Lantern Bandit Scout,
+  a time-slowing Chrono Lantern power-up, five recovery checkpoints, and a
+  route roughly 15 percent longer than Candle Fair without removing readable
+  landing and recovery space.
+- Combat pass, 2026-07-10: expanded health from 3 to 12 points, made the three
+  HUD hearts represent lives and empty when lives are spent, added a separate
+  proportional health bar, and assigned different damage values to enemy
+  contact, projectiles, spikes, flames, and falls.
+- Verification, 2026-07-10: targeted TypeScript/Jest/runtime-asset checks
+  passed; production-preview phone play passed at `740x390` and `932x430` for
+  Level 6 detail/start, checkpoints, Chrono activation, life-heart removal,
+  all crawl/high/final route segments, pool caps, and completion. Tutorial and
+  Levels 1-5 also passed landscape regression playthroughs, with an additional
+  Android Level 5 pass. Evidence is in
+  `output/playwright/shadow-runner-level6-final/`,
+  `output/playwright/shadow-runner-health-regression-*/`, and
+  `output/playwright/shadow-runner-level5-android-health-regression/`.
 - Latest pass, 2026-06-09: generated dedicated options-scroll and options-row
   button assets; removed title back/sound controls; added title Options and
   in-game Pause scroll menus; widened the title menu scroll without increasing

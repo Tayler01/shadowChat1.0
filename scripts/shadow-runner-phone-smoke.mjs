@@ -49,6 +49,19 @@ const LEVELS = {
       /Shield up\. Stay low\. Pick coin risks\./i,
     ],
   },
+  'level-6': {
+    title: 'Clockmaker Yard',
+    completedLevels: ['tutorial', 'level-1', 'level-2', 'level-3', 'level-4', 'level-5'],
+    detailChecks: [
+      /Level 6/i,
+      /Clockwork Pace/i,
+      /Chrono Lantern/i,
+      /Lantern Bandit Scouts/i,
+    ],
+    gameplayChecks: [
+      /Catch the clock\. Slow the yard\. Break the gear lock\./i,
+    ],
+  },
 }
 
 const PHONE_PROFILES = {
@@ -228,7 +241,7 @@ async function assertLevelDetails(page, level, profile) {
 
   const pageText = await page.locator('body').innerText({ timeout: DEFAULT_TIMEOUT_MS })
   for (const pattern of level.detailChecks) {
-    assert(pattern.test(pageText), `${profile.label}: missing Level 5 detail text matching ${pattern}`)
+    assert(pattern.test(pageText), `${profile.label}: missing ${config.levelId} detail text matching ${pattern}`)
   }
   record(`${profile.label} ${config.levelId} detail copy visible`, {
     checks: level.detailChecks.map(pattern => pattern.source),
@@ -240,7 +253,7 @@ async function assertActiveGameplay(page, level, profile) {
 
   for (const pattern of level.gameplayChecks) {
     await page.getByText(pattern).waitFor({ timeout: 4000 }).catch(() => {
-      throw new Error(`${profile.label}: missing Level 5 gameplay text matching ${pattern}`)
+      throw new Error(`${profile.label}: missing ${config.levelId} gameplay text matching ${pattern}`)
     })
   }
   record(`${profile.label} ${config.levelId} gameplay copy visible`, {
@@ -291,7 +304,7 @@ async function assertHudAndControls(page, profile) {
       pause: '[aria-label="Open pause menu"]',
       coins: '[aria-label^="Coins collected"]',
       score: '[aria-label^="Score"]',
-      health: '[aria-label^="Health"]',
+      health: '[aria-label^="Lives"]',
     }
 
     const entries = Object.entries(selectors).map(([name, selector]) => {
@@ -372,6 +385,8 @@ async function exerciseGameplayControls(page, level, profile) {
 
   if (config.levelId === 'level-5') {
     await assertLevelFiveCheckpointAndPools(page, profile)
+  } else if (config.levelId === 'level-6') {
+    await assertLevelSixGameplay(page, profile)
   }
 
   await page.keyboard.press('Digit3')
@@ -472,6 +487,119 @@ async function assertLevelFiveRouteSegments(page, profile) {
 
   record(`${profile.label} level-5 route segments navigable`, {
     finalBridgeX: snapshot?.player?.x,
+  })
+}
+
+async function assertLevelSixGameplay(page, profile) {
+  const checkpoints = [
+    { x: 2370, y: 584, id: 'yard-first-lock' },
+    { x: 4070, y: 614, id: 'yard-high-route' },
+    { x: 6620, y: 584, id: 'yard-gear-run' },
+    { x: 8470, y: 614, id: 'yard-gauntlet' },
+    { x: 9370, y: 584, id: 'yard-final-approach' },
+  ]
+
+  for (const checkpoint of checkpoints) {
+    await page.evaluate(({ x, y }) => window.__shadowRunnerQa?.teleport(x, y), checkpoint)
+    await page.waitForFunction(
+      expected => window.__shadowRunnerDebug?.().checkpointId === expected,
+      checkpoint.id,
+      { timeout: DEFAULT_TIMEOUT_MS },
+    )
+    if (checkpoint.id === 'yard-high-route' || checkpoint.id === 'yard-gauntlet') {
+      await delay(160)
+      await capture(page, `${profile.label}-05-${checkpoint.id}.png`)
+    }
+  }
+
+  await delay(1300)
+  await page.keyboard.press('Digit7')
+  await page.waitForFunction(() => window.__shadowRunnerDebug?.().player?.chronoActive === true, null, {
+    timeout: DEFAULT_TIMEOUT_MS,
+  })
+  let snapshot = await readShadowRunnerDebug(page)
+  assert((snapshot?.player?.chronoRemainingMs ?? 0) > 0, `${profile.label}: Chrono Lantern did not activate`)
+  await capture(page, `${profile.label}-05-chrono-lantern.png`)
+
+  await page.evaluate(() => window.__shadowRunnerQa?.damage(12))
+  await page.waitForFunction(() => {
+    const player = window.__shadowRunnerDebug?.().player
+    return player?.lives === 2 && player.health === 12
+  }, null, { timeout: DEFAULT_TIMEOUT_MS })
+
+  const heartState = await page.evaluate(() => ({
+    aria: document.querySelector('[aria-label^="Lives"]')?.getAttribute('aria-label'),
+    hearts: Array.from(document.querySelectorAll('[data-heart-state]'))
+      .map(heart => heart.getAttribute('data-heart-state')),
+  }))
+  assert(heartState.hearts.filter(state => state === 'full').length === 2, `${profile.label}: losing a life did not remove one full heart`)
+  assert(heartState.hearts.filter(state => state === 'empty').length === 1, `${profile.label}: lost life did not render one empty heart`)
+  assert(heartState.aria?.includes('health 12 of 12'), `${profile.label}: expanded health scale is missing from the HUD`)
+
+  const crouchSegments = [
+    { label: 'first clock gate', x: 2875, y: 584, targetX: 3170 },
+    { label: 'second clock gate', x: 6065, y: 584, targetX: 6340 },
+    { label: 'gauntlet clock gate', x: 8055, y: 584, targetX: 8330 },
+  ]
+
+  for (const segment of crouchSegments) {
+    await page.evaluate(({ x, y }) => {
+      window.__shadowRunnerQa?.restore()
+      window.__shadowRunnerQa?.teleport(x, y)
+    }, segment)
+    await delay(120)
+    await page.keyboard.down('KeyS')
+    await page.keyboard.down('KeyD')
+    await delay(3600)
+    await page.keyboard.up('KeyD')
+    await page.keyboard.up('KeyS')
+    snapshot = await readShadowRunnerDebug(page)
+    assert(
+      (snapshot?.player?.x ?? 0) >= segment.targetX,
+      `${profile.label}: Level 6 ${segment.label} stopped at x=${snapshot?.player?.x ?? 'missing'} before x=${segment.targetX}`,
+    )
+  }
+
+  const jumpSegments = [
+    { label: 'counterweight step one', x: 4260, y: 500, targetX: 4428, doubleJump: false },
+    { label: 'counterweight step two', x: 4560, y: 380, targetX: 4740, doubleJump: true },
+    { label: 'counterweight drop', x: 4890, y: 260, targetX: 5080, doubleJump: false },
+    { label: 'final gear bridge', x: 9680, y: 584, targetX: 9920, doubleJump: true },
+  ]
+
+  for (const segment of jumpSegments) {
+    await page.evaluate(({ x, y }) => {
+      window.__shadowRunnerQa?.restore()
+      window.__shadowRunnerQa?.teleport(x, y)
+    }, segment)
+    await delay(120)
+    await page.keyboard.down('KeyD')
+    await page.getByRole('button', { name: 'Jump' }).click()
+    if (segment.doubleJump) {
+      await delay(280)
+      await page.getByRole('button', { name: 'Jump' }).click()
+    }
+    await delay(820)
+    await page.keyboard.up('KeyD')
+    snapshot = await readShadowRunnerDebug(page)
+    assert(
+      (snapshot?.player?.x ?? 0) >= segment.targetX,
+      `${profile.label}: Level 6 ${segment.label} stopped at x=${snapshot?.player?.x ?? 'missing'} before x=${segment.targetX}`,
+    )
+  }
+
+  await page.evaluate(() => window.__shadowRunnerQa?.teleport(8040, 584))
+  await delay(3000)
+  snapshot = await readShadowRunnerDebug(page)
+  assert((snapshot?.pools?.projectiles.total ?? 99) <= 48, `${profile.label}: projectile pool exceeded its cap`)
+  assert((snapshot?.pools?.candleHazards.total ?? 99) <= 24, `${profile.label}: candle hazard pool exceeded its cap`)
+  await capture(page, `${profile.label}-06-level-6-routes.png`)
+
+  record(`${profile.label} level-6 health, Chrono Lantern, and route segments`, {
+    checkpointId: snapshot?.checkpointId,
+    hearts: heartState.hearts,
+    healthAria: heartState.aria,
+    pools: snapshot?.pools,
   })
 }
 
@@ -618,6 +746,11 @@ function attachDiagnostics(page, logPath, label) {
 
   page.on('requestfailed', async request => {
     await appendFile(logPath, `[requestfailed:${label}] ${request.method()} ${request.url()} ${request.failure()?.errorText || 'unknown'}\n`)
+  })
+
+  page.on('response', async response => {
+    if (response.status() < 400) return
+    await appendFile(logPath, `[response:${label}:${response.status()}] ${response.request().method()} ${response.url()}\n`)
   })
 }
 

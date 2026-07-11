@@ -9,9 +9,14 @@ const levelFiveMigration = readFileSync(
   path.join(process.cwd(), 'supabase/migrations/20260619070000_shadow_runner_level5_available.sql'),
   'utf8'
 )
+const levelSixMigration = readFileSync(
+  path.join(process.cwd(), 'supabase/migrations/20260710234000_shadow_runner_level6_available.sql'),
+  'utf8'
+)
 
 const compactSql = migration.replace(/\s+/g, ' ').toLowerCase()
 const compactLevelFiveSql = levelFiveMigration.replace(/\s+/g, ' ').toLowerCase()
+const compactLevelSixSql = levelSixMigration.replace(/\s+/g, ' ').toLowerCase()
 
 describe('Shadow Runner medals migration contract', () => {
   it('adds public medal flags and a private completion source of truth', () => {
@@ -33,6 +38,12 @@ describe('Shadow Runner medals migration contract', () => {
     expect(compactLevelFiveSql).toContain("('level-5', 5, 'candle fair ruins', 5, false, true, true)")
     expect(compactLevelFiveSql).toContain('is_available = true')
     expect(compactLevelFiveSql).toContain('select private.refresh_shadow_runner_medals()')
+  })
+
+  it('launches Clockmaker Yard as the new hardest available route', () => {
+    expect(compactLevelSixSql).toContain("('level-6', 6, 'clockmaker yard', 6, false, true, true)")
+    expect(compactLevelSixSql).toContain('is_available = true')
+    expect(compactLevelSixSql).toContain('select private.refresh_shadow_runner_medals()')
   })
 
   it('recalculates medals when completions or level availability change', () => {

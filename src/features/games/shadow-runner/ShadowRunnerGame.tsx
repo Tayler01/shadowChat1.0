@@ -17,7 +17,7 @@ import {
   getShadowRunnerLevelEnemies,
   type ShadowRunnerPlayableLevelId,
 } from './game/levels'
-import type { ShadowRunnerHudState } from './game/simulation'
+import { SHADOW_RUNNER_MAX_HEALTH, type ShadowRunnerHudState } from './game/simulation'
 import { ShadowRunnerScrollMenu, type ShadowRunnerScrollMenuAction } from './ShadowRunnerScrollMenu'
 
 export interface ShadowRunnerLevelCompletionSummary {
@@ -47,8 +47,8 @@ function createDefaultHud(levelId: ShadowRunnerPlayableLevelId): ShadowRunnerHud
   return {
     lives: 3,
     maxLives: 3,
-    health: 3,
-    maxHealth: 3,
+    health: SHADOW_RUNNER_MAX_HEALTH,
+    maxHealth: SHADOW_RUNNER_MAX_HEALTH,
     enemyHealth: enemy?.health ?? 0,
     enemyMaxHealth: enemy?.maxHealth ?? 0,
     levelId: level.id,
@@ -64,6 +64,9 @@ function createDefaultHud(levelId: ShadowRunnerPlayableLevelId): ShadowRunnerHud
     shieldActive: false,
     shieldRemainingMs: 0,
     shieldGuardCharges: 0,
+    chronoActive: false,
+    chronoRemainingMs: 0,
+    chronoTimeScale: 1,
     enemiesDefeated: 0,
     totalEnemies: getShadowRunnerLevelEnemies(level).length,
     objective: level.objective,
@@ -141,24 +144,46 @@ interface MovementPointerState extends MovementPointerOrigin {
   maxDistance: number
 }
 
-function HealthAndLives({ health, maxHealth, lives }: { health: number; maxHealth: number; lives: number }) {
+function HealthAndLives({
+  health,
+  maxHealth,
+  lives,
+  maxLives,
+}: {
+  health: number
+  maxHealth: number
+  lives: number
+  maxLives: number
+}) {
+  const healthPercent = maxHealth > 0 ? Math.max(0, Math.min(100, (health / maxHealth) * 100)) : 0
+
   return (
     <span
-      aria-label={`Health ${health} of ${maxHealth}, lives ${lives}`}
-      className="flex items-center justify-center gap-1"
+      aria-label={`Lives ${lives} of ${maxLives}, health ${health} of ${maxHealth}`}
+      className="flex w-full items-center justify-center gap-1.5"
     >
-      {Array.from({ length: maxHealth }, (_item, index) => (
-        <img
-          key={index}
-          src={index < health ? SHADOW_RUNNER_ASSETS.gameplay.heartFull : SHADOW_RUNNER_ASSETS.gameplay.heartEmpty}
-          alt=""
+      <span className="flex shrink-0 items-center gap-[1px]">
+        {Array.from({ length: maxLives }, (_item, index) => (
+          <img
+            key={index}
+            src={index < lives ? SHADOW_RUNNER_ASSETS.gameplay.heartFull : SHADOW_RUNNER_ASSETS.gameplay.heartEmpty}
+            data-heart-state={index < lives ? 'full' : 'empty'}
+            alt=""
+            aria-hidden="true"
+            className="h-[clamp(0.72rem,2.2vw,1.05rem)] w-auto object-contain drop-shadow-[0_2px_0_rgba(0,0,0,0.42)]"
+            draggable={false}
+          />
+        ))}
+      </span>
+      <span className="relative h-[0.72rem] min-w-12 flex-1 overflow-hidden rounded-full border border-[#f0d381]/55 bg-[#180907]/88 shadow-inner min-[740px]:h-[0.8rem]">
+        <span
           aria-hidden="true"
-          className="h-[clamp(1rem,3vw,1.55rem)] w-auto object-contain drop-shadow-[0_2px_0_rgba(0,0,0,0.42)]"
-          draggable={false}
+          className="absolute inset-y-[1px] left-[1px] rounded-full bg-gradient-to-r from-[#8f1f1f] via-[#d34a2f] to-[#f0a14a] transition-[width] duration-200"
+          style={{ width: `${healthPercent}%` }}
         />
-      ))}
-      <span className="ml-0.5 text-[0.5rem] font-black uppercase tracking-[0.04em] text-[#f0d381] min-[740px]:text-[0.58rem]">
-        x{lives}
+        <span className="absolute inset-0 flex items-center justify-center text-[0.38rem] font-black leading-none tracking-[0.02em] text-[#fff3cf] drop-shadow-[0_1px_1px_#210604] min-[740px]:text-[0.44rem]">
+          {health}/{maxHealth}
+        </span>
       </span>
     </span>
   )
@@ -711,7 +736,12 @@ export function ShadowRunnerGame({
             draggable={false}
           />
           <div className="absolute inset-y-[21%] left-[14.5%] flex w-[30%] items-center justify-center">
-            <HealthAndLives health={hud.health} maxHealth={hud.maxHealth} lives={hud.lives} />
+            <HealthAndLives
+              health={hud.health}
+              maxHealth={hud.maxHealth}
+              lives={hud.lives}
+              maxLives={hud.maxLives}
+            />
           </div>
           <div
             aria-label={`Coins collected ${hud.coins}`}
@@ -759,6 +789,24 @@ export function ShadowRunnerGame({
             <span>Shield</span>
             <span>{Math.ceil(hud.shieldRemainingMs / 1000)}s</span>
             {hud.shieldGuardCharges > 0 && <span className="text-[#f8e8ad]">Guard {hud.shieldGuardCharges}</span>}
+          </div>
+        )}
+
+        {hud.chronoActive && (
+          <div
+            aria-label={`Chrono Lantern ${Math.ceil(hud.chronoRemainingMs / 1000)} seconds remaining`}
+            className="pointer-events-none mx-auto mt-1 flex h-7 w-fit items-center gap-1.5 rounded border border-[#70e8ff]/45 bg-[#06121a]/82 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#9fefff] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
+          >
+            <span
+              aria-hidden="true"
+              className="h-5 w-5 bg-contain bg-left bg-no-repeat [image-rendering:pixelated]"
+              style={{
+                backgroundImage: `url(${SHADOW_RUNNER_ASSETS.levels.chronoLanternStrip})`,
+                backgroundSize: '400% 100%',
+              }}
+            />
+            <span>Chrono</span>
+            <span>{Math.ceil(hud.chronoRemainingMs / 1000)}s</span>
           </div>
         )}
 

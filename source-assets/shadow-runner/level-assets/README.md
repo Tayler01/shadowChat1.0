@@ -277,3 +277,41 @@ Style note: Candle Jester is intentionally separated from the hero with a
 cream mask, red-and-gold jester cap, red/gold motley tunic, curled shoes,
 candle wand, and fake coin silhouette instead of a dark hooded runner
 silhouette.
+
+## Batch 6 Clockmaker Yard - 2026-07-10
+
+The final built-in image-generation prompt set is preserved in
+`level-6/asset-prompts.md`.
+
+### Background
+
+- `level-6/background/clockmaker-yard-background-source.png`: generated wide
+  moonlit clockwork-yard source.
+- Runtime WebP:
+  `public/games/shadow-runner/level-assets/level-6/background/clockmaker-yard-background.webp`.
+
+### Terrain And Props
+
+- `level-6/props/clockmaker-yard-props-v1-source.png`: generated chroma-key
+  source sheet with wide floor, medium ledge, gear bridge, low overhang,
+  rubble floor, gear-lock switch, large gear, and counterweight pieces.
+- `level-6/props/clockmaker-yard-props-v1-transparent.png`: preserved alpha
+  source. The optimized runtime copy is registered as named Phaser terrain
+  frames rather than treated as a regular tilemap.
+
+### Power-Up
+
+- `level-6/collectibles/chrono-lantern-4f-source.png`: generated four-pose
+  chroma-key source for the Chrono Lantern.
+- `level-6/collectibles/chrono-lantern-4f-transparent.png`: preserved alpha
+  source.
+- Runtime strip:
+  `public/games/shadow-runner/level-assets/level-6/collectibles/chrono-lantern-4f-64.png`.
+
+### Enemy And UI
+
+- The previously approved Lantern Bandit Scout strip is promoted from
+  `source-assets/shadow-runner/sprites/strips/lantern-bandit-scout-v1-5f-128.png`
+  into the Level 6 runtime asset tree.
+- `level-6/ui/clockmaker-yard-thumbnail-source.png` preserves the generated
+  background crop used for the 320x180 and 160x90 runtime thumbnails.
