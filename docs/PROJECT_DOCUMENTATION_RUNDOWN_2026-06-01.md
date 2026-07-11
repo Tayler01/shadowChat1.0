@@ -81,6 +81,12 @@ implementation backlog.
 
 ## Current Product And Feature Docs
 
+The isolated ShadowChat 2.0 Wave One work is tracked in
+[SHADOWCHAT_2_0_WAVE_ONE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_ONE.md:1).
+Its first verified candidate is documented in
+[ACTIVITY_HQ.md](C:/repos/chat2.0/docs/ACTIVITY_HQ.md:1). These are candidate
+docs until the separate 2.0 Netlify trial is approved for `main`.
+
 | File | Latest tracked update/status date | Role | Refresh guidance |
 | --- | --- | --- | --- |
 | [docs/ADMIN_ACCESS.md](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1) | 2026-07-09 | Canonical `user_roles` authority, display-only badges, and active/paused admin surfaces. | Refresh after role, authority, or admin-surface changes. |

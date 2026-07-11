@@ -1,1 +1,1 @@
-export type AppView = 'chat' | 'dms' | 'boards' | 'games' | 'pins' | 'settings'
+export type AppView = 'chat' | 'dms' | 'activity' | 'boards' | 'games' | 'pins' | 'settings'

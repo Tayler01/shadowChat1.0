@@ -1,4 +1,6 @@
-import { Gamepad2, Images, MessageSquare, Newspaper, Users } from 'lucide-react'
+import { Bell, Gamepad2, Images, MessageSquare, Newspaper, Users } from 'lucide-react'
+import { useOptionalActivity } from '../../features/activity/ActivityContext'
+import { formatActivityBadge } from '../../features/activity/activityModel'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
 import type { AppView } from '../../types/navigation'
 
@@ -20,6 +22,7 @@ export function MobileNav({
   boardsBadgeCount = 0,
 }: MobileNavProps) {
   const { conversations } = useDirectMessages()
+  const activity = useOptionalActivity()
   const totalUnread = conversations.reduce(
     (sum, c) => sum + (c.unread_count || 0),
     0
@@ -33,14 +36,20 @@ export function MobileNav({
       label: 'DMs',
       badge: totalUnread > 0 ? totalUnread : null,
     },
+    {
+      id: 'activity' as const,
+      icon: Bell,
+      label: 'Activity',
+      badge: activity?.unreadCount ? activity.unreadCount : null,
+    },
     ...(boardsEnabled ? [{
       id: 'boards' as const,
       icon: Newspaper,
       label: 'Boards',
       badge: boardsBadgeCount > 0 ? boardsBadgeCount : null,
     }] : []),
-    { id: 'games' as const, icon: Gamepad2, label: 'Entertainment', badge: null },
     { id: 'pins' as const, icon: Images, label: 'Pins', badge: null },
+    { id: 'games' as const, icon: Gamepad2, label: 'Play', badge: null },
   ]
 
   const navSurface = embedded
@@ -56,8 +65,9 @@ export function MobileNav({
           <li key={item.id} className="relative flex-1">
             <button
               onClick={() => onViewChange(item.id)}
+              aria-label={`${item.label}${item.badge ? `, ${item.badge} unread` : ''}`}
               aria-current={currentView === item.id ? 'page' : undefined}
-              className={`flex h-full w-full flex-col items-center justify-center rounded-[var(--radius-md)] px-0.5 py-1.5 text-[10px] transition-[background-color,box-shadow,color] duration-[var(--dur-med)] focus:outline-none ${
+              className={`flex h-full min-h-11 w-full flex-col items-center justify-center rounded-[var(--radius-md)] px-0.5 py-1.5 text-[10px] transition-[background-color,box-shadow,color] duration-[var(--dur-med)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-accent)] ${
                 currentView === item.id
                   ? 'bg-[var(--nav-active-bg)] text-[var(--theme-accent-readable)] shadow-[var(--shadow-accent-soft)]'
                   : 'text-[var(--text-muted)] hover:bg-[var(--nav-hover-bg)] hover:text-[var(--text-primary)]'
@@ -66,8 +76,8 @@ export function MobileNav({
               <span className="relative mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--nav-icon-bg)]">
                 <item.icon className="w-[1.15rem] h-[1.15rem]" />
                 {item.badge && (
-                  <span className="theme-unread-badge absolute -right-1 -top-1 rounded-full px-1 text-[10px] leading-none">
-                    {item.badge}
+                  <span aria-hidden="true" className="theme-unread-badge absolute -right-1 -top-1 rounded-full px-1 text-[10px] leading-none">
+                    {formatActivityBadge(item.badge)}
                   </span>
                 )}
               </span>

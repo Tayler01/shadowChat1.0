@@ -48,7 +48,7 @@ import { cn } from '../../lib/utils'
 import type { AppView } from '../../types/navigation'
 import { useShadowPinCategories } from './hooks/useShadowPinCategories'
 import { useShadowPinImages } from './hooks/useShadowPinImages'
-import { searchShadowPinImages } from './api/shadowPinApi'
+import { fetchShadowPinImage, searchShadowPinImages } from './api/shadowPinApi'
 import { ShadowPinCommentsDialog } from './components/ShadowPinCommentsDialog'
 import { rankShadowPinCategories } from './categorySearch'
 import {
@@ -67,6 +67,8 @@ type ShadowPinProps = {
   currentView?: AppView
   onViewChange?: (view: AppView) => void
   onBack?: () => void
+  initialImageId?: string
+  initialCommentId?: string
 }
 
 type ModalMode =
@@ -3109,12 +3111,16 @@ function ShadowPinCategoryScreen({
   categoryId,
   onBack,
   tracker,
+  initialImage,
+  initialCommentId,
 }: {
   currentView: AppView
   onViewChange: (view: AppView) => void
   categoryId: string
   onBack: () => void
   tracker: ShadowPinActivityTracker
+  initialImage?: ShadowPinImage | null
+  initialCommentId?: string
 }) {
   const { user } = useAuth()
   const { role: adminRole } = useAdminAccess({ includeUsers: false })
@@ -3129,6 +3135,7 @@ function ShadowPinCategoryScreen({
   const [playableVisibleVideoCount, setPlayableVisibleVideoCount] = useState(0)
   const videoVisibilityRef = useRef(new Map<string, VideoVisibilitySnapshot>())
   const skippedVideoIdsRef = useRef(new Set<string>())
+  const openedInitialTargetRef = useRef<string | null>(null)
   const title = imagesState.category?.title || 'ShadowPin'
   useShadowPinCategoryDwell(imagesState.category, tracker)
 
@@ -3260,6 +3267,18 @@ function ShadowPinCategoryScreen({
     ? imagesState.images.find(image => image.id === modal.image.id) ?? modal.image
     : null
 
+  useEffect(() => {
+    if (!initialImage || openedInitialTargetRef.current === initialImage.id) return
+    openedInitialTargetRef.current = initialImage.id
+    const currentImage = imagesState.images.find(image => image.id === initialImage.id) ?? initialImage
+    tracker.recordPinOpened(currentImage, imagesState.category)
+    if (initialCommentId) {
+      setCommentsImage(currentImage)
+    } else {
+      setModal({ type: 'image-viewer', image: currentImage })
+    }
+  }, [imagesState.category, imagesState.images, initialCommentId, initialImage, tracker])
+
   return (
     <div className="theme-image-surface relative flex h-full min-h-0 flex-col">
       <MobileAppHeader
@@ -3381,6 +3400,7 @@ function ShadowPinCategoryScreen({
       {commentsImage && (
         <ShadowPinCommentsDialog
           image={commentsImage}
+          initialCommentId={initialCommentId}
           open
           onClose={() => {
             setCommentsImage(null)
@@ -3395,13 +3415,36 @@ function ShadowPinCategoryScreen({
 export function ShadowPin({
   currentView = 'pins',
   onViewChange = () => {},
+  initialImageId,
+  initialCommentId,
 }: ShadowPinProps) {
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
+  const [initialImage, setInitialImage] = useState<ShadowPinImage | null>(null)
   const categoryListScrollMemory = useRef<CategoryListScrollMemory>({
     scrollTop: 0,
     shouldRestore: false,
   })
   const tracker = useShadowPinActivityTracker()
+
+  useEffect(() => {
+    let cancelled = false
+    if (!initialImageId) {
+      setInitialImage(null)
+      return
+    }
+
+    void fetchShadowPinImage(initialImageId)
+      .then(image => {
+        if (cancelled || !image) return
+        setInitialImage(image)
+        setActiveCategoryId(image.category_id ?? null)
+      })
+      .catch(() => undefined)
+
+    return () => {
+      cancelled = true
+    }
+  }, [initialImageId])
 
   if (activeCategoryId) {
     return (
@@ -3411,6 +3454,8 @@ export function ShadowPin({
         categoryId={activeCategoryId}
         onBack={() => setActiveCategoryId(null)}
         tracker={tracker}
+        initialImage={initialImage}
+        initialCommentId={initialCommentId}
       />
     )
   }

@@ -5,11 +5,14 @@ export type AppLocationState = {
   view: AppView
   conversation: string | null
   message: string | null
+  pin: string | null
+  comment: string | null
 }
 
 const isEnabledView = (value: string | null): value is AppView => (
   value === 'chat' ||
   value === 'dms' ||
+  value === 'activity' ||
   value === 'games' ||
   value === 'pins' ||
   value === 'settings' ||
@@ -39,5 +42,7 @@ export const getLocationStateFromUrl = (url: URL): AppLocationState => {
     view,
     conversation: view === 'dms' ? params.get('conversation') : null,
     message: view === 'dms' || view === 'chat' ? params.get('message') : null,
+    pin: view === 'pins' ? params.get('pin') : null,
+    comment: view === 'pins' ? params.get('comment') : null,
   }
 }

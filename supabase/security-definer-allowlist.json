@@ -1,8 +1,13 @@
 {
-  "reviewed_on": "2026-07-10",
+  "reviewed_on": "2026-07-11",
   "expected_total_security_definers": 105,
   "private_security_definers": [
+    "private.cleanup_activity_events()",
     "private.cleanup_signup_invite_auth_metadata()",
+    "private.create_dm_activity_event()",
+    "private.create_group_activity_events()",
+    "private.create_hype_activity_event()",
+    "private.create_reaction_activity_event()",
     "private.create_shadow_pin_comment_notification()",
     "private.create_shadow_pin_post_notifications()",
     "private.create_signup_invite(uuid,text)",
@@ -12,6 +17,7 @@
     "private.enforce_shadow_pin_comment_parent()",
     "private.generate_signup_invite_code()",
     "private.is_operations_health_operator(uuid)",
+    "private.mirror_shadow_pin_activity_event()",
     "private.refresh_shadow_pin_category_latest_image(uuid)",
     "private.refresh_shadow_pin_comment_count()",
     "private.refresh_shadow_pin_scores()",
@@ -64,6 +70,7 @@
     "update_art_board_link(uuid,text)"
   ],
   "required_active_table_privileges": [
+    "authenticated:activity_events:SELECT",
     "authenticated:dm_conversations:INSERT",
     "authenticated:dm_conversations:SELECT",
     "authenticated:dm_conversations:UPDATE",
@@ -89,6 +96,10 @@
     "authenticated:user_presence:INSERT",
     "authenticated:user_presence:SELECT",
     "authenticated:user_presence:UPDATE",
+    "service_role:activity_events:DELETE",
+    "service_role:activity_events:INSERT",
+    "service_role:activity_events:SELECT",
+    "service_role:activity_events:UPDATE",
     "service_role:dm_conversations:DELETE",
     "service_role:dm_conversations:INSERT",
     "service_role:dm_conversations:SELECT",

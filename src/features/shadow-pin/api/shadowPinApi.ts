@@ -238,6 +238,20 @@ export async function fetchShadowPinImages(categoryId: string, page = 0) {
   }
 }
 
+export async function fetchShadowPinImage(imageId: string) {
+  const client = await getWorkingClient()
+  const { data, error } = await client
+    .from('shadow_pin_images')
+    .select(SHADOW_PIN_IMAGE_SELECT)
+    .eq('id', imageId)
+    .is('deleted_at', null)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) return null
+  return attachViewerImageHeart(normalizeShadowPinImageRecord(data as unknown as ShadowPinImageRecord))
+}
+
 async function getSessionAccessToken() {
   const sessionValid = await ensureSession(true)
   if (!sessionValid) {

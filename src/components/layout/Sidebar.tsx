@@ -1,4 +1,6 @@
-import { Gamepad2, Images, MessageSquare, Users, Newspaper, Settings, Moon, Sun, X } from 'lucide-react';
+import { Bell, Gamepad2, Images, MessageSquare, Users, Newspaper, Settings, Moon, Sun, X } from 'lucide-react';
+import { useOptionalActivity } from '../../features/activity/ActivityContext';
+import { formatActivityBadge } from '../../features/activity/activityModel';
 import { Avatar } from '../ui/Avatar';
 import { UserRoleBadge } from '../ui/UserRoleBadge';
 import { UserPresenceBadge } from '../ui/UserPresenceBadge';
@@ -32,6 +34,7 @@ export function Sidebar({
   const { user } = useAuth();
   const myPresence = usePresenceForUser(user?.id);
   const { conversations } = useDirectMessages();
+  const activity = useOptionalActivity();
   const myPresenceState =
     myPresence?.presence_state ||
     (user?.presence_visibility === 'invisible' ? 'invisible' : 'offline');
@@ -50,6 +53,12 @@ export function Sidebar({
       label: 'Direct Messages',
       icon: Users,
       badge: totalUnread > 0 ? totalUnread : null,
+    },
+    {
+      id: 'activity' as const,
+      label: 'Activity',
+      icon: Bell,
+      badge: activity?.unreadCount ? activity.unreadCount : null,
     },
     ...(boardsEnabled ? [{
       id: 'boards' as const,
@@ -108,6 +117,7 @@ export function Sidebar({
           <button
             key={item.id}
             onClick={() => onViewChange(item.id)}
+            aria-label={`${item.label}${item.badge ? `, ${item.badge} unread` : ''}`}
             aria-current={currentView === item.id ? 'page' : undefined}
             className={`
               flex w-full items-center space-x-3 rounded-[var(--radius-md)] px-3 py-3
@@ -123,8 +133,8 @@ export function Sidebar({
             </span>
             <span className="font-medium">{item.label}</span>
             {item.badge && (
-              <span className="theme-unread-badge ml-auto min-w-[20px] rounded-full px-2 py-1 text-center text-xs">
-                {item.badge}
+              <span aria-hidden="true" className="theme-unread-badge ml-auto min-w-[20px] rounded-full px-2 py-1 text-center text-xs">
+                {formatActivityBadge(item.badge)}
               </span>
             )}
           </button>

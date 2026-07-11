@@ -67,11 +67,13 @@ describe('useShadowPinCommentNotifications', () => {
     ;(getWorkingClient as jest.Mock).mockResolvedValue(client)
     ;(getRealtimeClient as jest.Mock).mockReturnValue(client)
     ;(toast.custom as jest.Mock).mockClear()
+    ;(toast.custom as jest.Mock).mockReturnValue('shadow-pin-toast')
     ;(toast.dismiss as jest.Mock).mockClear()
     window.history.replaceState({}, '', '/')
   })
 
   it('uses the normal toast timer and hides during the removal delay', async () => {
+    const timeoutSpy = jest.spyOn(window, 'setTimeout')
     renderHook(() => useShadowPinCommentNotifications())
     await waitFor(() => expect(insertHandler).toBeDefined())
 
@@ -91,8 +93,14 @@ describe('useShadowPinCommentNotifications', () => {
     await waitFor(() => expect(toast.custom).toHaveBeenCalledTimes(1))
     const [renderer, options] = (toast.custom as jest.Mock).mock.calls[0]
 
-    expect(options).toEqual({ position: 'top-center' })
-    expect(options.duration).toBeUndefined()
+    expect(options).toEqual({ duration: 5000, position: 'top-center' })
+    const hardDismiss = timeoutSpy.mock.calls.find(([, delay]) => delay === 5000)
+    expect(hardDismiss).toBeDefined()
+    act(() => {
+      ;(hardDismiss?.[0] as () => void)()
+    })
+    expect(toast.dismiss).toHaveBeenCalledWith('shadow-pin-toast')
+    timeoutSpy.mockRestore()
 
     const visibleToast = {
       id: 'toast-1',

@@ -42,7 +42,7 @@ export function useShadowPinCommentNotifications() {
       ? `${actorLabel} replied to your ShadowPin comment`
       : `${actorLabel} commented on ${event.payload?.image_title || 'your pin'}`
 
-    toast.custom(t => (
+    const toastId = toast.custom(t => (
       <button
         type="button"
         onClick={() => {
@@ -68,7 +68,8 @@ export function useShadowPinCommentNotifications() {
           )}
         </span>
       </button>
-    ), { position: 'top-center' })
+    ), { duration: 5000, position: 'top-center' })
+    window.setTimeout(() => toast.dismiss(toastId), 5000)
 
     const client = await getWorkingClient()
     await client

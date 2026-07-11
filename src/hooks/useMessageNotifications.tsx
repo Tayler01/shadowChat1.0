@@ -147,7 +147,7 @@ export function useMessageNotifications(onOpenConversation: (id: string) => void
               }
 
               const desktop = isDesktopRef.current
-              toast.custom(t => (
+              const toastId = toast.custom(t => (
                 <MessageNotification
                   t={t}
                   content={message.content}
@@ -162,6 +162,7 @@ export function useMessageNotifications(onOpenConversation: (id: string) => void
                 duration: 5000,
                 position: desktop ? 'top-right' : 'top-center',
               })
+              window.setTimeout(() => toast.dismiss(toastId), 5000)
             } catch {
               clearMessageNotificationStarted(messageId)
             }

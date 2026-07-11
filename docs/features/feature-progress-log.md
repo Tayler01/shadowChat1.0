@@ -33,6 +33,25 @@ Canonical detail and release gates live in:
 
 ## Current Goal
 
+### ShadowChat 2.0 Wave One
+
+- Goal: build five high-impact product upgrades on the isolated
+  `codex/shadowchat-2.0` branch, preserve the production frontend and shared
+  Supabase contract, then publish a separate installable Netlify test site.
+- Started: 2026-07-11
+- Status: active; Candidate 1 of 5 verified locally.
+- Candidate 1: Unified Activity HQ with an authoritative recipient ledger,
+  realtime/recovery, exact Chat/DM/Pin routes, five-item phone navigation,
+  accessible unread handling, and hard-bounded foreground toast lifetime.
+- Backend proof: clean local database replay, zero Supabase lint findings,
+  reviewed security-definer/table-grant contract, and rolled-back producer/RLS/
+  cleanup verification across nine event cases.
+- Browser proof: Android Chromium and actual WebKit phone layouts, exact
+  General Chat/DM/Pin-comment handoffs, live DM-to-Activity prepend and badge
+  increment, keyboard/focus review, and no final console errors.
+- Roadmap: [SHADOWCHAT_2_0_WAVE_ONE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_ONE.md:1)
+- Feature contract: [ACTIVITY_HQ.md](C:/repos/chat2.0/docs/ACTIVITY_HQ.md:1)
+
 ### Shadow Runner Playable Prototype Prep
 
 - Goal: Rebuild the Shadow Runner title/menu surface as clean asset-driven UI,

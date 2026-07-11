@@ -7,6 +7,10 @@ jest.mock('../src/hooks/useDirectMessages', () => ({
   useDirectMessages: () => ({ conversations: [] }),
 }))
 
+jest.mock('../src/features/activity/ActivityContext', () => ({
+  useOptionalActivity: () => ({ unreadCount: 140 }),
+}))
+
 jest.mock('../src/components/search/GlobalSearchButton', () => ({
   GlobalSearchButton: () => <button type="button" aria-label="Open search and saved messages" />,
 }))
@@ -27,10 +31,12 @@ test('mobile navigation omits paused boards by default', () => {
   render(<MobileNav currentView="chat" onViewChange={onViewChange} />)
 
   expect(screen.queryByText('Boards')).not.toBeInTheDocument()
-  expect(screen.getByText('Entertainment')).toBeInTheDocument()
+  expect(screen.getByText('Play')).toBeInTheDocument()
+  expect(screen.getByText('Activity')).toBeInTheDocument()
+  expect(screen.getByText('99+')).toBeInTheDocument()
   expect(screen.queryByText('Profile')).toBeNull()
 
-  fireEvent.click(screen.getByText('Entertainment'))
+  fireEvent.click(screen.getByText('Play'))
   expect(onViewChange).toHaveBeenCalledWith('games')
 })
 
@@ -73,6 +79,7 @@ test('sidebar navigation omits paused boards by default', () => {
 
   expect(screen.queryByText('Boards')).not.toBeInTheDocument()
   expect(screen.getByText('Entertainment')).toBeInTheDocument()
+  expect(screen.getByText('Activity')).toBeInTheDocument()
   expect(screen.queryByText('Profile')).toBeNull()
 
   fireEvent.click(screen.getByText('Entertainment'))

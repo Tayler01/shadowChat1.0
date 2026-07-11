@@ -110,6 +110,8 @@ describe('useMessageNotifications', () => {
     ;(getWorkingClient as jest.Mock).mockResolvedValue(workingClient)
     ;(getRealtimeClient as jest.Mock).mockReturnValue(workingClient)
     ;(toast.custom as jest.Mock).mockClear()
+    ;(toast.custom as jest.Mock).mockReturnValue('dm-toast')
+    ;(toast.dismiss as jest.Mock).mockClear()
     mockUseRealtimeRecovery.mockClear()
     workingClient.channel.mockClear()
     workingClient.removeChannel.mockClear()
@@ -153,6 +155,7 @@ describe('useMessageNotifications', () => {
   })
 
   it('shows one toast when duplicate realtime subscriptions deliver the same DM insert', async () => {
+    const timeoutSpy = jest.spyOn(window, 'setTimeout')
     renderHook(() => useMessageNotifications(jest.fn()))
 
     await waitFor(() => expect(channels[0]?.insertHandler).toBeDefined())
@@ -174,6 +177,13 @@ describe('useMessageNotifications', () => {
 
     expect(toast.custom).toHaveBeenCalledTimes(1)
     expect(workingClient.from).toHaveBeenCalledTimes(1)
+    const hardDismiss = timeoutSpy.mock.calls.find(([, delay]) => delay === 5000)
+    expect(hardDismiss).toBeDefined()
+    act(() => {
+      ;(hardDismiss?.[0] as () => void)()
+    })
+    expect(toast.dismiss).toHaveBeenCalledWith('dm-toast')
+    timeoutSpy.mockRestore()
   })
 
   it('keeps only the latest realtime recovery resubscribe channel active', async () => {

@@ -32,6 +32,7 @@ function CommentCard({
   onReply,
   onEdit,
   onDelete,
+  highlighted,
 }: {
   comment: ShadowPinComment
   reply?: boolean
@@ -40,10 +41,15 @@ function CommentCard({
   onReply: () => void
   onEdit: () => void
   onDelete: () => void
+  highlighted?: boolean
 }) {
   return (
-    <article className={reply ? 'ml-8 border-l border-[var(--border-subtle)] pl-3' : ''}>
-      <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.035)] p-3">
+    <article
+      id={`shadow-pin-comment-${comment.id}`}
+      tabIndex={-1}
+      className={`${reply ? 'ml-8 border-l border-[var(--border-subtle)] pl-3' : ''} rounded-[var(--radius-md)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]`}
+    >
+      <div className={`rounded-[var(--radius-md)] border p-3 transition-[background-color,border-color,box-shadow] ${highlighted ? 'border-[var(--theme-accent-border-soft)] bg-[var(--theme-accent-soft)] shadow-[var(--shadow-accent-soft)]' : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.035)]'}`}>
         <div className="flex items-start gap-2.5">
           <Avatar src={comment.author?.avatar_url} alt={authorLabel(comment)} size="sm" />
           <div className="min-w-0 flex-1">
@@ -97,11 +103,13 @@ export function ShadowPinCommentsDialog({
   open,
   onClose,
   onCountChange,
+  initialCommentId,
 }: {
   image: ShadowPinImage
   open: boolean
   onClose: () => void
   onCountChange?: (count: number) => void
+  initialCommentId?: string
 }) {
   const { user } = useAuth()
   const { role } = useAdminAccess({ includeUsers: false })
@@ -137,6 +145,16 @@ export function ShadowPinCommentsDialog({
     setEditing(null)
     void refresh()
   }, [open, refresh])
+
+  useEffect(() => {
+    if (!open || loading || !initialCommentId || comments.length === 0) return
+    const target = document.getElementById(`shadow-pin-comment-${initialCommentId}`)
+    if (!(target instanceof HTMLElement)) return
+    window.requestAnimationFrame(() => {
+      target.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      target.focus({ preventScroll: true })
+    })
+  }, [comments, initialCommentId, loading, open])
 
   const rootComments = useMemo(
     () => comments.filter(comment => !comment.parent_comment_id),
@@ -266,6 +284,7 @@ export function ShadowPinCommentsDialog({
                 <div key={comment.id} className="space-y-2">
                   <CommentCard
                     comment={comment}
+                    highlighted={comment.id === initialCommentId}
                     canEdit={comment.author_id === user?.id}
                     canDelete={comment.author_id === user?.id || role === 'admin' || role === 'sub_admin'}
                     onReply={() => startReply(comment)}
@@ -277,6 +296,7 @@ export function ShadowPinCommentsDialog({
                       key={reply.id}
                       comment={reply}
                       reply
+                      highlighted={reply.id === initialCommentId}
                       canEdit={reply.author_id === user?.id}
                       canDelete={reply.author_id === user?.id || role === 'admin' || role === 'sub_admin'}
                       onReply={() => startReply(comment)}

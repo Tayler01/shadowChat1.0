@@ -28,6 +28,8 @@ import { BOARDS_FEATURE_ENABLED } from './config/featureFlags'
 import { getLocationStateFromUrl, type AppLocationState as LocationState } from './lib/appRouting'
 import type { AppView as View } from './types/navigation'
 import { useShadowPinCommentNotifications } from './features/shadow-pin/hooks/useShadowPinCommentNotifications'
+import { ActivityProvider } from './features/activity/ActivityProvider'
+import type { ActivityTarget } from './features/activity/activityModel'
 
 const DirectMessagesView = lazy(() =>
   import('./components/dms/DirectMessagesView').then(module => ({
@@ -69,9 +71,15 @@ const ShadowPin = lazy(() =>
   }))
 )
 
+const ActivityView = lazy(() =>
+  import('./features/activity/ActivityView').then(module => ({
+    default: module.ActivityView,
+  }))
+)
+
 const getInitialLocationState = (): LocationState => {
   if (typeof window === 'undefined') {
-    return { view: 'chat', conversation: null, message: null }
+    return { view: 'chat', conversation: null, message: null, pin: null, comment: null }
   }
 
   return getLocationStateFromUrl(new URL(window.location.href))
@@ -105,6 +113,8 @@ function App() {
   const mobileAppHeightRef = useRef<number | null>(null)
   const [dmTarget, setDmTarget] = useState<string | null>(() => getInitialLocationState().conversation)
   const [messageTarget, setMessageTarget] = useState<string | null>(() => getInitialLocationState().message)
+  const [pinTarget, setPinTarget] = useState<string | null>(() => getInitialLocationState().pin)
+  const [commentTarget, setCommentTarget] = useState<string | null>(() => getInitialLocationState().comment)
   const isDarkMode = mode === 'dark'
 
   useLayoutEffect(() => {
@@ -219,6 +229,8 @@ function App() {
     setCurrentView(locationState.view)
     setDmTarget(locationState.conversation)
     setMessageTarget(locationState.message)
+    setPinTarget(locationState.pin)
+    setCommentTarget(locationState.comment)
   }, [])
 
   useEffect(() => {
@@ -266,6 +278,14 @@ function App() {
 
   const closeSidebar = () => setSidebarOpen(false)
 
+  const handleActivityOpen = (target: ActivityTarget) => {
+    setCurrentView(target.view)
+    setDmTarget(target.conversation)
+    setMessageTarget(target.message)
+    setPinTarget(target.pin)
+    setCommentTarget(target.comment)
+  }
+
   const handleViewChange = (view: View) => {
     const availableView = view === 'boards' && !BOARDS_FEATURE_ENABLED ? 'chat' : view
 
@@ -278,6 +298,10 @@ function App() {
     setCurrentView(availableView)
     if (availableView !== 'dms') {
       setDmTarget(null)
+    }
+    if (availableView !== 'pins') {
+      setPinTarget(null)
+      setCommentTarget(null)
     }
     if (availableView !== currentView) {
       setMessageTarget(null)
@@ -298,6 +322,8 @@ function App() {
         url.searchParams.delete('message')
       }
       url.searchParams.delete('conversation')
+      url.searchParams.delete('pin')
+      url.searchParams.delete('comment')
     } else {
       url.searchParams.set('view', currentView)
       if (currentView === 'dms' && dmTarget) {
@@ -310,10 +336,20 @@ function App() {
       } else {
         url.searchParams.delete('message')
       }
+      if (currentView === 'pins' && pinTarget) {
+        url.searchParams.set('pin', pinTarget)
+      } else {
+        url.searchParams.delete('pin')
+      }
+      if (currentView === 'pins' && commentTarget) {
+        url.searchParams.set('comment', commentTarget)
+      } else {
+        url.searchParams.delete('comment')
+      }
     }
 
     window.history.replaceState({}, '', url)
-  }, [currentView, dmTarget, messageTarget])
+  }, [currentView, dmTarget, messageTarget, pinTarget, commentTarget])
 
   useEffect(() => {
     if (currentView !== 'boards') {
@@ -364,6 +400,14 @@ function App() {
             initialMessageId={messageTarget || undefined}
           />
         )
+      case 'activity':
+        return (
+          <ActivityView
+            currentView={currentView}
+            onViewChange={handleViewChange}
+            onOpenActivity={handleActivityOpen}
+          />
+        )
       case 'games':
         return (
           <GamesHome
@@ -377,6 +421,8 @@ function App() {
           <ShadowPin
             currentView={currentView}
             onViewChange={handleViewChange}
+            initialImageId={pinTarget || undefined}
+            initialCommentId={commentTarget || undefined}
           />
         )
       case 'settings':
@@ -454,11 +500,13 @@ function App() {
             <MessagesProvider>
               <HypeProvider>
                 <DirectMessagesProvider>
-                  {BOARDS_FEATURE_ENABLED && BoardsRuntime ? (
-                    <Suspense fallback={<ViewLoadingState />}>
-                      <BoardsRuntime>{renderAppShell}</BoardsRuntime>
-                    </Suspense>
-                  ) : renderAppShell(0)}
+                  <ActivityProvider>
+                    {BOARDS_FEATURE_ENABLED && BoardsRuntime ? (
+                      <Suspense fallback={<ViewLoadingState />}>
+                        <BoardsRuntime>{renderAppShell}</BoardsRuntime>
+                      </Suspense>
+                    ) : renderAppShell(0)}
+                  </ActivityProvider>
                 </DirectMessagesProvider>
               </HypeProvider>
             </MessagesProvider>
