@@ -17,6 +17,7 @@ import {
 import { runRealtimeRecovery } from '../src/lib/realtimeRecovery';
 import { DirectMessagesView } from '../src/components/dms/DirectMessagesView';
 import { triggerDMPushNotification } from '../src/lib/push';
+import { getDMMessageWindow } from '../src/lib/dmConversationRetrieval';
 
 const mockPlayMessage = jest.fn();
 
@@ -53,6 +54,9 @@ jest.mock('../src/lib/push', () => ({
 }));
 jest.mock('../src/lib/realtimeRecovery', () => ({
   runRealtimeRecovery: jest.fn().mockResolvedValue({ ok: true, skipped: false, reason: 'channel-error' }),
+}));
+jest.mock('../src/lib/dmConversationRetrieval', () => ({
+  getDMMessageWindow: jest.fn(),
 }));
 jest.mock('../src/config', () => ({
   MESSAGE_FETCH_LIMIT: 40,
@@ -150,6 +154,12 @@ beforeEach(() => {
   (refreshSessionLocked as jest.Mock).mockResolvedValue({ data: { session: {} }, error: null });
   (runRealtimeRecovery as jest.Mock).mockResolvedValue({ ok: true, skipped: false, reason: 'channel-error' });
   (triggerDMPushNotification as jest.Mock).mockResolvedValue(undefined);
+  (getDMMessageWindow as jest.Mock).mockResolvedValue({
+    messages: [],
+    hasOlder: false,
+    hasNewer: false,
+    targetStatus: 'missing',
+  });
 
   const sb = supabase as SupabaseMock;
   sb.from.mockImplementation(() => createQuery() as any);
@@ -327,12 +337,12 @@ test('uses one DM realtime channel and hydrates an active-thread insert once', a
     ...incoming,
     sender: conversation.other_user,
   };
-  const handlers = new Map<string, (payload: { new: typeof incoming }) => void>();
+  const handlers = new Map<string, (payload: { new?: typeof incoming; old?: Partial<typeof incoming> }) => void>();
   const channel = {
     on: jest.fn(function (
       _kind: string,
       config: { event: string },
-      handler: (payload: { new: typeof incoming }) => void
+      handler: (payload: { new?: typeof incoming; old?: Partial<typeof incoming> }) => void
     ) {
       handlers.set(config.event, handler);
       return this;
@@ -371,6 +381,84 @@ test('uses one DM realtime channel and hydrates an active-thread insert once', a
   expect(hydrateQuery.maybeSingle).toHaveBeenCalledTimes(1);
   expect(mockPlayMessage).toHaveBeenCalledTimes(1);
   expect(workingClient.channel).toHaveBeenCalledTimes(1);
+
+  expect(handlers.get('DELETE')).toBeDefined();
+  act(() => {
+    handlers.get('DELETE')?.({ old: { id: incoming.id, conversation_id: incoming.conversation_id } });
+  });
+  await waitFor(() => expect(result.current.messages).not.toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: incoming.id }),
+  ])));
+  await waitFor(() => expect(fetchDMConversations).toHaveBeenCalledTimes(2));
+});
+
+test('loads an authoritative historical message window without falling back when missing', async () => {
+  const historicalMessage = {
+    id: '00000000-0000-4000-8000-000000000031',
+    conversationId: '00000000-0000-4000-8000-000000000021',
+    senderId: 'u2',
+    content: 'Older exact message',
+    messageType: 'text',
+    fileUrl: null,
+    thumbnailUrl: null,
+    thumbnailPath: 'dm/c1/thumb.webp',
+    audioUrl: null,
+    audioDuration: null,
+    clientMessageId: 'client-history-1',
+    replyTo: null,
+    reactions: {},
+    readAt: '2026-04-20T12:10:00.000Z',
+    readBy: ['u1'],
+    editedAt: null,
+    mediaProcessedAt: '2026-04-20T12:05:00.000Z',
+    createdAt: '2026-04-20T12:00:00.000Z',
+    updatedAt: '2026-04-20T12:00:00.000Z',
+    mediaWidth: null,
+    mediaHeight: null,
+    sender: { id: 'u2', username: 'bob', display_name: 'Bob' },
+  };
+  (getDMMessageWindow as jest.Mock)
+    .mockResolvedValueOnce({
+      messages: [historicalMessage],
+      hasOlder: true,
+      hasNewer: true,
+      targetStatus: 'resolved',
+    })
+    .mockResolvedValueOnce({
+      messages: [],
+      hasOlder: false,
+      hasNewer: false,
+      targetStatus: 'missing',
+    });
+
+  const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider });
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  act(() => result.current.setCurrentConversation(historicalMessage.conversationId));
+  await waitFor(() => expect(result.current.messagesLoading).toBe(false));
+
+  await act(async () => {
+    await expect(result.current.loadMessageWindow(historicalMessage.id)).resolves.toBe(true);
+  });
+  expect(result.current.messages).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      id: historicalMessage.id,
+      content: historicalMessage.content,
+      client_message_id: 'client-history-1',
+      read_at: '2026-04-20T12:10:00.000Z',
+      read_by: ['u1'],
+      media_processed_at: '2026-04-20T12:05:00.000Z',
+      thumbnail_path: 'dm/c1/thumb.webp',
+    }),
+  ]));
+  expect(result.current.hasMore).toBe(true);
+  expect(result.current.hasNewer).toBe(true);
+
+  await act(async () => {
+    await expect(result.current.loadMessageWindow('00000000-0000-4000-8000-000000000032')).resolves.toBe(false);
+  });
+  expect(result.current.messages).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: historicalMessage.id }),
+  ]));
 });
 
 test('defers unread message marking until the view records the read position', async () => {
@@ -802,6 +890,145 @@ describe('DirectMessagesView user search', () => {
     fireEvent.click(screen.getByRole('button', { name: /^chat$/i }));
 
     expect(onViewChange).toHaveBeenCalledWith('chat');
+  });
+
+  test('mobile browser Back clears the selected thread when the route returns to the inbox', async () => {
+    const { useIsDesktop } = jest.requireMock('../src/hooks/useIsDesktop') as {
+      useIsDesktop: jest.Mock
+    };
+    useIsDesktop.mockReturnValue(false);
+    const conversation = {
+      id: 'c1',
+      other_user: {
+        id: 'u2',
+        username: 'bob',
+        display_name: 'Bob',
+        avatar_url: '',
+        color: 'red',
+        status: 'online',
+      },
+      last_message: null,
+      unread_count: 0,
+    };
+    dmSpy.mockReturnValue({
+      conversations: [conversation],
+      currentConversation: 'c1',
+      messages: [],
+      messagesConversationId: 'c1',
+      loading: false,
+      messagesLoading: false,
+      loadingMore: false,
+      hasMore: false,
+      hasNewer: false,
+      sending: false,
+      setCurrentConversation: setCurrentConversationMock,
+      startConversation: startConversationMock,
+      sendMessage: jest.fn(),
+      editMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      toggleReaction: jest.fn(),
+      markAsRead: jest.fn(),
+      loadOlderMessages: jest.fn(),
+      loadLatestMessages: jest.fn(),
+      loadMessageWindow: jest.fn(),
+    } as any);
+
+    const { rerender } = render(
+      <DirectMessagesView
+        onToggleSidebar={() => {}}
+        currentView="dms"
+        onViewChange={() => {}}
+        initialConversation="c1"
+      />
+    );
+
+    setCurrentConversationMock.mockClear();
+    rerender(
+      <DirectMessagesView
+        onToggleSidebar={() => {}}
+        currentView="dms"
+        onViewChange={() => {}}
+      />
+    );
+
+    await waitFor(() => expect(setCurrentConversationMock).toHaveBeenCalledWith(null));
+  });
+
+  test('failed exact-message targets focus the thread header and can retry after reopening', async () => {
+    const { useIsDesktop } = jest.requireMock('../src/hooks/useIsDesktop') as {
+      useIsDesktop: jest.Mock
+    };
+    useIsDesktop.mockReturnValue(false);
+    const loadMessageWindow = jest.fn().mockResolvedValue(false);
+    const conversation = {
+      id: 'c1',
+      other_user: {
+        id: 'u2',
+        username: 'bob',
+        display_name: 'Bob',
+        avatar_url: '',
+        color: 'red',
+        status: 'online',
+      },
+      last_message: null,
+      unread_count: 0,
+    };
+    dmSpy.mockReturnValue({
+      conversations: [conversation],
+      currentConversation: 'c1',
+      messages: [],
+      messagesConversationId: 'c1',
+      loading: false,
+      messagesLoading: false,
+      loadingMore: false,
+      hasMore: false,
+      hasNewer: false,
+      sending: false,
+      setCurrentConversation: setCurrentConversationMock,
+      startConversation: startConversationMock,
+      sendMessage: jest.fn(),
+      editMessage: jest.fn(),
+      deleteMessage: jest.fn(),
+      toggleReaction: jest.fn(),
+      markAsRead: jest.fn(),
+      loadOlderMessages: jest.fn(),
+      loadLatestMessages: jest.fn(),
+      loadMessageWindow,
+    } as any);
+
+    const { rerender } = render(
+      <DirectMessagesView
+        onToggleSidebar={() => {}}
+        currentView="dms"
+        onViewChange={() => {}}
+        initialConversation="c1"
+        initialMessageId="missing-message"
+      />
+    );
+
+    await waitFor(() => expect(loadMessageWindow).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Back to direct messages' })).toHaveFocus());
+    expect(screen.getByRole('status')).toHaveTextContent(/message is no longer available/i);
+
+    rerender(
+      <DirectMessagesView
+        onToggleSidebar={() => {}}
+        currentView="dms"
+        onViewChange={() => {}}
+        initialConversation="c1"
+      />
+    );
+    rerender(
+      <DirectMessagesView
+        onToggleSidebar={() => {}}
+        currentView="dms"
+        onViewChange={() => {}}
+        initialConversation="c1"
+        initialMessageId="missing-message"
+      />
+    );
+
+    await waitFor(() => expect(loadMessageWindow).toHaveBeenCalledTimes(2));
   });
 
   test('shows inbox loading state instead of empty state while conversations restore', () => {

@@ -27,8 +27,11 @@ import { computeMobileViewportState, MOBILE_VIEWPORT_UPDATED_EVENT } from './lib
 import { BOARDS_FEATURE_ENABLED } from './config/featureFlags'
 import {
   getLocationStateFromUrl,
+  resolveDMRouteMutation,
   resolvePinRouteMutation,
   type AppLocationState as LocationState,
+  type DMHistoryLayer,
+  type DMRouteAction,
   type PinHistoryLayer,
   type PinRouteAction,
 } from './lib/appRouting'
@@ -85,7 +88,7 @@ const ActivityView = lazy(() =>
 
 const getInitialLocationState = (): LocationState => {
   if (typeof window === 'undefined') {
-    return { view: 'chat', conversation: null, message: null, pin: null, comment: null, pinPanel: null }
+    return { view: 'chat', conversation: null, message: null, dmPanel: null, pin: null, comment: null, pinPanel: null }
   }
 
   return getLocationStateFromUrl(new URL(window.location.href))
@@ -119,6 +122,7 @@ function App() {
   const mobileAppHeightRef = useRef<number | null>(null)
   const [dmTarget, setDmTarget] = useState<string | null>(() => getInitialLocationState().conversation)
   const [messageTarget, setMessageTarget] = useState<string | null>(() => getInitialLocationState().message)
+  const [dmPanel, setDmPanel] = useState<'details' | 'search' | 'shared' | null>(() => getInitialLocationState().dmPanel)
   const [pinTarget, setPinTarget] = useState<string | null>(() => getInitialLocationState().pin)
   const [commentTarget, setCommentTarget] = useState<string | null>(() => getInitialLocationState().comment)
   const [pinPanel, setPinPanel] = useState<'viewer' | 'comments' | null>(() => getInitialLocationState().pinPanel)
@@ -236,6 +240,7 @@ function App() {
     setCurrentView(locationState.view)
     setDmTarget(locationState.conversation)
     setMessageTarget(locationState.message)
+    setDmPanel(locationState.dmPanel)
     setPinTarget(locationState.pin)
     setCommentTarget(locationState.comment)
     setPinPanel(locationState.pinPanel)
@@ -333,6 +338,46 @@ function App() {
     applyLocationState(getLocationStateFromUrl(mutation.url))
   }
 
+  const handleDMRoute = (
+    action: DMRouteAction,
+    conversationId?: string,
+    messageId?: string
+  ) => {
+    if (typeof window === 'undefined') return
+
+    const storedLayer = window.history.state?.shadowchatLayer
+    const currentLayer: DMHistoryLayer = storedLayer === 'dm-thread' ||
+      storedLayer === 'dm-panel' ||
+      storedLayer === 'dm-panel-cold' ||
+      storedLayer === 'dm-result' ||
+      storedLayer === 'dm-result-cold'
+      ? storedLayer
+      : null
+    const mutation = resolveDMRouteMutation({
+      currentUrl: new URL(window.location.href),
+      currentLayer,
+      action,
+      conversationId,
+      messageId,
+    })
+    if (!mutation) return
+    if (mutation.method === 'back' || mutation.method === 'back-two') {
+      window.history.go(mutation.method === 'back-two' ? -2 : -1)
+      return
+    }
+
+    const nextState = {
+      ...(window.history.state ?? {}),
+      shadowchatLayer: mutation.layer,
+    }
+    if (mutation.method === 'push') {
+      window.history.pushState(nextState, '', mutation.url)
+    } else {
+      window.history.replaceState(nextState, '', mutation.url)
+    }
+    applyLocationState(getLocationStateFromUrl(mutation.url))
+  }
+
   const handleViewChange = (view: View) => {
     const availableView = view === 'boards' && !BOARDS_FEATURE_ENABLED ? 'chat' : view
 
@@ -345,6 +390,7 @@ function App() {
     setCurrentView(availableView)
     if (availableView !== 'dms') {
       setDmTarget(null)
+      setDmPanel(null)
     }
     if (availableView !== 'pins') {
       setPinTarget(null)
@@ -385,6 +431,11 @@ function App() {
       } else {
         url.searchParams.delete('message')
       }
+      if (currentView === 'dms' && dmTarget && dmPanel) {
+        url.searchParams.set('panel', dmPanel)
+      } else if (currentView !== 'pins') {
+        url.searchParams.delete('panel')
+      }
       if (currentView === 'pins' && pinTarget) {
         url.searchParams.set('pin', pinTarget)
       } else {
@@ -397,13 +448,13 @@ function App() {
       }
       if (currentView === 'pins' && pinPanel === 'comments' && pinTarget) {
         url.searchParams.set('panel', 'comments')
-      } else {
+      } else if (currentView !== 'dms') {
         url.searchParams.delete('panel')
       }
     }
 
     window.history.replaceState(window.history.state ?? {}, '', url)
-  }, [currentView, dmTarget, messageTarget, pinTarget, commentTarget, pinPanel])
+  }, [currentView, dmTarget, dmPanel, messageTarget, pinTarget, commentTarget, pinPanel])
 
   useEffect(() => {
     if (currentView !== 'boards') {
@@ -437,6 +488,8 @@ function App() {
             onViewChange={handleViewChange}
             initialConversation={dmTarget || undefined}
             initialMessageId={messageTarget || undefined}
+            initialPanel={dmPanel}
+            onRoute={handleDMRoute}
           />
         )
       case 'boards':

@@ -44,6 +44,7 @@ import {
   isRecoverableRealtimeStatus,
 } from '../lib/realtimeSubscription';
 import { embedPublicProfile } from '../../supabase/functions/_shared/public-profile';
+import { getDMMessageWindow } from '../lib/dmConversationRetrieval';
 
 const DM_MESSAGE_WITH_SENDER_SELECT = `
   *,
@@ -84,6 +85,7 @@ interface DirectMessagesContextValue {
   markAsRead: (conversationId: string) => Promise<void>;
   loadOlderMessages: () => Promise<void>;
   loadLatestMessages: () => Promise<void>;
+  loadMessageWindow: (messageId: string) => Promise<boolean>;
 }
 
 const DirectMessagesContext = createContext<DirectMessagesContextValue | undefined>(undefined);
@@ -177,9 +179,11 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
   const activeMessageHandlersRef = useRef<{
     insert: (incoming: Partial<DMMessage>) => void | Promise<void>;
     update: (incoming: Partial<DMMessage>) => void;
+    delete: (removed: Partial<DMMessage>) => void;
   }>({
     insert: () => undefined,
     update: () => undefined,
+    delete: () => undefined,
   });
 
   const {
@@ -198,14 +202,17 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     hasNewer,
     loadOlderMessages,
     loadLatestMessages,
+    loadMessageWindow,
     handleRealtimeInsert,
     handleRealtimeUpdate,
+    handleRealtimeDelete,
     refreshVisibleMessages,
   } = useConversationMessages(currentConversation);
 
   activeMessageHandlersRef.current = {
     insert: handleRealtimeInsert,
     update: handleRealtimeUpdate,
+    delete: handleRealtimeDelete,
   };
 
   const refreshConversations = useCallback(async () => {
@@ -387,6 +394,15 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
 
             activeMessageHandlersRef.current.update(incoming);
           }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'dm_messages' },
+          (payload: any) => {
+            const removed = payload.old as Partial<DMMessage>;
+            activeMessageHandlersRef.current.delete(removed);
+            void refreshConversations();
+          }
         );
 
       latestChannel = nextChannel;
@@ -518,6 +534,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     markAsRead,
     loadOlderMessages,
     loadLatestMessages,
+    loadMessageWindow,
   };
 }
 
@@ -919,6 +936,63 @@ export function useConversationMessages(conversationId: string | null) {
     });
   }, []);
 
+  const handleRealtimeDelete = useCallback((removed: Partial<DMMessage>) => {
+    if (!removed.id) return;
+
+    setMessages(prev => prev.filter(message => message.id !== removed.id));
+  }, []);
+
+  const loadMessageWindow = useCallback(async (messageId: string) => {
+    if (!conversationId) return false;
+    const requestedConversationId = conversationId;
+    setLoadingMore(true);
+    try {
+      const result = await getDMMessageWindow(requestedConversationId, messageId, { limit: 60 });
+      if (
+        result.targetStatus !== 'resolved' ||
+        activeConversationIdRef.current !== requestedConversationId
+      ) {
+        return false;
+      }
+
+      const windowMessages = result.messages.map(message => ({
+        id: message.id,
+        client_message_id: message.clientMessageId,
+        conversation_id: message.conversationId,
+        sender_id: message.senderId,
+        content: message.content,
+        message_type: message.messageType,
+        file_url: message.fileUrl ?? undefined,
+        thumbnail_url: message.thumbnailUrl,
+        thumbnail_path: message.thumbnailPath,
+        audio_url: message.audioUrl ?? undefined,
+        audio_duration: message.audioDuration ?? undefined,
+        reply_to: message.replyTo,
+        read_at: message.readAt ?? undefined,
+        read_by: message.readBy,
+        reactions: message.reactions,
+        edited_at: message.editedAt ?? undefined,
+        created_at: message.createdAt,
+        updated_at: message.updatedAt,
+        media_width: message.mediaWidth,
+        media_height: message.mediaHeight,
+        media_processed_at: message.mediaProcessedAt,
+        sender: message.sender,
+      } as DMMessage));
+
+      setMessages(previous => {
+        const local = previous.filter(message => !isServerDMCursorMessage(message));
+        return boundDMMessagesForWindow([...windowMessages, ...local], 'latest').messages;
+      });
+      setLoadedConversationId(requestedConversationId);
+      setHasMore(result.hasOlder);
+      updateHasNewer(result.hasNewer);
+      return true;
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [conversationId, updateHasNewer]);
+
   const sendMessage = useCallback(
     async (
       content: string,
@@ -1173,8 +1247,10 @@ export function useConversationMessages(conversationId: string | null) {
     toggleReaction,
     loadOlderMessages,
     loadLatestMessages,
+    loadMessageWindow,
     handleRealtimeInsert,
     handleRealtimeUpdate,
+    handleRealtimeDelete,
     refreshVisibleMessages,
   };
 }

@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ReactNode } from 'react'
+import { lazy, Suspense, type ReactNode, type Ref } from 'react'
 import { ArrowLeft, Settings } from 'lucide-react'
 import { GoldenEggDiscoveryLogo } from '../easter-egg/GoldenEggDiscoveryLogo'
 import { Avatar } from '../ui/Avatar'
@@ -29,6 +29,7 @@ interface MobileAppHeaderProps {
   srTitle?: string
   avatar?: HeaderAvatar
   onBack?: () => void
+  backButtonRef?: Ref<HTMLButtonElement>
   backLabel?: string
   collapseOnKeyboard?: boolean
   titleElement?: 'h1' | 'p'
@@ -48,6 +49,7 @@ export function MobileAppHeader({
   srTitle,
   avatar,
   onBack,
+  backButtonRef,
   backLabel = 'Back',
   collapseOnKeyboard = false,
   titleElement,
@@ -79,6 +81,7 @@ export function MobileAppHeader({
         <div className="flex min-w-0 flex-1 items-center gap-1.5">
           {onBack && (
             <button
+              ref={backButtonRef}
               type="button"
               onClick={onBack}
               className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--text-primary)] transition-colors hover:bg-[rgba(215,170,70,0.08)] hover:text-[var(--theme-accent-readable)]"

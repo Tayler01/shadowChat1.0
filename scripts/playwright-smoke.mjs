@@ -804,8 +804,27 @@ async function scenarioMobileDmBack(state, sessionA, sessionB, mobileSession) {
   await mobileNavButton(mobileSession.page, 'DMs').click()
   await waitForDmView(mobileSession.page)
   await openConversationWithUser(mobileSession.page, sessionB.account, state)
+  const messageText = `Mobile DM history ${timestampToken()}`
+  await sendThreadMessage(mobileSession.page, messageText)
+
+  const openExactResult = async () => {
+    await mobileSession.page.getByRole('button', { name: /Open conversation details for/i }).click()
+    await mobileSession.page.getByRole('button', { name: /Search conversation/i }).click()
+    await mobileSession.page.getByPlaceholder('Search this conversation').fill(messageText)
+    const result = mobileSession.page.getByRole('button', { name: new RegExp(escapeRegExp(messageText), 'i') }).first()
+    await result.waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+    await result.click()
+    await mobileSession.page.waitForFunction(() => new URL(window.location.href).searchParams.has('message'))
+  }
+
+  await openExactResult()
+  await mobileSession.page.goBack({ waitUntil: 'domcontentloaded' })
+  await mobileSession.page.getByRole('textbox', { name: /Message/i }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+
+  await openExactResult()
   await mobileSession.page.getByRole('button', { name: 'Back to direct messages' }).first().click()
   await waitForDmView(mobileSession.page)
+  await mobileSession.page.getByRole('button', { name: 'Start new conversation' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
   await mobileNavButton(mobileSession.page, 'Chat').click()
   await waitForChatView(mobileSession.page)
   await capture(mobileSession.page, state.artifactDir, 'mobile-dm-back')
@@ -863,7 +882,7 @@ async function goToDirectMessages(page) {
   if (await mobileNav.isVisible().catch(() => false)) {
     await mobileNav.click()
   } else {
-    await page.getByRole('button', { name: /^Direct Messages(?:\s+\d+)?$/ }).first().click()
+    await page.getByRole('button', { name: /^Direct Messages(?:,?\s+\d+(?: unread)?)?$/ }).first().click()
   }
   await waitForDmView(page)
 }

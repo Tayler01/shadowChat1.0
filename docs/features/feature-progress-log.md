@@ -39,7 +39,7 @@ Canonical detail and release gates live in:
   `codex/shadowchat-2.0` branch, preserve the production frontend and shared
   Supabase contract, then publish a separate installable Netlify test site.
 - Started: 2026-07-11
-- Status: active; Candidates 1 and 2 of 5 verified locally.
+- Status: active; Candidates 1 through 3 of 5 verified locally.
 - Candidate 1: Unified Activity HQ with an authoritative recipient ledger,
   realtime/recovery, exact Chat/DM/Pin routes, five-item phone navigation,
   accessible unread handling, and hard-bounded foreground toast lifetime.
@@ -60,6 +60,19 @@ Canonical detail and release gates live in:
   WebKit phone acceptance with 48px control, history, comments, zoom,
   safe-area, and consent verification.
 - Candidate 2 contract: [SHADOW_PIN_THEATER.md](C:/repos/chat2.0/docs/SHADOW_PIN_THEATER.md:1)
+- Candidate 3: DM Conversation Hub with searchable Inbox/Unread/Archived
+  modes, private pin/archive/manual-unread state, rich draft/mute/media rows,
+  route-aware phone history, consolidated conversation details, bounded
+  in-thread search/shared content, and authoritative old-message windows.
+- Candidate 3 backend proof: clean local replay and three-user RLS verifier;
+  immutable canonical participant pairs; narrowed message edits; legacy
+  client send/edit/delete/read/reaction compatibility; automatic unarchive;
+  Realtime preferences; and security-invoker bounded retrieval.
+- Candidate 3 product proof: 157 suites / 789 tests, lint/typecheck/build and
+  budgets, authenticated two-account DM smoke, plus Android Chromium and
+  WebKit phone acceptance for pinning, details, search, exact routing, shared
+  filters, 48-pixel controls, and header/system Back.
+- Candidate 3 contract: [DM_CONVERSATION_HUB.md](C:/repos/chat2.0/docs/DM_CONVERSATION_HUB.md:1)
 
 ### Shadow Runner Playable Prototype Prep
 

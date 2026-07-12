@@ -15,6 +15,7 @@ import {
   XCircle,
   ImagePlus,
   Bookmark,
+  MoreHorizontal,
 } from 'lucide-react'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
 import { useAuth } from '../../hooks/useAuth'
@@ -45,14 +46,19 @@ import type { BasicUser, ChatMessageType, DMMessage, User } from '../../lib/supa
 import { UnreadDivider } from '../chat/UnreadDivider'
 import type { EmojiClickData } from '../../types'
 import type { AppView } from '../../types/navigation'
+import type { DMRouteAction } from '../../lib/appRouting'
 import { saveMessageToLibrary } from '../../lib/messageLibrary'
 import { EmojiPickerOverlay } from '../chat/EmojiPickerOverlay'
 import { ImageModal } from '../ui/ImageModal'
 import { QuickReactionRail } from '../chat/QuickReactionRail'
 import { ChatImageRadialHeart } from '../chat/ChatImageRadialHeart'
-import { ConversationNotificationMuteButton } from '../notifications/ConversationNotificationMuteButton'
-import { BlockUserControl } from '../profile/BlockUserControl'
 import { BlockedConversationNotice } from './BlockedConversationNotice'
+import { useBlockedUsers } from '../../hooks/useBlockedUsers'
+import { useDMConversationHub } from '../../hooks/useDMConversationHub'
+import { DMHubInboxControls } from './hub/DMHubInboxControls'
+import { DMHubConversationRow } from './hub/DMHubConversationRow'
+import { DMHubConversationDetailsSheet } from './hub/DMHubConversationDetailsSheet'
+import type { DMConversationPreferenceChanges } from './dmConversationHubModel'
 import { ShareImageToShadowPinModal } from '../../features/shadow-pin/components/ShareImageToShadowPinModal'
 import {
   getImageMessageDisplaySrc,
@@ -67,6 +73,8 @@ interface DirectMessagesViewProps {
   onViewChange: (view: AppView) => void
   initialConversation?: string
   initialMessageId?: string
+  initialPanel?: 'details' | 'search' | 'shared' | null
+  onRoute?: (action: DMRouteAction, conversationId?: string, messageId?: string) => void
 }
 
 const HISTORY_LOAD_SCROLL_THRESHOLD = 180
@@ -84,6 +92,12 @@ const normalizeEmojiValue = (emoji: string) => {
 const PublicProfileDialog = React.lazy(() =>
   import('../profile/PublicProfileDialog').then(module => ({
     default: module.PublicProfileDialog,
+  }))
+)
+
+const DMHubConversationContentSheet = React.lazy(() =>
+  import('./hub/DMHubConversationContentSheet').then(module => ({
+    default: module.DMHubConversationContentSheet,
   }))
 )
 
@@ -314,6 +328,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
   return (
     <div
       id={`dm-message-${message.id}`}
+      tabIndex={-1}
       data-dm-message-row="true"
       data-message-id={message.id}
       className={`group flex ${isOwn ? 'justify-end' : 'justify-start'} ${isGrouped ? 'mt-1' : 'mt-4'}`}
@@ -429,6 +444,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
           {editing ? (
             <div className="space-y-2">
               <textarea
+                aria-label="Edit direct message"
                 value={draft}
                 onChange={event => setDraft(event.target.value)}
                 className="obsidian-input min-h-20 w-full resize-none rounded-[var(--radius-md)] p-3 text-base md:text-sm"
@@ -445,7 +461,12 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
               </div>
             </div>
           ) : message.message_type === 'audio' ? (
-            <audio controls src={message.audio_url} className="mt-1 max-w-full" />
+            <audio
+              controls
+              src={message.audio_url}
+              aria-label={`Voice message from ${message.sender?.display_name || (isOwn ? 'you' : 'this member')}`}
+              className="mt-1 max-w-full"
+            />
           ) : isImageMessage ? (
             <ChatImageRadialHeart
               className="mt-1"
@@ -459,7 +480,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
             >
               <img
                 src={imageMessageSrc}
-                alt="uploaded"
+                alt={`Image shared by ${message.sender?.display_name || (isOwn ? 'you' : 'this member')}${message.content.trim() ? `: ${message.content.trim()}` : ''}`}
                 loading="lazy"
                 decoding="async"
                 draggable={false}
@@ -487,7 +508,9 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
                 />
               )}
               <p className={`mt-1 text-xs ${isOwn ? 'text-[var(--theme-accent-readable)]/85' : 'text-[var(--text-muted)]'}`}>
+                <time dateTime={message.created_at}>
                 {formatTime(message.created_at)}
+                </time>
                 {message.edited_at && ' (edited)'}
                 {isOwn && message.delivery_status && message.delivery_status !== 'sent' && (
                   <span className={message.delivery_status === 'failed' ? 'ml-2 text-red-300' : 'ml-2'}>
@@ -706,6 +729,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   onViewChange,
   initialConversation,
   initialMessageId,
+  initialPanel,
+  onRoute,
 }) => {
   const { profile } = useAuth()
   const isDesktop = useIsDesktop()
@@ -730,6 +755,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     hasMore,
     hasNewer,
     loadLatestMessages,
+    loadMessageWindow,
     loading: conversationsLoading,
   } = useDirectMessages()
   const [showNewConversation, setShowNewConversation] = useState(false)
@@ -741,8 +767,19 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const selectedThreadLoaded = Boolean(currentConversation && messagesConversationId === currentConversation)
   const showThreadInitialLoading = !currentConv?.is_blocked && (!selectedThreadLoaded || messagesLoading) && messages.length === 0
   const showThreadEmpty = selectedThreadLoaded && !messagesLoading && messages.length === 0 && !loadingMore && !currentConv?.is_blocked
+  const hub = useDMConversationHub({ conversations, userId: profile?.id })
+  const saveHubPreference = hub.updatePreference
+  const toggleHubMute = hub.toggleMute
+  const [showConversationDetails, setShowConversationDetails] = useState(false)
+  const {
+    blockUser,
+    unblockUser,
+    isBlockedByMe,
+    savingUserIds: blockingUserIds,
+  } = useBlockedUsers()
 
   const [searchUsername, setSearchUsername] = useState('')
+  const inboxSearchInputRef = useRef<HTMLInputElement>(null)
   const [startingUsername, setStartingUsername] = useState<string | null>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
   const prevHeightRef = useRef(0)
@@ -753,15 +790,33 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const scrollFrameRef = useRef<number | null>(null)
   const initialConversationAppliedRef = useRef<string | null>(null)
   const initialTargetJumpDoneRef = useRef<string | null>(null)
+  const initialTargetLoadAttemptRef = useRef<string | null>(null)
+  const threadBackButtonRef = useRef<HTMLButtonElement>(null)
   const [uploading, setUploading] = useState(false)
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null)
   const [profileUser, setProfileUser] = useState<User | null>(null)
+  const [targetAnnouncement, setTargetAnnouncement] = useState('')
   const { typingUsers } = useTyping(currentConversation ? `dm-${currentConversation}` : 'none')
   const {
     cursor,
     loading: cursorLoading,
     markRead,
   } = useReadCursor('dm', currentConversation, Boolean(profile?.id && currentConversation))
+
+  useEffect(() => {
+    if (!initialMessageId) {
+      initialTargetLoadAttemptRef.current = null
+      initialTargetJumpDoneRef.current = null
+    }
+  }, [initialMessageId])
+
+  const focusThreadAfterTargetFailure = useCallback((announcement: string) => {
+    setTargetAnnouncement(announcement)
+    requestAnimationFrame(() => threadBackButtonRef.current?.focus({ preventScroll: true }))
+    window.setTimeout(() => {
+      setTargetAnnouncement(current => current === announcement ? '' : current)
+    }, 2200)
+  }, [])
 
   useEffect(() => {
     if (initialConversation && initialConversationAppliedRef.current !== initialConversation) {
@@ -772,6 +827,20 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
       setCurrentConversation(initialConversation)
     }
   }, [initialConversation, currentConversation, setCurrentConversation])
+
+  useEffect(() => {
+    if (
+      isDesktop ||
+      initialConversation ||
+      !initialConversationAppliedRef.current ||
+      !currentConversation
+    ) {
+      return
+    }
+
+    initialConversationAppliedRef.current = null
+    setCurrentConversation(null)
+  }, [currentConversation, initialConversation, isDesktop, setCurrentConversation])
 
   useEffect(() => {
     if (isDesktop || conversationsLoading || !selectedConversationMissing) {
@@ -791,7 +860,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
 
   const handleConversationSelect = useCallback((conversationId: string) => {
     setCurrentConversation(conversationId)
-  }, [setCurrentConversation])
+    onRoute?.('push-thread', conversationId)
+  }, [onRoute, setCurrentConversation])
 
   const handleUserSelect = useCallback(async (user: { username: string }) => {
     const normalizedUsername = user.username.trim().toLowerCase()
@@ -811,7 +881,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
       setStartingUsername(user.username)
       const conversationId = await startConversation(user.username)
       if (conversationId) {
-        setCurrentConversation(conversationId)
+        handleConversationSelect(conversationId)
         setShowNewConversation(false)
         setSearchUsername('')
         toast.success(`Opened @${user.username}`)
@@ -822,7 +892,107 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     } finally {
       setStartingUsername(null)
     }
-  }, [conversations, handleConversationSelect, setCurrentConversation, startConversation])
+  }, [conversations, handleConversationSelect, startConversation])
+
+  const handleBackToInbox = useCallback(() => {
+    if (currentConversation) {
+      onRoute?.('close-thread', currentConversation)
+    }
+    setCurrentConversation(null)
+  }, [currentConversation, onRoute, setCurrentConversation])
+
+  const updateHubPreference = useCallback(async (
+    conversationId: string,
+    changes: DMConversationPreferenceChanges,
+    successMessage: string
+  ) => {
+    try {
+      await saveHubPreference(conversationId, changes)
+      toast.success(successMessage)
+    } catch (error) {
+      console.error(error)
+      toast.error('Could not update this conversation')
+    }
+  }, [saveHubPreference])
+
+  const handleTogglePin = useCallback((conversationId: string, pinned: boolean) => (
+    updateHubPreference(
+      conversationId,
+      { pinnedAt: pinned ? new Date().toISOString() : null },
+      pinned ? 'Conversation pinned' : 'Conversation unpinned'
+    )
+  ), [updateHubPreference])
+
+  const handleToggleArchive = useCallback((conversationId: string, archived: boolean) => (
+    updateHubPreference(
+      conversationId,
+      { archivedAt: archived ? new Date().toISOString() : null, ...(archived ? { pinnedAt: null } : {}) },
+      archived ? 'Conversation archived' : 'Conversation returned to Inbox'
+    )
+  ), [updateHubPreference])
+
+  const handleToggleRead = useCallback(async (conversationId: string, unread: boolean) => {
+    try {
+      if (!unread) {
+        await markAsRead(conversationId)
+      }
+      await updateHubPreference(
+        conversationId,
+        { markedUnreadAt: unread ? new Date().toISOString() : null },
+        unread ? 'Marked unread' : 'Marked read'
+      )
+    } catch (error) {
+      console.error(error)
+      toast.error('Could not update the unread state')
+    }
+  }, [markAsRead, updateHubPreference])
+
+  const handleToggleMute = useCallback(async (conversationId: string, muted: boolean) => {
+    try {
+      await toggleHubMute(conversationId, muted)
+      toast.success(muted ? 'Conversation muted' : 'Notifications resumed')
+    } catch (error) {
+      console.error(error)
+      toast.error('Could not update notifications')
+    }
+  }, [toggleHubMute])
+
+  const currentHubItem = currentConversation
+    ? hub.allItems.find(item => item.conversation.id === currentConversation)
+    : null
+
+  useEffect(() => {
+    if (!currentConversation || !currentHubItem?.preference?.markedUnreadAt) return
+    void saveHubPreference(currentConversation, { markedUnreadAt: null }).catch(() => undefined)
+  }, [currentConversation, currentHubItem?.preference?.markedUnreadAt, saveHubPreference])
+
+  useEffect(() => {
+    setShowConversationDetails(initialPanel === 'details')
+  }, [initialPanel])
+
+  const handleOpenConversationDetails = useCallback(() => {
+    if (!currentConversation) return
+    setShowConversationDetails(true)
+    onRoute?.('push-details', currentConversation)
+  }, [currentConversation, onRoute])
+
+  const handleCloseConversationDetails = useCallback(() => {
+    if (currentConversation) onRoute?.('close-panel', currentConversation)
+    setShowConversationDetails(false)
+  }, [currentConversation, onRoute])
+
+  const handleToggleBlock = useCallback(async (_conversationId: string, nextBlocked: boolean) => {
+    const otherUser = currentConv?.other_user
+    if (!otherUser) return
+    try {
+      if (nextBlocked) await blockUser(otherUser.id)
+      else await unblockUser(otherUser.id)
+      toast.success(`${otherUser.display_name || otherUser.username} ${nextBlocked ? 'blocked' : 'unblocked'}`)
+    } catch (error) {
+      console.error(error)
+      toast.error(`Could not ${nextBlocked ? 'block' : 'unblock'} this member`)
+    }
+  }, [blockUser, currentConv?.other_user, unblockUser])
 
   const handleSendMessage = useCallback(async (
     content: string,
@@ -1056,6 +1226,34 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   useEffect(() => {
     if (
       !initialMessageId ||
+      !currentConversation ||
+      !selectedThreadLoaded ||
+      currentConv?.is_blocked ||
+      messages.some(message => message.id === initialMessageId)
+    ) {
+      return
+    }
+
+    const targetKey = `${currentConversation}:${initialMessageId}`
+    if (initialTargetLoadAttemptRef.current === targetKey) return
+    initialTargetLoadAttemptRef.current = targetKey
+    void loadMessageWindow(initialMessageId).then(resolved => {
+      if (!resolved) {
+        initialTargetLoadAttemptRef.current = null
+        toast.error('That message is no longer available')
+        focusThreadAfterTargetFailure('That message is no longer available. You are back in the conversation.')
+      }
+    }).catch(error => {
+      initialTargetLoadAttemptRef.current = null
+      console.error(error)
+      toast.error('Could not load that message')
+      focusThreadAfterTargetFailure('Could not load that message. You are back in the conversation.')
+    })
+  }, [currentConv?.is_blocked, currentConversation, focusThreadAfterTargetFailure, initialMessageId, loadMessageWindow, messages, selectedThreadLoaded])
+
+  useEffect(() => {
+    if (
+      !initialMessageId ||
       initialTargetJumpDoneRef.current === initialMessageId ||
       messages.length === 0
     ) {
@@ -1075,13 +1273,19 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
       const el = document.getElementById(`dm-message-${initialMessageId}`)
       if (!el) return
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      el.classList.add('ring-2', 'ring-[rgba(34,197,94,0.55)]')
+      el.focus({ preventScroll: true })
+      el.style.outline = '2px solid var(--theme-focus-ring)'
+      el.style.outlineOffset = '4px'
+      const announcement = `Opened message from ${target.sender?.display_name || (target.sender_id === profile?.id ? 'you' : 'this member')} at ${formatTime(target.created_at)}`
+      setTargetAnnouncement(announcement)
       void markLatestRead(false)
       window.setTimeout(() => {
-        el.classList.remove('ring-2', 'ring-[rgba(34,197,94,0.55)]')
+        el.style.removeProperty('outline')
+        el.style.removeProperty('outline-offset')
+        setTargetAnnouncement(current => current === announcement ? '' : current)
       }, 2200)
     })
-  }, [initialMessageId, markLatestRead, messages, setAutoScroll, setFirstUnreadMessageId])
+  }, [initialMessageId, markLatestRead, messages, profile?.id, setAutoScroll, setFirstUnreadMessageId])
 
   const dmMessageMap = useMemo(() => {
     const map = new Map<string, DMMessage>()
@@ -1095,12 +1299,24 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
       if (!el) return
 
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      el.classList.add('ring-2', 'ring-[rgba(34,197,94,0.55)]')
+      el.focus({ preventScroll: true })
+      el.style.outline = '2px solid var(--theme-focus-ring)'
+      el.style.outlineOffset = '4px'
+      const target = messages.find(message => message.id === id)
+      let announcement = ''
+      if (target) {
+        announcement = `Opened message from ${target.sender?.display_name || (target.sender_id === profile?.id ? 'you' : 'this member')} at ${formatTime(target.created_at)}`
+        setTargetAnnouncement(announcement)
+      }
       window.setTimeout(() => {
-        el.classList.remove('ring-2', 'ring-[rgba(34,197,94,0.55)]')
+        el.style.removeProperty('outline')
+        el.style.removeProperty('outline-offset')
+        if (announcement) {
+          setTargetAnnouncement(current => current === announcement ? '' : current)
+        }
       }, 2000)
     })
-  }, [])
+  }, [messages, profile?.id])
 
   const eagerDMAvatarMessageIds = useMemo(() => (
     new Set(messages.slice(-12).map(message => message.id))
@@ -1151,17 +1367,19 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
             <MobileAppHeader
               currentView={currentView}
               onViewChange={onViewChange}
-              title="DM"
+              title="Messages"
               logo
+              actions={(
+                <button
+                  type="button"
+                  onClick={() => setShowNewConversation(true)}
+                  className="inline-flex h-12 w-12 items-center justify-center rounded-full text-[var(--text-secondary)] transition-colors hover:bg-[var(--theme-accent-soft)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]"
+                  aria-label="Start new conversation"
+                >
+                  <Plus className="h-5 w-5" />
+                </button>
+              )}
             />
-            <Button
-              size="sm"
-              onClick={() => setShowNewConversation(true)}
-              className="theme-floating-action absolute right-3 top-[calc(env(safe-area-inset-top)_+_3.85rem)] z-40 h-11 w-11 rounded-full p-0 md:right-4"
-              aria-label="Start new conversation"
-            >
-              <Plus className="h-5 w-5" />
-            </Button>
 
             <div className="min-h-0 flex-1 overflow-y-auto pt-14 pb-[calc(env(safe-area-inset-bottom)_+_5rem)] md:pb-0 md:pt-0">
               {showInboxLoading ? (
@@ -1177,82 +1395,69 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   <p className="mt-1 text-xs">Start a private chat to build your inbox.</p>
                 </div>
               ) : (
-                <div className="space-y-1 p-2">
-                  {conversations.map((conversation, index) => {
-                    const unreadCount = conversation.unread_count || 0
-                    const eagerConversationAvatar = index < 12
-
-                    return (
-                    <motion.button
-                      key={conversation.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      type="button"
-                      onClick={() => handleConversationSelect(conversation.id)}
-                      className={`w-full rounded-[var(--radius-md)] border p-3 text-left transition-colors duration-[var(--dur-med)] ${
-                        currentConversation === conversation.id
-                          ? 'theme-selected-row'
-                          : 'border-transparent hover:border-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.03)]'
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        <Avatar
-                          src={conversation.other_user?.avatar_thumbnail_url || conversation.other_user?.avatar_url}
-                          alt={conversation.other_user?.display_name || 'Unknown User'}
-                          size="md"
-                          color={conversation.other_user?.color}
-                          userId={conversation.other_user?.id}
-                          presenceVisibility={conversation.other_user?.presence_visibility}
-                          showStatus
-                          loading={eagerConversationAvatar ? 'eager' : 'lazy'}
-                          fetchPriority={eagerConversationAvatar ? 'high' : undefined}
-                        />
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between">
-                            <span className="inline-flex min-w-0 items-center gap-1.5 font-medium text-[var(--text-primary)]">
-                              <span className="truncate">{conversation.other_user?.display_name}</span>
-                              <UserRoleBadge role={conversation.other_user?.admin_role} />
-                              <UserAchievementBadges user={conversation.other_user} />
-                              <UserPresenceBadge userId={conversation.other_user?.id} presenceVisibility={conversation.other_user?.presence_visibility} />
-                            </span>
+                <>
+                  <DMHubInboxControls
+                    query={hub.query}
+                    onQueryChange={hub.setQuery}
+                    mode={hub.mode}
+                    onModeChange={hub.setMode}
+                    counts={hub.counts}
+                    disabled={hub.loading}
+                    searchInputRef={inboxSearchInputRef}
+                  />
+                  {hub.items.length === 0 ? (
+                    <div className="px-6 py-10 text-center text-[var(--text-muted)]" role="status">
+                      <Search className="mx-auto mb-3 h-8 w-8 opacity-50" />
+                      <p className="text-sm font-medium text-[var(--text-primary)]">No matching conversations</p>
+                      <p className="mt-1 text-xs">Try another search or inbox view.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1 p-2" role="list" aria-label={`${hub.mode} conversations`}>
+                      {hub.items.map(item => {
+                        const conversation = item.conversation
+                        const lastMessage = conversation.last_message
+                        const messageKind = lastMessage?.message_type === 'image' || lastMessage?.message_type === 'video' || lastMessage?.message_type === 'audio' || lastMessage?.message_type === 'file'
+                          ? lastMessage.message_type
+                          : 'text'
+                        return (
+                          <div key={conversation.id} role="listitem">
+                            <DMHubConversationRow
+                              conversation={{
+                                id: conversation.id,
+                                displayName: conversation.other_user?.display_name || 'Unknown member',
+                                username: conversation.other_user?.username,
+                                avatarUrl: conversation.other_user?.avatar_url,
+                                avatarThumbnailUrl: conversation.other_user?.avatar_thumbnail_url,
+                                color: conversation.other_user?.color,
+                                presenceVisibility: conversation.other_user?.presence_visibility,
+                                preview: item.preview.text,
+                                timestamp: lastMessage?.created_at || conversation.last_message_at,
+                                timestampLabel: formatTime(lastMessage?.created_at || conversation.last_message_at),
+                                unreadCount: conversation.unread_count || 0,
+                                manuallyUnread: Boolean(item.preference?.markedUnreadAt),
+                                pinned: item.isPinned,
+                                archived: item.isArchived,
+                                muted: item.muted,
+                                blocked: conversation.is_blocked,
+                                draftPreview: item.localDraft || undefined,
+                                lastMessageFromCurrentUser: item.preview.direction === 'outgoing',
+                                lastMessageKind: messageKind,
+                                deliveryState: lastMessage?.delivery_status,
+                              }}
+                              selected={currentConversation === conversation.id}
+                              onOpen={handleConversationSelect}
+                              onTogglePin={handleTogglePin}
+                              onToggleArchive={handleToggleArchive}
+                              onToggleRead={handleToggleRead}
+                              onToggleMute={handleToggleMute}
+                              onRowRemovedFocusFallback={() => inboxSearchInputRef.current?.focus({ preventScroll: true })}
+                            />
                           </div>
-
-                          <div className="flex items-center justify-between">
-                            <span className="truncate text-xs text-[var(--text-muted)]">
-                              @{conversation.other_user?.username}
-                            </span>
-                            {conversation.is_blocked && (
-                              <span className="ml-2 rounded-full border border-[rgba(215,170,70,0.24)] bg-[rgba(215,170,70,0.08)] px-2 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[var(--text-gold)]">
-                                Blocked
-                              </span>
-                            )}
-                          </div>
-
-                          {conversation.last_message && (
-                            <p className="mt-1 truncate text-sm text-[var(--text-secondary)]">
-                              {conversation.last_message.content}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="ml-auto flex min-w-[3.5rem] shrink-0 flex-col items-end gap-2 text-right">
-                          {conversation.last_message && (
-                            <span className="text-xs text-[var(--text-muted)]">
-                              {formatTime(conversation.last_message.created_at)}
-                            </span>
-                          )}
-                          {unreadCount > 0 && (
-                            <span className="theme-unread-badge inline-flex min-w-[1.75rem] items-center justify-center rounded-full px-2 py-0.5 text-xs font-medium">
-                              {unreadCount > 99 ? '99+' : unreadCount}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </motion.button>
-                    )
-                  })}
-                </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </>
@@ -1273,36 +1478,45 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 userId: currentConv.other_user?.id,
                 presenceVisibility: currentConv.other_user?.presence_visibility,
               }}
-              onBack={() => setCurrentConversation(null)}
+              onBack={handleBackToInbox}
+              backButtonRef={threadBackButtonRef}
               backLabel="Back to direct messages"
               collapseOnKeyboard
               maxWidthClassName="max-w-4xl"
               actions={(
-                <>
-                  <ConversationNotificationMuteButton
-                    conversationId={currentConversation}
-                    conversationLabel={currentConv.other_user?.display_name || 'this conversation'}
-                  />
-                  {currentConv.other_user && (
-                    <BlockUserControl
-                      user={currentConv.other_user}
-                      blockedByMe={currentConv.blocked_by_me}
-                      compact
-                    />
-                  )}
-                </>
+                <button
+                  type="button"
+                  onClick={handleOpenConversationDetails}
+                  aria-label={`Open conversation details for ${currentConv.other_user?.display_name || 'this member'}`}
+                  aria-haspopup="dialog"
+                  aria-expanded={showConversationDetails}
+                  className="inline-flex h-12 w-12 items-center justify-center rounded-full text-[var(--text-secondary)] transition-colors hover:bg-[var(--theme-accent-soft)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]"
+                >
+                  <MoreHorizontal className="h-5 w-5" />
+                </button>
               )}
             />
 
             <div
               ref={messagesRef}
               onScroll={handleScroll}
+              role="log"
+              aria-label={`Direct messages with ${currentConv.other_user?.display_name || 'this member'}`}
               data-testid="dm-message-scroll"
               data-loaded-count={messages.length}
               data-rendered-count={messages.length}
               data-has-newer={String(hasNewer)}
               className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] pt-4 md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
             >
+              <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+                {targetAnnouncement || (uploading
+                  ? 'Uploading attachment'
+                  : sending
+                    ? 'Sending message'
+                    : typingUsers.length > 0
+                      ? `${typingUsers.map(typingUser => typingUser.display_name).join(', ')} ${typingUsers.length === 1 ? 'is' : 'are'} typing`
+                      : '')}
+              </div>
               <div data-testid="dm-message-stack" className="mx-auto flex min-h-full w-full max-w-4xl flex-col justify-end space-y-3">
               {loadingMore && (
                 <div className="flex justify-center py-2 text-sm text-[var(--text-muted)]">
@@ -1456,7 +1670,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
               currentView={currentView}
               onViewChange={onViewChange}
               title="Direct Message"
-              onBack={() => setCurrentConversation(null)}
+              onBack={handleBackToInbox}
               backLabel="Back to direct messages"
               collapseOnKeyboard
               maxWidthClassName="max-w-4xl"
@@ -1478,7 +1692,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                       type="button"
                       size="sm"
                       className="mt-5"
-                      onClick={() => setCurrentConversation(null)}
+                      onClick={handleBackToInbox}
                     >
                       Back to inbox
                     </Button>
@@ -1503,6 +1717,43 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
             user={profileUser}
             open
             onClose={() => setProfileUser(null)}
+          />
+        </React.Suspense>
+      )}
+      {currentConversation && currentConv?.other_user && (
+        <DMHubConversationDetailsSheet
+          open={showConversationDetails}
+          onClose={handleCloseConversationDetails}
+          conversationId={currentConversation}
+          otherUserId={currentConv.other_user.id}
+          displayName={currentConv.other_user.display_name || currentConv.other_user.username}
+          username={currentConv.other_user.username}
+          avatarUrl={currentConv.other_user.avatar_url}
+          avatarThumbnailUrl={currentConv.other_user.avatar_thumbnail_url}
+          color={currentConv.other_user.color}
+          presenceVisibility={currentConv.other_user.presence_visibility}
+          muted={Boolean(hub.allItems.find(item => item.conversation.id === currentConversation)?.muted)}
+          blockedByMe={currentConv.blocked_by_me || isBlockedByMe(currentConv.other_user.id)}
+          busyAction={blockingUserIds.has(currentConv.other_user.id) ? 'block' : null}
+          onSearch={conversationId => onRoute?.('replace-search', conversationId)}
+          onOpenShared={conversationId => onRoute?.('replace-shared', conversationId)}
+          onToggleNotifications={handleToggleMute}
+          onOpenProfile={() => {
+            handleCloseConversationDetails()
+            setProfileUser(currentConv.other_user ?? null)
+          }}
+          onToggleBlock={handleToggleBlock}
+        />
+      )}
+      {currentConversation && currentConv?.other_user && (initialPanel === 'search' || initialPanel === 'shared') && (
+        <React.Suspense fallback={null}>
+          <DMHubConversationContentSheet
+            open
+            panel={initialPanel}
+            conversationId={currentConversation}
+            conversationLabel={currentConv.other_user.display_name || currentConv.other_user.username}
+            onClose={() => onRoute?.('close-panel', currentConversation)}
+            onSelectMessage={messageId => onRoute?.('replace-thread', currentConversation, messageId)}
           />
         </React.Suspense>
       )}

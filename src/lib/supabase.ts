@@ -1690,7 +1690,7 @@ export const fetchDMConversations = async () => {
   const workingClient = await getWorkingClient()
   const { data, error } = await workingClient.rpc('get_dm_conversations')
   if (error) {
-    return [] as DMConversation[]
+    throw error
   }
 
   const rows = (data ?? []) as any[]

@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 
 type DraftUpdate = string | ((previous: string) => string)
-type DraftUpdateEventDetail = {
+export type DraftUpdateEventDetail = {
   draft: string
   storageKey: string
 }
 
-const DRAFT_UPDATE_EVENT = 'shadowchat:draft-update'
+export const DRAFT_UPDATE_EVENT = 'shadowchat:draft-update'
 
 const normalizeDraft = (value: string | null | undefined) => {
   if (!value || value.trim().length === 0) {
@@ -15,7 +15,7 @@ const normalizeDraft = (value: string | null | undefined) => {
   return value
 }
 
-const readDraft = (storageKey: string) => {
+export const readDraft = (storageKey: string) => {
   if (typeof localStorage === 'undefined') return ''
   try {
     const rawDraft = localStorage.getItem(storageKey)
