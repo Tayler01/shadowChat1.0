@@ -1,7 +1,10 @@
 {
   "reviewed_on": "2026-07-11",
-  "expected_total_security_definers": 105,
+  "expected_total_security_definers": 113,
   "private_security_definers": [
+    "private.can_operator_access_moderation_case(uuid,uuid)",
+    "private.can_operator_read_moderation_evidence(uuid,uuid)",
+    "private.can_read_moderation_attachment(uuid,text)",
     "private.cleanup_activity_events()",
     "private.cleanup_signup_invite_auth_metadata()",
     "private.create_dm_activity_event()",
@@ -17,17 +20,20 @@
     "private.enforce_shadow_pin_comment_parent()",
     "private.generate_signup_invite_code()",
     "private.is_operations_health_operator(uuid)",
+    "private.is_submitted_moderation_attachment(text)",
     "private.mirror_shadow_pin_activity_event()",
     "private.refresh_shadow_pin_category_latest_image(uuid)",
     "private.refresh_shadow_pin_comment_count()",
     "private.refresh_shadow_pin_scores()",
     "private.refresh_shadow_runner_medals_for_user(uuid)",
     "private.refresh_shadow_runner_medals()",
+    "private.reject_moderation_audit_mutation()",
     "private.revoke_signup_invite(uuid,uuid,text)",
     "private.sync_shadow_pin_category_latest_image()",
     "private.sync_shadow_pin_scores()",
     "private.sync_shadow_runner_catalog_medals()",
     "private.sync_shadow_runner_completion_medals()",
+    "private.unarchive_dm_conversation_on_message()",
     "private.users_have_block(uuid,uuid)",
     "private.validate_signup_invite_for_auth_hook(jsonb)"
   ],
@@ -67,17 +73,15 @@
     "toggle_board_chat_reaction(uuid,text)",
     "toggle_news_chat_reaction(uuid,text)",
     "toggle_news_feed_reaction(uuid,text)",
-    "update_art_board_link(uuid,text)"
+    "update_art_board_link(uuid,text)",
+    "update_conversation_last_message()"
   ],
   "required_active_table_privileges": [
     "authenticated:activity_events:SELECT",
-    "authenticated:dm_conversations:INSERT",
     "authenticated:dm_conversations:SELECT",
-    "authenticated:dm_conversations:UPDATE",
     "authenticated:dm_messages:DELETE",
     "authenticated:dm_messages:INSERT",
     "authenticated:dm_messages:SELECT",
-    "authenticated:dm_messages:UPDATE",
     "authenticated:messages:DELETE",
     "authenticated:messages:INSERT",
     "authenticated:messages:SELECT",
@@ -218,6 +222,19 @@
         "toggle_message_reaction_v2(uuid,text,boolean)",
         "toggle_shadow_pin_category_heart(uuid)",
         "toggle_shadow_pin_image_heart(uuid)"
+      ]
+    },
+    {
+      "domain": "member_reporting_and_safety_cases",
+      "justification": "Caller-private reporting and operator-only safety case workflows require guarded cross-table reads, evidence capture, assignment, state transitions, and enforcement actions.",
+      "signatures": [
+        "apply_moderation_case_action(uuid,integer,text,text[],integer,text,text)",
+        "assign_moderation_case(uuid,integer,uuid)",
+        "get_moderation_case(uuid)",
+        "list_moderation_cases(text,text,text,text,text,text,integer,timestamp with time zone,uuid)",
+        "list_my_member_reports(integer,timestamp with time zone,uuid)",
+        "submit_member_report(text,uuid,text,uuid,text,jsonb)",
+        "transition_moderation_case(uuid,integer,text,text,text,text,text)"
       ]
     },
     {
