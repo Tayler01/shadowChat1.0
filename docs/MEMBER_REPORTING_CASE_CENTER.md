@@ -2,11 +2,11 @@
 
 ## Status
 
-Wave One Candidate 4 is implemented and locally verified on
-`codex/shadowchat-2.0`. This is a new safety domain. Product Feedback remains
+Wave One Candidate 4 is implemented and deployed on the isolated
+`codex/shadowchat-2.0` trial. This is a new safety domain. Product Feedback remains
 the bug/feature intake and build workflow; it is not a moderation evidence
-store. The additive migration is intentionally not linked remotely until the
-Wave One shared-backend release checkpoint.
+store. Additive migration `20260712003000` passed the Wave One shared-backend
+checkpoint and is applied to the linked project.
 
 The production frontend and the ShadowChat 2.0 frontend share one Supabase
 project. Candidate 4 therefore uses only additive tables, RPCs, policies,
@@ -136,9 +136,10 @@ Candidate 4 is complete only when automated and browser proof shows:
   queue, and exact immutable evidence
 - the local database was reset after acceptance; `member_reports` returned zero
 
-The remaining release work is not Candidate 4 code: finish Candidate 5, run the
-combined Wave One compatibility gate, apply additive migrations in order, and
-deploy the isolated Netlify 2.0 frontend.
+The July 12 linked authority contract, migration history, dry run, and database
+lint pass. The separate Netlify trial loads My Safety Reports on a live Pixel 7
+profile. Operator action acceptance remains covered by the local multi-role SQL
+and browser evidence until real queue data exists.
 
 ## Deferred Until Real Queue Evidence Exists
 

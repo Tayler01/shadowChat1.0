@@ -126,7 +126,7 @@ Physical device validation remains required before claiming complete platform
 accessibility or WCAG conformance. Automated checks provide regression evidence,
 not a conformance certification.
 
-## Local Verification Evidence - July 11, 2026
+## Verification Evidence - July 11-12, 2026
 
 Candidate 5 is implemented and locally verified. The focused unit/component
 contracts cover parsing, legacy audio migration, presets, storage failure,
@@ -149,3 +149,10 @@ can scroll above the fixed nav and that the fixed header reset recovers the
 default profile at 320px. Evidence is under
 `output/playwright/candidate5-comfort-final-gate/` and is intentionally not a
 physical-device or installed-PWA certification.
+
+The same matrix passed against the live July 12 Netlify trial under
+`output/playwright/wave-one-live-comfort/`. HTTPS manifest/service-worker proof
+confirmed standalone display, three icons, and an active controlling `/sw.js`.
+WebKit's expected report-only CSP diagnostics are recorded as warnings rather
+than app failures. Physical VoiceOver/TalkBack and software-keyboard validation
+remain user-device follow-ups.

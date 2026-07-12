@@ -72,6 +72,7 @@
     "react-dom": "^18.3.1",
     "react-hot-toast": "^2.4.1",
     "recharts": "^3.8.1",
+    "semver": "^7.8.0",
     "sentiment": "^5.0.2",
     "sharp": "^0.34.5",
     "tailwind-merge": "^2.2.0",

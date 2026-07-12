@@ -133,6 +133,13 @@ for (const profile of profiles) {
         warnings.push(`console: ${message.text()}`)
         return
       }
+      if (
+        /Content Security Policy directive 'frame-ancestors' is ignored when delivered in a report-only policy/i.test(message.text())
+        || /Content Security Policy .* was delivered in report-only mode, but does not specify a 'report-to'/i.test(message.text())
+      ) {
+        warnings.push(`console: ${message.text()}`)
+        return
+      }
       errors.push(`console: ${message.text()}`)
     })
 

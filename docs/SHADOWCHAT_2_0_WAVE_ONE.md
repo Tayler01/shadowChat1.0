@@ -7,8 +7,9 @@ Build and validate the first high-impact 2.0 product wave on the long-lived
 through additive, backward-compatible contracts. Production `main` and its
 Netlify frontend remain unchanged until Tayler approves the completed fork.
 
-The completed wave will be deployed to a separate Netlify site and installable
-URL for phone testing.
+The completed wave is deployed to the separate Netlify site
+`shadowchat-2-0-wave-one` at
+`https://shadowchat-2-0-wave-one.netlify.app` for phone testing.
 
 ## Candidate Sequence
 
@@ -47,7 +48,34 @@ release gate rather than the Candidate 5 local claim.
 
 ## Wave Completion Gate
 
-Wave One is complete only when all five candidates pass lint, TypeScript,
+Wave One is implementation-complete: all five candidates pass lint, TypeScript,
 production build/budgets, relevant Jest and SQL verification, actual WebKit and
 Chromium phone QA, linked Supabase compatibility checks, full regression, and a
-separate Netlify deploy smoke. Tayler then reviews the installable 2.0 URL.
+separate Netlify deploy smoke. Tayler's installed-phone acceptance remains the
+approval gate before any merge to `main`.
+
+## Trial Deployment Evidence - July 12, 2026
+
+- Git branch: `codex/shadowchat-2.0`; production `main` was not changed.
+- Shared Supabase migrations `20260711194211`, `20260711225923`, and
+  `20260712003000` are applied. Linked history and dry run are clean.
+- Linked database lint returned zero findings. The reviewed authority contract
+  matches 79 authenticated, 1 anonymous, 34 internal, and 34 private
+  `SECURITY DEFINER` functions, with no paused browser grants.
+- Netlify site: `shadowchat-2-0-wave-one`; deploy
+  `6a531bc1e38b9bdade466b6d`; production site/domain bindings were not changed.
+- The Netlify Sharp media function returns the expected method/auth boundary
+  after native Linux dependency packaging was verified live.
+- Full authenticated live smoke passed auth, General Chat, Settings, DMs,
+  resume-send, profile, mobile DM Back/refocus, and mobile Settings.
+- Live Pixel 7 proof showed Activity Realtime `live`, DM Inbox/Unread/Archived,
+  ShadowPin Theater Previous/Next/Close, and My Safety Reports.
+- Live comfort QA passed compact 320px Chromium, Pixel 7 Chromium, and iPhone
+  13 WebKit with 130% text, no horizontal overflow, visible focus, persisted
+  prepaint preferences, and fixed-nav reachability.
+- HTTPS PWA proof found a standalone manifest with three icons and an active,
+  controlling `/sw.js` registration.
+
+Physical VoiceOver, TalkBack, software-keyboard, native safe-area, push-permission,
+and install-from-browser checks remain part of Tayler's phone trial rather than
+automated conformance certification.

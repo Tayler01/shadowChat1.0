@@ -39,7 +39,8 @@ Canonical detail and release gates live in:
   `codex/shadowchat-2.0` branch, preserve the production frontend and shared
   Supabase contract, then publish a separate installable Netlify test site.
 - Started: 2026-07-11
-- Status: active; Candidates 1 through 3 of 5 verified locally.
+- Status: implementation-complete and live on the separate Netlify trial;
+  awaiting Tayler's installed-phone approval before any merge to `main`.
 - Candidate 1: Unified Activity HQ with an authoritative recipient ledger,
   realtime/recovery, exact Chat/DM/Pin routes, five-item phone navigation,
   accessible unread handling, and hard-bounded foreground toast lifetime.
@@ -73,6 +74,21 @@ Canonical detail and release gates live in:
   WebKit phone acceptance for pinning, details, search, exact routing, shared
   filters, 48-pixel controls, and header/system Back.
 - Candidate 3 contract: [DM_CONVERSATION_HUB.md](C:/repos/chat2.0/docs/DM_CONVERSATION_HUB.md:1)
+- Candidate 4: member reporting plus an operator Safety Case Center with
+  private immutable evidence, reporter receipts, RLS-separated queues,
+  optimistic versioning, and audited actions.
+- Candidate 5: device-local Comfort Profiles for motion, transparency,
+  contrast, text scale, message density, touch targets, autoplay, sound, and
+  haptics, applied before React paints.
+- Combined proof, July 12: 164 Jest suites / 829 passing tests, 41 Node
+  contracts, 154 documentation files, clean lint/type/build/budgets, clean local
+  and linked database lint/security contracts, and three linked additive
+  migrations.
+- Trial: `https://shadowchat-2-0-wave-one.netlify.app`, Netlify deploy
+  `6a531bc1e38b9bdade466b6d`. Full authenticated smoke, Pixel 7 feature probe,
+  compact/Android/iPhone comfort matrix, Sharp media Function boundary, and
+  controlling service worker passed. Physical installed-phone acceptance is
+  the remaining approval step.
 
 ### Shadow Runner Playable Prototype Prep
 

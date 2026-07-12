@@ -9,12 +9,13 @@ original June findings, records the July production-alignment evidence, and
 ranks the work that remains. Update it when an item is implemented,
 intentionally deferred, or replaced by a narrower feature ticket.
 
-The separate `codex/shadowchat-2.0` Wave One track has locally completed all five
+The separate `codex/shadowchat-2.0` Wave One track has completed all five
 high-ticket product candidates without changing production `main`: Activity
 HQ, ShadowPin Theater, DM Conversation Hub, Member Reporting/Safety Case Center,
 and the device-local Accessibility & Comfort system. The combined regression,
-shared-backend compatibility, physical-device, and isolated Netlify trial gates
-remain open; see `docs/SHADOWCHAT_2_0_WAVE_ONE.md` for authoritative status.
+linked shared-backend, isolated Netlify, live Chromium/WebKit, Function, and PWA
+gates passed July 12. Tayler's physical-device trial remains the approval gate;
+see `docs/SHADOWCHAT_2_0_WAVE_ONE.md` for authoritative status.
 
 ## July 9, 2026 Alignment And Cleanup Program
 

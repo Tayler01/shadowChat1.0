@@ -100,15 +100,9 @@ browser proof includes an authoritative DM insert, Activity badge increment,
 realtime prepend, typed route handoff, exact Pin-comment focus, and zero console
 errors after fixture setup.
 
-## Shared-Backend Rollout
+## Shared-Backend Rollout - Complete July 12, 2026
 
-Before a 2.0 Netlify deployment:
-
-1. Keep the migration canonical in Git.
-2. Apply it backend-first to the linked Supabase project.
-3. Re-run linked migration, security-contract, lint/advisor, and dry-run checks.
-4. Confirm the production frontend can still mark legacy ShadowPin
-   `notification_events.read_at` and send/delete reacted messages.
-5. Deploy only the 2.0 branch to the separate Netlify site.
-
-Do not deploy the 2.0 frontend before the Activity migration is present.
+Migration `20260711194211` is canonical, applied to the linked Supabase project,
+and verified by linked history, dry run, lint, and the reviewed security
+contract. The 2.0 frontend is live only on the separate
+`shadowchat-2-0-wave-one` Netlify site; production `main` remains unchanged.

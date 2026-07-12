@@ -97,7 +97,9 @@ This checkpoint is complete only after:
   message targeting, shared-content filters, header Back, and browser/system
   Back with no page errors. Temporary accounts and message data were removed
   by a final local database reset.
-- No migration was applied remotely and no frontend was deployed. The linked
-  dry run passed and lists only the additive Activity HQ and DM Hub migrations;
-  old-production-client compatibility remains part of the combined Wave One
-  shared-backend gate.
+- Migration `20260711225923` was applied to the linked project on July 12 after
+  the combined compatibility gate. Linked history, dry run, database lint, and
+  the narrowed authority contract pass. The separate live trial exposes
+  Inbox, Unread, and Archived modes and passed the full authenticated DM,
+  resume-send, mobile Back, and mobile refocus smoke. Production `main` remains
+  unchanged.

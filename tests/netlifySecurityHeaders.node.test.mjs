@@ -67,6 +67,13 @@ test('Netlify requires service-worker update checks to revalidate sw.js', () => 
   assert.match(block, /Cache-Control\s*=\s*"no-cache"/)
 })
 
+test('Netlify preserves Sharp as a native external function dependency', () => {
+  const config = read('netlify.toml')
+
+  assert.match(config, /\[functions\][\s\S]*?node_bundler\s*=\s*"esbuild"/)
+  assert.match(config, /\[functions\][\s\S]*?external_node_modules\s*=\s*\["semver",\s*"sharp"\]/)
+})
+
 test('mobile metadata permits zoom and does not force portrait orientation', () => {
   const html = read('index.html')
   const manifest = JSON.parse(read('public/manifest.webmanifest'))

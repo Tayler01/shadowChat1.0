@@ -2,10 +2,10 @@
 
 ## Status
 
-Wave One candidate 2 is implemented and locally verified on
-`codex/shadowchat-2.0`.
-Production `main`, the production Netlify site, and the linked Supabase project
-remain unchanged.
+Wave One candidate 2 is implemented and live on the isolated
+`codex/shadowchat-2.0` trial at
+`https://shadowchat-2-0-wave-one.netlify.app`. Production `main` and the
+production Netlify site remain unchanged. Theater required no schema migration.
 
 ## Product Contract
 
@@ -116,3 +116,8 @@ proof.
 
 The local QA account, comments, Pins, category, and temporary preview assets
 were removed by the final clean local database reset and workspace cleanup.
+
+The July 12 live Pixel 7 acceptance opened Theater with a real touch gesture
+and verified visible Previous, Next, and Close controls. The full live smoke,
+iPhone WebKit comfort/navigation matrix, PWA registration, and Netlify media
+Function boundary also passed on the separate trial origin.

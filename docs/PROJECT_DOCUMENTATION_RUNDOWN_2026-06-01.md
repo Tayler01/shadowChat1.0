@@ -84,20 +84,20 @@ implementation backlog.
 
 The isolated ShadowChat 2.0 Wave One work is tracked in
 [SHADOWCHAT_2_0_WAVE_ONE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_ONE.md:1).
-Its five locally verified candidates are documented in Activity HQ, ShadowPin
+Its five verified and live-trial candidates are documented in Activity HQ, ShadowPin
 Theater, DM Conversation Hub, Member Reporting/Case Center, and Accessibility &
 Comfort docs.
-These remain candidate docs until the separate 2.0 Netlify trial is approved
+These remain candidate docs while the live separate 2.0 Netlify trial is reviewed
 for `main`.
 
 | File | Latest tracked update/status date | Role | Refresh guidance |
 | --- | --- | --- | --- |
-| [docs/SHADOWCHAT_2_0_WAVE_ONE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_ONE.md:1) | 2026-07-11 | Isolated Wave One sequence, compatibility boundary, and combined release gate. | Refresh after every candidate checkpoint and the Netlify trial. |
-| [docs/ACTIVITY_HQ.md](C:/repos/chat2.0/docs/ACTIVITY_HQ.md:1) | 2026-07-11 | Unified Activity HQ candidate contract and proof. | Refresh if event types, read state, or routing change. |
-| [docs/SHADOW_PIN_THEATER.md](C:/repos/chat2.0/docs/SHADOW_PIN_THEATER.md:1) | 2026-07-11 | Immersive ShadowPin viewer candidate contract and proof. | Refresh after viewer, media, or phone gesture changes. |
-| [docs/DM_CONVERSATION_HUB.md](C:/repos/chat2.0/docs/DM_CONVERSATION_HUB.md:1) | 2026-07-11 | DM inbox organization, search/shared-content, and message-window contract. | Refresh after DM lifecycle or retrieval changes. |
-| [docs/MEMBER_REPORTING_CASE_CENTER.md](C:/repos/chat2.0/docs/MEMBER_REPORTING_CASE_CENTER.md:1) | 2026-07-11 | Private reporting, immutable evidence, operator cases, and audited actions. | Refresh after report targets, safety policy, or enforcement changes. |
-| [docs/ACCESSIBILITY_COMFORT.md](C:/repos/chat2.0/docs/ACCESSIBILITY_COMFORT.md:1) | 2026-07-11 | Device-local comfort profiles, prepaint bootstrap, runtime policy axes, integration rules, and browser/physical-device verification boundary. | Refresh after comfort storage, presets, runtime consumers, or physical-device evidence changes. |
+| [docs/SHADOWCHAT_2_0_WAVE_ONE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_ONE.md:1) | 2026-07-12 | Isolated Wave One sequence, compatibility boundary, and combined release gate. | Refresh after every candidate checkpoint and the Netlify trial. |
+| [docs/ACTIVITY_HQ.md](C:/repos/chat2.0/docs/ACTIVITY_HQ.md:1) | 2026-07-12 | Unified Activity HQ candidate contract and proof. | Refresh if event types, read state, or routing change. |
+| [docs/SHADOW_PIN_THEATER.md](C:/repos/chat2.0/docs/SHADOW_PIN_THEATER.md:1) | 2026-07-12 | Immersive ShadowPin viewer candidate contract and proof. | Refresh after viewer, media, or phone gesture changes. |
+| [docs/DM_CONVERSATION_HUB.md](C:/repos/chat2.0/docs/DM_CONVERSATION_HUB.md:1) | 2026-07-12 | DM inbox organization, search/shared-content, and message-window contract. | Refresh after DM lifecycle or retrieval changes. |
+| [docs/MEMBER_REPORTING_CASE_CENTER.md](C:/repos/chat2.0/docs/MEMBER_REPORTING_CASE_CENTER.md:1) | 2026-07-12 | Private reporting, immutable evidence, operator cases, and audited actions. | Refresh after report targets, safety policy, or enforcement changes. |
+| [docs/ACCESSIBILITY_COMFORT.md](C:/repos/chat2.0/docs/ACCESSIBILITY_COMFORT.md:1) | 2026-07-12 | Device-local comfort profiles, prepaint bootstrap, runtime policy axes, integration rules, and browser/physical-device verification boundary. | Refresh after comfort storage, presets, runtime consumers, or physical-device evidence changes. |
 | [docs/ADMIN_ACCESS.md](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1) | 2026-07-11 | Canonical `user_roles` authority, display-only badges, and active/paused admin surfaces. | Refresh after role, authority, or admin-surface changes. |
 | [docs/APP_RELEASES.md](C:/repos/chat2.0/docs/APP_RELEASES.md:1) | 2026-05-29 | App release popup behavior. | Current enough unless release UX changes. |
 | [docs/ART_BOARD.md](C:/repos/chat2.0/docs/ART_BOARD.md:1) | 2026-07-09 | Paused Art Board domain and reviewed reactivation contract. | Update before restoring the import Function or UI. |
