@@ -14,6 +14,7 @@ import {
   PartyPopper,
   ImagePlus,
   Bookmark,
+  Flag,
 } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
 import { ImageModal } from '../ui/ImageModal'
@@ -42,6 +43,7 @@ import { useOptionalHype } from '../../hooks/useHype'
 import { getHypeTier } from '../../lib/hypePresentation'
 import { saveMessageToLibrary } from '../../lib/messageLibrary'
 import { MessageHypeBadge } from './MessageHypeBadge'
+import { useModerationReport } from '../../features/moderation/useModerationReport'
 import { ShareImageToShadowPinModal } from '../../features/shadow-pin/components/ShareImageToShadowPinModal'
 import {
   CHAT_MEDIA_INTRINSIC_HEIGHT,
@@ -202,6 +204,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const { profile } = useAuth()
     const { isOperator } = useAdminAccess({ includeUsers: false })
     const hype = useOptionalHype()
+    const { openReport } = useModerationReport()
     const [isEditing, setIsEditing] = useState(false)
     const [editContent, setEditContent] = useState(message.content)
     const [showReactionPicker, setShowReactionPicker] = useState(false)
@@ -387,6 +390,22 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         icon: Bookmark,
         hidden: isLocalDelivery,
         onSelect: () => void handleSaveMessage(),
+      },
+      {
+        id: 'report',
+        label: 'Report message',
+        icon: Flag,
+        hidden: isOwner || isLocalDelivery || !message.user,
+        onSelect: () => openReport({
+          type: 'general_message',
+          id: message.id,
+          label: message.user?.display_name || message.user?.username || 'ShadowChat member',
+          preview: getMessagePreviewText(message) || `${message.message_type} message`,
+          subjectUserId: message.user_id,
+          subjectLabel: message.user?.display_name || message.user?.username || 'ShadowChat member',
+          subjectUsername: message.user?.username ?? null,
+          subjectAvatarUrl: message.user?.avatar_url ?? null,
+        }),
       },
       {
         id: 'reaction',

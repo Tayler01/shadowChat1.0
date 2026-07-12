@@ -2,7 +2,7 @@
 
 This project uses a mix of static checks, Jest coverage, and real browser validation.
 
-## Documentation Status - July 10, 2026
+## Documentation Status - July 11, 2026
 
 This guide reflects the current repo scripts and deployed July 10 Release A.
 CI treats warnings, documentation drift, dependency advisories,
@@ -23,6 +23,26 @@ keyboard movement, push setup, media loading, or realtime reconnects.
 Desktop checks are still useful when a change affects desktop layout or shared
 logic, but they are secondary to phone-sized interaction, touch comfort,
 keyboard/composer behavior, scroll stability, and smooth media loading.
+
+## Member Reporting And Safety Case Center
+
+The ShadowChat 2.0 reporting domain requires both static and executable
+database proof. Run the focused contract set with:
+
+```powershell
+npx jest --runInBand tests/memberReportingCaseCenterSql.test.ts tests/memberReportingEntrypoints.test.ts tests/moderationCases.test.ts tests/MemberReportSheet.test.tsx
+npx supabase db reset --local --no-seed
+$dbContainer = (docker ps --format "{{.Names}}" | Select-String "supabase_db" | Select-Object -First 1).ToString().Trim()
+Get-Content -Raw scripts/verify-member-reporting-case-center-local.sql | docker exec -i $dbContainer psql -v ON_ERROR_STOP=1 -U postgres -d postgres
+npx supabase db lint --local --level error
+npx supabase db advisors --local --type security --level error --fail-on error
+```
+
+Browser acceptance uses disposable reporter, subject, and operator accounts on
+a local Supabase reset. Verify Android/Chromium and iPhone/WebKit Report,
+receipt, My Safety Reports, operator queue, and exact immutable evidence. Reset
+the local database afterward and confirm `public.member_reports` is empty. Do
+not seed this workflow into production.
 
 ## Baseline Checks
 

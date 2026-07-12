@@ -9,6 +9,7 @@ import { PresenceRoot } from './PresenceRoot';
 import { registerPushServiceWorker } from './lib/push';
 import { initializeTelemetry } from './lib/telemetry';
 import { BlockedUsersProvider } from './hooks/useBlockedUsers';
+import { ModerationReportProvider } from './features/moderation/ModerationReportProvider';
 
 initializeTelemetry();
 
@@ -18,9 +19,11 @@ createRoot(document.getElementById('root')!).render(
       <BlockedUsersProvider>
         <PresenceRoot>
           <ThemeProvider>
-            <ErrorBoundary>
-              <App />
-            </ErrorBoundary>
+            <ModerationReportProvider>
+              <ErrorBoundary>
+                <App />
+              </ErrorBoundary>
+            </ModerationReportProvider>
           </ThemeProvider>
         </PresenceRoot>
       </BlockedUsersProvider>

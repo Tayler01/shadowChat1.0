@@ -30,6 +30,7 @@ import { UserAchievementBadges } from '../ui/UserAchievementBadges'
 import { getUserAchievementMedals } from '../ui/userAchievementMedals'
 import { BlockUserControl } from './BlockUserControl'
 import { useBlockedUsers } from '../../hooks/useBlockedUsers'
+import { useModerationReport } from '../../features/moderation/useModerationReport'
 
 interface PublicProfileDialogProps {
   user: User | null
@@ -65,6 +66,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   const previousFocusRef = useRef<HTMLElement | null>(null)
   const { profile: currentProfile } = useAuth()
   const { isBlockedByMe } = useBlockedUsers()
+  const { openReport } = useModerationReport()
   const { role: currentAdminRole, isAdmin: currentIsAdmin, isOperator: currentIsOperator } = useAdminAccess({ includeUsers: false })
   const targetUserId = user?.id ?? null
   const targetUserAdminRole = user?.admin_role ?? null
@@ -431,6 +433,28 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                     </Button>
                   )}
                   <BlockUserControl user={user} />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      openReport({
+                        type: 'user',
+                        id: user.id,
+                        label: user.display_name || user.username || 'ShadowChat member',
+                        preview: statusMessage || `@${user.username || 'member'} profile`,
+                        subjectUserId: user.id,
+                        subjectLabel: user.display_name || user.username || 'ShadowChat member',
+                        subjectUsername: user.username,
+                        subjectAvatarUrl: user.avatar_url,
+                      })
+                      onClose()
+                    }}
+                    className="min-h-11 w-full sm:w-auto"
+                  >
+                    <ShieldAlert className="mr-2 h-4 w-4" />
+                    Report
+                  </Button>
                 </div>
               )}
 

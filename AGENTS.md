@@ -2,7 +2,7 @@
 
 This file is the working handbook for agentic contributors operating inside this repository.
 
-## Documentation Status - July 10, 2026
+## Documentation Status - July 11, 2026
 
 This handbook is current through the July 10 production-alignment and Release A
 deployment: the paused-domain contract, Supabase
@@ -18,6 +18,13 @@ performance, UX, and feature work, read
 before editing. For the complete documentation inventory and freshness notes,
 read
 [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
+
+On `codex/shadowchat-2.0`, Wave One Candidates 1-4 are locally verified:
+Activity HQ, ShadowPin Theater, DM Conversation Hub, and Member Reporting with
+the operator Safety Case Center. Candidate 5 and the combined isolated Netlify
+release gate remain open. Read
+[docs/SHADOWCHAT_2_0_WAVE_ONE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_ONE.md:1)
+before changing that branch track.
 
 ## Mission
 

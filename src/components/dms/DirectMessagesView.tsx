@@ -16,6 +16,7 @@ import {
   ImagePlus,
   Bookmark,
   MoreHorizontal,
+  Flag,
 } from 'lucide-react'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
 import { useAuth } from '../../hooks/useAuth'
@@ -66,6 +67,7 @@ import {
   messageToReplyTarget,
   type ReplyTarget,
 } from '../chat/messageDisplay'
+import { useModerationReport } from '../../features/moderation/useModerationReport'
 
 interface DirectMessagesViewProps {
   onToggleSidebar: () => void
@@ -134,6 +136,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
   avatarLoading?: 'eager' | 'lazy'
   avatarFetchPriority?: 'high' | 'low' | 'auto'
 }) {
+  const { openReport } = useModerationReport()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(message.content)
   const [showReactionPicker, setShowReactionPicker] = useState(false)
@@ -283,6 +286,23 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
       icon: Bookmark,
       hidden: isLocalDelivery,
       onSelect: () => void saveMessage(),
+    },
+    {
+      id: 'report',
+      label: 'Report message',
+      icon: Flag,
+      hidden: isOwn || isLocalDelivery || !message.sender,
+      onSelect: () => openReport({
+        type: 'dm_message',
+        id: message.id,
+        label: message.sender?.display_name || message.sender?.username || 'ShadowChat member',
+        preview: getMessagePreviewText(message) || `${message.message_type} message`,
+        subjectUserId: message.sender_id,
+        subjectLabel: message.sender?.display_name || message.sender?.username || 'ShadowChat member',
+        subjectUsername: message.sender?.username ?? null,
+        subjectAvatarUrl: message.sender?.avatar_url ?? null,
+        conversationId: message.conversation_id,
+      }),
     },
     {
       id: 'reaction',

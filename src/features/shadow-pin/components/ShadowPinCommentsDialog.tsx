@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Edit3, Loader2, MessageSquare, Reply, Send, Trash2, X } from 'lucide-react'
+import { Edit3, Flag, Loader2, MessageSquare, Reply, Send, Trash2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Avatar } from '../../../components/ui/Avatar'
 import { Button } from '../../../components/ui/Button'
@@ -15,6 +15,7 @@ import {
 } from '../api/shadowPinApi'
 import type { ShadowPinCommentCursor } from '../api/shadowPinApi'
 import type { ShadowPinComment, ShadowPinImage } from '../types'
+import { useModerationReport } from '../../moderation/useModerationReport'
 
 const authorLabel = (comment: ShadowPinComment) =>
   comment.author?.display_name || comment.author?.username || 'ShadowChat member'
@@ -39,18 +40,22 @@ function CommentCard({
   reply,
   canEdit,
   canDelete,
+  canReport,
   onReply,
   onEdit,
   onDelete,
+  onReport,
   highlighted,
 }: {
   comment: ShadowPinComment
   reply?: boolean
   canEdit: boolean
   canDelete: boolean
+  canReport: boolean
   onReply: () => void
   onEdit: () => void
   onDelete: () => void
+  onReport: () => void
   highlighted?: boolean
 }) {
   return (
@@ -78,6 +83,15 @@ function CommentCard({
               >
                 <Reply className="h-3.5 w-3.5" /> Reply
               </button>
+              {canReport && (
+                <button
+                  type="button"
+                  onClick={onReport}
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-xs font-medium text-[var(--text-muted)] hover:bg-[rgba(255,255,255,0.055)] hover:text-[var(--text-primary)]"
+                >
+                  <Flag className="h-3.5 w-3.5" /> Report
+                </button>
+              )}
               {(canEdit || canDelete) && (
                 <>
                   {canEdit && (
@@ -122,6 +136,7 @@ export function ShadowPinCommentsDialog({
   initialCommentId?: string
 }) {
   const { user } = useAuth()
+  const { openReport } = useModerationReport()
   const { role } = useAdminAccess({ includeUsers: false })
   const [comments, setComments] = useState<ShadowPinComment[]>([])
   const [body, setBody] = useState('')
@@ -137,6 +152,17 @@ export function ShadowPinCommentsDialog({
   const composerRef = useRef<HTMLTextAreaElement>(null)
   const canonicalCountRef = useRef(Math.max(0, image.comment_count ?? 0))
   const dialogRef = useDialogAccessibility({ open, onClose, initialFocusRef: closeRef })
+
+  const reportComment = (comment: ShadowPinComment) => openReport({
+    type: 'shadow_pin_comment',
+    id: comment.id,
+    label: authorLabel(comment),
+    preview: comment.body,
+    subjectUserId: comment.author_id,
+    subjectLabel: authorLabel(comment),
+    subjectUsername: comment.author?.username ?? null,
+    subjectAvatarUrl: comment.author?.avatar_url ?? null,
+  })
 
   useEffect(() => {
     canonicalCountRef.current = Math.max(0, image.comment_count ?? 0)
@@ -346,9 +372,11 @@ export function ShadowPinCommentsDialog({
                     highlighted={comment.id === initialCommentId}
                     canEdit={comment.author_id === user?.id}
                     canDelete={comment.author_id === user?.id || role === 'admin' || role === 'sub_admin'}
+                    canReport={comment.author_id !== user?.id}
                     onReply={() => startReply(comment)}
                     onEdit={() => startEdit(comment)}
                     onDelete={() => void removeComment(comment)}
+                    onReport={() => reportComment(comment)}
                   />
                   {(repliesByParent.get(comment.id) ?? []).map(reply => (
                     <CommentCard
@@ -358,9 +386,11 @@ export function ShadowPinCommentsDialog({
                       highlighted={reply.id === initialCommentId}
                       canEdit={reply.author_id === user?.id}
                       canDelete={reply.author_id === user?.id || role === 'admin' || role === 'sub_admin'}
+                      canReport={reply.author_id !== user?.id}
                       onReply={() => startReply(comment)}
                       onEdit={() => startEdit(reply)}
                       onDelete={() => void removeComment(reply)}
+                      onReport={() => reportComment(reply)}
                     />
                   ))}
                 </div>

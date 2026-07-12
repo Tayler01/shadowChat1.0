@@ -2159,7 +2159,9 @@ test('ShadowPin image long-press opens a radial thumb menu and slide-heart trigg
       'heart',
       'comment',
       'open',
+      'report',
     ])
+    expect(screen.getByTestId('shadow-pin-radial-action-report')).toBeInTheDocument()
 
     fireShadowPinPointer(imageCard!, 'pointermove', {
       pointerId: 7,

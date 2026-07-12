@@ -13,6 +13,7 @@ import {
   Edit3,
   ExternalLink,
   Film,
+  Flag,
   Heart,
   Image as ImageIcon,
   Link as LinkIcon,
@@ -54,6 +55,7 @@ import { fetchShadowPinImage, fetchShadowPinImageNeighbors, searchShadowPinImage
 import { ShadowPinCommentsDialog } from './components/ShadowPinCommentsDialog'
 import { ShadowPinImmersiveViewer } from './components/ShadowPinImmersiveViewer'
 import { buildViewerSequence, createShadowPinPermalink } from './immersiveViewerModel'
+import { useModerationReport } from '../moderation/useModerationReport'
 import { rankShadowPinCategories } from './categorySearch'
 import {
   useShadowPinActivityTracker,
@@ -632,7 +634,7 @@ const getImageAspectRatio = (item: { image_width?: number | null; image_height?:
 
 const isProcessingMedia = (status?: string | null) => status === 'pending' || status === 'processing'
 
-type PinQuickAction = 'heart' | 'share' | 'comment' | 'open' | 'edit'
+type PinQuickAction = 'heart' | 'share' | 'comment' | 'open' | 'edit' | 'report'
 type PinActionSide = 'left' | 'right'
 type PinColumnSide = 'left' | 'right'
 type PinActionConfig = {
@@ -695,6 +697,21 @@ const BASE_MANAGE_PIN_ACTIONS_RIGHT: PinActionConfig[] = [
   pinArcAction('open', 'Open', -12, Maximize2),
   pinArcAction('edit', 'Edit', 24, Edit3),
 ]
+const BASE_REPORT_PIN_ACTIONS_RIGHT: PinActionConfig[] = [
+  pinArcAction('share', 'Share', -102, Share2),
+  pinArcAction('heart', 'Heart', -66, Heart),
+  pinArcAction('comment', 'Comment', -30, MessageSquare),
+  pinArcAction('open', 'Open', 6, Maximize2),
+  pinArcAction('report', 'Report', 42, Flag),
+]
+const BASE_MANAGE_REPORT_PIN_ACTIONS_RIGHT: PinActionConfig[] = [
+  pinArcAction('share', 'Share', -138, Share2),
+  pinArcAction('heart', 'Heart', -102, Heart),
+  pinArcAction('comment', 'Comment', -66, MessageSquare),
+  pinArcAction('open', 'Open', -30, Maximize2),
+  pinArcAction('edit', 'Edit', 6, Edit3),
+  pinArcAction('report', 'Report', 42, Flag),
+]
 const PIN_ACTIONS: Record<PinActionSide, PinActionConfig[]> = {
   left: makePinActions(BASE_PIN_ACTIONS_RIGHT, 'left'),
   right: makePinActions(BASE_PIN_ACTIONS_RIGHT, 'right'),
@@ -703,9 +720,21 @@ const MANAGE_PIN_ACTIONS: Record<PinActionSide, PinActionConfig[]> = {
   left: makePinActions(BASE_MANAGE_PIN_ACTIONS_RIGHT, 'left'),
   right: makePinActions(BASE_MANAGE_PIN_ACTIONS_RIGHT, 'right'),
 }
+const REPORT_PIN_ACTIONS: Record<PinActionSide, PinActionConfig[]> = {
+  left: makePinActions(BASE_REPORT_PIN_ACTIONS_RIGHT, 'left'),
+  right: makePinActions(BASE_REPORT_PIN_ACTIONS_RIGHT, 'right'),
+}
+const MANAGE_REPORT_PIN_ACTIONS: Record<PinActionSide, PinActionConfig[]> = {
+  left: makePinActions(BASE_MANAGE_REPORT_PIN_ACTIONS_RIGHT, 'left'),
+  right: makePinActions(BASE_MANAGE_REPORT_PIN_ACTIONS_RIGHT, 'right'),
+}
 
-const getPinActions = (canManageImage: boolean, side: PinActionSide) =>
-  canManageImage ? MANAGE_PIN_ACTIONS[side] : PIN_ACTIONS[side]
+const getPinActions = (canManageImage: boolean, canReportImage: boolean, side: PinActionSide) => {
+  if (canManageImage && canReportImage) return MANAGE_REPORT_PIN_ACTIONS[side]
+  if (canManageImage) return MANAGE_PIN_ACTIONS[side]
+  if (canReportImage) return REPORT_PIN_ACTIONS[side]
+  return PIN_ACTIONS[side]
+}
 
 const getPinControlSide = (columnSide: PinColumnSide): PinActionSide => columnSide === 'left' ? 'right' : 'left'
 
@@ -1574,6 +1603,8 @@ function PinActionFeedback({ feedback }: { feedback: PinActionFeedbackState | nu
       ? Maximize2
       : feedback.action === 'comment'
         ? MessageSquare
+      : feedback.action === 'report'
+        ? Flag
       : feedback.action === 'edit'
         ? Edit3
         : Heart
@@ -1655,6 +1686,8 @@ function ImageCard({
   sharingToGroupChat?: boolean
   onVisible: () => void
 }) {
+  const { user } = useAuth()
+  const { openReport } = useModerationReport()
   const cardRef = useRef<HTMLElement | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
@@ -1686,6 +1719,7 @@ function ImageCard({
   const shareUrl = getShareUrl(image)
   const aspectRatio = getImageAspectRatio(image) || '4 / 5'
   const controlSide = getPinControlSide(columnSide)
+  const canReportImage = Boolean(user && image.creator_id && image.creator_id !== user.id)
   const videoPin = isVideoPin(image)
   const activeVideo = activeVideoId === image.id && image.processing_status !== 'failed'
   const nativeVideoSrc = getVideoPreviewUrl(image)
@@ -1984,6 +2018,20 @@ function ImageCard({
     setShareSheet({ open: true, url: shareUrl })
   }
 
+  const reportImage = () => {
+    if (!image.creator_id) return
+    openReport({
+      type: 'shadow_pin_image',
+      id: image.id,
+      label: getDisplayName(image),
+      preview: image.description || image.title,
+      subjectUserId: image.creator_id,
+      subjectLabel: getDisplayName(image),
+      subjectUsername: image.creator?.username ?? null,
+      subjectAvatarUrl: image.creator?.avatar_url ?? null,
+    })
+  }
+
   const closeShareSheet = () => {
     setShareSheet({ open: false, url: '' })
   }
@@ -2047,6 +2095,11 @@ function ImageCard({
       return
     }
 
+    if (action === 'report') {
+      window.setTimeout(reportImage, 90)
+      return
+    }
+
     window.setTimeout(onViewer, 90)
   }
 
@@ -2066,7 +2119,7 @@ function ImageCard({
     const pointerId = event.pointerId
     const startClientX = finitePointerCoordinate(event.clientX)
     const startClientY = finitePointerCoordinate(event.clientY)
-    const actions = getPinActions(canManageImage, controlSide)
+    const actions = getPinActions(canManageImage, canReportImage, controlSide)
     const menuOrigin = getPinActionMenuOrigin(startClientX, startClientY, actions)
     const originX = menuOrigin.x
     const originY = menuOrigin.y

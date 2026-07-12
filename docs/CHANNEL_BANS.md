@@ -1,6 +1,6 @@
 # Channel Ban Moderation
 
-## Documentation Status - July 10, 2026
+## Documentation Status - July 11, 2026
 
 This doc reflects shipped channel-ban behavior and the July 9-10 service-role
 and RPC hardening. AI post-to-chat preserves the canonical ban/authority checks. Bridge
@@ -53,6 +53,15 @@ sub-admins are protected from other operators; DMs are not part of operator
 message deletion. These deletes are server-confirmed deletes, not local hides:
 the client asks Supabase to return the deleted row and leaves the message in
 place if RLS or migration drift prevents the database delete.
+
+The ShadowChat 2.0 Safety Case Center can apply the same active channel-ban set
+through the existing `set_user_channel_bans` RPC. It does not introduce a
+second sanction system. The operator must provide a member-visible public ban
+reason separately from private case notes, confirm the action, and submit the
+complete desired active scope set. The case action refuses to overwrite a
+member who still has a legacy/paused-domain scope; the operator must review that
+full state from the profile moderation surface first. Every successful or
+failed attempt remains in the case audit.
 
 Available scopes:
 

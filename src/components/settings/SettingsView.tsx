@@ -17,6 +17,7 @@ import {
   Palette,
   Search,
   Shield,
+  ShieldAlert,
   Smartphone,
   Ticket,
   Trash2,
@@ -60,6 +61,14 @@ const ShadowMysteryStudio = React.lazy(() =>
   import('./ShadowMysteryStudio').then(module => ({ default: module.ShadowMysteryStudio }))
 )
 
+const MyReportsPanel = React.lazy(() =>
+  import('../../features/moderation/MyReportsPanel').then(module => ({ default: module.MyReportsPanel }))
+)
+
+const ModerationCaseCenter = React.lazy(() =>
+  import('../../features/moderation/ModerationCaseCenter').then(module => ({ default: module.ModerationCaseCenter }))
+)
+
 const BridgePairingAdminPanel = ESP_ADMIN_FEATURE_ENABLED
   ? React.lazy(() =>
       import('./BridgePairingAdminPanel').then(module => ({ default: module.BridgePairingAdminPanel }))
@@ -81,6 +90,7 @@ interface SettingsViewProps {
 type SettingsSectionId =
   | 'notifications-audio'
   | 'feedback'
+  | 'safety-reports'
   | 'app-setup-guide'
   | 'admin'
   | 'color-layout'
@@ -104,6 +114,7 @@ type AdminSectionId =
   | 'shadow-pin-activity'
   | 'news-sources'
   | 'feedback-review'
+  | 'case-center'
 
 type AdminSection = {
   id: AdminSectionId
@@ -125,6 +136,12 @@ const sections: SettingsSection[] = [
     title: 'Feedback',
     description: 'Submit bugs, feature ideas, screenshots, and concepts.',
     icon: MessageSquarePlus,
+  },
+  {
+    id: 'safety-reports',
+    title: 'Safety Reports',
+    description: 'Review private status and operator updates for concerns you submitted.',
+    icon: ShieldAlert,
   },
   {
     id: 'app-setup-guide',
@@ -233,6 +250,12 @@ const adminSections: AdminSection[] = [
     description: 'Manage tracked X and Truth accounts for the Today Board.',
     icon: KeyRound,
   }] : []),
+  {
+    id: 'case-center',
+    title: 'Safety Case Center',
+    description: 'Triage member reports, inspect evidence, and apply audited safety actions.',
+    icon: ShieldAlert,
+  },
   {
     id: 'feedback-review',
     title: 'Feedback Review',
@@ -1039,6 +1062,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       return 'Episodes'
     }
 
+    if (sectionId === 'case-center') {
+      return 'Report queue'
+    }
+
     if (sectionId === 'shadow-mystery-studio') {
       return 'Stories'
     }
@@ -1137,6 +1164,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     <AdminAutomationApprovals />
   )
 
+  const renderModerationCaseCenter = () => (
+    <React.Suspense fallback={<SettingsPanelLoading label="Loading safety cases..." />}>
+      <ModerationCaseCenter />
+    </React.Suspense>
+  )
+
+  const renderMyReports = () => (
+    <React.Suspense fallback={<SettingsPanelLoading label="Loading safety reports..." />}>
+      <MyReportsPanel />
+    </React.Suspense>
+  )
+
   const renderOperationsHealthPanel = () => (
     <React.Suspense fallback={<SettingsPanelLoading label="Loading operations health..." />}>
       <OperationsHealthCenter />
@@ -1175,6 +1214,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       'shadow-pin-activity': renderShadowPinActivityPanel,
       'news-sources': renderNewsSourcesPanel,
       'feedback-review': renderFeedbackReviewPanel,
+      'case-center': renderModerationCaseCenter,
     }[activeAdminSection]()
 
     return (
@@ -1321,6 +1361,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     const content = {
       'notifications-audio': renderNotificationsAudio,
       feedback: renderFeedback,
+      'safety-reports': renderMyReports,
       'app-setup-guide': renderAppSetupGuide,
       admin: renderAdmin,
       'color-layout': renderColorLayout,

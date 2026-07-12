@@ -1,6 +1,6 @@
 # Admin Access
 
-## Documentation Status - July 10, 2026
+## Documentation Status - July 11, 2026
 
 This doc reflects the app-wide admin model and July 9 authority cleanup.
 `public.user_roles` and operator helpers are the authorization source;
@@ -66,6 +66,10 @@ Admin settings are split into subpages under Settings > Admin:
   absent while News is paused.
 - Feedback Review: operator review and deletion for submitted bugs and
   suggestions.
+- Safety Case Center: operator report queues, protected evidence, assignment,
+  severity/status transitions, private notes, reporter-safe updates, and
+  confirmed audited actions. Sub-admins cannot access cases involving a
+  reporter or subject with an admin-class role; the full admin can.
 - Public Profile Admin Access: full admins can grant or remove sub-admin access
   from another user's profile popup.
 - Channel Bans: operator controls shown in another user's public profile popup
@@ -126,6 +130,10 @@ Main tables:
 - `public.shadow_mystery_stories`, `shadow_mystery_chapters`,
   `shadow_mystery_images`, and `shadow_mystery_sources`: isolated publishing
   domain managed by app operators; regular members read published story trees.
+- `public.member_reports`, `moderation_cases`, `moderation_evidence`, and the
+  related case event/action/update tables: the isolated member-safety domain.
+  Sensitive intake and evidence are RPC-only; only the sanitized case queue and
+  recipient-owned report updates have direct authenticated read surfaces.
 
 Main RPCs:
 
@@ -136,6 +144,11 @@ Main RPCs:
 - `mark_admin_role_notification_seen`
 - `is_app_admin`
 - `is_app_operator`
+- `list_moderation_cases`
+- `get_moderation_case`
+- `assign_moderation_case`
+- `transition_moderation_case`
+- `apply_moderation_case_action`
 - `create_signup_invite`
 - `revoke_signup_invite`
 - `list_signup_invites`

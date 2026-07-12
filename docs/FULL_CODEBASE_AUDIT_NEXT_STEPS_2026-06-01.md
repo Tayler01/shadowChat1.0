@@ -2,12 +2,18 @@
 
 This document turns the June 1, 2026 read-only audit into an implementation backlog and records status updates as fixes land.
 
-## Documentation Status - July 10, 2026
+## Documentation Status - July 11, 2026
 
 This is the current source of truth for the audit backlog. It preserves the
 original June findings, records the July production-alignment evidence, and
 ranks the work that remains. Update it when an item is implemented,
 intentionally deferred, or replaced by a narrower feature ticket.
+
+The separate `codex/shadowchat-2.0` Wave One track has locally completed four
+high-ticket product candidates without changing production `main`: Activity
+HQ, ShadowPin Theater, DM Conversation Hub, and Member Reporting/Safety Case
+Center. Candidate 5 and the combined shared-backend/Netlify trial gate remain
+open; see `docs/SHADOWCHAT_2_0_WAVE_ONE.md` for authoritative status.
 
 ## July 9, 2026 Alignment And Cleanup Program
 

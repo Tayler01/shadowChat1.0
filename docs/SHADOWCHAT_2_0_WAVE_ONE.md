@@ -18,8 +18,8 @@ URL for phone testing.
    [SHADOW_PIN_THEATER.md](C:/repos/chat2.0/docs/SHADOW_PIN_THEATER.md:1).
 3. **DM Conversation Hub** - implemented and locally verified. See
    [DM_CONVERSATION_HUB.md](C:/repos/chat2.0/docs/DM_CONVERSATION_HUB.md:1).
-4. **Member reporting and operator case center** - pending implementation
-   checkpoint.
+4. **Member reporting and operator case center** - implemented and locally verified.
+   See [MEMBER_REPORTING_CASE_CENTER.md](C:/repos/chat2.0/docs/MEMBER_REPORTING_CASE_CENTER.md:1).
 5. **App-wide accessibility and comfort system** - pending implementation
    checkpoint.
 

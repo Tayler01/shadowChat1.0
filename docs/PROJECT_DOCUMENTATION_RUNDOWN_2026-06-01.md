@@ -2,7 +2,7 @@
 
 This rundown captures the current documentation and agent-file surface in `C:\repos\chat2.0`. It is meant to help future updates start from the right source of truth instead of rediscovering stale or overlapping docs.
 
-## Documentation Status - July 10, 2026
+## Documentation Status - July 11, 2026
 
 This rundown was refreshed for the July 9-10 product pause, Supabase security and
 authority cleanup, strict release CI, deterministic backend parity, dependency
@@ -83,16 +83,22 @@ implementation backlog.
 
 The isolated ShadowChat 2.0 Wave One work is tracked in
 [SHADOWCHAT_2_0_WAVE_ONE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_ONE.md:1).
-Its first verified candidate is documented in
-[ACTIVITY_HQ.md](C:/repos/chat2.0/docs/ACTIVITY_HQ.md:1). These are candidate
-docs until the separate 2.0 Netlify trial is approved for `main`.
+Its first four locally verified candidates are documented in Activity HQ,
+ShadowPin Theater, DM Conversation Hub, and Member Reporting/Case Center docs.
+These remain candidate docs until the separate 2.0 Netlify trial is approved
+for `main`.
 
 | File | Latest tracked update/status date | Role | Refresh guidance |
 | --- | --- | --- | --- |
-| [docs/ADMIN_ACCESS.md](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1) | 2026-07-09 | Canonical `user_roles` authority, display-only badges, and active/paused admin surfaces. | Refresh after role, authority, or admin-surface changes. |
+| [docs/SHADOWCHAT_2_0_WAVE_ONE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_ONE.md:1) | 2026-07-11 | Isolated Wave One sequence, compatibility boundary, and combined release gate. | Refresh after every candidate checkpoint and the Netlify trial. |
+| [docs/ACTIVITY_HQ.md](C:/repos/chat2.0/docs/ACTIVITY_HQ.md:1) | 2026-07-11 | Unified Activity HQ candidate contract and proof. | Refresh if event types, read state, or routing change. |
+| [docs/SHADOW_PIN_THEATER.md](C:/repos/chat2.0/docs/SHADOW_PIN_THEATER.md:1) | 2026-07-11 | Immersive ShadowPin viewer candidate contract and proof. | Refresh after viewer, media, or phone gesture changes. |
+| [docs/DM_CONVERSATION_HUB.md](C:/repos/chat2.0/docs/DM_CONVERSATION_HUB.md:1) | 2026-07-11 | DM inbox organization, search/shared-content, and message-window contract. | Refresh after DM lifecycle or retrieval changes. |
+| [docs/MEMBER_REPORTING_CASE_CENTER.md](C:/repos/chat2.0/docs/MEMBER_REPORTING_CASE_CENTER.md:1) | 2026-07-11 | Private reporting, immutable evidence, operator cases, and audited actions. | Refresh after report targets, safety policy, or enforcement changes. |
+| [docs/ADMIN_ACCESS.md](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1) | 2026-07-11 | Canonical `user_roles` authority, display-only badges, and active/paused admin surfaces. | Refresh after role, authority, or admin-surface changes. |
 | [docs/APP_RELEASES.md](C:/repos/chat2.0/docs/APP_RELEASES.md:1) | 2026-05-29 | App release popup behavior. | Current enough unless release UX changes. |
 | [docs/ART_BOARD.md](C:/repos/chat2.0/docs/ART_BOARD.md:1) | 2026-07-09 | Paused Art Board domain and reviewed reactivation contract. | Update before restoring the import Function or UI. |
-| [docs/CHANNEL_BANS.md](C:/repos/chat2.0/docs/CHANNEL_BANS.md:1) | 2026-07-10 | Channel-ban moderation, paused-domain RPC boundary, and paused bridge service-role boundary. | Update after moderation or paused-domain reactivation changes. |
+| [docs/CHANNEL_BANS.md](C:/repos/chat2.0/docs/CHANNEL_BANS.md:1) | 2026-07-11 | Channel-ban moderation, Safety Case Center reuse, paused-domain RPC boundary, and paused bridge service-role boundary. | Update after moderation or paused-domain reactivation changes. |
 | [docs/FEEDBACK_SUBMISSIONS.md](C:/repos/chat2.0/docs/FEEDBACK_SUBMISSIONS.md:1) | 2026-05-07 | Feedback flow and storage. | Review after storage policy hardening. |
 | [docs/LINK_PREVIEWS.md](C:/repos/chat2.0/docs/LINK_PREVIEWS.md:1) | 2026-06-08 | Link preview architecture. | Keep current with provider-specific fallback behavior and safe-fetch deployment status. |
 | [docs/NEWS_TAB_AND_SCRAPER.md](C:/repos/chat2.0/docs/NEWS_TAB_AND_SCRAPER.md:1) | 2026-07-10 | Preserved News architecture, verified suspended Render state, and reactivation runbook. | Update before News reactivation or after worker changes. |
