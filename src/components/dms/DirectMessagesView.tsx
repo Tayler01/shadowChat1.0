@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   MessageSquare,
   Plus,
+  ArrowLeft,
   ArrowDown,
   X,
   Check,
@@ -624,6 +625,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
 })
 
 function NewDirectMessagePicker({
+  isDesktop,
   currentView,
   onViewChange,
   users,
@@ -634,6 +636,7 @@ function NewDirectMessagePicker({
   onSelect,
   onCancel,
 }: {
+  isDesktop: boolean
   currentView: AppView
   onViewChange: (view: AppView) => void
   users: BasicUser[]
@@ -654,24 +657,38 @@ function NewDirectMessagePicker({
 
   return (
     <div className="theme-image-surface flex h-full min-h-0 flex-col">
-      <MobileAppHeader
-        currentView={currentView}
-        onViewChange={onViewChange}
-        title="New Message"
-        eyebrow="Direct Messages"
-        onBack={onCancel}
-        backLabel="Back to direct messages"
-      />
-      <div className="border-b border-[var(--border-panel)] px-4 py-4 sm:px-5">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
-          <Input
-            value={query}
-            onChange={event => onQueryChange(event.target.value)}
-            placeholder="Search people"
-            autoFocus
-            className="h-12 rounded-2xl pl-10 text-base"
-          />
+      {isDesktop && (
+        <MobileAppHeader
+          currentView={currentView}
+          onViewChange={onViewChange}
+          title="New Message"
+          eyebrow="Direct Messages"
+          onBack={onCancel}
+          backLabel="Back to direct messages"
+        />
+      )}
+      <div className="border-b border-[var(--border-panel)] px-4 pb-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] sm:px-5 md:py-4">
+        <div className="flex items-center gap-2">
+          {!isDesktop && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]"
+              aria-label="Back to direct messages"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+          )}
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+            <Input
+              value={query}
+              onChange={event => onQueryChange(event.target.value)}
+              placeholder="Search people"
+              autoFocus
+              className="h-12 rounded-2xl pl-10 text-base"
+            />
+          </div>
         </div>
       </div>
 
@@ -1370,6 +1387,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
       >
         {showNewConversation ? (
           <NewDirectMessagePicker
+            isDesktop={isDesktop}
             currentView={currentView}
             onViewChange={onViewChange}
             users={availableDmUsers}
@@ -1385,24 +1403,36 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
           />
         ) : (
           <>
-            <MobileAppHeader
-              currentView={currentView}
-              onViewChange={onViewChange}
-              title="Messages"
-              logo
-              actions={(
-                <button
-                  type="button"
-                  onClick={() => setShowNewConversation(true)}
-                  className="inline-flex h-12 w-12 items-center justify-center rounded-full text-[var(--text-secondary)] transition-colors hover:bg-[var(--theme-accent-soft)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]"
-                  aria-label="Start new conversation"
-                >
-                  <Plus className="h-5 w-5" />
-                </button>
-              )}
-            />
+            {isDesktop && (
+              <MobileAppHeader
+                currentView={currentView}
+                onViewChange={onViewChange}
+                title="Messages"
+                logo
+                actions={(
+                  <button
+                    type="button"
+                    onClick={() => setShowNewConversation(true)}
+                    className="inline-flex h-12 w-12 items-center justify-center rounded-full text-[var(--text-secondary)] transition-colors hover:bg-[var(--theme-accent-soft)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]"
+                    aria-label="Start new conversation"
+                  >
+                    <Plus className="h-5 w-5" />
+                  </button>
+                )}
+              />
+            )}
 
             <div className="min-h-0 flex-1 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)_+_5rem)] md:pb-0">
+              <DMHubInboxControls
+                query={hub.query}
+                onQueryChange={hub.setQuery}
+                mode={hub.mode}
+                onModeChange={hub.setMode}
+                counts={hub.counts}
+                disabled={hub.loading}
+                searchInputRef={inboxSearchInputRef}
+                onStartConversation={() => setShowNewConversation(true)}
+              />
               {showInboxLoading ? (
                 <div className="p-6 text-center text-[var(--text-muted)]">
                   <LoadingSpinner size="md" className="mx-auto mb-3" />
@@ -1415,25 +1445,14 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   <p className="text-sm text-[var(--text-primary)]">No conversations yet</p>
                   <p className="mt-1 text-xs">Start a private chat to build your inbox.</p>
                 </div>
+              ) : hub.items.length === 0 ? (
+                <div className="px-6 py-10 text-center text-[var(--text-muted)]" role="status">
+                  <Search className="mx-auto mb-3 h-8 w-8 opacity-50" />
+                  <p className="text-sm font-medium text-[var(--text-primary)]">No matching conversations</p>
+                  <p className="mt-1 text-xs">Try another search or inbox view.</p>
+                </div>
               ) : (
-                <>
-                  <DMHubInboxControls
-                    query={hub.query}
-                    onQueryChange={hub.setQuery}
-                    mode={hub.mode}
-                    onModeChange={hub.setMode}
-                    counts={hub.counts}
-                    disabled={hub.loading}
-                    searchInputRef={inboxSearchInputRef}
-                  />
-                  {hub.items.length === 0 ? (
-                    <div className="px-6 py-10 text-center text-[var(--text-muted)]" role="status">
-                      <Search className="mx-auto mb-3 h-8 w-8 opacity-50" />
-                      <p className="text-sm font-medium text-[var(--text-primary)]">No matching conversations</p>
-                      <p className="mt-1 text-xs">Try another search or inbox view.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-1 p-2" role="list" aria-label={`${hub.mode} conversations`}>
+                <div className="space-y-1 p-2" role="list" aria-label={`${hub.mode} conversations`}>
                       {hub.items.map(item => {
                         const conversation = item.conversation
                         const lastMessage = conversation.last_message
@@ -1476,47 +1495,69 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                           </div>
                         )
                       })}
-                    </div>
-                  )}
-                </>
+                </div>
               )}
             </div>
           </>
         )}
       </motion.div>
 
-      <div className={`min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${currentConversation ? 'flex' : 'hidden lg:flex'}`}>
+      <div className={`relative min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${currentConversation ? 'flex' : 'hidden lg:flex'}`}>
         {currentConversation && currentConv ? (
           <>
-            <MobileAppHeader
-              currentView={currentView}
-              onViewChange={onViewChange}
-              title={currentConv.other_user?.display_name || 'Direct Message'}
-              avatar={{
-                src: currentConv.other_user?.avatar_thumbnail_url || currentConv.other_user?.avatar_url,
-                alt: currentConv.other_user?.display_name || 'Unknown User',
-                color: currentConv.other_user?.color,
-                userId: currentConv.other_user?.id,
-                presenceVisibility: currentConv.other_user?.presence_visibility,
-              }}
-              onBack={handleBackToInbox}
-              backButtonRef={threadBackButtonRef}
-              backLabel="Back to direct messages"
-              collapseOnKeyboard
-              maxWidthClassName="max-w-4xl"
-              actions={(
-                <button
-                  type="button"
-                  onClick={handleOpenConversationDetails}
-                  aria-label={`Open conversation details for ${currentConv.other_user?.display_name || 'this member'}`}
-                  aria-haspopup="dialog"
-                  aria-expanded={showConversationDetails}
-                  className="inline-flex h-12 w-12 items-center justify-center rounded-full text-[var(--text-secondary)] transition-colors hover:bg-[var(--theme-accent-soft)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]"
-                >
-                  <MoreHorizontal className="h-5 w-5" />
-                </button>
-              )}
-            />
+            {isDesktop && (
+              <MobileAppHeader
+                currentView={currentView}
+                onViewChange={onViewChange}
+                title={currentConv.other_user?.display_name || 'Direct Message'}
+                avatar={{
+                  src: currentConv.other_user?.avatar_thumbnail_url || currentConv.other_user?.avatar_url,
+                  alt: currentConv.other_user?.display_name || 'Unknown User',
+                  color: currentConv.other_user?.color,
+                  userId: currentConv.other_user?.id,
+                  presenceVisibility: currentConv.other_user?.presence_visibility,
+                }}
+                onBack={handleBackToInbox}
+                backButtonRef={threadBackButtonRef}
+                backLabel="Back to direct messages"
+                collapseOnKeyboard
+                maxWidthClassName="max-w-4xl"
+                actions={(
+                  <button
+                    type="button"
+                    onClick={handleOpenConversationDetails}
+                    aria-label={`Open conversation details for ${currentConv.other_user?.display_name || 'this member'}`}
+                    aria-haspopup="dialog"
+                    aria-expanded={showConversationDetails}
+                    className="inline-flex h-12 w-12 items-center justify-center rounded-full text-[var(--text-secondary)] transition-colors hover:bg-[var(--theme-accent-soft)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]"
+                  >
+                    <MoreHorizontal className="h-5 w-5" />
+                  </button>
+                )}
+              />
+            )}
+
+            {!isDesktop && <div className="pointer-events-none absolute inset-x-0 top-[calc(env(safe-area-inset-top)+0.5rem)] z-40 flex items-center justify-between px-3">
+              <button
+                ref={!isDesktop ? threadBackButtonRef : undefined}
+                type="button"
+                onClick={handleBackToInbox}
+                className="theme-floating-action pointer-events-auto inline-flex h-12 w-12 items-center justify-center rounded-full"
+                aria-label="Back to direct messages"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenConversationDetails}
+                aria-label={`Open conversation details for ${currentConv.other_user?.display_name || 'this member'}`}
+                aria-haspopup="dialog"
+                aria-expanded={showConversationDetails}
+                className="theme-floating-action pointer-events-auto inline-flex h-12 w-12 items-center justify-center rounded-full"
+              >
+                <MoreHorizontal className="h-5 w-5" />
+              </button>
+            </div>}
 
             <div
               ref={messagesRef}
@@ -1527,7 +1568,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
               data-loaded-count={messages.length}
               data-rendered-count={messages.length}
               data-has-newer={String(hasNewer)}
-              className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] pt-4 md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
+              className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] pt-[calc(env(safe-area-inset-top)+4rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)] md:pt-4"
             >
               <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
                 {targetAnnouncement || (uploading
@@ -1687,15 +1728,26 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
           </>
         ) : currentConversation ? (
           <>
-            <MobileAppHeader
-              currentView={currentView}
-              onViewChange={onViewChange}
-              title="Direct Message"
-              onBack={handleBackToInbox}
-              backLabel="Back to direct messages"
-              collapseOnKeyboard
-              maxWidthClassName="max-w-4xl"
-            />
+            {isDesktop ? (
+              <MobileAppHeader
+                currentView={currentView}
+                onViewChange={onViewChange}
+                title="Direct Message"
+                onBack={handleBackToInbox}
+                backLabel="Back to direct messages"
+                collapseOnKeyboard
+                maxWidthClassName="max-w-4xl"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={handleBackToInbox}
+                className="theme-floating-action absolute left-3 top-[calc(env(safe-area-inset-top)+0.5rem)] z-40 inline-flex h-12 w-12 items-center justify-center rounded-full"
+                aria-label="Back to direct messages"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+            )}
             <div className="flex flex-1 items-center justify-center px-4">
               <div className="glass-panel max-w-md rounded-[var(--radius-xl)] px-8 py-8 text-center text-[var(--text-muted)]">
                 {conversationsLoading ? (

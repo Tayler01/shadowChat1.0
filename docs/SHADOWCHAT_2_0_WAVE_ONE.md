@@ -94,6 +94,25 @@ because one slow remote screen discarded unrelated completed evidence. Future
 acceptance should use short, independently reported probes per surface and run
 the full repository gate only after code changes that can invalidate it.
 
+### Phone trial refinement - July 12, 2026
+
+- The shared mobile app header is now absent from DMs, ShadowPin, Play, and
+  Settings as well as General Chat. Desktop headers remain intact. Required
+  nested actions were retained as safe-area-aware inline or floating controls,
+  including new DM, thread Back/details, Pin Back/add/search, and Settings
+  Back/comfort reset.
+- DM Search plus Inbox/Unread/Archived now occupies the recovered top space and
+  includes the new-conversation action without introducing another header.
+- Pin feed detail dots moved into the image's upper-left corner while retaining
+  their 48-pixel target.
+- A long press that opens the Pin radial menu consumes its release click for the
+  full pointer sequence, regardless of hold duration. Releasing without an
+  action no longer opens Theater.
+- Theater previous/current/next slides use one invariant media stage, identical
+  transforms, full-opacity destination imagery, and the exact next static-image
+  source. Navigation resets its transform in the same commit as the active Pin,
+  removing the vertical, size, and color snap reported on a physical phone.
+
 ## Trial Deployment Evidence - July 12, 2026
 
 - Git branch: `codex/shadowchat-2.0`; production `main` was not changed.

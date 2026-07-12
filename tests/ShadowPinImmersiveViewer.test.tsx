@@ -54,6 +54,7 @@ const renderViewer = (overrides: Record<string, unknown> = {}) => {
     commentsOpen: false,
     canManageImage: () => false,
     getPosterUrl: (pin: ShadowPinImage) => pin.medium_url || pin.image_url,
+    getTransitionUrl: (pin: ShadowPinImage) => pin.image_url,
     getSourceUrl: (pin: ShadowPinImage) => pin.source_url || null,
     getProviderLabel: (pin: ShadowPinImage) => pin.provider === 'youtube' ? 'YouTube' : 'External provider',
     requiresExternalConsent: () => false,
@@ -93,6 +94,27 @@ test('Theater is a focus-managed dialog with 48px controls and one active media 
   expect(screen.getByLabelText('Previous Pin')).not.toHaveClass('border', 'bg-black/55')
   expect(props.onSettled).toHaveBeenCalledWith(expect.objectContaining({ id: 'two' }))
   expect(screen.getByLabelText('Pin 2 of 3')).toBeInTheDocument()
+})
+
+test('all swipe slides share one stable full-opacity media stage and exact destination source', () => {
+  const props = renderViewer()
+  const activeSlide = screen.getByTestId('shadow-pin-theater-active-slide')
+  const previousSlide = screen.getByTestId('shadow-pin-theater-previous-slide')
+  const nextSlide = screen.getByTestId('shadow-pin-theater-next-slide')
+
+  expect(screen.getByTestId('shadow-pin-theater-media-stage')).toHaveClass('top-20', 'bottom-36', 'md:bottom-28')
+  expect(previousSlide).toHaveClass('absolute', 'inset-0', 'h-full', 'w-full', 'object-contain')
+  expect(nextSlide).toHaveClass('absolute', 'inset-0', 'h-full', 'w-full', 'object-contain')
+  expect(nextSlide).not.toHaveClass('opacity-45')
+  expect(nextSlide).toHaveAttribute('src', 'https://example.test/three.jpg')
+  expect(previousSlide.style.transition).toBe(activeSlide.style.transition)
+  expect(nextSlide.style.transition).toBe(activeSlide.style.transition)
+
+  fireEvent.click(screen.getByLabelText('Next Pin'))
+  fireEvent.transitionEnd(activeSlide, { propertyName: 'transform' })
+  props.rerenderViewer({ activeImageId: 'three' })
+
+  expect(screen.getByTestId('shadow-pin-theater-active-slide')).toHaveStyle({ transform: 'translate3d(0px, 0, 0)' })
 })
 
 test('buttons and keyboard navigate without mounting adjacent video players', () => {

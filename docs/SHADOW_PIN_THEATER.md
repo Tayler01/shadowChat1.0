@@ -48,12 +48,16 @@ The existing comment conversation remains authoritative. On phone it is a
 safe-area bottom sheet above the current Pin. Existing loading, retry, empty,
 edit, reply, delete, and exact-comment highlight behavior is preserved.
 
-The July 12 trial revision makes feed-card detail dots and Theater navigation/
+The July 12 trial revisions make feed-card detail dots and Theater navigation/
 zoom glyphs visually minimal while retaining 48-pixel hit targets and visible
-focus. The detail toggle stays above its overlay so short cards can always be
-closed. Theater commits paging on the transform transition end, keys active
-media by Pin, and keeps the preloaded poster behind the incoming full asset to
-prevent WebKit from repainting the previous decoded image during a swipe.
+focus. The detail toggle sits in the image's upper-left corner and stays above
+its overlay so short cards can always be closed. A long press owns its complete
+pointer sequence, so a neutral release cannot become a later Theater click.
+Previous, current, and next media now occupy the exact same fixed stage and use
+the same transform timing at full opacity. Static-image neighbors preload the
+exact destination source, video neighbors remain static posters, and the drag
+offset resets atomically with the active Pin. This removes the former vertical,
+scale, brightness, and commit snap.
 
 ## Data And Performance Boundary
 
@@ -70,7 +74,8 @@ The 2.0 frontend will:
   duplicates
 - query at most one RLS-visible neighbor in each direction for a cold target
 - request only the next existing 30-Pin page near a loaded boundary
-- preload adjacent image/poster assets, never adjacent playback streams
+- preload the exact adjacent static-image asset or video poster, never adjacent
+  playback streams
 - record `pin_opened` once per settled Pin per viewer session
 - patch comment counts in the category cache instead of refetching the whole
   category after every comment session

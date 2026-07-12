@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import {
   Accessibility,
   Activity,
+  ArrowLeft,
   Bell,
   Clock3,
   BookOpen,
@@ -1417,34 +1418,59 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   }
 
   return (
-    <div className="theme-app-surface flex h-full min-h-0 flex-col text-sm">
-      <MobileAppHeader
-        currentView={currentView}
-        onViewChange={onViewChange}
-        title={headerTitle}
-        eyebrow={headerEyebrow}
-        logo={!activeSectionConfig}
-        titleElement={activeSectionConfig ? 'p' : undefined}
-        onBack={activeSection ? handleHeaderBack : undefined}
-        backLabel={activeAdminSection ? 'Back to admin sections' : 'Back'}
-        actions={activeSection === 'accessibility-comfort' ? (
+    <div className="theme-app-surface relative flex h-full min-h-0 flex-col text-sm">
+      {isDesktop && (
+        <MobileAppHeader
+          currentView={currentView}
+          onViewChange={onViewChange}
+          title={headerTitle}
+          eyebrow={headerEyebrow}
+          logo={!activeSectionConfig}
+          titleElement={activeSectionConfig ? 'p' : undefined}
+          onBack={activeSection ? handleHeaderBack : undefined}
+          backLabel={activeAdminSection ? 'Back to admin sections' : 'Back'}
+          actions={activeSection === 'accessibility-comfort' ? (
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new Event(COMFORT_RESET_EVENT))}
+              className="inline-flex h-11 min-h-[var(--comfort-control-min-size)] w-11 min-w-[var(--comfort-control-min-size)] shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-panel-soft)] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-glow)] hover:text-[var(--theme-accent-readable)]"
+              aria-label="Reset comfort settings"
+              title="Reset comfort settings"
+            >
+              <RotateCcw className="h-4 w-4" aria-hidden="true" />
+            </button>
+          ) : undefined}
+          showSettings={activeSection !== 'accessibility-comfort'}
+        />
+      )}
+      {!isDesktop && activeSection && (
+        <div className="pointer-events-none absolute inset-x-0 top-[calc(env(safe-area-inset-top)+0.5rem)] z-40 flex items-center justify-between px-3">
           <button
             type="button"
-            onClick={() => window.dispatchEvent(new Event(COMFORT_RESET_EVENT))}
-            className="inline-flex h-11 min-h-[var(--comfort-control-min-size)] w-11 min-w-[var(--comfort-control-min-size)] shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-panel-soft)] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-glow)] hover:text-[var(--theme-accent-readable)]"
-            aria-label="Reset comfort settings"
-            title="Reset comfort settings"
+            onClick={handleHeaderBack}
+            className="theme-floating-action pointer-events-auto inline-flex h-12 min-h-[var(--comfort-control-min-size)] w-12 min-w-[var(--comfort-control-min-size)] items-center justify-center rounded-full"
+            aria-label={activeAdminSection ? 'Back to admin sections' : 'Back'}
           >
-            <RotateCcw className="h-4 w-4" aria-hidden="true" />
+            <ArrowLeft className="h-5 w-5" aria-hidden="true" />
           </button>
-        ) : undefined}
-        showSettings={activeSection !== 'accessibility-comfort'}
-      />
+          {activeSection === 'accessibility-comfort' && (
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new Event(COMFORT_RESET_EVENT))}
+              className="theme-floating-action pointer-events-auto inline-flex h-12 min-h-[var(--comfort-control-min-size)] w-12 min-w-[var(--comfort-control-min-size)] items-center justify-center rounded-full"
+              aria-label="Reset comfort settings"
+              title="Reset comfort settings"
+            >
+              <RotateCcw className="h-4 w-4" aria-hidden="true" />
+            </button>
+          )}
+        </div>
+      )}
       <motion.div
         ref={scrollContainerRef}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="min-h-0 flex-1 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)_+_8rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_4rem)]"
+        className={`min-h-0 flex-1 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)_+_8rem)] ${activeSection ? 'pt-[calc(env(safe-area-inset-top)+3.5rem)]' : 'pt-[env(safe-area-inset-top)]'} md:pb-[calc(env(safe-area-inset-bottom)_+_4rem)] md:pt-0`}
       >
         <div className="mx-auto max-w-6xl p-4 sm:p-6">
           {renderSection()}

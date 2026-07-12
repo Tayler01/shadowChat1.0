@@ -9,6 +9,7 @@ import type {
 } from 'react'
 import { createPortal } from 'react-dom'
 import {
+  ArrowLeft,
   Copy,
   Edit3,
   ExternalLink,
@@ -1715,7 +1716,6 @@ function ImageCard({
   } | null>(null)
   const unlockGestureScrollRef = useRef<(() => void) | null>(null)
   const pressConsumedRef = useRef(false)
-  const pressConsumedTimerRef = useRef<number | null>(null)
   const feedbackKeyRef = useRef(0)
   const feedbackTimerRef = useRef<number | null>(null)
   const imageSources = useMemo(() => getPinImageSources(image, 'thumb'), [image])
@@ -1846,7 +1846,6 @@ function ImageCard({
   useEffect(() => () => {
     if (clickTimer.current) window.clearTimeout(clickTimer.current)
     if (pressRef.current?.timerId) window.clearTimeout(pressRef.current.timerId)
-    if (pressConsumedTimerRef.current) window.clearTimeout(pressConsumedTimerRef.current)
     if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current)
     unlockGestureScrollRef.current?.()
     unlockGestureScrollRef.current = null
@@ -1978,19 +1977,10 @@ function ImageCard({
 
   const resetPressConsumed = () => {
     pressConsumedRef.current = false
-    if (pressConsumedTimerRef.current) {
-      window.clearTimeout(pressConsumedTimerRef.current)
-      pressConsumedTimerRef.current = null
-    }
   }
 
   const markPressConsumed = () => {
     pressConsumedRef.current = true
-    if (pressConsumedTimerRef.current) window.clearTimeout(pressConsumedTimerRef.current)
-    pressConsumedTimerRef.current = window.setTimeout(() => {
-      pressConsumedRef.current = false
-      pressConsumedTimerRef.current = null
-    }, 420)
   }
 
   const clearPressTimer = () => {
@@ -2126,6 +2116,10 @@ function ImageCard({
       return
     }
 
+    // If the previous long press produced no synthetic click, the next real
+    // pointer sequence is the safe boundary for restoring ordinary taps.
+    resetPressConsumed()
+
     const pointerId = event.pointerId
     const startClientX = finitePointerCoordinate(event.clientX)
     const startClientY = finitePointerCoordinate(event.clientY)
@@ -2208,7 +2202,7 @@ function ImageCard({
         finitePointerCoordinate(event.clientX) - press.menuOriginX,
         finitePointerCoordinate(event.clientY) - press.menuOriginY,
         press.actions
-      ) || radialState.selected
+      )
       : null
 
     clearPress()
@@ -2227,10 +2221,12 @@ function ImageCard({
   }
 
   const handlePointerCancel = (event: ReactPointerEvent<HTMLElement>) => {
+    const wasActive = Boolean(pressRef.current?.active)
     clearPress()
     releasePointerCapture(event)
     setRadialState(EMPTY_PIN_RADIAL_STATE)
     unlockGestureScroll()
+    if (wasActive) resetPressConsumed()
   }
 
   const handleClick = () => {
@@ -2336,7 +2332,7 @@ function ImageCard({
             event.stopPropagation()
             onToggleOverlay()
           }}
-          className="absolute left-2 top-2 z-30 inline-flex h-12 w-12 items-center justify-center text-[var(--text-gold)] [filter:drop-shadow(0_2px_3px_rgba(0,0,0,0.95))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]"
+          className="absolute left-0 top-0 z-30 inline-flex h-12 w-12 items-center justify-center text-[var(--text-gold)] [filter:drop-shadow(0_2px_3px_rgba(0,0,0,0.95))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]"
           aria-label={`${overlayOpen ? 'Hide' : 'Show'} details for ${image.title}`}
           aria-expanded={overlayOpen}
         >
@@ -3009,11 +3005,12 @@ function ShadowPinHome({
         onViewChange={onViewChange}
         title="Shado Pin"
         logo
+        className="hidden md:flex"
       />
       <button
         type="button"
         onClick={() => setModal({ type: 'create-category' })}
-        className="theme-floating-action absolute right-3 top-[calc(env(safe-area-inset-top)_+_3.85rem)] z-40 inline-flex h-11 w-11 items-center justify-center rounded-full md:right-4"
+        className="theme-floating-action absolute right-3 top-[calc(env(safe-area-inset-top)_+_0.5rem)] z-40 inline-flex h-11 w-11 items-center justify-center rounded-full md:right-4 md:top-[calc(env(safe-area-inset-top)_+_3.85rem)]"
         aria-label="Create category"
       >
         <Plus className="h-5 w-5" />
@@ -3022,7 +3019,7 @@ function ShadowPinHome({
         <button
           type="button"
           onClick={showCategorySearchFromTrigger}
-          className="theme-floating-action absolute left-3 top-[calc(env(safe-area-inset-top)_+_3.85rem)] z-40 inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full px-3 md:left-4"
+          className="theme-floating-action absolute left-3 top-[calc(env(safe-area-inset-top)_+_0.5rem)] z-40 inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full px-3 md:left-4 md:top-[calc(env(safe-area-inset-top)_+_3.85rem)]"
           aria-label="Open category search"
           data-testid="shadow-pin-category-search-trigger"
         >
@@ -3498,11 +3495,20 @@ function ShadowPinCategoryScreen({
         eyebrow={title}
         onBack={onBack}
         backLabel="Back to Shado Pin"
+        className="hidden md:flex"
       />
       <button
         type="button"
+        onClick={onBack}
+        className="theme-floating-action absolute left-3 top-[calc(env(safe-area-inset-top)_+_0.5rem)] z-40 inline-flex h-11 w-11 items-center justify-center rounded-full md:hidden"
+        aria-label="Back to Shado Pin"
+      >
+        <ArrowLeft className="h-5 w-5" />
+      </button>
+      <button
+        type="button"
         onClick={() => setModal({ type: 'add-image' })}
-        className="theme-floating-action absolute right-3 top-[calc(env(safe-area-inset-top)_+_3.85rem)] z-40 inline-flex h-11 w-11 items-center justify-center rounded-full md:right-4"
+        className="theme-floating-action absolute right-3 top-[calc(env(safe-area-inset-top)_+_0.5rem)] z-40 inline-flex h-11 w-11 items-center justify-center rounded-full md:right-4 md:top-[calc(env(safe-area-inset-top)_+_3.85rem)]"
         aria-label="Add pin"
       >
         <Plus className="h-5 w-5" />
@@ -3609,6 +3615,9 @@ function ShadowPinCategoryScreen({
           commentsOpen={Boolean(commentsImage)}
           canManageImage={image => canManage(image, user?.id, adminRole)}
           getPosterUrl={image => getPinImageUrl(image, 'medium')}
+          getTransitionUrl={image => isVideoPin(image)
+            ? getPinImageUrl(image, 'medium')
+            : getPinImageSources(image, 'full')[0] || getPinImageUrl(image, 'medium')}
           getSourceUrl={getPinSourceUrl}
           getProviderLabel={getPinProviderLabel}
           requiresExternalConsent={requiresViewerExternalConsent}
@@ -3738,6 +3747,7 @@ export function ShadowPin({
           commentsOpen={false}
           canManageImage={() => false}
           getPosterUrl={() => ''}
+          getTransitionUrl={() => ''}
           getSourceUrl={() => null}
           getProviderLabel={() => 'the external provider'}
           requiresExternalConsent={() => false}

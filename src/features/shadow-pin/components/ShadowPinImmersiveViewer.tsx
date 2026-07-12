@@ -67,6 +67,7 @@ type ShadowPinImmersiveViewerProps = {
   commentsOpen: boolean
   canManageImage: (image: ShadowPinImage) => boolean
   getPosterUrl: (image: ShadowPinImage) => string
+  getTransitionUrl: (image: ShadowPinImage) => string
   getSourceUrl: (image: ShadowPinImage) => string | null
   getProviderLabel: (image: ShadowPinImage) => string
   requiresExternalConsent: (image: ShadowPinImage) => boolean
@@ -111,6 +112,7 @@ export function ShadowPinImmersiveViewer({
   commentsOpen,
   canManageImage,
   getPosterUrl,
+  getTransitionUrl,
   getSourceUrl,
   getProviderLabel,
   requiresExternalConsent,
@@ -198,6 +200,9 @@ export function ShadowPinImmersiveViewer({
     setTransitioning(false)
     pendingNavigationRef.current = null
     gestureRef.current = null
+  }, [activeImageId])
+
+  useEffect(() => {
     if (!activeImage || openedIdsRef.current.has(activeImage.id)) return
     openedIdsRef.current.add(activeImage.id)
     onSettled(activeImage)
@@ -208,14 +213,14 @@ export function ShadowPinImmersiveViewer({
     if (!activeImage) return
     const posterUrls = [previousImage, nextImage]
       .filter((image): image is ShadowPinImage => Boolean(image))
-      .map(getPosterUrl)
+      .map(getTransitionUrl)
       .filter(Boolean)
     posterUrls.forEach(url => {
       const preload = new Image()
       preload.decoding = 'async'
       preload.src = url
     })
-  }, [activeImage, getPosterUrl, nextImage, previousImage])
+  }, [activeImage, getTransitionUrl, nextImage, previousImage])
 
   useEffect(() => {
     const shouldLoad = shouldLoadMoreForViewer({
@@ -256,8 +261,9 @@ export function ShadowPinImmersiveViewer({
       window.clearTimeout(navigationTimerRef.current)
       navigationTimerRef.current = null
     }
-    onActiveImageChange(pending.image, pending.meta)
+    setDragX(0)
     setTransitioning(false)
+    onActiveImageChange(pending.image, pending.meta)
   }, [onActiveImageChange])
 
   const navigate = useCallback((direction: ViewerDirection, reason: ViewerNavigationReason) => {
@@ -283,7 +289,7 @@ export function ShadowPinImmersiveViewer({
     pendingNavigationRef.current = { image: neighbor, meta: { direction, reason } }
     setTransitioning(true)
     setDragX(direction === 1 ? -window.innerWidth : window.innerWidth)
-    navigationTimerRef.current = window.setTimeout(commitPendingNavigation, 350)
+    navigationTimerRef.current = window.setTimeout(commitPendingNavigation, 400)
   }, [commentsOpen, commitPendingNavigation, hasMore, loadingMore, nextImage, onActiveImageChange, onLoadMore, previousImage, reducedMotion, transitioning, zoomed])
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -378,12 +384,15 @@ export function ShadowPinImmersiveViewer({
     setAnnouncement(`${getProviderLabel(activeImage!)} content enabled for this viewer session`)
   }
 
-  const mediaTransformStyle = {
-    transform: `translate3d(${dragX}px, 0, 0)`,
+  const slideTransition = reducedMotion ? 'none' : 'transform 220ms cubic-bezier(0.22, 0.72, 0.24, 1)'
+  const getSlideStyle = (offset: -1 | 0 | 1) => ({
+    transform: offset === 0
+      ? `translate3d(${dragX}px, 0, 0)`
+      : `translate3d(calc(${offset * 100}vw + ${dragX}px), 0, 0)`,
     transition: transitioning || dragX === 0
-      ? reducedMotion ? 'none' : 'transform 180ms cubic-bezier(0.22, 0.72, 0.24, 1)'
+      ? slideTransition
       : 'none',
-  }
+  })
 
   if (typeof document === 'undefined') return null
 
@@ -405,33 +414,40 @@ export function ShadowPinImmersiveViewer({
         onPointerUpCapture={finishPointer}
         onPointerCancelCapture={finishPointer}
       >
-        {previousImage && (
-          <img
-            src={getPosterUrl(previousImage)}
-            alt=""
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 h-full w-full object-contain opacity-45"
-            style={{ transform: `translate3d(calc(-100vw + ${dragX}px), 0, 0)` }}
-          />
-        )}
-        {nextImage && (
-          <img
-            src={getPosterUrl(nextImage)}
-            alt=""
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 h-full w-full object-contain opacity-45"
-            style={{ transform: `translate3d(calc(100vw + ${dragX}px), 0, 0)` }}
-          />
-        )}
         <div
-          className="absolute inset-0 flex items-center justify-center pb-36 pt-20 md:pb-28"
-          style={mediaTransformStyle}
-          onTransitionEnd={event => {
-            if (event.target === event.currentTarget && event.propertyName === 'transform') {
-              commitPendingNavigation()
-            }
-          }}
+          className="absolute inset-x-0 bottom-36 top-20 overflow-hidden md:bottom-28"
+          data-testid="shadow-pin-theater-media-stage"
         >
+          {previousImage && (
+            <img
+              src={getTransitionUrl(previousImage)}
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+              style={getSlideStyle(-1)}
+              data-testid="shadow-pin-theater-previous-slide"
+            />
+          )}
+          {nextImage && (
+            <img
+              src={getTransitionUrl(nextImage)}
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+              style={getSlideStyle(1)}
+              data-testid="shadow-pin-theater-next-slide"
+            />
+          )}
+          <div
+            className="absolute inset-0 flex items-center justify-center"
+            style={getSlideStyle(0)}
+            data-testid="shadow-pin-theater-active-slide"
+            onTransitionEnd={event => {
+              if (event.target === event.currentTarget && event.propertyName === 'transform') {
+                commitPendingNavigation()
+              }
+            }}
+          >
           {targetLoading ? (
             <div className="flex flex-col items-center gap-3 text-white/70" role="status">
               <Loader2 className="h-8 w-8 animate-spin text-[var(--theme-accent-readable)]" />
@@ -493,6 +509,7 @@ export function ShadowPinImmersiveViewer({
               <p className="mt-2 text-sm text-[var(--text-secondary)]">It may have been removed or is not visible to your account.</p>
             </div>
           )}
+          </div>
         </div>
       </div>
 

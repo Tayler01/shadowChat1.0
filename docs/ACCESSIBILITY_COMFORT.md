@@ -56,8 +56,10 @@ Members can independently choose:
 - optional haptics on supported devices.
 
 Changing a control applies immediately and is announced to assistive
-technology. Reset returns the device to Follow device. The same reset remains
-in the fixed Comfort header so an oversized profile can always be recovered.
+technology. Reset returns the device to Follow device. The reset remains in the
+desktop Comfort header and as a fixed safe-area-aware mobile control so an
+oversized profile can always be recovered without restoring the app-wide phone
+header.
 
 ## Runtime Architecture
 
@@ -145,7 +147,7 @@ The pass verified solid surfaces, high contrast, 48px shared buttons, visible
 keyboard focus, 130% text without page-level horizontal overflow across
 Settings, Chat, DMs, Activity, and ShadowPin, plus persistence through a full
 reload via the prepaint bootstrap. It also proved that the last sensory control
-can scroll above the fixed nav and that the fixed header reset recovers the
+can scroll above the fixed nav and that the always-reachable reset recovers the
 default profile at 320px. Evidence is under
 `output/playwright/candidate5-comfort-final-gate/` and is intentionally not a
 physical-device or installed-PWA certification.

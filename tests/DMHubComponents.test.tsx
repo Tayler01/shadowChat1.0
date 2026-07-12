@@ -11,6 +11,7 @@ describe('DM Hub presentational components', () => {
   test('inbox controls expose a labelled search, clear action, and pressed modes', () => {
     const onQueryChange = jest.fn()
     const onModeChange = jest.fn()
+    const onStartConversation = jest.fn()
 
     render(
       <DMHubInboxControls
@@ -19,6 +20,7 @@ describe('DM Hub presentational components', () => {
         mode="unread"
         onModeChange={onModeChange}
         counts={{ inbox: 12, unread: 3, archived: 2 }}
+        onStartConversation={onStartConversation}
       />
     )
 
@@ -29,9 +31,11 @@ describe('DM Hub presentational components', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Archived, 2' }))
     fireEvent.click(screen.getByRole('button', { name: 'Clear conversation search' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start new conversation' }))
 
     expect(onModeChange).toHaveBeenCalledWith('archived')
     expect(onQueryChange).toHaveBeenCalledWith('')
+    expect(onStartConversation).toHaveBeenCalledTimes(1)
   })
 
   test('conversation row exposes rich state and routes row actions through an accessible sheet', async () => {

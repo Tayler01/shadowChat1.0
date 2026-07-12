@@ -1755,9 +1755,10 @@ test('restores category list scroll after returning from a category', async () =
     fireEvent.scroll(categoryList)
 
     fireEvent.click(screen.getByText('Fam & Friends').closest('article')!)
-    expect(screen.getByLabelText('Back to Shado Pin')).toBeInTheDocument()
+    const backButtons = screen.getAllByLabelText('Back to Shado Pin')
+    expect(backButtons).toHaveLength(2)
 
-    fireEvent.click(screen.getByLabelText('Back to Shado Pin'))
+    fireEvent.click(backButtons[1])
 
     await waitFor(() => {
       expect(screen.getByRole('main').scrollTop).toBe(420)
@@ -2193,6 +2194,46 @@ test('ShadowPin image long-press opens a radial thumb menu and slide-heart trigg
     expect(screen.queryByTestId('shadow-pin-radial-menu')).not.toBeInTheDocument()
     expect(screen.getByTestId('shadow-pin-action-feedback')).toHaveAttribute('data-action', 'heart')
     expect(screen.getByTestId('shadow-pin-action-heart-burst')).toBeInTheDocument()
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('ShadowPin long-press release without an action never opens Theater, even after a long hold', () => {
+  jest.useFakeTimers()
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+    fireEvent.click(screen.getByText('Fam & Friends'))
+
+    const imageCard = screen.getByAltText('Pin one').closest('article')
+    expect(imageCard).not.toBeNull()
+    const mediaOpener = within(imageCard!).getByRole('button', { name: /open.*pin one/i })
+    const detailsButton = within(imageCard!).getByRole('button', { name: 'Show details for Pin one' })
+    expect(detailsButton).toHaveClass('left-0', 'top-0', 'h-12', 'w-12')
+
+    fireShadowPinPointer(imageCard!, 'pointerdown', {
+      pointerId: 27,
+      button: 0,
+      clientX: 160,
+      clientY: 320,
+    })
+    act(() => {
+      jest.advanceTimersByTime(1200)
+    })
+    expect(screen.getByTestId('shadow-pin-radial-menu')).toHaveAttribute('data-selected-action', '')
+
+    fireShadowPinPointer(imageCard!, 'pointerup', {
+      pointerId: 27,
+      clientX: 160,
+      clientY: 320,
+    })
+    fireEvent.click(mediaOpener)
+
+    expect(screen.queryByTestId('shadow-pin-theater')).not.toBeInTheDocument()
+
+    fireEvent.click(mediaOpener)
+    expect(screen.getByTestId('shadow-pin-theater')).toBeInTheDocument()
   } finally {
     jest.useRealTimers()
   }

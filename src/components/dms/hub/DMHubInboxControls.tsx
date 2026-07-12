@@ -1,4 +1,4 @@
-import { Search, X } from 'lucide-react'
+import { Plus, Search, X } from 'lucide-react'
 import { cn } from '../../../lib/utils'
 
 export type DMHubInboxMode = 'inbox' | 'unread' | 'archived'
@@ -11,6 +11,7 @@ type DMHubInboxControlsProps = {
   counts?: Partial<Record<DMHubInboxMode, number>>
   disabled?: boolean
   searchInputRef?: React.Ref<HTMLInputElement>
+  onStartConversation?: () => void
 }
 
 const modes: Array<{ id: DMHubInboxMode; label: string }> = [
@@ -27,32 +28,45 @@ export function DMHubInboxControls({
   counts,
   disabled = false,
   searchInputRef,
+  onStartConversation,
 }: DMHubInboxControlsProps) {
   return (
-    <section className="border-b border-[var(--border-panel)] px-3 pb-3 pt-2 sm:px-4" aria-label="Direct message inbox controls">
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" aria-hidden="true" />
-        <label htmlFor="dm-hub-inbox-search" className="sr-only">Search conversations</label>
-        <input
-          ref={searchInputRef}
-          id="dm-hub-inbox-search"
-          type="search"
-          value={query}
-          onChange={event => onQueryChange(event.target.value)}
-          placeholder="Search conversations"
-          autoComplete="off"
-          disabled={disabled}
-          className="obsidian-input h-12 w-full rounded-2xl pl-11 pr-12 text-base text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none disabled:cursor-wait disabled:opacity-60"
-        />
-        {query && (
+    <section className="border-b border-[var(--border-panel)] px-3 pb-3 pt-[calc(env(safe-area-inset-top)+0.5rem)] sm:px-4 md:pt-2" aria-label="Direct message inbox controls">
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" aria-hidden="true" />
+          <label htmlFor="dm-hub-inbox-search" className="sr-only">Search conversations</label>
+          <input
+            ref={searchInputRef}
+            id="dm-hub-inbox-search"
+            type="search"
+            value={query}
+            onChange={event => onQueryChange(event.target.value)}
+            placeholder="Search conversations"
+            autoComplete="off"
+            disabled={disabled}
+            className="obsidian-input h-12 w-full rounded-2xl pl-11 pr-12 text-base text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none disabled:cursor-wait disabled:opacity-60"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => onQueryChange('')}
+              disabled={disabled}
+              aria-label="Clear conversation search"
+              className="absolute right-0 top-0 inline-flex h-12 w-12 items-center justify-center rounded-2xl text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--theme-focus-ring)] disabled:opacity-50"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        {onStartConversation && (
           <button
             type="button"
-            onClick={() => onQueryChange('')}
-            disabled={disabled}
-            aria-label="Clear conversation search"
-            className="absolute right-0 top-0 inline-flex h-12 w-12 items-center justify-center rounded-2xl text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--theme-focus-ring)] disabled:opacity-50"
+            onClick={onStartConversation}
+            className="theme-floating-action inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full md:hidden"
+            aria-label="Start new conversation"
           >
-            <X className="h-4 w-4" />
+            <Plus className="h-5 w-5" />
           </button>
         )}
       </div>

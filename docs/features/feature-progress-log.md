@@ -42,6 +42,11 @@ Canonical detail and release gates live in:
 - Status: revision verified and live on the separate Netlify trial branch;
   Activity and member report intake are paused and Tayler's installed-phone
   approval remains the gate before Phase Two or any merge to `main`.
+- July 12 phone refinement: removed the shared mobile header from all active
+  tabs, relocated required nested actions without another bar, tightened the DM
+  top controls, fixed neutral radial-release activation, and unified the
+  ShadowPin Theater slide stage/source/transition geometry. Focused and full
+  verification plus trial redeployment remain the closing gate for this pass.
 - Candidate 1: Unified Activity HQ with an authoritative recipient ledger,
   realtime/recovery, exact Chat/DM/Pin routes, five-item phone navigation,
   accessible unread handling, and hard-bounded foreground toast lifetime.

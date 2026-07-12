@@ -333,9 +333,10 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
         onViewChange={onViewChange}
         title="Entertainment"
         logo
+        className="hidden md:flex"
       />
 
-      <main className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-4 overflow-y-auto px-4 py-5 md:p-6">
+      <main className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-4 overflow-y-auto px-4 pb-5 pt-[calc(env(safe-area-inset-top)+1rem)] md:p-6">
         <button
           type="button"
           aria-label="Open Will & Kirk"
