@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { ShadowMysteryScreen } from '../src/features/entertainment/shadow-mystery/ShadowMysteryScreen'
 import { getShadowMysteryStories, type ShadowMysteryStory } from '../src/features/entertainment/shadow-mystery/data'
 
@@ -24,6 +24,7 @@ const publishedStory: ShadowMysteryStory = {
 }
 
 test('Shadow Mystery overlays published database stories without delaying bundled fallbacks', async () => {
+  mockFetchCatalog.mockReset()
   let resolveCatalog: ((catalog: { stories: ShadowMysteryStory[]; loadedFromSupabase: boolean }) => void) | undefined
   mockFetchCatalog.mockReturnValue(new Promise(resolve => {
     resolveCatalog = resolve
@@ -40,4 +41,44 @@ test('Shadow Mystery overlays published database stories without delaying bundle
   })
   expect(await screen.findByText('Database Case')).toBeInTheDocument()
   expect(screen.getByText('5 stories')).toBeInTheDocument()
+})
+
+test('Shadow Mystery opens an exact story slug and reacts to a warm route update', async () => {
+  const bundledStories = getShadowMysteryStories()
+  const exactStory = bundledStories[0]!
+  const onStoryRoute = jest.fn()
+  mockFetchCatalog.mockReset().mockResolvedValue({
+    stories: bundledStories,
+    loadedFromSupabase: false,
+  })
+
+  const { rerender } = render(
+    <ShadowMysteryScreen onExit={jest.fn()} onStoryRoute={onStoryRoute} />
+  )
+  expect(screen.getByText('4 stories')).toBeInTheDocument()
+
+  rerender(
+    <ShadowMysteryScreen
+      onExit={jest.fn()}
+      initialStoryId={exactStory.slug}
+      onStoryRoute={onStoryRoute}
+    />
+  )
+
+  expect(await screen.findByRole('heading', { name: exactStory.title })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Back to Shadow Mystery' }))
+  expect(onStoryRoute).toHaveBeenCalledWith('close-item', exactStory.slug)
+  expect(screen.getByText('4 stories')).toBeInTheDocument()
+})
+
+test('Shadow Mystery does not substitute another story for an unknown exact item', async () => {
+  const bundledStories = getShadowMysteryStories()
+  mockFetchCatalog.mockReset().mockResolvedValue({
+    stories: bundledStories,
+    loadedFromSupabase: false,
+  })
+
+  render(<ShadowMysteryScreen onExit={jest.fn()} initialStoryId="missing-story" />)
+
+  expect(await screen.findByRole('heading', { name: 'Case not found' })).toBeInTheDocument()
 })

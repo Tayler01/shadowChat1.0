@@ -34,6 +34,26 @@ export interface MessageCollection {
   updatedAt: string
 }
 
+export type DiscoveryLibraryTargetKind = 'shadow_pin' | 'shado_tv_video' | 'shadow_mystery_story'
+
+export interface SavedDiscoveryItem {
+  savedId: string
+  targetKind: DiscoveryLibraryTargetKind
+  targetId: string
+  parentId?: string | null
+  targetSlug?: string | null
+  parentSlug?: string | null
+  title: string
+  subtitle?: string | null
+  description?: string | null
+  thumbnailUrl?: string | null
+  thumbnailPath?: string | null
+  creator?: PublicProfile | null
+  collectionId?: string | null
+  note?: string | null
+  savedAt: string
+}
+
 type SearchRow = {
   message_source: MessageLibrarySource
   message_id: string
@@ -73,6 +93,24 @@ type CollectionRow = {
   sort_order?: number | null
   created_at: string
   updated_at: string
+}
+
+type SavedDiscoveryRow = {
+  saved_id: string
+  target_kind: DiscoveryLibraryTargetKind
+  target_id: string
+  parent_id?: string | null
+  target_slug?: string | null
+  parent_slug?: string | null
+  title: string
+  subtitle?: string | null
+  description?: string | null
+  thumbnail_url?: string | null
+  thumbnail_path?: string | null
+  creator?: Record<string, unknown> | null
+  collection_id?: string | null
+  note?: string | null
+  saved_at: string
 }
 
 async function getAuthenticatedClient() {
@@ -135,6 +173,26 @@ function mapCollection(row: CollectionRow): MessageCollection {
   }
 }
 
+function mapSavedDiscoveryRow(row: SavedDiscoveryRow): SavedDiscoveryItem {
+  return {
+    savedId: row.saved_id,
+    targetKind: row.target_kind,
+    targetId: row.target_id,
+    parentId: row.parent_id ?? null,
+    targetSlug: row.target_slug ?? null,
+    parentSlug: row.parent_slug ?? null,
+    title: row.title,
+    subtitle: row.subtitle ?? null,
+    description: row.description ?? null,
+    thumbnailUrl: row.thumbnail_url ?? null,
+    thumbnailPath: row.thumbnail_path ?? null,
+    creator: row.creator ? mapAuthor(row.creator) : null,
+    collectionId: row.collection_id ?? null,
+    note: row.note ?? null,
+    savedAt: row.saved_at,
+  }
+}
+
 export async function searchMessageLibrary(
   query: string,
   options: { limit?: number; beforeCreatedAt?: string | null } = {}
@@ -159,6 +217,16 @@ export async function listSavedMessages(collectionId?: string | null) {
   })
   if (error) throw error
   return ((data ?? []) as SavedRow[]).map(mapSavedRow)
+}
+
+export async function listSavedDiscoveryItems(collectionId?: string | null) {
+  const { client } = await getAuthenticatedClient()
+  const { data, error } = await client.rpc('list_my_saved_discovery_items', {
+    collection_filter: collectionId ?? null,
+    result_limit: 200,
+  })
+  if (error) throw error
+  return ((data ?? []) as SavedDiscoveryRow[]).map(mapSavedDiscoveryRow)
 }
 
 export async function listMessageCollections() {
@@ -247,4 +315,40 @@ export async function removeMessageFromLibrary(source: MessageLibrarySource, mes
     .eq('user_id', userId)
     .eq(idColumn, messageId)
   if (error) throw error
+}
+
+export async function saveDiscoveryItemToLibrary(input: {
+  targetKind: DiscoveryLibraryTargetKind
+  targetId: string
+  collectionId?: string | null
+  note?: string | null
+}) {
+  const { client } = await getAuthenticatedClient()
+  const { data, error } = await client.rpc('save_discovery_item_to_library', {
+    target_kind: input.targetKind,
+    target_id: input.targetId,
+    target_collection_id: input.collectionId ?? null,
+    target_note: input.note?.trim() || null,
+  })
+  if (error) throw error
+  return data as string
+}
+
+export async function moveDiscoveryItemToCollection(savedItemId: string, collectionId?: string | null) {
+  const { client } = await getAuthenticatedClient()
+  const { data, error } = await client.rpc('move_discovery_item_to_collection', {
+    saved_item_id: savedItemId,
+    target_collection_id: collectionId ?? null,
+  })
+  if (error) throw error
+  return data as string
+}
+
+export async function removeDiscoveryItemFromLibrary(savedItemId: string) {
+  const { client } = await getAuthenticatedClient()
+  const { data, error } = await client.rpc('remove_discovery_item_from_library', {
+    saved_item_id: savedItemId,
+  })
+  if (error) throw error
+  return Boolean(data)
 }

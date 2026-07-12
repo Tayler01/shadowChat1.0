@@ -6,7 +6,25 @@ Older artifact paths remain historical evidence. The July 10 web Release A is
 deployed, but its mobile/PWA-sensitive behavior still needs a fresh harness
 artifact and physical-device pass.
 
-Last updated: 2026-07-10
+Last updated: 2026-07-12
+
+## July 12 ShadowChat 2.0 Universal Discovery Checkpoint
+
+- Branch: `codex/shadowchat-2.0`; production `main` frontend unchanged.
+- Authenticated production-preview proof passed Pixel Chromium `412x915` and
+  iPhone WebKit `390x844` for Discover empty/grouped results, Play scope, and
+  Library scope.
+- Both engines reported exact viewport/dialog width and height, document
+  `scrollWidth` equal to viewport width, stable header geometry, and zero
+  console/page errors.
+- WebKit exposed and verified a message-card line-box regression that Chromium
+  did not reproduce. Explicit block/flex button layout reduced the WebKit card
+  from about `846px` to `222px` without changing content.
+- Rapid scope changes no longer surface an unhandled abort page error.
+- Evidence: `output/playwright/wave2-candidate1-discovery/summary.json` and the
+  paired Pixel/iPhone screenshots in that directory.
+- No posts, messages, uploads, saves, or collections were created by this
+  browser pass, so no remote test-data cleanup was required.
 
 ## July 10 Release A Mobile QA Checkpoint
 

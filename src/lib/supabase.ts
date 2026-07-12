@@ -1783,7 +1783,7 @@ export const markDMMessagesRead = async (conversationId: string) => {
   }
 }
 
-export const searchUsers = async (
+export const searchUsersStrict = async (
   term: string,
   options?: { signal?: AbortSignal }
 ) => {
@@ -1794,11 +1794,22 @@ export const searchUsers = async (
   }
   const { data, error } = await query
   if (error) {
-    return [] as BasicUser[]
+    throw error
   }
   return (data ?? []).map((user: any) =>
     pickPublicProfile(user as Record<string, unknown>) as unknown as BasicUser
   )
+}
+
+export const searchUsers = async (
+  term: string,
+  options?: { signal?: AbortSignal }
+) => {
+  try {
+    return await searchUsersStrict(term, options)
+  } catch {
+    return [] as BasicUser[]
+  }
 }
 
 export const fetchAllUsers = async (options?: { signal?: AbortSignal }) => {

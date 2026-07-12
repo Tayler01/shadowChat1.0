@@ -9,6 +9,92 @@ export type AppLocationState = {
   pin: string | null
   comment: string | null
   pinPanel: 'viewer' | 'comments' | null
+  playExperience: PlayExperience | null
+  playItem: string | null
+}
+
+export type PlayExperience =
+  | 'shadow-runner'
+  | 'shadow-war'
+  | 'shadow-checkers'
+  | 'shado-tv'
+  | 'shadow-mystery'
+  | 'will-kirk'
+
+export type PlayRouteAction = 'push-experience' | 'push-item' | 'close-item' | 'close-experience'
+export type PlayHistoryLayer = 'play-experience' | 'play-item' | null
+export type PlayRouteMutation =
+  | { method: 'back' }
+  | { method: 'push' | 'replace'; url: URL; layer: PlayHistoryLayer }
+
+const PLAY_EXPERIENCES = new Set<PlayExperience>([
+  'shadow-runner',
+  'shadow-war',
+  'shadow-checkers',
+  'shado-tv',
+  'shadow-mystery',
+  'will-kirk',
+])
+
+const PLAY_EXPERIENCES_WITH_ITEMS = new Set<PlayExperience>(['shado-tv', 'shadow-mystery'])
+
+export const normalizePlayExperience = (value: string | null): PlayExperience | null => (
+  value && PLAY_EXPERIENCES.has(value as PlayExperience) ? value as PlayExperience : null
+)
+
+const normalizePlayItem = (value: string | null) => {
+  const normalized = value?.trim()
+  return normalized && normalized.length <= 160 ? normalized : null
+}
+
+export const resolvePlayRouteMutation = ({
+  currentUrl,
+  currentLayer,
+  action,
+  experience,
+  item,
+}: {
+  currentUrl: URL
+  currentLayer: PlayHistoryLayer
+  action: PlayRouteAction
+  experience?: PlayExperience
+  item?: string
+}): PlayRouteMutation | null => {
+  if (action === 'close-item' && currentLayer === 'play-item') return { method: 'back' }
+  if (action === 'close-experience' && currentLayer === 'play-experience') return { method: 'back' }
+
+  const url = new URL(currentUrl)
+  url.searchParams.set('view', 'games')
+  url.searchParams.delete('conversation')
+  url.searchParams.delete('message')
+  url.searchParams.delete('pin')
+  url.searchParams.delete('comment')
+  url.searchParams.delete('panel')
+
+  if (action === 'close-experience') {
+    url.searchParams.delete('experience')
+    url.searchParams.delete('item')
+    return { method: 'replace', url, layer: null }
+  }
+
+  const nextExperience = experience ?? normalizePlayExperience(url.searchParams.get('experience'))
+  if (!nextExperience) return null
+  url.searchParams.set('experience', nextExperience)
+
+  if (action === 'close-item') {
+    url.searchParams.delete('item')
+    return { method: 'replace', url, layer: currentLayer === 'play-item' ? 'play-experience' : currentLayer }
+  }
+
+  if (action === 'push-item') {
+    const nextItem = normalizePlayItem(item ?? null)
+    if (!PLAY_EXPERIENCES_WITH_ITEMS.has(nextExperience) || !nextItem) return null
+    url.searchParams.set('item', nextItem)
+    return { method: 'push', url, layer: 'play-item' }
+  }
+
+  url.searchParams.delete('item')
+  return { method: 'push', url, layer: 'play-experience' }
 }
 
 export type DMRouteAction =
@@ -56,6 +142,8 @@ export const resolveDMRouteMutation = ({
   url.searchParams.set('view', 'dms')
   url.searchParams.delete('pin')
   url.searchParams.delete('comment')
+  url.searchParams.delete('experience')
+  url.searchParams.delete('item')
 
   if (action === 'close-thread') {
     url.searchParams.delete('conversation')
@@ -150,6 +238,8 @@ export const resolvePinRouteMutation = ({
   url.searchParams.set('view', 'pins')
   url.searchParams.delete('message')
   url.searchParams.delete('conversation')
+  url.searchParams.delete('experience')
+  url.searchParams.delete('item')
 
   if (action === 'close-viewer') {
     url.searchParams.delete('pin')
@@ -221,6 +311,10 @@ export const getLocationStateFromUrl = (url: URL): AppLocationState => {
   const comment = view === 'pins' ? params.get('comment') : null
   const panel = view === 'pins' ? params.get('panel') : null
   const dmPanelParam = view === 'dms' ? params.get('panel') : null
+  const playExperience = view === 'games' ? normalizePlayExperience(params.get('experience')) : null
+  const playItem = playExperience && PLAY_EXPERIENCES_WITH_ITEMS.has(playExperience)
+    ? normalizePlayItem(params.get('item'))
+    : null
 
   return {
     view,
@@ -232,5 +326,7 @@ export const getLocationStateFromUrl = (url: URL): AppLocationState => {
     pin,
     comment,
     pinPanel: pin ? (comment || panel === 'comments' ? 'comments' : 'viewer') : null,
+    playExperience,
+    playItem,
   }
 }

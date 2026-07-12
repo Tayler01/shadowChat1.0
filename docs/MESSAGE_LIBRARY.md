@@ -1,6 +1,6 @@
 # Message Library
 
-## Documentation Status - July 10, 2026
+## Documentation Status - July 12, 2026
 
 Universal message search, private saves, and personal collections shipped in
 the July 10 Release A backend-first deployment, including
@@ -11,10 +11,17 @@ grant correction.
 
 ## Product Behavior
 
-The app-header search control opens a mobile-first dialog with two tabs:
+The July 12 Wave Two branch extends this foundation through Universal Discovery
+without changing the shipped message contracts. See
+[UNIVERSAL_DISCOVERY_LIBRARY.md](C:/repos/chat2.0/docs/UNIVERSAL_DISCOVERY_LIBRARY.md:1).
 
-- **Search** searches caller-visible General Chat and DM message text.
-- **Saved** lists the caller's saved messages and filters them by collection.
+On production `main`, the app-header search control opens the original
+mobile-first message dialog. On the Wave Two branch, the same utility entry
+opens Discover with message search and a unified Library:
+
+- **Messages** searches caller-visible General Chat and DM message text.
+- **Library** lists the caller's saved messages alongside eligible Pins and
+  Play content, filtered by the same private collections.
 
 Search waits briefly while the member types, ranks full-text matches, and
 returns the newest/ranked results with API-safe author presentation fields.
@@ -32,7 +39,8 @@ Search runs as `SECURITY INVOKER`. Existing General Chat, DM, profile, and
 personal-block RLS remains the visibility authority, so the search function
 cannot reveal a message the caller could not select normally.
 
-`public.message_collections` and `public.saved_messages` are private to their
+`public.message_collections`, `public.saved_messages`, and Wave Two's additive
+`public.saved_discovery_items` are private to their
 owner under RLS. A save may reference only a visible General Chat message or a
 DM whose conversation includes the caller, and it may be assigned only to a
 collection owned by that caller. Removing a source message cascades its saved
@@ -43,6 +51,8 @@ reference; removing a collection preserves the save.
 Canonical migration:
 
 - `20260710043132_universal_search_saved_collections.sql`
+- `20260712224323_discovery_library_non_message_items.sql` (Wave Two additive
+  non-message Library; existing message APIs unchanged)
 
 Tables:
 
@@ -50,6 +60,8 @@ Tables:
   description/accent, sort order, and timestamps
 - `saved_messages`: owner, optional collection, General/DM source identity,
   optional private note, and timestamps
+- `saved_discovery_items`: owner, optional existing collection, and exactly one
+  visible ShadowPin/Shado TV/Shadow Mystery target
 
 Search uses GIN full-text indexes over General Chat and DM content. The public
 member APIs are:
@@ -65,8 +77,10 @@ search cursor even where the first UI does not yet expose every field.
 
 ## Frontend Source Map
 
-- `src/components/search/GlobalSearchButton.tsx`: dialog, tabs, collections,
-  save/remove actions, and deep-link routing
+- `src/components/search/GlobalSearchButton.tsx`: lazy Discover launcher and
+  Back restoration
+- `src/features/discovery/UniversalDiscoveryDialog.tsx`: discovery scopes,
+  collections, save/move/remove actions, and exact result routing
 - `src/lib/messageLibrary.ts`: authenticated search/save/collection client API
 - `src/components/layout/MobileAppHeader.tsx`: lazy app-header entry point
 
@@ -75,7 +89,7 @@ search cursor even where the first UI does not yet expose every field.
 Run:
 
 ```powershell
-npx jest --runInBand tests/messageLibrarySql.test.ts tests/GlobalSearchButton.test.tsx
+npx jest --runInBand tests/messageLibrarySql.test.ts tests/discoveryLibrarySql.test.ts tests/GlobalSearchButton.test.tsx
 ```
 
 For browser QA, verify General Chat and DM matches, save/move/remove behavior,

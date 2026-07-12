@@ -20,14 +20,18 @@ import { WillKirkScreen } from '../entertainment/will-kirk/WillKirkScreen'
 import { WILL_KIRK_ASSETS } from '../entertainment/will-kirk/assets/manifest'
 import { MobileAppHeader } from '../../components/layout/MobileAppHeader'
 import type { AppView } from '../../types/navigation'
+import type { PlayExperience, PlayRouteAction } from '../../lib/appRouting'
 
 interface GamesHomeProps {
   currentView: AppView
   onViewChange: (view: AppView) => void
   onImmersiveChange?: (immersive: boolean) => void
+  initialExperience?: PlayExperience
+  initialItem?: string
+  onPlayRoute?: (action: PlayRouteAction, experience?: PlayExperience, item?: string) => void
 }
 
-type SelectedEntertainment = 'shadow-runner' | 'shadow-war' | 'shadow-checkers' | 'shado-tv' | 'shadow-mystery' | 'will-kirk' | null
+type SelectedEntertainment = PlayExperience | null
 
 type ShadowRunnerOrientationLock =
   | 'any'
@@ -104,8 +108,17 @@ function releaseShadowRunnerLandscapeMode() {
   }
 }
 
-export function GamesHome({ currentView, onViewChange, onImmersiveChange }: GamesHomeProps) {
-  const [selectedEntertainment, setSelectedEntertainment] = useState<SelectedEntertainment>(() => readLocalPreviewEntertainment())
+export function GamesHome({
+  currentView,
+  onViewChange,
+  onImmersiveChange,
+  initialExperience,
+  initialItem,
+  onPlayRoute,
+}: GamesHomeProps) {
+  const [selectedEntertainment, setSelectedEntertainment] = useState<SelectedEntertainment>(() => (
+    initialExperience ?? readLocalPreviewEntertainment()
+  ))
   const [musicPlaying, setMusicPlaying] = useState(false)
   const [audioBlocked, setAudioBlocked] = useState(false)
   const soundtrackRef = useRef<GameSoundtrackController | null>(null)
@@ -145,31 +158,39 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
     setAudioBlocked(false)
   }, [])
 
+  const openExperience = (experience: PlayExperience) => {
+    setSelectedEntertainment(experience)
+    onPlayRoute?.('push-experience', experience)
+    onImmersiveChange?.(true)
+  }
+
+  const closeExperience = (experience: PlayExperience) => {
+    setSelectedEntertainment(null)
+    onPlayRoute?.('close-experience', experience)
+    onImmersiveChange?.(false)
+  }
+
   const enterShadowWar = () => {
     void playMusic(SHADOW_WAR_ASSETS.music)
-    setSelectedEntertainment('shadow-war')
-    onImmersiveChange?.(true)
+    openExperience('shadow-war')
   }
 
   const exitShadowWar = () => {
     pauseMusic()
     setAudioBlocked(false)
-    setSelectedEntertainment(null)
-    onImmersiveChange?.(false)
+    closeExperience('shadow-war')
   }
 
   const enterShadowCheckers = () => {
     void playMusic(SHADOW_CHECKERS_ASSETS.music)
     setAudioBlocked(false)
-    setSelectedEntertainment('shadow-checkers')
-    onImmersiveChange?.(true)
+    openExperience('shadow-checkers')
   }
 
   const exitShadowCheckers = () => {
     pauseMusic()
     setAudioBlocked(false)
-    setSelectedEntertainment(null)
-    onImmersiveChange?.(false)
+    closeExperience('shadow-checkers')
   }
 
   const enterShadowRunner = () => {
@@ -181,55 +202,47 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
       pauseMusic()
     }
     setAudioBlocked(false)
-    setSelectedEntertainment('shadow-runner')
-    onImmersiveChange?.(true)
+    openExperience('shadow-runner')
   }
 
   const exitShadowRunner = () => {
     releaseShadowRunnerLandscapeMode()
     pauseMusic()
     setAudioBlocked(false)
-    setSelectedEntertainment(null)
-    onImmersiveChange?.(false)
+    closeExperience('shadow-runner')
   }
 
   const enterShadoTv = () => {
     pauseMusic()
     setAudioBlocked(false)
-    setSelectedEntertainment('shado-tv')
-    onImmersiveChange?.(true)
+    openExperience('shado-tv')
   }
 
   const exitShadoTv = () => {
     setAudioBlocked(false)
-    setSelectedEntertainment(null)
-    onImmersiveChange?.(false)
+    closeExperience('shado-tv')
   }
 
   const enterShadowMystery = () => {
     pauseMusic()
     setAudioBlocked(false)
-    setSelectedEntertainment('shadow-mystery')
-    onImmersiveChange?.(true)
+    openExperience('shadow-mystery')
   }
 
   const exitShadowMystery = () => {
     setAudioBlocked(false)
-    setSelectedEntertainment(null)
-    onImmersiveChange?.(false)
+    closeExperience('shadow-mystery')
   }
 
   const enterWillKirk = () => {
     pauseMusic()
     setAudioBlocked(false)
-    setSelectedEntertainment('will-kirk')
-    onImmersiveChange?.(true)
+    openExperience('will-kirk')
   }
 
   const exitWillKirk = () => {
     setAudioBlocked(false)
-    setSelectedEntertainment(null)
-    onImmersiveChange?.(false)
+    closeExperience('will-kirk')
   }
 
   const toggleMusic = () => {
@@ -253,6 +266,10 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
   useEffect(() => {
     onImmersiveChange?.(selectedEntertainment !== null)
   }, [onImmersiveChange, selectedEntertainment])
+
+  useEffect(() => {
+    setSelectedEntertainment(initialExperience ?? readLocalPreviewEntertainment())
+  }, [initialExperience])
 
   useEffect(() => {
     return () => {
@@ -312,11 +329,19 @@ export function GamesHome({ currentView, onViewChange, onImmersiveChange }: Game
         </div>
       ) : selectedEntertainment === 'shado-tv' ? (
         <div className="h-full min-h-0 overflow-hidden bg-black">
-          <ShadoTvScreen onExit={exitShadoTv} />
+          <ShadoTvScreen
+            onExit={exitShadoTv}
+            initialVideoId={initialItem}
+            onVideoRoute={(action, videoId) => onPlayRoute?.(action, 'shado-tv', videoId)}
+          />
         </div>
       ) : selectedEntertainment === 'shadow-mystery' ? (
         <div className="h-full min-h-0 overflow-hidden bg-black">
-          <ShadowMysteryScreen onExit={exitShadowMystery} />
+          <ShadowMysteryScreen
+            onExit={exitShadowMystery}
+            initialStoryId={initialItem}
+            onStoryRoute={(action, storyId) => onPlayRoute?.(action, 'shadow-mystery', storyId)}
+          />
         </div>
       ) : selectedEntertainment === 'will-kirk' ? (
         <div className="h-full min-h-0 overflow-hidden bg-black">

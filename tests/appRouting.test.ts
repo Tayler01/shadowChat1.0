@@ -1,4 +1,11 @@
-import { getLocationStateFromUrl, normalizeViewParam, resolveDMRouteMutation, resolvePinRouteMutation } from '../src/lib/appRouting'
+import {
+  getLocationStateFromUrl,
+  normalizePlayExperience,
+  normalizeViewParam,
+  resolveDMRouteMutation,
+  resolvePinRouteMutation,
+  resolvePlayRouteMutation,
+} from '../src/lib/appRouting'
 
 test('paused board and legacy news routes fall back to chat', () => {
   expect(normalizeViewParam('boards')).toBe('chat')
@@ -12,6 +19,8 @@ test('paused board and legacy news routes fall back to chat', () => {
     pin: null,
     comment: null,
     pinPanel: null,
+    playExperience: null,
+    playItem: null,
   })
 
   expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=news'))).toEqual({
@@ -22,6 +31,8 @@ test('paused board and legacy news routes fall back to chat', () => {
     pin: null,
     comment: null,
     pinPanel: null,
+    playExperience: null,
+    playItem: null,
   })
 })
 
@@ -34,6 +45,8 @@ test('active routes and message targets keep their expected shape', () => {
     pin: null,
     comment: null,
     pinPanel: null,
+    playExperience: null,
+    playItem: null,
   })
 
   expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=profile'))).toEqual({
@@ -44,6 +57,8 @@ test('active routes and message targets keep their expected shape', () => {
     pin: null,
     comment: null,
     pinPanel: null,
+    playExperience: null,
+    playItem: null,
   })
 })
 
@@ -56,6 +71,8 @@ test('paused Activity routes fall back to Chat without leaking Activity targets'
     pin: null,
     comment: null,
     pinPanel: null,
+    playExperience: null,
+    playItem: null,
   })
 
   expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=pins&pin=pin-1&comment=comment-2&message=ignored'))).toEqual({
@@ -66,7 +83,91 @@ test('paused Activity routes fall back to Chat without leaking Activity targets'
     pin: 'pin-1',
     comment: 'comment-2',
     pinPanel: 'comments',
+    playExperience: null,
+    playItem: null,
   })
+})
+
+test('Play URL state accepts typed experiences and bounded exact items', () => {
+  expect(normalizePlayExperience('shado-tv')).toBe('shado-tv')
+  expect(normalizePlayExperience('unknown')).toBeNull()
+
+  expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=games&experience=shado-tv&item=the-chicken-snatchers'))).toMatchObject({
+    view: 'games',
+    playExperience: 'shado-tv',
+    playItem: 'the-chicken-snatchers',
+  })
+  expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=games&experience=shadow-mystery&item=the-devil-s-school'))).toMatchObject({
+    playExperience: 'shadow-mystery',
+    playItem: 'the-devil-s-school',
+  })
+  expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=games&experience=shadow-runner&item=ignored'))).toMatchObject({
+    playExperience: 'shadow-runner',
+    playItem: null,
+  })
+  expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=games&experience=unknown&item=ignored'))).toMatchObject({
+    playExperience: null,
+    playItem: null,
+  })
+  const oversizedItemUrl = new URL('https://shadochat.online/?view=games&experience=shado-tv')
+  oversizedItemUrl.searchParams.set('item', 'x'.repeat(161))
+  expect(getLocationStateFromUrl(oversizedItemUrl)).toMatchObject({ playItem: null })
+})
+
+test('Play history mutations push warm layers and replace cold direct links', () => {
+  const experience = resolvePlayRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=games'),
+    currentLayer: null,
+    action: 'push-experience',
+    experience: 'shado-tv',
+  })
+  expect(experience).toMatchObject({ method: 'push', layer: 'play-experience' })
+  expect(experience && experience.method !== 'back' ? experience.url.search : '').toBe('?view=games&experience=shado-tv')
+
+  const item = resolvePlayRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=games&experience=shado-tv'),
+    currentLayer: 'play-experience',
+    action: 'push-item',
+    experience: 'shado-tv',
+    item: 'the-chicken-snatchers',
+  })
+  expect(item).toMatchObject({ method: 'push', layer: 'play-item' })
+  expect(item && item.method !== 'back' ? item.url.search : '').toBe('?view=games&experience=shado-tv&item=the-chicken-snatchers')
+
+  expect(resolvePlayRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=games&experience=shado-tv&item=the-chicken-snatchers'),
+    currentLayer: 'play-item',
+    action: 'close-item',
+  })).toEqual({ method: 'back' })
+  expect(resolvePlayRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=games&experience=shado-tv'),
+    currentLayer: 'play-experience',
+    action: 'close-experience',
+  })).toEqual({ method: 'back' })
+
+  const coldItemClose = resolvePlayRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=games&experience=shadow-mystery&item=the-devil-s-school'),
+    currentLayer: null,
+    action: 'close-item',
+  })
+  expect(coldItemClose).toMatchObject({ method: 'replace', layer: null })
+  expect(coldItemClose && coldItemClose.method !== 'back' ? coldItemClose.url.search : '').toBe('?view=games&experience=shadow-mystery')
+
+  const coldExperienceClose = resolvePlayRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=games&experience=shadow-mystery'),
+    currentLayer: null,
+    action: 'close-experience',
+  })
+  expect(coldExperienceClose).toMatchObject({ method: 'replace', layer: null })
+  expect(coldExperienceClose && coldExperienceClose.method !== 'back' ? coldExperienceClose.url.search : '').toBe('?view=games')
+
+  expect(resolvePlayRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=games&experience=shadow-runner'),
+    currentLayer: 'play-experience',
+    action: 'push-item',
+    experience: 'shadow-runner',
+    item: 'ignored',
+  })).toBeNull()
 })
 
 test('DM history mutations layer threads and panels while cold links close by replacement', () => {

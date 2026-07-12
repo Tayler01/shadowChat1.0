@@ -3,10 +3,12 @@ import { Archive, ArrowLeft, Camera, ChevronRight, Clock, MapPin } from 'lucide-
 import { motion } from 'framer-motion'
 import { SHADOW_MYSTERY_ASSETS } from './assets/manifest'
 import { fetchShadowMysteryCatalog } from './api'
-import { getShadowMysteryStories, getShadowMysteryStory, type ShadowMysteryImage, type ShadowMysteryStory } from './data'
+import { getShadowMysteryStories, type ShadowMysteryImage, type ShadowMysteryStory } from './data'
 
 interface ShadowMysteryScreenProps {
   onExit: () => void
+  initialStoryId?: string
+  onStoryRoute?: (action: 'push-item' | 'close-item', storyId?: string) => void
 }
 
 type ShadowMysteryView =
@@ -273,13 +275,14 @@ function StoryView({ story }: { story: ShadowMysteryStory }) {
   )
 }
 
-export function ShadowMysteryScreen({ onExit }: ShadowMysteryScreenProps) {
-  const [view, setView] = useState<ShadowMysteryView>({ type: 'home' })
+export function ShadowMysteryScreen({ onExit, initialStoryId, onStoryRoute }: ShadowMysteryScreenProps) {
+  const [view, setView] = useState<ShadowMysteryView>(() => (
+    initialStoryId ? { type: 'story', storyId: initialStoryId } : { type: 'home' }
+  ))
   const fallbackStories = useMemo(() => getShadowMysteryStories(), [])
   const [stories, setStories] = useState<ShadowMysteryStory[]>(fallbackStories)
   const story = view.type === 'story'
     ? stories.find(candidate => candidate.id === view.storyId || candidate.slug === view.storyId)
-      ?? getShadowMysteryStory(view.storyId)
     : undefined
   const backgroundAsset = story?.headerAsset ?? SHADOW_MYSTERY_ASSETS.pickerBanner
 
@@ -297,12 +300,22 @@ export function ShadowMysteryScreen({ onExit }: ShadowMysteryScreenProps) {
     }
   }, [])
 
+  useEffect(() => {
+    setView(initialStoryId ? { type: 'story', storyId: initialStoryId } : { type: 'home' })
+  }, [initialStoryId])
+
+  const openStory = (storyId: string) => {
+    setView({ type: 'story', storyId })
+    onStoryRoute?.('push-item', storyId)
+  }
+
   const goBack = () => {
     if (view.type === 'home') {
       onExit()
       return
     }
     setView({ type: 'home' })
+    onStoryRoute?.('close-item', view.storyId)
   }
 
   return (
@@ -328,10 +341,22 @@ export function ShadowMysteryScreen({ onExit }: ShadowMysteryScreenProps) {
         onExit={onExit}
       />
       <div className="relative z-10 flex min-h-0 flex-1 flex-col">
-        {view.type === 'story' && story ? (
-          <StoryView story={story} />
+        {view.type === 'story' ? (
+          story ? (
+            <StoryView story={story} />
+          ) : (
+            <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)_+_1.25rem)] pt-4">
+              <section className="mx-auto max-w-3xl rounded-xl border border-[#b88452]/24 bg-black/34 p-5">
+                <p className="text-[0.68rem] font-black uppercase tracking-[0.22em] text-[#c89561]">Unavailable</p>
+                <h1 className="mt-2 text-2xl font-black uppercase text-[#f1dbc0]">Case not found</h1>
+                <p className="mt-3 text-sm font-semibold leading-6 text-[#dac5a3]/78">
+                  This story is not visible in the published archive.
+                </p>
+              </section>
+            </main>
+          )
         ) : (
-          <HomeView stories={stories} onOpenStory={storyId => setView({ type: 'story', storyId })} />
+          <HomeView stories={stories} onOpenStory={openStory} />
         )}
       </div>
     </motion.div>

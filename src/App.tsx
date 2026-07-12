@@ -28,12 +28,16 @@ import { ACTIVITY_FEATURE_ENABLED, BOARDS_FEATURE_ENABLED } from './config/featu
 import {
   getLocationStateFromUrl,
   resolveDMRouteMutation,
+  resolvePlayRouteMutation,
   resolvePinRouteMutation,
   type AppLocationState as LocationState,
   type DMHistoryLayer,
   type DMRouteAction,
   type PinHistoryLayer,
   type PinRouteAction,
+  type PlayExperience,
+  type PlayHistoryLayer,
+  type PlayRouteAction,
 } from './lib/appRouting'
 import type { AppView as View } from './types/navigation'
 import { useShadowPinCommentNotifications } from './features/shadow-pin/hooks/useShadowPinCommentNotifications'
@@ -97,7 +101,17 @@ const ActivityProvider = ACTIVITY_FEATURE_ENABLED
 
 const getInitialLocationState = (): LocationState => {
   if (typeof window === 'undefined') {
-    return { view: 'chat', conversation: null, message: null, dmPanel: null, pin: null, comment: null, pinPanel: null }
+    return {
+      view: 'chat',
+      conversation: null,
+      message: null,
+      dmPanel: null,
+      pin: null,
+      comment: null,
+      pinPanel: null,
+      playExperience: null,
+      playItem: null,
+    }
   }
 
   return getLocationStateFromUrl(new URL(window.location.href))
@@ -135,6 +149,8 @@ function App() {
   const [pinTarget, setPinTarget] = useState<string | null>(() => getInitialLocationState().pin)
   const [commentTarget, setCommentTarget] = useState<string | null>(() => getInitialLocationState().comment)
   const [pinPanel, setPinPanel] = useState<'viewer' | 'comments' | null>(() => getInitialLocationState().pinPanel)
+  const [playExperience, setPlayExperience] = useState<PlayExperience | null>(() => getInitialLocationState().playExperience)
+  const [playItem, setPlayItem] = useState<string | null>(() => getInitialLocationState().playItem)
   const isDarkMode = mode === 'dark'
 
   useLayoutEffect(() => {
@@ -253,6 +269,8 @@ function App() {
     setPinTarget(locationState.pin)
     setCommentTarget(locationState.comment)
     setPinPanel(locationState.pinPanel)
+    setPlayExperience(locationState.playExperience)
+    setPlayItem(locationState.playItem)
   }, [])
 
   useEffect(() => {
@@ -387,6 +405,42 @@ function App() {
     applyLocationState(getLocationStateFromUrl(mutation.url))
   }
 
+  const handlePlayRoute = (
+    action: PlayRouteAction,
+    experience?: PlayExperience,
+    item?: string
+  ) => {
+    if (typeof window === 'undefined') return
+
+    const storedLayer = window.history.state?.shadowchatLayer
+    const currentLayer: PlayHistoryLayer = storedLayer === 'play-experience' || storedLayer === 'play-item'
+      ? storedLayer
+      : null
+    const mutation = resolvePlayRouteMutation({
+      currentUrl: new URL(window.location.href),
+      currentLayer,
+      action,
+      experience,
+      item,
+    })
+    if (!mutation) return
+    if (mutation.method === 'back') {
+      window.history.back()
+      return
+    }
+
+    const nextState = {
+      ...(window.history.state ?? {}),
+      shadowchatLayer: mutation.layer,
+    }
+    if (mutation.method === 'push') {
+      window.history.pushState(nextState, '', mutation.url)
+    } else {
+      window.history.replaceState(nextState, '', mutation.url)
+    }
+    applyLocationState(getLocationStateFromUrl(mutation.url))
+  }
+
   const handleViewChange = (view: View) => {
     const availableView = (view === 'boards' && !BOARDS_FEATURE_ENABLED)
       || (view === 'activity' && !ACTIVITY_FEATURE_ENABLED)
@@ -398,6 +452,8 @@ function App() {
     }
     if (availableView !== 'games') {
       setGameImmersive(false)
+      setPlayExperience(null)
+      setPlayItem(null)
     }
     setCurrentView(availableView)
     if (availableView !== 'dms') {
@@ -431,6 +487,8 @@ function App() {
       url.searchParams.delete('pin')
       url.searchParams.delete('comment')
       url.searchParams.delete('panel')
+      url.searchParams.delete('experience')
+      url.searchParams.delete('item')
     } else {
       url.searchParams.set('view', currentView)
       if (currentView === 'dms' && dmTarget) {
@@ -463,10 +521,18 @@ function App() {
       } else if (currentView !== 'dms') {
         url.searchParams.delete('panel')
       }
+      if (currentView === 'games' && playExperience) {
+        url.searchParams.set('experience', playExperience)
+        if (playItem) url.searchParams.set('item', playItem)
+        else url.searchParams.delete('item')
+      } else {
+        url.searchParams.delete('experience')
+        url.searchParams.delete('item')
+      }
     }
 
     window.history.replaceState(window.history.state ?? {}, '', url)
-  }, [currentView, dmTarget, dmPanel, messageTarget, pinTarget, commentTarget, pinPanel])
+  }, [currentView, dmTarget, dmPanel, messageTarget, pinTarget, commentTarget, pinPanel, playExperience, playItem])
 
   useEffect(() => {
     if (currentView !== 'boards') {
@@ -535,6 +601,9 @@ function App() {
             currentView={currentView}
             onViewChange={handleViewChange}
             onImmersiveChange={setGameImmersive}
+            initialExperience={playExperience || undefined}
+            initialItem={playItem || undefined}
+            onPlayRoute={handlePlayRoute}
           />
         )
       case 'pins':

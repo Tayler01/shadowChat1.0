@@ -20,12 +20,14 @@ read
 [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
 
 On `codex/shadowchat-2.0`, all five Wave One candidate implementations remain
-preserved. The current trial revision pauses the Activity frontend and
-member-facing report intake, retains the operator Safety Case Center, and is
-revalidating ShadowPin Theater, the DM Conversation Hub, mobile navigation,
-and stale-session Edge Function recovery before phone approval. Read
+preserved. Activity and member-facing report intake stay paused, while the
+operator Safety Case Center remains available. Wave Two is now active in the
+fixed sequence Universal Discovery & Library, True General Chat Threads,
+ShadowPin Creator Studio, then First-Run Activation Journey. Read
+[docs/SHADOWCHAT_2_0_WAVE_TWO.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_TWO.md:1)
+before changing that branch track; use
 [docs/SHADOWCHAT_2_0_WAVE_ONE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_ONE.md:1)
-before changing that branch track.
+for the preserved Wave One contract.
 
 ## Mission
 

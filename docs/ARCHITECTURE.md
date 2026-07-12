@@ -296,18 +296,24 @@ and [docs/ESP_BRIDGE_TUI_PRODUCTION_READINESS.md](C:/repos/chat2.0/docs/ESP_BRID
 
 Full contract: [docs/PERSONAL_BLOCKING.md](C:/repos/chat2.0/docs/PERSONAL_BLOCKING.md:1).
 
-### Message Library
+### Universal Discovery And Library
 
-1. The app-header control opens Search or Saved.
-2. `search_my_messages` runs as the authenticated caller; existing General
-   Chat, DM, profile, and block RLS filters every result.
-3. `save_message_to_library` creates or updates one private save per source
-   message, optionally in an owner-private collection.
-4. Opening a result routes to General Chat or the relevant DM/message deep link.
-5. Deleting a collection leaves its saved messages unfiled rather than deleting
-   the source or save.
+1. The lazy Search utility opens Discover without adding a primary nav tab.
+2. A bounded client orchestrator queries messages, DM-discoverable people,
+   ShadowPin, and published Play content in parallel. Provider failures remain
+   local to their group.
+3. Each provider runs through its existing invoker/RLS boundary; people use the
+   safe public projection and Play adds explicit consumer publication filters.
+4. `save_message_to_library` preserves the shipped message contract. Additive
+   invoker RPCs save/list/move/remove visible Pin, TV, and Mystery items in the
+   same owner-private collections.
+5. Library reads rejoin live sources, so blocks/deletes/unpublishes hide stale
+   saves. Deleting a collection leaves all saves unfiled.
+6. Exact Chat/DM/Pin/Play URL state opens results; Back restores the private
+   in-memory Discover session.
 
 Full contract: [docs/MESSAGE_LIBRARY.md](C:/repos/chat2.0/docs/MESSAGE_LIBRARY.md:1).
+Wave Two contract: [docs/UNIVERSAL_DISCOVERY_LIBRARY.md](C:/repos/chat2.0/docs/UNIVERSAL_DISCOVERY_LIBRARY.md:1).
 
 ### ShadowPin Social Notification
 

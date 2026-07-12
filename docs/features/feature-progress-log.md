@@ -33,15 +33,40 @@ Canonical detail and release gates live in:
 
 ## Current Goal
 
+### ShadowChat 2.0 Wave Two
+
+- Goal: build Universal Discovery & Library, True General Chat Threads,
+  ShadowPin Creator Studio, and the First-Run Activation Journey on the
+  isolated `codex/shadowchat-2.0` branch without changing production `main`.
+- Started: 2026-07-12
+- Status: active. Candidate 1 is implemented, documented, remotely aligned,
+  and passed its local/mobile checkpoint. Candidate 2 strategy review is next.
+- Backend boundary: shared Supabase changes are additive and backward
+  compatible. Existing production RPC signatures and RLS remain authoritative.
+- Delivery boundary: four separate verified checkpoints, then a combined
+  regression/mobile gate and isolated Netlify trial deployment.
+- Roadmap: [SHADOWCHAT_2_0_WAVE_TWO.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_TWO.md:1)
+- Candidate 1: Universal Discovery & Library with bounded partial-error search,
+  exact Chat/DM/Pin/Play routing, Back restoration, and owner-private saves for
+  messages, Pins, published TV, and published Mystery stories.
+- Candidate 1 backend proof: additive linked migration, clean local replay,
+  zero database lint/security-advisor findings, rollback-only operator draft/
+  hidden/deleted and cross-owner negative checks, and linked no-pending proof.
+- Candidate 1 product proof: 171 Jest suites / 872 passing tests, zero-warning
+  lint, TypeScript, production build/paused chunks/budgets, and authenticated
+  Pixel Chromium/iPhone WebKit geometry with zero console/page errors.
+- Candidate 1 contract: [UNIVERSAL_DISCOVERY_LIBRARY.md](C:/repos/chat2.0/docs/UNIVERSAL_DISCOVERY_LIBRARY.md:1)
+
+## Prior Goal
+
 ### ShadowChat 2.0 Wave One
 
 - Goal: build five high-impact product upgrades on the isolated
   `codex/shadowchat-2.0` branch, preserve the production frontend and shared
   Supabase contract, then publish a separate installable Netlify test site.
 - Started: 2026-07-11
-- Status: revision verified and live on the separate Netlify trial branch;
-  Activity and member report intake are paused and Tayler's installed-phone
-  approval remains the gate before Phase Two or any merge to `main`.
+- Status: revision verified, live on the separate Netlify trial branch, and
+  accepted for Wave Two. Activity and member report intake remain paused.
 - July 12 phone refinement: removed the shared mobile header from all active
   tabs, relocated required nested actions without another bar, tightened the DM
   top controls, fixed neutral radial-release activation, and unified the

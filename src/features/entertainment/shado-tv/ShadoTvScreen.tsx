@@ -19,6 +19,8 @@ import { ShadoTvStreamFrame, type ShadoTvPlaybackEvent } from './ShadoTvStreamFr
 
 interface ShadoTvScreenProps {
   onExit: () => void
+  initialVideoId?: string
+  onVideoRoute?: (action: 'push-item' | 'close-item', videoId?: string) => void
 }
 
 type ShadoTvView =
@@ -657,8 +659,10 @@ function PageScaffold({ eyebrow, title, children }: { eyebrow: string; title: st
   )
 }
 
-export function ShadoTvScreen({ onExit }: ShadoTvScreenProps) {
-  const [view, setView] = useState<ShadoTvView>({ type: 'home' })
+export function ShadoTvScreen({ onExit, initialVideoId, onVideoRoute }: ShadoTvScreenProps) {
+  const [view, setView] = useState<ShadoTvView>(() => (
+    initialVideoId ? { type: 'episode', videoId: initialVideoId } : { type: 'home' }
+  ))
   const [catalog, setCatalog] = useState(SHADO_TV_FALLBACK_CATALOG)
   const [watchProgress, setWatchProgress] = useState<Map<string, ShadoTvWatchProgress>>(new Map())
   const [catalogError, setCatalogError] = useState<string | null>(null)
@@ -668,7 +672,9 @@ export function ShadoTvScreen({ onExit }: ShadoTvScreenProps) {
   const contentItems = catalog.contentItems
   const castItems = getContentItems(contentItems, series.id, 'cast')
   const updateItems = getContentItems(contentItems, series.id, 'updates')
-  const currentVideo = view.type === 'episode' ? videos.find(video => video.id === view.videoId) : undefined
+  const currentVideo = view.type === 'episode'
+    ? videos.find(video => video.id === view.videoId || video.slug === view.videoId)
+    : undefined
   const headerTitle = view.type === 'home'
     ? SHOW_TITLE
     : view.type === 'episode'
@@ -707,9 +713,23 @@ export function ShadoTvScreen({ onExit }: ShadoTvScreenProps) {
     void loadWatchProgress(videos)
   }, [loadWatchProgress, videos])
 
+  useEffect(() => {
+    setView(initialVideoId ? { type: 'episode', videoId: initialVideoId } : { type: 'home' })
+  }, [initialVideoId])
+
+  const openEpisode = useCallback((videoId: string) => {
+    setView({ type: 'episode', videoId })
+    onVideoRoute?.('push-item', videoId)
+  }, [onVideoRoute])
+
   const goBack = () => {
     if (view.type === 'home') {
       onExit()
+      return
+    }
+    if (view.type === 'episode') {
+      setView({ type: 'home' })
+      onVideoRoute?.('close-item', view.videoId)
       return
     }
     setView({ type: 'home' })
@@ -721,7 +741,7 @@ export function ShadoTvScreen({ onExit }: ShadoTvScreenProps) {
         <HomeView
           videos={videos}
           watchProgress={watchProgress}
-          onOpenEpisode={videoId => setView({ type: 'episode', videoId })}
+          onOpenEpisode={openEpisode}
           onOpenTrailers={() => setView({ type: 'trailers' })}
           onOpenCast={() => setView({ type: 'cast' })}
           onOpenUpdates={() => setView({ type: 'updates' })}
@@ -741,7 +761,7 @@ export function ShadoTvScreen({ onExit }: ShadoTvScreenProps) {
     }
 
     if (view.type === 'trailers') {
-      return <TrailersView videos={videos} onOpenEpisode={videoId => setView({ type: 'episode', videoId })} />
+      return <TrailersView videos={videos} onOpenEpisode={openEpisode} />
     }
 
     if (view.type === 'cast') {
@@ -759,7 +779,7 @@ export function ShadoTvScreen({ onExit }: ShadoTvScreenProps) {
         </p>
       </PageScaffold>
     )
-  }, [castItems, currentVideo, loadWatchProgress, updateItems, videos, view, watchProgress])
+  }, [castItems, currentVideo, loadWatchProgress, openEpisode, updateItems, videos, view, watchProgress])
 
   return (
     <motion.div
