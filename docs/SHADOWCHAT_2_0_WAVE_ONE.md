@@ -78,6 +78,22 @@ that acceptance.
   Chat/DMs/Pins/Play, then Weather/Active/Search/Settings with explicit
   forward/back chevrons. Desktop header controls remain available.
 
+Revision verification passed 165 Jest suites with 839 passing tests and 16
+intentional todos, zero-warning lint, TypeScript no-emit, the production build,
+paused-chunk verification, and bundle budgets. The eager entry bundle decreased
+to about 472 KiB raw / 142 KiB gzip. Authenticated Pixel proof confirmed the
+header-free General Chat feed, both footer pages, compact DM controls, and named
+DM previews. Local Pixel and WebKit Settings proof showed neither Activity nor
+My Safety Reports. The deployed origin returned the exact branch SHA in its
+health manifest, a configured push key, manifest/service-worker HTTP 200, the
+media Function's expected HTTP 405 boundary, and 24 GIF results from a live
+`klipy-gifs` HTTP 200 without sending test content.
+
+The broad multi-screen ad hoc browser loop was retired during this revision
+because one slow remote screen discarded unrelated completed evidence. Future
+acceptance should use short, independently reported probes per surface and run
+the full repository gate only after code changes that can invalidate it.
+
 ## Trial Deployment Evidence - July 12, 2026
 
 - Git branch: `codex/shadowchat-2.0`; production `main` was not changed.
