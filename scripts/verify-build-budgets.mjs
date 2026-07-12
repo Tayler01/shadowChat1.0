@@ -4,10 +4,11 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const DEFAULT_BUILD_BUDGETS = Object.freeze({
-  // Current default build: about 1.19 MB raw / 318 kB gzip. These caps leave
-  // modest release headroom without allowing the removed vendor-ui bucket back.
-  initialRawBytes: 1_250_000,
-  initialGzipBytes: 335_000,
+  // Wave One's pre-paint comfort runtime and global accessibility CSS bring the
+  // default build to about 1.26 MB raw / 336 kB gzip. Keep a narrow allowance
+  // for that intentional foundation without allowing a large eager dependency.
+  initialRawBytes: 1_270_000,
+  initialGzipBytes: 340_000,
   eagerJavaScriptRawBytes: 525_000,
   eagerJavaScriptGzipBytes: 160_000,
   regularJavaScriptRawBytes: 525_000,
@@ -35,7 +36,7 @@ export function extractInitialAssetPaths(indexHtml) {
 
     if (tagName === 'script') {
       const type = getAttribute(tag, 'type')?.toLowerCase()
-      if (type === 'module') {
+      if (!type || type === 'module' || type === 'text/javascript' || type === 'application/javascript') {
         addLocalAssetPath(assetPaths, getAttribute(tag, 'src'))
       }
       continue

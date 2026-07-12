@@ -19,10 +19,11 @@ before editing. For the complete documentation inventory and freshness notes,
 read
 [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
 
-On `codex/shadowchat-2.0`, Wave One Candidates 1-4 are locally verified:
-Activity HQ, ShadowPin Theater, DM Conversation Hub, and Member Reporting with
-the operator Safety Case Center. Candidate 5 and the combined isolated Netlify
-release gate remain open. Read
+On `codex/shadowchat-2.0`, all five Wave One candidates are locally verified:
+Activity HQ, ShadowPin Theater, DM Conversation Hub, Member Reporting with the
+operator Safety Case Center, and the device-local Accessibility & Comfort
+system. The combined isolated Netlify release gate and physical-device comfort
+validation remain open. Read
 [docs/SHADOWCHAT_2_0_WAVE_ONE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_ONE.md:1)
 before changing that branch track.
 
@@ -43,6 +44,13 @@ For user-facing work, verify the closest practical iPhone/WebKit and
 Android/Chromium paths. Pay special attention to touch targets, safe-area
 insets, browser chrome, keyboard compression, fixed headers/footers, scroll
 containers, media loading, and realtime UI smoothness on phone-sized viewports.
+
+Before changing motion, transparency, contrast, text scale, touch sizing,
+spacing, autoplay, UI/Hype sound, or haptic behavior, read
+[docs/ACCESSIBILITY_COMFORT.md](C:/repos/chat2.0/docs/ACCESSIBILITY_COMFORT.md:1).
+Use the shared Comfort provider instead of new direct `matchMedia`,
+`localStorage`, vibration, or autoplay checks. Candidate 5 v1 preferences are
+device-local and must not be described as Supabase-synchronized.
 
 ## Current Feature Focus
 

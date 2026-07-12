@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
+  Accessibility,
   Activity,
   Bell,
   Clock3,
@@ -15,6 +16,7 @@ import {
   Menu,
   MessageSquarePlus,
   Palette,
+  RotateCcw,
   Search,
   Shield,
   ShieldAlert,
@@ -48,6 +50,7 @@ import { MobileAppHeader } from '../layout/MobileAppHeader'
 import { BOARDS_FEATURE_ENABLED, ESP_ADMIN_FEATURE_ENABLED } from '../../config/featureFlags'
 import type { AppView } from '../../types/navigation'
 import { getBrowserTimeZone } from '../../lib/push'
+import { COMFORT_RESET_EVENT } from '../../lib/comfortPreferences'
 
 const ShadowPinActivityAdmin = React.lazy(() =>
   import('./ShadowPinActivityAdmin').then(module => ({ default: module.ShadowPinActivityAdmin }))
@@ -67,6 +70,10 @@ const MyReportsPanel = React.lazy(() =>
 
 const ModerationCaseCenter = React.lazy(() =>
   import('../../features/moderation/ModerationCaseCenter').then(module => ({ default: module.ModerationCaseCenter }))
+)
+
+const AccessibilityComfortPanel = React.lazy(() =>
+  import('./AccessibilityComfortPanel').then(module => ({ default: module.AccessibilityComfortPanel }))
 )
 
 const BridgePairingAdminPanel = ESP_ADMIN_FEATURE_ENABLED
@@ -89,6 +96,7 @@ interface SettingsViewProps {
 
 type SettingsSectionId =
   | 'notifications-audio'
+  | 'accessibility-comfort'
   | 'feedback'
   | 'safety-reports'
   | 'app-setup-guide'
@@ -125,6 +133,12 @@ type AdminSection = {
 }
 
 const sections: SettingsSection[] = [
+  {
+    id: 'accessibility-comfort',
+    title: 'Accessibility & Comfort',
+    description: 'Comfort profiles for motion, readability, touch, media, and sensory feedback.',
+    icon: Accessibility,
+  },
   {
     id: 'notifications-audio',
     title: 'Notifications & Audio',
@@ -407,7 +421,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const activeSectionConfig = sections.find(section => section.id === activeSection) ?? null
   const activeAdminSectionConfig =
     visibleAdminSections.find(section => section.id === activeAdminSection) ?? null
-  const headerTitle = activeAdminSectionConfig?.title || activeSectionConfig?.title || 'Settings'
+  const headerTitle = activeAdminSectionConfig?.title
+    || (activeSection === 'accessibility-comfort' ? 'Comfort' : activeSectionConfig?.title)
+    || 'Settings'
   const headerEyebrow = activeAdminSectionConfig ? 'Admin' : activeSectionConfig ? 'Settings' : undefined
   const adminFilteredUsers = useMemo(() => {
     const normalizedSearch = adminUserSearch.trim().toLowerCase()
@@ -1277,6 +1293,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     </div>
   )
 
+  const renderAccessibilityComfort = () => (
+    <React.Suspense fallback={<SettingsPanelLoading label="Loading comfort controls..." />}>
+      <AccessibilityComfortPanel />
+    </React.Suspense>
+  )
+
   const renderAccountProfile = () => (
     <div className="space-y-5">
       <ProfileView onToggleSidebar={onToggleSidebar} embedded />
@@ -1360,6 +1382,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
     const content = {
       'notifications-audio': renderNotificationsAudio,
+      'accessibility-comfort': renderAccessibilityComfort,
       feedback: renderFeedback,
       'safety-reports': renderMyReports,
       'app-setup-guide': renderAppSetupGuide,
@@ -1367,7 +1390,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       'color-layout': renderColorLayout,
       'account-profile': renderAccountProfile,
     }[activeSection]()
-    const showSectionHeader = !(activeSection === 'admin' && activeAdminSection)
+    const showSectionHeader = !(
+      (activeSection === 'admin' && activeAdminSection)
+      || activeSection === 'accessibility-comfort'
+    )
 
     return (
       <>
@@ -1397,6 +1423,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         titleElement={activeSectionConfig ? 'p' : undefined}
         onBack={activeSection ? handleHeaderBack : undefined}
         backLabel={activeAdminSection ? 'Back to admin sections' : 'Back'}
+        actions={activeSection === 'accessibility-comfort' ? (
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event(COMFORT_RESET_EVENT))}
+            className="inline-flex h-11 min-h-[var(--comfort-control-min-size)] w-11 min-w-[var(--comfort-control-min-size)] shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-panel-soft)] text-[var(--text-secondary)] transition-colors hover:border-[var(--border-glow)] hover:text-[var(--theme-accent-readable)]"
+            aria-label="Reset comfort settings"
+            title="Reset comfort settings"
+          >
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />
+          </button>
+        ) : undefined}
+        showSettings={activeSection !== 'accessibility-comfort'}
       />
       <motion.div
         ref={scrollContainerRef}

@@ -12,6 +12,7 @@ import {
 
 test('extractInitialAssetPaths returns only resources fetched by the initial document', () => {
   const html = `
+    <script src="/comfort-bootstrap.js"></script>
     <script type="module" src="/assets/index.js"></script>
     <link rel="modulepreload" href="/assets/vendor.js">
     <link rel="stylesheet" href="/assets/index.css">
@@ -22,6 +23,7 @@ test('extractInitialAssetPaths returns only resources fetched by the initial doc
     'assets/index.css',
     'assets/index.js',
     'assets/vendor.js',
+    'comfort-bootstrap.js',
     'index.html',
   ])
 })

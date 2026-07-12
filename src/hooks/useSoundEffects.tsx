@@ -2,11 +2,11 @@
 import React, {
   createContext,
   useContext,
-  useState,
   useEffect,
   useCallback,
   useRef,
 } from 'react'
+import { useComfortPreferences } from './useComfortPreferences'
 
 interface SoundEffectsContextValue {
   enabled: boolean
@@ -63,25 +63,12 @@ const toneDefinitions: Record<ToneVariant, ToneDefinition> = {
 }
 
 function useProvideSoundEffects(): SoundEffectsContextValue {
-  const [enabled, setEnabled] = useState(() => {
-    if (typeof localStorage !== 'undefined') {
-      const stored = localStorage.getItem('soundEffectsEnabled')
-      if (stored === null) return true
-      return stored === 'true'
-    }
-    return true
-  })
-
-  const [hypeEnabled, setHypeEnabled] = useState(() => {
-    if (typeof localStorage !== 'undefined') {
-      const stored = localStorage.getItem('hypeSoundEffectsEnabled')
-      if (stored === null) return true
-      return stored === 'true'
-    }
-    return true
-  })
-
+  const { preferences, updatePreferences } = useComfortPreferences()
+  const enabled = preferences.uiSounds
+  const hypeEnabled = preferences.celebrationSounds
   const audioContextRef = useRef<AudioContext | null>(null)
+  const soundPolicyRef = useRef({ enabled, hypeEnabled })
+  soundPolicyRef.current = { enabled, hypeEnabled }
 
   const ensureAudioContext = useCallback(() => {
     if (typeof window === 'undefined') return null
@@ -99,6 +86,26 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
     audioContextRef.current = context
     return context
   }, [])
+
+  const unlockAudioContext = useCallback(() => {
+    try {
+      const context = ensureAudioContext()
+      if (context?.state === 'suspended') {
+        context.resume().catch(() => {})
+      }
+    } catch {
+      // Visual feedback still runs if browser audio is unavailable.
+    }
+  }, [ensureAudioContext])
+
+  const setEnabled = useCallback((value: boolean) => {
+    if (value) unlockAudioContext()
+    updatePreferences({ uiSounds: value })
+  }, [unlockAudioContext, updatePreferences])
+  const setHypeEnabled = useCallback((value: boolean) => {
+    if (value) unlockAudioContext()
+    updatePreferences({ celebrationSounds: value })
+  }, [unlockAudioContext, updatePreferences])
 
   useEffect(() => {
     try {
@@ -125,14 +132,9 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
 
     // Create and resume the shared context from a user gesture for mobile browsers.
     const unlock = () => {
-      try {
-        const context = ensureAudioContext()
-        if (context?.state === 'suspended') {
-          context.resume().catch(() => {})
-        }
-      } catch {
-        // Visual feedback still runs if browser audio is unavailable.
-      }
+      const policy = soundPolicyRef.current
+      if (!policy.enabled && !policy.hypeEnabled) return
+      unlockAudioContext()
     }
     document.addEventListener('pointerdown', unlock, { once: true })
     document.addEventListener('keydown', unlock, { once: true })
@@ -147,7 +149,7 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
         context.close().catch(() => {})
       }
     }
-  }, [ensureAudioContext])
+  }, [unlockAudioContext])
 
   const playTone = useCallback((variant: ToneVariant) => {
     try {

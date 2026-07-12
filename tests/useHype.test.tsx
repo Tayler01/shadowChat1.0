@@ -24,6 +24,9 @@ jest.mock('../src/hooks/useSoundEffects', () => ({
     playHypeMessage: jest.fn(),
   }),
 }))
+jest.mock('../src/hooks/useComfortPreferences', () => ({
+  useComfortPreferences: () => ({ isReducedMotion: false }),
+}))
 jest.mock('../src/lib/push', () => ({
   triggerHypePushNotification: jest.fn().mockResolvedValue(undefined),
 }))

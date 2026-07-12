@@ -5,11 +5,18 @@ import { claimGoldEasterEgg } from '../src/lib/supabase'
 
 const mockRefreshProfile = jest.fn()
 let mockProfile: any
+let mockHapticsEnabled = true
 
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => ({
     profile: mockProfile,
     refreshProfile: mockRefreshProfile,
+  }),
+}))
+
+jest.mock('../src/hooks/useComfortPreferences', () => ({
+  useComfortPreferences: () => ({
+    preferences: { haptics: mockHapticsEnabled },
   }),
 }))
 
@@ -35,6 +42,7 @@ describe('GoldenEggDiscoveryLogo', () => {
   const originalVibrate = navigator.vibrate
 
   beforeEach(() => {
+    mockHapticsEnabled = true
     jest.useFakeTimers()
     mockProfile = {
       id: 'user-1',
@@ -105,6 +113,24 @@ describe('GoldenEggDiscoveryLogo', () => {
     expect(screen.getByText('Golden Egg Found')).toBeInTheDocument()
     expect(screen.getByText('Alice')).toBeInTheDocument()
     expect(screen.getByLabelText('Golden egg found')).toBeInTheDocument()
+    expect(navigator.vibrate).toHaveBeenCalledWith([18, 32, 28])
+  })
+
+  test('does not vibrate when the device comfort policy disables haptics', async () => {
+    mockHapticsEnabled = false
+    render(
+      <>
+        <GoldenEggDiscoveryController />
+        <GoldenEggDiscoveryLogo />
+      </>
+    )
+
+    fireTouchPointerDown(screen.getByRole('button', { name: 'SHADO' }))
+    await act(async () => {
+      jest.advanceTimersByTime(1300)
+    })
+    await waitFor(() => expect(claimGoldEasterEgg).toHaveBeenCalledTimes(1))
+    expect(navigator.vibrate).not.toHaveBeenCalled()
   })
 
   test('does not claim the egg from a desktop pointer', () => {

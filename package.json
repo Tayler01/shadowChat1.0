@@ -48,6 +48,7 @@
     "qa:chat-scroll:metrics": "node scripts/group-chat-scroll-probe.mjs --scenario=metrics",
     "qa:chat-scroll:all": "node scripts/group-chat-scroll-probe.mjs --scenario=all",
     "qa:mobile-pwa": "node scripts/mobile-pwa-visual-qa.mjs",
+    "qa:comfort": "node scripts/comfort-visual-qa.mjs",
     "qa:themes": "node scripts/theme-visual-qa.mjs",
     "automation:submit-daily-scan": "node scripts/submit-daily-scan-approval-packets.mjs",
     "shadow-runner:audio": "node scripts/generate-shadow-runner-audio.mjs",

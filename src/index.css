@@ -140,6 +140,26 @@
     --dur-med: 220ms;
     --dur-slow: 420ms;
 
+    /*
+      App-wide comfort tokens. The default values are intentionally inert so
+      the existing product remains pixel-identical until a user opts in.
+      Components can adopt the spacing scale incrementally without inventing
+      one-off accessibility overrides.
+    */
+    --comfort-control-min-size: 0px;
+    --comfort-space-1: 0.25rem;
+    --comfort-space-2: 0.5rem;
+    --comfort-space-3: 0.75rem;
+    --comfort-space-4: 1rem;
+    --comfort-space-5: 1.25rem;
+    --comfort-space-6: 1.5rem;
+    --comfort-focus-width: 2px;
+    --comfort-focus-offset: 2px;
+    --comfort-message-gap: 0.75rem;
+    --comfort-message-row-start: 1rem;
+    --comfort-message-row-grouped-start: 0.25rem;
+    --comfort-message-row-end: 0.25rem;
+
     --color-primary-start: var(--gold-5);
     --color-primary-end: var(--gold-2);
     --color-accent: var(--theme-accent);
@@ -3212,5 +3232,273 @@ html, body, #root {
   to {
     opacity: 1;
     transform: translate(0, -50%);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Accessibility and comfort runtime foundation                               */
+/* -------------------------------------------------------------------------- */
+
+html[data-comfort-text-scale='100'] {
+  font-size: 100%;
+}
+
+html[data-comfort-text-scale='115'] {
+  font-size: 115%;
+}
+
+html[data-comfort-text-scale='130'] {
+  font-size: 130%;
+}
+
+html[data-comfort-touch-target='large'] {
+  --comfort-control-min-size: 3rem;
+}
+
+html[data-comfort-density='compact'] {
+  --comfort-space-1: 0.2rem;
+  --comfort-space-2: 0.4rem;
+  --comfort-space-3: 0.6rem;
+  --comfort-space-4: 0.8rem;
+  --comfort-space-5: 1rem;
+  --comfort-space-6: 1.2rem;
+  --comfort-message-gap: 0.45rem;
+  --comfort-message-row-start: 0.65rem;
+  --comfort-message-row-grouped-start: 0.125rem;
+  --comfort-message-row-end: 0.125rem;
+}
+
+html[data-comfort-density='comfortable'] {
+  --comfort-space-1: 0.25rem;
+  --comfort-space-2: 0.5rem;
+  --comfort-space-3: 0.75rem;
+  --comfort-space-4: 1rem;
+  --comfort-space-5: 1.25rem;
+  --comfort-space-6: 1.5rem;
+  --comfort-message-gap: 0.75rem;
+  --comfort-message-row-start: 1rem;
+  --comfort-message-row-grouped-start: 0.25rem;
+  --comfort-message-row-end: 0.25rem;
+}
+
+html[data-comfort-density='spacious'] {
+  --comfort-space-1: 0.3rem;
+  --comfort-space-2: 0.625rem;
+  --comfort-space-3: 0.95rem;
+  --comfort-space-4: 1.25rem;
+  --comfort-space-5: 1.6rem;
+  --comfort-space-6: 1.9rem;
+  --comfort-message-gap: 1.05rem;
+  --comfort-message-row-start: 1.35rem;
+  --comfort-message-row-grouped-start: 0.5rem;
+  --comfort-message-row-end: 0.4rem;
+}
+
+.comfort-message-stack > :not([hidden]) ~ :not([hidden]) {
+  margin-top: var(--comfort-message-gap) !important;
+}
+
+.comfort-message-row {
+  padding-block: var(--comfort-message-row-start) var(--comfort-message-row-end);
+}
+
+.comfort-message-row[data-message-grouped='true'] {
+  padding-block-start: var(--comfort-message-row-grouped-start);
+}
+
+html[data-comfort-density='compact'] .comfort-button {
+  padding-inline: var(--comfort-space-3);
+}
+
+html[data-comfort-density='spacious'] .comfort-button {
+  padding-inline: var(--comfort-space-5);
+}
+
+/*
+  Keep the current OS-level behavior and allow an explicit in-app override.
+  Loading spinners remain visible: they are an essential progress affordance,
+  not decorative motion. Canvas and game loops are intentionally untouched.
+*/
+html[data-comfort-motion='reduced'] *,
+html[data-comfort-motion='reduced'] *::before,
+html[data-comfort-motion='reduced'] *::after {
+  animation-duration: 80ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 80ms !important;
+}
+
+html[data-comfort-motion='none'] *,
+html[data-comfort-motion='none'] *::before,
+html[data-comfort-motion='none'] *::after {
+  animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 1ms !important;
+}
+
+html:is([data-comfort-motion='reduced'], [data-comfort-motion='none']) .animate-spin {
+  animation-duration: 1.6s !important;
+  animation-iteration-count: infinite !important;
+  animation-timing-function: linear !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin {
+    animation-duration: 1.6s !important;
+    animation-iteration-count: infinite !important;
+    animation-timing-function: linear !important;
+  }
+}
+
+/*
+  Reduced transparency removes fixed theme artwork and GPU-heavy backdrop
+  blur from core product surfaces. Opaque theme-derived colors preserve the
+  selected palette and readable surface hierarchy in both light and dark mode.
+*/
+html[data-comfort-transparency='solid'] {
+  --theme-backdrop-image: none;
+  --theme-texture-image: none;
+  --theme-image-surface-overlay: none;
+  --theme-image-panel-overlay: none;
+  --theme-panel: var(--theme-elevated);
+  --theme-panel-strong: color-mix(in srgb, var(--theme-elevated) 94%, var(--theme-text-primary) 6%);
+  --theme-panel-soft: color-mix(in srgb, var(--theme-elevated) 96%, var(--theme-text-primary) 4%);
+  --theme-input: color-mix(in srgb, var(--theme-elevated) 92%, var(--theme-text-primary) 8%);
+  --theme-input-focus: color-mix(in srgb, var(--theme-elevated) 88%, var(--theme-text-primary) 12%);
+  --theme-overlay: color-mix(in srgb, var(--theme-page-end) 88%, black 12%);
+  --theme-modal-background: var(--theme-elevated);
+  --theme-panel-cover-bg: var(--theme-elevated);
+  --theme-popup-surface-bg: var(--theme-elevated);
+  --theme-composer-bg: var(--theme-elevated);
+  --theme-sent-bubble-bg: var(--theme-elevated);
+  --bg-panel: var(--theme-panel);
+  --bg-panel-strong: var(--theme-panel-strong);
+  --bg-panel-soft: var(--theme-panel-soft);
+  --bg-input: var(--theme-input);
+  --bg-input-focus: var(--theme-input-focus);
+  --bg-overlay: var(--theme-overlay);
+}
+
+html[data-comfort-transparency='solid'],
+html[data-comfort-transparency='solid'] body {
+  background-attachment: scroll !important;
+}
+
+html[data-comfort-transparency='solid'] .glass-panel,
+html[data-comfort-transparency='solid'] .glass-panel-strong,
+html[data-comfort-transparency='solid'] .popup-surface,
+html[data-comfort-transparency='solid'] .theme-sent-bubble,
+html[data-comfort-transparency='solid'] .theme-composer-surface,
+html[data-comfort-transparency='solid'] .theme-panel-cover,
+html[data-comfort-transparency='solid'] [class*='backdrop-blur'] {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+html[data-comfort-transparency='solid'] .glass-panel,
+html[data-comfort-transparency='solid'] .theme-composer-surface,
+html[data-comfort-transparency='solid'] .theme-panel-cover {
+  background: var(--bg-panel) !important;
+}
+
+html[data-comfort-transparency='solid'] .glass-panel-strong,
+html[data-comfort-transparency='solid'] .popup-surface {
+  background: var(--bg-panel-strong) !important;
+}
+
+/* High contrast strengthens semantic tokens without replacing theme identity. */
+html[data-comfort-contrast='high'][data-theme-mode='dark'] {
+  --theme-text-primary: #ffffff;
+  --theme-text-secondary: #f0ede6;
+  --theme-text-muted: #d0c9bd;
+  --border-subtle: rgba(255, 255, 255, 0.24);
+  --border-panel: rgba(255, 255, 255, 0.32);
+  --border-strong: rgba(255, 255, 255, 0.46);
+  --border-glow: rgb(var(--theme-accent-strong-rgb) / 0.72);
+  --theme-focus-ring: rgb(var(--theme-accent-strong-rgb) / 0.82);
+  --state-danger: #ff8497;
+  --state-warning: #ffd17a;
+}
+
+html[data-comfort-contrast='high'][data-theme-mode='light'] {
+  --theme-text-primary: #0a1018;
+  --theme-text-secondary: #1d2a38;
+  --theme-text-muted: #34485c;
+  --border-subtle: rgba(10, 16, 24, 0.24);
+  --border-panel: rgba(10, 16, 24, 0.34);
+  --border-strong: rgba(10, 16, 24, 0.5);
+  --border-glow: rgb(var(--theme-accent-rgb) / 0.78);
+  --theme-focus-ring: rgb(var(--theme-accent-rgb) / 0.86);
+  --state-danger: #8f1732;
+  --state-warning: #754600;
+}
+
+html[data-comfort-contrast='high'] {
+  --text-primary: var(--theme-text-primary);
+  --text-secondary: var(--theme-text-secondary);
+  --text-muted: var(--theme-text-muted);
+  --state-muted: var(--theme-text-muted);
+  --comfort-focus-width: 3px;
+}
+
+:where(
+  a[href],
+  button,
+  input,
+  select,
+  textarea,
+  summary,
+  [role='button'],
+  [role='link'],
+  [role='menuitem'],
+  [role='option'],
+  [tabindex]:not([tabindex='-1'])
+):focus-visible {
+  outline: var(--comfort-focus-width) solid var(--theme-focus-ring) !important;
+  outline-offset: var(--comfort-focus-offset) !important;
+}
+
+@media (forced-colors: active) {
+  :root {
+    --comfort-focus-width: 3px;
+  }
+
+  :where(
+    a[href],
+    button,
+    input,
+    select,
+    textarea,
+    summary,
+    [role='button'],
+    [role='link'],
+    [role='menuitem'],
+    [role='option'],
+    [tabindex]:not([tabindex='-1'])
+  ):focus-visible {
+    outline-color: Highlight !important;
+  }
+
+  .glass-panel,
+  .glass-panel-strong,
+  .popup-surface,
+  .theme-sent-bubble,
+  .theme-composer-surface,
+  .theme-panel-cover {
+    background: Canvas !important;
+    border-color: CanvasText !important;
+    box-shadow: none !important;
+    color: CanvasText !important;
+    forced-color-adjust: auto;
+  }
+
+  :where(button, [role='button'], input, select, textarea) {
+    border: 1px solid ButtonText;
+  }
+
+  :where([aria-current='page'], [aria-selected='true'], [aria-pressed='true']) {
+    outline: 2px solid Highlight !important;
+    outline-offset: 1px;
   }
 }

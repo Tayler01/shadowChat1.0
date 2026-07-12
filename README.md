@@ -23,9 +23,10 @@ contract; a forward revocation and follow-up release are the remaining closeout
 step. The latest successful `main` workflow plus the public health manifest are
 the authority for the live SHA and deployment state.
 
-The isolated `codex/shadowchat-2.0` branch now contains four locally verified
-Wave One candidates: Unified Activity HQ, ShadowPin Theater, DM Conversation
-Hub, and private member reporting with an operator Safety Case Center. These
+The isolated `codex/shadowchat-2.0` branch now contains all five locally
+verified Wave One candidates: Unified Activity HQ, ShadowPin Theater, DM
+Conversation Hub, private member reporting with an operator Safety Case Center,
+and the device-local Accessibility & Comfort system. These
 are not production claims and have not changed `main`; follow
 [docs/SHADOWCHAT_2_0_WAVE_ONE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_ONE.md:1)
 for the separate-backend-compatible Netlify trial gate.
@@ -73,6 +74,9 @@ header/advisor verification, and domain-by-domain reduction of the guarded
 - Reciprocal personal blocking across profile discovery, General Chat,
   presence, DMs, ShadowPin, Hype, and push delivery while preserving DM history
   for restoration after unblock
+- Device-local Accessibility & Comfort profiles with prepaint persistence,
+  device-aware motion/contrast/transparency, 100-130% text, solid surfaces,
+  48px shared controls, spacing, autoplay, sound, and haptic preferences
 - AI reply and summary hooks through a secured Supabase Edge Function
 - Preserved, default-off Boards domain with its draggable map, News Feed, board chats, and Art Board mood canvas
 - App-wide admin/sub-admin access controls with role badges and operator-only tools
@@ -135,6 +139,7 @@ Frontend lives under [`src`](C:/repos/chat2.0/src).
 - [`src/hooks/useBoardChat.tsx`](C:/repos/chat2.0/src/hooks/useBoardChat.tsx), [`src/hooks/useBoardBadges.ts`](C:/repos/chat2.0/src/hooks/useBoardBadges.ts), [`src/hooks/useNewsFeed.tsx`](C:/repos/chat2.0/src/hooks/useNewsFeed.tsx), and [`src/hooks/useNewsAdmin.ts`](C:/repos/chat2.0/src/hooks/useNewsAdmin.ts) own the Boards and News client behavior.
 - [`src/hooks/useAdminAccess.ts`](C:/repos/chat2.0/src/hooks/useAdminAccess.ts:1) owns admin/sub-admin access state.
 - [`src/hooks/useBlockedUsers.tsx`](C:/repos/chat2.0/src/hooks/useBlockedUsers.tsx:1) owns private block-list state and reciprocal UI enforcement.
+- [`src/hooks/useComfortPreferences.tsx`](C:/repos/chat2.0/src/hooks/useComfortPreferences.tsx:1), [`src/lib/comfortPreferences.ts`](C:/repos/chat2.0/src/lib/comfortPreferences.ts:1), and [`public/comfort-bootstrap.js`](C:/repos/chat2.0/public/comfort-bootstrap.js:1) own device-local comfort policy, runtime resolution, and prepaint application without a Supabase migration.
 - [`src/lib/messageLibrary.ts`](C:/repos/chat2.0/src/lib/messageLibrary.ts:1) owns message search, saves, and collections.
 - [`src/lib/personalBlocking.ts`](C:/repos/chat2.0/src/lib/personalBlocking.ts:1) owns personal-block RPC helpers and blocked-action messaging.
 - [`src/hooks/useWeatherPreference.ts`](C:/repos/chat2.0/src/hooks/useWeatherPreference.ts:1), [`src/hooks/useWeatherForecast.ts`](C:/repos/chat2.0/src/hooks/useWeatherForecast.ts:1), and [`src/lib/weather.ts`](C:/repos/chat2.0/src/lib/weather.ts:1) own weather preference and forecast behavior.

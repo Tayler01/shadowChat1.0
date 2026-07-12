@@ -44,6 +44,35 @@ receipt, My Safety Reports, operator queue, and exact immutable evidence. Reset
 the local database afterward and confirm `public.member_reports` is empty. Do
 not seed this workflow into production.
 
+## Accessibility And Comfort
+
+The focused Comfort contracts are device-local and introduce no Supabase
+migration. Run the static/component set with the normal Jest and Node gates,
+then run the authenticated visual harness against a fresh production-style
+preview:
+
+```powershell
+npx jest --runInBand tests/comfortPreferences.test.ts tests/useComfortPreferences.test.tsx tests/AccessibilityComfortPanel.test.tsx tests/useSoundEffects.test.tsx tests/useHype.test.tsx tests/HypeCelebrationController.test.tsx tests/GoldenEggDiscovery.test.tsx tests/ShadowPinImmersiveViewer.test.tsx
+node --test tests/comfortBootstrap.node.test.mjs tests/comfortVisualFoundation.node.test.mjs
+npm run build
+npx vite preview --host 127.0.0.1 --port 4174
+npm run qa:comfort -- --base-url=http://127.0.0.1:4174 --storage-state=output/playwright/comfort-auth.json --output-dir=output/playwright/candidate5-comfort
+```
+
+`qa:comfort` requires a Playwright storage-state file containing an already
+authenticated ShadowChat session. It deliberately does not log in, infer test
+credentials, or bypass Auth. Create or refresh that state through an approved
+local/staging login flow, keep it under ignored `output/`, and never commit its
+cookies or local-storage values. The harness fails immediately when
+`--storage-state` is omitted.
+
+The harness runs compact 320px Chromium, Android Chromium, and iPhone WebKit.
+It applies high visibility and custom 130% settings, checks solid surfaces,
+48px shared controls, keyboard focus, horizontal overflow across core views,
+and then reloads to prove the prepaint bootstrap retained device state. It does
+not replace VoiceOver, TalkBack, native keyboard, safe-area, or installed-PWA
+checks on physical devices.
+
 ## Baseline Checks
 
 Run these for almost every change:

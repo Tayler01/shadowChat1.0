@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../hooks/useAuth'
+import { useComfortPreferences } from '../../hooks/useComfortPreferences'
 import { claimGoldEasterEgg, type User } from '../../lib/supabase'
 import { GoldEasterEggBadge } from '../ui/GoldEasterEggBadge'
 import { GOLD_EGG_DISCOVERY_REQUEST_EVENT } from './goldEggEvents'
@@ -87,6 +88,7 @@ function GoldEggDiscoveryOverlay({ celebration }: { celebration: CelebrationStat
 
 export function GoldenEggDiscoveryController() {
   const { profile, refreshProfile } = useAuth()
+  const { preferences: comfortPreferences } = useComfortPreferences()
   const [celebration, setCelebration] = useState<CelebrationState | null>(null)
   const celebrationTimerRef = useRef<number | null>(null)
   const awardingRef = useRef(false)
@@ -106,7 +108,7 @@ export function GoldenEggDiscoveryController() {
       },
     }))
 
-    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+    if (comfortPreferences.haptics && typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
       navigator.vibrate([18, 32, 28])
     }
 

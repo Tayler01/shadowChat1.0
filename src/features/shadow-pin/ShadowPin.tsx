@@ -43,6 +43,7 @@ import { UserAchievementBadges } from '../../components/ui/UserAchievementBadges
 import { ZoomableImageFrame } from '../../components/ui/ZoomableImageFrame'
 import { useAuth } from '../../hooks/useAuth'
 import { useAdminAccess } from '../../hooks/useAdminAccess'
+import { useComfortPreferences } from '../../hooks/useComfortPreferences'
 import { useOptionalMessages } from '../../hooks/MessagesContext'
 import { getBlockedActionMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
@@ -427,11 +428,15 @@ const getExternalRichEmbedSrcDoc = (image: ShadowPinImage) => {
 </html>`
 }
 
-const getYoutubeAutoplayUrl = (image: ShadowPinImage, mode: VideoIframeMode = 'feed') => {
+const getYoutubeAutoplayUrl = (
+  image: ShadowPinImage,
+  mode: VideoIframeMode = 'feed',
+  autoplay = true
+) => {
   if (!image.video_embed_url) return ''
   try {
     const url = new URL(image.video_embed_url)
-    url.searchParams.set('autoplay', '1')
+    url.searchParams.set('autoplay', autoplay ? '1' : '0')
     url.searchParams.set('mute', '1')
     url.searchParams.set('playsinline', '1')
     url.searchParams.set('controls', mode === 'viewer' ? '1' : '0')
@@ -450,8 +455,12 @@ const getYoutubeAutoplayUrl = (image: ShadowPinImage, mode: VideoIframeMode = 'f
   }
 }
 
-const getVideoIframeUrl = (image: ShadowPinImage, mode: VideoIframeMode = 'feed') => {
-  if (isYoutubeVideoPin(image)) return getYoutubeAutoplayUrl(image, mode)
+const getVideoIframeUrl = (
+  image: ShadowPinImage,
+  mode: VideoIframeMode = 'feed',
+  autoplay = true
+) => {
+  if (isYoutubeVideoPin(image)) return getYoutubeAutoplayUrl(image, mode, autoplay)
   if (image.provider === 'pinterest') return getPinterestEmbedUrl(image)
   if (!image.video_embed_url || image.provider !== 'bunny_stream') return ''
 
@@ -460,7 +469,7 @@ const getVideoIframeUrl = (image: ShadowPinImage, mode: VideoIframeMode = 'feed'
     if (url.hostname === 'iframe.mediadelivery.net') {
       url.hostname = BUNNY_PLAYER_HOST
     }
-    url.searchParams.set('autoplay', 'true')
+    url.searchParams.set('autoplay', autoplay ? 'true' : 'false')
     url.searchParams.set('muted', 'true')
     url.searchParams.set('loop', 'true')
     url.searchParams.set('preload', 'true')
@@ -2519,12 +2528,14 @@ function ImageViewerMedia({
   image,
   muted,
   reducedMotion,
+  autoplayMedia,
   onMutedChange,
   onZoomChange,
 }: {
   image: ShadowPinImage
   muted: boolean
   reducedMotion: boolean
+  autoplayMedia: boolean
   onMutedChange: (muted: boolean) => void
   onZoomChange: (zoomed: boolean) => void
 }) {
@@ -2537,7 +2548,7 @@ function ImageViewerMedia({
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const videoPin = isVideoPin(image)
   const nativeVideoSrc = getVideoPlaybackUrl(image)
-  const iframeSrc = getVideoIframeUrl(image, 'viewer')
+  const iframeSrc = getVideoIframeUrl(image, 'viewer', autoplayMedia)
   const richEmbedFrameUrl = getExternalRichEmbedFrameUrl(image)
   const richEmbedSrcDoc = richEmbedFrameUrl ? '' : getExternalRichEmbedSrcDoc(image)
   const sourceUrl = image.source_url || image.video_embed_url
@@ -2550,9 +2561,9 @@ function ImageViewerMedia({
   }, [image.id, imageSources.length, imageSourcesKey, nativeVideoSrc])
 
   useEffect(() => {
-    if (!iframeSrc) return
+    if (!iframeSrc || !autoplayMedia) return
     syncIframeAudio(iframeRef.current, image.provider, muted)
-  }, [iframeSrc, image.provider, muted])
+  }, [autoplayMedia, iframeSrc, image.provider, muted])
 
   useEffect(() => () => {
     const video = videoRef.current
@@ -2575,8 +2586,8 @@ function ImageViewerMedia({
             poster={getPinImageUrl(image, 'medium')}
             className="h-full w-full object-contain"
             controls
-            autoPlay={!reducedMotion}
-            loop={!reducedMotion}
+            autoPlay={autoplayMedia && !reducedMotion}
+            loop={autoplayMedia && !reducedMotion}
             playsInline
             muted={muted}
             aria-label={`Video: ${image.title}`}
@@ -2594,7 +2605,9 @@ function ImageViewerMedia({
             className="block h-full w-full border-0"
             allow="autoplay; encrypted-media; picture-in-picture; web-share"
             loading="eager"
-            onLoad={() => syncIframeAudio(iframeRef.current, image.provider, muted)}
+            onLoad={() => {
+              if (autoplayMedia) syncIframeAudio(iframeRef.current, image.provider, muted)
+            }}
             data-viewer-no-swipe="true"
             allowFullScreen
           />
@@ -3224,6 +3237,7 @@ function ShadowPinCategoryScreen({
 }) {
   const { user } = useAuth()
   const { role: adminRole } = useAdminAccess({ includeUsers: false })
+  const { shouldAutoplayMedia } = useComfortPreferences()
   const messagesApi = useOptionalMessages()
   const imagesState = useShadowPinImages(categoryId)
   const [modal, setModal] = useState<ModalMode>(null)
@@ -3233,6 +3247,7 @@ function ShadowPinCategoryScreen({
   const [overlayImageId, setOverlayImageId] = useState<string | null>(null)
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null)
   const [soundVideoId, setSoundVideoId] = useState<string | null>(null)
+  const soundVideoIdRef = useRef<string | null>(null)
   const [playableVisibleVideoCount, setPlayableVisibleVideoCount] = useState(0)
   const videoVisibilityRef = useRef(new Map<string, VideoVisibilitySnapshot>())
   const skippedVideoIdsRef = useRef(new Set<string>())
@@ -3368,6 +3383,11 @@ function ShadowPinCategoryScreen({
   const syncVideoPlaybackState = useCallback((preferOrderedStart: boolean) => {
     const visibilityMap = videoVisibilityRef.current
     const playableVideos = getOrderedVisibleVideos(visibilityMap.values(), skippedVideoIdsRef.current)
+    if (!shouldAutoplayMedia) {
+      setPlayableVisibleVideoCount(0)
+      setActiveVideoId(current => current && current === soundVideoIdRef.current ? current : null)
+      return
+    }
     const nextVideoId = playableVideos[0]?.id ?? null
     setPlayableVisibleVideoCount(playableVideos.length)
     setActiveVideoId(current => {
@@ -3376,7 +3396,11 @@ function ShadowPinCategoryScreen({
       if (!currentPlayable || preferOrderedStart) return nextVideoId
       return current
     })
-  }, [])
+  }, [shouldAutoplayMedia])
+
+  useEffect(() => {
+    syncVideoPlaybackState(false)
+  }, [shouldAutoplayMedia, syncVideoPlaybackState])
 
   const updateVideoVisibility = useCallback((visibility: VideoVisibilitySnapshot) => {
     const visibilityMap = videoVisibilityRef.current
@@ -3417,8 +3441,9 @@ function ShadowPinCategoryScreen({
   }, [advanceVisibleVideo])
 
   useEffect(() => {
+    soundVideoIdRef.current = soundVideoId
     setSoundVideoId(current => current && current !== activeVideoId ? null : current)
-  }, [activeVideoId])
+  }, [activeVideoId, soundVideoId])
 
   const masonryColumnCount = useShadowPinMasonryColumnCount()
   const masonryColumns = useMemo(
@@ -3591,6 +3616,7 @@ function ShadowPinCategoryScreen({
               image={image}
               muted={controls.muted}
               reducedMotion={controls.reducedMotion}
+              autoplayMedia={controls.autoplayMedia}
               onMutedChange={controls.onMutedChange}
               onZoomChange={controls.onZoomChange}
             />

@@ -27,6 +27,7 @@ import { getHypeDisplayDurationMs } from '../lib/hypePresentation'
 import { useAuth } from './useAuth'
 import { useMessages } from './MessagesContext'
 import { useSoundEffects } from './useSoundEffects'
+import { useComfortPreferences } from './useComfortPreferences'
 
 const HYPE_STACK_WINDOW_MS = 60_000
 const HYPE_STARTUP_ANIMATION_DELAY_MS = 2_000
@@ -153,6 +154,7 @@ export function HypeProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
   const { loading: messagesLoading } = useMessages()
   const { playHypeBell, playHypeMessage } = useSoundEffects()
+  const { isReducedMotion } = useComfortPreferences()
   const [status, setStatus] = useState<HypeStatus | null>(null)
   const [loadingStatus, setLoadingStatus] = useState(false)
   const [ringing, setRinging] = useState(false)
@@ -176,13 +178,12 @@ export function HypeProvider({ children }: { children: React.ReactNode }) {
   const scheduleDismiss = useCallback((mode: HypeCelebrationState['mode'], intensity: number) => {
     if (typeof window === 'undefined') return
     clearDisplayTimer()
-    const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false
     const isPhone = window.matchMedia?.('(max-width: 767px)').matches ?? window.innerWidth < 768
     displayTimerRef.current = window.setTimeout(() => {
       setActiveCelebration(null)
       displayTimerRef.current = null
-    }, getHypeDisplayDurationMs({ mode, intensity, prefersReducedMotion, isPhone }))
-  }, [clearDisplayTimer])
+    }, getHypeDisplayDurationMs({ mode, intensity, prefersReducedMotion: isReducedMotion, isPhone }))
+  }, [clearDisplayTimer, isReducedMotion])
 
   const clearStartupDelayTimer = useCallback(() => {
     if (startupDelayTimerRef.current !== null) {

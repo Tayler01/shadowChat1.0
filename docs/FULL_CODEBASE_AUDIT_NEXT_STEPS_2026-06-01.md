@@ -9,11 +9,12 @@ original June findings, records the July production-alignment evidence, and
 ranks the work that remains. Update it when an item is implemented,
 intentionally deferred, or replaced by a narrower feature ticket.
 
-The separate `codex/shadowchat-2.0` Wave One track has locally completed four
+The separate `codex/shadowchat-2.0` Wave One track has locally completed all five
 high-ticket product candidates without changing production `main`: Activity
-HQ, ShadowPin Theater, DM Conversation Hub, and Member Reporting/Safety Case
-Center. Candidate 5 and the combined shared-backend/Netlify trial gate remain
-open; see `docs/SHADOWCHAT_2_0_WAVE_ONE.md` for authoritative status.
+HQ, ShadowPin Theater, DM Conversation Hub, Member Reporting/Safety Case Center,
+and the device-local Accessibility & Comfort system. The combined regression,
+shared-backend compatibility, physical-device, and isolated Netlify trial gates
+remain open; see `docs/SHADOWCHAT_2_0_WAVE_ONE.md` for authoritative status.
 
 ## July 9, 2026 Alignment And Cleanup Program
 
@@ -187,9 +188,15 @@ linked checks, and public health manifest as authority rather than an older SHA:
    MIME, and worker cache headers.
 10. Complete installed-PWA checks on physical iPhone and Android devices and
    make a deliberate portrait/Shadow Runner landscape decision.
-11. **Shipped in Release A:** removed `user-scalable=no`; standardized the
-    touched focus traps, Escape/focus return, keyboard menus, `aria-current`,
-    and phone touch targets. Physical-device accessibility review remains.
+11. **Release A baseline shipped; Wave One candidate locally verified:** removed
+    `user-scalable=no`; standardized touched focus traps, Escape/focus return,
+    keyboard menus, and `aria-current`. The isolated 2.0 branch now adds a
+    device-local prepaint Comfort policy for motion, transparency, contrast,
+    100-130% text, spacing, 48px shared controls, autoplay, sound, and haptics,
+    with global focus-visible and forced-colors treatment. Compact 320px
+    Chromium, Android Chromium, and iPhone WebKit passed the authenticated local
+    Comfort harness; physical-device VoiceOver/TalkBack, installed-PWA, keyboard,
+    and safe-area review remains open.
 12. **Shipped in Release A:** the phone header is contextual and Hype
     celebrations avoid essential composer/navigation controls.
 13. **Completed:** add opt-in release-correlated client/worker telemetry
@@ -685,7 +692,9 @@ Validation target:
 6. Verify the implemented report-only Netlify header packet in production and
    review CSP reports before enforcement.
 7. Complete physical-device accessibility, orientation, notification, and
-   mobile-polish review for the implemented UI changes.
+   mobile-polish review for the implemented UI changes, including VoiceOver,
+   TalkBack, installed-PWA persistence, native keyboard/safe-area behavior, and
+   the locally verified Accessibility & Comfort profiles.
 8. Continue domain-scoped realtime/send/scroll extraction and performance-
    advisor work without broad rewrites.
 

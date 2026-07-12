@@ -3,6 +3,7 @@ import {
   SoundEffectsProvider,
   useSoundEffects,
 } from '../src/hooks/useSoundEffects'
+import { ComfortPreferencesProvider } from '../src/hooks/useComfortPreferences'
 
 const resume = jest.fn().mockResolvedValue(undefined)
 const close = jest.fn().mockResolvedValue(undefined)
@@ -73,9 +74,11 @@ describe('SoundEffectsProvider', () => {
 
   it('retires the remote sound cache and synthesizes distinct local tones', async () => {
     render(
-      <SoundEffectsProvider>
-        <Harness />
-      </SoundEffectsProvider>
+      <ComfortPreferencesProvider>
+        <SoundEffectsProvider>
+          <Harness />
+        </SoundEffectsProvider>
+      </ComfortPreferencesProvider>
     )
 
     await waitFor(() => {
@@ -92,9 +95,11 @@ describe('SoundEffectsProvider', () => {
 
   it('honors the sound-effects preference and closes its shared context', () => {
     const { unmount } = render(
-      <SoundEffectsProvider>
-        <Harness />
-      </SoundEffectsProvider>
+      <ComfortPreferencesProvider>
+        <SoundEffectsProvider>
+          <Harness />
+        </SoundEffectsProvider>
+      </ComfortPreferencesProvider>
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Message tone' }))
@@ -103,6 +108,12 @@ describe('SoundEffectsProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Toggle tones' }))
     fireEvent.click(screen.getByRole('button', { name: 'Message tone' }))
     expect(createOscillator).toHaveBeenCalledTimes(2)
+    expect(close).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle tones' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Message tone' }))
+    expect(createOscillator).toHaveBeenCalledTimes(4)
+    expect(close).not.toHaveBeenCalled()
 
     unmount()
     expect(close).toHaveBeenCalledTimes(1)

@@ -6,6 +6,12 @@ jest.mock('../src/hooks/useHype', () => ({
   useHype: jest.fn(),
 }))
 
+jest.mock('../src/hooks/useComfortPreferences', () => ({
+  useComfortPreferences: () => ({
+    isReducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
+  }),
+}))
+
 const mockedUseHype = useHype as jest.Mock
 const dismissCelebration = jest.fn()
 const originalMatchMedia = window.matchMedia

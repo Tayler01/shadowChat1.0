@@ -112,7 +112,7 @@ export function MobileAppHeader({
           <div className="min-w-0 flex-1">
             {srTitle && <h1 className="sr-only">{srTitle}</h1>}
             {eyebrow && (
-              <p className="truncate text-[9px] uppercase tracking-[0.13em] text-[var(--text-muted)] min-[380px]:text-[10px] sm:tracking-[0.18em]">
+              <p className="truncate text-[0.5625rem] uppercase tracking-[0.13em] text-[var(--text-muted)] min-[380px]:text-[0.625rem] sm:tracking-[0.18em]">
                 {eyebrow}
               </p>
             )}
@@ -120,8 +120,8 @@ export function MobileAppHeader({
               className={cn(
                 'truncate font-semibold text-[var(--text-primary)]',
                 eyebrow
-                  ? 'text-[13px] leading-4 min-[380px]:text-sm'
-                  : 'text-sm leading-5 min-[380px]:text-[15px]'
+                  ? 'text-[0.8125rem] leading-4 min-[380px]:text-sm'
+                  : 'text-sm leading-5 min-[380px]:text-[0.9375rem]'
               )}
             >
               {title}

@@ -27,6 +27,7 @@ import { createPortal } from 'react-dom'
 import { Avatar } from '../../../components/ui/Avatar'
 import { UserAchievementBadges } from '../../../components/ui/UserAchievementBadges'
 import { useDialogAccessibility } from '../../../hooks/useDialogAccessibility'
+import { useComfortPreferences } from '../../../hooks/useComfortPreferences'
 import { cn } from '../../../lib/utils'
 import {
   canStartViewerSwipe,
@@ -43,6 +44,7 @@ type ViewerNavigationReason = 'swipe' | 'button' | 'keyboard'
 type ActiveMediaControls = {
   muted: boolean
   reducedMotion: boolean
+  autoplayMedia: boolean
   onMutedChange: (muted: boolean) => void
   onZoomChange: (zoomed: boolean) => void
 }
@@ -99,22 +101,6 @@ const formatCount = (count: number) => count > 999 ? `${Math.floor(count / 100) 
 const getDisplayName = (image: ShadowPinImage) =>
   image.creator?.display_name || image.creator?.username || 'ShadowChat member'
 
-const useReducedMotion = () => {
-  const [reduced, setReduced] = useState(() => (
-    typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  ))
-
-  useEffect(() => {
-    const media = window.matchMedia?.('(prefers-reduced-motion: reduce)')
-    if (!media) return
-    const update = () => setReduced(media.matches)
-    media.addEventListener?.('change', update)
-    return () => media.removeEventListener?.('change', update)
-  }, [])
-
-  return reduced
-}
-
 export function ShadowPinImmersiveViewer({
   images,
   activeImageId,
@@ -145,7 +131,7 @@ export function ShadowPinImmersiveViewer({
     initialFocusRef: closeRef,
     restoreFocus: false,
   })
-  const reducedMotion = useReducedMotion()
+  const { isReducedMotion: reducedMotion, shouldAutoplayMedia } = useComfortPreferences()
   const activeIndex = getViewerIndex(images, activeImageId)
   const activeImage = activeIndex >= 0 ? images[activeIndex] : null
   const previousImage = getViewerNeighbor(images, activeImageId, -1)
@@ -465,7 +451,8 @@ export function ShadowPinImmersiveViewer({
               </div>
             ) : renderActiveMedia(activeImage, {
                 muted,
-                reducedMotion,
+              reducedMotion,
+              autoplayMedia: shouldAutoplayMedia,
                 onMutedChange: setMuted,
                 onZoomChange: handleZoomChange,
               })

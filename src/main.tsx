@@ -10,6 +10,7 @@ import { registerPushServiceWorker } from './lib/push';
 import { initializeTelemetry } from './lib/telemetry';
 import { BlockedUsersProvider } from './hooks/useBlockedUsers';
 import { ModerationReportProvider } from './features/moderation/ModerationReportProvider';
+import { ComfortPreferencesProvider } from './hooks/useComfortPreferences';
 
 initializeTelemetry();
 
@@ -18,13 +19,15 @@ createRoot(document.getElementById('root')!).render(
     <AuthProvider>
       <BlockedUsersProvider>
         <PresenceRoot>
-          <ThemeProvider>
-            <ModerationReportProvider>
-              <ErrorBoundary>
-                <App />
-              </ErrorBoundary>
-            </ModerationReportProvider>
-          </ThemeProvider>
+          <ComfortPreferencesProvider>
+            <ThemeProvider>
+              <ModerationReportProvider>
+                <ErrorBoundary>
+                  <App />
+                </ErrorBoundary>
+              </ModerationReportProvider>
+            </ThemeProvider>
+          </ComfortPreferencesProvider>
         </PresenceRoot>
       </BlockedUsersProvider>
     </AuthProvider>

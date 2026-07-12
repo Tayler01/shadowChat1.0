@@ -22,6 +22,7 @@ let mockAuthUser = {
   admin_role: null,
 }
 let mockAdminRole: 'admin' | 'sub_admin' | null = null
+let mockShouldAutoplayMedia = true
 
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => ({
@@ -37,6 +38,13 @@ jest.mock('../src/hooks/useAdminAccess', () => ({
 
 jest.mock('../src/components/chat/WeatherWidget', () => ({
   WeatherWidget: () => <div data-testid="weather-widget" />,
+}))
+
+jest.mock('../src/hooks/useComfortPreferences', () => ({
+  useComfortPreferences: () => ({
+    shouldAutoplayMedia: mockShouldAutoplayMedia,
+    isReducedMotion: false,
+  }),
 }))
 
 jest.mock('../src/components/search/GlobalSearchButton', () => ({
@@ -154,6 +162,7 @@ const openPinFromCard = (card: Element) => {
 }
 
 beforeEach(() => {
+  mockShouldAutoplayMedia = true
   mockAuthUser = {
     id: 'user-1',
     admin_role: null,
@@ -295,7 +304,7 @@ test('hides the video label in the feed until pin details are active', () => {
   }
 })
 
-test('autoplays a focused native video pin muted in the masonry feed', async () => {
+test('autoplays focused native video when allowed and stops when comfort disables autoplay', async () => {
   const originalIntersectionObserver = global.IntersectionObserver
   const originalPlay = HTMLMediaElement.prototype.play
   const observers: Array<{
@@ -354,7 +363,7 @@ test('autoplays a focused native video pin muted in the masonry feed', async () 
   })
 
   try {
-    const { container } = render(<ShadowPin onBack={() => {}} />)
+    const { container, rerender } = render(<ShadowPin onBack={() => {}} />)
 
     fireEvent.click(screen.getByText('Fam & Friends'))
     expect(container.querySelector('video')).not.toBeInTheDocument()
@@ -379,6 +388,10 @@ test('autoplays a focused native video pin muted in the masonry feed', async () 
     expect(video).toHaveAttribute('webkit-playsinline')
     expect(video).toHaveAttribute('muted')
     expect(HTMLMediaElement.prototype.play).toHaveBeenCalled()
+
+    mockShouldAutoplayMedia = false
+    rerender(<ShadowPin onBack={() => {}} />)
+    await waitFor(() => expect(container.querySelector('video')).not.toBeInTheDocument())
   } finally {
     Object.defineProperty(global, 'IntersectionObserver', {
       configurable: true,

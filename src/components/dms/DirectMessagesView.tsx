@@ -1537,7 +1537,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                       ? `${typingUsers.map(typingUser => typingUser.display_name).join(', ')} ${typingUsers.length === 1 ? 'is' : 'are'} typing`
                       : '')}
               </div>
-              <div data-testid="dm-message-stack" className="mx-auto flex min-h-full w-full max-w-4xl flex-col justify-end space-y-3">
+              <div data-testid="dm-message-stack" className="comfort-message-stack mx-auto flex min-h-full w-full max-w-4xl flex-col justify-end space-y-3">
               {loadingMore && (
                 <div className="flex justify-center py-2 text-sm text-[var(--text-muted)]">
                   <LoadingSpinner size="sm" /> Loading more...

@@ -31,7 +31,8 @@ implementation backlog.
 - Several bridge docs are still useful but date from April 2026 planning. They now carry bridge-specific status notes and should be checked against current firmware/functions before implementation.
 - `README.md` and `docs/ARCHITECTURE.md` are current through the July 10
   production alignment and Release A deployment while preserving the dated
-  June feature and incident history.
+  June feature and incident history. The isolated Wave One inventory is current
+  through all five locally verified candidates.
 - `PLAN.md`, `STATUS.md`, and `TASK.md` are now labeled as bridge-specific status artifacts, not global project status.
 - `.agents/` contains local ignored agent skills. They are not tracked or pushed by default because `.gitignore` ignores `.agents/`.
 
@@ -83,8 +84,9 @@ implementation backlog.
 
 The isolated ShadowChat 2.0 Wave One work is tracked in
 [SHADOWCHAT_2_0_WAVE_ONE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_ONE.md:1).
-Its first four locally verified candidates are documented in Activity HQ,
-ShadowPin Theater, DM Conversation Hub, and Member Reporting/Case Center docs.
+Its five locally verified candidates are documented in Activity HQ, ShadowPin
+Theater, DM Conversation Hub, Member Reporting/Case Center, and Accessibility &
+Comfort docs.
 These remain candidate docs until the separate 2.0 Netlify trial is approved
 for `main`.
 
@@ -95,6 +97,7 @@ for `main`.
 | [docs/SHADOW_PIN_THEATER.md](C:/repos/chat2.0/docs/SHADOW_PIN_THEATER.md:1) | 2026-07-11 | Immersive ShadowPin viewer candidate contract and proof. | Refresh after viewer, media, or phone gesture changes. |
 | [docs/DM_CONVERSATION_HUB.md](C:/repos/chat2.0/docs/DM_CONVERSATION_HUB.md:1) | 2026-07-11 | DM inbox organization, search/shared-content, and message-window contract. | Refresh after DM lifecycle or retrieval changes. |
 | [docs/MEMBER_REPORTING_CASE_CENTER.md](C:/repos/chat2.0/docs/MEMBER_REPORTING_CASE_CENTER.md:1) | 2026-07-11 | Private reporting, immutable evidence, operator cases, and audited actions. | Refresh after report targets, safety policy, or enforcement changes. |
+| [docs/ACCESSIBILITY_COMFORT.md](C:/repos/chat2.0/docs/ACCESSIBILITY_COMFORT.md:1) | 2026-07-11 | Device-local comfort profiles, prepaint bootstrap, runtime policy axes, integration rules, and browser/physical-device verification boundary. | Refresh after comfort storage, presets, runtime consumers, or physical-device evidence changes. |
 | [docs/ADMIN_ACCESS.md](C:/repos/chat2.0/docs/ADMIN_ACCESS.md:1) | 2026-07-11 | Canonical `user_roles` authority, display-only badges, and active/paused admin surfaces. | Refresh after role, authority, or admin-surface changes. |
 | [docs/APP_RELEASES.md](C:/repos/chat2.0/docs/APP_RELEASES.md:1) | 2026-05-29 | App release popup behavior. | Current enough unless release UX changes. |
 | [docs/ART_BOARD.md](C:/repos/chat2.0/docs/ART_BOARD.md:1) | 2026-07-09 | Paused Art Board domain and reviewed reactivation contract. | Update before restoring the import Function or UI. |

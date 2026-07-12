@@ -1024,7 +1024,8 @@ export const MessageList: React.FC<MessageListProps> = ({
                 <div
                   data-message-row="true"
                   data-message-id={message.id}
-                  className={isGrouped ? 'pt-1 pb-1 [overflow-anchor:none]' : 'pt-4 pb-1 [overflow-anchor:none]'}
+                  data-message-grouped={isGrouped ? 'true' : 'false'}
+                  className="comfort-message-row [overflow-anchor:none]"
                 >
                   <MessageItem
                     message={message}

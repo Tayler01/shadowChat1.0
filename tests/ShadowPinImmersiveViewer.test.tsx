@@ -2,6 +2,13 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { ShadowPinImmersiveViewer } from '../src/features/shadow-pin/components/ShadowPinImmersiveViewer'
 import type { ShadowPinImage } from '../src/features/shadow-pin/types'
 
+jest.mock('../src/hooks/useComfortPreferences', () => ({
+  useComfortPreferences: () => ({
+    shouldAutoplayMedia: true,
+    isReducedMotion: false,
+  }),
+}))
+
 const image = (id: string, createdAt: string, provider: ShadowPinImage['provider'] = 'shadow_pin_storage'): ShadowPinImage => ({
   id,
   category_id: 'category-1',

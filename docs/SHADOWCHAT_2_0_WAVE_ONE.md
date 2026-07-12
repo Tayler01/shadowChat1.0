@@ -20,12 +20,18 @@ URL for phone testing.
    [DM_CONVERSATION_HUB.md](C:/repos/chat2.0/docs/DM_CONVERSATION_HUB.md:1).
 4. **Member reporting and operator case center** - implemented and locally verified.
    See [MEMBER_REPORTING_CASE_CENTER.md](C:/repos/chat2.0/docs/MEMBER_REPORTING_CASE_CENTER.md:1).
-5. **App-wide accessibility and comfort system** - pending implementation
-   checkpoint.
+5. **App-wide accessibility and comfort system** - implemented and locally verified.
+   See [ACCESSIBILITY_COMFORT.md](C:/repos/chat2.0/docs/ACCESSIBILITY_COMFORT.md:1).
 
 Each candidate gets its own research, focused implementation, tests, browser
 proof, documentation update, and checkpoint commit. Combined regression and
 shared-backend compatibility verification run after all five candidates.
+
+All five candidate checkpoints are now implemented and locally verified. The
+Candidate 5 browser proof covers compact 320px Chromium, Android Chromium, and
+iPhone WebKit with authenticated device-local preference state. Physical iPhone
+and Android installed-PWA accessibility validation remains part of the combined
+release gate rather than the Candidate 5 local claim.
 
 ## Release Boundaries
 

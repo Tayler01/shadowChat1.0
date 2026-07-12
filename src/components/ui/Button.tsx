@@ -65,7 +65,7 @@ export function Button({
   return (
     <button
       className={`
-        group ${hasExplicitPosition ? '' : 'relative'} inline-flex items-center justify-center overflow-hidden
+        comfort-button group ${hasExplicitPosition ? '' : 'relative'} inline-flex min-h-[var(--comfort-control-min-size)] items-center justify-center overflow-hidden
         font-medium rounded-[var(--radius-sm)]
         transition-[background-color,border-color,box-shadow,color,opacity,transform] duration-[var(--dur-med)] ease-[var(--ease-premium)]
         disabled:opacity-50 disabled:cursor-not-allowed

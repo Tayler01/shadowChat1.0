@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Sparkles, X } from 'lucide-react'
 import { useHype } from '../../hooks/useHype'
+import { useComfortPreferences } from '../../hooks/useComfortPreferences'
 import {
   getHypeCelebrationPresentation,
   getHypeDisplayDurationMs,
@@ -42,7 +43,7 @@ const useMediaQuery = (query: string) => {
 
 export function HypeCelebrationController() {
   const { activeCelebration, dismissCelebration } = useHype()
-  const prefersReducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
+  const { isReducedMotion: prefersReducedMotion } = useComfortPreferences()
   const isPhone = useMediaQuery('(max-width: 767px)')
   const intensity = clamp(activeCelebration?.intensity ?? 1, 1, 8)
   const mode = activeCelebration?.mode ?? 'catchup'
