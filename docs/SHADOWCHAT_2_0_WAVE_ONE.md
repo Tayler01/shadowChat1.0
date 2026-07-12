@@ -62,8 +62,8 @@ approval gate before any merge to `main`.
 - Linked database lint returned zero findings. The reviewed authority contract
   matches 79 authenticated, 1 anonymous, 34 internal, and 34 private
   `SECURITY DEFINER` functions, with no paused browser grants.
-- Netlify site: `shadowchat-2-0-wave-one`; deploy
-  `6a531bc1e38b9bdade466b6d`; production site/domain bindings were not changed.
+- Netlify site: `shadowchat-2-0-wave-one`; the live health manifest identifies
+  the exact branch commit. Production site/domain bindings were not changed.
 - The Netlify Sharp media function returns the expected method/auth boundary
   after native Linux dependency packaging was verified live.
 - Full authenticated live smoke passed auth, General Chat, Settings, DMs,
