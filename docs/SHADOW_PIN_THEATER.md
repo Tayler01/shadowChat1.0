@@ -48,6 +48,13 @@ The existing comment conversation remains authoritative. On phone it is a
 safe-area bottom sheet above the current Pin. Existing loading, retry, empty,
 edit, reply, delete, and exact-comment highlight behavior is preserved.
 
+The July 12 trial revision makes feed-card detail dots and Theater navigation/
+zoom glyphs visually minimal while retaining 48-pixel hit targets and visible
+focus. The detail toggle stays above its overlay so short cards can always be
+closed. Theater commits paging on the transform transition end, keys active
+media by Pin, and keeps the preloaded poster behind the incoming full asset to
+prevent WebKit from repainting the previous decoded image during a swipe.
+
 ## Data And Performance Boundary
 
 No new database domain is required. Existing RLS, reciprocal blocking,

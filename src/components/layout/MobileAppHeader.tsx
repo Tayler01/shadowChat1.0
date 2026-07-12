@@ -5,9 +5,8 @@ import { Avatar } from '../ui/Avatar'
 import { cn } from '../../lib/utils'
 import type { PresenceVisibility } from '../../types'
 import type { AppView } from '../../types/navigation'
+import { openSettingsMain } from '../../lib/settingsNavigation'
 
-const SETTINGS_SECTION_STORAGE_KEY = 'shadowchat:settings-section'
-const SETTINGS_MAIN_EVENT = 'shadowchat:settings-main'
 const LazyGlobalSearchButton = lazy(() => import('../search/GlobalSearchButton').then(module => ({
   default: module.GlobalSearchButton,
 })))
@@ -62,11 +61,7 @@ export function MobileAppHeader({
   const TitleElement = titleElement ?? (srTitle ? 'p' : 'h1')
 
   const openSettings = () => {
-    if (typeof window !== 'undefined') {
-      window.sessionStorage.removeItem(SETTINGS_SECTION_STORAGE_KEY)
-      window.dispatchEvent(new CustomEvent(SETTINGS_MAIN_EVENT))
-    }
-    onViewChange('settings')
+    openSettingsMain(onViewChange)
   }
 
   return (

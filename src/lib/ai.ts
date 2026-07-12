@@ -1,11 +1,5 @@
 import type { ChatMessage } from './supabase'
-import {
-  SUPABASE_ANON_KEY,
-  SUPABASE_URL,
-  ensureSession,
-  getSessionWithTimeout,
-  getWorkingClient,
-} from './supabase'
+import { invokeAuthenticatedEdgeFunction } from './edgeFunctions'
 
 interface AIMessage {
   role: 'system' | 'user'
@@ -31,39 +25,11 @@ const invokeAI = async (
   options: { model?: string; postToChat?: boolean } = {}
 ): Promise<AIResponse> => {
   const model = options.model ?? 'mistralai/mistral-nemo'
-  const hasSession = await ensureSession()
-  if (!hasSession) {
-    throw new Error('Authentication required')
-  }
-
-  const workingClient = await getWorkingClient()
-  const { data: { session } } = await getSessionWithTimeout(workingClient)
-  const accessToken = session?.access_token
-
-  if (!accessToken) {
-    throw new Error('Authentication required')
-  }
-
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/openai-chat`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      apikey: SUPABASE_ANON_KEY,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
+  return invokeAuthenticatedEdgeFunction<AIResponse>('openai-chat', {
       model,
       messages,
       postToChat: options.postToChat,
-    }),
   })
-
-  if (!response.ok) {
-    const text = await response.text()
-    throw new Error(text || `AI function failed with status ${response.status}`)
-  }
-
-  return (await response.json()) as AIResponse
 }
 
 export async function summarizeConversation(messages: ChatMessage[]): Promise<string> {

@@ -47,7 +47,7 @@ import { useAdminAccess } from '../../hooks/useAdminAccess'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { MobileAppHeader } from '../layout/MobileAppHeader'
-import { BOARDS_FEATURE_ENABLED, ESP_ADMIN_FEATURE_ENABLED } from '../../config/featureFlags'
+import { BOARDS_FEATURE_ENABLED, ESP_ADMIN_FEATURE_ENABLED, MEMBER_REPORTING_FEATURE_ENABLED } from '../../config/featureFlags'
 import type { AppView } from '../../types/navigation'
 import { getBrowserTimeZone } from '../../lib/push'
 import { COMFORT_RESET_EVENT } from '../../lib/comfortPreferences'
@@ -64,9 +64,11 @@ const ShadowMysteryStudio = React.lazy(() =>
   import('./ShadowMysteryStudio').then(module => ({ default: module.ShadowMysteryStudio }))
 )
 
-const MyReportsPanel = React.lazy(() =>
-  import('../../features/moderation/MyReportsPanel').then(module => ({ default: module.MyReportsPanel }))
-)
+const MyReportsPanel = MEMBER_REPORTING_FEATURE_ENABLED
+  ? React.lazy(() =>
+      import('../../features/moderation/MyReportsPanel').then(module => ({ default: module.MyReportsPanel }))
+    )
+  : null
 
 const ModerationCaseCenter = React.lazy(() =>
   import('../../features/moderation/ModerationCaseCenter').then(module => ({ default: module.ModerationCaseCenter }))
@@ -151,12 +153,12 @@ const sections: SettingsSection[] = [
     description: 'Submit bugs, feature ideas, screenshots, and concepts.',
     icon: MessageSquarePlus,
   },
-  {
+  ...(MEMBER_REPORTING_FEATURE_ENABLED ? [{
     id: 'safety-reports',
     title: 'Safety Reports',
     description: 'Review private status and operator updates for concerns you submitted.',
     icon: ShieldAlert,
-  },
+  } as const] : []),
   {
     id: 'app-setup-guide',
     title: 'App Setup & User Guide',
@@ -1187,9 +1189,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   )
 
   const renderMyReports = () => (
-    <React.Suspense fallback={<SettingsPanelLoading label="Loading safety reports..." />}>
-      <MyReportsPanel />
-    </React.Suspense>
+    MyReportsPanel ? (
+      <React.Suspense fallback={<SettingsPanelLoading label="Loading safety reports..." />}>
+        <MyReportsPanel />
+      </React.Suspense>
+    ) : null
   )
 
   const renderOperationsHealthPanel = () => (

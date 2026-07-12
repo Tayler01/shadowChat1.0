@@ -5,6 +5,7 @@ site_url = "https://shadochat.online"
 additional_redirect_urls = [
   "https://shadochat.online",
   "https://shadowchat-1-0.netlify.app",
+  "https://shadowchat-2-0-wave-one.netlify.app",
   "http://localhost:5173",
   "http://localhost:4174",
   "http://127.0.0.1:5173",

@@ -31,6 +31,7 @@ import { getUserAchievementMedals } from '../ui/userAchievementMedals'
 import { BlockUserControl } from './BlockUserControl'
 import { useBlockedUsers } from '../../hooks/useBlockedUsers'
 import { useModerationReport } from '../../features/moderation/useModerationReport'
+import { MEMBER_REPORTING_FEATURE_ENABLED } from '../../config/featureFlags'
 
 interface PublicProfileDialogProps {
   user: User | null
@@ -433,7 +434,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                     </Button>
                   )}
                   <BlockUserControl user={user} />
-                  <Button
+                  {MEMBER_REPORTING_FEATURE_ENABLED && <Button
                     type="button"
                     variant="ghost"
                     size="sm"
@@ -454,7 +455,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
                   >
                     <ShieldAlert className="mr-2 h-4 w-4" />
                     Report
-                  </Button>
+                  </Button>}
                 </div>
               )}
 

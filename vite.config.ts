@@ -10,6 +10,8 @@ export default defineConfig(({ mode }) => {
     define: {
       __SHADOWCHAT_BOARDS_ENABLED__: JSON.stringify(isEnabled('VITE_FEATURE_BOARDS')),
       __SHADOWCHAT_ESP_ADMIN_ENABLED__: JSON.stringify(isEnabled('VITE_FEATURE_ESP_ADMIN')),
+      __SHADOWCHAT_ACTIVITY_ENABLED__: JSON.stringify(isEnabled('VITE_FEATURE_ACTIVITY')),
+      __SHADOWCHAT_MEMBER_REPORTING_ENABLED__: JSON.stringify(isEnabled('VITE_FEATURE_MEMBER_REPORTING')),
     },
     plugins: [react()],
     optimizeDeps: {

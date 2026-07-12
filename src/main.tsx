@@ -1,4 +1,4 @@
-import { StrictMode } from 'react';
+import { lazy, StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -9,8 +9,14 @@ import { PresenceRoot } from './PresenceRoot';
 import { registerPushServiceWorker } from './lib/push';
 import { initializeTelemetry } from './lib/telemetry';
 import { BlockedUsersProvider } from './hooks/useBlockedUsers';
-import { ModerationReportProvider } from './features/moderation/ModerationReportProvider';
 import { ComfortPreferencesProvider } from './hooks/useComfortPreferences';
+import { MEMBER_REPORTING_FEATURE_ENABLED } from './config/featureFlags';
+
+const ModerationReportProvider = MEMBER_REPORTING_FEATURE_ENABLED
+  ? lazy(() => import('./features/moderation/ModerationReportProvider').then(module => ({
+      default: module.ModerationReportProvider,
+    })))
+  : null;
 
 initializeTelemetry();
 
@@ -21,11 +27,19 @@ createRoot(document.getElementById('root')!).render(
         <PresenceRoot>
           <ComfortPreferencesProvider>
             <ThemeProvider>
-              <ModerationReportProvider>
+              {MEMBER_REPORTING_FEATURE_ENABLED && ModerationReportProvider ? (
+                <Suspense fallback={null}>
+                  <ModerationReportProvider>
+                    <ErrorBoundary>
+                      <App />
+                    </ErrorBoundary>
+                  </ModerationReportProvider>
+                </Suspense>
+              ) : (
                 <ErrorBoundary>
                   <App />
                 </ErrorBoundary>
-              </ModerationReportProvider>
+              )}
             </ThemeProvider>
           </ComfortPreferencesProvider>
         </PresenceRoot>

@@ -47,9 +47,9 @@ test('active routes and message targets keep their expected shape', () => {
   })
 })
 
-test('Activity and exact ShadowPin routes retain only their typed targets', () => {
+test('paused Activity routes fall back to Chat without leaking Activity targets', () => {
   expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=activity&message=ignored'))).toEqual({
-    view: 'activity',
+    view: 'chat',
     conversation: null,
     message: null,
     dmPanel: null,

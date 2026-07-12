@@ -1,4 +1,4 @@
-import { BOARDS_FEATURE_ENABLED } from '../config/featureFlags'
+import { ACTIVITY_FEATURE_ENABLED, BOARDS_FEATURE_ENABLED } from '../config/featureFlags'
 import type { AppView } from '../types/navigation'
 
 export type AppLocationState = {
@@ -186,7 +186,7 @@ export const resolvePinRouteMutation = ({
 const isEnabledView = (value: string | null): value is AppView => (
   value === 'chat' ||
   value === 'dms' ||
-  value === 'activity' ||
+  (ACTIVITY_FEATURE_ENABLED && value === 'activity') ||
   value === 'games' ||
   value === 'pins' ||
   value === 'settings' ||
@@ -202,12 +202,17 @@ export const normalizeViewParam = (value: string | null): AppView | null => {
     return 'chat'
   }
 
+  if (value === 'activity' && !ACTIVITY_FEATURE_ENABLED) {
+    return 'chat'
+  }
+
   return isEnabledView(value) ? value : null
 }
 
 export const getLocationStateFromUrl = (url: URL): AppLocationState => {
   const params = new URLSearchParams(url.search)
   const nextView = params.get('view')
+  const pausedActivityRoute = nextView === 'activity' && !ACTIVITY_FEATURE_ENABLED
   const view = nextView === 'profile'
     ? 'settings'
     : normalizeViewParam(nextView) ?? 'chat'
@@ -220,7 +225,7 @@ export const getLocationStateFromUrl = (url: URL): AppLocationState => {
   return {
     view,
     conversation: view === 'dms' ? params.get('conversation') : null,
-    message: view === 'dms' || view === 'chat' ? params.get('message') : null,
+    message: !pausedActivityRoute && (view === 'dms' || view === 'chat') ? params.get('message') : null,
     dmPanel: dmPanelParam === 'details' || dmPanelParam === 'search' || dmPanelParam === 'shared'
       ? dmPanelParam
       : null,

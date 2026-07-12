@@ -2,7 +2,7 @@
 
 This file is the working handbook for agentic contributors operating inside this repository.
 
-## Documentation Status - July 11, 2026
+## Documentation Status - July 12, 2026
 
 This handbook is current through the July 10 production-alignment and Release A
 deployment: the paused-domain contract, Supabase
@@ -19,11 +19,11 @@ before editing. For the complete documentation inventory and freshness notes,
 read
 [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
 
-On `codex/shadowchat-2.0`, all five Wave One candidates are locally verified:
-Activity HQ, ShadowPin Theater, DM Conversation Hub, Member Reporting with the
-operator Safety Case Center, and the device-local Accessibility & Comfort
-system. The combined isolated Netlify release gate and physical-device comfort
-validation remain open. Read
+On `codex/shadowchat-2.0`, all five Wave One candidate implementations remain
+preserved. The current trial revision pauses the Activity frontend and
+member-facing report intake, retains the operator Safety Case Center, and is
+revalidating ShadowPin Theater, the DM Conversation Hub, mobile navigation,
+and stale-session Edge Function recovery before phone approval. Read
 [docs/SHADOWCHAT_2_0_WAVE_ONE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_ONE.md:1)
 before changing that branch track.
 
@@ -54,10 +54,11 @@ device-local and must not be described as Supabase-synchronized.
 
 ## Current Feature Focus
 
-Boards, News, Art Board, and ESP Bridge are intentionally paused as of July 9,
-2026. Their source, data, migrations, firmware, and tests remain preserved, but
-the default production build must omit their navigation, runtime subscriptions,
-and admin panels. Read
+Boards, News, Art Board, ESP Bridge, Activity HQ, and member-facing report
+intake are intentionally paused. Their source, data, migrations, firmware, and
+tests remain preserved, but the default build must omit their navigation,
+member intake, and runtime subscriptions. The operator Safety Case Center stays
+available for existing cases. Read
 [docs/PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1) before
 touching or re-enabling any of those domains.
 

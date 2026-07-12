@@ -1,6 +1,7 @@
 import { Bell, Gamepad2, Images, MessageSquare, Users, Newspaper, Settings, Moon, Sun, X } from 'lucide-react';
 import { useOptionalActivity } from '../../features/activity/ActivityContext';
 import { formatActivityBadge } from '../../features/activity/activityModel';
+import { ACTIVITY_FEATURE_ENABLED } from '../../config/featureFlags';
 import { Avatar } from '../ui/Avatar';
 import { UserRoleBadge } from '../ui/UserRoleBadge';
 import { UserPresenceBadge } from '../ui/UserPresenceBadge';
@@ -54,12 +55,12 @@ export function Sidebar({
       icon: Users,
       badge: totalUnread > 0 ? totalUnread : null,
     },
-    {
+    ...(ACTIVITY_FEATURE_ENABLED ? [{
       id: 'activity' as const,
       label: 'Activity',
       icon: Bell,
       badge: activity?.unreadCount ? activity.unreadCount : null,
-    },
+    }] : []),
     ...(boardsEnabled ? [{
       id: 'boards' as const,
       label: 'Boards',

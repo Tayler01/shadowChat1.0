@@ -44,6 +44,7 @@ import { getHypeTier } from '../../lib/hypePresentation'
 import { saveMessageToLibrary } from '../../lib/messageLibrary'
 import { MessageHypeBadge } from './MessageHypeBadge'
 import { useModerationReport } from '../../features/moderation/useModerationReport'
+import { MEMBER_REPORTING_FEATURE_ENABLED } from '../../config/featureFlags'
 import { ShareImageToShadowPinModal } from '../../features/shadow-pin/components/ShareImageToShadowPinModal'
 import {
   CHAT_MEDIA_INTRINSIC_HEIGHT,
@@ -395,7 +396,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         id: 'report',
         label: 'Report message',
         icon: Flag,
-        hidden: isOwner || isLocalDelivery || !message.user,
+        hidden: !MEMBER_REPORTING_FEATURE_ENABLED || isOwner || isLocalDelivery || !message.user,
         onSelect: () => openReport({
           type: 'general_message',
           id: message.id,

@@ -39,11 +39,14 @@ Canonical detail and release gates live in:
   `codex/shadowchat-2.0` branch, preserve the production frontend and shared
   Supabase contract, then publish a separate installable Netlify test site.
 - Started: 2026-07-11
-- Status: implementation-complete and live on the separate Netlify trial;
-  awaiting Tayler's installed-phone approval before any merge to `main`.
+- Status: revision in progress on the separate Netlify trial branch before
+  Tayler's installed-phone approval; Activity and member report intake are
+  paused while the remaining UX/auth adjustments are revalidated.
 - Candidate 1: Unified Activity HQ with an authoritative recipient ledger,
   realtime/recovery, exact Chat/DM/Pin routes, five-item phone navigation,
   accessible unread handling, and hard-bounded foreground toast lifetime.
+- Current decision: preserve Candidate 1 source/backend but compile its
+  navigation, provider, queries, and subscriptions out of the trial frontend.
 - Backend proof: clean local database replay, zero Supabase lint findings,
   reviewed security-definer/table-grant contract, and rolled-back producer/RLS/
   cleanup verification across nine event cases.
@@ -77,6 +80,9 @@ Canonical detail and release gates live in:
 - Candidate 4: member reporting plus an operator Safety Case Center with
   private immutable evidence, reporter receipts, RLS-separated queues,
   optimistic versioning, and audited actions.
+- Current decision: preserve intake/history source and the complete backend,
+  pause all member-facing Report/My Reports UI, and keep the operator Case
+  Center active for existing cases.
 - Candidate 5: device-local Comfort Profiles for motion, transparency,
   contrast, text scale, message density, touch targets, autoplay, sound, and
   haptics, applied before React paints.

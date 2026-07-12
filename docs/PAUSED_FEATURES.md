@@ -1,17 +1,19 @@
 # Paused Product Domains
 
-## Status - July 10, 2026
+## Status - July 12, 2026
 
-Boards, News, Art Board, and the ESP Bridge product surfaces are intentionally
-paused. Their implementation history, source, migrations, stored data, and
-firmware remain part of ShadowChat so the work can be resumed later without a
-destructive rebuild.
+Boards, News, Art Board, the ESP Bridge, Activity HQ, and member-facing safety
+report intake are intentionally paused. Their implementation history, source,
+migrations, stored data, and firmware remain part of ShadowChat so the work can
+be resumed later without a destructive rebuild.
 
 Paused does not mean deleted:
 
 - no Board, News, or Art Board rows or Storage objects should be removed;
 - no bridge tables, device history, firmware, TUI, or design docs should be
   removed;
+- no Activity or moderation case rows, evidence, receipts, source, or migrations
+  should be removed;
 - direct dormant-feature tests remain in the suite;
 - reactivation requires an explicit security, cost, and product review.
 
@@ -22,6 +24,8 @@ The production defaults are compile-time off:
 ```dotenv
 VITE_FEATURE_BOARDS=false
 VITE_FEATURE_ESP_ADMIN=false
+VITE_FEATURE_ACTIVITY=false
+VITE_FEATURE_MEMBER_REPORTING=false
 ```
 
 Leaving either variable unset also means `false`. Only the literal value
@@ -34,7 +38,15 @@ With the default production build:
 - Board badge, News, and Art Board realtime subscriptions are not mounted;
 - Boards/News/Art Board chunks are not emitted in `dist`;
 - Settings omits News Sources and ESP Bridge Pairing;
+- mobile and desktop navigation omit Activity, `?view=activity` falls back to
+  Chat, and the Activity provider performs no fetch or Realtime subscription;
+- General Chat, DM, member profile, ShadowPin post, and ShadowPin comment Report
+  actions are absent, and Settings omits My Safety Reports;
+- the operator Safety Case Center remains available so existing cases can still
+  be triaged and audited;
 - News and ESP admin panel chunks are not emitted in `dist`.
+- Activity View, member report sheet, and My Reports chunks are not emitted in
+  `dist`.
 
 `npm run build` runs `scripts/verify-paused-feature-build.mjs` after Vite and
 fails if paused feature chunks or known subscription/API markers leak into the
@@ -86,6 +98,26 @@ provider controls below are part of the pause contract.
   future reactivation requires deliberate grants plus fresh pairing and
   sessions; it must not revive preserved credentials.
 
+### Activity HQ
+
+- The additive `activity_events` ledger, triggers, RLS, Realtime publication,
+  source, and dormant tests remain intact on shared Supabase.
+- The default frontend does not mount `ActivityProvider`, query the ledger,
+  subscribe to it, show a badge/destination, or honor Activity deep links.
+- Re-enable with `VITE_FEATURE_ACTIVITY=true`, then repeat phone navigation,
+  exact-target routing, unread, Realtime, and installed-PWA badge review before
+  release.
+
+### Member Reporting
+
+- `member_reports`, cases, immutable evidence, reporter updates, private
+  Storage, RPCs, migrations, and all dormant UI source remain preserved.
+- Member intake and reporter history are compile-time off by default. The
+  operator Safety Case Center deliberately stays on to manage existing cases.
+- Re-enable with `VITE_FEATURE_MEMBER_REPORTING=true`, then repeat multi-role
+  RLS, evidence, Storage cleanup, entry-point, receipt, phone keyboard, and
+  operator workflow proof before release.
+
 ## Re-enable Checklist
 
 Do not re-enable a flag by itself. A reviewed reactivation must:
@@ -115,6 +147,8 @@ Explicit local re-enable proof:
 ```powershell
 $env:VITE_FEATURE_BOARDS='true'
 $env:VITE_FEATURE_ESP_ADMIN='true'
+$env:VITE_FEATURE_ACTIVITY='true'
+$env:VITE_FEATURE_MEMBER_REPORTING='true'
 npm run build
 ```
 

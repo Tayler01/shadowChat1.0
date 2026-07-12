@@ -6,13 +6,9 @@ import {
   BellOff,
   CheckCheck,
   Circle,
-  FileText,
-  Image,
-  Mic,
   MoreHorizontal,
   Pin,
   PinOff,
-  Video,
 } from 'lucide-react'
 import type { PresenceVisibility } from '../../../types'
 import { cn } from '../../../lib/utils'
@@ -57,13 +53,13 @@ type DMHubConversationRowProps = {
   onRowRemovedFocusFallback?: () => void
 }
 
-const kindMeta: Record<DMHubMessageKind, { label: string; Icon: typeof FileText }> = {
-  text: { label: 'Message', Icon: FileText },
-  image: { label: 'Photo', Icon: Image },
-  video: { label: 'Video', Icon: Video },
-  audio: { label: 'Voice message', Icon: Mic },
-  file: { label: 'File', Icon: FileText },
-  gif: { label: 'GIF', Icon: Image },
+const kindMeta: Record<DMHubMessageKind, { label: string }> = {
+  text: { label: 'Message' },
+  image: { label: 'Photo' },
+  video: { label: 'Video' },
+  audio: { label: 'Voice message' },
+  file: { label: 'File' },
+  gif: { label: 'GIF' },
 }
 
 const getPreview = (conversation: DMHubConversationRowData) => {
@@ -121,10 +117,12 @@ export function DMHubConversationRow({
   const [actionsOpen, setActionsOpen] = useState(false)
   const unreadCount = Math.max(0, conversation.unreadCount ?? 0)
   const isUnread = unreadCount > 0 || conversation.manuallyUnread === true
-  const messageKind = conversation.lastMessageKind ?? 'text'
-  const KindIcon = kindMeta[messageKind].Icon
   const preview = getPreview(conversation)
-  const senderPrefix = conversation.lastMessageFromCurrentUser && !conversation.draftPreview ? 'You: ' : ''
+  const senderLabel = conversation.draftPreview
+    ? 'Draft:'
+    : conversation.lastMessageFromCurrentUser
+      ? 'You:'
+      : `${conversation.displayName}:`
   const deliveryLabel = conversation.deliveryState === 'failed'
     ? 'Failed to send'
     : conversation.deliveryState === 'sending'
@@ -169,7 +167,7 @@ export function DMHubConversationRow({
         type="button"
         onClick={() => onOpen(conversation.id)}
         aria-current={selected ? 'true' : undefined}
-        aria-label={`${conversation.displayName}${conversation.username ? `, @${conversation.username}` : ''}. ${senderPrefix}${preview}. ${accessibleState}${conversation.timestampLabel ? `, ${conversation.timestampLabel}` : ''}`}
+        aria-label={`${conversation.displayName}${conversation.username ? `, @${conversation.username}` : ''}. ${senderLabel} ${preview}. ${accessibleState}${conversation.timestampLabel ? `, ${conversation.timestampLabel}` : ''}`}
         className="flex min-h-[5.25rem] w-full items-center gap-3 rounded-[var(--radius-lg)] py-3 pl-3 pr-14 text-left focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--theme-focus-ring)]"
       >
         <div className="relative shrink-0">
@@ -199,17 +197,18 @@ export function DMHubConversationRow({
               <span className="shrink-0 rounded-full border border-[rgba(215,170,70,0.2)] bg-[rgba(215,170,70,0.07)] px-1.5 py-0.5 text-[0.58rem] font-semibold uppercase tracking-[0.1em] text-[var(--text-gold)]" aria-hidden="true">Blocked</span>
             )}
           </div>
-          <div className="mt-1 flex min-w-0 items-center gap-1.5 text-sm">
-            {conversation.draftPreview ? (
-              <span className="shrink-0 font-semibold text-[var(--theme-accent-readable)]">Draft:</span>
-            ) : (
-              <KindIcon className="h-3.5 w-3.5 shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
-            )}
+          <div className="mt-1 flex min-w-0 items-center gap-1 text-sm">
             <span className={cn(
-              'truncate',
+              'max-w-[40%] shrink-0 truncate font-semibold',
+              conversation.draftPreview ? 'text-[var(--theme-accent-readable)]' : 'text-[var(--text-secondary)]'
+            )}>
+              {senderLabel}
+            </span>
+            <span className={cn(
+              'min-w-0 flex-1 truncate',
               deliveryLabel === 'Failed to send' ? 'text-red-300' : isUnread ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'
             )}>
-              {senderPrefix}{preview}
+              {preview}
             </span>
           </div>
           {deliveryLabel && (

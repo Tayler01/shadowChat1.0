@@ -13,6 +13,12 @@ project. Candidate 4 therefore uses only additive tables, RPCs, policies,
 Storage configuration, Realtime publication entries, and TypeScript consumers.
 No existing RPC signature or old-client write path changes.
 
+Member-facing report intake and My Safety Reports are paused in the current
+trial build at Tayler's request. The five entry points, sheet, reporter history,
+provider, backend, migrations, evidence, and tests remain preserved behind
+`VITE_FEATURE_MEMBER_REPORTING=true`. The operator Safety Case Center stays
+available so existing cases can still be resolved and audited.
+
 ## Product Contract
 
 Members can report exactly five active target types:

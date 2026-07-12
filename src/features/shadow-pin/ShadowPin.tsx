@@ -57,6 +57,7 @@ import { ShadowPinCommentsDialog } from './components/ShadowPinCommentsDialog'
 import { ShadowPinImmersiveViewer } from './components/ShadowPinImmersiveViewer'
 import { buildViewerSequence, createShadowPinPermalink } from './immersiveViewerModel'
 import { useModerationReport } from '../moderation/useModerationReport'
+import { MEMBER_REPORTING_FEATURE_ENABLED } from '../../config/featureFlags'
 import { rankShadowPinCategories } from './categorySearch'
 import {
   useShadowPinActivityTracker,
@@ -1728,7 +1729,7 @@ function ImageCard({
   const shareUrl = getShareUrl(image)
   const aspectRatio = getImageAspectRatio(image) || '4 / 5'
   const controlSide = getPinControlSide(columnSide)
-  const canReportImage = Boolean(user && image.creator_id && image.creator_id !== user.id)
+  const canReportImage = MEMBER_REPORTING_FEATURE_ENABLED && Boolean(user && image.creator_id && image.creator_id !== user.id)
   const videoPin = isVideoPin(image)
   const activeVideo = activeVideoId === image.id && image.processing_status !== 'failed'
   const nativeVideoSrc = getVideoPreviewUrl(image)
@@ -2335,8 +2336,8 @@ function ImageCard({
             event.stopPropagation()
             onToggleOverlay()
           }}
-          className="absolute left-2 top-2 z-20 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white shadow-lg backdrop-blur-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]"
-          aria-label={`Show actions for ${image.title}`}
+          className="absolute left-2 top-2 z-30 inline-flex h-12 w-12 items-center justify-center text-[var(--text-gold)] [filter:drop-shadow(0_2px_3px_rgba(0,0,0,0.95))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]"
+          aria-label={`${overlayOpen ? 'Hide' : 'Show'} details for ${image.title}`}
           aria-expanded={overlayOpen}
         >
           <MoreHorizontal className="h-5 w-5" />
@@ -2671,7 +2672,7 @@ function ImageViewerMedia({
               <button type="button" onClick={() => { setImageSourceIndex(0); setImageFailed(false) }} className="min-h-11 rounded-full border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white">Retry</button>
             </div>
           ) : (
-            <ZoomableImageFrame resetKey={image.id} className="h-full w-full" controlsPosition="top" onZoomChange={onZoomChange}>
+            <ZoomableImageFrame resetKey={image.id} className="h-full w-full" controlsPosition="top" controlsVariant="minimal" onZoomChange={onZoomChange}>
               <img
                 src={imageSources[imageSourceIndex] || getPinImageUrl(image, 'medium')}
                 alt={image.title}

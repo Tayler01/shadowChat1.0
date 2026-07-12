@@ -1,8 +1,25 @@
-import { Bell, Gamepad2, Images, MessageSquare, Newspaper, Users } from 'lucide-react'
-import { useOptionalActivity } from '../../features/activity/ActivityContext'
-import { formatActivityBadge } from '../../features/activity/activityModel'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Bell, ChevronLeft, ChevronRight, Gamepad2, Images, MessageSquare, Newspaper, Settings, Users } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { useOptionalClientReset } from '../../hooks/ClientResetContext'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
+import { useOptionalMessages } from '../../hooks/MessagesContext'
+import { useOptionalActivity } from '../../features/activity/ActivityContext'
+import { ACTIVITY_FEATURE_ENABLED } from '../../config/featureFlags'
+import { openSettingsMain } from '../../lib/settingsNavigation'
+import { uploadChatImageAsset } from '../../lib/supabase'
 import type { AppView } from '../../types/navigation'
+
+const LazyActiveUsersButton = lazy(() => import('../chat/ActiveUsersButton').then(module => ({
+  default: module.ActiveUsersButton,
+})))
+const LazyWeatherWidget = lazy(() => import('../chat/WeatherWidget').then(module => ({
+  default: module.WeatherWidget,
+})))
+
+const LazyGlobalSearchButton = lazy(() => import('../search/GlobalSearchButton').then(module => ({
+  default: module.GlobalSearchButton,
+})))
 
 interface MobileNavProps {
   currentView: AppView
@@ -13,6 +30,8 @@ interface MobileNavProps {
   boardsBadgeCount?: number
 }
 
+const formatBadge = (count: number) => count > 99 ? '99+' : String(count)
+
 export function MobileNav({
   currentView,
   onViewChange,
@@ -22,70 +41,179 @@ export function MobileNav({
   boardsBadgeCount = 0,
 }: MobileNavProps) {
   const { conversations } = useDirectMessages()
+  const messagesContext = useOptionalMessages()
   const activity = useOptionalActivity()
-  const totalUnread = conversations.reduce(
-    (sum, c) => sum + (c.unread_count || 0),
-    0
-  )
+  const { status: resetStatus } = useOptionalClientReset()
+  const [page, setPage] = useState<0 | 1>(0)
+  const [toolsMounted, setToolsMounted] = useState(false)
+  const [sharingWeather, setSharingWeather] = useState(false)
+  const primaryPageRef = useRef<HTMLUListElement>(null)
+  const toolsPageRef = useRef<HTMLUListElement>(null)
+  const totalUnread = conversations.reduce((sum, conversation) => sum + (conversation.unread_count || 0), 0)
 
-  const navItems = [
+  const primaryItems = useMemo(() => [
     { id: 'chat' as const, icon: MessageSquare, label: 'Chat', badge: null },
-    {
-      id: 'dms' as const,
-      icon: Users,
-      label: 'DMs',
-      badge: totalUnread > 0 ? totalUnread : null,
-    },
-    {
-      id: 'activity' as const,
-      icon: Bell,
-      label: 'Activity',
-      badge: activity?.unreadCount ? activity.unreadCount : null,
-    },
-    ...(boardsEnabled ? [{
-      id: 'boards' as const,
-      icon: Newspaper,
-      label: 'Boards',
-      badge: boardsBadgeCount > 0 ? boardsBadgeCount : null,
-    }] : []),
+    { id: 'dms' as const, icon: Users, label: 'DMs', badge: totalUnread || null },
+    ...(ACTIVITY_FEATURE_ENABLED ? [{ id: 'activity' as const, icon: Bell, label: 'Activity', badge: activity?.unreadCount || null }] : []),
+    ...(boardsEnabled ? [{ id: 'boards' as const, icon: Newspaper, label: 'Boards', badge: boardsBadgeCount || null }] : []),
     { id: 'pins' as const, icon: Images, label: 'Pins', badge: null },
     { id: 'games' as const, icon: Gamepad2, label: 'Play', badge: null },
-  ]
+  ], [activity?.unreadCount, boardsBadgeCount, boardsEnabled, totalUnread])
+
+  useEffect(() => {
+    const resetForKeyboard = () => {
+      if (document.documentElement.dataset.shadowchatKeyboard === 'open') setPage(0)
+    }
+    const observer = new MutationObserver(resetForKeyboard)
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-shadowchat-keyboard'],
+    })
+    resetForKeyboard()
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (primaryPageRef.current) primaryPageRef.current.inert = page === 1
+    if (toolsPageRef.current) toolsPageRef.current.inert = page === 0
+  }, [page])
+
+  const changeView = (view: AppView) => {
+    setPage(0)
+    onViewChange(view)
+  }
+
+  const showTools = () => {
+    setToolsMounted(true)
+    setPage(1)
+    window.requestAnimationFrame(() => {
+      toolsPageRef.current?.querySelector<HTMLButtonElement>('button:not([disabled])')?.focus({ preventScroll: true })
+    })
+  }
+
+  const showPrimary = () => {
+    setPage(0)
+    window.requestAnimationFrame(() => {
+      primaryPageRef.current?.querySelector<HTMLButtonElement>('button:not([disabled])')?.focus({ preventScroll: true })
+    })
+  }
+
+  const shareWeather = async (file: File) => {
+    setSharingWeather(true)
+    try {
+      if (!messagesContext) throw new Error('General Chat is still loading.')
+      const asset = await uploadChatImageAsset(file, 'weather')
+      const sent = await messagesContext.sendMessage(
+        'Weather share',
+        'image',
+        asset.publicUrl,
+        undefined,
+        asset.thumbnailUrl
+      )
+      if (sent) toast.success('Weather shared')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to share weather')
+    } finally {
+      setSharingWeather(false)
+    }
+  }
 
   const navSurface = embedded
     ? 'shadowchat-mobile-nav shadowchat-mobile-nav--embedded border-t border-[var(--border-panel)] bg-transparent'
     : 'shadowchat-mobile-nav shadowchat-mobile-nav--standalone glass-panel-strong border-t border-[var(--border-panel)]'
 
+  const pageButtonClass = 'flex h-full min-h-11 w-full flex-col items-center justify-center rounded-[var(--radius-md)] px-0.5 py-1.5 text-[0.625rem] text-[var(--text-muted)] transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-accent)]'
+
   return (
     <nav
-      className={`${navSurface} md:hidden ${className || 'fixed bottom-0 inset-x-0 z-50'}`}
+      className={`${navSurface} overflow-hidden md:hidden ${className || 'fixed bottom-0 inset-x-0 z-50'}`}
+      aria-label="Primary and utility navigation"
     >
-      <ul className="flex h-[var(--shadowchat-mobile-nav-row-height)] justify-around px-1">
-        {navItems.map(item => (
-          <li key={item.id} className="relative flex-1">
-            <button
-              onClick={() => onViewChange(item.id)}
-              aria-label={`${item.label}${item.badge ? `, ${item.badge} unread` : ''}`}
-              aria-current={currentView === item.id ? 'page' : undefined}
-              className={`flex h-full min-h-11 w-full flex-col items-center justify-center rounded-[var(--radius-md)] px-0.5 py-1.5 text-[0.625rem] transition-[background-color,box-shadow,color] duration-[var(--dur-med)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-accent)] ${
-                currentView === item.id
-                  ? 'bg-[var(--nav-active-bg)] text-[var(--theme-accent-readable)] shadow-[var(--shadow-accent-soft)]'
-                  : 'text-[var(--text-muted)] hover:bg-[var(--nav-hover-bg)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              <span className="relative mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--nav-icon-bg)]">
-                <item.icon className="w-[1.15rem] h-[1.15rem]" />
-                {item.badge && (
-                  <span aria-hidden="true" className="theme-unread-badge absolute -right-1 -top-1 rounded-full px-1 text-[0.625rem] leading-none">
-                    {formatActivityBadge(item.badge)}
-                  </span>
-                )}
-              </span>
-              <span>{item.label}</span>
+      <div
+        className={`flex w-[200%] transition-transform duration-300 ease-out motion-reduce:transition-none ${page === 1 ? '-translate-x-1/2' : 'translate-x-0'}`}
+        data-testid="mobile-nav-pages"
+      >
+        <ul
+          ref={primaryPageRef}
+          className="grid h-[var(--shadowchat-mobile-nav-row-height)] w-1/2 shrink-0 px-1"
+          style={{ gridTemplateColumns: `repeat(${primaryItems.length + 1}, minmax(0, 1fr))` }}
+          aria-label="Main navigation"
+          aria-hidden={page === 1}
+        >
+          {primaryItems.map(item => (
+            <li key={item.id} className="relative min-w-0">
+              <button
+                type="button"
+                onClick={() => changeView(item.id)}
+                aria-label={`${item.label}${item.badge ? `, ${item.badge} unread` : ''}`}
+                aria-current={currentView === item.id ? 'page' : undefined}
+                className={`${pageButtonClass} ${currentView === item.id ? 'bg-[var(--nav-active-bg)] text-[var(--theme-accent-readable)] shadow-[var(--shadow-accent-soft)]' : ''}`}
+              >
+                <span className="relative mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--nav-icon-bg)]">
+                  <item.icon className="h-[1.15rem] w-[1.15rem]" />
+                  {item.badge ? (
+                    <span aria-hidden="true" className="theme-unread-badge absolute -right-1 -top-1 rounded-full px-1 text-[0.625rem] leading-none">
+                      {formatBadge(item.badge)}
+                    </span>
+                  ) : null}
+                </span>
+                <span>{item.label}</span>
+              </button>
+            </li>
+          ))}
+          <li className="min-w-0">
+            <button type="button" onClick={showTools} className={pageButtonClass} aria-label="Show app tools">
+              <span className="mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--nav-icon-bg)]"><ChevronRight className="h-[1.15rem] w-[1.15rem]" /></span>
+              <span>Tools</span>
             </button>
           </li>
-        ))}
-      </ul>
+        </ul>
+
+        <ul
+          ref={toolsPageRef}
+          className="grid h-[var(--shadowchat-mobile-nav-row-height)] w-1/2 shrink-0 grid-cols-5 px-1"
+          aria-label="App tools"
+          aria-hidden={page === 0}
+        >
+          <li className="min-w-0">
+            {toolsMounted ? (
+              <Suspense fallback={<span className="block h-full w-full" aria-hidden="true" />}>
+                <LazyWeatherWidget
+                  variant="nav"
+                  onOpenSettings={() => openSettingsMain(changeView)}
+                  onShareWeather={sharingWeather ? undefined : shareWeather}
+                />
+              </Suspense>
+            ) : null}
+          </li>
+          <li className="min-w-0">
+            {toolsMounted ? (
+              <Suspense fallback={<span className="block h-full w-full" aria-hidden="true" />}>
+                <LazyActiveUsersButton resetStatus={resetStatus} variant="nav" />
+              </Suspense>
+            ) : null}
+          </li>
+          <li className="min-w-0">
+            {toolsMounted ? (
+              <Suspense fallback={<span className="block h-full w-full" aria-hidden="true" />}>
+                <LazyGlobalSearchButton variant="nav" />
+              </Suspense>
+            ) : null}
+          </li>
+          <li className="min-w-0">
+            <button type="button" onClick={() => openSettingsMain(changeView)} className={pageButtonClass} aria-label="Open app preferences" aria-current={currentView === 'settings' ? 'page' : undefined}>
+              <span className="mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--nav-icon-bg)]"><Settings className="h-[1.15rem] w-[1.15rem]" /></span>
+              <span>Settings</span>
+            </button>
+          </li>
+          <li className="min-w-0">
+            <button type="button" onClick={showPrimary} className={pageButtonClass} aria-label="Return to main navigation">
+              <span className="mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--nav-icon-bg)]"><ChevronLeft className="h-[1.15rem] w-[1.15rem]" /></span>
+              <span>Back</span>
+            </button>
+          </li>
+        </ul>
+      </div>
       <div className="shadowchat-mobile-nav-home-spacer" aria-hidden="true" />
     </nav>
   )

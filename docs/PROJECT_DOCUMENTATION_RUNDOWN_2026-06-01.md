@@ -76,19 +76,19 @@ implementation backlog.
 | [docs/DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1) | 2026-07-10 | Main-only GitHub release authority, Netlify CLI publication, classified Supabase deployment, and paused Render worker. | Update after Netlify headers, backend manifest changes, or Auth config changes. |
 | [docs/GOAL_PLAYBOOKS.md](C:/repos/chat2.0/docs/GOAL_PLAYBOOKS.md:1) | 2026-05-14 | Goal-mode playbooks. | Add audit-backlog playbook if this becomes a repeated workflow. |
 | [docs/DEFERRED_FOLLOWUPS.md](C:/repos/chat2.0/docs/DEFERRED_FOLLOWUPS.md:1) | 2026-07-10 | Historical small ideas with completed bundle/Node work clearly marked. | Keep small only; larger audit items live in the dedicated audit next-steps doc. |
-| [docs/PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1) | 2026-07-10 | Canonical paused-domain status, build flags, verified remote controls, and re-enable checklist. | Update before any Boards, News, Art Board, or ESP reactivation. |
+| [docs/PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1) | 2026-07-12 | Canonical paused-domain status, build flags, verified remote controls, and re-enable checklist. | Update before any Boards, News, Art Board, ESP, Activity, or member-report reactivation. |
 | [docs/PRODUCTION_SMOKE_TESTING.md](C:/repos/chat2.0/docs/PRODUCTION_SMOKE_TESTING.md:1) | 2026-07-10 | Production smoke strategy, latest-window stabilization, cleanup contract, and July 10 live proof. | Keep stable email-confirmed smoke-account setup current. |
 | [docs/ENGINEERING_SAFEGUARDS.md](C:/repos/chat2.0/docs/ENGINEERING_SAFEGUARDS.md:1) | 2026-07-10 | Privacy-safe telemetry, main-only release authority, remote parity, security automation, and pause-aware monitoring. | Update with workflow, monitoring, or telemetry policy changes. |
 
 ## Current Product And Feature Docs
 
-The isolated ShadowChat 2.0 Wave One work is tracked in
+The isolated ShadowChat 2.0 Wave One work and its July 12 trial revision are tracked in
 [SHADOWCHAT_2_0_WAVE_ONE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_ONE.md:1).
-Its five verified and live-trial candidates are documented in Activity HQ, ShadowPin
+Its five implemented candidates are documented in Activity HQ, ShadowPin
 Theater, DM Conversation Hub, Member Reporting/Case Center, and Accessibility &
 Comfort docs.
-These remain candidate docs while the live separate 2.0 Netlify trial is reviewed
-for `main`.
+Activity and member intake are currently paused while the revised live separate
+2.0 Netlify trial is revalidated for phone approval.
 
 | File | Latest tracked update/status date | Role | Refresh guidance |
 | --- | --- | --- | --- |

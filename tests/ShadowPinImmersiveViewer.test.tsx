@@ -90,6 +90,7 @@ test('Theater is a focus-managed dialog with 48px controls and one active media 
   expect(screen.getByLabelText('Close ShadowPin Theater')).toHaveClass('h-12', 'w-12')
   expect(screen.getByLabelText('Previous Pin')).toHaveClass('h-12', 'w-12')
   expect(screen.getByLabelText('Next Pin')).toHaveClass('h-12', 'w-12')
+  expect(screen.getByLabelText('Previous Pin')).not.toHaveClass('border', 'bg-black/55')
   expect(props.onSettled).toHaveBeenCalledWith(expect.objectContaining({ id: 'two' }))
   expect(screen.getByLabelText('Pin 2 of 3')).toBeInTheDocument()
 })
@@ -99,7 +100,9 @@ test('buttons and keyboard navigate without mounting adjacent video players', ()
   const props = renderViewer()
 
   fireEvent.click(screen.getByLabelText('Next Pin'))
-  act(() => jest.advanceTimersByTime(200))
+  const mediaRail = screen.getByTestId('active-media').parentElement?.parentElement
+  expect(mediaRail).toBeTruthy()
+  fireEvent.transitionEnd(mediaRail!, { propertyName: 'transform' })
   expect(props.onActiveImageChange).toHaveBeenCalledWith(
     expect.objectContaining({ id: 'three' }),
     { direction: 1, reason: 'button' }
@@ -107,7 +110,7 @@ test('buttons and keyboard navigate without mounting adjacent video players', ()
 
   props.onActiveImageChange.mockClear()
   fireEvent.keyDown(screen.getByRole('dialog'), { key: 'ArrowLeft' })
-  act(() => jest.advanceTimersByTime(200))
+  fireEvent.transitionEnd(mediaRail!, { propertyName: 'transform' })
   expect(props.onActiveImageChange).toHaveBeenCalledWith(
     expect.objectContaining({ id: 'one' }),
     { direction: -1, reason: 'keyboard' }

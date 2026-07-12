@@ -24,6 +24,12 @@ The Hub adds:
 - accessible list/log/status semantics, focus return, named media, and
   phone-comfortable controls
 
+The July 12 trial revision removes the redundant mobile inbox top padding so
+Search and Inbox/Unread/Archived sit directly beneath the header. Conversation
+previews no longer show a generic media icon; they use `You:`, `Draft:`, or the
+other member's display name while retaining Photo, Video, Voice message, File,
+and GIF fallback text.
+
 ## Shared-Backend Boundary
 
 Production `main` and the ShadowChat 2.0 frontend share one Supabase project.

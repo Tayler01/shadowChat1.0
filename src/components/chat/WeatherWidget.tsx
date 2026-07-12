@@ -26,6 +26,7 @@ import {
 interface WeatherWidgetProps {
   onOpenSettings?: () => void
   onShareWeather?: (file: File) => Promise<void>
+  variant?: 'compact' | 'nav'
 }
 
 const SETTINGS_SECTION_STORAGE_KEY = 'shadowchat:settings-section'
@@ -162,7 +163,7 @@ function WeatherShareCaptureCard({
   )
 }
 
-export function WeatherWidget({ onOpenSettings, onShareWeather }: WeatherWidgetProps) {
+export function WeatherWidget({ onOpenSettings, onShareWeather, variant = 'compact' }: WeatherWidgetProps) {
   const { preference, forecast, loading, error } = useWeatherForecast()
   const [open, setOpen] = useState(false)
   const [sharing, setSharing] = useState(false)
@@ -356,7 +357,7 @@ export function WeatherWidget({ onOpenSettings, onShareWeather }: WeatherWidgetP
   ) : null
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className={variant === 'nav' ? 'relative h-full w-full' : 'relative'}>
       {current && forecast && (
         <div
           ref={weatherShareRef}
@@ -373,20 +374,22 @@ export function WeatherWidget({ onOpenSettings, onShareWeather }: WeatherWidgetP
       <button
         type="button"
         onClick={() => setOpen(value => !value)}
-        className="inline-flex min-h-7 items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-2 py-0.5 text-[11px] text-[var(--text-muted)] transition-colors hover:border-[rgba(215,170,70,0.28)] hover:bg-[rgba(215,170,70,0.08)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.28)] sm:min-h-8 sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-xs"
+        className={variant === 'nav'
+          ? 'flex h-full min-h-11 w-full flex-col items-center justify-center rounded-[var(--radius-md)] px-0.5 py-1.5 text-[0.625rem] text-[var(--text-muted)] transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[var(--theme-accent)]'
+          : 'inline-flex min-h-7 items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-2 py-0.5 text-[11px] text-[var(--text-muted)] transition-colors hover:border-[rgba(215,170,70,0.28)] hover:bg-[rgba(215,170,70,0.08)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.28)] sm:min-h-8 sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-xs'}
         aria-label={current ? `${formatTemperature(current.temperature)} and ${current.condition.label}` : 'Set weather location'}
         aria-haspopup="dialog"
         aria-expanded={open}
       >
-        <span className="text-[var(--text-gold)]">
+        <span className={variant === 'nav' ? 'mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--nav-icon-bg)] text-[var(--text-gold)]' : 'text-[var(--text-gold)]'}>
           {current ? (
             <WeatherIcon kind={current.condition.kind} isDay={current.isDay} />
           ) : (
             <MapPin className="h-4 w-4" />
           )}
         </span>
-        <span className="min-w-[1.8rem] text-center text-xs font-semibold text-[var(--text-primary)]">
-          {current ? formatTemperature(current.temperature) : loading ? '--' : 'Set'}
+        <span className={variant === 'nav' ? '' : 'min-w-[1.8rem] text-center text-xs font-semibold text-[var(--text-primary)]'}>
+          {variant === 'nav' ? 'Weather' : current ? formatTemperature(current.temperature) : loading ? '--' : 'Set'}
         </span>
       </button>
 

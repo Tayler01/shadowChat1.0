@@ -448,6 +448,8 @@ Netlify needs the frontend equivalents of:
 - `VITE_MESSAGE_FETCH_LIMIT` only when deliberately changing chat/DM fetch windows
 - `VITE_FEATURE_BOARDS=false` while Boards/News/Art Board remain paused
 - `VITE_FEATURE_ESP_ADMIN=false` while ESP Bridge remains on hold
+- `VITE_FEATURE_ACTIVITY=false` while Activity HQ remains paused
+- `VITE_FEATURE_MEMBER_REPORTING=false` while member intake remains paused
 
 Check [`.env.example`](C:/repos/chat2.0/.env.example:1) for the expected names.
 

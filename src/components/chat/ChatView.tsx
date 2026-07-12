@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { lazy, Suspense, useEffect, useState, useCallback } from 'react'
 import { useMessages } from '../../hooks/useMessages'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
@@ -15,7 +15,11 @@ import type { ChatMessageType } from '../../lib/supabase'
 import type { AppView } from '../../types/navigation'
 import type { Message } from '../../lib/supabase'
 import { messageToReplyTarget, type ReplyTarget } from './messageDisplay'
-import { GeneralChatRoomTools } from './GeneralChatRoomTools'
+import { useIsDesktop } from '../../hooks/useIsDesktop'
+
+const LazyGeneralChatRoomTools = lazy(() => import('./GeneralChatRoomTools').then(module => ({
+  default: module.GeneralChatRoomTools,
+})))
 
 interface ChatViewProps {
   currentView: AppView
@@ -24,6 +28,7 @@ interface ChatViewProps {
 }
 
 export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, initialMessageId }) => {
+  const isDesktop = useIsDesktop()
   const {
     messages,
     sendMessage,
@@ -88,7 +93,12 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
         srTitle="General Chat"
         logo
         collapseOnKeyboard
-        actions={<GeneralChatRoomTools onViewChange={onViewChange} />}
+        actions={isDesktop ? (
+          <Suspense fallback={null}>
+            <LazyGeneralChatRoomTools onViewChange={onViewChange} />
+          </Suspense>
+        ) : null}
+        className="hidden md:flex"
       />
 
       {/* Messages */}

@@ -68,6 +68,7 @@ import {
   type ReplyTarget,
 } from '../chat/messageDisplay'
 import { useModerationReport } from '../../features/moderation/useModerationReport'
+import { MEMBER_REPORTING_FEATURE_ENABLED } from '../../config/featureFlags'
 
 interface DirectMessagesViewProps {
   onToggleSidebar: () => void
@@ -291,7 +292,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
       id: 'report',
       label: 'Report message',
       icon: Flag,
-      hidden: isOwn || isLocalDelivery || !message.sender,
+      hidden: !MEMBER_REPORTING_FEATURE_ENABLED || isOwn || isLocalDelivery || !message.sender,
       onSelect: () => openReport({
         type: 'dm_message',
         id: message.id,
@@ -1401,7 +1402,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
               )}
             />
 
-            <div className="min-h-0 flex-1 overflow-y-auto pt-14 pb-[calc(env(safe-area-inset-bottom)_+_5rem)] md:pb-0 md:pt-0">
+            <div className="min-h-0 flex-1 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)_+_5rem)] md:pb-0">
               {showInboxLoading ? (
                 <div className="p-6 text-center text-[var(--text-muted)]">
                   <LoadingSpinner size="md" className="mx-auto mb-3" />

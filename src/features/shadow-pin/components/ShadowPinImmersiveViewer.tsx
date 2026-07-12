@@ -145,6 +145,10 @@ export function ShadowPinImmersiveViewer({
   const [consentedProviders, setConsentedProviders] = useState<Set<string>>(() => new Set())
   const gestureRef = useRef<GestureSnapshot | null>(null)
   const navigationTimerRef = useRef<number | null>(null)
+  const pendingNavigationRef = useRef<{
+    image: ShadowPinImage
+    meta: { direction: ViewerDirection; reason: ViewerNavigationReason }
+  } | null>(null)
   const openedIdsRef = useRef(new Set<string>())
   const requestedMoreRef = useRef<string | null>(null)
 
@@ -184,6 +188,7 @@ export function ShadowPinImmersiveViewer({
     if (navigationTimerRef.current !== null) {
       window.clearTimeout(navigationTimerRef.current)
     }
+    pendingNavigationRef.current = null
   }, [])
 
   useEffect(() => {
@@ -191,6 +196,7 @@ export function ShadowPinImmersiveViewer({
     setZoomed(false)
     setDragX(0)
     setTransitioning(false)
+    pendingNavigationRef.current = null
     gestureRef.current = null
     if (!activeImage || openedIdsRef.current.has(activeImage.id)) return
     openedIdsRef.current.add(activeImage.id)
@@ -229,6 +235,7 @@ export function ShadowPinImmersiveViewer({
     gestureRef.current = null
     setDragX(0)
     setTransitioning(false)
+    pendingNavigationRef.current = null
   }, [commentsOpen])
 
   useEffect(() => {
@@ -240,6 +247,18 @@ export function ShadowPinImmersiveViewer({
     document.addEventListener('visibilitychange', pauseOnHide)
     return () => document.removeEventListener('visibilitychange', pauseOnHide)
   }, [dialogRef])
+
+  const commitPendingNavigation = useCallback(() => {
+    const pending = pendingNavigationRef.current
+    if (!pending) return
+    pendingNavigationRef.current = null
+    if (navigationTimerRef.current !== null) {
+      window.clearTimeout(navigationTimerRef.current)
+      navigationTimerRef.current = null
+    }
+    onActiveImageChange(pending.image, pending.meta)
+    setTransitioning(false)
+  }, [onActiveImageChange])
 
   const navigate = useCallback((direction: ViewerDirection, reason: ViewerNavigationReason) => {
     if (transitioning || commentsOpen || zoomed) return
@@ -255,22 +274,17 @@ export function ShadowPinImmersiveViewer({
       return
     }
 
-    const commit = () => {
+    if (reducedMotion) {
       onActiveImageChange(neighbor, { direction, reason })
       setDragX(0)
-      setTransitioning(false)
-      navigationTimerRef.current = null
-    }
-
-    if (reducedMotion) {
-      commit()
       return
     }
 
+    pendingNavigationRef.current = { image: neighbor, meta: { direction, reason } }
     setTransitioning(true)
     setDragX(direction === 1 ? -window.innerWidth : window.innerWidth)
-    navigationTimerRef.current = window.setTimeout(commit, 190)
-  }, [commentsOpen, hasMore, loadingMore, nextImage, onActiveImageChange, onLoadMore, previousImage, reducedMotion, transitioning, zoomed])
+    navigationTimerRef.current = window.setTimeout(commitPendingNavigation, 350)
+  }, [commentsOpen, commitPendingNavigation, hasMore, loadingMore, nextImage, onActiveImageChange, onLoadMore, previousImage, reducedMotion, transitioning, zoomed])
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!event.isPrimary) {
@@ -409,7 +423,15 @@ export function ShadowPinImmersiveViewer({
             style={{ transform: `translate3d(calc(100vw + ${dragX}px), 0, 0)` }}
           />
         )}
-        <div className="absolute inset-0 flex items-center justify-center pb-36 pt-20 md:pb-28" style={mediaTransformStyle}>
+        <div
+          className="absolute inset-0 flex items-center justify-center pb-36 pt-20 md:pb-28"
+          style={mediaTransformStyle}
+          onTransitionEnd={event => {
+            if (event.target === event.currentTarget && event.propertyName === 'transform') {
+              commitPendingNavigation()
+            }
+          }}
+        >
           {targetLoading ? (
             <div className="flex flex-col items-center gap-3 text-white/70" role="status">
               <Loader2 className="h-8 w-8 animate-spin text-[var(--theme-accent-readable)]" />
@@ -449,13 +471,21 @@ export function ShadowPinImmersiveViewer({
                   </button>
                 </div>
               </div>
-            ) : renderActiveMedia(activeImage, {
-                muted,
-              reducedMotion,
-              autoplayMedia: shouldAutoplayMedia,
-                onMutedChange: setMuted,
-                onZoomChange: handleZoomChange,
-              })
+            ) : (
+              <div
+                key={activeImage.id}
+                className="h-full w-full bg-contain bg-center bg-no-repeat"
+                style={{ backgroundImage: getPosterUrl(activeImage) ? `url(${JSON.stringify(getPosterUrl(activeImage))})` : undefined }}
+              >
+                {renderActiveMedia(activeImage, {
+                  muted,
+                  reducedMotion,
+                  autoplayMedia: shouldAutoplayMedia,
+                  onMutedChange: setMuted,
+                  onZoomChange: handleZoomChange,
+                })}
+              </div>
+            )
           ) : (
             <div className="mx-6 rounded-[var(--radius-xl)] border border-[var(--border-panel)] bg-[rgba(8,9,12,0.92)] p-6 text-center">
               <Info className="mx-auto h-8 w-8 text-[var(--theme-accent-readable)]" />
@@ -491,7 +521,7 @@ export function ShadowPinImmersiveViewer({
         type="button"
         onClick={() => navigate(-1, 'button')}
         disabled={!previousImage || transitioning || zoomed}
-        className="absolute left-3 top-1/2 z-20 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white shadow-lg backdrop-blur-md disabled:pointer-events-none disabled:opacity-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]"
+        className="absolute left-3 top-1/2 z-20 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center text-white [filter:drop-shadow(0_2px_3px_rgba(0,0,0,0.95))] disabled:pointer-events-none disabled:opacity-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]"
         aria-label="Previous Pin"
       >
         <ChevronLeft className="h-6 w-6" />
@@ -500,7 +530,7 @@ export function ShadowPinImmersiveViewer({
         type="button"
         onClick={() => navigate(1, 'button')}
         disabled={(!nextImage && !hasMore) || transitioning || zoomed}
-        className="absolute right-3 top-1/2 z-20 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/15 bg-black/55 text-white shadow-lg backdrop-blur-md disabled:pointer-events-none disabled:opacity-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]"
+        className="absolute right-3 top-1/2 z-20 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center text-white [filter:drop-shadow(0_2px_3px_rgba(0,0,0,0.95))] disabled:pointer-events-none disabled:opacity-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]"
         aria-label={loadingMore && !nextImage ? 'Loading next Pin' : 'Next Pin'}
       >
         {loadingMore && !nextImage ? <Loader2 className="h-5 w-5 animate-spin" /> : <ChevronRight className="h-6 w-6" />}

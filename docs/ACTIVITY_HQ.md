@@ -2,10 +2,13 @@
 
 ## Status - ShadowChat 2.0 Wave One
 
-Activity HQ is implemented on the isolated `codex/shadowchat-2.0` branch. It
-is not part of the production `main` frontend until the full 2.0 wave is
-approved. Its database contract is additive and is designed to coexist with
-the existing production frontend against the same Supabase project.
+Activity HQ is implemented on the isolated `codex/shadowchat-2.0` branch, but
+its frontend is paused for the current phone trial at Tayler's request. The
+default build omits its navigation, lazy view, provider fetch, and Realtime
+subscription. Its additive database contract, source, migrations, and tests
+remain preserved and compatible with both frontends against the same Supabase
+project. Re-enable only through `VITE_FEATURE_ACTIVITY=true` plus the release
+gate below.
 
 ## Product Contract
 
@@ -64,7 +67,8 @@ are deduplicated by row ID.
 
 ## UX Contract
 
-- Phone navigation: Chat, DMs, Activity, Pins, Play.
+- When explicitly re-enabled, phone navigation includes Activity and desktop
+  navigation exposes the same destination.
 - Desktop: Activity is a normal sidebar destination.
 - All and Unread views use 44-pixel minimum controls.
 - Rows group into Today, Yesterday, and Earlier.

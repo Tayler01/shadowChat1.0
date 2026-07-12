@@ -73,6 +73,17 @@ test('keyboard and switch users can zoom with 48px controls', () => {
   expect(screen.getByRole('button', { name: /reset image zoom/i })).toHaveClass('h-12', 'w-12')
 })
 
+test('minimal controls keep 48px targets without outlined glass chrome', () => {
+  render(
+    <ZoomableImageFrame controlsVariant="minimal">
+      <img src="https://example.com/photo.jpg" alt="Minimal zoom target" />
+    </ZoomableImageFrame>
+  )
+  const zoomIn = screen.getByRole('button', { name: /zoom in/i })
+  expect(zoomIn).toHaveClass('h-12', 'w-12')
+  expect(zoomIn).not.toHaveClass('rounded-full', 'border')
+})
+
 test('pinch gesture scales an opened image', () => {
   const { frame, content } = renderZoomableImage()
 

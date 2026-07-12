@@ -24,7 +24,7 @@ import { useChannelBanExpirySweep } from './hooks/useChannelBanExpirySweep'
 import { useTheme } from './hooks/useTheme'
 import { WeatherProvider } from './hooks/useWeatherForecast'
 import { computeMobileViewportState, MOBILE_VIEWPORT_UPDATED_EVENT } from './lib/mobileViewport'
-import { BOARDS_FEATURE_ENABLED } from './config/featureFlags'
+import { ACTIVITY_FEATURE_ENABLED, BOARDS_FEATURE_ENABLED } from './config/featureFlags'
 import {
   getLocationStateFromUrl,
   resolveDMRouteMutation,
@@ -37,7 +37,6 @@ import {
 } from './lib/appRouting'
 import type { AppView as View } from './types/navigation'
 import { useShadowPinCommentNotifications } from './features/shadow-pin/hooks/useShadowPinCommentNotifications'
-import { ActivityProvider } from './features/activity/ActivityProvider'
 import type { ActivityTarget } from './features/activity/activityModel'
 
 const DirectMessagesView = lazy(() =>
@@ -80,11 +79,21 @@ const ShadowPin = lazy(() =>
   }))
 )
 
-const ActivityView = lazy(() =>
-  import('./features/activity/ActivityView').then(module => ({
-    default: module.ActivityView,
-  }))
-)
+const ActivityView = ACTIVITY_FEATURE_ENABLED
+  ? lazy(() =>
+      import('./features/activity/ActivityView').then(module => ({
+        default: module.ActivityView,
+      }))
+    )
+  : null
+
+const ActivityProvider = ACTIVITY_FEATURE_ENABLED
+  ? lazy(() =>
+      import('./features/activity/ActivityProvider').then(module => ({
+        default: module.ActivityProvider,
+      }))
+    )
+  : null
 
 const getInitialLocationState = (): LocationState => {
   if (typeof window === 'undefined') {
@@ -379,7 +388,10 @@ function App() {
   }
 
   const handleViewChange = (view: View) => {
-    const availableView = view === 'boards' && !BOARDS_FEATURE_ENABLED ? 'chat' : view
+    const availableView = (view === 'boards' && !BOARDS_FEATURE_ENABLED)
+      || (view === 'activity' && !ACTIVITY_FEATURE_ENABLED)
+      ? 'chat'
+      : view
 
     if (availableView === 'boards') {
       setBoardsResetKey(value => value + 1)
@@ -508,12 +520,14 @@ function App() {
           />
         )
       case 'activity':
-        return (
+        return ACTIVITY_FEATURE_ENABLED && ActivityView ? (
           <ActivityView
             currentView={currentView}
             onViewChange={handleViewChange}
             onOpenActivity={handleActivityOpen}
           />
+        ) : (
+          <ChatView currentView="chat" onViewChange={handleViewChange} />
         )
       case 'games':
         return (
@@ -601,6 +615,20 @@ function App() {
     </WeatherProvider>
   )
 
+  const renderFeatureShell = () => {
+    const shell = BOARDS_FEATURE_ENABLED && BoardsRuntime ? (
+      <Suspense fallback={<ViewLoadingState />}>
+        <BoardsRuntime>{renderAppShell}</BoardsRuntime>
+      </Suspense>
+    ) : renderAppShell(0)
+
+    return ACTIVITY_FEATURE_ENABLED && ActivityProvider ? (
+      <Suspense fallback={<ViewLoadingState />}>
+        <ActivityProvider>{shell}</ActivityProvider>
+      </Suspense>
+    ) : shell
+  }
+
   return (
     <>
       <AuthGuard>
@@ -609,13 +637,7 @@ function App() {
             <MessagesProvider>
               <HypeProvider>
                 <DirectMessagesProvider>
-                  <ActivityProvider>
-                    {BOARDS_FEATURE_ENABLED && BoardsRuntime ? (
-                      <Suspense fallback={<ViewLoadingState />}>
-                        <BoardsRuntime>{renderAppShell}</BoardsRuntime>
-                      </Suspense>
-                    ) : renderAppShell(0)}
-                  </ActivityProvider>
+                  {renderFeatureShell()}
                 </DirectMessagesProvider>
               </HypeProvider>
             </MessagesProvider>

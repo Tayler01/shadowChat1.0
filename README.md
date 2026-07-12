@@ -1,6 +1,6 @@
 # ShadowChat 1.0
 
-ShadowChat 1.0 is a premium dark realtime chat app built with React, TypeScript, Vite, and Supabase. Its active production surface combines public group chat, private direct messages, Entertainment, ShadowPin, admin tools, profile customization, AI-assisted chat utilities, browser push notifications, and a per-user weather widget behind a polished black-and-gold interface. Boards, News, Art Board, and ESP Bridge are preserved but intentionally paused; see [docs/PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1).
+ShadowChat 1.0 is a premium dark realtime chat app built with React, TypeScript, Vite, and Supabase. Its active production surface combines public group chat, private direct messages, Entertainment, ShadowPin, admin tools, profile customization, AI-assisted chat utilities, browser push notifications, and a per-user weather widget behind a polished black-and-gold interface. Boards, News, Art Board, ESP Bridge, Activity HQ, and member-facing report intake are preserved but intentionally paused; see [docs/PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1).
 
 The project is already wired for hosted Supabase and Netlify deployment. It is designed to behave like a product app, not a demo: realtime messaging, uploads, presence, settings, DMs, and notification flows are all first-class parts of the codebase.
 
@@ -23,10 +23,11 @@ contract; a forward revocation and follow-up release are the remaining closeout
 step. The latest successful `main` workflow plus the public health manifest are
 the authority for the live SHA and deployment state.
 
-The isolated `codex/shadowchat-2.0` branch now contains all five locally
-verified Wave One candidates: Unified Activity HQ, ShadowPin Theater, DM
-Conversation Hub, private member reporting with an operator Safety Case Center,
-and the device-local Accessibility & Comfort system. These
+The isolated `codex/shadowchat-2.0` branch contains all five Wave One candidate
+implementations. The current trial revision pauses Activity HQ and member-facing
+report intake while preserving their complete source/backend, keeps the operator
+Safety Case Center available, tightens the DM hub and ShadowPin Theater, and
+moves General Chat mobile utilities into a two-page bottom navigation. These
 are not production claims and have not changed `main`; follow
 [docs/SHADOWCHAT_2_0_WAVE_ONE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_ONE.md:1)
 for the separate-backend-compatible Netlify trial gate.

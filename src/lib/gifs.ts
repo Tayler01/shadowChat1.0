@@ -1,4 +1,4 @@
-import { ensureSession, getWorkingClient } from './supabase'
+import { invokeAuthenticatedEdgeFunction } from './edgeFunctions'
 
 export type GifResult = {
   id: string
@@ -28,24 +28,11 @@ export const searchKlipyGifs = async ({
   limit = 24,
   signal,
 }: GifSearchOptions = {}): Promise<GifSearchResponse> => {
-  const sessionValid = await ensureSession()
-  if (!sessionValid) {
-    throw new Error('Sign in to search GIFs')
-  }
-
-  const workingClient = await getWorkingClient()
-  const { data, error } = await workingClient.functions.invoke('klipy-gifs', {
-    body: {
+  const data = await invokeAuthenticatedEdgeFunction<GifSearchResponse>('klipy-gifs', {
       query: query.trim(),
       page,
       limit,
-    },
-    signal,
-  }) as { data?: GifSearchResponse; error?: { message?: string } | null }
-
-  if (error) {
-    throw new Error(error.message || 'Unable to load GIFs')
-  }
+  }, { signal })
 
   return {
     gifs: Array.isArray(data?.gifs) ? data.gifs : [],

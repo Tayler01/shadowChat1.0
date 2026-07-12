@@ -493,7 +493,7 @@ test('keeps uploaded Bunny feed videos on native playback when sound is enabled'
       expect(container.querySelector('video')).toHaveAttribute('src', 'https://vz.example/video-guid/play_480p.mp4')
     })
 
-    fireEvent.click(within(videoCard!).getByRole('button', { name: 'Show actions for Pin bunny-feed' }))
+    fireEvent.click(within(videoCard!).getByRole('button', { name: 'Show details for Pin bunny-feed' }))
     fireEvent.click(screen.getByLabelText('Unmute video'))
 
     await waitFor(() => {
@@ -2172,9 +2172,8 @@ test('ShadowPin image long-press opens a radial thumb menu and slide-heart trigg
       'heart',
       'comment',
       'open',
-      'report',
     ])
-    expect(screen.getByTestId('shadow-pin-radial-action-report')).toBeInTheDocument()
+    expect(screen.queryByTestId('shadow-pin-radial-action-report')).not.toBeInTheDocument()
 
     fireShadowPinPointer(imageCard!, 'pointermove', {
       pointerId: 7,

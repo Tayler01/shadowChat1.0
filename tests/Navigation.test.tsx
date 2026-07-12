@@ -7,12 +7,16 @@ jest.mock('../src/hooks/useDirectMessages', () => ({
   useDirectMessages: () => ({ conversations: [] }),
 }))
 
-jest.mock('../src/features/activity/ActivityContext', () => ({
-  useOptionalActivity: () => ({ unreadCount: 140 }),
+jest.mock('../src/components/search/GlobalSearchButton', () => ({
+  GlobalSearchButton: ({ variant }: { variant?: string }) => <button type="button" aria-label="Open search and saved messages">{variant === 'nav' ? 'Search' : null}</button>,
 }))
 
-jest.mock('../src/components/search/GlobalSearchButton', () => ({
-  GlobalSearchButton: () => <button type="button" aria-label="Open search and saved messages" />,
+jest.mock('../src/components/chat/WeatherWidget', () => ({
+  WeatherWidget: () => <button type="button">Weather</button>,
+}))
+
+jest.mock('../src/components/chat/ActiveUsersButton', () => ({
+  ActiveUsersButton: () => <button type="button">Active</button>,
 }))
 
 jest.mock('../src/hooks/useAuth', () => ({
@@ -26,14 +30,14 @@ jest.mock('../src/hooks/useAuth', () => ({
   }),
 }))
 
-test('mobile navigation omits paused boards by default', () => {
+test('mobile navigation exposes four primary destinations and pauses Activity and Boards', () => {
   const onViewChange = jest.fn()
   render(<MobileNav currentView="chat" onViewChange={onViewChange} />)
 
   expect(screen.queryByText('Boards')).not.toBeInTheDocument()
   expect(screen.getByText('Play')).toBeInTheDocument()
-  expect(screen.getByText('Activity')).toBeInTheDocument()
-  expect(screen.getByText('99+')).toBeInTheDocument()
+  expect(screen.queryByText('Activity')).not.toBeInTheDocument()
+  expect(screen.getByText('Tools')).toBeInTheDocument()
   expect(screen.queryByText('Profile')).toBeNull()
 
   fireEvent.click(screen.getByText('Play'))
@@ -48,20 +52,18 @@ test('mobile navigation exposes only the active destination as the current page'
   expect(screen.getAllByRole('button').filter(button => button.hasAttribute('aria-current'))).toHaveLength(1)
 })
 
-test('mobile navigation can restore boards with an explicit feature flag', () => {
-  const onViewChange = jest.fn()
-  render(
-    <MobileNav
-      currentView="chat"
-      onViewChange={onViewChange}
-      boardsEnabled
-      boardsBadgeCount={4}
-    />
-  )
+test('mobile navigation slides to utility controls and back', async () => {
+  render(<MobileNav currentView="chat" onViewChange={jest.fn()} />)
 
-  fireEvent.click(screen.getByText('Boards'))
-  expect(onViewChange).toHaveBeenCalledWith('boards')
-  expect(screen.getByText('4')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Show app tools' }))
+  expect(screen.getByTestId('mobile-nav-pages')).toHaveClass('-translate-x-1/2')
+  expect(await screen.findByText('Weather')).toBeInTheDocument()
+  expect(await screen.findByText('Active')).toBeInTheDocument()
+  expect(await screen.findByText('Search')).toBeInTheDocument()
+  expect(screen.getByText('Settings')).toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Return to main navigation' }))
+  expect(screen.getByTestId('mobile-nav-pages')).toHaveClass('translate-x-0')
 })
 
 test('sidebar navigation omits paused boards by default', () => {
@@ -79,7 +81,7 @@ test('sidebar navigation omits paused boards by default', () => {
 
   expect(screen.queryByText('Boards')).not.toBeInTheDocument()
   expect(screen.getByText('Entertainment')).toBeInTheDocument()
-  expect(screen.getByText('Activity')).toBeInTheDocument()
+  expect(screen.queryByText('Activity')).not.toBeInTheDocument()
   expect(screen.queryByText('Profile')).toBeNull()
 
   fireEvent.click(screen.getByText('Entertainment'))

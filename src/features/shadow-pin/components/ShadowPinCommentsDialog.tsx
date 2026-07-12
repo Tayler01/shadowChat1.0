@@ -16,6 +16,7 @@ import {
 import type { ShadowPinCommentCursor } from '../api/shadowPinApi'
 import type { ShadowPinComment, ShadowPinImage } from '../types'
 import { useModerationReport } from '../../moderation/useModerationReport'
+import { MEMBER_REPORTING_FEATURE_ENABLED } from '../../../config/featureFlags'
 
 const authorLabel = (comment: ShadowPinComment) =>
   comment.author?.display_name || comment.author?.username || 'ShadowChat member'
@@ -372,7 +373,7 @@ export function ShadowPinCommentsDialog({
                     highlighted={comment.id === initialCommentId}
                     canEdit={comment.author_id === user?.id}
                     canDelete={comment.author_id === user?.id || role === 'admin' || role === 'sub_admin'}
-                    canReport={comment.author_id !== user?.id}
+                    canReport={MEMBER_REPORTING_FEATURE_ENABLED && comment.author_id !== user?.id}
                     onReply={() => startReply(comment)}
                     onEdit={() => startEdit(comment)}
                     onDelete={() => void removeComment(comment)}
@@ -386,7 +387,7 @@ export function ShadowPinCommentsDialog({
                       highlighted={reply.id === initialCommentId}
                       canEdit={reply.author_id === user?.id}
                       canDelete={reply.author_id === user?.id || role === 'admin' || role === 'sub_admin'}
-                      canReport={reply.author_id !== user?.id}
+                      canReport={MEMBER_REPORTING_FEATURE_ENABLED && reply.author_id !== user?.id}
                       onReply={() => startReply(comment)}
                       onEdit={() => startEdit(reply)}
                       onDelete={() => void removeComment(reply)}

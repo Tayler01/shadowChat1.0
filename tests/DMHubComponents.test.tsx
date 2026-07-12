@@ -66,7 +66,7 @@ describe('DM Hub presentational components', () => {
     )
 
     const row = screen.getByRole('button', {
-      name: /Tayler, @tayler\. Finish this thought\. 3 unread, draft, muted, 4:00 PM/i,
+      name: /Tayler, @tayler\. Draft: Finish this thought\. 3 unread, draft, muted, 4:00 PM/i,
     })
     expect(row).toHaveAttribute('aria-current', 'true')
     fireEvent.click(row)

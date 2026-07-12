@@ -27,6 +27,24 @@ const checks = [
       'ESP Bridge Pairing',
     ],
   },
+  {
+    feature: 'Activity HQ',
+    enabled: isEnabled('VITE_FEATURE_ACTIVITY'),
+    filenamePatterns: [/activityview/iu, /activityprovider/iu],
+    contentPatterns: [
+      'Unified Activity',
+      'Mark all activity as read',
+    ],
+  },
+  {
+    feature: 'Member report intake',
+    enabled: isEnabled('VITE_FEATURE_MEMBER_REPORTING'),
+    filenamePatterns: [/memberreportsheet/iu, /myreportspanel/iu],
+    contentPatterns: [
+      'My Safety Reports',
+      'Submit safety report',
+    ],
+  },
 ]
 
 const filenames = await fs.readdir(assetsDir)

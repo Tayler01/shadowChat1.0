@@ -43,6 +43,7 @@ interface ZoomableImageFrameProps {
   resetKey?: string | number
   resetLabel?: string
   controlsPosition?: 'top' | 'bottom'
+  controlsVariant?: 'outlined' | 'minimal'
   onZoomChange?: (zoomed: boolean) => void
 }
 
@@ -66,6 +67,7 @@ export const ZoomableImageFrame: React.FC<ZoomableImageFrameProps> = ({
   resetKey,
   resetLabel = 'Reset image zoom',
   controlsPosition = 'bottom',
+  controlsVariant = 'outlined',
   onZoomChange,
 }) => {
   const frameRef = useRef<HTMLDivElement | null>(null)
@@ -251,6 +253,10 @@ export const ZoomableImageFrame: React.FC<ZoomableImageFrameProps> = ({
     zoomAtPoint({ x: (frame?.clientWidth ?? 0) / 2, y: (frame?.clientHeight ?? 0) / 2 }, transformRef.current.scale * factor)
   }
 
+  const controlClassName = controlsVariant === 'minimal'
+    ? 'inline-flex h-12 w-12 items-center justify-center text-white [filter:drop-shadow(0_2px_3px_rgba(0,0,0,0.95))] transition-colors hover:text-[var(--theme-accent-readable)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]'
+    : 'inline-flex h-12 w-12 items-center justify-center rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(5,6,8,0.78)] text-[var(--text-primary)] shadow-[0_12px_26px_rgba(0,0,0,0.35)] backdrop-blur-md transition-colors hover:bg-[rgba(255,255,255,0.12)]'
+
   return (
     <div
       ref={frameRef}
@@ -279,15 +285,15 @@ export const ZoomableImageFrame: React.FC<ZoomableImageFrameProps> = ({
       </div>
       {transform.scale > MIN_SCALE ? (
         <div className={cn('absolute right-3 z-10 flex gap-2', controlsPosition === 'top' ? 'top-24' : 'bottom-3')} data-viewer-no-swipe="true">
-          <button type="button" onClick={() => zoomFromCenter(0.8)} className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(5,6,8,0.78)] text-[var(--text-primary)] shadow-[0_12px_26px_rgba(0,0,0,0.35)] backdrop-blur-md transition-colors hover:bg-[rgba(255,255,255,0.12)]" aria-label="Zoom out">
+          <button type="button" onClick={() => zoomFromCenter(0.8)} className={controlClassName} aria-label="Zoom out">
             <ZoomOut className="h-4 w-4" />
           </button>
-          <button type="button" onClick={reset} className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(5,6,8,0.78)] text-[var(--text-primary)] shadow-[0_12px_26px_rgba(0,0,0,0.35)] backdrop-blur-md transition-colors hover:bg-[rgba(255,255,255,0.12)]" aria-label={resetLabel}>
+          <button type="button" onClick={reset} className={controlClassName} aria-label={resetLabel}>
             <RotateCcw className="h-4 w-4" />
           </button>
         </div>
       ) : (
-        <button type="button" onClick={() => zoomFromCenter(1.8)} className={cn('absolute right-3 z-10 inline-flex h-12 w-12 items-center justify-center rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(5,6,8,0.78)] text-[var(--text-primary)] shadow-[0_12px_26px_rgba(0,0,0,0.35)] backdrop-blur-md transition-colors hover:bg-[rgba(255,255,255,0.12)]', controlsPosition === 'top' ? 'top-24' : 'bottom-3')} aria-label="Zoom in" data-viewer-no-swipe="true">
+        <button type="button" onClick={() => zoomFromCenter(1.8)} className={cn('absolute right-3 z-10', controlClassName, controlsPosition === 'top' ? 'top-24' : 'bottom-3')} aria-label="Zoom in" data-viewer-no-swipe="true">
           <ZoomIn className="h-4 w-4" />
         </button>
       )}

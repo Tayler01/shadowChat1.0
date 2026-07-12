@@ -2,19 +2,19 @@
 
 This document turns the June 1, 2026 read-only audit into an implementation backlog and records status updates as fixes land.
 
-## Documentation Status - July 11, 2026
+## Documentation Status - July 12, 2026
 
 This is the current source of truth for the audit backlog. It preserves the
 original June findings, records the July production-alignment evidence, and
 ranks the work that remains. Update it when an item is implemented,
 intentionally deferred, or replaced by a narrower feature ticket.
 
-The separate `codex/shadowchat-2.0` Wave One track has completed all five
-high-ticket product candidates without changing production `main`: Activity
-HQ, ShadowPin Theater, DM Conversation Hub, Member Reporting/Safety Case Center,
-and the device-local Accessibility & Comfort system. The combined regression,
-linked shared-backend, isolated Netlify, live Chromium/WebKit, Function, and PWA
-gates passed July 12. Tayler's physical-device trial remains the approval gate;
+The separate `codex/shadowchat-2.0` Wave One track preserves all five
+high-ticket candidate implementations without changing production `main`.
+The July 12 trial revision pauses Activity and member-facing report intake,
+keeps the Safety Case Center, and revises Edge auth recovery, DM density,
+ShadowPin controls/transitions, and mobile navigation. Its repeated regression,
+browser, linked-backend, and isolated Netlify gates are the current open work;
 see `docs/SHADOWCHAT_2_0_WAVE_ONE.md` for authoritative status.
 
 ## July 9, 2026 Alignment And Cleanup Program
@@ -37,6 +37,9 @@ now contain only `main`, and GitHub has zero open pull requests.
   session revocation is deployed, dedicated Auth sessions are removed by the
   release workflow, and all deployed Bridge endpoints deny with
   `feature_paused` before request processing.
+- **Activity and member report intake are paused in the 2.0 trial.** Preserve
+  their additive backend, source, and tests. Compile out Activity runtime and
+  member intake/history; keep the operator Safety Case Center available.
 - **Render News must remain suspended with automatic deploys off.** Do not
   restore a paid worker until the News product is explicitly reapproved.
 - Canonical status and re-enable instructions live in
