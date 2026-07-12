@@ -54,10 +54,13 @@ focus. The detail toggle sits in the image's upper-left corner and stays above
 its overlay so short cards can always be closed. A long press owns its complete
 pointer sequence, so a neutral release cannot become a later Theater click.
 Previous, current, and next media now occupy the exact same fixed stage and use
-the same transform timing at full opacity. Static-image neighbors preload the
-exact destination source, video neighbors remain static posters, and the drag
-offset resets atomically with the active Pin. This removes the former vertical,
-scale, brightness, and commit snap.
+the same transform timing at full opacity. Static-image neighbors preload and
+retain the exact destination source, video neighbors remain static posters, and
+all slide math uses the measured media-stage width. Navigation has explicit
+settle and transition-free rebase phases; a short-lived destination cover stays
+painted while the active interactive media remounts. Cancelled pointers return
+to center without navigating. This removes the former reverse transition,
+vertical, scale, brightness, and commit snaps.
 
 ## Data And Performance Boundary
 
@@ -133,3 +136,17 @@ The July 12 live Pixel 7 acceptance opened Theater with a real touch gesture
 and verified visible Previous, Next, and Close controls. The full live smoke,
 iPhone WebKit comfort/navigation matrix, PWA registration, and Netlify media
 Function boundary also passed on the separate trial origin.
+
+## Swipe Rebase Verification - July 12, 2026
+
+- the controlled-parent regression verifies that a committed destination
+  rebases at `translate3d(0px, 0, 0)` with transitions disabled and retains the
+  exact destination cover while active media remounts
+- pointer cancellation animates back to center without changing the active Pin
+- 64 focused ShadowPin tests and the full 166-suite repository run passed, with
+  845 passing tests and 16 intentional todos
+- authenticated Pixel Chromium and iPhone WebKit production-preview probes
+  sampled forward and reverse swipes against a real 35-Pin category; both had
+  zero rebound frames, title reversions, media-stage movement, console errors,
+  or page errors
+- no Pins, comments, messages, uploads, or Storage objects were created by QA

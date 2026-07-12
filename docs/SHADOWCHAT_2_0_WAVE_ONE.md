@@ -78,7 +78,7 @@ that acceptance.
   Chat/DMs/Pins/Play, then Weather/Active/Search/Settings with explicit
   forward/back chevrons. Desktop header controls remain available.
 
-Revision verification passed 165 Jest suites with 839 passing tests and 16
+Revision verification passed 166 Jest suites with 845 passing tests and 16
 intentional todos, zero-warning lint, TypeScript no-emit, the production build,
 paused-chunk verification, and bundle budgets. The eager entry bundle decreased
 to about 472 KiB raw / 142 KiB gzip. Authenticated Pixel proof confirmed the
@@ -108,10 +108,15 @@ the full repository gate only after code changes that can invalidate it.
 - A long press that opens the Pin radial menu consumes its release click for the
   full pointer sequence, regardless of hold duration. Releasing without an
   action no longer opens Theater.
-- Theater previous/current/next slides use one invariant media stage, identical
-  transforms, full-opacity destination imagery, and the exact next static-image
-  source. Navigation resets its transform in the same commit as the active Pin,
-  removing the vertical, size, and color snap reported on a physical phone.
+- Theater previous/current/next slides use one invariant media stage, measured
+  stage-width transforms, full-opacity destination imagery, and the exact next
+  static-image source. An explicit transition-free rebase plus retained
+  destination cover prevents the newly active Pin from animating backward or
+  flashing the previous frame; cancelled pointers return without navigation.
+- Authenticated production-preview motion sampling passed forward and reverse
+  swipes on Pixel Chromium and iPhone WebKit. After the destination title
+  committed, neither engine produced a nonzero active-slide transform, title
+  reversion, stage-position change, console error, or page error.
 
 ## Trial Deployment Evidence - July 12, 2026
 

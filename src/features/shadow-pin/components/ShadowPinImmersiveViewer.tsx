@@ -17,6 +17,7 @@ import {
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -40,6 +41,7 @@ import {
 import type { ShadowPinImage } from '../types'
 
 type ViewerNavigationReason = 'swipe' | 'button' | 'keyboard'
+type ViewerMotionPhase = 'idle' | 'settling-navigation' | 'settling-return' | 'rebasing'
 
 type ActiveMediaControls = {
   muted: boolean
@@ -127,6 +129,7 @@ export function ShadowPinImmersiveViewer({
   onClose,
 }: ShadowPinImmersiveViewerProps) {
   const closeRef = useRef<HTMLButtonElement>(null)
+  const mediaStageRef = useRef<HTMLDivElement>(null)
   const dialogRef = useDialogAccessibility({
     open: !commentsOpen,
     onClose,
@@ -142,23 +145,35 @@ export function ShadowPinImmersiveViewer({
   const [muted, setMuted] = useState(true)
   const [zoomed, setZoomed] = useState(false)
   const [dragX, setDragX] = useState(0)
-  const [transitioning, setTransitioning] = useState(false)
+  const [motionPhase, setMotionPhase] = useState<ViewerMotionPhase>('idle')
+  const [handoffImage, setHandoffImage] = useState<ShadowPinImage | null>(null)
   const [announcement, setAnnouncement] = useState('')
   const [consentedProviders, setConsentedProviders] = useState<Set<string>>(() => new Set())
   const gestureRef = useRef<GestureSnapshot | null>(null)
   const navigationTimerRef = useRef<number | null>(null)
+  const handoffFrameRef = useRef<number | null>(null)
+  const handoffReleaseFrameRef = useRef<number | null>(null)
+  const handoffImageRef = useRef<ShadowPinImage | null>(null)
   const pendingNavigationRef = useRef<{
     image: ShadowPinImage
     meta: { direction: ViewerDirection; reason: ViewerNavigationReason }
   } | null>(null)
   const openedIdsRef = useRef(new Set<string>())
   const requestedMoreRef = useRef<string | null>(null)
+  const preloadedImagesRef = useRef(new Map<string, HTMLImageElement>())
+
+  const getStageWidth = useCallback(() => (
+    mediaStageRef.current?.clientWidth || window.innerWidth
+  ), [])
 
   const handleZoomChange = useCallback((nextZoomed: boolean) => {
     setZoomed(nextZoomed)
     if (!nextZoomed) return
     gestureRef.current = null
     setDragX(0)
+    setMotionPhase('idle')
+    handoffImageRef.current = null
+    setHandoffImage(null)
   }, [])
 
   useEffect(() => {
@@ -190,17 +205,54 @@ export function ShadowPinImmersiveViewer({
     if (navigationTimerRef.current !== null) {
       window.clearTimeout(navigationTimerRef.current)
     }
+    if (handoffFrameRef.current !== null) {
+      window.cancelAnimationFrame(handoffFrameRef.current)
+    }
+    if (handoffReleaseFrameRef.current !== null) {
+      window.cancelAnimationFrame(handoffReleaseFrameRef.current)
+    }
     pendingNavigationRef.current = null
+    handoffImageRef.current = null
+    preloadedImagesRef.current.clear()
   }, [])
 
   useEffect(() => {
     setDetailsOpen(false)
     setZoomed(false)
     setDragX(0)
-    setTransitioning(false)
     pendingNavigationRef.current = null
     gestureRef.current = null
+    if (handoffImageRef.current?.id !== activeImageId) {
+      handoffImageRef.current = null
+      setHandoffImage(null)
+      setMotionPhase('idle')
+    }
   }, [activeImageId])
+
+  useLayoutEffect(() => {
+    if (!handoffImage || handoffImage.id !== activeImageId) return
+
+    handoffFrameRef.current = window.requestAnimationFrame(() => {
+      handoffReleaseFrameRef.current = window.requestAnimationFrame(() => {
+        handoffImageRef.current = null
+        setHandoffImage(null)
+        setMotionPhase('idle')
+        handoffFrameRef.current = null
+        handoffReleaseFrameRef.current = null
+      })
+    })
+
+    return () => {
+      if (handoffFrameRef.current !== null) {
+        window.cancelAnimationFrame(handoffFrameRef.current)
+        handoffFrameRef.current = null
+      }
+      if (handoffReleaseFrameRef.current !== null) {
+        window.cancelAnimationFrame(handoffReleaseFrameRef.current)
+        handoffReleaseFrameRef.current = null
+      }
+    }
+  }, [activeImageId, handoffImage])
 
   useEffect(() => {
     if (!activeImage || openedIdsRef.current.has(activeImage.id)) return
@@ -216,10 +268,20 @@ export function ShadowPinImmersiveViewer({
       .map(getTransitionUrl)
       .filter(Boolean)
     posterUrls.forEach(url => {
+      if (preloadedImagesRef.current.has(url)) return
       const preload = new Image()
       preload.decoding = 'async'
+      preloadedImagesRef.current.set(url, preload)
       preload.src = url
+      if (typeof preload.decode === 'function') {
+        void preload.decode().catch(() => undefined)
+      }
     })
+    while (preloadedImagesRef.current.size > 8) {
+      const oldestUrl = preloadedImagesRef.current.keys().next().value as string | undefined
+      if (!oldestUrl) break
+      preloadedImagesRef.current.delete(oldestUrl)
+    }
   }, [activeImage, getTransitionUrl, nextImage, previousImage])
 
   useEffect(() => {
@@ -239,8 +301,10 @@ export function ShadowPinImmersiveViewer({
     if (!commentsOpen) return
     gestureRef.current = null
     setDragX(0)
-    setTransitioning(false)
+    setMotionPhase('idle')
     pendingNavigationRef.current = null
+    handoffImageRef.current = null
+    setHandoffImage(null)
   }, [commentsOpen])
 
   useEffect(() => {
@@ -255,19 +319,39 @@ export function ShadowPinImmersiveViewer({
 
   const commitPendingNavigation = useCallback(() => {
     const pending = pendingNavigationRef.current
-    if (!pending) return
+    if (navigationTimerRef.current !== null) {
+      window.clearTimeout(navigationTimerRef.current)
+      navigationTimerRef.current = null
+    }
+    if (!pending) {
+      setMotionPhase('idle')
+      return
+    }
+    pendingNavigationRef.current = null
+    handoffImageRef.current = pending.image
+    setHandoffImage(pending.image)
+    setDragX(0)
+    setMotionPhase('rebasing')
+    onActiveImageChange(pending.image, pending.meta)
+  }, [onActiveImageChange])
+
+  const settleBackToCenter = useCallback(() => {
     pendingNavigationRef.current = null
     if (navigationTimerRef.current !== null) {
       window.clearTimeout(navigationTimerRef.current)
       navigationTimerRef.current = null
     }
+    if (dragX === 0) {
+      setMotionPhase('idle')
+      return
+    }
+    setMotionPhase('settling-return')
     setDragX(0)
-    setTransitioning(false)
-    onActiveImageChange(pending.image, pending.meta)
-  }, [onActiveImageChange])
+    navigationTimerRef.current = window.setTimeout(commitPendingNavigation, 400)
+  }, [commitPendingNavigation, dragX])
 
   const navigate = useCallback((direction: ViewerDirection, reason: ViewerNavigationReason) => {
-    if (transitioning || commentsOpen || zoomed) return
+    if (motionPhase !== 'idle' || commentsOpen || zoomed) return
     const neighbor = direction === -1 ? previousImage : nextImage
     if (!neighbor) {
       if (hasMore && direction === 1) {
@@ -287,10 +371,10 @@ export function ShadowPinImmersiveViewer({
     }
 
     pendingNavigationRef.current = { image: neighbor, meta: { direction, reason } }
-    setTransitioning(true)
-    setDragX(direction === 1 ? -window.innerWidth : window.innerWidth)
+    setMotionPhase('settling-navigation')
+    setDragX(direction === 1 ? -getStageWidth() : getStageWidth())
     navigationTimerRef.current = window.setTimeout(commitPendingNavigation, 400)
-  }, [commentsOpen, commitPendingNavigation, hasMore, loadingMore, nextImage, onActiveImageChange, onLoadMore, previousImage, reducedMotion, transitioning, zoomed])
+  }, [commentsOpen, commitPendingNavigation, getStageWidth, hasMore, loadingMore, motionPhase, nextImage, onActiveImageChange, onLoadMore, previousImage, reducedMotion, zoomed])
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!event.isPrimary) {
@@ -298,12 +382,12 @@ export function ShadowPinImmersiveViewer({
       setDragX(0)
       return
     }
-    if (event.button !== 0 || transitioning) return
+    if (event.button !== 0 || motionPhase !== 'idle') return
     const target = event.target instanceof Element ? event.target : null
     const interactiveTarget = Boolean(target?.closest(INTERACTIVE_TARGET_SELECTOR))
     if (!canStartViewerSwipe({
       clientX: event.clientX,
-      viewportWidth: window.innerWidth,
+      viewportWidth: getStageWidth(),
       zoomed,
       commentsOpen,
       interactiveTarget,
@@ -347,12 +431,19 @@ export function ShadowPinImmersiveViewer({
       deltaX,
       deltaY,
       elapsedMs: performance.now() - gesture.startedAt,
-      viewportWidth: window.innerWidth,
+      viewportWidth: getStageWidth(),
       hasPrevious: Boolean(previousImage),
       hasNext: Boolean(nextImage),
     })
     if (direction) navigate(direction, 'swipe')
-    else setDragX(0)
+    else settleBackToCenter()
+  }
+
+  const cancelPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const gesture = gestureRef.current
+    if (!gesture || gesture.pointerId !== event.pointerId) return
+    gestureRef.current = null
+    settleBackToCenter()
   }
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -385,13 +476,14 @@ export function ShadowPinImmersiveViewer({
   }
 
   const slideTransition = reducedMotion ? 'none' : 'transform 220ms cubic-bezier(0.22, 0.72, 0.24, 1)'
+  const transitionEnabled = motionPhase === 'settling-navigation' || motionPhase === 'settling-return'
   const getSlideStyle = (offset: -1 | 0 | 1) => ({
     transform: offset === 0
       ? `translate3d(${dragX}px, 0, 0)`
-      : `translate3d(calc(${offset * 100}vw + ${dragX}px), 0, 0)`,
-    transition: transitioning || dragX === 0
-      ? slideTransition
-      : 'none',
+      : `translate3d(calc(${offset * 100}% + ${dragX}px), 0, 0)`,
+    transition: transitionEnabled ? slideTransition : 'none',
+    willChange: 'transform',
+    backfaceVisibility: 'hidden' as const,
   })
 
   if (typeof document === 'undefined') return null
@@ -412,10 +504,11 @@ export function ShadowPinImmersiveViewer({
         onPointerDownCapture={handlePointerDown}
         onPointerMoveCapture={handlePointerMove}
         onPointerUpCapture={finishPointer}
-        onPointerCancelCapture={finishPointer}
+        onPointerCancelCapture={cancelPointer}
       >
         <div
-          className="absolute inset-x-0 bottom-36 top-20 overflow-hidden md:bottom-28"
+          ref={mediaStageRef}
+          className="absolute inset-x-0 bottom-36 top-20 overflow-hidden [contain:layout_paint] md:bottom-28"
           data-testid="shadow-pin-theater-media-stage"
         >
           {previousImage && (
@@ -425,6 +518,7 @@ export function ShadowPinImmersiveViewer({
               aria-hidden="true"
               className="pointer-events-none absolute inset-0 h-full w-full object-contain"
               style={getSlideStyle(-1)}
+              draggable={false}
               data-testid="shadow-pin-theater-previous-slide"
             />
           )}
@@ -435,6 +529,7 @@ export function ShadowPinImmersiveViewer({
               aria-hidden="true"
               className="pointer-events-none absolute inset-0 h-full w-full object-contain"
               style={getSlideStyle(1)}
+              draggable={false}
               data-testid="shadow-pin-theater-next-slide"
             />
           )}
@@ -491,7 +586,7 @@ export function ShadowPinImmersiveViewer({
               <div
                 key={activeImage.id}
                 className="h-full w-full bg-contain bg-center bg-no-repeat"
-                style={{ backgroundImage: getPosterUrl(activeImage) ? `url(${JSON.stringify(getPosterUrl(activeImage))})` : undefined }}
+                style={{ backgroundImage: getTransitionUrl(activeImage) ? `url(${JSON.stringify(getTransitionUrl(activeImage))})` : undefined }}
               >
                 {renderActiveMedia(activeImage, {
                   muted,
@@ -510,6 +605,16 @@ export function ShadowPinImmersiveViewer({
             </div>
           )}
           </div>
+          {handoffImage && (
+            <img
+              src={getTransitionUrl(handoffImage)}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              className="pointer-events-none absolute inset-0 z-[1] h-full w-full object-contain [backface-visibility:hidden]"
+              data-testid="shadow-pin-theater-handoff-slide"
+            />
+          )}
         </div>
       </div>
 
@@ -537,7 +642,7 @@ export function ShadowPinImmersiveViewer({
       <button
         type="button"
         onClick={() => navigate(-1, 'button')}
-        disabled={!previousImage || transitioning || zoomed}
+        disabled={!previousImage || motionPhase !== 'idle' || zoomed}
         className="absolute left-3 top-1/2 z-20 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center text-white [filter:drop-shadow(0_2px_3px_rgba(0,0,0,0.95))] disabled:pointer-events-none disabled:opacity-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]"
         aria-label="Previous Pin"
       >
@@ -546,7 +651,7 @@ export function ShadowPinImmersiveViewer({
       <button
         type="button"
         onClick={() => navigate(1, 'button')}
-        disabled={(!nextImage && !hasMore) || transitioning || zoomed}
+        disabled={(!nextImage && !hasMore) || motionPhase !== 'idle' || zoomed}
         className="absolute right-3 top-1/2 z-20 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center text-white [filter:drop-shadow(0_2px_3px_rgba(0,0,0,0.95))] disabled:pointer-events-none disabled:opacity-25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]"
         aria-label={loadingMore && !nextImage ? 'Loading next Pin' : 'Next Pin'}
       >

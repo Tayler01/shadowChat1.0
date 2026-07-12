@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { useState } from 'react'
 import { ShadowPinImmersiveViewer } from '../src/features/shadow-pin/components/ShadowPinImmersiveViewer'
 import type { ShadowPinImage } from '../src/features/shadow-pin/types'
 
@@ -44,8 +45,7 @@ const images = [
   image('three', '2026-07-11T10:00:00.000Z'),
 ]
 
-const renderViewer = (overrides: Record<string, unknown> = {}) => {
-  const props = {
+const createViewerProps = (overrides: Record<string, unknown> = {}) => ({
     images,
     activeImageId: 'two',
     categoryTitle: 'Night Drive',
@@ -68,7 +68,10 @@ const renderViewer = (overrides: Record<string, unknown> = {}) => {
     onEdit: jest.fn(),
     onClose: jest.fn(),
     ...overrides,
-  }
+  })
+
+const renderViewer = (overrides: Record<string, unknown> = {}) => {
+  const props = createViewerProps(overrides)
   const view = render(<ShadowPinImmersiveViewer {...props} />)
   return {
     ...props,
@@ -109,12 +112,54 @@ test('all swipe slides share one stable full-opacity media stage and exact desti
   expect(nextSlide).toHaveAttribute('src', 'https://example.test/three.jpg')
   expect(previousSlide.style.transition).toBe(activeSlide.style.transition)
   expect(nextSlide.style.transition).toBe(activeSlide.style.transition)
+  expect(activeSlide.style.transition).toBe('none')
 
   fireEvent.click(screen.getByLabelText('Next Pin'))
+  expect(activeSlide.style.transition).toContain('220ms')
   fireEvent.transitionEnd(activeSlide, { propertyName: 'transform' })
   props.rerenderViewer({ activeImageId: 'three' })
 
   expect(screen.getByTestId('shadow-pin-theater-active-slide')).toHaveStyle({ transform: 'translate3d(0px, 0, 0)' })
+  expect(screen.getByTestId('shadow-pin-theater-active-slide').style.transition).toBe('none')
+})
+
+test('controlled navigation rebases the destination without a reverse transition or old-frame flash', () => {
+  const onActiveImageChange = jest.fn()
+  const props = createViewerProps()
+
+  function ControlledViewer() {
+    const [activeImageId, setActiveImageId] = useState('two')
+    return (
+      <ShadowPinImmersiveViewer
+        {...props}
+        activeImageId={activeImageId}
+        onActiveImageChange={(nextImage, meta) => {
+          onActiveImageChange(nextImage, meta)
+          setActiveImageId(nextImage.id)
+        }}
+      />
+    )
+  }
+
+  render(<ControlledViewer />)
+  const activeSlide = screen.getByTestId('shadow-pin-theater-active-slide')
+
+  fireEvent.click(screen.getByLabelText('Next Pin'))
+  expect(activeSlide.style.transition).toContain('220ms')
+  fireEvent.transitionEnd(activeSlide, { propertyName: 'transform' })
+
+  expect(onActiveImageChange).toHaveBeenCalledWith(
+    expect.objectContaining({ id: 'three' }),
+    { direction: 1, reason: 'button' }
+  )
+  expect(screen.getByTestId('active-media')).toHaveTextContent('Pin three')
+  expect(screen.getByTestId('shadow-pin-theater-active-slide')).toHaveStyle({ transform: 'translate3d(0px, 0, 0)' })
+  expect(screen.getByTestId('shadow-pin-theater-active-slide').style.transition).toBe('none')
+  expect(screen.getByTestId('shadow-pin-theater-handoff-slide')).toHaveAttribute(
+    'src',
+    'https://example.test/three.jpg'
+  )
+  expect(screen.queryByText('Pin two')).not.toBeInTheDocument()
 })
 
 test('buttons and keyboard navigate without mounting adjacent video players', () => {
@@ -130,11 +175,13 @@ test('buttons and keyboard navigate without mounting adjacent video players', ()
     { direction: 1, reason: 'button' }
   )
 
+  props.rerenderViewer({ activeImageId: 'three' })
+  act(() => jest.advanceTimersByTime(40))
   props.onActiveImageChange.mockClear()
   fireEvent.keyDown(screen.getByRole('dialog'), { key: 'ArrowLeft' })
-  fireEvent.transitionEnd(mediaRail!, { propertyName: 'transform' })
+  fireEvent.transitionEnd(screen.getByTestId('shadow-pin-theater-active-slide'), { propertyName: 'transform' })
   expect(props.onActiveImageChange).toHaveBeenCalledWith(
-    expect.objectContaining({ id: 'one' }),
+    expect.objectContaining({ id: 'two' }),
     { direction: -1, reason: 'keyboard' }
   )
 })
@@ -233,5 +280,32 @@ test('a second pointer cancels a pending page swipe before pinch zoom begins', (
   pointer('pointerup', 1, true, 120)
   act(() => jest.advanceTimersByTime(220))
 
+  expect(props.onActiveImageChange).not.toHaveBeenCalled()
+})
+
+test('pointer cancellation returns to center and never commits navigation', () => {
+  jest.useFakeTimers()
+  const props = renderViewer()
+  const surface = screen.getByTestId('shadow-pin-theater').firstElementChild as HTMLElement
+  const pointer = (type: string, clientX: number) => {
+    const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX, clientY: 300 })
+    Object.defineProperties(event, {
+      pointerId: { value: 7 },
+      isPrimary: { value: true },
+      button: { value: 0 },
+    })
+    fireEvent(surface, event)
+  }
+
+  pointer('pointerdown', 300)
+  pointer('pointermove', 180)
+  pointer('pointercancel', 180)
+
+  const activeSlide = screen.getByTestId('shadow-pin-theater-active-slide')
+  expect(activeSlide.style.transition).toContain('220ms')
+  fireEvent.transitionEnd(activeSlide, { propertyName: 'transform' })
+
+  expect(activeSlide).toHaveStyle({ transform: 'translate3d(0px, 0, 0)' })
+  expect(activeSlide.style.transition).toBe('none')
   expect(props.onActiveImageChange).not.toHaveBeenCalled()
 })
