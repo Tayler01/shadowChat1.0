@@ -67,6 +67,7 @@ export function ConnectionsHubSheet({ open, onClose, currentUserId, summary, onM
   const [profileUser, setProfileUser] = useState<User | null>(null)
   const requestRef = useRef(0)
   const searchRequestRef = useRef(0)
+  const closeProfile = useCallback(() => setProfileUser(null), [])
 
   const load = useCallback(async (append = false) => {
     const requestId = ++requestRef.current
@@ -322,7 +323,7 @@ export function ConnectionsHubSheet({ open, onClose, currentUserId, summary, onM
         </div>
       </DMHubBottomSheet>
 
-      {profileUser && <PublicProfileDialog user={profileUser} open onClose={() => setProfileUser(null)} />}
+      {profileUser && <PublicProfileDialog user={profileUser} open onClose={closeProfile} />}
     </>
   )
 }

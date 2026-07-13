@@ -115,12 +115,25 @@ if (migrationProbe.error) throw migrationProbe.error
 
 const profilesResult = await admin
   .from('users')
-  .select('id,username,display_name')
+  .select('id,username,display_name,dm_discoverable')
   .in('id', userIds)
 if (profilesResult.error) throw profilesResult.error
 const profilesById = new Map((profilesResult.data || []).map(profile => [profile.id, profile]))
 const controlledProfiles = userIds.map(userId => profilesById.get(userId))
 must(controlledProfiles.every(Boolean), 'A controlled account is missing its public profile row.')
+const discoveryProfile = controlledProfiles[1]
+const changedDiscoveryUserIds = []
+if (discoveryProfile.dm_discoverable !== true) {
+  const enabledDiscovery = await admin
+    .from('users')
+    .update({ dm_discoverable: true })
+    .eq('id', discoveryProfile.id)
+    .eq('dm_discoverable', false)
+    .select('id,dm_discoverable')
+  if (enabledDiscovery.error) throw enabledDiscovery.error
+  must(enabledDiscovery.data?.length === 1 && enabledDiscovery.data[0].dm_discoverable === true, 'Controlled discovery setup could not be confirmed.')
+  changedDiscoveryUserIds.push(discoveryProfile.id)
+}
 
 const [memberLowId, memberHighId] = [...userIds].sort()
 const preexistingPair = await admin
@@ -580,6 +593,21 @@ try {
   }
 
   try {
+    for (const userId of changedDiscoveryUserIds) {
+      const restored = await admin
+        .from('users')
+        .update({ dm_discoverable: false })
+        .eq('id', userId)
+        .eq('dm_discoverable', true)
+        .select('id,dm_discoverable')
+      if (restored.error) throw restored.error
+      must(restored.data?.length === 1 && restored.data[0].dm_discoverable === false, `Discovery preference restore was not confirmed for ${userId}.`)
+    }
+  } catch (error) {
+    cleanupErrors.push(`Discovery cleanup: ${messageOf(error)}`)
+  }
+
+  try {
     const [remainingPair, remainingBlocks, dmAfterCleanup] = await Promise.all([
       admin.from('user_connections').select('id').eq('member_low_id', memberLowId).eq('member_high_id', memberHighId),
       readPairBlocks(),
@@ -615,7 +643,7 @@ const summary = {
   results,
   browserDiagnostics: serializableDiagnostics,
   cleanup: {
-    strategy: 'authenticated block then unblock hard-delete; exact service-role notification IDs; preference restoration',
+    strategy: 'authenticated block then unblock hard-delete; exact service-role notification IDs; notification and discovery preference restoration',
     errors: cleanupErrors,
   },
 }
