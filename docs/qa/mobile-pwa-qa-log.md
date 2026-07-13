@@ -29,7 +29,7 @@ Last updated: 2026-07-13
   in a `620px` simulated keyboard viewport, and requires automatic local image,
   local video, image URL, external-video poster, and authenticated link-preview
   rendering. The final immutable deploy
-  `6a54d6c7d4f62a4538f2341c` passed all 19 Studio lifecycle checks with zero
+  `6a552eb8a7705fe8b607a0e5` passed all 19 Studio lifecycle checks with zero
   console, page, media-API, harness, database-cleanup, or Storage-cleanup
   errors.
 - The first immutable Studio pass safely stopped on a Netlify media 401 after
@@ -52,6 +52,12 @@ Last updated: 2026-07-13
   the same final immutable deploy on Pixel Chromium and iPhone WebKit and both
   passed again. Physical iOS/Android installed-PWA keyboard animation and
   hardware safe-area validation remain the real-device gate.
+- The validated frontend was promoted from a draft-only deploy to the isolated
+  site's stable test URL, `https://shadowchat-2-0-wave-one.netlify.app`, on
+  deploy `6a552eb8a7705fe8b607a0e5`. Stable and immutable HTML/entry-script hashes
+  matched exactly; the thread and rapid-swipe probes passed on the stable URL,
+  and the 19-check Studio lifecycle passed on its immutable twin. Production
+  ShadowChat and `main` were not changed.
 
 ## July 13 ShadowChat 2.0 First-Run Activation - Authenticated Checkpoint
 

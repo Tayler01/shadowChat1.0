@@ -399,13 +399,18 @@ installed-phone acceptance. Nothing merges to `main` before that approval.
   correct. The isolated test site's deploy contexts were rotated to the current
   linked key and marked secret; production was not changed.
 - The final immutable Studio checkpoint passed on deploy
-  `6a54d6c7d4f62a4538f2341c`: all 19 lifecycle checks completed across Pixel
+  `6a552eb8a7705fe8b607a0e5`: all 19 lifecycle checks completed across Pixel
   Chromium and iPhone WebKit with zero console, page, media-API, or harness
   errors. Cleanup removed four drafts, five assets, one Pin, all generated
   notifications/activity rows, nine private objects, seven public objects,
   seeded Chat/DM/category rows, and verified every scoped counter at zero. The
   browser harness now bounds engine shutdown so cleanup cannot be blocked by a
   hung Playwright close.
+- That validated deploy is now published at the isolated stable test frontend,
+  `https://shadowchat-2-0-wave-one.netlify.app`. Stable and immutable HTML and
+  entry-script hashes match; General Chat threads and rapid Theater swipes also
+  passed directly on the stable URL. This promotion did not touch production
+  ShadowChat or `main`.
 - ShadowPin Theater now coalesces drag rendering to animation frames, accepts
   up to three queued swipes during the 220ms handoff, preloads two Pins on each
   side, and reuses locally resolved routed Pins instead of refetching exact and

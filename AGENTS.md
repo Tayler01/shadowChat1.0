@@ -24,8 +24,9 @@ preserved. Activity and member-facing report intake stay paused, while the
 operator Safety Case Center remains available. All four Wave Two candidates
 are implemented and passed their local, shared-backend, immutable-Netlify, and
 automated Pixel Chromium/iPhone WebKit gates. The exact trial deploy is
-`6a549b1e052c56307d851b7d`; production `main` remains unchanged while Tayler's
-installed-phone acceptance is pending. Read
+`6a552eb8a7705fe8b607a0e5`, published at the isolated stable test URL
+`https://shadowchat-2-0-wave-one.netlify.app`; production `main` remains
+unchanged while Tayler's installed-phone acceptance is pending. Read
 [docs/SHADOWCHAT_2_0_WAVE_TWO.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_TWO.md:1)
 before changing that branch track; use
 [docs/SHADOWCHAT_2_0_WAVE_ONE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_ONE.md:1)
