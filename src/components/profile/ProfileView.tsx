@@ -15,6 +15,7 @@ import { UserAchievementBadges } from '../ui/UserAchievementBadges'
 import toast from 'react-hot-toast'
 import type { PresenceVisibility } from '../../types'
 import { getUploadErrorMessage } from '../../lib/uploadLimits'
+import { openConnectionsHub } from '../../lib/connectionsNavigation'
 
 interface ProfileViewProps {
   onToggleSidebar: () => void
@@ -294,7 +295,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
   const [loading, setLoading] = useState(false)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingBanner, setUploadingBanner] = useState(false)
-  const [stats, setStats] = useState({ messages: 0, reactions: 0, friends: 0 })
+  const [stats, setStats] = useState({ messages: 0, reactions: 0, connections: 0 })
   const avatarInputRef = React.useRef<HTMLInputElement>(null)
   const bannerInputRef = React.useRef<HTMLInputElement>(null)
   const [avatarEditor, setAvatarEditor] = useState<AvatarEditorState | null>(null)
@@ -653,13 +654,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
             {stats.reactions > 0 ? 'People are already engaging with your posts.' : 'Reactions will show up here once people engage with you.'}
           </div>
         </div>
-        <div className="glass-panel rounded-[var(--radius-lg)] p-4 text-center">
-          <div className="text-2xl font-bold text-[var(--text-primary)]">{stats.friends}</div>
-          <div className="text-sm text-[var(--text-muted)]">Friends</div>
+        <button
+          type="button"
+          onClick={openConnectionsHub}
+          className="glass-panel rounded-[var(--radius-lg)] p-4 text-center transition-[border-color,background-color,transform] hover:-translate-y-0.5 hover:border-[var(--border-glow)] hover:bg-[var(--theme-accent-soft)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]"
+          aria-label={`Open Connections, ${stats.connections}`}
+        >
+          <div className="text-2xl font-bold text-[var(--text-primary)]">{stats.connections}</div>
+          <div className="text-sm text-[var(--text-muted)]">Connections</div>
           <div className="mt-2 text-xs text-[var(--text-muted)]">
-            {stats.friends > 0 ? 'Your network is growing.' : 'Start a few DMs to build your private circle.'}
+            {stats.connections > 0 ? 'Your trusted network is growing.' : 'Find people and build your private network.'}
           </div>
-        </div>
+        </button>
       </div>
 
       {!isEditing && (

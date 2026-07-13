@@ -363,6 +363,14 @@ test('DM history mutations layer threads and panels while cold links close by re
     action: 'close-panel',
     conversationId: 'dm-1',
   })).toMatchObject({ method: 'replace', layer: null })
+
+  const connections = resolveDMRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=dms'),
+    currentLayer: null,
+    action: 'push-connections',
+  })
+  expect(connections).toMatchObject({ method: 'push', layer: 'dm-panel' })
+  expect(connections && 'url' in connections ? connections.url.search : '').toBe('?view=dms&panel=connections')
 })
 
 test('DM panel URL state is typed and ignores unknown panels', () => {
@@ -373,6 +381,10 @@ test('DM panel URL state is typed and ignores unknown panels', () => {
   expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=dms&conversation=dm-1&panel=unknown'))).toMatchObject({
     conversation: 'dm-1',
     dmPanel: null,
+  })
+  expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=dms&panel=connections'))).toMatchObject({
+    conversation: null,
+    dmPanel: 'connections',
   })
 })
 

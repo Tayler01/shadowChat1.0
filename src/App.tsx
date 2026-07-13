@@ -44,6 +44,7 @@ import {
 } from './lib/appRouting'
 import type { AppView as View } from './types/navigation'
 import { useShadowPinCommentNotifications } from './features/shadow-pin/hooks/useShadowPinCommentNotifications'
+import { useConnectionNotifications } from './features/connections/useConnectionNotifications'
 import type { ActivityTarget } from './features/activity/activityModel'
 import { FirstRunActivationCoordinator } from './features/activation/FirstRunActivationCoordinator'
 
@@ -139,6 +140,7 @@ function App() {
   useSessionResumeRecovery()
   useAdminRoleNotifications()
   useShadowPinCommentNotifications()
+  useConnectionNotifications()
   useChannelBanExpirySweep()
   const { scheme, setScheme, mode } = useTheme()
   const [currentView, setCurrentView] = useState<View>(() => getInitialLocationState().view)
@@ -152,7 +154,7 @@ function App() {
   const [dmTarget, setDmTarget] = useState<string | null>(() => getInitialLocationState().conversation)
   const [messageTarget, setMessageTarget] = useState<string | null>(() => getInitialLocationState().message)
   const [threadTarget, setThreadTarget] = useState<string | null>(() => getInitialLocationState().thread ?? null)
-  const [dmPanel, setDmPanel] = useState<'details' | 'search' | 'shared' | null>(() => getInitialLocationState().dmPanel)
+  const [dmPanel, setDmPanel] = useState<'details' | 'search' | 'shared' | 'connections' | null>(() => getInitialLocationState().dmPanel)
   const [pinTarget, setPinTarget] = useState<string | null>(() => getInitialLocationState().pin)
   const [commentTarget, setCommentTarget] = useState<string | null>(() => getInitialLocationState().comment)
   const [pinPanel, setPinPanel] = useState<'viewer' | 'comments' | null>(() => getInitialLocationState().pinPanel)

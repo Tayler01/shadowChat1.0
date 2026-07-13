@@ -1,10 +1,11 @@
 {
   "reviewed_on": "2026-07-11",
-  "expected_total_security_definers": 113,
+  "expected_total_security_definers": 119,
   "private_security_definers": [
     "private.can_operator_access_moderation_case(uuid,uuid)",
     "private.can_operator_read_moderation_evidence(uuid,uuid)",
     "private.can_read_moderation_attachment(uuid,text)",
+    "private.capture_activation_first_action()",
     "private.cleanup_activity_events()",
     "private.cleanup_signup_invite_auth_metadata()",
     "private.create_dm_activity_event()",
@@ -18,9 +19,12 @@
     "private.enforce_dm_message_not_blocked()",
     "private.enforce_dm_reaction_not_blocked()",
     "private.enforce_shadow_pin_comment_parent()",
+    "private.enroll_invite_user_activation_journey()",
+    "private.finalize_shadow_pin_creator_draft_v1(uuid,integer,uuid)",
     "private.generate_signup_invite_code()",
     "private.is_operations_health_operator(uuid)",
     "private.is_submitted_moderation_attachment(text)",
+    "private.map_general_chat_reply()",
     "private.mirror_shadow_pin_activity_event()",
     "private.refresh_shadow_pin_category_latest_image(uuid)",
     "private.refresh_shadow_pin_comment_count()",
@@ -34,8 +38,17 @@
     "private.sync_shadow_runner_catalog_medals()",
     "private.sync_shadow_runner_completion_medals()",
     "private.unarchive_dm_conversation_on_message()",
+    "private.users_are_connected(uuid,uuid)",
     "private.users_have_block(uuid,uuid)",
     "private.validate_signup_invite_for_auth_hook(jsonb)"
+  ],
+  "unexposed_security_definers": [
+    "activation_private.update_my_activation_journey_impl(integer,text,text)",
+    "connections_private.get_my_connection_state_impl(uuid)",
+    "connections_private.get_my_connection_summary_impl()",
+    "connections_private.list_my_connections_impl(text,integer,timestamp with time zone,uuid)",
+    "connections_private.mutate_connection_impl(uuid,text)",
+    "connections_private.remove_connection_on_block()"
   ],
   "anon_signatures": [
     "is_username_available(text)"
@@ -125,6 +138,7 @@
     "service_role:push_subscriptions:SELECT",
     "service_role:push_subscriptions:UPDATE",
     "service_role:user_blocks:SELECT",
+    "service_role:user_connections:SELECT",
     "service_role:user_presence:DELETE",
     "service_role:user_presence:INSERT",
     "service_role:user_presence:SELECT",
@@ -222,6 +236,18 @@
         "toggle_message_reaction_v2(uuid,text,boolean)",
         "toggle_shadow_pin_category_heart(uuid)",
         "toggle_shadow_pin_image_heart(uuid)"
+      ]
+    },
+    {
+      "domain": "shadow_pin_creator_studio",
+      "justification": "Owner-checked draft creation, revision updates, bounded listing, deletion, and atomic media finalization span private draft assets and published ShadowPin rows.",
+      "signatures": [
+        "create_shadow_pin_creator_draft(uuid,text,text,text[],text,uuid,uuid)",
+        "delete_shadow_pin_creator_draft(uuid,integer)",
+        "finalize_shadow_pin_creator_bunny_draft(uuid,integer,uuid,uuid,text,text,text,text)",
+        "finalize_shadow_pin_creator_draft(uuid,integer,uuid)",
+        "list_my_shadow_pin_creator_drafts(integer)",
+        "update_shadow_pin_creator_draft(uuid,integer,text,uuid,text,text,text[])"
       ]
     },
     {

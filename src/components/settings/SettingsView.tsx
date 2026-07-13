@@ -496,6 +496,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               enabled: preferences.shadow_pin_reply_enabled,
               onChange: (enabled: boolean) => updatePreference('shadow_pin_reply_enabled', enabled),
             },
+            {
+              label: 'Connections (in-app)',
+              description: 'Show an in-app banner when someone sends or accepts a connection request. OS push is not enabled yet.',
+              enabled: preferences.connection_notifications_enabled,
+              onChange: (enabled: boolean) => updatePreference('connection_notifications_enabled', enabled),
+            },
           ]
         : []
     ),

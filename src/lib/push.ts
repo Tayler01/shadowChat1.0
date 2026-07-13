@@ -13,6 +13,7 @@ export interface NotificationPreferences {
   shadow_pin_new_post_enabled: boolean
   shadow_pin_comment_enabled: boolean
   shadow_pin_reply_enabled: boolean
+  connection_notifications_enabled: boolean
   general_chat_muted: boolean
   quiet_hours_start: string | null
   quiet_hours_end: string | null
@@ -52,6 +53,7 @@ const DEFAULT_PREFERENCES = {
   shadow_pin_new_post_enabled: true,
   shadow_pin_comment_enabled: true,
   shadow_pin_reply_enabled: true,
+  connection_notifications_enabled: true,
   general_chat_muted: false,
   quiet_hours_start: null,
   quiet_hours_end: null,
@@ -71,6 +73,7 @@ const NOTIFICATION_PREFERENCE_SELECT = [
   'shadow_pin_new_post_enabled',
   'shadow_pin_comment_enabled',
   'shadow_pin_reply_enabled',
+  'connection_notifications_enabled',
   'general_chat_muted',
   'quiet_hours_start',
   'quiet_hours_end',

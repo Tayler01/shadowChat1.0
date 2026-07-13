@@ -2191,19 +2191,19 @@ export const ensureSession = async (force = false) => {
 export interface UserStats {
   messages: number
   reactions: number
-  friends: number
+  connections: number
 }
 
 export const fetchUserStats = async (userId: string): Promise<UserStats> => {
   const sessionValid = await ensureSession()
 
   if (!sessionValid) {
-    return { messages: 0, reactions: 0, friends: 0 }
+    return { messages: 0, reactions: 0, connections: 0 }
   }
 
   const workingClient = await getWorkingClient()
 
-  const [messagesRes, reactionsGivenRes, channelReactionsRes, dmReactionsRes, friendsRes] = await Promise.all([
+  const [messagesRes, reactionsGivenRes, channelReactionsRes, dmReactionsRes, connectionsRes] = await Promise.all([
     workingClient
       .from('messages')
       .select('id', { count: 'exact', head: true })
@@ -2211,10 +2211,7 @@ export const fetchUserStats = async (userId: string): Promise<UserStats> => {
     workingClient.rpc('count_user_reactions', { target_user_id: userId }),
     workingClient.rpc('count_reactions_to_user_messages_v2', { target_user_id: userId }),
     workingClient.rpc('count_reactions_to_user_dm_messages_v2', { target_user_id: userId }),
-    workingClient
-      .from('dm_conversations')
-      .select('id', { count: 'exact', head: true })
-      .contains('participants', [userId]),
+    workingClient.rpc('get_my_connection_summary'),
   ])
 
   return {
@@ -2223,6 +2220,6 @@ export const fetchUserStats = async (userId: string): Promise<UserStats> => {
       (reactionsGivenRes.data as number || 0) +
       (channelReactionsRes.data as number || 0) +
       (dmReactionsRes.data as number || 0),
-    friends: friendsRes.count || 0,
+    connections: Number((connectionsRes.data as { connections?: number } | null)?.connections ?? 0),
   }
 }

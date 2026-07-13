@@ -33,6 +33,25 @@ Canonical detail and release gates live in:
 
 ## Current Goal
 
+### ShadowChat 2.0 Wave Three
+
+- Goal: deliver Connections, ShadowPin Feed Modes, and Inner Circles in that
+  order on `codex/shadowchat-2.0`, then prepare the gated Shado Live prototype
+  and deterministic source-linked Catch-Up track without changing production
+  `main`.
+- Started: 2026-07-13
+- Status: Candidate 1 Connections contract locked; additive backend and
+  phone-first DM Hub/profile implementation in progress.
+- Backend boundary: reciprocal caller-private relationships, no public graph or
+  counts, personal-block teardown with no restore, and compatibility with the
+  unchanged production frontend sharing Supabase.
+- Delivery boundary: verify each candidate independently before beginning the
+  next, then run one combined local/shared-backend/mobile/cleanup/isolated-
+  Netlify gate.
+- Roadmap: [SHADOWCHAT_2_0_WAVE_THREE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_THREE.md:1)
+- Candidate 1 contract: [CONNECTIONS.md](C:/repos/chat2.0/docs/CONNECTIONS.md:1)
+- Production `main` and the production Netlify frontend remain unchanged.
+
 ### ShadowChat 2.0 Wave Two
 
 - Goal: build Universal Discovery & Library, True General Chat Threads,

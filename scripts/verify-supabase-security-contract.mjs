@@ -25,6 +25,7 @@ const expectedAuthenticated = contract.domains
 const expectedAnon = [...contract.anon_signatures].sort()
 const expectedInternal = [...contract.internal_signatures].sort()
 const expectedPrivate = [...contract.private_security_definers].sort()
+const expectedUnexposed = [...(contract.unexposed_security_definers ?? [])].sort()
 const expectedActiveTablePrivileges = [...contract.required_active_table_privileges].sort()
 const expectedUsersUpdateColumns = [...contract.authenticated_users_update_columns].sort()
 const activeGrantTables = [...new Set(expectedActiveTablePrivileges.map(entry => entry.split(':')[1]))]
@@ -66,6 +67,14 @@ const privateRows = query(`
     and p.prosecdef
   order by 1
 `)
+const unexposedRows = query(`
+  select p.oid::regprocedure::text as signature
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname in ('activation_private', 'connections_private')
+    and p.prosecdef
+  order by 1
+`)
 const [definerSummary] = query(`
   select
     count(*)::integer as total,
@@ -94,6 +103,21 @@ const [privateDefinerSummary] = query(`
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'private'
+    and p.prosecdef
+`)
+const [unexposedDefinerSummary] = query(`
+  select
+    count(*)::integer as total,
+    count(*) filter (
+      where not exists (
+        select 1
+        from unnest(coalesce(p.proconfig, array[]::text[])) setting
+        where setting like 'search_path=%'
+      )
+    )::integer as missing_search_path
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname in ('activation_private', 'connections_private')
     and p.prosecdef
 `)
 const pausedGrantRows = query(`
@@ -161,6 +185,11 @@ assert.deepEqual(
   expectedPrivate,
   'private SECURITY DEFINER surface drifted from the reviewed allowlist',
 )
+assert.deepEqual(
+  unexposedRows.map(row => row.signature).sort(),
+  expectedUnexposed,
+  'unexposed SECURITY DEFINER surface drifted from the reviewed allowlist',
+)
 assert.equal(
   Number(definerSummary?.total),
   contract.expected_total_security_definers,
@@ -171,6 +200,11 @@ assert.equal(
   Number(privateDefinerSummary?.missing_search_path),
   0,
   'every private SECURITY DEFINER must pin search_path',
+)
+assert.equal(
+  Number(unexposedDefinerSummary?.missing_search_path),
+  0,
+  'every unexposed SECURITY DEFINER must pin search_path',
 )
 assert.deepEqual(pausedGrantRows, [], 'paused domains must expose no table privileges to browser roles')
 assert.deepEqual(
@@ -196,6 +230,7 @@ console.log(JSON.stringify({
   internalSecurityDefiners: expectedInternal.length,
   totalSecurityDefiners: Number(definerSummary.total),
   privateSecurityDefiners: Number(privateDefinerSummary.total),
+  unexposedSecurityDefiners: Number(unexposedDefinerSummary.total),
   pausedBrowserTableGrants: pausedGrantRows.length,
   activeTablePrivileges: expectedActiveTablePrivileges.length,
   usersUpdateColumns: expectedUsersUpdateColumns.length,

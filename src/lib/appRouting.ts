@@ -6,7 +6,7 @@ export type AppLocationState = {
   conversation: string | null
   message: string | null
   thread?: string | null
-  dmPanel: 'details' | 'search' | 'shared' | null
+  dmPanel: 'details' | 'search' | 'shared' | 'connections' | null
   pin: string | null
   comment: string | null
   pinPanel: 'viewer' | 'comments' | null
@@ -159,6 +159,7 @@ export type DMRouteAction =
   | 'push-details'
   | 'push-search'
   | 'push-shared'
+  | 'push-connections'
   | 'replace-search'
   | 'replace-shared'
   | 'close-panel'
@@ -219,6 +220,17 @@ export const resolveDMRouteMutation = ({
         : currentLayer === 'dm-panel-cold'
           ? null
           : currentLayer,
+    }
+  }
+
+  if (action === 'push-connections') {
+    url.searchParams.delete('conversation')
+    url.searchParams.delete('message')
+    url.searchParams.set('panel', 'connections')
+    return {
+      method: 'push',
+      url,
+      layer: 'dm-panel',
     }
   }
 
@@ -377,7 +389,7 @@ export const getLocationStateFromUrl = (url: URL): AppLocationState => {
     conversation: view === 'dms' ? params.get('conversation') : null,
     message: !pausedActivityRoute && (view === 'dms' || view === 'chat') ? params.get('message') : null,
     thread: !pausedActivityRoute && view === 'chat' ? normalizeChatMessageId(params.get('thread')) : null,
-    dmPanel: dmPanelParam === 'details' || dmPanelParam === 'search' || dmPanelParam === 'shared'
+    dmPanel: dmPanelParam === 'details' || dmPanelParam === 'search' || dmPanelParam === 'shared' || dmPanelParam === 'connections'
       ? dmPanelParam
       : null,
     pin,

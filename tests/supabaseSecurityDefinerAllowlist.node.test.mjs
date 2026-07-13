@@ -41,9 +41,9 @@ test('linked active-table grant cleanup removes only reviewed historical extras'
 
 test('SECURITY DEFINER allowlist is explicit, categorized, and duplicate-free', () => {
   assert.match(contract.reviewed_on, /^\d{4}-\d{2}-\d{2}$/)
-  assert.equal(contract.expected_total_security_definers, 113)
+  assert.equal(contract.expected_total_security_definers, 119)
   assert.deepEqual(contract.anon_signatures, ['is_username_available(text)'])
-  assert.equal(contract.private_security_definers.length, 34)
+  assert.equal(contract.private_security_definers.length, 39)
   assert.equal(
     new Set(contract.private_security_definers).size,
     contract.private_security_definers.length,
@@ -60,12 +60,12 @@ test('SECURITY DEFINER allowlist is explicit, categorized, and duplicate-free', 
     signatures.push(...domain.signatures)
   }
 
-  assert.equal(signatures.length, 79)
+  assert.equal(signatures.length, 85)
   assert.equal(new Set(signatures).size, signatures.length)
   assert.ok(signatures.every(signature => /^[a-z0-9_]+\(.*\)$/.test(signature)))
   assert.equal(new Set([...signatures, ...contract.internal_signatures]).size, contract.expected_total_security_definers)
-  assert.equal(contract.required_active_table_privileges.length, 52)
-  assert.equal(new Set(contract.required_active_table_privileges).size, 52)
+  assert.equal(contract.required_active_table_privileges.length, 53)
+  assert.equal(new Set(contract.required_active_table_privileges).size, 53)
   assert.deepEqual(contract.authenticated_users_update_columns, [
     'avatar_thumbnail_path',
     'avatar_thumbnail_url',

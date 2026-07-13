@@ -32,6 +32,7 @@ import { BlockUserControl } from './BlockUserControl'
 import { useBlockedUsers } from '../../hooks/useBlockedUsers'
 import { useModerationReport } from '../../features/moderation/useModerationReport'
 import { MEMBER_REPORTING_FEATURE_ENABLED } from '../../config/featureFlags'
+import { ConnectionControl } from '../../features/connections/ConnectionControl'
 
 interface PublicProfileDialogProps {
   user: User | null
@@ -330,7 +331,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
   const profilePage = (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[120] flex h-[var(--shadowchat-visual-viewport-height,100dvh)] items-stretch justify-center p-0 sm:items-center sm:px-4 sm:py-6">
+        <div className="fixed inset-0 z-[150] flex h-[var(--shadowchat-visual-viewport-height,100dvh)] items-stretch justify-center p-0 sm:items-center sm:px-4 sm:py-6">
           <motion.button
             type="button"
             aria-label="Dismiss profile"
@@ -420,6 +421,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
 
               {canManagePersonalBlock && (
                 <div className="mt-4 flex flex-wrap gap-2">
+                  {!blockedByMe && <ConnectionControl user={user} />}
                   {canStartDM && (
                     <Button
                       type="button"

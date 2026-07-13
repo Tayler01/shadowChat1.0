@@ -1,4 +1,4 @@
-import { Plus, Search, X } from 'lucide-react'
+import { Plus, Search, UserPlus, X } from 'lucide-react'
 import { cn } from '../../../lib/utils'
 
 export type DMHubInboxMode = 'inbox' | 'unread' | 'archived'
@@ -12,6 +12,8 @@ type DMHubInboxControlsProps = {
   disabled?: boolean
   searchInputRef?: React.Ref<HTMLInputElement>
   onStartConversation?: () => void
+  onOpenConnections?: () => void
+  connectionRequestCount?: number
 }
 
 const modes: Array<{ id: DMHubInboxMode; label: string }> = [
@@ -29,6 +31,8 @@ export function DMHubInboxControls({
   disabled = false,
   searchInputRef,
   onStartConversation,
+  onOpenConnections,
+  connectionRequestCount = 0,
 }: DMHubInboxControlsProps) {
   return (
     <section className="border-b border-[var(--border-panel)] px-3 pb-3 pt-[calc(env(safe-area-inset-top)+0.5rem)] sm:px-4 md:pt-2" aria-label="Direct message inbox controls">
@@ -59,6 +63,21 @@ export function DMHubInboxControls({
             </button>
           )}
         </div>
+        {onOpenConnections && (
+          <button
+            type="button"
+            onClick={onOpenConnections}
+            className="relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.035)] text-[var(--text-secondary)] transition-[border-color,background-color,color] hover:border-[var(--border-glow)] hover:bg-[var(--theme-accent-soft)] hover:text-[var(--theme-accent-readable)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]"
+            aria-label={`Open Connections${connectionRequestCount > 0 ? `, ${connectionRequestCount} pending request${connectionRequestCount === 1 ? '' : 's'}` : ''}`}
+          >
+            <UserPlus className="h-5 w-5" />
+            {connectionRequestCount > 0 && (
+              <span aria-hidden="true" className="theme-unread-badge absolute -right-1 -top-1 min-w-5 rounded-full px-1 text-center text-[0.625rem] leading-5">
+                {connectionRequestCount > 99 ? '99+' : connectionRequestCount}
+              </span>
+            )}
+          </button>
+        )}
         {onStartConversation && (
           <button
             type="button"

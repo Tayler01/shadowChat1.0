@@ -70,6 +70,7 @@ import {
 } from '../chat/messageDisplay'
 import { useModerationReport } from '../../features/moderation/useModerationReport'
 import { MEMBER_REPORTING_FEATURE_ENABLED } from '../../config/featureFlags'
+import { useConnectionSummary } from '../../features/connections/useConnectionSummary'
 
 interface DirectMessagesViewProps {
   onToggleSidebar: () => void
@@ -77,7 +78,7 @@ interface DirectMessagesViewProps {
   onViewChange: (view: AppView) => void
   initialConversation?: string
   initialMessageId?: string
-  initialPanel?: 'details' | 'search' | 'shared' | null
+  initialPanel?: 'details' | 'search' | 'shared' | 'connections' | null
   onRoute?: (action: DMRouteAction, conversationId?: string, messageId?: string) => void
 }
 
@@ -102,6 +103,12 @@ const PublicProfileDialog = React.lazy(() =>
 const DMHubConversationContentSheet = React.lazy(() =>
   import('./hub/DMHubConversationContentSheet').then(module => ({
     default: module.DMHubConversationContentSheet,
+  }))
+)
+
+const ConnectionsHubSheet = React.lazy(() =>
+  import('../../features/connections/ConnectionsHubSheet').then(module => ({
+    default: module.ConnectionsHubSheet,
   }))
 )
 
@@ -806,6 +813,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const showThreadInitialLoading = !currentConv?.is_blocked && (!selectedThreadLoaded || messagesLoading) && messages.length === 0
   const showThreadEmpty = selectedThreadLoaded && !messagesLoading && messages.length === 0 && !loadingMore && !currentConv?.is_blocked
   const hub = useDMConversationHub({ conversations, userId: profile?.id })
+  const { summary: connectionSummary } = useConnectionSummary()
   const saveHubPreference = hub.updatePreference
   const toggleHubMute = hub.toggleMute
   const [showConversationDetails, setShowConversationDetails] = useState(false)
@@ -1431,6 +1439,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 counts={hub.counts}
                 disabled={hub.loading}
                 searchInputRef={inboxSearchInputRef}
+                onOpenConnections={() => onRoute?.('push-connections')}
+                connectionRequestCount={connectionSummary.incomingCount}
                 onStartConversation={() => setShowNewConversation(true)}
               />
               {showInboxLoading ? (
@@ -1790,6 +1800,17 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
             user={profileUser}
             open
             onClose={() => setProfileUser(null)}
+          />
+        </React.Suspense>
+      )}
+      {initialPanel === 'connections' && (
+        <React.Suspense fallback={null}>
+          <ConnectionsHubSheet
+            open
+            onClose={() => onRoute?.('close-panel')}
+            currentUserId={profile?.id ?? ''}
+            summary={connectionSummary}
+            onMessage={connectionUser => { void handleUserSelect(connectionUser) }}
           />
         </React.Suspense>
       )}

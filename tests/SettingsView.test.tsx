@@ -94,6 +94,7 @@ jest.mock('../src/hooks/usePushNotifications', () => ({
       shadow_pin_new_post_enabled: true,
       shadow_pin_comment_enabled: true,
       shadow_pin_reply_enabled: true,
+      connection_notifications_enabled: true,
       general_chat_muted: false,
       quiet_hours_start: null,
       quiet_hours_end: null,

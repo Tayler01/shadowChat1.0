@@ -13,6 +13,7 @@ type DMHubBottomSheetProps = {
   children: ReactNode
   className?: string
   testId?: string
+  suspended?: boolean
 }
 
 export function DMHubBottomSheet({
@@ -24,12 +25,13 @@ export function DMHubBottomSheet({
   children,
   className,
   testId = 'dm-hub-bottom-sheet',
+  suspended = false,
 }: DMHubBottomSheetProps) {
   const titleId = useId()
   const descriptionId = useId()
   const closeRef = useRef<HTMLButtonElement>(null)
   const dialogRef = useDialogAccessibility<HTMLDivElement>({
-    open,
+    open: open && !suspended,
     onClose,
     initialFocusRef: closeRef,
   })
@@ -47,11 +49,13 @@ export function DMHubBottomSheet({
       <div
         ref={dialogRef}
         role="dialog"
-        aria-modal="true"
+        aria-modal={!suspended}
+        aria-hidden={suspended || undefined}
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         className={cn(
           'glass-panel-strong flex max-h-[min(92dvh,48rem)] w-full flex-col overflow-hidden rounded-t-[var(--radius-xl)] border border-b-0 border-[var(--border-panel)] shadow-[var(--shadow-panel-strong)] sm:max-w-xl sm:rounded-[var(--radius-xl)] sm:border-b',
+          suspended && 'pointer-events-none',
           className
         )}
         data-testid={testId}

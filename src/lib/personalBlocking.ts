@@ -2,6 +2,8 @@ import type { User } from './supabase'
 import { getWorkingClient } from './supabase'
 import { pickPublicProfile } from '../../supabase/functions/_shared/public-profile'
 
+export const PERSONAL_BLOCKS_CHANGED_EVENT = 'shadowchat:personal-blocks-changed'
+
 export type BlockedUserEntry = {
   user: User
   blockedAt: string

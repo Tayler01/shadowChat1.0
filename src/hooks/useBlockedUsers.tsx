@@ -13,10 +13,10 @@ import {
   blockUser as persistBlockUser,
   fetchMyBlockedUsers,
   unblockUser as persistUnblockUser,
+  PERSONAL_BLOCKS_CHANGED_EVENT,
   type BlockedUserEntry,
 } from '../lib/personalBlocking'
-
-export const PERSONAL_BLOCKS_CHANGED_EVENT = 'shadowchat:personal-blocks-changed'
+export { PERSONAL_BLOCKS_CHANGED_EVENT } from '../lib/personalBlocking'
 
 type BlockedUsersContextValue = {
   entries: BlockedUserEntry[]
@@ -47,9 +47,11 @@ const fallbackValue: BlockedUsersContextValue = {
 
 const BlockedUsersContext = createContext<BlockedUsersContextValue>(fallbackValue)
 
-const notifyBlocksChanged = () => {
+const notifyBlocksChanged = (userId: string, blocked: boolean) => {
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent(PERSONAL_BLOCKS_CHANGED_EVENT))
+    window.dispatchEvent(new CustomEvent(PERSONAL_BLOCKS_CHANGED_EVENT, {
+      detail: { userId, blocked },
+    }))
   }
 }
 
@@ -122,7 +124,7 @@ export function BlockedUsersProvider({ children }: { children: React.ReactNode }
     try {
       await persistBlockUser(userId)
       setBlockedUserIds(current => new Set(current).add(userId))
-      notifyBlocksChanged()
+      notifyBlocksChanged(userId, true)
       await refresh().catch(() => undefined)
     } finally {
       setSaving(userId, false)
@@ -140,7 +142,7 @@ export function BlockedUsersProvider({ children }: { children: React.ReactNode }
         return next
       })
       setEntries(current => current.filter(entry => entry.user.id !== userId))
-      notifyBlocksChanged()
+      notifyBlocksChanged(userId, false)
       await refresh().catch(() => undefined)
     } finally {
       setSaving(userId, false)
