@@ -61,6 +61,9 @@ interface MessageItemProps {
   previousMessage?: Message
   parentMessage?: Message
   onReply?: (message: Message) => void
+  onOpenThread?: (message: Message) => void
+  allowPin?: boolean
+  domIdPrefix?: string
   onEdit: (messageId: string, content: string) => Promise<void>
   onDelete: (messageId: string) => Promise<void>
   onTogglePin: (messageId: string) => Promise<void>
@@ -190,6 +193,9 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     previousMessage,
     parentMessage,
     onReply,
+    onOpenThread,
+    allowPin = true,
+    domIdPrefix = 'message',
     onEdit,
     onDelete,
     onTogglePin,
@@ -239,6 +245,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const hypeCount = message.hype_count ?? 0
     const hypeTier = getHypeTier(hypeCount)
     const hypeUsers = message.hype_users ?? []
+    const threadSummary = message.thread_summary
     const hasCurrentUserHyped = hypeUsers.some(user => user.user_id === profile?.id)
     const imageHeartReaction = message.reactions?.[HEART_REACTION] || message.reactions?.['\u2764']
     const imageHeartCount = Number(imageHeartReaction?.count ?? 0)
@@ -326,7 +333,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
 
     if (message.message_type === 'hype') {
       return (
-        <div id={`message-${message.id}`} className="hype-system-event" data-testid="hype-system-event">
+        <div id={`${domIdPrefix}-${message.id}`} className="hype-system-event" data-testid="hype-system-event">
           <span>{message.user?.display_name || message.user?.username || 'Someone'} hyped</span>
           <span className="ml-1" aria-hidden="true">{'\u{1F389}'}</span>
           <span className="ml-2 text-xs font-normal text-[var(--text-muted)]">{formatTime(message.created_at)}</span>
@@ -458,7 +465,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
         id: 'pin',
         label: message.pinned ? 'Unpin' : 'Pin',
         icon: message.pinned ? PinOff : Pin,
-        hidden: isLocalDelivery,
+        hidden: isLocalDelivery || !allowPin,
         onSelect: handlePinToggle,
       },
     ]
@@ -466,7 +473,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     return (
       <>
         <div
-          id={`message-${message.id}`}
+          id={`${domIdPrefix}-${message.id}`}
           className="group relative ml-2 min-w-0 py-1"
         >
         {!isGrouped && (
@@ -720,6 +727,41 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   desktopClassName="fixed left-1/2 top-16 z-[90] max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] sm:absolute sm:bottom-full sm:left-1/2 sm:top-auto sm:mb-2"
                 />
               </div>
+              {threadSummary && threadSummary.reply_count > 0 && onOpenThread && (
+                <button
+                  type="button"
+                  onClick={() => onOpenThread(message)}
+                  className="mt-1.5 flex min-h-11 max-w-full items-center gap-2 rounded-[var(--radius-md)] border border-[var(--theme-accent-border-soft)] bg-[var(--theme-accent-softer)] px-3 py-2 text-left text-xs text-[var(--text-secondary)] transition-colors hover:border-[var(--theme-accent-border)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent-border)]"
+                  aria-label={`Open thread with ${threadSummary.reply_count} ${threadSummary.reply_count === 1 ? 'reply' : 'replies'}${threadSummary.unread_count > 0 ? `, ${threadSummary.unread_count} new` : ''}`}
+                  data-testid="open-message-thread"
+                >
+                  <span className="font-semibold text-[var(--theme-accent-readable)]">
+                    View thread
+                  </span>
+                  <span aria-hidden="true">·</span>
+                  <span>
+                    {threadSummary.reply_count} {threadSummary.reply_count === 1 ? 'reply' : 'replies'}
+                  </span>
+                  {threadSummary.unread_count > 0 && (
+                    <span className="rounded-full border border-[var(--theme-accent-border)] px-1.5 py-0.5 font-semibold text-[var(--theme-accent-readable)]">
+                      {threadSummary.unread_count} new
+                    </span>
+                  )}
+                  {threadSummary.participants && threadSummary.participants.length > 0 && (
+                    <span className="ml-auto flex -space-x-1.5" aria-hidden="true">
+                      {threadSummary.participants.slice(0, 3).map(participant => (
+                        <Avatar
+                          key={participant.id}
+                          src={participant.avatar_thumbnail_url || participant.avatar_url}
+                          alt=""
+                          size="sm"
+                          color={participant.color}
+                        />
+                      ))}
+                    </span>
+                  )}
+                </button>
+              )}
               {isFailedLocalMessage && (
                 <div className="mt-1.5 flex flex-wrap items-center gap-2 pl-1 text-xs text-red-300">
                   <span>Failed to send</span>

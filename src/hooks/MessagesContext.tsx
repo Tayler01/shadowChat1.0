@@ -45,6 +45,7 @@ export interface MessagesContextValue {
   loadNewerMessages: () => Promise<void>
   ensureMessageWindow: (targetMessageId: string | null, options?: EnsureMessageWindowOptions) => Promise<Message | null>
   compactToLatestMessages: () => void
+  refreshThreadSummaries?: (rootMessageIds?: string[]) => Promise<void>
 }
 
 export const MessagesContext = createContext<MessagesContextValue | undefined>(undefined)

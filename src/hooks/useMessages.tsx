@@ -9,8 +9,9 @@ import {
   Message,
   User,
   type ChatMessageType,
-  fetchGeneralChatMessageWindow,
-  isGeneralChatMessageWindowRpcUnavailable,
+  fetchGeneralChatThreadedWindow,
+  fetchGeneralChatThreadSummaries,
+  isGeneralChatThreadRpcUnavailable,
   ensureSession,
   refreshSessionLocked,
   getRealtimeClient,
@@ -159,7 +160,7 @@ const withSentDeliveryState = (message: Message) => ({
 })
 
 const trimMessageWindow = (items: Message[]) => {
-  const deduped = dedupeMessagesById(items)
+  const deduped = dedupeMessagesById(items).filter(message => !message.reply_to)
   const pinned = deduped.filter(message => message.pinned)
   const regular = deduped.filter(message => !message.pinned)
 
@@ -176,7 +177,7 @@ const cacheMessages = (items: Message[]) => {
 
   try {
     const cacheableMessages = items.filter(
-      message => !message.optimistic && message.delivery_status !== 'sending' && message.delivery_status !== 'failed'
+      message => !message.reply_to && !message.optimistic && message.delivery_status !== 'sending' && message.delivery_status !== 'failed'
     )
     localStorage.setItem('chatHistory', JSON.stringify(trimMessageWindow(cacheableMessages)))
   } catch {
@@ -216,11 +217,37 @@ const combineWindowMessages = (window: GeneralChatMessageWindowResult) =>
     ...window.messages,
   ].map(withSentDeliveryState)))
 
+const attachThreadSummaries = async (window: GeneralChatMessageWindowResult) => {
+  const allMessages = [...window.pinnedMessages, ...window.messages]
+  const rootIds = allMessages.filter(message => !message.reply_to).map(message => message.id)
+
+  try {
+    const summaries = await fetchGeneralChatThreadSummaries(rootIds)
+    const attach = (message: Message) => ({
+      ...message,
+      thread_summary: summaries.get(message.id) ?? message.thread_summary ?? null,
+    })
+    return {
+      ...window,
+      messages: window.messages.filter(message => !message.reply_to).map(attach),
+      pinnedMessages: window.pinnedMessages.filter(message => !message.reply_to).map(attach),
+    }
+  } catch (error) {
+    if (!isGeneralChatThreadRpcUnavailable(error)) throw error
+    return {
+      ...window,
+      messages: window.messages.filter(message => !message.reply_to),
+      pinnedMessages: window.pinnedMessages.filter(message => !message.reply_to),
+    }
+  }
+}
+
 const fetchPinnedMessages = async (workingClient: any) => {
   const { data, error } = await workingClient
     .from('messages')
     .select(MESSAGE_WITH_USER_SELECT)
     .eq('pinned', true)
+    .is('reply_to', null)
     .order('pinned_at', { ascending: true })
     .order('created_at', { ascending: true })
     .order('id', { ascending: true })
@@ -245,6 +272,7 @@ const fetchLatestWindowDirect = async (
       .from('messages')
       .select(MESSAGE_WITH_USER_SELECT)
       .eq('pinned', false)
+      .is('reply_to', null)
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
       .limit(limit),
@@ -273,6 +301,7 @@ const fetchOlderWindowDirect = async (
       .from('messages')
       .select(MESSAGE_WITH_USER_SELECT)
       .eq('pinned', false)
+      .is('reply_to', null)
       .or(buildOlderKeysetFilter(anchor))
       .order('created_at', { ascending: false })
       .order('id', { ascending: false })
@@ -302,6 +331,7 @@ const fetchNewerWindowDirect = async (
       .from('messages')
       .select(MESSAGE_WITH_USER_SELECT)
       .eq('pinned', false)
+      .is('reply_to', null)
       .or(buildNewerKeysetFilter(anchor))
       .order('created_at', { ascending: true })
       .order('id', { ascending: true })
@@ -351,6 +381,7 @@ const fetchTargetWindowDirect = async (
       .from('messages')
       .select(MESSAGE_WITH_USER_SELECT)
       .eq('pinned', false)
+      .is('reply_to', null)
       .or(buildNewerKeysetFilter(anchor))
       .order('created_at', { ascending: true })
       .order('id', { ascending: true })
@@ -380,6 +411,7 @@ const fetchTargetWindowDirect = async (
         .from('messages')
         .select(MESSAGE_WITH_USER_SELECT)
         .eq('pinned', false)
+        .is('reply_to', null)
         .or(buildOlderKeysetFilter(target))
         .order('created_at', { ascending: false })
         .order('id', { ascending: false })
@@ -390,6 +422,7 @@ const fetchTargetWindowDirect = async (
         .from('messages')
         .select(MESSAGE_WITH_USER_SELECT)
         .eq('pinned', false)
+        .is('reply_to', null)
         .or(buildNewerKeysetFilter(target))
         .order('created_at', { ascending: true })
         .order('id', { ascending: true })
@@ -646,37 +679,38 @@ function useProvideMessages(): MessagesContextValue {
 
   const fetchWindowDirect = useCallback(async (request: GeneralChatMessageWindowRequest) => {
     const workingClient = await getWorkingClient();
+    let window: GeneralChatMessageWindowResult
 
     if (request.mode === 'older' && request.anchor) {
-      return fetchOlderWindowDirect(workingClient, request.anchor, request.limit);
-    }
-
-    if (request.mode === 'newer' && request.anchor) {
-      return fetchNewerWindowDirect(workingClient, request.anchor, request.limit);
-    }
-
-    if (request.mode === 'target' && (request.targetMessageId || request.targetLastReadAt)) {
-      return fetchTargetWindowDirect(
+      window = await fetchOlderWindowDirect(workingClient, request.anchor, request.limit);
+    } else if (request.mode === 'newer' && request.anchor) {
+      window = await fetchNewerWindowDirect(workingClient, request.anchor, request.limit);
+    } else if (request.mode === 'target' && (request.targetMessageId || request.targetLastReadAt)) {
+      window = await fetchTargetWindowDirect(
         workingClient,
         request.targetMessageId ?? null,
         request.limit,
         request.targetLastReadMessageId ?? null,
         request.targetLastReadAt ?? null
       );
+    } else {
+      window = await fetchLatestWindowDirect(workingClient, request.limit);
     }
 
-    return fetchLatestWindowDirect(workingClient, request.limit);
+    return attachThreadSummaries(window)
   }, []);
 
   const fetchMessageWindow = useCallback(async (request: GeneralChatMessageWindowRequest) => {
-    const canUseCenteredWindowRpc = request.mode === 'latest' || request.mode === 'target';
-    if (canUseCenteredWindowRpc && windowRpcAvailableRef.current !== false) {
+    if (windowRpcAvailableRef.current !== false) {
       try {
-        const window = await fetchGeneralChatMessageWindow(request);
+        const window = await fetchGeneralChatThreadedWindow({
+          ...request,
+          targetMessageId: request.targetMessageId ?? request.anchor?.id ?? null,
+        });
         windowRpcAvailableRef.current = true;
-        return window;
+        return { ...window, windowMode: request.mode };
       } catch (error) {
-        if (!isGeneralChatMessageWindowRpcUnavailable(error)) {
+        if (!isGeneralChatThreadRpcUnavailable(error)) {
           throw error;
         }
         windowRpcAvailableRef.current = false;
@@ -690,7 +724,7 @@ function useProvideMessages(): MessagesContextValue {
     if (!user?.id) return;
 
     const entries = loadLocalOutboxEntries(GROUP_OUTBOX_SCOPE)
-      .filter(entry => entry.senderId === user.id);
+      .filter(entry => entry.senderId === user.id && !entry.replyTo);
     if (entries.length === 0) return;
 
     setMessages(prev => {
@@ -706,6 +740,15 @@ function useProvideMessages(): MessagesContextValue {
     (msg: Message) => {
       let added = false;
       const normalizedMessage = withSentDeliveryState(msg as Message) as Message;
+      if (normalizedMessage.reply_to) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('shadowchat:general-thread-message', {
+            detail: normalizedMessage,
+          }))
+        }
+        if (user && normalizedMessage.user_id !== user.id) playMessage()
+        return
+      }
       const currentMessages = latestMessagesRef.current;
       const existsInCurrentWindow = findMatchingMessageIndex(currentMessages, normalizedMessage) >= 0;
       const newestWindowMessage = getNewestServerWindowMessage(currentMessages);
@@ -739,6 +782,40 @@ function useProvideMessages(): MessagesContextValue {
     },
     [playMessage, setHasNewerValue, user]
   );
+
+  const refreshThreadSummaries = useCallback(async (rootMessageIds?: string[]) => {
+    const ids = rootMessageIds?.length
+      ? rootMessageIds
+      : latestMessagesRef.current.filter(message => !message.reply_to).map(message => message.id)
+    if (ids.length === 0) return
+
+    const summaries = await fetchGeneralChatThreadSummaries(ids)
+    const loungeScroll = typeof document !== 'undefined'
+      ? document.querySelector<HTMLElement>('[data-testid="message-scroll"]')
+      : null
+    const preserveScrollTop = loungeScroll?.scrollTop ?? null
+    setMessages(prev => {
+      let changed = false
+      const next = prev.map(message => {
+        const summary = summaries.get(message.id) ?? null
+        const before = JSON.stringify(message.thread_summary ?? null)
+        const after = JSON.stringify(summary)
+        if (before === after) return message
+        changed = true
+        return { ...message, thread_summary: summary }
+      })
+      return changed ? next : prev
+    })
+    if (loungeScroll && preserveScrollTop !== null) {
+      const restore = () => { loungeScroll.scrollTop = preserveScrollTop }
+      restore()
+      window.requestAnimationFrame(() => {
+        restore()
+        window.requestAnimationFrame(restore)
+      })
+      window.setTimeout(restore, 120)
+    }
+  }, [])
 
   const loadLatestMessages = useCallback(async () => {
     const requestId = fetchRequestIdRef.current + 1;
@@ -935,7 +1012,10 @@ function useProvideMessages(): MessagesContextValue {
         }
         : null;
       const targetMessage = targetMessageId
-        ? windowMessages.find(message => message.id === targetMessageId) ?? null
+        ? windowMessages.find(message => message.id === targetMessageId)
+          ?? (window.targetThreadId
+            ? windowMessages.find(message => message.id === window.targetThreadId) ?? null
+            : null)
         : cursorAnchor
           ? windowMessages.find(message =>
             !message.pinned && compareMessageKeys(message, cursorAnchor) > 0
@@ -1192,6 +1272,31 @@ function useProvideMessages(): MessagesContextValue {
             );
           }
         )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'general_chat_thread_replies',
+          },
+          (payload: any) => {
+            const threadId = payload.new?.thread_id
+            if (!threadId || disposed) return
+            void refreshThreadSummaries([String(threadId)]).catch(() => undefined)
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'general_chat_thread_replies',
+          },
+          () => {
+            if (disposed) return
+            void refreshThreadSummaries().catch(() => undefined)
+          }
+        )
         .subscribe(async (status: string, err: any) => {
           if (disposed) {
             return;
@@ -1263,7 +1368,7 @@ function useProvideMessages(): MessagesContextValue {
       void subscriptionManager?.stop();
       channelRef.current = null;
     };
-  }, [addNewMessage, hydrateMessage, playReaction, user]);
+  }, [addNewMessage, hydrateMessage, playReaction, refreshThreadSummaries, user]);
 
   const sendMessage = useCallback(async (
     content: string,
@@ -1296,23 +1401,30 @@ function useProvideMessages(): MessagesContextValue {
       clientMessageId,
       thumbnailUrl
     );
+    const optimisticMessage = {
+      id: clientMessageId,
+      ...optimisticPayload,
+      reactions: {},
+      pinned: false,
+      pinned_by: null,
+      pinned_at: null,
+      created_at: createdAt,
+      updated_at: createdAt,
+      user: profile ?? user,
+      optimistic: true,
+      delivery_status: 'sending',
+    } as Message;
 
-    setMessages(prev => {
-      const nextMessages = upsertMessageIntoState(prev, {
-        id: clientMessageId,
-        ...optimisticPayload,
-        reactions: {},
-        pinned: false,
-        pinned_by: null,
-        pinned_at: null,
-        created_at: createdAt,
-        updated_at: createdAt,
-        user: profile ?? user,
-        optimistic: true,
-        delivery_status: 'sending',
-      } as Message);
-      return loadedOlderRef.current ? sortMessagesByStableKey(nextMessages) : trimMessageWindow(nextMessages);
-    });
+    if (!replyTo) {
+      setMessages(prev => {
+        const nextMessages = upsertMessageIntoState(prev, optimisticMessage);
+        return loadedOlderRef.current ? sortMessagesByStableKey(nextMessages) : trimMessageWindow(nextMessages);
+      });
+    } else if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('shadowchat:general-thread-local', {
+        detail: { action: 'upsert', message: optimisticMessage },
+      }))
+    }
 
     const executeSend = async () => {
       // Ensure we have a valid session before attempting database operations
@@ -1408,7 +1520,20 @@ function useProvideMessages(): MessagesContextValue {
         createdAt,
         failedAt: new Date().toISOString(),
       });
-      setMessages(prev => markMessageSendFailed(prev, clientMessageId));
+      if (!replyTo) {
+        setMessages(prev => markMessageSendFailed(prev, clientMessageId));
+      } else if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('shadowchat:general-thread-local', {
+          detail: {
+            action: 'upsert',
+            message: {
+              ...optimisticMessage,
+              updated_at: new Date().toISOString(),
+              delivery_status: 'failed',
+            },
+          },
+        }))
+      }
       await runRealtimeRecovery('send-error').catch(() => undefined);
       if (error instanceof Error) {
         (error as Error & { optimisticMessageId?: string }).optimisticMessageId = clientMessageId;
@@ -1429,20 +1554,26 @@ function useProvideMessages(): MessagesContextValue {
       (message.id === messageId || message.client_message_id === messageId) &&
       message.delivery_status === 'failed'
     );
+    const outboxEntry = loadLocalOutboxEntries(GROUP_OUTBOX_SCOPE).find(entry => (
+      entry.id === messageId || entry.clientMessageId === messageId
+    ))
 
-    if (!failedMessage) return null;
+    if (!failedMessage && !outboxEntry) return null;
 
-    const clientMessageId = failedMessage.client_message_id || failedMessage.id;
-    const retryContent = failedMessage.message_type === 'audio'
-      ? failedMessage.audio_url || failedMessage.content
-      : failedMessage.content;
+    const clientMessageId = failedMessage?.client_message_id || failedMessage?.id || outboxEntry!.clientMessageId;
+    const messageType = failedMessage?.message_type ?? outboxEntry!.messageType
+    const retryContent = failedMessage
+      ? failedMessage.message_type === 'audio'
+        ? failedMessage.audio_url || failedMessage.content
+        : failedMessage.content
+      : outboxEntry!.content
 
     return sendMessage(
       retryContent,
-      failedMessage.message_type,
-      failedMessage.file_url ?? undefined,
-      failedMessage.reply_to ?? undefined,
-      failedMessage.thumbnail_url,
+      messageType,
+      failedMessage?.file_url ?? outboxEntry?.fileUrl,
+      failedMessage?.reply_to ?? outboxEntry?.replyTo ?? undefined,
+      failedMessage?.thumbnail_url ?? outboxEntry?.thumbnailUrl,
       {
         clientMessageId,
         createdAt: new Date().toISOString(),
@@ -1456,6 +1587,11 @@ function useProvideMessages(): MessagesContextValue {
       message.id !== messageId &&
       message.client_message_id !== messageId
     )));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('shadowchat:general-thread-local', {
+        detail: { action: 'remove', messageId },
+      }))
+    }
   }, []);
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
@@ -1632,6 +1768,7 @@ function useProvideMessages(): MessagesContextValue {
     loadNewerMessages,
     ensureMessageWindow,
     compactToLatestMessages,
+    refreshThreadSummaries,
   };
 }
 

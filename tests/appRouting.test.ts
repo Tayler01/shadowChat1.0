@@ -2,6 +2,7 @@ import {
   getLocationStateFromUrl,
   normalizePlayExperience,
   normalizeViewParam,
+  resolveChatThreadRouteMutation,
   resolveDMRouteMutation,
   resolvePinRouteMutation,
   resolvePlayRouteMutation,
@@ -15,6 +16,7 @@ test('paused board and legacy news routes fall back to chat', () => {
     view: 'chat',
     conversation: null,
     message: null,
+    thread: null,
     dmPanel: null,
     pin: null,
     comment: null,
@@ -27,6 +29,7 @@ test('paused board and legacy news routes fall back to chat', () => {
     view: 'chat',
     conversation: null,
     message: null,
+    thread: null,
     dmPanel: null,
     pin: null,
     comment: null,
@@ -41,6 +44,7 @@ test('active routes and message targets keep their expected shape', () => {
     view: 'dms',
     conversation: 'dm-1',
     message: 'message-2',
+    thread: null,
     dmPanel: null,
     pin: null,
     comment: null,
@@ -53,6 +57,7 @@ test('active routes and message targets keep their expected shape', () => {
     view: 'settings',
     conversation: null,
     message: null,
+    thread: null,
     dmPanel: null,
     pin: null,
     comment: null,
@@ -67,6 +72,7 @@ test('paused Activity routes fall back to Chat without leaking Activity targets'
     view: 'chat',
     conversation: null,
     message: null,
+    thread: null,
     dmPanel: null,
     pin: null,
     comment: null,
@@ -79,6 +85,7 @@ test('paused Activity routes fall back to Chat without leaking Activity targets'
     view: 'pins',
     conversation: null,
     message: null,
+    thread: null,
     dmPanel: null,
     pin: 'pin-1',
     comment: 'comment-2',
@@ -86,6 +93,107 @@ test('paused Activity routes fall back to Chat without leaking Activity targets'
     playExperience: null,
     playItem: null,
   })
+})
+
+test('General Chat thread URLs preserve a root and exact reply target', () => {
+  expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=chat&thread=root-1&message=reply-2'))).toMatchObject({
+    view: 'chat',
+    thread: 'root-1',
+    message: 'reply-2',
+  })
+
+  expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=chat&message=legacy-message'))).toMatchObject({
+    view: 'chat',
+    thread: null,
+    message: 'legacy-message',
+  })
+
+  expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=dms&conversation=dm-1&thread=ignored&message=message-2'))).toMatchObject({
+    view: 'dms',
+    thread: null,
+    message: 'message-2',
+  })
+})
+
+test('General Chat thread history pushes warm opens and unwinds with Back', () => {
+  const open = resolveChatThreadRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=chat'),
+    currentLayer: null,
+    action: 'push-thread',
+    threadRootId: 'root-1',
+  })
+
+  expect(open).toMatchObject({ method: 'push', layer: 'chat-thread' })
+  expect(open && open.method !== 'back' ? open.url.search : '').toBe('?view=chat&thread=root-1&message=root-1')
+  expect(open && open.method !== 'back' ? getLocationStateFromUrl(open.url) : null).toMatchObject({
+    thread: 'root-1',
+    message: 'root-1',
+  })
+
+  expect(resolveChatThreadRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=chat&thread=root-1&message=root-1'),
+    currentLayer: 'chat-thread',
+    action: 'close-thread',
+  })).toEqual({ method: 'back' })
+
+  // A browser Forward navigation can reconstruct the thread entirely from the pushed URL.
+  expect(open && open.method !== 'back' ? getLocationStateFromUrl(open.url) : null).toMatchObject({
+    view: 'chat',
+    thread: 'root-1',
+    message: 'root-1',
+  })
+})
+
+test('General Chat exact targets replace within the active thread layer', () => {
+  const exactReply = resolveChatThreadRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=chat&thread=root-1&message=root-1'),
+    currentLayer: 'chat-thread',
+    action: 'replace-thread',
+    threadRootId: 'root-1',
+    targetMessageId: 'reply-2',
+  })
+
+  expect(exactReply).toMatchObject({ method: 'replace', layer: 'chat-thread' })
+  expect(exactReply && exactReply.method !== 'back' ? exactReply.url.search : '').toBe('?view=chat&thread=root-1&message=reply-2')
+})
+
+test('cold General Chat thread links close by replacement and clear foreign route parameters', () => {
+  const close = resolveChatThreadRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=chat&thread=root-1&message=reply-2&conversation=old-dm&pin=old-pin&comment=old-comment&panel=comments&experience=shado-tv&item=old-item'),
+    currentLayer: null,
+    action: 'close-thread',
+  })
+
+  expect(close).toMatchObject({ method: 'replace', layer: null })
+  expect(close && close.method !== 'back' ? close.url.search : '').toBe('?view=chat')
+
+  const open = resolveChatThreadRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=pins&pin=old-pin&comment=old-comment&panel=comments&conversation=old-dm&experience=shado-tv&item=old-item'),
+    currentLayer: null,
+    action: 'push-thread',
+    threadRootId: 'root-1',
+    targetMessageId: 'reply-2',
+  })
+  expect(open && open.method !== 'back' ? open.url.search : '').toBe('?view=chat&thread=root-1&message=reply-2')
+})
+
+test('General Chat thread mutations reject missing and oversized identifiers', () => {
+  expect(resolveChatThreadRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=chat'),
+    currentLayer: null,
+    action: 'push-thread',
+  })).toBeNull()
+
+  expect(resolveChatThreadRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=chat'),
+    currentLayer: null,
+    action: 'push-thread',
+    threadRootId: 'x'.repeat(161),
+  })).toBeNull()
+
+  const oversizedThread = new URL('https://shadochat.online/?view=chat&message=message-1')
+  oversizedThread.searchParams.set('thread', 'x'.repeat(161))
+  expect(getLocationStateFromUrl(oversizedThread)).toMatchObject({ thread: null, message: 'message-1' })
 })
 
 test('Play URL state accepts typed experiences and bounded exact items', () => {

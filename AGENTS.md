@@ -96,6 +96,14 @@ and collections are caller-private and inherit existing RLS visibility; read
 [docs/MESSAGE_LIBRARY.md](C:/repos/chat2.0/docs/MESSAGE_LIBRARY.md:1) before
 changing that surface.
 
+General Chat threads keep `public.messages` and `reply_to` canonical while the
+server-owned `general_chat_thread_replies` projection powers the 2.0 root-only
+feed and routed thread surface. Read
+[docs/GENERAL_CHAT_THREADS.md](C:/repos/chat2.0/docs/GENERAL_CHAT_THREADS.md:1)
+before changing General Chat reply, window, read-cursor, push-route, or
+Realtime behavior; do not write the mapping from application code or break the
+legacy flat-window contract.
+
 The July 9-10 alignment closed the immediate schema drift, broad paused-domain
 grants, Storage limits, leaked-password screening, release credential, backend
 parity, bundle-budget, and live smoke gaps. Release A also shipped

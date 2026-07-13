@@ -1100,7 +1100,15 @@ const sendGroupPush = async (
   const sender = getActor(groupMessage.user)
   const senderLabel = getActorLabel(sender)
   const preview = getMessagePreview(groupMessage)
-  const route = `/?view=chat&message=${groupMessage.id}`
+  const { data: threadMapping } = await supabase
+    .from('general_chat_thread_replies')
+    .select('thread_id')
+    .eq('message_id', groupMessage.id)
+    .maybeSingle()
+  const threadId = threadMapping?.thread_id ? String(threadMapping.thread_id) : null
+  const route = threadId
+    ? `/?view=chat&thread=${threadId}&message=${groupMessage.id}`
+    : `/?view=chat&message=${groupMessage.id}`
 
   const perRecipientResults = await Promise.all(
     eligibleRecipients.map(async ({ preferences: prefs, kind }) => {
@@ -1135,6 +1143,7 @@ const sendGroupPush = async (
             route,
             sender_id: authUserId,
             notification_kind: kind,
+            thread_id: threadId,
             origin: isBridgeSenderRecipient ? 'bridge' : undefined,
             bridge_device_id: isBridgeSenderRecipient ? bridgeDeviceId : undefined,
           },
@@ -1166,6 +1175,7 @@ const sendGroupPush = async (
             messageId: groupMessage.id,
             senderId: authUserId,
             notificationKind: kind,
+            threadId,
             origin: isBridgeSenderRecipient ? 'bridge' : undefined,
             bridgeDeviceId: isBridgeSenderRecipient ? bridgeDeviceId : undefined,
           },

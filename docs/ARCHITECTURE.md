@@ -315,6 +315,28 @@ Full contract: [docs/PERSONAL_BLOCKING.md](C:/repos/chat2.0/docs/PERSONAL_BLOCKI
 Full contract: [docs/MESSAGE_LIBRARY.md](C:/repos/chat2.0/docs/MESSAGE_LIBRARY.md:1).
 Wave Two contract: [docs/UNIVERSAL_DISCOVERY_LIBRARY.md](C:/repos/chat2.0/docs/UNIVERSAL_DISCOVERY_LIBRARY.md:1).
 
+### True General Chat Threads
+
+1. `public.messages` remains canonical and old clients continue inserting
+   `reply_to` and reading the unchanged flat General Chat window.
+2. A private insert trigger maps every reply, including replies to replies,
+   into server-owned `general_chat_thread_replies`. Clients have only
+   RLS-filtered read access to that immutable projection.
+3. The 2.0 root-window RPC excludes mapped replies and attaches bounded
+   RLS-aware summaries. Exact reply targets resolve to the canonical root.
+4. The routed thread reader returns the visible root or an unavailable
+   placeholder plus chronological keyset pages. A deleted root keeps surviving
+   replies stable; a deleted reply removes only its mapping.
+5. `user_read_cursors` scopes unread state by
+   `general_chat_thread:<root-id>`. Realtime mapping and canonical message
+   events refresh summaries and the open thread without merging replies back
+   into the room.
+6. Phone renders the route as a safe-area full-height sheet; desktop renders a
+   right drawer. The canonical URL is
+   `?view=chat&thread=<root-id>&message=<target-id>`.
+
+Full contract: [docs/GENERAL_CHAT_THREADS.md](C:/repos/chat2.0/docs/GENERAL_CHAT_THREADS.md:1).
+
 ### ShadowPin Social Notification
 
 1. A creator inserts/uploads a pin, which may begin in a processing state.

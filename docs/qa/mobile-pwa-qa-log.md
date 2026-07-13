@@ -8,6 +8,35 @@ artifact and physical-device pass.
 
 Last updated: 2026-07-12
 
+## July 12 ShadowChat 2.0 General Chat Threads Checkpoint
+
+- Branch: `codex/shadowchat-2.0`; production `main` frontend remains
+  unchanged.
+- Candidate 2 implements a root-only General Chat feed and a routed thread
+  surface: full-height phone sheet and `28rem` desktop drawer.
+- Authenticated two-account proof passed Pixel Chromium `412x915` and iPhone
+  WebKit `390x844` against a production build and the linked shared backend.
+- Both engines verified exact viewport-sized sheet geometry, document
+  `scrollWidth` equal to viewport width, safe-area composer placement, root
+  messages only in the Lounge, chronological direct/nested replies, live
+  nested reply arrival, a stable underlying root-card position, exact-target
+  focus, and browser Back/cold-close behavior.
+- Pixel and iPhone completed with zero console/page errors. SQL/Jest separately
+  prove read-cursor ordering, block filtering, deletion placeholders, ACLs,
+  routing, normalization, and reply isolation.
+- Evidence:
+  `output/playwright/wave2-candidate2-threads/summary.json` and paired thread /
+  exact-target screenshots in that directory.
+- Each run created seven text-only QA messages across two controlled accounts,
+  including one composer-sent reply per browser profile.
+  Cleanup deleted in dependency-safe order, confirmed every delete, queried
+  for remaining IDs, and reported zero cleanup errors. Read-cursor writes were
+  intercepted because their legacy owner-private table intentionally has no
+  member delete policy; cursor behavior is covered by rollback-only SQL.
+- Physical installed-PWA keyboard animation, VoiceOver/TalkBack, native safe
+  areas, and touch comfort remain release-gate follow-ups.
+- Contract: [GENERAL_CHAT_THREADS.md](C:/repos/chat2.0/docs/GENERAL_CHAT_THREADS.md:1).
+
 ## July 12 ShadowChat 2.0 Universal Discovery Checkpoint
 
 - Branch: `codex/shadowchat-2.0`; production `main` frontend unchanged.

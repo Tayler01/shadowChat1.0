@@ -39,8 +39,8 @@ Canonical detail and release gates live in:
   ShadowPin Creator Studio, and the First-Run Activation Journey on the
   isolated `codex/shadowchat-2.0` branch without changing production `main`.
 - Started: 2026-07-12
-- Status: active. Candidate 1 is implemented, documented, remotely aligned,
-  and passed its local/mobile checkpoint. Candidate 2 strategy review is next.
+- Status: active. Candidates 1 and 2 are implemented, documented, remotely
+  aligned, and passed their local/mobile checkpoints. Candidate 3 is next.
 - Backend boundary: shared Supabase changes are additive and backward
   compatible. Existing production RPC signatures and RLS remain authoritative.
 - Delivery boundary: four separate verified checkpoints, then a combined
@@ -56,6 +56,25 @@ Canonical detail and release gates live in:
   lint, TypeScript, production build/paused chunks/budgets, and authenticated
   Pixel Chromium/iPhone WebKit geometry with zero console/page errors.
 - Candidate 1 contract: [UNIVERSAL_DISCOVERY_LIBRARY.md](C:/repos/chat2.0/docs/UNIVERSAL_DISCOVERY_LIBRARY.md:1)
+- Candidate 2: True General Chat Threads keeps `public.messages` canonical and
+  the production flat-window contract intact while adding a server-owned
+  reply-to-root projection, root-only 2.0 feed summaries, bounded routed
+  thread pages, per-thread read cursors, and canonical push/search handoffs.
+- Candidate 2 current UI: full-height phone sheet, right-side desktop drawer,
+  fixed thread composer, exact target focus, older-page scroll preservation,
+  and a non-disruptive new-replies affordance.
+- Candidate 2 security: invoker/RLS readers, read-only mapping, private
+  trigger-owned derivation, reciprocal block filtering/rejection, safe profile
+  JSON, bounded pages/summaries, and deletion placeholders.
+- Candidate 2 backend proof: linked migration `20260712234202`, deployed
+  thread-aware `send-push`, clean local replay, rollback-only multi-user
+  verifier, zero database lint/security-advisor findings, and aligned linked
+  dry-run/history.
+- Candidate 2 product proof: 173 Jest suites / 885 passing tests, zero-warning
+  lint, TypeScript, production build/paused chunks/budgets, and authenticated
+  two-account Pixel Chromium/iPhone WebKit realtime, exact-route, geometry,
+  root-anchor, console, and cleanup proof.
+- Candidate 2 contract: [GENERAL_CHAT_THREADS.md](C:/repos/chat2.0/docs/GENERAL_CHAT_THREADS.md:1)
 
 ## Prior Goal
 

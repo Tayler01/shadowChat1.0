@@ -898,11 +898,23 @@ export interface Message {
   pinned_at?: string | null
   edited_at?: string | null
   reply_to?: string | null
+  thread_summary?: GeneralChatThreadSummary | null
   created_at: string
   updated_at: string
   user?: User
   optimistic?: boolean
   delivery_status?: 'sending' | 'sent' | 'failed'
+}
+
+export interface GeneralChatThreadSummary {
+  thread_id: string
+  reply_count: number
+  unread_count: number
+  latest_reply_id?: string | null
+  latest_reply_at?: string | null
+  latest_reply_preview?: string | null
+  latest_reply_author?: User | null
+  participants?: User[]
 }
 
 export type GeneralChatMessageWindowMode = 'latest' | 'older' | 'newer' | 'target'
@@ -939,6 +951,7 @@ export interface GeneralChatMessageWindowResult {
   windowMode: GeneralChatMessageWindowMode
   targetStatus: GeneralChatMessageWindowStatus
   anchorStatus: GeneralChatMessageWindowStatus
+  targetThreadId?: string | null
 }
 
 const normalizeGeneralChatWindowMode = (
@@ -1020,12 +1033,93 @@ export const fetchGeneralChatMessageWindow = async (
   }
 }
 
+export const fetchGeneralChatThreadedWindow = async (
+  request: GeneralChatMessageWindowRequest
+): Promise<GeneralChatMessageWindowResult> => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_general_chat_threaded_window', {
+    target_message_id: request.targetMessageId ?? null,
+    target_last_read_message_id: request.targetLastReadMessageId ?? null,
+    target_last_read_at: request.targetLastReadAt ?? null,
+    target_limit: request.limit,
+  })
+
+  if (error) throw error
+
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row || (row.messages === undefined && row.window_messages === undefined)) {
+    const unavailable = new Error('Function get_general_chat_threaded_window is unavailable') as Error & { code?: string }
+    unavailable.code = 'PGRST202'
+    throw unavailable
+  }
+  const anchorStatus = normalizeGeneralChatWindowStatus(
+    row?.anchor_status ?? row?.anchorStatus,
+    request.targetMessageId || request.targetLastReadMessageId || request.targetLastReadAt
+      ? 'missing'
+      : 'latest'
+  )
+
+  return {
+    messages: normalizeGeneralChatMessages(row?.messages ?? row?.window_messages),
+    pinnedMessages: normalizeGeneralChatMessages(row?.pinned_messages ?? row?.pinnedMessages),
+    hasOlder: Boolean(row?.has_older ?? row?.hasOlder),
+    hasNewer: Boolean(row?.has_newer ?? row?.hasNewer),
+    windowMode: normalizeGeneralChatWindowMode(row?.window_mode ?? row?.windowMode, request.mode),
+    targetStatus: normalizeGeneralChatWindowStatus(
+      row?.target_status ?? row?.targetStatus,
+      request.targetMessageId && anchorStatus === 'resolved' ? 'found' : 'not_requested'
+    ),
+    anchorStatus,
+    targetThreadId: row?.target_thread_id ?? row?.targetThreadId ?? null,
+  }
+}
+
+export const fetchGeneralChatThreadSummaries = async (rootMessageIds: string[]) => {
+  const uniqueIds = [...new Set(rootMessageIds.filter(Boolean))].slice(0, 50)
+  if (uniqueIds.length === 0) return new Map<string, GeneralChatThreadSummary>()
+
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_general_chat_thread_summaries', {
+    target_root_ids: uniqueIds,
+  })
+  if (error) throw error
+
+  return new Map<string, GeneralChatThreadSummary>(
+    (Array.isArray(data) ? data : []).flatMap((row: any) => {
+      const threadId = String(row?.thread_id ?? row?.threadId ?? '')
+      const summary = row?.summary as GeneralChatThreadSummary | null | undefined
+      return threadId && summary ? [[threadId, summary]] : []
+    })
+  )
+}
+
+export const resolveGeneralChatThreadId = async (messageId: string) => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient
+    .from('general_chat_thread_replies')
+    .select('thread_id')
+    .eq('message_id', messageId)
+    .maybeSingle()
+
+  if (error) throw error
+  return data?.thread_id ? String(data.thread_id) : null
+}
+
 export const isGeneralChatMessageWindowRpcUnavailable = (error: unknown) => {
   const record = error as { code?: string; message?: string; details?: string; hint?: string }
   const haystack = `${record?.code || ''} ${record?.message || ''} ${record?.details || ''} ${record?.hint || ''}`
   return haystack.includes('PGRST202') ||
     /could not find (the )?function/i.test(haystack) ||
     /function .*get_general_chat_message_window.* does not exist/i.test(haystack)
+}
+
+export const isGeneralChatThreadRpcUnavailable = (error: unknown) => {
+  const record = error as { code?: string; message?: string; details?: string; hint?: string }
+  const haystack = `${record?.code || ''} ${record?.message || ''} ${record?.details || ''} ${record?.hint || ''}`
+  return haystack.includes('PGRST202') ||
+    /could not find (the )?function/i.test(haystack) ||
+    /relation .*general_chat_thread_replies.* does not exist/i.test(haystack) ||
+    /function .*general_chat_thread/i.test(haystack)
 }
 
 const normalizeHypeEvent = (value: any): HypeEvent => ({

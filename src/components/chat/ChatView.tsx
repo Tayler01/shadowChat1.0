@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useEffect, useState, useCallback } from 'react'
+import React, { lazy, Suspense, useEffect, useRef, useState, useCallback } from 'react'
 import { useMessages } from '../../hooks/useMessages'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
@@ -11,23 +11,35 @@ import {
   SESSION_RECOVERY_EVENT,
   type SessionRecoveryResult,
 } from '../../lib/sessionRecovery'
-import type { ChatMessageType } from '../../lib/supabase'
+import { resolveGeneralChatThreadId, type ChatMessageType } from '../../lib/supabase'
 import type { AppView } from '../../types/navigation'
 import type { Message } from '../../lib/supabase'
-import { messageToReplyTarget, type ReplyTarget } from './messageDisplay'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
+import type { ChatThreadRouteAction } from '../../lib/appRouting'
 
 const LazyGeneralChatRoomTools = lazy(() => import('./GeneralChatRoomTools').then(module => ({
   default: module.GeneralChatRoomTools,
+})))
+
+const LazyGeneralChatThreadSheet = lazy(() => import('../../features/general-chat-threads').then(module => ({
+  default: module.GeneralChatThreadSheet,
 })))
 
 interface ChatViewProps {
   currentView: AppView
   onViewChange: (view: AppView) => void
   initialMessageId?: string
+  initialThreadId?: string
+  onThreadRoute?: (action: ChatThreadRouteAction, threadRootId?: string, targetMessageId?: string) => void
 }
 
-export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, initialMessageId }) => {
+export const ChatView: React.FC<ChatViewProps> = ({
+  currentView,
+  onViewChange,
+  initialMessageId,
+  initialThreadId,
+  onThreadRoute,
+}) => {
   const isDesktop = useIsDesktop()
   const {
     messages,
@@ -35,10 +47,45 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
     sending,
     retryFailedMessage,
     discardFailedMessage,
+    refreshThreadSummaries = async () => {},
   } = useMessages()
 
   const [uploading, setUploading] = useState(false)
-  const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null)
+  const [localThreadId, setLocalThreadId] = useState<string | null>(initialThreadId ?? null)
+  const activeThreadId = initialThreadId ?? localThreadId
+  const loungeScrollTopRef = useRef<number | null>(null)
+
+  const captureLoungeScroll = useCallback(() => {
+    const scroll = document.querySelector<HTMLElement>('[data-testid="message-scroll"]')
+    if (scroll) loungeScrollTopRef.current = scroll.scrollTop
+  }, [])
+
+  const restoreLoungeScroll = useCallback(() => {
+    const savedTop = loungeScrollTopRef.current
+    if (savedTop === null) return
+    const restore = () => {
+      const scroll = document.querySelector<HTMLElement>('[data-testid="message-scroll"]')
+      if (scroll) scroll.scrollTop = savedTop
+    }
+    restore()
+    window.requestAnimationFrame(() => {
+      restore()
+      window.requestAnimationFrame(restore)
+    })
+    window.setTimeout(restore, 120)
+  }, [])
+
+  useEffect(() => {
+    setLocalThreadId(initialThreadId ?? null)
+  }, [initialThreadId])
+
+  useEffect(() => {
+    if (activeThreadId) restoreLoungeScroll()
+    else if (loungeScrollTopRef.current !== null) {
+      restoreLoungeScroll()
+      loungeScrollTopRef.current = null
+    }
+  }, [activeThreadId, restoreLoungeScroll])
 
   useEffect(() => {
     void clearGroupNotifications()
@@ -56,9 +103,35 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
     return () => window.removeEventListener(SESSION_RECOVERY_EVENT, handleSessionRecovery)
   }, [])
 
+  const openThread = useCallback((message: Message, targetMessageId = message.id) => {
+    captureLoungeScroll()
+    setLocalThreadId(message.id)
+    onThreadRoute?.('push-thread', message.id, targetMessageId)
+  }, [captureLoungeScroll, onThreadRoute])
+
   const handleReply = useCallback((message: Message) => {
-    setReplyTo(messageToReplyTarget(message))
-  }, [])
+    openThread(message)
+  }, [openThread])
+
+  useEffect(() => {
+    if (!initialMessageId || initialThreadId) return
+    let cancelled = false
+    void resolveGeneralChatThreadId(initialMessageId)
+      .then(threadId => {
+        if (cancelled || !threadId) return
+        captureLoungeScroll()
+        setLocalThreadId(threadId)
+        onThreadRoute?.('replace-thread', threadId, initialMessageId)
+      })
+      .catch(() => undefined)
+    return () => { cancelled = true }
+  }, [captureLoungeScroll, initialMessageId, initialThreadId, onThreadRoute])
+
+  const closeThread = useCallback(() => {
+    if (activeThreadId) void refreshThreadSummaries([activeThreadId]).catch(() => undefined)
+    setLocalThreadId(null)
+    onThreadRoute?.('close-thread', activeThreadId ?? undefined, initialMessageId)
+  }, [activeThreadId, initialMessageId, onThreadRoute, refreshThreadSummaries])
 
   const handleSendMessage = async (
     content: string,
@@ -69,7 +142,6 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
   ) => {
     try {
       const msg = await sendMessage(content, type, fileUrl, replyToId, thumbnailUrl)
-      setReplyTo(null)
       return msg
     } catch (error) {
       const activeBan = await getCurrentUserChannelBan('general_chat').catch(() => null)
@@ -104,6 +176,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
       {/* Messages */}
       <MessageList
         onReply={handleReply}
+        onOpenThread={openThread}
         onRetryFailed={retryFailedMessage}
         onDiscardFailed={discardFailedMessage}
         sending={sending}
@@ -112,7 +185,10 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
       />
 
       {/* Desktop Message Input */}
-      <div className="hidden md:block">
+      <div
+        className={`hidden md:block ${activeThreadId ? 'invisible pointer-events-none' : ''}`}
+        aria-hidden={activeThreadId ? 'true' : undefined}
+      >
         <div className="mx-auto w-full max-w-6xl">
           <MessageInput
             onSendMessage={handleSendMessage}
@@ -121,31 +197,44 @@ export const ChatView: React.FC<ChatViewProps> = ({ currentView, onViewChange, i
             cacheKey="general"
             onUploadStatusChange={setUploading}
             messages={messages}
-            replyingTo={replyTo || undefined}
-            onCancelReply={() => setReplyTo(null)}
             enableGifPicker
           />
         </div>
       </div>
 
       {/* Mobile Message Input with Navigation */}
-      <MobileChatFooter
-        currentView={currentView}
-        onViewChange={onViewChange}
+      <div
+        className={activeThreadId ? 'invisible pointer-events-none' : ''}
+        aria-hidden={activeThreadId ? 'true' : undefined}
       >
-        <MessageInput
-          onSendMessage={handleSendMessage}
-          placeholder='Try "@ai" to ask AI anything'
-          disabled={uploading}
-          className="border-t border-[var(--border-panel)]"
-          cacheKey="general"
-          onUploadStatusChange={setUploading}
-          messages={messages}
-          replyingTo={replyTo || undefined}
-          onCancelReply={() => setReplyTo(null)}
-          enableGifPicker
-        />
-      </MobileChatFooter>
+        <MobileChatFooter
+          currentView={currentView}
+          onViewChange={onViewChange}
+        >
+          <MessageInput
+            onSendMessage={handleSendMessage}
+            placeholder='Try "@ai" to ask AI anything'
+            disabled={uploading}
+            className="border-t border-[var(--border-panel)]"
+            cacheKey="general"
+            onUploadStatusChange={setUploading}
+            messages={messages}
+            enableGifPicker
+          />
+        </MobileChatFooter>
+      </div>
+
+      {activeThreadId && (
+        <Suspense fallback={null}>
+          <LazyGeneralChatThreadSheet
+            open
+            threadId={activeThreadId}
+            initialRootMessage={messages.find(message => message.id === activeThreadId) ?? null}
+            initialMessageId={initialMessageId ?? activeThreadId}
+            onClose={closeThread}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }

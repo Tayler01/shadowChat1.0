@@ -24,6 +24,7 @@ import { useBlockedUsers } from '../../hooks/useBlockedUsers'
 interface MessageListProps {
   messagesApi?: MessagesContextValue
   onReply?: (message: Message) => void
+  onOpenThread?: (message: Message) => void
   failedMessages?: FailedMessage[]
   onResend?: (msg: FailedMessage) => void
   onRetryFailed?: (messageId: string) => Promise<Message | null>
@@ -115,6 +116,7 @@ const isReadCursorMessage = (message: Message) => (
 export const MessageList: React.FC<MessageListProps> = ({
   messagesApi: providedMessagesApi,
   onReply,
+  onOpenThread,
   failedMessages = [],
   onResend,
   onRetryFailed,
@@ -1032,6 +1034,7 @@ export const MessageList: React.FC<MessageListProps> = ({
                     previousMessage={prev}
                     parentMessage={messageMap.get(message.reply_to ?? '')}
                     onReply={onReply}
+                    onOpenThread={onOpenThread}
                     onEdit={handleEdit}
                     onDelete={handleDelete}
                     onTogglePin={togglePin}

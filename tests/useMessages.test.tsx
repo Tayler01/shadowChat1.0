@@ -14,9 +14,12 @@ import {
   supabase,
   ensureSession,
   fetchGeneralChatMessageWindow,
+  fetchGeneralChatThreadedWindow,
+  fetchGeneralChatThreadSummaries,
   getWorkingClient,
   getRealtimeClient,
   isGeneralChatMessageWindowRpcUnavailable,
+  isGeneralChatThreadRpcUnavailable,
   refreshSessionLocked,
 } from '../src/lib/supabase';
 import type { Message } from '../src/lib/supabase';
@@ -52,7 +55,10 @@ jest.mock('../src/lib/supabase', () => {
     getWorkingClient: jest.fn(),
     getRealtimeClient: jest.fn(),
     fetchGeneralChatMessageWindow: jest.fn(),
+    fetchGeneralChatThreadedWindow: jest.fn(),
+    fetchGeneralChatThreadSummaries: jest.fn(),
     isGeneralChatMessageWindowRpcUnavailable: jest.fn(),
+    isGeneralChatThreadRpcUnavailable: jest.fn(),
     refreshSessionLocked: jest.fn(),
     ensureSession: jest.fn(),
     withTimeout: jest.fn((promise: Promise<unknown>) => promise),
@@ -84,6 +90,7 @@ const createQuery = (overrides: Record<string, unknown> = {}) => {
     update: jest.fn(() => query),
     delete: jest.fn(() => query),
     eq: jest.fn(() => query),
+    is: jest.fn(() => query),
     maybeSingle: jest.fn().mockResolvedValue({ data: { id: 'm1' }, error: null }),
     rpc: jest.fn(() => query),
   };
@@ -159,6 +166,14 @@ const configureWorkingClient = () => {
   (isGeneralChatMessageWindowRpcUnavailable as jest.Mock).mockImplementation((error: any) =>
     error?.code === 'PGRST202' ||
     /get_general_chat_message_window|could not find/i.test(error?.message || '')
+  );
+  (fetchGeneralChatThreadedWindow as jest.Mock).mockRejectedValue({
+    code: 'PGRST202',
+    message: 'Could not find function get_general_chat_threaded_window',
+  });
+  (fetchGeneralChatThreadSummaries as jest.Mock).mockResolvedValue(new Map());
+  (isGeneralChatThreadRpcUnavailable as jest.Mock).mockImplementation((error: any) =>
+    error?.code === 'PGRST202' || /general_chat_thread|could not find/i.test(error?.message || '')
   );
   (runRealtimeRecovery as jest.Mock).mockResolvedValue({ ok: true, skipped: false, reason: 'channel-error' });
 };
@@ -325,7 +340,9 @@ describe('message fetching windows', () => {
     const hook = renderHook(() => useMessages(), { wrapper: MessagesProvider });
 
     await waitFor(() => expect(hook.result.current.loading).toBe(false));
-    await waitFor(() => expect(hook.result.current.messages).toHaveLength(latestWindow.length));
+    await waitFor(() => expect(hook.result.current.messages).toHaveLength(
+      latestWindow.filter(message => !message.reply_to).length
+    ));
 
     return {
       ...hook,
@@ -340,7 +357,47 @@ describe('message fetching windows', () => {
 
     expect(latestQuery.order).toHaveBeenCalledWith('created_at', { ascending: false });
     expect(latestQuery.order).toHaveBeenCalledWith('id', { ascending: false });
+    expect(latestQuery.is).toHaveBeenCalledWith('reply_to', null);
   });
+
+  it('keeps reply rows out of the root-only Lounge window', async () => {
+    const root = makeDbMessage('root', '2026-05-03T12:00:00.000Z')
+    const reply = { ...makeDbMessage('reply', '2026-05-03T12:01:00.000Z'), reply_to: root.id }
+    const { result } = await renderWithLatestWindow([root, reply])
+
+    expect(result.current.messages.map(message => message.id)).toEqual(['root'])
+  })
+
+  it('does not merge realtime replies into the Lounge root window', async () => {
+    let broadcastHandler: ((payload: any) => void) | undefined
+    workingClient.channel.mockImplementation(() => {
+      const channel: any = {
+        on: jest.fn((event: string, filter: any, handler: any) => {
+          if (event === 'broadcast' && filter?.event === 'new_message') broadcastHandler = handler
+          return channel
+        }),
+        subscribe: jest.fn(() => channel),
+        send: jest.fn(),
+        state: 'joined',
+      }
+      return channel
+    })
+
+    const root = makeDbMessage('root', '2026-05-03T12:00:00.000Z')
+    const { result } = await renderWithLatestWindow([root])
+    await waitFor(() => expect(broadcastHandler).toBeDefined())
+
+    act(() => {
+      broadcastHandler?.({
+        payload: {
+          ...makeDbMessage('reply', '2026-05-03T12:01:00.000Z'),
+          reply_to: root.id,
+        },
+      })
+    })
+
+    expect(result.current.messages.map(message => message.id)).toEqual(['root'])
+  })
 
   it('loads older history with a created_at and id keyset when timestamps collide', async () => {
     const { result, latestWindow } = await renderWithLatestWindow();

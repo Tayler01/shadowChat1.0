@@ -86,6 +86,78 @@ run after all four candidates.
 - Clean local Supabase replay, database lint/advisors, lint, TypeScript, build
   and budgets, focused/full Jest, Pixel Chromium, and iPhone WebKit must pass.
 
+## Candidate 2 Contract - True General Chat Threads
+
+### Product shape
+
+- Keep the main 2.0 General Chat feed fast by rendering only root messages.
+  Roots with replies show a compact count, unread state, and bounded
+  participant preview.
+- Reply opens a focused thread instead of expanding an inline tree. Direct
+  reply context remains available, but replies stay in one chronological
+  conversation without nested indentation.
+- Use a full-height, safe-area-aware phone sheet with a fixed composer and a
+  `28rem` right drawer on desktop. Preserve scroll position when older replies
+  load and do not force the member to the bottom when realtime replies arrive.
+- Route exact targets as
+  `?view=chat&thread=<root-id>&message=<target-id>`. Browser Back closes an
+  in-app-opened thread; a cold route has an explicit close fallback.
+- Preserve reactions, edits/deletes, attachments/GIFs, moderation, personal
+  blocks, search, saves, push notifications, and existing direct-reply
+  previews inside the thread.
+
+### Architecture decision
+
+- Keep `public.messages` and `reply_to` canonical. Add a server-owned,
+  read-only `general_chat_thread_replies` projection that maps every direct or
+  nested reply to a stable root while recording its direct parent.
+- Leave `get_general_chat_message_window(...)` unchanged so the production
+  frontend continues to receive the legacy flat stream. Add separate invoker
+  readers for the 2.0 root window, bounded thread pages, and at-most-50 summary
+  batches.
+- Backfill existing reply chains and reject rollout if any chain is cyclic,
+  over-depth, or otherwise cannot be mapped. New legacy `reply_to` inserts are
+  mapped by a private trigger, so no new client write shape is required.
+- Use `user_read_cursors` with `surface = 'general_chat_thread'` and the
+  canonical root as scope. Realtime mapping events refresh root summaries;
+  the open thread coalesces mapping and canonical message changes through the
+  RLS-aware readers.
+- Root deletion retains the mapped conversation and returns an unavailable
+  root placeholder. Individual reply deletion cascades only its projection.
+
+### Security boundaries
+
+- Existing `messages` RLS, channel-ban rules, ownership, and reciprocal block
+  enforcement remain authoritative for roots and replies.
+- Reply validation rejects missing, self, cyclic, moved, and blocked targets.
+  Authenticated clients cannot create or alter mapping rows.
+- Existing hidden/blocked replies disappear from pages, counts, previews, and
+  participant summaries. A hidden or deleted root uses the same unavailable
+  placeholder so the API does not reveal why access is absent.
+- Public thread APIs are authenticated `SECURITY INVOKER` functions with an
+  empty `search_path`, bounded inputs, least grants, and no `anon` execution.
+  Profile JSON continues through the safe public projection.
+- The private trigger-only definer is not publicly executable and does not
+  become a second content or authorization path.
+
+### Verification gate
+
+- Clean local replay proves legacy and nested mapping, flat-client
+  compatibility, root-only windows, exact-target resolution, summaries,
+  read-cursor ordering, delete placeholders, block filtering, cycle rejection,
+  batch limits, and least privileges.
+- Focused behavior tests cover API normalization/merge, route history, feed
+  summaries, sheet behavior, and canonical push handoffs.
+- Two authenticated accounts prove reply realtime, unread increment/clear,
+  edit/delete/block refresh, exact target, and no reply duplication in the
+  main feed.
+- Lint, TypeScript, build/paused chunks/budgets, targeted/full Jest, Pixel
+  Chromium, and iPhone WebKit must pass. Test-created rows/uploads must be
+  removed before Candidate 2 is accepted.
+
+Full contract:
+[docs/GENERAL_CHAT_THREADS.md](C:/repos/chat2.0/docs/GENERAL_CHAT_THREADS.md:1).
+
 ## Release Boundaries
 
 - Boards, News, Art Board, ESP Bridge, Activity, and member report intake stay
@@ -124,4 +196,27 @@ installed-phone acceptance. Nothing merges to `main` before that approval.
   multi-user RLS/visibility verification, 171 Jest suites / 872 passing tests,
   zero-warning lint, TypeScript, production build/paused chunks/budgets, and
   authenticated Pixel Chromium plus iPhone WebKit with zero console/page
-  errors. Candidate 2 strategy review is next.
+  errors.
+- Candidate 2 domain, security/data, and phone UX reviews are complete. The
+  accepted implementation keeps `public.messages` canonical, adds a
+  server-owned stable reply-to-root projection, retains the old flat-window
+  contract for production, and adds a root-only 2.0 feed plus exact routed
+  thread sheet/drawer.
+- Candidate 2 passed its checkpoint. Migration `20260712234202` is applied to
+  the linked shared project, linked dry-run is clean, migration history is
+  aligned, and the updated `send-push` Edge Function is deployed. The old
+  flat-window RPC remains unchanged for the production frontend.
+- Candidate 2 proof: fresh local replay, rollback-only multi-user SQL verifier,
+  zero database-lint/security-advisor findings, catalog ACL/security checks,
+  173 Jest suites / 885 passing tests / 16 intentional todos, zero-warning
+  lint, TypeScript, production build/paused chunks/budgets, and an
+  authenticated two-account realtime pass on Pixel Chromium `412x915` plus
+  iPhone WebKit `390x844`. Both engines proved root-feed isolation, routed
+  thread geometry, live nested reply delivery without moving the root card,
+  exact-target focus, Back restoration, zero horizontal overflow, and zero
+  console/page errors. All seven QA messages per run were deletion-confirmed;
+  the final artifact is
+  `output/playwright/wave2-candidate2-threads/summary.json`.
+- Candidate 3, ShadowPin Creator Studio, is next. Physical installed-PWA
+  keyboard, VoiceOver/TalkBack, and touch-comfort checks remain Wave Two
+  release-gate follow-ups rather than automated-browser claims.

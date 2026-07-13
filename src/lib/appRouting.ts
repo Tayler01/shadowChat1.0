@@ -5,12 +5,68 @@ export type AppLocationState = {
   view: AppView
   conversation: string | null
   message: string | null
+  thread?: string | null
   dmPanel: 'details' | 'search' | 'shared' | null
   pin: string | null
   comment: string | null
   pinPanel: 'viewer' | 'comments' | null
   playExperience: PlayExperience | null
   playItem: string | null
+}
+
+export type ChatThreadRouteAction = 'push-thread' | 'replace-thread' | 'close-thread'
+export type ChatThreadHistoryLayer = 'chat-thread' | null
+export type ChatThreadRouteMutation =
+  | { method: 'back' }
+  | { method: 'push' | 'replace'; url: URL; layer: ChatThreadHistoryLayer }
+
+const normalizeChatMessageId = (value: string | null | undefined) => {
+  const normalized = value?.trim()
+  return normalized && normalized.length <= 160 ? normalized : null
+}
+
+export const resolveChatThreadRouteMutation = ({
+  currentUrl,
+  currentLayer,
+  action,
+  threadRootId,
+  targetMessageId,
+}: {
+  currentUrl: URL
+  currentLayer: ChatThreadHistoryLayer
+  action: ChatThreadRouteAction
+  threadRootId?: string
+  targetMessageId?: string
+}): ChatThreadRouteMutation | null => {
+  if (action === 'close-thread' && currentLayer === 'chat-thread') return { method: 'back' }
+
+  const url = new URL(currentUrl)
+  url.searchParams.set('view', 'chat')
+  url.searchParams.delete('conversation')
+  url.searchParams.delete('pin')
+  url.searchParams.delete('comment')
+  url.searchParams.delete('panel')
+  url.searchParams.delete('experience')
+  url.searchParams.delete('item')
+
+  if (action === 'close-thread') {
+    url.searchParams.delete('thread')
+    url.searchParams.delete('message')
+    return { method: 'replace', url, layer: null }
+  }
+
+  const nextThreadRootId = normalizeChatMessageId(threadRootId)
+  if (!nextThreadRootId) return null
+
+  const nextTargetMessageId = normalizeChatMessageId(targetMessageId) ?? nextThreadRootId
+  url.searchParams.set('thread', nextThreadRootId)
+  url.searchParams.set('message', nextTargetMessageId)
+
+  return {
+    method: action === 'push-thread' ? 'push' : 'replace',
+    url,
+    layer: action === 'push-thread' ? 'chat-thread' : currentLayer,
+  }
 }
 
 export type PlayExperience =
@@ -320,6 +376,7 @@ export const getLocationStateFromUrl = (url: URL): AppLocationState => {
     view,
     conversation: view === 'dms' ? params.get('conversation') : null,
     message: !pausedActivityRoute && (view === 'dms' || view === 'chat') ? params.get('message') : null,
+    thread: !pausedActivityRoute && view === 'chat' ? normalizeChatMessageId(params.get('thread')) : null,
     dmPanel: dmPanelParam === 'details' || dmPanelParam === 'search' || dmPanelParam === 'shared'
       ? dmPanelParam
       : null,

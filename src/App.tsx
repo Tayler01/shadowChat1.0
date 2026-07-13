@@ -27,6 +27,7 @@ import { computeMobileViewportState, MOBILE_VIEWPORT_UPDATED_EVENT } from './lib
 import { ACTIVITY_FEATURE_ENABLED, BOARDS_FEATURE_ENABLED } from './config/featureFlags'
 import {
   getLocationStateFromUrl,
+  resolveChatThreadRouteMutation,
   resolveDMRouteMutation,
   resolvePlayRouteMutation,
   resolvePinRouteMutation,
@@ -38,6 +39,8 @@ import {
   type PlayExperience,
   type PlayHistoryLayer,
   type PlayRouteAction,
+  type ChatThreadHistoryLayer,
+  type ChatThreadRouteAction,
 } from './lib/appRouting'
 import type { AppView as View } from './types/navigation'
 import { useShadowPinCommentNotifications } from './features/shadow-pin/hooks/useShadowPinCommentNotifications'
@@ -105,6 +108,7 @@ const getInitialLocationState = (): LocationState => {
       view: 'chat',
       conversation: null,
       message: null,
+      thread: null,
       dmPanel: null,
       pin: null,
       comment: null,
@@ -145,6 +149,7 @@ function App() {
   const mobileAppHeightRef = useRef<number | null>(null)
   const [dmTarget, setDmTarget] = useState<string | null>(() => getInitialLocationState().conversation)
   const [messageTarget, setMessageTarget] = useState<string | null>(() => getInitialLocationState().message)
+  const [threadTarget, setThreadTarget] = useState<string | null>(() => getInitialLocationState().thread ?? null)
   const [dmPanel, setDmPanel] = useState<'details' | 'search' | 'shared' | null>(() => getInitialLocationState().dmPanel)
   const [pinTarget, setPinTarget] = useState<string | null>(() => getInitialLocationState().pin)
   const [commentTarget, setCommentTarget] = useState<string | null>(() => getInitialLocationState().comment)
@@ -265,6 +270,7 @@ function App() {
     setCurrentView(locationState.view)
     setDmTarget(locationState.conversation)
     setMessageTarget(locationState.message)
+    setThreadTarget(locationState.thread ?? null)
     setDmPanel(locationState.dmPanel)
     setPinTarget(locationState.pin)
     setCommentTarget(locationState.comment)
@@ -362,6 +368,37 @@ function App() {
     } else {
       window.history.replaceState(nextState, '', mutation.url)
     }
+    applyLocationState(getLocationStateFromUrl(mutation.url))
+  }
+
+  const handleChatThreadRoute = (
+    action: ChatThreadRouteAction,
+    threadRootId?: string,
+    targetMessageId?: string
+  ) => {
+    if (typeof window === 'undefined') return
+
+    const storedLayer = window.history.state?.shadowchatLayer
+    const currentLayer: ChatThreadHistoryLayer = storedLayer === 'chat-thread' ? storedLayer : null
+    const mutation = resolveChatThreadRouteMutation({
+      currentUrl: new URL(window.location.href),
+      currentLayer,
+      action,
+      threadRootId,
+      targetMessageId,
+    })
+    if (!mutation) return
+    if (mutation.method === 'back') {
+      window.history.back()
+      return
+    }
+
+    const nextState = {
+      ...(window.history.state ?? {}),
+      shadowchatLayer: mutation.layer,
+    }
+    if (mutation.method === 'push') window.history.pushState(nextState, '', mutation.url)
+    else window.history.replaceState(nextState, '', mutation.url)
     applyLocationState(getLocationStateFromUrl(mutation.url))
   }
 
@@ -467,6 +504,7 @@ function App() {
     }
     if (availableView !== currentView) {
       setMessageTarget(null)
+      setThreadTarget(null)
     }
   }
 
@@ -476,12 +514,18 @@ function App() {
     const url = new URL(window.location.href)
 
     if (currentView === 'chat') {
-      if (messageTarget) {
+      if (threadTarget) {
+        url.searchParams.set('view', 'chat')
+        url.searchParams.set('thread', threadTarget)
+        url.searchParams.set('message', messageTarget || threadTarget)
+      } else if (messageTarget) {
         url.searchParams.set('view', 'chat')
         url.searchParams.set('message', messageTarget)
+        url.searchParams.delete('thread')
       } else {
         url.searchParams.delete('view')
         url.searchParams.delete('message')
+        url.searchParams.delete('thread')
       }
       url.searchParams.delete('conversation')
       url.searchParams.delete('pin')
@@ -491,6 +535,7 @@ function App() {
       url.searchParams.delete('item')
     } else {
       url.searchParams.set('view', currentView)
+      url.searchParams.delete('thread')
       if (currentView === 'dms' && dmTarget) {
         url.searchParams.set('conversation', dmTarget)
       } else {
@@ -532,7 +577,7 @@ function App() {
     }
 
     window.history.replaceState(window.history.state ?? {}, '', url)
-  }, [currentView, dmTarget, dmPanel, messageTarget, pinTarget, commentTarget, pinPanel, playExperience, playItem])
+  }, [currentView, dmTarget, dmPanel, messageTarget, threadTarget, pinTarget, commentTarget, pinPanel, playExperience, playItem])
 
   useEffect(() => {
     if (currentView !== 'boards') {
@@ -556,6 +601,8 @@ function App() {
             currentView={currentView}
             onViewChange={handleViewChange}
             initialMessageId={messageTarget || undefined}
+            initialThreadId={threadTarget || undefined}
+            onThreadRoute={handleChatThreadRoute}
           />
         )
       case 'dms':
@@ -583,6 +630,8 @@ function App() {
             currentView="chat"
             onViewChange={handleViewChange}
             initialMessageId={messageTarget || undefined}
+            initialThreadId={threadTarget || undefined}
+            onThreadRoute={handleChatThreadRoute}
           />
         )
       case 'activity':
@@ -631,6 +680,8 @@ function App() {
             currentView={currentView}
             onViewChange={handleViewChange}
             initialMessageId={messageTarget || undefined}
+            initialThreadId={threadTarget || undefined}
+            onThreadRoute={handleChatThreadRoute}
           />
         )
     }
