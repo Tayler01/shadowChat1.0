@@ -196,9 +196,13 @@ receive a separate approved contract before implementation.
 
 - The authoritative Wave Three and final-track sequence is locked in this
   document.
-- Connections implementation is in progress on
-  `codex/shadowchat-2.0` under the contract above.
-- ShadowPin Feed Modes and Inner Circles have not started.
+- Connections is implemented and accepted on `codex/shadowchat-2.0`. The
+  additive migration is linked, the unchanged production frontend passed its
+  compatibility smoke, and immutable deploy `6a556190a9c126b4758b29f1`
+  passed repeat Pixel Chromium/iPhone WebKit lifecycle, realtime, routing,
+  focus, geometry, DM-independence, and zero-residue proof.
+- ShadowPin Feed Modes is the active Candidate 2 checkpoint. Inner Circles has
+  not started.
 - Shado Live is limited to specification/prototype work while its Activity and
   reporting dependencies remain paused.
 - Catch-Up remains queued behind a deterministic, source-linked contract; no

@@ -8,6 +8,24 @@ artifact and physical-device pass.
 
 Last updated: 2026-07-13
 
+## July 13 Wave Three Connections Automated Checkpoint
+
+- Immutable deploy `6a556190a9c126b4758b29f1` passed twice with two
+  authenticated accounts across Pixel Chromium and iPhone WebKit.
+- The run covered exact `?view=dms&panel=connections` routing, Browser Back,
+  Escape, search/profile entry, request/cancel/decline/accept/remove, realtime
+  request and accepted banners, request badges, focus refresh, accepted-list
+  profile/message entry, and return-focus behavior.
+- The Connections sheet stayed within `412x839` and `390x664` visual
+  viewports with no horizontal overflow, console errors, page errors, failed
+  requests, HTTP error responses, or unexpected Supabase hosts.
+- Existing DM history remained unchanged. Exact test pairs and Connection
+  events were removed, notification/discovery preferences were restored, and
+  the final residue check found no pair, block, event, preference, or DM drift.
+- The isolated stable test URL now serves this checkpoint. Production
+  ShadowChat and `main` remain unchanged; installed iPhone/Android acceptance
+  is still required.
+
 ## July 13 ShadowChat 2.0 Phone Regression Hardening
 
 - Physical-iPhone screenshots showed that Creator Studio's whole frame ended

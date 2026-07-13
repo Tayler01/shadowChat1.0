@@ -4,8 +4,16 @@
 
 This document is the product, data, privacy, compatibility, and verification
 contract for ShadowChat 2.0 Wave Three Candidate 1. Implementation is in
-progress on `codex/shadowchat-2.0`. Production `main` and the production
-Netlify frontend remain unchanged.
+complete and independently verified on `codex/shadowchat-2.0`. Production
+`main` and the production Netlify frontend remain unchanged.
+
+Accepted checkpoint:
+
+- branch commits: `38b8ff7` through `7e62a32`
+- linked migration: `20260713190000_connections_foundation.sql`
+- immutable trial deploy: `6a556190a9c126b4758b29f1`
+- immutable URL:
+  `https://6a556190a9c126b4758b29f1--shadowchat-2-0-wave-one.netlify.app`
 
 ## Product Contract
 
@@ -265,4 +273,26 @@ accounts.
 - AI-generated people recommendations
 
 Wave Three Candidate 2 and Candidate 3 own Feed Modes and Inner Circles after
-this foundation is implemented, verified, and accepted.
+this accepted foundation.
+
+## Accepted Verification - July 13, 2026
+
+- clean linked migration parity and linked security-contract verification
+- unchanged production frontend auth and background/resume-send smoke after
+  the additive migration
+- clean local replay, database lint, transactional SQL contract, block/request
+  race proof, and concurrent 50-outgoing cap proof
+- zero-warning lint, TypeScript, production build, paused-feature check, and
+  build budgets
+- 192 Jest suites passed with 1,008 passing tests and 16 intentional todos
+- all 42 Node contract tests passed
+- two repeat passes against the immutable trial deploy using Pixel Chromium
+  and iPhone WebKit
+- exact route, Browser Back, Escape, request/cancel/decline/accept/remove,
+  foreground realtime badges/banners, profile/list/message entry points,
+  focus restoration, and canonical focus refresh all passed
+- no console, page, request, response, Supabase-host, or horizontal-overflow
+  failures; report-only CSP diagnostics remain expected and nonblocking
+- existing DM history remained byte-for-byte unchanged and the verifier proved
+  zero pair, event, block, notification-preference, or discovery-preference
+  residue after cleanup

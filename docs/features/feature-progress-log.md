@@ -40,8 +40,8 @@ Canonical detail and release gates live in:
   and deterministic source-linked Catch-Up track without changing production
   `main`.
 - Started: 2026-07-13
-- Status: Candidate 1 Connections contract locked; additive backend and
-  phone-first DM Hub/profile implementation in progress.
+- Status: Candidate 1 Connections accepted; Candidate 2 ShadowPin Feed Modes
+  is active.
 - Backend boundary: reciprocal caller-private relationships, no public graph or
   counts, personal-block teardown with no restore, and compatibility with the
   unchanged production frontend sharing Supabase.
@@ -50,6 +50,11 @@ Canonical detail and release gates live in:
   Netlify gate.
 - Roadmap: [SHADOWCHAT_2_0_WAVE_THREE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_THREE.md:1)
 - Candidate 1 contract: [CONNECTIONS.md](C:/repos/chat2.0/docs/CONNECTIONS.md:1)
+- Candidate 1 proof: linked migration `20260713190000`, unchanged-production
+  compatibility smoke, 192 Jest suites / 1,008 passing tests, 42 Node contract
+  tests, clean lint/typecheck/build/budgets, and repeat two-account Pixel
+  Chromium/iPhone WebKit proof against immutable deploy
+  `6a556190a9c126b4758b29f1` with unchanged DM history and zero residue.
 - Production `main` and the production Netlify frontend remain unchanged.
 
 ### ShadowChat 2.0 Wave Two

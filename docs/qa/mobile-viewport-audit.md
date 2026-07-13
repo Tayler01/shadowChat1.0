@@ -6,7 +6,21 @@ This audit separates previously verified mobile artifacts from the deployed
 July 10 Release A. Keep older artifact paths as historical evidence; deployment
 and Expo checks do not replace fresh viewport/physical-device proof.
 
-Last updated: 2026-07-10
+Last updated: 2026-07-13
+
+## July 13 Wave Three Connections Checkpoint
+
+The phone-first Connections bottom sheet passed repeat authenticated Pixel
+Chromium and iPhone WebKit proof against immutable deploy
+`6a556190a9c126b4758b29f1`. Its measured surfaces remained inside the visual
+viewport (`412x839` and `390x664`) with no page or sheet horizontal overflow.
+The exact route, Back/Escape dismissal, nested public-profile focus, focus
+restoration, realtime request state, and existing-DM independence also passed.
+
+This is automated browser evidence, not a physical installed-PWA claim. The
+stable isolated test URL still needs Tayler's iPhone and Android touch, safe-
+area, keyboard, browser-chrome, and resume acceptance before Wave Three is
+eligible to merge.
 
 ## July 10 Release A Checkpoint
 

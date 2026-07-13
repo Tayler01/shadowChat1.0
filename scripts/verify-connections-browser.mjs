@@ -328,6 +328,7 @@ const assertNoHorizontalOverflow = async (page, surfaceTestId) => {
 }
 
 const openConnections = async page => {
+  await dismissTransientUi(page)
   const button = page.getByRole('button', { name: /^Open Connections(?:,|$)/iu })
   await button.waitFor({ timeout: 20_000 })
   await button.click()
@@ -345,6 +346,28 @@ const focusRefresh = async page => {
   await page.bringToFront()
   await page.evaluate(() => window.dispatchEvent(new Event('focus')))
   await page.waitForTimeout(350)
+}
+
+const waitForDialogFocus = async (page, focusAnchor, label) => {
+  const element = await focusAnchor.elementHandle()
+  must(element, `${label} focus anchor is unavailable.`)
+  try {
+    await page.waitForFunction(anchor => anchor.closest('[role="dialog"]')?.contains(document.activeElement) === true, element, { timeout: 3_000 })
+  } catch (error) {
+    const state = await focusAnchor.evaluate(anchor => {
+      const active = document.activeElement
+      return {
+        activeTag: active?.tagName || null,
+        activeLabel: active?.getAttribute?.('aria-label') || null,
+        activeTestId: active?.getAttribute?.('data-testid') || null,
+        activeRole: active?.getAttribute?.('role') || null,
+        activeId: active?.id || null,
+        activeClass: typeof active?.className === 'string' ? active.className.slice(0, 240) : null,
+        activeDialogLabel: active?.closest?.('[role="dialog"]')?.getAttribute('aria-labelledby') || null,
+      }
+    })
+    throw new Error(`${label} did not receive modal focus: ${JSON.stringify(state)}`, { cause: error })
+  }
 }
 
 const captureCurrentPairId = async client => {
@@ -408,8 +431,7 @@ try {
   await searchRowB.getByRole('button').first().click()
   const profileCloseA = pageA.getByRole('button', { name: 'Close profile' })
   await profileCloseA.waitFor({ timeout: 15_000 })
-  const profileFocus = await profileCloseA.evaluate(element => element.closest('[role="dialog"]')?.contains(document.activeElement) === true)
-  must(profileFocus, 'Public profile did not trap initial focus inside its modal.')
+  await waitForDialogFocus(pageA, profileCloseA, 'Public profile')
 
   await pageA.getByTestId(`connection-action-request-${userIds[1]}`).click()
   await pageA.getByTestId(`connection-action-cancel-${userIds[1]}`).waitFor({ timeout: 20_000 })
@@ -466,7 +488,7 @@ try {
   const closeAcceptedProfile = pageB.getByRole('button', { name: 'Close profile' })
   await closeAcceptedProfile.waitFor({ timeout: 15_000 })
   await pageB.getByTestId(`connection-action-remove-${userIds[0]}`).waitFor({ timeout: 15_000 })
-  must(await closeAcceptedProfile.evaluate(element => element.closest('[role="dialog"]')?.contains(document.activeElement) === true), 'Accepted profile entry did not receive modal focus.')
+  await waitForDialogFocus(pageB, closeAcceptedProfile, 'Accepted profile entry')
   await pageB.keyboard.press('Escape')
   await closeAcceptedProfile.waitFor({ state: 'hidden', timeout: 15_000 })
   hubB = pageB.getByTestId('connections-hub')
