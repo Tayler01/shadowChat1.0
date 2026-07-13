@@ -8,6 +8,7 @@ export default async () => {
     const result = await recoverExpiredShadowPinImagePromotions(createAdminClient(), 50)
     return Response.json({ ok: result.failures.length === 0, ...result })
   } catch (error) {
+    console.error('ShadowPin promotion recovery failed.', error)
     return Response.json({
       ok: false,
       error: error instanceof Error ? error.message : 'ShadowPin promotion recovery failed.',
