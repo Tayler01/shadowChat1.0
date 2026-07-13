@@ -51,8 +51,10 @@ inbox in this checkpoint.
 The phone-first Studio has four stages:
 
 1. **Media** - choose an image or short video, use a public URL, inspect the
-   real preview/poster, and replace or remove it. Validation is immediate and
-   retains the established image/video limits.
+   real preview/poster, and replace or remove it. Local files preview from
+   their object URL immediately; staged playback/posters, direct media URLs,
+   YouTube posters, and authenticated link-preview images form a bounded
+   fallback chain. Validation retains the established image/video limits.
 2. **Details** - choose a visible category, add title and description, and
    enter up to eight normalized comma-separated tags. Meaningful changes are
    autosaved with visible saving, saved, recovery, or needs-attention state.
@@ -199,9 +201,14 @@ tags, and source URLs never enter the address bar.
 - Render through a body portal with dialog semantics, focus trap, Escape,
   focus restoration, body scroll lock, and visible labels for stage and save
   state.
-- Use the shared visual-viewport height and safe-area insets. The active field
-  and fixed actions must remain reachable above iPhone and Android software
+- Use the shared visual-viewport height and safe-area insets. The action footer
+  is a non-scrolling flex child instead of a layout-viewport fixed overlay;
+  focused fields are re-revealed as the visual viewport settles so title,
+  description, and tags remain reachable above iPhone and Android software
   keyboards at 130% text.
+- Background autosave reports saving state without disabling the editor or
+  blurring the active field. Upload, processing, restore, draft-switch, and
+  publish operations retain the intentional interaction lock.
 - Controls meet the shared phone touch baseline and Comfort large-control
   setting. Progress and validation never rely on color alone.
 - Upload/publish status uses a polite live region; failure gets focus without
@@ -225,6 +232,9 @@ tags, and source URLs never enter the address bar.
 - File/URL exclusion, image/video boundaries, video duration, unsafe URL,
   category disappearance, tag normalization/limits, preview, confirmation,
   retry, cancel, edit, and replacement are covered.
+- Character-by-character typing proves autosave does not collapse the keyboard
+  or drop focus, and local image, local video, direct URL, provider poster, and
+  discovered link-preview fallbacks prove media appears automatically.
 - Focus trap/restoration, keyboard operation, live progress, reduced motion,
   130% text, and large controls have component assertions.
 

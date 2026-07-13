@@ -75,6 +75,7 @@ interface MessageItemProps {
   avatarLoading?: 'eager' | 'lazy'
   avatarFetchPriority?: 'high' | 'low' | 'auto'
   moderationScope?: ChannelBanScope
+  messageActionsPortalClassName?: string
 }
 
 const PublicProfileDialog = lazy(() =>
@@ -207,6 +208,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     avatarLoading = 'lazy',
     avatarFetchPriority,
     moderationScope = 'general_chat',
+    messageActionsPortalClassName,
   }) => {
     const { profile } = useAuth()
     const { isOperator } = useAdminAccess({ includeUsers: false })
@@ -690,6 +692,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                   containerRef={containerRef}
                   className="absolute -right-12 -top-2"
                   buttonClassName="md:opacity-0 md:group-hover/message:opacity-70"
+                  portalClassName={messageActionsPortalClassName}
                 />
 
                 {/* Invisible hover area to trigger reactions */}

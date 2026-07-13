@@ -1,4 +1,5 @@
 import { act, createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { useState } from 'react'
 import { ShadowPin } from '../src/features/shadow-pin/ShadowPin'
 import { ShadowPinGoldPinBadge } from '../src/features/shadow-pin/components/ShadowPinGoldPinBadge'
 import * as shadowPinApi from '../src/features/shadow-pin/api/shadowPinApi'
@@ -2085,6 +2086,50 @@ test('removing the routed Pin closes a locally opened Theater before route looku
     expect(onPinRoute).toHaveBeenCalledTimes(1)
   } finally {
     fetchSpy.mockRestore()
+  }
+})
+
+test('replaces the routed Pin from local Theater state without exact or neighbor refetches', async () => {
+  const exactFetch = jest.spyOn(shadowPinApi, 'fetchShadowPinImage').mockResolvedValue(null)
+  const neighborFetch = jest.spyOn(shadowPinApi, 'fetchShadowPinImageNeighbors').mockResolvedValue({
+    previous: null,
+    next: null,
+  })
+  const routeCalls = jest.fn()
+
+  function RoutedShadowPin() {
+    const [pin, setPin] = useState<string | undefined>()
+    return (
+      <ShadowPin
+        onBack={() => {}}
+        initialImageId={pin}
+        onPinRoute={(action, imageId) => {
+          routeCalls(action, imageId)
+          if ((action === 'push-viewer' || action === 'replace-viewer') && imageId) setPin(imageId)
+          if (action === 'close-viewer') setPin(undefined)
+        }}
+      />
+    )
+  }
+
+  try {
+    render(<RoutedShadowPin />)
+    fireEvent.click(screen.getByText('Fam & Friends'))
+    const imageCard = screen.getByAltText('Pin one').closest('article')
+    expect(imageCard).not.toBeNull()
+    openPinFromCard(imageCard!)
+    expect(screen.getByRole('dialog', { name: 'Pin one' })).toBeInTheDocument()
+
+    fireEvent.click(within(screen.getByTestId('shadow-pin-theater')).getByLabelText('Previous Pin'))
+    fireEvent.transitionEnd(screen.getByTestId('shadow-pin-theater-active-slide'), { propertyName: 'transform' })
+
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Pin three' })).toBeInTheDocument())
+    expect(routeCalls).toHaveBeenLastCalledWith('replace-viewer', 'three')
+    expect(exactFetch).not.toHaveBeenCalled()
+    expect(neighborFetch).not.toHaveBeenCalled()
+  } finally {
+    exactFetch.mockRestore()
+    neighborFetch.mockRestore()
   }
 })
 

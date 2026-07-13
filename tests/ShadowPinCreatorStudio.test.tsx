@@ -15,6 +15,7 @@ const mockListCreatorDrafts = jest.fn()
 const mockLoadCreatorLocalDraft = jest.fn()
 const mockSaveCreatorLocalDraft = jest.fn()
 const mockClearCreatorLocalDraft = jest.fn()
+const mockFetchLinkPreview = jest.fn()
 
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 'user-1' } }),
@@ -26,6 +27,10 @@ jest.mock('../src/hooks/useComfortPreferences', () => ({
 
 jest.mock('../src/hooks/useDialogAccessibility', () => ({
   useDialogAccessibility: () => ({ current: null }),
+}))
+
+jest.mock('../src/lib/linkPreview', () => ({
+  fetchLinkPreview: (...args: unknown[]) => mockFetchLinkPreview(...args),
 }))
 
 jest.mock('../src/features/shadow-pin/hooks/useShadowPinCategories', () => ({
@@ -126,6 +131,7 @@ beforeEach(() => {
   jest.clearAllMocks()
   mockLoadCreatorLocalDraft.mockReturnValue(null)
   mockListCreatorDrafts.mockResolvedValue([])
+  mockFetchLinkPreview.mockResolvedValue(null)
   mockCreateCreatorDraft.mockResolvedValue({ draft: draft(1, 'editing'), asset: null })
   mockUpdateCreatorDraft.mockResolvedValue({ draft: draft(3, 'publish_ready'), asset: readyAsset })
   mockStageCreatorDraftMedia.mockResolvedValue({ draft: draft(2, 'publish_ready'), asset: readyAsset })
@@ -179,6 +185,40 @@ test('locks media inputs until initial draft recovery finishes', async () => {
   await waitFor(() => expect(fileInput).toBeEnabled())
 })
 
+test('keeps the focused details field enabled while background autosave is pending', async () => {
+  let resolveSave!: (bundle: ShadowPinCreatorDraftBundle) => void
+  mockCreateCreatorDraft.mockReturnValue(new Promise<ShadowPinCreatorDraftBundle>(resolve => {
+    resolveSave = resolve
+  }))
+
+  render(
+    <ShadowPinCreatorStudio
+      open
+      initialCategoryId="category-1"
+      initialMediaUrl="https://example.com/pin.jpg"
+      initialTitle="A new Pin"
+      onClose={jest.fn()}
+      onPublished={jest.fn()}
+    />
+  )
+
+  await waitFor(() => expect(screen.getByLabelText(/public media url/i)).toBeEnabled())
+  fireEvent.click(screen.getByRole('button', { name: /continue/i }))
+  const title = await screen.findByRole('textbox', { name: /title/i })
+  title.focus()
+  fireEvent.change(title, { target: { value: 'A new Pin with focus' } })
+
+  await waitFor(() => expect(mockCreateCreatorDraft).toHaveBeenCalled(), { timeout: 1_500 })
+  expect(title).toBeEnabled()
+  expect(title).toHaveFocus()
+  expect(screen.getByTestId('creator-studio-footer')).toHaveClass('shrink-0')
+  expect(screen.getByTestId('creator-studio-footer')).not.toHaveClass('fixed')
+
+  await act(async () => {
+    resolveSave({ draft: draft(1, 'editing', { title: 'A new Pin with focus' }), asset: null })
+  })
+})
+
 test('shows a newly selected replacement file instead of the existing Pin preview', async () => {
   const originalCreateObjectURL = URL.createObjectURL
   const originalRevokeObjectURL = URL.revokeObjectURL
@@ -223,6 +263,31 @@ test('shows a newly selected replacement file instead of the existing Pin previe
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: originalCreateObjectURL })
     Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: originalRevokeObjectURL })
   }
+})
+
+test('discovers and shows a preview automatically for a non-direct media URL', async () => {
+  mockFetchLinkPreview.mockResolvedValue({
+    image: 'https://preview.example/social-card.webp',
+    mediaType: 'video',
+    provider: 'instagram',
+  })
+
+  render(
+    <ShadowPinCreatorStudio
+      open
+      initialMediaUrl="https://www.instagram.com/reel/example/"
+      initialTitle="Social video"
+      onClose={jest.fn()}
+      onPublished={jest.fn()}
+    />
+  )
+
+  expect(await screen.findByText('Finding the media preview…')).toBeInTheDocument()
+  await waitFor(() => expect(mockFetchLinkPreview).toHaveBeenCalledWith('https://www.instagram.com/reel/example/'))
+  expect(await screen.findByRole('img', { name: 'Social video' })).toHaveAttribute(
+    'src',
+    'https://preview.example/social-card.webp'
+  )
 })
 
 test('moves through Preview and requires explicit confirmation before publishing', async () => {

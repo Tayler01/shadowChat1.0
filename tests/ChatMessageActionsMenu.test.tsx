@@ -231,4 +231,16 @@ describe('ChatMessageActionsMenu', () => {
     expect(onSelect).toHaveBeenCalledTimes(1)
     await waitFor(() => expect(screen.queryByRole('menu')).not.toBeInTheDocument())
   })
+
+  it('accepts a scoped portal layer for nested dialog surfaces', () => {
+    render(
+      <ChatMessageActionsMenu
+        portalClassName="!z-[150]"
+        actions={[{ id: 'copy', label: 'Copy', icon: Copy, onSelect: jest.fn() }]}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Message actions' }))
+    expect(screen.getByTestId('message-actions-menu')).toHaveClass('!z-[150]')
+  })
 })

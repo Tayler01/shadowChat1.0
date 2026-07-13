@@ -309,3 +309,63 @@ test('pointer cancellation returns to center and never commits navigation', () =
   expect(activeSlide.style.transition).toBe('none')
   expect(props.onActiveImageChange).not.toHaveBeenCalled()
 })
+
+test('queues a rapid follow-up swipe instead of dropping it during the first settle', () => {
+  jest.useFakeTimers()
+  const rapidImages = [
+    ...images,
+    image('four', '2026-07-11T09:00:00.000Z'),
+    image('five', '2026-07-11T08:00:00.000Z'),
+  ]
+  const onActiveImageChange = jest.fn()
+  const props = createViewerProps({ images: rapidImages })
+
+  function ControlledViewer() {
+    const [activeImageId, setActiveImageId] = useState('two')
+    return (
+      <ShadowPinImmersiveViewer
+        {...props}
+        images={rapidImages}
+        activeImageId={activeImageId}
+        onActiveImageChange={(nextImage, meta) => {
+          onActiveImageChange(nextImage, meta)
+          setActiveImageId(nextImage.id)
+        }}
+      />
+    )
+  }
+
+  render(<ControlledViewer />)
+  const surface = screen.getByTestId('shadow-pin-theater').firstElementChild as HTMLElement
+  const swipeNext = (pointerId: number) => {
+    for (const [type, clientX] of [['pointerdown', 320], ['pointermove', 80], ['pointerup', 80]] as const) {
+      const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientX, clientY: 300 })
+      Object.defineProperties(event, {
+        pointerId: { value: pointerId },
+        isPrimary: { value: true },
+        button: { value: 0 },
+      })
+      fireEvent(surface, event)
+    }
+  }
+
+  swipeNext(1)
+  swipeNext(2)
+  expect(onActiveImageChange).not.toHaveBeenCalled()
+
+  fireEvent.transitionEnd(screen.getByTestId('shadow-pin-theater-active-slide'), { propertyName: 'transform' })
+  expect(onActiveImageChange).toHaveBeenNthCalledWith(
+    1,
+    expect.objectContaining({ id: 'three' }),
+    { direction: 1, reason: 'swipe' }
+  )
+
+  act(() => jest.advanceTimersByTime(50))
+  expect(screen.getByTestId('shadow-pin-theater-active-slide').style.transition).toContain('220ms')
+  fireEvent.transitionEnd(screen.getByTestId('shadow-pin-theater-active-slide'), { propertyName: 'transform' })
+  expect(onActiveImageChange).toHaveBeenNthCalledWith(
+    2,
+    expect.objectContaining({ id: 'four' }),
+    { direction: 1, reason: 'swipe' }
+  )
+})

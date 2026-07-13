@@ -382,6 +382,20 @@ installed-phone acceptance. Nothing merges to `main` before that approval.
 - Candidate 3 linked history/dry-run and the combined Wave Two regression gate
   are clean. The authenticated checkpoint does not claim production
   publication or physical installed-PWA certification.
+- July 13 phone-hardening follow-up: General Chat threads now reuse the shared
+  mobile footer so the composer stays against the software keyboard while the
+  bottom navigation remains present; message action portals sit above the
+  thread sheet. Creator Studio autosave no longer disables focused fields, its
+  action footer participates in the visual-viewport flex layout, focused
+  fields are re-revealed during keyboard settling, and media preview uses local,
+  staged, direct, provider-poster, and authenticated link-preview fallbacks.
+- ShadowPin Theater now coalesces drag rendering to animation frames, accepts
+  up to three queued swipes during the 220ms handoff, preloads two Pins on each
+  side, and reuses locally resolved routed Pins instead of refetching exact and
+  neighbor rows on every swipe. Pixel Chromium and iPhone WebKit both completed
+  two rapid touch swipes from Pin 1 to Pin 3 of 18 and stayed settled without
+  route/title snapback or console/page errors. Evidence:
+  `output/playwright/shadow-pin-theater-rapid-swipe/summary.json`.
 - Candidate 4 is implemented and remotely aligned. Its activation table is
   future-invite-only and owner-private; validated constraints enforce receipt
   order; canonical message/DM/Pin triggers own completion; the public mutation

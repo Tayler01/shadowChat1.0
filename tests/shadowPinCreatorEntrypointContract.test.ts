@@ -60,7 +60,9 @@ describe('ShadowPin Creator Studio entrypoint contracts', () => {
     expect(studio).toContain('var(--shadowchat-visual-viewport-height,100dvh)')
     expect(studio).toContain('env(safe-area-inset-bottom)')
     expect(studio).toContain("!isReducedMotion && 'animate-spin'")
-    expect(studio).toContain('fixed inset-x-0 bottom-0')
+    expect(studio).toContain('data-testid="creator-studio-footer"')
+    expect(studio).toContain('shrink-0 border-t border-[var(--border-panel)]')
+    expect(studio).not.toContain('<footer className="fixed')
   })
 
   test('image staging remains private until the bounded publish-preparation step', () => {

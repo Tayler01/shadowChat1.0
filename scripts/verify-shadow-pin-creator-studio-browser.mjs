@@ -820,6 +820,7 @@ const stageUrlDraftAndDiscard = async (page, { url, title, expectedKind }) => {
   await page.goto(`${baseUrl}/?view=pins`, { waitUntil: 'domcontentloaded' })
   await page.getByRole('button', { name: 'Create Pin', exact: true }).click()
   await setUrlMedia(page, url)
+  await page.getByTestId('shadow-pin-creator-studio').getByRole('img', { name: 'Draft Pin preview' }).waitFor({ timeout: 20_000 })
   await continueToDetails(page)
   await fillCreatorDetails(page, { title, categoryId: seeded.categoryIds[0] })
   await page.getByTestId('shadow-pin-creator-studio').getByRole('button', { name: /^Continue/ }).click()
@@ -945,25 +946,46 @@ try {
 
   const studio = pixelPage.getByTestId('shadow-pin-creator-studio')
   await studio.locator('input[type="file"]').setInputFiles(imagePath)
-  await studio.getByRole('img', { name: 'Draft Pin preview' }).waitFor({ timeout: 10_000 })
+  const selectedImagePreview = studio.getByRole('img', { name: 'Draft Pin preview' })
+  await selectedImagePreview.waitFor({ timeout: 10_000 })
+  must((await selectedImagePreview.getAttribute('src'))?.startsWith('blob:'), 'Selected image did not preview automatically from its local object URL.')
   await studio.getByRole('button', { name: /^Continue/ }).click()
   await pixelPage.getByTestId('creator-step-details').waitFor({ timeout: 10_000 })
 
   const details = pixelPage.getByTestId('creator-step-details')
-  await details.getByPlaceholder('Give this Pin a clear title').fill(marker)
+  const titleField = details.getByPlaceholder('Give this Pin a clear title')
+  await titleField.fill('')
+  await titleField.pressSequentially(marker, { delay: 16 })
+  must(await titleField.inputValue() === marker, 'Creator title lost characters during autosave.')
+  must(await titleField.evaluate(element => document.activeElement === element), 'Creator title lost focus during autosave.')
   const categorySelect = details.locator('select')
   await categorySelect.waitFor({ timeout: 15_000 })
   await pixelPage.waitForFunction(select => select.options.length > 1, await categorySelect.elementHandle(), { timeout: 15_000 })
   const selectedCategory = await categorySelect.selectOption(seeded.categoryIds[0])
   must(selectedCategory[0] === seeded.categoryIds[0], 'Creator Studio did not select the temporary publication category.')
-  await details.getByPlaceholder('Add context, credits, or the story behind it').fill('Temporary authenticated Wave 2 verification Pin. Removed automatically after proof.')
-  await details.getByPlaceholder('folklore, travel, behind-the-scenes').fill('wave2, qa, creator-studio')
+  const descriptionField = details.getByPlaceholder('Add context, credits, or the story behind it')
+  await descriptionField.pressSequentially('Temporary authenticated Wave 2 verification Pin. Removed automatically after proof.', { delay: 6 })
+  must(await descriptionField.evaluate(element => document.activeElement === element), 'Creator description lost focus during autosave.')
+  const tagsField = details.getByPlaceholder('folklore, travel, behind-the-scenes')
+  await tagsField.pressSequentially('wave2, qa, creator-studio', { delay: 10 })
+  must(await tagsField.evaluate(element => document.activeElement === element), 'Creator tags lost focus during autosave.')
 
   await pixelPage.setViewportSize({ width: profiles.pixel.viewport.width, height: 620 })
-  await details.getByPlaceholder('Give this Pin a clear title').focus()
+  await titleField.focus()
   const keyboardGeometry = await assertStudioGeometry(pixelPage, `${profiles.pixel.name}-keyboard-compressed`)
+  const focusedFieldGeometry = await titleField.evaluate(element => {
+    const rect = element.getBoundingClientRect()
+    const footer = document.querySelector('[data-testid="creator-studio-footer"]')?.getBoundingClientRect()
+    return {
+      top: rect.top,
+      bottom: rect.bottom,
+      viewportHeight: window.visualViewport?.height ?? window.innerHeight,
+      footerTop: footer?.top ?? null,
+    }
+  })
+  must(focusedFieldGeometry.top >= 0 && focusedFieldGeometry.bottom <= (focusedFieldGeometry.footerTop ?? focusedFieldGeometry.viewportHeight), `Focused Creator field is hidden behind the keyboard/footer: ${JSON.stringify(focusedFieldGeometry)}`)
   await pixelPage.setViewportSize(profiles.pixel.viewport)
-  checks.push({ name: 'software-keyboard-footer-safe-area-geometry', passed: true, simulatedViewportHeight: 620, geometry: keyboardGeometry, residual: 'Physical iOS/Android keyboard animation and hardware safe-area insets still require real-device validation.' })
+  checks.push({ name: 'software-keyboard-focus-footer-safe-area-geometry', passed: true, simulatedViewportHeight: 620, geometry: keyboardGeometry, focusedFieldGeometry, residual: 'Physical iOS/Android keyboard animation and hardware safe-area insets still require real-device validation.' })
 
   expectedMediaFailure.armed = true
   await studio.getByRole('button', { name: /^Continue/ }).click()

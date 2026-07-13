@@ -107,6 +107,12 @@ jest.mock('../src/components/layout/MobileChatFooter', () => ({
   ),
 }))
 
+jest.mock('../src/features/general-chat-threads', () => ({
+  GeneralChatThreadSheet: ({ currentView }: { currentView: string }) => (
+    <div data-testid="mock-thread-sheet" data-current-view={currentView} />
+  ),
+}))
+
 jest.mock('../src/hooks/useFailedMessages', () => ({
   useFailedMessages: () => ({
     failedMessages: [],
@@ -171,4 +177,19 @@ test('keeps the mobile composer enabled while a send is pending so iOS preserves
 
   expect(desktopComposer).toHaveAttribute('data-disabled', 'true')
   expect(mobileComposer).toHaveAttribute('data-disabled', 'false')
+})
+
+test('unmounts the Lounge footer while the routed thread owns the mobile composer and navigation', async () => {
+  await act(async () => {
+    render(
+      <ChatView
+        currentView="chat"
+        onViewChange={() => {}}
+        initialThreadId="pinned-1"
+      />
+    )
+  })
+
+  expect(await screen.findByTestId('mock-thread-sheet')).toHaveAttribute('data-current-view', 'chat')
+  expect(screen.queryByTestId('mobile-chat-footer')).not.toBeInTheDocument()
 })

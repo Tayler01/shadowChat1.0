@@ -3254,6 +3254,7 @@ function ShadowPinCategoryScreen({
   initialPanel,
   onPinRoute,
   onViewerClose,
+  onViewerImageResolved,
 }: {
   currentView: AppView
   onViewChange: (view: AppView) => void
@@ -3267,6 +3268,7 @@ function ShadowPinCategoryScreen({
   initialPanel?: 'viewer' | 'comments'
   onPinRoute: (action: PinRouteAction, imageId?: string, commentId?: string) => void
   onViewerClose?: () => void
+  onViewerImageResolved?: (image: ShadowPinImage) => void
 }) {
   const { user } = useAuth()
   const { role: adminRole } = useAdminAccess({ includeUsers: false })
@@ -3339,13 +3341,17 @@ function ShadowPinCategoryScreen({
     setCommentsImage(null)
     setViewerSessionImages([image])
     setModal({ type: 'image-viewer', image })
-    if (pushRoute) onPinRoute('push-viewer', image.id)
+    if (pushRoute) {
+      onViewerImageResolved?.(image)
+      onPinRoute('push-viewer', image.id)
+    }
   }
 
   const openImageComments = (image: ShadowPinImage, viewerAlreadyOpen = false) => {
     if (!viewerAlreadyOpen) {
       setViewerSessionImages([image])
       setModal({ type: 'image-viewer', image })
+      onViewerImageResolved?.(image)
       onPinRoute('push-viewer', image.id)
     }
     setCommentsImage(image)
@@ -3641,6 +3647,7 @@ function ShadowPinCategoryScreen({
               toast.success('Pin published')
               setViewerSessionImages([image])
               setModal({ type: 'image-viewer', image })
+              onViewerImageResolved?.(image)
               onPinRoute('replace-viewer', image.id)
             }}
           />
@@ -3687,6 +3694,7 @@ function ShadowPinCategoryScreen({
               ? current.map(item => item.id === image.id ? image : item)
               : [...current, image])
             setModal({ type: 'image-viewer', image })
+            onViewerImageResolved?.(image)
             onPinRoute('replace-viewer', image.id)
           }}
           onLoadMore={imagesState.loadMore}
@@ -3741,6 +3749,7 @@ export function ShadowPin({
   const [initialImage, setInitialImage] = useState<ShadowPinImage | null>(null)
   const [initialNeighbors, setInitialNeighbors] = useState<ShadowPinImage[]>([])
   const [initialImageStatus, setInitialImageStatus] = useState<'idle' | 'loading' | 'unavailable'>('idle')
+  const routedViewerImagesRef = useRef(new Map<string, ShadowPinImage>())
   const [initialCreatorOpen] = useState(() => (
     typeof window !== 'undefined' && hasCreatorStudioQuery(window)
   ))
@@ -3756,6 +3765,15 @@ export function ShadowPin({
       setInitialImage(null)
       setInitialNeighbors([])
       setInitialImageStatus('idle')
+      return
+    }
+
+    const locallyResolved = routedViewerImagesRef.current.get(initialImageId)
+    if (locallyResolved?.category_id) {
+      setInitialImage(locallyResolved)
+      setInitialNeighbors([])
+      setInitialImageStatus('idle')
+      setActiveCategoryId(locallyResolved.category_id)
       return
     }
 
@@ -3838,6 +3856,9 @@ export function ShadowPin({
         initialCommentId={initialCommentId}
         initialPanel={initialPanel}
         onPinRoute={onPinRoute}
+        onViewerImageResolved={image => {
+          routedViewerImagesRef.current.set(image.id, image)
+        }}
         onViewerClose={returnHomeAfterViewerClose ? () => {
           setReturnHomeAfterViewerClose(false)
           setInitialImage(null)
@@ -3859,6 +3880,7 @@ export function ShadowPin({
       onOpenPin={image => {
         if (!image.category_id) return
         setReturnHomeAfterViewerClose(false)
+        routedViewerImagesRef.current.set(image.id, image)
         setInitialImage(image)
         setInitialNeighbors([])
         setActiveCategoryId(image.category_id)
@@ -3867,6 +3889,7 @@ export function ShadowPin({
       onPublishedPin={image => {
         if (!image.category_id) return
         setReturnHomeAfterViewerClose(true)
+        routedViewerImagesRef.current.set(image.id, image)
         setInitialImage(image)
         setInitialNeighbors([])
         setActiveCategoryId(image.category_id)

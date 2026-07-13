@@ -8,6 +8,29 @@ artifact and physical-device pass.
 
 Last updated: 2026-07-13
 
+## July 13 ShadowChat 2.0 Phone Regression Hardening
+
+- General Chat thread proof was rerun against a fresh production build on
+  Pixel Chromium `412x915` and iPhone WebKit `390x844`. Both engines retained
+  the bottom navigation, rendered message actions at layer `150` above the
+  sheet, kept the compressed composer against the bottom of the keyboard
+  viewport, preserved the underlying Lounge during live replies, and reported
+  zero console/page errors.
+- The thread run created seven temporary text messages per engine pass and
+  deletion-confirmed all of them with zero cleanup errors. Evidence:
+  `output/playwright/wave2-candidate2-threads/summary.json`.
+- A read-only ShadowPin Theater probe issued two rapid left swipes during the
+  first transition. Pixel Chromium and iPhone WebKit both advanced from Pin 1
+  to Pin 3 of 18, then remained stable for the post-settle sample with no route
+  or title snapback and zero console/page errors. Evidence:
+  `output/playwright/shadow-pin-theater-rapid-swipe/summary.json`.
+- Creator Studio regression coverage now types title, description, and tags
+  character by character while autosave runs, checks focused-field visibility
+  in a `620px` simulated keyboard viewport, and requires automatic local image,
+  local video, image URL, external-video poster, and authenticated link-preview
+  rendering. The exact immutable deploy rerun is part of this trial redeploy's
+  final acceptance gate.
+
 ## July 13 ShadowChat 2.0 First-Run Activation - Authenticated Checkpoint
 
 - Exact immutable deploy only:

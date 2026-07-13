@@ -155,6 +155,8 @@ try {
       const geometry = await sheet.evaluate(element => {
         const rect = element.getBoundingClientRect()
         const composer = element.querySelector('[data-message-composer-surface="true"]')?.getBoundingClientRect()
+        const footer = element.querySelector('[data-mobile-chat-footer="true"]')?.getBoundingClientRect()
+        const nav = element.querySelector('[aria-label="Primary and utility navigation"]')?.getBoundingClientRect()
         return {
           left: rect.left,
           right: rect.right,
@@ -164,20 +166,62 @@ try {
           viewportHeight: window.visualViewport?.height ?? window.innerHeight,
           pageScrollWidth: document.documentElement.scrollWidth,
           composerBottom: composer?.bottom ?? null,
+          footerBottom: footer?.bottom ?? null,
+          navHeight: nav?.height ?? null,
         }
       })
       if (geometry.left < -1 || geometry.right > geometry.viewportWidth + 1 || geometry.top < -1 || geometry.bottom > geometry.viewportHeight + 1 || geometry.pageScrollWidth > geometry.viewportWidth + 1) {
         throw new Error(`Thread sheet overflow: ${JSON.stringify(geometry)}`)
       }
+      if (!geometry.footerBottom || geometry.footerBottom > geometry.viewportHeight + 1 || !geometry.navHeight) {
+        throw new Error(`Thread mobile footer or bottom navigation is unavailable: ${JSON.stringify(geometry)}`)
+      }
 
-      const opened = await scroll.evaluate(element => ({
-        top: element.scrollTop,
-        loaded: element.getAttribute('data-loaded-count'),
-      }))
-      opened.rootTop = await rootRow.evaluate(element => element.getBoundingClientRect().top)
+      const visibleReplyRow = sheet.getByText(`${marker} first reply`, { exact: true }).first().locator('xpath=ancestor::*[@data-thread-message-id][1]')
+      await visibleReplyRow.evaluate(element => element.scrollIntoView({ block: 'center', inline: 'nearest' }))
+      const threadMessageActions = visibleReplyRow.getByRole('button', { name: 'Message actions', exact: true })
+      await threadMessageActions.click()
+      const threadActionsMenu = page.getByTestId('message-actions-menu')
+      await threadActionsMenu.waitFor({ timeout: 10_000 })
+      const actionMenuLayer = await threadActionsMenu.evaluate(element => Number.parseInt(getComputedStyle(element).zIndex, 10))
+      if (!Number.isFinite(actionMenuLayer) || actionMenuLayer < 150) {
+        throw new Error(`Thread message actions rendered below the sheet: ${actionMenuLayer}`)
+      }
+      await threadActionsMenu.getByRole('menuitem', { name: 'Reply', exact: true }).click()
+      await threadActionsMenu.waitFor({ state: 'hidden', timeout: 10_000 })
+
+      const originalViewport = profile.viewport
+      await page.setViewportSize({ width: originalViewport.width, height: Math.max(560, originalViewport.height - 260) })
+      const threadComposer = sheet.getByPlaceholder('Reply in thread')
+      await threadComposer.focus()
+      await page.waitForTimeout(350)
+      const keyboardGeometry = await sheet.evaluate(element => {
+        const composer = element.querySelector('[data-message-composer-surface="true"]')?.getBoundingClientRect()
+        const footer = element.querySelector('[data-mobile-chat-footer="true"]')?.getBoundingClientRect()
+        return {
+          viewportHeight: window.visualViewport?.height ?? window.innerHeight,
+          composerTop: composer?.top ?? null,
+          composerBottom: composer?.bottom ?? null,
+          footerTop: footer?.top ?? null,
+          footerBottom: footer?.bottom ?? null,
+        }
+      })
+      if (
+        keyboardGeometry.composerTop === null ||
+        keyboardGeometry.composerBottom === null ||
+        keyboardGeometry.footerTop === null ||
+        keyboardGeometry.footerBottom === null ||
+        keyboardGeometry.composerTop < keyboardGeometry.viewportHeight * 0.55 ||
+        keyboardGeometry.composerBottom > keyboardGeometry.footerBottom + 1 ||
+        keyboardGeometry.footerBottom > keyboardGeometry.viewportHeight + 1
+      ) {
+        throw new Error(`Thread composer escaped the keyboard footer: ${JSON.stringify(keyboardGeometry)}`)
+      }
+      await page.setViewportSize(originalViewport)
+      await page.waitForTimeout(250)
 
       const uiReplyContent = `${marker} ui ${profile.name}`
-      await sheet.getByPlaceholder('Reply in thread').fill(uiReplyContent)
+      await threadComposer.fill(uiReplyContent)
       await sheet.getByRole('button', { name: /^Send message/i }).click()
       await sheet.getByText(uiReplyContent, { exact: true }).first().waitFor({ timeout: 20_000 })
       let uiReplyId = null
@@ -193,6 +237,13 @@ try {
       }
       if (!uiReplyId) throw new Error('UI thread reply was not persisted.')
       created.push({ id: uiReplyId, clientIndex: 0 })
+
+      await page.waitForTimeout(350)
+      const opened = await scroll.evaluate(element => ({
+        top: element.scrollTop,
+        loaded: element.getAttribute('data-loaded-count'),
+      }))
+      opened.rootTop = await rootRow.evaluate(element => element.getBoundingClientRect().top)
 
       const liveReply = await insertMessage(1, {
         content: `${marker} live ${profile.name}`,
@@ -236,7 +287,7 @@ try {
       if (consoleErrors.length || pageErrors.length) {
         throw new Error(`Browser errors: ${JSON.stringify({ consoleErrors, pageErrors })}`)
       }
-      results.push({ profile: profile.name, passed: true, geometry, before, opened, after, restored, consoleErrors, pageErrors })
+      results.push({ profile: profile.name, passed: true, geometry, keyboardGeometry, actionMenuLayer, before, opened, after, restored, consoleErrors, pageErrors })
     } catch (error) {
       await page.screenshot({ path: path.join(artifactDir, `${profile.name}-failure.png`) }).catch(() => undefined)
       results.push({ profile: profile.name, passed: false, error: error instanceof Error ? error.message : String(error), consoleErrors, pageErrors })

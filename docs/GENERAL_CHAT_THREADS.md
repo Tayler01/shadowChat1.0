@@ -17,8 +17,10 @@ release gate.
 - Replying from the main feed opens the thread. Replying to a reply remains in
   that thread and preserves the direct-parent preview without creating visual
   nesting levels.
-- Phones use a full-height, safe-area-aware sheet with a fixed thread composer.
-  Desktop uses the same surface as a right-side drawer.
+- Phones use a full-height, safe-area-aware sheet with the shared mobile chat
+  footer: the thread composer stays attached to the software keyboard and the
+  primary bottom navigation remains available below it. Desktop uses the same
+  surface as a right-side drawer with an inline composer.
 - The thread presents the starting message, chronological replies, bounded
   older-page loading, and a `new replies` affordance when realtime content
   arrives while the member is away from the bottom.
@@ -30,6 +32,8 @@ release gate.
 - Existing edit, delete, reactions, attachments, GIFs, moderation, blocking,
   search, saves, push notifications, and direct reply previews remain part of
   the General Chat message contract.
+- Thread message action menus render above the sheet layer, so the three-dot
+  controls remain visible and usable instead of opening behind the thread.
 
 ## Canonical Data And Compatibility
 
@@ -152,9 +156,10 @@ message rather than showing that reply as a root in the room.
   unread increment/clear, editing/deleting, block refresh, and exact push/search
   handoff.
 - Android/Pixel Chromium and iPhone WebKit verify sheet geometry, safe areas,
-  fixed composer and keyboard behavior, 44-48px controls, exact-target focus,
-  Back/cold-close behavior, older-page scroll preservation, reduced motion,
-  and no horizontal overflow or console/page errors.
+  the shared bottom navigation, action-menu foreground layering, composer and
+  keyboard behavior, 44-48px controls, exact-target focus, Back/cold-close
+  behavior, older-page scroll preservation, reduced motion, and no horizontal
+  overflow or console/page errors.
 - Lint, TypeScript, production build, paused-domain checks, bundle budgets,
   targeted Jest, and the full Jest suite pass.
 - Any test-created messages, uploads, notification rows, and Storage objects

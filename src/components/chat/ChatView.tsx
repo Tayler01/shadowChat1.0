@@ -203,10 +203,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       </div>
 
       {/* Mobile Message Input with Navigation */}
-      <div
-        className={activeThreadId ? 'invisible pointer-events-none' : ''}
-        aria-hidden={activeThreadId ? 'true' : undefined}
-      >
+      {!activeThreadId && <div>
         <MobileChatFooter
           currentView={currentView}
           onViewChange={onViewChange}
@@ -222,7 +219,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             enableGifPicker
           />
         </MobileChatFooter>
-      </div>
+      </div>}
 
       {activeThreadId && (
         <Suspense fallback={null}>
@@ -231,6 +228,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
             threadId={activeThreadId}
             initialRootMessage={messages.find(message => message.id === activeThreadId) ?? null}
             initialMessageId={initialMessageId ?? activeThreadId}
+            currentView={currentView}
+            onViewChange={onViewChange}
             onClose={closeThread}
           />
         </Suspense>

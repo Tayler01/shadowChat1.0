@@ -57,7 +57,11 @@ type GestureSnapshot = {
   startY: number
   startedAt: number
   axis: 'pending' | 'horizontal' | 'vertical'
+  queued: boolean
 }
+
+const NAVIGATION_FALLBACK_MS = 320
+const MAX_QUEUED_SWIPES = 3
 
 type ShadowPinImmersiveViewerProps = {
   images: readonly ShadowPinImage[]
@@ -147,6 +151,7 @@ export function ShadowPinImmersiveViewer({
   const [dragX, setDragX] = useState(0)
   const [motionPhase, setMotionPhase] = useState<ViewerMotionPhase>('idle')
   const [handoffImage, setHandoffImage] = useState<ShadowPinImage | null>(null)
+  const [queuedSwipes, setQueuedSwipes] = useState<ViewerDirection[]>([])
   const [announcement, setAnnouncement] = useState('')
   const [consentedProviders, setConsentedProviders] = useState<Set<string>>(() => new Set())
   const gestureRef = useRef<GestureSnapshot | null>(null)
@@ -154,6 +159,9 @@ export function ShadowPinImmersiveViewer({
   const handoffFrameRef = useRef<number | null>(null)
   const handoffReleaseFrameRef = useRef<number | null>(null)
   const handoffImageRef = useRef<ShadowPinImage | null>(null)
+  const dragXRef = useRef(0)
+  const dragFrameRef = useRef<number | null>(null)
+  const pendingDragXRef = useRef(0)
   const pendingNavigationRef = useRef<{
     image: ShadowPinImage
     meta: { direction: ViewerDirection; reason: ViewerNavigationReason }
@@ -162,6 +170,46 @@ export function ShadowPinImmersiveViewer({
   const requestedMoreRef = useRef<string | null>(null)
   const preloadedImagesRef = useRef(new Map<string, HTMLImageElement>())
 
+  const updateDragX = useCallback((value: number, immediate = false) => {
+    dragXRef.current = value
+    pendingDragXRef.current = value
+    if (immediate) {
+      if (dragFrameRef.current !== null) {
+        window.cancelAnimationFrame(dragFrameRef.current)
+        dragFrameRef.current = null
+      }
+      setDragX(value)
+      return
+    }
+    if (dragFrameRef.current !== null) return
+    dragFrameRef.current = window.requestAnimationFrame(() => {
+      dragFrameRef.current = null
+      setDragX(pendingDragXRef.current)
+    })
+  }, [])
+
+  const cancelPendingMotion = useCallback(() => {
+    if (navigationTimerRef.current !== null) {
+      window.clearTimeout(navigationTimerRef.current)
+      navigationTimerRef.current = null
+    }
+    if (handoffFrameRef.current !== null) {
+      window.cancelAnimationFrame(handoffFrameRef.current)
+      handoffFrameRef.current = null
+    }
+    if (handoffReleaseFrameRef.current !== null) {
+      window.cancelAnimationFrame(handoffReleaseFrameRef.current)
+      handoffReleaseFrameRef.current = null
+    }
+    pendingNavigationRef.current = null
+    gestureRef.current = null
+    setQueuedSwipes([])
+    handoffImageRef.current = null
+    setHandoffImage(null)
+    updateDragX(0, true)
+    setMotionPhase('idle')
+  }, [updateDragX])
+
   const getStageWidth = useCallback(() => (
     mediaStageRef.current?.clientWidth || window.innerWidth
   ), [])
@@ -169,12 +217,8 @@ export function ShadowPinImmersiveViewer({
   const handleZoomChange = useCallback((nextZoomed: boolean) => {
     setZoomed(nextZoomed)
     if (!nextZoomed) return
-    gestureRef.current = null
-    setDragX(0)
-    setMotionPhase('idle')
-    handoffImageRef.current = null
-    setHandoffImage(null)
-  }, [])
+    cancelPendingMotion()
+  }, [cancelPendingMotion])
 
   useEffect(() => {
     const origin = document.activeElement instanceof HTMLElement
@@ -211,6 +255,9 @@ export function ShadowPinImmersiveViewer({
     if (handoffReleaseFrameRef.current !== null) {
       window.cancelAnimationFrame(handoffReleaseFrameRef.current)
     }
+    if (dragFrameRef.current !== null) {
+      window.cancelAnimationFrame(dragFrameRef.current)
+    }
     pendingNavigationRef.current = null
     handoffImageRef.current = null
     preloadedImagesRef.current.clear()
@@ -219,7 +266,7 @@ export function ShadowPinImmersiveViewer({
   useEffect(() => {
     setDetailsOpen(false)
     setZoomed(false)
-    setDragX(0)
+    updateDragX(0, true)
     pendingNavigationRef.current = null
     gestureRef.current = null
     if (handoffImageRef.current?.id !== activeImageId) {
@@ -227,7 +274,7 @@ export function ShadowPinImmersiveViewer({
       setHandoffImage(null)
       setMotionPhase('idle')
     }
-  }, [activeImageId])
+  }, [activeImageId, updateDragX])
 
   useLayoutEffect(() => {
     if (!handoffImage || handoffImage.id !== activeImageId) return
@@ -263,7 +310,12 @@ export function ShadowPinImmersiveViewer({
 
   useEffect(() => {
     if (!activeImage) return
-    const posterUrls = [previousImage, nextImage]
+    const posterUrls = [
+      images[activeIndex - 2],
+      previousImage,
+      nextImage,
+      images[activeIndex + 2],
+    ]
       .filter((image): image is ShadowPinImage => Boolean(image))
       .map(getTransitionUrl)
       .filter(Boolean)
@@ -282,7 +334,7 @@ export function ShadowPinImmersiveViewer({
       if (!oldestUrl) break
       preloadedImagesRef.current.delete(oldestUrl)
     }
-  }, [activeImage, getTransitionUrl, nextImage, previousImage])
+  }, [activeImage, activeIndex, getTransitionUrl, images, nextImage, previousImage])
 
   useEffect(() => {
     const shouldLoad = shouldLoadMoreForViewer({
@@ -299,13 +351,8 @@ export function ShadowPinImmersiveViewer({
 
   useEffect(() => {
     if (!commentsOpen) return
-    gestureRef.current = null
-    setDragX(0)
-    setMotionPhase('idle')
-    pendingNavigationRef.current = null
-    handoffImageRef.current = null
-    setHandoffImage(null)
-  }, [commentsOpen])
+    cancelPendingMotion()
+  }, [cancelPendingMotion, commentsOpen])
 
   useEffect(() => {
     const pauseOnHide = () => {
@@ -330,10 +377,10 @@ export function ShadowPinImmersiveViewer({
     pendingNavigationRef.current = null
     handoffImageRef.current = pending.image
     setHandoffImage(pending.image)
-    setDragX(0)
+    updateDragX(0, true)
     setMotionPhase('rebasing')
     onActiveImageChange(pending.image, pending.meta)
-  }, [onActiveImageChange])
+  }, [onActiveImageChange, updateDragX])
 
   const settleBackToCenter = useCallback(() => {
     pendingNavigationRef.current = null
@@ -341,14 +388,14 @@ export function ShadowPinImmersiveViewer({
       window.clearTimeout(navigationTimerRef.current)
       navigationTimerRef.current = null
     }
-    if (dragX === 0) {
+    if (dragXRef.current === 0) {
       setMotionPhase('idle')
       return
     }
     setMotionPhase('settling-return')
-    setDragX(0)
-    navigationTimerRef.current = window.setTimeout(commitPendingNavigation, 400)
-  }, [commitPendingNavigation, dragX])
+    updateDragX(0, true)
+    navigationTimerRef.current = window.setTimeout(commitPendingNavigation, NAVIGATION_FALLBACK_MS)
+  }, [commitPendingNavigation, updateDragX])
 
   const navigate = useCallback((direction: ViewerDirection, reason: ViewerNavigationReason) => {
     if (motionPhase !== 'idle' || commentsOpen || zoomed) return
@@ -360,29 +407,35 @@ export function ShadowPinImmersiveViewer({
       } else {
         setAnnouncement(direction === -1 ? 'First Pin in this category' : 'Last Pin in this category')
       }
-      setDragX(0)
+      updateDragX(0, true)
       return
     }
 
     if (reducedMotion) {
       onActiveImageChange(neighbor, { direction, reason })
-      setDragX(0)
+      updateDragX(0, true)
       return
     }
 
     pendingNavigationRef.current = { image: neighbor, meta: { direction, reason } }
     setMotionPhase('settling-navigation')
-    setDragX(direction === 1 ? -getStageWidth() : getStageWidth())
-    navigationTimerRef.current = window.setTimeout(commitPendingNavigation, 400)
-  }, [commentsOpen, commitPendingNavigation, getStageWidth, hasMore, loadingMore, motionPhase, nextImage, onActiveImageChange, onLoadMore, previousImage, reducedMotion, zoomed])
+    updateDragX(direction === 1 ? -getStageWidth() : getStageWidth(), true)
+    navigationTimerRef.current = window.setTimeout(commitPendingNavigation, NAVIGATION_FALLBACK_MS)
+  }, [commentsOpen, commitPendingNavigation, getStageWidth, hasMore, loadingMore, motionPhase, nextImage, onActiveImageChange, onLoadMore, previousImage, reducedMotion, updateDragX, zoomed])
+
+  useEffect(() => {
+    if (motionPhase !== 'idle' || commentsOpen || zoomed || queuedSwipes.length === 0) return
+    const [direction, ...remaining] = queuedSwipes
+    setQueuedSwipes(remaining)
+    navigate(direction, 'swipe')
+  }, [activeImageId, commentsOpen, motionPhase, navigate, queuedSwipes, zoomed])
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!event.isPrimary) {
-      gestureRef.current = null
-      setDragX(0)
+      cancelPendingMotion()
       return
     }
-    if (event.button !== 0 || motionPhase !== 'idle') return
+    if (event.button !== 0 || commentsOpen || zoomed) return
     const target = event.target instanceof Element ? event.target : null
     const interactiveTarget = Boolean(target?.closest(INTERACTIVE_TARGET_SELECTOR))
     if (!canStartViewerSwipe({
@@ -399,6 +452,7 @@ export function ShadowPinImmersiveViewer({
       startY: event.clientY,
       startedAt: performance.now(),
       axis: 'pending',
+      queued: motionPhase !== 'idle',
     }
   }
 
@@ -412,13 +466,14 @@ export function ShadowPinImmersiveViewer({
     }
     if (gesture.axis === 'vertical') {
       gestureRef.current = null
-      setDragX(0)
+      if (!gesture.queued) updateDragX(0, true)
       return
     }
     if (gesture.axis !== 'horizontal') return
     event.preventDefault()
+    if (gesture.queued) return
     const atBoundary = (deltaX > 0 && !previousImage) || (deltaX < 0 && !nextImage)
-    setDragX(atBoundary ? deltaX * 0.24 : deltaX)
+    updateDragX(atBoundary ? deltaX * 0.24 : deltaX)
   }
 
   const finishPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -432,18 +487,23 @@ export function ShadowPinImmersiveViewer({
       deltaY,
       elapsedMs: performance.now() - gesture.startedAt,
       viewportWidth: getStageWidth(),
-      hasPrevious: Boolean(previousImage),
-      hasNext: Boolean(nextImage),
+      hasPrevious: gesture.queued ? true : Boolean(previousImage),
+      hasNext: gesture.queued ? true : Boolean(nextImage),
     })
-    if (direction) navigate(direction, 'swipe')
-    else settleBackToCenter()
+    if (direction && (gesture.queued || motionPhase !== 'idle')) {
+      setQueuedSwipes(current => current.length >= MAX_QUEUED_SWIPES ? current : [...current, direction])
+    } else if (direction) {
+      navigate(direction, 'swipe')
+    } else if (!gesture.queued) {
+      settleBackToCenter()
+    }
   }
 
   const cancelPointer = (event: ReactPointerEvent<HTMLDivElement>) => {
     const gesture = gestureRef.current
     if (!gesture || gesture.pointerId !== event.pointerId) return
     gestureRef.current = null
-    settleBackToCenter()
+    if (!gesture.queued) settleBackToCenter()
   }
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {

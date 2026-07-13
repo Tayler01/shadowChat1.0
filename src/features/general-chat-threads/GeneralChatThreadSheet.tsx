@@ -13,18 +13,23 @@ import { ArrowDown, ArrowLeft, MessageCircle, RefreshCw } from 'lucide-react'
 import { MessageInput } from '../../components/chat/MessageInput'
 import { MessageItem } from '../../components/chat/MessageItem'
 import { messageToReplyTarget, type ReplyTarget } from '../../components/chat/messageDisplay'
+import { MobileChatFooter } from '../../components/layout/MobileChatFooter'
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner'
 import { useComfortPreferences } from '../../hooks/useComfortPreferences'
 import { useDialogAccessibility } from '../../hooks/useDialogAccessibility'
+import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useOptionalMessages, type MessagesContextValue } from '../../hooks/MessagesContext'
 import { useReadCursor } from '../../hooks/useReadCursor'
 import { cn, shouldGroupMessage } from '../../lib/utils'
 import type { ChatMessageType, Message } from '../../lib/supabase'
+import type { AppView } from '../../types/navigation'
 import { useGeneralChatThread } from './useGeneralChatThread'
 
 export type GeneralChatThreadSheetProps = {
   open: boolean
   threadId: string | null
+  currentView: AppView
+  onViewChange: (view: AppView) => void
   onClose: () => void
   initialRootMessage?: Message | null
   initialMessageId?: string | null
@@ -38,6 +43,8 @@ const isNearBottom = (element: HTMLElement) => (
 export function GeneralChatThreadSheet({
   open,
   threadId,
+  currentView,
+  onViewChange,
   onClose,
   initialRootMessage = null,
   initialMessageId = null,
@@ -56,6 +63,7 @@ export function GeneralChatThreadSheet({
   const previousReplyCountRef = useRef(0)
   const [replyingTo, setReplyingTo] = useState<ReplyTarget | undefined>()
   const { isReducedMotion } = useComfortPreferences()
+  const isDesktop = useIsDesktop()
   const thread = useGeneralChatThread({
     threadId,
     open,
@@ -218,7 +226,7 @@ export function GeneralChatThreadSheet({
           role="dialog"
           aria-modal="true"
           aria-labelledby={titleId}
-          className="glass-panel-strong flex h-[var(--shadowchat-visual-viewport-height,100dvh)] w-full flex-col overflow-hidden border-l border-[var(--border-panel)] bg-[var(--bg-app)] shadow-[var(--shadow-panel-strong)] md:w-[28rem]"
+          className="glass-panel-strong flex h-[var(--shadowchat-app-height,var(--shadowchat-visual-viewport-height,100dvh))] w-full flex-col overflow-hidden border-l border-[var(--border-panel)] bg-[var(--bg-app)] shadow-[var(--shadow-panel-strong)] md:w-[28rem]"
           initial={isReducedMotion ? false : { x: '100%' }}
           animate={{ x: 0 }}
           exit={isReducedMotion ? undefined : { x: '100%' }}
@@ -250,7 +258,7 @@ export function GeneralChatThreadSheet({
           <div
             ref={scrollRef}
             onScroll={handleScroll}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 [overflow-anchor:auto] md:px-4"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] pt-3 [overflow-anchor:auto] md:px-4 md:pb-3"
             data-testid="general-chat-thread-scroll"
           >
             {thread.loading && !thread.rootMessage ? (
@@ -288,6 +296,7 @@ export function GeneralChatThreadSheet({
                       moderationScope="general_chat"
                       allowPin={false}
                       domIdPrefix="thread-message"
+                      messageActionsPortalClassName="!z-[150]"
                     />
                   </div>
                 ) : (
@@ -350,6 +359,7 @@ export function GeneralChatThreadSheet({
                             moderationScope="general_chat"
                             allowPin={false}
                             domIdPrefix="thread-message"
+                            messageActionsPortalClassName="!z-[150]"
                           />
                         </div>
                       )
@@ -360,7 +370,7 @@ export function GeneralChatThreadSheet({
             )}
           </div>
 
-          <div className="relative shrink-0 border-t border-[var(--border-panel)] bg-[var(--bg-panel-strong)] px-2 pb-[calc(env(safe-area-inset-bottom)_+_0.4rem)] pt-2 md:px-3 md:pb-3">
+          {isDesktop && <div className="relative shrink-0 border-t border-[var(--border-panel)] bg-[var(--bg-panel-strong)] px-2 pb-[calc(env(safe-area-inset-bottom)_+_0.4rem)] pt-2 md:px-3 md:pb-3">
             {thread.pendingReplyCount > 0 && (
               <button
                 type="button"
@@ -380,13 +390,48 @@ export function GeneralChatThreadSheet({
               cacheKey={`general-thread:${threadId}`}
               typingChannel={`general-thread:${threadId}`}
               enableGifPicker
-              disabled={!thread.rootMessage || messagesApi.sending}
+              disabled={!thread.rootMessage}
               className="rounded-[var(--radius-lg)]"
             />
             <p className="sr-only" aria-live="polite">
               {thread.pendingReplyCount > 0 ? `${thread.pendingReplyCount} new replies available` : ''}
             </p>
-          </div>
+          </div>}
+          {!isDesktop && (
+            <MobileChatFooter
+              currentView={currentView}
+              onViewChange={onViewChange}
+              avoidAndroidKeyboardLift
+            >
+              <div className="relative bg-[var(--bg-panel-strong)] px-2 pt-2">
+                {thread.pendingReplyCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={scrollToLatest}
+                    className="absolute bottom-full left-1/2 mb-2 inline-flex min-h-10 -translate-x-1/2 items-center gap-2 rounded-full border border-[var(--border-glow)] bg-[var(--bg-panel-strong)] px-4 text-sm font-medium text-[var(--theme-accent-readable)] shadow-[var(--shadow-panel)]"
+                  >
+                    <ArrowDown className="h-4 w-4" />
+                    {thread.pendingReplyCount} new {thread.pendingReplyCount === 1 ? 'reply' : 'replies'}
+                  </button>
+                )}
+                <MessageInput
+                  onSendMessage={handleSendMessage}
+                  messages={thread.replies}
+                  replyingTo={replyingTo}
+                  onCancelReply={() => setReplyingTo(undefined)}
+                  placeholder="Reply in thread"
+                  cacheKey={`general-thread:${threadId}`}
+                  typingChannel={`general-thread:${threadId}`}
+                  enableGifPicker
+                  disabled={!thread.rootMessage}
+                  className="rounded-[var(--radius-lg)]"
+                />
+                <p className="sr-only" aria-live="polite">
+                  {thread.pendingReplyCount > 0 ? `${thread.pendingReplyCount} new replies available` : ''}
+                </p>
+              </div>
+            </MobileChatFooter>
+          )}
         </motion.section>
       </motion.div>
     </AnimatePresence>

@@ -20,6 +20,7 @@ type ChatMessageActionsMenuProps = {
   containerRef?: React.RefObject<HTMLElement>
   className?: string
   buttonClassName?: string
+  portalClassName?: string
   menuLabel?: string
   buttonLabel?: string
   onOpenChange?: (open: boolean) => void
@@ -76,6 +77,7 @@ export function ChatMessageActionsMenu({
   containerRef,
   className,
   buttonClassName,
+  portalClassName,
   menuLabel = 'Message options',
   buttonLabel = 'Message actions',
   onOpenChange,
@@ -328,6 +330,7 @@ export function ChatMessageActionsMenu({
             <div
               className={cn(
                 'fixed z-[90] p-2',
+                portalClassName,
                 !placement && 'pointer-events-none invisible'
               )}
               ref={menuRef}

@@ -24,6 +24,8 @@ import { Button } from '../../../components/ui/Button'
 import { useAuth } from '../../../hooks/useAuth'
 import { useComfortPreferences } from '../../../hooks/useComfortPreferences'
 import { useDialogAccessibility } from '../../../hooks/useDialogAccessibility'
+import { MOBILE_VIEWPORT_UPDATED_EVENT } from '../../../lib/mobileViewport'
+import { fetchLinkPreview } from '../../../lib/linkPreview'
 import { cn } from '../../../lib/utils'
 import { useShadowPinCategories } from '../hooks/useShadowPinCategories'
 import type { ShadowPinImage } from '../types'
@@ -118,30 +120,49 @@ function MediaPreview({
   fileType,
   asset,
   title,
+  discoveredPreviewUrl,
+  discoveringPreview,
 }: {
   objectUrl: string
   sourceUrl: string
   fileType: string
   asset: ShadowPinCreatorAsset | null
   title: string
+  discoveredPreviewUrl: string
+  discoveringPreview: boolean
 }) {
-  const previewUrl = objectUrl || asset?.playbackUrl || asset?.previewUrl || sourceUrl
-  const posterUrl = asset?.previewUrl || youtubePreview(sourceUrl)
-  const video = fileType.startsWith('video/') || Boolean(asset?.playbackUrl) || /\.(mp4|mov|m4v|webm)(?:$|\?)/i.test(previewUrl)
+  const directVideoUrl = /\.(mp4|mov|m4v|webm)(?:$|\?)/i.test(sourceUrl) ? sourceUrl : ''
+  const directImageUrl = /\.(avif|gif|jpe?g|png|webp)(?:$|\?)/i.test(sourceUrl) ? sourceUrl : ''
+  const localVideoUrl = fileType.startsWith('video/') ? objectUrl : ''
+  const localImageUrl = objectUrl && !fileType.startsWith('video/') ? objectUrl : ''
+  const posterUrl = asset?.previewUrl || discoveredPreviewUrl || youtubePreview(sourceUrl)
+  const videoSources = Array.from(new Set([localVideoUrl, asset?.playbackUrl, directVideoUrl].filter(Boolean) as string[]))
+  const imageSources = Array.from(new Set([localImageUrl, asset?.previewUrl, discoveredPreviewUrl, youtubePreview(sourceUrl), directImageUrl].filter(Boolean) as string[]))
+  const [videoSourceIndex, setVideoSourceIndex] = useState(0)
+  const [imageSourceIndex, setImageSourceIndex] = useState(0)
+  const videoSourceKey = videoSources.join('|')
+  const imageSourceKey = imageSources.join('|')
+  useEffect(() => setVideoSourceIndex(0), [videoSourceKey])
+  useEffect(() => setImageSourceIndex(0), [imageSourceKey])
+  const videoUrl = videoSources[videoSourceIndex] || ''
+  const imageUrl = imageSources[imageSourceIndex] || ''
 
-  if (!previewUrl && !posterUrl) {
+  if (!videoUrl && !imageUrl && !posterUrl) {
     return (
       <div className="flex aspect-[4/5] w-full items-center justify-center rounded-[var(--radius-lg)] border border-dashed border-[var(--border-panel)] bg-[rgba(255,255,255,0.025)] text-[var(--text-muted)]">
-        <div className="text-center"><ImageIcon className="mx-auto mb-2 h-8 w-8" /><p>Choose media to preview it here.</p></div>
+        <div className="text-center">
+          {discoveringPreview ? <Loader2 className="mx-auto mb-2 h-8 w-8 animate-spin" /> : <ImageIcon className="mx-auto mb-2 h-8 w-8" />}
+          <p>{discoveringPreview ? 'Finding the media preview…' : 'Choose media to preview it here.'}</p>
+        </div>
       </div>
     )
   }
 
-  if (video) {
-    return <video src={previewUrl} poster={posterUrl || undefined} controls playsInline preload="metadata" className="aspect-[4/5] max-h-[58dvh] w-full rounded-[var(--radius-lg)] bg-black object-contain" aria-label={title || 'Draft video preview'} />
+  if (videoUrl) {
+    return <video src={videoUrl} poster={posterUrl || undefined} controls playsInline preload="metadata" onError={() => setVideoSourceIndex(index => index + 1)} className="aspect-[4/5] max-h-[58dvh] w-full rounded-[var(--radius-lg)] bg-black object-contain" aria-label={title || 'Draft video preview'} />
   }
 
-  return <img src={objectUrl || posterUrl || previewUrl} alt={title || 'Draft Pin preview'} className="aspect-[4/5] max-h-[58dvh] w-full rounded-[var(--radius-lg)] bg-black/30 object-contain" />
+  return <img src={imageUrl || posterUrl} onError={() => setImageSourceIndex(index => index + 1)} alt={title || 'Draft Pin preview'} className="aspect-[4/5] max-h-[58dvh] w-full rounded-[var(--radius-lg)] bg-black/30 object-contain" />
 }
 
 export function ShadowPinCreatorStudio({
@@ -166,6 +187,8 @@ export function ShadowPinCreatorStudio({
   const [tagsText, setTagsText] = useState('')
   const [mediaInspecting, setMediaInspecting] = useState(false)
   const [mediaInspectionError, setMediaInspectionError] = useState<string | null>(null)
+  const [discoveredPreviewUrl, setDiscoveredPreviewUrl] = useState('')
+  const [discoveringPreview, setDiscoveringPreview] = useState(false)
   const [recoveryPending, setRecoveryPending] = useState(false)
   const [draftSwitching, setDraftSwitching] = useState(false)
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -182,12 +205,48 @@ export function ShadowPinCreatorStudio({
   const saveContextTokenRef = useRef(0)
   const saveRequestTokenRef = useRef(0)
   const restoreRequestTokenRef = useRef(0)
+  const previewRequestTokenRef = useRef(0)
   const closeInFlightRef = useRef(false)
   const closeRequestTokenRef = useRef(0)
   const popstateCloseRef = useRef<() => void>(() => undefined)
+  const focusedEditorRef = useRef<HTMLElement | null>(null)
+  const focusRevealFrameRef = useRef<number | null>(null)
+  const focusRevealTimersRef = useRef<number[]>([])
   const titleId = useId()
   const { isReducedMotion } = useComfortPreferences()
   stateRef.current = state
+
+  const revealFocusedEditor = useCallback(() => {
+    if (focusRevealFrameRef.current !== null) {
+      window.cancelAnimationFrame(focusRevealFrameRef.current)
+    }
+    focusRevealTimersRef.current.forEach(timer => window.clearTimeout(timer))
+    focusRevealTimersRef.current = []
+
+    const reveal = () => {
+      const field = focusedEditorRef.current
+      if (!field?.isConnected || document.activeElement !== field) return
+      field.scrollIntoView?.({ block: 'nearest', inline: 'nearest', behavior: 'auto' })
+    }
+    focusRevealFrameRef.current = window.requestAnimationFrame(() => {
+      focusRevealFrameRef.current = null
+      reveal()
+      focusRevealTimersRef.current = [80, 180, 320].map(delay => window.setTimeout(reveal, delay))
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!open) return
+    window.addEventListener(MOBILE_VIEWPORT_UPDATED_EVENT, revealFocusedEditor)
+    window.visualViewport?.addEventListener('resize', revealFocusedEditor)
+    return () => {
+      window.removeEventListener(MOBILE_VIEWPORT_UPDATED_EVENT, revealFocusedEditor)
+      window.visualViewport?.removeEventListener('resize', revealFocusedEditor)
+      if (focusRevealFrameRef.current !== null) window.cancelAnimationFrame(focusRevealFrameRef.current)
+      focusRevealTimersRef.current.forEach(timer => window.clearTimeout(timer))
+      focusRevealTimersRef.current = []
+    }
+  }, [open, revealFocusedEditor])
 
   const applyAsyncAction = useCallback((action: ShadowPinCreatorAction) => {
     stateRef.current = creatorReducer(stateRef.current, action)
@@ -213,10 +272,46 @@ export function ShadowPinCreatorStudio({
     setTagsText('')
     setMediaInspecting(false)
     setMediaInspectionError(null)
+    setDiscoveredPreviewUrl('')
+    setDiscoveringPreview(false)
     setRecoveryPending(false)
     setDraftSwitching(false)
     dispatch({ type: 'reset', categoryId: initialCategoryId, targetImageId: targetImage?.id ?? null })
   }, [initialCategoryId, open, targetImage?.id])
+
+  useEffect(() => {
+    const sourceUrl = state.values.sourceMode === 'url' ? state.values.sourceUrl.trim() : ''
+    const requestToken = ++previewRequestTokenRef.current
+    setDiscoveredPreviewUrl('')
+    if (!open || !sourceUrl) {
+      setDiscoveringPreview(false)
+      return
+    }
+    try {
+      const parsed = new URL(sourceUrl)
+      if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('Unsupported URL')
+    } catch {
+      setDiscoveringPreview(false)
+      return
+    }
+    if (/\.(avif|gif|jpe?g|png|webp|mp4|mov|m4v|webm)(?:$|\?)/i.test(sourceUrl) || youtubePreview(sourceUrl)) {
+      setDiscoveringPreview(false)
+      return
+    }
+
+    setDiscoveringPreview(true)
+    const timer = window.setTimeout(() => {
+      void fetchLinkPreview(sourceUrl)
+        .then(preview => {
+          if (requestToken !== previewRequestTokenRef.current) return
+          setDiscoveredPreviewUrl(preview?.image || '')
+        })
+        .finally(() => {
+          if (requestToken === previewRequestTokenRef.current) setDiscoveringPreview(false)
+        })
+    }, 350)
+    return () => window.clearTimeout(timer)
+  }, [open, state.values.sourceMode, state.values.sourceUrl])
 
   useEffect(() => {
     if (!open) return
@@ -666,9 +761,12 @@ export function ShadowPinCreatorStudio({
 
   if (!open) return null
   const stepIndex = CREATOR_STEPS.indexOf(state.step)
-  const busy = recoveryPending || draftSwitching || mediaInspecting || ['restoring', 'saving', 'uploading', 'processing', 'publishing'].includes(state.operation)
+  const busy = recoveryPending || draftSwitching || mediaInspecting || ['restoring', 'uploading', 'processing', 'publishing'].includes(state.operation)
   const fileNeedsReselection = state.values.sourceMode === 'file' && !state.values.file && Boolean(state.values.fileFingerprint)
   const previewFileType = state.values.file?.type || state.values.fileFingerprint?.type || asset?.mimeType || ''
+  const previewAsset = asset && (
+    state.values.keepExistingMedia || stagedSourceKeyRef.current === sourceKey(state.values)
+  ) ? asset : null
 
   const studio = (
     <div className="fixed inset-0 z-[138] bg-[var(--bg-app)] text-[var(--text-primary)]" data-testid="shadow-pin-creator-studio">
@@ -689,7 +787,16 @@ export function ShadowPinCreatorStudio({
           </nav>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 pb-[calc(env(safe-area-inset-bottom)_+_6rem)] sm:px-5" data-testid={`creator-step-${state.step}`}>
+        <main
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 pb-[calc(env(safe-area-inset-bottom)_+_0.75rem)] [scroll-padding-bottom:1rem] sm:px-5"
+          data-testid={`creator-step-${state.step}`}
+          onFocusCapture={event => {
+            const target = event.target
+            if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement)) return
+            focusedEditorRef.current = target
+            revealFocusedEditor()
+          }}
+        >
           <div className="mx-auto max-w-3xl">
             <fieldset disabled={busy} className="contents" aria-label="Creator Studio editor" aria-busy={busy}>
             {state.step === 'media' && availableDrafts.length > 1 && (
@@ -772,7 +879,7 @@ export function ShadowPinCreatorStudio({
                 {targetImage && !state.values.file && !state.values.sourceUrl && <p className="rounded-[var(--radius-sm)] border border-[var(--theme-accent-border-soft)] bg-[var(--theme-accent-softer)] p-3 text-sm text-[var(--text-secondary)]">Choose replacement media. Your current Pin stays unchanged until the new version is fully published.</p>}
                 {mediaInspecting && <p className="flex items-center gap-2 text-sm text-[var(--text-muted)]"><Loader2 className={cn('h-4 w-4', !isReducedMotion && 'animate-spin')} /> Checking video duration</p>}
                 {fileNeedsReselection && <div className="rounded-[var(--radius-sm)] border border-amber-300/25 bg-amber-400/10 p-3 text-sm text-amber-100"><p>Reselect {state.values.fileFingerprint?.name} to resume its upload. The file itself is never stored in localStorage.</p><button type="button" onClick={() => dispatch({ type: 'set-file', file: null })} className="mt-2 min-h-12 rounded-full border border-amber-200/25 px-3 font-semibold">Use different media</button></div>}
-                <MediaPreview objectUrl={objectUrl} sourceUrl={state.values.sourceUrl} fileType={previewFileType} asset={asset} title={state.values.title} />
+                <MediaPreview objectUrl={objectUrl} sourceUrl={state.values.sourceUrl} fileType={previewFileType} asset={previewAsset} title={state.values.title} discoveredPreviewUrl={discoveredPreviewUrl} discoveringPreview={discoveringPreview} />
               </section>
             )}
 
@@ -789,7 +896,7 @@ export function ShadowPinCreatorStudio({
             {state.step === 'preview' && (
               <section className="space-y-5" aria-labelledby="creator-preview-title">
                 <div><h2 id="creator-preview-title" className="text-2xl font-semibold">Preview your Pin</h2><p className="mt-1 text-sm text-[var(--text-muted)]">This is how the media and details will feel in ShadowPin.</p></div>
-                <div className="mx-auto max-w-lg rounded-[var(--radius-xl)] border border-[var(--border-panel)] bg-white/[0.025] p-3 shadow-[var(--shadow-panel)]"><MediaPreview objectUrl={objectUrl} sourceUrl={state.values.sourceUrl} fileType={previewFileType} asset={asset} title={state.values.title} /><div className="p-2 pt-4"><h3 className="text-xl font-semibold">{state.values.title}</h3>{state.values.description && <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[var(--text-secondary)]">{state.values.description}</p>}<div className="mt-3 flex flex-wrap gap-2">{state.values.tags.map(tag => <span key={tag} className="rounded-full border border-[var(--border-subtle)] px-2.5 py-1 text-xs text-[var(--text-muted)]">#{tag}</span>)}</div></div></div>
+                <div className="mx-auto max-w-lg rounded-[var(--radius-xl)] border border-[var(--border-panel)] bg-white/[0.025] p-3 shadow-[var(--shadow-panel)]"><MediaPreview objectUrl={objectUrl} sourceUrl={state.values.sourceUrl} fileType={previewFileType} asset={previewAsset} title={state.values.title} discoveredPreviewUrl={discoveredPreviewUrl} discoveringPreview={discoveringPreview} /><div className="p-2 pt-4"><h3 className="text-xl font-semibold">{state.values.title}</h3>{state.values.description && <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[var(--text-secondary)]">{state.values.description}</p>}<div className="mt-3 flex flex-wrap gap-2">{state.values.tags.map(tag => <span key={tag} className="rounded-full border border-[var(--border-subtle)] px-2.5 py-1 text-xs text-[var(--text-muted)]">#{tag}</span>)}</div></div></div>
                 {asset && !isAssetReady(asset) && <button type="button" onClick={() => void retryProcessing()} className="mx-auto flex min-h-11 items-center gap-2 rounded-full border border-[var(--theme-accent-border-soft)] px-4 text-sm text-[var(--theme-accent-readable)]"><RotateCcw className="h-4 w-4" /> Refresh processing status</button>}
               </section>
             )}
@@ -797,7 +904,7 @@ export function ShadowPinCreatorStudio({
             {state.step === 'publish' && (
               <section className="space-y-5" aria-labelledby="creator-publish-title">
                 <div><h2 id="creator-publish-title" className="text-2xl font-semibold">Ready for the spotlight?</h2><p className="mt-1 text-sm text-[var(--text-muted)]">Publishing makes this Pin visible and may notify members who follow ShadowPin updates.</p></div>
-                <div className="grid gap-4 rounded-[var(--radius-xl)] border border-[var(--border-panel)] bg-white/[0.025] p-4 sm:grid-cols-[9rem,1fr]"><MediaPreview objectUrl={objectUrl} sourceUrl={state.values.sourceUrl} fileType={previewFileType} asset={asset} title={state.values.title} /><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--theme-accent-readable)]">{categoriesState.categories.find(category => category.id === state.values.categoryId)?.title || 'ShadowPin'}</p><h3 className="mt-1 text-xl font-semibold">{state.values.title}</h3><p className="mt-2 text-sm text-[var(--text-secondary)]">{state.values.description || 'No description'}</p></div></div>
+                <div className="grid gap-4 rounded-[var(--radius-xl)] border border-[var(--border-panel)] bg-white/[0.025] p-4 sm:grid-cols-[9rem,1fr]"><MediaPreview objectUrl={objectUrl} sourceUrl={state.values.sourceUrl} fileType={previewFileType} asset={previewAsset} title={state.values.title} discoveredPreviewUrl={discoveredPreviewUrl} discoveringPreview={discoveringPreview} /><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--theme-accent-readable)]">{categoriesState.categories.find(category => category.id === state.values.categoryId)?.title || 'ShadowPin'}</p><h3 className="mt-1 text-xl font-semibold">{state.values.title}</h3><p className="mt-2 text-sm text-[var(--text-secondary)]">{state.values.description || 'No description'}</p></div></div>
                 <label className="flex cursor-pointer items-start gap-3 rounded-[var(--radius-lg)] border border-[var(--theme-accent-border-soft)] bg-[var(--theme-accent-softer)] p-4"><input type="checkbox" checked={state.publishConfirmed} onChange={event => dispatch({ type: 'publish-confirmed', confirmed: event.target.checked })} className="mt-1 h-5 w-5 accent-[var(--theme-accent)]" /><span><span className="block font-semibold">I am ready to publish this Pin</span><span className="mt-1 block text-sm text-[var(--text-muted)]">I reviewed the media, category, title, and description.</span></span></label>
                 <Button type="button" size="lg" className="w-full" loading={state.operation === 'publishing'} disabled={!state.publishConfirmed || busy} onClick={() => void publish()}><Check className="mr-2 h-5 w-5" /> Publish Pin</Button>
               </section>
@@ -808,7 +915,7 @@ export function ShadowPinCreatorStudio({
           </div>
         </main>
 
-        <footer className="fixed inset-x-0 bottom-0 z-10 border-t border-[var(--border-panel)] bg-[rgba(5,6,8,0.96)] px-3 pb-[calc(env(safe-area-inset-bottom)_+_0.45rem)] pt-2 backdrop-blur-md">
+        <footer className="z-10 shrink-0 border-t border-[var(--border-panel)] bg-[rgba(5,6,8,0.96)] px-3 pb-[calc(env(safe-area-inset-bottom)_+_0.45rem)] pt-2 backdrop-blur-md" data-testid="creator-studio-footer">
           <div className="mx-auto flex max-w-3xl items-center gap-2">
             {stepIndex > 0 ? <Button type="button" variant="secondary" onClick={() => void goTo(CREATOR_STEPS[stepIndex - 1])} disabled={busy}><ArrowLeft className="mr-1 h-4 w-4" /> Back</Button> : <button type="button" onClick={() => void discard()} disabled={busy} className="min-h-11 px-3 text-sm text-red-300/75">Discard</button>}
             <div className="min-w-0 flex-1 text-center text-xs text-[var(--text-muted)]" aria-live="polite">{statusLabel(state.operation)}{state.operation === 'uploading' && state.progress > 0 ? ` ${state.progress}%` : ''}</div>
