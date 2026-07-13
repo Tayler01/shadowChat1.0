@@ -85,7 +85,8 @@ Authenticated Netlify media requests use the current session first. A 401
 forces one locked Supabase session refresh and repeats the exact request body
 and abort signal once; other failures are surfaced without an auth retry. This
 keeps long Studio sessions from failing when the access token rotates between
-draft autosave and media staging.
+draft autosave and media staging. Each attempt is bounded to 45 seconds and
+returns a clear retry prompt rather than leaving Studio indefinitely busy.
 
 Metadata-only edits update the canonical Pin without new-post delivery. Media
 replacement is staged and processed before an atomic swap; other members keep
@@ -234,7 +235,8 @@ tags, and source URLs never enter the address bar.
   handles conflicts, and requests media reselection only when staging never
   completed.
 - Netlify media staging covers healthy-token success, one stale-token 401
-  refresh/retry with the same body, and a bounded second-401 failure.
+  refresh/retry with the same body, a bounded second-401 failure, and a stalled
+  request timeout.
 - Every entry point prepopulates the same Studio model; the legacy mini share
   dialog is not a second publisher.
 - File/URL exclusion, image/video boundaries, video duration, unsafe URL,

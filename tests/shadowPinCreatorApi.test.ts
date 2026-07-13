@@ -216,6 +216,35 @@ describe('ShadowPin Creator Studio API', () => {
     }
   })
 
+  test('times out a stalled Netlify media request instead of freezing Studio', async () => {
+    jest.useFakeTimers()
+    const draft = normalizeCreatorDraft({ ...rawDraft, state: 'ready', revision: 3 })
+    const asset = normalizeCreatorAsset({ ...rawAsset, state: 'ready' })!
+    const originalFetch = globalThis.fetch
+    const fetchMock = jest.fn((_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true })
+    }))
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, writable: true, value: fetchMock })
+
+    try {
+      const request = publishCreatorDraft(draft, asset)
+      const assertion = expect(request).rejects.toThrow(
+        'Media processing timed out. Check your connection and try again.'
+      )
+      await jest.advanceTimersByTimeAsync(45_000)
+
+      await assertion
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    } finally {
+      jest.useRealTimers()
+      if (originalFetch) {
+        Object.defineProperty(globalThis, 'fetch', { configurable: true, writable: true, value: originalFetch })
+      } else {
+        Reflect.deleteProperty(globalThis, 'fetch')
+      }
+    }
+  })
+
   test('publishes a native Bunny draft without exposing playback before finalization', async () => {
     const invoke = jest.fn().mockResolvedValue({
       data: {

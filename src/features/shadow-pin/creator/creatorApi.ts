@@ -12,6 +12,7 @@ import type {
 const DRAFT_BUCKET = 'shadow-pin-drafts'
 const NETLIFY_MEDIA_ENDPOINT = '/api/shadow-pin/media'
 const VIDEO_FUNCTION = 'shadow-pin-video'
+const NETLIFY_MEDIA_TIMEOUT_MS = 45_000
 
 type UnknownRecord = Record<string, unknown>
 
@@ -243,12 +244,37 @@ const accessToken = async (forceRefresh = false) => {
 
 const callNetlifyMediaRaw = async (body: UnknownRecord, signal?: AbortSignal) => {
   const requestBody = JSON.stringify(body)
-  const call = async (token: string) => fetch(NETLIFY_MEDIA_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: requestBody,
-      signal,
-    })
+  const call = async (token: string) => {
+    const controller = new AbortController()
+    let timedOut = false
+    const abortFromCaller = () => controller.abort(signal?.reason)
+    if (signal?.aborted) {
+      abortFromCaller()
+    } else {
+      signal?.addEventListener('abort', abortFromCaller, { once: true })
+    }
+    const timeout = window.setTimeout(() => {
+      timedOut = true
+      controller.abort()
+    }, NETLIFY_MEDIA_TIMEOUT_MS)
+
+    try {
+      return await fetch(NETLIFY_MEDIA_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: requestBody,
+        signal: controller.signal,
+      })
+    } catch (error) {
+      if (timedOut && !signal?.aborted) {
+        throw new Error('Media processing timed out. Check your connection and try again.')
+      }
+      throw error
+    } finally {
+      window.clearTimeout(timeout)
+      signal?.removeEventListener('abort', abortFromCaller)
+    }
+  }
 
   let response = await call(await accessToken())
   if (response.status === 401) {

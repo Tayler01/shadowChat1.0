@@ -34,7 +34,9 @@ Last updated: 2026-07-13
   session rotation and removed every scoped draft/message/category artifact.
   The client now performs one locked refresh and exact-request retry on 401;
   focused API/Studio/shared-edge tests cover that recovery before the final
-  immutable rerun.
+  immutable rerun. Each Netlify media attempt also has a 45-second ceiling, so
+  a stalled provider request returns a retryable error instead of freezing the
+  mobile editor.
 
 ## July 13 ShadowChat 2.0 First-Run Activation - Authenticated Checkpoint
 
