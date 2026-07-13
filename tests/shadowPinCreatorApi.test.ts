@@ -172,6 +172,50 @@ describe('ShadowPin Creator Studio API', () => {
     }
   })
 
+  test('refreshes and retries a Netlify media request once after a stale-session 401', async () => {
+    const draft = normalizeCreatorDraft({ ...rawDraft, state: 'ready', revision: 3 })
+    const asset = normalizeCreatorAsset({ ...rawAsset, state: 'ready' })!
+    const originalFetch = globalThis.fetch
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce({
+        status: 401,
+        ok: false,
+        json: async () => ({ error: 'Authentication required.' }),
+      } as Response)
+      .mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => ({
+          ok: true,
+          draft: { ...rawDraft, state: 'published', revision: 5, published_image_id: 'pin-1' },
+          asset: { ...rawAsset, state: 'publish_ready' },
+          image: { id: 'pin-1' },
+          wasAlreadyPublished: false,
+        }),
+      } as Response)
+    ;(getSessionWithTimeout as jest.Mock)
+      .mockResolvedValueOnce({ data: { session: { access_token: 'stale-token' } }, error: null })
+      .mockResolvedValueOnce({ data: { session: { access_token: 'fresh-token' } }, error: null })
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, writable: true, value: fetchMock })
+
+    try {
+      await expect(publishCreatorDraft(draft, asset)).resolves.toMatchObject({ image: { id: 'pin-1' } })
+
+      expect(ensureSession).toHaveBeenNthCalledWith(1, false)
+      expect(ensureSession).toHaveBeenNthCalledWith(2, true)
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(fetchMock.mock.calls[0][1]?.headers).toEqual(expect.objectContaining({ Authorization: 'Bearer stale-token' }))
+      expect(fetchMock.mock.calls[1][1]?.headers).toEqual(expect.objectContaining({ Authorization: 'Bearer fresh-token' }))
+      expect(fetchMock.mock.calls[1][1]?.body).toBe(fetchMock.mock.calls[0][1]?.body)
+    } finally {
+      if (originalFetch) {
+        Object.defineProperty(globalThis, 'fetch', { configurable: true, writable: true, value: originalFetch })
+      } else {
+        Reflect.deleteProperty(globalThis, 'fetch')
+      }
+    }
+  })
+
   test('publishes a native Bunny draft without exposing playback before finalization', async () => {
     const invoke = jest.fn().mockResolvedValue({
       data: {

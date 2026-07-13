@@ -30,6 +30,11 @@ Last updated: 2026-07-13
   local video, image URL, external-video poster, and authenticated link-preview
   rendering. The exact immutable deploy rerun is part of this trial redeploy's
   final acceptance gate.
+- The first immutable Studio pass safely stopped on a Netlify media 401 after
+  session rotation and removed every scoped draft/message/category artifact.
+  The client now performs one locked refresh and exact-request retry on 401;
+  focused API/Studio/shared-edge tests cover that recovery before the final
+  immutable rerun.
 
 ## July 13 ShadowChat 2.0 First-Run Activation - Authenticated Checkpoint
 

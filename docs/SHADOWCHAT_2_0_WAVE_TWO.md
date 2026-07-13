@@ -389,6 +389,11 @@ installed-phone acceptance. Nothing merges to `main` before that approval.
   action footer participates in the visual-viewport flex layout, focused
   fields are re-revealed during keyboard settling, and media preview uses local,
   staged, direct, provider-poster, and authenticated link-preview fallbacks.
+- The immutable Studio rerun exposed a stale-session 401 at the Netlify media
+  boundary after several authenticated navigation and draft operations. The
+  media client now mirrors the shared Edge Function recovery contract: current
+  token first, one locked refresh/retry on 401, identical body/signal, and no
+  retry for other statuses.
 - ShadowPin Theater now coalesces drag rendering to animation frames, accepts
   up to three queued swipes during the 220ms handoff, preloads two Pins on each
   side, and reuses locally resolved routed Pins instead of refetching exact and

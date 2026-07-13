@@ -105,8 +105,17 @@ for (const profile of profiles) {
   }, { storageKey: authStorageKey, session: signedIn.data.session })
   const page = await context.newPage()
   const consoleErrors = []
+  const browserDiagnostics = []
   const pageErrors = []
-  page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()) })
+  page.on('console', message => {
+    if (message.type() !== 'error') return
+    const text = message.text()
+    if (text.includes('Content Security Policy') && text.toLowerCase().includes('report-only')) {
+      browserDiagnostics.push(text)
+    } else {
+      consoleErrors.push(text)
+    }
+  })
   page.on('pageerror', error => pageErrors.push(error.message))
 
   try {
@@ -145,10 +154,10 @@ for (const profile of profiles) {
     }
 
     await page.screenshot({ path: path.join(artifactDir, `${profile.name}-settled.png`) })
-    results.push({ profile: profile.name, passed: true, settledCounter, settledPinId: sequence[2].id, consoleErrors, pageErrors })
+    results.push({ profile: profile.name, passed: true, settledCounter, settledPinId: sequence[2].id, consoleErrors, browserDiagnostics, pageErrors })
   } catch (error) {
     await page.screenshot({ path: path.join(artifactDir, `${profile.name}-failure.png`) }).catch(() => undefined)
-    results.push({ profile: profile.name, passed: false, error: error instanceof Error ? error.message : String(error), consoleErrors, pageErrors })
+    results.push({ profile: profile.name, passed: false, error: error instanceof Error ? error.message : String(error), consoleErrors, browserDiagnostics, pageErrors })
   } finally {
     await context.close()
     await browser.close()

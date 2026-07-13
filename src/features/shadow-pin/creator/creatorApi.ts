@@ -233,8 +233,8 @@ const normalizeCreatorPublishResult = (value: unknown): ShadowPinCreatorPublishR
   }
 }
 
-const accessToken = async () => {
-  if (!(await ensureSession(true))) throw new Error('Sign in to continue your draft.')
+const accessToken = async (forceRefresh = false) => {
+  if (!(await ensureSession(forceRefresh))) throw new Error('Sign in to continue your draft.')
   const client = await getWorkingClient()
   const { data: { session } } = await getSessionWithTimeout(client)
   if (!session?.access_token) throw new Error('Sign in to continue your draft.')
@@ -242,12 +242,18 @@ const accessToken = async () => {
 }
 
 const callNetlifyMediaRaw = async (body: UnknownRecord, signal?: AbortSignal) => {
-  const response = await fetch(NETLIFY_MEDIA_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await accessToken()}` },
-    body: JSON.stringify(body),
-    signal,
-  })
+  const requestBody = JSON.stringify(body)
+  const call = async (token: string) => fetch(NETLIFY_MEDIA_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: requestBody,
+      signal,
+    })
+
+  let response = await call(await accessToken())
+  if (response.status === 401) {
+    response = await call(await accessToken(true))
+  }
   const data = await response.json().catch(() => null)
   if (!response.ok || data?.error) throw new Error(data?.error || 'Unable to process draft media.')
   return data as UnknownRecord

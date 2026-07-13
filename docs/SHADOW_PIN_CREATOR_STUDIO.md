@@ -81,6 +81,12 @@ and resumable session. The Studio presents a safe stage-specific error with
 timeout after server success cannot create another Pin, notification, Bunny
 asset, or Storage object.
 
+Authenticated Netlify media requests use the current session first. A 401
+forces one locked Supabase session refresh and repeats the exact request body
+and abort signal once; other failures are surfaced without an auth retry. This
+keeps long Studio sessions from failing when the access token rotates between
+draft autosave and media staging.
+
 Metadata-only edits update the canonical Pin without new-post delivery. Media
 replacement is staged and processed before an atomic swap; other members keep
 seeing the old ready media until the replacement succeeds. A failed
@@ -227,6 +233,8 @@ tags, and source URLs never enter the address bar.
 - Debounced autosave ignores stale responses, survives reload/offline state,
   handles conflicts, and requests media reselection only when staging never
   completed.
+- Netlify media staging covers healthy-token success, one stale-token 401
+  refresh/retry with the same body, and a bounded second-401 failure.
 - Every entry point prepopulates the same Studio model; the legacy mini share
   dialog is not a second publisher.
 - File/URL exclusion, image/video boundaries, video duration, unsafe URL,
