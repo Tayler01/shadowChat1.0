@@ -210,6 +210,7 @@ export function ShadowPinCreatorStudio({
   const closeRequestTokenRef = useRef(0)
   const popstateCloseRef = useRef<() => void>(() => undefined)
   const focusedEditorRef = useRef<HTMLElement | null>(null)
+  const scrollRegionRef = useRef<HTMLElement | null>(null)
   const focusRevealFrameRef = useRef<number | null>(null)
   const focusRevealTimersRef = useRef<number[]>([])
   const titleId = useId()
@@ -226,7 +227,23 @@ export function ShadowPinCreatorStudio({
     const reveal = () => {
       const field = focusedEditorRef.current
       if (!field?.isConnected || document.activeElement !== field) return
-      field.scrollIntoView?.({ block: 'nearest', inline: 'nearest', behavior: 'auto' })
+      const keyboardOpen = document.documentElement.dataset.shadowchatKeyboard === 'open'
+      const scrollRegion = scrollRegionRef.current
+      if (keyboardOpen && scrollRegion?.contains(field)) {
+        const fieldRect = field.getBoundingClientRect()
+        const scrollRegionRect = scrollRegion.getBoundingClientRect()
+        const viewport = window.visualViewport
+        const viewportBottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight
+        const visibleBottom = Math.min(scrollRegionRect.bottom, viewportBottom)
+        const desiredFieldBottom = visibleBottom - 12
+        scrollRegion.scrollTop += fieldRect.bottom - desiredFieldBottom
+        return
+      }
+      field.scrollIntoView?.({
+        block: 'nearest',
+        inline: 'nearest',
+        behavior: 'auto',
+      })
     }
     focusRevealFrameRef.current = window.requestAnimationFrame(() => {
       focusRevealFrameRef.current = null
@@ -788,7 +805,8 @@ export function ShadowPinCreatorStudio({
         </header>
 
         <main
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 pb-[calc(env(safe-area-inset-bottom)_+_0.75rem)] [scroll-padding-bottom:1rem] sm:px-5"
+          ref={scrollRegionRef}
+          className="shadow-pin-creator-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 pb-[calc(env(safe-area-inset-bottom)_+_0.75rem)] [scroll-padding-bottom:0.75rem] sm:px-5"
           data-testid={`creator-step-${state.step}`}
           onFocusCapture={event => {
             const target = event.target

@@ -989,20 +989,36 @@ try {
 
   await pixelPage.setViewportSize({ width: profiles.pixel.viewport.width, height: 620 })
   await titleField.focus()
+  // Let the app's synthetic-resize settle timers finish before pinning the
+  // keyboard state. A real mobile visual viewport remains compressed here.
+  await pixelPage.waitForTimeout(400)
+  await pixelPage.evaluate(() => {
+    document.documentElement.dataset.shadowchatKeyboard = 'open'
+    window.dispatchEvent(new Event('shadowchat:mobile-viewport-updated'))
+  })
+  await pixelPage.waitForTimeout(400)
   const keyboardGeometry = await assertStudioGeometry(pixelPage, `${profiles.pixel.name}-keyboard-compressed`)
   const focusedFieldGeometry = await titleField.evaluate(element => {
     const rect = element.getBoundingClientRect()
     const footer = document.querySelector('[data-testid="creator-studio-footer"]')?.getBoundingClientRect()
+    const scrollRegion = element.closest('[data-testid^="creator-step-"]')
     return {
       top: rect.top,
       bottom: rect.bottom,
       viewportHeight: window.visualViewport?.height ?? window.innerHeight,
       footerTop: footer?.top ?? null,
+      scrollTop: scrollRegion?.scrollTop ?? null,
     }
   })
   must(focusedFieldGeometry.top >= 0 && focusedFieldGeometry.bottom <= (focusedFieldGeometry.footerTop ?? focusedFieldGeometry.viewportHeight), `Focused Creator field is hidden behind the keyboard/footer: ${JSON.stringify(focusedFieldGeometry)}`)
+  const focusedFieldFooterGap = (focusedFieldGeometry.footerTop ?? focusedFieldGeometry.viewportHeight) - focusedFieldGeometry.bottom
+  must(focusedFieldFooterGap >= 0 && focusedFieldFooterGap <= 28, `Focused Creator field left excessive space above the keyboard footer: ${JSON.stringify({ ...focusedFieldGeometry, focusedFieldFooterGap })}`)
+  await pixelPage.evaluate(() => {
+    document.documentElement.dataset.shadowchatKeyboard = 'closed'
+    window.dispatchEvent(new Event('shadowchat:mobile-viewport-updated'))
+  })
   await pixelPage.setViewportSize(profiles.pixel.viewport)
-  checks.push({ name: 'software-keyboard-focus-footer-safe-area-geometry', passed: true, simulatedViewportHeight: 620, geometry: keyboardGeometry, focusedFieldGeometry, residual: 'Physical iOS/Android keyboard animation and hardware safe-area insets still require real-device validation.' })
+  checks.push({ name: 'software-keyboard-focus-footer-safe-area-geometry', passed: true, simulatedViewportHeight: 620, geometry: keyboardGeometry, focusedFieldGeometry, focusedFieldFooterGap, residual: 'Physical iOS/Android keyboard animation and hardware safe-area insets still require real-device validation.' })
 
   expectedMediaFailure.armed = true
   await studio.getByRole('button', { name: /^Continue/ }).click()

@@ -411,6 +411,14 @@ installed-phone acceptance. Nothing merges to `main` before that approval.
   entry-script hashes match; General Chat threads and rapid Theater swipes also
   passed directly on the stable URL. This promotion did not touch production
   ShadowChat or `main`.
+- July 13 Creator Studio keyboard-spacing follow-up: the focused field now uses
+  the Studio scroll region and measured visual-viewport bottom rather than
+  browser-dependent page scrolling. Immutable deploy
+  `6a5541b45d9cfad72331beac` passed all 19 lifecycle checks, measured a
+  `12.21875px` field-to-footer gap in the `620px` compressed Pixel viewport,
+  and verified every generated database/Storage counter back at zero. The
+  identical build is published to the stable isolated test URL as deploy
+  `6a5542e1bc2a1171f1b4073c`; production and `main` were not touched.
 - ShadowPin Theater now coalesces drag rendering to animation frames, accepts
   up to three queued swipes during the 220ms handoff, preloads two Pins on each
   side, and reuses locally resolved routed Pins instead of refetching exact and

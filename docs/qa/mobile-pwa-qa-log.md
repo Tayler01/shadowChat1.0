@@ -10,6 +10,14 @@ Last updated: 2026-07-13
 
 ## July 13 ShadowChat 2.0 Phone Regression Hardening
 
+- Creator Studio now adds in-flow anchoring space only while the mobile keyboard
+  is open, then positions the focused editor from the Studio scroll region and
+  visual viewport. Immutable deploy `6a5541b45d9cfad72331beac` passed all 19
+  lifecycle checks; the `620px` compressed Pixel gate measured a `12.21875px`
+  field-to-footer gap against a `28px` maximum, and cleanup returned every
+  generated database and Storage counter to zero. The identical build is live
+  on the isolated stable URL as deploy `6a5542e1bc2a1171f1b4073c`; production
+  ShadowChat and `main` remain unchanged.
 - General Chat thread proof was rerun against a fresh production build on
   Pixel Chromium `412x915` and iPhone WebKit `390x844`. Both engines retained
   the bottom navigation, rendered message actions at layer `150` above the

@@ -1394,6 +1394,11 @@ html, body, #root {
     --shadowchat-mobile-chat-footer-height: var(--shadowchat-mobile-chat-footer-compact-height);
   }
 
+  html[data-shadowchat-keyboard='open'] .shadow-pin-creator-scroll {
+    padding-top: min(42dvh, 14rem);
+    overflow-anchor: none;
+  }
+
   .app-viewport {
     height: var(--shadowchat-app-height, var(--shadowchat-visual-viewport-height, 100dvh));
   }
