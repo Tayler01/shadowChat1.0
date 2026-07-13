@@ -28,8 +28,10 @@ Last updated: 2026-07-13
   character by character while autosave runs, checks focused-field visibility
   in a `620px` simulated keyboard viewport, and requires automatic local image,
   local video, image URL, external-video poster, and authenticated link-preview
-  rendering. The exact immutable deploy rerun is part of this trial redeploy's
-  final acceptance gate.
+  rendering. The final immutable deploy
+  `6a54d6c7d4f62a4538f2341c` passed all 19 Studio lifecycle checks with zero
+  console, page, media-API, harness, database-cleanup, or Storage-cleanup
+  errors.
 - The first immutable Studio pass safely stopped on a Netlify media 401 after
   session rotation and removed every scoped draft/message/category artifact.
   The client now performs one locked refresh and exact-request retry on 401;
@@ -37,6 +39,19 @@ Last updated: 2026-07-13
   immutable rerun. Each Netlify media attempt also has a 45-second ceiling, so
   a stalled provider request returns a retryable error instead of freezing the
   mobile editor.
+- The remaining double-401 was isolated-site environment drift: its Supabase
+  URL was correct, but its function-scoped service-role fingerprint did not
+  match the linked project. The test site's production, deploy-preview, and
+  branch-deploy values were rotated to the current key and marked secret;
+  production ShadowChat was not changed.
+- The comprehensive Creator Studio browser harness now bounds response-drain,
+  context-close, and browser-close operations, writes harness diagnostics, and
+  performs its database/Storage cleanup even when a Playwright engine will not
+  close normally.
+- General Chat threads and rapid ShadowPin Theater swipes were rerun against
+  the same final immutable deploy on Pixel Chromium and iPhone WebKit and both
+  passed again. Physical iOS/Android installed-PWA keyboard animation and
+  hardware safe-area validation remain the real-device gate.
 
 ## July 13 ShadowChat 2.0 First-Run Activation - Authenticated Checkpoint
 

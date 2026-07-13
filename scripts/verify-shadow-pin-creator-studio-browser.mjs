@@ -483,8 +483,25 @@ let failure = null
 let cleanup = null
 let failureDiagnostics = null
 const checks = []
+const harnessDiagnostics = []
 const expectedMediaFailure = { armed: false, injected: 0 }
 let expectedRetryStorageDuplicates = 0
+
+const settleHarnessOperation = async (label, operation, timeoutMs = 5_000) => {
+  let timeout = null
+  const result = await Promise.race([
+    Promise.resolve(operation).then(
+      () => ({ status: 'settled' }),
+      error => ({ status: 'rejected', message: messageOf(error) })
+    ),
+    new Promise(resolve => {
+      timeout = setTimeout(() => resolve({ status: 'timed-out' }), timeoutMs)
+    }),
+  ])
+  if (timeout) clearTimeout(timeout)
+  if (result.status !== 'settled') harnessDiagnostics.push({ label, ...result })
+  return result
+}
 
 await mkdir(artifactDir, { recursive: true })
 
@@ -1300,9 +1317,13 @@ try {
   }
   failureDiagnostics = diagnostics
 } finally {
-  await Promise.allSettled(networkCapturePromises)
-  for (const browser of browserHandles.reverse()) {
-    await browser.close().catch(() => undefined)
+  await settleHarnessOperation('network response capture drain', Promise.allSettled(networkCapturePromises))
+  for (const [index, browser] of browserHandles.reverse().entries()) {
+    await settleHarnessOperation(
+      `browser ${index + 1} context close`,
+      Promise.allSettled(browser.contexts().map(context => context.close()))
+    )
+    await settleHarnessOperation(`browser ${index + 1} close`, browser.close())
   }
   await wait(500)
   try {
@@ -1326,6 +1347,7 @@ try {
     created: { draftId, assetId, pinId },
     pageEvidence,
     cleanup,
+    harnessDiagnostics,
     failureDiagnostics,
     failure,
     completedAt: new Date().toISOString(),
@@ -1336,7 +1358,7 @@ try {
 if (failure) {
   console.error(`Candidate 3 browser verification failed: ${failure}`)
   console.error(`Evidence: ${path.join(artifactDir, 'summary.json')}`)
-  process.exitCode = 1
 } else {
   console.log(`Candidate 3 browser verification passed: ${path.join(artifactDir, 'summary.json')}`)
 }
+process.exit(failure ? 1 : 0)

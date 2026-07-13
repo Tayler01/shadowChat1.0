@@ -393,7 +393,19 @@ installed-phone acceptance. Nothing merges to `main` before that approval.
   boundary after several authenticated navigation and draft operations. The
   media client now mirrors the shared Edge Function recovery contract: current
   token first, one locked refresh/retry on 401, identical body/signal, and no
-  retry for other statuses.
+  retry for other statuses. Each media attempt also has a 45-second ceiling.
+  A second 401 after refresh proved to be isolated-site environment drift: the
+  function-scoped service-role key was stale while the Supabase URL remained
+  correct. The isolated test site's deploy contexts were rotated to the current
+  linked key and marked secret; production was not changed.
+- The final immutable Studio checkpoint passed on deploy
+  `6a54d6c7d4f62a4538f2341c`: all 19 lifecycle checks completed across Pixel
+  Chromium and iPhone WebKit with zero console, page, media-API, or harness
+  errors. Cleanup removed four drafts, five assets, one Pin, all generated
+  notifications/activity rows, nine private objects, seven public objects,
+  seeded Chat/DM/category rows, and verified every scoped counter at zero. The
+  browser harness now bounds engine shutdown so cleanup cannot be blocked by a
+  hung Playwright close.
 - ShadowPin Theater now coalesces drag rendering to animation frames, accepts
   up to three queued swipes during the 220ms handoff, preloads two Pins on each
   side, and reuses locally resolved routed Pins instead of refetching exact and
