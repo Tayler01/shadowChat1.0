@@ -130,40 +130,39 @@ describe('ShadowPin Creator Studio API', () => {
     expect(published).toMatchObject({ image: { id: 'pin-1' }, wasAlreadyPublished: false })
   })
 
-  test('promotes a private ready image immediately before guarded finalization', async () => {
+  test('publishes a private ready image through one atomic server request', async () => {
     const draft = normalizeCreatorDraft({ ...rawDraft, state: 'ready', revision: 3 })
     const asset = normalizeCreatorAsset({ ...rawAsset, state: 'ready' })!
     const originalFetch = globalThis.fetch
     const fetchMock = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        draft: { ...rawDraft, state: 'publish_ready', revision: 4 },
+        ok: true,
+        draft: { ...rawDraft, state: 'published', revision: 5, published_image_id: 'pin-1' },
         asset: { ...rawAsset, state: 'publish_ready' },
+        image: { id: 'pin-1' },
+        wasAlreadyPublished: false,
       }),
     } as Response)
     Object.defineProperty(globalThis, 'fetch', { configurable: true, writable: true, value: fetchMock })
-    rpc.mockResolvedValue({
-      data: [{
-        draft: { ...rawDraft, state: 'published', revision: 5, published_image_id: 'pin-1' },
-        image: { id: 'pin-1' },
-        was_already_published: false,
-      }],
-      error: null,
-    })
 
     try {
-      await publishCreatorDraft(draft, asset)
+      const result = await publishCreatorDraft(draft, asset)
 
       expect(fetchMock).toHaveBeenCalledWith('/api/shadow-pin/media', expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({ Authorization: 'Bearer test-token' }),
-        body: expect.stringContaining('prepare-draft-image-publish'),
+        body: expect.stringContaining('publish-draft-image'),
       }))
-      expect(rpc).toHaveBeenCalledWith('finalize_shadow_pin_creator_draft', {
-        target_draft_id: 'draft-1',
-        target_expected_revision: 4,
-        target_publish_idempotency_key: 'publish-1',
+      expect(JSON.parse(fetchMock.mock.calls[0][1]?.body as string)).toEqual({
+        action: 'publish-draft-image',
+        draftId: 'draft-1',
+        expectedRevision: 3,
+        assetId: 'asset-1',
+        publishIdempotencyKey: 'publish-1',
       })
+      expect(rpc).not.toHaveBeenCalled()
+      expect(result).toMatchObject({ image: { id: 'pin-1' }, wasAlreadyPublished: false })
     } finally {
       if (originalFetch) {
         Object.defineProperty(globalThis, 'fetch', { configurable: true, writable: true, value: originalFetch })
@@ -171,6 +170,47 @@ describe('ShadowPin Creator Studio API', () => {
         Reflect.deleteProperty(globalThis, 'fetch')
       }
     }
+  })
+
+  test('publishes a native Bunny draft without exposing playback before finalization', async () => {
+    const invoke = jest.fn().mockResolvedValue({
+      data: {
+        ok: true,
+        draft: { ...rawDraft, state: 'published', revision: 5, published_image_id: 'pin-1' },
+        asset: { ...rawAsset, asset_kind: 'video', provider: 'bunny_stream', state: 'publish_ready' },
+        image: { id: 'pin-1' },
+        wasAlreadyPublished: false,
+      },
+      error: null,
+    })
+    ;(getWorkingClient as jest.Mock).mockResolvedValue({ rpc, functions: { invoke } })
+    const videoAsset = normalizeCreatorAsset({
+      ...rawAsset,
+      asset_kind: 'video',
+      provider: 'bunny_stream',
+      state: 'ready',
+      video_preview_url: null,
+      video_playback_url: null,
+      video_hls_url: null,
+      video_embed_url: null,
+    })!
+
+    const result = await publishCreatorDraft(
+      normalizeCreatorDraft({ ...rawDraft, state: 'ready', revision: 3 }),
+      videoAsset
+    )
+
+    expect(invoke).toHaveBeenCalledWith('shadow-pin-video', {
+      body: {
+        action: 'publish-draft-video',
+        draftId: 'draft-1',
+        expectedRevision: 3,
+        assetId: 'asset-1',
+        publishIdempotencyKey: 'publish-1',
+      },
+    })
+    expect(rpc).not.toHaveBeenCalled()
+    expect(result).toMatchObject({ image: { id: 'pin-1' }, wasAlreadyPublished: false })
   })
 
   test('throws RPC errors without inventing a local success', async () => {

@@ -20,6 +20,7 @@ describe('ShadowPin Creator Studio entrypoint contracts', () => {
     expect(shareModal).toContain('<LazyShadowPinCreatorStudio')
     expect(shareModal).toContain('initialMediaUrl={imageUrl}')
     expect(shareModal).toContain("action: 'replace-viewer'")
+    expect(shareModal).toContain("currentLayer: 'pin-viewer'")
     expect(shareModal).toContain("window.history.replaceState(nextState, '', mutation.url)")
     expect(shareModal).toContain("window.dispatchEvent(new PopStateEvent('popstate'")
     expect(shareModal).not.toContain('createShadowPinImage')
@@ -50,5 +51,12 @@ describe('ShadowPin Creator Studio entrypoint contracts', () => {
     expect(media).toContain('export async function rollbackShadowPinDraftImagePublish')
     expect(handler).toContain("action === 'prepare-draft-image-publish'")
     expect(handler).toContain("action === 'rollback-draft-image-publish'")
+  })
+
+  test('keeps every direct Studio action at the shared mobile touch baseline', () => {
+    const studio = source('src/features/shadow-pin/creator/ShadowPinCreatorStudio.tsx')
+
+    expect(studio).toMatch(/Creator Studio steps[\s\S]*?className=\{cn\('min-h-(?:11|12)\b/)
+    expect(studio).toMatch(/className="[^"]*min-h-(?:11|12)\b[^"]*"[^>]*>Use different media/)
   })
 })

@@ -5,8 +5,14 @@ const migrationPath = path.resolve(
   process.cwd(),
   'supabase/migrations/20260713003323_shadow_pin_creator_studio_backend.sql'
 )
+const hardeningMigrationPath = path.resolve(
+  process.cwd(),
+  'supabase/migrations/20260713042749_shadow_pin_creator_studio_hardening.sql'
+)
 
-const source = fs.readFileSync(migrationPath, 'utf8')
+const source = [migrationPath, hardeningMigrationPath]
+  .map(file => fs.readFileSync(file, 'utf8'))
+  .join('\n')
 const sql = source.toLowerCase().replace(/\s+/g, ' ')
 
 describe('ShadowPin Creator Studio backend source contract', () => {
@@ -95,5 +101,21 @@ describe('ShadowPin Creator Studio backend source contract', () => {
     expect(sql).not.toMatch(/drop\s+table[^;]*shadow_pin_images/)
     expect(sql).not.toMatch(/drop\s+function[^;]*(create_shadow_pin_image|set_shadow_pin_image_tags)/)
     expect(sql).not.toMatch(/drop\s+column[^;]*(reply_to|processing_status|media_type)/)
+  })
+
+  test('rejects a replacement draft when the canonical Pin changed after capture', () => {
+    expect(sql).toContain('target_image_updated_at')
+    expect(sql).toMatch(/shadow_pin_creator_drafts[\s\S]*?target_image_updated_at\s+timestamptz/)
+    expect(sql).toMatch(/target_image_updated_at[\s\S]*?shadow_pin_images[\s\S]*?updated_at/)
+    expect(sql).toContain('target pin changed after this draft was created')
+  })
+
+  test('bounds staged-asset generations and leases promoted media to recoverable server cleanup', () => {
+    expect(sql).toContain('promotion_lease')
+    expect(sql).toContain('claim_shadow_pin_image_promotion')
+    expect(sql).toContain('release_shadow_pin_image_promotion')
+    expect(sql).toMatch(/generation\s+between\s+1\s+and\s+32/)
+    expect(sql).toContain('enforce_shadow_pin_draft_asset_caps')
+    expect(sql).toContain('too many active creator studio assets')
   })
 })

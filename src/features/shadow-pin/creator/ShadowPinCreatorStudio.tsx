@@ -43,7 +43,9 @@ import {
   creatorFileMatchesFingerprint,
   creatorReducer,
   inferCreatorSourceKind,
+  shouldPreferLocalCreatorDraft,
   validateCreatorStep,
+  type ShadowPinCreatorAction,
   type ShadowPinCreatorStep,
 } from './creatorModel'
 import {
@@ -55,7 +57,6 @@ import type { ShadowPinCreatorAsset, ShadowPinCreatorDraftBundle } from './creat
 import { validateShadowPinFile } from '../api/shadowPinApi'
 import {
   enterCreatorStudioHistory,
-  isCreatorStudioHistoryEntry,
   replaceCreatorStudioHistory,
   requestCreatorStudioClose,
 } from './creatorHistory'
@@ -165,18 +166,42 @@ export function ShadowPinCreatorStudio({
   const [tagsText, setTagsText] = useState('')
   const [mediaInspecting, setMediaInspecting] = useState(false)
   const [mediaInspectionError, setMediaInspectionError] = useState<string | null>(null)
+  const [recoveryPending, setRecoveryPending] = useState(false)
+  const [draftSwitching, setDraftSwitching] = useState(false)
   const closeRef = useRef<HTMLButtonElement>(null)
   const saveTimerRef = useRef<number | null>(null)
-  const savePromiseRef = useRef<Promise<ShadowPinCreatorDraftBundle> | null>(null)
+  const savePromiseRef = useRef<{
+    contextToken: number
+    requestToken: number
+    promise: Promise<ShadowPinCreatorDraftBundle>
+  } | null>(null)
   const stagedSourceKeyRef = useRef('')
   const uploadAbortRef = useRef<AbortController | null>(null)
   const restoredRef = useRef(false)
+  const stateRef = useRef(state)
+  const saveContextTokenRef = useRef(0)
+  const saveRequestTokenRef = useRef(0)
+  const restoreRequestTokenRef = useRef(0)
+  const closeInFlightRef = useRef(false)
+  const closeRequestTokenRef = useRef(0)
+  const popstateCloseRef = useRef<() => void>(() => undefined)
   const titleId = useId()
   const { isReducedMotion } = useComfortPreferences()
+  stateRef.current = state
+
+  const applyAsyncAction = useCallback((action: ShadowPinCreatorAction) => {
+    stateRef.current = creatorReducer(stateRef.current, action)
+    dispatch(action)
+  }, [])
 
   useEffect(() => {
     if (open) return
     restoredRef.current = false
+    restoreRequestTokenRef.current += 1
+    saveContextTokenRef.current += 1
+    saveRequestTokenRef.current += 1
+    closeRequestTokenRef.current += 1
+    closeInFlightRef.current = false
     uploadAbortRef.current?.abort()
     uploadAbortRef.current = null
     if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current)
@@ -188,18 +213,18 @@ export function ShadowPinCreatorStudio({
     setTagsText('')
     setMediaInspecting(false)
     setMediaInspectionError(null)
+    setRecoveryPending(false)
+    setDraftSwitching(false)
     dispatch({ type: 'reset', categoryId: initialCategoryId, targetImageId: targetImage?.id ?? null })
   }, [initialCategoryId, open, targetImage?.id])
 
   useEffect(() => {
     if (!open) return
     enterCreatorStudioHistory()
-    const handlePopState = () => {
-      if (!isCreatorStudioHistoryEntry()) onClose()
-    }
+    const handlePopState = () => popstateCloseRef.current()
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
-  }, [onClose, open])
+  }, [open])
 
   useEffect(() => {
     if (!state.values.file) {
@@ -214,6 +239,8 @@ export function ShadowPinCreatorStudio({
   useEffect(() => {
     if (!open || !user?.id || restoredRef.current) return
     restoredRef.current = true
+    const restoreRequestToken = ++restoreRequestTokenRef.current
+    setRecoveryPending(true)
     dispatch({ type: 'restore-started' })
     const storedLocal = initialMediaUrl ? null : loadCreatorLocalDraft(user.id)
     const local = storedLocal?.targetImageId === (targetImage?.id ?? null) ? storedLocal : null
@@ -235,11 +262,22 @@ export function ShadowPinCreatorStudio({
       keepExistingMedia: false,
     } : null
     if (local) {
-      dispatch({ type: 'restored', values: local.values, step: local.step, recovered: true, clientMutationId: local.clientMutationId, targetImageId: local.targetImageId })
+      applyAsyncAction({
+        type: 'restored',
+        values: local.values,
+        step: local.step,
+        recovered: true,
+        clientMutationId: local.clientMutationId,
+        targetImageId: local.targetImageId,
+        dirtyRevision: local.dirtyRevision,
+        savedRevision: local.savedRevision,
+        updatedAt: local.updatedAt,
+      })
       setTagsText(local.values.tags.join(', '))
     }
     void listCreatorDrafts()
       .then(drafts => {
+        if (restoreRequestToken !== restoreRequestTokenRef.current) return
         const activeDrafts = drafts.filter(bundle => (
           bundle.draft.state !== 'published' &&
           bundle.draft.state !== 'abandoned' &&
@@ -250,14 +288,26 @@ export function ShadowPinCreatorStudio({
           ? undefined
           : (local?.draftId
               ? activeDrafts.find(bundle => bundle.draft.id === local.draftId)
-              : undefined) ?? activeDrafts[0]
+              : local
+                ? undefined
+                : activeDrafts[0])
         if (!selected) {
           const values = local?.values ?? targetValues ?? { categoryId: initialCategoryId }
-          dispatch({ type: 'restored', values, step: local?.step, recovered: Boolean(local), clientMutationId: local?.clientMutationId, targetImageId: local?.targetImageId ?? targetImage?.id ?? null })
+          applyAsyncAction({
+            type: 'restored',
+            values,
+            step: local?.step,
+            recovered: Boolean(local),
+            clientMutationId: local?.clientMutationId,
+            targetImageId: local?.targetImageId ?? targetImage?.id ?? null,
+            dirtyRevision: local?.dirtyRevision,
+            savedRevision: local?.savedRevision,
+            updatedAt: local?.updatedAt,
+          })
           if (targetValues) setTagsText(targetValues.tags.join(', '))
           return
         }
-        const draftValues = {
+        const serverValues = {
           categoryId: selected.draft.categoryId || initialCategoryId,
           title: selected.draft.title,
           description: selected.draft.description,
@@ -269,13 +319,38 @@ export function ShadowPinCreatorStudio({
             ? Boolean(local.values.keepExistingMedia || selected.asset)
             : Boolean(selected.asset),
         }
-        dispatch({ type: 'restored', values: draftValues, draft: selected.draft, step: local?.step, recovered: true, clientMutationId: selected.draft.clientMutationId, targetImageId: selected.draft.targetImageId })
-        setTagsText(selected.draft.tags.join(', '))
+        const useLocal = Boolean(local && shouldPreferLocalCreatorDraft(local, selected.draft))
+        const restoredValues = useLocal && local
+          ? {
+              ...serverValues,
+              ...local.values,
+              keepExistingMedia: Boolean(local.values.keepExistingMedia || selected.asset),
+            }
+          : serverValues
+        applyAsyncAction({
+          type: 'restored',
+          values: restoredValues,
+          draft: selected.draft,
+          step: local?.step,
+          recovered: true,
+          clientMutationId: selected.draft.clientMutationId,
+          targetImageId: selected.draft.targetImageId,
+          dirtyRevision: useLocal ? local?.dirtyRevision : undefined,
+          savedRevision: useLocal ? local?.savedRevision : undefined,
+          updatedAt: useLocal ? local?.updatedAt : selected.draft.updatedAt,
+        })
+        setTagsText(restoredValues.tags.join(', '))
         setAsset(selected.asset)
-        if (selected.asset) stagedSourceKeyRef.current = sourceKey({ ...createInitialCreatorState().values, ...draftValues })
+        if (selected.asset) stagedSourceKeyRef.current = sourceKey({ ...createInitialCreatorState().values, ...restoredValues })
       })
-      .catch(error => dispatch({ type: 'operation', operation: 'failed', error: error instanceof Error ? error.message : 'Draft recovery is unavailable.' }))
-  }, [initialCategoryId, initialMediaUrl, initialTitle, open, targetImage, user?.id])
+      .catch(error => {
+        if (restoreRequestToken !== restoreRequestTokenRef.current) return
+        applyAsyncAction({ type: 'operation', operation: 'failed', error: error instanceof Error ? error.message : 'Draft recovery is unavailable.' })
+      })
+      .finally(() => {
+        if (restoreRequestToken === restoreRequestTokenRef.current) setRecoveryPending(false)
+      })
+  }, [applyAsyncAction, initialCategoryId, initialMediaUrl, initialTitle, open, targetImage, user?.id])
 
   useEffect(() => {
     if (!targetImage || asset) return
@@ -317,28 +392,80 @@ export function ShadowPinCreatorStudio({
   }, [open, state, user?.id])
 
   const saveNow = useCallback(async () => {
-    if (savePromiseRef.current) return savePromiseRef.current
-    const requestedRevision = state.dirtyRevision
-    dispatch({ type: 'operation', operation: 'saving', error: null })
-    const save = (state.draft
-      ? updateCreatorDraft(state.draft, state.values)
-      : createCreatorDraft(state.values, state.targetImageId, state.clientMutationId))
+    const contextToken = saveContextTokenRef.current
+    if (savePromiseRef.current?.contextToken === contextToken) {
+      return savePromiseRef.current.promise
+    }
+    const snapshot = stateRef.current
+    const requestedRevision = snapshot.dirtyRevision
+    const requestToken = ++saveRequestTokenRef.current
+    const draftKey = snapshot.draft?.id ?? `new:${snapshot.clientMutationId}`
+    applyAsyncAction({ type: 'operation', operation: 'saving', error: null })
+    const save = (snapshot.draft
+      ? updateCreatorDraft(snapshot.draft, snapshot.values)
+      : createCreatorDraft(snapshot.values, snapshot.targetImageId, snapshot.clientMutationId))
       .then(bundle => {
+        const current = stateRef.current
+        const currentDraftKey = current.draft?.id ?? `new:${current.clientMutationId}`
+        if (
+          contextToken !== saveContextTokenRef.current ||
+          requestToken !== saveRequestTokenRef.current ||
+          currentDraftKey !== draftKey
+        ) return bundle
         setAsset(current => bundle.asset ?? current)
-        dispatch({ type: 'draft-saved', draft: bundle.draft, savedRevision: requestedRevision })
+        applyAsyncAction({ type: 'draft-saved', draft: bundle.draft, savedRevision: requestedRevision })
         return bundle
       })
       .catch(error => {
-        dispatch({ type: 'operation', operation: 'failed', error: error instanceof Error ? error.message : 'Unable to save this draft.' })
+        if (contextToken === saveContextTokenRef.current && requestToken === saveRequestTokenRef.current) {
+          applyAsyncAction({ type: 'operation', operation: 'failed', error: error instanceof Error ? error.message : 'Unable to save this draft.' })
+        }
         throw error
       })
-      .finally(() => { savePromiseRef.current = null })
-    savePromiseRef.current = save
+      .finally(() => {
+        if (
+          savePromiseRef.current?.contextToken === contextToken &&
+          savePromiseRef.current.requestToken === requestToken
+        ) savePromiseRef.current = null
+      })
+    savePromiseRef.current = { contextToken, requestToken, promise: save }
     return save
-  }, [state.clientMutationId, state.dirtyRevision, state.draft, state.targetImageId, state.values])
+  }, [applyAsyncAction])
+
+  const flushCurrentDraft = useCallback(async () => {
+    if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = null
+    if (user?.id) saveCreatorLocalDraft(user.id, stateRef.current)
+    const contextToken = saveContextTokenRef.current
+    try {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const current = stateRef.current
+        const hasUnsavedPrefill = !current.draft && Boolean(
+          current.values.sourceUrl.trim() ||
+          current.values.fileFingerprint ||
+          current.values.keepExistingMedia ||
+          current.values.title.trim() ||
+          current.values.description.trim()
+        )
+        if (
+          current.dirtyRevision <= current.savedRevision &&
+          !savePromiseRef.current &&
+          !hasUnsavedPrefill
+        ) return true
+        await saveNow()
+        if (contextToken !== saveContextTokenRef.current) return false
+        if (user?.id) saveCreatorLocalDraft(user.id, stateRef.current)
+      }
+      return stateRef.current.dirtyRevision <= stateRef.current.savedRevision
+    } catch {
+      // The persisted dirty snapshot is the reliable retry queue when the
+      // network is unavailable during Back, close, or a draft switch.
+      return false
+    }
+  }, [saveNow, user?.id])
 
   useEffect(() => {
-    if (!open || state.operation === 'restoring' || state.dirtyRevision <= state.savedRevision) return
+    if (!open || recoveryPending || draftSwitching || state.operation === 'restoring' || state.dirtyRevision <= state.savedRevision) return
     if (state.values.sourceMode === 'file'
       ? !state.values.fileFingerprint && !state.values.keepExistingMedia
       : !state.values.sourceUrl.trim()) return
@@ -348,7 +475,7 @@ export function ShadowPinCreatorStudio({
       if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current)
       saveTimerRef.current = null
     }
-  }, [open, saveNow, state.dirtyRevision, state.operation, state.savedRevision, state.values.categoryId, state.values.fileFingerprint, state.values.keepExistingMedia, state.values.sourceMode, state.values.sourceUrl])
+  }, [draftSwitching, open, recoveryPending, saveNow, state.dirtyRevision, state.operation, state.savedRevision, state.values.categoryId, state.values.fileFingerprint, state.values.keepExistingMedia, state.values.sourceMode, state.values.sourceUrl])
 
   const stageMedia = useCallback(async () => {
     const bundle = await saveNow()
@@ -371,7 +498,7 @@ export function ShadowPinCreatorStudio({
       })
       setAsset(current => staged.asset ?? current)
       stagedSourceKeyRef.current = currentKey
-      dispatch({ type: 'draft-saved', draft: staged.draft, savedRevision: state.dirtyRevision })
+      applyAsyncAction({ type: 'draft-saved', draft: staged.draft, savedRevision: state.dirtyRevision })
       return staged
     } catch (error) {
       if ((error as { name?: string })?.name !== 'AbortError') {
@@ -381,9 +508,21 @@ export function ShadowPinCreatorStudio({
     } finally {
       if (uploadAbortRef.current === controller) uploadAbortRef.current = null
     }
-  }, [asset, saveNow, state.dirtyRevision, state.values])
+  }, [applyAsyncAction, asset, saveNow, state.dirtyRevision, state.values])
 
-  const openAvailableDraft = (bundle: ShadowPinCreatorDraftBundle) => {
+  const openAvailableDraft = async (bundle: ShadowPinCreatorDraftBundle) => {
+    if (bundle.draft.id === stateRef.current.draft?.id || draftSwitching) return
+    setDraftSwitching(true)
+    uploadAbortRef.current?.abort()
+    uploadAbortRef.current = null
+    const flushed = await flushCurrentDraft()
+    if (!flushed) {
+      setDraftSwitching(false)
+      return
+    }
+    saveContextTokenRef.current += 1
+    saveRequestTokenRef.current += 1
+    savePromiseRef.current = null
     const values = {
       categoryId: bundle.draft.categoryId || initialCategoryId,
       title: bundle.draft.title,
@@ -394,7 +533,7 @@ export function ShadowPinCreatorStudio({
       fileFingerprint: null,
       keepExistingMedia: Boolean(bundle.asset),
     }
-    dispatch({
+    applyAsyncAction({
       type: 'restored',
       values,
       draft: bundle.draft,
@@ -402,12 +541,14 @@ export function ShadowPinCreatorStudio({
       recovered: true,
       clientMutationId: bundle.draft.clientMutationId,
       targetImageId: bundle.draft.targetImageId,
+      updatedAt: bundle.draft.updatedAt,
     })
     setTagsText(bundle.draft.tags.join(', '))
     setAsset(bundle.asset)
     stagedSourceKeyRef.current = bundle.asset
       ? sourceKey({ ...createInitialCreatorState().values, ...values })
       : ''
+    setDraftSwitching(false)
   }
 
   const goTo = async (nextStep: ShadowPinCreatorStep) => {
@@ -431,9 +572,23 @@ export function ShadowPinCreatorStudio({
   }
 
   const saveAndExit = useCallback(async () => {
-    try { await saveNow() } catch { return }
+    if (closeInFlightRef.current) return
+    closeInFlightRef.current = true
+    const closeRequestToken = ++closeRequestTokenRef.current
+    await flushCurrentDraft()
+    if (closeRequestToken !== closeRequestTokenRef.current) return
     requestCreatorStudioClose(onClose)
-  }, [onClose, saveNow])
+  }, [flushCurrentDraft, onClose])
+
+  popstateCloseRef.current = () => {
+    if (closeInFlightRef.current) {
+      closeRequestTokenRef.current += 1
+      onClose()
+      return
+    }
+    closeInFlightRef.current = true
+    void flushCurrentDraft().finally(onClose)
+  }
   const dialogRef = useDialogAccessibility<HTMLDivElement>({
     open,
     onClose: () => { void saveAndExit() },
@@ -463,7 +618,7 @@ export function ShadowPinCreatorStudio({
     try {
       const bundle = await syncCreatorDraftStatus(state.draft)
       setAsset(current => bundle.asset ?? current)
-      dispatch({ type: 'draft-saved', draft: bundle.draft, savedRevision: state.dirtyRevision })
+      applyAsyncAction({ type: 'draft-saved', draft: bundle.draft, savedRevision: state.dirtyRevision })
     } catch (error) {
       dispatch({ type: 'operation', operation: 'failed', error: error instanceof Error ? error.message : 'Unable to refresh processing.' })
     }
@@ -502,7 +657,7 @@ export function ShadowPinCreatorStudio({
 
   if (!open) return null
   const stepIndex = CREATOR_STEPS.indexOf(state.step)
-  const busy = mediaInspecting || ['restoring', 'saving', 'uploading', 'processing', 'publishing'].includes(state.operation)
+  const busy = recoveryPending || draftSwitching || mediaInspecting || ['restoring', 'saving', 'uploading', 'processing', 'publishing'].includes(state.operation)
   const fileNeedsReselection = state.values.sourceMode === 'file' && !state.values.file && Boolean(state.values.fileFingerprint)
   const previewFileType = state.values.file?.type || state.values.fileFingerprint?.type || asset?.mimeType || ''
 
@@ -520,7 +675,7 @@ export function ShadowPinCreatorStudio({
           </div>
           <nav className="mx-auto mt-2 grid max-w-3xl grid-cols-4 gap-1" aria-label="Creator Studio steps">
             {CREATOR_STEPS.map((step, index) => (
-              <button key={step} type="button" onClick={() => void goTo(step)} disabled={busy || index > stepIndex + 1} className={cn('min-h-10 rounded-full px-2 text-xs font-semibold transition-colors', state.step === step ? 'border border-[var(--border-glow)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-readable)]' : index < stepIndex ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)] disabled:opacity-55')} aria-current={state.step === step ? 'step' : undefined}>{index + 1}. {STEP_LABELS[step]}</button>
+              <button key={step} type="button" onClick={() => void goTo(step)} disabled={busy || index > stepIndex + 1} className={cn('min-h-11 rounded-full px-2 text-xs font-semibold transition-colors', state.step === step ? 'border border-[var(--border-glow)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-readable)]' : index < stepIndex ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)] disabled:opacity-55')} aria-current={state.step === step ? 'step' : undefined}>{index + 1}. {STEP_LABELS[step]}</button>
             ))}
           </nav>
         </header>
@@ -541,7 +696,8 @@ export function ShadowPinCreatorStudio({
                       <button
                         key={bundle.draft.id}
                         type="button"
-                        onClick={() => openAvailableDraft(bundle)}
+                        onClick={() => void openAvailableDraft(bundle)}
+                        disabled={busy || selected}
                         className={cn('min-h-14 rounded-[var(--radius-md)] border px-3 py-2 text-left', selected ? 'border-[var(--border-glow)] bg-[var(--theme-accent-soft)]' : 'border-[var(--border-subtle)] bg-black/10')}
                         aria-pressed={selected}
                       >
@@ -605,7 +761,7 @@ export function ShadowPinCreatorStudio({
                 )}
                 {targetImage && !state.values.file && !state.values.sourceUrl && <p className="rounded-[var(--radius-sm)] border border-[var(--theme-accent-border-soft)] bg-[var(--theme-accent-softer)] p-3 text-sm text-[var(--text-secondary)]">Choose replacement media. Your current Pin stays unchanged until the new version is fully published.</p>}
                 {mediaInspecting && <p className="flex items-center gap-2 text-sm text-[var(--text-muted)]"><Loader2 className={cn('h-4 w-4', !isReducedMotion && 'animate-spin')} /> Checking video duration</p>}
-                {fileNeedsReselection && <div className="rounded-[var(--radius-sm)] border border-amber-300/25 bg-amber-400/10 p-3 text-sm text-amber-100"><p>Reselect {state.values.fileFingerprint?.name} to resume its upload. The file itself is never stored in localStorage.</p><button type="button" onClick={() => dispatch({ type: 'set-file', file: null })} className="mt-2 min-h-10 rounded-full border border-amber-200/25 px-3 font-semibold">Use different media</button></div>}
+                {fileNeedsReselection && <div className="rounded-[var(--radius-sm)] border border-amber-300/25 bg-amber-400/10 p-3 text-sm text-amber-100"><p>Reselect {state.values.fileFingerprint?.name} to resume its upload. The file itself is never stored in localStorage.</p><button type="button" onClick={() => dispatch({ type: 'set-file', file: null })} className="mt-2 min-h-12 rounded-full border border-amber-200/25 px-3 font-semibold">Use different media</button></div>}
                 <MediaPreview objectUrl={objectUrl} sourceUrl={state.values.sourceUrl} fileType={previewFileType} asset={asset} title={state.values.title} />
               </section>
             )}

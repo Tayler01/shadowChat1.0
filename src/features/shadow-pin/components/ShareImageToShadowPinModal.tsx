@@ -11,7 +11,9 @@ const routeToPublishedPin = (imageId: string) => {
   if (typeof window === 'undefined') return
   const mutation = resolvePinRouteMutation({
     currentUrl: new URL(window.location.href),
-    currentLayer: null,
+    // Creator Studio is a pushed layer above Chat/DM. Replacing that layer
+    // with Theater must keep it closable via Back to the originating surface.
+    currentLayer: 'pin-viewer',
     action: 'replace-viewer',
     imageId,
   })

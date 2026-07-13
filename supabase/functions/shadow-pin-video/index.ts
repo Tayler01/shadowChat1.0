@@ -63,6 +63,7 @@ type VideoAction =
   | 'create-draft-upload'
   | 'complete-draft-upload'
   | 'sync-draft-status'
+  | 'publish-draft-video'
   | 'delete-draft-video-asset'
 
 type VideoPayload = {
@@ -86,6 +87,7 @@ type VideoPayload = {
   draftId?: string
   assetId?: string
   expectedRevision?: number
+  publishIdempotencyKey?: string
 }
 
 type ShadowPinDraftRow = {
@@ -220,6 +222,14 @@ const authenticate = async (req: Request) => {
   }
 }
 
+function getUserScopedSupabase(req: Request) {
+  const { supabaseUrl, serviceRoleKey } = getSupabaseEnv()
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
+  })
+}
+
 const resolvePositiveLimit = (name: string, fallback: number, maximum: number) => {
   const configured = Number(Deno.env.get(name) ?? '')
   if (!Number.isFinite(configured) || configured <= 0) return fallback
@@ -243,7 +253,7 @@ const enforceProviderRequestLimit = async (
     message: 'Too many ShadowPin video requests. Please wait a moment and try again.',
   })
 
-  const isPolling = action === 'sync-status'
+  const isPolling = action === 'sync-status' || action === 'sync-draft-status'
   await consumeEdgeRateLimit(supabase, {
     userId,
     scope: `shadow-pin-video:${action}:minute`,
@@ -1975,16 +1985,15 @@ const handleCreateDraftUpload = async (req: Request, body: VideoPayload) => {
   if (draft.source_kind !== 'video_upload') throw new Error('Draft source is not a native video.')
   const upload = validateNativeUpload(body)
   await enforceDailyDraftNativeUploadLimit(auth.supabase, auth.userId)
-  const { libraryId, apiKey, pullZoneUrl } = getBunnyEnv()
+  const { libraryId, apiKey } = getBunnyEnv()
   const bunnyVideo = await createBunnyVideo(libraryId, apiKey, cleanText(body.title, 80) || 'ShadowPin draft')
-  const playback = buildBunnyPlaybackUrls(libraryId, bunnyVideo.guid, pullZoneUrl, bunnyVideo.raw.availableResolutions)
   const providerPayload = {
     bunny_stream: {
-      libraryId, videoId: bunnyVideo.guid, embedUrl: playback.embedUrl,
-      pullZoneConfigured: Boolean(pullZoneUrl), fileName: upload.fileName,
+      libraryId, videoId: bunnyVideo.guid,
+      fileName: upload.fileName,
       fileType: upload.fileType, fileSize: upload.fileSize,
       createdAt: new Date().toISOString(), createdBy: auth.userId,
-      bunnyResponse: bunnyVideo.raw,
+      providerStatus: bunnyVideo.raw.status ?? null,
     },
   }
   const posterUrl = upload.posterUrl || FALLBACK_VIDEO_POSTER_URL
@@ -2001,8 +2010,8 @@ const handleCreateDraftUpload = async (req: Request, body: VideoPayload) => {
       image_width: upload.mediaWidth, image_height: upload.mediaHeight,
       duration_seconds: upload.durationSeconds, provider_asset_id: bunnyVideo.guid,
       provider_playback_id: bunnyVideo.guid, provider_payload: providerPayload,
-      video_preview_url: playback.previewUrl, video_playback_url: playback.playbackUrl,
-      video_hls_url: playback.hlsUrl, video_embed_url: playback.embedUrl,
+      video_preview_url: null, video_playback_url: null,
+      video_hls_url: null, video_embed_url: null,
     })
     .select('*').single()
   if (assetError) {
@@ -2058,45 +2067,121 @@ const handleSyncDraftStatus = async (req: Request, body: VideoPayload) => {
   if (!assetId) return badRequest('Draft does not have an active upload.')
   const asset = await getDraftAsset(auth.supabase, auth.userId, draftId, assetId)
   if (!asset) return notFound('Draft asset not found.')
-  if (asset.state === 'publish_ready' || asset.state === 'failed') {
+  if (asset.state === 'ready' || asset.state === 'publish_ready' || asset.state === 'failed') {
     return json({ ok: true, draft, asset })
   }
   if (asset.provider !== 'bunny_stream' || !asset.provider_asset_id) {
     return badRequest('Draft asset does not have a Bunny Stream video id.')
   }
   await enforceProviderRequestLimit(auth.supabase, auth.userId, 'sync-draft-status')
-  const { libraryId, apiKey, pullZoneUrl } = getBunnyEnv()
+  const { libraryId, apiKey } = getBunnyEnv()
   const bunnyStatus = await getBunnyVideo(libraryId, apiKey, asset.provider_asset_id)
   const providerState = getBunnyReadyState(bunnyStatus)
-  const playback = buildBunnyPlaybackUrls(libraryId, asset.provider_asset_id, pullZoneUrl, bunnyStatus.availableResolutions)
   const duration = normalizeNonNegativeInteger(bunnyStatus.length ?? bunnyStatus.duration ?? bunnyStatus.durationSeconds)
   const tooLong = duration !== null && duration > MAX_VIDEO_SECONDS
-  const state = providerState.failed || tooLong ? 'failed' : providerState.ready ? 'publish_ready' : 'processing'
+  const state = providerState.failed || tooLong ? 'failed' : providerState.ready ? 'ready' : 'processing'
   const errorMessage = tooLong
     ? 'Video is longer than 60 seconds.'
     : providerState.failed ? 'Bunny Stream could not process this video.' : null
   const providerPayload = mergeProviderPayload(asset.provider_payload, {
-    bunny_status: { syncedAt: new Date().toISOString(), state: providerState, raw: bunnyStatus },
+    bunny_status: {
+      syncedAt: new Date().toISOString(),
+      state: providerState,
+      durationSeconds: duration,
+      availableResolutions: bunnyStatus.availableResolutions ?? null,
+    },
   })
   const { data: updatedAsset, error } = await auth.supabase
     .from('shadow_pin_draft_assets')
     .update({
       state, provider_payload: providerPayload,
       duration_seconds: duration !== null && duration <= MAX_VIDEO_SECONDS ? duration : undefined,
-      video_preview_url: playback.previewUrl,
-      video_playback_url: playback.playbackUrl,
-      video_hls_url: playback.hlsUrl,
-      video_embed_url: playback.embedUrl,
+      video_preview_url: null,
+      video_playback_url: null,
+      video_hls_url: null,
+      video_embed_url: null,
       error_code: state === 'failed' ? 'provider_processing_failed' : null,
       error_message: errorMessage,
-      ready_at: state === 'publish_ready' ? new Date().toISOString() : null,
+      ready_at: state === 'ready' ? new Date().toISOString() : null,
     })
     .eq('id', assetId).select('*').single()
   if (error) throw error
   const updatedDraft = await activateDraftAsset(
-    auth.supabase, draftId, assetId, state === 'publish_ready' ? 'publish_ready' : state,
+    auth.supabase, draftId, assetId, state,
   )
   return json({ ok: true, draft: updatedDraft, asset: updatedAsset })
+}
+
+const handlePublishDraftVideo = async (req: Request, body: VideoPayload) => {
+  const auth = await authenticate(req)
+  if ('error' in auth) return auth.error
+  const draftId = normalizeUuid(body.draftId)
+  const assetId = normalizeUuid(body.assetId)
+  const publishIdempotencyKey = normalizeUuid(body.publishIdempotencyKey)
+  const expectedRevision = normalizePositiveInteger(body.expectedRevision)
+  if (!draftId || !assetId || !publishIdempotencyKey || expectedRevision === null) {
+    return badRequest('draftId, assetId, expectedRevision, and publishIdempotencyKey are required.')
+  }
+
+  const draft = await getCreatorDraft(auth.supabase, auth.userId, draftId, undefined, true)
+  if (draft.state !== 'published' && draft.revision !== expectedRevision) {
+    throw new Error('Creator draft changed on another device.')
+  }
+  const asset = await getDraftAsset(auth.supabase, auth.userId, draftId, assetId)
+  if (!asset) return notFound('Draft asset not found.')
+  if (asset.provider !== 'bunny_stream' || asset.asset_kind !== 'video' || !asset.provider_asset_id) {
+    return badRequest('Draft asset is not a Bunny Stream video.')
+  }
+  if (draft.state !== 'published' && !['ready', 'publish_ready'].includes(asset.state)) {
+    return badRequest('Draft video is not ready to publish.')
+  }
+
+  await enforceProviderRequestLimit(auth.supabase, auth.userId, 'publish-draft-video')
+  let playback = { previewUrl: null, playbackUrl: null, hlsUrl: null, embedUrl: null } as {
+    previewUrl: string | null
+    playbackUrl: string | null
+    hlsUrl: string | null
+    embedUrl: string | null
+  }
+  if (draft.state !== 'published') {
+    const { libraryId, apiKey, pullZoneUrl } = getBunnyEnv()
+    const bunnyStatus = await getBunnyVideo(libraryId, apiKey, asset.provider_asset_id)
+    const providerState = getBunnyReadyState(bunnyStatus)
+    const duration = normalizeNonNegativeInteger(
+      bunnyStatus.length ?? bunnyStatus.duration ?? bunnyStatus.durationSeconds,
+    )
+    if (providerState.failed) throw new Error('Bunny Stream could not process this video.')
+    if (!providerState.ready) throw new Error('Bunny Stream is still processing this video.')
+    if (duration !== null && duration > MAX_VIDEO_SECONDS) {
+      throw new Error('Video is longer than 60 seconds.')
+    }
+    playback = buildBunnyPlaybackUrls(
+      libraryId, asset.provider_asset_id, pullZoneUrl, bunnyStatus.availableResolutions,
+    )
+  }
+
+  const userClient = getUserScopedSupabase(req)
+  const { data, error } = await userClient.rpc('finalize_shadow_pin_creator_bunny_draft', {
+    target_draft_id: draftId,
+    target_expected_revision: expectedRevision,
+    target_publish_idempotency_key: publishIdempotencyKey,
+    target_asset_id: assetId,
+    target_video_preview_url: playback.previewUrl,
+    target_video_playback_url: playback.playbackUrl,
+    target_video_hls_url: playback.hlsUrl,
+    target_video_embed_url: playback.embedUrl,
+  })
+  if (error) throw error
+  const result = Array.isArray(data) ? data[0] : data
+  if (!result?.draft || !result?.image) throw new Error('Draft publish returned an invalid receipt.')
+  const publishedAsset = await getDraftAsset(auth.supabase, auth.userId, draftId, assetId)
+  return json({
+    ok: true,
+    draft: result.draft,
+    image: result.image,
+    wasAlreadyPublished: Boolean(result.was_already_published),
+    asset: publishedAsset,
+  })
 }
 
 const handleDeleteDraftVideoAsset = async (req: Request, body: VideoPayload) => {
@@ -2186,6 +2271,8 @@ serve(async (req): Promise<Response> => {
         return ensureResponse(await handleCompleteDraftUpload(req, body))
       case 'sync-draft-status':
         return ensureResponse(await handleSyncDraftStatus(req, body))
+      case 'publish-draft-video':
+        return ensureResponse(await handlePublishDraftVideo(req, body))
       case 'delete-draft-video-asset':
         return ensureResponse(await handleDeleteDraftVideoAsset(req, body))
       default:

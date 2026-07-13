@@ -1,11 +1,13 @@
 import {
   CREATOR_STEPS,
   createInitialCreatorState,
+  creatorLocalDraftHasUnsyncedChanges,
   creatorFileMatchesFingerprint,
   creatorReducer,
   fingerprintCreatorFile,
   inferCreatorSourceKind,
   serializeCreatorLocalDraft,
+  shouldPreferLocalCreatorDraft,
   validateCreatorStep,
 } from '../src/features/shadow-pin/creator/creatorModel'
 
@@ -127,6 +129,55 @@ describe('ShadowPin Creator Studio model', () => {
     expect(serialized.values.fileFingerprint).toEqual(fingerprintCreatorFile(file))
     expect(serialized.values.tags).toEqual(['one', 'two-tags'])
     expect(serialized.targetImageId).toBe('pin-to-replace')
+    expect(serialized.dirtyRevision).toBe(state.dirtyRevision)
+    expect(serialized.savedRevision).toBe(state.savedRevision)
     expect(JSON.stringify(serialized)).not.toContain('secret binary')
+  })
+
+  test('prefers an unsynced matching local snapshot but not an older clean snapshot', () => {
+    const server = {
+      id: 'draft-1', creatorId: 'user-1', categoryId: 'category-1', targetImageId: null,
+      clientMutationId: 'mutation-1', sourceKind: 'image_url' as const, title: 'Server title',
+      description: '', tags: [], state: 'editing' as const, revision: 4, activeAssetId: null,
+      publishedImageId: null, publishIdempotencyKey: 'publish-1', lastErrorCode: null,
+      lastErrorMessage: null, expiresAt: null, createdAt: '2026-07-12T00:00:00Z',
+      updatedAt: '2026-07-12T00:00:05Z', publishedAt: null,
+    }
+    const local = {
+      draftId: 'draft-1',
+      targetImageId: null,
+      clientMutationId: 'mutation-1',
+      step: 'details' as const,
+      values: { ...createInitialCreatorState().values, file: undefined },
+      dirtyRevision: 6,
+      savedRevision: 4,
+      updatedAt: '2026-07-12T00:00:01Z',
+    }
+    Reflect.deleteProperty(local.values, 'file')
+
+    expect(creatorLocalDraftHasUnsyncedChanges(local)).toBe(true)
+    expect(shouldPreferLocalCreatorDraft(local, server)).toBe(true)
+    expect(shouldPreferLocalCreatorDraft({ ...local, dirtyRevision: 4 }, server)).toBe(false)
+    expect(shouldPreferLocalCreatorDraft({ ...local, draftId: 'different-draft' }, server)).toBe(false)
+  })
+
+  test('does not let a late save receipt regress the acknowledged local revision', () => {
+    const firstReceipt = {
+      id: 'draft-1', creatorId: 'user-1', categoryId: 'category-1', targetImageId: null,
+      clientMutationId: 'mutation-1', sourceKind: 'image_url' as const, title: 'First',
+      description: '', tags: [], state: 'editing' as const, revision: 8, activeAssetId: null,
+      publishedImageId: null, publishIdempotencyKey: 'publish-1', lastErrorCode: null,
+      lastErrorMessage: null, expiresAt: null, createdAt: '2026-07-12T00:00:00Z',
+      updatedAt: '2026-07-12T00:00:08Z', publishedAt: null,
+    }
+    const lateReceipt = { ...firstReceipt, revision: 7, updatedAt: '2026-07-12T00:00:07Z' }
+    let state = creatorReducer(createInitialCreatorState(), {
+      type: 'draft-saved', draft: firstReceipt, savedRevision: 8,
+    })
+    state = creatorReducer(state, {
+      type: 'draft-saved', draft: lateReceipt, savedRevision: 7,
+    })
+
+    expect(state.savedRevision).toBe(8)
   })
 })

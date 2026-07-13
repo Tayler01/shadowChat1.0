@@ -9,6 +9,7 @@ export type ShadowPinCreatorDraft = {
   creatorId: string
   categoryId: string
   targetImageId: string | null
+  targetImageUpdatedAt?: string | null
   clientMutationId: string
   sourceKind: ShadowPinCreatorSourceKind
   title: string
@@ -19,6 +20,9 @@ export type ShadowPinCreatorDraft = {
   activeAssetId: string | null
   publishedImageId: string | null
   publishIdempotencyKey: string
+  promotionLeaseToken?: string | null
+  promotionLeaseExpiresAt?: string | null
+  promotionAssetId?: string | null
   lastErrorCode: string | null
   lastErrorMessage: string | null
   expiresAt: string | null

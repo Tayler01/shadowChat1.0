@@ -287,13 +287,20 @@ installed-phone acceptance. Nothing merges to `main` before that approval.
   `output/playwright/wave2-candidate2-threads/summary.json`.
 - Candidate 3 implementation is present locally. The contract uses
   owner-private drafts, private image staging with signed owner previews,
-  server-owned staged assets, bounded publish promotion/rollback, idempotent
-  finalization, and one lazy four-stage Media/Details/Preview/Publish Studio.
+  server-owned staged assets, leased atomic image publication with scheduled
+  orphan recovery, private-until-publish Bunny delivery, target-version
+  guards, bounded media work, idempotent finalization, and one lazy four-stage
+  Media/Details/Preview/Publish Studio. Local recovery now preserves newer
+  unsynced metadata, Back/close and draft switches flush safely, late saves are
+  scoped to their draft, Chat/DM success routes retain their origin, and all
+  direct actions meet the shared phone touch baseline.
   Seven focused model, history, API, component, entrypoint, media, and SQL
-  contract suites pass with 32 tests. Fresh local database replay, rollback verifier, database lint,
-  and security advisors also pass. No Candidate 3 linked-backend,
-  cross-account browser, function-deploy, production notification, or full
-  test-data/media cleanup proof is claimed yet.
+  contract suites pass with 46 tests; the broader Candidate 3 route/ShadowPin
+  set passes 9 suites and 107 tests. The hardening backend gate passes a fresh
+  local reset, expanded rollback verifier, database lint/advisors, Deno/Node
+  checks, and 3 focused suites with 21 tests. Linked history/dry-run,
+  cross-account browser, function-deploy, production notification, and full
+  test-data/media cleanup proof remain open.
 - Physical installed-PWA
   keyboard, VoiceOver/TalkBack, and touch-comfort checks remain Wave Two
   release-gate follow-ups rather than automated-browser claims.

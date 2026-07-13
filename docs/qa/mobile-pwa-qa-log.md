@@ -6,7 +6,7 @@ Older artifact paths remain historical evidence. The July 10 web Release A is
 deployed, but its mobile/PWA-sensitive behavior still needs a fresh harness
 artifact and physical-device pass.
 
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 ## July 12 ShadowChat 2.0 ShadowPin Creator Studio - Local Implementation
 
@@ -17,8 +17,13 @@ Last updated: 2026-07-12
   confirmation, and exact Theater success handoff from ShadowPin, Chat, and DM
   entry points.
 - Seven focused model, history, API, component, lazy/share-entry,
-  private-media, and SQL source contract suites pass locally with 32 tests.
-  This is code-level proof, not browser or linked-backend acceptance.
+  private-media, and SQL source contract suites pass locally with 46 tests;
+  the broader route/ShadowPin set passes 9 suites and 107 tests. The hardening
+  assertions cover local/server recovery conflicts, draft-switch and Back
+  flushes, late save receipts, exact-origin routing, phone touch targets,
+  target-version rejection, atomic promotion recovery, private Bunny drafts,
+  rate budgets, and asset caps. This is code-level proof, not browser or
+  linked-backend acceptance.
 - Required Pixel Chromium `412x915` and iPhone WebKit `390x844` proof must
   cover home/category/Chat/DM/Edit entry prefills, image/video/URL preview,
   category/tags, close-reload-offline recovery, upload retry/resume, keyboard

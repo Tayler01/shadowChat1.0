@@ -19,7 +19,17 @@ export const loadCreatorLocalDraft = (userId: string): CreatorLocalDraft | null 
   try {
     const parsed = JSON.parse(window.localStorage.getItem(keyFor(userId)) || 'null') as CreatorLocalDraft | null
     if (!parsed || !CREATOR_STEPS.includes(parsed.step)) return null
-    return parsed
+    const hasPersistedRevisions = Number.isFinite(parsed.dirtyRevision) && Number.isFinite(parsed.savedRevision)
+    return {
+      ...parsed,
+      // Legacy v1 snapshots did not carry revisions. Treat them as unsynced so
+      // recovery cannot silently replace possible offline work with the server.
+      dirtyRevision: hasPersistedRevisions ? parsed.dirtyRevision : 1,
+      savedRevision: hasPersistedRevisions ? parsed.savedRevision : 0,
+      updatedAt: Number.isFinite(Date.parse(parsed.updatedAt))
+        ? parsed.updatedAt
+        : new Date(0).toISOString(),
+    }
   } catch {
     return null
   }

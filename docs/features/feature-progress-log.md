@@ -85,12 +85,16 @@ Canonical detail and release gates live in:
   draft participation in public Pin reads/search/score/activity/engagement or
   notifications.
 - Candidate 3 verification status: implementation and seven focused model/
-  history/API/component/entrypoint/media/SQL suites (32 tests) pass locally. Private image
-  derivatives now remain in owner storage until bounded publish preparation,
-  with rollback for unreferenced promoted objects. Fresh local database replay,
-  rollback verification, database lint, and security advisors pass. No linked
-  push, function deployment, full Jest/build, two-account Chromium/WebKit, or
-  media cleanup proof is claimed yet.
+  history/API/component/entrypoint/media/SQL suites (46 tests) pass locally;
+  the broader route/ShadowPin set passes 9 suites and 107 tests. Hardening adds
+  local-draft conflict recovery, safe draft switches, exact-origin routing,
+  phone touch sizing, target-version enforcement, atomic leased image publish
+  with scheduled orphan recovery, private-until-publish Bunny delivery, and
+  bounded media work. The hardening backend gate passes a fresh local reset,
+  expanded rollback verifier, database lint/advisors, Deno/Node checks, and 3
+  focused suites with 21 tests. Linked history/dry-run, function deployment,
+  full Jest/build, two-account Chromium/WebKit, and media cleanup proof remain
+  open.
 - Candidate 3 contract: [SHADOW_PIN_CREATOR_STUDIO.md](C:/repos/chat2.0/docs/SHADOW_PIN_CREATOR_STUDIO.md:1)
 
 ## Prior Goal

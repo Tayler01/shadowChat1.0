@@ -1,10 +1,13 @@
 import {
   authenticateAuthorization,
   cleanText,
+  consumeShadowPinCreatorMediaBudget,
   createAdminClient,
   createImportedShadowPinItem,
+  createUserScopedClient,
   deleteShadowPinDraftImageAssets,
   prepareShadowPinDraftImagePublish,
+  publishShadowPinDraftImage,
   processShadowPinRowForUser,
   processShadowPinDraftImage,
   rollbackShadowPinDraftImagePublish,
@@ -29,16 +32,15 @@ export async function handler(event) {
 
   try {
     const admin = createAdminClient()
-    const user = await authenticateAuthorization(
-      event.headers?.authorization || event.headers?.Authorization || '',
-      admin
-    )
+    const authorization = event.headers?.authorization || event.headers?.Authorization || ''
+    const user = await authenticateAuthorization(authorization, admin)
     if (!user) {
       return json({ error: 'Authentication required.' }, 401)
     }
 
     const body = JSON.parse(event.body || '{}')
     const action = body?.action
+    await consumeShadowPinCreatorMediaBudget(admin, user.id, action)
 
     if (action === 'process-draft-image') {
       const result = await processShadowPinDraftImage({
@@ -71,6 +73,19 @@ export async function handler(event) {
         draftId: body?.draftId,
         expectedRevision: Number(body?.expectedRevision),
         assetId: body?.assetId || null,
+      })
+      return json({ ok: true, ...result })
+    }
+
+    if (action === 'publish-draft-image') {
+      const result = await publishShadowPinDraftImage({
+        admin,
+        userClient: createUserScopedClient(authorization),
+        userId: user.id,
+        draftId: body?.draftId,
+        expectedRevision: Number(body?.expectedRevision),
+        assetId: body?.assetId,
+        publishIdempotencyKey: body?.publishIdempotencyKey,
       })
       return json({ ok: true, ...result })
     }
@@ -161,6 +176,11 @@ export async function handler(event) {
     return json({ error: 'Unsupported ShadowPin media action.' }, 400)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'ShadowPin media processing failed.'
-    return json({ error: message }, 400)
+    const statusCode = Number(error?.statusCode) || 400
+    const response = json({ error: message }, statusCode)
+    if (statusCode === 429 && error?.retryAfterSeconds) {
+      response.headers['retry-after'] = String(error.retryAfterSeconds)
+    }
+    return response
   }
 }

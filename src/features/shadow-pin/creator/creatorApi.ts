@@ -31,6 +31,7 @@ export const normalizeCreatorDraft = (value: unknown): ShadowPinCreatorDraft => 
     creatorId: asString(pick(row, 'creator_id', 'creatorId')),
     categoryId: asString(pick(row, 'category_id', 'categoryId')),
     targetImageId: asOptionalString(pick(row, 'target_image_id', 'targetImageId')),
+    targetImageUpdatedAt: asOptionalString(pick(row, 'target_image_updated_at', 'targetImageUpdatedAt')),
     clientMutationId: asString(pick(row, 'client_mutation_id', 'clientMutationId')),
     sourceKind: asString(pick(row, 'source_kind', 'sourceKind')) as ShadowPinCreatorSourceKind,
     title: asString(row.title),
@@ -41,6 +42,9 @@ export const normalizeCreatorDraft = (value: unknown): ShadowPinCreatorDraft => 
     activeAssetId: asOptionalString(pick(row, 'active_asset_id', 'activeAssetId')),
     publishedImageId: asOptionalString(pick(row, 'published_image_id', 'publishedImageId')),
     publishIdempotencyKey: asString(pick(row, 'publish_idempotency_key', 'publishIdempotencyKey')),
+    promotionLeaseToken: asOptionalString(pick(row, 'promotion_lease_token', 'promotionLeaseToken')),
+    promotionLeaseExpiresAt: asOptionalString(pick(row, 'promotion_lease_expires_at', 'promotionLeaseExpiresAt')),
+    promotionAssetId: asOptionalString(pick(row, 'promotion_asset_id', 'promotionAssetId')),
     lastErrorCode: asOptionalString(pick(row, 'last_error_code', 'lastErrorCode')),
     lastErrorMessage: asOptionalString(pick(row, 'last_error_message', 'lastErrorMessage')),
     expiresAt: asOptionalString(pick(row, 'expires_at', 'expiresAt')),
@@ -173,25 +177,32 @@ export async function publishCreatorDraft(
   if (!draft.publishIdempotencyKey) {
     throw new Error('Refresh this draft before publishing so its publish receipt can be verified.')
   }
-  const client = await getWorkingClient()
-  let publishDraft = draft
-  let publishAsset = asset
-  const imageNeedsPromotion = asset?.assetKind === 'image' && asset.provider === 'shadow_pin_storage' && asset.state !== 'publish_ready'
-  if (imageNeedsPromotion) {
-    const prepared = await callNetlifyMedia({
-      action: 'prepare-draft-image-publish',
-      draftId: draft.id,
-      expectedRevision: draft.revision,
-      assetId: asset.id,
-    })
-    publishDraft = prepared.draft
-    publishAsset = prepared.asset ?? asset
+  const publishPayload = {
+    draftId: draft.id,
+    expectedRevision: draft.revision,
+    assetId: asset?.id,
+    publishIdempotencyKey: draft.publishIdempotencyKey,
   }
-  const publishIdempotencyKey = publishDraft.publishIdempotencyKey || draft.publishIdempotencyKey
+  if (asset?.assetKind === 'image' && asset.provider === 'shadow_pin_storage') {
+    const result = await callNetlifyMediaRaw({
+      action: 'publish-draft-image',
+      ...publishPayload,
+    })
+    return normalizeCreatorPublishResult(result)
+  }
+  if (asset?.assetKind === 'video' && asset.provider === 'bunny_stream') {
+    const result = await callVideoFunction({
+      action: 'publish-draft-video',
+      ...publishPayload,
+    })
+    return normalizeCreatorPublishResult(result)
+  }
+
+  const client = await getWorkingClient()
   const finalize = () => client.rpc('finalize_shadow_pin_creator_draft', {
-    target_draft_id: publishDraft.id,
-    target_expected_revision: publishDraft.revision,
-    target_publish_idempotency_key: publishIdempotencyKey,
+    target_draft_id: draft.id,
+    target_expected_revision: draft.revision,
+    target_publish_idempotency_key: draft.publishIdempotencyKey,
   })
   let { data, error } = await finalize()
   if (error) {
@@ -199,25 +210,11 @@ export async function publishCreatorDraft(
     data = retry.data
     error = retry.error
   }
-  if (error) {
-    if (imageNeedsPromotion && publishAsset) {
-      await callNetlifyMedia({
-        action: 'rollback-draft-image-publish',
-        draftId: publishDraft.id,
-        assetId: publishAsset.id,
-      }).catch(() => undefined)
-    }
-    throw error
-  }
-  const row = firstRow(data)
-  const result: ShadowPinCreatorPublishResult = {
-    draft: normalizeCreatorDraft(row.draft),
-    image: row.image as ShadowPinCreatorPublishResult['image'],
-    wasAlreadyPublished: Boolean(row.was_already_published ?? row.wasAlreadyPublished),
-  }
-  if (publishAsset) {
+  if (error) throw error
+  const result = normalizeCreatorPublishResult(data)
+  if (asset) {
     try {
-      await cleanupCreatorPublishedAssets(result.draft, publishAsset)
+      await cleanupCreatorPublishedAssets(result.draft, asset)
     } catch {
       // The published draft remains a durable cleanup receipt. Opening Studio
       // again retries cleanup without making a successful publish look failed.
@@ -225,6 +222,15 @@ export async function publishCreatorDraft(
     }
   }
   return result
+}
+
+const normalizeCreatorPublishResult = (value: unknown): ShadowPinCreatorPublishResult => {
+  const row = firstRow(value)
+  return {
+    draft: normalizeCreatorDraft(row.draft),
+    image: row.image as ShadowPinCreatorPublishResult['image'],
+    wasAlreadyPublished: Boolean(row.was_already_published ?? row.wasAlreadyPublished),
+  }
 }
 
 const accessToken = async () => {
@@ -235,7 +241,7 @@ const accessToken = async () => {
   return session.access_token as string
 }
 
-const callNetlifyMedia = async (body: UnknownRecord, signal?: AbortSignal) => {
+const callNetlifyMediaRaw = async (body: UnknownRecord, signal?: AbortSignal) => {
   const response = await fetch(NETLIFY_MEDIA_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await accessToken()}` },
@@ -244,7 +250,11 @@ const callNetlifyMedia = async (body: UnknownRecord, signal?: AbortSignal) => {
   })
   const data = await response.json().catch(() => null)
   if (!response.ok || data?.error) throw new Error(data?.error || 'Unable to process draft media.')
-  return withCreatorPrivatePreview(normalizeCreatorBundle(data))
+  return data as UnknownRecord
+}
+
+const callNetlifyMedia = async (body: UnknownRecord, signal?: AbortSignal) => {
+  return withCreatorPrivatePreview(normalizeCreatorBundle(await callNetlifyMediaRaw(body, signal)))
 }
 
 const callVideoFunction = async (body: UnknownRecord) => {

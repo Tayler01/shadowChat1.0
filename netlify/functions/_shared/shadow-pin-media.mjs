@@ -288,6 +288,51 @@ async function isOperator(admin, userId) {
   return data?.role === 'admin' || data?.role === 'sub_admin'
 }
 
+export function createUserScopedClient(authorization) {
+  const { supabaseUrl, serviceRoleKey } = getSupabaseEnv()
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: authorization } },
+  })
+}
+
+export class ShadowPinCreatorRateLimitError extends Error {
+  constructor(message, retryAfterSeconds) {
+    super(message)
+    this.statusCode = 429
+    this.retryAfterSeconds = Math.max(1, Math.ceil(Number(retryAfterSeconds) || 1))
+  }
+}
+
+const CREATOR_MEDIA_ACTION_LIMITS = new Map([
+  ['process-draft-image', 10],
+  ['stage-draft-image-from-url', 6],
+  ['prepare-draft-image-publish', 6],
+  ['publish-draft-image', 6],
+  ['rollback-draft-image-publish', 12],
+  ['delete-draft-image-assets', 10],
+])
+
+export async function consumeShadowPinCreatorMediaBudget(admin, userId, action) {
+  const limit = CREATOR_MEDIA_ACTION_LIMITS.get(action)
+  if (!limit) return null
+  const { data, error } = await admin.rpc('consume_edge_request_bucket', {
+    target_subject_id: userId,
+    request_scope: `shadow-pin-creator:${action}:minute`,
+    window_seconds: 60,
+    request_limit: limit,
+    request_cost: 1,
+  })
+  if (error) throw error
+  if (!data?.allowed) {
+    throw new ShadowPinCreatorRateLimitError(
+      'Too many Creator Studio media requests. Please wait a moment and try again.',
+      data?.retry_after_seconds,
+    )
+  }
+  return data
+}
+
 async function assertCanMutate(admin, row, userId, requireOwnership) {
   if (!requireOwnership) return
   if (row.creator_id === userId) return
@@ -856,9 +901,9 @@ export async function stageShadowPinDraftImageFromUrl({ admin, userId, draftId, 
 }
 
 export async function prepareShadowPinDraftImagePublish({
-  admin, userId, draftId, expectedRevision, assetId = null,
+  admin, userId, draftId, expectedRevision, assetId = null, leaseToken = null,
 }) {
-  const draft = await getCreatorDraftForWorker(admin, userId, draftId, expectedRevision)
+  let draft = await getCreatorDraftForWorker(admin, userId, draftId, expectedRevision)
   const resolvedAssetId = assetId || draft.active_asset_id
   if (!resolvedAssetId) throw new Error('Draft does not have active image media.')
   const { data: asset, error: assetError } = await admin.from('shadow_pin_draft_assets').select('*')
@@ -866,6 +911,18 @@ export async function prepareShadowPinDraftImagePublish({
     .eq('provider', 'shadow_pin_storage').is('deleted_at', null).maybeSingle()
   if (assetError) throw assetError
   if (!asset) throw new Error('Draft image asset is unavailable.')
+  const resolvedLeaseToken = leaseToken || draft.publish_idempotency_key
+  if (!resolvedLeaseToken) throw new Error('Draft publish receipt is unavailable.')
+  const { data: claimedDraft, error: claimError } = await admin.rpc('claim_shadow_pin_image_promotion', {
+    target_creator_id: userId,
+    target_draft_id: draftId,
+    target_expected_revision: expectedRevision,
+    target_asset_id: asset.id,
+    target_lease_token: resolvedLeaseToken,
+    target_lease_seconds: 180,
+  })
+  if (claimError) throw claimError
+  draft = claimedDraft
   if (asset.state === 'publish_ready') {
     const publishReadyDraft = draft.active_asset_id === asset.id && draft.state === 'publish_ready'
       ? draft
@@ -892,7 +949,6 @@ export async function prepareShadowPinDraftImagePublish({
   const finalMedium = `${publicBase}/medium.webp`
   const publicPaths = [finalOriginal, finalThumb, finalMedium]
   try {
-    await activateCreatorDraftAsset(admin, draftId, asset.id, 'preparing_publish')
     for (const [path, blob, contentType] of [
       [finalOriginal, originalBlob, imageType.contentType],
       [finalThumb, thumbBlob, 'image/webp'],
@@ -924,12 +980,19 @@ export async function prepareShadowPinDraftImagePublish({
       final_thumbnail_url: null, final_thumbnail_path: null,
       final_medium_url: null, final_medium_path: null,
     }).eq('id', asset.id)
-    await admin.from('shadow_pin_creator_drafts').update({ state: 'ready' }).eq('id', draftId)
+    await admin.rpc('release_shadow_pin_image_promotion', {
+      target_creator_id: userId,
+      target_draft_id: draftId,
+      target_lease_token: resolvedLeaseToken,
+      target_next_state: 'ready',
+    }).catch(() => undefined)
     throw error
   }
 }
 
-export async function rollbackShadowPinDraftImagePublish({ admin, userId, draftId, assetId = null }) {
+export async function rollbackShadowPinDraftImagePublish({
+  admin, userId, draftId, assetId = null, leaseToken = null,
+}) {
   const draft = await getCreatorDraftForWorker(admin, userId, draftId, undefined, true)
   const resolvedAssetId = assetId || draft.active_asset_id
   if (!resolvedAssetId) throw new Error('Draft does not have active image media.')
@@ -938,16 +1001,35 @@ export async function rollbackShadowPinDraftImagePublish({ admin, userId, draftI
     .eq('provider', 'shadow_pin_storage').maybeSingle()
   if (assetError) throw assetError
   if (!asset) throw new Error('Draft image asset is unavailable.')
-  if (asset.state !== 'publish_ready') return { draft, asset, canonicalReferenced: false }
-
-  const finalPaths = [asset.final_image_path, asset.final_thumbnail_path, asset.final_medium_path].filter(Boolean)
+  const imageType = resolveImageType(asset.content_type)
+  const publicBase = `${userId}/studio/${draftId}/${asset.id}`
+  const deterministicPaths = [
+    `${publicBase}/original.${imageType.extension}`,
+    `${publicBase}/thumbnail.webp`,
+    `${publicBase}/medium.webp`,
+  ]
+  const finalPaths = Array.from(new Set([
+    asset.final_image_path, asset.final_thumbnail_path, asset.final_medium_path,
+    ...deterministicPaths,
+  ].filter(Boolean)))
   const { data: canonicalRows, error: canonicalError } = await admin.from('shadow_pin_images')
     .select('id,image_path,thumbnail_path,medium_path').eq('creator_draft_id', draftId)
   if (canonicalError) throw canonicalError
   const referenced = (canonicalRows || []).some(row => (
     finalPaths.includes(row.image_path) || finalPaths.includes(row.thumbnail_path) || finalPaths.includes(row.medium_path)
   ))
-  if (referenced) return { draft, asset, canonicalReferenced: true }
+  const resolvedLeaseToken = leaseToken || draft.promotion_lease_token
+  if (referenced) {
+    if (resolvedLeaseToken) {
+      await admin.rpc('release_shadow_pin_image_promotion', {
+        target_creator_id: userId,
+        target_draft_id: draftId,
+        target_lease_token: resolvedLeaseToken,
+        target_next_state: 'publish_ready',
+      }).catch(() => undefined)
+    }
+    return { draft, asset, canonicalReferenced: true }
+  }
 
   await removeObjectsQuietly(admin, SHADOW_PIN_BUCKET, finalPaths)
   const { data: readyAsset, error: resetError } = await admin.from('shadow_pin_draft_assets').update({
@@ -956,11 +1038,85 @@ export async function rollbackShadowPinDraftImagePublish({ admin, userId, draftI
     final_medium_url: null, final_medium_path: null,
   }).eq('id', asset.id).select('*').single()
   if (resetError) throw resetError
-  const nextDraftState = ['published', 'abandoned'].includes(draft.state) ? draft.state : 'ready'
-  const { data: readyDraft, error: draftError } = await admin.from('shadow_pin_creator_drafts')
-    .update({ state: nextDraftState }).eq('id', draftId).select('*').single()
-  if (draftError) throw draftError
+  let readyDraft
+  if (resolvedLeaseToken) {
+    const { data, error: releaseError } = await admin.rpc('release_shadow_pin_image_promotion', {
+      target_creator_id: userId,
+      target_draft_id: draftId,
+      target_lease_token: resolvedLeaseToken,
+      target_next_state: 'ready',
+    })
+    if (releaseError) throw releaseError
+    readyDraft = data
+  } else {
+    const nextDraftState = ['published', 'abandoned'].includes(draft.state) ? draft.state : 'ready'
+    const { data, error: draftError } = await admin.from('shadow_pin_creator_drafts')
+      .update({ state: nextDraftState }).eq('id', draftId).select('*').single()
+    if (draftError) throw draftError
+    readyDraft = data
+  }
   return { draft: readyDraft, asset: readyAsset, canonicalReferenced: false }
+}
+
+export async function publishShadowPinDraftImage({
+  admin, userClient, userId, draftId, expectedRevision, assetId, publishIdempotencyKey,
+}) {
+  const prepared = await prepareShadowPinDraftImagePublish({
+    admin, userId, draftId, expectedRevision, assetId,
+    leaseToken: publishIdempotencyKey,
+  })
+  try {
+    const { data, error } = await userClient.rpc('finalize_shadow_pin_creator_draft', {
+      target_draft_id: prepared.draft.id,
+      target_expected_revision: prepared.draft.revision,
+      target_publish_idempotency_key: publishIdempotencyKey,
+    })
+    if (error) throw error
+    const result = Array.isArray(data) ? data[0] : data
+    if (!result?.draft || !result?.image) throw new Error('Draft publish returned an invalid receipt.')
+    return {
+      draft: result.draft,
+      image: result.image,
+      wasAlreadyPublished: Boolean(result.was_already_published),
+      asset: prepared.asset,
+    }
+  } catch (error) {
+    await rollbackShadowPinDraftImagePublish({
+      admin, userId, draftId, assetId: prepared.asset.id,
+      leaseToken: publishIdempotencyKey,
+    }).catch(() => undefined)
+    throw error
+  }
+}
+
+export async function recoverExpiredShadowPinImagePromotions(admin, limit = 50) {
+  const { data: drafts, error } = await admin.from('shadow_pin_creator_drafts')
+    .select('id,creator_id,promotion_asset_id,promotion_lease_token')
+    .not('promotion_lease_token', 'is', null)
+    .lt('promotion_lease_expires_at', new Date().toISOString())
+    .order('promotion_lease_expires_at', { ascending: true })
+    .limit(Math.max(1, Math.min(Number(limit) || 50, 100)))
+  if (error) throw error
+  const failures = []
+  let recovered = 0
+  for (const draft of drafts || []) {
+    try {
+      await rollbackShadowPinDraftImagePublish({
+        admin,
+        userId: draft.creator_id,
+        draftId: draft.id,
+        assetId: draft.promotion_asset_id,
+        leaseToken: draft.promotion_lease_token,
+      })
+      recovered += 1
+    } catch (recoveryError) {
+      failures.push({
+        draftId: draft.id,
+        error: recoveryError instanceof Error ? recoveryError.message : 'Promotion recovery failed.',
+      })
+    }
+  }
+  return { scanned: (drafts || []).length, recovered, failures }
 }
 
 export async function deleteShadowPinDraftImageAssets({ admin, userId, draftId, assetId = null }) {

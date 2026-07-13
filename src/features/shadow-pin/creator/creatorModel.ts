@@ -46,11 +46,12 @@ export type ShadowPinCreatorState = {
   publishConfirmed: boolean
   dirtyRevision: number
   savedRevision: number
+  updatedAt: string
 }
 
 export type ShadowPinCreatorAction =
   | { type: 'restore-started' }
-  | { type: 'restored'; values: Partial<ShadowPinCreatorValues>; draft?: ShadowPinCreatorDraft | null; step?: ShadowPinCreatorStep; recovered?: boolean; clientMutationId?: string; targetImageId?: string | null }
+  | { type: 'restored'; values: Partial<ShadowPinCreatorValues>; draft?: ShadowPinCreatorDraft | null; step?: ShadowPinCreatorStep; recovered?: boolean; clientMutationId?: string; targetImageId?: string | null; dirtyRevision?: number; savedRevision?: number; updatedAt?: string }
   | { type: 'set-value'; key: keyof ShadowPinCreatorValues; value: ShadowPinCreatorValues[keyof ShadowPinCreatorValues] }
   | { type: 'set-file'; file: File | null }
   | { type: 'set-step'; step: ShadowPinCreatorStep }
@@ -91,6 +92,7 @@ export const createInitialCreatorState = (categoryId = '', targetImageId: string
   publishConfirmed: false,
   dirtyRevision: 0,
   savedRevision: 0,
+  updatedAt: new Date().toISOString(),
 })
 
 export const fingerprintCreatorFile = (file: File): CreatorFileFingerprint => ({
@@ -180,8 +182,9 @@ export const creatorReducer = (
         step: action.step ?? state.step,
         recovered: action.recovered ?? state.recovered,
         operation: 'idle',
-        dirtyRevision: action.draft?.revision ?? state.dirtyRevision,
-        savedRevision: action.draft?.revision ?? state.savedRevision,
+        dirtyRevision: action.dirtyRevision ?? action.draft?.revision ?? state.dirtyRevision,
+        savedRevision: action.savedRevision ?? action.draft?.revision ?? state.savedRevision,
+        updatedAt: action.updatedAt ?? action.draft?.updatedAt ?? state.updatedAt,
       }
     case 'set-value':
       return {
@@ -193,6 +196,7 @@ export const creatorReducer = (
             : action.value,
         },
         dirtyRevision: state.dirtyRevision + 1,
+        updatedAt: new Date().toISOString(),
         publishConfirmed: false,
         error: null,
       }
@@ -207,11 +211,12 @@ export const creatorReducer = (
           keepExistingMedia: false,
         },
         dirtyRevision: state.dirtyRevision + 1,
+        updatedAt: new Date().toISOString(),
         publishConfirmed: false,
         error: null,
       }
     case 'set-step':
-      return { ...state, step: action.step, error: null }
+      return { ...state, step: action.step, updatedAt: new Date().toISOString(), error: null }
     case 'operation':
       return {
         ...state,
@@ -226,7 +231,10 @@ export const creatorReducer = (
         targetImageId: action.draft.targetImageId,
         draft: action.draft,
         operation: 'saved',
-        savedRevision: action.savedRevision,
+        savedRevision: Math.max(state.savedRevision, action.savedRevision),
+        updatedAt: state.dirtyRevision > action.savedRevision
+          ? state.updatedAt
+          : action.draft.updatedAt || state.updatedAt,
         error: null,
       }
     case 'publish-confirmed':
@@ -244,23 +252,59 @@ export type CreatorLocalDraft = {
   clientMutationId: string
   step: ShadowPinCreatorStep
   values: Omit<ShadowPinCreatorValues, 'file'>
+  dirtyRevision: number
+  savedRevision: number
   updatedAt: string
 }
 
-export const serializeCreatorLocalDraft = (state: ShadowPinCreatorState): CreatorLocalDraft => ({
-  draftId: state.draft?.id ?? null,
-  targetImageId: state.targetImageId,
-  clientMutationId: state.clientMutationId,
-  step: state.step,
-  values: {
-    categoryId: state.values.categoryId,
-    title: state.values.title,
-    description: state.values.description,
-    tags: normalizeTags(state.values.tags),
-    sourceMode: state.values.sourceMode,
-    sourceUrl: state.values.sourceUrl,
-    fileFingerprint: state.values.fileFingerprint,
-    keepExistingMedia: state.values.keepExistingMedia,
-  },
-  updatedAt: new Date().toISOString(),
-})
+export const creatorLocalDraftHasUnsyncedChanges = (draft: CreatorLocalDraft) => (
+  draft.dirtyRevision > draft.savedRevision
+)
+
+const creatorTimestamp = (value: string) => {
+  const timestamp = Date.parse(value)
+  return Number.isFinite(timestamp) ? timestamp : 0
+}
+
+export const shouldPreferLocalCreatorDraft = (
+  local: CreatorLocalDraft,
+  server: ShadowPinCreatorDraft
+) => (
+  local.draftId === server.id && (
+    creatorLocalDraftHasUnsyncedChanges(local) ||
+    creatorTimestamp(local.updatedAt) > creatorTimestamp(server.updatedAt)
+  )
+)
+
+export const serializeCreatorLocalDraft = (state: ShadowPinCreatorState): CreatorLocalDraft => {
+  const hasLocalOnlyWork = !state.draft && Boolean(
+    state.values.sourceUrl.trim() ||
+    state.values.fileFingerprint ||
+    state.values.keepExistingMedia ||
+    state.values.title.trim() ||
+    state.values.description.trim()
+  )
+  return {
+    draftId: state.draft?.id ?? null,
+    targetImageId: state.targetImageId,
+    clientMutationId: state.clientMutationId,
+    step: state.step,
+    values: {
+      categoryId: state.values.categoryId,
+      title: state.values.title,
+      description: state.values.description,
+      tags: normalizeTags(state.values.tags),
+      sourceMode: state.values.sourceMode,
+      sourceUrl: state.values.sourceUrl,
+      fileFingerprint: state.values.fileFingerprint,
+      keepExistingMedia: state.values.keepExistingMedia,
+    },
+    // A failed first server save still has no draft receipt. Persist it dirty
+    // so reopening Studio automatically retries instead of treating it clean.
+    dirtyRevision: hasLocalOnlyWork && state.dirtyRevision <= state.savedRevision
+      ? state.savedRevision + 1
+      : state.dirtyRevision,
+    savedRevision: state.savedRevision,
+    updatedAt: state.updatedAt,
+  }
+}

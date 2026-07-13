@@ -2,12 +2,16 @@
 
 ## Status
 
-Wave Two Candidate 3 is implemented locally on `codex/shadowchat-2.0` as of
-July 12, 2026. The production `main` frontend and production Netlify site
-remain unchanged. Seven focused model, history, API, component, lazy-entry,
-media, and SQL contract suites pass locally with 32 tests. A fresh local database replay, rollback
-verifier, database lint, and security-advisor pass also succeed; linked-backend,
-cross-account browser, deployment, and physical-device proof remain open.
+Wave Two Candidate 3 is implemented and locally hardened on
+`codex/shadowchat-2.0` as of July 13, 2026. The production `main` frontend and
+production Netlify site remain unchanged. Seven focused model, history, API,
+component, lazy-entry, media, and SQL contract suites pass locally with 46
+tests; the broader Candidate 3 route/ShadowPin set passes 9 suites and 107
+tests. The hardening backend gate also passes a fresh local reset, expanded
+rollback verifier, database lint/advisors, Deno/Node checks, and 3 focused
+suites with 21 tests. Linked-backend alignment, cross-account browser,
+deployment, and physical-device proof remain release-gate checks until
+separately recorded.
 
 ## Product Contract
 
@@ -85,14 +89,20 @@ Clients read an owner-filtered projection but cannot forge ready state,
 provider ids, storage paths, processing results, or publication links.
 
 Staged images and derivatives live in the private `shadow-pin-drafts` bucket
-and use ten-minute owner-authorized signed preview URLs. Immediately before an
-image finalization request, a bounded server action promotes its prepared
-objects to canonical public paths and marks the asset `publish_ready`; a failed
-finalization retries idempotently and then rolls back unreferenced promoted
-objects. Native video keeps the existing Bunny TUS limits and resume behavior,
-but its server-issued session and asset identity belong to the draft.
-Expiry/abandon cleanup removes private Storage objects and eligible Bunny
-assets without touching a published Pin.
+and use ten-minute owner-authorized signed preview URLs. Image publication is
+one authenticated server request: it claims a three-minute promotion lease, copies
+the prepared objects to canonical paths, finalizes the Pin transaction, and
+rolls back unreferenced public objects on failure. A scheduled ten-minute
+janitor recovers expired promotion leases if the request or client disappears
+mid-flight. The older prepare/rollback actions remain compatibility-only.
+
+Native video keeps the existing Bunny TUS limits and resume behavior, but its
+server-issued session and asset identity belong to the draft. Direct Bunny
+preview, playback, HLS, and embed URLs remain null while the draft is private;
+the device-local file supplies the immediate preview. The publish action
+verifies Bunny readiness, computes canonical URLs server-side, and finalizes
+through one authenticated transaction. Expiry/abandon cleanup removes private
+Storage objects and eligible Bunny assets without touching a published Pin.
 
 ### Idempotent finalization
 
@@ -119,15 +129,21 @@ asset states are `reserved`, `uploading`, `processing`, `ready`,
 the active asset to be `publish_ready`, the caller's expected draft revision,
 and the draft idempotency key.
 
+Replacement drafts also capture the target Pin's `updated_at` value on the
+server. Finalization locks the target and rejects the swap if that value has
+changed, so a stale Studio tab cannot overwrite a newer edit.
+
 ### Client model
 
 The Creator Studio feature is lazy-loaded. A typed reducer/model owns the four
 stages, validation, dirty/autosave state, upload progress, recoverable errors,
-and publish success. Request versions prevent late autosave responses from
-replacing newer local state. A device-local snapshot may provide immediate
-offline resilience, but the owner-private server draft is authoritative once
-synced. Browser `File` objects are never described as persistable; if an asset
-was not staged before reload, the Studio explicitly requests reselection.
+and publish success. Device snapshots persist dirty/saved revisions and a
+timestamp. A newer unsynced matching snapshot wins recovery over an older
+server receipt; late save responses are scoped to one draft and cannot replace
+newer local state. Back/close persists locally and attempts a server flush,
+while switching drafts flushes the outgoing context before the incoming draft
+is rendered. Browser `File` objects are never described as persistable; if an
+asset was not staged before reload, the Studio explicitly requests reselection.
 
 Studio history uses its own marker. An in-app open pushes one Studio entry and
 closing it uses Back. A cold `?studio=creator` route is replace-marked and
@@ -143,9 +159,14 @@ tags, and source URLs never enter the address bar.
   path, processing, ready, published, or cleanup fields directly.
 - The staging bucket is private, accepts only the established MIME/size limits,
   and exposes previews through short owner-authorized signed URLs.
+- Native Bunny drafts expose no direct provider playback URL before the
+  authenticated publish transaction.
 - Server media paths recheck the authenticated user, draft ownership,
   creator/operator edit authority, category availability, rate limits, and
   target optimistic version at every sensitive transition.
+- Per-action image/video budgets, a 32-generation ceiling, and active-asset
+  caps of four per draft and 40 per user bound provider, CPU, and Storage work
+  independently of the draft count.
 - Public URL import retains safe-fetch redirect, DNS/IP, MIME, and byte-limit
   protections. Provider credentials and service-role keys remain server-only.
 - Autosave does not consume the public 12-per-minute or 100-per-day post
@@ -240,8 +261,10 @@ VoiceOver, and TalkBack. Automated WebKit is not that certification.
 - Cleanup workers must distinguish abandoned staged assets from canonical live
   assets and fail closed on uncertain ownership/publication state.
 
-Canonical backend migration:
-`supabase/migrations/20260713003323_shadow_pin_creator_studio_backend.sql`.
+Canonical backend migrations:
+
+- `supabase/migrations/20260713003323_shadow_pin_creator_studio_backend.sql`
+- `supabase/migrations/20260713042749_shadow_pin_creator_studio_hardening.sql`
 
 Canonical member RPCs:
 

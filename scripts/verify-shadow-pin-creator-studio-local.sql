@@ -349,6 +349,231 @@ $$;
 
 reset role;
 
+-- A replacement draft captures the target version and refuses to overwrite a
+-- canonical Pin that changed after the draft began.
+insert into public.shadow_pin_images (
+  id,category_id,creator_id,title,image_url,image_path,processing_status,
+  processed_at,media_type,source_type,provider
+) values (
+  '64000000-0000-0000-0000-000000000602',
+  '61000000-0000-0000-0000-000000000601',
+  '00000000-0000-0000-0000-000000000601',
+  'Versioned pin','https://example.test/version-1.webp','versioned/v1.webp',
+  'ready',now(),'image','file_upload','shadow_pin_storage'
+);
+
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000601',true);
+select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000601","role":"authenticated"}',true);
+set local role authenticated;
+do $$
+declare bundle jsonb;
+begin
+  bundle := public.create_shadow_pin_creator_draft(
+    '61000000-0000-0000-0000-000000000601','Stale replacement','',array[]::text[],
+    'image_upload','64000000-0000-0000-0000-000000000602',
+    '62000000-0000-0000-0000-000000000606'
+  );
+  if bundle->'draft'->>'target_image_updated_at' is null then
+    raise exception 'Replacement draft did not capture target updated_at';
+  end if;
+end
+$$;
+reset role;
+
+insert into public.shadow_pin_draft_assets (
+  id,draft_id,creator_id,generation,asset_kind,provider,state,
+  final_image_url,final_image_path,content_type,size_bytes
+)
+select '63000000-0000-0000-0000-000000000606',id,creator_id,2,
+  'image','shadow_pin_storage','publish_ready',
+  'https://example.test/stale-replacement.webp','final/stale-replacement.webp','image/webp',1024
+from public.shadow_pin_creator_drafts
+where client_mutation_id='62000000-0000-0000-0000-000000000606';
+update public.shadow_pin_creator_drafts set
+  active_asset_id='63000000-0000-0000-0000-000000000606',state='publish_ready'
+where client_mutation_id='62000000-0000-0000-0000-000000000606';
+update public.shadow_pin_images set title='Edited elsewhere'
+where id='64000000-0000-0000-0000-000000000602';
+
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000601',true);
+select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000601","role":"authenticated"}',true);
+set local role authenticated;
+do $$
+declare draft_row public.shadow_pin_creator_drafts%rowtype; failure_message text;
+begin
+  select * into draft_row from public.shadow_pin_creator_drafts
+  where client_mutation_id='62000000-0000-0000-0000-000000000606';
+  begin
+    perform public.finalize_shadow_pin_creator_draft(
+      draft_row.id,draft_row.revision,draft_row.publish_idempotency_key
+    );
+    raise exception 'Stale replacement finalize was accepted';
+  exception when others then
+    get stacked diagnostics failure_message = message_text;
+    if failure_message <> 'Target Pin changed after this draft was created' then raise; end if;
+  end;
+end
+$$;
+reset role;
+
+-- Image promotion leases are exclusive, expire, and can be recovered. Active
+-- assets and lifetime generations are bounded in the database under races.
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000601',true);
+select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000601","role":"authenticated"}',true);
+set local role authenticated;
+do $$
+begin
+  perform public.create_shadow_pin_creator_draft(
+    '61000000-0000-0000-0000-000000000601','Lease draft','',array[]::text[],
+    'image_upload',null,'62000000-0000-0000-0000-000000000607'
+  );
+end
+$$;
+reset role;
+
+insert into public.shadow_pin_draft_assets (
+  id,draft_id,creator_id,generation,asset_kind,provider,state,
+  storage_bucket,original_path,thumbnail_path,medium_path,content_type,size_bytes
+)
+select '63000000-0000-0000-0000-000000000607',id,creator_id,1,
+  'image','shadow_pin_storage','ready','shadow-pin-drafts',
+  creator_id||'/'||id||'/original.webp','private/thumb.webp','private/medium.webp','image/webp',1024
+from public.shadow_pin_creator_drafts
+where client_mutation_id='62000000-0000-0000-0000-000000000607';
+update public.shadow_pin_creator_drafts set
+  active_asset_id='63000000-0000-0000-0000-000000000607',state='ready'
+where client_mutation_id='62000000-0000-0000-0000-000000000607';
+
+do $$
+declare
+  draft_row public.shadow_pin_creator_drafts%rowtype;
+  claimed jsonb;
+  denied boolean := false;
+begin
+  select * into draft_row from public.shadow_pin_creator_drafts
+  where client_mutation_id='62000000-0000-0000-0000-000000000607';
+  claimed := public.claim_shadow_pin_image_promotion(
+    draft_row.creator_id,draft_row.id,draft_row.revision,
+    '63000000-0000-0000-0000-000000000607',
+    '65000000-0000-0000-0000-000000000607',180
+  );
+  if claimed->>'state' <> 'preparing_publish' then raise exception 'Promotion lease was not claimed'; end if;
+  begin
+    perform public.claim_shadow_pin_image_promotion(
+      draft_row.creator_id,draft_row.id,(claimed->>'revision')::integer,
+      '63000000-0000-0000-0000-000000000607',
+      '65000000-0000-0000-0000-000000000608',180
+    );
+  exception when others then denied := true; end;
+  if not denied then raise exception 'Concurrent promotion lease was accepted'; end if;
+
+  update public.shadow_pin_creator_drafts set promotion_lease_expires_at=now()-interval '1 minute'
+  where id=draft_row.id;
+  select * into draft_row from public.shadow_pin_creator_drafts where id=draft_row.id;
+  claimed := public.claim_shadow_pin_image_promotion(
+    draft_row.creator_id,draft_row.id,draft_row.revision,
+    '63000000-0000-0000-0000-000000000607',
+    '65000000-0000-0000-0000-000000000608',180
+  );
+  perform public.release_shadow_pin_image_promotion(
+    draft_row.creator_id,draft_row.id,
+    '65000000-0000-0000-0000-000000000608','ready'
+  );
+  if exists (
+    select 1 from public.shadow_pin_creator_drafts
+    where id=draft_row.id and promotion_lease_token is not null
+  ) then raise exception 'Promotion lease was not released'; end if;
+
+  insert into public.shadow_pin_draft_assets (
+    id,draft_id,creator_id,generation,asset_kind,provider,state,content_type
+  ) values
+    ('63000000-0000-0000-0000-000000000617',draft_row.id,draft_row.creator_id,2,'image','shadow_pin_storage','ready','image/webp'),
+    ('63000000-0000-0000-0000-000000000627',draft_row.id,draft_row.creator_id,3,'image','shadow_pin_storage','ready','image/webp'),
+    ('63000000-0000-0000-0000-000000000637',draft_row.id,draft_row.creator_id,4,'image','shadow_pin_storage','ready','image/webp');
+  denied := false;
+  begin
+    insert into public.shadow_pin_draft_assets (
+      id,draft_id,creator_id,generation,asset_kind,provider,state,content_type
+    ) values (
+      '63000000-0000-0000-0000-000000000647',draft_row.id,draft_row.creator_id,5,
+      'image','shadow_pin_storage','ready','image/webp'
+    );
+  exception when others then denied := true; end;
+  if not denied then raise exception 'Fifth active draft asset was accepted'; end if;
+
+  denied := false;
+  begin
+    insert into public.shadow_pin_draft_assets (
+      id,draft_id,creator_id,generation,asset_kind,provider,state,content_type
+    ) values (
+      '63000000-0000-0000-0000-000000000657',draft_row.id,draft_row.creator_id,33,
+      'image','shadow_pin_storage','failed','image/webp'
+    );
+  exception when others then denied := true; end;
+  if not denied then raise exception 'Generation 33 was accepted'; end if;
+end
+$$;
+
+-- Bunny playback remains absent from the owner-visible draft row until the
+-- authenticated transactional Bunny finalizer publishes the canonical Pin.
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000601',true);
+select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000601","role":"authenticated"}',true);
+set local role authenticated;
+do $$
+begin
+  perform public.create_shadow_pin_creator_draft(
+    '61000000-0000-0000-0000-000000000601','Private Bunny draft','',array[]::text[],
+    'video_upload',null,'62000000-0000-0000-0000-000000000608'
+  );
+end
+$$;
+reset role;
+insert into public.shadow_pin_draft_assets (
+  id,draft_id,creator_id,generation,asset_kind,provider,state,
+  final_image_url,final_image_path,provider_asset_id,provider_playback_id,
+  video_preview_url,video_playback_url,video_hls_url,video_embed_url,content_type,size_bytes
+)
+select '63000000-0000-0000-0000-000000000608',id,creator_id,1,
+  'video','bunny_stream','ready','/video-poster.webp','bunny:private:poster',
+  'bunny-private-asset','bunny-private-asset',null,null,null,null,'image/webp',2048
+from public.shadow_pin_creator_drafts
+where client_mutation_id='62000000-0000-0000-0000-000000000608';
+update public.shadow_pin_creator_drafts set
+  active_asset_id='63000000-0000-0000-0000-000000000608',state='ready'
+where client_mutation_id='62000000-0000-0000-0000-000000000608';
+
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000601',true);
+select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000601","role":"authenticated"}',true);
+set local role authenticated;
+do $$
+declare draft_row public.shadow_pin_creator_drafts%rowtype; result_row record; denied boolean := false;
+begin
+  select * into draft_row from public.shadow_pin_creator_drafts
+  where client_mutation_id='62000000-0000-0000-0000-000000000608';
+  if exists (
+    select 1 from public.shadow_pin_draft_assets where id=draft_row.active_asset_id
+      and coalesce(video_preview_url,video_playback_url,video_hls_url,video_embed_url) is not null
+  ) then raise exception 'Unpublished Bunny draft exposed playback URLs'; end if;
+  begin
+    perform public.finalize_shadow_pin_creator_draft(
+      draft_row.id,draft_row.revision,draft_row.publish_idempotency_key
+    );
+  exception when others then denied := true; end;
+  if not denied then raise exception 'Regular finalizer published a private Bunny draft'; end if;
+
+  select * into result_row from public.finalize_shadow_pin_creator_bunny_draft(
+    draft_row.id,draft_row.revision,draft_row.publish_idempotency_key,draft_row.active_asset_id,
+    'https://cdn.example.test/preview.mp4','https://cdn.example.test/playback.mp4',
+    'https://cdn.example.test/playlist.m3u8','https://player.example.test/embed'
+  );
+  if result_row.image->>'video_embed_url' <> 'https://player.example.test/embed'
+    or result_row.image->>'provider_asset_id' <> 'bunny-private-asset' then
+    raise exception 'Transactional Bunny finalizer did not publish playback';
+  end if;
+end
+$$;
+reset role;
+
 do $$
 begin
   if (select public from storage.buckets where id='shadow-pin-drafts') then
